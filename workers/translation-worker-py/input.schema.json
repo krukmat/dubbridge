@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TranslationWorkerInput",
+  "type": "object",
+  "required": ["job_id", "source_transcript_uri", "target_language"],
+  "properties": {
+    "job_id": { "type": "string" },
+    "source_transcript_uri": { "type": "string" },
+    "target_language": { "type": "string" }
+  },
+  "additionalProperties": false
+}

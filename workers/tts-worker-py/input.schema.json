@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TtsWorkerInput",
+  "type": "object",
+  "required": ["job_id", "translated_segments_uri", "voice_profile_id"],
+  "properties": {
+    "job_id": { "type": "string" },
+    "translated_segments_uri": { "type": "string" },
+    "voice_profile_id": { "type": "string" }
+  },
+  "additionalProperties": false
+}

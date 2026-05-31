@@ -1,0 +1,21 @@
+[package]
+name = "dubbridge-storage"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+tokio = { workspace = true, features = ["fs"] }
+async-trait = "0.1"
+thiserror = "2.0"
+uuid.workspace = true
+serde = { workspace = true, features = ["derive"] }
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+temp-env = "0.3"
+
+[lints]
+workspace = true

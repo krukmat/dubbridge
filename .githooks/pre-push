@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "pre-push: cargo is required to run the coverage gate" >&2
+  exit 1
+fi
+
+if ! cargo llvm-cov --version >/dev/null 2>&1; then
+  echo "pre-push: cargo-llvm-cov is not installed." >&2
+  echo "Install it with: cargo install cargo-llvm-cov" >&2
+  exit 1
+fi
+
+echo "pre-push: enforcing 90% line coverage"
+cargo llvm-cov --workspace --summary-only --fail-under-lines 90

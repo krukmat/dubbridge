@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AsrWorkerInput",
+  "type": "object",
+  "required": ["job_id", "audio_uri", "language_hint"],
+  "properties": {
+    "job_id": { "type": "string" },
+    "audio_uri": { "type": "string" },
+    "language_hint": { "type": "string" }
+  },
+  "additionalProperties": false
+}

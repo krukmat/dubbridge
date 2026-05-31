@@ -1,0 +1,11 @@
+/target
+# Cargo.lock is intentionally committed: this workspace ships binaries
+# (apps/api, apps/cli, apps/worker-runner) and needs reproducible builds.
+.DS_Store
+.env
+.env.*
+.next
+node_modules
+dist
+coverage
+tmp

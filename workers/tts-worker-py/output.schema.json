@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TtsWorkerOutput",
+  "type": "object",
+  "required": ["job_id", "segments_uri", "merged_audio_uri", "status"],
+  "properties": {
+    "job_id": { "type": "string" },
+    "segments_uri": { "type": "string" },
+    "merged_audio_uri": { "type": "string" },
+    "status": { "type": "string", "enum": ["ok"] }
+  },
+  "additionalProperties": false
+}

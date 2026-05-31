@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TranslationWorkerOutput",
+  "type": "object",
+  "required": ["job_id", "subtitle_uri", "translation_uri", "status"],
+  "properties": {
+    "job_id": { "type": "string" },
+    "subtitle_uri": { "type": "string" },
+    "translation_uri": { "type": "string" },
+    "status": { "type": "string", "enum": ["ok"] }
+  },
+  "additionalProperties": false
+}

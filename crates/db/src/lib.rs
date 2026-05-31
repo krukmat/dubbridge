@@ -1,0 +1,20 @@
+// T3: S1 db crate — pool factory and repository modules
+pub mod artifact_repo;
+pub mod asset_repo;
+pub mod audit_repo;
+pub mod error;
+pub mod pending_ingestion_repo;
+pub mod rights_repo;
+
+use sqlx::PgPool;
+use sqlx::postgres::PgPoolOptions;
+
+use crate::error::DbError;
+
+pub async fn create_pool(database_url: &str) -> Result<PgPool, DbError> {
+    PgPoolOptions::new()
+        .max_connections(10)
+        .connect(database_url)
+        .await
+        .map_err(DbError::ConnectionFailed)
+}

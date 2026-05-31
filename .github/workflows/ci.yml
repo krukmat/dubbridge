@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+
+jobs:
+  cargo-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run cargo check
+        run: cargo check --workspace
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Enforce 90% line coverage
+        # Excluded paths (--ignore-filename-regex):
+        #   apps/api/src/main.rs        — binary startup wiring; fails loudly at boot
+        #   apps/cli/src/main.rs        — skeleton binary, no logic
+        #   apps/worker-runner/src/main.rs — skeleton binary, no logic
+        #   crates/db/src/lib.rs        — thin sqlx pool factory; requires live DB
+        #   crates/jobs/src/lib.rs      — default_queue() returns a string literal
+        #   crates/observability/src/lib.rs — init_tracing() with let _ = try_init()
+        run: |
+          cargo llvm-cov --workspace --summary-only --fail-under-lines 90 \
+            --ignore-filename-regex '(apps/(api|cli|worker-runner)/src/main\.rs|crates/(db|jobs|observability)/src/lib\.rs)'

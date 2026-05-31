@@ -1,0 +1,14 @@
+[package]
+name = "dubbridge-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+tokio.workspace = true
+dubbridge-config = { path = "../../crates/config" }
+dubbridge-observability = { path = "../../crates/observability" }
+
+[lints]
+workspace = true

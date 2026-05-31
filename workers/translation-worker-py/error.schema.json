@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TranslationWorkerError",
+  "type": "object",
+  "required": ["job_id", "error_code", "message"],
+  "properties": {
+    "job_id": { "type": "string" },
+    "error_code": { "type": "string" },
+    "message": { "type": "string" }
+  },
+  "additionalProperties": false
+}

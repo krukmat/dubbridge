@@ -1,0 +1,17 @@
+[package]
+name = "dubbridge-worker-runner"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+apalis.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+dubbridge-config = { path = "../../crates/config" }
+dubbridge-jobs = { path = "../../crates/jobs" }
+dubbridge-observability = { path = "../../crates/observability" }
+
+[lints]
+workspace = true

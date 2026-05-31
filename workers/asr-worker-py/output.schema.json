@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AsrWorkerOutput",
+  "type": "object",
+  "required": ["job_id", "transcript_uri", "alignment_uri", "status"],
+  "properties": {
+    "job_id": { "type": "string" },
+    "transcript_uri": { "type": "string" },
+    "alignment_uri": { "type": "string" },
+    "status": { "type": "string", "enum": ["ok"] }
+  },
+  "additionalProperties": false
+}
