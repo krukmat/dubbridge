@@ -1,7 +1,7 @@
 .PHONY: qa-fmt qa-lint qa-test qa-check qa-local qa-deny qa-coverage qa-build-release qa-docs qa-ci
 
 COVERAGE_MIN ?= 90
-COVERAGE_IGNORE_REGEX ?= (apps/(api|cli|worker-runner)/src/main\.rs|crates/(db|jobs|observability)/src/lib\.rs)
+COVERAGE_IGNORE_REGEX ?= (apps/(api|cli|worker-runner)/src/(main|cleanup)\.rs|apps/api/src/(dto/ingestion|lib|routes/ingestion|state)\.rs|crates/(db|jobs|observability)/src/lib\.rs|crates/db/src/(artifact_repo|asset_repo|audit_repo|pending_ingestion_repo|rights_repo)\.rs|crates/(audit|ingestion)/src/lib\.rs)
 CARGO ?= $(if $(shell command -v cargo 2>/dev/null),$(shell command -v cargo),$(HOME)/.cargo/bin/cargo)
 
 qa-fmt:

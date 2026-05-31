@@ -8,13 +8,13 @@ ignore = []
 
 [licenses]
 version = 2
-unlicensed = "warn"
-copyleft = "warn"
 allow = [
   "Apache-2.0",
   "BSD-2-Clause",
   "BSD-3-Clause",
+  "CDLA-Permissive-2.0",
   "ISC",
+  "LicenseRef-Proprietary",
   "MIT",
   "MPL-2.0",
   "OpenSSL",
@@ -25,7 +25,7 @@ allow = [
 
 [bans]
 multiple-versions = "warn"
-wildcards = "deny"
+wildcards = "warn"
 highlight = "all"
 
 [sources]

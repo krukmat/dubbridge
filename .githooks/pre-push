@@ -87,7 +87,7 @@ if [ "$RUST_CHANGED" -eq 1 ]; then
   if [ "$DEPENDENCY_CHANGED" -eq 1 ]; then
     if ! "$CARGO_BIN" deny --version >/dev/null 2>&1; then
       echo "pre-push: cargo-deny is required when dependency manifests change" >&2
-      echo "Install it with: cargo install cargo-deny --version 0.18.4 --locked" >&2
+      echo "Install it with: cargo install cargo-deny --version 0.19.4 --locked" >&2
       exit 1
     fi
 
