@@ -322,10 +322,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
+ "dubbridge-audit",
  "dubbridge-auth",
  "dubbridge-config",
  "dubbridge-db",
  "dubbridge-domain",
+ "dubbridge-ingestion",
  "dubbridge-observability",
  "dubbridge-storage",
  "serde",
@@ -346,6 +348,13 @@ dependencies = [
 [[package]]
 name = "dubbridge-audit"
 version = "0.1.0"
+dependencies = [
+ "dubbridge-db",
+ "dubbridge-domain",
+ "sqlx",
+ "thiserror",
+ "tracing",
+]
 
 [[package]]
 name = "dubbridge-auth"
@@ -399,6 +408,20 @@ dependencies = [
  "serde",
  "thiserror",
  "time",
+ "uuid",
+]
+
+[[package]]
+name = "dubbridge-ingestion"
+version = "0.1.0"
+dependencies = [
+ "dubbridge-audit",
+ "dubbridge-db",
+ "dubbridge-domain",
+ "sqlx",
+ "thiserror",
+ "time",
+ "tracing",
  "uuid",
 ]
 

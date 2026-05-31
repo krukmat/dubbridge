@@ -53,7 +53,8 @@ state may be reached without explicit, valid rights basis.
 - `config.rs` — StorageConfig (bucket, endpoint, prefix)
 
 ### crates/audit/src/
-- `lib.rs` — AuditLogger struct wrapping audit_repo writes + tracing spans
+- `lib.rs` — historical intended `AuditLogger` location. T1-T5 removed the
+  conflicting placeholder type; H1 now owns the shared durable-emission boundary.
 
 ### apps/api/src/
 - `main.rs` — add ingestion router, inject AppState
@@ -96,13 +97,15 @@ the `assets:ingest` scope, and asset reads require `assets:read`. The API derive
 `AuthenticatedPrincipal.subject_id`; request DTOs must not accept a caller-supplied
 `uploader_id`.
 
-### IngestionStatus state machine
+### Upload-ingestion lifecycle
 ```
-Pending -> Finalized (success path)
-Pending -> RejectedMissingRights (validation failure)
+pending_ingestions row -> rights attached -> finalized asset (success path)
+pending_ingestions row -> HTTP 422 + durable audit -> retryable until TTL (validation failure)
 ```
-Processing-ready states (ReadyForProbe, ReadyForTranscode, etc.) are intentionally
-absent from this slice. Downstream slices add transitions explicitly.
+The asset schema retains rejected-status variants for future aggregate workflows,
+but the S1 HTTP upload path creates no asset on validation failure. Processing-ready
+states (`ReadyForProbe`, `ReadyForTranscode`, etc.) remain intentionally absent from
+this slice. Downstream slices add transitions explicitly.
 
 ### Storage adapter boundary
 `StorageAdapter` is a trait with `put` / `get` / `delete` / `object_url`. The
@@ -123,12 +126,14 @@ token rejection. Written to `audit_events` table and also logged via `tracing::i
 ## Module Dependencies
 
 ```
-apps/api → crates/domain, crates/db, crates/storage, crates/auth, crates/audit, crates/config, crates/observability
+apps/api → crates/domain, crates/db, crates/storage, crates/auth, crates/config, crates/observability
 crates/db → crates/domain, crates/config
 crates/storage → crates/config
-crates/audit → crates/domain, crates/db
 crates/domain → (no internal deps)
 ```
+
+`crates/audit` is currently a reserved empty namespace. H1 decides the shared audit
+wrapper dependency graph before S3 adds recording lifecycle events.
 
 ## Lines Affected After Implementation
 

@@ -1,8 +1,16 @@
 # ADR-019: Stream recording engine — FFmpeg subprocess orchestration
 
-- **Status:** Proposed
+- **Status:** Proposed — **scope narrowed to the S3b live-recording sub-case
+  (2026-05-31 replan)**
 - **Date:** 2026-05-31
 - **Deciders:** DubBridge platform team
+
+> **2026-05-31 scope note (S3 replan, see ADR-025).** The primary S3 intake path is
+> now owner-authorized **platform download** (ADR-025), not RTMP/SRT live capture.
+> The FFmpeg-subprocess decision in this ADR remains valid and unchanged, but it now
+> governs the **deferred S3b live-recording sub-case** only. It is not on the
+> primary S3 critical path. No technical decision here is reversed; only its slice
+> placement changes.
 
 ## Context
 
@@ -42,6 +50,10 @@ engineering reference, but it is a separate Go service.
   used.** Competitive/reference material stays internal (not for publication).
 - FFmpeg is consumed **only via subprocess** (no linked GPL libraries). Builds must
   remain within FFmpeg's LGPL configuration; GPL-only components are not used.
+- Before recorder implementation, S3 Task T0c validates the concrete FFmpeg
+  segmentation, graceful-stop, recovery, and output-artifact shape with a local
+  synthetic-source spike. The subprocess decision is fixed; the v1 output contract
+  is not.
 - **GStreamer (`gstreamer-rs`)** is recorded as the sanctioned **future upgrade
   path** for in-process, low-latency pipelines, behind the same `crates/recorder`
   trait, if/when subprocess overhead or control granularity becomes a constraint.

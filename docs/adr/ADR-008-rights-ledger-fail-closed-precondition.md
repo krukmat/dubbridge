@@ -22,9 +22,11 @@ proceed by default.
   command. Rights are validated **before** uploader context, because rights are
   the primary legal precondition. See
   `crates/domain/src/ingestion.rs::FinalizeIngestionCommand::validate`.
-- Rejections are explicit terminal states on the asset
-  (`rejected_missing_rights`, `rejected_missing_uploader_context`) and are mapped
-  to HTTP `422` at the API.
+- Upload finalization rejection creates no asset and maps to HTTP `422`. The durable
+  pending-ingestion session remains amendable until TTL expiry so a caller can
+  attach corrected rights and retry. Any source that persists an aggregate before
+  capture or processing (for example S3 recording sessions) records an explicit
+  terminal rejected state.
 - A persisted **`rights_records`** row is written for every finalized asset; the
   ledger is auditable and immutable.
 - `IngestionStatus` deliberately has **no processing-ready variant** until a slice
@@ -58,3 +60,7 @@ proceed by default.
 - ADR-021 (recording-to-asset bridge) — recorded streams reuse this exact gate.
 - Implemented by: `crates/domain/src/{ingestion,rights,asset}.rs`,
   `infra/migrations/0002_create_rights_records.sql`.
+
+> Implementation note: H1 adds database-backed append-only enforcement for
+> `rights_records`. Repository conventions alone are not sufficient to guarantee an
+> immutable ledger against direct SQL mutation.

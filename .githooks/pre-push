@@ -1,16 +1,96 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if ! command -v cargo >/dev/null 2>&1; then
-  echo "pre-push: cargo is required to run the coverage gate" >&2
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
+
+CARGO_BIN="${CARGO:-$(command -v cargo 2>/dev/null || true)}"
+if [ -z "$CARGO_BIN" ] && [ -x "$HOME/.cargo/bin/cargo" ]; then
+  CARGO_BIN="$HOME/.cargo/bin/cargo"
+fi
+
+if [ -z "$CARGO_BIN" ]; then
+  echo "pre-push: cargo is required to run Rust QA gates" >&2
   exit 1
 fi
 
-if ! cargo llvm-cov --version >/dev/null 2>&1; then
-  echo "pre-push: cargo-llvm-cov is not installed." >&2
-  echo "Install it with: cargo install cargo-llvm-cov" >&2
+if ! command -v make >/dev/null 2>&1; then
+  echo "pre-push: make is required to run Rust QA gates" >&2
   exit 1
 fi
 
-echo "pre-push: enforcing 90% line coverage"
-cargo llvm-cov --workspace --summary-only --fail-under-lines 90
+UPSTREAM_REF="$(git rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2>/dev/null || true)"
+
+if [ -n "$UPSTREAM_REF" ]; then
+  DIFF_RANGE="${UPSTREAM_REF}...HEAD"
+else
+  DEFAULT_REMOTE="$(git remote 2>/dev/null | head -n 1)"
+  DEFAULT_BRANCH="$(git symbolic-ref "refs/remotes/${DEFAULT_REMOTE}/HEAD" 2>/dev/null | sed "s@^refs/remotes/${DEFAULT_REMOTE}/@@")"
+  if [ -n "${DEFAULT_REMOTE:-}" ] && [ -n "${DEFAULT_BRANCH:-}" ] && git rev-parse "${DEFAULT_REMOTE}/${DEFAULT_BRANCH}" >/dev/null 2>&1; then
+    DIFF_RANGE="${DEFAULT_REMOTE}/${DEFAULT_BRANCH}...HEAD"
+  elif git rev-parse HEAD~1 >/dev/null 2>&1; then
+    DIFF_RANGE="HEAD~1...HEAD"
+  else
+    DIFF_RANGE=""
+  fi
+fi
+
+if [ -n "$DIFF_RANGE" ]; then
+  CHANGED_FILES="$(git diff --name-only "$DIFF_RANGE" 2>/dev/null || true)"
+else
+  CHANGED_FILES="$(git diff-tree --no-commit-id --name-only -r HEAD 2>/dev/null || true)"
+fi
+
+RUST_CHANGED=0
+DEPENDENCY_CHANGED=0
+DOCS_CHANGED=0
+
+if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(Cargo\.toml$|Cargo\.lock$|rust-toolchain\.toml$|\.cargo/|build\.rs$|src/|tests/|benches/|examples/|crates/|apps/|deny\.toml$|\.clippy\.toml$|tarpaulin\.toml$|Makefile$|justfile$|\.github/workflows/|\.githooks/)'; then
+  RUST_CHANGED=1
+fi
+
+if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(docs/adr/|docs/architecture\.md$|docs/plan/|docs/tasks/|README\.md$|docs/playbooks/|Makefile$|\.github/workflows/|\.githooks/)'; then
+  DOCS_CHANGED=1
+fi
+
+if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(Cargo\.toml$|Cargo\.lock$|apps/.+/Cargo\.toml$|crates/.+/Cargo\.toml$)'; then
+  DEPENDENCY_CHANGED=1
+fi
+
+if [ "$RUST_CHANGED" -eq 0 ] && [ "$DOCS_CHANGED" -eq 0 ]; then
+  if [ -n "$DIFF_RANGE" ]; then
+    echo "pre-push: no Rust- or docs-impacting changes detected in $DIFF_RANGE, skipping QA"
+  else
+    echo "pre-push: no Rust- or docs-impacting changes detected, skipping QA"
+  fi
+  exit 0
+fi
+
+if [ "$DOCS_CHANGED" -eq 1 ]; then
+  if [ -n "$DIFF_RANGE" ]; then
+    echo "pre-push: canonical docs changed in $DIFF_RANGE"
+  else
+    echo "pre-push: canonical docs changed"
+  fi
+  make qa-docs
+fi
+
+if [ "$RUST_CHANGED" -eq 1 ]; then
+  if [ -n "$DIFF_RANGE" ]; then
+    echo "pre-push: Rust-impacting changes detected in $DIFF_RANGE"
+  else
+    echo "pre-push: Rust-impacting changes detected"
+  fi
+
+  make qa-local
+
+  if [ "$DEPENDENCY_CHANGED" -eq 1 ]; then
+    if ! "$CARGO_BIN" deny --version >/dev/null 2>&1; then
+      echo "pre-push: cargo-deny is required when dependency manifests change" >&2
+      echo "Install it with: cargo install cargo-deny --version 0.18.4 --locked" >&2
+      exit 1
+    fi
+
+    make qa-deny
+  fi
+fi

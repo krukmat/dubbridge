@@ -139,10 +139,10 @@ fn validate_times(
         return Err(TokenVerificationError::Expired);
     }
 
-    if let Some(nbf) = nbf {
-        if now.saturating_add(leeway) < nbf {
-            return Err(TokenVerificationError::NotYetValid);
-        }
+    if let Some(nbf) = nbf
+        && now.saturating_add(leeway) < nbf
+    {
+        return Err(TokenVerificationError::NotYetValid);
     }
 
     Ok(())

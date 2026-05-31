@@ -86,7 +86,7 @@ Implement repository functions in `crates/db/src/`:
 - `audit_repo.rs`: `insert_audit_event`
 
 ### Acceptance criteria
-- All functions use `sqlx::query!` or `sqlx::query_as!` (not raw strings)
+- All functions use SQLx query APIs and typed row mappings where rows are decoded.
 - `insert_artifact_record` returns `Err` on unique constraint violation
 - `find_asset_by_id` returns `Option<Asset>`
 - `cargo check` passes

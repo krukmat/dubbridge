@@ -96,12 +96,12 @@ apps/api -> crates/auth -> verified AuthenticatedPrincipal.subject_id
          -> ingestion handler -> FinalizeIngestionCommand.uploader_id
 ```
 
-## Execution Order
+## Delivered execution order
 
 ```text
 S0 T1 JWT verifier + typed principal
   -> S0 T2 Axum middleware + scope authorization
-  -> resume S1 T5 Axum ingestion endpoints
+  -> S1 T5 Axum ingestion endpoints
 ```
 
 ## Lines Affected After Implementation

@@ -34,13 +34,13 @@ left unaddressed.
 - `T1-T5` — Reconcile `crates/audit` with the intended architectural boundary.
 - `T1-T6` — Add upload-size/abuse/operational safeguards for ingestion endpoints.
 
-## Design note
+## Historical design note
 
-S1 T5 currently keeps upload-ingestion sessions in process memory between
+S1 T5 originally kept upload-ingestion sessions in process memory between
 `POST /ingest`, `POST /ingest/{token}/rights`, and `POST /ingest/{token}/finalize`.
-That satisfies the current task contract but loses pending sessions if the API
-process restarts before finalization. This phase exists to close that gap without
-changing the S1 API contract.
+That satisfied the original task contract but lost pending sessions if the API
+process restarted before finalization. T1 closed that gap without changing the S1
+API contract.
 
 ## Current outcome
 
@@ -60,7 +60,8 @@ changing the S1 API contract.
 - **Concurrency behavior** (T1-T4): DONE — two deterministic concurrency tests added
   (`concurrent_duplicate_finalize_one_wins`, `concurrent_rights_and_finalize_is_consistent`).
   Cleanup-vs-finalize race documented as explicit invariant in `apps/api/src/cleanup.rs`.
-  Closing the cleanup race fully requires a distributed lock; deferred to a future slice.
+  Closing the cleanup race fully requires finalize/cleanup coordination; moved to
+  blocking gate H1 before S3 expands the shared finalize path.
 - **`crates/audit`** (T1-T5): DONE — stub replaced with module-level architecture
   comment pointing at `crates/domain/src/audit.rs` (types) and
   `crates/db/src/audit_repo.rs` (writes). Stale `serde`/`time` dependencies

@@ -11,10 +11,10 @@ upload API cannot safely accept that identifier from an untrusted request body:
 doing so would let a caller impersonate another uploader while creating an asset
 and rights ledger entry.
 
-The repository already reserves `crates/auth` for authentication and authorization
-policy boundaries, but it currently contains only a placeholder. The first mutable
-HTTP endpoints arrive in S1 Task 5, so API client identity must be established
-before those handlers are implemented.
+At decision time, the repository reserved `crates/auth` for authentication and
+authorization policy boundaries but contained only a placeholder. The first mutable
+HTTP endpoints arrived in S1 Task 5, so API client identity had to be established
+before those handlers were implemented.
 
 This concern is separate from live-source authentication in ADR-022. API client
 authentication identifies the caller invoking Axum. Stream-source authentication

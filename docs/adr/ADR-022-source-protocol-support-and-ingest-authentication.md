@@ -1,8 +1,15 @@
 # ADR-022: Source protocol support (RTMP + SRT) and ingest authentication
 
-- **Status:** Proposed
+- **Status:** Proposed — **scope narrowed to the S3b live-recording sub-case
+  (2026-05-31 replan)**
 - **Date:** 2026-05-31
 - **Deciders:** DubBridge platform team
+
+> **2026-05-31 scope note (S3 replan, see ADR-025).** RTMP/SRT source protocols and
+> capture-edge authentication govern the **deferred S3b live-recording sub-case**.
+> The primary S3 intake is owner-authorized platform download; its connector
+> authentication and owner-credential model are governed by **ADR-025**, not this
+> ADR. Both share the same fail-closed, credential-redaction posture.
 
 ## Context
 

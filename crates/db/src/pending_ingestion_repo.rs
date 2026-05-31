@@ -161,6 +161,78 @@ pub async fn list_expired_pending_ingestions(
     rows.into_iter().map(TryInto::try_into).collect()
 }
 
+/// H1-T1: SELECT FOR UPDATE — locks the row for the duration of the caller's
+/// transaction so cleanup (SKIP LOCKED) cannot delete the blob while finalize
+/// is writing its artifact reference.
+pub async fn lock_for_finalize(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    ingest_token: Uuid,
+) -> Result<Option<PendingIngestionRecord>, DbError> {
+    let row = sqlx::query_as::<_, PendingIngestionRow>(
+        r#"
+        SELECT
+            ingest_token, title, storage_key, content_type, file_size_bytes, checksum,
+            rights_owner, license_type, source_type, proof_reference,
+            created_at, updated_at, expires_at
+        FROM pending_ingestions
+        WHERE ingest_token = $1
+        FOR UPDATE
+        "#,
+    )
+    .bind(ingest_token)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    row.map(TryInto::try_into).transpose()
+}
+
+/// H1-T1: DELETE within a transaction (used inside the atomic finalize block).
+pub async fn delete_pending_ingestion_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    ingest_token: Uuid,
+) -> Result<(), DbError> {
+    sqlx::query("DELETE FROM pending_ingestions WHERE ingest_token = $1")
+        .bind(ingest_token)
+        .execute(&mut **tx)
+        .await
+        .map_err(DbError::QueryFailed)?;
+    Ok(())
+}
+
+/// H1-T1: Atomically claims and deletes all expired pending ingestions whose rows
+/// are NOT locked by an in-flight finalize transaction (FOR UPDATE SKIP LOCKED).
+/// Returns (ingest_token, storage_key) pairs so the caller can delete the blobs.
+pub async fn claim_expired_for_cleanup(pool: &PgPool) -> Result<Vec<(Uuid, String)>, DbError> {
+    #[derive(sqlx::FromRow)]
+    struct ClaimedRow {
+        ingest_token: Uuid,
+        storage_key: String,
+    }
+
+    let rows = sqlx::query_as::<_, ClaimedRow>(
+        r#"
+        WITH claimed AS (
+            SELECT ingest_token
+            FROM pending_ingestions
+            WHERE expires_at < NOW()
+            FOR UPDATE SKIP LOCKED
+        )
+        DELETE FROM pending_ingestions
+        WHERE ingest_token IN (SELECT ingest_token FROM claimed)
+        RETURNING ingest_token, storage_key
+        "#,
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| (r.ingest_token, r.storage_key))
+        .collect())
+}
+
 pub async fn delete_pending_ingestion(pool: &PgPool, ingest_token: Uuid) -> Result<(), DbError> {
     sqlx::query(
         r#"
@@ -223,9 +295,9 @@ fn parse_license_type(value: &str) -> Result<LicenseType, DbError> {
         "public_domain" => Ok(LicenseType::PublicDomain),
         "licensed_distribution" => Ok(LicenseType::LicensedDistribution),
         "internal_only" => Ok(LicenseType::InternalOnly),
-        _ => Err(DbError::QueryFailed(sqlx::Error::Protocol(
-            format!("unknown license_type '{value}'").into(),
-        ))),
+        _ => Err(DbError::QueryFailed(sqlx::Error::Protocol(format!(
+            "unknown license_type '{value}'"
+        )))),
     }
 }
 
@@ -236,8 +308,8 @@ fn parse_source_type(value: &str) -> Result<SourceType, DbError> {
         "internal_feed" => Ok(SourceType::InternalFeed),
         "licensed_source" => Ok(SourceType::LicensedSource),
         "public_domain_with_proof" => Ok(SourceType::PublicDomainWithProof),
-        _ => Err(DbError::QueryFailed(sqlx::Error::Protocol(
-            format!("unknown source_type '{value}'").into(),
-        ))),
+        _ => Err(DbError::QueryFailed(sqlx::Error::Protocol(format!(
+            "unknown source_type '{value}'"
+        )))),
     }
 }

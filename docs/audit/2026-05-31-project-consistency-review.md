@@ -14,14 +14,14 @@ explicit tasks instead of being patched blind.
 
 | ID | Area | Severity | Status |
 |----|------|----------|--------|
-| F1 | Duplicate/conflicting `AuditEvent` types | High | Folded into plan (Task 0b + T1/T5) |
+| F1 | Duplicate/conflicting `AuditEvent` types | High | **Closed by T1/T5**; H1 owns centralized emission |
 | F2 | `audit_events.ingest_token NOT NULL` blocks recording lifecycle events | High | Recorded → folded into plan (T1/T2) |
 | F3 | Dead branch in `find_original_by_ingest_token` (artifact kind) | Medium | Recorded → folded into plan (T1/T5), surfaced in ADR-021 |
 | F4 | `.gitignore` ignores `Cargo.lock` in a binary workspace | Medium | **Fixed** |
 | F5 | `AGENTS.md` references 3 non-existent governance docs | Medium | **Fixed** (scaffolds created) |
 | F6 | `README.md` stale environment-specific "Validation note" | Low | **Fixed** |
 | F7 | Toolchain pin drift (`docker-compose` rust:1.88 vs `stable`) | Low | Tracked: plan Task 9 |
-| F8 | S1 plan vs code drift around `crates/audit` | Medium | ADR-018 corrected; reconcile via Task 0b |
+| F8 | S1 plan vs code drift around `crates/audit` | Medium | **Closed by T1/T5** |
 
 ---
 
@@ -39,9 +39,9 @@ explicit tasks instead of being patched blind.
 `crates/audit`". That is wrong — recording audit must use `domain::audit::AuditEvent`
 + `db::audit_repo`, identical to S1. Plan corrected.
 
-**Recommendation:** reconcile `crates/audit` — either implement the intended
-`AuditLogger` over `db::audit_repo` (deleting the placeholder `AuditEvent`) or
-remove the crate from the workspace. Tracked as a follow-up, not in recording scope.
+**Resolution:** T1-T5 removed the placeholder type and kept `crates/audit` as a
+reserved empty namespace. H1 now owns the shared durable-emission boundary required
+before recording lifecycle events are added.
 
 ### F2 — `audit_events.ingest_token` is `NOT NULL` (High)
 
@@ -53,7 +53,8 @@ exists, so they cannot be persisted under the current schema/type.
 **Resolution (folded into plan):**
 - T1 extends `AuditEventKind` with recording variants and makes
   `AuditEvent.ingest_token: Option<Uuid>` plus a new `recording_session_id: Option<Uuid>`.
-- T2 adds migration `0006_alter_audit_events_for_recording.sql`: relax
+- S3 T2 adds the next available `alter_audit_events_for_recording` migration after
+  H1 migrations: relax
   `ingest_token` to nullable and add nullable `recording_session_id` FK.
 - This matches ADR-018, which already anticipates `recording_session_id` as a
   correlation identifier.
@@ -99,14 +100,14 @@ services, while `rust-toolchain.toml` and CI use `stable`. Not harmful today
 (edition 2024 + resolver 3 build on 1.88), but the pin can silently lag `stable`.
 Recommendation: align the compose image to a documented minimum or to `stable`.
 
-### F8 — S1 plan vs code drift around `crates/audit` (Medium) — RECORDED
+### F8 — S1 plan vs code drift around `crates/audit` (Medium) — CLOSED
 
 `docs/plan/s1-asset-ingestion-rights-ledger.md` lists `crates/audit` as hosting an
 `AuditLogger` with deps on `domain` and `db`. The implemented `crates/audit` does
 neither (see F1). ADR-018's "Implemented by" line was corrected to point at the real
-implementation (`domain::audit` + `db::audit_repo`) and to mark `crates/audit` as a
-reserved-but-stub crate. The S1 plan itself is left as historical record; the
-reconciliation is a follow-up.
+implementation (`domain::audit` + `db::audit_repo`). T1-T5 later removed the
+placeholder type and kept `crates/audit` as a reserved empty namespace. H1 owns the
+future shared durable-emission boundary.
 
 ## Actions taken in this review
 
@@ -119,11 +120,22 @@ reconciliation is a follow-up.
 
 ## Consolidated follow-ups (now tracked in the recording plan)
 
-- Reconcile or remove `crates/audit` (F1/F8) → `docs/tasks/stream-recording-ingest.md`
-  **Task 0b** (preparatory, scheduled before Task 1).
+- Reconcile or remove `crates/audit` (F1/F8) → **closed by T1-T5**. H1 owns the
+  centralized durable-emission boundary.
 - Align docker-compose Rust image with the toolchain policy (F7) →
   `docs/tasks/stream-recording-ingest.md` **Task 9** (low-priority housekeeping).
 
 ## Still open
 
 - Backfill the remaining open ADR numbers if/when their decisions are identified.
+
+## Post-review consolidation update — 2026-05-31
+
+Later work closed F1/F8 through T1-T5 by removing the duplicate
+`crates/audit::AuditEvent` placeholder. The reserved namespace remains empty; H1 now
+owns centralized durable-audit emission semantics.
+
+Migrations `0005` and `0006` were subsequently allocated to pending-ingestion
+hardening. Future recording migrations must use the next free sequence after H1
+migrations. The broader roadmap/ADR review is recorded in
+`docs/audit/2026-05-31-roadmap-adr-architecture-consolidation.md`.

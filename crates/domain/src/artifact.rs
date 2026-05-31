@@ -1,21 +1,40 @@
 // T1: S1 domain — original media artifact record
+// S3-T1: added RecordedStreamMedia variant and parse_artifact_kind() (F3 fix)
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::asset::AssetId;
 
-/// Artifact kind — S1 only tracks the original upload.
+/// Artifact kind — S1 tracks upload artifacts; S3 adds recorded stream media.
 /// Probe, rendition, HLS, transcript etc. are added in later slices.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ArtifactKind {
     OriginalMedia,
+    /// S3-T1: assembled MP4 produced by the recording bridge (ADR-021).
+    RecordedStreamMedia,
 }
 
 impl std::fmt::Display for ArtifactKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "original_media")
+        let s = match self {
+            Self::OriginalMedia => "original_media",
+            Self::RecordedStreamMedia => "recorded_stream_media",
+        };
+        write!(f, "{s}")
+    }
+}
+
+/// Parses a DB-stored kind string into `ArtifactKind`.
+///
+/// Unknown strings fall back to `OriginalMedia` so a mislabeled row does not
+/// panic the process. The recording bridge (S3-T5) uses this to ensure
+/// `RecordedStreamMedia` artifacts read back with the correct kind (F3).
+pub fn parse_artifact_kind(s: &str) -> ArtifactKind {
+    match s {
+        "recorded_stream_media" => ArtifactKind::RecordedStreamMedia,
+        _ => ArtifactKind::OriginalMedia,
     }
 }
 
@@ -55,5 +74,44 @@ impl ArtifactRecord {
             checksum,
             created_at: OffsetDateTime::now_utc(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // S3-T1: F3 acceptance criteria — parse_artifact_kind round-trips
+    #[test]
+    fn parse_recorded_stream_media() {
+        assert_eq!(
+            parse_artifact_kind("recorded_stream_media"),
+            ArtifactKind::RecordedStreamMedia
+        );
+    }
+
+    #[test]
+    fn parse_original_media() {
+        assert_eq!(
+            parse_artifact_kind("original_media"),
+            ArtifactKind::OriginalMedia
+        );
+    }
+
+    #[test]
+    fn parse_unknown_falls_back_to_original_media() {
+        assert_eq!(
+            parse_artifact_kind("probe_output"),
+            ArtifactKind::OriginalMedia
+        );
+    }
+
+    #[test]
+    fn artifact_kind_display_all_variants() {
+        assert_eq!(ArtifactKind::OriginalMedia.to_string(), "original_media");
+        assert_eq!(
+            ArtifactKind::RecordedStreamMedia.to_string(),
+            "recorded_stream_media"
+        );
     }
 }

@@ -11,4 +11,9 @@ pub enum DbError {
 
     #[error("query failed: {0}")]
     QueryFailed(sqlx::Error),
+
+    // H1-T2: fail-closed decoding — unknown persisted governance values must never silently
+    // coerce to a fallback variant (ADR-008).
+    #[error("unknown stored value in {field}: {value}")]
+    UnknownStoredValue { field: &'static str, value: String },
 }

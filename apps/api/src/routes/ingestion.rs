@@ -11,6 +11,7 @@ use axum::{
 // T1-T6: maximum accepted upload body size. Sized at 500 MB to cover professional
 // audio/video assets while bounding server memory exposure per concurrent request.
 pub const MAX_UPLOAD_BYTES: usize = 500 * 1024 * 1024;
+use dubbridge_audit::emit_governance_audit;
 use dubbridge_auth::{
     AuthenticatedPrincipal, SharedTokenVerifier, authenticate_bearer, require_scope,
 };
@@ -72,11 +73,13 @@ async fn create_ingestion(
     let mut content_type: Option<String> = None;
     let mut file_bytes: Option<Vec<u8>> = None;
 
-    while let Some(field) = multipart
-        .next_field()
-        .await
-        .map_err(|error| ApiError::bad_request(format!("invalid multipart payload: {error}")))?
-    {
+    while let Some(field) = multipart.next_field().await.map_err(|error| {
+        if is_body_size_limit_error(&error) {
+            ApiError::payload_too_large("request body exceeds the maximum allowed size")
+        } else {
+            ApiError::bad_request(format!("invalid multipart payload: {error}"))
+        }
+    })? {
         match field.name() {
             Some("title") => {
                 title = Some(field.text().await.map_err(|error| {
@@ -91,7 +94,16 @@ async fn create_ingestion(
                         .bytes()
                         .await
                         .map_err(|error| {
-                            ApiError::bad_request(format!("invalid file field: {error}"))
+                            // multer wraps DefaultBodyLimit's LengthLimitError as a
+                            // body-read failure. Surface it as 413 so clients know the
+                            // body was too large, not malformed.
+                            if is_body_size_limit_error(&error) {
+                                ApiError::payload_too_large(
+                                    "request body exceeds the maximum allowed size",
+                                )
+                            } else {
+                                ApiError::bad_request(format!("invalid file field: {error}"))
+                            }
                         })?
                         .to_vec(),
                 );
@@ -195,37 +207,34 @@ async fn submit_rights(
     }))
 }
 
-// S3-T0: thin wrapper — load pending record, enforce expiry, then delegate to core.
+// H1-T1: delegate entirely to the atomic core — it acquires the row lock,
+// re-checks expiry inside the transaction, and commits all writes atomically.
+// H1-T3: uses match instead of .map_err() so rejection audit can be awaited.
 async fn finalize_ingestion(
     Path(token): Path<Uuid>,
     State(state): State<Arc<AppState>>,
     Extension(principal): Extension<AuthenticatedPrincipal>,
 ) -> Result<(StatusCode, Json<AssetSummaryResponse>), ApiError> {
-    let pending = dubbridge_db::pending_ingestion_repo::find_pending_ingestion(&state.pool, token)
-        .await
-        .map_err(ApiError::from_db)?
-        .ok_or_else(|| ApiError::not_found("ingestion session not found"))?;
-
-    // T1-T2: reject finalization of expired sessions (fail-closed per ADR-008).
-    if pending.expires_at < OffsetDateTime::now_utc() {
-        tracing::info!(ingest_token = %token, "finalization rejected: session expired");
-        return Err(ApiError::gone("ingestion session has expired"));
-    }
-
-    let asset = finalize_ingestion_core(
+    match finalize_ingestion_core(
         &state.pool,
         token,
         principal.subject_id,
         ArtifactKind::OriginalMedia,
-        pending,
     )
     .await
-    .map_err(|error| map_service_error(&state, token, error))?;
-
-    Ok((StatusCode::CREATED, Json(asset.into())))
+    {
+        Ok(asset) => Ok((StatusCode::CREATED, Json(asset.into()))),
+        Err(error) => Err(map_service_error(&state, token, error).await),
+    }
 }
 
-fn map_service_error(state: &AppState, ingest_token: Uuid, error: IngestionServiceError) -> ApiError {
+// H1-T3: async so rejection audit can be awaited before returning.
+// Fail-closed: if audit persistence fails, returns 500 rather than swallowing the error.
+async fn map_service_error(
+    state: &AppState,
+    ingest_token: Uuid,
+    error: IngestionServiceError,
+) -> ApiError {
     match error {
         IngestionServiceError::AlreadyFinalized => {
             ApiError::conflict("ingestion token has already been finalized")
@@ -235,27 +244,27 @@ fn map_service_error(state: &AppState, ingest_token: Uuid, error: IngestionServi
             ApiError::not_found("ingestion session not found")
         }
         IngestionServiceError::Validation(validation_error) => {
-            // Fire-and-forget audit — log if the audit write itself fails.
-            let pool = state.pool.clone();
-            let error_str = validation_error.to_string();
             let event_kind = match &validation_error {
                 IngestionError::MissingUploaderContext => {
                     AuditEventKind::IngestionRejectedMissingUploaderContext
                 }
                 _ => AuditEventKind::IngestionRejectedMissingRights,
             };
-            tokio::spawn(async move {
-                let audit_event = AuditEvent::new(None, event_kind, ingest_token, Some(error_str));
-                if let Err(db_error) =
-                    dubbridge_db::audit_repo::insert_audit_event(&pool, &audit_event).await
-                {
-                    tracing::warn!(
-                        ingest_token = %ingest_token,
-                        error = %db_error,
-                        "failed to persist validation-rejection audit event"
-                    );
-                }
-            });
+            let audit_event = AuditEvent::new(
+                None,
+                event_kind,
+                ingest_token,
+                Some(validation_error.to_string()),
+            );
+            // H1-T3: awaited — durable row guaranteed before response (ADR-018).
+            if let Err(audit_err) = emit_governance_audit(&state.pool, &audit_event).await {
+                tracing::error!(
+                    ingest_token = %ingest_token,
+                    error = %audit_err,
+                    "audit persistence failed for validation rejection"
+                );
+                return ApiError::internal("audit persistence failed");
+            }
             ApiError::unprocessable(validation_error.to_string())
         }
         IngestionServiceError::Db(db_error) => ApiError::from_db(db_error),
@@ -273,6 +282,20 @@ async fn get_asset(
         .ok_or_else(|| ApiError::not_found("asset not found"))?;
 
     Ok(Json(asset.into()))
+}
+
+/// Traverses the error source chain to detect a body-size limit error surfaced
+/// by DefaultBodyLimit (LengthLimitError) or multer's own stream-size gate.
+fn is_body_size_limit_error(error: &dyn std::error::Error) -> bool {
+    let mut maybe: Option<&dyn std::error::Error> = Some(error);
+    while let Some(e) = maybe {
+        let msg = e.to_string().to_lowercase();
+        if msg.contains("length limit") || msg.contains("stream size exceeded") {
+            return true;
+        }
+        maybe = e.source();
+    }
+    false
 }
 
 fn build_storage_key(ingest_token: Uuid, filename: Option<&str>) -> String {
@@ -335,6 +358,13 @@ impl ApiError {
         }
     }
 
+    fn payload_too_large(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::PAYLOAD_TOO_LARGE,
+            message: message.into(),
+        }
+    }
+
     // T1-T2: session existed but its lifecycle window is closed.
     fn gone(message: impl Into<String>) -> Self {
         Self {
@@ -349,6 +379,10 @@ impl ApiError {
             dubbridge_db::error::DbError::ConnectionFailed(source)
             | dubbridge_db::error::DbError::QueryFailed(source) => {
                 Self::internal(format!("database operation failed: {source}"))
+            }
+            // H1-T2: unknown persisted governance value is a data integrity error, not a client error.
+            dubbridge_db::error::DbError::UnknownStoredValue { field, value } => {
+                Self::internal(format!("corrupt stored value in {field}: {value}"))
             }
         }
     }

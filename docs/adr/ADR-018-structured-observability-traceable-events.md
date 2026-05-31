@@ -16,13 +16,13 @@ structured, correlated tracing for operational diagnosis.
 ## Decision
 
 - **Governance-significant events** are persisted as rows in `audit_events`
-  (event kind, optional `asset_id`, `ingest_token`, detail, timestamp). The
+  (event kind, optional `asset_id`, correlation identifiers, detail, timestamp). The
   `asset_id` is nullable because rejection events may occur before an asset is
   persisted.
 - The same events are emitted through **structured tracing** (`tracing` /
   `tracing-subscriber`), initialized centrally by `crates/observability`.
 - Audit writes and trace spans share correlation identifiers (e.g. `ingest_token`,
-  later `recording_session_id`) so a durable audit row can be tied back to its
+  and `recording_session_id` once S3 lands) so a durable audit row can be tied back to its
   operational trace.
 - Audit emission is part of the operation's success path: finalize success, rights
   rejection, and duplicate-token handling all emit an audit event.
@@ -55,10 +55,14 @@ structured, correlated tracing for operational diagnosis.
 - ADR-008 (rights ledger) — rights rejections are auditable events.
 - ADR-020 (recording lifecycle) — defines recording-specific audit events.
 - Implemented by: domain type `crates/domain/src/audit.rs`, persistence
-  `crates/db/src/audit_repo.rs`, tracing setup `crates/observability`, and
-  `infra/migrations/0004_create_audit_events.sql`.
+  `crates/db/src/audit_repo.rs`, tracing setup `crates/observability`,
+  `infra/migrations/0004_create_audit_events.sql`, and the shared emission
+  boundary `crates/audit::emit_governance_audit` (H1-T3).
 
-> Note: `crates/audit` is reserved for an `AuditLogger` that would wrap
-> `db::audit_repo` writes and tracing spans, but it is currently a stub holding an
-> unrelated `AuditEvent` placeholder. Reconciling it is a tracked follow-up
-> (see `docs/audit/2026-05-31-project-consistency-review.md`, F1/F8).
+**H1-T3 implementation (2026-05-31):** `crates/audit::emit_governance_audit`
+is the single entry point for all governance audit writes. It awaits the DB
+insert before emitting the trace, coupling durable persistence with correlated
+tracing via `ingest_token`. All `tokio::spawn` fire-and-forget audit writes
+have been removed. Duplicate-token rejections now emit a durable
+`IngestionRejectedDuplicateToken` row. Fail-closed policy: if the DB write
+fails, `Err(AuditEmitError)` is returned and the caller surfaces a 500.

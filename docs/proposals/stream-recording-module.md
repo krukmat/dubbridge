@@ -1,6 +1,7 @@
 # Proposal: Stream Recording Module
 
-- **Status:** Draft for approval
+- **Status:** Internal decision context; execution contract superseded by the S3
+  plan/tasks and blocking Task T0c
 - **Date:** 2026-05-31
 - **Author:** Platform engineering (assisted)
 - **Decision confirmed by stakeholder:** engine = FFmpeg orchestrated by Rust;
@@ -28,10 +29,12 @@ fail-closed rights gate (ADR-008) and explicit-lineage guarantees (ADR-006).
   process via a command builder** (`ffprobe_command`) — not as a linked library.
 - **Fail-closed rights** (ADR-008) and **immutable lineage + checksums** (ADR-006)
   must hold for any new ingestion source.
-- **Jobs** run on apalis/Redis through `apps/worker-runner`; the API enqueues.
+- **Jobs** are intended to run on apalis/Redis through `apps/worker-runner`; queue
+  consumption is still a planned implementation surface.
 - S1 (asset ingestion + rights ledger) provides the ingestion finalize path this
-  module must reuse. S1 tasks T4–T6 (storage adapter, API, tests) are still open
-  and are a prerequisite for the bridge (ADR-021).
+  module must reuse. S1 tasks T4-T6 are complete and S3 T0 extracted
+  `finalize_ingestion_core`. H1 must harden atomicity and durable audit before S3
+  expands that path (ADR-021).
 
 ## 3. Open-source options evaluated
 
@@ -75,11 +78,11 @@ their independent DubBridge equivalents:
 | Recorder: **segments** (`recordSegmentDuration`) | Bounds file size; enables incremental upload | `record_segment_duration`; FFmpeg `segment` muxer |
 | `recordPath` templating (`%path/%Y-%m-%d/...`) | Organized, collision-free naming | `crates/recorder::segments` path templater → `storage_key` |
 | `recordDeleteAfter` retention | Local cleanup after durable upload | `record_delete_after`; cleanup after MinIO put |
-| `runOnRecordSegmentComplete` hook | Fires when a segment is finalized | **In-process** segment-complete event → upload + asset bridge (ADR-021) |
+| `runOnRecordSegmentComplete` hook | Fires when a segment is finalized | **In-process** segment-complete event -> upload + lineage bookkeeping; T0c selects the asset bridge boundary (ADR-020/021) |
 | `internal/playback` server | Serves recorded content over HTTP | Out of scope for v1 (assets are served via the normal asset path) |
 | Graceful behavior / clean finalization | Non-corrupt files on stop | Write `q\n` to FFmpeg stdin on stop (ADR-020) |
 
-**Reference spike (recommended, not built in this proposal):** a throwaway,
+**Reference spike (required by S3 T0c, not built in this proposal):** a throwaway,
 internal-only sandbox under `spikes/recorder-sandbox/` that validates, end to end:
 `ffmpeg -i srt://…  -c copy -f segment -segment_format mp4 …` and the RTMP
 equivalent, plus graceful-stop finalization. Its only purpose is to confirm the
@@ -118,8 +121,8 @@ flowchart LR
     RS -->|StreamRecordingJob| SUP
     SUP --> CMD --> FF
     FF -->|fMP4 segments| SEG
-    SEG -->|put| OS
-    SEG -->|segment-complete event| BRIDGE["Recording→Asset bridge\n(reuses S1 finalize, ADR-021)"]
+    SEG -->|segment-complete upload| OS
+    SEG -->|T0c-selected completed output| BRIDGE["Recording→Asset bridge\n(reuses S1 finalize, ADR-021)"]
     BRIDGE -->|fail-closed rights gate| PG
     RS -. audit .-> PG
 ```
@@ -139,23 +142,23 @@ flowchart LR
 - **`apps/api`** — recording routes + DTOs.
 - **`apps/worker-runner`** — consume `StreamRecordingJob`, supervise capture,
   upload, bridge to asset, emit audit.
-- **`infra/migrations`** — `0005_create_recording_sessions.sql` (+ optional
-  `0006_create_recording_segments.sql`).
+- **`infra/migrations`** — allocate the next free sequence after H1 for
+  `create_recording_sessions`, `alter_audit_events_for_recording`, plus conditional
+  `create_recording_segments` if T0c selects persisted segments.
 
 ## 6. Risks and prerequisites
 
-- **Prerequisite:** the S1 finalize path must be reusable by the bridge. This means
-  completing S1 T4–T6 or extracting the finalize logic into a transport-agnostic
-  function. Tracked in the plan.
+- **Prerequisite:** S3 T0 extracted the reusable finalize path. H1 must now make its
+  metadata writes atomic and its audit emission durable before recording expands it.
 - **FFmpeg runtime** must be present in the worker-runner image (LGPL build; no
   GPL-only components).
 - **Subprocess management** (graceful stop, timeouts, zombies) is error-prone;
   covered by ADR-020 and dedicated tests.
 - **Credential handling** for RTMP keys / SRT passphrases must be redacted in logs
   (ADR-022, ADR-018).
-- **Per-segment vs whole-session bridging** is an open design choice resolved in
-  the plan (default: bridge on session stop for v1 simplicity; per-segment is a
-  follow-up).
+- **Recording output contract** remains a blocking design choice: per-segment
+  assets, whole-session assembly, or manifest-backed session artifact. S3 T0c must
+  validate FFmpeg behavior and update ADR-020/021 before recorder implementation.
 
 ## 7. Governing ADRs
 
@@ -165,9 +168,17 @@ flowchart LR
 
 ## 8. Next step
 
-On approval, implementation is tracked by:
+Implementation is tracked by:
 - Plan: `docs/plan/stream-recording-ingest.md`
 - Tasks: `docs/tasks/stream-recording-ingest.md`
+
+Required order before recorder implementation:
+
+```text
+H1 governance atomicity + durable audit hardening
+  -> S3 T0c recording output-contract spike
+  -> S3 T1+ implementation
+```
 
 ## Sources
 

@@ -24,6 +24,8 @@ dubbridge-auth = { path = "../../crates/auth" }
 dubbridge-db = { path = "../../crates/db" }
 dubbridge-domain = { path = "../../crates/domain" }
 dubbridge-storage = { path = "../../crates/storage" }
+dubbridge-ingestion = { path = "../../crates/ingestion" }
+dubbridge-audit    = { path = "../../crates/audit" }
 
 [dev-dependencies]
 tempfile = "3"

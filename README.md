@@ -4,7 +4,7 @@ DubBridge is a platform for localizing audiovisual content — taking a video in
 
 ## What it does
 
-Content arrives either as a direct upload or as a live stream recording. From there, DubBridge takes it through a governed pipeline:
+Content enters the target platform as a direct upload or, once the planned intake slice lands, as an owner-authorized download from a content platform (for example, importing content from an account the owner controls). From there, DubBridge takes it through a governed pipeline:
 
 1. **Rights verification** — nothing moves forward without a confirmed authorization basis. This is a hard gate, not a best-effort check.
 2. **Media preparation** — the file is analyzed, normalized, and made ready for processing.
@@ -24,12 +24,13 @@ Every step is logged. Every artifact has a traceable origin. Nothing reaches an 
 
 ## How content gets in
 
-DubBridge accepts content two ways:
+DubBridge accepts content these ways:
 
-- **Upload** — send a file through the API. Authenticated clients submit assets directly.
-- **Live stream recording** — point an RTMP or SRT stream at DubBridge and it captures, segments, and ingests the recording automatically, feeding it into the same pipeline as an uploaded file.
+- **Upload (operational)** — send a file through the API. Authenticated clients submit assets directly.
+- **Platform download (planned, primary intake)** — the content owner authorizes DubBridge to import content from an account they control; DubBridge downloads it on their behalf and ingests it through the same governed pipeline as an uploaded file. Access requires the owner's explicit, scoped authorization.
+- **Live stream recording (planned, deferred sub-case)** — for clients producing live broadcasts, DubBridge can capture an authorized live stream and ingest the result through the same governed pipeline.
 
-Both paths converge at the same rights gate. There is no shortcut.
+All paths converge, once delivered, at the same rights gate. There is no shortcut.
 
 ## Design philosophy
 
@@ -42,11 +43,38 @@ The processing core is written in Rust. AI workloads (transcription, translation
 Requires Rust (via `rustup`) and Docker.
 
 ```
-docker compose -f infra/docker-compose.yml up -d
+# Infrastructure only. Full app-container wiring is tracked in roadmap slice P0.
+docker compose -f infra/docker-compose.yml up -d postgres redis minio
+# Configure DUBBRIDGE_AUTH_ISSUER, DUBBRIDGE_AUTH_AUDIENCE, and
+# DUBBRIDGE_AUTH_RSA_PUBLIC_KEY_PATH before starting the protected API.
 cargo run -p dubbridge-api
 ```
 
+Enable the shared Git hook path so local `pre-push` uses the repository hook:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Local Rust QA commands:
+
+```bash
+make qa-local          # fmt + clippy + test + cargo check
+make qa-deny           # dependency policy / advisories
+make qa-coverage       # 90% coverage gate (existing llvm-cov scope)
+make qa-build-release  # release build verification
+make qa-ci             # full local mirror of the blocking CI baseline
+```
+
+When `Cargo.toml` or `Cargo.lock` changes, install `cargo-deny` locally:
+
+```bash
+cargo install cargo-deny --version 0.18.4 --locked
+```
+
 Infrastructure: PostgreSQL for state, Redis for job coordination, MinIO for object storage.
+Full `api` / `worker-runner` container environment wiring is still planned work
+(`docs/plan/roadmap.md`, P0).
 
 ## Repository layout
 
@@ -62,4 +90,4 @@ docs/               — architecture decisions, pipeline design, and development
 
 ---
 
-*DubBridge is under active development. The rights gateway and ingestion pipeline are operational. Media preparation, transcription, dubbing, and publication are in progress.*
+*DubBridge is under active development. JWT-protected upload ingestion and the rights ledger are operational. Platform-download intake (primary), live stream recording (deferred sub-case), media preparation, transcription, dubbing, and publication remain planned work.*

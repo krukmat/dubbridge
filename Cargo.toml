@@ -12,6 +12,7 @@ members = [
   "crates/qc",
   "crates/auth",
   "crates/audit",
+  "crates/ingestion",
   "crates/config",
   "crates/observability",
 ]

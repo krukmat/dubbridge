@@ -177,6 +177,13 @@ async fn missing_rights_is_rejected() {
             .expect("error")
             .contains("rights basis is required")
     );
+
+    let audit_count =
+        count_audit_events(&ctx.pool, ingest_token, "ingestion_rejected_missing_rights").await;
+    assert_eq!(
+        audit_count, 1,
+        "missing-rights rejection must persist one durable audit row"
+    );
 }
 
 #[tokio::test]
@@ -210,8 +217,57 @@ async fn duplicate_finalization_does_not_create_duplicate_artifact() {
             .fetch_one(&ctx.pool)
             .await
             .expect("artifact count");
+    let duplicate_audit_count = count_audit_events(
+        &ctx.pool,
+        ingest_token,
+        "ingestion_rejected_duplicate_token",
+    )
+    .await;
 
     assert_eq!(artifact_count, 1);
+    assert_eq!(
+        duplicate_audit_count, 1,
+        "duplicate finalize must persist one duplicate-token audit row"
+    );
+}
+
+#[tokio::test]
+async fn finalize_rollback_on_constraint_violation() {
+    let Some(mut ctx) = TestContext::new().await else {
+        eprintln!("skipping integration test: DATABASE_URL not set");
+        return;
+    };
+
+    let auth_token = ctx.ingest_token.clone();
+    let ingest_token = create_ingestion(&mut ctx).await;
+    submit_rights(&mut ctx, ingest_token, valid_rights_body()).await;
+    insert_preexisting_artifact_for_token(&ctx.pool, ingest_token).await;
+
+    let response = finalize(&mut ctx, ingest_token, &auth_token).await;
+
+    assert!(
+        response.status().is_client_error(),
+        "expected 4xx rollback response, got {}",
+        response.status()
+    );
+
+    let created_asset_count =
+        count_assets_for_uploader_and_title(&ctx.pool, ctx.principal_id, "Test Video").await;
+    let pending_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM pending_ingestions WHERE ingest_token = $1")
+            .bind(ingest_token)
+            .fetch_one(&ctx.pool)
+            .await
+            .expect("pending count");
+
+    assert_eq!(
+        created_asset_count, 0,
+        "failed finalize must roll back asset insertion"
+    );
+    assert_eq!(
+        pending_count, 1,
+        "failed finalize must leave pending ingestion intact"
+    );
 }
 
 #[tokio::test]
@@ -466,7 +522,27 @@ async fn concurrent_duplicate_finalize_one_wins() {
             .fetch_one(&ctx.pool)
             .await
             .expect("artifact count");
-    assert_eq!(artifact_count, 1, "exactly one artifact must exist after concurrent finalize");
+    let asset_count = count_assets_for_ingest_token(&ctx.pool, ingest_token).await;
+    let rights_count = count_rights_for_ingest_token(&ctx.pool, ingest_token).await;
+    let finalized_audit_count =
+        count_audit_events(&ctx.pool, ingest_token, "ingestion_finalized").await;
+
+    assert_eq!(
+        artifact_count, 1,
+        "exactly one artifact must exist after concurrent finalize"
+    );
+    assert_eq!(
+        asset_count, 1,
+        "exactly one asset must exist after concurrent finalize"
+    );
+    assert_eq!(
+        rights_count, 1,
+        "exactly one rights row must exist after concurrent finalize"
+    );
+    assert_eq!(
+        finalized_audit_count, 1,
+        "exactly one finalized audit row must exist after concurrent finalize"
+    );
 }
 
 // T1-T4: Rights submission and finalize fire concurrently against the same token.
@@ -489,18 +565,29 @@ async fn concurrent_rights_and_finalize_is_consistent() {
     let rights_token = ctx.ingest_token.clone();
 
     let (rights_resp, finalize_resp) = tokio::join!(
-        app1.oneshot(make_rights_request(ingest_token, &rights_token, valid_rights_body())),
+        app1.oneshot(make_rights_request(
+            ingest_token,
+            &rights_token,
+            valid_rights_body()
+        )),
         app2.oneshot(make_finalize_request(ingest_token, &auth_token)),
     );
 
     let rights_status = rights_resp.expect("rights response").status();
     let finalize_status = finalize_resp.expect("finalize response").status();
 
-    assert_eq!(rights_status, StatusCode::OK, "rights submission must always succeed");
+    assert_eq!(
+        rights_status,
+        StatusCode::OK,
+        "rights submission must always succeed"
+    );
 
     // Finalize may race: 201 (rights loaded) or 422 (rights not yet visible) are both valid.
     assert!(
-        matches!(finalize_status, StatusCode::CREATED | StatusCode::UNPROCESSABLE_ENTITY),
+        matches!(
+            finalize_status,
+            StatusCode::CREATED | StatusCode::UNPROCESSABLE_ENTITY
+        ),
         "finalize must be 201 or 422 in a rights+finalize race, got {finalize_status}"
     );
 
@@ -512,7 +599,10 @@ async fn concurrent_rights_and_finalize_is_consistent() {
             .fetch_one(&ctx.pool)
             .await
             .expect("artifact count");
-    assert!(artifact_count <= 1, "at most one artifact must exist for this token, got {artifact_count}");
+    assert!(
+        artifact_count <= 1,
+        "at most one artifact must exist for this token, got {artifact_count}"
+    );
 }
 
 fn make_finalize_request(ingest_token: Uuid, auth_token: &str) -> Request<Body> {
@@ -667,6 +757,95 @@ async fn migrate_and_reset(pool: &PgPool) {
     .expect("truncate");
 }
 
+async fn count_audit_events(pool: &PgPool, ingest_token: Uuid, event_kind: &str) -> i64 {
+    sqlx::query_scalar(
+        "SELECT COUNT(*) FROM audit_events WHERE ingest_token = $1 AND event_kind = $2",
+    )
+    .bind(ingest_token)
+    .bind(event_kind)
+    .fetch_one(pool)
+    .await
+    .expect("audit count")
+}
+
+async fn count_assets_for_ingest_token(pool: &PgPool, ingest_token: Uuid) -> i64 {
+    sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)
+        FROM assets a
+        JOIN artifact_records ar ON ar.asset_id = a.id
+        WHERE ar.ingest_token = $1
+        "#,
+    )
+    .bind(ingest_token)
+    .fetch_one(pool)
+    .await
+    .expect("asset count by ingest token")
+}
+
+async fn count_assets_for_uploader_and_title(pool: &PgPool, uploader_id: Uuid, title: &str) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM assets WHERE uploader_id = $1 AND title = $2")
+        .bind(uploader_id)
+        .bind(title)
+        .fetch_one(pool)
+        .await
+        .expect("asset count by uploader and title")
+}
+
+async fn count_rights_for_ingest_token(pool: &PgPool, ingest_token: Uuid) -> i64 {
+    sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)
+        FROM rights_records rr
+        JOIN artifact_records ar ON ar.asset_id = rr.asset_id
+        WHERE ar.ingest_token = $1
+        "#,
+    )
+    .bind(ingest_token)
+    .fetch_one(pool)
+    .await
+    .expect("rights count by ingest token")
+}
+
+async fn insert_preexisting_artifact_for_token(pool: &PgPool, ingest_token: Uuid) {
+    let existing_asset_id = Uuid::new_v4();
+    let existing_uploader_id = Uuid::new_v4();
+
+    sqlx::query(
+        r#"
+        INSERT INTO assets (id, title, uploader_id, status)
+        VALUES ($1, $2, $3, $4)
+        "#,
+    )
+    .bind(existing_asset_id)
+    .bind("preexisting duplicate guard")
+    .bind(existing_uploader_id)
+    .bind("finalized")
+    .execute(pool)
+    .await
+    .expect("insert preexisting asset");
+
+    sqlx::query(
+        r#"
+        INSERT INTO artifact_records (
+            id, asset_id, kind, ingest_token, storage_key, content_type, size_bytes, checksum
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(existing_asset_id)
+    .bind("original_media")
+    .bind(ingest_token)
+    .bind("assets/preexisting/file.mp4")
+    .bind("video/mp4")
+    .bind(123_i64)
+    .bind("preexisting-checksum")
+    .execute(pool)
+    .await
+    .expect("insert preexisting artifact");
+}
+
 fn rebuild_context(ctx: &TestContext) -> TestContext {
     let verifier: SharedTokenVerifier = Arc::new(
         StubTokenVerifier::default()
@@ -706,6 +885,50 @@ fn rebuild_context(ctx: &TestContext) -> TestContext {
     }
 }
 
+// H1-T1: cleanup must skip a pending row that is locked by an in-flight finalize
+// transaction (SELECT ... FOR UPDATE SKIP LOCKED). This test holds a FOR UPDATE
+// lock on an expired row to simulate finalize-in-progress, verifies claim returns
+// nothing for that row, then releases the lock and verifies claim succeeds.
+#[tokio::test]
+async fn cleanup_skips_row_locked_by_in_flight_finalize() {
+    let Some(mut ctx) = TestContext::new().await else {
+        eprintln!("skipping integration test: DATABASE_URL not set");
+        return;
+    };
+
+    let ingest_token = create_ingestion(&mut ctx).await;
+    expire_pending_ingestion(&ctx.pool, ingest_token).await;
+
+    // Simulate an in-flight finalize by holding a FOR UPDATE lock on the row.
+    let mut lock_tx = ctx.pool.begin().await.expect("begin lock tx");
+    sqlx::query("SELECT 1 FROM pending_ingestions WHERE ingest_token = $1 FOR UPDATE")
+        .bind(ingest_token)
+        .execute(&mut *lock_tx)
+        .await
+        .expect("lock row");
+
+    // claim_expired_for_cleanup uses SKIP LOCKED — must not return the locked row.
+    let claimed = dubbridge_db::pending_ingestion_repo::claim_expired_for_cleanup(&ctx.pool)
+        .await
+        .expect("claim while locked");
+    assert!(
+        claimed.iter().all(|(t, _)| *t != ingest_token),
+        "cleanup must skip a row locked by an in-flight finalize"
+    );
+
+    // Release the lock (finalize "aborts").
+    lock_tx.rollback().await.expect("rollback lock tx");
+
+    // Now claim should pick up the row.
+    let claimed2 = dubbridge_db::pending_ingestion_repo::claim_expired_for_cleanup(&ctx.pool)
+        .await
+        .expect("claim after lock released");
+    assert!(
+        claimed2.iter().any(|(t, _)| *t == ingest_token),
+        "cleanup must claim row after finalize lock is released"
+    );
+}
+
 // T1-T6: A multipart upload whose body exceeds MAX_UPLOAD_BYTES must be rejected
 // with 413 Payload Too Large before any bytes reach storage. The body is built
 // inline as raw multipart bytes so we can exceed the limit without writing to disk.
@@ -727,9 +950,12 @@ async fn upload_too_large_is_rejected() {
     let payload_size = MAX_UPLOAD_BYTES + 1;
     let mut body_bytes = Vec::with_capacity(header.len() + payload_size + footer.len());
     body_bytes.extend_from_slice(header.as_bytes());
-    body_bytes.extend(std::iter::repeat(0u8).take(payload_size));
+    body_bytes.extend(std::iter::repeat_n(0u8, payload_size));
     body_bytes.extend_from_slice(footer.as_bytes());
 
+    // axum DefaultBodyLimit checks Content-Length to enforce the limit before
+    // reading the body. Without it, the multipart parser reads and returns 400.
+    let content_length = body_bytes.len();
     let response = ctx
         .app
         .clone()
@@ -745,6 +971,7 @@ async fn upload_too_large_is_rejected() {
                     header::CONTENT_TYPE,
                     format!("multipart/form-data; boundary={boundary}"),
                 )
+                .header(header::CONTENT_LENGTH, content_length.to_string())
                 .body(Body::from(body_bytes))
                 .expect("oversized request"),
         )

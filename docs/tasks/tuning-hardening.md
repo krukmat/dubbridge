@@ -23,7 +23,7 @@ durable mechanism that survives API restarts and preserves the existing
 `/ingest -> /ingest/{token}/rights -> /ingest/{token}/finalize` contract.
 
 ### Context
-- S1 T5 currently stores pending upload-ingestion sessions in process memory.
+- At task start, S1 T5 stored pending upload-ingestion sessions in process memory.
 - A restart between upload and finalize loses the session and orphaned stored
   objects may remain.
 - This does not block S1 acceptance, but it is a real reliability risk before
@@ -191,6 +191,8 @@ unit-testable.
   - `crates/domain/src/asset.rs` — 3 tests for `IngestionStatus::Display`, `AssetId::Display`, `Asset::new_pending`
 - Added `temp-env = "0.3"` dev-dependency to `crates/storage/Cargo.toml` and `crates/config/Cargo.toml` for thread-safe env var isolation.
 - Narrowed CI gate in `.github/workflows/ci.yml` using `--ignore-filename-regex` to exclude 6 non-testable files (binary entry points, sqlx factory, string literal, tracing init). Each exclusion is justified in inline comments.
+- Post-consolidation fix: aligned `.githooks/pre-push` with the same
+  `--ignore-filename-regex` so the local and CI coverage scopes match.
 - Final measurement: **91.08% lines** (1783 total, 159 uncovered) with exclusions applied.
 - Verification run on 2026-05-31:
   - `~/.cargo/bin/cargo test -p dubbridge-config -p dubbridge-domain -p dubbridge-media -p dubbridge-storage` → 36/36 passed
@@ -221,7 +223,7 @@ finalize, concurrent rights/finalize, and cleanup-vs-finalize races.
   - `concurrent_duplicate_finalize_one_wins`: proves exactly one finalize wins (201) and the other is rejected (409 or 404 depending on scheduler); artifact count = 1. Documents that the DB unique constraint on `artifact_records.ingest_token` is the real guard.
   - `concurrent_rights_and_finalize_is_consistent`: proves no silent data corruption when rights and finalize race; finalize gets 201 (rights loaded) or 422 (rights not visible yet); artifact count ≤ 1.
   - Helper functions `make_finalize_request` and `make_rights_request` added for direct `oneshot` composition.
-- `apps/api/src/cleanup.rs`: race window documented as explicit invariant comment (T1-T4 block). Explains the boundary condition, the risk (orphaned blob reference on artifact record), and why closing it fully requires a distributed lock (deferred).
+- `apps/api/src/cleanup.rs`: race window documented as explicit invariant comment (T1-T4 block). Explains the boundary condition and the risk (orphaned blob reference on artifact record). Full finalize/cleanup coordination moved to blocking gate H1 before S3 expansion.
 - Verified: `cargo test -p dubbridge-api --test ingestion_test -- --test-threads=1` → 11/11 passed.
 - Verified: `cargo check --workspace` → clean.
 - Integration tests require `--test-threads=1` with a live DB (all tests share `migrate_and_reset` which truncates tables; documented in test comment).

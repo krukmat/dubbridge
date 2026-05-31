@@ -23,8 +23,7 @@ fail-closed invariants the platform depends on.
 ## Decision
 
 - **PostgreSQL** is the system of record for all structured metadata. Repositories
-  in `crates/db` use compile-time-checked `sqlx` queries against typed domain
-  models in `crates/domain`.
+  in `crates/db` use SQLx queries and typed domain mappings from `crates/domain`.
 - **Object storage** (MinIO locally, S3-compatible in production) holds all binary
   artifacts. Access is mediated by the `StorageAdapter` boundary in
   `crates/storage`, never by direct client coupling.
@@ -61,3 +60,9 @@ fail-closed invariants the platform depends on.
 - ADR-008 (rights ledger precondition) — depends on transactional metadata.
 - ADR-018 (observability) — audit events live in PostgreSQL.
 - Implemented by: `infra/migrations/0001..0004`, `crates/db`, `crates/storage`.
+
+> Implementation note: S1 still constructs upload keys in
+> `apps/api/src/routes/ingestion.rs` and passes buffered bytes to
+> `StorageAdapter::put`. S2 must move upload-key construction behind
+> `crates/storage`, implement MinIO/S3 behavior, add orphan reconciliation, and
+> choose a streaming or presigned upload strategy for production-scale files.
