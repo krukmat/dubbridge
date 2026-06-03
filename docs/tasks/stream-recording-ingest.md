@@ -4,7 +4,7 @@
 > **platform download** (ADR-025), not RTMP/SRT live capture. Shared foundation
 > **S3-T0/T0b/T0c/T1/T2 stay DONE and are reused**. **S3-T3 … S3-T8 are marked
 > `[~] REPLANNED → S3b`** (deferred FFmpeg live recorder). New primary-path tasks
-> **S3-P1 … S3-P5** are added below. Build order for S3: P1 → P5. S3b is built only
+> **S3-P1 … S3-P7** are added below. Build order for S3: P1 → P7. S3b is built only
 > when a real live-broadcast client need exists.
 
 Governing plan: `docs/plan/stream-recording-ingest.md`
@@ -280,7 +280,7 @@ New crate mirroring `crates/media`'s command-builder pattern (ADR-019, ADR-020):
 - `crates/jobs/src/lib.rs`
 - `crates/storage/src/lib.rs`
 
-### Status: [~] REPLANNED → S3b — `StreamRecordingJob`/recording storage are live-capture specific; the platform path uses `PlatformIngestJob` (S3-P4). Deferred to S3b.
+### Status: [~] REPLANNED → S3b — `StreamRecordingJob`/recording storage are live-capture specific; the platform path uses `PlatformIngestJob` (S3-P6). Deferred to S3b.
 
 ---
 
@@ -312,7 +312,7 @@ idempotency-token cardinality.
 - `crates/db/src/artifact_repo.rs` (F3 parse fix), `crates/db/src/audit_repo.rs`
 - `crates/domain/src/audit.rs` (recording audit constructor — shared with T1)
 
-### Status: [~] REPLANNED → S3b — the recording→asset bridge is generalized by ADR-021 and implemented for downloads in S3-P4; this live-capture bridge is deferred to S3b.
+### Status: [~] REPLANNED → S3b — the recording→asset bridge is generalized by ADR-021 and implemented for downloads in S3-P6; this live-capture bridge is deferred to S3b.
 
 ---
 
@@ -344,7 +344,7 @@ idempotency-token cardinality.
 - `apps/api/src/state.rs`, `apps/api/src/main.rs`
 - `apps/api/Cargo.toml`
 
-### Status: [~] REPLANNED → S3b — start/stop capture endpoints are live-recording specific; the platform path exposes create/start/get ingest endpoints in S3-P5. Deferred to S3b.
+### Status: [~] REPLANNED → S3b — start/stop capture endpoints are live-recording specific; the platform path exposes create/start/get ingest endpoints in S3-P7. Deferred to S3b.
 
 ---
 
@@ -370,7 +370,7 @@ invoke the bridge (T5), on `Failed` audit and surface the error.
 - `apps/worker-runner/src/handlers/recording.rs`
 - `apps/worker-runner/Cargo.toml`
 
-### Status: [~] REPLANNED → S3b — supervises FFmpeg capture, which is the deferred sub-case; the platform worker handler is S3-P4. Deferred to S3b.
+### Status: [~] REPLANNED → S3b — supervises FFmpeg capture, which is the deferred sub-case; the platform worker handler is S3-P6. Deferred to S3b.
 
 ---
 
@@ -400,13 +400,13 @@ invoke the bridge (T5), on `Failed` audit and surface the error.
   root is not a Cargo package)
 - Unit test modules co-located in the crates above.
 
-### Status: [~] REPLANNED → S3b — these tests exercise the FFmpeg `lavfi` capture path; the primary platform-ingest test suite lives in S3-P3/S3-P4. Deferred to S3b.
+### Status: [~] REPLANNED → S3b — these tests exercise the FFmpeg `lavfi` capture path; the primary platform-ingest test suite lives in S3-P5/S3-P6. Deferred to S3b.
 
 ---
 
 # Platform Ingester tasks (PRIMARY path — REPLAN 2026-05-31, ADR-025)
 
-Build order for S3: **P1 → P5**. These reuse the DONE foundation
+Build order for S3: **P1 → P7**. These reuse the DONE foundation
 (T0/T0b/T0c/T1/T2) and the generalized ADR-021 bridge. The FFmpeg recorder
 (T3–T8) is deferred to S3b.
 
@@ -475,7 +475,8 @@ retrieval mechanism must be proven, not assumed.
 
 ### Acceptance criteria
 - ADR-025 (or an appendix) records one coherent, validated v1 retrieval mechanism.
-- The credential scope and redaction approach are documented before P3 starts.
+- The credential scope and redaction approach are documented before connector
+  implementation starts.
 - The spike contains no vendored third-party source and is not published.
 
 ### Files affected
@@ -483,22 +484,115 @@ retrieval mechanism must be proven, not assumed.
 - `docs/adr/ADR-025-platform-connector-ingest-and-owner-authorized-credentials.md`
 - `docs/plan/stream-recording-ingest.md` (decision note)
 
-### Status: [ ]
+### Status: [x] DONE — 2026-06-03
+
+Outcome:
+- Official docs validate `resolve()` with OAuth 2.0 + `youtube.readonly` and
+  authenticated channel resolution through `channels.list(part=contentDetails, mine=true)`.
+- Official docs did **not** validate a backend API endpoint that returns media bytes
+  for a creator's uploaded video.
+- The documented owner-download surfaces found are YouTube Studio per-video download
+  and Google Takeout export, both user-mediated.
+- ADR-025 was narrowed accordingly; internal spike notes recorded under
+  `spikes/youtube-connector-sandbox/`.
 
 ---
 
-## Task P3 — YouTube connector v1
+## Task P3 — Replan platform-ingest provider path after YouTube spike
 
-**Effort:** L · **Complexity:** High · **Depends on:** P1, P2
+**Effort:** M · **Complexity:** High · **Depends on:** P1, P2
+**Recommended model:** Codex `GPT-5.2-Codex` / Claude `Sonnet 4` with thinking On
+
+### Objective
+Convert the P2 negative spike result into a coherent next-step plan for S3. Keep
+the connector architecture, but remove YouTube as the pinned backend-download `v1`
+provider until an official server-driven byte-retrieval path exists or a separate
+user-mediated export slice is planned.
+
+### Scope
+- Update ADR-025, this task ledger, and the linked plan/roadmap so the S3 primary
+  path is provider-agnostic after P2.
+- Decide the immediate downstream sequence:
+  - a new capability spike for the first provider with an official server-side
+    download API,
+  - then connector implementation for that supported provider,
+  - then job/bridge wiring and API endpoints.
+- Explicitly defer YouTube backend-download implementation for now.
+
+### Acceptance criteria
+- The S3 plan no longer describes YouTube as the fixed backend-download `v1`
+  connector.
+- P4+ tasks are rewritten into a viable post-P2 sequence with consistent
+  dependencies.
+- ADR, roadmap, and task ledger agree on the new path.
+
+### Files affected
+- `docs/tasks/stream-recording-ingest.md`
+- `docs/plan/stream-recording-ingest.md`
+- `docs/plan/roadmap.md`
+- `docs/adr/ADR-025-platform-connector-ingest-and-owner-authorized-credentials.md`
+
+### Status: [x] DONE — 2026-06-03
+
+Outcome:
+- YouTube is no longer the pinned backend-download `v1` provider for S3.
+- The next gate would be a provider-capability spike for the first provider with
+  an official server-side download API, but that work is deferred for this phase.
+- The connector, worker, and API tasks were renumbered and rewritten accordingly.
+
+---
+
+## Task P4 — First supported-provider capability spike (gate)
+
+**Effort:** M · **Complexity:** High (external API dependency) · **Depends on:** P1, P3
+**Recommended model:** Codex `GPT-5.2-Codex` / Claude `Sonnet 4` with thinking On
+
+### Objective
+Before implementing the first real connector, validate one provider that actually
+offers an official server-side media-download surface compatible with the
+`PlatformConnector` contract.
+
+### Scope
+- Throwaway internal spike under `spikes/<provider>-connector-sandbox/` (not
+  published, no third-party source vendored).
+- Determine and document, for the chosen provider: required credential scope(s),
+  how ownership/access is verified (`resolve`), the official byte-retrieval
+  mechanism for `download`, the container/quality contract, and redaction rules.
+- Narrow ADR-025 and the plan if the spike constrains the trait contract.
+
+### Acceptance criteria
+- ADR-025 (or an appendix) records one coherent, validated `resolve` + `download`
+  mechanism for the selected provider.
+- The credential scope and redaction approach are documented before connector
+  implementation starts.
+- The spike contains no vendored third-party source and is not published.
+
+### Files affected
+- `spikes/<provider>-connector-sandbox/` (temporary, internal)
+- `docs/adr/ADR-025-platform-connector-ingest-and-owner-authorized-credentials.md`
+- `docs/plan/stream-recording-ingest.md`
+
+### Status: [~] DEFERRED / NOT NOW — 2026-06-03
+
+Deferred note:
+- Valid follow-up for S3, but intentionally out of scope for the current phase.
+- Do not treat this as the next active execution target unless S3 is re-prioritized.
+
+---
+
+## Task P5 — First supported-provider connector v1
+
+**Effort:** L · **Complexity:** High · **Depends on:** P1, P3, P4
 **Recommended model:** Codex `GPT-5.2-Codex` / Claude `Sonnet 4`
 
 ### Objective
-Implement the YouTube `PlatformConnector` using the P2-validated mechanism:
-`resolve()` (ownership + metadata) and `download()` (owner-authorized bytes to local
-staging), with credentials resolved by reference and redacted in logs.
+Implement the first real `PlatformConnector` using the P4-validated provider
+mechanism: `resolve()` (ownership + metadata) and `download()` (official
+server-driven bytes to local staging), with credentials resolved by reference and
+redacted in logs.
 
 ### Scope
-- `crates/connectors/src/youtube.rs`: pure request builder (unit-testable, no
+- `crates/connectors/src/<provider>.rs`: pure request builder (unit-testable, no
   network) + executor performing authenticated IO.
 - Connector config in `crates/config` (timeouts, staging path, secrets-store ref).
 
@@ -510,16 +604,20 @@ staging), with credentials resolved by reference and redacted in logs.
 - `cargo check` + `cargo test -p dubbridge-connectors` pass.
 
 ### Files affected
-- `crates/connectors/src/youtube.rs`, `crates/connectors/Cargo.toml`
+- `crates/connectors/src/<provider>.rs`, `crates/connectors/Cargo.toml`
 - `crates/config/src/lib.rs`
 
-### Status: [ ]
+### Status: [~] DEFERRED / NOT NOW — 2026-06-03
+
+Deferred note:
+- Blocked by phase priority, not by technical invalidity.
+- Remains downstream of P4 when/if S3 resumes.
 
 ---
 
-## Task P4 — `PlatformIngestJob` + download→bridge wiring
+## Task P6 — `PlatformIngestJob` + download→bridge wiring
 
-**Effort:** L · **Complexity:** High · **Depends on:** T0 (DONE), P1, P3
+**Effort:** L · **Complexity:** High · **Depends on:** T0 (DONE), P1, P3, P5
 **Recommended model:** Codex `GPT-5.2-Codex` / Claude `Sonnet 4`
 
 ### Objective
@@ -553,13 +651,17 @@ generalized). One asset, one `ingest_token` per session.
 - `infra/migrations/<next>_create_platform_ingest_sessions.sql` (new)
 - `apps/worker-runner/src/{main.rs,handlers/platform_ingest.rs}`
 
-### Status: [ ]
+### Status: [~] DEFERRED / NOT NOW — 2026-06-03
+
+Deferred note:
+- Blocked by phase priority, not by technical invalidity.
+- Remains downstream of P5 when/if S3 resumes.
 
 ---
 
-## Task P5 — API endpoints (platform ingest)
+## Task P7 — API endpoints (platform ingest)
 
-**Effort:** M · **Complexity:** Medium · **Depends on:** S0 T2, P1, P4
+**Effort:** M · **Complexity:** Medium · **Depends on:** S0 T2, P1, P6
 **Recommended model:** Codex `GPT-5.2-Codex` / Claude `Sonnet 4`
 
 ### Endpoints
@@ -584,7 +686,11 @@ generalized). One asset, one `ingest_token` per session.
 - `apps/api/src/dto/platform_ingest.rs` (new)
 - `apps/api/src/{state.rs,main.rs}`, `apps/api/Cargo.toml`
 
-### Status: [ ]
+### Status: [~] DEFERRED / NOT NOW — 2026-06-03
+
+Deferred note:
+- Blocked by phase priority, not by technical invalidity.
+- Remains downstream of P6 when/if S3 resumes.
 
 ---
 
@@ -621,7 +727,8 @@ track `stable` to match CI. Record the chosen Rust version policy in the README
 
 ```
 You are implementing the PRIMARY S3 Platform Ingest path of DubBridge
-(owner-authorized platform download — YouTube first). RTMP/SRT live recording is
+(owner-authorized platform download via the first officially supported provider).
+RTMP/SRT live recording is
 the DEFERRED S3b sub-case; do not build it unless explicitly asked.
 
 Repo: /Users/matiasleandrokruk/Documents/dubbridge
@@ -632,7 +739,7 @@ ADRs: ADR-025 (primary: connector ingest + owner credentials),
       ADR-023 (API identity). ADR-019/020/022 govern the deferred S3b recorder.
 
 Foundation T0/T0b/T0c/H1/T1/T2 are complete and reused. Work one approved task at a
-time in order: P1 -> P5. After each task:
+time in order: P1 -> P7. After each task:
 1. Run `cargo check` (and `cargo test` for the touched crate) at the workspace root.
 2. Mark the task [x] in the tasks document and record the files/lines affected.
 3. Report a summary and WAIT for approval before starting the next task.
@@ -650,7 +757,8 @@ Hard invariants (do not violate):
   in plaintext, and redacted in all logs/traces.
 - API identity (ADR-023): platform-ingest HTTP endpoints reuse the S0 verified
   principal; keep API bearer tokens separate from owner platform credentials.
-- YouTube retrieval mechanism is fixed by the P2 spike before P3 implementation.
+- YouTube backend-download is deferred after the P2 spike; do not restore it
+  unless the task ledger/ADR is explicitly replanned again.
 - Do NOT commit if any test is broken. Run all tests before commit/push.
 - All user-facing communication is in Spanish; code/docs/commits in English.
 ```

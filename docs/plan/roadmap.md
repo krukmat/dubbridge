@@ -10,7 +10,8 @@ in `docs/plan/<slice>.md`; this file explains how they fit together.
 Last consolidated: 2026-05-31 after the roadmap/ADR/architecture review in
 `docs/audit/2026-05-31-roadmap-adr-architecture-consolidation.md` (including the
 same-day ADR-traceability follow-up G1–G4 in that file). Updated the same day
-after H1 completion.
+after H1 completion. Updated 2026-06-03: scoped P0 around environment separation
+and fail-closed configuration (see "P0 strategy" below, principle added, and X21).
 
 ## Status legend
 - ✅ Done · 🟡 In progress · ⬜ Not started · 📄 Planned (plan exists, not built)
@@ -24,6 +25,12 @@ after H1 completion.
   (ADR-006).
 - Rights are a mandatory fail-closed precondition for every intake mode and every
   downstream derivative (ADR-008).
+- Runtime configuration is fail-closed and environment-explicit: no environment-
+  specific value is compiled into the binary; production refuses to boot on a missing
+  required value or a local default (localhost datastore, local-fs storage, absent
+  auth). Non-secret environment values live in committed per-environment profiles;
+  secrets exist only in injected environment variables. Local Docker Compose is local
+  infrastructure only and is never the production deployment descriptor (P0, ADR-026, X21).
 - Governance-significant events require durable audit rows plus correlated
   structured tracing (ADR-018).
 - API caller identity is verified at the Axum boundary; first-party browser access
@@ -53,7 +60,7 @@ API client -> S0 authenticated principal
                   |
         +-- direct upload ............... S1 (operational)
 intake -+-- platform download ........... S3 (primary, planned: owner-authorized
-        |                                  YouTube/Vimeo -> download -> same gate, ADR-025)
+        |                                  first supported provider -> download -> same gate, ADR-025)
         +-- live stream recording ....... S3b (deferred: RTMP/SRT -> recording -> same gate)
 ```
 
@@ -76,7 +83,7 @@ Plan: `docs/plan/h1-governance-atomicity-hardening.md`
 | **S1** | Asset ingestion + rights ledger (upload) | S0 T2 for HTTP endpoints | ✅ done | `docs/plan/s1-asset-ingestion-rights-ledger.md` |
 | **T1** | Initial tuning / hardening backlog | S1 | ✅ done | `docs/plan/tuning-hardening.md` |
 | **S2** | Object storage switchover (MinIO/S3 behind `StorageAdapter`) | S1 T4 | ⬜ no plan yet | — |
-| **S3** | Platform ingest (owner-authorized download: YouTube/Vimeo) | S0 T2, S1, H1; S2 prudent before heavy writes | 🟡 REPLANNED 2026-05-31 — foundation T0/T0c/T1/T2 done; primary path P1–P5 pending | `docs/plan/stream-recording-ingest.md` |
+| **S3** | Platform ingest (owner-authorized download: first supported provider) | S0 T2, S1, H1; S2 prudent before heavy writes | 🟡 REPLANNED 2026-05-31 — foundation T0/T0c/T1/T2 done; P1/P2/P3 done; P4-P7 deferred for this phase | `docs/plan/stream-recording-ingest.md` |
 | **S3b** | Stream recording ingest (RTMP/SRT live capture) — deferred sub-case | S3 foundation | ⬜ deferred — built only for live-broadcast clients (ex-T3–T8) | `docs/plan/stream-recording-ingest.md` |
 | **S4** | Media preparation (ffprobe metadata + HLS transcode) | S1, S2 | ⬜ no plan yet | — |
 | **S5** | Processing / ASR (transcription) | S4 | ⬜ worker contract only | `workers/asr-worker-py` |
@@ -91,19 +98,66 @@ These are real architecture work, but they do not sit on the linear media pipeli
 
 | Slice | Name | Depends on | Status | Source |
 |-------|------|------------|--------|--------|
-| **P0** | Local/deployment runtime wiring (compose env, auth bootstrap, service DNS, version policy) | S0, S1 | ⬜ no plan yet | `infra/docker-compose.yml`, `README.md` |
+| **P0** | Environment separation & deployment runtime wiring (layered fail-closed config, compose = local-infra-only, auth bootstrap, service DNS, version policy) | S0, S1 | ⬜ scoped (see "P0 strategy" below); no plan ledger yet | `crates/config`, `crates/observability`, `infra/docker-compose.yml`, `README.md` |
 | **P1** | First-party session gateway / BFF | S0, external authorization-server contract | ⬜ no plan yet | ADR-024 |
 | **P2** | Production identity hardening (JWKS discovery, automatic key rotation, subject mapping if needed) | S0 | ⬜ no plan yet | ADR-023 |
 
 `P1` must be planned before building a first-party browser or operator-console auth
 flow. It does not block S2 or S3.
 
+## P0 strategy: environment separation & fail-closed configuration
+
+P0 makes the local ↔ production boundary explicit and hard to confuse. Today
+`crates/config` compiles local defaults into the binary (`AppConfig::from_env` falls
+back to `localhost` Postgres/Redis and `/tmp` storage), so a misconfigured production
+process boots silently against development resources. P0 inverts this to the same
+fail-closed posture as the rights gate (ADR-008): wrong configuration must abort
+startup, not degrade silently.
+
+Design (recommended: typed layered config; no Kubernetes assumed at this stage):
+
+- One explicit discriminator `DUBBRIDGE_ENV ∈ {local, staging, production}` with no
+  compiled default; an unknown or missing value fails closed at startup.
+- Resolution layers: code defaults (universal only) ← `config/default.toml` ←
+  `config/<env>.toml` (committed, non-secret) ← `DUBBRIDGE_*` env vars (secrets and
+  per-deploy overrides). The former in-code `localhost`/`/tmp` fallbacks move into
+  `config/local.toml`; they never live in the binary again.
+- A single typed schema + `validate()` is read by `apps/api` and `apps/worker-runner`
+  alike and, in production-like environments, rejects localhost datastores, the
+  local-fs storage backend, absent auth (ADR-023), and human-pretty log format
+  (must be JSON, ADR-018).
+- Storage backend selection becomes env-driven (`build_adapter` switches on a backend
+  selector). The selector seam is P0; the MinIO/S3 adapter itself is S2 (X9).
+- Observability format/exporter become env-driven (`init_tracing` parameterized):
+  local pretty, production JSON + exporter (ADR-018).
+- `infra/` is split so Compose is local infrastructure only (a banner states it is
+  not the production descriptor); the production deployment descriptor is a separate
+  artifact added when a first deploy target exists.
+
+Phasing (now vs later):
+
+- Phase 0 (now): `DUBBRIDGE_ENV` + a typed `load()` + `validate()`; move local
+  defaults to `config/local.toml`; add `config/default.toml` and `.env.example`;
+  api/worker switch to fail-closed load. Closes the compiled-default leak (core of X18).
+- Phase 1 (now): reorganize to `infra/local/`; Compose = infra + app under a profile
+  with a non-production banner; pin the Rust image to `rust-toolchain.toml` (X2/T9).
+- Phase 2 (couples with S2): env-driven storage backend selector (X9) and env-driven
+  observability format/exporter (ADR-018).
+- Phase 3 (later): production deployment descriptor + secret-manager injection
+  boundary; owner-credential secret-store decision (X20).
+- Phase 4 (deferred): orchestration (k8s/Helm or Nomad), telemetry collector, config
+  service — only if multiple live environments or teams justify it. Not assumed now.
+
+The layered fail-closed configuration & environment-separation decision is recorded
+in ADR-026. The owner-credential secret-store mechanism (X20) remains an open decision
+and warrants its own ADR when authored (X3).
+
 ## Why platform ingest is S3 (and live recording is S3b)
 
 **Replan 2026-05-31 (ADR-025).** The real S3 intake use case is owner-authorized
 **platform download**: the content owner provides scoped credentials to their own
-platform account (YouTube first, Vimeo/others later) and DubBridge downloads the
-owner's content on their behalf. This is the primary S3 path. RTMP/SRT live capture
+platform account and DubBridge downloads the owner's content on their behalf. This
+is the primary S3 path. RTMP/SRT live capture
 is demoted to a deferred sub-slice (**S3b**) for the minority of clients who produce
 live broadcasts.
 
@@ -118,8 +172,9 @@ platform-download path**:
   mirroring the `crates/media` pure-builder / IO-executor boundary (ADR-025).
 - Owner-credential handling stored by reference and redacted (ADR-025, ADR-018).
 - H1 atomicity and durable-audit hardening before the reused finalize path expands.
-- A validated YouTube retrieval mechanism (P2 spike gate) before the connector is
-  built — the T0c-style gate for this path.
+- The completed YouTube spike (P2), which ruled out YouTube as the pinned
+  backend-download v1 provider, and a new provider-capability spike (P4) before
+  the first connector is built.
 
 The **deferred S3b live-recording path** additionally needs the FFmpeg-subprocess
 recorder (ADR-019), the segment/lifecycle model and T0c output contract (ADR-020),
@@ -145,12 +200,14 @@ Shared foundation (DONE, reused by both paths):
   T1  domain: recording aggregate, ArtifactKind, audit generalization
   T2  migrations: recording_sessions + audit generalization
 
-PRIMARY S3 — platform ingest (build P1 -> P5):
+PRIMARY S3 — platform ingest (build P1 -> P7):
   P1 connector trait boundary (crates/connectors) + PlatformIngestSession domain
-  P2 YouTube retrieval-mechanism spike (gate)
-  P3 YouTube connector v1
-  P4 PlatformIngestJob + download->bridge wiring + platform_ingest_sessions migration
-  P5 API endpoints (/ingests/platform)
+  P2 YouTube retrieval-mechanism spike (gate) -> DONE 2026-06-03
+  P3 provider-path replan after YouTube spike -> DONE 2026-06-03
+  P4 first supported-provider capability spike (gate) -> DEFERRED for this phase
+  P5 first supported-provider connector v1 -> DEFERRED for this phase
+  P6 PlatformIngestJob + download->bridge wiring + platform_ingest_sessions migration -> DEFERRED for this phase
+  P7 API endpoints (/ingests/platform) -> DEFERRED for this phase
 
 S3b — live recorder (DEFERRED): ex-T3 recorder crate, ex-T4 jobs/storage,
   ex-T5 bridge, ex-T6 API, ex-T7 worker, ex-T8 tests. Marked [~] REPLANNED.
@@ -163,8 +220,8 @@ S3b — live recorder (DEFERRED): ex-T3 recorder crate, ex-T4 jobs/storage,
 | Item | Obligation | Owner / next action |
 |------|------------|---------------------|
 | **X1** | Reconcile `crates/audit` duplicate type | ✅ closed by T1 Task 5; H1 now owns central audit emission semantics |
-| **X2** | Align docker-compose Rust pin with toolchain policy | S3 Task 9; fold into P0 when planned |
-| **X3** | Backfill remaining open ADR numbers only when real decisions are identified | open |
+| **X2** | Align docker-compose Rust pin with toolchain policy | P0 Phase 1 (pin Rust image to `rust-toolchain.toml`); ex-S3 Task 9 |
+| **X3** | Backfill remaining open ADR numbers only when real decisions are identified | layered fail-closed configuration & environment separation now recorded as ADR-026; owner-credential secret-store (X20) still open, ADR to be authored |
 | **X4** | Persist pending upload sessions across API restarts | ✅ closed by T1 Task 1 |
 | **X5** | Add TTL/cleanup for abandoned pending uploads | ✅ closed by T1 Task 2 |
 | **X6** | Enforce the 90% coverage gate | ✅ closed by T1 Task 3 |
@@ -179,24 +236,30 @@ S3b — live recorder (DEFERRED): ex-T3 recorder crate, ex-T4 jobs/storage,
 | **X15** | Keep RTSP, HLS pull, WebRTC, and per-segment publication as explicit live-recording follow-ups | post-S3b backlog |
 | **X16** | Move reusable finalize logic from `apps/api` into an app-neutral shared boundary | ✅ closed by H1 on 2026-05-31 |
 | **X17** | Enforce append-only rights rows and strict decoding of stored governance states | ✅ closed by H1 on 2026-05-31 |
-| **X18** | Wire container service DNS, database/Redis URLs, auth bootstrap, health checks, and version policy so documented local startup is reproducible | P0 |
+| **X18** | Wire container service DNS, database/Redis URLs, auth bootstrap, health checks, and version policy so documented local startup is reproducible | P0 Phases 0–1 (layered config + `infra/local/` split) |
 | **X19** | Enforce fail-closed source authentication (RTMP stream key / SRT passphrase, credential redaction, `rtmp`/`srt` scheme allow-list) before any capture begins | S3b (domain T1 done, migration T2 done, recorder ex-T3, API ex-T6); ADR-022 |
-| **X20** | Decide the secrets-store mechanism for owner-provided platform credentials (storage by reference, scope minimization, redaction); no dedicated ADR yet | S3 P1–P4; ADR-025 |
+| **X20** | Decide the secrets-store mechanism for owner-provided platform credentials (storage by reference, scope minimization, redaction); no dedicated ADR yet | S3 P1–P6 + P0 (the config/secret split — committed non-secret profiles vs injected env secrets — is the boundary the store plugs into); ADR-025 |
+| **X21** | Make runtime configuration fail-closed and environment-explicit: no compiled environment-specific defaults; `DUBBRIDGE_ENV` required; production rejects localhost datastores, local-fs storage, absent auth, and pretty logs; committed non-secret per-env profiles separated from injected secrets; Compose is local-infra-only (ADR-026) | P0 (Phase 0 core) |
 
 ## Known planning gaps
 
 - **S3 replanned 2026-05-31 (ADR-025).** Primary path is owner-authorized platform
-  download; next S3 work is P1 (connector boundary + `PlatformIngestSession` domain).
-  RTMP/SRT live recording (ex-T3–T8) is the deferred S3b sub-case.
+  download. P1/P2/P3 are complete; the remaining P4–P7 work is intentionally
+  deferred for this phase. RTMP/SRT live recording (ex-T3–T8) is the deferred S3b
+  sub-case.
 - The shared foundation (T0/T0b/T0c/H1/T1/T2) is complete and reused by both paths.
   T0c only governs S3b (it fixed the live-recording output contract).
-- The YouTube retrieval mechanism for the platform path is not yet fixed; P2 is a
-  blocking spike gate before P3, analogous to T0c for recording.
+- The YouTube retrieval mechanism for the platform path was spiked on 2026-06-03.
+  Result: official docs validate `resolve()` but not an API-driven backend
+  `download()` path. YouTube is therefore deferred for backend-download in this
+  slice; P4 is the next gate for selecting the first officially supported provider.
 - The owner-credential secrets-store mechanism (X20) has no dedicated ADR yet and
-  must be decided during P1–P4.
-- S2, S4, P0, P1, and P2 need plan/task ledgers before execution. S2 must include the
-  object-store adapter, storage-key ownership, orphan reconciliation, and upload
-  memory-safety strategy.
+  must be decided during P1–P6; P0 establishes the config/secret split it plugs into.
+- S2, S4, P0, P1, and P2 need plan/task ledgers before execution. P0's strategy is now
+  scoped above (environment separation + fail-closed config, Phases 0–4); it still
+  needs `docs/plan/p0-*.md` + `docs/tasks/p0-*.md` ledgers before implementation. S2
+  must include the object-store adapter, storage-key ownership, orphan reconciliation,
+  and upload memory-safety strategy.
 - Slice numbering is provisional. Update this map whenever a slice, dependency, or
   ADR materially changes.
 - ADR-021 is generalized to all non-upload intake; ADR-019/020/022 are scoped to the

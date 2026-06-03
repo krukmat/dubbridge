@@ -43,7 +43,8 @@ The processing core is written in Rust. AI workloads (transcription, translation
 Requires Rust (via `rustup`) and Docker.
 
 ```
-# Infrastructure only. Full app-container wiring is tracked in roadmap slice P0.
+# Local infrastructure only — this Compose file is never the production deployment
+# descriptor (ADR-026). Full app-container wiring is tracked in roadmap slice P0.
 docker compose -f infra/docker-compose.yml up -d postgres redis minio
 # Configure DUBBRIDGE_AUTH_ISSUER, DUBBRIDGE_AUTH_AUDIENCE, and
 # DUBBRIDGE_AUTH_RSA_PUBLIC_KEY_PATH before starting the protected API.
@@ -75,6 +76,17 @@ cargo install cargo-deny --version 0.18.4 --locked
 Infrastructure: PostgreSQL for state, Redis for job coordination, MinIO for object storage.
 Full `api` / `worker-runner` container environment wiring is still planned work
 (`docs/plan/roadmap.md`, P0).
+
+### Environments (local vs production)
+
+Local and production are separated by a fail-closed layered configuration model
+governed by ADR-026 and delivered in slice P0
+(`docs/plan/p0-environment-separation.md`). Today `crates/config` still compiles local
+defaults into the binary; P0 replaces this with an explicit `DUBBRIDGE_ENV`, committed
+non-secret `config/<env>.toml` profiles, secrets injected only through environment
+variables, and a production `validate()` that rejects local defaults (localhost
+datastores, local-fs storage, absent auth). The Docker Compose file above is local
+infrastructure only and is never the production deployment descriptor.
 
 ## Repository layout
 

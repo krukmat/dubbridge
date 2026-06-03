@@ -14,6 +14,7 @@ members = [
   "crates/audit",
   "crates/ingestion",
   "crates/config",
+  "crates/connectors",
   "crates/observability",
 ]
 resolver = "3"

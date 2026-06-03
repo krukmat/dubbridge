@@ -14,6 +14,8 @@ pub enum ArtifactKind {
     OriginalMedia,
     /// S3-T1: assembled MP4 produced by the recording bridge (ADR-021).
     RecordedStreamMedia,
+    /// S3-P1: owner-authorized media downloaded from a platform connector.
+    DownloadedPlatformMedia,
 }
 
 impl std::fmt::Display for ArtifactKind {
@@ -21,6 +23,7 @@ impl std::fmt::Display for ArtifactKind {
         let s = match self {
             Self::OriginalMedia => "original_media",
             Self::RecordedStreamMedia => "recorded_stream_media",
+            Self::DownloadedPlatformMedia => "downloaded_platform_media",
         };
         write!(f, "{s}")
     }
@@ -34,6 +37,7 @@ impl std::fmt::Display for ArtifactKind {
 pub fn parse_artifact_kind(s: &str) -> ArtifactKind {
     match s {
         "recorded_stream_media" => ArtifactKind::RecordedStreamMedia,
+        "downloaded_platform_media" => ArtifactKind::DownloadedPlatformMedia,
         _ => ArtifactKind::OriginalMedia,
     }
 }
@@ -112,6 +116,23 @@ mod tests {
         assert_eq!(
             ArtifactKind::RecordedStreamMedia.to_string(),
             "recorded_stream_media"
+        );
+    }
+
+    // S3-P1: DownloadedPlatformMedia — written TDD-first, implemented in sub-task 4
+    #[test]
+    fn parse_downloaded_platform_media() {
+        assert_eq!(
+            parse_artifact_kind("downloaded_platform_media"),
+            ArtifactKind::DownloadedPlatformMedia
+        );
+    }
+
+    #[test]
+    fn artifact_kind_display_downloaded_platform_media() {
+        assert_eq!(
+            ArtifactKind::DownloadedPlatformMedia.to_string(),
+            "downloaded_platform_media"
         );
     }
 }

@@ -3,7 +3,7 @@
 > **2026-05-31 REPLAN (S3-REPLAN).** The S3 primary intake use case changed. It is
 > **not** "a client points their live encoder at DubBridge" (RTMP/SRT capture). It
 > is: **the content owner provides credentials to their own platform account
-> (YouTube, Vimeo, …) and DubBridge downloads the owner's content on their behalf**
+> and DubBridge downloads the owner's content on their behalf**
 > — legal and authorized because the client owns the content. RTMP/SRT live
 > recording is demoted to a **deferred sub-slice (S3b)**, valid only for clients who
 > produce live broadcasts. The new primary architecture is governed by **ADR-025**.
@@ -33,8 +33,8 @@ converges on the S1 rights gate.
 ## Objective (REPLAN 2026-05-31)
 
 **Primary (S3).** Add an **owner-authorized platform ingester**: given a content
-owner's credentials to their own platform account (YouTube first, Vimeo/others
-later) and a reference to an item they own, DubBridge **resolves ownership +
+owner's credentials to their own platform account and a reference to an item they
+own, DubBridge **resolves ownership +
 metadata, downloads the media to local staging, uploads the file to storage, and
 incorporates it as an asset through the existing fail-closed ingestion path**
 (ADR-021 + S1 `finalize_ingestion_core`). No downloaded media becomes a processable
@@ -54,8 +54,9 @@ a real live-broadcast need exists (ADR-019/020/022).
   `AuditEventKind` variants (ADR-025). Reuses S3-T1 fail-closed validation pattern.
 - `crates/connectors` control-plane crate: `PlatformConnector` trait + pure request
   builder / IO executor split (mirrors `crates/media`/`crates/recorder`).
-- YouTube connector (v1), preceded by a retrieval-mechanism spike (the T0c-style
-  gate for the platform path).
+- A provider-selection replan after the negative YouTube spike, followed by a
+  capability spike for the first platform with an official server-side download
+  API, then one connector v1 behind the shared trait boundary.
 - Owner-credential handling by reference in the secrets store, redacted in logs
   (ADR-018, ADR-025).
 - `PlatformIngestJob` in `crates/jobs`; worker-runner consumption that downloads,
@@ -72,7 +73,10 @@ a real live-broadcast need exists (ADR-019/020/022).
   in the task ledger (S3-T3 … S3-T8 are REPLANNED into S3b).
 
 ### Excluded (deferred, both paths)
-- Vimeo and other connectors beyond YouTube v1 (additive behind the trait).
+- YouTube backend-download until an official server-driven byte-retrieval surface
+  exists or a separate user-mediated export slice is planned.
+- Additional connectors beyond the first supported provider (additive behind the
+  trait).
 - GStreamer in-process pipeline (future upgrade, ADR-019).
 - MediaMTX/SRS sidecar deployment (fallback, ADR-019).
 - RTSP, HLS pull, WebRTC sources (ADR-022 follow-ups).
@@ -197,13 +201,24 @@ retrieval) is validated by a throwaway internal spike before the connector is
 implemented — the T0c-style gate for this path. The trait keeps the mechanism
 swappable.
 
+**P2 result (2026-06-03).** The spike validated `resolve()` with
+`youtube.readonly` plus `channels.list(part=contentDetails, mine=true)` ownership
+resolution, but it did **not** validate an official API-driven backend
+`download()` path for a creator's uploaded bytes. The official documented
+retrieval surfaces found were YouTube Studio per-video download and Google Takeout
+export, both user-mediated. As a result, YouTube is deferred for backend-download
+in this slice. The next S3 gate is a provider-capability spike for the first
+platform with an official server-side download API. That follow-up is itself
+deferred for the current phase and should not be treated as an active execution
+target until S3 is re-prioritized.
+
 ## Platform ingester — affected files (primary, S3)
 
 ### crates/connectors/ (new crate)
 - `Cargo.toml` + workspace member
 - `src/lib.rs` — `PlatformConnector` trait, `Platform`, `SourceRef`,
   `ConnectorCredential`, `RemoteMediaMetadata`, `DownloadedMedia`, `ConnectorError`
-- `src/youtube.rs` — YouTube connector v1 (pure request builder + executor)
+- `src/<provider>.rs` — first supported connector v1 (pure request builder + executor)
 
 ### crates/domain/src/
 - `platform_ingest.rs` (new) — `PlatformIngestSession`, status set,

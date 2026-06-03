@@ -37,8 +37,8 @@ request builder** and an **IO executor**:
 ```text
 crates/connectors
   src/lib.rs        -> PlatformConnector trait, Platform enum, shared types
-  src/youtube.rs    -> YouTube connector (v1)
-  src/vimeo.rs      -> Vimeo connector (later)
+  src/<provider>.rs -> first supported connector (v1)
+  src/youtube.rs    -> deferred unless provider surface changes or an export-flow slice is planned
 ```
 
 Trait shape (illustrative; final signatures decided in the implementing task):
@@ -74,21 +74,44 @@ pub trait PlatformConnector {
 - `crates/connectors` has **no DB dependency**; it depends on `crates/domain` and
   `crates/config`, exactly like `crates/recorder` was specified to.
 
-### 2. YouTube connector is v1; retrieval mechanism validated by a spike
+### 2. YouTube spike invalidated YouTube-as-v1; the first supported connector is selected after validation
 
 YouTube does not expose a single Data-API endpoint that returns the original media
 bytes for arbitrary videos. The legitimate owner-download mechanism (YouTube Data
 API for metadata + ownership verification, plus the owner-authorized retrieval of
-their own media) must be validated by a throwaway internal spike **before** the
-connector is implemented — the same gate discipline T0c applied to FFmpeg.
+their own media) had to be validated by a throwaway internal spike **before** the
+connector could be implemented — the same gate discipline T0c applied to FFmpeg.
 
-The spike fixes, for v1:
-- the OAuth scope(s) the owner must grant,
-- how ownership is verified (`resolve`),
-- the concrete retrieval mechanism for owner-authorized media,
-- output container/quality contract for the downloaded file.
+**P2 spike result (2026-06-03).**
 
-The trait boundary keeps the chosen mechanism swappable without touching callers.
+- `resolve()` is validated with the YouTube Data API and OAuth 2.0 using
+  `https://www.googleapis.com/auth/youtube.readonly`.
+- Ownership verification can be implemented by resolving the authenticated user's
+  channel with `channels.list(part=contentDetails, mine=true)` and treating the
+  channel's uploads playlist as the authoritative set of owner-uploaded videos.
+- The official documented byte-retrieval paths for a creator's own uploads are
+  **YouTube Studio per-video download** and **Google Takeout export**.
+- No official YouTube Data API endpoint was validated that returns video bytes for
+  a backend connector `download()` call.
+
+This narrows the v1 decision:
+
+- The trait boundary remains correct and reusable.
+- The YouTube `resolve()` half is viable.
+- The YouTube `download()` half, as originally envisioned for S3-P3
+  (authenticated backend IO directly to local staging), is **not validated by the
+  current official provider surface**.
+
+Therefore YouTube is **deferred for backend-download in this slice**. The v1 path
+keeps the connector boundary, but the next execution gate is a provider-capability
+spike for the first platform with an official server-to-server media download API.
+
+YouTube may return later only if:
+
+1. the product is replanned around a user-mediated export artifact
+   (Studio download or Takeout archive), or
+2. the provider surface changes and official documentation validates a backend
+   `download()` path.
 
 ### 3. Owner-authorized credential model (fail-closed, redacted)
 
@@ -142,8 +165,10 @@ lineage distinguishes platform downloads from uploads and live recordings.
 **Negative / trade-offs**
 - Owner-credential handling adds a secrets-store integration surface that must be
   audited for redaction and scope minimization.
-- The exact YouTube retrieval mechanism is not yet fixed and needs a spike before
-  implementation (risk mitigated by the trait boundary).
+- The P2 spike fixed the current YouTube answer negatively for backend download:
+  metadata/ownership resolution is supported, but official server-driven byte
+  retrieval was not validated. YouTube is therefore deferred for backend-download
+  in this slice, though the trait boundary still protects callers from churn.
 - The domain grows a second intake aggregate/state set alongside recording.
 
 ## Alternatives considered

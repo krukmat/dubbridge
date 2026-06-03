@@ -390,6 +390,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dubbridge-connectors"
+version = "0.1.0"
+dependencies = [
+ "dubbridge-domain",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "dubbridge-db"
 version = "0.1.0"
 dependencies = [

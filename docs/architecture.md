@@ -19,6 +19,12 @@ operational surfaces from planned ones. Delivery sequence lives in
   review gates succeed.
 - Governance-significant decisions require a durable audit row plus correlated
   structured tracing (ADR-018).
+- Runtime configuration is fail-closed and environment-explicit: no environment-
+  specific value is compiled into the binary, and a production-like process refuses to
+  start on a missing required value or a local default (localhost datastore, local-fs
+  storage, absent auth). Non-secret environment values live in committed per-environment
+  profiles; secrets exist only in injected environment variables. Local Docker Compose
+  is local infrastructure only, never the production deployment descriptor (ADR-026, P0).
 
 ## Delivery status
 
@@ -32,7 +38,7 @@ operational surfaces from planned ones. Delivery sequence lives in
 | Platform ingest (owner-authorized download) | Planned (primary S3); foundation T0/T0c/T1/T2 done | S3, ADR-025/021/006/008/018 |
 | RTMP/SRT live recording ingest | Deferred sub-case (S3b); shares the S3 foundation | S3b, ADR-019/020/022 |
 | Media preparation through publication | Planned | S4..S9 |
-| Reproducible app-container runtime wiring | Planned supporting surface | P0 |
+| Environment separation + reproducible app-container runtime wiring | Planned supporting surface | P0, ADR-026 |
 | First-party session gateway / BFF | Planned supporting surface | P1, ADR-024 |
 
 ## Runtime surfaces
@@ -82,7 +88,8 @@ operational surfaces from planned ones. Delivery sequence lives in
   depends on `domain` + `config`, no DB (ADR-025).
 - `recorder` (planned, deferred S3b): FFmpeg subprocess capture for RTMP/SRT live
   recording (ADR-019/020/022).
-- `config`: Typed runtime configuration.
+- `config`: Typed runtime configuration; layered fail-closed loader with an explicit
+  `DUBBRIDGE_ENV` and production validation (ADR-026, P0).
 - `observability`: Logging, tracing, and health-reporting helpers.
 
 ## Intake boundaries
@@ -139,12 +146,20 @@ paths. Recording lifecycle events must reuse that contract.
 
 ## Local development topology
 
-Local development uses PostgreSQL for primary state, Redis for job coordination,
-MinIO for object storage, and containerized service entrypoints where needed. Until
-S2 lands, the API storage adapter still resolves to `LocalFsAdapter`.
+Local development uses PostgreSQL for primary state, Redis for job coordination, and
+MinIO for object storage. Until S2 lands, the API storage adapter still resolves to
+`LocalFsAdapter`.
 
 The infrastructure containers are usable today with
-`docker compose -f infra/docker-compose.yml up -d postgres redis minio`. Full
-`api` / `worker-runner` container startup is not yet reproducible: P0 must wire
-container service DNS URLs, API auth bootstrap, health checks, and the Rust image
-version policy.
+`docker compose -f infra/docker-compose.yml up -d postgres redis minio`. That Compose
+file is **local infrastructure only**; it is never the production deployment
+descriptor (ADR-026).
+
+Environment separation is governed by ADR-026 and delivered in P0. Today
+`crates/config` still compiles local defaults into the binary, so a misconfigured
+process can silently fall back to localhost/`/tmp`. P0 inverts this to a fail-closed
+layered model: an explicit `DUBBRIDGE_ENV`, committed non-secret `config/<env>.toml`
+profiles, secrets only in injected environment variables, and a `validate()` that
+rejects local defaults in production-like environments. Full `api` / `worker-runner`
+container startup becomes reproducible once P0 wires container service DNS URLs, API
+auth bootstrap, health checks, and the Rust image version policy (X18, X2).

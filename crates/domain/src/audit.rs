@@ -24,6 +24,14 @@ pub enum AuditEventKind {
     RecordingRecorded,
     RecordingFailed,
     RecordingBridgedToAsset,
+    // S3-P1: platform ingest lifecycle events (ADR-018, ADR-025).
+    // These occur before any ingest_token exists, so they use platform_ingest_session_id.
+    PlatformIngestSessionCreated,
+    PlatformIngestRejectedMissingRights,
+    PlatformIngestDownloadStarted,
+    PlatformIngestDownloaded,
+    PlatformIngestFailed,
+    PlatformIngestBridgedToAsset,
 }
 
 impl std::fmt::Display for AuditEventKind {
@@ -41,6 +49,12 @@ impl std::fmt::Display for AuditEventKind {
             Self::RecordingRecorded => "recording_recorded",
             Self::RecordingFailed => "recording_failed",
             Self::RecordingBridgedToAsset => "recording_bridged_to_asset",
+            Self::PlatformIngestSessionCreated => "platform_ingest_session_created",
+            Self::PlatformIngestRejectedMissingRights => "platform_ingest_rejected_missing_rights",
+            Self::PlatformIngestDownloadStarted => "platform_ingest_download_started",
+            Self::PlatformIngestDownloaded => "platform_ingest_downloaded",
+            Self::PlatformIngestFailed => "platform_ingest_failed",
+            Self::PlatformIngestBridgedToAsset => "platform_ingest_bridged_to_asset",
         };
         write!(f, "{s}")
     }
@@ -56,6 +70,8 @@ pub struct AuditEvent {
     pub ingest_token: Option<Uuid>,
     /// Present for recording events; None for S1 ingestion events (F2, ADR-018).
     pub recording_session_id: Option<Uuid>,
+    /// Present for platform-ingest events; None for ingestion/recording events.
+    pub platform_ingest_session_id: Option<Uuid>,
     pub detail: Option<String>,
     pub happened_at: OffsetDateTime,
 }
@@ -74,6 +90,7 @@ impl AuditEvent {
             event_kind,
             ingest_token: Some(ingest_token),
             recording_session_id: None,
+            platform_ingest_session_id: None,
             detail,
             happened_at: OffsetDateTime::now_utc(),
         }
@@ -93,6 +110,27 @@ impl AuditEvent {
             event_kind,
             ingest_token,
             recording_session_id: Some(recording_session_id),
+            platform_ingest_session_id: None,
+            detail,
+            happened_at: OffsetDateTime::now_utc(),
+        }
+    }
+
+    /// Constructor for S3 platform-ingest lifecycle events. Always sets
+    /// `platform_ingest_session_id`.
+    pub fn new_platform_ingest(
+        asset_id: Option<AssetId>,
+        event_kind: AuditEventKind,
+        platform_ingest_session_id: Uuid,
+        detail: Option<String>,
+    ) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            asset_id,
+            event_kind,
+            ingest_token: None,
+            recording_session_id: None,
+            platform_ingest_session_id: Some(platform_ingest_session_id),
             detail,
             happened_at: OffsetDateTime::now_utc(),
         }
@@ -116,6 +154,7 @@ mod tests {
         );
         assert!(event.ingest_token.is_none());
         assert_eq!(event.recording_session_id, Some(session_id));
+        assert!(event.platform_ingest_session_id.is_none());
         assert_eq!(event.event_kind, AuditEventKind::RecordingSessionCreated);
     }
 
@@ -125,6 +164,53 @@ mod tests {
         let event = AuditEvent::new(None, AuditEventKind::IngestionFinalized, token, None);
         assert_eq!(event.ingest_token, Some(token));
         assert!(event.recording_session_id.is_none());
+        assert!(event.platform_ingest_session_id.is_none());
+    }
+
+    #[test]
+    fn audit_event_platform_ingest_round_trip() {
+        let session_id = Uuid::new_v4();
+        let event = AuditEvent::new_platform_ingest(
+            None,
+            AuditEventKind::PlatformIngestSessionCreated,
+            session_id,
+            None,
+        );
+        assert!(event.ingest_token.is_none());
+        assert!(event.recording_session_id.is_none());
+        assert_eq!(event.platform_ingest_session_id, Some(session_id));
+        assert_eq!(
+            event.event_kind,
+            AuditEventKind::PlatformIngestSessionCreated
+        );
+    }
+
+    #[test]
+    fn audit_event_kind_display_platform_ingest_variants() {
+        assert_eq!(
+            AuditEventKind::PlatformIngestSessionCreated.to_string(),
+            "platform_ingest_session_created"
+        );
+        assert_eq!(
+            AuditEventKind::PlatformIngestRejectedMissingRights.to_string(),
+            "platform_ingest_rejected_missing_rights"
+        );
+        assert_eq!(
+            AuditEventKind::PlatformIngestDownloadStarted.to_string(),
+            "platform_ingest_download_started"
+        );
+        assert_eq!(
+            AuditEventKind::PlatformIngestDownloaded.to_string(),
+            "platform_ingest_downloaded"
+        );
+        assert_eq!(
+            AuditEventKind::PlatformIngestFailed.to_string(),
+            "platform_ingest_failed"
+        );
+        assert_eq!(
+            AuditEventKind::PlatformIngestBridgedToAsset.to_string(),
+            "platform_ingest_bridged_to_asset"
+        );
     }
 
     #[test]
@@ -168,6 +254,30 @@ mod tests {
         assert_eq!(
             AuditEventKind::RecordingBridgedToAsset.to_string(),
             "recording_bridged_to_asset"
+        );
+        assert_eq!(
+            AuditEventKind::PlatformIngestSessionCreated.to_string(),
+            "platform_ingest_session_created"
+        );
+        assert_eq!(
+            AuditEventKind::PlatformIngestRejectedMissingRights.to_string(),
+            "platform_ingest_rejected_missing_rights"
+        );
+        assert_eq!(
+            AuditEventKind::PlatformIngestDownloadStarted.to_string(),
+            "platform_ingest_download_started"
+        );
+        assert_eq!(
+            AuditEventKind::PlatformIngestDownloaded.to_string(),
+            "platform_ingest_downloaded"
+        );
+        assert_eq!(
+            AuditEventKind::PlatformIngestFailed.to_string(),
+            "platform_ingest_failed"
+        );
+        assert_eq!(
+            AuditEventKind::PlatformIngestBridgedToAsset.to_string(),
+            "platform_ingest_bridged_to_asset"
         );
     }
 }

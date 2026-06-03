@@ -12,7 +12,12 @@
    design decisions, and module dependencies.
 3. **Tasks** — create `docs/tasks/<tasks-name>.md` with: an ordered task list,
    inter-task dependencies, acceptance criteria per task, an **Effort** field
-   (S/M/L/XL), and a short agent handoff prompt.
+   (S/M/L/XL), a short agent handoff prompt, and for each development task a
+   small behavioral example set covering both:
+   - at least one **happy path example** — a concrete success flow the task must
+     implement or preserve;
+   - at least one **edge case example** — a concrete boundary, invalid-input, or
+     failure flow the task must handle or reject.
 4. **Present and wait** — show the plan and tasks and wait for explicit approval
    before starting implementation, even if a plan was approved in a prior session.
 5. **Implement** — one task at a time, in the defined order.
@@ -22,10 +27,36 @@
    a task is done, update every materially affected status document in the same
    workflow pass. Completion is not valid until those documents are consistent.
 
+## Task definition requirements
+
+- For development tasks, the `docs/tasks/*.md` entry is not complete unless it
+  includes explicit examples for both the intended happy path and the relevant
+  edge cases.
+- These examples do not need to be long. One or two bullets per category is
+  enough if they are concrete and testable.
+- Write the examples in behavioral terms, not implementation terms. Prefer
+  statements such as `valid ingest token + owned blob -> artifact finalized` over
+  `call finalize_ingestion()`.
+- The pre-task sections `Happy paths considered` and `Edge cases considered`
+  should be derived from these task-definition examples, then refined if new
+  constraints are discovered during analysis.
+- Skip this requirement for docs-only, config-only, migration-only, or planning
+  tasks unless the task's main risk is behavioral correctness.
+
 ## Per-task discipline
 
 - Present the next task using the `AGENTS.md` presentation contract before executing
   it when approval is required.
+- **Pre-task summary for development tasks:** when the task will write or modify
+  code, the task presentation must include two explicit sections:
+  - **Happy paths considered** — the primary success flows the agent expects to
+    implement and verify for the task.
+  - **Edge cases considered** — the boundary and failure conditions the agent
+    expects to handle or verify for the task.
+  These sections are required at task start for development tasks so approval
+  covers not just the objective but also the intended behavioral coverage. Skip
+  them for docs-only, config, migration-only, or planning tasks unless the user
+  explicitly asks for them.
 - After each task: verify the relevant tests/checks, update the status docs,
   document deviations or evidence, and state unresolved risks or blockers.
 - Treat status-document synchronization as part of the task itself, not follow-up
@@ -43,6 +74,17 @@
 - When an ADR is created, amended, or deleted as part of a task, apply the
   **ADR change propagation** contract below in the same workflow pass.
 - Work on the approved task only; show a summary before switching to the next.
+- **Post-task summary for development tasks:** when the completed task involves writing
+  or modifying code, the summary must include two explicit sections:
+  - **Happy paths covered** — the primary success flows exercised by the implementation
+    and tests (e.g., "valid command → session created in Requested state").
+  - **Edge cases covered** — the boundary and failure conditions explicitly handled in
+    logic and tests (e.g., "None credential_ref → MissingCredentialRef before any IO").
+  For both sections, include **code evidence**: point to the concrete files,
+  functions, and tests that prove the claimed coverage, using file references and
+  concise explanations of what each reference demonstrates.
+  This section is required only for development tasks. Skip it for docs-only,
+  config, migration-only, or planning tasks.
 
 ## ADR change propagation
 
