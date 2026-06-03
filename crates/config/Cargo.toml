@@ -6,6 +6,8 @@ license.workspace = true
 
 [dependencies]
 serde.workspace = true
+thiserror = "2"
+figment = { version = "0.10", features = ["toml", "env"] }
 
 [dev-dependencies]
 temp-env = "0.3"

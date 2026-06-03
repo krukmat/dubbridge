@@ -1,0 +1,18 @@
+# config/local.toml — local development values.
+# These are the former in-code unwrap_or(...) defaults, now living here
+# instead of compiled into the binary (ADR-026, Decision 2).
+# No secrets here — secrets go in .env (git-ignored).
+
+env = "local"
+
+database_url = "postgres://dubbridge:dubbridge@localhost:5432/dubbridge"
+redis_url = "redis://127.0.0.1:6379"
+
+[storage]
+backend = "local_fs"
+base_path = "/tmp/dubbridge-storage"
+bucket = "dubbridge-local"
+
+[observability]
+log_format = "pretty"
+filter = "info"

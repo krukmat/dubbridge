@@ -1,7 +1,7 @@
 # ADR-024: Low-friction first-party API access via session gateway
 
-- **Status:** Proposed
-- **Date:** 2026-05-31
+- **Status:** Accepted
+- **Date:** 2026-05-31 (proposed); 2026-06-03 (accepted)
 - **Deciders:** DubBridge platform team
 
 ## Context
@@ -60,6 +60,62 @@ posture of the API itself.
 - This ADR applies only to **API client access**. It does not change ADR-022's
   separate source-authentication boundary for RTMP/SRT recording ingest.
 
+## Concrete decisions (accepted 2026-06-03, P1 T0)
+
+These decisions resolve the implementation choices the proposed text left open and
+are binding for slice **P1** (`docs/plan/p1-session-gateway-bff.md`) and its
+first-party consumers — the web app and slice **P3** (mobile, React Native + Expo).
+
+### Login flow
+- The gateway is a **confidential OAuth 2.0 client** using **Authorization Code with
+  PKCE** (`S256` `code_challenge`) plus an unguessable, single-use `state`. PKCE +
+  `state` defend the login leg against code interception and login-CSRF.
+
+### Session cookie
+- The browser session is represented by a single cookie carrying an **opaque,
+  high-entropy session id** — never an access or refresh token.
+- Cookie attributes:
+  - `HttpOnly` — not readable by client JavaScript.
+  - `Secure` — only sent over TLS.
+  - `SameSite=Lax` — the default posture. It permits top-level navigations (needed
+    for the OAuth redirect return) while blocking cross-site subrequests. A stricter
+    `SameSite=Strict` may be adopted later if the redirect-return UX allows it; this
+    is an operational tightening, not a contract change.
+  - `Path=/` and a host-scoped cookie (no broad `Domain` widening).
+
+### CSRF posture
+- Because `SameSite=Lax` still allows top-level GET navigations, mutating gateway
+  routes use **defense in depth**: an **`Origin`/`Referer` check** plus a
+  **double-submit CSRF token** (a non-`HttpOnly` token cookie echoed in a request
+  header by first-party client code, compared server-side). The login `state`
+  parameter covers CSRF on the OAuth callback specifically.
+
+### Session store
+- Sessions are stored **server-side only**. The store is defined behind a trait with
+  two implementations: an **in-memory** store for deterministic tests and a
+  **Redis-backed** store for runtime (Redis is already reserved for coordination in
+  the architecture). Stored material: the OAuth `TokenSet` (access + refresh +
+  expiry), the verified subject, the CSRF token, and timestamps.
+
+### Session TTL / idle policy
+- Each session has an **absolute lifetime** (default 8 hours) and an **idle timeout**
+  (default 30 minutes of inactivity), both env-configurable per ADR-026. Reaching
+  either bound invalidates the session; the next request resolves to "no session"
+  and the client must re-authenticate. The access token inside the session is
+  refreshed transparently against the authorization server while the session itself
+  remains valid.
+
+### Transport-agnostic session seam (mobile / P3)
+- A **native mobile client does not share the browser cookie jar**, so the canonical
+  session abstraction is an **opaque session id**, of which the hardened cookie is
+  one transport. The mobile client (P3) authenticates through the **same gateway**
+  using the device system browser (`expo-auth-session`) and carries the same opaque
+  session reference, stored on-device in secure storage
+  (`expo-secure-store` / Keychain / Keystore) — **never** an access or refresh token.
+- This means web and mobile are two transports of one session contract terminating
+  in the **same** gateway trust boundary. P3 must not introduce a parallel auth path
+  or hold long-lived tokens on the device.
+
 ## Consequences
 
 **Positive**
@@ -99,5 +155,9 @@ posture of the API itself.
   trustworthy only if request-level identity is preserved.
 - ADR-018 (traceable governance events) — the verified subject remains the
   auditable actor.
-- Follow-up expected: a concrete design/task slice for session gateway/BFF
-  implementation, cookie policy, CSRF posture, and first-party client routing.
+- Implemented by (planned): slice **P1** — `docs/plan/p1-session-gateway-bff.md`,
+  `docs/tasks/p1-session-gateway-bff.md` (cookie policy, CSRF posture, session store,
+  TTL, and first-party client routing decided here in P1 T0).
+- Consumed by (planned): slice **P3** — first-party mobile client (React Native +
+  Expo), `docs/plan/p3-mobile-client.md`, `docs/tasks/p3-mobile-client.md`. Mobile
+  is the second transport of the same opaque-session contract.

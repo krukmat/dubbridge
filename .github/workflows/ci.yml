@@ -67,6 +67,14 @@ jobs:
       - name: Run dependency policy gate
         run: make qa-deny
 
+  config-secrets:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject committed secrets in config profiles
+        run: make qa-config-secrets
+
   coverage:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest

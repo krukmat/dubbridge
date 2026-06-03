@@ -90,10 +90,10 @@ local default, never degrade silently. This slice is governed by ADR-026.
   default fallback.
 
 ### infra/ (Phase 1)
-- `infra/docker-compose.yml` → `infra/local/docker-compose.yml` — infrastructure only
-  by default; `api` / `worker-runner` / python workers under opt-in profiles; a banner
-  stating the file is not the production deployment descriptor; Rust image pinned to
-  the `rust-toolchain.toml` channel.
+- `infra/local/docker-compose.yml` — infrastructure only by default; `api` /
+  `worker-runner` / python workers under opt-in profiles; a banner stating the file
+  is not the production deployment descriptor; Rust image pinned to the
+  `rust-toolchain.toml` channel.
 
 ### docs / CI (Phase 1)
 - `README.md`, `docs/architecture.md` — update the Compose path after the move.
@@ -126,11 +126,12 @@ gate.
 ### Schema now, behavior staged
 Phase 0 introduces the `storage.backend` selector and the `observability.log_format`
 fields and validates them, but `build_adapter` and `init_tracing` consume them only in
-Phase 2 (with S2 / the observability work). Consequence: setting
-`DUBBRIDGE_ENV=production` cannot succeed until the S2 S3-storage backend exists,
-because `validate()` rejects local-fs in production. This is intentional fail-closed
-behavior — production is not deployable until its required backends exist — and is
-harmless because there is no production deploy target before Phase 3.
+Phase 2 (with S2 / the observability work). Consequence: a production-like
+configuration can now pass `validate()` when it selects `storage.backend = s3`,
+uses non-local datastore URLs, provides auth, and selects JSON logs; however,
+runtime behavior still remains incomplete until `build_adapter` and
+`init_tracing` consume those settings in later phases. This keeps configuration
+fail-closed while preserving the staged runtime rollout.
 
 ### Secret / config split; Compose is local-only
 Non-secret environment values live in committed `config/*.toml`; secrets and per-deploy

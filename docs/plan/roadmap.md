@@ -11,7 +11,15 @@ Last consolidated: 2026-05-31 after the roadmap/ADR/architecture review in
 `docs/audit/2026-05-31-roadmap-adr-architecture-consolidation.md` (including the
 same-day ADR-traceability follow-up G1–G4 in that file). Updated the same day
 after H1 completion. Updated 2026-06-03: scoped P0 around environment separation
-and fail-closed configuration (see "P0 strategy" below, principle added, and X21).
+and fail-closed configuration (see "P0 strategy" below, principle added, and X21),
+then synchronized after P0 Task 2 and Task 3 completion. Updated 2026-06-03 again:
+added plan/task ledgers for P1 (first-party session gateway / BFF) and introduced
+slice P3 (first-party mobile client, React Native + Expo) as a P1-gated consumer
+(ADR-024); no mobile app exists in the repo yet. Updated 2026-06-03 once more after
+P0 Task 5 moved local Compose under `infra/local/` and wired the opt-in `app`
+profile to fail-closed local config. Updated again on 2026-06-03 after P0 Task 6
+aligned the local Rust image with `rust-toolchain.toml` and added the committed-config
+secret guard.
 
 ## Status legend
 - ✅ Done · 🟡 In progress · ⬜ Not started · 📄 Planned (plan exists, not built)
@@ -98,12 +106,20 @@ These are real architecture work, but they do not sit on the linear media pipeli
 
 | Slice | Name | Depends on | Status | Source |
 |-------|------|------------|--------|--------|
-| **P0** | Environment separation & deployment runtime wiring (layered fail-closed config, compose = local-infra-only, auth bootstrap, service DNS, version policy) | S0, S1 | ⬜ scoped (see "P0 strategy" below); no plan ledger yet | `crates/config`, `crates/observability`, `infra/docker-compose.yml`, `README.md` |
-| **P1** | First-party session gateway / BFF | S0, external authorization-server contract | ⬜ no plan yet | ADR-024 |
+| **P0** | Environment separation & deployment runtime wiring (layered fail-closed config, compose = local-infra-only, auth bootstrap, service DNS, version policy) | S0, S1 | ✅ done — Phase 0 and Phase 1 task ledgers complete; later env-driven runtime behavior stays deferred to S2+/later phases | `docs/plan/p0-environment-separation.md`, `docs/tasks/p0-environment-separation.md` |
+| **P1** | First-party session gateway / BFF | S0, external authorization-server contract | 📄 planned — plan + task ledgers exist, not built | `docs/plan/p1-session-gateway-bff.md`, `docs/tasks/p1-session-gateway-bff.md` (ADR-024) |
 | **P2** | Production identity hardening (JWKS discovery, automatic key rotation, subject mapping if needed) | S0 | ⬜ no plan yet | ADR-023 |
+| **P3** | First-party mobile client (React Native + Expo) | P1 (hard); P2 recommended for production device login | 📄 planned — plan + task ledgers exist, not built | `docs/plan/p3-mobile-client.md`, `docs/tasks/p3-mobile-client.md` (ADR-024) |
 
-`P1` must be planned before building a first-party browser or operator-console auth
-flow. It does not block S2 or S3.
+`P1` must be planned before building a first-party browser, operator-console, or
+mobile auth flow. It does not block S2 or S3.
+
+`P3` (mobile) is a first-party interactive client and therefore a hard consumer of
+the P1 gateway (ADR-024): the device must terminate in the same session-gateway
+trust boundary as the web app and must not hold long-lived tokens. P3 cannot start
+until P1 is built. Stack decision (2026-06-03): React Native + Expo, coherent with
+the React line reserved in `web/README.md`. There is no mobile app in the repository
+today; P3 introduces it.
 
 ## P0 strategy: environment separation & fail-closed configuration
 
@@ -138,9 +154,11 @@ Phasing (now vs later):
 
 - Phase 0 (now): `DUBBRIDGE_ENV` + a typed `load()` + `validate()`; move local
   defaults to `config/local.toml`; add `config/default.toml` and `.env.example`;
-  api/worker switch to fail-closed load. Closes the compiled-default leak (core of X18).
+  api/worker switch to fail-closed load. This portion is complete and closes the
+  compiled-default leak (core of X18).
 - Phase 1 (now): reorganize to `infra/local/`; Compose = infra + app under a profile
-  with a non-production banner; pin the Rust image to `rust-toolchain.toml` (X2/T9).
+  with a non-production banner. The file move, app-profile env wiring, and Rust image
+  alignment to `rust-toolchain.toml` are complete.
 - Phase 2 (couples with S2): env-driven storage backend selector (X9) and env-driven
   observability format/exporter (ADR-018).
 - Phase 3 (later): production deployment descriptor + secret-manager injection
@@ -220,7 +238,7 @@ S3b — live recorder (DEFERRED): ex-T3 recorder crate, ex-T4 jobs/storage,
 | Item | Obligation | Owner / next action |
 |------|------------|---------------------|
 | **X1** | Reconcile `crates/audit` duplicate type | ✅ closed by T1 Task 5; H1 now owns central audit emission semantics |
-| **X2** | Align docker-compose Rust pin with toolchain policy | P0 Phase 1 (pin Rust image to `rust-toolchain.toml`); ex-S3 Task 9 |
+| **X2** | Align docker-compose Rust pin with toolchain policy | ✅ closed by P0 Task 6 on 2026-06-03 (`infra/local/docker-compose.yml` now tracks `rust-toolchain.toml` = `stable`) |
 | **X3** | Backfill remaining open ADR numbers only when real decisions are identified | layered fail-closed configuration & environment separation now recorded as ADR-026; owner-credential secret-store (X20) still open, ADR to be authored |
 | **X4** | Persist pending upload sessions across API restarts | ✅ closed by T1 Task 1 |
 | **X5** | Add TTL/cleanup for abandoned pending uploads | ✅ closed by T1 Task 2 |
@@ -236,10 +254,10 @@ S3b — live recorder (DEFERRED): ex-T3 recorder crate, ex-T4 jobs/storage,
 | **X15** | Keep RTSP, HLS pull, WebRTC, and per-segment publication as explicit live-recording follow-ups | post-S3b backlog |
 | **X16** | Move reusable finalize logic from `apps/api` into an app-neutral shared boundary | ✅ closed by H1 on 2026-05-31 |
 | **X17** | Enforce append-only rights rows and strict decoding of stored governance states | ✅ closed by H1 on 2026-05-31 |
-| **X18** | Wire container service DNS, database/Redis URLs, auth bootstrap, health checks, and version policy so documented local startup is reproducible | P0 Phases 0–1 (layered config + `infra/local/` split) |
+| **X18** | Wire container service DNS, database/Redis URLs, auth bootstrap, health checks, and version policy so documented local startup is reproducible | ✅ closed by P0 Tasks 2-6 on 2026-06-03 for the documented local startup path |
 | **X19** | Enforce fail-closed source authentication (RTMP stream key / SRT passphrase, credential redaction, `rtmp`/`srt` scheme allow-list) before any capture begins | S3b (domain T1 done, migration T2 done, recorder ex-T3, API ex-T6); ADR-022 |
 | **X20** | Decide the secrets-store mechanism for owner-provided platform credentials (storage by reference, scope minimization, redaction); no dedicated ADR yet | S3 P1–P6 + P0 (the config/secret split — committed non-secret profiles vs injected env secrets — is the boundary the store plugs into); ADR-025 |
-| **X21** | Make runtime configuration fail-closed and environment-explicit: no compiled environment-specific defaults; `DUBBRIDGE_ENV` required; production rejects localhost datastores, local-fs storage, absent auth, and pretty logs; committed non-secret per-env profiles separated from injected secrets; Compose is local-infra-only (ADR-026) | P0 (Phase 0 core) |
+| **X21** | Make runtime configuration fail-closed and environment-explicit: no compiled environment-specific defaults; `DUBBRIDGE_ENV` required; production rejects localhost datastores, local-fs storage, absent auth, and pretty logs; committed non-secret per-env profiles separated from injected secrets; Compose is local-infra-only (ADR-026) | ✅ closed by P0 Tasks 1-6 on 2026-06-03 |
 
 ## Known planning gaps
 
@@ -255,11 +273,19 @@ S3b — live recorder (DEFERRED): ex-T3 recorder crate, ex-T4 jobs/storage,
   slice; P4 is the next gate for selecting the first officially supported provider.
 - The owner-credential secrets-store mechanism (X20) has no dedicated ADR yet and
   must be decided during P1–P6; P0 establishes the config/secret split it plugs into.
-- S2, S4, P0, P1, and P2 need plan/task ledgers before execution. P0's strategy is now
-  scoped above (environment separation + fail-closed config, Phases 0–4); it still
-  needs `docs/plan/p0-*.md` + `docs/tasks/p0-*.md` ledgers before implementation. S2
-  must include the object-store adapter, storage-key ownership, orphan reconciliation,
-  and upload memory-safety strategy.
+- S2, S4, and P2 need plan/task ledgers before execution. P0 now has
+  `docs/plan/p0-environment-separation.md` + `docs/tasks/p0-environment-separation.md`
+  with its current Phase 0 / Phase 1 scope complete. P1 now has
+  `docs/plan/p1-session-gateway-bff.md` + `docs/tasks/p1-session-gateway-bff.md`
+  (planned, not built). S2 must include the object-store adapter, storage-key
+  ownership, orphan reconciliation, and upload memory-safety strategy.
+- **Mobile is slice P3, newly introduced 2026-06-03.** No mobile app exists in the
+  repository today (only an empty `web/README.md` React skeleton). P3 has
+  `docs/plan/p3-mobile-client.md` + `docs/tasks/p3-mobile-client.md` (planned, not
+  built) and is a hard consumer of the P1 gateway (ADR-024): a first-party device
+  must terminate in the session-gateway trust boundary and must not hold long-lived
+  tokens. P3 cannot start until P1 is built; P2 (JWKS) is recommended before
+  production device login. Stack: React Native + Expo.
 - Slice numbering is provisional. Update this map whenever a slice, dependency, or
   ADR materially changes.
 - ADR-021 is generalized to all non-upload intake; ADR-019/020/022 are scoped to the

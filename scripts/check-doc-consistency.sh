@@ -114,24 +114,28 @@ check_status_parity_and_completeness() {
     fi
   done
 
-  local index_lines
-  index_lines="$(grep -E '^\| \[ADR-[0-9]{3}\]\([^)]+\) \|' docs/adr/README.md || true)"
-  local old_ifs
-  old_ifs="$IFS"
-  IFS=$'\n'
   local line
-  for line in $index_lines; do
+  while IFS= read -r line; do
     [[ -n "$line" ]] || continue
     local adr_id
     local target
     adr_id="$(printf '%s\n' "$line" | sed -n 's/^| \[\(ADR-[0-9][0-9][0-9]\)\].*$/\1/p')"
     target="$(printf '%s\n' "$line" | sed -n 's/^| \[[^]]*\](\([^)]*\)) | .*$/\1/p')"
 
-    if ! adr_exists "$adr_id"; then
-      add_violation "docs/adr/README.md: index row for $adr_id points to missing ADR file '$target'"
+    if [[ -z "$adr_id" || -z "$target" ]]; then
+      add_violation "docs/adr/README.md: could not parse ADR index row '$line'"
+      continue
     fi
-  done
-  IFS="$old_ifs"
+
+    if [[ ! -f "docs/adr/$target" ]]; then
+      add_violation "docs/adr/README.md: index row for $adr_id points to missing ADR file '$target'"
+      continue
+    fi
+
+    if [[ "$target" != "${adr_id}"-* ]]; then
+      add_violation "docs/adr/README.md: index row for $adr_id points to mismatched file '$target'"
+    fi
+  done < <(grep -E '^\| \[ADR-[0-9]{3}\]\([^)]+\) \|' docs/adr/README.md || true)
 }
 
 check_stream_for_dangling_refs() {

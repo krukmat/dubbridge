@@ -31,7 +31,7 @@ Run `make qa-docs` before reporting an ADR change complete.
 | [ADR-021](ADR-021-recording-to-asset-ingestion-bridge-fail-closed.md) | Intake-to-asset ingestion bridge with fail-closed rights (generalized) | Accepted |
 | [ADR-022](ADR-022-source-protocol-support-and-ingest-authentication.md) | Source protocol support (RTMP + SRT) and ingest authentication | Proposed (scope: S3b live recording) |
 | [ADR-023](ADR-023-api-client-authentication-and-principal-propagation.md) | API client authentication and principal propagation | Accepted |
-| [ADR-024](ADR-024-low-friction-first-party-api-access-via-session-gateway.md) | Low-friction first-party API access via session gateway | Proposed |
+| [ADR-024](ADR-024-low-friction-first-party-api-access-via-session-gateway.md) | Low-friction first-party API access via session gateway | Accepted |
 | [ADR-025](ADR-025-platform-connector-ingest-and-owner-authorized-credentials.md) | Platform connector ingest and owner-authorized credential model | Proposed (primary S3 intake) |
 | [ADR-026](ADR-026-layered-fail-closed-configuration-and-environment-separation.md) | Layered fail-closed configuration and environment separation | Proposed (scope: P0 environment separation) |
 

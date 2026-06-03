@@ -1,0 +1,102 @@
+# LOCAL INFRASTRUCTURE ONLY
+# This Compose file is for local development infrastructure and optional local app
+# containers. It is never the production deployment descriptor (ADR-026).
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: dubbridge
+      POSTGRES_USER: dubbridge
+      POSTGRES_PASSWORD: dubbridge
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: dubbridge
+      MINIO_ROOT_PASSWORD: dubbridge123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+  api:
+    image: rust:stable
+    profiles: ["app"]
+    working_dir: /workspace
+    command: cargo run -p dubbridge-api
+    env_file:
+      - path: ../../.env
+        required: false
+    environment:
+      DUBBRIDGE_ENV: local
+      DUBBRIDGE_DATABASE_URL: postgres://dubbridge:dubbridge@postgres:5432/dubbridge
+      DUBBRIDGE_REDIS_URL: redis://redis:6379
+      DUBBRIDGE_STORAGE_BASE_PATH: /tmp/dubbridge-storage
+      DUBBRIDGE_STORAGE_BUCKET: dubbridge-local
+      DUBBRIDGE_STORAGE__BASE_PATH: /tmp/dubbridge-storage
+      DUBBRIDGE_STORAGE__BUCKET: dubbridge-local
+      DUBBRIDGE_CONFIG_DIR: /workspace/config
+      DUBBRIDGE_AUTH__ISSUER: ${DUBBRIDGE_AUTH_ISSUER:-}
+      DUBBRIDGE_AUTH__AUDIENCE: ${DUBBRIDGE_AUTH_AUDIENCE:-}
+      DUBBRIDGE_AUTH__RSA_PUBLIC_KEY_PATH: ${DUBBRIDGE_AUTH_RSA_PUBLIC_KEY_PATH:-}
+      DUBBRIDGE_AUTH__CLOCK_SKEW_LEEWAY_SECONDS: ${DUBBRIDGE_AUTH_CLOCK_SKEW_LEEWAY_SECONDS:-30}
+    volumes:
+      - ../..:/workspace
+    depends_on:
+      - postgres
+      - redis
+      - minio
+
+  worker-runner:
+    image: rust:stable
+    profiles: ["app"]
+    working_dir: /workspace
+    command: cargo run -p dubbridge-worker-runner
+    env_file:
+      - path: ../../.env
+        required: false
+    environment:
+      DUBBRIDGE_ENV: local
+      DUBBRIDGE_DATABASE_URL: postgres://dubbridge:dubbridge@postgres:5432/dubbridge
+      DUBBRIDGE_REDIS_URL: redis://redis:6379
+      DUBBRIDGE_STORAGE_BASE_PATH: /tmp/dubbridge-storage
+      DUBBRIDGE_STORAGE_BUCKET: dubbridge-local
+      DUBBRIDGE_STORAGE__BASE_PATH: /tmp/dubbridge-storage
+      DUBBRIDGE_STORAGE__BUCKET: dubbridge-local
+      DUBBRIDGE_CONFIG_DIR: /workspace/config
+    volumes:
+      - ../..:/workspace
+    depends_on:
+      - postgres
+      - redis
+      - minio
+
+  asr-worker-py:
+    build:
+      context: ../../workers/asr-worker-py
+    profiles: ["workers"]
+
+  translation-worker-py:
+    build:
+      context: ../../workers/translation-worker-py
+    profiles: ["workers"]
+
+  tts-worker-py:
+    build:
+      context: ../../workers/tts-worker-py
+    profiles: ["workers"]
+
+volumes:
+  postgres-data:
+  minio-data:

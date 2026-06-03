@@ -21,8 +21,16 @@ in this repository. Read them in this order before acting on any task:
 6. `docs/plan/roadmap.md` — the general plan: slice sequence, dependencies, and
    where each slice/task sits. Read it to locate any task before implementing.
 
-On conflict, this `CLAUDE.md` and the user's global `CLAUDE.md` take precedence over
-the guides above.
+**Precedence rule:**
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` is the highest-authority source for
+**all** agent-facing decisions: workflow, process, implementation discipline,
+task presentation structure, model selection, complexity scoring, testing rules,
+commit rules, handoff format, ADR propagation, and language policy.
+It overrides this `CLAUDE.md`, the user's global `CLAUDE.md`, and every other
+guide listed above without exception.
+
+This `CLAUDE.md` and the user's global `CLAUDE.md` remain authoritative only for
+topics not covered by `AGENT_WORKFLOW_GUIDE.md`.
 
 ## Task Presentation Contract
 

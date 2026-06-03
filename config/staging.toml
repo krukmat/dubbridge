@@ -1,0 +1,14 @@
+# config/staging.toml — staging environment non-secret values.
+# Secrets (database_url, redis_url, auth credentials) are injected via
+# DUBBRIDGE_* env vars and must never appear in this file (ADR-026, Decision 4).
+
+env = "staging"
+
+[storage]
+backend = "s3"
+base_path = ""
+bucket = "dubbridge-staging"
+
+[observability]
+log_format = "json"
+filter = "info"

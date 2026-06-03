@@ -1,9 +1,10 @@
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    dubbridge_observability::init_tracing();
-
-    let config = dubbridge_config::AppConfig::from_env();
+    let config = dubbridge_config::AppConfig::load()?;
+    dubbridge_observability::init_tracing(&config.observability);
     tracing::info!(
+        env = ?config.env,
+        log_format = ?config.observability.log_format,
         redis_url = %config.redis_url,
         worker_concurrency = config.worker_concurrency,
         "starting worker runner"

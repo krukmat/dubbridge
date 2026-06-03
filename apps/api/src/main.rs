@@ -9,14 +9,13 @@ const CLEANUP_INTERVAL: Duration = Duration::from_secs(60 * 60); // 1 hour
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    dubbridge_observability::init_tracing();
-
-    let config = dubbridge_config::AppConfig::from_env();
+    let config = dubbridge_config::AppConfig::load()?;
+    dubbridge_observability::init_tracing(&config.observability);
     let verifier = build_verifier(&config)?;
     let pool = dubbridge_db::create_pool(&config.database_url)
         .await
         .context("failed to create database pool")?;
-    let storage_config = dubbridge_storage::StorageConfig::from_env(&config.storage_bucket);
+    let storage_config = dubbridge_storage::StorageConfig::from(&config.storage);
     let storage = dubbridge_storage::build_adapter(&storage_config);
     let app_state = Arc::new(AppState::new(
         pool,
@@ -25,7 +24,10 @@ async fn main() -> anyhow::Result<()> {
         config.clone(),
     ));
     let api_port = app_state.config.api_port;
-    let storage_bucket = app_state.config.storage_bucket.clone();
+    let resolved_env = app_state.config.env.clone();
+    let storage_backend = app_state.config.storage.backend.clone();
+    let log_format = app_state.config.observability.log_format.clone();
+    let storage_bucket = app_state.config.storage.bucket.clone();
     let auth_verifier = app_state.verifier.clone();
 
     // T1-T2: spawn background task that periodically removes expired pending sessions
@@ -47,7 +49,10 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
 
     tracing::info!(
+        env = ?resolved_env,
         port = api_port,
+        storage_backend = ?storage_backend,
+        log_format = ?log_format,
         storage_bucket = %storage_bucket,
         "starting api"
     );

@@ -24,7 +24,7 @@ Concretely, at the time of this ADR:
 - `build_adapter` (`crates/storage/src/lib.rs`) hardcodes `LocalFsAdapter`, and
   `init_tracing` (`crates/observability/src/lib.rs`) always emits a human-readable
   format — neither is environment-driven.
-- `infra/docker-compose.yml` mixes local infrastructure (Postgres/Redis/MinIO) with
+- the local Compose file mixes local infrastructure (Postgres/Redis/MinIO) with
   application startup (`cargo run` over a bind-mounted workspace), which invites
   treating Compose as the production deployment model.
 - There is no `.env.example` and no committed per-environment configuration profile,
@@ -138,10 +138,11 @@ multiple live environments or teams justify it.
   code" to "default in the local profile" (no loss, but a change).
 - One new dependency (`figment` or `config`) enters the graph; it must pass
   `make qa-deny`.
-- Setting `DUBBRIDGE_ENV=production` cannot succeed until the S2 S3-storage backend
-  exists, because `validate()` rejects the local-fs backend in production. This is
-  intentional fail-closed behavior, not a regression: production is not deployable
-  until its required backends exist.
+- A production-like configuration can now pass `validate()` when it selects the
+  non-local storage backend, uses non-local datastore URLs, provides auth, and
+  emits JSON logs. The runtime behavior behind those settings still lands in later
+  phases (S2 / observability wiring), so configuration acceptance and runtime
+  production-readiness are distinct checkpoints.
 
 ## Alternatives considered
 

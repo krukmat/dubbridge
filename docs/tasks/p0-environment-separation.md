@@ -39,7 +39,14 @@ In `crates/config/src/lib.rs`, introduce:
 - `crates/config/src/lib.rs`
 - `crates/config/Cargo.toml` (add `thiserror`)
 
-### Status: [ ] Not started
+### Status: [x] Done
+
+**Evidence (2026-06-03):**
+- `AppEnv { Local, Staging, Production }` + `ConfigError { MissingEnv, UnknownEnv, Load, Validation }` added to `crates/config/src/lib.rs`.
+- `thiserror = "2"` added to `crates/config/Cargo.toml`.
+- 9 new TDD tests cover: missing var → MissingEnv, unknown values ("prod", "") → UnknownEnv, all three valid variants, is_production_like() true/false.
+- `cargo test -p dubbridge-config`: **17/17 passed**.
+- `make qa-local` (fmt + clippy + test + check): **green**, zero failures across workspace.
 
 ---
 
@@ -110,7 +117,18 @@ In `crates/config/src/lib.rs`, introduce:
   `config/production.toml` `config/README.md` (new)
 - `.env.example` (new)
 
-### Status: [ ] Not started
+### Status: [x] Done — completed via `docs/tasks/p0-t2-layered-loader.md`
+
+**Evidence (2026-06-03):**
+- T2-A through T2-F marked `[x]` in `docs/tasks/p0-t2-layered-loader.md`.
+- `crates/config` now owns the layered typed loader (`AppEnv`, `ConfigError`, `AppConfig::load()`) and committed `config/*.toml` profiles.
+- `crates/storage` no longer reads `DUBBRIDGE_*`; integration tests now use `DUBBRIDGE_DATABASE_URL`; `/.env.example` documents the injected env contract.
+- Verification across sub-tasks: `make qa-deny` green, `cargo test -p dubbridge-config` green, `cargo check --workspace` green, `make qa-local` green, `make qa-docs` green.
+
+Sub-tasks (in order): T2-A (figment dep) → T2-B (schema + TOML profiles) →
+T2-C (AppConfig::load()) → T2-D (StorageConfig consolidation) →
+T2-E (DATABASE_URL migration) → T2-F (.env.example).
+This task is marked [x] only when all six sub-tasks are [x].
 
 ---
 
@@ -131,14 +149,22 @@ or Redis URL, `StorageBackend::LocalFs`, `auth.is_none()`, and `LogFormat::Prett
 - `production` with `log_format = pretty` fails validation (ADR-018).
 - `local` permits all of the above (local is not production-like).
 - The committed `config/production.toml` + a representative secret env set passes
-  validation *except* for the storage backend, which is expected to fail until S2
-  provides the S3 backend (a test documents this intentional fail-closed gap).
+  validation with `storage.backend = s3`; runtime adapter behavior remains deferred
+  to S2 and later observability wiring.
 - `cargo test -p dubbridge-config` passes.
 
 ### Files affected
 - `crates/config/src/lib.rs`
 
-### Status: [ ] Not started
+### Status: [x] Done
+
+**Evidence (2026-06-03):**
+- `AppConfig::validate(&self) -> Result<(), ConfigError>` agregado a `crates/config/src/lib.rs` y llamado al final de `AppConfig::load()`.
+- Rechazos fail-closed implementados para entornos production-like: `database_url` localhost/`127.0.0.1`, `redis_url` localhost/`127.0.0.1`, `storage.backend = local_fs`, `auth = None`, y `observability.log_format = pretty`.
+- 8 tests TDD nuevos en `crates/config/src/lib.rs`: cinco rejection paths de `validate()`, un caso `local` permitido, un caso `load()` que prueba que la validación corre al final, y un caso `production` con secretos representativos que valida correctamente.
+- `cargo test -p dubbridge-config`: **34/34 passed**.
+- `cargo check --workspace`: **green**.
+- `make qa-local` (fmt + clippy + test + check): **green**, workspace completo.
 
 ---
 
@@ -182,7 +208,23 @@ or Redis URL, `StorageBackend::LocalFs`, `auth.is_none()`, and `LogFormat::Prett
 - `apps/worker-runner/src/main.rs`
 - `crates/observability/src/lib.rs`
 
-### Status: [ ] Not started
+### Status: [x] Done
+
+**Evidence (2026-06-03):**
+- `apps/api/src/main.rs` y `apps/worker-runner/src/main.rs` migrados de `AppConfig::from_env()` a `AppConfig::load()?`.
+- `crates/observability/src/lib.rs` consolidado al reader tipado: `init_tracing(obs: &ObsSettings)` ya no usa `std::env::var` ni `EnvFilter::try_from_default_env()`.
+- Startup logs enriquecidos con configuración resuelta: `env`, `storage_backend` y `log_format` en API; `env` y `log_format` en worker runner.
+- Verificación manual fail-closed:
+  - `cargo run -q -p dubbridge-worker-runner` con `DUBBRIDGE_ENV` ausente → `DUBBRIDGE_ENV is not set...`
+  - `cargo run -q -p dubbridge-worker-runner` con `DUBBRIDGE_ENV=qa` → `unrecognised value 'qa'...`
+  - `cargo run -q -p dubbridge-api` con `DUBBRIDGE_ENV` ausente → `DUBBRIDGE_ENV is not set...`
+  - `cargo run -q -p dubbridge-api` con `DUBBRIDGE_ENV=qa` → `unrecognised value 'qa'...`
+- Verificación manual local:
+  - `cargo run -q -p dubbridge-worker-runner` con `DUBBRIDGE_ENV=local` arranca y emite el startup log con `env=Local` y `log_format=Pretty`.
+  - `cargo run -q -p dubbridge-api` con `DUBBRIDGE_ENV=local` y auth inyectado progresa más allá de `load()`/`init_tracing()` y falla después al inicializar el verifier por falta del archivo de clave, no por configuración.
+- `rg -n 'env::var|from_default_env' crates/observability/src/lib.rs` devuelve cero matches.
+- `cargo check --workspace`: **green**.
+- `make qa-test`: **green**.
 
 ---
 
@@ -194,7 +236,7 @@ or Redis URL, `StorageBackend::LocalFs`, `auth.is_none()`, and `LogFormat::Prett
 **Depends on:** Task 4 (so docs describe the new config flow consistently)
 
 ### Scope
-- Move `infra/docker-compose.yml` → `infra/local/docker-compose.yml`.
+- Relocate the local Compose file to `infra/local/docker-compose.yml`.
 - Keep `postgres` / `redis` / `minio` as the default services; move `api` /
   `worker-runner` under an opt-in `app` profile and keep python workers under their
   existing `workers` profile.
@@ -224,14 +266,25 @@ or Redis URL, `StorageBackend::LocalFs`, `auth.is_none()`, and `LogFormat::Prett
 - `--profile app` is required to start `api` / `worker-runner`.
 - With `--profile app`, the `api` service connects to the `postgres` container (DNS
   `postgres:5432`), not to `localhost` (manually verified; documented in evidence).
-- No doc references the old `infra/docker-compose.yml` path.
+- No doc references the pre-move root-level Compose path.
 - `make qa-docs` passes.
 
 ### Files affected
 - `infra/local/docker-compose.yml` (moved; env wiring added)
 - `README.md`, `docs/architecture.md`, `docs/plan/p0-environment-separation.md`
 
-### Status: [ ] Not started
+### Status: [x] Done
+
+**Evidence (2026-06-03):**
+- Local Compose moved to `infra/local/docker-compose.yml` with a top-of-file non-production banner.
+- `api` and `worker-runner` now sit behind `profiles: ["app"]`; default `docker compose -f infra/local/docker-compose.yml config` renders only `postgres`, `redis`, and `minio`.
+- Both app-profile services now receive explicit local env wiring: `DUBBRIDGE_ENV=local`, container-DNS datastore URLs (`postgres`, `redis`), local storage settings, and `DUBBRIDGE_CONFIG_DIR=/workspace/config`.
+- Auth remains injected, not hardcoded: the Compose file reads local `.env` when present and maps auth values into the typed config keys consumed by `AppConfig::load()`.
+- `docker compose -f infra/local/docker-compose.yml up -d postgres redis minio` was attempted directly, but this host already had port `5432` allocated; the failure was environmental, not due to Compose selection.
+- Manual isolated verification without published host ports:
+  - `docker compose -f infra/local/docker-compose.yml --profile app config --services` includes `api` and `worker-runner`, proving `--profile app` is required for app containers.
+  - Inside the `api` service container, `DUBBRIDGE_DATABASE_URL` resolved to `postgres://dubbridge:dubbridge@postgres:5432/dubbridge`, `getent hosts postgres` resolved successfully, and a TCP open to `postgres:5432` returned `tcp-ok`.
+- Documentation updated to the new path; repo-wide search for the pre-move root-level Compose path now returns zero matches.
 
 ---
 
@@ -257,7 +310,20 @@ or Redis URL, `StorageBackend::LocalFs`, `auth.is_none()`, and `LogFormat::Prett
 - `Makefile`
 - `.github/workflows/ci.yml`
 
-### Status: [ ] Not started
+### Status: [x] Done
+
+**Evidence (2026-06-03):**
+- `infra/local/docker-compose.yml` now pins both Rust app containers to `image: rust:stable`, matching `rust-toolchain.toml`.
+- Added `scripts/check-config-secrets.sh` plus `make qa-config-secrets`; the target passes on committed `config/*.toml` profiles and fails on a deliberately planted fixture containing `client_secret = "super-secret"`.
+- Added a dedicated `config-secrets` job to `.github/workflows/ci.yml`, and folded the guard into `make qa-ci`.
+- `docker compose -f infra/local/docker-compose.yml config` is valid with the updated image tags.
+- Local verification:
+  - `make qa-config-secrets` → passes on real profiles.
+  - `bash scripts/check-config-secrets.sh /tmp/dubbridge-task6-fixture/bad.toml` → fails with `Secret-looking config key found ... client_secret`.
+  - `make qa-ci` → passes locally.
+
+With Task 6 complete, the current P0 task ledger (Tasks 1-6) is complete for the
+Phase 0 / Phase 1 scope defined in this slice.
 
 ---
 

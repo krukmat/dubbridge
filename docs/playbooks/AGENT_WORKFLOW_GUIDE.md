@@ -1,9 +1,11 @@
 # Agent Workflow Guide
 
-> **Status:** Scaffold. This guide consolidates the mandatory workflow already
-> defined in the project and global `CLAUDE.md`. It exists to resolve the dangling
-> reference in `AGENTS.md`. Keep it in sync with `CLAUDE.md`; `CLAUDE.md` wins on
-> conflict.
+> **Status:** Authoritative. This guide is the highest-authority source for **all**
+> agent-facing decisions: workflow, process, implementation discipline, task
+> presentation structure, model selection, complexity scoring, testing rules, commit
+> rules, handoff format, ADR propagation, and language policy.
+> It overrides `CLAUDE.md` (project and global) and `AGENTS.md` without exception.
+> `CLAUDE.md` applies only for topics not covered here.
 
 ## Mandatory workflow before implementing
 

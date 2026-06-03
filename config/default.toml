@@ -1,0 +1,9 @@
+# config/default.toml — universal baseline, valid in every environment.
+# Only values that are true in ALL environments belong here.
+# Never put a URL, host, path, bucket, or credential here (ADR-026, Decision 2).
+
+api_port = 8080
+worker_concurrency = 4
+
+[observability]
+filter = "info"

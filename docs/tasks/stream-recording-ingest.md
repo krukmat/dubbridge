@@ -694,16 +694,16 @@ Deferred note:
 
 ---
 
-## Task 9 — Housekeeping: align docker-compose Rust pin (F7)
+## Task 9 — Housekeeping: align local Compose Rust pin (F7)
 
 **Effort:** S · **Complexity:** Low · **Depends on:** nothing
 **Priority:** Low — independent of the recording work; can be done at any time.
 **Recommended model:** Codex `GPT-5.2-Codex` / Claude `Sonnet 4`
 
 ### Objective
-`infra/docker-compose.yml` pins `image: rust:1.88` for the `api` / `worker-runner`
-services, while `rust-toolchain.toml` and CI use `stable`. Align the pin so local
-compose builds match the toolchain policy and cannot silently lag.
+`infra/local/docker-compose.yml` was pinning a Rust image that could drift from
+`rust-toolchain.toml` and CI. Align the pin so local compose builds match the
+toolchain policy and cannot silently lag.
 
 ### Decision
 Either pin a documented minimum (the MSRV required for edition 2024 + resolver 3) or
@@ -713,13 +713,13 @@ track `stable` to match CI. Record the chosen Rust version policy in the README
 ### Acceptance criteria
 - The compose Rust image and the toolchain policy agree, or the divergence is
   intentional and documented.
-- `docker compose -f infra/docker-compose.yml config` is valid.
+- `docker compose -f infra/local/docker-compose.yml config` is valid.
 
 ### Files affected
-- `infra/docker-compose.yml`
+- `infra/local/docker-compose.yml`
 - `README.md` (Rust version policy note, if changed)
 
-### Status: [ ]
+### Status: [x] Done — closed by `docs/tasks/p0-environment-separation.md` Task 6 on 2026-06-03
 
 ---
 

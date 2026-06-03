@@ -20,7 +20,7 @@ explicit tasks instead of being patched blind.
 | F4 | `.gitignore` ignores `Cargo.lock` in a binary workspace | Medium | **Fixed** |
 | F5 | `AGENTS.md` references 3 non-existent governance docs | Medium | **Fixed** (scaffolds created) |
 | F6 | `README.md` stale environment-specific "Validation note" | Low | **Fixed** |
-| F7 | Toolchain pin drift (`docker-compose` rust:1.88 vs `stable`) | Low | Tracked: plan Task 9 |
+| F7 | Toolchain pin drift (`docker-compose` rust:1.88 vs `stable`) | Low | **Closed by P0 Task 6** |
 | F8 | S1 plan vs code drift around `crates/audit` | Medium | **Closed by T1/T5** |
 
 ---
@@ -93,12 +93,11 @@ The README baked in an environment-specific note ("On May 25, 2026, both `rustc`
 runs `cargo check --workspace`; local validation requires installing the toolchain
 via `rustup`.
 
-### F7 — Toolchain pin drift (Low) — RECORDED
+### F7 — Toolchain pin drift (Low) — CLOSED 2026-06-03
 
-`infra/docker-compose.yml` pins `image: rust:1.88` for the `api`/`worker-runner`
-services, while `rust-toolchain.toml` and CI use `stable`. Not harmful today
-(edition 2024 + resolver 3 build on 1.88), but the pin can silently lag `stable`.
-Recommendation: align the compose image to a documented minimum or to `stable`.
+The local Compose file was pinning `image: rust:1.88` for the `api`/`worker-runner`
+services, while `rust-toolchain.toml` and CI used `stable`. That drift was closed on
+2026-06-03 by P0 Task 6; the local Compose file now tracks `rust:stable`.
 
 ### F8 — S1 plan vs code drift around `crates/audit` (Medium) — CLOSED
 

@@ -148,7 +148,7 @@ this plan's task list:
   before recording expands the shared finalize path.
 - **Task 0c — Resolve the recording output contract.** Complete on 2026-05-31.
   V1 is local HLS fMP4 staging plus one assembled MP4 bridged once per session.
-- **Task 9 — Align docker-compose Rust pin (F7).** Low priority, fully independent
+- **Task 9 — Align local Compose Rust pin (F7).** Low priority, fully independent
   of recording; can be done at any time (warm-up or final cleanup).
 
 Full findings: `docs/audit/2026-05-31-project-consistency-review.md`.

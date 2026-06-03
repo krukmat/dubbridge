@@ -23,6 +23,12 @@ When a user asks an agent to execute a staged task or a task from a task file, t
 
 The presentation must be concise but operationally complete.
 
+Before presenting or executing any staged task, the agent must verify the
+current requirements in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`. This file is a
+presentation contract summary, not a replacement for the workflow guide.
+Task-type-specific requirements defined there are mandatory even when they are
+not restated verbatim below.
+
 ## Required Task Presentation Format
 
 Before execution, present:
@@ -48,9 +54,12 @@ Before execution, present:
 12. `Execution summary`
    - short description of what will be done
    - if applicable, list the ordered steps
-13. `Pseudocode`, only if it materially clarifies non-trivial logic
-14. `Diagram`, only if structure, flow or boundaries are easier to understand visually
-15. explicit statement that execution has not started yet and is waiting for approval, when approval is required
+13. any task-type-specific pre-task sections required by `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
+   - for development tasks, include `Happy paths considered`
+   - for development tasks, include `Edge cases considered`
+14. `Pseudocode`, only if it materially clarifies non-trivial logic
+15. `Diagram`, only if structure, flow or boundaries are easier to understand visually
+16. explicit statement that execution has not started yet and is waiting for approval, when approval is required
 
 ## Complexity And Model Guidance
 

@@ -44,10 +44,13 @@ Requires Rust (via `rustup`) and Docker.
 
 ```
 # Local infrastructure only — this Compose file is never the production deployment
-# descriptor (ADR-026). Full app-container wiring is tracked in roadmap slice P0.
-docker compose -f infra/docker-compose.yml up -d postgres redis minio
-# Configure DUBBRIDGE_AUTH_ISSUER, DUBBRIDGE_AUTH_AUDIENCE, and
-# DUBBRIDGE_AUTH_RSA_PUBLIC_KEY_PATH before starting the protected API.
+# descriptor (ADR-026).
+docker compose -f infra/local/docker-compose.yml up -d postgres redis minio
+# Start local app containers only when you explicitly opt into the app profile.
+# Put auth env vars in .env before starting the protected API container.
+docker compose -f infra/local/docker-compose.yml --profile app up api worker-runner
+# Configure the auth env required by your local profile before starting the
+# protected API outside Compose.
 cargo run -p dubbridge-api
 ```
 
@@ -74,19 +77,21 @@ cargo install cargo-deny --version 0.18.4 --locked
 ```
 
 Infrastructure: PostgreSQL for state, Redis for job coordination, MinIO for object storage.
-Full `api` / `worker-runner` container environment wiring is still planned work
-(`docs/plan/roadmap.md`, P0).
+Local app-container wiring now lives in the opt-in `app` profile of
+`infra/local/docker-compose.yml`; it targets container DNS (`postgres`, `redis`) and
+keeps auth secrets in a local `.env`.
 
 ### Environments (local vs production)
 
 Local and production are separated by a fail-closed layered configuration model
 governed by ADR-026 and delivered in slice P0
-(`docs/plan/p0-environment-separation.md`). Today `crates/config` still compiles local
-defaults into the binary; P0 replaces this with an explicit `DUBBRIDGE_ENV`, committed
-non-secret `config/<env>.toml` profiles, secrets injected only through environment
-variables, and a production `validate()` that rejects local defaults (localhost
-datastores, local-fs storage, absent auth). The Docker Compose file above is local
-infrastructure only and is never the production deployment descriptor.
+(`docs/plan/p0-environment-separation.md`). `crates/config` now requires an explicit
+`DUBBRIDGE_ENV`, loads committed non-secret `config/<env>.toml` profiles, accepts
+secrets only through injected environment variables, and runs a production
+`validate()` that rejects local defaults (localhost datastores, local-fs storage,
+absent auth). The Docker Compose file above is local infrastructure only and is never
+the production deployment descriptor, and the local Rust app containers track
+`rust-toolchain.toml` via `rust:stable`.
 
 ## Repository layout
 

@@ -1,0 +1,18 @@
+# config/production.toml — production environment non-secret values.
+# Secrets (database_url, redis_url, auth credentials) are injected via
+# DUBBRIDGE_* env vars and must never appear in this file (ADR-026, Decision 4).
+#
+# NOTE: This profile is configuration-valid once representative secrets are injected.
+# Runtime behavior for the `s3` selector still lands in later phases when
+# `build_adapter` and observability wiring consume these settings.
+
+env = "production"
+
+[storage]
+backend = "s3"
+base_path = ""
+bucket = "dubbridge-production"
+
+[observability]
+log_format = "json"
+filter = "info"

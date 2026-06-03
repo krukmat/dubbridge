@@ -54,7 +54,7 @@ struct TestContext {
 
 impl TestContext {
     async fn new() -> Option<Self> {
-        let database_url = match env::var("DATABASE_URL") {
+        let database_url = match env::var("DUBBRIDGE_DATABASE_URL") {
             Ok(url) => url,
             Err(_) => return None,
         };
@@ -113,7 +113,7 @@ impl TestContext {
 #[tokio::test]
 async fn successful_ingestion_creates_asset_rights_artifact_and_audit() {
     let Some(mut ctx) = TestContext::new().await else {
-        eprintln!("skipping integration test: DATABASE_URL not set");
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
         return;
     };
 
@@ -160,7 +160,7 @@ async fn successful_ingestion_creates_asset_rights_artifact_and_audit() {
 #[tokio::test]
 async fn missing_rights_is_rejected() {
     let Some(mut ctx) = TestContext::new().await else {
-        eprintln!("skipping integration test: DATABASE_URL not set");
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
         return;
     };
 
@@ -189,7 +189,7 @@ async fn missing_rights_is_rejected() {
 #[tokio::test]
 async fn duplicate_finalization_does_not_create_duplicate_artifact() {
     let Some(mut ctx) = TestContext::new().await else {
-        eprintln!("skipping integration test: DATABASE_URL not set");
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
         return;
     };
 
@@ -234,7 +234,7 @@ async fn duplicate_finalization_does_not_create_duplicate_artifact() {
 #[tokio::test]
 async fn finalize_rollback_on_constraint_violation() {
     let Some(mut ctx) = TestContext::new().await else {
-        eprintln!("skipping integration test: DATABASE_URL not set");
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
         return;
     };
 
@@ -273,7 +273,7 @@ async fn finalize_rollback_on_constraint_violation() {
 #[tokio::test]
 async fn missing_bearer_token_is_rejected() {
     let Some(ctx) = TestContext::new().await else {
-        eprintln!("skipping integration test: DATABASE_URL not set");
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
         return;
     };
 
@@ -296,7 +296,7 @@ async fn missing_bearer_token_is_rejected() {
 #[tokio::test]
 async fn uploader_id_is_derived_from_authenticated_principal() {
     let Some(mut ctx) = TestContext::new().await else {
-        eprintln!("skipping integration test: DATABASE_URL not set");
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
         return;
     };
 
@@ -333,7 +333,7 @@ async fn uploader_id_is_derived_from_authenticated_principal() {
 #[tokio::test]
 async fn rights_and_finalize_survive_app_restart() {
     let Some(mut ctx) = TestContext::new().await else {
-        eprintln!("skipping integration test: DATABASE_URL not set");
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
         return;
     };
 
@@ -357,7 +357,7 @@ async fn rights_and_finalize_survive_app_restart() {
 #[tokio::test]
 async fn expired_session_is_rejected_on_rights() {
     let Some(mut ctx) = TestContext::new().await else {
-        eprintln!("skipping integration test: DATABASE_URL not set");
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
         return;
     };
 
@@ -397,7 +397,7 @@ async fn expired_session_is_rejected_on_rights() {
 #[tokio::test]
 async fn expired_session_is_rejected_on_finalize() {
     let Some(mut ctx) = TestContext::new().await else {
-        eprintln!("skipping integration test: DATABASE_URL not set");
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
         return;
     };
 
@@ -423,7 +423,7 @@ async fn expired_session_is_rejected_on_finalize() {
 #[tokio::test]
 async fn cleanup_removes_expired_sessions() {
     let Some(ctx) = TestContext::new().await else {
-        eprintln!("skipping integration test: DATABASE_URL not set");
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
         return;
     };
 
@@ -481,7 +481,7 @@ async fn cleanup_removes_expired_sessions() {
 #[tokio::test]
 async fn concurrent_duplicate_finalize_one_wins() {
     let Some(mut ctx) = TestContext::new().await else {
-        eprintln!("skipping integration test: DATABASE_URL not set");
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
         return;
     };
 
@@ -552,7 +552,7 @@ async fn concurrent_duplicate_finalize_one_wins() {
 #[tokio::test]
 async fn concurrent_rights_and_finalize_is_consistent() {
     let Some(mut ctx) = TestContext::new().await else {
-        eprintln!("skipping integration test: DATABASE_URL not set");
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
         return;
     };
 
@@ -892,7 +892,7 @@ fn rebuild_context(ctx: &TestContext) -> TestContext {
 #[tokio::test]
 async fn cleanup_skips_row_locked_by_in_flight_finalize() {
     let Some(mut ctx) = TestContext::new().await else {
-        eprintln!("skipping integration test: DATABASE_URL not set");
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
         return;
     };
 
@@ -935,7 +935,7 @@ async fn cleanup_skips_row_locked_by_in_flight_finalize() {
 #[tokio::test]
 async fn upload_too_large_is_rejected() {
     let Some(ctx) = TestContext::new().await else {
-        eprintln!("skipping integration test: DATABASE_URL not set");
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
         return;
     };
 

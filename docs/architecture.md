@@ -151,15 +151,14 @@ MinIO for object storage. Until S2 lands, the API storage adapter still resolves
 `LocalFsAdapter`.
 
 The infrastructure containers are usable today with
-`docker compose -f infra/docker-compose.yml up -d postgres redis minio`. That Compose
+`docker compose -f infra/local/docker-compose.yml up -d postgres redis minio`. That Compose
 file is **local infrastructure only**; it is never the production deployment
 descriptor (ADR-026).
 
-Environment separation is governed by ADR-026 and delivered in P0. Today
-`crates/config` still compiles local defaults into the binary, so a misconfigured
-process can silently fall back to localhost/`/tmp`. P0 inverts this to a fail-closed
-layered model: an explicit `DUBBRIDGE_ENV`, committed non-secret `config/<env>.toml`
-profiles, secrets only in injected environment variables, and a `validate()` that
-rejects local defaults in production-like environments. Full `api` / `worker-runner`
-container startup becomes reproducible once P0 wires container service DNS URLs, API
-auth bootstrap, health checks, and the Rust image version policy (X18, X2).
+Environment separation is governed by ADR-026 and delivered in P0. `crates/config`
+now uses a fail-closed layered model: an explicit `DUBBRIDGE_ENV`, committed
+non-secret `config/<env>.toml` profiles, secrets only in injected environment
+variables, and a `validate()` that rejects local defaults in production-like
+environments. The opt-in `app` profile wires container service DNS URLs and
+config-path resolution for `api` / `worker-runner`, and the local Rust container image
+tracks the repo toolchain policy (`rust-toolchain.toml` = `stable`).
