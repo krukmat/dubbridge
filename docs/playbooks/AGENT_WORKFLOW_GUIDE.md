@@ -161,6 +161,32 @@ Do not collapse these into one undocumented guess.
 When presenting a task, the agent must compute a complexity score and derive the
 recommended model tier from it. Do not guess; use the procedure below.
 
+### RRI — canonical scoring method (adopted 2026-06-04)
+
+This guide adopts the **Required Reasoning Index (RRI)** as the canonical method
+for deriving complexity, risk, model tier, and autonomy gates. The full procedure
+(formula, scoring rubric, repo-specific anchor rubric, penalty table, bands, and
+decomposition triggers) lives in `docs/policies/RRI_POLICY.md`.
+
+**Adoption note:** RRI supersedes the single-axis cyclomatic-complexity scoring
+that previously drove the tier mapping. No ADR is required — RRI is a workflow
+policy, not a runtime architecture decision. `AGENTS.md` and `CLAUDE.md` are
+**not** changed; this guide overrides both "without exception" on complexity
+scoring and model selection, so the adoption is binding from this file alone.
+
+**How Steps 1 and 2 below relate to RRI:**
+- The cyclomatic-complexity formula in Step 1 maps directly to the **`C` variable**
+  of the RRI formula. Step 1 remains the procedure for computing `C`.
+- The tier mapping in Step 2 is now driven by the **RRI band** (not the raw CC
+  label). The tier names (Economy / Balanced / Premium) and thinking-mode rules
+  are unchanged; only the input that selects the tier changes.
+- Step 3 is updated to include the RRI score in the task presentation.
+
+When presenting any task: compute the full RRI using `docs/policies/RRI_POLICY.md`,
+present the variable table (score + evidence + confidence), state the band, apply
+the band's autonomy gates, and resolve the model tier. For objective variables (`F`,
+`T`, and `C`) measure — do not estimate.
+
 ### Step 1 — Compute complexity
 
 **For development tasks (code to write or modify):**
@@ -176,12 +202,16 @@ where E = edges, N = nodes, P = connected components in the control-flow graph.
 Practically: start at 1 and add 1 for each `if`, `else if`, `match` arm, `while`,
 `for`, `loop`, `?` propagation that branches, `&&`, `||` in a condition.
 
-| CC range | Complexity label |
-|---|---|
-| 1–5 | Low |
-| 6–10 | Medium |
-| 11–20 | High |
-| > 20 | Very High |
+| CC range | Complexity label | RRI `C` variable score |
+|---|---|---|
+| 1–5 | Low | 0–1 |
+| 6–10 | Medium | 1–2 |
+| 11–20 | High | 2–3 |
+| > 20 | Very High | 4–5 |
+
+> **Subsumed by RRI:** the CC range above is the `C` variable of the RRI formula.
+> Use the full RRI score (not just `C`) to determine the model tier and autonomy
+> gates. See `docs/policies/RRI_POLICY.md` for the complete scoring procedure.
 
 **For non-development tasks (analysis, planning, research, config, docs):**
 
@@ -210,14 +240,20 @@ over time; the workflow should stay stable across agents and providers.
 | Balanced | Medium-complexity, standard implementation work |
 | Premium | High / Very High complexity, architecture, synthesis, deep debugging |
 
-Mapping:
+Mapping (now driven by RRI band — see `docs/policies/RRI_POLICY.md`):
 
-| Complexity | Codex capability | Claude Code capability | Thinking mode |
-|---|---|---|---|
-| Low | Economy coding model | Economy coding model | Off |
-| Medium | Balanced coding model | Balanced coding model | Off |
-| High | Premium reasoning/coding model | Balanced or Premium reasoning/coding model | **On** |
-| Very High | Premium reasoning/coding model | Premium reasoning/coding model | **On** |
+| RRI band | Complexity label | Codex capability | Claude Code capability | Thinking mode |
+|---|---|---|---|---|
+| 0–25 | Low | Economy coding model | Economy coding model | Off |
+| 26–40 | Moderate | Balanced coding model | Balanced coding model | Off |
+| 41–55 | Med-high | Balanced coding model | Balanced → Premium | **On** |
+| 56–70 | Complex | Premium reasoning/coding model | Premium reasoning/coding model | **On** |
+| 71+ | High / Very High | Premium reasoning/coding model | Premium reasoning/coding model | **On** |
+
+> **Subsumed by RRI:** the complexity label alone no longer determines the tier.
+> The RRI band (which incorporates `C`, `F`, `D`, `T`, `A`, `K`, `P`, `X`, and
+> penalties) selects the row above. The tier names and thinking-mode rules are
+> unchanged; only the input that selects the tier has changed.
 
 Agent-specific resolution rules:
 
@@ -260,10 +296,15 @@ doc updates, or any task where the strategy is fully pre-defined.
 Include in every task presentation:
 
 ```
-| Complexity score | <CC range or decision-weight score> → <label> |
-| Claude Code      | <resolved model or pinned model> — thinking <On / Off> |
+| RRI              | <score> → band <label> → gates: <list>                  |
+| Complexity score | <CC range or decision-weight score> → <label>           |
+| Claude Code      | <resolved model or pinned model> — thinking <On / Off>  |
 | Codex            | <resolved model or pinned model>                        |
 ```
+
+Present the full RRI variable table (variable | score | evidence | confidence)
+before this summary block. See `docs/policies/RRI_POLICY.md` for the reporting
+format.
 
 The recommendation is **not** a competition between vendors. Every presentation
 must provide:
@@ -328,3 +369,4 @@ A handoff prompt must contain only:
 
 - `CLAUDE.md`, `AGENTS.md`, `README_AGENT_ORDER.md`
 - `docs/policies/HITL_AUTONOMY_POLICY.md`
+- `docs/policies/RRI_POLICY.md` — RRI formula, anchor rubric, bands, and gates

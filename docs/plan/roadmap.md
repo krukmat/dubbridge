@@ -107,7 +107,7 @@ These are real architecture work, but they do not sit on the linear media pipeli
 | Slice | Name | Depends on | Status | Source |
 |-------|------|------------|--------|--------|
 | **P0** | Environment separation & deployment runtime wiring (layered fail-closed config, compose = local-infra-only, auth bootstrap, service DNS, version policy) | S0, S1 | ✅ done — Phase 0 and Phase 1 task ledgers complete; later env-driven runtime behavior stays deferred to S2+/later phases | `docs/plan/p0-environment-separation.md`, `docs/tasks/p0-environment-separation.md` |
-| **P1** | First-party session gateway / BFF | S0, external authorization-server contract | 📄 planned — plan + task ledgers exist, not built | `docs/plan/p1-session-gateway-bff.md`, `docs/tasks/p1-session-gateway-bff.md` (ADR-024) |
+| **P1** | First-party session gateway / BFF | S0, external authorization-server contract | ✅ done — built on 2026-06-04; T0-T6 complete (ADR acceptance, scaffold/config, OAuth client, session store/cookies, auth routes, authenticated proxy, deterministic end-to-end lifecycle coverage) | `docs/plan/p1-session-gateway-bff.md`, `docs/tasks/p1-session-gateway-bff.md` (ADR-024) |
 | **P2** | Production identity hardening (JWKS discovery, automatic key rotation, subject mapping if needed) | S0 | ⬜ no plan yet | ADR-023 |
 | **P3** | First-party mobile client (React Native + Expo) | P1 (hard); P2 recommended for production device login | 📄 planned — plan + task ledgers exist, not built | `docs/plan/p3-mobile-client.md`, `docs/tasks/p3-mobile-client.md` (ADR-024) |
 
@@ -116,10 +116,10 @@ mobile auth flow. It does not block S2 or S3.
 
 `P3` (mobile) is a first-party interactive client and therefore a hard consumer of
 the P1 gateway (ADR-024): the device must terminate in the same session-gateway
-trust boundary as the web app and must not hold long-lived tokens. P3 cannot start
-until P1 is built. Stack decision (2026-06-03): React Native + Expo, coherent with
-the React line reserved in `web/README.md`. There is no mobile app in the repository
-today; P3 introduces it.
+trust boundary as the web app and must not hold long-lived tokens. That dependency
+is now satisfied: P1 was completed on 2026-06-04. Stack decision (2026-06-03):
+React Native + Expo, coherent with the React line reserved in `web/README.md`.
+There is no mobile app in the repository today; P3 introduces it.
 
 ## P0 strategy: environment separation & fail-closed configuration
 

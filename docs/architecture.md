@@ -39,13 +39,16 @@ operational surfaces from planned ones. Delivery sequence lives in
 | RTMP/SRT live recording ingest | Deferred sub-case (S3b); shares the S3 foundation | S3b, ADR-019/020/022 |
 | Media preparation through publication | Planned | S4..S9 |
 | Environment separation + reproducible app-container runtime wiring | Planned supporting surface | P0, ADR-026 |
-| First-party session gateway / BFF | Planned supporting surface | P1, ADR-024 |
+| First-party session gateway / BFF | Operational supporting surface | P1, ADR-024 |
 
 ## Runtime surfaces
 
 ### Operational
 
 - `apps/api` exposes HTTP endpoints and operational health checks.
+- `apps/gateway` exposes first-party auth endpoints (`/auth/login`, `/auth/callback`,
+  `/auth/logout`) plus the authenticated `/api/*` proxy, keeping tokens server-side
+  while preserving JWT verification at `apps/api` (P1, ADR-024/023).
 - `apps/worker-runner` is the Rust background-job execution surface; its real queue
   consumption remains to be implemented as slices require it.
 - `apps/cli` hosts local operational commands for development and administration.
@@ -66,9 +69,6 @@ operational surfaces from planned ones. Delivery sequence lives in
   authentication (ADR-022). Its v1 output contract was fixed by S3 Task 0c (local
   HLS fMP4 staging + one assembled MP4). It is built only when a real
   live-broadcast client need exists; it is not on the primary S3 critical path.
-- A first-party session gateway / BFF will keep browser token lifecycle outside
-  browser JavaScript while preserving JWT verification at `apps/api` (ADR-024).
-
 ## Shared crates
 
 - `domain`: Core entities and invariants.
@@ -103,8 +103,9 @@ platform download (owner creds) ------+--> shared rights-gated finalize --> asse
 RTMP/SRT live recording (S3b) --------+
 ```
 
-Direct upload is operational. **Platform download (primary S3, ADR-025)** and the
-session gateway are planned; **RTMP/SRT live recording is the deferred S3b sub-case**.
+Direct upload and the first-party session gateway are operational. **Platform
+download (primary S3, ADR-025)** is planned; **RTMP/SRT live recording is the
+deferred S3b sub-case**.
 Every intake mode — upload, platform download, and live recording — must use the same
 fail-closed ingestion boundary (`finalize_ingestion_core`); none may create a weaker
 parallel path (ADR-021, producer-agnostic).

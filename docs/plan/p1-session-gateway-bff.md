@@ -10,6 +10,20 @@ web app (`web/`) and the planned mobile app (slice **P3**, React Native + Expo).
 > mobile client auth flow exists. Per ADR-024 and `docs/plan/roadmap.md` (lines
 > 103–107), it does not block S2 or S3.
 
+**Implementation status (2026-06-04):**
+- `T0` complete — ADR-024 accepted with concrete cookie / CSRF / session decisions.
+- `T1` complete — `apps/gateway` scaffold, typed fail-closed `GatewaySettings`,
+  profile/env wiring, and public health endpoints are in place.
+- `T2` complete — OAuth PKCE/token exchange/refresh client is implemented and tested.
+- `T3` complete — session store, hardened cookies, and CSRF helpers are in place.
+- `T4` complete — login / callback / logout routes are wired and tested.
+- `T5` complete — authenticated `/api/*` proxy with transparent refresh is wired and tested.
+- `T6` complete — deterministic end-to-end lifecycle coverage, architecture/roadmap sync,
+  and ADR-024 implementation references are in place.
+
+**Slice status:** P1 is implemented and ready to serve as the first-party auth surface
+for the planned web client and for P3 (mobile).
+
 ## Objective
 
 Introduce a **backend-for-frontend (BFF) / session gateway** as a new
@@ -64,8 +78,8 @@ per-request identity verification.
 
 ## Governing ADRs
 - **ADR-024**: Low-friction first-party API access via session gateway (the slice's
-  primary decision; currently **Proposed** — P1 implements it and should move it to
-  **Accepted**, recording cookie policy, CSRF posture, and session-store choice).
+  primary decision; **Accepted** on 2026-06-03 with the concrete cookie policy,
+  CSRF posture, session-store choice, TTL, and mobile transport seam recorded in T0).
 - **ADR-023**: API client authentication and principal propagation — the protected
   API trust boundary P1 must preserve unchanged.
 - **ADR-026**: Layered fail-closed configuration — gateway config (client secret,

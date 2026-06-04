@@ -103,6 +103,7 @@ pub struct AppConfig {
     pub storage: StorageSettings,
     pub observability: ObsSettings,
     pub auth: Option<AuthSettings>,
+    pub gateway: Option<GatewaySettings>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -111,6 +112,30 @@ pub struct AuthSettings {
     pub audience: String,
     pub rsa_public_key_path: String,
     pub clock_skew_leeway_seconds: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GatewaySettings {
+    pub port: u16,
+    pub upstream_api_base_url: String,
+    pub oauth: GatewayOAuthSettings,
+    pub session: GatewaySessionSettings,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GatewayOAuthSettings {
+    pub authorization_url: String,
+    pub token_url: String,
+    pub client_id: String,
+    pub client_secret: Option<String>,
+    pub redirect_url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GatewaySessionSettings {
+    pub cookie_name: String,
+    pub absolute_ttl_seconds: u64,
+    pub idle_ttl_seconds: u64,
 }
 
 impl AppConfig {
@@ -131,6 +156,10 @@ impl AppConfig {
     }
 
     pub fn validate(&self) -> Result<(), ConfigError> {
+        if let Some(gateway) = &self.gateway {
+            gateway.validate(self.env.is_production_like())?;
+        }
+
         if !self.env.is_production_like() {
             return Ok(());
         }
@@ -171,6 +200,14 @@ impl AppConfig {
         Ok(())
     }
 
+    pub fn gateway_settings(&self) -> Result<&GatewaySettings, ConfigError> {
+        self.gateway.as_ref().ok_or_else(|| {
+            ConfigError::Validation(
+                "gateway settings are required to start the gateway".to_string(),
+            )
+        })
+    }
+
     /// Legacy reader kept until Task 4 replaces call sites with load().
     /// Do not add new callers — use load() instead.
     pub fn from_env() -> Self {
@@ -202,6 +239,7 @@ impl AppConfig {
                 filter: std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string()),
             },
             auth: AuthSettings::from_env(),
+            gateway: None,
         }
     }
 
@@ -219,6 +257,85 @@ impl AppConfig {
     fn is_local_address_url(url: &str) -> bool {
         let normalized = url.to_ascii_lowercase();
         normalized.contains("localhost") || normalized.contains("127.0.0.1")
+    }
+}
+
+impl GatewaySettings {
+    fn validate(&self, production_like: bool) -> Result<(), ConfigError> {
+        if self.upstream_api_base_url.trim().is_empty() {
+            return Err(ConfigError::Validation(
+                "gateway.upstream_api_base_url is required".to_string(),
+            ));
+        }
+
+        if self.oauth.authorization_url.trim().is_empty() {
+            return Err(ConfigError::Validation(
+                "gateway.oauth.authorization_url is required".to_string(),
+            ));
+        }
+
+        if self.oauth.token_url.trim().is_empty() {
+            return Err(ConfigError::Validation(
+                "gateway.oauth.token_url is required".to_string(),
+            ));
+        }
+
+        if self.oauth.client_id.trim().is_empty() {
+            return Err(ConfigError::Validation(
+                "gateway.oauth.client_id is required".to_string(),
+            ));
+        }
+
+        if self.oauth.redirect_url.trim().is_empty() {
+            return Err(ConfigError::Validation(
+                "gateway.oauth.redirect_url is required".to_string(),
+            ));
+        }
+
+        if self.session.cookie_name.trim().is_empty() {
+            return Err(ConfigError::Validation(
+                "gateway.session.cookie_name is required".to_string(),
+            ));
+        }
+
+        if self.session.absolute_ttl_seconds == 0 {
+            return Err(ConfigError::Validation(
+                "gateway.session.absolute_ttl_seconds must be greater than zero".to_string(),
+            ));
+        }
+
+        if self.session.idle_ttl_seconds == 0 {
+            return Err(ConfigError::Validation(
+                "gateway.session.idle_ttl_seconds must be greater than zero".to_string(),
+            ));
+        }
+
+        if production_like && self.oauth.client_secret.is_none() {
+            return Err(ConfigError::Validation(
+                "gateway.oauth.client_secret is required in production-like environments"
+                    .to_string(),
+            ));
+        }
+
+        if production_like && AppConfig::is_local_address_url(&self.upstream_api_base_url) {
+            return Err(ConfigError::Validation(
+                "gateway.upstream_api_base_url must not target localhost or 127.0.0.1 in production-like environments".to_string(),
+            ));
+        }
+
+        if production_like && AppConfig::is_local_address_url(&self.oauth.authorization_url) {
+            return Err(ConfigError::Validation(
+                "gateway.oauth.authorization_url must not target localhost or 127.0.0.1 in production-like environments".to_string(),
+            ));
+        }
+
+        if production_like && AppConfig::is_local_address_url(&self.oauth.token_url) {
+            return Err(ConfigError::Validation(
+                "gateway.oauth.token_url must not target localhost or 127.0.0.1 in production-like environments".to_string(),
+            ));
+        }
+
+        Ok(())
     }
 }
 
@@ -358,6 +475,11 @@ mod tests {
         assert_eq!(cfg.storage.backend, StorageBackend::LocalFs);
         assert_eq!(cfg.storage.bucket, "dubbridge-local");
         assert_eq!(cfg.observability.log_format, LogFormat::Pretty);
+        let gateway = cfg
+            .gateway
+            .expect("local gateway settings should deserialize");
+        assert_eq!(gateway.port, 8081);
+        assert_eq!(gateway.oauth.client_id, "dubbridge-web-local");
     }
 
     #[test]
@@ -384,6 +506,12 @@ mod tests {
                 assert_eq!(cfg.env, AppEnv::Staging);
                 assert_eq!(cfg.storage.backend, StorageBackend::S3);
                 assert_eq!(cfg.observability.log_format, LogFormat::Json);
+                assert_eq!(
+                    cfg.gateway
+                        .expect("staging gateway settings should deserialize")
+                        .upstream_api_base_url,
+                    "https://api.staging.dubbridge.example"
+                );
             },
         );
     }
@@ -411,6 +539,13 @@ mod tests {
                 assert_eq!(cfg.env, AppEnv::Production);
                 assert_eq!(cfg.storage.backend, StorageBackend::S3);
                 assert_eq!(cfg.observability.log_format, LogFormat::Json);
+                assert_eq!(
+                    cfg.gateway
+                        .expect("production gateway settings should deserialize")
+                        .oauth
+                        .client_id,
+                    "dubbridge-web"
+                );
             },
         );
     }
@@ -445,12 +580,22 @@ mod tests {
             [
                 ("DUBBRIDGE_ENV", Some("local")),
                 ("DUBBRIDGE_CONFIG_DIR", Some(fixtures_dir().as_str())),
+                (
+                    "DUBBRIDGE_GATEWAY__OAUTH__CLIENT_SECRET",
+                    Some("local-gateway-secret"),
+                ),
             ],
             || {
                 let cfg = AppConfig::load().expect("local profile should load");
                 assert_eq!(cfg.api_port, 8080);
                 assert!(cfg.database_url.contains("localhost"));
                 assert_eq!(cfg.storage.backend, StorageBackend::LocalFs);
+                let gateway = cfg.gateway_settings().expect("gateway settings");
+                assert_eq!(gateway.port, 8081);
+                assert_eq!(
+                    gateway.oauth.client_secret.as_deref(),
+                    Some("local-gateway-secret")
+                );
             },
         );
     }
@@ -474,11 +619,23 @@ mod tests {
                     Some("/tmp/public.pem"),
                 ),
                 ("DUBBRIDGE_AUTH__CLOCK_SKEW_LEEWAY_SECONDS", Some("30")),
+                (
+                    "DUBBRIDGE_GATEWAY__OAUTH__CLIENT_SECRET",
+                    Some("staging-gateway-secret"),
+                ),
             ],
             || {
                 let cfg = AppConfig::load().expect("staging profile should load");
                 assert_eq!(cfg.storage.backend, StorageBackend::S3);
                 assert_eq!(cfg.observability.log_format, LogFormat::Json);
+                assert_eq!(
+                    cfg.gateway_settings()
+                        .expect("gateway settings")
+                        .oauth
+                        .client_secret
+                        .as_deref(),
+                    Some("staging-gateway-secret")
+                );
             },
         );
     }
@@ -548,6 +705,26 @@ mod tests {
                 filter: "info".to_string(),
             },
             auth: Some(sample_auth()),
+            gateway: Some(sample_gateway()),
+        }
+    }
+
+    fn sample_gateway() -> GatewaySettings {
+        GatewaySettings {
+            port: 8081,
+            upstream_api_base_url: "https://api.example.com".to_string(),
+            oauth: GatewayOAuthSettings {
+                authorization_url: "https://auth.example.com/oauth/authorize".to_string(),
+                token_url: "https://auth.example.com/oauth/token".to_string(),
+                client_id: "dubbridge-web".to_string(),
+                client_secret: Some("gateway-secret".to_string()),
+                redirect_url: "https://gateway.example.com/auth/callback".to_string(),
+            },
+            session: GatewaySessionSettings {
+                cookie_name: "dubbridge_session".to_string(),
+                absolute_ttl_seconds: 28_800,
+                idle_ttl_seconds: 1_800,
+            },
         }
     }
 
@@ -635,9 +812,53 @@ mod tests {
                 filter: "info".to_string(),
             },
             auth: None,
+            gateway: Some(sample_gateway()),
         };
 
         assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn app_config_validate_rejects_missing_gateway_upstream_url() {
+        let mut cfg = production_like_config();
+        cfg.gateway.as_mut().expect("gateway").upstream_api_base_url = String::new();
+
+        let result = cfg.validate();
+
+        assert!(
+            matches!(result, Err(ConfigError::Validation(ref msg)) if msg.contains("gateway.upstream_api_base_url")),
+            "expected Validation(gateway.upstream_api_base_url), got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn app_config_validate_rejects_local_gateway_authorization_url_in_production() {
+        let mut cfg = production_like_config();
+        cfg.gateway
+            .as_mut()
+            .expect("gateway")
+            .oauth
+            .authorization_url = "http://localhost:9000/oauth/authorize".to_string();
+
+        let result = cfg.validate();
+
+        assert!(
+            matches!(result, Err(ConfigError::Validation(ref msg)) if msg.contains("gateway.oauth.authorization_url")),
+            "expected Validation(gateway.oauth.authorization_url), got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn app_config_validate_rejects_missing_gateway_client_secret_in_production() {
+        let mut cfg = production_like_config();
+        cfg.gateway.as_mut().expect("gateway").oauth.client_secret = None;
+
+        let result = cfg.validate();
+
+        assert!(
+            matches!(result, Err(ConfigError::Validation(ref msg)) if msg.contains("gateway.oauth.client_secret")),
+            "expected Validation(gateway.oauth.client_secret), got: {result:?}"
+        );
     }
 
     #[test]
@@ -662,6 +883,10 @@ mod tests {
                     Some("/tmp/public.pem"),
                 ),
                 ("DUBBRIDGE_AUTH__CLOCK_SKEW_LEEWAY_SECONDS", Some("30")),
+                (
+                    "DUBBRIDGE_GATEWAY__OAUTH__CLIENT_SECRET",
+                    Some("prod-gateway-secret"),
+                ),
             ],
             || {
                 let result = AppConfig::load();
@@ -695,6 +920,10 @@ mod tests {
                     Some("/tmp/public.pem"),
                 ),
                 ("DUBBRIDGE_AUTH__CLOCK_SKEW_LEEWAY_SECONDS", Some("30")),
+                (
+                    "DUBBRIDGE_GATEWAY__OAUTH__CLIENT_SECRET",
+                    Some("prod-gateway-secret"),
+                ),
             ],
             || {
                 let cfg = AppConfig::load().expect("production profile should validate");

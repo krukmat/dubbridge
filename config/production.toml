@@ -16,3 +16,18 @@ bucket = "dubbridge-production"
 [observability]
 log_format = "json"
 filter = "info"
+
+[gateway]
+port = 8081
+upstream_api_base_url = "https://api.dubbridge.example"
+
+[gateway.oauth]
+authorization_url = "https://auth.dubbridge.example/oauth/authorize"
+token_url = "https://auth.dubbridge.example/oauth/token"
+client_id = "dubbridge-web"
+redirect_url = "https://gateway.dubbridge.example/auth/callback"
+
+[gateway.session]
+cookie_name = "dubbridge_session"
+absolute_ttl_seconds = 28800
+idle_ttl_seconds = 1800

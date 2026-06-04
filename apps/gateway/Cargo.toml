@@ -1,0 +1,34 @@
+[package]
+name = "dubbridge-gateway"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+# P1-T2: PKCE (RFC 7636) and OAuth 2.0 token client
+sha2 = "0.10"
+base64 = "0.22"
+rand = "0.8"
+url = "2.5"
+thiserror = "2.0"
+# P1-T3: session store, hardened cookie, CSRF
+async-trait = "0.1"
+subtle = "2"
+redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
+dubbridge-config = { path = "../../crates/config" }
+dubbridge-observability = { path = "../../crates/observability" }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+wiremock = "0.6"
+axum-test = "16"
+
+[lints]
+workspace = true

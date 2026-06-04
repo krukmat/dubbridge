@@ -16,3 +16,18 @@ bucket = "dubbridge-local"
 [observability]
 log_format = "pretty"
 filter = "info"
+
+[gateway]
+port = 8081
+upstream_api_base_url = "http://localhost:8080"
+
+[gateway.oauth]
+authorization_url = "http://localhost:9000/oauth/authorize"
+token_url = "http://localhost:9000/oauth/token"
+client_id = "dubbridge-web-local"
+redirect_url = "http://localhost:8081/auth/callback"
+
+[gateway.session]
+cookie_name = "dubbridge_session"
+absolute_ttl_seconds = 28800
+idle_ttl_seconds = 1800

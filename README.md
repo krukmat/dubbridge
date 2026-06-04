@@ -93,6 +93,31 @@ absent auth). The Docker Compose file above is local infrastructure only and is 
 the production deployment descriptor, and the local Rust app containers track
 `rust-toolchain.toml` via `rust:stable`.
 
+### Agent workflow and task complexity (RRI)
+
+All development in this repository follows a mandatory
+`analyze → plan → tasks → approval → implement` workflow governed by
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md`.
+
+Before implementing any task, agents compute a **Required Reasoning Index (RRI)**
+score that estimates how much reasoning, caution, and verification the task
+requires. The RRI combines cyclomatic complexity, files affected, domain risk,
+test-coverage risk, ambiguity, coupling, security/data impact, and context size
+into a single score with penalties for high-risk combinations.
+
+| RRI band | Label | What it requires |
+|---|---|---|
+| 0–25 | Low | Implement after approval, high autonomy |
+| 26–40 | Moderate | Confirm area tests exist |
+| 41–55 | Med-high | Plan + explicit acceptance criteria |
+| 56–70 | Complex | Plan first; human reviews the plan |
+| 71–85 | High | Characterization tests + human reviews the diff |
+| 86–100 | Very high | ADR + risk analysis + decompose first |
+| > 100 | Excessive | Architecture work required before any implementation |
+
+The RRI also drives model-tier selection (Economy / Balanced / Premium) and
+thinking-mode activation. Full procedure: `docs/policies/RRI_POLICY.md`.
+
 ## Repository layout
 
 ```

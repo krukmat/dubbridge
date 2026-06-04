@@ -12,3 +12,18 @@ bucket = "dubbridge-staging"
 [observability]
 log_format = "json"
 filter = "info"
+
+[gateway]
+port = 8081
+upstream_api_base_url = "https://api.staging.dubbridge.example"
+
+[gateway.oauth]
+authorization_url = "https://auth.staging.dubbridge.example/oauth/authorize"
+token_url = "https://auth.staging.dubbridge.example/oauth/token"
+client_id = "dubbridge-web-staging"
+redirect_url = "https://gateway.staging.dubbridge.example/auth/callback"
+
+[gateway.session]
+cookie_name = "dubbridge_session"
+absolute_ttl_seconds = 28800
+idle_ttl_seconds = 1800
