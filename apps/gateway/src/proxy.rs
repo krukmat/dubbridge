@@ -23,7 +23,7 @@ use axum::{
 use crate::{
     auth::oauth_client::{OAuthError, OAuthExecutor, build_token_refresh_params},
     cookie::{build_session_cookie, clear_csrf_cookie, clear_session_cookie},
-    cookie_ext::resolve_session,
+    cookie_ext::{MOBILE_SESSION_HEADER, SessionTransportError, resolve_session},
     session::{SessionId, StoredSession},
     state::GatewayState,
 };
@@ -174,8 +174,11 @@ pub async fn proxy_handler(
     let session_cfg = &app_state.gateway.session;
     let csrf_cookie_name = format!("{}_csrf", session_cfg.cookie_name);
 
-    let Some((session_id, session)) = resolve_session(&app_state, &headers).await else {
-        return unauthorized_response(&session_cfg.cookie_name, &csrf_cookie_name);
+    let (session_id, session, transport) = match resolve_session(&app_state, &headers).await {
+        Ok(Some(resolved)) => resolved,
+        Ok(None) | Err(SessionTransportError::Conflict) => {
+            return unauthorized_response(&session_cfg.cookie_name, &csrf_cookie_name);
+        }
     };
 
     let (access_token, effective_session_id, session_refreshed) =
@@ -220,6 +223,9 @@ pub async fn proxy_handler(
         ) {
             continue;
         }
+        if name.as_str().eq_ignore_ascii_case(MOBILE_SESSION_HEADER) {
+            continue;
+        }
         upstream_request = upstream_request.header(name, value);
     }
 
@@ -232,6 +238,7 @@ pub async fn proxy_handler(
         upstream_response,
         session_refreshed.then_some(effective_session_id),
         &session_cfg.cookie_name,
+        transport.uses_mobile_header(),
     )
     .await
 }
@@ -278,6 +285,7 @@ async fn relay_upstream_response(
     upstream_response: reqwest::Response,
     refreshed_session_id: Option<SessionId>,
     session_cookie_name: &str,
+    mobile_transport: bool,
 ) -> Response {
     let status = upstream_response.status();
     let upstream_headers = upstream_response.headers().clone();
@@ -295,10 +303,18 @@ async fn relay_upstream_response(
     }
 
     if let Some(session_id) = refreshed_session_id {
-        response_headers.append(
-            header::SET_COOKIE,
-            build_session_cookie(&session_id, session_cookie_name),
-        );
+        if mobile_transport {
+            if let Ok(header_value) = header::HeaderValue::from_str(session_id.as_str()) {
+                response_headers.insert(MOBILE_SESSION_HEADER, header_value);
+            } else {
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        } else {
+            response_headers.append(
+                header::SET_COOKIE,
+                build_session_cookie(&session_id, session_cookie_name),
+            );
+        }
     }
 
     (status, response_headers, body).into_response()
@@ -321,8 +337,9 @@ mod tests {
     };
 
     use crate::{
-        auth::{oauth_client::TokenSet, pending::PendingAuthStore},
+        auth::{handoff::HandoffStore, oauth_client::TokenSet, pending::PendingAuthStore},
         build_app,
+        cookie_ext::MOBILE_SESSION_HEADER,
         proxy::{ensure_fresh_token, needs_refresh},
         session::{CsrfToken, StoredSession, store::InMemorySessionStore},
         state::GatewayState,
@@ -334,6 +351,7 @@ mod tests {
         let gw = dubbridge_config::GatewaySettings {
             port: 8081,
             upstream_api_base_url: upstream_api_base_url.to_string(),
+            mobile_return_uris: vec!["dubbridge://auth/callback".to_string()],
             oauth: dubbridge_config::GatewayOAuthSettings {
                 authorization_url: "http://localhost:9000/oauth/authorize".to_string(),
                 token_url: token_url.to_string(),
@@ -372,6 +390,7 @@ mod tests {
             gw,
             Arc::new(InMemorySessionStore::new()),
             Arc::new(PendingAuthStore::with_default_ttl()),
+            Arc::new(HandoffStore::with_default_ttl()),
         ))
     }
 
@@ -723,6 +742,179 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
         assert_eq!(upstream.received_requests().await.unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn proxy_with_mobile_session_header_resolves_same_server_side_session() {
+        let auth_server = MockServer::start().await;
+        let upstream = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/assets"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("via-header"))
+            .expect(1)
+            .mount(&upstream)
+            .await;
+
+        let state = make_state(
+            &format!("{}/oauth/token", auth_server.uri()),
+            &upstream.uri(),
+        );
+        let session_id = create_session(&state, session_expiring_in(3600, true)).await;
+        let app = build_app(state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/assets")
+                    .header(MOBILE_SESSION_HEADER, session_id.as_str())
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = read_body_text(response.into_body()).await;
+        assert_eq!(body, "via-header");
+    }
+
+    #[tokio::test]
+    async fn proxy_with_mismatched_cookie_and_mobile_header_returns_401_and_skips_upstream() {
+        let auth_server = MockServer::start().await;
+        let upstream = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/assets"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("must-not-run"))
+            .expect(0)
+            .mount(&upstream)
+            .await;
+
+        let state = make_state(
+            &format!("{}/oauth/token", auth_server.uri()),
+            &upstream.uri(),
+        );
+        let cookie_session_id = create_session(&state, session_expiring_in(3600, true)).await;
+        let different_session_id = crate::session::SessionId::generate();
+        let app = build_app(state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/assets")
+                    .header(
+                        "cookie",
+                        format!("dubbridge_session={}", cookie_session_id.as_str()),
+                    )
+                    .header(MOBILE_SESSION_HEADER, different_session_id.as_str())
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn proxy_with_jwt_like_mobile_header_returns_401_and_never_forwards_as_bearer() {
+        let auth_server = MockServer::start().await;
+        let upstream = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/assets"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("must-not-run"))
+            .expect(0)
+            .mount(&upstream)
+            .await;
+
+        let app = build_app(make_state(
+            &format!("{}/oauth/token", auth_server.uri()),
+            &upstream.uri(),
+        ));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/assets")
+                    .header(MOBILE_SESSION_HEADER, "eyJhbGciOiJIUzI1NiJ9.payload.sig")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn proxy_refresh_with_mobile_header_returns_rotated_session_ref_header_and_no_cookie() {
+        let auth_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/oauth/token"))
+            .and(body_string_contains("grant_type=refresh_token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "access_token": "fresh-access-token",
+                "refresh_token": "fresh-refresh-token",
+                "expires_in": 3600,
+                "token_type": "Bearer"
+            })))
+            .expect(1)
+            .mount(&auth_server)
+            .await;
+
+        let upstream = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/assets"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("mobile-refresh-ok"))
+            .expect(1)
+            .mount(&upstream)
+            .await;
+
+        let state = make_state(
+            &format!("{}/oauth/token", auth_server.uri()),
+            &upstream.uri(),
+        );
+        let session_id = create_session(&state, session_expiring_in(-60, true)).await;
+        let app = build_app(state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/assets")
+                    .header(MOBILE_SESSION_HEADER, session_id.as_str())
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let rotated_session_ref = response
+            .headers()
+            .get(MOBILE_SESSION_HEADER)
+            .expect("mobile refresh must return rotated session ref header")
+            .to_str()
+            .unwrap()
+            .to_string();
+        assert_ne!(rotated_session_ref, session_id.as_str());
+        assert!(
+            response
+                .headers()
+                .get_all("set-cookie")
+                .iter()
+                .next()
+                .is_none(),
+            "mobile refresh path must not set browser cookies"
+        );
+
+        let body = read_body_text(response.into_body()).await;
+        assert_eq!(body, "mobile-refresh-ok");
     }
 
     #[tokio::test]

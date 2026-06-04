@@ -13,7 +13,7 @@ use axum::{
 
 use crate::{
     cookie::{clear_csrf_cookie, clear_session_cookie},
-    cookie_ext::extract_session_id,
+    cookie_ext::{SessionTransportError, extract_session_transport},
     state::GatewayState,
 };
 
@@ -27,10 +27,23 @@ pub async fn logout_handler(
     headers: HeaderMap,
 ) -> Response {
     let session_cfg = &app_state.gateway.session;
+    let transport = match extract_session_transport(&headers, &session_cfg.cookie_name) {
+        Ok(transport) => transport,
+        Err(SessionTransportError::Conflict) => return StatusCode::UNAUTHORIZED.into_response(),
+    };
 
-    if let Some(session_id) = extract_session_id(&headers, &session_cfg.cookie_name) {
+    let mobile_path = transport
+        .as_ref()
+        .map(|transport| transport.uses_mobile_header())
+        .unwrap_or(false);
+
+    if let Some(transport) = transport {
         // Best-effort delete — session may already be expired or gone; never 500 on delete failure
-        let _ = app_state.session_store.delete(&session_id).await;
+        let _ = app_state.session_store.delete(transport.session_id()).await;
+    }
+
+    if mobile_path {
+        return StatusCode::OK.into_response();
     }
 
     let mut resp_headers = HeaderMap::new();
@@ -61,7 +74,11 @@ mod tests {
     use tower::ServiceExt;
 
     use crate::{
-        auth::{logout::logout_handler, oauth_client::TokenSet, pending::PendingAuthStore},
+        auth::{
+            handoff::HandoffStore, logout::logout_handler, oauth_client::TokenSet,
+            pending::PendingAuthStore,
+        },
+        cookie_ext::MOBILE_SESSION_HEADER,
         session::{CsrfToken, StoredSession, store::InMemorySessionStore},
         state::GatewayState,
     };
@@ -72,6 +89,7 @@ mod tests {
         let gw = dubbridge_config::GatewaySettings {
             port: 8081,
             upstream_api_base_url: "http://localhost:8080".to_string(),
+            mobile_return_uris: vec!["dubbridge://auth/callback".to_string()],
             oauth: dubbridge_config::GatewayOAuthSettings {
                 authorization_url: "http://localhost:9000/oauth/authorize".to_string(),
                 token_url: "http://localhost:9000/oauth/token".to_string(),
@@ -110,6 +128,7 @@ mod tests {
             gw,
             Arc::new(InMemorySessionStore::new()),
             Arc::new(PendingAuthStore::with_default_ttl()),
+            Arc::new(HandoffStore::with_default_ttl()),
         ))
     }
 
@@ -292,5 +311,65 @@ mod tests {
             StatusCode::OK,
             "logout on already-deleted session must be idempotent (200)"
         );
+    }
+
+    #[tokio::test]
+    async fn logout_with_mobile_header_returns_200_and_no_set_cookie_headers() {
+        let state = make_state();
+        let session = StoredSession::new("user-mobile", sample_token_set(), CsrfToken::generate());
+        let session_id = state.session_store.create(session, 28_800).await.unwrap();
+
+        let app = build_logout_router(Arc::clone(&state));
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/auth/logout")
+                    .header(MOBILE_SESSION_HEADER, session_id.as_str())
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert!(
+            resp.headers().get_all("set-cookie").iter().next().is_none(),
+            "mobile logout must not emit browser cookie clears"
+        );
+
+        let resolved = state
+            .session_store
+            .resolve(&session_id, 28_800, 1_800)
+            .await
+            .unwrap();
+        assert!(resolved.is_none(), "mobile logout must delete the session");
+    }
+
+    #[tokio::test]
+    async fn logout_with_mismatched_cookie_and_mobile_header_returns_401() {
+        let state = make_state();
+        let session = StoredSession::new("user-mobile", sample_token_set(), CsrfToken::generate());
+        let cookie_session_id = state.session_store.create(session, 28_800).await.unwrap();
+        let different_session_id = crate::session::SessionId::generate();
+
+        let app = build_logout_router(state);
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/auth/logout")
+                    .header(
+                        "cookie",
+                        format!("dubbridge_session={}", cookie_session_id.as_str()),
+                    )
+                    .header(MOBILE_SESSION_HEADER, different_session_id.as_str())
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 }

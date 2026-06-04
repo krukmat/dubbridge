@@ -107,19 +107,37 @@ These are real architecture work, but they do not sit on the linear media pipeli
 | Slice | Name | Depends on | Status | Source |
 |-------|------|------------|--------|--------|
 | **P0** | Environment separation & deployment runtime wiring (layered fail-closed config, compose = local-infra-only, auth bootstrap, service DNS, version policy) | S0, S1 | ✅ done — Phase 0 and Phase 1 task ledgers complete; later env-driven runtime behavior stays deferred to S2+/later phases | `docs/plan/p0-environment-separation.md`, `docs/tasks/p0-environment-separation.md` |
-| **P1** | First-party session gateway / BFF | S0, external authorization-server contract | ✅ done — built on 2026-06-04; T0-T6 complete (ADR acceptance, scaffold/config, OAuth client, session store/cookies, auth routes, authenticated proxy, deterministic end-to-end lifecycle coverage) | `docs/plan/p1-session-gateway-bff.md`, `docs/tasks/p1-session-gateway-bff.md` (ADR-024) |
+| **P1** | First-party session gateway / BFF | S0, external authorization-server contract | ✅ done — T0–T7 complete as of 2026-06-04; browser/cookie transport and full mobile-safe gateway transport delivered | `docs/plan/p1-session-gateway-bff.md`, `docs/tasks/p1-session-gateway-bff.md`, `docs/tasks/p1-t7-mobile-session-handoff.md` (ADR-024) |
 | **P2** | Production identity hardening (JWKS discovery, automatic key rotation, subject mapping if needed) | S0 | ⬜ no plan yet | ADR-023 |
-| **P3** | First-party mobile client (React Native + Expo) | P1 (hard); P2 recommended for production device login | 📄 planned — plan + task ledgers exist, not built | `docs/plan/p3-mobile-client.md`, `docs/tasks/p3-mobile-client.md` (ADR-024) |
+| **P3** | First-party mobile client (React Native + Expo) | P1 T7 (hard); P2 recommended for production device login | 📄 planned — T0 gate checked on 2026-06-04; P1 T7 complete; `T1+` unblocked | `docs/plan/p3-mobile-client.md`, `docs/tasks/p3-mobile-client.md` (ADR-024) |
 
 `P1` must be planned before building a first-party browser, operator-console, or
 mobile auth flow. It does not block S2 or S3.
 
 `P3` (mobile) is a first-party interactive client and therefore a hard consumer of
 the P1 gateway (ADR-024): the device must terminate in the same session-gateway
-trust boundary as the web app and must not hold long-lived tokens. That dependency
-is now satisfied: P1 was completed on 2026-06-04. Stack decision (2026-06-03):
-React Native + Expo, coherent with the React line reserved in `web/README.md`.
-There is no mobile app in the repository today; P3 introduces it.
+trust boundary as the web app and must not hold long-lived tokens. P1 was
+completed for the browser/cookie transport on 2026-06-04; P3 T0 verified the
+delivered surface was browser-oriented only. P1 T7 is the unblock, decomposed in
+`docs/tasks/p1-t7-mobile-session-handoff.md`. T7.1 (contract definition) is
+complete as of 2026-06-04: five gateway surfaces are specified (`GET
+/auth/login?return_uri`, mobile callback redirect with one-time handoff code,
+`POST /auth/mobile/session` redemption, `ANY /api/*` and `POST /auth/logout`
+with `X-Dubbridge-Session` header), ADR-024 invariants (no access or refresh
+token on device, no parallel auth path) are enumerated, and implementation notes
+for T7.2–T7.4 are recorded. T7.2 is now complete: the gateway validates
+registered mobile `return_uri` values, carries the mobile intent through pending
+OAuth state, and branches callback completion between the browser cookie path and
+the mobile `handoff_code` redirect with no cookies set. T7.3 is now complete:
+the gateway exposes `POST /auth/mobile/session`, redeems handoff codes into
+opaque `session_ref` values, accepts `X-Dubbridge-Session` on `/api/*`, and
+rejects mismatched cookie/header transports fail-closed. T7.4 is now complete:
+mobile refresh returns the rotated opaque session reference in
+`X-Dubbridge-Session`, mobile logout accepts the same transport, and a
+deterministic end-to-end mobile lifecycle is covered by tests. Stack decision
+(2026-06-03): React Native + Expo,
+coherent with the React line reserved in `web/README.md`. There is no mobile app
+in the repository today; P3 introduces it, and `T1+` is now unblocked.
 
 ## P0 strategy: environment separation & fail-closed configuration
 

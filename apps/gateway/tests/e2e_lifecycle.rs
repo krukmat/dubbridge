@@ -7,7 +7,10 @@ use axum::{
 };
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use dubbridge_gateway::{
-    auth::pending::PendingAuthStore, build_app, session::store::InMemorySessionStore,
+    auth::{handoff::HandoffStore, pending::PendingAuthStore},
+    build_app,
+    cookie_ext::MOBILE_SESSION_HEADER,
+    session::store::InMemorySessionStore,
     state::GatewayState,
 };
 use tower::ServiceExt;
@@ -24,6 +27,7 @@ fn make_gateway_settings(
     dubbridge_config::GatewaySettings {
         port: 8081,
         upstream_api_base_url: upstream_api_base_url.to_string(),
+        mobile_return_uris: vec!["dubbridge://auth/callback".to_string()],
         oauth: dubbridge_config::GatewayOAuthSettings {
             authorization_url: "http://localhost:9000/oauth/authorize".to_string(),
             token_url: token_url.to_string(),
@@ -70,6 +74,7 @@ fn make_state(token_url: &str, upstream_api_base_url: &str) -> Arc<GatewayState>
         gateway,
         Arc::new(InMemorySessionStore::new()),
         Arc::new(PendingAuthStore::with_default_ttl()),
+        Arc::new(HandoffStore::with_default_ttl()),
     ))
 }
 
@@ -415,5 +420,270 @@ async fn e2e_access_tokens_never_appear_in_client_visible_responses_or_cookies()
     assert!(
         !response_contains_secret(&proxy_headers, &proxy_body, &initial_access_token),
         "proxied response must not expose the access token back to the client"
+    );
+}
+
+#[tokio::test]
+async fn e2e_mobile_handoff_refresh_logout_lifecycle_is_deterministic() {
+    let initial_access_token = jwt_with_subject("user-mobile-e2e");
+    let refreshed_access_token = "mobile-refreshed-access-token-never-leak";
+    let refreshed_refresh_token = "mobile-refresh-token-never-leak";
+    let return_uri = "dubbridge://auth/callback";
+
+    let auth_server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/oauth/token"))
+        .and(body_string_contains("grant_type=authorization_code"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "access_token": initial_access_token,
+            "refresh_token": "mobile-refresh-token-1",
+            "expires_in": 0,
+            "token_type": "Bearer"
+        })))
+        .expect(1)
+        .mount(&auth_server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/oauth/token"))
+        .and(body_string_contains("grant_type=refresh_token"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "access_token": refreshed_access_token,
+            "refresh_token": refreshed_refresh_token,
+            "expires_in": 3600,
+            "token_type": "Bearer"
+        })))
+        .expect(1)
+        .mount(&auth_server)
+        .await;
+
+    let upstream = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/assets"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("x-upstream", "mobile-ok")
+                .set_body_string("mobile-asset-list-ok"),
+        )
+        .expect(1)
+        .mount(&upstream)
+        .await;
+
+    let app = build_test_app(
+        &format!("{}/oauth/token", auth_server.uri()),
+        &upstream.uri(),
+    );
+
+    let (login_status, login_headers, login_body) = request(
+        &app,
+        Request::builder()
+            .method("GET")
+            .uri("/auth/login?return_uri=dubbridge%3A%2F%2Fauth%2Fcallback")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(login_status, StatusCode::SEE_OTHER);
+    assert!(login_body.is_empty());
+
+    let login_location = login_headers
+        .get("location")
+        .expect("login redirect must set location")
+        .to_str()
+        .unwrap();
+    let login_state = parse_state_from_location(login_location);
+
+    let (callback_status, callback_headers, callback_body) = request(
+        &app,
+        Request::builder()
+            .method("GET")
+            .uri(format!(
+                "/auth/callback?code=mobile-code&state={login_state}"
+            ))
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(callback_status, StatusCode::SEE_OTHER);
+    assert!(callback_body.is_empty());
+    assert!(
+        callback_headers
+            .get_all("set-cookie")
+            .iter()
+            .next()
+            .is_none(),
+        "mobile callback must not emit cookies"
+    );
+
+    let callback_location = callback_headers
+        .get("location")
+        .expect("mobile callback must redirect")
+        .to_str()
+        .unwrap();
+    assert!(callback_location.starts_with(return_uri));
+    assert!(
+        !response_contains_secret(&callback_headers, callback_location, &initial_access_token),
+        "mobile callback location must not expose the initial access token"
+    );
+    assert!(
+        !response_contains_secret(
+            &callback_headers,
+            callback_location,
+            "mobile-refresh-token-1"
+        ),
+        "mobile callback location must not expose the initial refresh token"
+    );
+
+    let callback_url = Url::parse(callback_location).unwrap();
+    let handoff_code = callback_url
+        .query_pairs()
+        .find(|(key, _)| key == "handoff_code")
+        .map(|(_, value)| value.into_owned())
+        .expect("mobile callback must include handoff_code");
+
+    let (redeem_status, redeem_headers, redeem_body) = request(
+        &app,
+        Request::builder()
+            .method("POST")
+            .uri("/auth/mobile/session")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::json!({ "handoff_code": handoff_code }).to_string(),
+            ))
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(redeem_status, StatusCode::OK);
+    assert!(
+        !response_contains_secret(&redeem_headers, &redeem_body, &initial_access_token),
+        "redeem response must not expose the initial access token"
+    );
+    assert!(
+        !response_contains_secret(&redeem_headers, &redeem_body, "mobile-refresh-token-1"),
+        "redeem response must not expose the initial refresh token"
+    );
+
+    let redeem_json: serde_json::Value = serde_json::from_str(&redeem_body).unwrap();
+    let initial_session_ref = redeem_json
+        .get("session_ref")
+        .and_then(|value| value.as_str())
+        .expect("redeem response must contain session_ref")
+        .to_string();
+    assert_eq!(redeem_json.as_object().map(|obj| obj.len()), Some(1));
+
+    let (proxy_status, proxy_headers, proxy_body) = request(
+        &app,
+        Request::builder()
+            .method("GET")
+            .uri("/api/assets?view=mobile")
+            .header(MOBILE_SESSION_HEADER, initial_session_ref.as_str())
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(proxy_status, StatusCode::OK);
+    assert_eq!(proxy_body, "mobile-asset-list-ok");
+    assert_eq!(proxy_headers.get("x-upstream").unwrap(), "mobile-ok");
+    assert!(
+        !response_contains_secret(&proxy_headers, &proxy_body, &initial_access_token),
+        "mobile proxy response must not expose the initial access token"
+    );
+    assert!(
+        !response_contains_secret(&proxy_headers, &proxy_body, refreshed_access_token),
+        "mobile proxy response must not expose the refreshed access token"
+    );
+    assert!(
+        !response_contains_secret(&proxy_headers, &proxy_body, refreshed_refresh_token),
+        "mobile proxy response must not expose the refreshed refresh token"
+    );
+    assert!(
+        proxy_headers.get_all("set-cookie").iter().next().is_none(),
+        "mobile proxy path must not emit browser cookies"
+    );
+
+    let rotated_session_ref = proxy_headers
+        .get(MOBILE_SESSION_HEADER)
+        .expect("mobile refresh must return rotated session ref header")
+        .to_str()
+        .unwrap()
+        .to_string();
+    assert_ne!(rotated_session_ref, initial_session_ref);
+    assert!(
+        !rotated_session_ref.contains(refreshed_access_token),
+        "rotated session ref must never contain the access token"
+    );
+    assert!(
+        !rotated_session_ref.contains(refreshed_refresh_token),
+        "rotated session ref must never contain the refresh token"
+    );
+
+    let upstream_requests = upstream.received_requests().await.unwrap();
+    assert_eq!(upstream_requests.len(), 1);
+    assert_eq!(upstream_requests[0].url.path(), "/assets");
+    assert_eq!(upstream_requests[0].url.query(), Some("view=mobile"));
+    assert_eq!(
+        upstream_requests[0]
+            .headers
+            .get("authorization")
+            .unwrap()
+            .to_str()
+            .unwrap(),
+        format!("Bearer {refreshed_access_token}")
+    );
+    assert!(
+        upstream_requests[0]
+            .headers
+            .get(MOBILE_SESSION_HEADER)
+            .is_none(),
+        "gateway must not forward X-Dubbridge-Session upstream"
+    );
+
+    let (logout_status, logout_headers, logout_body) = request(
+        &app,
+        Request::builder()
+            .method("POST")
+            .uri("/auth/logout")
+            .header(MOBILE_SESSION_HEADER, rotated_session_ref.as_str())
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(logout_status, StatusCode::OK);
+    assert!(logout_body.is_empty());
+    assert!(
+        logout_headers.get_all("set-cookie").iter().next().is_none(),
+        "mobile logout must not emit cookie clears"
+    );
+    assert!(
+        !response_contains_secret(&logout_headers, &logout_body, refreshed_access_token),
+        "logout response must not expose the refreshed access token"
+    );
+    assert!(
+        !response_contains_secret(&logout_headers, &logout_body, refreshed_refresh_token),
+        "logout response must not expose the refreshed refresh token"
+    );
+
+    let (post_logout_status, post_logout_headers, post_logout_body) = request(
+        &app,
+        Request::builder()
+            .method("GET")
+            .uri("/api/assets?view=mobile")
+            .header(MOBILE_SESSION_HEADER, initial_session_ref.as_str())
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(post_logout_status, StatusCode::UNAUTHORIZED);
+    assert!(
+        !response_contains_secret(
+            &post_logout_headers,
+            &post_logout_body,
+            refreshed_access_token
+        ),
+        "stale-session response must not expose the refreshed access token"
+    );
+    assert_eq!(
+        upstream.received_requests().await.unwrap().len(),
+        1,
+        "stale mobile session refs must not reach upstream after logout"
     );
 }

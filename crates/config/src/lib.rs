@@ -118,6 +118,8 @@ pub struct AuthSettings {
 pub struct GatewaySettings {
     pub port: u16,
     pub upstream_api_base_url: String,
+    #[serde(default)]
+    pub mobile_return_uris: Vec<String>,
     pub oauth: GatewayOAuthSettings,
     pub session: GatewaySessionSettings,
 }
@@ -271,6 +273,16 @@ impl GatewaySettings {
         if self.oauth.authorization_url.trim().is_empty() {
             return Err(ConfigError::Validation(
                 "gateway.oauth.authorization_url is required".to_string(),
+            ));
+        }
+
+        if self
+            .mobile_return_uris
+            .iter()
+            .any(|uri| uri.trim().is_empty())
+        {
+            return Err(ConfigError::Validation(
+                "gateway.mobile_return_uris must not contain empty values".to_string(),
             ));
         }
 
@@ -713,6 +725,7 @@ mod tests {
         GatewaySettings {
             port: 8081,
             upstream_api_base_url: "https://api.example.com".to_string(),
+            mobile_return_uris: vec!["dubbridge://auth/callback".to_string()],
             oauth: GatewayOAuthSettings {
                 authorization_url: "https://auth.example.com/oauth/authorize".to_string(),
                 token_url: "https://auth.example.com/oauth/token".to_string(),
@@ -858,6 +871,19 @@ mod tests {
         assert!(
             matches!(result, Err(ConfigError::Validation(ref msg)) if msg.contains("gateway.oauth.client_secret")),
             "expected Validation(gateway.oauth.client_secret), got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn app_config_validate_rejects_blank_mobile_return_uri() {
+        let mut cfg = production_like_config();
+        cfg.gateway.as_mut().expect("gateway").mobile_return_uris = vec![" ".to_string()];
+
+        let result = cfg.validate();
+
+        assert!(
+            matches!(result, Err(ConfigError::Validation(ref msg)) if msg.contains("gateway.mobile_return_uris")),
+            "expected Validation(gateway.mobile_return_uris), got: {result:?}"
         );
     }
 

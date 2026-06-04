@@ -1,10 +1,11 @@
 # Plan: P3 — First-party mobile client (React Native + Expo)
 
-**Roadmap position:** Supporting platform slice **P3**. Depends on **P1**
-(session gateway / BFF — hard architectural prerequisite, ADR-024) and benefits
-from **P2** (production identity hardening / JWKS, ADR-023) for real device login.
-It is **not** on the linear media pipeline (S0–S9); it is a first-party client
-surface, the mobile twin of the planned web app (`web/`).
+**Roadmap position:** Supporting platform slice **P3**. Depends on **P1 T7**
+(mobile-safe session handoff / deep-link return on the session gateway / BFF —
+hard architectural prerequisite, ADR-024) and benefits from **P2** (production
+identity hardening / JWKS, ADR-023) for real device login. It is **not** on the
+linear media pipeline (S0–S9); it is a first-party client surface, the mobile twin
+of the planned web app (`web/`).
 
 > Mobile does not exist in the repository today. This slice introduces it. Per the
 > roadmap and ADR-024, a first-party interactive client must terminate in the P1
@@ -24,9 +25,9 @@ only the gateway's opaque session, exactly as the web client does (ADR-024).
 
 ### Included
 - A new `mobile/` Expo (managed workflow) React Native TypeScript app.
-- Authentication via the **P1 gateway**: OAuth login through the device system
-  browser (`expo-auth-session` / `expo-web-browser`) against the gateway's
-  `/auth/login` → `/auth/callback`, establishing the gateway session.
+- Authentication via the **P1 gateway after T7**: OAuth login through the device
+  system browser (`expo-auth-session` / `expo-web-browser`) against the gateway's
+  mobile handoff contract, establishing the gateway session.
 - A typed API client that talks to the **gateway** (never directly to `apps/api`
   with a raw token), honoring the transport-agnostic session contract defined in
   P1 T0.
@@ -54,9 +55,12 @@ only the gateway's opaque session, exactly as the web client does (ADR-024).
   (owned by P1).
 
 ## Hard dependencies
-- **P1 (session gateway / BFF)** must be built and expose a stable session contract
-  (login/callback/logout + authenticated proxy). Without it, P3 has no compliant
-  auth path. **This is the blocking dependency.**
+- **P1 T7 (mobile-safe session handoff / deep-link return)** is complete as of
+  2026-06-04. The gateway now exposes the full mobile contract:
+  `GET /auth/login?return_uri`, mobile callback handoff code, `POST
+  /auth/mobile/session`, `X-Dubbridge-Session` transport on `/api/*`, mobile
+  refresh rotation signaling, and header-based logout parity. This previously
+  blocked dependency is now satisfied.
 - **P2 (production identity hardening)** is strongly recommended before real device
   login at scale (JWKS rotation), though P3 can develop against the same
   authorization server P1 uses.
@@ -165,7 +169,7 @@ flowchart LR
 ## Proposed execution order
 
 ```text
-P3 T0 (gate) confirm P1 gateway session contract is available + stable
+P3 T0 (gate) confirm P1 T7 mobile handoff contract is available + stable
   -> P3 T1 Expo app scaffold (TS) + env-driven gateway config + navigation shell
   -> P3 T2 gateway API client (typed) + error/session transport handling
   -> P3 T3 auth flow (system-browser OAuth via gateway) + secure session storage

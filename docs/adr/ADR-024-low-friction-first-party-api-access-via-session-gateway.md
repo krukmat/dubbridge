@@ -156,9 +156,10 @@ first-party consumers — the web app and slice **P3** (mobile, React Native + E
 - ADR-018 (traceable governance events) — the verified subject remains the
   auditable actor.
 - Implemented by: slice **P1** — `apps/gateway/src/{auth,proxy,session,cookie}.rs`,
-  `docs/plan/p1-session-gateway-bff.md`, `docs/tasks/p1-session-gateway-bff.md`
-  (cookie policy, CSRF posture, session store, TTL, auth routes, and authenticated
-  proxy delivered in P1 T0-T6).
+  `docs/plan/p1-session-gateway-bff.md`, `docs/tasks/p1-session-gateway-bff.md`,
+  `docs/tasks/p1-t7-mobile-session-handoff.md` (cookie policy, CSRF posture,
+  session store, TTL, auth routes, authenticated proxy, and the complete
+  mobile-safe handoff / explicit-session-header transport delivered in P1 T0-T7).
 - Consumed by (planned): slice **P3** — first-party mobile client (React Native +
   Expo), `docs/plan/p3-mobile-client.md`, `docs/tasks/p3-mobile-client.md`. Mobile
   is the second transport of the same opaque-session contract.

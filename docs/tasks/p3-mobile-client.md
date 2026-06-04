@@ -15,17 +15,19 @@ gateway / BFF, ADR-024). Benefits from **P2** (production identity hardening).
 ## Task dependency order
 
 ```text
-P1 (built) -> T0 -> T1 -> T2 -> T3 -> T4 -> T5
+P1 T7 (mobile handoff built) -> T0 -> T1 -> T2 -> T3 -> T4 -> T5
 ```
 
-> **Blocking note:** T1+ must not start until P1 is built and its session contract
-> (login/callback/logout + authenticated `/api/*` proxy) is stable. T0 is the gate.
+> **Gate note:** P1 T7 is now complete (2026-06-04). The mobile-safe session
+> handoff / deep-link return contract is live in the gateway, and `T1+` is
+> unblocked.
 
 ---
 
 ## T0 — Gate: confirm P1 gateway session contract is available
 
-- **Status:** [ ] Not started
+- **Status:** [x] Done — 2026-06-04; gate outcome: initially blocked, now
+  unblocked after P1 T7.4 completion
 - **Effort:** S
 - **Complexity:** Low
 - **Type:** Verification / docs (no app code)
@@ -46,6 +48,67 @@ P1 (built) -> T0 -> T1 -> T2 -> T3 -> T4 -> T5
   - The native redirect/deep-link scheme to return from the system browser to the
     app is decided and recorded.
   - If P1 is not yet built/stable, this gate **blocks** and the slice does not start.
+- **Completion record (2026-06-04):**
+  - Verified the implemented P1 gateway surface in `apps/gateway`:
+    - `GET /auth/login` starts Authorization Code + PKCE and redirects to the
+      authorization server.
+    - `GET /auth/callback?code=...&state=...` validates single-use `state`,
+      exchanges the code, creates the server-side session, and returns `200 OK`
+      with `Set-Cookie` headers for `dubbridge_session` and
+      `dubbridge_session_csrf`.
+    - `POST /auth/logout` is idempotent and clears both cookies.
+    - `ANY /api/*` resolves the session, refreshes tokens server-side when
+      needed, forwards to `apps/api`, and returns `401` with cleared cookies when
+      the session is missing, expired, or refresh fails.
+  - Verified coverage evidence for the lifecycle above in:
+    - `apps/gateway/src/auth/login.rs`
+    - `apps/gateway/src/auth/logout.rs`
+    - `apps/gateway/src/proxy.rs`
+    - `apps/gateway/tests/e2e_lifecycle.rs`
+  - Confirmed the currently implemented session transport:
+    - ADR-024 defines the canonical session abstraction as an opaque session id.
+    - The current gateway implementation exposes that session id only through the
+      hardened `dubbridge_session` cookie; `apps/gateway/src/cookie_ext.rs`
+      resolves sessions only from the `Cookie` request header.
+    - No alternate mobile-readable transport exists today (no response body field,
+      no dedicated header contract, no documented session-handoff endpoint).
+  - Confirmed the current callback / return-path behavior:
+    - The configured OAuth redirect URI is the gateway callback
+      (`.../auth/callback`), not a native app deep link.
+    - After successful callback, the gateway returns `200 OK` + `Set-Cookie`; it
+      does not redirect or bridge back to a native deep-link scheme.
+  - **Gateway contract for mobile (current state):**
+    - `GET /auth/login`
+    - `GET /auth/callback?code=...&state=...`
+    - `POST /auth/logout`
+    - `ANY /api/*`
+    - Session transport currently required by the implementation: browser-style
+      `Cookie: dubbridge_session=<opaque-session-id>`. The callback also emits a
+      companion `dubbridge_session_csrf` cookie, but the mobile handoff contract
+      for that browser-oriented state is not yet defined.
+  - **Gate outcome (at T0 completion time):** blocked.
+    - P1 is built and stable for the browser/cookie transport.
+    - The mobile-specific deep-link / return scheme and app-readable opaque-session
+      handoff required by ADR-024 and this slice are not yet implemented or
+      documented.
+    - P1 tracks the unblock as `T7 — Mobile-safe session handoff / deep-link
+      return`, decomposed in `docs/tasks/p1-t7-mobile-session-handoff.md`.
+    - T7.1 contract is now defined (2026-06-04): five gateway surfaces named
+      (`/auth/login?return_uri`, mobile callback redirect, `POST
+      /auth/mobile/session`, `ANY /api/*` + `POST /auth/logout` with
+      `X-Dubbridge-Session` header), ADR-024 invariants enumerated, and
+      implementation notes for T7.2–T7.4 recorded.
+    - T7.2 is now implemented: gateway login accepts validated mobile
+      `return_uri`, callback preserves the browser path, and the mobile path
+      returns only a one-time opaque `handoff_code` with no cookies set.
+    - T7.3 is now implemented: `POST /auth/mobile/session` redeems the handoff
+      code into `session_ref`, and `/api/*` accepts `X-Dubbridge-Session` with
+      the documented cookie/header conflict rule.
+    - T7.4 is now implemented: mobile refresh returns the rotated opaque session
+      reference in `X-Dubbridge-Session`, mobile logout accepts the same header,
+      and deterministic e2e coverage proves the full mobile lifecycle.
+    - **Current gate status:** unblocked. `T1+` may proceed on the delivered P1
+      gateway contract.
 
 ---
 
@@ -56,11 +119,11 @@ P1 (built) -> T0 -> T1 -> T2 -> T3 -> T4 -> T5
 - **Complexity:** Medium
 - **Type:** Development
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4`
-- **Depends on:** T0
+- **Depends on:** T0 with gate outcome unblocked after P1 T7 completion
 - **Objective:** Create the `mobile/` Expo React Native TypeScript app with an
   environment-driven gateway base URL (per ADR-026 — no hardcoded URL), a navigation
   shell (authed vs. unauthed trees), and a placeholder home screen.
-- **Inputs:** Expo SDK, T0 gateway contract.
+- **Inputs:** Expo SDK, T0 gateway contract after P1 T7 completion.
 - **Outputs:** `mobile/{package.json, app.config.ts, tsconfig.json, babel.config.js}`,
   `src/config/env.ts`, `src/navigation/`, a placeholder `Home` screen.
 - **Acceptance criteria:**

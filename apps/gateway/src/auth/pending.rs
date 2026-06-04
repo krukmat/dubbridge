@@ -14,8 +14,31 @@ use crate::auth::oauth_client::PkceVerifier;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-struct PendingEntry {
+#[derive(Debug, Clone)]
+pub struct PendingAuth {
     verifier: PkceVerifier,
+    return_uri: Option<String>,
+}
+
+impl PendingAuth {
+    pub fn new(verifier: PkceVerifier, return_uri: Option<String>) -> Self {
+        Self {
+            verifier,
+            return_uri,
+        }
+    }
+
+    pub fn verifier(&self) -> &PkceVerifier {
+        &self.verifier
+    }
+
+    pub fn into_parts(self) -> (PkceVerifier, Option<String>) {
+        (self.verifier, self.return_uri)
+    }
+}
+
+struct PendingEntry {
+    auth: PendingAuth,
     expires_at: Instant,
 }
 
@@ -49,25 +72,29 @@ impl PendingAuthStore {
         Self::new(Duration::from_secs(10 * 60))
     }
 
-    /// Store a (state → verifier) pair. Overwrites any prior entry for the same
+    /// Store a pending auth entry. Overwrites any prior entry for the same
     /// state string (should not happen in practice; each login generates fresh state).
-    pub fn insert(&self, state: &str, verifier: PkceVerifier) {
+    pub fn insert(&self, state: &str, auth: PendingAuth) {
         let entry = PendingEntry {
-            verifier,
+            auth,
             expires_at: Instant::now() + self.ttl,
         };
         self.map.lock().unwrap().insert(state.to_string(), entry);
     }
 
-    /// Consume the verifier for `state`. Removes the entry atomically.
+    pub fn insert_verifier_only(&self, state: &str, verifier: PkceVerifier) {
+        self.insert(state, PendingAuth::new(verifier, None));
+    }
+
+    /// Consume the pending auth for `state`. Removes the entry atomically.
     /// Returns `Err(NotFound)` if missing (already used or never inserted).
     /// Returns `Err(Expired)` if the TTL has elapsed.
-    pub fn consume(&self, state: &str) -> Result<PkceVerifier, PendingError> {
+    pub fn consume(&self, state: &str) -> Result<PendingAuth, PendingError> {
         let mut map = self.map.lock().unwrap();
         match map.remove(state) {
             None => Err(PendingError::NotFound),
             Some(entry) if entry.expires_at < Instant::now() => Err(PendingError::Expired),
-            Some(entry) => Ok(entry.verifier),
+            Some(entry) => Ok(entry.auth),
         }
     }
 }
@@ -91,10 +118,10 @@ mod tests {
         let verifier = make_verifier();
         let expected = verifier.as_str().to_string();
 
-        store.insert("state-abc", verifier);
+        store.insert_verifier_only("state-abc", verifier);
         let got = store.consume("state-abc").unwrap();
 
-        assert_eq!(got.as_str(), expected);
+        assert_eq!(got.verifier().as_str(), expected);
     }
 
     // --- single-use enforcement (ADR-024 hard invariant) ---
@@ -102,7 +129,7 @@ mod tests {
     #[test]
     fn consume_second_call_returns_not_found() {
         let store = PendingAuthStore::with_default_ttl();
-        store.insert("state-xyz", make_verifier());
+        store.insert_verifier_only("state-xyz", make_verifier());
 
         let _first = store.consume("state-xyz").unwrap();
         let second = store.consume("state-xyz");
@@ -128,7 +155,7 @@ mod tests {
     fn consume_expired_entry_returns_expired() {
         // TTL of 1 nanosecond — will be expired by the time consume runs
         let store = PendingAuthStore::new(Duration::from_nanos(1));
-        store.insert("state-expired", make_verifier());
+        store.insert_verifier_only("state-expired", make_verifier());
 
         // spin briefly to ensure the instant has passed
         std::thread::sleep(Duration::from_millis(1));
@@ -148,13 +175,13 @@ mod tests {
         let original_verifier = make_verifier();
         let expected_challenge = PkceChallenge::from_verifier(&original_verifier);
 
-        store.insert("state-check", original_verifier);
+        store.insert_verifier_only("state-check", original_verifier);
         let consumed = store.consume("state-check").unwrap();
-        let derived_challenge = PkceChallenge::from_verifier(&consumed);
+        let derived_challenge = PkceChallenge::from_verifier(consumed.verifier());
 
         assert_eq!(
-            consumed.as_str(),
-            consumed.as_str(),
+            consumed.verifier().as_str(),
+            consumed.verifier().as_str(),
             "verifier value must be intact after store round-trip"
         );
         assert_eq!(
@@ -174,13 +201,28 @@ mod tests {
         let v1_str = v1.as_str().to_string();
         let v2_str = v2.as_str().to_string();
 
-        store.insert("state-1", v1);
-        store.insert("state-2", v2);
+        store.insert_verifier_only("state-1", v1);
+        store.insert_verifier_only("state-2", v2);
 
         let got1 = store.consume("state-1").unwrap();
         let got2 = store.consume("state-2").unwrap();
 
-        assert_eq!(got1.as_str(), v1_str);
-        assert_eq!(got2.as_str(), v2_str);
+        assert_eq!(got1.verifier().as_str(), v1_str);
+        assert_eq!(got2.verifier().as_str(), v2_str);
+    }
+
+    #[test]
+    fn consume_preserves_mobile_return_uri() {
+        let store = PendingAuthStore::with_default_ttl();
+        let verifier = make_verifier();
+        store.insert(
+            "state-mobile",
+            PendingAuth::new(verifier, Some("dubbridge://auth/callback".to_string())),
+        );
+
+        let consumed = store.consume("state-mobile").unwrap();
+        let (_, return_uri) = consumed.into_parts();
+
+        assert_eq!(return_uri.as_deref(), Some("dubbridge://auth/callback"));
     }
 }

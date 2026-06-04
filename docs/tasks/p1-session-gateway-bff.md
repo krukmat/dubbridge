@@ -15,7 +15,7 @@ authorization-server contract. Prerequisite for the web frontend and for **P3**
 ## Task dependency order
 
 ```text
-T0 -> T1 -> T2 -> T3 -> T4 -> T5 -> T6
+T0 -> T1 -> T2 -> T3 -> T4 -> T5 -> T6 -> T7
 ```
 
 ---
@@ -399,16 +399,81 @@ T0 -> T1 -> T2 -> T3 -> T4 -> T5 -> T6
 
 ---
 
+## T7 — Mobile-safe session handoff / deep-link return
+
+- **Status:** [x] Done — 2026-06-04
+- **Effort:** L -> split into 4 sub-tasks (see `docs/tasks/p1-t7-mobile-session-handoff.md`)
+- **Complexity:** High as a combined task; split target is Med-high or lower per
+  subtask
+- **Type:** Development + docs sync
+- **Recommended model:** Codex current Premium coding model · Claude Code current
+  Premium model, thinking On
+- **Depends on:** T6; P3 T0 blocked verification
+- **Sub-tasks:** `docs/tasks/p1-t7-mobile-session-handoff.md`
+  - T7.1 — Define the mobile return and handoff contract (Effort: S)
+  - T7.2 — Mobile login intent + callback handoff code (Effort: M)
+  - T7.3 — Handoff redemption + explicit mobile session header (Effort: M)
+  - T7.4 — Mobile refresh/logout parity + e2e/status sync (Effort: M)
+- **Objective:** Extend the delivered P1 browser-oriented gateway contract with the
+  missing mobile-safe return and opaque session-reference transport required by
+  ADR-024 and P3. OAuth still completes through the same gateway PKCE/state flow;
+  the mobile app receives only opaque gateway session material and never receives
+  access or refresh tokens.
+- **Inputs:** P3 T0 blocker record, ADR-024 mobile seam, current gateway auth routes
+  and session resolver.
+- **Outputs:** Mobile contract docs, gateway mobile handoff implementation, tests,
+  and synchronized P1/P3/roadmap/ADR status.
+- **Acceptance criteria:**
+  - System-browser OAuth can return control to the mobile app through a registered
+    mobile URI or app-link contract.
+  - The return path carries only a short-lived opaque handoff code; redeeming that
+    code returns only an opaque gateway session reference.
+  - The mobile app can authenticate future gateway `/api/*` and `/auth/logout`
+    calls with the explicit opaque session reference transport.
+  - Browser cookie behavior remains compatible with T4-T6.
+  - No access token or refresh token is exposed to, persisted by, or expected from
+    the mobile device.
+  - Status artifacts state clearly whether P3 T1+ is unblocked after completion.
+- **Happy paths considered:**
+  - mobile login -> system browser -> gateway callback -> registered mobile return
+    -> handoff redeem -> gateway `/api/*` call succeeds with server-side bearer
+    translation.
+  - mobile logout with the opaque session reference -> server-side session removed;
+    subsequent gateway call returns unauthenticated.
+- **Edge cases considered:**
+  - unregistered return URI -> rejected before OAuth redirect.
+  - expired/already-used handoff code -> fail closed, no session reference returned.
+  - mismatched cookie and explicit mobile session header -> rejected rather than
+    silently choosing one transport.
+  - refresh-token failure -> session invalidated, mobile receives 401, no token
+    leakage.
+- **Completion record (2026-06-04):**
+  - T7.1 defined the five-surface mobile contract and ADR-024 invariants.
+  - T7.2 implemented mobile login intent, validated `return_uri`, and mobile
+    callback return with one-time opaque `handoff_code`.
+  - T7.3 implemented `POST /auth/mobile/session`, `X-Dubbridge-Session`, and the
+    cookie/header conflict rule for `/api/*`.
+  - T7.4 implemented mobile refresh rotation signaling via response header,
+    header-based logout parity, deterministic mobile e2e lifecycle coverage, and
+    final P1/P3/roadmap/ADR status sync.
+  - Verification:
+    - `~/.cargo/bin/cargo test -p dubbridge-gateway` — passed
+    - `~/.cargo/bin/cargo test -p dubbridge-config` — passed
+    - `make qa-docs` — passed
+
+---
+
 ## Agent handoff prompt (delegation-ready)
 
 > Implement slice **P1 — first-party session gateway / BFF** in the `dubbridge`
-> repo, one task at a time in order T0→T6, per `docs/tasks/p1-session-gateway-bff.md`
+> repo, one task at a time in order T0→T7, per `docs/tasks/p1-session-gateway-bff.md`
 > and `docs/plan/p1-session-gateway-bff.md`. Read the canonical guides first
 > (`README_AGENT_ORDER.md`, `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`,
 > `docs/policies/HITL_AUTONOMY_POLICY.md`, `AGENTS.md`) and ADR-024/023/026/018.
 > Build a new `apps/gateway` Axum service; **do not modify the `apps/api` JWT
 > resource-server trust boundary** (ADR-023). Tokens must live server-side only;
-> the client sees only a hardened opaque session cookie (ADR-024). Keep the session
+> the client sees only an opaque gateway session reference (a hardened cookie for
+> browser, explicit opaque session header for mobile) (ADR-024). Keep the session
 > contract transport-agnostic so slice **P3 (mobile, React Native + Expo)** can
 > reuse the same gateway. TDD: write tests first, then implement, then run all
 > tests. Do not commit with broken tests. Present each task for explicit approval

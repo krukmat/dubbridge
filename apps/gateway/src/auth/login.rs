@@ -12,12 +12,15 @@ use axum::{
 };
 use base64::Engine;
 use serde::Deserialize;
+use url::Url;
 
 use crate::{
+    auth::handoff::HandoffStore,
     auth::oauth_client::{
         OAuthError, OAuthExecutor, OAuthState, PkceChallenge, PkceVerifier,
         build_authorization_url, build_token_exchange_params,
     },
+    auth::pending::PendingAuth,
     cookie::{build_csrf_cookie, build_session_cookie},
     session::{CsrfToken, StoredSession},
     state::GatewayState,
@@ -31,18 +34,36 @@ pub struct CallbackParams {
     pub state: String,
 }
 
+#[derive(Deserialize, Default)]
+pub struct LoginParams {
+    pub return_uri: Option<String>,
+}
+
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
 /// GET /auth/login
 /// Generates PKCE verifier + challenge + state, stores pending entry, redirects.
-pub async fn login_handler(State(app_state): State<Arc<GatewayState>>) -> Response {
+pub async fn login_handler(
+    State(app_state): State<Arc<GatewayState>>,
+    Query(params): Query<LoginParams>,
+) -> Response {
+    let return_uri = match params.return_uri {
+        Some(uri)
+            if is_registered_mobile_return_uri(&app_state.gateway.mobile_return_uris, &uri) =>
+        {
+            Some(uri)
+        }
+        Some(_) => return StatusCode::BAD_REQUEST.into_response(),
+        None => None,
+    };
+
     let verifier = PkceVerifier::generate();
     let challenge = PkceChallenge::from_verifier(&verifier);
     let oauth_state = OAuthState::generate();
 
     app_state
         .pending_store
-        .insert(oauth_state.as_str(), verifier);
+        .insert(oauth_state.as_str(), PendingAuth::new(verifier, return_uri));
 
     let oauth = &app_state.gateway.oauth;
     let url = match build_authorization_url(
@@ -67,10 +88,17 @@ pub async fn callback_handler(
     Query(params): Query<CallbackParams>,
 ) -> Response {
     // Consume state atomically — single-use invariant (ADR-024)
-    let verifier = match app_state.pending_store.consume(&params.state) {
+    let pending = match app_state.pending_store.consume(&params.state) {
         Ok(v) => v,
         Err(_) => return StatusCode::BAD_REQUEST.into_response(),
     };
+    let (verifier, return_uri) = pending.into_parts();
+
+    if let Some(ref return_uri) = return_uri {
+        if !is_registered_mobile_return_uri(&app_state.gateway.mobile_return_uris, return_uri) {
+            return StatusCode::BAD_REQUEST.into_response();
+        }
+    }
 
     let oauth = &app_state.gateway.oauth;
     let exchange_params = build_token_exchange_params(
@@ -112,6 +140,10 @@ pub async fn callback_handler(
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
 
+    if let Some(return_uri) = return_uri {
+        return mobile_callback_redirect(&app_state.handoff_store, session_id, &return_uri);
+    }
+
     let mut headers = HeaderMap::new();
     headers.insert(
         header::SET_COOKIE,
@@ -123,6 +155,26 @@ pub async fn callback_handler(
     );
 
     (StatusCode::OK, headers).into_response()
+}
+
+fn is_registered_mobile_return_uri(allowlist: &[String], candidate: &str) -> bool {
+    allowlist.iter().any(|uri| uri == candidate) && Url::parse(candidate).is_ok()
+}
+
+fn mobile_callback_redirect(
+    handoff_store: &Arc<HandoffStore>,
+    session_id: crate::session::SessionId,
+    return_uri: &str,
+) -> Response {
+    let handoff_code = handoff_store.issue(session_id);
+    let mut url = match Url::parse(return_uri) {
+        Ok(url) => url,
+        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
+    };
+    url.query_pairs_mut()
+        .append_pair("handoff_code", &handoff_code);
+
+    Redirect::to(url.as_ref()).into_response()
 }
 
 // ── JWT subject extraction ─────────────────────────────────────────────────────
@@ -152,6 +204,7 @@ mod tests {
         routing::get,
     };
     use tower::ServiceExt;
+    use url::Url;
     use wiremock::{
         Mock, MockServer, ResponseTemplate,
         matchers::{body_string_contains, method, path},
@@ -159,9 +212,10 @@ mod tests {
 
     use crate::{
         auth::{
+            handoff::HandoffStore,
             login::{callback_handler, login_handler},
             oauth_client::PkceVerifier,
-            pending::PendingAuthStore,
+            pending::{PendingAuth, PendingAuthStore},
         },
         session::store::InMemorySessionStore,
         state::GatewayState,
@@ -173,6 +227,10 @@ mod tests {
         dubbridge_config::GatewaySettings {
             port: 8081,
             upstream_api_base_url: "http://localhost:8080".to_string(),
+            mobile_return_uris: vec![
+                "dubbridge://auth/callback".to_string(),
+                "https://mobile.local.dubbridge.example/auth/callback".to_string(),
+            ],
             oauth: dubbridge_config::GatewayOAuthSettings {
                 authorization_url: "http://localhost:9000/oauth/authorize".to_string(),
                 token_url: token_url.to_string(),
@@ -219,6 +277,7 @@ mod tests {
             gw,
             Arc::new(InMemorySessionStore::new()),
             Arc::new(PendingAuthStore::with_default_ttl()),
+            Arc::new(HandoffStore::with_default_ttl()),
         ))
     }
 
@@ -249,6 +308,22 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::SEE_OTHER);
+    }
+
+    #[tokio::test]
+    async fn login_with_unregistered_return_uri_returns_400() {
+        let app = build_login_router("http://localhost:9000/oauth/token");
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/auth/login?return_uri=https%3A%2F%2Fevil.example%2Fcallback")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]
@@ -329,7 +404,7 @@ mod tests {
         let test_state = "test-state-valid-callback";
         state
             .pending_store
-            .insert(test_state, PkceVerifier::generate());
+            .insert_verifier_only(test_state, PkceVerifier::generate());
 
         let resp = build_callback_router(state)
             .oneshot(
@@ -384,7 +459,7 @@ mod tests {
         let test_state = "state-no-token-leak";
         state
             .pending_store
-            .insert(test_state, PkceVerifier::generate());
+            .insert_verifier_only(test_state, PkceVerifier::generate());
 
         let resp = build_callback_router(state)
             .oneshot(
@@ -422,7 +497,7 @@ mod tests {
         let state = make_state(&token_url);
         state
             .pending_store
-            .insert("reuse-state", PkceVerifier::generate());
+            .insert_verifier_only("reuse-state", PkceVerifier::generate());
 
         let app = build_callback_router(state);
 
@@ -470,7 +545,7 @@ mod tests {
         let state = make_state(&token_url);
         state
             .pending_store
-            .insert("state-invalid-grant", PkceVerifier::generate());
+            .insert_verifier_only("state-invalid-grant", PkceVerifier::generate());
 
         let resp = build_callback_router(state)
             .oneshot(
@@ -483,5 +558,124 @@ mod tests {
             .unwrap();
 
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn callback_with_mobile_return_uri_redirects_with_handoff_code_only() {
+        let mock_as = MockServer::start().await;
+        let access_token = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJtb2JpbGUtdXNlciJ9.sig";
+        Mock::given(method("POST"))
+            .and(path("/oauth/token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "access_token": access_token,
+                "refresh_token": "refresh-mobile",
+                "expires_in": 3600,
+                "token_type": "Bearer"
+            })))
+            .mount(&mock_as)
+            .await;
+
+        let token_url = format!("{}/oauth/token", mock_as.uri());
+        let state = make_state(&token_url);
+        state.pending_store.insert(
+            "mobile-state",
+            PendingAuth::new(
+                PkceVerifier::generate(),
+                Some("dubbridge://auth/callback".to_string()),
+            ),
+        );
+
+        let resp = build_callback_router(state)
+            .oneshot(
+                Request::builder()
+                    .uri("/auth/callback?code=mobile-code&state=mobile-state")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::SEE_OTHER);
+        assert!(
+            resp.headers().get_all("set-cookie").iter().next().is_none(),
+            "mobile callback must not set browser cookies"
+        );
+
+        let location = resp
+            .headers()
+            .get("location")
+            .expect("mobile callback must set Location")
+            .to_str()
+            .unwrap();
+        let redirect = Url::parse(location).expect("redirect location must be a valid URI");
+        let pairs: Vec<_> = redirect.query_pairs().collect();
+        assert_eq!(
+            pairs.len(),
+            1,
+            "mobile callback must return only handoff_code"
+        );
+        assert_eq!(pairs[0].0, "handoff_code");
+        assert_eq!(
+            pairs[0].1.len(),
+            43,
+            "handoff code must be opaque 32-byte base64url"
+        );
+        assert!(
+            !location.contains(access_token),
+            "redirect URI must not contain access token"
+        );
+        assert!(
+            !location.contains("refresh-mobile"),
+            "redirect URI must not contain refresh token"
+        );
+        assert!(
+            !location.contains("dubbridge_session"),
+            "redirect URI must not contain session cookie name or session id"
+        );
+    }
+
+    #[tokio::test]
+    async fn callback_with_unregistered_mobile_return_uri_fails_closed() {
+        let mock_as = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/oauth/token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "access_token": "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyLTEifQ.sig",
+                "refresh_token": "refresh-xyz",
+                "expires_in": 3600,
+                "token_type": "Bearer"
+            })))
+            .mount(&mock_as)
+            .await;
+
+        let token_url = format!("{}/oauth/token", mock_as.uri());
+        let state = make_state(&token_url);
+        state.pending_store.insert(
+            "mobile-state-bad-uri",
+            PendingAuth::new(
+                PkceVerifier::generate(),
+                Some("https://evil.example/callback".to_string()),
+            ),
+        );
+
+        let resp = build_callback_router(state)
+            .oneshot(
+                Request::builder()
+                    .uri("/auth/callback?code=mobile-code&state=mobile-state-bad-uri")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        assert!(
+            resp.headers().get("location").is_none(),
+            "fail-closed callback must not redirect to attacker URI"
+        );
+        assert!(
+            resp.headers().get_all("set-cookie").iter().next().is_none(),
+            "fail-closed callback must not expose session cookies"
+        );
     }
 }

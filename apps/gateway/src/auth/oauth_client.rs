@@ -9,6 +9,7 @@ use sha2::{Digest, Sha256};
 
 /// PKCE code_verifier: high-entropy random string, base64url-encoded (RFC 7636).
 /// 32 random bytes → 43 base64url chars, all unreserved (no padding).
+#[derive(Debug, Clone)]
 pub struct PkceVerifier(String);
 
 /// PKCE code_challenge: BASE64URL(SHA256(ASCII(verifier))) — S256 method.

@@ -2,7 +2,9 @@ use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::Context;
 use dubbridge_gateway::{
-    auth::pending::PendingAuthStore, build_app, session::store::RedisSessionStore,
+    auth::{handoff::HandoffStore, pending::PendingAuthStore},
+    build_app,
+    session::store::RedisSessionStore,
     state::GatewayState,
 };
 
@@ -22,6 +24,8 @@ async fn main() -> anyhow::Result<()> {
     );
     // P1-T4: in-process pending store for OAuth state/verifier pairs (TTL 10 min)
     let pending_store = Arc::new(PendingAuthStore::with_default_ttl());
+    // P1-T7.2: transient handoff-code store for mobile callback return (TTL 90 s)
+    let handoff_store = Arc::new(HandoffStore::with_default_ttl());
 
     let state = Arc::new(GatewayState::new(
         reqwest::Client::new(),
@@ -29,6 +33,7 @@ async fn main() -> anyhow::Result<()> {
         gateway.clone(),
         session_store,
         pending_store,
+        handoff_store,
     ));
     let app = build_app(state);
 

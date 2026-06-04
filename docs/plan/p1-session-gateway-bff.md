@@ -20,9 +20,19 @@ web app (`web/`) and the planned mobile app (slice **P3**, React Native + Expo).
 - `T5` complete — authenticated `/api/*` proxy with transparent refresh is wired and tested.
 - `T6` complete — deterministic end-to-end lifecycle coverage, architecture/roadmap sync,
   and ADR-024 implementation references are in place.
+- `T7` complete — 2026-06-04: the mobile-safe session handoff contract is now
+  live end-to-end. Mobile login/callback emits one-time opaque `handoff_code`,
+  `POST /auth/mobile/session` redeems that code into `session_ref`, `/api/*`
+  accepts `X-Dubbridge-Session`, refresh rotation returns the new opaque session
+  reference to mobile callers, `/auth/logout` accepts the mobile header, and the
+  deterministic mobile lifecycle is covered end-to-end.
 
-**Slice status:** P1 is implemented and ready to serve as the first-party auth surface
-for the planned web client and for P3 (mobile).
+**Slice status:** P1 is complete. The gateway now serves both first-party
+transports defined by ADR-024:
+- browser/cookie transport
+- mobile-safe handoff + explicit session-header transport
+
+P3 is unblocked to start `T1+`.
 
 ## Objective
 
@@ -62,8 +72,10 @@ per-request identity verification.
   the failure branches.
 - A **transport-agnostic session contract** so P3 (React Native / Expo) can reuse
   the same gateway. The cookie is the browser representation; the underlying
-  session-id mechanism must not assume a browser cookie jar (design note + seam,
-  not a second client implementation in P1).
+  session-id mechanism must not assume a browser cookie jar. P3 T0 verified that
+  the delivered T0-T6 implementation still exposes only the browser cookie
+  transport, so T7 adds the mobile-safe return/handoff seam without creating a
+  parallel auth path.
 
 ### Excluded (deferred)
 - The web frontend itself (`web/` React app) — a separate frontend slice.
@@ -164,10 +176,20 @@ later.
 ### Transport-agnostic session seam (mobile-ready)
 Native mobile clients (P3) do not share the browser cookie jar the same way. P1
 defines the session contract around an opaque session id; the cookie is one
-transport of that id. P1 does **not** build the mobile client, but it must not bake
-in browser-only assumptions that would force a parallel auth path in P3. This is the
-single most important forward-looking constraint, since P3 reuses this exact
-gateway.
+transport of that id. T7 extends the implemented gateway contract with a mobile
+transport:
+
+- mobile OAuth still starts and completes through the same gateway PKCE/state flow;
+- the gateway callback returns to a registered mobile URI with a short-lived,
+  one-time opaque handoff code only;
+- the app redeems that handoff code at the gateway for an opaque session reference;
+- subsequent mobile `/api/*` and `/auth/logout` calls carry that opaque reference in
+  an explicit gateway session header;
+- access tokens and refresh tokens remain server-side only.
+
+P1 does **not** build the mobile client, but it must not bake in browser-only
+assumptions that would force a parallel auth path in P3. This is the single most
+important forward-looking constraint, since P3 reuses this exact gateway.
 
 ### Fail-closed configuration
 Gateway config follows ADR-026: missing required values (authorization-server
@@ -229,6 +251,7 @@ P1 T0 ADR-024 decision finalize (cookie policy, CSRF, session store, mobile seam
   -> P1 T4 login/callback/logout routes wired to store
   -> P1 T5 authenticated proxy to apps/api with transparent refresh
   -> P1 T6 end-to-end lifecycle tests (stub AS + stub upstream) + docs/ADR sync
+  -> P1 T7 mobile-safe session handoff / deep-link return (post-P3-T0 unblock)
 ```
 
 ## Lines Affected After Implementation

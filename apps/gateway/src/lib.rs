@@ -59,12 +59,14 @@ mod tests {
     async fn health_endpoints_are_public() {
         let store = Arc::new(InMemorySessionStore::new());
         let pending = Arc::new(crate::auth::pending::PendingAuthStore::with_default_ttl());
+        let handoff = Arc::new(crate::auth::handoff::HandoffStore::with_default_ttl());
         let state = Arc::new(GatewayState::new(
             reqwest::Client::new(),
             sample_config(),
             sample_gateway_settings(),
             store,
             pending,
+            handoff,
         ));
         let app = build_app(state);
 
@@ -118,6 +120,7 @@ mod tests {
         dubbridge_config::GatewaySettings {
             port: 8081,
             upstream_api_base_url: "http://localhost:8080".to_string(),
+            mobile_return_uris: vec!["dubbridge://auth/callback".to_string()],
             oauth: dubbridge_config::GatewayOAuthSettings {
                 authorization_url: "http://localhost:9000/oauth/authorize".to_string(),
                 token_url: "http://localhost:9000/oauth/token".to_string(),

@@ -20,6 +20,7 @@ filter = "info"
 [gateway]
 port = 8081
 upstream_api_base_url = "https://api.dubbridge.example"
+mobile_return_uris = ["dubbridge://auth/callback", "https://mobile.dubbridge.example/auth/callback"]
 
 [gateway.oauth]
 authorization_url = "https://auth.dubbridge.example/oauth/authorize"
