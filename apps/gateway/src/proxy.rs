@@ -260,9 +260,7 @@ fn build_upstream_url(base_url: &str, original_uri: &Uri) -> Result<String, ()> 
         .map(|value| value.as_str())
         .unwrap_or("/api");
     let stripped = path_and_query.strip_prefix("/api").ok_or(())?;
-    let relative = if stripped.is_empty() {
-        "/"
-    } else if stripped.starts_with('?') {
+    let relative = if stripped.is_empty() || stripped.starts_with('?') {
         "/"
     } else {
         stripped

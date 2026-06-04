@@ -94,10 +94,10 @@ pub async fn callback_handler(
     };
     let (verifier, return_uri) = pending.into_parts();
 
-    if let Some(ref return_uri) = return_uri {
-        if !is_registered_mobile_return_uri(&app_state.gateway.mobile_return_uris, return_uri) {
-            return StatusCode::BAD_REQUEST.into_response();
-        }
+    if let Some(ref return_uri) = return_uri
+        && !is_registered_mobile_return_uri(&app_state.gateway.mobile_return_uris, return_uri)
+    {
+        return StatusCode::BAD_REQUEST.into_response();
     }
 
     let oauth = &app_state.gateway.oauth;
@@ -182,7 +182,7 @@ fn mobile_callback_redirect(
 /// Decode the `sub` claim from the JWT payload without verifying the signature.
 /// Returns `None` if the token is malformed or the claim is absent.
 fn extract_jwt_subject(token: &str) -> Option<String> {
-    let payload_b64 = token.splitn(3, '.').nth(1)?;
+    let payload_b64 = token.split('.').nth(1)?;
     let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .decode(payload_b64)
         .or_else(|_| base64::engine::general_purpose::URL_SAFE.decode(payload_b64))
