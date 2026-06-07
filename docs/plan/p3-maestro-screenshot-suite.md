@@ -86,16 +86,16 @@ ADR-024-clean, leaves the P1 gateway contract untouched, and keeps Phase 2 stabl
 
 ## Sequencing decision (APPROVED 2026-06-07: Option S2 — defer until after P3 T4)
 
-Phase 2 needs (a) a working deep-link → `session_ref` redemption in the app and
-(b) authenticated screens worth capturing. Today only placeholder `Login` + `Home`
-exist, the real `login()` (P3 T3b-ii) and navigation wiring (T3b-iii) are **not
-started**, and asset screens (P3 T4) do not exist.
+At planning time, Phase 2 needed (a) a working deep-link → `session_ref`
+redemption in the app and (b) authenticated screens worth capturing. That
+prerequisite is now satisfied: **P3 T4 and P3 T5 completed on 2026-06-07**, so the
+core screens (`Login`, `Home`, `AssetList`, `AssetDetail`) and the real auth flow
+from T3b-ii/iii exist.
 
 **Approved: Option S2 — defer the entire P3-V sub-slice until after P3 T4 is done.**
-The full suite (V1–V8) is **gated** on P3 T4: it is not started until the core
-screens (`Login`, `Home`, `AssetList`, `AssetDetail`) and the real auth flow
-(T3b-ii/iii) exist. This trades an earlier regression net for fewer moving parts and
-a stable, complete set of screens to capture on the first run.
+That gate is now **satisfied**. The deferral achieved its purpose: P3-V can start
+from a stable, complete first pass over the implemented auth flow and core screens
+instead of growing around placeholders.
 
 Options considered:
 - **Option S1 (not chosen): land the suite infrastructure now, grow the flows
@@ -103,9 +103,10 @@ Options considered:
   screens land.
 - **Option S2 (APPROVED): defer the whole suite until after P3 T4.**
 
-**Consequence for this plan:** every task below carries a hard prerequisite of
-**P3 T4 complete**. Do not begin V1 until then. The plan and task documents are
-authored now (this is permitted planning work) but execution is blocked on P3 T4.
+**Consequence for this plan:** every task below still depends on **P3 T4 complete**
+as a historical prerequisite, and that prerequisite is now met. **P3-V is unblocked
+and queued at V1**; execution still follows the per-task approval workflow in
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` / `docs/policies/HITL_AUTONOMY_POLICY.md`.
 
 ---
 
@@ -151,10 +152,10 @@ authored now (this is permitted planning work) but execution is blocked on P3 T4
 - **P3 T2 (done):** typed gateway client (`mobile/src/api/client.ts`) — reused by the
   E2E bootstrap to redeem the handoff code.
 - **P3 T3a (done):** `mobile/src/auth/session.ts` secure-store primitives + JWT guard.
-- **P3 T4 (not started) — HARD GATE for the entire P3-V sub-slice (approved
-  sequencing S2).** No P3-V task (V1–V8) starts until P3 T4 is complete, which itself
-  requires T3b-ii (`login()`) and T3b-iii (navigation wiring). The suite is authored
-  now but execution is blocked on P3 T4.
+- **P3 T4 / T5 (done 2026-06-07) — historical gate for the entire P3-V
+  sub-slice (approved sequencing S2).** The gate is satisfied: T3b-ii (`login()`),
+  T3b-iii (navigation wiring), the core screens, and the P3 verification pass are
+  complete. P3-V remains documented-not-built, but it is no longer blocked on P3.
 - **Local stack:** running emulator + `adb`, gateway (`:8081`), apps/api (`:8080`),
   Redis (session store), Node ≥ 18, Maestro CLI, Android SDK/platform-tools.
 
@@ -225,6 +226,16 @@ Generate a debug build via `expo prebuild` + `gradlew assembleDebug` (or
 on demand (keeps the repo a clean managed workflow); revisit if build time forces
 committing it. This is the highest-uncertainty (XL) task.
 
+**V2a decision (2026-06-07):** use `npx expo prebuild --platform android` followed
+by `cd android && ./gradlew assembleDebug` as the canonical screenshot-build path.
+Reason: Maestro needs a reproducible debug APK with a stable output path, and this
+split makes the generated native project and the APK build separately inspectable.
+`expo run:android` remains a convenience path for local iteration, not the recorded
+automation path. The generated `android/` tree stays gitignored and is regenerated
+on demand. Recorded Android package / Maestro `appId`:
+`com.dubbridge.mobile`. Recorded debug APK path:
+`mobile/android/app/build/outputs/apk/debug/app-debug.apk`.
+
 ### D5 — Secret hygiene
 The runner redacts `handoff_code` and `session_ref` from Maestro reports before
 persisting. Although both are opaque and short-lived (90 s code; idle-bounded
@@ -235,6 +246,13 @@ Any app code that auto-redeems an inbound handoff deep link is gated behind
 `__DEV__` / `EXPO_PUBLIC_E2E_ENABLED` and must be inert in production builds — the
 DubBridge analog of FenixCRM's `__DEV__`-gated handler, but redeeming an opaque
 reference rather than injecting a token.
+
+### D7 — Screen root `testID` convention
+Every screen captured or asserted by Maestro exposes a stable root `testID` using
+the convention `<feature>-screen`. V1 establishes the first set:
+`login-screen`, `home-screen`, and `config-error-screen`. Later P3-V tasks and any
+new mobile screens captured by Maestro must follow the same pattern so visual flows
+assert by `id` rather than brittle text.
 
 ---
 

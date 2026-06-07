@@ -20,8 +20,8 @@ type RuntimeConfigResult =
     };
 
 type ExpoExtra = {
-  dubbridgeEnv?: string | null;
-  gatewayBaseUrl?: string | null;
+  dubbridgeEnv?: unknown;
+  gatewayBaseUrl?: unknown;
 };
 
 function getExpoExtra(): ExpoExtra {
@@ -32,41 +32,59 @@ function isDubbridgeEnv(value: string): value is DubbridgeEnv {
   return (ALLOWED_ENVS as readonly string[]).includes(value);
 }
 
+function normalizeExtraString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 export function readRuntimeConfig(): RuntimeConfigResult {
-  const extra = getExpoExtra();
-  const dubbridgeEnv = extra.dubbridgeEnv?.trim();
-  const gatewayBaseUrl = extra.gatewayBaseUrl?.trim();
+  try {
+    const extra = getExpoExtra();
+    const dubbridgeEnv = normalizeExtraString(extra.dubbridgeEnv);
+    const gatewayBaseUrl = normalizeExtraString(extra.gatewayBaseUrl);
 
-  if (!dubbridgeEnv) {
+    if (!dubbridgeEnv) {
+      return {
+        ok: false,
+        message:
+          "Missing DUBBRIDGE_ENV. Expected one of: local, staging, production.",
+      };
+    }
+
+    if (!isDubbridgeEnv(dubbridgeEnv)) {
+      return {
+        ok: false,
+        message: `Invalid DUBBRIDGE_ENV '${dubbridgeEnv}'. Expected one of: ${ALLOWED_ENVS.join(
+          ", ",
+        )}.`,
+      };
+    }
+
+    if (!gatewayBaseUrl) {
+      return {
+        ok: false,
+        message:
+          "Missing gateway base URL. Set EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL or DUBBRIDGE_GATEWAY_URL.",
+      };
+    }
+
+    return {
+      ok: true,
+      value: {
+        dubbridgeEnv,
+        gatewayBaseUrl,
+      },
+    };
+  } catch {
     return {
       ok: false,
       message:
-        "Missing DUBBRIDGE_ENV. Expected one of: local, staging, production.",
+        "Invalid Expo runtime configuration. Ensure DUBBRIDGE_ENV and gateway URL are string values.",
     };
   }
-
-  if (!isDubbridgeEnv(dubbridgeEnv)) {
-    return {
-      ok: false,
-      message: `Invalid DUBBRIDGE_ENV '${dubbridgeEnv}'. Expected one of: ${ALLOWED_ENVS.join(
-        ", ",
-      )}.`,
-    };
-  }
-
-  if (!gatewayBaseUrl) {
-    return {
-      ok: false,
-      message:
-        "Missing gateway base URL. Set EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL or DUBBRIDGE_GATEWAY_URL.",
-    };
-  }
-
-  return {
-    ok: true,
-    value: {
-      dubbridgeEnv,
-      gatewayBaseUrl,
-    },
-  };
 }

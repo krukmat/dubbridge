@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 export function ConfigErrorScreen({ message }: { message: string }) {
   return (
-    <View style={styles.container}>
+    <View testID="config-error-screen" style={styles.container}>
       <View style={styles.panel}>
         <Text style={styles.eyebrow}>Configuration required</Text>
         <Text style={styles.title}>Mobile app cannot start yet.</Text>

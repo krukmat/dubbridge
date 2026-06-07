@@ -4,8 +4,8 @@ import type { AuthContextValue } from "../src/auth/AuthProvider";
 import { RootNavigator } from "../src/navigation/RootNavigator";
 
 let mockExtra: {
-  dubbridgeEnv?: string | null;
-  gatewayBaseUrl?: string | null;
+  dubbridgeEnv?: unknown;
+  gatewayBaseUrl?: unknown;
 } = {};
 
 let mockAuthValue: AuthContextValue;
@@ -53,6 +53,7 @@ describe("RootNavigator", () => {
 
     expect(view.getByText("DubBridge mobile")).toBeTruthy();
     expect(view.getByText("Sign in with session gateway")).toBeTruthy();
+    expect(view.getByTestId("login-screen")).toBeTruthy();
   });
 
   it("renders the unauthenticated entry screen while auth is loading", async () => {
@@ -69,6 +70,7 @@ describe("RootNavigator", () => {
 
     expect(view.getByText("DubBridge mobile")).toBeTruthy();
     expect(view.getByText("Sign in with session gateway")).toBeTruthy();
+    expect(view.getByTestId("login-screen")).toBeTruthy();
   });
 
   it("renders the authenticated home screen when auth status is authed", async () => {
@@ -89,6 +91,7 @@ describe("RootNavigator", () => {
     expect(view.getByText("http://127.0.0.1:4000")).toBeTruthy();
     expect(view.getByText("Browse assets")).toBeTruthy();
     expect(view.getByText("Sign out")).toBeTruthy();
+    expect(view.getByTestId("home-screen")).toBeTruthy();
   });
 
   it("renders a clear configuration error when the gateway URL is missing", async () => {
@@ -105,6 +108,24 @@ describe("RootNavigator", () => {
         "Missing gateway base URL. Set EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL or DUBBRIDGE_GATEWAY_URL.",
       ),
     ).toBeTruthy();
+    expect(view.getByTestId("config-error-screen")).toBeTruthy();
+  });
+
+  it("fails closed to the config error screen when Expo extra values are not strings", async () => {
+    mockExtra = {
+      dubbridgeEnv: { value: "local" },
+      gatewayBaseUrl: "http://127.0.0.1:4000",
+    };
+
+    const view = await render(<RootNavigator />);
+
+    expect(view.getByText("Configuration required")).toBeTruthy();
+    expect(
+      view.getByText(
+        "Missing DUBBRIDGE_ENV. Expected one of: local, staging, production.",
+      ),
+    ).toBeTruthy();
+    expect(view.getByTestId("config-error-screen")).toBeTruthy();
   });
 
   it("wires the login screen button to auth.login()", async () => {

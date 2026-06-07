@@ -53,10 +53,7 @@ only the gateway's opaque session, exactly as the web client does (ADR-024).
 - Native live capture / RTMP/SRT streaming from the device — that is S3b
   (ADR-019/020/022) backend work, not this client slice.
 - Push notifications, offline sync, and app-store release/CI signing pipelines —
-  follow-up mobile hardening backlog once the core client is proven. The
-  **Maestro screenshot / visual-audit suite** is part of that backlog and is planned
-  separately as sub-slice **P3-V** (`docs/plan/p3-maestro-screenshot-suite.md`,
-  `docs/tasks/p3-maestro-screenshot-suite.md`), gated on **T4**.
+  follow-up mobile hardening backlog once the core client is proven.
 - Any change to the `apps/api` trust boundary (ADR-023) or to the gateway contract
   (owned by P1).
 

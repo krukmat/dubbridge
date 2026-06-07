@@ -174,27 +174,25 @@ The HITL approval requirement applies at every band **except RRI 0–25**, which
 uses show-and-proceed (see below). For all other bands, what the band controls is
 the evidence and gates the agent must satisfy before and after that approval.
 
-| RRI | Label | Gate | Tier | Thinking |
-|---|---|---|---|---|
-| **0–25** | Low | **Auto-execute:** present the RRI table and a one-line summary of intended actions, then begin implementation immediately — no approval checkpoint, no pause. | Economy | Off |
-| **26–40** | Moderate | Confirm tests exist in the affected area. | Balanced | Off |
-| **41–55** | Med-high | Plan + explicit acceptance criteria required before approval. | Balanced → Premium | On |
-| **56–70** | Complex | Plan first. Do not implement before producing and approving a clear plan. Human reviews the plan. | Premium | On |
-| **71–85** | High | Characterization tests + explicit acceptance criteria + human reviews the **diff** (not just the plan). | Premium | On |
-| **86–100** | Very high | Do not implement directly. Produce an ADR + risk analysis + decompose into subtasks. | Premium | On |
-| **> 100** | Excessive | Architecture/design work must happen first. Re-scope before any implementation. | Premium | On |
+Effort, capability, thinking, and gate are each derived **in parallel** from the RRI
+band — never derive one output from another (e.g. do not infer capability from Effort).
+
+| RRI band | Label | Effort | Capability (Codex) | Capability (Claude Code) | Thinking | Gate |
+|---|---|---|---|---|---|---|
+| **0–25** | Low | **S** | Economy | Economy | Off | **Auto-execute:** present the RRI table and a one-line summary of intended actions, then begin implementation immediately — no approval checkpoint, no pause. |
+| **26–40** | Moderate | **M** | Balanced | Balanced | Off | Confirm tests exist in the affected area. |
+| **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Plan + explicit acceptance criteria required before approval. |
+| **56–70** | Complex | **L** | Premium | Premium | On | Plan first. Do not implement before producing and approving a clear plan. Human reviews the plan. |
+| **71–85** | High | **XL** | Premium | Premium | On | Characterization tests + explicit acceptance criteria + human reviews the **diff** (not just the plan). |
+| **86–100** | Very high | **XL** | Premium | Premium | On | Do not implement directly. Produce an ADR + risk analysis + decompose into subtasks. |
+| **> 100** | Excessive | **XL** | Premium | Premium | On | Architecture/design work must happen first. Re-scope before any implementation. |
 
 ### Model tier resolution
 
-Tier names map to the current DubBridge agent environment as follows. Resolve
-against official vendor documentation at task-presentation time — do not rely on
-stale memory for "latest" or "best".
-
-| Tier | Claude Code | Codex |
-|---|---|---|
-| Economy | Claude Haiku (current family) | Economy coding model |
-| Balanced | Claude Sonnet (current family) | Balanced coding model |
-| Premium | Claude Opus (current family) | Premium reasoning/coding model |
+The capability labels above (Economy / Balanced / Premium) map to concrete model IDs
+per the resolution table in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` (Model tier
+resolution). Resolve against official vendor documentation at task-presentation time —
+do not rely on stale memory for "latest" or "best".
 
 Thinking mode: activate for Balanced→Premium and above when the task requires
 multi-step reasoning that cannot be validated incrementally. Do **not** activate

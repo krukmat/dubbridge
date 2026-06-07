@@ -1110,11 +1110,12 @@ Gate: confirm existing T1 tests pass with new context API.
   (`docs/plan/p3-maestro-screenshot-suite.md`,
   `docs/tasks/p3-maestro-screenshot-suite.md`). Mobile-hardening backlog capability
   that auto-captures screenshots of every mobile screen on an Android emulator via a
-  two-phase Maestro flow. **Hard gate: this slice's T4** (core screens + T3b-ii/iii
-  auth) must be `[x] Done` before P3-V starts. Approved 2026-06-07 with **Option A**
-  (ADR-024-clean handoff-code bootstrap — no JWT on device) and sequencing **S2**
-  (defer the entire suite until after T4). Uses a `V`-prefixed task namespace
-  (`V1`–`V8`) distinct from this file's `T` prefix; `V4 ≠ T4`. Documented, not built.
+  two-phase Maestro flow. The historical gate for starting it, **this slice's T4**
+  (core screens + T3b-ii/iii auth), is already satisfied; `T5` also closed on
+  2026-06-07. Approved 2026-06-07 with **Option A** (ADR-024-clean handoff-code
+  bootstrap — no JWT on device) and sequencing **S2** (defer the entire suite until
+  after T4). Uses a `V`-prefixed task namespace (`V1`–`V8`) distinct from this
+  file's `T` prefix; `V4 ≠ T4`. Documented, not built; next task is `V1`.
 
 ---
 

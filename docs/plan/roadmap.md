@@ -111,7 +111,7 @@ These are real architecture work, but they do not sit on the linear media pipeli
 | **P1** | First-party session gateway / BFF | S0, external authorization-server contract | ✅ done — T0–T7 complete as of 2026-06-04; browser/cookie transport and full mobile-safe gateway transport delivered | `docs/plan/p1-session-gateway-bff.md`, `docs/tasks/p1-session-gateway-bff.md`, `docs/tasks/p1-t7-mobile-session-handoff.md` (ADR-024) |
 | **P2** | Production identity hardening (JWKS discovery, automatic key rotation, subject mapping if needed) | S0 | ⬜ no plan yet | ADR-023 |
 | **P3** | First-party mobile client (React Native + Expo) | P1 T7 (hard); P2 recommended for production device login | ✅ done — T0–T5 complete as of 2026-06-07 | `docs/plan/p3-mobile-client.md`, `docs/tasks/p3-mobile-client.md` (ADR-024) |
-| **P3-V** | Maestro screenshot / visual-audit suite (mobile hardening backlog) | **P3 T4** (hard gate — core screens + T3b-ii/iii auth) | 📄 planned — authored 2026-06-07, not built; approved Option A (ADR-024-clean handoff-code, no JWT on device) + S2 (defer until after P3 T4) | `docs/plan/p3-maestro-screenshot-suite.md`, `docs/tasks/p3-maestro-screenshot-suite.md` |
+| **P3-V** | Maestro screenshot / visual-audit suite (mobile hardening backlog) | **P3 complete** (historical gate satisfied: P3 T4/T5 done 2026-06-07) | 📄 planned — authored 2026-06-07, not built; approved Option A (ADR-024-clean handoff-code, no JWT on device) + S2 (defer until after P3 T4); ready to start at V1 | `docs/plan/p3-maestro-screenshot-suite.md`, `docs/tasks/p3-maestro-screenshot-suite.md` |
 
 `P1` must be planned before building a first-party browser, operator-console, or
 mobile auth flow. It does not block S2 or S3.

@@ -183,7 +183,27 @@ a delete + create and must update all references atomically.
 | S  | Mechanical — transcription, copy, merge | Config files from an explicit spec |
 | M  | Moderate — contracts, logic, edge cases | Boundary tests; small services |
 | L  | High — multiple subsystems, architecture | Process supervisor with replay tests |
-| XL | Very high — unpredictable external tooling | Native toolchain conflict resolution |
+| XL | Very high — RRI-driven reasoning, risk, and verification burden | Cross-boundary redesign with explicit risk analysis |
+
+**Canonical effort mapping (required):** `Effort` must reflect the computed **RRI
+band**, not a separate subjective estimate of likely elapsed time or annoyance. See
+`docs/policies/RRI_POLICY.md` §Bands, autonomy gates, and model tiers for the
+canonical crosswalk.
+
+The S/M/L/XL descriptions above are illustrative; the RRI band is authoritative for
+assignment.
+
+Effort, capability tier, and autonomy gate are each derived in parallel from the RRI
+band; never derive capability or gate from Effort.
+
+Rules:
+- Do not use `Effort` to encode toolchain pain, waiting time, or expected operator
+  frustration when the computed RRI is lower.
+- If a task is operationally tedious but its RRI remains in a lower band, keep the
+  lower `Effort` and explain the operational caveat in prose.
+- If an existing task ledger has `Effort` that disagrees with the computed RRI band,
+  update the ledger so `Effort`, complexity presentation, and model guidance are
+  internally consistent in the same documentation change.
 
 ## Model and thinking-mode selection
 
@@ -245,7 +265,7 @@ where E = edges, N = nodes, P = connected components in the control-flow graph.
 Practically: start at 1 and add 1 for each `if`, `else if`, `match` arm, `while`,
 `for`, `loop`, `?` propagation that branches, `&&`, `||` in a condition.
 
-| CC range | Complexity label | RRI `C` variable score |
+| CC range | Cyclomatic (C) label | RRI `C` variable score |
 |---|---|---|
 | 1–5 | Low | 0–1 |
 | 6–10 | Medium | 1–2 |
@@ -283,20 +303,13 @@ over time; the workflow should stay stable across agents and providers.
 | Balanced | Medium-complexity, standard implementation work |
 | Premium | High / Very High complexity, architecture, synthesis, deep debugging |
 
-Mapping (now driven by RRI band — see `docs/policies/RRI_POLICY.md`):
-
-| RRI band | Complexity label | Codex capability | Claude Code capability | Thinking mode |
-|---|---|---|---|---|
-| 0–25 | Low | Economy coding model | Economy coding model | Off |
-| 26–40 | Moderate | Balanced coding model | Balanced coding model | Off |
-| 41–55 | Med-high | Balanced coding model | Balanced → Premium | **On** |
-| 56–70 | Complex | Premium reasoning/coding model | Premium reasoning/coding model | **On** |
-| 71+ | High / Very High | Premium reasoning/coding model | Premium reasoning/coding model | **On** |
+Mapping (now driven by RRI band — see the canonical crosswalk in
+`docs/policies/RRI_POLICY.md` §Bands, autonomy gates, and model tiers):
 
 > **Subsumed by RRI:** the complexity label alone no longer determines the tier.
 > The RRI band (which incorporates `C`, `F`, `D`, `T`, `A`, `K`, `P`, `X`, and
-> penalties) selects the row above. The tier names and thinking-mode rules are
-> unchanged; only the input that selects the tier has changed.
+> penalties) selects the canonical crosswalk row. The tier names and thinking-mode
+> rules are unchanged; only the input that selects the tier has changed.
 
 Agent-specific resolution rules:
 
@@ -312,10 +325,10 @@ Agent-specific resolution rules:
   2. map complexity to capability tier with Step 2
   3. resolve that tier to the best current vendor model
   4. present the resolved model and note any task-local override
-- `Effort` may inform cost discipline and escalation judgment, but it does not
-  replace the complexity formula. If `Effort` and computed complexity pull in
-  different directions, compute complexity first and then add a one-line
-  rationale for the final recommendation.
+- `Effort` must be derived from the computed RRI band using the canonical effort
+  mapping above; it does not replace the complexity formula. If an existing task's
+  recorded `Effort` disagrees with the computed RRI band, fix the task metadata
+  instead of carrying the inconsistency forward into the presentation.
 - If a task file explicitly pins a model, that task-local guidance overrides the
   default tier mapping.
 - If a task file pins a model that appears stale relative to current vendor
@@ -340,7 +353,7 @@ Include in every task presentation:
 
 ```
 | RRI              | <score> → band <label> → gates: <list>                  |
-| Complexity score | <CC range or decision-weight score> → <label>           |
+| Complexity score | <CC range or decision-weight score> → <cyclomatic/decision-weight label> |
 | Claude Code      | <resolved model or pinned model> — thinking <On / Off>  |
 | Codex            | <resolved model or pinned model>                        |
 ```

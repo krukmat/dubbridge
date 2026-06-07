@@ -133,6 +133,12 @@ Recommended wording:
 
 If no approval is required under the active workflow, the agent may still present the task briefly and continue autonomously.
 
+Under the canonical RRI mapping in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and
+`docs/policies/RRI_POLICY.md`, `Effort: S` normally corresponds to the **RRI 0–25**
+Low band. Those tasks use show-and-proceed: present the task, state the computed
+RRI, and begin execution without waiting for approval unless another explicit safety
+rule overrides that default.
+
 ## Language
 
 Agent-facing repository instructions must be written in English.

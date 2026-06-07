@@ -8,7 +8,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   orientation: "portrait",
   userInterfaceStyle: "light",
   scheme: "dubbridge",
-  plugins: ["expo-status-bar"],
+  android: {
+    package: "com.dubbridge.mobile",
+  },
+  plugins: ["expo-status-bar", "expo-web-browser"],
   extra: {
     dubbridgeEnv: process.env.DUBBRIDGE_ENV ?? null,
     gatewayBaseUrl:

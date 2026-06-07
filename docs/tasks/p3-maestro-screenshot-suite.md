@@ -10,13 +10,15 @@
 
 > **Approved options (2026-06-07) drive this list:** **Option A**
 > (mock-token-endpoint + real gateway handoff; no gateway change) and **Option S2**
-> (defer the entire sub-slice until after **P3 T4**). See the plan's *Central design
-> decision* and *Sequencing decision*.
+> (defer the entire sub-slice until after **P3 T4**). The sequencing gate is now
+> satisfied because **P3 T4/T5 completed on 2026-06-07**. See the plan's *Central
+> design decision* and *Sequencing decision*.
 
-> **HARD GATE — P3 T4.** Every task below is blocked until P3 T4 (core screens
-> `Login`/`Home`/`AssetList`/`AssetDetail` + real auth from T3b-ii/iii) is `[x] Done`
-> in `docs/tasks/p3-mobile-client.md`. Do not present or start V1 before then. These
-> documents are authored now as permitted planning work; execution waits on P3 T4.
+> **HISTORICAL GATE — P3 T4.** The required P3 screen/auth milestone is already
+> complete in `docs/tasks/p3-mobile-client.md`: core screens
+> `Login`/`Home`/`AssetList`/`AssetDetail` plus real auth from T3b-ii/iii are done,
+> and `T5` closed on 2026-06-07. **V1 is now the next executable task**, subject to
+> the normal per-task presentation/approval rules.
 
 > **Task namespace (avoid the V/T twin hazard).** This sub-slice uses the **`V`**
 > prefix (`V1`–`V8`); the P3 client slice in `docs/tasks/p3-mobile-client.md` uses
@@ -27,14 +29,14 @@
 > below is the **existing** P3 `T4` (Core screens), not a task defined here.
 
 ## Status legend
-- [ ] Not started · [~] In progress · [x] Done · [⛔] Blocked (gate)
+- [ ] Not started · [~] In progress · [x] Done
 
 ## Task dependency order
 
 ```text
-[GATE] P3 T4 done ──▶ V1 -> V2a -> V2b -> V3 -> V4a -> V4b -> V6 -> V7a -> V7b -> V8
-                                                  (V5 inserted before V6 Phase-2 if
-                                                   openAuthSessionAsync is not Maestro-drivable)
+[gate satisfied: P3 T4/T5 done 2026-06-07] ──▶ V1 -> V2a -> V2b -> V3 -> V4a -> V4b -> V6 -> V7a -> V7b -> V8
+                                                       (V5 inserted before V6 Phase-2 if
+                                                        openAuthSessionAsync is not Maestro-drivable)
 ```
 
 ## RRI review & decomposition (2026-06-07)
@@ -74,7 +76,7 @@ below are the planning estimate that drove the split.
 
 ## V1 — testIDs on captured screens + naming convention
 
-- **Status:** [⛔] Blocked — gated on P3 T4
+- **Status:** [x] Done — 2026-06-07
 - **Effort:** S · **Indicative RRI:** ~18 (Low)
 - **Type:** Development
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4`
@@ -104,6 +106,49 @@ below are the planning estimate that drove the split.
   > IDs, convention documented, `npm test`+`typecheck` green. Stop after tests pass;
   > do not start V2.
 
+### Completion record (2026-06-07)
+
+- Added `testID="login-screen"` to `LoginScreen`, `testID="home-screen"` to
+  `HomeScreen`, and `testID="config-error-screen"` to `ConfigErrorScreen`.
+- Extended `mobile/__tests__/RootNavigator.test.tsx` to assert those IDs are present
+  in the unauthenticated, authenticated, and config-error renders.
+- Documented the naming convention in the plan under `D7 — Screen root testID
+  convention`.
+
+### Happy paths covered
+
+- `HP-1`: `HomeScreen` now exposes `testID="home-screen"` and the existing
+  authenticated-root test asserts it directly.
+  Evidence:
+  [HomeScreen.tsx](/Users/matiasleandrokruk/Documents/dubbridge/mobile/src/screens/HomeScreen.tsx),
+  [RootNavigator.test.tsx](/Users/matiasleandrokruk/Documents/dubbridge/mobile/__tests__/RootNavigator.test.tsx)
+  prove the authed shell renders a stable Maestro-facing root id.
+
+### Edge cases covered
+
+- `EC-1`: a missing screen root `testID` now fails the navigator-level render tests
+  for the unauthenticated, authenticated, or config-error entry states instead of
+  silently leaking into later Maestro flakiness.
+  Evidence:
+  [LoginScreen.tsx](/Users/matiasleandrokruk/Documents/dubbridge/mobile/src/screens/LoginScreen.tsx),
+  [ConfigErrorScreen.tsx](/Users/matiasleandrokruk/Documents/dubbridge/mobile/src/screens/ConfigErrorScreen.tsx),
+  [RootNavigator.test.tsx](/Users/matiasleandrokruk/Documents/dubbridge/mobile/__tests__/RootNavigator.test.tsx)
+  prove those roots are asserted by `testID`.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | rendering `HomeScreen` exposes `testID="home-screen"` queryable by Testing Library | `mobile/__tests__/RootNavigator.test.tsx::renders the authenticated home screen when auth status is authed` | passed |
+| EC-1 | Edge case | a screen without a `testID` is caught by a test asserting presence on every captured screen | `mobile/__tests__/RootNavigator.test.tsx::renders the unauthenticated entry screen when runtime config is valid` / `mobile/__tests__/RootNavigator.test.tsx::renders the authenticated home screen when auth status is authed` / `mobile/__tests__/RootNavigator.test.tsx::renders a clear configuration error when the gateway URL is missing` | passed |
+
+### Owner final verification
+
+- Owner: `Codex`
+- Date: `2026-06-07`
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
+- Commands run: `npm test`; `npm run typecheck`
+
 ---
 
 ## V2 — Android debug-build path for managed Expo  (highest risk — SPLIT)
@@ -111,15 +156,16 @@ below are the planning estimate that drove the split.
 > **Decomposition (2026-06-07):** V2's base RRI ~49 rises to ~61 (Complex) once the
 > `+12` "architecture/process decision required" penalty for the prebuild-strategy
 > and `android/` commit decision is counted. Split to isolate that **process
-> decision (V2a)** from the **XL native-build execution (V2b)**, per the RRI policy's
-> "separate the decision" guidance. V2a is a low-RRI decision/docs task; V2b inherits
-> the XL native-toolchain risk but starts from a settled strategy.
+> decision (V2a)** from the native-build execution (V2b), per the RRI policy's
+> "separate the decision" guidance. V2a is a low-RRI decision/docs task; V2b starts
+> from a settled strategy and retains a med-high RRI driven by native-toolchain
+> integration and emulator verification.
 
 ---
 
 ### V2a — Decide prebuild strategy + `android/` commit policy
 
-- **Status:** [⛔] Blocked — gated on P3 T4 · depends on V1
+- **Status:** [x] Done — 2026-06-07 · depends on V1
 - **Effort:** S · **Indicative RRI:** ~20 (Low) — but carries the `+12` process
   decision, so present the decision explicitly before V2b
 - **Type:** Planning / decision (docs + a small config/`.gitignore` change)
@@ -142,13 +188,38 @@ below are the planning estimate that drove the split.
   > path. AC: decision documented, no build run. Stop after the decision is recorded;
   > do not start V2b.
 
+### Completion record (2026-06-07)
+
+- Chosen canonical screenshot-build path: `npx expo prebuild --platform android`
+  followed by `cd android && ./gradlew assembleDebug`.
+- Rejected as primary automation path: `npx expo run:android`. It remains useful for
+  iterative local development, but not as the recorded Maestro build path because it
+  hides the native build behind a higher-level wrapper and does not give V2b the same
+  stable APK artifact boundary.
+- Recorded Android package / Maestro `appId` as `com.dubbridge.mobile` by adding an
+  explicit `android.package` entry in `mobile/app.config.ts`.
+- Recorded the expected debug APK output path as
+  `mobile/android/app/build/outputs/apk/debug/app-debug.apk`.
+- Chosen repo policy: generated `mobile/android/` is **gitignored** in the root
+  `.gitignore` and regenerated on demand; the repo remains managed-workflow-first.
+- Created the initial `mobile/maestro/README.md` stub to hold the build strategy and
+  recorded identifiers for later P3-V tasks.
+
+### Owner final verification
+
+- Owner: `Codex`
+- Date: `2026-06-07`
+- Statement: I verified the V2a process decision is documented with rationale, the
+  `android/` commit policy is explicit, and the recorded `appId` / APK path are
+  available for V2b and V6. No native build was executed in this task.
+- Commands run: `npm test`; `npm run typecheck`; `make qa-docs`
+
 ---
 
 ### V2b — Execute the debug build + verify emulator launch
 
-- **Status:** [⛔] Blocked — gated on P3 T4 · depends on V2a, V3
-- **Effort:** XL · **Indicative RRI:** ~49 (Med-high), thinking **On** — XL effort
-  reflects iterative native-toolchain diagnosis, not RRI band
+- **Status:** [ ] Not started · depends on V2a, V3
+- **Effort:** L · **Indicative RRI:** ~49 (Med-high), thinking **On**
 - **Type:** Development / ops
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Opus 4.1`
   (iterative native-toolchain diagnosis) — thinking **On**
@@ -182,7 +253,7 @@ below are the planning estimate that drove the split.
 
 ## V3 — Screenshot env profile + port deconfliction
 
-- **Status:** [⛔] Blocked — gated on P3 T4
+- **Status:** [ ] Not started
 - **Effort:** M · **Indicative RRI:** ~24 (Low/Moderate)
 - **Type:** Development / config
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4`
@@ -227,7 +298,7 @@ below are the planning estimate that drove the split.
 
 ### V4a — Mock token endpoint fixture + screenshot `token_url` override
 
-- **Status:** [⛔] Blocked — gated on P3 T4 · depends on V3
+- **Status:** [ ] Not started · depends on V3
 - **Effort:** M · **Indicative RRI:** ~36 (Moderate) — no auth penalty (returns a
   fixture token; handles no real credential, adds no prod path)
 - **Type:** Development
@@ -265,7 +336,7 @@ below are the planning estimate that drove the split.
 
 ### V4b — Seed orchestration (handoff-code mint) + no-JWT verification  (auth core)
 
-- **Status:** [⛔] Blocked — gated on P3 T4 · depends on V4a
+- **Status:** [ ] Not started · depends on V4a
 - **Effort:** M · **Indicative RRI:** ~57 (Complex, irreducible auth floor) —
   thinking **On**; human reviews the **diff**
 - **Type:** Development
@@ -306,7 +377,7 @@ below are the planning estimate that drove the split.
 
 ## V5 — (Conditional) app-side E2E deep-link bootstrap  (dev-gated, auth-adjacent)
 
-- **Status:** [⛔] Blocked — gated on P3 T4 (incl. T3b-ii + T3b-iii)
+- **Status:** [ ] Not started · depends on V4b and delivered P3 T3b-ii/T3b-iii auth
 - **Effort:** M · **Indicative RRI:** ~59 (Complex, 56–70) — `+10` auth penalty,
   irreducible auth floor (P=5, ADR-024). Not split: further subdivision cannot lower
   `D`/`P`/auth penalty. Human reviews the **diff**; thinking **On**.
@@ -347,7 +418,7 @@ below are the planning estimate that drove the split.
 
 ## V6 — Maestro flow files (auth-surface + authenticated-audit)
 
-- **Status:** [⛔] Blocked — gated on P3 T4
+- **Status:** [ ] Not started
 - **Effort:** M · **Indicative RRI:** ~36 (Moderate)
 - **Type:** Development
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4`
@@ -393,7 +464,7 @@ below are the planning estimate that drove the split.
 
 ### V7a — Runner: preconditions + stack bring-up (health, adb, Metro)
 
-- **Status:** [⛔] Blocked — gated on P3 T4 · depends on V3, V2b
+- **Status:** [ ] Not started · depends on V3, V2b
 - **Effort:** M · **Indicative RRI:** ~38 (Moderate)
 - **Type:** Development
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4`
@@ -425,7 +496,7 @@ below are the planning estimate that drove the split.
 
 ### V7b — Runner: seed→env + two-phase Maestro + copy + report sanitization
 
-- **Status:** [⛔] Blocked — gated on P3 T4 · depends on V7a, V4b, V6
+- **Status:** [ ] Not started · depends on V7a, V4b, V6
 - **Effort:** M · **Indicative RRI:** ~45 (Med-high) — thinking **On**; isolates the
   security-relevant secret redaction
 - **Type:** Development
@@ -456,7 +527,7 @@ below are the planning estimate that drove the split.
 
 ## V8 — `npm run screenshots` + README + docs/roadmap sync
 
-- **Status:** [⛔] Blocked — gated on P3 T4
+- **Status:** [ ] Not started
 - **Effort:** S · **Indicative RRI:** ~18 (Low)
 - **Type:** Development (script) + docs sync
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4`

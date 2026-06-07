@@ -14,7 +14,7 @@ export function HomeScreen({
   const auth = useAuth();
 
   return (
-    <View style={styles.container}>
+    <View testID="home-screen" style={styles.container}>
       <View style={styles.hero}>
         <Text style={styles.kicker}>Authenticated shell</Text>
         <Text style={styles.title}>Mobile home</Text>

@@ -6,7 +6,7 @@ export function LoginScreen() {
   const auth = useAuth();
 
   return (
-    <View style={styles.container}>
+    <View testID="login-screen" style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.kicker}>Session gateway shell</Text>
         <Text style={styles.title}>DubBridge mobile</Text>
