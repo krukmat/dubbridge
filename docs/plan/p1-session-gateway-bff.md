@@ -25,7 +25,9 @@ web app (`web/`) and the planned mobile app (slice **P3**, React Native + Expo).
   `POST /auth/mobile/session` redeems that code into `session_ref`, `/api/*`
   accepts `X-Dubbridge-Session`, refresh rotation returns the new opaque session
   reference to mobile callers, `/auth/logout` accepts the mobile header, and the
-  deterministic mobile lifecycle is covered end-to-end.
+  deterministic mobile lifecycle is covered end-to-end. Session renewal and
+  rotation remain gateway-owned; mobile only transports and persists the current
+  opaque reference.
 
 **Slice status:** P1 is complete. The gateway now serves both first-party
 transports defined by ADR-024:
@@ -64,6 +66,10 @@ per-request identity verification.
   (refreshing transparently when expired), and forward to `apps/api`.
 - Token refresh against the authorization server when the access token is expired
   but the session/refresh token is still valid.
+- Gateway-owned first-party session renewal/rotation: clients do not refresh tokens
+  or extend sessions locally. The gateway updates idle-use state, refreshes backend
+  credentials, rotates opaque session references when needed, and rejects sessions
+  that crossed idle or absolute expiry.
 - A typed gateway configuration in `crates/config` (authorization-server endpoints,
   client id, client secret reference, cookie policy, upstream `apps/api` base URL,
   session TTL) consistent with the P0 fail-closed layered model (ADR-026).
@@ -186,6 +192,9 @@ transport:
 - subsequent mobile `/api/*` and `/auth/logout` calls carry that opaque reference in
   an explicit gateway session header;
 - access tokens and refresh tokens remain server-side only.
+- if the gateway rotates the opaque session reference on the mobile transport, it
+  returns the replacement in `X-Dubbridge-Session`; P3 must store that value and
+  treat stale references as invalid.
 
 P1 does **not** build the mobile client, but it must not bake in browser-only
 assumptions that would force a parallel auth path in P3. This is the single most

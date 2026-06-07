@@ -1,0 +1,234 @@
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import { makeRedirectUri } from "expo-auth-session";
+import * as WebBrowser from "expo-web-browser";
+
+import { createGatewayClient } from "../api/client";
+import {
+  clearSessionRef,
+  isJwtLike,
+  loadSessionRef,
+  saveSessionRef,
+  updateSessionRef,
+} from "./session";
+import { readRuntimeConfig } from "../config/env";
+
+export type AuthStatus = "loading" | "authed" | "unauthed";
+
+export type AuthContextValue = {
+  sessionRef: string | null;
+  status: AuthStatus;
+  loginError: string | null;
+  login: () => Promise<void>;
+  logout: () => Promise<void>;
+  onSessionRotation: (rotation: string | null) => Promise<void>;
+};
+
+const missingAuthProviderError =
+  "useAuth must be used within an AuthProvider";
+
+const createStubAsync = (): Promise<void> => Promise.resolve();
+
+export const AuthContext =
+  createContext<AuthContextValue | undefined>(undefined);
+
+export function useAuth(): AuthContextValue {
+  const authContext = useContext(AuthContext);
+
+  if (authContext === undefined) {
+    throw new Error(missingAuthProviderError);
+  }
+
+  return authContext;
+}
+
+type AuthProviderProps = {
+  children: ReactNode;
+};
+
+function getGatewayClient() {
+  const runtimeConfig = readRuntimeConfig();
+
+  if (!runtimeConfig.ok) {
+    return null;
+  }
+
+  return {
+    client: createGatewayClient({
+      gatewayBaseUrl: runtimeConfig.value.gatewayBaseUrl,
+    }),
+    gatewayBaseUrl: runtimeConfig.value.gatewayBaseUrl,
+  };
+}
+
+export function AuthProvider({
+  children,
+}: AuthProviderProps): ReactNode {
+  const [sessionRef, setSessionRef] = useState<string | null>(null);
+  const [status, setStatus] = useState<AuthStatus>("loading");
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function hydrateSession(): Promise<void> {
+      const storedSessionRef = await loadSessionRef();
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (storedSessionRef === null) {
+        setSessionRef(null);
+        setStatus("unauthed");
+        setLoginError(null);
+        return;
+      }
+
+      if (isJwtLike(storedSessionRef)) {
+        await clearSessionRef();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setSessionRef(null);
+        setStatus("unauthed");
+        setLoginError(null);
+        return;
+      }
+
+      setSessionRef(storedSessionRef);
+      setStatus("authed");
+      setLoginError(null);
+    }
+
+    void hydrateSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  async function logout(): Promise<void> {
+    const previousSessionRef = sessionRef;
+
+    setSessionRef(null);
+    setStatus("unauthed");
+    setLoginError(null);
+
+    await clearSessionRef();
+
+    if (previousSessionRef === null) {
+      return;
+    }
+
+    const gateway = getGatewayClient();
+
+    if (gateway === null) {
+      return;
+    }
+
+    await gateway.client.post("/auth/logout", previousSessionRef, {});
+  }
+
+  async function login(): Promise<void> {
+    setLoginError(null);
+
+    const gateway = getGatewayClient();
+
+    if (gateway === null) {
+      setStatus("unauthed");
+      setSessionRef(null);
+      setLoginError("missing_runtime_config");
+      return;
+    }
+
+    const redirectUri = makeRedirectUri({
+      scheme: "dubbridge",
+      path: "auth/callback",
+    });
+    const loginUrl = new URL("/auth/login", gateway.gatewayBaseUrl);
+    loginUrl.searchParams.set("return_uri", redirectUri);
+
+    const result = await WebBrowser.openAuthSessionAsync(
+      loginUrl.toString(),
+      redirectUri,
+    );
+
+    if (result.type !== "success") {
+      return;
+    }
+
+    const handoffCode = new URL(result.url).searchParams.get("handoff_code");
+
+    if (!handoffCode) {
+      setStatus("unauthed");
+      setSessionRef(null);
+      setLoginError("missing_handoff_code");
+      return;
+    }
+
+    const redeemResult = await gateway.client.post<{ session_ref: string }>(
+      "/auth/mobile/session",
+      null,
+      { handoff_code: handoffCode },
+    );
+
+    if (!redeemResult.ok) {
+      setStatus("unauthed");
+      setSessionRef(null);
+      setLoginError(
+        redeemResult.error.kind === "session_expired"
+          ? "session_expired"
+          : "login_failed",
+      );
+      return;
+    }
+
+    const nextSessionRef = redeemResult.value.data.session_ref;
+
+    if (!nextSessionRef || isJwtLike(nextSessionRef)) {
+      setStatus("unauthed");
+      setSessionRef(null);
+      setLoginError("invalid_session_ref");
+      return;
+    }
+
+    await saveSessionRef(nextSessionRef);
+    setSessionRef(nextSessionRef);
+    setStatus("authed");
+    setLoginError(null);
+  }
+
+  async function onSessionRotation(rotation: string | null): Promise<void> {
+    if (rotation === null || isJwtLike(rotation)) {
+      return;
+    }
+
+    await updateSessionRef(rotation);
+    setSessionRef(rotation);
+    setStatus("authed");
+    setLoginError(null);
+  }
+
+  const value: AuthContextValue = {
+    sessionRef,
+    status,
+    loginError,
+    login,
+    logout,
+    onSessionRotation,
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
+}

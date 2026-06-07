@@ -40,6 +40,7 @@ operational surfaces from planned ones. Delivery sequence lives in
 | Media preparation through publication | Planned | S4..S9 |
 | Environment separation + reproducible app-container runtime wiring | Planned supporting surface | P0, ADR-026 |
 | First-party session gateway / BFF | Operational supporting surface | P1, ADR-024 |
+| First-party mobile client (React Native + Expo) | Operational supporting surface | P3, ADR-024 |
 
 ## Runtime surfaces
 
@@ -47,8 +48,14 @@ operational surfaces from planned ones. Delivery sequence lives in
 
 - `apps/api` exposes HTTP endpoints and operational health checks.
 - `apps/gateway` exposes first-party auth endpoints (`/auth/login`, `/auth/callback`,
-  `/auth/logout`) plus the authenticated `/api/*` proxy, keeping tokens server-side
-  while preserving JWT verification at `apps/api` (P1, ADR-024/023).
+  `/auth/logout`) plus the authenticated `/api/*` proxy. It owns first-party session
+  validation, renewal, rotation, expiry, logout, and backend token refresh while
+  keeping tokens server-side and preserving JWT verification at `apps/api` (P1,
+  ADR-024/023).
+- `mobile/` is the first-party React Native + Expo client surface. It authenticates
+  only through the session gateway, persists only the gateway-owned opaque
+  `session_ref` in secure storage, and uses the authenticated gateway `/api/*`
+  proxy for product requests (P3, ADR-024).
 - `apps/worker-runner` is the Rust background-job execution surface; its real queue
   consumption remains to be implemented as slices require it.
 - `apps/cli` hosts local operational commands for development and administration.
@@ -97,13 +104,17 @@ operational surfaces from planned ones. Delivery sequence lives in
 ```text
 programmatic client -- JWT bearer token --> apps/api
 first-party browser -- hardened session --> session gateway / BFF -- JWT/internal credential --> apps/api
+first-party mobile -- opaque session ref --> session gateway / BFF -- JWT/internal credential --> apps/api
 
 apps/api direct upload ---------------+
 platform download (owner creds) ------+--> shared rights-gated finalize --> asset + lineage + audit
 RTMP/SRT live recording (S3b) --------+
 ```
 
-Direct upload and the first-party session gateway are operational. **Platform
+Direct upload and the first-party session gateway are operational. The gateway is
+the only authenticated entrypoint for first-party browser/mobile product API calls;
+it renews or rotates first-party sessions when allowed and proxies `/api/*` to
+`apps/api`. **Platform
 download (primary S3, ADR-025)** is planned; **RTMP/SRT live recording is the
 deferred S3b sub-case**.
 Every intake mode — upload, platform download, and live recording — must use the same
@@ -131,12 +142,20 @@ parallel path (ADR-021, producer-agnostic).
 bearer principal through `crates/auth`; handlers never trust caller-supplied uploader
 identity (ADR-023).
 
-The planned session gateway / BFF changes first-party client ergonomics, not the core
-API trust boundary (ADR-024). Intake-source credentials are a separate concern from
-the API principal and from each other: owner platform credentials for downloads are
-stored by reference and redacted (primary S3, ADR-025); live RTMP/SRT source
-credentials are a capture-edge concern (deferred S3b, ADR-022). Neither is ever
-conflated with the verified API bearer principal.
+The session gateway / BFF changes first-party client ergonomics, not the core API
+trust boundary (ADR-024). It owns browser/mobile session lifecycle behavior:
+login, session validation, renewal, rotation, expiry, logout, backend token refresh,
+and authenticated `/api/*` proxying. First-party clients never renew tokens or
+sessions themselves; they carry the current opaque session transport and update it
+only when the gateway returns a rotated reference. `apps/api` never receives a
+browser/mobile session reference; it receives an authenticated backend request from
+the gateway and continues to enforce protected-resource authorization.
+
+Intake-source credentials are a separate concern from the API principal and from
+each other: owner platform credentials for downloads are stored by reference and
+redacted (primary S3, ADR-025); live RTMP/SRT source credentials are a capture-edge
+concern (deferred S3b, ADR-022). Neither is ever conflated with the verified API
+bearer principal.
 
 ## Audit boundary
 

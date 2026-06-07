@@ -15,11 +15,12 @@ and fail-closed configuration (see "P0 strategy" below, principle added, and X21
 then synchronized after P0 Task 2 and Task 3 completion. Updated 2026-06-03 again:
 added plan/task ledgers for P1 (first-party session gateway / BFF) and introduced
 slice P3 (first-party mobile client, React Native + Expo) as a P1-gated consumer
-(ADR-024); no mobile app exists in the repo yet. Updated 2026-06-03 once more after
+(ADR-024). Updated 2026-06-03 once more after
 P0 Task 5 moved local Compose under `infra/local/` and wired the opt-in `app`
 profile to fail-closed local config. Updated again on 2026-06-03 after P0 Task 6
 aligned the local Rust image with `rust-toolchain.toml` and added the committed-config
-secret guard.
+secret guard. Updated 2026-06-07 after P3 T0–T5 completion: the mobile app is now
+implemented, tested, and reflected in the architecture/task status documents.
 
 ## Status legend
 - ✅ Done · 🟡 In progress · ⬜ Not started · 📄 Planned (plan exists, not built)
@@ -109,7 +110,8 @@ These are real architecture work, but they do not sit on the linear media pipeli
 | **P0** | Environment separation & deployment runtime wiring (layered fail-closed config, compose = local-infra-only, auth bootstrap, service DNS, version policy) | S0, S1 | ✅ done — Phase 0 and Phase 1 task ledgers complete; later env-driven runtime behavior stays deferred to S2+/later phases | `docs/plan/p0-environment-separation.md`, `docs/tasks/p0-environment-separation.md` |
 | **P1** | First-party session gateway / BFF | S0, external authorization-server contract | ✅ done — T0–T7 complete as of 2026-06-04; browser/cookie transport and full mobile-safe gateway transport delivered | `docs/plan/p1-session-gateway-bff.md`, `docs/tasks/p1-session-gateway-bff.md`, `docs/tasks/p1-t7-mobile-session-handoff.md` (ADR-024) |
 | **P2** | Production identity hardening (JWKS discovery, automatic key rotation, subject mapping if needed) | S0 | ⬜ no plan yet | ADR-023 |
-| **P3** | First-party mobile client (React Native + Expo) | P1 T7 (hard); P2 recommended for production device login | 📄 planned — T0 gate checked on 2026-06-04; P1 T7 complete; `T1+` unblocked | `docs/plan/p3-mobile-client.md`, `docs/tasks/p3-mobile-client.md` (ADR-024) |
+| **P3** | First-party mobile client (React Native + Expo) | P1 T7 (hard); P2 recommended for production device login | ✅ done — T0–T5 complete as of 2026-06-07 | `docs/plan/p3-mobile-client.md`, `docs/tasks/p3-mobile-client.md` (ADR-024) |
+| **P3-V** | Maestro screenshot / visual-audit suite (mobile hardening backlog) | **P3 T4** (hard gate — core screens + T3b-ii/iii auth) | 📄 planned — authored 2026-06-07, not built; approved Option A (ADR-024-clean handoff-code, no JWT on device) + S2 (defer until after P3 T4) | `docs/plan/p3-maestro-screenshot-suite.md`, `docs/tasks/p3-maestro-screenshot-suite.md` |
 
 `P1` must be planned before building a first-party browser, operator-console, or
 mobile auth flow. It does not block S2 or S3.
@@ -134,10 +136,17 @@ opaque `session_ref` values, accepts `X-Dubbridge-Session` on `/api/*`, and
 rejects mismatched cookie/header transports fail-closed. T7.4 is now complete:
 mobile refresh returns the rotated opaque session reference in
 `X-Dubbridge-Session`, mobile logout accepts the same transport, and a
-deterministic end-to-end mobile lifecycle is covered by tests. Stack decision
+deterministic end-to-end mobile lifecycle is covered by tests. Session renewal and
+rotation are gateway-owned: mobile carries only the current opaque reference and
+persists a rotated replacement when the gateway returns one. Stack decision
 (2026-06-03): React Native + Expo,
-coherent with the React line reserved in `web/README.md`. There is no mobile app
-in the repository today; P3 introduces it, and `T1+` is now unblocked.
+coherent with the React line reserved in `web/README.md`. The mobile
+app is now implemented in `mobile/` with gateway-backed auth, navigation, asset
+list/detail surfaces, and deterministic Jest coverage. A planned
+mobile-hardening sub-slice, **P3-V (Maestro screenshot / visual-audit suite,
+`docs/plan/p3-maestro-screenshot-suite.md` + `docs/tasks/p3-maestro-screenshot-suite.md`)**,
+is gated on **P3 T4** and approved with Option A (ADR-024 handoff-code bootstrap, no
+JWT on device) + sequencing S2 (defer until after T4); it is documented, not built.
 
 ## P0 strategy: environment separation & fail-closed configuration
 
@@ -295,15 +304,15 @@ S3b — live recorder (DEFERRED): ex-T3 recorder crate, ex-T4 jobs/storage,
   `docs/plan/p0-environment-separation.md` + `docs/tasks/p0-environment-separation.md`
   with its current Phase 0 / Phase 1 scope complete. P1 now has
   `docs/plan/p1-session-gateway-bff.md` + `docs/tasks/p1-session-gateway-bff.md`
-  (planned, not built). S2 must include the object-store adapter, storage-key
+  (complete). S2 must include the object-store adapter, storage-key
   ownership, orphan reconciliation, and upload memory-safety strategy.
-- **Mobile is slice P3, newly introduced 2026-06-03.** No mobile app exists in the
-  repository today (only an empty `web/README.md` React skeleton). P3 has
-  `docs/plan/p3-mobile-client.md` + `docs/tasks/p3-mobile-client.md` (planned, not
-  built) and is a hard consumer of the P1 gateway (ADR-024): a first-party device
-  must terminate in the session-gateway trust boundary and must not hold long-lived
-  tokens. P3 cannot start until P1 is built; P2 (JWKS) is recommended before
-  production device login. Stack: React Native + Expo.
+- **Mobile is slice P3, introduced 2026-06-03 and completed 2026-06-07.** The
+  repository now contains the first-party React Native + Expo app in `mobile/`.
+  P3 has `docs/plan/p3-mobile-client.md` + `docs/tasks/p3-mobile-client.md` and
+  is a hard consumer of the P1 gateway (ADR-024): a first-party device must
+  terminate in the session-gateway trust boundary and must not hold long-lived
+  tokens. P2 (JWKS) remains recommended before production device login. Stack:
+  React Native + Expo.
 - Slice numbering is provisional. Update this map whenever a slice, dependency, or
   ADR materially changes.
 - ADR-021 is generalized to all non-upload intake; ADR-019/020/022 are scoped to the

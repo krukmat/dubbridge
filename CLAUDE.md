@@ -53,7 +53,9 @@ Use this structure:
 11. `Acceptance criteria`
 12. `Execution summary`
 13. `Pseudocode` if applicable
-14. `Diagram` if applicable
+14. `Diagram`
+   - required for development tasks
+   - otherwise include if applicable
 15. explicit approval wait-state when required
 
 ## Complexity And Model Defaults
@@ -105,7 +107,12 @@ Skip pseudocode for straightforward document creation, direct shell operations o
 
 ## Diagram Rule
 
-Add a Mermaid diagram only when boundaries, flows or architecture are materially easier to evaluate visually.
+For development tasks, add a compact Mermaid diagram in every task presentation.
+Its purpose is to make the concept, flow, boundary, dependency direction, state
+transition, or ownership split easy to approve before implementation starts.
+
+For non-development tasks, add a Mermaid diagram only when boundaries, flows or
+architecture are materially easier to evaluate visually.
 
 Skip diagrams for simple documentation tasks unless the subject itself is architectural.
 

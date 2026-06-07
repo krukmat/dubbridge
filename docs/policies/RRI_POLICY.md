@@ -10,10 +10,11 @@
 RRI estimates how much reasoning, context, caution, and verification a task
 requires before an AI agent may safely implement it.
 
-RRI **graduates the evidence and gates required at the always-mandatory HITL
-approval checkpoint** — it does NOT replace or add new approval gates. The
-approval requirement (see `docs/policies/HITL_AUTONOMY_POLICY.md`) is
-unconditional; what changes with the band is what the agent must bring to it.
+RRI **determines the approval gate and evidence required** before an agent may
+implement a task. For bands **RRI 26+**, the HITL approval checkpoint is
+mandatory; what the band controls is what evidence the agent must bring to it.
+For band **RRI 0–25**, the agent uses show-and-proceed — no approval checkpoint
+(see `docs/policies/HITL_AUTONOMY_POLICY.md` for the full rule).
 
 ## Formula
 
@@ -169,13 +170,13 @@ Apply each penalty independently; they are additive.
 
 ## Bands, autonomy gates, and model tiers
 
-The HITL approval requirement is **unconditional** at every band. What the band
-controls is the evidence and gates the agent must satisfy before and after that
-approval.
+The HITL approval requirement applies at every band **except RRI 0–25**, which
+uses show-and-proceed (see below). For all other bands, what the band controls is
+the evidence and gates the agent must satisfy before and after that approval.
 
-| RRI | Label | Gate (on top of mandatory HITL approval) | Tier | Thinking |
+| RRI | Label | Gate | Tier | Thinking |
 |---|---|---|---|---|
-| **0–25** | Low | Implement after approval. High autonomy. | Economy | Off |
+| **0–25** | Low | **Auto-execute:** present the RRI table and a one-line summary of intended actions, then begin implementation immediately — no approval checkpoint, no pause. | Economy | Off |
 | **26–40** | Moderate | Confirm tests exist in the affected area. | Balanced | Off |
 | **41–55** | Med-high | Plan + explicit acceptance criteria required before approval. | Balanced → Premium | On |
 | **56–70** | Complex | Plan first. Do not implement before producing and approving a clear plan. Human reviews the plan. | Premium | On |
@@ -242,5 +243,5 @@ as one step higher when confidence is Low.
 ## Related
 
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` — highest authority; adopts this policy
-- `docs/policies/HITL_AUTONOMY_POLICY.md` — unconditional approval requirement
+- `docs/policies/HITL_AUTONOMY_POLICY.md` — approval requirements and show-and-proceed rule
 - `docs/tasks/rri-integration.md` — integration task ledger

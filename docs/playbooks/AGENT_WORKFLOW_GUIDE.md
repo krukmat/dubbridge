@@ -16,10 +16,10 @@
    inter-task dependencies, acceptance criteria per task, an **Effort** field
    (S/M/L/XL), a short agent handoff prompt, and for each development task a
    small behavioral example set covering both:
-   - at least one **happy path example** — a concrete success flow the task must
-     implement or preserve;
-   - at least one **edge case example** — a concrete boundary, invalid-input, or
-     failure flow the task must handle or reject.
+   - at least one **happy path example** with a stable `HP-#` ID — a concrete
+     success flow the task must implement or preserve;
+   - at least one **edge case example** with a stable `EC-#` ID — a concrete
+     boundary, invalid-input, or failure flow the task must handle or reject.
 4. **Present and wait** — show the plan and tasks and wait for explicit approval
    before starting implementation, even if a plan was approved in a prior session.
 5. **Implement** — one task at a time, in the defined order.
@@ -36,14 +36,22 @@
   edge cases.
 - These examples do not need to be long. One or two bullets per category is
   enough if they are concrete and testable.
+- Every development-task example must have a stable case ID:
+  - happy path examples use `HP-1`, `HP-2`, etc.;
+  - edge case examples use `EC-1`, `EC-2`, etc.
 - Write the examples in behavioral terms, not implementation terms. Prefer
-  statements such as `valid ingest token + owned blob -> artifact finalized` over
-  `call finalize_ingestion()`.
+  statements such as `HP-1: valid ingest token + owned blob -> artifact finalized`
+  over `call finalize_ingestion()`.
 - The pre-task sections `Happy paths considered` and `Edge cases considered`
   should be derived from these task-definition examples, then refined if new
   constraints are discovered during analysis.
 - Skip this requirement for docs-only, config-only, migration-only, or planning
   tasks unless the task's main risk is behavioral correctness.
+- A task ledger can opt into automated enforcement by declaring
+  `Behavioral coverage contract: unit-v1`. For ledgers with that marker, `make
+  qa-docs` rejects completed development tasks whose `HP-#` / `EC-#` cases are not
+  certified with unit test evidence. Legacy completed tasks without the marker are
+  grandfathered until they are migrated into the contract.
 
 ## Per-task discipline
 
@@ -55,6 +63,10 @@
     implement and verify for the task.
   - **Edge cases considered** — the boundary and failure conditions the agent
     expects to handle or verify for the task.
+  - **Diagram** — a compact Mermaid diagram that explains the concept to be
+    implemented: the flow, boundary, dependency direction, state transition, or
+    ownership split that the task relies on. The diagram may be minimal, but it is
+    required for development tasks even when the architecture itself is unchanged.
   These sections are required at task start for development tasks so approval
   covers not just the objective but also the intended behavioral coverage. Skip
   them for docs-only, config, migration-only, or planning tasks unless the user
@@ -87,6 +99,37 @@
   concise explanations of what each reference demonstrates.
   This section is required only for development tasks. Skip it for docs-only,
   config, migration-only, or planning tasks.
+- **Unit coverage certification for development tasks:** before marking a
+  development task `[x] Done`, add a `Unit coverage certification` section that
+  maps every approved `HP-#` and `EC-#` case to at least one unit test reference in
+  the form `` `path/to/file.rs::test_name` ``. The referenced test must replicate
+  the behavior described by that case and the recorded result must be `passed`.
+  `N/A` is not allowed for development-task happy paths or edge cases. If a case
+  cannot be unit-tested, refactor the implementation until it can be unit-tested
+  or revise the task definition before closure.
+- The same completion record must include `Owner final verification` with owner,
+  date, verification statement, and exact commands run. The owner is responsible
+  for certifying that each referenced unit test genuinely covers the claimed
+  behavior; the automated gate verifies the structure and referenced test
+  existence.
+
+Required completion format for development tasks:
+
+```md
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | valid input creates session | `apps/gateway/src/auth/login.rs::valid_login_creates_session` | passed |
+| EC-1 | Edge case | unknown state fails closed | `apps/gateway/src/auth/login.rs::unknown_state_returns_unauthorized` | passed |
+
+### Owner final verification
+
+- Owner: `<name-or-handle>`
+- Date: `YYYY-MM-DD`
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
+- Commands run: `<exact test commands>`
+```
 
 ## ADR change propagation
 
@@ -320,6 +363,9 @@ Presentation rules:
 
 - Always show the computed `Complexity score`, even if the task file already
   declares `Complexity:`.
+- For development tasks, always include a Mermaid diagram in the task presentation.
+  Its purpose is conceptual clarity at approval time, not only architecture-change
+  review; use the smallest diagram that makes the implementation shape obvious.
 - If the task file provides explicit complexity or model guidance, state that it
   is a task-local override when presenting the task.
 - If the presentation uses a resolved model from the current agent environment,

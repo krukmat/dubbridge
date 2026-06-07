@@ -58,7 +58,9 @@ Before execution, present:
    - for development tasks, include `Happy paths considered`
    - for development tasks, include `Edge cases considered`
 14. `Pseudocode`, only if it materially clarifies non-trivial logic
-15. `Diagram`, only if structure, flow or boundaries are easier to understand visually
+15. `Diagram`
+   - required for development tasks
+   - for non-development tasks, include only if structure, flow or boundaries are easier to understand visually
 16. explicit statement that execution has not started yet and is waiting for approval, when approval is required
 
 ## Complexity And Model Guidance
@@ -94,14 +96,17 @@ Do not add pseudocode for trivial file creation, simple edits, or direct command
 
 ## Diagram Rule
 
-Include a diagram only when at least one is true:
+For development tasks, always include a compact Mermaid diagram in the task presentation.
+The goal is conceptual clarity before approval: show the relevant flow, boundary,
+dependency direction, state transition, or ownership split even when the system
+architecture itself is unchanged.
+
+For non-development tasks, include a diagram only when at least one is true:
 
 - the task changes architecture boundaries
 - the task spans multiple services, crates, workers or repositories
 - the task introduces a pipeline, state machine or dependency flow
 - the task is easier to approve when shown as a compact flow
-
-Preferred format is Mermaid.
 
 Do not add diagrams for simple documentation-only tasks unless the document itself is about architecture.
 

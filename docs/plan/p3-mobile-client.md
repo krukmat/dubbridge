@@ -30,10 +30,13 @@ only the gateway's opaque session, exactly as the web client does (ADR-024).
   mobile handoff contract, establishing the gateway session.
 - A typed API client that talks to the **gateway** (never directly to `apps/api`
   with a raw token), honoring the transport-agnostic session contract defined in
-  P1 T0.
+  P1 T0. Product operations such as asset list/detail/status use the gateway
+  `/api/*` proxy; the mobile app has no separate `apps/api` base URL.
 - Secure handling of the device-side session reference: stored in `expo-secure-store`
   (Keychain / Keystore), never in plain `AsyncStorage`; no access/refresh token
-  ever persisted on device.
+  ever persisted on device. If the gateway rotates the opaque session reference,
+  mobile replaces the stored value with the rotated reference returned in
+  `X-Dubbridge-Session`.
 - Core screens for the available product surface: authenticated home, asset list,
   asset detail / ingestion status. Screens degrade gracefully where a backend slice
   (S4–S9) is not yet built.
@@ -50,7 +53,10 @@ only the gateway's opaque session, exactly as the web client does (ADR-024).
 - Native live capture / RTMP/SRT streaming from the device — that is S3b
   (ADR-019/020/022) backend work, not this client slice.
 - Push notifications, offline sync, and app-store release/CI signing pipelines —
-  follow-up mobile hardening backlog once the core client is proven.
+  follow-up mobile hardening backlog once the core client is proven. The
+  **Maestro screenshot / visual-audit suite** is part of that backlog and is planned
+  separately as sub-slice **P3-V** (`docs/plan/p3-maestro-screenshot-suite.md`,
+  `docs/tasks/p3-maestro-screenshot-suite.md`), gated on **T4**.
 - Any change to the `apps/api` trust boundary (ADR-023) or to the gateway contract
   (owned by P1).
 
@@ -60,7 +66,9 @@ only the gateway's opaque session, exactly as the web client does (ADR-024).
   `GET /auth/login?return_uri`, mobile callback handoff code, `POST
   /auth/mobile/session`, `X-Dubbridge-Session` transport on `/api/*`, mobile
   refresh rotation signaling, and header-based logout parity. This previously
-  blocked dependency is now satisfied.
+  blocked dependency is now satisfied. Session renewal and rotation policy remain
+  gateway-owned: mobile only sends the current opaque reference and persists a
+  rotated replacement when the gateway returns one.
 - **P2 (production identity hardening)** is strongly recommended before real device
   login at scale (JWKS rotation), though P3 can develop against the same
   authorization server P1 uses.
@@ -115,6 +123,15 @@ opaque session reference (in `expo-secure-store` / Keychain / Keystore). Access 
 refresh tokens never live on the device. This is the mobile application of ADR-024
 and the reason P1 is a hard prerequisite.
 
+### Gateway-owned session renewal
+Mobile does not implement token refresh or decide whether a first-party session may
+be extended. Every authenticated product request carries the current opaque session
+reference to the gateway. The gateway validates the session, renews idle state when
+allowed, refreshes backend credentials when needed, and may rotate the opaque
+reference. T2 must expose rotated `X-Dubbridge-Session` values to auth/session state;
+T3 must persist the replacement in `expo-secure-store`. A `401` from the gateway
+means the session is no longer renewable and the app must re-authenticate.
+
 ### System-browser OAuth, not embedded webview
 Login uses the device system browser (`expo-web-browser` / `expo-auth-session`) for
 the OAuth redirect, which is the current security best practice (avoids credential
@@ -137,11 +154,14 @@ mobile (Expo RN/TS)
   -> expo-secure-store                     (session reference at rest)
   -> P1 gateway (/auth/* + /api/* proxy)   (the only backend the device talks to)
 
-device --(opaque session)--> apps/gateway (P1) --(Bearer JWT)--> apps/api (ADR-023)
+device --(opaque session)--> apps/gateway (P1)
+apps/gateway --(optional rotated opaque session)--> device
+apps/gateway --(Bearer JWT/internal credential)--> apps/api (ADR-023)
 ```
 
 The device never opens a direct authenticated channel to `apps/api`; all
-authenticated traffic flows through the P1 gateway.
+authenticated traffic flows through the P1 gateway. Session renewal/rotation is
+also a gateway responsibility; mobile only stores the current opaque reference.
 
 ## Architecture Diagram
 
@@ -162,8 +182,11 @@ flowchart LR
     Br <-- OAuth code --> AS
     Br -- callback --> GW
     GW -- creates session --> App
-    App -- /api/* via gateway --> GW
+    App -- "/api/* + X-Dubbridge-Session" --> GW
+    GW -- "renew/rotate session if allowed" --> GW
+    GW <-- "refresh backend token if needed" --> AS
     GW -- Bearer JWT --> API
+    GW -- "optional rotated X-Dubbridge-Session" --> App
 ```
 
 ## Proposed execution order
@@ -175,6 +198,12 @@ P3 T0 (gate) confirm P1 T7 mobile handoff contract is available + stable
   -> P3 T3 auth flow (system-browser OAuth via gateway) + secure session storage
   -> P3 T4 core screens (Login, Home, AssetList, AssetDetail) against the gateway
   -> P3 T5 tests (unit + component + auth-flow vs. stubbed gateway) + docs/roadmap sync
+
+[after P3 T4] -> P3-V Maestro screenshot / visual-audit suite (mobile hardening backlog)
+                 docs/plan/p3-maestro-screenshot-suite.md
+                 docs/tasks/p3-maestro-screenshot-suite.md
+                 Approved: Option A (ADR-024-clean handoff-code) + S2 (defer until after T4)
+                 Task namespace: V1–V8 (distinct from P3's T0–T5; V4 ≠ T4)
 ```
 
 ## Lines Affected After Implementation

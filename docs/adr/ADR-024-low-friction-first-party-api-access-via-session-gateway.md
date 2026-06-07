@@ -46,9 +46,10 @@ posture of the API itself.
   - appropriate `SameSite`
 - The session gateway is responsible for:
   - token exchange / refresh with the external authorization server
+  - first-party session validation, renewal, rotation, and expiry
   - storing tokens away from browser JavaScript
-  - calling the protected DubBridge API or translating the session into internal
-    API credentials
+  - authenticated proxying of first-party `/api/*` calls to the protected
+    DubBridge API or translating the session into internal API credentials
 - The browser/client must **not** be the canonical holder of long-lived access or
   refresh tokens for first-party UX. Avoid storing such tokens in `localStorage`
   or similar script-accessible storage.
@@ -105,6 +106,24 @@ first-party consumers — the web app and slice **P3** (mobile, React Native + E
   refreshed transparently against the authorization server while the session itself
   remains valid.
 
+### Session renewal and rotation ownership
+- The gateway is the sole owner of first-party session renewal policy. First-party
+  clients do not decide whether a session may be extended, do not refresh access or
+  refresh tokens, and do not implement their own session-renewal timers beyond
+  reacting to gateway responses.
+- On authenticated first-party `/api/*` requests, the gateway validates the opaque
+  session reference, updates idle-use state when the session is still renewable,
+  refreshes backend access tokens when needed, and may rotate the opaque session
+  reference. Once the idle timeout or absolute lifetime is reached, renewal is
+  forbidden and the gateway returns unauthenticated.
+- When a mobile session reference is rotated, the gateway returns the replacement
+  opaque reference in `X-Dubbridge-Session`. The mobile client must replace the
+  stored secure-store value with that header value. The old reference must be
+  treated as stale.
+- Browser clients receive equivalent session rotation through the hardened session
+  cookie transport. In both transports, token refresh and session renewal remain
+  gateway-owned behavior.
+
 ### Transport-agnostic session seam (mobile / P3)
 - A **native mobile client does not share the browser cookie jar**, so the canonical
   session abstraction is an **opaque session id**, of which the hardened cookie is
@@ -115,6 +134,10 @@ first-party consumers — the web app and slice **P3** (mobile, React Native + E
 - This means web and mobile are two transports of one session contract terminating
   in the **same** gateway trust boundary. P3 must not introduce a parallel auth path
   or hold long-lived tokens on the device.
+- Mobile product operations also use this same gateway trust boundary: authenticated
+  mobile calls go to the gateway `/api/*` proxy, never directly to `apps/api`. The
+  mobile client owns only transport of the current opaque session reference and
+  persistence of a rotated replacement when the gateway returns one.
 
 ## Consequences
 
