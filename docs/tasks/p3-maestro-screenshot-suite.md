@@ -28,6 +28,56 @@
 > (never bare `T4`) when referring to the gate, and `V4a/V4b` for the seed. The gate
 > below is the **existing** P3 `T4` (Core screens), not a task defined here.
 
+## ⚠ TODO — Sub-slice suspended (2026-06-08, out of scope after team migration)
+
+> **This entire sub-slice (V3–V8) is suspended and out of scope.**
+> The team migrated to a shared team plan after V4b/V5 were completed.
+> V6 was the last executed task and ended in a **partial pass** (Phase 1 only).
+> Do not pick up any task here without explicit re-scoping approval from the team.
+
+### Where we stopped
+
+| Task | State | Blocker |
+|---|---|---|
+| V1–V2b, V4a–V4b, V5 | ✅ Done | — |
+| **V6 Phase 1** | ✅ Done | `auth-surface.yaml` executes; `01_auth_login.png` captured |
+| **V6 Phase 2** | ❌ Blocked | `authenticated-audit.yaml` fails on `id: home-screen` |
+| V3, V7a, V7b, V8 | ⏸ Not started | Suspended; blocked on V6 Phase 2 |
+
+### Open issues (unresolved at suspension)
+
+1. **Home screen not reached after deep-link bootstrap.**
+   After `openLink ${SEED_BOOTSTRAP_DEEPLINK}` (or equivalent manual
+   `adb shell am start -a android.intent.action.VIEW -d "dubbridge://auth/callback?handoff_code=..."`),
+   the app stays on `login-screen`. The Linking listener in `AuthProvider.tsx` (V5)
+   does not visibly process the incoming deep link under the current emulator setup.
+   Evidence: `/tmp/v6-manual-openlink.png`; Maestro assertion failure logged in
+   `mobile/maestro/authenticated-audit.yaml` run on 2026-06-08.
+
+2. **Chrome-free migration (V5 workaround) did not unblock Phase 2 on emulator.**
+   V5 was implemented to bypass `openAuthSessionAsync` + Chrome. However, the actual
+   emulator run showed that even with `EXPO_PUBLIC_E2E_ENABLED=true` and the Linking
+   listener in place, the app remained on `login-screen` after the deep-link was fired.
+   Root cause is unresolved — candidates: Metro transport instability
+   (`Cannot connect to Expo CLI ... URL: 10.0.2.2:8081` warnings visible in logcat),
+   or the Linking handler not firing in time before the app re-renders to the
+   unauthenticated state. No Chrome dependency has been confirmed or ruled out.
+
+### Next step if resumed
+
+- Diagnose whether the `Linking` event fires inside the app when the deep link is
+  delivered from `adb am start`. Add a temporary `console.log` in the V5 listener
+  and capture logcat output to confirm or rule out listener execution.
+- If the listener fires but the session redemption fails, check the `session_ref`
+  storage path and the `AuthProvider` state machine transition.
+- If the listener does not fire, investigate whether Metro transport instability
+  prevents JS from executing deep-link events on the emulator (V3 port deconfliction
+  may be a prerequisite — V3 is **not started**).
+- If resumed as a team, re-scope from V3 (port deconfliction) as the entry point,
+  since V3 is the unblocked prerequisite for a stable Metro runtime during Maestro runs.
+
+---
+
 ## Status legend
 - [ ] Not started · [~] In progress · [x] Done
 
