@@ -3,9 +3,11 @@ import {
   type ReactNode,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { makeRedirectUri } from "expo-auth-session";
+import { useLinkingURL } from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 
 import { createGatewayClient } from "../api/client";
@@ -66,12 +68,47 @@ function getGatewayClient() {
   };
 }
 
+function isE2EBootstrapEnabled(): boolean {
+  return __DEV__ && process.env.EXPO_PUBLIC_E2E_ENABLED === "true";
+}
+
+function getHandoffCodeFromCallbackUrl(url: string): string | null {
+  try {
+    const parsedUrl = new URL(url);
+
+    if (parsedUrl.protocol !== "dubbridge:") {
+      return null;
+    }
+
+    const normalizedPath = parsedUrl.pathname.replace(/^\/+/, "");
+    const route =
+      parsedUrl.host.length > 0
+        ? `${parsedUrl.host}/${normalizedPath}`
+        : normalizedPath;
+
+    if (route !== "auth/callback") {
+      return null;
+    }
+
+    const handoffCode = parsedUrl.searchParams.get("handoff_code")?.trim();
+
+    return handoffCode ? handoffCode : null;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({
   children,
 }: AuthProviderProps): ReactNode {
   const [sessionRef, setSessionRef] = useState<string | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [loginError, setLoginError] = useState<string | null>(null);
+  const bootstrapUrl = useLinkingURL();
+  const statusRef = useRef<AuthStatus>("loading");
+  const lastHandledBootstrapUrlRef = useRef<string | null>(null);
+  const lastRedeemedHandoffCodeRef = useRef<string | null>(null);
+  const pendingBootstrapUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -115,6 +152,118 @@ export function AuthProvider({
     };
   }, []);
 
+  async function redeemHandoffCode(
+    handoffCode: string,
+    gateway = getGatewayClient(),
+  ): Promise<void> {
+    if (lastRedeemedHandoffCodeRef.current === handoffCode) {
+      return;
+    }
+
+    lastRedeemedHandoffCodeRef.current = handoffCode;
+    setLoginError(null);
+
+    if (gateway === null) {
+      setStatus("unauthed");
+      setSessionRef(null);
+      setLoginError("missing_runtime_config");
+      return;
+    }
+
+    const redeemResult = await gateway.client.post<{ session_ref: string }>(
+      "/auth/mobile/session",
+      null,
+      { handoff_code: handoffCode },
+    );
+
+    if (!redeemResult.ok) {
+      setStatus("unauthed");
+      setSessionRef(null);
+      setLoginError(
+        redeemResult.error.kind === "session_expired"
+          ? "session_expired"
+          : "login_failed",
+      );
+      return;
+    }
+
+    const nextSessionRef = redeemResult.value.data.session_ref;
+
+    if (!nextSessionRef || isJwtLike(nextSessionRef)) {
+      setStatus("unauthed");
+      setSessionRef(null);
+      setLoginError("invalid_session_ref");
+      return;
+    }
+
+    await saveSessionRef(nextSessionRef);
+    setSessionRef(nextSessionRef);
+    setStatus("authed");
+    setLoginError(null);
+  }
+
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+
+  async function redeemPendingBootstrapUrl(): Promise<void> {
+    if (!isE2EBootstrapEnabled() || statusRef.current !== "unauthed") {
+      return;
+    }
+
+    const pendingUrl = pendingBootstrapUrlRef.current;
+
+    if (!pendingUrl || lastHandledBootstrapUrlRef.current === pendingUrl) {
+      return;
+    }
+
+    const handoffCode = getHandoffCodeFromCallbackUrl(pendingUrl);
+
+    pendingBootstrapUrlRef.current = null;
+
+    if (!handoffCode) {
+      return;
+    }
+
+    lastHandledBootstrapUrlRef.current = pendingUrl;
+    await redeemHandoffCode(handoffCode);
+  }
+
+  async function queueBootstrapUrl(url: string | null): Promise<void> {
+    if (!url || statusRef.current === "authed") {
+      return;
+    }
+
+    const handoffCode = getHandoffCodeFromCallbackUrl(url);
+
+    if (
+      !handoffCode ||
+      lastHandledBootstrapUrlRef.current === url ||
+      pendingBootstrapUrlRef.current === url
+    ) {
+      return;
+    }
+
+    pendingBootstrapUrlRef.current = url;
+    await redeemPendingBootstrapUrl();
+  }
+
+  useEffect(() => {
+    if (!isE2EBootstrapEnabled()) {
+      return;
+    }
+
+    void queueBootstrapUrl(bootstrapUrl);
+  }, [bootstrapUrl]);
+
+  useEffect(() => {
+    if (!isE2EBootstrapEnabled() || status !== "unauthed") {
+      return;
+    }
+
+    void redeemPendingBootstrapUrl();
+  }, [status]);
+
   async function logout(): Promise<void> {
     const previousSessionRef = sessionRef;
 
@@ -138,8 +287,6 @@ export function AuthProvider({
   }
 
   async function login(): Promise<void> {
-    setLoginError(null);
-
     const gateway = getGatewayClient();
 
     if (gateway === null) {
@@ -174,36 +321,7 @@ export function AuthProvider({
       return;
     }
 
-    const redeemResult = await gateway.client.post<{ session_ref: string }>(
-      "/auth/mobile/session",
-      null,
-      { handoff_code: handoffCode },
-    );
-
-    if (!redeemResult.ok) {
-      setStatus("unauthed");
-      setSessionRef(null);
-      setLoginError(
-        redeemResult.error.kind === "session_expired"
-          ? "session_expired"
-          : "login_failed",
-      );
-      return;
-    }
-
-    const nextSessionRef = redeemResult.value.data.session_ref;
-
-    if (!nextSessionRef || isJwtLike(nextSessionRef)) {
-      setStatus("unauthed");
-      setSessionRef(null);
-      setLoginError("invalid_session_ref");
-      return;
-    }
-
-    await saveSessionRef(nextSessionRef);
-    setSessionRef(nextSessionRef);
-    setStatus("authed");
-    setLoginError(null);
+    await redeemHandoffCode(handoffCode, gateway);
   }
 
   async function onSessionRotation(rotation: string | null): Promise<void> {

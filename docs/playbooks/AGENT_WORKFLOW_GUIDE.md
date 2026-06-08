@@ -245,10 +245,30 @@ scoring and model selection, so the adoption is binding from this file alone.
   are unchanged; only the input that selects the tier changes.
 - Step 3 is updated to include the RRI score in the task presentation.
 
-When presenting any task: compute the full RRI using `docs/policies/RRI_POLICY.md`,
-present the variable table (score + evidence + confidence), state the band, apply
-the band's autonomy gates, and resolve the model tier. For objective variables (`F`,
-`T`, and `C`) measure — do not estimate.
+When presenting any task: **run `scripts/rri.py`** — do not compute the RRI by hand.
+The script measures F automatically and maps raw CC to the C score via the policy
+table. Paste its markdown output directly into the task presentation.
+
+```bash
+# Task-presentation time (before code is written — diff is empty):
+python3 scripts/rri.py \
+  --touches <path1> --touches <path2> \
+  --cc <raw-cyclomatic-complexity> \
+  --D <0-5> --K <0-5> --P <0-5> \
+  --T <0-5> --A <0-5> --X <0-5> \
+  [--penalty refactor_and_behavior] [--penalty arch_decision] [--penalty no_verification]
+
+# Post-implementation (diff available; omit --touches):
+python3 scripts/rri.py --cc <raw> --D <0-5> --K <0-5> --P <0-5> \
+  --T <0-5> --A <0-5> --X <0-5>
+```
+
+Measure C and T before invoking: use `radon`/`mccabe` (Python) or
+`clippy::cognitive_complexity` (Rust) for C; use `cargo llvm-cov` for T.
+The script applies D/P/K floors from the anchor rubric and auto-detects four
+penalties — agent supplies only the three intent-based ones. See
+`docs/policies/RRI_POLICY.md § Script automation` for the full agent-vs-script
+split and `--json` output for tooling use.
 
 ### Step 1 — Compute complexity
 
@@ -423,6 +443,15 @@ A handoff prompt must contain only:
 
 - User-facing communication: Spanish.
 - Plans, task documents, prompts, ADRs, and code/comments: precise technical English.
+
+## Communication format
+
+Agent communication must follow a **Socratic doubt model**:
+
+- **Do not consent by default.** Do not affirm, validate, or agree with a user statement unless you have verified it independently. A question is not a position; treat it as a question.
+- **Doubt with trusted sources.** Every claim about the codebase, a policy rule, a score, or a fact must be grounded in a source you can cite (a file, a line, a tool output). If you cannot cite a source, say so explicitly rather than asserting.
+- **No hallucination.** Do not infer positions from tone or phrasing. Do not attribute intent, agreement, or correctness to a message that does not state them. If a message is ambiguous, ask — do not deduce.
+- **Challenge your own output.** Before reporting a result, ask whether it could be wrong and whether the source you used is current. The RRI self-scoring error in T1 (estimated ~16/28 by hand; script returned 27) is the canonical example of why this matters.
 
 ## Related
 

@@ -238,8 +238,73 @@ Then state:
 Low-confidence scores on D, P, or K are themselves a signal: treat the variable
 as one step higher when confidence is Low.
 
+## Script automation
+
+**Agents must run `python3 scripts/rri.py` instead of computing the formula,
+floors, or penalties manually.** The script is the canonical RRI calculator.
+
+### What the script decides vs. what the agent supplies
+
+| Decided by `scripts/rri.py` (objective / derivable) | Supplied by the agent (irreducible judgment) |
+|---|---|
+| F score — counts `--touches` paths or `git diff`, maps to 0–5 | **C** — agent measures raw CC (radon/mccabe/clippy), passes as `--cc <raw>` |
+| C score — maps raw CC to 0–5 via the policy CC table | **T** — agent measures via `cargo llvm-cov`, passes as `--T` |
+| D / P / K floors — derived from the anchor rubric; raises agent input, never lowers | **A** — task ambiguity (has acceptance criteria + examples?) |
+| `many_files`, `complex_and_domain`, `no_tests_high_impact`, `auth_security` penalties | **X** — context size required |
+| Band, Effort (S/M/L/XL), tiers (Economy/Balanced/Premium), thinking, gate | **D / P / K above the floor** + 3 intent penalties: `refactor_and_behavior`, `arch_decision`, `no_verification` |
+| Decomposition-trigger detection | — |
+
+### Invocation
+
+**At task-presentation time** (before any code is written; diff is empty):
+
+```bash
+python3 scripts/rri.py \
+  --touches <path1> --touches <path2> \
+  --cc <raw-cyclomatic>  \
+  --D <0-5> --K <0-5> --P <0-5> \
+  --T <0-5> --A <0-5> --X <0-5> \
+  [--penalty refactor_and_behavior] \
+  [--penalty arch_decision] \
+  [--penalty no_verification]
+```
+
+`--touches` feeds both the F file count and the anchor-rubric floor derivation.
+Repeat it once per affected path. The script raises D/P/K to their rubric floors
+automatically and reports any raise in the evidence column.
+
+**Post-implementation** (diff is available; omit `--touches`):
+
+```bash
+python3 scripts/rri.py --cc <raw> --D <0-5> --K <0-5> --P <0-5> \
+  --T <0-5> --A <0-5> --X <0-5>
+# F measured automatically from git diff --name-only <base>...HEAD
+```
+
+Use `--F <0-5>` only when git is unavailable (e.g., sandbox agent with no repo).
+Use `--C <0-5>` only when the raw CC value is unavailable (pre-computed score).
+
+**JSON output** (for tooling or CI):
+
+```bash
+python3 scripts/rri.py ... --json
+```
+
+### Measuring C (raw cyclomatic complexity)
+
+- **Python:** `python3 -m mccabe --min 1 <file>` or `radon cc -s <file>`
+- **Rust:** `cargo clippy -- -W clippy::cognitive_complexity` or count branch points manually with the CC formula in this policy.
+- Take the highest CC value across all functions that will be created or materially changed.
+
+### Copy the output into the task presentation
+
+Run the script, then paste its markdown output directly into the task presentation
+block. Do not reformat or recompute. The script output **is** the RRI report.
+
 ## Related
 
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` — highest authority; adopts this policy
 - `docs/policies/HITL_AUTONOMY_POLICY.md` — approval requirements and show-and-proceed rule
 - `docs/tasks/rri-integration.md` — integration task ledger
+- `scripts/rri.py` — canonical calculator
+- `scripts/rri_test.py` — unit tests (29 vectors; run via `make qa-rri`)

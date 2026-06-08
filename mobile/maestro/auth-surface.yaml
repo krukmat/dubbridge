@@ -1,0 +1,30 @@
+appId: com.dubbridge.mobile
+name: Auth Surface
+tags:
+  - android
+  - p3-v
+  - auth-surface
+---
+- launchApp:
+    clearState: true
+
+- repeat:
+    times: 20
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+      - waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible:
+      id: login-screen
+    timeout: 20000
+
+- assertVisible:
+    id: login-screen
+
+- takeScreenshot: 01_auth_login

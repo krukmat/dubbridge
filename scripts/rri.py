@@ -1,0 +1,419 @@
+#!/usr/bin/env python3
+# RRI calculator — deterministic Required Reasoning Index engine. [rri-calculator-script T1]
+# Source of truth: docs/policies/RRI_POLICY.md. The agent measures raw inputs
+# (paths, raw CC, coverage); this script owns every numeric->score mapping and the
+# entire formula, anchor-rubric, penalty, band, and decomposition logic.
+"""Compute the Required Reasoning Index (RRI) for a DubBridge task.
+
+Usage (task-presentation time, no diff yet):
+  python3 scripts/rri.py --touches crates/auth/src/lib.rs \\
+      --cc 18 --T 3 --A 0 --X 2 --D 1 --K 1 --P 1
+
+Usage (post-implementation, measured from the working branch):
+  python3 scripts/rri.py --cc 12 --T 2 --A 0 --X 2 --D 2 --K 2 --P 2
+"""
+import argparse
+import json
+import subprocess
+import sys
+from fnmatch import fnmatchcase
+
+# --- Formula weights (sum = 1.00; verified in RRI_POLICY.md) ---------------------
+WEIGHTS = {"C": 0.18, "F": 0.12, "D": 0.15, "T": 0.15,
+           "A": 0.12, "K": 0.12, "P": 0.10, "X": 0.06}
+
+VARS = list(WEIGHTS.keys())
+
+# --- Per-variable numeric->score tables -----------------------------------------
+# C: raw cyclomatic complexity -> score (RRI_POLICY.md "C" band table).
+CC_TABLE = [(5, 0), (10, 1), (20, 2), (30, 3), (50, 4)]  # else 5
+
+# F: file count -> score (RRI_POLICY.md "F" band table).
+F_TABLE = [(1, 0), (2, 1), (5, 2), (10, 3), (20, 4)]  # else 5
+
+
+def cc_to_score(cc):
+    """Map a raw cyclomatic-complexity value to its 0-5 RRI C score."""
+    for upper, score in CC_TABLE:
+        if cc <= upper:
+            return score
+    return 5
+
+
+def count_to_f(n):
+    """Map an affected-file count to its 0-5 RRI F score."""
+    for upper, score in F_TABLE:
+        if n <= upper:
+            return score
+    return 5
+
+
+# --- Anchor rubric: path glob -> (D, P, K) floor + ADR -------------------------
+# Ordered most-specific-first; the first matching row wins. fnmatchcase '*' spans
+# '/', so a single '*' covers a subtree. RRI_POLICY.md "DubBridge anchor rubric".
+RUBRIC = [
+    ("crates/domain/src/rights*", 4, 5, 4, "ADR-008, ADR-018", "crates/domain rights-ledger"),
+    ("crates/audit/*", 4, 5, 4, "ADR-008, ADR-018", "crates/audit"),
+    ("infra/migrations/*", 4, 5, 4, "ADR-008, ADR-018", "infra/migrations"),
+    ("apps/gateway/src/auth/*", 4, 4, 4, "ADR-024", "apps/gateway/src/auth"),
+    ("crates/auth/*", 4, 4, 4, "ADR-023", "crates/auth"),
+    ("crates/db/*", 3, 3, 3, "ADR-006, ADR-018", "crates/db"),
+    ("crates/storage/*", 3, 3, 3, "ADR-006, ADR-018", "crates/storage"),
+    ("crates/jobs/*", 3, 3, 3, "ADR-006, ADR-018", "crates/jobs"),
+    ("crates/connectors/*", 3, 3, 3, "ADR-006, ADR-018", "crates/connectors"),
+    ("crates/ingestion/*", 3, 3, 3, "ADR-006, ADR-018", "crates/ingestion"),
+    ("crates/observability/*", 3, 3, 3, "ADR-006, ADR-018", "crates/observability"),
+    ("crates/qc/*", 2, 2, 2, "—", "crates/qc"),
+    ("crates/media/*", 2, 2, 2, "—", "crates/media"),
+    ("crates/providers/*", 2, 2, 2, "—", "crates/providers"),
+    ("crates/domain/*", 2, 2, 2, "—", "crates/domain"),
+    ("config/README.md", 1, 1, 1, "ADR-026", "config/README.md"),
+    ("docs/*", 0, 0, 0, "—", "docs"),
+    ("config/*.toml", 0, 0, 0, "—", "config (non-secret)"),
+]
+
+
+def first_matching_row(path):
+    """Return the most-specific rubric row matching path, or None."""
+    for row in RUBRIC:
+        if fnmatchcase(path, row[0]):
+            return row
+    return None
+
+
+def match_rubric(paths):
+    """Derive D/P/K floors from the paths a task touches.
+
+    Returns (floors, rows, advisories, matched_auth) where floors maps each of
+    D/P/K to its highest floor across all paths, rows records which rubric label
+    set each floor, advisories holds content-dependent notes, and matched_auth is
+    True when any touched path carries a P floor >= 4 (auth/authz/ownership/data).
+    """
+    floors = {"D": 0, "P": 0, "K": 0}
+    rows = {"D": None, "P": None, "K": None}
+    advisories = []
+    for path in paths:
+        row = first_matching_row(path)
+        if row is None:
+            advisories.append(
+                f"{path}: no anchor-rubric match — agent judgment governs D/P/K")
+            continue
+        _, d, p, k, adr, label = row
+        for dim, val in (("D", d), ("P", p), ("K", k)):
+            if val > floors[dim]:
+                floors[dim] = val
+                rows[dim] = (label, adr)
+        if fnmatchcase(path, "config/*.toml"):
+            advisories.append(
+                f"{path}: config floor is 0 (non-secret); if it wires env/secrets, "
+                f"raise D/P/K to >= 1 (ADR-026)")
+    matched_auth = floors["P"] >= 4
+    return floors, rows, advisories, matched_auth
+
+
+# --- Penalties (RRI_POLICY.md "Penalties") --------------------------------------
+PENALTY_VALUES = {
+    "refactor_and_behavior": 8,
+    "no_tests_high_impact": 10,
+    "complex_and_domain": 10,
+    "auth_security": 10,
+    "many_files": 8,
+    "arch_decision": 12,
+    "no_verification": 15,
+}
+# Penalties an agent may pass via --penalty. The other three are auto-detected.
+MANUAL_PENALTIES = {"refactor_and_behavior", "arch_decision",
+                    "no_verification", "auth_security"}
+
+
+def detect_penalties(scores, matched_auth, manual):
+    """Return {name: (value, reason)} merging auto-detected and manual penalties.
+
+    Each penalty is applied at most once; an auto reason wins over a manual one.
+    """
+    applied = {}
+    if scores["F"] >= 4:
+        applied["many_files"] = (8, f"F={scores['F']} >= 4")
+    if scores["C"] >= 4 and scores["D"] >= 3:
+        applied["complex_and_domain"] = (
+            10, f"C={scores['C']} >= 4 and D={scores['D']} >= 3")
+    if scores["T"] >= 4 and scores["P"] >= 4:
+        applied["no_tests_high_impact"] = (
+            10, f"T={scores['T']} >= 4 and P={scores['P']} >= 4")
+    if matched_auth:
+        applied["auth_security"] = (10, "anchor-rubric P floor >= 4 (auth/audit/rights/secrets)")
+    for name in manual:
+        if name not in applied:
+            applied[name] = (PENALTY_VALUES[name], "manual flag")
+    return applied
+
+
+# --- Bands crosswalk (RRI_POLICY.md "Bands, autonomy gates, and model tiers") ---
+# (upper_inclusive, label, effort, codex, claude, thinking, gate)
+BANDS = [
+    (25, "Low", "S", "Economy", "Economy", "Off",
+     "Auto-execute: present the RRI table + one-line summary, then implement immediately."),
+    (40, "Moderate", "M", "Balanced", "Balanced", "Off",
+     "Confirm tests exist in the affected area."),
+    (55, "Med-high", "L", "Balanced -> Premium", "Balanced -> Premium", "On",
+     "Plan + explicit acceptance criteria required before approval."),
+    (70, "Complex", "L", "Premium", "Premium", "On",
+     "Plan first. Human reviews the plan before any implementation."),
+    (85, "High", "XL", "Premium", "Premium", "On",
+     "Characterization tests + explicit acceptance criteria + human reviews the diff."),
+    (100, "Very high", "XL", "Premium", "Premium", "On",
+     "Do not implement directly. Produce an ADR + risk analysis + decompose into subtasks."),
+    (float("inf"), "Excessive", "XL", "Premium", "Premium", "On",
+     "Architecture/design work must happen first. Re-scope before any implementation."),
+]
+
+
+def resolve_band(rri):
+    """Return the crosswalk row (as a dict) for a final RRI value."""
+    for upper, label, effort, codex, claude, thinking, gate in BANDS:
+        if rri <= upper:
+            lower = {"Low": 0, "Moderate": 26, "Med-high": 41, "Complex": 56,
+                     "High": 71, "Very high": 86, "Excessive": 101}[label]
+            rng = f"{lower}-{upper}" if upper != float("inf") else ">100"
+            return {"range": rng, "label": label, "effort": effort,
+                    "codex": codex, "claude": claude, "thinking": thinking,
+                    "gate": gate}
+    raise AssertionError("unreachable: bands cover all values")
+
+
+def detect_triggers(rri, base, scores, applied):
+    """Return the list of decomposition triggers that fired (RRI_POLICY.md)."""
+    triggers = []
+    if rri > 70:
+        triggers.append("RRI > 70")
+    if base > 100:
+        triggers.append("base RRI > 100")
+    if scores["F"] >= 4 and scores["K"] >= 3:
+        triggers.append("F >= 4 and K >= 3")
+    if scores["C"] >= 4 and scores["D"] >= 3:
+        triggers.append("C >= 4 and D >= 3")
+    if "refactor_and_behavior" in applied:
+        triggers.append("refactor + behavior (+8) active")
+    if scores["T"] >= 4 and scores["P"] >= 4:
+        triggers.append("T >= 4 and P >= 4")
+    return triggers
+
+
+# --- Core evaluation ------------------------------------------------------------
+def git_diff_paths(base):
+    """Return the files changed vs base, or raise RuntimeError if git is unavailable."""
+    try:
+        out = subprocess.run(
+            ["git", "diff", "--name-only", f"{base}...HEAD"],
+            capture_output=True, text=True, check=True)
+    except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+        raise RuntimeError(
+            "git diff unavailable; pass --touches <path>... or --F <0-5>") from exc
+    return [line for line in out.stdout.splitlines() if line.strip()]
+
+
+def evaluate(*, cc=None, c_score=None, touches=None, f_override=None, base="main",
+             d=0, k=0, p=0, t=0, a=0, x=0, manual_penalties=None, low_conf=None,
+             git=git_diff_paths):
+    """Compute a full RRI result dict from resolved inputs.
+
+    Exactly one of cc / c_score must be set. F comes from touches, else f_override,
+    else git. D/K/P are raised to their anchor-rubric floors; low-confidence vars are
+    bumped +1 (capped at 5). Returns a dict ready for rendering.
+    """
+    manual_penalties = set(manual_penalties or [])
+    low_conf = list(low_conf or [])
+
+    # C: raw CC mapped via the policy table, else the pre-computed score.
+    if cc is not None:
+        c = cc_to_score(cc)
+        c_ev = f"raw CC {cc} -> score {c} (policy CC table)"
+    else:
+        c = c_score
+        c_ev = "agent-supplied score"
+
+    # F + the path set used for the anchor rubric.
+    if touches:
+        paths = list(touches)
+        f = count_to_f(len(paths))
+        f_ev = f"--touches -> {len(paths)} files"
+    elif f_override is not None:
+        paths = []
+        f = f_override
+        f_ev = f"--F override = {f_override}"
+    else:
+        paths = git(base)
+        f = count_to_f(len(paths))
+        f_ev = f"git diff --name-only {base}...HEAD -> {len(paths)} files"
+
+    floors, rows, advisories, matched_auth = match_rubric(paths)
+
+    # Agent judgments, with D/P/K raised to the rubric floor (never lowered).
+    agent = {"D": d, "K": k, "P": p}
+    scores = {"C": c, "F": f, "T": t, "A": a, "X": x}
+    floor_ev = {}
+    for dim in ("D", "K", "P"):
+        raised = max(agent[dim], floors[dim])
+        scores[dim] = raised
+        if rows[dim] is not None:
+            label, adr = rows[dim]
+            if raised > agent[dim]:
+                floor_ev[dim] = (f"anchor rubric: {label} ({adr}) -> floor {floors[dim]}; "
+                                 f"raised from {agent[dim]}")
+            else:
+                floor_ev[dim] = (f"anchor rubric: {label} ({adr}) -> floor {floors[dim]} "
+                                 f"(agent {agent[dim]} kept)")
+        else:
+            floor_ev[dim] = "agent-supplied (no rubric match)"
+
+    # Confidence + low-confidence +1 bump (mechanical; RRI_POLICY.md).
+    confidence = {v: "High" for v in VARS}
+    for v in low_conf:
+        scores[v] = min(5, scores[v] + 1)
+        confidence[v] = "Low"
+
+    # Base value: weighted sum, normalized by /5, scaled x100, rounded to nearest.
+    weighted = sum(WEIGHTS[v] * scores[v] for v in VARS)
+    base_val = round(100 * weighted / 5)
+
+    applied = detect_penalties(scores, matched_auth, manual_penalties)
+    penalty_total = sum(val for val, _ in applied.values())
+    final = base_val + penalty_total
+
+    band = resolve_band(final)
+    triggers = detect_triggers(final, base_val, scores, applied)
+
+    evidence = {
+        "C": c_ev, "F": f_ev, "T": "agent-supplied", "A": "agent-supplied",
+        "X": "agent-supplied", "D": floor_ev["D"], "K": floor_ev["K"],
+        "P": floor_ev["P"],
+    }
+    return {
+        "scores": scores, "evidence": evidence, "confidence": confidence,
+        "base": base_val, "penalties": applied, "penalty_total": penalty_total,
+        "final": final, "band": band, "triggers": triggers,
+        "advisories": advisories,
+    }
+
+
+# --- Rendering ------------------------------------------------------------------
+VAR_LABELS = {"C": "C cyclomatic", "F": "F files", "D": "D domain",
+              "T": "T coverage", "A": "A ambiguity", "K": "K coupling",
+              "P": "P impact", "X": "X context"}
+TABLE_ORDER = ["C", "F", "D", "T", "A", "K", "P", "X"]
+
+
+def render_markdown(r):
+    """Render the result as the RRI_POLICY.md reporting-format markdown block."""
+    lines = ["| Variable | Score | Evidence | Confidence |", "|---|---|---|---|"]
+    for v in TABLE_ORDER:
+        lines.append(
+            f"| {VAR_LABELS[v]} | {r['scores'][v]} | {r['evidence'][v]} | {r['confidence'][v]} |")
+    lines.append("")
+    if r["penalties"]:
+        pen = "; ".join(f"{name} (+{val}, {reason})"
+                        for name, (val, reason) in sorted(r["penalties"].items()))
+    else:
+        pen = "none"
+    b = r["band"]
+    lines.append(f"**Base value:** 100 x (weighted / 5) = {r['base']}")
+    lines.append(f"**Penalties applied:** {pen}")
+    lines.append(
+        f"**Final RRI:** {r['final']} -> band {b['label']} ({b['range']}) -> "
+        f"Effort {b['effort']} . Codex {b['codex']} . Claude {b['claude']} . "
+        f"thinking {b['thinking']}")
+    lines.append(f"**Gates for this band:** {b['gate']}")
+    if r["triggers"]:
+        lines.append(f"**Decomposition:** triggered by {', '.join(r['triggers'])} "
+                     f"— split before implementing")
+    else:
+        lines.append("**Decomposition:** not triggered")
+    for note in r["advisories"]:
+        lines.append(f"**Advisory:** {note}")
+    return "\n".join(lines)
+
+
+def render_json(r):
+    """Render the result as a machine-parseable JSON object."""
+    return json.dumps({
+        "variables": {v: {"score": r["scores"][v], "evidence": r["evidence"][v],
+                          "confidence": r["confidence"][v]} for v in TABLE_ORDER},
+        "base": r["base"],
+        "penalties": [{"name": n, "value": v, "reason": why}
+                      for n, (v, why) in sorted(r["penalties"].items())],
+        "penalty_total": r["penalty_total"],
+        "final": r["final"],
+        "band": r["band"],
+        "triggers": r["triggers"],
+        "advisories": r["advisories"],
+    }, indent=2)
+
+
+# --- CLI ------------------------------------------------------------------------
+def _score_arg(name):
+    def parse(raw):
+        try:
+            val = int(raw)
+        except ValueError:
+            raise argparse.ArgumentTypeError(f"{name} must be an integer 0-5, got {raw!r}")
+        if not 0 <= val <= 5:
+            raise argparse.ArgumentTypeError(f"{name} must be in range 0-5, got {val}")
+        return val
+    return parse
+
+
+def build_parser():
+    p = argparse.ArgumentParser(
+        prog="rri.py",
+        description="Deterministic RRI calculator (docs/policies/RRI_POLICY.md).")
+    cgroup = p.add_mutually_exclusive_group(required=True)
+    cgroup.add_argument("--cc", type=int, metavar="RAW",
+                        help="Raw cyclomatic complexity (radon/mccabe/clippy) -> mapped to C score")
+    cgroup.add_argument("--C", dest="c_score", type=_score_arg("--C"), metavar="0-5",
+                        help="Pre-computed C score (use when raw CC is unavailable)")
+    for name in ("T", "A", "X"):
+        p.add_argument(f"--{name}", required=True, type=_score_arg(f"--{name}"),
+                       metavar="0-5")
+    for name in ("D", "K", "P"):
+        p.add_argument(f"--{name}", required=True, type=_score_arg(f"--{name}"),
+                       metavar="0-5", help=f"{name} judgment (raised to anchor-rubric floor)")
+    p.add_argument("--touches", action="append", metavar="PATH",
+                   help="Affected path; repeatable. Drives F and the anchor rubric.")
+    p.add_argument("--base", default="main", help="Base branch for git-diff fallback")
+    p.add_argument("--F", dest="f_override", type=_score_arg("--F"), metavar="0-5",
+                   help="Manual F score (overrides git; use with no --touches)")
+    p.add_argument("--penalty", action="append", default=[], choices=sorted(MANUAL_PENALTIES),
+                   metavar="KEY", help=f"Manual penalty; repeatable. One of: {sorted(MANUAL_PENALTIES)}")
+    p.add_argument("--low-confidence", default="", metavar="VARS",
+                   help="Comma list (e.g. D,K) bumped +1 and marked Low")
+    p.add_argument("--json", action="store_true", help="Emit JSON instead of markdown")
+    return p
+
+
+def main(argv=None):
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    if args.cc is not None and args.cc < 1:
+        parser.error("--cc must be >= 1 (cyclomatic complexity starts at 1)")
+
+    low = [v.strip().upper() for v in args.low_confidence.split(",") if v.strip()]
+    bad = [v for v in low if v not in VARS]
+    if bad:
+        parser.error(f"--low-confidence has unknown variable(s) {bad}; valid: {VARS}")
+
+    try:
+        result = evaluate(
+            cc=args.cc, c_score=args.c_score, touches=args.touches,
+            f_override=args.f_override, base=args.base,
+            d=args.D, k=args.K, p=args.P, t=args.T, a=args.A, x=args.X,
+            manual_penalties=args.penalty, low_conf=low)
+    except RuntimeError as exc:
+        parser.error(str(exc))
+
+    print(render_json(result) if args.json else render_markdown(result))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

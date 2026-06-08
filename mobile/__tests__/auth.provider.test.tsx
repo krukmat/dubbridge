@@ -1,6 +1,7 @@
 import { act, cleanup, render, waitFor } from "@testing-library/react-native";
 import { Text } from "react-native";
 import { makeRedirectUri } from "expo-auth-session";
+import { useLinkingURL } from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 
 import { createGatewayClient } from "../src/api/client";
@@ -48,6 +49,10 @@ jest.mock("expo-web-browser", () => ({
   openAuthSessionAsync: jest.fn(),
 }));
 
+jest.mock("expo-linking", () => ({
+  useLinkingURL: jest.fn(),
+}));
+
 const OPAQUE_REF = "opaque-session-abc123";
 const JWT_LIKE = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.SomeSignatureValue";
 const ROTATED_REF = "rotated-session-xyz789";
@@ -66,13 +71,27 @@ const mockOpenAuthSessionAsync =
   WebBrowser.openAuthSessionAsync as jest.MockedFunction<
     typeof WebBrowser.openAuthSessionAsync
   >;
+const mockUseLinkingURL = useLinkingURL as jest.MockedFunction<typeof useLinkingURL>;
 
 type MockGatewayClient = {
   post: jest.Mock;
 };
 
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+
+  return { promise, resolve, reject };
+}
+
 let latestAuthValue: AuthContextValue | null = null;
 let mockGatewayClient: MockGatewayClient;
+let mockLinkingUrl: string | null = null;
+const originalE2EEnabled = process.env.EXPO_PUBLIC_E2E_ENABLED;
 
 function AuthProbe() {
   const auth = useAuth();
@@ -91,6 +110,7 @@ describe("AuthProvider", () => {
   beforeEach(() => {
     latestAuthValue = null;
     jest.clearAllMocks();
+    mockLinkingUrl = null;
 
     mockLoadSessionRef.mockResolvedValue(null);
     mockSaveSessionRef.mockResolvedValue(undefined);
@@ -119,10 +139,17 @@ describe("AuthProvider", () => {
     mockCreateGatewayClient.mockReturnValue(
       mockGatewayClient as unknown as ReturnType<typeof createGatewayClient>,
     );
+    mockUseLinkingURL.mockImplementation(() => mockLinkingUrl);
+    delete process.env.EXPO_PUBLIC_E2E_ENABLED;
   });
 
   afterEach(() => {
     cleanup();
+    if (originalE2EEnabled === undefined) {
+      delete process.env.EXPO_PUBLIC_E2E_ENABLED;
+    } else {
+      process.env.EXPO_PUBLIC_E2E_ENABLED = originalE2EEnabled;
+    }
   });
 
   describe("T3b-i-β HP-1: valid stored opaque session boots into authed state", () => {
@@ -472,6 +499,212 @@ describe("AuthProvider", () => {
       expect(mockSaveSessionRef).not.toHaveBeenCalled();
       expect(view.getByText("status:unauthed")).toBeTruthy();
       expect(view.getByText("loginError:invalid_session_ref")).toBeTruthy();
+    });
+  });
+
+  describe("V5 HP-1: dev-gated bootstrap redeems an inbound handoff deep link", () => {
+    it("hydrates from an initial callback URL and becomes authed without opening the browser", async () => {
+      process.env.EXPO_PUBLIC_E2E_ENABLED = "true";
+      mockLinkingUrl = `${REDIRECT_URI}?handoff_code=${HANDOFF_CODE}`;
+      mockGatewayClient.post.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          data: {
+            session_ref: OPAQUE_REF,
+          },
+          sessionRotation: null,
+        },
+      });
+      mockIsJwtLike.mockReturnValueOnce(false);
+
+      const view = await render(
+        <AuthProvider>
+          <AuthProbe />
+        </AuthProvider>,
+      );
+
+      await waitFor(() => {
+        expect(view.getByText("status:authed")).toBeTruthy();
+      });
+
+      expect(mockOpenAuthSessionAsync).not.toHaveBeenCalled();
+      expect(mockGatewayClient.post).toHaveBeenCalledWith(
+        "/auth/mobile/session",
+        null,
+        { handoff_code: HANDOFF_CODE },
+      );
+      expect(mockSaveSessionRef).toHaveBeenCalledWith(OPAQUE_REF);
+      expect(view.getByText(`sessionRef:${OPAQUE_REF}`)).toBeTruthy();
+    });
+  });
+
+  describe("V5 EC-1: bootstrap listener stays inert when the flag is off", () => {
+    it("ignores inbound deep links when EXPO_PUBLIC_E2E_ENABLED is not true", async () => {
+      mockLinkingUrl = `${REDIRECT_URI}?handoff_code=${HANDOFF_CODE}`;
+
+      const view = await render(
+        <AuthProvider>
+          <AuthProbe />
+        </AuthProvider>,
+      );
+
+      await waitFor(() => {
+        expect(view.getByText("status:unauthed")).toBeTruthy();
+      });
+
+      expect(mockGatewayClient.post).not.toHaveBeenCalledWith(
+        "/auth/mobile/session",
+        null,
+        { handoff_code: HANDOFF_CODE },
+      );
+      expect(mockSaveSessionRef).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("V5 EC-2: JWT-like session_ref from bootstrap is rejected", () => {
+    it("does not persist a JWT-looking session ref from an inbound deep link", async () => {
+      process.env.EXPO_PUBLIC_E2E_ENABLED = "true";
+      mockLinkingUrl = `${REDIRECT_URI}?handoff_code=${HANDOFF_CODE}`;
+      mockGatewayClient.post.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          data: {
+            session_ref: JWT_LIKE,
+          },
+          sessionRotation: null,
+        },
+      });
+      mockIsJwtLike.mockReturnValueOnce(true);
+
+      const view = await render(
+        <AuthProvider>
+          <AuthProbe />
+        </AuthProvider>,
+      );
+
+      await waitFor(() => {
+        expect(view.getByText("status:unauthed")).toBeTruthy();
+      });
+
+      expect(mockSaveSessionRef).not.toHaveBeenCalled();
+      expect(view.getByText("loginError:invalid_session_ref")).toBeTruthy();
+    });
+  });
+
+  describe("V5 EC-3: 401 bootstrap redemption stays unauthenticated cleanly", () => {
+    it("maps a failed inbound redemption to session_expired without crashing", async () => {
+      process.env.EXPO_PUBLIC_E2E_ENABLED = "true";
+      mockLinkingUrl = `${REDIRECT_URI}?handoff_code=${HANDOFF_CODE}`;
+      mockGatewayClient.post.mockResolvedValueOnce({
+        ok: false,
+        error: { kind: "session_expired" },
+      });
+
+      const view = await render(
+        <AuthProvider>
+          <AuthProbe />
+        </AuthProvider>,
+      );
+
+      await waitFor(() => {
+        expect(view.getByText("status:unauthed")).toBeTruthy();
+      });
+
+      expect(mockSaveSessionRef).not.toHaveBeenCalled();
+      expect(view.getByText("loginError:session_expired")).toBeTruthy();
+    });
+  });
+
+  describe("V5 EC-4: duplicate url events are redeemed only once", () => {
+    it("deduplicates the same callback URL across initial and event delivery", async () => {
+      process.env.EXPO_PUBLIC_E2E_ENABLED = "true";
+      const bootstrapUrl = `${REDIRECT_URI}?handoff_code=${HANDOFF_CODE}`;
+      mockLinkingUrl = bootstrapUrl;
+      mockGatewayClient.post.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          data: {
+            session_ref: OPAQUE_REF,
+          },
+          sessionRotation: null,
+        },
+      });
+      mockIsJwtLike.mockReturnValueOnce(false);
+
+      const view = await render(
+        <AuthProvider>
+          <AuthProbe />
+        </AuthProvider>,
+      );
+
+      await waitFor(() => {
+        expect(view.getByText("status:authed")).toBeTruthy();
+      });
+
+      mockLinkingUrl = null;
+      view.rerender(
+        <AuthProvider>
+          <AuthProbe />
+        </AuthProvider>,
+      );
+      mockLinkingUrl = bootstrapUrl;
+      view.rerender(
+        <AuthProvider>
+          <AuthProbe />
+        </AuthProvider>,
+      );
+
+      expect(mockGatewayClient.post).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("V6 EC-1: bootstrap deep links received during loading are replayed after hydration", () => {
+    it("redeems a queued callback URL once status becomes unauthed", async () => {
+      process.env.EXPO_PUBLIC_E2E_ENABLED = "true";
+      const bootstrapUrl = `${REDIRECT_URI}?handoff_code=${HANDOFF_CODE}`;
+      const sessionDeferred = createDeferred<string | null>();
+      mockLoadSessionRef.mockImplementationOnce(() => sessionDeferred.promise);
+      mockGatewayClient.post.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          data: {
+            session_ref: OPAQUE_REF,
+          },
+          sessionRotation: null,
+        },
+      });
+      mockIsJwtLike.mockReturnValueOnce(false);
+
+      const view = await render(
+        <AuthProvider>
+          <AuthProbe />
+        </AuthProvider>,
+      );
+
+      mockLinkingUrl = bootstrapUrl;
+      view.rerender(
+        <AuthProvider>
+          <AuthProbe />
+        </AuthProvider>,
+      );
+
+      expect(mockGatewayClient.post).not.toHaveBeenCalled();
+
+      await act(async () => {
+        sessionDeferred.resolve(null);
+        await sessionDeferred.promise;
+      });
+
+      await waitFor(() => {
+        expect(view.getByText("status:authed")).toBeTruthy();
+      });
+
+      expect(mockGatewayClient.post).toHaveBeenCalledWith(
+        "/auth/mobile/session",
+        null,
+        { handoff_code: HANDOFF_CODE },
+      );
+      expect(mockSaveSessionRef).toHaveBeenCalledWith(OPAQUE_REF);
     });
   });
 });

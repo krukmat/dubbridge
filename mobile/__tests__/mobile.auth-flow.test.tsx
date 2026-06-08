@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react-native";
 import { makeRedirectUri } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
+import { Linking } from "react-native";
 
 import { createGatewayClient } from "../src/api/client";
 import { RootNavigator } from "../src/navigation/RootNavigator";
@@ -67,12 +68,15 @@ const mockOpenAuthSessionAsync =
   WebBrowser.openAuthSessionAsync as jest.MockedFunction<
     typeof WebBrowser.openAuthSessionAsync
   >;
+const mockLinkingGetInitialURL = jest.spyOn(Linking, "getInitialURL");
+const mockLinkingAddEventListener = jest.spyOn(Linking, "addEventListener");
 
 const REDIRECT_URI = "dubbridge://auth/callback";
 const OPAQUE_REF = "opaque-session-abc123";
 const HANDOFF_CODE = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNO12345";
 const JWT_LIKE =
   "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.SomeSignatureValue";
+const originalE2EEnabled = process.env.EXPO_PUBLIC_E2E_ENABLED;
 
 describe("mobile auth flow integration", () => {
   beforeEach(() => {
@@ -94,6 +98,13 @@ describe("mobile auth flow integration", () => {
       type: "success",
       url: `${REDIRECT_URI}?handoff_code=${HANDOFF_CODE}`,
     } as Awaited<ReturnType<typeof WebBrowser.openAuthSessionAsync>>);
+    mockLinkingGetInitialURL.mockResolvedValue(null);
+    mockLinkingAddEventListener.mockImplementation(
+      () =>
+        ({
+          remove: jest.fn(),
+        }) as unknown as ReturnType<typeof Linking.addEventListener>,
+    );
 
     const mockClient = {
       get: jest
@@ -156,6 +167,11 @@ describe("mobile auth flow integration", () => {
   afterEach(() => {
     cleanup();
     mockExtra = {};
+    if (originalE2EEnabled === undefined) {
+      delete process.env.EXPO_PUBLIC_E2E_ENABLED;
+    } else {
+      process.env.EXPO_PUBLIC_E2E_ENABLED = originalE2EEnabled;
+    }
   });
 
   describe("T5 HP-1: full mobile login to asset detail flow stays green against the stub", () => {
@@ -196,6 +212,24 @@ describe("mobile auth flow integration", () => {
         expect(view.getByText("Asset detail")).toBeTruthy();
         expect(view.getByText("Downstream processing")).toBeTruthy();
       });
+    });
+  });
+
+  describe("V5 HP-1: root navigator enters the authed tree from an inbound handoff deep link", () => {
+    it("boots directly to the home screen when E2E bootstrap is enabled", async () => {
+      process.env.EXPO_PUBLIC_E2E_ENABLED = "true";
+      mockLinkingGetInitialURL.mockResolvedValueOnce(
+        `${REDIRECT_URI}?handoff_code=${HANDOFF_CODE}`,
+      );
+
+      const view = await render(<RootNavigator />);
+
+      await waitFor(() => {
+        expect(view.getByText("Mobile home")).toBeTruthy();
+      });
+
+      expect(mockSaveSessionRef).toHaveBeenCalledWith(OPAQUE_REF);
+      expect(view.getByTestId("home-screen")).toBeTruthy();
     });
   });
 });

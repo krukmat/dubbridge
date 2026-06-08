@@ -31,3 +31,118 @@ V2a decision (2026-06-07):
 
 - V2a is decision-only. It does **not** run prebuild, Gradle, or emulator launch.
 - V2b executes the chosen build path and verifies the app launches past splash.
+
+## Runtime launch command
+
+- To launch the Android debug build with the intended local runtime env, start Metro
+  from `mobile/` with:
+  `DUBBRIDGE_ENV=local EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL=http://localhost:8081 CI=1 npx expo start --port 8081 --clear`
+
+## Mock OAuth fixture for seed work
+
+- `V4a` adds a deterministic local OAuth token fixture at
+  `scripts/e2e-seed/mock-oauth-server.mjs`.
+- Run it from the repo root before `V4b` seed work:
+  `node scripts/e2e-seed/mock-oauth-server.mjs`
+- Health check:
+  `curl http://127.0.0.1:9000/health/live`
+- Local gateway config already targets this seam in [local.toml](/Users/matiasleandrokruk/Documents/dubbridge/config/local.toml:17):
+  `authorization_url = "http://localhost:9000/oauth/authorize"` and
+  `token_url = "http://localhost:9000/oauth/token"`.
+- The fixture returns a deterministic `TokenSet` for both
+  `grant_type=authorization_code` and `grant_type=refresh_token`:
+  `access_token=fixture-access-token`, `refresh_token=fixture-refresh-token`,
+  `expires_in=3600`, `token_type=Bearer`.
+- Important local-auth finding for later tasks: `apps/api` does not run
+  auth-disabled in local mode. By code inspection, it requires auth settings at
+  startup and builds an RSA JWT verifier from the configured public key, so a bare
+  opaque fixture access token is not sufficient for authenticated `/api/*` calls.
+  `V4b` must either keep its verification at the gateway/mobile-session boundary or
+  provide a JWT fixture compatible with the local verifier config.
+
+## Seed handoff-code mint
+
+- `V4b` adds the seed CLI at `scripts/e2e-seed/mint-handoff-code.mjs`.
+- Usage:
+  `node scripts/e2e-seed/mint-handoff-code.mjs --gateway-base-url http://127.0.0.1:8081`
+- Output contract:
+  - `auth.handoff_code`
+  - `auth.bootstrap_deeplink`
+  - `meta.gateway_base_url`
+  - `meta.return_uri`
+- The seed drives the real gateway flow:
+  `GET /auth/login?return_uri=...` → parse `state` from the auth redirect →
+  `GET /auth/callback?code=...&state=...` → extract `handoff_code` from the mobile
+  `Location` redirect.
+- The CLI fails closed if `--gateway-base-url` does not answer
+  `/health/ready` as `{ "service": "gateway", "status": "ready" }`. This matters in
+  local dev because `:8081` can still be occupied by Metro. If that happens, either
+  stop Metro or point `--gateway-base-url` at the actual gateway port.
+- The seed output never includes `access_token`, `refresh_token`, or a JWT-like
+  value. The single-use redeem proof stays in the verification harness, not in the
+  emitted JSON, so the emitted `handoff_code` remains usable by later tasks.
+
+## Dev bootstrap fallback
+
+- If the Android emulator blocks the browser-based login in Chrome first-run / ANR,
+  start Metro with the V5 bootstrap flag enabled:
+  `DUBBRIDGE_ENV=local EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL=http://localhost:8081 EXPO_PUBLIC_E2E_ENABLED=true CI=1 npx expo start --port 8081 --clear`
+- With that flag on, the app accepts an inbound
+  `dubbridge://auth/callback?handoff_code=...` deep link in `__DEV__`, redeems it
+  into an opaque `session_ref`, and enters the authed tree without relying on
+  Chrome/Custom Tabs.
+- Once V4b provides a real seed, the emulator bootstrap command shape is:
+  `adb shell am start -a android.intent.action.VIEW -d "dubbridge://auth/callback?handoff_code=<seeded-code>" com.dubbridge.mobile`
+
+## Maestro flows
+
+- `auth-surface.yaml` cold-launches the app, polls for ANR dialogs containing
+  `isn't responding`, waits for `id: login-screen`, and captures
+  `01_auth_login`.
+- `authenticated-audit.yaml` cold-launches the app, waits for `id: login-screen`,
+  opens `${SEED_BOOTSTRAP_DEEPLINK}`, polls again for ANR dialogs, waits for
+  `id: home-screen`, and captures `02_home`.
+- The ANR guard intentionally polls over multiple `waitForAnimationToEnd`
+  iterations instead of firing only once. On this emulator, a one-shot guard
+  could finish before the `Chrome isn't responding` dialog reappeared.
+
+## After `expo start`
+
+- Leave Metro running in that terminal.
+- In a second terminal, keep the emulator connected to Metro and the local gateway:
+  `adb reverse tcp:8081 tcp:8081`
+- Install or refresh the debug APK:
+  `adb install -r /Users/matiasleandrokruk/Documents/dubbridge/mobile/android/app/build/outputs/apk/debug/app-debug.apk`
+- Clear any stale app process before relaunch:
+  `adb shell am force-stop com.dubbridge.mobile`
+- Start the app explicitly:
+  `adb shell am start -n com.dubbridge.mobile/.MainActivity`
+- The success checkpoint for `V2b` is: the app passes the Android splash screen and
+  renders React UI on the emulator instead of hanging on splash.
+
+## Troubleshooting
+
+- If the app hangs on splash, confirm Metro is still running and repeat:
+  `adb reverse tcp:8081 tcp:8081`
+- If the app opens but shows `Missing DUBBRIDGE_ENV`, Metro alone was not enough;
+  rebuild with the same env vars applied to both:
+  `DUBBRIDGE_ENV=local EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL=http://localhost:8081 npx expo prebuild --platform android`
+  and
+  `cd android && DUBBRIDGE_ENV=local EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL=http://localhost:8081 ./gradlew assembleDebug`
+- If install fails due to stale package state, run:
+  `adb uninstall com.dubbridge.mobile`
+  and then reinstall the APK with `adb install -r`.
+- If the emulator window looks blank white or blank black even though the process
+  stays alive, verify the mounted screen via accessibility dump before treating it
+  as an app-logic failure:
+  `adb shell uiautomator dump /sdcard/window_dump.xml && adb pull /sdcard/window_dump.xml /tmp/window_dump.xml`
+  then inspect `/tmp/window_dump.xml` for nodes such as `resource-id="login-screen"`
+  or the text `DubBridge mobile`.
+  On `2026-06-07`, this proved the app had passed splash and mounted
+  `LoginScreen` even while the emulator surface rendered as a blank white frame.
+- If `authenticated-audit.yaml` fails on `id: home-screen`, verify the runtime
+  bootstrap independently before blaming the selector:
+  `adb shell am start -a android.intent.action.VIEW -d "dubbridge://auth/callback?handoff_code=<seeded-code>" com.dubbridge.mobile`
+  On `2026-06-08`, this manual deep-link probe still left the app on
+  `login-screen`, which means the Phase-2 blocker was the runtime bootstrap path,
+  not Maestro's `openLink` syntax.

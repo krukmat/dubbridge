@@ -25,7 +25,12 @@ type ExpoExtra = {
 };
 
 function getExpoExtra(): ExpoExtra {
-  return (Constants.expoConfig?.extra ?? {}) as ExpoExtra;
+  const extra =
+    Constants.expoConfig?.extra ??
+    (Constants.manifest as { extra?: ExpoExtra } | null)?.extra ??
+    {};
+
+  return extra as ExpoExtra;
 }
 
 function isDubbridgeEnv(value: string): value is DubbridgeEnv {

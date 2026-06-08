@@ -1,0 +1,51 @@
+appId: com.dubbridge.mobile
+name: Authenticated Audit
+tags:
+  - android
+  - p3-v
+  - authenticated-audit
+---
+- launchApp:
+    clearState: true
+
+- repeat:
+    times: 20
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+      - waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible:
+      id: login-screen
+    timeout: 20000
+
+- assertVisible:
+    id: login-screen
+
+- openLink: ${SEED_BOOTSTRAP_DEEPLINK}
+
+- repeat:
+    times: 20
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+      - waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 30000
+
+- assertVisible:
+    id: home-screen
+
+- takeScreenshot: 02_home
