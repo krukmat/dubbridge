@@ -18,5 +18,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       process.env.EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL ??
       process.env.DUBBRIDGE_GATEWAY_URL ??
       null,
+    e2eEnabled: process.env.EXPO_PUBLIC_E2E_ENABLED === "true",
   },
 });

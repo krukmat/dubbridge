@@ -32,11 +32,36 @@ V2a decision (2026-06-07):
 - V2a is decision-only. It does **not** run prebuild, Gradle, or emulator launch.
 - V2b executes the chosen build path and verifies the app launches past splash.
 
+## Port map
+
+| Service | Host port | adb reverse mapping | Notes |
+|---|---|---|---|
+| `apps/gateway` | `:8081` | `adb reverse tcp:8081 tcp:8081` | gateway and OAuth callback |
+| `apps/api` | `:8080` | `adb reverse tcp:8080 tcp:8080` | REST data for authed screens |
+| Metro (JS bundler) | `:8082` | `adb reverse tcp:8082 tcp:8082` | deconflicted from gateway |
+| `mock-oauth` | `:9000` | none (host-only) | gateway contacts it directly |
+
+Metro runs on `:8082` — never `:8081` — to avoid a port collision with the gateway.
+The debug APK must be built (or rebuilt) after this change so the native Metro
+discovery URL matches `:8082`.
+
+## Screenshot environment setup
+
+Source `mobile/maestro/screenshot-env.sh` into your shell before starting Metro:
+
+```sh
+. mobile/maestro/screenshot-env.sh
+cd mobile && npx expo start --port 8082 --clear
+```
+
+The script exports `DUBBRIDGE_ENV=local`,
+`EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL=http://localhost:8081`, and
+`EXPO_PUBLIC_E2E_ENABLED=true`. It is safe to commit — no secrets.
+
 ## Runtime launch command
 
-- To launch the Android debug build with the intended local runtime env, start Metro
-  from `mobile/` with:
-  `DUBBRIDGE_ENV=local EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL=http://localhost:8081 CI=1 npx expo start --port 8081 --clear`
+- Source the screenshot env and start Metro on the deconflicted port:
+  `. mobile/maestro/screenshot-env.sh && cd mobile && npx expo start --port 8082 --clear`
 
 ## Mock OAuth fixture for seed work
 
@@ -85,8 +110,9 @@ V2a decision (2026-06-07):
 ## Dev bootstrap fallback
 
 - If the Android emulator blocks the browser-based login in Chrome first-run / ANR,
-  start Metro with the V5 bootstrap flag enabled:
-  `DUBBRIDGE_ENV=local EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL=http://localhost:8081 EXPO_PUBLIC_E2E_ENABLED=true CI=1 npx expo start --port 8081 --clear`
+  source the screenshot env (which already includes `EXPO_PUBLIC_E2E_ENABLED=true`)
+  and start Metro on `:8082`:
+  `. mobile/maestro/screenshot-env.sh && cd mobile && npx expo start --port 8082 --clear`
 - With that flag on, the app accepts an inbound
   `dubbridge://auth/callback?handoff_code=...` deep link in `__DEV__`, redeems it
   into an opaque `session_ref`, and enters the authed tree without relying on
@@ -109,10 +135,14 @@ V2a decision (2026-06-07):
 ## After `expo start`
 
 - Leave Metro running in that terminal.
-- In a second terminal, keep the emulator connected to Metro and the local gateway:
-  `adb reverse tcp:8081 tcp:8081`
+- In a second terminal, set up all three `adb reverse` mappings:
+  ```sh
+  adb reverse tcp:8081 tcp:8081   # gateway
+  adb reverse tcp:8080 tcp:8080   # apps/api
+  adb reverse tcp:8082 tcp:8082   # Metro (JS bundle)
+  ```
 - Install or refresh the debug APK:
-  `adb install -r /Users/matiasleandrokruk/Documents/dubbridge/mobile/android/app/build/outputs/apk/debug/app-debug.apk`
+  `adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk`
 - Clear any stale app process before relaunch:
   `adb shell am force-stop com.dubbridge.mobile`
 - Start the app explicitly:
@@ -122,8 +152,15 @@ V2a decision (2026-06-07):
 
 ## Troubleshooting
 
-- If the app hangs on splash, confirm Metro is still running and repeat:
-  `adb reverse tcp:8081 tcp:8081`
+- If the app hangs on splash, confirm Metro is still running on `:8082` and repeat
+  all three reverse mappings:
+  ```sh
+  adb reverse tcp:8081 tcp:8081
+  adb reverse tcp:8080 tcp:8080
+  adb reverse tcp:8082 tcp:8082
+  ```
+- If `adb reverse tcp:8081` maps to Metro instead of the gateway (collision), stop
+  Metro, start the gateway, then restart Metro on `:8082` using the screenshot env.
 - If the app opens but shows `Missing DUBBRIDGE_ENV`, Metro alone was not enough;
   rebuild with the same env vars applied to both:
   `DUBBRIDGE_ENV=local EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL=http://localhost:8081 npx expo prebuild --platform android`
