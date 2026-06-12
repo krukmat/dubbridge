@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -29,8 +30,7 @@ type AssetListViewState =
   | { kind: "loading" }
   | { kind: "ready"; assets: AssetSummary[] }
   | { kind: "empty" }
-  | { kind: "error"; message: string }
-  | { kind: "not_available" };
+  | { kind: "error"; message: string };
 
 function formatStatus(status: string): string {
   return status
@@ -47,74 +47,99 @@ export function AssetListScreen({
   const [viewState, setViewState] = useState<AssetListViewState>({
     kind: "loading",
   });
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadAssets = useCallback(async (): Promise<void> => {
+    const client = createGatewayClient({ gatewayBaseUrl });
+    const result = await client.get<AssetSummary[]>(
+      "/api/assets",
+      auth.sessionRef,
+    );
+
+    if (result.ok) {
+      await auth.onSessionRotation(result.value.sessionRotation);
+      if (result.value.data.length === 0) {
+        setViewState({ kind: "empty" });
+      } else {
+        setViewState({ kind: "ready", assets: result.value.data });
+      }
+      return;
+    }
+
+    if (result.error.kind === "session_expired") {
+      await auth.logout();
+      return;
+    }
+
+    const message =
+      result.error.kind === "network"
+        ? result.error.message
+        : result.error.kind === "forbidden"
+          ? "You do not have access to the asset list."
+          : `Request failed with status ${result.error.status}.`;
+    setViewState({ kind: "error", message });
+  }, [auth, gatewayBaseUrl]);
 
   useEffect(() => {
     let isActive = true;
 
-    async function loadAssets(): Promise<void> {
+    void (async () => {
       setViewState({ kind: "loading" });
-
+      // Only apply state from this effect invocation if it's still current.
       const client = createGatewayClient({ gatewayBaseUrl });
       const result = await client.get<AssetSummary[]>(
-        "/api/assets?view=mobile",
+        "/api/assets",
         auth.sessionRef,
       );
 
-      if (!isActive) {
-        return;
-      }
+      if (!isActive) return;
 
-      if (!result.ok) {
-        if (result.error.kind === "session_expired") {
-          await auth.logout();
-          return;
+      if (result.ok) {
+        await auth.onSessionRotation(result.value.sessionRotation);
+        if (!isActive) return;
+        if (result.value.data.length === 0) {
+          setViewState({ kind: "empty" });
+        } else {
+          setViewState({ kind: "ready", assets: result.value.data });
         }
-
-        if (result.error.kind === "http" && result.error.status === 404) {
-          setViewState({ kind: "not_available" });
-          return;
-        }
-
-        const message =
-          result.error.kind === "network"
-            ? result.error.message
-            : result.error.kind === "forbidden"
-              ? "You do not have access to the mobile asset list."
-              : `Gateway request failed with status ${result.error.status}.`;
-        setViewState({ kind: "error", message });
         return;
       }
 
-      await auth.onSessionRotation(result.value.sessionRotation);
-
-      if (!isActive) {
+      if (result.error.kind === "session_expired") {
+        await auth.logout();
         return;
       }
 
-      if (result.value.data.length === 0) {
-        setViewState({ kind: "empty" });
-        return;
-      }
-
-      setViewState({ kind: "ready", assets: result.value.data });
-    }
-
-    void loadAssets();
+      const message =
+        result.error.kind === "network"
+          ? result.error.message
+          : result.error.kind === "forbidden"
+            ? "You do not have access to the asset list."
+            : `Request failed with status ${result.error.status}.`;
+      setViewState({ kind: "error", message });
+    })();
 
     return () => {
       isActive = false;
     };
   }, [auth, gatewayBaseUrl]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadAssets();
+    setRefreshing(false);
+  }, [loadAssets]);
+
+  const onRetry = useCallback(() => {
+    setViewState({ kind: "loading" });
+    void loadAssets();
+  }, [loadAssets]);
+
   return (
-    <View style={styles.container}>
+    <View testID="asset-list-screen" style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.kicker}>Gateway assets</Text>
+        <Text style={styles.kicker}>My assets</Text>
         <Text style={styles.title}>Asset list</Text>
-        <Text style={styles.copy}>
-          This view loads the authenticated mobile asset surface through the
-          session gateway.
-        </Text>
       </View>
 
       {viewState.kind === "loading" ? (
@@ -122,41 +147,48 @@ export function AssetListScreen({
           <ActivityIndicator size="small" color="#1a5d50" />
           <Text style={styles.panelTitle}>Loading assets…</Text>
           <Text style={styles.panelCopy}>
-            Fetching the mobile asset list from the gateway.
+            Fetching your assets from the gateway.
           </Text>
         </View>
       ) : null}
 
       {viewState.kind === "empty" ? (
-        <View style={styles.centerPanel}>
-          <Text style={styles.panelTitle}>No assets yet</Text>
-          <Text style={styles.panelCopy}>
-            Your authenticated workspace does not have any assets to show.
-          </Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={styles.centerPanelScroll}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          <View testID="asset-list-empty-state" style={styles.centerPanel}>
+            <Text style={styles.panelTitle}>No assets yet</Text>
+            <Text style={styles.panelCopy}>
+              Your authenticated workspace does not have any assets to show.
+            </Text>
+          </View>
+        </ScrollView>
       ) : null}
 
       {viewState.kind === "error" ? (
         <View style={styles.centerPanel}>
           <Text style={styles.panelTitle}>Could not load assets</Text>
           <Text style={styles.panelCopy}>{viewState.message}</Text>
-        </View>
-      ) : null}
-
-      {viewState.kind === "not_available" ? (
-        <View style={styles.centerPanel}>
-          <Text style={styles.panelTitle}>Asset list not available yet</Text>
-          <Text style={styles.panelCopy}>
-            The mobile list endpoint is not live on this backend surface yet.
-          </Text>
+          <Pressable onPress={onRetry} style={styles.retryButton}>
+            <Text style={styles.retryLabel}>Retry</Text>
+          </Pressable>
         </View>
       ) : null}
 
       {viewState.kind === "ready" ? (
-        <ScrollView contentContainerStyle={styles.listContent}>
+        <ScrollView
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
           {viewState.assets.map((asset) => (
             <Pressable
               key={asset.id}
+              testID={`asset-card-${asset.id}`}
               onPress={() => onOpenAsset(asset)}
               style={styles.assetCard}
             >
@@ -193,10 +225,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#10212a",
   },
-  copy: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: "#425059",
+  centerPanelScroll: {
+    flexGrow: 1,
   },
   centerPanel: {
     borderRadius: 10,
@@ -215,6 +245,19 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     color: "#52616a",
+  },
+  retryButton: {
+    marginTop: 4,
+    alignSelf: "flex-start",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: "#1a5d50",
+  },
+  retryLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#ffffff",
   },
   listContent: {
     gap: 12,

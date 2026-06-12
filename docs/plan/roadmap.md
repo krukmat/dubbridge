@@ -100,8 +100,8 @@ Plan: `docs/plan/h1-governance-atomicity-hardening.md`
 | **S-030** | Environment separation + deployment runtime wiring | S-000, S-010 | ✅ done — Phase 0 and Phase 1 complete; later env-driven runtime behavior stays deferred to S-080+ | `docs/plan/s-030-environment-separation.md`, `docs/tasks/s-030-environment-separation.md` |
 | **S-040** | First-party session gateway / BFF | S-000, external authorization-server contract | ✅ done — browser/cookie transport and full mobile-safe gateway transport delivered | `docs/plan/s-040-session-gateway-bff.md`, `docs/tasks/s-040-session-gateway-bff.md`, `docs/tasks/s-040-t7-mobile-session-handoff.md` (ADR-024) |
 | **S-050** | First-party mobile client (React Native + Expo) | S-040-T7; S-070 recommended for production device login | ✅ done — T0–T5 complete as of 2026-06-07 | `docs/plan/s-050-mobile-client.md`, `docs/tasks/s-050-mobile-client.md` (ADR-024) |
-| **S-055** | Maestro screenshot / visual-audit suite | S-050 | 🟡 partial — V1–V5 done, V6 Phase 1 captured login, V6 Phase 2 blocked on deep-link bootstrap; next V6b, then V7a/V7b/V8 | `docs/plan/s-055-maestro-screenshot-suite.md`, `docs/tasks/s-055-maestro-screenshot-suite.md` |
-| **S-060** | First-party mobile asset lifecycle: `GET /assets`, mobile list, upload→rights→finalize, BDD/Maestro, mock `/api/*` | S-050, S-055 infra, S-010 | 📄 Planned — T0–T6 defined 2026-06-11, not built | `docs/plan/s-060-mobile-asset-lifecycle.md`, `docs/tasks/s-060-mobile-asset-lifecycle.md` |
+| **S-055** | Maestro screenshot / visual-audit suite | S-050 | ✅ done — V1–V8 complete as of 2026-06-12; two-phase Maestro suite captures `01_auth_login` + `02_home`; `npm run screenshots` wired | `docs/plan/s-055-maestro-screenshot-suite.md`, `docs/tasks/s-055-maestro-screenshot-suite.md` |
+| **S-060** | First-party mobile asset lifecycle: `GET /assets`, mobile list, upload→rights→finalize, BDD/Maestro, mock `/api/*` | S-050, S-055 infra, S-010 | ✅ done — T0–T6 complete as of 2026-06-12; asset list/detail/ingestion Maestro flows integrated into `npm run screenshots`; open follow-ups X-P3F-1/X-P3F-2 recorded | `docs/plan/s-060-mobile-asset-lifecycle.md`, `docs/tasks/s-060-mobile-asset-lifecycle.md` |
 | **S-070** | Production identity hardening (JWKS discovery, automatic key rotation, subject mapping if needed) | S-000 | ⬜ no plan yet | ADR-023 |
 | **S-080** | Object storage switchover (MinIO/S3 behind `StorageAdapter`) | S-010-T4 | ⬜ no plan yet | — |
 | **S-090** | Platform ingest (owner-authorized download: first supported provider) | S-000-T2, S-010, S-020; S-080 prudent before heavy writes | 🟡 REPLANNED 2026-05-31 — foundation T0/T0c/T1/T2 done; S-040/S-070/S-050 done; later connector work deferred | `docs/plan/stream-recording-ingest.md` |
@@ -159,11 +159,11 @@ mobile-hardening sub-slice, **S-055** (Maestro screenshot / visual-audit suite,
 `docs/plan/s-055-maestro-screenshot-suite.md` + `docs/tasks/s-055-maestro-screenshot-suite.md`)**,
 was gated on **S-050-T4** and approved with Option A (ADR-024 handoff-code bootstrap,
 no JWT on device) + sequencing S-080 (defer until after T4). That gate is satisfied.
-The sub-slice is partially built: test IDs, screenshot env, mock OAuth fixture,
-handoff-code seed, dev-gated E2E bootstrap, and both Maestro flow files exist.
-Phase 1 captured the login screen; Phase 2 is blocked because the seeded deep link
-has not yet driven the app to `home-screen` on the emulator. Resume at **V6b**
-before building the V7 runner and V8 one-command script.
+The sub-slice is complete: test IDs, screenshot env, mock OAuth fixture,
+handoff-code seed, dev-gated E2E bootstrap, both Maestro flow files, the
+`seed-and-run.sh` runner with report sanitization, and the `npm run screenshots`
+alias are all delivered. Both phases capture their screenshots (`01_auth_login.png`,
+`02_home.png`). S-055 is done as of 2026-06-12.
 
 ## S-030 Strategy: environment separation & fail-closed configuration
 
@@ -302,6 +302,9 @@ S-095 — live recorder (DEFERRED): ex-T3 recorder crate, ex-T4 jobs/storage,
 | **X19** | Enforce fail-closed source authentication (RTMP stream key / SRT passphrase, credential redaction, `rtmp`/`srt` scheme allow-list) before any capture begins | `S-095` (domain T1 done, migration T2 done, recorder ex-T3, API ex-T6); ADR-022 |
 | **X20** | Decide the secrets-store mechanism for owner-provided platform credentials (storage by reference, scope minimization, redaction); no dedicated ADR yet | `S-090-C1`–`S-090-C6` + `S-030` config/secret split; ADR-025 |
 | **X21** | Make runtime configuration fail-closed and environment-explicit: no compiled environment-specific defaults; `DUBBRIDGE_ENV` required; production rejects localhost datastores, local-fs storage, absent auth, and pretty logs; committed non-secret per-env profiles separated from injected secrets; Compose is local-infra-only (ADR-026) | ✅ closed by `S-030` Tasks 1-6 on 2026-06-03 |
+| **X22** | Define the org/membership/role authorization model: multi-tenant boundary, RBAC scopes layered over ADR-023 principal, org-scoped API enforcement; no dedicated ADR yet — must be authored as **X-S-100-1** before `S-100-T1`/`S-100-T2` | `S-100-T1`/`S-100-T2` (org-aware authz); ADR to be authored |
+| **X23** | Define the review/decision/publication gate model: append-only decision ledger, fail-closed publication precondition (ADR-008 spirit), S-140/S-150 artifact contract; no dedicated ADR yet — must be authored as **X-S-160-1** before `S-160-T1`/`S-160-T2` | `S-160-T1`/`S-160-T2` (review state machine + gate); ADR to be authored |
+| **X24** | Define the voice-consent ledger and TTS precondition: append-only consent rows, evidence stored by reference (ADR-025 spirit), fail-closed gate before any TTS derivative; closes **X11** at the contract level; no dedicated ADR yet — must be authored as **X-S-110-1** before `S-110-T1`/`S-110-T2` | `S-110-T1`/`S-110-T2` (consent ledger + gate); ADR to be authored; `S-150` enforces it |
 
 ## Known planning gaps
 
@@ -336,3 +339,14 @@ S-095 — live recorder (DEFERRED): ex-T3 recorder crate, ex-T4 jobs/storage,
   ADR materially changes; do not introduce new active `P*` or bare `S0`–`S9` phase IDs.
 - ADR-021 is generalized to all non-upload intake; ADR-019/020/022 are scoped to the
   deferred `S-095` live-recording sub-case (their technical decisions are unchanged).
+- **ADR candidates for product-layer phases (X22/X23/X24).** Three open architecture
+  decisions must be promoted to ADRs before their respective implementation tasks start:
+  - **X22 → X-S-100-1:** org/membership/role authorization model (RBAC over ADR-023
+    principal, org-scoped enforcement). Must be authored before `S-100-T1`/`S-100-T2`.
+    Tracked in `docs/plan/s-100-collaborative-workspace.md`.
+  - **X23 → X-S-160-1:** review/decision/publication gate model (append-only decisions,
+    fail-closed publication precondition, ADR-008 spirit). Must be authored before
+    `S-160-T1`/`S-160-T2`. Tracked in `docs/plan/s-160-review-publication-workspace.md`.
+  - **X24 → X-S-110-1:** voice-consent ledger + TTS fail-closed precondition (closes X11
+    at contract level; evidence stored by reference, ADR-025 spirit). Must be authored
+    before `S-110-T1`/`S-110-T2`. Tracked in `docs/plan/s-110-compliance-consent-center.md`.

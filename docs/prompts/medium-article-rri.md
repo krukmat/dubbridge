@@ -1,15 +1,15 @@
 # Prompt: Medium Article on RRI (Required Reasoning Index)
 
-**Target model:** `gemma4-12b-m5pro-cline:latest`
+**Target model:** `gemma4:12b-it-q4_K_M`
 
 **Usage via Ollama (recommended — avoids escape codes and truncation):**
 ```bash
 curl -s http://localhost:11434/api/generate \
-  -d "{\"model\":\"gemma4-12b-m5pro-cline:latest\",\"prompt\":$(jq -Rs . < docs/prompts/medium-article-rri.md),\"stream\":false}" \
+  -d "{\"model\":\"gemma4:12b-it-q4_K_M\",\"prompt\":$(jq -Rs . < docs/prompts/medium-article-rri.md),\"stream\":false}" \
   | jq -r '.response' > docs/prompts/medium-article-rri-output.md
 ```
 
-**Usage via Cline:** paste this file's content as the first message in a new chat with `gemma4-12b-m5pro-cline:latest`. Ignore capability warnings — no tools or agentic features are used.
+**Usage via Cline:** paste this file's content as the first message in a new chat with `gemma4:12b-it-q4_K_M`. Ignore capability warnings — no tools or agentic features are used.
 
 ---
 

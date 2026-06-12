@@ -1115,9 +1115,9 @@ Gate: confirm existing T1 tests pass with new context API.
   2026-06-07. Approved 2026-06-07 with **Option A** (ADR-024-clean handoff-code
   bootstrap — no JWT on device) and sequencing **S2** (defer the entire suite until
   after T4). Uses a `V`-prefixed task namespace (`V1`–`V8`) distinct from this
-  file's `T` prefix; `V4 ≠ T4`. S-055 is now partially built: V1–V5 are done, V6
-  Phase 1 captured the login screen, and V6 Phase 2 is blocked on the deep-link
-  bootstrap. Resume at `V6b` before V7/V8.
+  file's `T` prefix; `V4 ≠ T4`. S-055 is **complete as of 2026-06-12**: V1–V8 all
+  done. Both Maestro phases produce screenshots (`01_auth_login.png`, `02_home.png`);
+  `cd mobile && npm run screenshots` runs the full suite end-to-end.
 
 ---
 

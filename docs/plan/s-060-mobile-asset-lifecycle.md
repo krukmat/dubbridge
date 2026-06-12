@@ -63,7 +63,7 @@ Deliver a working, BDD-verified mobile asset lifecycle:
 | Mobile | `mobile/src/api/client.ts` | Add multipart-capable request method for `POST /ingest` |
 | Mobile | `mobile/src/screens/UploadScreen.tsx` (new) | Upload → rights → finalize 3-step flow |
 | Mobile | `mobile/src/navigation/RootNavigator.tsx` | Register the upload route + entry point from Home/List |
-| E2E backend | `scripts/e2e-seed/mock-gateway-server.mjs` | Serve `GET /api/assets`, `GET /api/assets/{id}`, `POST /api/ingest*` with an in-memory asset store |
+| E2E backend | `scripts/e2e-seed/mock-gateway-server.mjs` | Serve `GET /api/assets`, `GET /api/assets/{id}`, `POST /api/ingest*` with static seed fixtures |
 | BDD | `mobile/bdd/*.feature` (new) | Gherkin specs for list, detail, and ingestion |
 | Maestro | `mobile/maestro/*.yaml` (new) | Flows for list, detail, ingestion + screenshots |
 | Maestro | `mobile/maestro/seed-and-run.sh`, `mobile/package.json` | Runner integration + `npm run screenshots` |
@@ -117,16 +117,16 @@ so no gateway change is required.
 
 ### D4 — Mock-gateway `/api/*` fixtures (Maestro E2E backend)
 
-`mock-gateway-server.mjs` currently serves only health + `/auth/mobile/session`
+`mock-gateway-server.mjs` originally served only health + `/auth/mobile/session`
 ([mock-gateway-server.mjs](/Users/matias/Documents/projects/dubbridge/scripts/e2e-seed/mock-gateway-server.mjs)).
-It is extended with an in-memory asset store and these routes, all gated behind a
+It is extended with two static seed assets and these routes, all gated behind a
 resolved `X-Dubbridge-Session`:
 
-- `GET /api/assets` → ordered list from the in-memory store.
+- `GET /api/assets` → ordered list of the two static seed fixtures.
 - `GET /api/assets/{id}` → single asset or 404.
 - `POST /api/ingest`, `POST /api/ingest/{token}/rights`, `POST /api/ingest/{token}/finalize`
-  → drive a fixture asset from pending → finalized and insert it into the store so a
-  freshly uploaded asset appears in the subsequent list (the E2E narrative).
+  → return deterministic happy-path response shapes only; they do not mutate a
+  dynamic store.
 
 This is dev/test-only fixture code; it must never ship in a production path
 (ADR-026 fail-closed posture is unaffected because it lives under `scripts/e2e-seed/`).
@@ -162,7 +162,7 @@ flowchart TD
     T2["T2 · mobile list rewire<br/>(RRI 29)"]
     T3a["T3a · multipart client + upload screen<br/>(RRI 38)"]
     T3b["T3b · rights + finalize state machine<br/>(RRI 42)"]
-    T4["T4 · mock-gateway /api/* fixtures<br/>(RRI 31)"]
+    T4["T4 · mock-gateway /api/* fixtures<br/>(RRI 22)"]
     T5["T5 · Maestro flows + testIDs + screenshots<br/>(RRI 27)"]
     T6["T6 · runner + npm script + docs/roadmap sync<br/>(RRI 24)"]
 

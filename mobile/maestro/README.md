@@ -1,246 +1,286 @@
-# Maestro screenshot suite
+# Maestro screenshot suite — S-055 + S-060
 
-## Build strategy
+Reproducible five-phase screenshot capture for every DubBridge mobile screen on an
+Android emulator. S-055 (V1–V8) delivered phases 1–2; S-060 T6 integrated phases 3–5
+into the same one-command runner. Complete as of 2026-06-12.
 
-V2a decision (2026-06-07):
+## Overview
 
-- Use `npx expo prebuild --platform android` to materialize the managed Expo Android
-  project when the screenshot suite needs a debug build.
-- Build the APK from the generated native project with
-  `cd android && ./gradlew assembleDebug`.
-- Do not use `npx expo run:android` as the primary screenshot-build path. It is
-  useful for iterative local development, but `prebuild + gradlew assembleDebug`
-  gives P3-V a stable, inspectable debug-APK output path for Maestro and separates
-  the one-time native-project generation step from the actual APK build step.
+| Phase | Flow file | BDD scenarios | Screenshot |
+|---|---|---|---|
+| 1 — Auth surface | `auth-surface.yaml` | — | `01_auth_login.png` |
+| 2 — Authenticated audit | `authenticated-audit.yaml` | — | `02_home.png` |
+| 3 — Asset list (populated) | `asset-list.yaml` | `SC-LIST-1` | `03_asset_list.png` |
+| 3b — Asset list (empty) | `asset-list.yaml` | `SC-LIST-2` | `03_asset_list.png` |
+| 4 — Asset detail | `asset-detail.yaml` | `SC-DETAIL-1` | `04_asset_detail.png` |
+| 5 — Asset ingestion | `asset-ingestion.yaml` | `SC-INGEST-1` | `05_upload.png` |
 
-## Android project policy
+The list flow supports two mock-gateway seed modes:
 
-- The generated `android/` project is **not committed**.
-- The repository stays on the Expo managed-workflow source of truth
-  (`app.config.ts`, package manifests, JS/TS sources).
-- `android/` is regenerated on demand and ignored from the repo root via
-  `mobile/android/`.
+- default handoff (`POST /e2e/issue-handoff`) returns the two populated seed assets and captures the standard `03_asset_list` screenshot (phase 3 / SC-LIST-1).
+- empty handoff (`POST /e2e/issue-handoff?asset_seed=empty`) returns an empty list for that redeemed session and asserts `SC-LIST-2` (phase 3b).
 
-## Recorded identifiers for later tasks
+Phase 2 bootstraps a gateway session without UI login by redeeming a seeded one-time
+`handoff_code` into an opaque `session_ref` (ADR-024). No JWT or refresh token ever
+reaches the device or any Maestro artifact.
 
-- Android package / Maestro `appId`: `com.dubbridge.mobile`
-- Expected debug APK path after `assembleDebug`:
-  `mobile/android/app/build/outputs/apk/debug/app-debug.apk`
+## Prerequisites
 
-## Follow-up boundary
+Install each tool before running the suite:
 
-- V2a is decision-only. It does **not** run prebuild, Gradle, or emulator launch.
-- V2b executes the chosen build path and verifies the app launches past splash.
+| Tool | Install | Required for |
+|---|---|---|
+| `adb` | Android SDK platform-tools | emulator control |
+| Android emulator | Android Studio / `sdkmanager` | running the app |
+| `node` >= 18 | <https://nodejs.org> | seed scripts |
+| `maestro` | `brew install mobile-dev-inc/tap/maestro` | flow execution |
+| `curl` | pre-installed on macOS | health checks |
+
+The debug APK must exist at:
+
+```
+mobile/android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+If it does not exist, build it first:
+
+```sh
+cd mobile
+npx expo prebuild --platform android
+cd android && ./gradlew assembleDebug
+```
+
+See [V6b findings](#v6b-findings--phase-2-blockers-resolved) if the APK was built
+without the correct env vars set.
 
 ## Port map
 
-| Service | Host port | adb reverse mapping | Notes |
+| Service | Host port | `adb reverse` mapping | Notes |
 |---|---|---|---|
-| `apps/gateway` | `:8081` | `adb reverse tcp:8081 tcp:8081` | gateway and OAuth callback |
+| `apps/gateway` / `mock-gateway` | `:8081` | `adb reverse tcp:8081 tcp:8081` | gateway and OAuth callback |
 | `apps/api` | `:8080` | `adb reverse tcp:8080 tcp:8080` | REST data for authed screens |
 | Metro (JS bundler) | `:8082` | `adb reverse tcp:8082 tcp:8082` | deconflicted from gateway |
 | `mock-oauth` | `:9000` | none (host-only) | gateway contacts it directly |
 
-Metro runs on `:8082` — never `:8081` — to avoid a port collision with the gateway.
-The debug APK must be built (or rebuilt) after this change so the native Metro
-discovery URL matches `:8082`.
+Metro **must** run on `:8082` — never `:8081` — to avoid collision with the gateway.
 
-## Screenshot environment setup
+## Running the suite
 
-Source `mobile/maestro/screenshot-env.sh` into your shell before starting Metro:
+### One-command run (recommended)
 
 ```sh
-. mobile/maestro/screenshot-env.sh
-cd mobile && npx expo start --port 8082 --clear
-```
-
-The script exports `DUBBRIDGE_ENV=local`,
-`EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL=http://localhost:8081`, and
-`EXPO_PUBLIC_E2E_ENABLED=true`. It also normalizes local Android/Maestro tooling by
-exporting `ANDROID_SDK_ROOT=$HOME/Library/Android/sdk`, a Homebrew `openjdk@17`
-`JAVA_HOME`, and `/opt/homebrew/opt/maestro/bin` in `PATH` so Gradle and the
-Maestro CLI do not inherit a stale shell-level Java path. It is safe to commit —
-no secrets.
-
-## Runtime launch command
-
-- Source the screenshot env and start Metro on the deconflicted port:
-  `. mobile/maestro/screenshot-env.sh && cd mobile && npx expo start --port 8082 --clear`
-
-## Mock OAuth fixture for seed work
-
-- `V4a` adds a deterministic local OAuth token fixture at
-  `scripts/e2e-seed/mock-oauth-server.mjs`.
-- Run it from the repo root before `V4b` seed work:
-  `node scripts/e2e-seed/mock-oauth-server.mjs`
-- Health check:
-  `curl http://127.0.0.1:9000/health/live`
-- Local gateway config already targets this seam in [local.toml](/Users/matiasleandrokruk/Documents/dubbridge/config/local.toml:17):
-  `authorization_url = "http://localhost:9000/oauth/authorize"` and
-  `token_url = "http://localhost:9000/oauth/token"`.
-- The fixture returns a deterministic `TokenSet` for both
-  `grant_type=authorization_code` and `grant_type=refresh_token`:
-  `access_token=fixture-access-token`, `refresh_token=fixture-refresh-token`,
-  `expires_in=3600`, `token_type=Bearer`.
-- Important local-auth finding for later tasks: `apps/api` does not run
-  auth-disabled in local mode. By code inspection, it requires auth settings at
-  startup and builds an RSA JWT verifier from the configured public key, so a bare
-  opaque fixture access token is not sufficient for authenticated `/api/*` calls.
-  `V4b` must either keep its verification at the gateway/mobile-session boundary or
-  provide a JWT fixture compatible with the local verifier config.
-
-## Seed handoff-code mint
-
-- `V4b` adds the seed CLI at `scripts/e2e-seed/mint-handoff-code.mjs`.
-- Usage:
-  `node scripts/e2e-seed/mint-handoff-code.mjs --gateway-base-url http://127.0.0.1:8081`
-- Output contract:
-  - `auth.handoff_code`
-  - `auth.bootstrap_deeplink`
-  - `meta.gateway_base_url`
-  - `meta.return_uri`
-- The seed drives the real gateway flow:
-  `GET /auth/login?return_uri=...` → parse `state` from the auth redirect →
-  `GET /auth/callback?code=...&state=...` → extract `handoff_code` from the mobile
-  `Location` redirect.
-- The CLI fails closed if `--gateway-base-url` does not answer
-  `/health/ready` as `{ "service": "gateway", "status": "ready" }`. This matters in
-  local dev because `:8081` can still be occupied by Metro. If that happens, either
-  stop Metro or point `--gateway-base-url` at the actual gateway port.
-- The seed output never includes `access_token`, `refresh_token`, or a JWT-like
-  value. The single-use redeem proof stays in the verification harness, not in the
-  emitted JSON, so the emitted `handoff_code` remains usable by later tasks.
-
-## Dev bootstrap fallback
-
-- If the Android emulator blocks the browser-based login in Chrome first-run / ANR,
-  source the screenshot env (which already includes `EXPO_PUBLIC_E2E_ENABLED=true`)
-  and start Metro on `:8082`:
-  `. mobile/maestro/screenshot-env.sh && cd mobile && npx expo start --port 8082 --clear`
-- With that flag on, the app accepts an inbound
-  `dubbridge://auth/callback?handoff_code=...` deep link in `__DEV__`, redeems it
-  into an opaque `session_ref`, and enters the authed tree without relying on
-  Chrome/Custom Tabs.
-- Once V4b provides a real seed, the emulator bootstrap command shape is:
-  `adb shell am start -a android.intent.action.VIEW -d "dubbridge://auth/callback?handoff_code=<seeded-code>" com.dubbridge.mobile`
-
-## Maestro flows
-
-- `auth-surface.yaml` cold-launches the app, polls for ANR dialogs containing
-  `isn't responding`, waits for `id: login-screen`, and captures
-  `01_auth_login`.
-- `authenticated-audit.yaml` cold-launches the app, waits for `id: login-screen`,
-  opens `${SEED_BOOTSTRAP_DEEPLINK}`, polls again for ANR dialogs, waits for
-  `id: home-screen`, and captures `02_home`.
-- The ANR guard intentionally polls over multiple `waitForAnimationToEnd`
-  iterations instead of firing only once. On this emulator, a one-shot guard
-  could finish before the `Chrome isn't responding` dialog reappeared.
-
-## After `expo start`
-
-- Leave Metro running in that terminal.
-- In a second terminal, set up all three `adb reverse` mappings:
-  ```sh
-  adb reverse tcp:8081 tcp:8081   # gateway
-  adb reverse tcp:8080 tcp:8080   # apps/api
-  adb reverse tcp:8082 tcp:8082   # Metro (JS bundle)
-  ```
-- Install or refresh the debug APK:
-  `adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk`
-- Clear any stale app process before relaunch:
-  `adb shell am force-stop com.dubbridge.mobile`
-- Start the app explicitly:
-  `adb shell am start -n com.dubbridge.mobile/.MainActivity`
-- The success checkpoint for `V2b` is: the app passes the Android splash screen and
-  renders React UI on the emulator instead of hanging on splash.
-
-## Troubleshooting
-
-- If the app hangs on splash, confirm Metro is still running on `:8082` and repeat
-  all three reverse mappings:
-  ```sh
-  adb reverse tcp:8081 tcp:8081
-  adb reverse tcp:8080 tcp:8080
-  adb reverse tcp:8082 tcp:8082
-  ```
-- If `adb reverse tcp:8081` maps to Metro instead of the gateway (collision), stop
-  Metro, start the gateway, then restart Metro on `:8082` using the screenshot env.
-- If the app opens but shows `Missing DUBBRIDGE_ENV`, Metro alone was not enough;
-  rebuild with the same env vars applied to both:
-  `DUBBRIDGE_ENV=local EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL=http://localhost:8081 npx expo prebuild --platform android`
-  and
-  `cd android && DUBBRIDGE_ENV=local EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL=http://localhost:8081 ./gradlew assembleDebug`
-- If install fails due to stale package state, run:
-  `adb uninstall com.dubbridge.mobile`
-  and then reinstall the APK with `adb install -r`.
-- If the emulator window looks blank white or blank black even though the process
-  stays alive, verify the mounted screen via accessibility dump before treating it
-  as an app-logic failure:
-  `adb shell uiautomator dump /sdcard/window_dump.xml && adb pull /sdcard/window_dump.xml /tmp/window_dump.xml`
-  then inspect `/tmp/window_dump.xml` for nodes such as `resource-id="login-screen"`
-  or the text `DubBridge mobile`.
-  On `2026-06-07`, this proved the app had passed splash and mounted
-  `LoginScreen` even while the emulator surface rendered as a blank white frame.
-- If `authenticated-audit.yaml` fails on `id: home-screen`, verify the runtime
-  bootstrap independently before blaming the selector:
-  `adb shell am start -a android.intent.action.VIEW -d "dubbridge://auth/callback?handoff_code=<seeded-code>" com.dubbridge.mobile`
-  On `2026-06-08`, this manual deep-link probe still left the app on
-  `login-screen`, which means the Phase-2 blocker was the runtime bootstrap path,
-  not Maestro's `openLink` syntax.
-  On `2026-06-11`, all Phase-2 blockers were resolved — see V6b findings below.
-
-## V6b findings (2026-06-11) — Phase-2 blockers resolved
-
-Three independent root causes kept the app on `login-screen` after the deep link:
-
-1. **APK Metro port mismatch.** React Native's default dev server port is `:8081`.
-   The screenshot env runs Metro on `:8082` to avoid collision with `apps/gateway`.
-   The APK read `react_native_dev_server_port` from the compiled-in resource, which
-   defaulted to `8081`. Fix: add `reactNativeDevServerPort=8082` to
-   `mobile/android/gradle.properties` and rebuild.
-
-2. **`app.config` asset baked with null values.** `expo-constants` reads
-   `assets/app.config` at runtime to populate `Constants.expoConfig?.extra`. That
-   file is generated by `expo prebuild`. When prebuild ran without `DUBBRIDGE_ENV`
-   set, `process.env.DUBBRIDGE_ENV` serialized as `{}` (not `null`).
-   The app showed `config-error-screen` instead of `login-screen`.
-   Fix: create `mobile/android/app/src/main/assets/app.config` with the correct
-   values before `assembleDebug`. Gradle's `mergeDebugAssets` picks it up.
-
-3. **Gateway not available for `POST /auth/mobile/session`.** The real Rust gateway
-   requires PostgreSQL + Redis + first compilation. The handoff code redemption
-   call failed silently (10 s timeout → `login_failed` state), leaving the app on
-   `login-screen`. Fix: `scripts/e2e-seed/mock-gateway-server.mjs` — a minimal
-   Node.js gateway stub that serves `GET /health/ready` and
-   `POST /auth/mobile/session`. Pre-seed a code with `POST /e2e/issue-handoff`.
-
-4. **`SEED_BOOTSTRAP_DEEPLINK` not passed to Maestro.** Shell `export` inside a
-   compound command (`export X=Y && maestro test`) did not propagate the var into
-   the Maestro process (arrived as `undefined`). Fix: use
-   `maestro test --env SEED_BOOTSTRAP_DEEPLINK=<value>`.
-
-## Running the full Phase-2 flow
-
-```sh
-# 1. Start supporting services
+# From repo root — start supporting services first
 node scripts/e2e-seed/mock-oauth-server.mjs &
 node scripts/e2e-seed/mock-gateway-server.mjs &
 
-# 2. Start Metro (if not already running)
+# Then run the full suite (all 5 phases)
+cd mobile && npm run screenshots
+```
+
+`npm run screenshots` calls `bash maestro/seed-and-run.sh`, which:
+
+1. Checks dependencies (`adb`, `node`, `curl`, `maestro`).
+2. Detects the running Android emulator and installs the debug APK.
+3. Waits for gateway `:8081/health/ready` and api `:8080` to be ready.
+4. Starts Metro on `:8082` if not already running.
+5. Sets all three `adb reverse` mappings.
+6. Runs **Phase 1** (`auth-surface.yaml`) — captures `01_auth_login.png`.
+7. Mints a handoff code; runs **Phase 2** (`authenticated-audit.yaml`) — captures `02_home.png`.
+8. Mints a handoff code; runs **Phase 3** (`asset-list.yaml` / SC-LIST-1) — captures `03_asset_list.png`.
+9. Mints an empty handoff code; runs **Phase 3b** (`asset-list.yaml` / SC-LIST-2) — captures `03_asset_list.png` (empty state).
+10. Mints a handoff code; runs **Phase 4** (`asset-detail.yaml` / SC-DETAIL-1) — captures `04_asset_detail.png`.
+11. Mints a handoff code; runs **Phase 5** (`asset-ingestion.yaml` / SC-INGEST-1) — captures `05_upload.png`.
+12. Copies all PNGs to `mobile/artifacts/screenshots/`.
+13. Sanitizes `handoff_code` and `session_ref` from all Maestro JSON reports.
+14. Asserts no sensitive values remain in reports.
+
+Set `START_MOCK_SERVERS=1` to have the script start mock-oauth and mock-gateway
+automatically:
+
+```sh
+START_MOCK_SERVERS=1 npm run screenshots
+```
+
+### Manual step-by-step
+
+If you need to run phases independently:
+
+```sh
+# 1. Source the screenshot env
 . mobile/maestro/screenshot-env.sh
+
+# 2. Start supporting services
+node scripts/e2e-seed/mock-oauth-server.mjs &
+node scripts/e2e-seed/mock-gateway-server.mjs &
+
+# 3. Start Metro on :8082
 cd mobile && npx expo start --port 8082 --clear &
 
-# 3. adb reverse
+# 4. Set adb reverse mappings
 adb reverse tcp:8081 tcp:8081
 adb reverse tcp:8080 tcp:8080
 adb reverse tcp:8082 tcp:8082
 
-# 4. Issue handoff code
-DEEPLINK=$(curl -s -X POST http://127.0.0.1:8081/e2e/issue-handoff \
-  | python3 -c "import json,sys; print(json.load(sys.stdin)['auth']['bootstrap_deeplink'])")
+# 5. Install APK
+adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk
 
-# 5. Run Phase 2
-. mobile/maestro/screenshot-env.sh
-maestro test --env SEED_BOOTSTRAP_DEEPLINK="$DEEPLINK" \
-  mobile/maestro/authenticated-audit.yaml
+# 6. Phase 1 — auth surface
+maestro test mobile/maestro/auth-surface.yaml \
+  --test-output-dir /tmp/dubbridge-maestro-auth
+
+# 7. Mint a handoff code
+DEEPLINK=$(curl -sf -X POST http://127.0.0.1:8081/e2e/issue-handoff \
+  | node -e "const d=require('fs').readFileSync('/dev/stdin','utf8'); \
+             console.log(JSON.parse(d).auth.bootstrap_deeplink)")
+
+# 8. Phase 2 — authenticated home
+maestro test mobile/maestro/authenticated-audit.yaml \
+  --test-output-dir /tmp/dubbridge-maestro-authed \
+  --env SEED_BOOTSTRAP_DEEPLINK="$DEEPLINK"
+
+# 9. Mint a new code; Phase 3 — asset list (SC-LIST-1)
+DEEPLINK=$(curl -sf -X POST http://127.0.0.1:8081/e2e/issue-handoff \
+  | node -e "const d=require('fs').readFileSync('/dev/stdin','utf8'); \
+             console.log(JSON.parse(d).auth.bootstrap_deeplink)")
+maestro test mobile/maestro/asset-list.yaml \
+  --test-output-dir /tmp/dubbridge-maestro-asset-list \
+  --env SEED_BOOTSTRAP_DEEPLINK="$DEEPLINK"
+
+# 10. Phase 3b — asset list empty (SC-LIST-2)
+EMPTY_DEEPLINK=$(curl -sf -X POST \
+  "http://127.0.0.1:8081/e2e/issue-handoff?asset_seed=empty" \
+  | node -e "const d=require('fs').readFileSync('/dev/stdin','utf8'); \
+             console.log(JSON.parse(d).auth.bootstrap_deeplink)")
+maestro test mobile/maestro/asset-list.yaml \
+  --test-output-dir /tmp/dubbridge-maestro-asset-list-empty \
+  --env SEED_BOOTSTRAP_DEEPLINK="$EMPTY_DEEPLINK"
+
+# 11. Phase 4 — asset detail (SC-DETAIL-1)
+DEEPLINK=$(curl -sf -X POST http://127.0.0.1:8081/e2e/issue-handoff \
+  | node -e "const d=require('fs').readFileSync('/dev/stdin','utf8'); \
+             console.log(JSON.parse(d).auth.bootstrap_deeplink)")
+maestro test mobile/maestro/asset-detail.yaml \
+  --test-output-dir /tmp/dubbridge-maestro-asset-detail \
+  --env SEED_BOOTSTRAP_DEEPLINK="$DEEPLINK"
+
+# 12. Phase 5 — ingestion (SC-INGEST-1); requires EXPO_PUBLIC_E2E_ENABLED=true in APK
+DEEPLINK=$(curl -sf -X POST http://127.0.0.1:8081/e2e/issue-handoff \
+  | node -e "const d=require('fs').readFileSync('/dev/stdin','utf8'); \
+             console.log(JSON.parse(d).auth.bootstrap_deeplink)")
+maestro test mobile/maestro/asset-ingestion.yaml \
+  --test-output-dir /tmp/dubbridge-maestro-asset-ingestion \
+  --env SEED_BOOTSTRAP_DEEPLINK="$DEEPLINK"
 ```
+
+Note: always pass `SEED_BOOTSTRAP_DEEPLINK` via `--env` to Maestro, not via shell
+`export`. A shell `export` inside a compound command does not propagate into the
+Maestro process (V6b finding).
+
+`asset-ingestion.yaml` requires `EXPO_PUBLIC_E2E_ENABLED=true` baked into the APK:
+the upload screen then skips manual rights entry, starts at the `Pick file` step with
+seeded rights metadata, and injects the deterministic `dubbridge-e2e-upload.mov` asset
+for screenshot capture.
+
+## Screen testID convention
+
+Every screen captured by Maestro exposes a stable `testID` on its root view:
+
+| Screen | `testID` |
+|---|---|
+| `LoginScreen` | `login-screen` |
+| `HomeScreen` | `home-screen` |
+| `AssetListScreen` | `asset-list-screen` |
+| `AssetDetailScreen` | `asset-detail-screen` |
+| `UploadScreen` | `upload-screen` |
+| `ConfigErrorScreen` | `config-error-screen` |
+
+New screens added to the suite must follow the pattern `<feature>-screen`.
+
+## Troubleshooting
+
+### App hangs on splash screen
+
+Metro is not reachable from the emulator. Confirm Metro is running on `:8082` (not
+`:8081`) and repeat all three reverse mappings:
+
+```sh
+adb reverse tcp:8081 tcp:8081
+adb reverse tcp:8080 tcp:8080
+adb reverse tcp:8082 tcp:8082
+```
+
+If the APK was built before the port was changed to `:8082`, rebuild it with
+`gradle.properties` containing `reactNativeDevServerPort=8082`:
+
+```sh
+cd mobile
+npx expo prebuild --platform android
+cd android && ./gradlew assembleDebug
+```
+
+### App shows "Missing DUBBRIDGE_ENV" or config error screen
+
+The APK baked null env values at prebuild time. Rebuild with the env vars set:
+
+```sh
+DUBBRIDGE_ENV=local \
+EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL=http://localhost:8081 \
+EXPO_PUBLIC_E2E_ENABLED=true \
+npx expo prebuild --platform android
+
+cd android && \
+DUBBRIDGE_ENV=local \
+EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL=http://localhost:8081 \
+./gradlew assembleDebug
+```
+
+### ANR dialog — "Chrome isn't responding"
+
+The Maestro flows include an ANR guard that polls over 20 iterations of
+`waitForAnimationToEnd`. If the dialog reappears after the guard, increase the
+`repeat.times` value in the affected flow file or dismiss manually and re-run.
+
+### Phase 2 fails on `id: home-screen` (app stays on login screen)
+
+Verify the bootstrap independently before blaming the Maestro selector:
+
+```sh
+adb shell am start -a android.intent.action.VIEW \
+  -d "dubbridge://auth/callback?handoff_code=<seeded-code>" \
+  com.dubbridge.mobile
+```
+
+If this manual probe also leaves the app on `login-screen`, the blocker is the runtime
+bootstrap path, not the Maestro YAML. Check:
+
+1. `mock-gateway-server` is running and `POST /auth/mobile/session` returns `{ session_ref }`.
+2. `EXPO_PUBLIC_E2E_ENABLED=true` was set when the APK was built.
+3. The handoff code has not expired (90 s TTL) or been redeemed already.
+
+### APK install fails
+
+```sh
+adb uninstall com.dubbridge.mobile
+adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+## V6b findings — Phase-2 blockers resolved
+
+Three independent root causes kept the app on `login-screen` after the deep link
+(resolved 2026-06-11):
+
+1. **APK Metro port mismatch.** The React Native default dev server port is `:8081`.
+   Fix: add `reactNativeDevServerPort=8082` to `mobile/android/gradle.properties` and
+   rebuild the APK.
+
+2. **`app.config` asset baked with null values.** When `expo prebuild` ran without
+   `DUBBRIDGE_ENV` set, `process.env.DUBBRIDGE_ENV` serialized as `{}`. Fix: set env
+   vars before `expo prebuild` and `assembleDebug`.
+
+3. **Gateway not available for `POST /auth/mobile/session`.** The real Rust gateway
+   requires PostgreSQL + Redis. Fix: use `scripts/e2e-seed/mock-gateway-server.mjs`,
+   which serves `GET /health/ready` and `POST /auth/mobile/session` in-process.
+
+4. **`SEED_BOOTSTRAP_DEEPLINK` not passed to Maestro.** Shell `export` inside a
+   compound command did not propagate into the Maestro process. Fix: pass via
+   `maestro test --env SEED_BOOTSTRAP_DEEPLINK=<value>`.

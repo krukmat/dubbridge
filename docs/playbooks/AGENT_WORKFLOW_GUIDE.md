@@ -20,8 +20,10 @@
      success flow the task must implement or preserve;
    - at least one **edge case example** with a stable `EC-#` ID — a concrete
      boundary, invalid-input, or failure flow the task must handle or reject.
-4. **Present and wait** — show the plan and tasks and wait for explicit approval
-   before starting implementation, even if a plan was approved in a prior session.
+4. **Gate by RRI** — compute RRI with `scripts/rri.py`. For RRI 0–25, skip the
+   full human approval presentation and use local Gemma delegation through Ollama.
+   For RRI 26+, show the plan and tasks and wait for explicit approval before
+   starting implementation, even if a plan was approved in a prior session.
 5. **Implement** — one task at a time, in the defined order.
 6. **Mark progress** — update the tasks document after each completed task (it is
    the crash-safe progress ledger).
@@ -56,7 +58,9 @@
 ## Per-task discipline
 
 - Present the next task using the `AGENTS.md` presentation contract before executing
-  it when approval is required.
+  it when approval is required. For RRI 0–25, do not present the full task for
+  approval; prepare a local delegation packet for Gemma and report after review
+  and verification.
 - **Pre-task summary for development tasks:** when the task will write or modify
   code, the task presentation must include two explicit sections:
   - **Happy paths considered** — the primary success flows the agent expects to
@@ -87,7 +91,8 @@
   prompt or blocking-gate language that names the completed work.
 - When an ADR is created, amended, or deleted as part of a task, apply the
   **ADR change propagation** contract below in the same workflow pass.
-- Work on the approved task only; show a summary before switching to the next.
+- Work on the approved or delegated task only; show a summary before switching to
+  the next.
 - **Post-task summary for development tasks:** when the completed task involves writing
   or modifying code, the summary must include two explicit sections:
   - **Happy paths covered** — the primary success flows exercised by the implementation
@@ -221,8 +226,14 @@ Concrete vendor model IDs change over time. Agents must therefore separate:
 
 Do not collapse these into one undocumented guess.
 
-When presenting a task, the agent must compute a complexity score and derive the
-recommended model tier from it. Do not guess; use the procedure below.
+The **RRI 0–25 Low band** is the exception to vendor model resolution: it uses
+local Gemma delegation through Ollama. Resolve the local model from
+`DUBBRIDGE_LOW_RRI_MODEL`, defaulting to `gemma4:12b-it-q4_K_M`, and the
+Ollama endpoint from `OLLAMA_HOST`, defaulting to `http://localhost:11434`.
+
+When preparing a task for presentation or local delegation, the agent must compute
+a complexity score and derive the recommended model tier or local delegation
+target from it. Do not guess; use the procedure below.
 
 ### RRI — canonical scoring method (adopted 2026-06-04)
 
@@ -243,11 +254,13 @@ scoring and model selection, so the adoption is binding from this file alone.
 - The tier mapping in Step 2 is now driven by the **RRI band** (not the raw CC
   label). The tier names (Economy / Balanced / Premium) and thinking-mode rules
   are unchanged; only the input that selects the tier changes.
-- Step 3 is updated to include the RRI score in the task presentation.
+- Step 3 is updated to include the RRI score in the task presentation for RRI 26+,
+  or in the local delegation packet and final report for RRI 0–25.
 
-When presenting any task: **run `scripts/rri.py`** — do not compute the RRI by hand.
+Before presenting or delegating any task: **run `scripts/rri.py`** — do not compute the RRI by hand.
 The script measures F automatically and maps raw CC to the C score via the policy
-table. Paste its markdown output directly into the task presentation.
+table. Paste its markdown output directly into the task presentation for RRI 26+,
+or into the local delegation packet and final report for RRI 0–25.
 
 ```bash
 # Task-presentation time (before code is written — diff is empty):
@@ -333,6 +346,9 @@ Mapping (now driven by RRI band — see the canonical crosswalk in
 
 Agent-specific resolution rules:
 
+- For RRI 0–25, use the local Ollama/Gemma delegation protocol in
+  `docs/policies/RRI_POLICY.md § Low RRI local delegation`; do not resolve to a
+  cloud vendor model.
 - Resolve each capability label to the best currently available model in the
   active agent environment.
 - When naming a concrete vendor model ID, verify the current vendor guidance
@@ -367,9 +383,11 @@ constraints, novel algorithmic design, or diagnosis of non-deterministic failure
 Do **not** activate for: writing tests for already-specified logic, config edits,
 doc updates, or any task where the strategy is fully pre-defined.
 
-### Step 3 — State it in the task presentation
+### Step 3 — State it in the task presentation or delegation packet
 
-Include in every task presentation:
+For RRI 26+, include this block in the task presentation. For RRI 0–25, include it
+in the local Gemma delegation packet and final report instead of presenting the
+full task for approval:
 
 ```
 | RRI              | <score> → band <label> → gates: <list>                  |
@@ -379,8 +397,9 @@ Include in every task presentation:
 ```
 
 Present the full RRI variable table (variable | score | evidence | confidence)
-before this summary block. See `docs/policies/RRI_POLICY.md` for the reporting
-format.
+before this summary block when a human approval presentation is required. For
+RRI 0–25, place the same table in the local delegation packet and final report.
+See `docs/policies/RRI_POLICY.md` for the reporting format.
 
 The recommendation is **not** a competition between vendors. Every presentation
 must provide:
@@ -391,6 +410,9 @@ must provide:
 Both recommendations must be derived from the same computed complexity and the
 same tier-mapping rules in this guide. Do not present only one vendor unless the
 task file explicitly scopes the task to a single vendor environment.
+
+For RRI 0–25, replace both vendor recommendations with the resolved local Gemma
+model and note that the active agent remains the reviewer/orchestrator.
 
 Presentation rules:
 
@@ -429,15 +451,26 @@ Presentation rules:
 
 ## Handoff prompt format
 
-Keep handoff prompts minimal. The task was already presented and approved — do not re-explain it.
+Keep handoff prompts minimal. The task was already presented and approved, or it
+is in the RRI 0–25 local-delegation band — do not re-explain it.
 
-A handoff prompt must contain only:
+A human-agent handoff prompt must contain only:
 
 1. Task ID + one-line goal
 2. Governing docs (task file + plan file, paths only)
 3. The one file + line range with the logic to change
 4. Exact acceptance criteria (bullets only, no prose)
 5. Stop condition: what the agent must do last and must NOT start next
+
+For RRI 0–25 local Gemma delegation, build a delegation packet instead of the
+human-agent handoff prompt. It must contain only: task excerpt, acceptance
+criteria, RRI output, allowed paths, relevant file snippets, and stop conditions.
+Send the packet with `scripts/delegate-low-rri.py`, which performs the local
+Ollama request with schema-constrained JSON and the repository timeout. Gemma
+must return structured JSON with a unified diff; the delegating agent must
+validate the diff, personally review the solution against the requirements, run
+verification, and perform at most one bounded repair cycle before escalating.
+Gemma must not evaluate or approve its own delegated work.
 
 ## Language
 

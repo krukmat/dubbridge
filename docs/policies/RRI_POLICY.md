@@ -13,8 +13,9 @@ requires before an AI agent may safely implement it.
 RRI **determines the approval gate and evidence required** before an agent may
 implement a task. For bands **RRI 26+**, the HITL approval checkpoint is
 mandatory; what the band controls is what evidence the agent must bring to it.
-For band **RRI 0–25**, the agent uses show-and-proceed — no approval checkpoint
-(see `docs/policies/HITL_AUTONOMY_POLICY.md` for the full rule).
+For band **RRI 0–25**, the agent skips the full human approval presentation and
+delegates execution to local Gemma through Ollama, then reviews, verifies, and
+reports the result (see `docs/policies/HITL_AUTONOMY_POLICY.md` for the full rule).
 
 ## Formula
 
@@ -171,15 +172,16 @@ Apply each penalty independently; they are additive.
 ## Bands, autonomy gates, and model tiers
 
 The HITL approval requirement applies at every band **except RRI 0–25**, which
-uses show-and-proceed (see below). For all other bands, what the band controls is
-the evidence and gates the agent must satisfy before and after that approval.
+uses local Gemma delegation (see below). For all other bands, what the band
+controls is the evidence and gates the agent must satisfy before and after that
+approval.
 
 Effort, capability, thinking, and gate are each derived **in parallel** from the RRI
 band — never derive one output from another (e.g. do not infer capability from Effort).
 
 | RRI band | Label | Effort | Capability (Codex) | Capability (Claude Code) | Thinking | Gate |
 |---|---|---|---|---|---|---|
-| **0–25** | Low | **S** | Economy | Economy | Off | **Auto-execute:** present the RRI table and a one-line summary of intended actions, then begin implementation immediately — no approval checkpoint, no pause. |
+| **0–25** | Low | **S** | Local Gemma via Ollama | Local Gemma via Ollama | Off | **Local delegation:** do not present the full task for approval; delegate to local Gemma, validate and apply only an in-scope diff, review against requirements, verify, and report. |
 | **26–40** | Moderate | **M** | Balanced | Balanced | Off | Confirm tests exist in the affected area. |
 | **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Plan + explicit acceptance criteria required before approval. |
 | **56–70** | Complex | **L** | Premium | Premium | On | Plan first. Do not implement before producing and approving a clear plan. Human reviews the plan. |
@@ -189,14 +191,104 @@ band — never derive one output from another (e.g. do not infer capability from
 
 ### Model tier resolution
 
-The capability labels above (Economy / Balanced / Premium) map to concrete model IDs
-per the resolution table in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` (Model tier
-resolution). Resolve against official vendor documentation at task-presentation time —
-do not rely on stale memory for "latest" or "best".
+For RRI 26+, the capability labels above (Balanced / Premium) map to concrete model
+IDs per the resolution table in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` (Model
+tier resolution). Resolve against official vendor documentation at
+task-presentation time — do not rely on stale memory for "latest" or "best".
+
+The Low band is special: it resolves to the local Ollama/Gemma delegation path,
+not to a cloud vendor model recommendation. Use `OLLAMA_HOST` when set, otherwise
+`http://localhost:11434`. Use `DUBBRIDGE_LOW_RRI_MODEL` when set, otherwise
+`gemma4:12b-it-q4_K_M`.
 
 Thinking mode: activate for Balanced→Premium and above when the task requires
 multi-step reasoning that cannot be validated incrementally. Do **not** activate
 for config edits, doc updates, or tasks where the strategy is fully pre-defined.
+
+### Low RRI local delegation
+
+For final **RRI 0–25**, the active agent remains the orchestrator and reviewer.
+Gemma has no direct filesystem or shell authority; it returns **full file
+contents** plus verification intent, and the caller (the script + orchestrating
+agent) deterministically builds the diff and applies it. Gemma must not evaluate,
+approve, or mark its own delegated work as complete; the delegating agent owns
+that decision.
+
+**Why file contents, not a diff:** small local models reliably write correct file
+bodies but botch unified-diff framing — merged hunks, missing headers, wrong line
+counts — especially across multiple files. The model returns each changed file in
+full; the script constructs the diff with `git diff --no-index` (git owns all hunk
+framing) and applies it with `git apply`. The failure-prone step never runs in the
+model.
+
+Use `scripts/delegate-low-rri.py` to communicate with Ollama. The wrapper avoids
+shell-quoting failures, checks that the resolved model is installed, and uses the
+`/api/chat` endpoint with **`stream: true`**. Each received token resets an
+idle-timeout (default 60 s); a separate max-wall cap (default 900 s) guards
+against runaway generation. This distinguishes a stalled Gemma (no tokens for 60 s
+→ exit 124) from a slow but working one (tokens still arriving), making the
+delegation reliable at any generation speed without imposing a blind wall-clock
+timeout against total generation time.
+
+**Always invoke the script in the background from an agent** so the agent's Bash
+tool timeout (typically 120 s) does not abort a legitimately long generation:
+
+```bash
+# 1. Write the packet to a file (avoids shell-quoting issues with heredocs).
+# 2. Delegate in the background; agent is notified on completion. Pass the
+#    in-scope path set with --allow-path; --apply builds and applies the diff.
+scripts/delegate-low-rri.py packet.md \
+  --allow-path scripts/ --apply --out result.json
+# Exit 0  → read result.json (includes the built unified_diff + apply_result)
+# Exit 124 → Gemma stalled (idle) or hit the max-wall cap; escalate
+# Exit 2   → Ollama unreachable
+# Exit 1   → validation / out-of-scope path / git apply failure
+```
+
+`--allow-path` is **required** whenever files are written: any returned path
+outside the declared prefixes/globs (or escaping the repo) is rejected before any
+diff is built. Omit `--apply` to build the diff and inspect it without touching
+the tree; the script still writes the diff into `result.json` under
+`unified_diff`.
+
+The wrapper resolves:
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint |
+| `DUBBRIDGE_LOW_RRI_MODEL` | `gemma4:12b-it-q4_K_M` | Local model |
+| `DUBBRIDGE_LOW_RRI_IDLE_TIMEOUT_SECONDS` | `60` | Seconds without a token = stall |
+| `DUBBRIDGE_LOW_RRI_MAX_WALL_SECONDS` | `900` | Hard generation cap |
+| `DUBBRIDGE_LOW_RRI_NUM_CTX` | `16384` | Context window for packet + schema |
+
+Gemma's response content must be JSON with full file contents (never a diff):
+
+```json
+{
+  "status": "patch",
+  "summary": "<short implementation summary>",
+  "files": [
+    {"path": "<repo-relative path>",
+     "action": "create | modify | delete",
+     "contents": "<COMPLETE final file contents>"}
+  ],
+  "test_commands": ["<command>"],
+  "risk_notes": ["<note>"]
+}
+```
+
+The script then enforces the allowed-path scope, builds the unified diff with git,
+and (with `--apply`) runs `git apply --check` followed by `git apply`, recording
+the diff under `unified_diff` and the outcome under `apply_result` in the result
+JSON. The orchestrator must still personally evaluate the applied result against
+all task requirements and acceptance criteria, and run the required checks — this
+evaluation is performed by the delegating agent, not by Gemma. If requirements are
+missed or checks fail, the orchestrator may run one bounded repair request through
+Gemma with the same allowed paths and the failure evidence. A second failure, an
+out-of-scope path, invalid JSON, unavailable Ollama/model, or a post-application
+RRI above 25 must escalate to the normal human-gated workflow. If the delegation
+times out (exit 124), report it explicitly as `Gemma timeout (idle|wall)` in the
+final task summary.
 
 ## Decomposition triggers
 
@@ -216,7 +308,9 @@ Split a task into subtasks before implementing if **any** of the following apply
 
 ## Reporting format
 
-Before every implementation, present the RRI as a table:
+Before every implementation, compute the RRI as a table. For RRI 26+, present it
+in the task approval packet. For RRI 0–25, include it in the local delegation
+packet and final report instead of presenting the full task for approval.
 
 | Variable | Score | Evidence | Confidence |
 |---|---|---|---|
@@ -335,7 +429,7 @@ block. Do not reformat or recompute. The script output **is** the RRI report.
 ## Related
 
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` — highest authority; adopts this policy
-- `docs/policies/HITL_AUTONOMY_POLICY.md` — approval requirements and show-and-proceed rule
+- `docs/policies/HITL_AUTONOMY_POLICY.md` — approval requirements and local delegation rule
 - `docs/tasks/rri-integration.md` — integration task ledger
 - `scripts/rri.py` — canonical calculator
-- `scripts/rri_test.py` — unit tests (29 vectors; run via `make qa-rri`)
+- `scripts/rri_test.py` — unit tests (run via `make qa-rri`)

@@ -92,7 +92,11 @@ export function AssetDetailScreen({
   }, [assetId, auth, gatewayBaseUrl]);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      testID="asset-detail-screen"
+      style={styles.container}
+      contentContainerStyle={styles.content}
+    >
       <View style={styles.header}>
         <Text style={styles.kicker}>Gateway asset detail</Text>
         <Text style={styles.title}>Asset detail</Text>

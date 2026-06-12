@@ -605,6 +605,195 @@ async fn concurrent_rights_and_finalize_is_consistent() {
     );
 }
 
+// T1 HP-1: authenticated assets:read caller with owned assets returns them ordered created_at DESC.
+#[tokio::test]
+async fn list_assets_returns_owned_assets_ordered_by_created_at_desc() {
+    let Some(mut ctx) = TestContext::new().await else {
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    // Create two assets for the principal via the ingest flow.
+    let auth_token = ctx.ingest_token.clone();
+    let t1 = create_ingestion(&mut ctx).await;
+    submit_rights(&mut ctx, t1, valid_rights_body()).await;
+    let r1 = finalize(&mut ctx, t1, &auth_token).await;
+    assert_eq!(r1.status(), StatusCode::CREATED);
+    let b1 = json_body(r1).await;
+
+    let t2 = create_ingestion(&mut ctx).await;
+    submit_rights(&mut ctx, t2, valid_rights_body()).await;
+    let r2 = finalize(&mut ctx, t2, &auth_token).await;
+    assert_eq!(r2.status(), StatusCode::CREATED);
+    let b2 = json_body(r2).await;
+
+    let response = ctx
+        .app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/assets")
+                .header(header::AUTHORIZATION, format!("Bearer {}", ctx.read_token))
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    let status = response.status();
+    let body = json_body(response).await;
+
+    assert_eq!(status, StatusCode::OK);
+    let arr = body.as_array().expect("array");
+    assert_eq!(arr.len(), 2);
+
+    // Both assets belong to the authenticated principal.
+    let uploader_str = ctx.principal_id.to_string();
+    for item in arr {
+        assert_eq!(item["uploader_id"].as_str().expect("uploader_id"), uploader_str);
+    }
+
+    // Most-recently created asset is first.
+    let id0 = arr[0]["id"].as_str().expect("id[0]");
+    let id1 = arr[1]["id"].as_str().expect("id[1]");
+    assert_eq!(id0, b2["id"].as_str().expect("b2 id"));
+    assert_eq!(id1, b1["id"].as_str().expect("b1 id"));
+}
+
+// T1 HP-2: caller with no owned assets gets 200 with an empty array.
+#[tokio::test]
+async fn list_assets_empty_for_caller_with_no_assets() {
+    let Some(ctx) = TestContext::new().await else {
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    let response = ctx
+        .app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/assets")
+                .header(header::AUTHORIZATION, format!("Bearer {}", ctx.read_token))
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = json_body(response).await;
+    assert_eq!(body.as_array().expect("array").len(), 0);
+}
+
+// T1 EC-3: assets owned by a different principal must never appear in the list.
+#[tokio::test]
+async fn list_assets_excludes_other_principals_assets() {
+    let Some(mut ctx) = TestContext::new().await else {
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    // Insert an asset directly for a different uploader_id.
+    let other_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO assets (id, title, uploader_id, status) VALUES ($1, $2, $3, $4)",
+    )
+    .bind(Uuid::new_v4())
+    .bind("other-owner asset")
+    .bind(other_id)
+    .bind("finalized")
+    .execute(&ctx.pool)
+    .await
+    .expect("insert other asset");
+
+    // Also create one owned asset for the principal.
+    let auth_token = ctx.ingest_token.clone();
+    let t = create_ingestion(&mut ctx).await;
+    submit_rights(&mut ctx, t, valid_rights_body()).await;
+    let r = finalize(&mut ctx, t, &auth_token).await;
+    assert_eq!(r.status(), StatusCode::CREATED);
+
+    let response = ctx
+        .app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/assets")
+                .header(header::AUTHORIZATION, format!("Bearer {}", ctx.read_token))
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    let status = response.status();
+    let body = json_body(response).await;
+
+    assert_eq!(status, StatusCode::OK);
+    let arr = body.as_array().expect("array");
+    assert_eq!(arr.len(), 1, "only the principal's own asset must be returned");
+    assert_eq!(
+        arr[0]["uploader_id"].as_str().expect("uploader_id"),
+        ctx.principal_id.to_string()
+    );
+}
+
+// T1 EC-2: limit above hard cap is clamped — no error, bounded result.
+#[tokio::test]
+async fn list_assets_limit_is_clamped_to_max() {
+    let Some(ctx) = TestContext::new().await else {
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    let response = ctx
+        .app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/assets?limit=99999&offset=0")
+                .header(header::AUTHORIZATION, format!("Bearer {}", ctx.read_token))
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    // Must not error — clamped limit returns 200 with (empty) array.
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = json_body(response).await;
+    assert!(body.is_array(), "response must be an array");
+}
+
+// T1 EC-1 / unauthenticated: missing bearer must be rejected with 401.
+#[tokio::test]
+async fn list_assets_missing_bearer_is_unauthorized() {
+    let Some(ctx) = TestContext::new().await else {
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    let response = ctx
+        .app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/assets")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
 fn make_finalize_request(ingest_token: Uuid, auth_token: &str) -> Request<Body> {
     Request::builder()
         .method("POST")

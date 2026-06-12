@@ -21,15 +21,16 @@
 ## Task dependency order
 
 ```text
-S-160-T0 (BDD) ─▶ S-160-T1 (schema+domain+repos) ─▶ S-160-T2 (review state machine + publication gate + audit) ─▶ S-160-T3 (review/publication API) ─┬─▶ S-160-T4 (notifications) ─┬─▶ S-160-T5 (web console) ─┐
-                                                                                                                                          │                          ├─▶ S-160-T6 (mobile + push) ┤
-                                                                                                                                          └──────────────────────────┴─▶ S-160-T7 (E2E + docs) ◀───┘
+S-160-T0 (BDD) ─▶ S-160-T0b (ADR X-S-160-1) ─▶ S-160-T1 (schema+domain+repos) ─▶ S-160-T2 (review state machine + publication gate + audit) ─▶ S-160-T3 (review/publication API) ─┬─▶ S-160-T4 (notifications) ─┬─▶ S-160-T5 (web console) ─┐
+                                                                                                                                                                        │                          ├─▶ S-160-T6 (mobile + push) ┤
+                                                                                                                                                                        └──────────────────────────┴─▶ S-160-T7 (E2E + docs) ◀───┘
 ```
 
 | Task | Title | Depends on | RRI | Band | Effort |
 |---|---|---|---|---|---|
 | S-160-T0 | BDD `.feature` specs + mapping | — | 11 | Low | S |
-| S-160-T1 | Schema + domain + repos (review/decisions/publications) | S-160-T0 | 63 | Complex | L |
+| S-160-T0b | ADR authoring: review/decision/publication gate model (X23 → X-S-160-1) | S-160-T0 | 18 | Low | S |
+| S-160-T1 | Schema + domain + repos (review/decisions/publications) | S-160-T0b | 63 | Complex | L |
 | S-160-T2 | Review state machine + publication gate + audit | S-160-T1 | 66 | Complex | L |
 | S-160-T3 | Review/publication API | S-160-T2 | 44 | Med-high | L |
 | S-160-T4 | Notifications mechanism (table + emit + push) | S-160-T3 | 66 | Complex | L |
@@ -117,7 +118,51 @@ S-160-T0 (BDD) ─▶ S-160-T1 (schema+domain+repos) ─▶ S-160-T2 (review sta
   > S-160-T0 — author BDD specs. Docs: this ledger + plan §D1–§D6. Create
   > `docs/bdd/p5-review.feature` (SC-REVIEW-1/2/3, SC-PUBLISH-1/2, SC-NOTIFY-1) and append
   > mapping rows to `docs/bdd/README.md`. AC: stable IDs mapped to web/mobile + HP/EC,
-  > qa-docs green. Stop after docs; do not start S-160-T1.
+  > qa-docs green. Stop after docs; do not start S-160-T0b.
+
+---
+
+## S-160-T0b — ADR authoring: review/decision/publication gate model (X23 → X-S-160-1)
+
+- **Status:** [ ] Not started
+- **Type:** Architecture decision · **Effort:** S
+- **RRI:** 18 → band **Low (0–25)** → **auto-execute**
+- **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Haiku 4.5` · thinking Off
+- **Depends on:** S-160-T0, S-100 (org/role model)
+- **Blocks:** S-160-T1, S-160-T2 — **neither may start until this ADR is merged**
+- **Objective:** Author and merge the ADR that defines the review/decision/publication gate
+  model: how review tasks are created and assigned, how append-only decisions derive
+  task state, and how the publication gate enforces approval as a fail-closed precondition
+  (ADR-008 spirit). Closes X23 / X-S-160-1.
+- **Inputs:**
+  - ADR-008 — fail-closed precondition posture
+  - ADR-018 — durable audit obligation
+  - `infra/migrations/0007` — append-only governance posture (rights_records)
+  - `docs/plan/s-160-review-publication-workspace.md` §D1–§D3
+  - S-100-T0b ADR (role model — reviewer role gate)
+- **Outputs:**
+  - `docs/adr/ADR-NNN-review-publication-gate.md` — decision record covering:
+    - Review task lifecycle: Pending → Approved | Rejected (state = latest decision row)
+    - `review_decisions` is append-only; no UPDATE/DELETE paths
+    - Publication gate: `publications` row only created when latest decision = Approved
+    - Unknown verdict rejected at decode boundary (fail-closed)
+    - Reviewer role required (from S-100 role model) — org-scoped
+    - Every decision + publication emits an `audit_events` row (ADR-018)
+    - Forward dependency: operates on fixtures until S-140/S-150 artifacts land
+  - ADR index entry added to `docs/adr/README.md`
+- **Acceptance criteria:**
+  - ADR file present in `docs/adr/` with a real sequential number.
+  - `docs/adr/README.md` index updated.
+  - ADR text covers: task lifecycle, append-only decision invariant, publication gate,
+    fail-closed posture, role gate, audit obligation, and S-140/S-150 forward dependency.
+  - `make qa-docs` passes.
+- **Handoff prompt:**
+  > S-160-T0b — author ADR for review/decision/publication gate (X23). Inputs:
+  > ADR-008, ADR-018, migration 0007, plan §D1–§D3, S-100-T0b ADR. Create
+  > `docs/adr/ADR-NNN-review-publication-gate.md` (task lifecycle, append-only decisions,
+  > publication gate fail-closed, role gate, audit obligation, S-140/S-150 forward dep)
+  > and update `docs/adr/README.md` index. AC: real ADR number, index updated, qa-docs
+  > green. Stop after docs; do not start S-160-T1.
 
 ---
 

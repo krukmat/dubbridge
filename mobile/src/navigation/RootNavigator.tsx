@@ -8,6 +8,7 @@ import { AssetListScreen } from "../screens/AssetListScreen";
 import { ConfigErrorScreen } from "../screens/ConfigErrorScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { LoginScreen } from "../screens/LoginScreen";
+import { UploadScreen } from "../screens/UploadScreen";
 
 type UnauthedStackParamList = {
   Login: undefined;
@@ -20,6 +21,7 @@ type AuthedStackParamList = {
     assetId: string;
     assetTitle: string;
   };
+  Upload: undefined;
 };
 
 const UnauthedStack = createNativeStackNavigator<UnauthedStackParamList>();
@@ -50,6 +52,7 @@ function AuthedNavigator({
             dubbridgeEnv={dubbridgeEnv}
             gatewayBaseUrl={gatewayBaseUrl}
             onOpenAssets={() => navigation.navigate("AssetList")}
+            onOpenUpload={() => navigation.navigate("Upload")}
           />
         )}
       </AuthedStack.Screen>
@@ -74,6 +77,14 @@ function AuthedNavigator({
           <AssetDetailScreen
             assetId={route.params.assetId}
             gatewayBaseUrl={gatewayBaseUrl}
+          />
+        )}
+      </AuthedStack.Screen>
+      <AuthedStack.Screen name="Upload" options={{ title: "Upload" }}>
+        {({ navigation }) => (
+          <UploadScreen
+            gatewayBaseUrl={gatewayBaseUrl}
+            onSuccess={() => navigation.navigate("AssetList")}
           />
         )}
       </AuthedStack.Screen>

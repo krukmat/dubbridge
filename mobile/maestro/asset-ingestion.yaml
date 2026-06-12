@@ -1,0 +1,70 @@
+appId: com.dubbridge.mobile
+name: Asset Ingestion
+tags:
+  - android
+  - s-060
+  - asset-ingestion
+# BDD scenarios: SC-INGEST-1, SC-INGEST-2
+---
+- launchApp:
+    clearState: true
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: login-screen
+    timeout: 20000
+
+- assertVisible:
+    id: login-screen
+
+- openLink: ${SEED_BOOTSTRAP_DEEPLINK}
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 30000
+
+- assertVisible:
+    id: home-screen
+
+- tapOn:
+    id: home-open-upload
+
+- extendedWaitUntil:
+    visible:
+      id: upload-screen
+    timeout: 20000
+
+- assertVisible:
+    id: upload-screen
+- tapOn: Pick file
+
+- extendedWaitUntil:
+    visible:
+      text: Upload & finalize
+    timeout: 10000
+
+- assertVisible: Upload & finalize
+- assertVisible: dubbridge-e2e-upload.mov
+
+- takeScreenshot: 05_upload

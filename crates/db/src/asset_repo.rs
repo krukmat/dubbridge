@@ -109,6 +109,42 @@ pub async fn update_asset_status_tx(
     Ok(())
 }
 
+pub async fn list_assets(
+    pool: &PgPool,
+    uploader_id: Uuid,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<Asset>, DbError> {
+    let rows = sqlx::query_as::<_, AssetRow>(
+        r#"
+        SELECT id, title, uploader_id, status, created_at, updated_at
+        FROM assets
+        WHERE uploader_id = $1
+        ORDER BY created_at DESC
+        LIMIT $2 OFFSET $3
+        "#,
+    )
+    .bind(uploader_id)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(pool)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    rows.into_iter()
+        .map(|r| {
+            Ok(Asset {
+                id: AssetId(r.id),
+                title: r.title,
+                uploader_id: r.uploader_id,
+                status: parse_status(&r.status)?,
+                created_at: r.created_at,
+                updated_at: r.updated_at,
+            })
+        })
+        .collect()
+}
+
 pub async fn find_asset_by_id(pool: &PgPool, asset_id: AssetId) -> Result<Option<Asset>, DbError> {
     let row = sqlx::query_as::<_, AssetRow>(
         r#"

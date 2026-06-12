@@ -2,7 +2,7 @@ use std::{borrow::Cow, sync::Arc};
 
 use axum::{
     Extension, Json, Router,
-    extract::{DefaultBodyLimit, Multipart, Path, State},
+    extract::{DefaultBodyLimit, Multipart, Path, Query, State},
     http::StatusCode,
     middleware,
     routing::{get, post},
@@ -50,6 +50,7 @@ pub fn router(verifier: SharedTokenVerifier) -> Router<Arc<AppState>> {
         ));
 
     let read_routes = Router::new()
+        .route("/assets", get(list_assets))
         .route("/assets/{id}", get(get_asset))
         .route_layer(middleware::from_fn_with_state(
             Arc::<str>::from("assets:read"),
@@ -270,6 +271,31 @@ async fn map_service_error(
         IngestionServiceError::Db(db_error) => ApiError::from_db(db_error),
         IngestionServiceError::Internal(message) => ApiError::internal(message),
     }
+}
+
+const DEFAULT_LIMIT: i64 = 50;
+const MAX_LIMIT: i64 = 200;
+
+#[derive(serde::Deserialize, Default)]
+struct ListAssetsParams {
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+async fn list_assets(
+    State(state): State<Arc<AppState>>,
+    Extension(principal): Extension<AuthenticatedPrincipal>,
+    Query(params): Query<ListAssetsParams>,
+) -> Result<Json<Vec<AssetSummaryResponse>>, ApiError> {
+    let limit = params.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
+    let offset = params.offset.unwrap_or(0).max(0);
+
+    let assets =
+        dubbridge_db::asset_repo::list_assets(&state.pool, principal.subject_id, limit, offset)
+            .await
+            .map_err(ApiError::from_db)?;
+
+    Ok(Json(assets.into_iter().map(AssetSummaryResponse::from).collect()))
 }
 
 async fn get_asset(

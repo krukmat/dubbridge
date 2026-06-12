@@ -1,0 +1,88 @@
+appId: com.dubbridge.mobile
+name: Asset List
+tags:
+  - android
+  - s-060
+  - asset-list
+# BDD scenarios: SC-LIST-1, SC-LIST-2
+---
+- launchApp:
+    clearState: true
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: login-screen
+    timeout: 20000
+
+- assertVisible:
+    id: login-screen
+
+- openLink: ${SEED_BOOTSTRAP_DEEPLINK}
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 30000
+
+- assertVisible:
+    id: home-screen
+
+- tapOn:
+    id: home-open-assets
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: asset-list-screen
+    timeout: 20000
+
+- assertVisible:
+    id: asset-list-screen
+
+- runFlow:
+    when:
+      visible:
+        id: asset-list-empty-state
+    commands:
+      - assertVisible:
+          id: asset-list-empty-state
+      - assertVisible: No assets yet
+      - takeScreenshot: 03_asset_list
+
+- runFlow:
+    when:
+      visible:
+        id: asset-card-asset-seed-1
+    commands:
+      - assertVisible: Demo Reel 2026
+      - assertVisible: Interview Selects
+      - takeScreenshot: 03_asset_list

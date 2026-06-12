@@ -24,10 +24,11 @@ the `dubbridge` repository.
 
 1. Analyze context, dependencies, and affected files.
 2. Ensure a `docs/plan/<name>.md` and `docs/tasks/<name>.md` exist (create if not).
-3. Present the next task using the `AGENTS.md` presentation contract.
+3. Compute RRI with `scripts/rri.py`; present the next task using the `AGENTS.md`
+   presentation contract only when approval is required.
 4. If the computed RRI requires approval, wait for explicit approval (see the HITL
    policy). If the task is in the RRI 0–25 Low band (normally `Effort: S` under the
-   canonical mapping), use show-and-proceed instead.
+   canonical mapping), use local Gemma delegation through Ollama instead.
 5. Implement one task at a time, in order.
 6. Verify (tests/checks), mark progress in the tasks document, report, and wait.
 

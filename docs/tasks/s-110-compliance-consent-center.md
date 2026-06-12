@@ -21,15 +21,16 @@
 ## Task dependency order
 
 ```text
-S-110-T0 (BDD) ─▶ S-110-T1 (schema+domain+repo) ─▶ S-110-T2 (consent ledger + TTS precondition + audit) ─▶ S-110-T3 (compliance read API) ─┬─▶ S-110-T4 (web dashboard) ─┐
-                                                                                                                               ├─▶ S-110-T5 (mobile consent) ┤
-                                                                                                                               └─▶ S-110-T6 (E2E + docs) ◀────┘
+S-110-T0 (BDD) ─▶ S-110-T0b (ADR X-S-110-1) ─▶ S-110-T1 (schema+domain+repo) ─▶ S-110-T2 (consent ledger + TTS precondition + audit) ─▶ S-110-T3 (compliance read API) ─┬─▶ S-110-T4 (web dashboard) ─┐
+                                                                                                                                                            ├─▶ S-110-T5 (mobile consent) ┤
+                                                                                                                                                            └─▶ S-110-T6 (E2E + docs) ◀────┘
 ```
 
 | Task | Title | Depends on | RRI | Band | Effort |
 |---|---|---|---|---|---|
 | S-110-T0 | BDD `.feature` specs + mapping | — | 11 | Low | S |
-| S-110-T1 | Schema + domain + repo (voice_consents) | S-110-T0 | 58 | Complex | L |
+| S-110-T0b | ADR authoring: voice-consent ledger + TTS precondition (X24 → X-S-110-1) | S-110-T0 | 18 | Low | S |
+| S-110-T1 | Schema + domain + repo (voice_consents) | S-110-T0b | 58 | Complex | L |
 | S-110-T2 | Consent ledger + TTS precondition + audit (X11) | S-110-T1 | 66 | Complex | L |
 | S-110-T3 | Compliance read API (audit/rights viewer) | S-110-T2 | 44 | Med-high | L |
 | S-110-T4 | Web compliance dashboard | S-110-T3 | 30 | Moderate | M |
@@ -116,7 +117,53 @@ S-110-T0 (BDD) ─▶ S-110-T1 (schema+domain+repo) ─▶ S-110-T2 (consent led
   > S-110-T0 — author BDD specs. Docs: this ledger + plan §D1–§D4. Create
   > `docs/bdd/p6-compliance.feature` (SC-AUDIT-1/2, SC-RIGHTS-1, SC-CONSENT-1/2/3) and append
   > mapping rows to `docs/bdd/README.md`. AC: stable IDs mapped to web/mobile + HP/EC, qa-docs
-  > green. Stop after docs; do not start S-110-T1.
+  > green. Stop after docs; do not start S-110-T0b.
+
+---
+
+## S-110-T0b — ADR authoring: voice-consent ledger + TTS precondition (X24 → X-S-110-1)
+
+- **Status:** [ ] Not started
+- **Type:** Architecture decision · **Effort:** S
+- **RRI:** 18 → band **Low (0–25)** → **auto-execute**
+- **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Haiku 4.5` · thinking Off
+- **Depends on:** S-110-T0, S-100 (org/asset ownership model)
+- **Blocks:** S-110-T1, S-110-T2 — **neither may start until this ADR is merged**
+- **Objective:** Author and merge the ADR that defines the voice-consent ledger and the
+  fail-closed TTS precondition. Closes X24 / X-S-110-1 and closes **X11** at the
+  architecture-contract level before S-150 (TTS/dubbing) is built.
+- **Inputs:**
+  - ADR-008 — fail-closed precondition posture
+  - ADR-018 — durable audit obligation
+  - ADR-025 — owner credentials/evidence stored by reference, redacted from logs
+  - `infra/migrations/0002` (rights_records shape), `0007` (append-only governance)
+  - `docs/plan/s-110-compliance-consent-center.md` §D1–§D3
+  - X11 obligation in roadmap
+- **Outputs:**
+  - `docs/adr/ADR-NNN-voice-consent-ledger.md` — decision record covering:
+    - `voice_consents` is append-only; current status = latest row (grant / revoke)
+    - Consent scope: asset-level; granted by the asset owner or authorized delegate
+    - Evidence stored as an opaque reference (URI/ID), never inline (ADR-025 spirit)
+    - Evidence bytes/secrets are not stored in the DB and are redacted from logs
+    - TTS precondition: `consent_gate.rs` checks latest consent status fail-closed
+      before any TTS derivative is created; absent or revoked consent → hard reject
+    - Every consent mutation emits an `audit_events` row (ADR-018)
+    - Revocation does not delete history; prior consent rows are immutable
+    - Open follow-up: evidence-store tie to X20 (S-090 owner-credential secret-store)
+  - ADR index entry added to `docs/adr/README.md`
+- **Acceptance criteria:**
+  - ADR file present in `docs/adr/` with a real sequential number.
+  - `docs/adr/README.md` index updated.
+  - ADR text covers: append-only ledger, evidence-by-reference, TTS fail-closed gate,
+    revocation immutability, audit obligation, and evidence-store open follow-up.
+  - `make qa-docs` passes.
+- **Handoff prompt:**
+  > S-110-T0b — author ADR for voice-consent ledger + TTS precondition (X24, closes X11).
+  > Inputs: ADR-008, ADR-018, ADR-025, migrations 0002/0007, plan §D1–§D3. Create
+  > `docs/adr/ADR-NNN-voice-consent-ledger.md` (append-only ledger, evidence by ref,
+  > TTS gate fail-closed, revocation immutability, audit obligation, evidence-store
+  > follow-up) and update `docs/adr/README.md` index. AC: real ADR number, index
+  > updated, qa-docs green. Stop after docs; do not start S-110-T1.
 
 ---
 

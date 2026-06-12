@@ -107,7 +107,7 @@ into a single score with penalties for high-risk combinations.
 
 | RRI band | Label | What it requires |
 |---|---|---|
-| 0–25 | Low | Implement after approval, high autonomy |
+| 0–25 | Low | Auto-execute via local Gemma (Ollama); orchestrator reviews + reports |
 | 26–40 | Moderate | Confirm area tests exist |
 | 41–55 | Med-high | Plan + explicit acceptance criteria |
 | 56–70 | Complex | Plan first; human reviews the plan |
@@ -115,8 +115,9 @@ into a single score with penalties for high-risk combinations.
 | 86–100 | Very high | ADR + risk analysis + decompose first |
 | > 100 | Excessive | Architecture work required before any implementation |
 
-The RRI also drives model-tier selection (Economy / Balanced / Premium) and
-thinking-mode activation. Full procedure: `docs/policies/RRI_POLICY.md`.
+Low-band tasks (RRI 0–25) are delegated to a local Gemma model running through
+Ollama — no cloud call, no approval gate. The orchestrating agent reviews the
+output and reports before marking the task done. Full procedure: `docs/policies/RRI_POLICY.md`.
 
 Background and design rationale: `docs/prompts/medium-article-rri-output.md`.
 
@@ -134,4 +135,4 @@ docs/               — architecture decisions, pipeline design, and development
 
 ---
 
-*DubBridge is under active development. JWT-protected upload ingestion and the rights ledger are operational. Platform-download intake (primary), live stream recording (deferred sub-case), media preparation, transcription, dubbing, and publication remain planned work.*
+*DubBridge is under active development. JWT-protected upload ingestion, the rights ledger, the first-party mobile client (React Native + Expo), and the full mobile asset lifecycle — asset list, detail, and upload flow with a Maestro screenshot suite — are operational. Platform-download intake (primary), live stream recording (deferred sub-case), media preparation, transcription, dubbing, and publication remain planned work.*

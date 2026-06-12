@@ -23,16 +23,17 @@ S-055 testID + mock-gateway conventions, and S-060's planned asset lifecycle bou
 ## Task dependency order
 
 ```text
-S-100-T0 (BDD) ─▶ S-100-T1 (schema+domain+repos) ─┬─▶ S-100-T2 (org-aware authz) ─┐
-                                            └────────────────────────────┼─▶ S-100-T3 (workspace API) ─┬─▶ S-100-T4 (web skeleton) ─▶ S-100-T5 (web screens) ─┐
-                                                                          │                          ├─▶ S-100-T6 (mobile projects) ─────────────────────┤
-                                                                          │                          └─▶ S-100-T7 (E2E + docs sync) ◀────────────────────┘
+S-100-T0 (BDD) ─▶ S-100-T0b (ADR X-S-100-1) ─▶ S-100-T1 (schema+domain+repos) ─┬─▶ S-100-T2 (org-aware authz) ─┐
+                                                                          └────────────────────────────┼─▶ S-100-T3 (workspace API) ─┬─▶ S-100-T4 (web skeleton) ─▶ S-100-T5 (web screens) ─┐
+                                                                                                        │                          ├─▶ S-100-T6 (mobile projects) ─────────────────────┤
+                                                                                                        │                          └─▶ S-100-T7 (E2E + docs sync) ◀────────────────────┘
 ```
 
 | Task | Title | Depends on | RRI | Band | Effort |
 |---|---|---|---|---|---|
 | S-100-T0 | BDD `.feature` specs + mapping | — | 11 | Low | S |
-| S-100-T1 | Schema + domain + repos (orgs/projects/target-langs) | S-100-T0 | 60 | Complex | L |
+| S-100-T0b | ADR authoring: org/membership/role authorization model (X22 → X-S-100-1) | S-100-T0 | 18 | Low | S |
+| S-100-T1 | Schema + domain + repos (orgs/projects/target-langs) | S-100-T0b | 60 | Complex | L |
 | S-100-T2 | Org-aware authorization (membership + role) | S-100-T1 | 64 | Complex | L |
 | S-100-T3 | Workspace API + audit | S-100-T1, S-100-T2 | 44 | Med-high | L |
 | S-100-T4 | Web console skeleton (Vite/React + gateway auth) | S-100-T3 | 35 | Moderate | M |
@@ -135,7 +136,50 @@ S-100 to reuse.
   > S-100-T0 — author BDD specs. Docs: this ledger + plan §D1–§D7. Create
   > `docs/bdd/p4-workspace.feature` (SC-ORG-1, SC-MEMBER-1/2, SC-PROJECT-1, SC-LANG-1)
   > and `docs/bdd/README.md` mapping table. AC: stable IDs mapped to web/mobile + HP/EC,
-  > qa-docs green. Stop after docs; do not start S-100-T1.
+  > qa-docs green. Stop after docs; do not start S-100-T0b.
+
+---
+
+## S-100-T0b — ADR authoring: org/membership/role authorization model (X22 → X-S-100-1)
+
+- **Status:** [ ] Not started
+- **Type:** Architecture decision · **Effort:** S
+- **RRI:** 18 → band **Low (0–25)** → **auto-execute** (present RRI + one-line summary, then proceed)
+- **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Haiku 4.5` · thinking Off
+- **Depends on:** S-100-T0
+- **Blocks:** S-100-T1, S-100-T2 — **neither may start until this ADR is merged**
+- **Objective:** Author and merge the ADR that defines the multi-tenant authorization model
+  for DubBridge: how organizations form tenancy boundaries, how `org_members` role-enum
+  maps to API scopes, and how the Axum middleware enforces org membership as a
+  fail-closed precondition on every org-scoped route. Closes X22 / X-S-100-1 and
+  satisfies the "plan-first" gate for S-100-T1/T2.
+- **Inputs:**
+  - `crates/auth/src/principal.rs` — current flat `AuthenticatedPrincipal`
+  - ADR-023 — JWT resource server, API caller identity at Axum boundary
+  - ADR-008 — fail-closed precondition posture
+  - `docs/plan/s-100-collaborative-workspace.md` §D2 (tenancy model) and §D3 (auth design)
+- **Outputs:**
+  - `docs/adr/ADR-NNN-org-membership-authorization.md` — decision record covering:
+    - Org as tenancy boundary; assets stay uploader-owned; projects *link* assets
+    - `OrgMemberPrincipal` wraps `AuthenticatedPrincipal` with resolved `org_id` + `role`
+    - Role enum: `Owner | Admin | Editor | Reviewer | Viewer` — strict decode, fail-closed
+    - Axum middleware `require_org_member(min_role)` as precondition extractor
+    - No org-scoped JWT claim; membership resolved from DB at request time
+    - Audit obligation: membership changes emit `audit_events` rows (ADR-018)
+  - ADR index entry added to `docs/adr/README.md`
+- **Acceptance criteria:**
+  - ADR file present in `docs/adr/` with a real sequential number.
+  - `docs/adr/README.md` index updated with the new entry.
+  - ADR text covers: tenancy model, role enum, middleware contract, fail-closed posture,
+    audit obligation, and open follow-ups.
+  - `make qa-docs` passes (ADR index consistent, no dangling refs).
+- **Handoff prompt:**
+  > S-100-T0b — author ADR for org/membership/role authorization (X22). Inputs:
+  > `crates/auth/src/principal.rs`, ADR-023, ADR-008, plan §D2/§D3. Create
+  > `docs/adr/ADR-NNN-org-membership-authorization.md` (tenancy boundary, role enum,
+  > Axum middleware contract, fail-closed posture, audit obligation) and update
+  > `docs/adr/README.md` index. AC: real ADR number, index updated, qa-docs green.
+  > Stop after docs; do not start S-100-T1.
 
 ---
 
@@ -146,7 +190,7 @@ S-100 to reuse.
 - **RRI:** 60 → band **Complex (56–70)** → **Plan first; human reviews the plan before
   implementation; thinking On.**
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Opus 4.8` · thinking On
-- **Depends on:** S-100-T0
+- **Depends on:** S-100-T0b
 - **Objective:** Introduce the tenancy data model — `organizations` + `org_members`
   (role enum), `projects` + `project_assets`, `target_languages` — plus the domain
   entities and DB repos. (Plan §D1–§D3.)

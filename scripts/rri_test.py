@@ -122,6 +122,12 @@ class Bands(unittest.TestCase):
         self.assertEqual(b["effort"], "M")
         self.assertEqual(b["thinking"], "Off")
 
+    def test_low_band_uses_local_gemma_delegation(self):
+        b = rri.resolve_band(25)
+        self.assertEqual(b["codex"], "Local Gemma via Ollama")
+        self.assertEqual(b["claude"], "Local Gemma via Ollama")
+        self.assertIn("Local delegation", b["gate"])
+
 
 class Decomposition(unittest.TestCase):
     def test_complex_and_domain_triggers(self):

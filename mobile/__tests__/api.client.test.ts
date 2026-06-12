@@ -206,4 +206,143 @@ describe('createGatewayClient', () => {
       expect(calledInit.body).toBe(JSON.stringify(payload));
     });
   });
+
+  // ── postMultipart: HP-1 ───────────────────────────────────────────────────
+  describe('postMultipart HP-1: sends FormData without JSON Content-Type', () => {
+    it('does not set Content-Type header and passes FormData as body', async () => {
+      mockFetch.mockResolvedValueOnce(
+        makeMockResponse(201, { ingest_token: 'tok-abc' })
+      );
+
+      const fd = new FormData();
+      fd.append('title', 'My track');
+
+      const result = await client.postMultipart<{ ingest_token: string }>(
+        '/api/ingest',
+        SESSION_REF,
+        fd,
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.data.ingest_token).toBe('tok-abc');
+      }
+
+      const calledInit = mockFetch.mock.calls[0]?.[1] as RequestInit;
+      const sentHeaders = calledInit?.headers as Record<string, string> | undefined;
+      expect(sentHeaders?.['Content-Type']).toBeUndefined();
+      expect(calledInit.body).toBe(fd);
+    });
+  });
+
+  // ── postMultipart: HP-2 ───────────────────────────────────────────────────
+  describe('postMultipart HP-2: attaches X-Dubbridge-Session header', () => {
+    it('forwards session ref via X-Dubbridge-Session', async () => {
+      mockFetch.mockResolvedValueOnce(
+        makeMockResponse(201, { ingest_token: 'tok-xyz' })
+      );
+
+      const fd = new FormData();
+      await client.postMultipart('/api/ingest', SESSION_REF, fd);
+
+      const calledInit = mockFetch.mock.calls[0]?.[1] as RequestInit;
+      const sentHeaders = calledInit?.headers as Record<string, string> | undefined;
+      expect(sentHeaders?.['X-Dubbridge-Session']).toBe(SESSION_REF);
+    });
+  });
+
+  // ── postMultipart: HP-3 ───────────────────────────────────────────────────
+  describe('postMultipart HP-3: null sessionRef omits session header', () => {
+    it('does not attach X-Dubbridge-Session when sessionRef is null', async () => {
+      mockFetch.mockResolvedValueOnce(makeMockResponse(201, { ingest_token: 'tok-pub' }));
+
+      const fd = new FormData();
+      await client.postMultipart('/api/ingest', null, fd);
+
+      const calledInit = mockFetch.mock.calls[0]?.[1] as RequestInit;
+      const sentHeaders = calledInit?.headers as Record<string, string> | undefined;
+      expect(sentHeaders?.['X-Dubbridge-Session']).toBeUndefined();
+    });
+  });
+
+  // ── postMultipart: EC-1 ───────────────────────────────────────────────────
+  describe('postMultipart EC-1: 401 → session_expired', () => {
+    it('returns session_expired on 401', async () => {
+      mockFetch.mockResolvedValueOnce(makeMockResponse(401, {}));
+
+      const result = await client.postMultipart('/api/ingest', SESSION_REF, new FormData());
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.kind).toBe('session_expired');
+      }
+    });
+  });
+
+  // ── postMultipart: EC-2 ───────────────────────────────────────────────────
+  describe('postMultipart EC-2: 403 → forbidden', () => {
+    it('returns forbidden on 403', async () => {
+      mockFetch.mockResolvedValueOnce(makeMockResponse(403, {}));
+
+      const result = await client.postMultipart('/api/ingest', SESSION_REF, new FormData());
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.kind).toBe('forbidden');
+      }
+    });
+  });
+
+  // ── postMultipart: EC-3 ───────────────────────────────────────────────────
+  describe('postMultipart EC-3: network error → network kind', () => {
+    it('returns network error on fetch rejection', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('Upload network failure'));
+
+      const result = await client.postMultipart('/api/ingest', SESSION_REF, new FormData());
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.kind).toBe('network');
+        if (result.error.kind === 'network') {
+          expect(result.error.message).toBe('Upload network failure');
+        }
+      }
+    });
+  });
+
+  // ── postMultipart: EC-4 ───────────────────────────────────────────────────
+  describe('postMultipart EC-4: AbortError → network timeout', () => {
+    it('returns network timeout on AbortError', async () => {
+      const abortError = new Error('The user aborted a request.');
+      abortError.name = 'AbortError';
+      mockFetch.mockRejectedValueOnce(abortError);
+
+      const result = await client.postMultipart('/api/ingest', SESSION_REF, new FormData());
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.kind).toBe('network');
+        if (result.error.kind === 'network') {
+          expect(result.error.message).toBe('timeout');
+        }
+      }
+    });
+  });
+
+  // ── postMultipart: EC-5 ───────────────────────────────────────────────────
+  describe('postMultipart EC-5: non-2xx (413) → http kind', () => {
+    it('returns http error with status 413', async () => {
+      mockFetch.mockResolvedValueOnce(makeMockResponse(413, {}));
+
+      const result = await client.postMultipart('/api/ingest', SESSION_REF, new FormData());
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.kind).toBe('http');
+        if (result.error.kind === 'http') {
+          expect(result.error.status).toBe(413);
+        }
+      }
+    });
+  });
 });

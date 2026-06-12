@@ -22,19 +22,42 @@ human sign-off.
 
 The only exception to the approval gate is when the user explicitly says "proceed
 without asking" (or equivalent) for a clearly bounded scope, **or when the
-computed RRI is 0–25** (see show-and-proceed rule below).
+computed RRI is 0–25** (see the local delegation rule below).
 
-## Auto-execute (RRI 0–25)
+## Local delegation (RRI 0–25)
 
-When the computed RRI falls in the **0–25 Low band**, the agent must:
+When the computed RRI falls in the **0–25 Low band**, the agent must not present
+the full task for human approval. Instead, it delegates the task to the local
+Gemma model through Ollama and remains the reviewer/orchestrator of record.
+Gemma must not evaluate, approve, or mark its own delegated work as complete.
+Only the delegating agent may decide whether the task satisfies the requirements.
 
-1. Present the full RRI breakdown table.
-2. State the band, tier, and a one-line summary of what will be done.
-3. Begin implementation immediately — no approval checkpoint, no pause.
-4. Note explicitly: `RRI 0–25 — auto-executing.`
+The delegating agent must:
 
-If penalties are present and the final RRI ≤ 25, auto-execute still applies;
-state all active penalties explicitly so the score is transparent.
+1. Compute RRI with `scripts/rri.py`.
+2. Build a local delegation packet with the task excerpt, acceptance criteria, RRI
+   output, allowed paths, relevant file snippets, and stop conditions.
+3. Send the packet to Ollama/Gemma with `scripts/delegate-low-rri.py`, which uses
+   the 120-second timeout and structured-output protocol defined in
+   `docs/policies/RRI_POLICY.md`; require structured JSON with a unified diff.
+4. Validate the JSON, check the diff with `git apply --check`, and reject any patch
+   outside the allowed task scope.
+5. Apply only a valid in-scope patch.
+6. Personally review the solution against every task requirement and acceptance
+   criterion; this evaluation must be performed by the delegating agent, not Gemma.
+7. Recompute/check actual touched scope; if the result now scores above RRI 25 or
+   triggers a higher gate, stop and escalate to the normal approval workflow.
+8. Run required verification commands.
+9. If requirements are missed or checks fail, run one bounded Gemma repair cycle
+   with the failure evidence and the same allowed paths; if it still fails, stop and
+   escalate.
+10. Report the RRI, Gemma model used, files changed, the delegating agent's
+    requirement-review result, verification commands, and whether a repair cycle
+    was needed. If delegation times out, report `Gemma timeout after 120s`.
+
+If penalties are present and the final RRI is still ≤ 25, local delegation still
+applies; state all active penalties explicitly in the delegation packet and final
+report so the score is transparent.
 
 ## Approval checkpoint wording
 

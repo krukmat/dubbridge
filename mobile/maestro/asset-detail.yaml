@@ -1,0 +1,87 @@
+appId: com.dubbridge.mobile
+name: Asset Detail
+tags:
+  - android
+  - s-060
+  - asset-detail
+# BDD scenario: SC-DETAIL-1
+---
+- launchApp:
+    clearState: true
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: login-screen
+    timeout: 20000
+
+- assertVisible:
+    id: login-screen
+
+- openLink: ${SEED_BOOTSTRAP_DEEPLINK}
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 30000
+
+- assertVisible:
+    id: home-screen
+
+- tapOn:
+    id: home-open-assets
+
+- extendedWaitUntil:
+    visible:
+      id: asset-list-screen
+    timeout: 20000
+
+- assertVisible:
+    id: asset-card-asset-seed-1
+
+- tapOn:
+    id: asset-card-asset-seed-1
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: asset-detail-screen
+    timeout: 20000
+
+- assertVisible:
+    id: asset-detail-screen
+
+- assertVisible: Demo Reel 2026
+- assertVisible: Finalized
+- assertVisible: asset-seed-1
+- assertVisible: e2e-user
+
+- takeScreenshot: 04_asset_detail

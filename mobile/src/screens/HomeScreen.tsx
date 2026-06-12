@@ -6,10 +6,12 @@ export function HomeScreen({
   dubbridgeEnv,
   gatewayBaseUrl,
   onOpenAssets,
+  onOpenUpload,
 }: {
   dubbridgeEnv: string;
   gatewayBaseUrl: string;
   onOpenAssets: () => void;
+  onOpenUpload: () => void;
 }) {
   const auth = useAuth();
 
@@ -32,11 +34,27 @@ export function HomeScreen({
       </View>
 
       <View style={styles.actions}>
-        <Pressable onPress={onOpenAssets} style={styles.secondaryButton}>
+        <Pressable
+          testID="home-open-assets"
+          onPress={onOpenAssets}
+          style={styles.secondaryButton}
+        >
           <Text style={styles.secondaryButtonText}>Browse assets</Text>
         </Pressable>
 
-        <Pressable onPress={() => void auth.logout()} style={styles.button}>
+        <Pressable
+          testID="home-open-upload"
+          onPress={onOpenUpload}
+          style={styles.secondaryButton}
+        >
+          <Text style={styles.secondaryButtonText}>Upload asset</Text>
+        </Pressable>
+
+        <Pressable
+          testID="home-sign-out"
+          onPress={() => void auth.logout()}
+          style={styles.button}
+        >
           <Text style={styles.buttonText}>Sign out</Text>
         </Pressable>
       </View>
