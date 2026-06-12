@@ -34,6 +34,7 @@ Run `make qa-docs` before reporting an ADR change complete.
 | [ADR-024](ADR-024-low-friction-first-party-api-access-via-session-gateway.md) | Low-friction first-party API access via session gateway | Accepted |
 | [ADR-025](ADR-025-platform-connector-ingest-and-owner-authorized-credentials.md) | Platform connector ingest and owner-authorized credential model | Proposed (primary S3 intake) |
 | [ADR-026](ADR-026-layered-fail-closed-configuration-and-environment-separation.md) | Layered fail-closed configuration and environment separation | Proposed (scope: P0 environment separation) |
+| [ADR-027](ADR-027-org-membership-authorization.md) | Organization membership authorization | Accepted |
 
 ## Backfill note
 

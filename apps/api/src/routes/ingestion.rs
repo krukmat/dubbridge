@@ -303,11 +303,16 @@ async fn list_assets(
 async fn get_asset(
     Path(id): Path<Uuid>,
     State(state): State<Arc<AppState>>,
+    Extension(principal): Extension<AuthenticatedPrincipal>,
 ) -> Result<Json<AssetSummaryResponse>, ApiError> {
     let asset = dubbridge_db::asset_repo::find_asset_by_id(&state.pool, AssetId(id))
         .await
         .map_err(ApiError::from_db)?
         .ok_or_else(|| ApiError::not_found("asset not found"))?;
+
+    if asset.uploader_id != principal.subject_id {
+        return Err(ApiError::forbidden("asset not found"));
+    }
 
     Ok(Json(asset.into()))
 }
@@ -394,6 +399,13 @@ impl ApiError {
     }
 
     // T1-T2: session existed but its lifecycle window is closed.
+    fn forbidden(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::FORBIDDEN,
+            message: message.into(),
+        }
+    }
+
     fn gone(message: impl Into<String>) -> Self {
         Self {
             status: StatusCode::GONE,

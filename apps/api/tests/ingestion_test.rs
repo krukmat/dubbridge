@@ -331,6 +331,55 @@ async fn uploader_id_is_derived_from_authenticated_principal() {
 }
 
 #[tokio::test]
+async fn get_asset_by_id_denied_for_non_owner() {
+    let Some(mut ctx) = TestContext::new().await else {
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    // Create an asset owned by the default principal.
+    let auth_token = ctx.ingest_token.clone();
+    let ingest_token = create_ingestion(&mut ctx).await;
+    submit_rights(&mut ctx, ingest_token, valid_rights_body()).await;
+    let finalize = finalize(&mut ctx, ingest_token, &auth_token).await;
+    let body = json_body(finalize).await;
+    let asset_id = body["id"].as_str().expect("asset id");
+
+    // Build a second app instance that recognises a different principal.
+    let other_principal_id = Uuid::new_v4();
+    let other_read_token = "other-read-token";
+    let other_verifier: SharedTokenVerifier = Arc::new(StubTokenVerifier::default().with_token(
+        other_read_token,
+        Ok(AuthenticatedPrincipal::new(
+            other_principal_id,
+            ["assets:read"].into_iter().map(str::to_string),
+        )),
+    ));
+    let config = dubbridge_config::AppConfig::from_env();
+    let other_state = Arc::new(AppState::new(
+        ctx.pool.clone(),
+        Box::new(LocalFsAdapter::new(&ctx.storage_path)),
+        other_verifier.clone(),
+        config,
+    ));
+    let other_app = build_app(other_state, other_verifier);
+
+    let response = other_app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!("/assets/{asset_id}"))
+                .header(header::AUTHORIZATION, format!("Bearer {other_read_token}"))
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
 async fn rights_and_finalize_survive_app_restart() {
     let Some(mut ctx) = TestContext::new().await else {
         eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");

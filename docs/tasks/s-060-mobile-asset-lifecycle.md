@@ -827,23 +827,31 @@ await waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1));
 
 ### Open follow-ups
 
-- **X-P3F-1**: `asset-ingestion.yaml` stops at the `05_upload` screenshot boundary
-  (before the multipart `POST /ingest` request fires) due to an Android runtime
-  defect: `Unsupported FormDataPart implementation`. The upload state machine and
-  unit tests are correct; this is an emulator/RN limitation that must be resolved
-  before the full SC-INGEST-1 flow (file→rights→finalize) can be verified end-to-end
-  on device. Track in a future hardening slice.
-- **X-P3F-2**: SC-INGEST-2 (finalize-without-rights rejection, `422` path) is covered
-  by unit tests in `asset.screens.test.tsx` but has no Maestro flow. Add once
-  X-P3F-1 is resolved and the ingest flow can proceed past the file-pick step.
+- **X-P3F-1**: ✅ Closed 2026-06-12 — `GET /assets/{id}` now enforces ownership:
+  `get_asset` handler adds `Extension(principal)` and returns `403` if
+  `asset.uploader_id != principal.subject_id`. Integration test
+  `get_asset_by_id_denied_for_non_owner` added.
+- **X-P3F-2**: ✅ Closed 2026-06-12 — Split into X-P3F-2a + X-P3F-2b:
+  - **X-P3F-2a**: `postMultipart` rewritten to use `expo-file-system/legacy`
+    `FileSystem.uploadAsync` (MULTIPART mode), bypassing the Android
+    `Unsupported FormDataPart implementation` defect. `expo-file-system ~56.0.8`
+    added as dependency. All 84 mobile tests green; typecheck clean.
+  - **X-P3F-2b**: `asset-ingestion.yaml` extended past `05_upload` to complete
+    SC-INGEST-1 end-to-end (tap finalize → `asset-list-screen`; screenshot
+    `06_ingest_complete`). New `asset-ingestion-no-rights.yaml` covers SC-INGEST-2
+    (mock-gateway `ingest_seed=no_rights` mode returns `422`; app shows rights-required
+    error; screenshot `07_ingest_no_rights`). Phase 5b added to `seed-and-run.sh`.
+    8/8 mock-gateway tests green.
 
 ### Owner final verification
 
 - Owner: `Claude Sonnet 4.6`
 - Date: `2026-06-12`
-- Statement: `seed-and-run.sh` integrates all 5 phases (+ phase 3b empty) with fresh
-  handoff codes per phase, sanitization over all 6 output dirs, and leak assertions.
-  `npm run screenshots` is wired. README updated. Status docs consistent.
+- Statement: All three follow-ups resolved. `seed-and-run.sh` integrates 6 phases
+  (+ phase 3b empty + phase 5b no-rights) with fresh handoff codes per phase,
+  sanitization over all 7 output dirs, and leak assertions. `npm run screenshots`
+  wired. 84/84 mobile tests + 8/8 mock-gateway tests green. Rust build + typecheck
+  clean.
 
 ---
 

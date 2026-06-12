@@ -8,6 +8,8 @@ import { AssetListScreen } from "../screens/AssetListScreen";
 import { ConfigErrorScreen } from "../screens/ConfigErrorScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { LoginScreen } from "../screens/LoginScreen";
+import { ProjectDetailScreen } from "../screens/ProjectDetailScreen";
+import { ProjectListScreen } from "../screens/ProjectListScreen";
 import { UploadScreen } from "../screens/UploadScreen";
 
 type UnauthedStackParamList = {
@@ -22,6 +24,8 @@ type AuthedStackParamList = {
     assetTitle: string;
   };
   Upload: undefined;
+  ProjectList: { orgId: string };
+  ProjectDetail: { orgId: string; projectId: string; projectName: string };
 };
 
 const UnauthedStack = createNativeStackNavigator<UnauthedStackParamList>();
@@ -53,6 +57,7 @@ function AuthedNavigator({
             gatewayBaseUrl={gatewayBaseUrl}
             onOpenAssets={() => navigation.navigate("AssetList")}
             onOpenUpload={() => navigation.navigate("Upload")}
+            onOpenProjects={(orgId) => navigation.navigate("ProjectList", { orgId })}
           />
         )}
       </AuthedStack.Screen>
@@ -85,6 +90,39 @@ function AuthedNavigator({
           <UploadScreen
             gatewayBaseUrl={gatewayBaseUrl}
             onSuccess={() => navigation.navigate("AssetList")}
+          />
+        )}
+      </AuthedStack.Screen>
+      <AuthedStack.Screen
+        name="ProjectList"
+        options={{ title: "Projects" }}
+      >
+        {({ route, navigation }) => (
+          <ProjectListScreen
+            gatewayBaseUrl={gatewayBaseUrl}
+            orgId={route.params.orgId}
+            onOpenProject={(project) =>
+              navigation.navigate("ProjectDetail", {
+                orgId: route.params.orgId,
+                projectId: project.id,
+                projectName: project.name,
+              })
+            }
+          />
+        )}
+      </AuthedStack.Screen>
+      <AuthedStack.Screen
+        name="ProjectDetail"
+        options={({ route }) => ({ title: route.params.projectName })}
+      >
+        {({ route, navigation }) => (
+          <ProjectDetailScreen
+            gatewayBaseUrl={gatewayBaseUrl}
+            orgId={route.params.orgId}
+            projectId={route.params.projectId}
+            onOpenAsset={(assetId, assetTitle) =>
+              navigation.navigate("AssetDetail", { assetId, assetTitle })
+            }
           />
         )}
       </AuthedStack.Screen>

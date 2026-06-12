@@ -32,6 +32,31 @@ export const SEED_ASSETS = [
   },
 ];
 
+export const SEED_ORG = {
+  id: "org-seed-1",
+  name: "E2E Org",
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z",
+};
+
+export const SEED_PROJECT = {
+  id: "project-seed-1",
+  org_id: "org-seed-1",
+  name: "E2E Project",
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z",
+};
+
+export const SEED_MEMBER = {
+  org_id: "org-seed-1",
+  subject_id: "e2e-user",
+  role: "Owner",
+  joined_at: "2026-01-01T00:00:00Z",
+};
+
+// Session used for the non-member EC-2 / SC-MEMBER-2 fixture.
+export const NON_MEMBER_SESSION = "e2e-non-member-session";
+
 function sendJson(res, status, body) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(body));
@@ -66,6 +91,8 @@ export function createMockGatewayServer({
   // In-memory handoff store: code → seeded session info (single-use)
   const handoffStore = new Map();
   const sessionModes = new Map();
+  // In-memory ingest token mode: token → "no_rights" | undefined
+  const ingestTokenModes = new Map();
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
@@ -83,7 +110,8 @@ export function createMockGatewayServer({
       const sessionRef = `e2e-session-${randomUUID()}`;
       const handoffCode = `e2e-handoff-${randomUUID()}`;
       const assetSeed = url.searchParams.get("asset_seed") === "empty" ? "empty" : "default";
-      handoffStore.set(handoffCode, { sessionRef, assetSeed });
+      const ingestSeed = url.searchParams.get("ingest_seed") === "no_rights" ? "no_rights" : undefined;
+      handoffStore.set(handoffCode, { sessionRef, assetSeed, ingestSeed });
       logger.log?.(`[mock-gateway] issued handoff_code=${handoffCode}`);
       return sendJson(res, 200, {
         auth: {
@@ -116,7 +144,10 @@ export function createMockGatewayServer({
       }
 
       handoffStore.delete(code);
-      sessionModes.set(sessionInfo.sessionRef, { assetSeed: sessionInfo.assetSeed });
+      sessionModes.set(sessionInfo.sessionRef, {
+        assetSeed: sessionInfo.assetSeed,
+        ingestSeed: sessionInfo.ingestSeed,
+      });
       logger.log?.(
         `[mock-gateway] redeemed handoff_code=${code} -> session_ref=${sessionInfo.sessionRef}`,
       );
@@ -140,7 +171,12 @@ export function createMockGatewayServer({
     }
 
     if (req.method === "POST" && url.pathname === "/api/ingest") {
-      return sendJson(res, 201, { ingest_token: randomUUID() });
+      const ingestToken = randomUUID();
+      const sessionMode = sessionModes.get(req.headers["x-dubbridge-session"]);
+      if (sessionMode?.ingestSeed === "no_rights") {
+        ingestTokenModes.set(ingestToken, "no_rights");
+      }
+      return sendJson(res, 201, { ingest_token: ingestToken });
     }
 
     if (req.method === "POST" && /^\/api\/ingest\/[^/]+\/rights$/.test(url.pathname)) {
@@ -148,7 +184,76 @@ export function createMockGatewayServer({
     }
 
     if (req.method === "POST" && /^\/api\/ingest\/[^/]+\/finalize$/.test(url.pathname)) {
+      const token = url.pathname.split("/")[3];
+      if (ingestTokenModes.get(token) === "no_rights") {
+        return sendJson(res, 422, { error: "rights_required" });
+      }
       return sendJson(res, 201, SEED_ASSETS[0]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Workspace routes (S-100-T7) — in-memory fixtures, session-gated
+    // Non-member sessions (NON_MEMBER_SESSION) are rejected on org-scoped routes.
+    // -------------------------------------------------------------------------
+
+    const isNonMember =
+      req.headers["x-dubbridge-session"] === NON_MEMBER_SESSION;
+
+    // GET /api/orgs — list orgs for the session
+    if (req.method === "GET" && url.pathname === "/api/orgs") {
+      return sendJson(res, 200, [SEED_ORG]);
+    }
+
+    // POST /api/orgs — create org (returns seed for determinism)
+    if (req.method === "POST" && url.pathname === "/api/orgs") {
+      return sendJson(res, 201, SEED_ORG);
+    }
+
+    // Org-scoped routes — deny non-members with 403
+    const orgMatch = url.pathname.match(/^\/api\/orgs\/([^/]+)(\/.*)?$/);
+    if (orgMatch) {
+      if (isNonMember) {
+        return sendJson(res, 403, { error: "forbidden" });
+      }
+
+      const orgId = orgMatch[1];
+      const subPath = orgMatch[2] ?? "";
+
+      // GET /api/orgs/{orgId}/members
+      if (req.method === "GET" && subPath === "/members") {
+        return sendJson(res, 200, [SEED_MEMBER]);
+      }
+
+      // POST /api/orgs/{orgId}/members
+      if (req.method === "POST" && subPath === "/members") {
+        return sendJson(res, 201, SEED_MEMBER);
+      }
+
+      // GET /api/orgs/{orgId}/projects
+      if (req.method === "GET" && subPath === "/projects") {
+        return sendJson(res, 200, [SEED_PROJECT]);
+      }
+
+      // POST /api/orgs/{orgId}/projects
+      if (req.method === "POST" && subPath === "/projects") {
+        return sendJson(res, 201, SEED_PROJECT);
+      }
+
+      // GET /api/orgs/{orgId}/projects/{projectId}
+      const projectDetailMatch = subPath.match(/^\/projects\/([^/]+)$/);
+      if (req.method === "GET" && projectDetailMatch) {
+        const projectId = projectDetailMatch[1];
+        if (projectId !== SEED_PROJECT.id) {
+          return sendJson(res, 404, { error: "project_not_found" });
+        }
+        return sendJson(res, 200, {
+          ...SEED_PROJECT,
+          assets: SEED_ASSETS,
+          target_languages: [],
+        });
+      }
+
+      void orgId;
     }
 
     sendJson(res, 404, { error: "not_found", path: url.pathname });

@@ -5,6 +5,7 @@ pub mod audit_repo;
 pub mod error;
 pub mod pending_ingestion_repo;
 pub mod rights_repo;
+pub mod workspace_repo;
 
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;

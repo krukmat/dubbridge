@@ -14,6 +14,7 @@ Usage (post-implementation, measured from the working branch):
 """
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -94,9 +95,12 @@ def measure_cc_clippy(paths):
     rs_files = _filter_existing(paths, (".rs",))
     if not rs_files:
         return None, "no local .rs files in --touches; clippy skipped"
+    cargo_bin = shutil.which("cargo") or str(Path.home() / ".cargo" / "bin" / "cargo")
+    if not Path(cargo_bin).exists():
+        return None, "cargo not installed; clippy --auto-cc skipped"
     try:
         out = subprocess.run(
-            ["cargo", "clippy", "--message-format=json", "--quiet",
+            [cargo_bin, "clippy", "--message-format=json", "--quiet",
              "--", "-W", "clippy::cognitive_complexity"],
             capture_output=True, text=True, check=False)
     except FileNotFoundError:

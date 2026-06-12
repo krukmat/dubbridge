@@ -65,7 +65,17 @@ Before execution, present:
 
 ## Complexity And Model Guidance
 
-Default mapping:
+**When RRI has been computed**, the `Complexity` field in the task presentation must
+use the RRI band name — not the Effort-based mapping below:
+
+| RRI range | Complexity to present |
+|---|---|
+| 0–25 | Low |
+| 26–40 | Moderate |
+| 41–55 | Med-high |
+| 56–70 | Complex |
+
+The Effort → Complexity mapping is a **fallback** used only when no RRI is available:
 
 - `Effort: S` -> `Complexity: Low`
 - `Effort: M` -> `Complexity: Medium`

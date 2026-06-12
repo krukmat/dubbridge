@@ -7,11 +7,13 @@ export function HomeScreen({
   gatewayBaseUrl,
   onOpenAssets,
   onOpenUpload,
+  onOpenProjects,
 }: {
   dubbridgeEnv: string;
   gatewayBaseUrl: string;
   onOpenAssets: () => void;
   onOpenUpload: () => void;
+  onOpenProjects: (orgId: string) => void;
 }) {
   const auth = useAuth();
 

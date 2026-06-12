@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 
 import { createGatewayClient } from '../api/client';
-import type { GatewayErrorKind } from '../api/client';
+import type { GatewayErrorKind, MultipartUpload } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
 import type { AssetSummary } from './AssetListScreen';
 
@@ -154,19 +154,17 @@ export function UploadScreen({
     setViewState({ kind: 'processing' });
     const client = createGatewayClient({ gatewayBaseUrl });
 
-    // Step 1: POST /ingest (multipart)
-    const formData = new FormData();
-    formData.append('title', file.name);
-    formData.append('file', {
-      uri: file.uri,
-      name: file.name,
-      type: file.mimeType,
-    } as unknown as Blob);
+    // Step 1: POST /ingest (multipart via FileSystem.uploadAsync)
+    const upload: MultipartUpload = {
+      fileUri: file.uri,
+      fileName: file.name,
+      mimeType: file.mimeType,
+    };
 
     const ingestResult = await client.postMultipart<IngestCreateResponse>(
       '/api/ingest',
       auth.sessionRef,
-      formData,
+      upload,
     );
 
     if (!ingestResult.ok) {

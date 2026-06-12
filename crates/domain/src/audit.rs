@@ -32,6 +32,10 @@ pub enum AuditEventKind {
     PlatformIngestDownloaded,
     PlatformIngestFailed,
     PlatformIngestBridgedToAsset,
+    // S-100-T3: workspace governance events (ADR-027, ADR-018).
+    OrgCreated,
+    OrgMemberAdded,
+    ProjectCreated,
 }
 
 impl std::fmt::Display for AuditEventKind {
@@ -55,6 +59,9 @@ impl std::fmt::Display for AuditEventKind {
             Self::PlatformIngestDownloaded => "platform_ingest_downloaded",
             Self::PlatformIngestFailed => "platform_ingest_failed",
             Self::PlatformIngestBridgedToAsset => "platform_ingest_bridged_to_asset",
+            Self::OrgCreated => "org_created",
+            Self::OrgMemberAdded => "org_member_added",
+            Self::ProjectCreated => "project_created",
         };
         write!(f, "{s}")
     }
@@ -131,6 +138,21 @@ impl AuditEvent {
             ingest_token: None,
             recording_session_id: None,
             platform_ingest_session_id: Some(platform_ingest_session_id),
+            detail,
+            happened_at: OffsetDateTime::now_utc(),
+        }
+    }
+
+    /// Constructor for workspace governance events. These events are not tied to
+    /// asset ingestion or recording correlation identifiers.
+    pub fn new_workspace_event(event_kind: AuditEventKind, detail: Option<String>) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            asset_id: None,
+            event_kind,
+            ingest_token: None,
+            recording_session_id: None,
+            platform_ingest_session_id: None,
             detail,
             happened_at: OffsetDateTime::now_utc(),
         }
@@ -214,6 +236,20 @@ mod tests {
     }
 
     #[test]
+    fn audit_event_workspace_round_trip_has_no_correlation_ids() {
+        let event = AuditEvent::new_workspace_event(
+            AuditEventKind::OrgCreated,
+            Some("{\"org_id\":\"demo\"}".to_string()),
+        );
+        assert!(event.asset_id.is_none());
+        assert!(event.ingest_token.is_none());
+        assert!(event.recording_session_id.is_none());
+        assert!(event.platform_ingest_session_id.is_none());
+        assert_eq!(event.event_kind, AuditEventKind::OrgCreated);
+        assert_eq!(event.detail.as_deref(), Some("{\"org_id\":\"demo\"}"));
+    }
+
+    #[test]
     fn audit_event_kind_display_all_variants() {
         assert_eq!(
             AuditEventKind::IngestionFinalized.to_string(),
@@ -278,6 +314,15 @@ mod tests {
         assert_eq!(
             AuditEventKind::PlatformIngestBridgedToAsset.to_string(),
             "platform_ingest_bridged_to_asset"
+        );
+        assert_eq!(AuditEventKind::OrgCreated.to_string(), "org_created");
+        assert_eq!(
+            AuditEventKind::OrgMemberAdded.to_string(),
+            "org_member_added"
+        );
+        assert_eq!(
+            AuditEventKind::ProjectCreated.to_string(),
+            "project_created"
         );
     }
 }

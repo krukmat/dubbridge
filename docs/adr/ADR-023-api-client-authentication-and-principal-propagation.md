@@ -39,6 +39,14 @@ authorizes an RTMP or SRT encoder/source before capture starts.
   - `assets:read` for asset reads.
   - `recordings:write` for recording create/start/stop endpoints.
   - `recordings:read` for recording reads.
+  - `workspaces:write` for workspace mutation endpoints (create org, add member,
+    create project, link/unlink assets, set target languages). Introduced in S-100-T3.
+  - `workspaces:read` for workspace read endpoints (list orgs, members, projects,
+    assets, target languages). Introduced in S-100-T3.
+  - **Follow-up X-S-100-4:** the external authorization server must be configured
+    to issue `workspaces:write` and `workspaces:read` before workspace endpoints
+    are usable in a real deployment. Tests stub the token verifier and are not
+    blocked by this follow-up.
 - `/health/live` and `/health/ready` remain public.
 - The v1 verifier accepts a configured public RSA verification key. The verifier
   boundary must allow a JWKS-backed implementation later without changing route

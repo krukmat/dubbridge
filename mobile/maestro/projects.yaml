@@ -1,0 +1,103 @@
+appId: com.dubbridge.mobile
+name: Project surfaces
+tags:
+  - android
+  - s-100
+  - projects
+# BDD scenarios: SC-ORG-1, SC-PROJECT-1, SC-MEMBER-2
+---
+- launchApp:
+    clearState: true
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: login-screen
+    timeout: 20000
+
+- assertVisible:
+    id: login-screen
+
+- openLink: ${SEED_BOOTSTRAP_DEEPLINK}
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 30000
+
+- assertVisible:
+    id: home-screen
+
+- takeScreenshot: 08_home_for_projects
+
+# SC-ORG-1 / SC-PROJECT-1: navigate to project list and assert seed project is visible
+- openLink: dubbridge://workspace/orgs/org-seed-1/projects
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: project-list-screen
+    timeout: 20000
+
+- assertVisible:
+    id: project-list-screen
+
+- assertVisible:
+    id: project-card-project-seed-1
+
+- takeScreenshot: 09_project_list
+
+# SC-PROJECT-1: tap project card → project detail with linked assets
+- tapOn:
+    id: project-card-project-seed-1
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: project-detail-screen
+    timeout: 20000
+
+- assertVisible:
+    id: project-detail-screen
+
+- assertVisible:
+    id: asset-row-asset-seed-1
+
+- takeScreenshot: 10_project_detail

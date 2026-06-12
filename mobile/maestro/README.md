@@ -1,8 +1,8 @@
 # Maestro screenshot suite — S-055 + S-060
 
-Reproducible five-phase screenshot capture for every DubBridge mobile screen on an
+Reproducible six-phase screenshot capture for every DubBridge mobile screen on an
 Android emulator. S-055 (V1–V8) delivered phases 1–2; S-060 T6 integrated phases 3–5
-into the same one-command runner. Complete as of 2026-06-12.
+into the same one-command runner; X-P3F-2b completed phases 5 and 5b. Complete as of 2026-06-12.
 
 ## Overview
 
@@ -13,12 +13,18 @@ into the same one-command runner. Complete as of 2026-06-12.
 | 3 — Asset list (populated) | `asset-list.yaml` | `SC-LIST-1` | `03_asset_list.png` |
 | 3b — Asset list (empty) | `asset-list.yaml` | `SC-LIST-2` | `03_asset_list.png` |
 | 4 — Asset detail | `asset-detail.yaml` | `SC-DETAIL-1` | `04_asset_detail.png` |
-| 5 — Asset ingestion | `asset-ingestion.yaml` | `SC-INGEST-1` | `05_upload.png` |
+| 5 — Asset ingestion (SC-INGEST-1) | `asset-ingestion.yaml` | `SC-INGEST-1` | `05_upload.png`, `06_ingest_complete.png` |
+| 5b — Asset ingestion no-rights (SC-INGEST-2) | `asset-ingestion-no-rights.yaml` | `SC-INGEST-2` | `07_ingest_no_rights.png` |
 
 The list flow supports two mock-gateway seed modes:
 
 - default handoff (`POST /e2e/issue-handoff`) returns the two populated seed assets and captures the standard `03_asset_list` screenshot (phase 3 / SC-LIST-1).
 - empty handoff (`POST /e2e/issue-handoff?asset_seed=empty`) returns an empty list for that redeemed session and asserts `SC-LIST-2` (phase 3b).
+
+The ingestion flow supports a `ingest_seed=no_rights` mode:
+
+- default handoff: mock-gateway returns `201` on `/api/ingest/{token}/finalize` (phase 5 / SC-INGEST-1).
+- no-rights handoff (`POST /e2e/issue-handoff?ingest_seed=no_rights`): mock-gateway returns `422` on finalize, and the app surfaces the rights-required error (phase 5b / SC-INGEST-2).
 
 Phase 2 bootstraps a gateway session without UI login by redeeming a seeded one-time
 `handoff_code` into an opaque `session_ref` (ADR-024). No JWT or refresh token ever
@@ -89,10 +95,11 @@ cd mobile && npm run screenshots
 8. Mints a handoff code; runs **Phase 3** (`asset-list.yaml` / SC-LIST-1) — captures `03_asset_list.png`.
 9. Mints an empty handoff code; runs **Phase 3b** (`asset-list.yaml` / SC-LIST-2) — captures `03_asset_list.png` (empty state).
 10. Mints a handoff code; runs **Phase 4** (`asset-detail.yaml` / SC-DETAIL-1) — captures `04_asset_detail.png`.
-11. Mints a handoff code; runs **Phase 5** (`asset-ingestion.yaml` / SC-INGEST-1) — captures `05_upload.png`.
-12. Copies all PNGs to `mobile/artifacts/screenshots/`.
-13. Sanitizes `handoff_code` and `session_ref` from all Maestro JSON reports.
-14. Asserts no sensitive values remain in reports.
+11. Mints a handoff code; runs **Phase 5** (`asset-ingestion.yaml` / SC-INGEST-1) — captures `05_upload.png` + `06_ingest_complete.png`.
+12. Mints a `ingest_seed=no_rights` handoff code; runs **Phase 5b** (`asset-ingestion-no-rights.yaml` / SC-INGEST-2) — captures `07_ingest_no_rights.png`.
+13. Copies all PNGs to `mobile/artifacts/screenshots/`.
+14. Sanitizes `handoff_code` and `session_ref` from all Maestro JSON reports.
+15. Asserts no sensitive values remain in reports.
 
 Set `START_MOCK_SERVERS=1` to have the script start mock-oauth and mock-gateway
 automatically:
@@ -170,6 +177,15 @@ DEEPLINK=$(curl -sf -X POST http://127.0.0.1:8081/e2e/issue-handoff \
 maestro test mobile/maestro/asset-ingestion.yaml \
   --test-output-dir /tmp/dubbridge-maestro-asset-ingestion \
   --env SEED_BOOTSTRAP_DEEPLINK="$DEEPLINK"
+
+# 13. Phase 5b — ingestion no-rights (SC-INGEST-2)
+NR_DEEPLINK=$(curl -sf -X POST \
+  "http://127.0.0.1:8081/e2e/issue-handoff?ingest_seed=no_rights" \
+  | node -e "const d=require('fs').readFileSync('/dev/stdin','utf8'); \
+             console.log(JSON.parse(d).auth.bootstrap_deeplink)")
+maestro test mobile/maestro/asset-ingestion-no-rights.yaml \
+  --test-output-dir /tmp/dubbridge-maestro-asset-ingestion-no-rights \
+  --env SEED_BOOTSTRAP_DEEPLINK="$NR_DEEPLINK"
 ```
 
 Note: always pass `SEED_BOOTSTRAP_DEEPLINK` via `--env` to Maestro, not via shell

@@ -1,8 +1,10 @@
 pub mod cleanup; // T1-T2
 pub mod dto;
 pub mod ingestion_service; // S3-T0: transport-agnostic finalization core
+pub mod middleware;
 pub mod routes;
 pub mod state;
+pub mod workspace_service;
 
 use std::sync::Arc;
 
@@ -21,7 +23,8 @@ pub fn build_app(state: Arc<AppState>, verifier: dubbridge_auth::SharedTokenVeri
     Router::new()
         .route("/health/live", get(live))
         .route("/health/ready", get(ready))
-        .merge(routes::ingestion::router(verifier))
+        .merge(routes::ingestion::router(verifier.clone()))
+        .merge(routes::workspace::router(state.pool.clone(), verifier))
         .with_state(state)
 }
 

@@ -67,6 +67,11 @@
     implement and verify for the task.
   - **Edge cases considered** — the boundary and failure conditions the agent
     expects to handle or verify for the task.
+  - **Reflection strategy** — when the task's RRI is 26 or higher, the task
+    presentation must state the Reflection strategy that will be used, derived
+    from the `Reflection design pattern for development tasks` section below.
+    The presentation must name the required pass count for the task's RRI band
+    and briefly summarize the intended focus of each pass.
   - **Diagram** — a compact Mermaid diagram that explains the concept to be
     implemented: the flow, boundary, dependency direction, state transition, or
     ownership split that the task relies on. The diagram may be minimal, but it is
@@ -431,6 +436,87 @@ Presentation rules:
   - a task-local explicit pin documented in the task file.
 - Add a one-line rationale if the mapping is non-obvious (e.g., a Medium CC task
   escalated to High because of a Very High external-dependency count).
+
+## Reflection design pattern for development tasks
+
+When a development task has an RRI of 26 or higher, the agent must apply
+**Reflection** passes before reporting the task complete. Each pass is a complete
+Draft → Critique → Revise loop.
+
+Required pass count by RRI band:
+
+| RRI band | Label | Required Reflection passes |
+|---|---|---|
+| 26–40 | Moderate | 2 |
+| 41–55 | Med-high | 3 |
+| 56–70 | Complex | 4 |
+
+For RRI 71+, follow the decomposition and human-review gates in
+`docs/policies/RRI_POLICY.md` before implementation. If an exceptional approved
+development task still proceeds without decomposition, apply at least the Complex
+band minimum of 4 Reflection passes in addition to the RRI-policy gates.
+
+Task-presentation requirement for development tasks:
+
+- When a development task's RRI is 26 or higher and the task is being presented
+  for approval, the presentation must include a `Reflection strategy` section.
+- That section must be derived from this table and must state:
+  - the task's RRI and band;
+  - the required number of Reflection passes for that band;
+  - a short pass-by-pass plan describing the intended Draft → Critique → Revise
+    focus for each pass.
+- The section should be concrete enough that the approver can see how the agent
+  intends to use Reflection on correctness, fail-closed behavior, side effects,
+  and coverage risk for the specific task being proposed.
+
+Each Reflection pass consists of:
+
+1. **Draft** — produce the initial implementation following the task's acceptance
+   criteria, happy paths, and edge cases. In later passes, treat the current revised
+   implementation as the draft.
+2. **Critique** — re-read the draft as if reviewing someone else's code. Check for:
+   - logical correctness against every `HP-#` and `EC-#` case;
+   - missing or incorrect error handling at system boundaries;
+   - unintended side effects on adjacent modules or state;
+   - whether applicable design patterns or concepts should be used to improve
+     execution performance, memory usage, and UX/UI quality when the task has a
+     user-facing surface;
+   - test coverage gaps against the 90% gate.
+3. **Revise** — apply concrete fixes identified in the critique step. If no fixes are
+   needed, state that explicitly (one sentence).
+4. **Certify** — proceed to unit coverage certification only after at least one
+   complete Draft → Critique → Revise loop has been recorded for every required
+   Reflection pass.
+
+The passes must be documented in the task completion record as a
+`### Reflection log` section placed before `### Unit coverage certification`.
+Minimum format:
+
+```md
+### Reflection log
+
+Required passes: <N> (`<RRI>` → `<band>`)
+
+#### Pass 1
+
+- **Draft verdict:** <one-line summary of current state>
+- **Critique findings:** <bullet list of issues found, or "no issues found">
+- **Revisions applied:** <bullet list of changes made, or "none">
+
+#### Pass 2
+
+- **Draft verdict:** <one-line summary of current state>
+- **Critique findings:** <bullet list of issues found, or "no issues found">
+- **Revisions applied:** <bullet list of changes made, or "none">
+```
+
+For RRI 0–25 tasks delegated to local Gemma, the delegating agent applies the
+Reflection cycle to Gemma's output during the mandatory review step. Record the
+reflection log in the final report, not inside the delegated task.
+
+Skip the Reflection cycle for: docs-only, config-only, migration-only, or planning
+tasks. For tasks at the boundary (RRI exactly 25–26), apply judgment: if the task
+writes non-trivial logic, apply the cycle.
 
 ## Testing and commit rules
 

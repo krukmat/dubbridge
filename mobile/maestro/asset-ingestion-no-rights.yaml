@@ -1,0 +1,93 @@
+appId: com.dubbridge.mobile
+name: Asset Ingestion — No Rights (SC-INGEST-2)
+tags:
+  - android
+  - s-060
+  - asset-ingestion
+# BDD scenario: SC-INGEST-2 — finalize without rights returns a rights-required error
+---
+- launchApp:
+    clearState: true
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: login-screen
+    timeout: 20000
+
+- assertVisible:
+    id: login-screen
+
+- openLink: ${SEED_BOOTSTRAP_DEEPLINK}
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 30000
+
+- assertVisible:
+    id: home-screen
+
+- tapOn:
+    id: home-open-upload
+
+- extendedWaitUntil:
+    visible:
+      id: upload-screen
+    timeout: 20000
+
+- assertVisible:
+    id: upload-screen
+
+# E2E mode starts at file_pending; pick file to advance to ready
+- tapOn: Pick file
+
+- extendedWaitUntil:
+    visible:
+      text: Upload & finalize
+    timeout: 10000
+
+- assertVisible: Upload & finalize
+
+# SC-INGEST-2: tap finalize → mock-gateway returns 422 → rights-required error shown
+- tapOn:
+    id: upload-finalize
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      text: "Rights are required before finalizing"
+    timeout: 20000
+
+- assertVisible:
+    text: "Rights are required before finalizing"
+
+- takeScreenshot: 07_ingest_no_rights

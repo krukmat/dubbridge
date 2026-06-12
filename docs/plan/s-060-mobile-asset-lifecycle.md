@@ -1,6 +1,6 @@
 # Plan: S-060 - First-party Mobile Asset Lifecycle (Functional Surface + BDD/Maestro)
 
-> **Status:** Planned (plan exists, not built). Authored 2026-06-11.
+> **Status:** Complete. Authored 2026-06-11; implemented and closed 2026-06-12.
 > **Roadmap phase:** `S-060` — successor functional phase to `S-050` (mobile client,
 > done) and sibling of `S-055` (Maestro screenshot/visual-audit suite, V1–V6 done).
 > **Tasks ledger:** `docs/tasks/s-060-mobile-asset-lifecycle.md`.

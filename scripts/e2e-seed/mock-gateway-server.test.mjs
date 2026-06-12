@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 
 import {
   SEED_ASSETS,
+  SEED_ORG,
+  SEED_PROJECT,
+  SEED_MEMBER,
+  NON_MEMBER_SESSION,
   createMockGatewayServer,
 } from "./mock-gateway-server.mjs";
 
@@ -136,6 +140,154 @@ test("mock gateway returns 404 for an unknown asset id", async () => {
     assert.deepEqual(await response.json(), { error: "asset_not_found" });
   });
 });
+
+test("mock gateway returns 422 on finalize when ingest_seed=no_rights", async () => {
+  await withServer(async ({ baseUrl }) => {
+    // Issue a handoff with ingest_seed=no_rights
+    const issueResponse = await fetch(`${baseUrl}/e2e/issue-handoff?ingest_seed=no_rights`, {
+      method: "POST",
+    });
+    assert.equal(issueResponse.status, 200);
+    const issuePayload = await issueResponse.json();
+
+    // Redeem the handoff code
+    const redeemResponse = await fetch(`${baseUrl}/auth/mobile/session`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ handoff_code: issuePayload.auth.handoff_code }),
+    });
+    assert.equal(redeemResponse.status, 200);
+    const { session_ref } = await redeemResponse.json();
+
+    // Create an ingest session — the token is now flagged as no_rights
+    const ingestResponse = await fetch(`${baseUrl}/api/ingest`, {
+      method: "POST",
+      headers: { "x-dubbridge-session": session_ref },
+    });
+    assert.equal(ingestResponse.status, 201);
+    const { ingest_token } = await ingestResponse.json();
+
+    // Finalize should return 422
+    const finalizeResponse = await fetch(`${baseUrl}/api/ingest/${ingest_token}/finalize`, {
+      method: "POST",
+      headers: { "x-dubbridge-session": session_ref },
+    });
+    assert.equal(finalizeResponse.status, 422);
+    assert.deepEqual(await finalizeResponse.json(), { error: "rights_required" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Workspace route tests (S-100-T7)
+// ---------------------------------------------------------------------------
+
+test("mock gateway lists seed org for any authenticated session", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/api/orgs`, {
+      headers: SESSION_HEADERS,
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), [SEED_ORG]);
+  });
+});
+
+test("mock gateway creates org and returns seed shape", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/api/orgs`, {
+      method: "POST",
+      headers: { ...SESSION_HEADERS, "content-type": "application/json" },
+      body: JSON.stringify({ name: "New Org" }),
+    });
+
+    assert.equal(response.status, 201);
+    assert.deepEqual(await response.json(), SEED_ORG);
+  });
+});
+
+test("mock gateway lists members for org owner session", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/api/orgs/${SEED_ORG.id}/members`, {
+      headers: SESSION_HEADERS,
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), [SEED_MEMBER]);
+  });
+});
+
+test("mock gateway lists projects for org member session", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/api/orgs/${SEED_ORG.id}/projects`, {
+      headers: SESSION_HEADERS,
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), [SEED_PROJECT]);
+  });
+});
+
+test("mock gateway returns project detail with linked assets", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const response = await fetch(
+      `${baseUrl}/api/orgs/${SEED_ORG.id}/projects/${SEED_PROJECT.id}`,
+      { headers: SESSION_HEADERS },
+    );
+
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.id, SEED_PROJECT.id);
+    assert.equal(body.org_id, SEED_ORG.id);
+    assert.deepEqual(body.assets, SEED_ASSETS);
+    assert.deepEqual(body.target_languages, []);
+  });
+});
+
+test("mock gateway returns 404 for unknown project id", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const response = await fetch(
+      `${baseUrl}/api/orgs/${SEED_ORG.id}/projects/does-not-exist`,
+      { headers: SESSION_HEADERS },
+    );
+
+    assert.equal(response.status, 404);
+    assert.deepEqual(await response.json(), { error: "project_not_found" });
+  });
+});
+
+test("mock gateway denies non-member session on org-scoped routes (SC-MEMBER-2)", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const nonMemberHeaders = { "x-dubbridge-session": NON_MEMBER_SESSION };
+    const routes = [
+      fetch(`${baseUrl}/api/orgs/${SEED_ORG.id}/members`, { headers: nonMemberHeaders }),
+      fetch(`${baseUrl}/api/orgs/${SEED_ORG.id}/projects`, { headers: nonMemberHeaders }),
+      fetch(`${baseUrl}/api/orgs/${SEED_ORG.id}/projects/${SEED_PROJECT.id}`, {
+        headers: nonMemberHeaders,
+      }),
+    ];
+
+    for (const response of await Promise.all(routes)) {
+      assert.equal(response.status, 403);
+      assert.deepEqual(await response.json(), { error: "forbidden" });
+    }
+  });
+});
+
+test("mock gateway preserves existing 401 gate: workspace routes without session return 401", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const routes = [
+      fetch(`${baseUrl}/api/orgs`),
+      fetch(`${baseUrl}/api/orgs/${SEED_ORG.id}/projects`),
+    ];
+
+    for (const response of await Promise.all(routes)) {
+      assert.equal(response.status, 401);
+      assert.deepEqual(await response.json(), { error: "missing_session" });
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 
 test("mock gateway returns happy-path ingest shapes", async () => {
   await withServer(async ({ baseUrl }) => {

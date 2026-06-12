@@ -8,3 +8,4 @@ pub mod ingestion;
 pub mod platform_ingest;
 pub mod recording;
 pub mod rights;
+pub mod workspace;

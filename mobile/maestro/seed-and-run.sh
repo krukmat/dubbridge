@@ -225,8 +225,10 @@ MAESTRO_OUT_3="/tmp/dubbridge-maestro-asset-list-$$"
 MAESTRO_OUT_3E="/tmp/dubbridge-maestro-asset-list-empty-$$"
 MAESTRO_OUT_4="/tmp/dubbridge-maestro-asset-detail-$$"
 MAESTRO_OUT_5="/tmp/dubbridge-maestro-asset-ingestion-$$"
+MAESTRO_OUT_5B="/tmp/dubbridge-maestro-asset-ingestion-no-rights-$$"
+MAESTRO_OUT_6="/tmp/dubbridge-maestro-projects-$$"
 mkdir -p "$MAESTRO_OUT_1" "$MAESTRO_OUT_2" "$MAESTRO_OUT_3" "$MAESTRO_OUT_3E" \
-         "$MAESTRO_OUT_4" "$MAESTRO_OUT_5"
+         "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6"
 
 # --- S-055 Phase 1: auth surface ---
 
@@ -330,6 +332,47 @@ maestro test \
 
 info "Phase 5 passed."
 
+# --- S-060 Phase 5b: asset ingestion no-rights (SC-INGEST-2) ---
+
+info "Minting handoff code for Phase 5b (ingest no-rights — SC-INGEST-2)..."
+DEEPLINK_INGEST_NR=$(curl -sf --max-time 10 -X POST \
+  "$GATEWAY_URL/e2e/issue-handoff?ingest_seed=no_rights") \
+  || die "Seed request for Phase 5b failed."
+DEEPLINK_INGEST_NR=$(SEED_JSON="$DEEPLINK_INGEST_NR" node -e "
+  const raw = process.env.SEED_JSON;
+  try { const p = JSON.parse(raw); process.stdout.write(p.auth.bootstrap_deeplink); }
+  catch(e) { process.exit(1); }
+") || die "Could not parse bootstrap_deeplink for Phase 5b."
+
+info "Phase 5b — asset ingestion no-rights (asset-ingestion-no-rights.yaml / SC-INGEST-2)..."
+maestro test \
+  --test-output-dir "$MAESTRO_OUT_5B" \
+  --env SEED_BOOTSTRAP_DEEPLINK="$DEEPLINK_INGEST_NR" \
+  "$REPO_ROOT/mobile/maestro/asset-ingestion-no-rights.yaml" \
+  || die "Phase 5b (asset-ingestion-no-rights.yaml) failed. Check $MAESTRO_OUT_5B for details."
+
+info "Phase 5b passed."
+
+# --- S-100 Phase 6: project list + detail (SC-ORG-1, SC-PROJECT-1, SC-MEMBER-2) ---
+
+info "Minting handoff code for Phase 6 (project surfaces)..."
+DEEPLINK_PROJECTS=$(curl -sf --max-time 10 -X POST "$GATEWAY_URL/e2e/issue-handoff") \
+  || die "Seed request for Phase 6 failed."
+DEEPLINK_PROJECTS=$(SEED_JSON="$DEEPLINK_PROJECTS" node -e "
+  const raw = process.env.SEED_JSON;
+  try { const p = JSON.parse(raw); process.stdout.write(p.auth.bootstrap_deeplink); }
+  catch(e) { process.exit(1); }
+") || die "Could not parse bootstrap_deeplink for Phase 6."
+
+info "Phase 6 — project surfaces (projects.yaml / SC-ORG-1, SC-PROJECT-1)..."
+maestro test \
+  --test-output-dir "$MAESTRO_OUT_6" \
+  --env SEED_BOOTSTRAP_DEEPLINK="$DEEPLINK_PROJECTS" \
+  "$REPO_ROOT/mobile/maestro/projects.yaml" \
+  || die "Phase 6 (projects.yaml) failed. Check $MAESTRO_OUT_6 for details."
+
+info "Phase 6 passed."
+
 # ---------------------------------------------------------------------------
 # Copy screenshots
 # ---------------------------------------------------------------------------
@@ -339,7 +382,7 @@ mkdir -p "$SCREENSHOTS_DIR"
 
 info "Copying screenshots to $SCREENSHOTS_DIR ..."
 find "$MAESTRO_OUT_1" "$MAESTRO_OUT_2" "$MAESTRO_OUT_3" "$MAESTRO_OUT_3E" \
-     "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" -name "*.png" | while IFS= read -r png; do
+     "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" -name "*.png" | while IFS= read -r png; do
   cp "$png" "$SCREENSHOTS_DIR/"
   info "  Copied: $(basename "$png")"
 done
@@ -376,19 +419,21 @@ sanitize_dir "$MAESTRO_OUT_3"
 sanitize_dir "$MAESTRO_OUT_3E"
 sanitize_dir "$MAESTRO_OUT_4"
 sanitize_dir "$MAESTRO_OUT_5"
+sanitize_dir "$MAESTRO_OUT_5B"
+sanitize_dir "$MAESTRO_OUT_6"
 
 # Assert absence of sensitive values post-sanitization
 LEAK_HANDOFF=$(grep -r 'handoff_code=' \
   "$MAESTRO_OUT_1" "$MAESTRO_OUT_2" "$MAESTRO_OUT_3" "$MAESTRO_OUT_3E" \
-  "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" 2>/dev/null \
+  "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" 2>/dev/null \
   | grep -v 'handoff_code=\[REDACTED\]' || true)
 LEAK_SESSION=$(grep -r 'session_ref=' \
   "$MAESTRO_OUT_1" "$MAESTRO_OUT_2" "$MAESTRO_OUT_3" "$MAESTRO_OUT_3E" \
-  "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" 2>/dev/null \
+  "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" 2>/dev/null \
   | grep -v 'session_ref=\[REDACTED\]' || true)
 LEAK_SESSION_JSON=$(grep -r '"session_ref":"' \
   "$MAESTRO_OUT_1" "$MAESTRO_OUT_2" "$MAESTRO_OUT_3" "$MAESTRO_OUT_3E" \
-  "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" 2>/dev/null \
+  "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" 2>/dev/null \
   | grep -v '"session_ref":"\[REDACTED\]"' || true)
 
 if [[ -n "$LEAK_HANDOFF" || -n "$LEAK_SESSION" || -n "$LEAK_SESSION_JSON" ]]; then
@@ -406,11 +451,13 @@ info "Sanitization verified: no handoff_code or session_ref values remain in rep
 # ---------------------------------------------------------------------------
 
 info ""
-info "Suite complete — 5 phases, $(echo "$PNG_COUNT") screenshot(s)."
+info "Suite complete — 7 phases, $(echo "$PNG_COUNT") screenshot(s)."
 info "  Screenshots    : $SCREENSHOTS_DIR"
-info "  Phase 1 out    : $MAESTRO_OUT_1  (01_auth_login)"
-info "  Phase 2 out    : $MAESTRO_OUT_2  (02_home)"
-info "  Phase 3 out    : $MAESTRO_OUT_3  (03_asset_list — populated)"
-info "  Phase 3b out   : $MAESTRO_OUT_3E (03_asset_list — empty)"
-info "  Phase 4 out    : $MAESTRO_OUT_4  (04_asset_detail)"
-info "  Phase 5 out    : $MAESTRO_OUT_5  (05_upload)"
+info "  Phase 1 out    : $MAESTRO_OUT_1   (01_auth_login)"
+info "  Phase 2 out    : $MAESTRO_OUT_2   (02_home)"
+info "  Phase 3 out    : $MAESTRO_OUT_3   (03_asset_list — populated)"
+info "  Phase 3b out   : $MAESTRO_OUT_3E  (03_asset_list — empty)"
+info "  Phase 4 out    : $MAESTRO_OUT_4   (04_asset_detail)"
+info "  Phase 5 out    : $MAESTRO_OUT_5   (05_upload → 06_ingest_complete)"
+info "  Phase 5b out   : $MAESTRO_OUT_5B  (07_ingest_no_rights — SC-INGEST-2)"
+info "  Phase 6 out    : $MAESTRO_OUT_6   (08_home_for_projects → 09_project_list → 10_project_detail)"

@@ -515,6 +515,7 @@ name = "dubbridge-api"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "axum 0.8.9",
  "dubbridge-audit",
  "dubbridge-auth",
@@ -555,6 +556,7 @@ name = "dubbridge-auth"
 version = "0.1.0"
 dependencies = [
  "axum 0.8.9",
+ "dubbridge-domain",
  "jsonwebtoken",
  "serde",
  "serde_json",

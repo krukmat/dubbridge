@@ -348,7 +348,7 @@ describe("asset screens", () => {
       expect(mockClient.postMultipart).toHaveBeenCalledWith(
         "/api/ingest",
         "opaque-session-abc123",
-        expect.any(FormData),
+        expect.objectContaining({ fileUri: expect.any(String), fileName: expect.any(String) }),
       );
       expect(mockClient.post).toHaveBeenCalledWith(
         "/api/ingest/tok-abc/rights",

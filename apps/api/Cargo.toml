@@ -18,6 +18,7 @@ uuid.workspace = true
 time.workspace = true
 sha2 = "0.10"
 thiserror = "2.0"
+async-trait = "0.1"
 dubbridge-config = { path = "../../crates/config" }
 dubbridge-observability = { path = "../../crates/observability" }
 dubbridge-auth = { path = "../../crates/auth" }

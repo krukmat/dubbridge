@@ -1,9 +1,27 @@
 // P3 T2: unit tests for the typed gateway API client (stubbed fetch, no real network)
 
 import { createGatewayClient } from '../src/api/client';
+import type { MultipartUpload } from '../src/api/client';
+import * as FileSystem from 'expo-file-system/legacy';
+
+jest.mock('expo-file-system/legacy', () => ({
+  uploadAsync: jest.fn(),
+  FileSystemUploadType: { MULTIPART: 'MULTIPART' },
+  FileSystemSessionType: { BACKGROUND: 'BACKGROUND' },
+}));
 
 const BASE_URL = 'http://localhost:4000';
 const SESSION_REF = 'opaque-session-abc123';
+
+const SAMPLE_UPLOAD: MultipartUpload = {
+  fileUri: 'file:///tmp/test.mov',
+  fileName: 'test.mov',
+  mimeType: 'video/quicktime',
+};
+
+function makeUploadResult(status: number, body: unknown): FileSystem.FileSystemUploadResult {
+  return { status, body: JSON.stringify(body), headers: {}, mimeType: null };
+}
 
 function makeMockResponse(
   status: number,
@@ -208,59 +226,67 @@ describe('createGatewayClient', () => {
   });
 
   // ── postMultipart: HP-1 ───────────────────────────────────────────────────
-  describe('postMultipart HP-1: sends FormData without JSON Content-Type', () => {
-    it('does not set Content-Type header and passes FormData as body', async () => {
-      mockFetch.mockResolvedValueOnce(
-        makeMockResponse(201, { ingest_token: 'tok-abc' })
+  describe('postMultipart HP-1: calls FileSystem.uploadAsync and returns parsed body', () => {
+    it('calls uploadAsync with MULTIPART type and returns typed data', async () => {
+      (FileSystem.uploadAsync as jest.Mock).mockResolvedValueOnce(
+        makeUploadResult(201, { ingest_token: 'tok-abc' })
       );
-
-      const fd = new FormData();
-      fd.append('title', 'My track');
 
       const result = await client.postMultipart<{ ingest_token: string }>(
         '/api/ingest',
         SESSION_REF,
-        fd,
+        SAMPLE_UPLOAD,
       );
 
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.data.ingest_token).toBe('tok-abc');
+        expect(result.value.sessionRotation).toBeNull();
       }
 
-      const calledInit = mockFetch.mock.calls[0]?.[1] as RequestInit;
-      const sentHeaders = calledInit?.headers as Record<string, string> | undefined;
-      expect(sentHeaders?.['Content-Type']).toBeUndefined();
-      expect(calledInit.body).toBe(fd);
+      expect(FileSystem.uploadAsync).toHaveBeenCalledWith(
+        `${BASE_URL}/api/ingest`,
+        SAMPLE_UPLOAD.fileUri,
+        expect.objectContaining({
+          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+          fieldName: 'file',
+          mimeType: SAMPLE_UPLOAD.mimeType,
+          parameters: expect.objectContaining({ title: SAMPLE_UPLOAD.fileName }),
+        }),
+      );
     });
   });
 
   // ── postMultipart: HP-2 ───────────────────────────────────────────────────
   describe('postMultipart HP-2: attaches X-Dubbridge-Session header', () => {
-    it('forwards session ref via X-Dubbridge-Session', async () => {
-      mockFetch.mockResolvedValueOnce(
-        makeMockResponse(201, { ingest_token: 'tok-xyz' })
+    it('forwards session ref in the headers option', async () => {
+      (FileSystem.uploadAsync as jest.Mock).mockResolvedValueOnce(
+        makeUploadResult(201, { ingest_token: 'tok-xyz' })
       );
 
-      const fd = new FormData();
-      await client.postMultipart('/api/ingest', SESSION_REF, fd);
+      await client.postMultipart('/api/ingest', SESSION_REF, SAMPLE_UPLOAD);
 
-      const calledInit = mockFetch.mock.calls[0]?.[1] as RequestInit;
-      const sentHeaders = calledInit?.headers as Record<string, string> | undefined;
-      expect(sentHeaders?.['X-Dubbridge-Session']).toBe(SESSION_REF);
+      expect(FileSystem.uploadAsync).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'X-Dubbridge-Session': SESSION_REF }),
+        }),
+      );
     });
   });
 
   // ── postMultipart: HP-3 ───────────────────────────────────────────────────
   describe('postMultipart HP-3: null sessionRef omits session header', () => {
     it('does not attach X-Dubbridge-Session when sessionRef is null', async () => {
-      mockFetch.mockResolvedValueOnce(makeMockResponse(201, { ingest_token: 'tok-pub' }));
+      (FileSystem.uploadAsync as jest.Mock).mockResolvedValueOnce(
+        makeUploadResult(201, { ingest_token: 'tok-pub' })
+      );
 
-      const fd = new FormData();
-      await client.postMultipart('/api/ingest', null, fd);
+      await client.postMultipart('/api/ingest', null, SAMPLE_UPLOAD);
 
-      const calledInit = mockFetch.mock.calls[0]?.[1] as RequestInit;
-      const sentHeaders = calledInit?.headers as Record<string, string> | undefined;
+      const calledOptions = (FileSystem.uploadAsync as jest.Mock).mock.calls[0]?.[2] as Record<string, unknown>;
+      const sentHeaders = calledOptions?.headers as Record<string, string> | undefined;
       expect(sentHeaders?.['X-Dubbridge-Session']).toBeUndefined();
     });
   });
@@ -268,9 +294,9 @@ describe('createGatewayClient', () => {
   // ── postMultipart: EC-1 ───────────────────────────────────────────────────
   describe('postMultipart EC-1: 401 → session_expired', () => {
     it('returns session_expired on 401', async () => {
-      mockFetch.mockResolvedValueOnce(makeMockResponse(401, {}));
+      (FileSystem.uploadAsync as jest.Mock).mockResolvedValueOnce(makeUploadResult(401, {}));
 
-      const result = await client.postMultipart('/api/ingest', SESSION_REF, new FormData());
+      const result = await client.postMultipart('/api/ingest', SESSION_REF, SAMPLE_UPLOAD);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -282,9 +308,9 @@ describe('createGatewayClient', () => {
   // ── postMultipart: EC-2 ───────────────────────────────────────────────────
   describe('postMultipart EC-2: 403 → forbidden', () => {
     it('returns forbidden on 403', async () => {
-      mockFetch.mockResolvedValueOnce(makeMockResponse(403, {}));
+      (FileSystem.uploadAsync as jest.Mock).mockResolvedValueOnce(makeUploadResult(403, {}));
 
-      const result = await client.postMultipart('/api/ingest', SESSION_REF, new FormData());
+      const result = await client.postMultipart('/api/ingest', SESSION_REF, SAMPLE_UPLOAD);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -295,10 +321,10 @@ describe('createGatewayClient', () => {
 
   // ── postMultipart: EC-3 ───────────────────────────────────────────────────
   describe('postMultipart EC-3: network error → network kind', () => {
-    it('returns network error on fetch rejection', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Upload network failure'));
+    it('returns network error on uploadAsync rejection', async () => {
+      (FileSystem.uploadAsync as jest.Mock).mockRejectedValueOnce(new Error('Upload network failure'));
 
-      const result = await client.postMultipart('/api/ingest', SESSION_REF, new FormData());
+      const result = await client.postMultipart('/api/ingest', SESSION_REF, SAMPLE_UPLOAD);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -311,30 +337,35 @@ describe('createGatewayClient', () => {
   });
 
   // ── postMultipart: EC-4 ───────────────────────────────────────────────────
-  describe('postMultipart EC-4: AbortError → network timeout', () => {
-    it('returns network timeout on AbortError', async () => {
-      const abortError = new Error('The user aborted a request.');
-      abortError.name = 'AbortError';
-      mockFetch.mockRejectedValueOnce(abortError);
+  describe('postMultipart EC-4: extra fields forwarded in parameters', () => {
+    it('merges upload.fields into parameters alongside title', async () => {
+      (FileSystem.uploadAsync as jest.Mock).mockResolvedValueOnce(
+        makeUploadResult(201, { ingest_token: 'tok-fields' })
+      );
 
-      const result = await client.postMultipart('/api/ingest', SESSION_REF, new FormData());
+      const uploadWithFields: MultipartUpload = {
+        ...SAMPLE_UPLOAD,
+        fields: { custom: 'value' },
+      };
 
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error.kind).toBe('network');
-        if (result.error.kind === 'network') {
-          expect(result.error.message).toBe('timeout');
-        }
-      }
+      await client.postMultipart('/api/ingest', SESSION_REF, uploadWithFields);
+
+      expect(FileSystem.uploadAsync).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+        expect.objectContaining({
+          parameters: expect.objectContaining({ title: SAMPLE_UPLOAD.fileName, custom: 'value' }),
+        }),
+      );
     });
   });
 
   // ── postMultipart: EC-5 ───────────────────────────────────────────────────
   describe('postMultipart EC-5: non-2xx (413) → http kind', () => {
     it('returns http error with status 413', async () => {
-      mockFetch.mockResolvedValueOnce(makeMockResponse(413, {}));
+      (FileSystem.uploadAsync as jest.Mock).mockResolvedValueOnce(makeUploadResult(413, {}));
 
-      const result = await client.postMultipart('/api/ingest', SESSION_REF, new FormData());
+      const result = await client.postMultipart('/api/ingest', SESSION_REF, SAMPLE_UPLOAD);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {

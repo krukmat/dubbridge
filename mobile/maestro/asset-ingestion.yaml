@@ -68,3 +68,27 @@ tags:
 - assertVisible: dubbridge-e2e-upload.mov
 
 - takeScreenshot: 05_upload
+
+# SC-INGEST-1: tap finalize → processing → asset list (success navigation)
+- tapOn:
+    id: upload-finalize
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: asset-list-screen
+    timeout: 30000
+
+- assertVisible:
+    id: asset-list-screen
+
+- takeScreenshot: 06_ingest_complete
