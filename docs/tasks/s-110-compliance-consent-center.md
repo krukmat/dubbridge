@@ -11,9 +11,9 @@
 
 > **RRI provenance.** Every RRI below was computed with `python3 scripts/rri.py`
 > (platform `dubbridge`) at planning time, not by hand. Final RRI is recomputed at
-> presentation. All tasks scored ≤ 70 → no mandatory decomposition; `S-110-T1` and `S-110-T2`
-> land in **Complex (56–70)** and therefore require a reviewed plan before
-> implementation — this ledger + the plan provide it.
+> presentation. `S-110-T1` was decomposed 2026-06-12 into T1a/T1b/T1c to lower
+> complexity; `S-110-T2` lands in **Complex (56–70)** and requires a reviewed plan
+> before implementation — this ledger + the plan provide it.
 
 ## Status legend
 - [ ] Not started · [~] In progress · [x] Done
@@ -21,17 +21,30 @@
 ## Task dependency order
 
 ```text
-S-110-T0 (BDD) ─▶ S-110-T0b (ADR X-S-110-1) ─▶ S-110-T1 (schema+domain+repo) ─▶ S-110-T2 (consent ledger + TTS precondition + audit) ─▶ S-110-T3 (compliance read API) ─┬─▶ S-110-T4 (web dashboard) ─┐
-                                                                                                                                                            ├─▶ S-110-T5 (mobile consent) ┤
-                                                                                                                                                            └─▶ S-110-T6 (E2E + docs) ◀────┘
+S-110-T0 (BDD) ─▶ S-110-T0b (ADR X-S-110-1) ─▶ S-110-T1a (migration SQL)
+                                                         │
+                                              ┌──────────┴──────────┐
+                                    S-110-T1b (domain entity)   S-110-T1c (DB repo)
+                                              └──────────┬──────────┘
+                                                         ▼
+                                              S-110-T2 (consent gate + audit, X11)
+                                                         ▼
+                                              S-110-T3 (compliance read API)
+                                              ┌──────────┴──────────┐
+                                    S-110-T4 (web dashboard)   S-110-T5 (mobile consent)
+                                              └──────────┬──────────┘
+                                                         ▼
+                                              S-110-T6 (E2E + docs sync)
 ```
 
 | Task | Title | Depends on | RRI | Band | Effort |
 |---|---|---|---|---|---|
 | S-110-T0 | BDD `.feature` specs + mapping | — | 11 | Low | S | ✅ done 2026-06-12 |
 | S-110-T0b | ADR authoring: voice-consent ledger + TTS precondition (X24 → X-S-110-1) | S-110-T0 | 18 | Low | S | ✅ done 2026-06-12 |
-| S-110-T1 | Schema + domain + repo (voice_consents) | S-110-T0b | 58 | Complex | L |
-| S-110-T2 | Consent ledger + TTS precondition + audit (X11) | S-110-T1 | 66 | Complex | L |
+| S-110-T1a | Migration SQL: `0013_create_voice_consents.sql` + RULES + CHECK constraints | S-110-T0b | 51 | Med-high | M |
+| S-110-T1b | Domain entity: `consent.rs` — types, status derivation, grant validation | S-110-T1a | 27 | Moderate | M |
+| S-110-T1c | DB repo: `consent_repo.rs` — append, latest_status, list | S-110-T1a | 31 | Moderate | M |
+| S-110-T2 | Consent gate + TTS precondition + audit (X11) | S-110-T1b, S-110-T1c | 66 | Complex | L |
 | S-110-T3 | Compliance read API (audit/rights viewer) | S-110-T2 | 44 | Med-high | L |
 | S-110-T4 | Web compliance dashboard | S-110-T3 | 30 | Moderate | M |
 | S-110-T5 | Mobile consent + compliance surfaces | S-110-T3 | 31 | Moderate | M |
@@ -167,69 +180,129 @@ S-110-T0 (BDD) ─▶ S-110-T0b (ADR X-S-110-1) ─▶ S-110-T1 (schema+domain+r
 
 ---
 
-## S-110-T1 — Schema + domain + repo (voice_consents)
+## S-110-T1a — Migration SQL: `0013_create_voice_consents.sql`
 
 - **Status:** [ ] Not started
-- **Type:** Development (Rust + SQL) · **Effort:** L
-- **RRI:** 58 → band **Complex (56–70)** → **Plan first; human reviews the plan; thinking On.**
-- **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Opus 4.8` · thinking On
-- **Depends on:** S-110-T0
-- **Objective:** Introduce the append-only `voice_consents` ledger plus the consent domain
-  entity and repo (status derived from the latest row). (Plan §D1.)
-- **Inputs:** `infra/migrations/` (next free index 0017), `migration 0002` (rights ledger
-  shape), `migration 0007` (append-only governance), `rights_repo.rs` (append-only patterns).
-- **Outputs:**
-  - `0017_create_voice_consents.sql` (append-only: scope, granted_by, evidence ref, status, ts).
-  - `crates/domain/src/consent.rs` (consent entity + latest-status derivation + scope model).
-  - `crates/db/src/consent_repo.rs` (append row, derive latest status, list).
-  - Unit/integration tests; ≥90% coverage.
+- **Type:** Development (SQL) · **Effort:** M
+- **RRI:** 51 → band **Med-high (41–55)** → **Plan + explicit AC before approval; thinking On.**
+- **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4.6` · thinking On
+- **Depends on:** S-110-T0b
+- **Objective:** Create the `voice_consents` table with append-only RULES and CHECK constraints
+  on `status` and `scope`. Establishes the schema foundation for T1b (domain) and T1c (repo).
+- **Inputs:** `infra/migrations/0002_create_rights_records.sql` (table shape), `0007_harden_governance_invariants.sql` (RULES + CHECK pattern).
+- **Outputs:** `infra/migrations/0013_create_voice_consents.sql`.
 - **Acceptance criteria:**
-  - `voice_consents` is append-only; current status = latest row (grant/revoke).
-  - Evidence is stored as a reference; no evidence bytes/secret stored inline (ADR-025).
-  - Migration applies cleanly, FK-constrained to assets.
-  - ≥90% coverage; all tests green.
-- **RRI variable table (script output):**
+  - Table created with columns: `id UUID PK`, `asset_id UUID FK→assets`, `scope TEXT NOT NULL`, `status TEXT NOT NULL`, `evidence_ref TEXT`, `granted_by UUID NOT NULL`, `happened_at TIMESTAMPTZ NOT NULL`.
+  - `status` CHECK constraint: `grant`, `revoke` only.
+  - `scope` CHECK constraint: `voice_clone`, `tts_synthesis` only.
+  - RULES block UPDATE and DELETE (append-only, ADR-028).
+  - Migration applies cleanly against a fresh DB; FK to `assets` enforced.
+- **RRI variable table:**
 
   | Variable | Score | Evidence | Confidence |
   |---|---|---|---|
-  | C | 1 | raw CC 10 → 1 | High |
-  | F | 2 | 3 files | High |
-  | D | 4 | anchor: `infra/migrations` (ADR-008, ADR-018) floor 4 | High |
-  | T | 2 | db/domain area has tests | High |
-  | A | 0 | criteria + examples present | High |
+  | C | 0 | raw CC 3 → 0 | High |
+  | F | 1 | 1 file | High |
+  | D | 4 | anchor: `infra/migrations` floor 4 | High |
+  | T | 2 | migration tests exist in CI | High |
+  | A | 0 | criteria present | High |
   | K | 4 | anchor: `infra/migrations` floor 4 | High |
-  | P | 5 | anchor: `infra/migrations` floor 5 (schema/data) | High |
-  | X | 2 | migration + domain + repo | High |
+  | P | 5 | schema/data impact floor 5 | High |
+  | X | 1 | single migration file | High |
 
-  **Base 48 · penalties auth_security (+10, P floor ≥ 4) · Final 58 → Complex → plan-first.**
-
-- **Happy paths considered:**
-  - `HP-1`: grant consent → active status derived. (SC-CONSENT-1)
-  - `HP-2`: grant then revoke → inactive status; both rows preserved. (SC-CONSENT-2)
-- **Edge cases considered:**
-  - `EC-1`: attempt to UPDATE/DELETE a consent row → not supported; supersede only.
-  - `EC-2`: evidence reference missing on grant → rejected (fail-closed, ADR-025).
-- **Diagram:**
-
-  ```mermaid
-  erDiagram
-    assets ||--o{ voice_consents : consented_for
-    voice_consents {
-      uuid id
-      uuid asset_id
-      text scope
-      text status
-      text evidence_ref
-      uuid granted_by
-      timestamptz happened_at
-    }
-  ```
+  **Base 41 · penalty auth_security +10 · Final 51 → Med-high.**
 
 - **Handoff prompt:**
-  > S-110-T1 — voice-consent schema + domain + repo. Docs: this ledger + plan §D1, ADR-008/018/025.
-  > Add migration 0017, `crates/domain/src/consent.rs`, `crates/db/src/consent_repo.rs`. AC:
-  > append-only, latest-status derivation, evidence by reference, ≥90% cov. Stop after tests;
-  > do not start S-110-T2.
+  > S-110-T1a — migration SQL for voice_consents. Docs: ledger §T1a, ADR-028, migrations 0002/0007.
+  > Create `infra/migrations/0013_create_voice_consents.sql`: table + FK→assets + CHECK(status IN
+  > ('grant','revoke')) + CHECK(scope IN ('voice_clone','tts_synthesis')) + RULES no-update/no-delete.
+  > AC: migration applies cleanly. Stop; do not touch Rust files.
+
+---
+
+## S-110-T1b — Domain entity: `crates/domain/src/consent.rs`
+
+- **Status:** [ ] Not started
+- **Type:** Development (Rust) · **Effort:** M
+- **RRI:** 27 → band **Moderate (26–40)** → **Confirm tests exist in the area.**
+- **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4.6` · thinking Off
+- **Depends on:** S-110-T1a
+- **Objective:** Define `ConsentScope`, `ConsentStatus`, `ConsentRow`, grant/revoke constructors,
+  and `derive_status` / `is_active` helpers. No DB access — pure domain logic.
+- **Inputs:** `crates/domain/src/rights.rs` (pattern), `crates/domain/src/lib.rs` (module registry), ADR-028.
+- **Outputs:** `crates/domain/src/consent.rs`; `pub mod consent;` in `lib.rs`.
+- **Acceptance criteria:**
+  - `ConsentScope` and `ConsentStatus` decode fail-closed: unknown string → `Err`.
+  - `new_grant` rejects empty `evidence_ref` → `Err(ConsentError::MissingEvidenceRef)`.
+  - `derive_status` returns `Some(Grant)` when latest row is grant; `Some(Revoke)` when revoked; `None` when no rows.
+  - `is_active` true iff `derive_status` = `Some(Grant)`.
+  - Unit tests cover HP-1, HP-2, EC-1, EC-2; ≥90% coverage; `cargo test -p dubbridge-domain` green.
+- **RRI variable table:**
+
+  | Variable | Score | Evidence | Confidence |
+  |---|---|---|---|
+  | C | 1 | raw CC 6 → 1 | High |
+  | F | 1 | 1 file + lib.rs | High |
+  | D | 2 | pure domain, no migrations | High |
+  | T | 2 | domain area has tests | High |
+  | A | 0 | criteria present | High |
+  | K | 2 | no external coupling | High |
+  | P | 1 | domain-internal only | High |
+  | X | 2 | entity + tests | High |
+
+  **Base 27 · no penalties · Final 27 → Moderate.**
+
+- **Happy paths / Edge cases:**
+  - `HP-1`: `new_grant` + `derive_status` → `Some(Grant)`. (SC-CONSENT-1)
+  - `HP-2`: grant + revoke rows → `derive_status` → `Some(Revoke)`; both rows preserved. (SC-CONSENT-2)
+  - `EC-1`: empty `evidence_ref` on grant → `Err`. (ADR-028)
+  - `EC-2`: unknown scope string decode → `Err`.
+- **Handoff prompt:**
+  > S-110-T1b — domain entity consent.rs. Docs: ledger §T1b, ADR-028, rights.rs pattern.
+  > Add `crates/domain/src/consent.rs` (ConsentScope, ConsentStatus, ConsentRow, new_grant,
+  > new_revoke, derive_status, is_active) + `pub mod consent` in lib.rs. AC: fail-closed decode,
+  > missing evidence_ref rejected, HP-1/HP-2/EC-1/EC-2 unit tests, ≥90% cov. Stop; do not touch db crate.
+
+---
+
+## S-110-T1c — DB repo: `crates/db/src/consent_repo.rs`
+
+- **Status:** [ ] Not started
+- **Type:** Development (Rust) · **Effort:** M
+- **RRI:** 31 → band **Moderate (26–40)** → **Confirm tests exist in the area.**
+- **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4.6` · thinking Off
+- **Depends on:** S-110-T1a (schema), S-110-T1b (types) — can run parallel to T1b once T1a is done
+- **Objective:** Implement the three consent repo functions over the `voice_consents` table.
+- **Inputs:** `crates/db/src/rights_repo.rs` (append pattern), `crates/domain/src/consent.rs` (T1b types), `crates/db/src/lib.rs` (module registry).
+- **Outputs:** `crates/db/src/consent_repo.rs`; `pub mod consent_repo;` in `lib.rs`.
+- **Acceptance criteria:**
+  - `append_consent(pool, row)` — INSERT only; no upsert.
+  - `latest_consent_status(pool, asset_id, scope)` — returns `Option<ConsentStatus>` from latest row by `happened_at DESC LIMIT 1`.
+  - `list_consents_for_asset(pool, asset_id)` — returns all rows ordered `happened_at ASC`.
+  - Integration tests (sqlx test-db) cover HP-1, HP-2; ≥90% coverage; `cargo test -p dubbridge-db` green.
+- **RRI variable table:**
+
+  | Variable | Score | Evidence | Confidence |
+  |---|---|---|---|
+  | C | 0 | raw CC 5 → 0 | High |
+  | F | 1 | 1 file + lib.rs | High |
+  | D | 3 | DB layer, references migrations | High |
+  | T | 2 | db area has integration tests | High |
+  | A | 0 | criteria present | High |
+  | K | 3 | sqlx + domain types coupling | High |
+  | P | 2 | read/write single new table | High |
+  | X | 2 | repo + tests | High |
+
+  **Base 31 · no penalties · Final 31 → Moderate.**
+
+- **Happy paths / Edge cases:**
+  - `HP-1`: append grant row → `latest_consent_status` returns `Grant`. (SC-CONSENT-1)
+  - `HP-2`: append grant + revoke → `latest_consent_status` returns `Revoke`; `list` returns both rows. (SC-CONSENT-2)
+- **Handoff prompt:**
+  > S-110-T1c — DB repo consent_repo.rs. Docs: ledger §T1c, ADR-028, rights_repo.rs pattern.
+  > Add `crates/db/src/consent_repo.rs` (append_consent, latest_consent_status, list_consents_for_asset)
+  > + `pub mod consent_repo` in lib.rs. AC: append-only INSERT, latest-row query, HP-1/HP-2 integration
+  > tests, ≥90% cov. Stop; do not start S-110-T2.
 
 ---
 
@@ -239,7 +312,7 @@ S-110-T0 (BDD) ─▶ S-110-T0b (ADR X-S-110-1) ─▶ S-110-T1 (schema+domain+r
 - **Type:** Development (Rust) · **Effort:** L
 - **RRI:** 66 → band **Complex (56–70)** → **Plan first; human reviews the plan; thinking On.**
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Opus 4.8` · thinking On
-- **Depends on:** S-110-T1
+- **Depends on:** S-110-T1b, S-110-T1c
 - **Objective:** Implement the consent grant/revoke transitions and the **fail-closed TTS
   precondition** (X11): no TTS/voice-cloning derivative may proceed without an active,
   unrevoked consent for the target scope. Emit durable audit on grant/revoke and on every
