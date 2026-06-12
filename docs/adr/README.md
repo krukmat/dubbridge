@@ -35,6 +35,7 @@ Run `make qa-docs` before reporting an ADR change complete.
 | [ADR-025](ADR-025-platform-connector-ingest-and-owner-authorized-credentials.md) | Platform connector ingest and owner-authorized credential model | Proposed (primary S3 intake) |
 | [ADR-026](ADR-026-layered-fail-closed-configuration-and-environment-separation.md) | Layered fail-closed configuration and environment separation | Proposed (scope: P0 environment separation) |
 | [ADR-027](ADR-027-org-membership-authorization.md) | Organization membership authorization | Accepted |
+| [ADR-028](ADR-028-voice-consent-ledger.md) | Voice-consent ledger and fail-closed TTS precondition | Accepted |
 
 ## Backfill note
 
