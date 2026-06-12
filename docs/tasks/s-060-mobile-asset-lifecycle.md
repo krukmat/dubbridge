@@ -849,9 +849,9 @@ await waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1));
 
 ## Coverage contract
 
-This ledger does **not** declare `Behavioral coverage contract: unit-v1` (the
-automated `make qa-docs` gate). Development tasks (T1, T2, T3a, T3b, T4) still require
-the standard `Unit coverage certification` + `Owner final verification` completion
-record per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` before being marked `[x] Done`.
+This ledger is exempt from the automated unit-v1 coverage gate (`make qa-docs`).
+Development tasks (T1, T2, T3a, T3b, T4) still require the standard
+`Unit coverage certification` + `Owner final verification` completion record per
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` before being marked `[x] Done`.
 The BDD `.feature` scenarios (T0) are the behavioral source of truth from which each
 task's `HP-#`/`EC-#` cases are derived.

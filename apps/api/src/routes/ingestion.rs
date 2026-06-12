@@ -295,7 +295,9 @@ async fn list_assets(
             .await
             .map_err(ApiError::from_db)?;
 
-    Ok(Json(assets.into_iter().map(AssetSummaryResponse::from).collect()))
+    Ok(Json(
+        assets.into_iter().map(AssetSummaryResponse::from).collect(),
+    ))
 }
 
 async fn get_asset(

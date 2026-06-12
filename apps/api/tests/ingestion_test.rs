@@ -651,7 +651,10 @@ async fn list_assets_returns_owned_assets_ordered_by_created_at_desc() {
     // Both assets belong to the authenticated principal.
     let uploader_str = ctx.principal_id.to_string();
     for item in arr {
-        assert_eq!(item["uploader_id"].as_str().expect("uploader_id"), uploader_str);
+        assert_eq!(
+            item["uploader_id"].as_str().expect("uploader_id"),
+            uploader_str
+        );
     }
 
     // Most-recently created asset is first.
@@ -698,16 +701,14 @@ async fn list_assets_excludes_other_principals_assets() {
 
     // Insert an asset directly for a different uploader_id.
     let other_id = Uuid::new_v4();
-    sqlx::query(
-        "INSERT INTO assets (id, title, uploader_id, status) VALUES ($1, $2, $3, $4)",
-    )
-    .bind(Uuid::new_v4())
-    .bind("other-owner asset")
-    .bind(other_id)
-    .bind("finalized")
-    .execute(&ctx.pool)
-    .await
-    .expect("insert other asset");
+    sqlx::query("INSERT INTO assets (id, title, uploader_id, status) VALUES ($1, $2, $3, $4)")
+        .bind(Uuid::new_v4())
+        .bind("other-owner asset")
+        .bind(other_id)
+        .bind("finalized")
+        .execute(&ctx.pool)
+        .await
+        .expect("insert other asset");
 
     // Also create one owned asset for the principal.
     let auth_token = ctx.ingest_token.clone();
@@ -735,7 +736,11 @@ async fn list_assets_excludes_other_principals_assets() {
 
     assert_eq!(status, StatusCode::OK);
     let arr = body.as_array().expect("array");
-    assert_eq!(arr.len(), 1, "only the principal's own asset must be returned");
+    assert_eq!(
+        arr.len(),
+        1,
+        "only the principal's own asset must be returned"
+    );
     assert_eq!(
         arr[0]["uploader_id"].as_str().expect("uploader_id"),
         ctx.principal_id.to_string()
