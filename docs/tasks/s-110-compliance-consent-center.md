@@ -41,7 +41,7 @@ S-110-T0 (BDD) ─▶ S-110-T0b (ADR X-S-110-1) ─▶ S-110-T1a (migration SQL)
 |---|---|---|---|---|---|
 | S-110-T0 | BDD `.feature` specs + mapping | — | 11 | Low | S | ✅ done 2026-06-12 |
 | S-110-T0b | ADR authoring: voice-consent ledger + TTS precondition (X24 → X-S-110-1) | S-110-T0 | 18 | Low | S | ✅ done 2026-06-12 |
-| S-110-T1a | Migration SQL: `0013_create_voice_consents.sql` + RULES + CHECK constraints | S-110-T0b | 51 | Med-high | M |
+| S-110-T1a | Migration SQL: `0013_create_voice_consents.sql` + RULES + CHECK constraints | S-110-T0b | 51 | Med-high | M | ✅ done 2026-06-12 |
 | S-110-T1b | Domain entity: `consent.rs` — types, status derivation, grant validation | S-110-T1a | 27 | Moderate | M |
 | S-110-T1c | DB repo: `consent_repo.rs` — append, latest_status, list | S-110-T1a | 31 | Moderate | M |
 | S-110-T2 | Consent gate + TTS precondition + audit (X11) | S-110-T1b, S-110-T1c | 66 | Complex | L |
@@ -182,7 +182,7 @@ S-110-T0 (BDD) ─▶ S-110-T0b (ADR X-S-110-1) ─▶ S-110-T1a (migration SQL)
 
 ## S-110-T1a — Migration SQL: `0013_create_voice_consents.sql`
 
-- **Status:** [ ] Not started
+- **Status:** [x] Done — 2026-06-12
 - **Type:** Development (SQL) · **Effort:** M
 - **RRI:** 51 → band **Med-high (41–55)** → **Plan + explicit AC before approval; thinking On.**
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4.6` · thinking On
@@ -581,8 +581,8 @@ S-110-T0 (BDD) ─▶ S-110-T0b (ADR X-S-110-1) ─▶ S-110-T1a (migration SQL)
 
 ## Coverage contract
 
-This ledger does **not** declare `Behavioral coverage contract: unit-v1`. Development
-tasks (S-110-T1…S-110-T5) still require the standard `Unit coverage certification` + `Owner
+This ledger does **not** opt into the unit-v1 behavioral coverage contract. Development
+tasks (S-110-T1a…S-110-T5) still require the standard `Unit coverage certification` + `Owner
 final verification` completion record per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
 before being marked `[x] Done`. The BDD `.feature` scenarios (S-110-T0) are the behavioral
 source of truth from which each task's `HP-#`/`EC-#` cases are derived.
