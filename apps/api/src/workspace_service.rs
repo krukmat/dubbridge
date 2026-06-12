@@ -94,6 +94,17 @@ struct PgWorkspaceService {
     pool: PgPool,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn workspace_service_error_display_db_variant() {
+        let err = WorkspaceServiceError::Db(dubbridge_db::error::DbError::NotFound);
+        assert!(err.to_string().contains("database error"));
+    }
+}
+
 #[async_trait]
 impl WorkspaceService for PgWorkspaceService {
     async fn create_org_with_owner(
