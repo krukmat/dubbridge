@@ -1,6 +1,6 @@
-# BDD specs — S-100 Collaborative localization workspace
+# BDD specs — DubBridge
 
-Gherkin acceptance specs for the S-100 slice. Each scenario has a stable ID that maps
+Gherkin acceptance specs for product-layer slices. Each scenario has a stable ID that maps
 to a web (Playwright) or mobile (Maestro) flow and to the task-level happy-path /
 edge-case evidence.
 
@@ -13,7 +13,9 @@ edge-case evidence.
 - Scenario language is behavioral — no implementation calls, no UI selectors.
   Implementation details live in the E2E flows and the unit tests.
 
-## Mapping table
+## S-100 — Collaborative localization workspace
+
+Spec file: `docs/bdd/p4-workspace.feature`
 
 | Scenario ID | Description | Task | Web flow | Mobile flow | HP / EC |
 |---|---|---|---|---|---|
@@ -23,13 +25,22 @@ edge-case evidence.
 | SC-PROJECT-1 | Create a project and link assets | S-100-T3, S-100-T5, S-100-T6 | `web/e2e/projects.spec.ts` | `mobile/maestro/projects.yaml` | HP-1, HP-2 |
 | SC-LANG-1 | Declare target languages for a project | S-100-T3, S-100-T5 | `web/e2e/projects.spec.ts` | — | HP-2 |
 
-## Spec file
+## S-110 — Compliance & consent center
 
-`docs/bdd/p4-workspace.feature`
+Spec file: `docs/bdd/p6-compliance.feature`
+
+| Scenario ID | Description | Task | Web flow | Mobile flow | HP / EC |
+|---|---|---|---|---|---|
+| SC-AUDIT-1 | View an asset's audit timeline | S-110-T3, S-110-T4 | `web/e2e/compliance.spec.ts` | `mobile/maestro/compliance.yaml` | HP-1 |
+| SC-AUDIT-2 | Audit view is ownership-scoped | S-110-T3, S-110-T4 | `web/e2e/compliance.spec.ts` | — | EC-1 |
+| SC-RIGHTS-1 | View the rights ledger for an asset | S-110-T3, S-110-T4 | `web/e2e/compliance.spec.ts` | `mobile/maestro/compliance.yaml` | HP-2 |
+| SC-CONSENT-1 | Grant voice consent | S-110-T2, S-110-T3, S-110-T4, S-110-T5 | `web/e2e/compliance.spec.ts` | `mobile/maestro/compliance.yaml` | HP-1 |
+| SC-CONSENT-2 | Revoke voice consent | S-110-T2, S-110-T3, S-110-T4, S-110-T5 | `web/e2e/compliance.spec.ts` | `mobile/maestro/compliance.yaml` | HP-2, EC-1 |
+| SC-CONSENT-3 | Synthesis blocked without consent | S-110-T2, S-110-T3, S-110-T6 | `web/e2e/compliance.spec.ts` | `mobile/maestro/compliance.yaml` | EC-1 |
 
 ## Adding new scenarios
 
-1. Add the scenario to `p4-workspace.feature` with the next available `SC-<AREA>-<N>` ID.
-2. Add the row to the mapping table above.
+1. Add the scenario to the relevant `.feature` file with the next available `SC-<AREA>-<N>` ID.
+2. Add the row to the mapping table for that slice above.
 3. Create or update the corresponding web (Playwright) or Maestro flow.
 4. Add `HP-#` / `EC-#` coverage in the implementing task in the ledger.

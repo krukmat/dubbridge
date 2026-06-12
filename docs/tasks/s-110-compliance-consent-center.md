@@ -28,7 +28,7 @@ S-110-T0 (BDD) ─▶ S-110-T0b (ADR X-S-110-1) ─▶ S-110-T1 (schema+domain+r
 
 | Task | Title | Depends on | RRI | Band | Effort |
 |---|---|---|---|---|---|
-| S-110-T0 | BDD `.feature` specs + mapping | — | 11 | Low | S |
+| S-110-T0 | BDD `.feature` specs + mapping | — | 11 | Low | S | ✅ done 2026-06-12 |
 | S-110-T0b | ADR authoring: voice-consent ledger + TTS precondition (X24 → X-S-110-1) | S-110-T0 | 18 | Low | S |
 | S-110-T1 | Schema + domain + repo (voice_consents) | S-110-T0b | 58 | Complex | L |
 | S-110-T2 | Consent ledger + TTS precondition + audit (X11) | S-110-T1 | 66 | Complex | L |
@@ -50,7 +50,7 @@ S-110-T0 (BDD) ─▶ S-110-T0b (ADR X-S-110-1) ─▶ S-110-T1 (schema+domain+r
 
 ## S-110-T0 — BDD `.feature` specs + BDD⇄web⇄mobile⇄unit mapping
 
-- **Status:** [ ] Not started
+- **Status:** [x] Done — 2026-06-12
 - **Type:** Planning / docs (BDD authoring) · **Effort:** S
 - **RRI:** 11 → band **Low (0–25)** → **auto-execute**
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Haiku 4.5` · thinking Off
