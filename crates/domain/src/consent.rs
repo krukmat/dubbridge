@@ -161,7 +161,10 @@ mod tests {
     #[test]
     fn hp1_grant_produces_active_status() {
         let row = new_grant(asset(), ConsentScope::VoiceClone, "ref-001", actor()).unwrap();
-        assert_eq!(derive_status(&[row.clone()]), Some(ConsentStatus::Grant));
+        assert_eq!(
+            derive_status(std::slice::from_ref(&row)),
+            Some(ConsentStatus::Grant)
+        );
         assert!(is_active(&[row]));
     }
 
@@ -230,5 +233,74 @@ mod tests {
         let row = new_revoke(asset(), ConsentScope::TtsSynthesis, actor());
         assert_eq!(row.evidence_ref, None);
         assert_eq!(row.status, ConsentStatus::Revoke);
+    }
+
+    // ConsentError Display covers all three variants
+    #[test]
+    fn consent_error_display_covers_all_variants() {
+        assert_eq!(
+            ConsentError::MissingEvidenceRef.to_string(),
+            "evidence_ref is required for a consent grant",
+        );
+        assert!(
+            ConsentError::UnknownScope("dubbing".into())
+                .to_string()
+                .contains("dubbing")
+        );
+        assert!(
+            ConsentError::UnknownStatus("pending".into())
+                .to_string()
+                .contains("pending")
+        );
+    }
+
+    // new_grant sets expected fields
+    #[test]
+    fn new_grant_sets_expected_fields() {
+        let asset_id = asset();
+        let actor_id = actor();
+        let row = new_grant(asset_id, ConsentScope::TtsSynthesis, "ref-tts", actor_id).unwrap();
+        assert_eq!(row.asset_id, asset_id);
+        assert_eq!(row.scope, ConsentScope::TtsSynthesis);
+        assert_eq!(row.status, ConsentStatus::Grant);
+        assert_eq!(row.evidence_ref.as_deref(), Some("ref-tts"));
+        assert_eq!(row.granted_by, actor_id);
+    }
+
+    // new_revoke sets expected fields
+    #[test]
+    fn new_revoke_sets_expected_fields() {
+        let asset_id = asset();
+        let actor_id = actor();
+        let row = new_revoke(asset_id, ConsentScope::VoiceClone, actor_id);
+        assert_eq!(row.asset_id, asset_id);
+        assert_eq!(row.scope, ConsentScope::VoiceClone);
+        assert_eq!(row.granted_by, actor_id);
+    }
+
+    // ConsentScope::from_str roundtrips both known variants
+    #[test]
+    fn consent_scope_from_str_roundtrips() {
+        assert_eq!(
+            "voice_clone".parse::<ConsentScope>().unwrap(),
+            ConsentScope::VoiceClone,
+        );
+        assert_eq!(
+            "tts_synthesis".parse::<ConsentScope>().unwrap(),
+            ConsentScope::TtsSynthesis,
+        );
+    }
+
+    // ConsentStatus::from_str roundtrips both known variants
+    #[test]
+    fn consent_status_from_str_roundtrips() {
+        assert_eq!(
+            "grant".parse::<ConsentStatus>().unwrap(),
+            ConsentStatus::Grant
+        );
+        assert_eq!(
+            "revoke".parse::<ConsentStatus>().unwrap(),
+            ConsentStatus::Revoke
+        );
     }
 }
