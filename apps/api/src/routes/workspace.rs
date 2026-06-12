@@ -250,8 +250,7 @@ async fn create_project(
         .map_err(ApiError::from_workspace_service)
         .map_err(map_project_asset_error)?;
 
-    let detail =
-        build_project_detail_response(state.as_ref(), project.id, member.org_id).await?;
+    let detail = build_project_detail_response(state.as_ref(), project.id, member.org_id).await?;
     Ok((StatusCode::CREATED, Json(detail)))
 }
 
@@ -300,7 +299,11 @@ async fn link_project_asset(
 
     state
         .workspace_service
-        .link_asset_to_project(project_id, AssetId(request.asset_id), member.principal.subject_id)
+        .link_asset_to_project(
+            project_id,
+            AssetId(request.asset_id),
+            member.principal.subject_id,
+        )
         .await
         .map_err(ApiError::from_workspace_service)
         .map_err(map_project_asset_error)?;
@@ -348,7 +351,8 @@ async fn get_target_languages(
         return Err(ApiError::forbidden("project not found"));
     }
 
-    let project = load_project_in_org(state.as_ref(), ProjectId(path.project_id), member.org_id).await?;
+    let project =
+        load_project_in_org(state.as_ref(), ProjectId(path.project_id), member.org_id).await?;
     let target_languages = state
         .workspace_service
         .list_target_languages(project.id)
@@ -512,10 +516,15 @@ impl IntoResponse for ApiError {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, sync::{Arc, Mutex}};
+    use std::{
+        collections::HashMap,
+        sync::{Arc, Mutex},
+    };
 
     use async_trait::async_trait;
-    use dubbridge_auth::{AuthenticatedPrincipal, SharedTokenVerifier, TokenVerificationError, TokenVerifier};
+    use dubbridge_auth::{
+        AuthenticatedPrincipal, SharedTokenVerifier, TokenVerificationError, TokenVerifier,
+    };
     use dubbridge_domain::{
         asset::{Asset, IngestionStatus},
         audit::AuditEvent,
@@ -524,7 +533,10 @@ mod tests {
     use dubbridge_storage::LocalFsAdapter;
     use tempfile::TempDir;
 
-    use crate::{state::AppState, workspace_service::{SharedWorkspaceService, WorkspaceService, WorkspaceServiceError}};
+    use crate::{
+        state::AppState,
+        workspace_service::{SharedWorkspaceService, WorkspaceService, WorkspaceServiceError},
+    };
 
     use super::*;
 
@@ -557,7 +569,9 @@ mod tests {
         ) -> Result<(), WorkspaceServiceError> {
             let mut data = self.data.lock().expect("lock");
             if data.fail_create_org {
-                return Err(WorkspaceServiceError::Db(dubbridge_db::error::DbError::QueryFailed(sqlx::Error::RowNotFound)));
+                return Err(WorkspaceServiceError::Db(
+                    dubbridge_db::error::DbError::QueryFailed(sqlx::Error::RowNotFound),
+                ));
             }
             data.orgs.insert(organization.id.0, organization);
             data.members.push(owner_membership);
@@ -565,14 +579,17 @@ mod tests {
             Ok(())
         }
 
-        async fn list_orgs_for_subject(&self, subject_id: Uuid) -> Result<Vec<Organization>, WorkspaceServiceError> {
+        async fn list_orgs_for_subject(
+            &self,
+            subject_id: Uuid,
+        ) -> Result<Vec<Organization>, WorkspaceServiceError> {
             let data = self.data.lock().expect("lock");
             let mut orgs = Vec::new();
             for member in &data.members {
-                if member.subject_id == subject_id {
-                    if let Some(org) = data.orgs.get(&member.org_id.0) {
-                        orgs.push(org.clone());
-                    }
+                if member.subject_id == subject_id
+                    && let Some(org) = data.orgs.get(&member.org_id.0)
+                {
+                    orgs.push(org.clone());
                 }
             }
             Ok(orgs)
@@ -585,16 +602,26 @@ mod tests {
         ) -> Result<(), WorkspaceServiceError> {
             let mut data = self.data.lock().expect("lock");
             if data.fail_add_member {
-                return Err(WorkspaceServiceError::Db(dubbridge_db::error::DbError::QueryFailed(sqlx::Error::RowNotFound)));
+                return Err(WorkspaceServiceError::Db(
+                    dubbridge_db::error::DbError::QueryFailed(sqlx::Error::RowNotFound),
+                ));
             }
             data.members.push(member);
             data.audits.push(audit_event);
             Ok(())
         }
 
-        async fn list_org_members(&self, org_id: OrgId) -> Result<Vec<OrgMember>, WorkspaceServiceError> {
+        async fn list_org_members(
+            &self,
+            org_id: OrgId,
+        ) -> Result<Vec<OrgMember>, WorkspaceServiceError> {
             let data = self.data.lock().expect("lock");
-            Ok(data.members.iter().filter(|member| member.org_id == org_id).cloned().collect())
+            Ok(data
+                .members
+                .iter()
+                .filter(|member| member.org_id == org_id)
+                .cloned()
+                .collect())
         }
 
         async fn create_project_with_assets_and_audit(
@@ -606,13 +633,19 @@ mod tests {
         ) -> Result<(), WorkspaceServiceError> {
             let mut data = self.data.lock().expect("lock");
             if data.fail_create_project {
-                return Err(WorkspaceServiceError::Db(dubbridge_db::error::DbError::QueryFailed(sqlx::Error::RowNotFound)));
+                return Err(WorkspaceServiceError::Db(
+                    dubbridge_db::error::DbError::QueryFailed(sqlx::Error::RowNotFound),
+                ));
             }
             let mut project_assets = Vec::new();
             for asset_id in asset_ids {
-                let asset = data.assets_by_id.get(&asset_id.0).cloned().ok_or(WorkspaceServiceError::Db(dubbridge_db::error::DbError::NotFound))?;
+                let asset = data.assets_by_id.get(&asset_id.0).cloned().ok_or(
+                    WorkspaceServiceError::Db(dubbridge_db::error::DbError::NotFound),
+                )?;
                 if asset.uploader_id != caller_subject_id {
-                    return Err(WorkspaceServiceError::Db(dubbridge_db::error::DbError::NotFound));
+                    return Err(WorkspaceServiceError::Db(
+                        dubbridge_db::error::DbError::NotFound,
+                    ));
                 }
                 project_assets.push(asset);
             }
@@ -622,19 +655,37 @@ mod tests {
             Ok(())
         }
 
-        async fn list_projects_for_org(&self, org_id: OrgId) -> Result<Vec<Project>, WorkspaceServiceError> {
+        async fn list_projects_for_org(
+            &self,
+            org_id: OrgId,
+        ) -> Result<Vec<Project>, WorkspaceServiceError> {
             let data = self.data.lock().expect("lock");
-            Ok(data.projects.values().filter(|project| project.org_id == org_id).cloned().collect())
+            Ok(data
+                .projects
+                .values()
+                .filter(|project| project.org_id == org_id)
+                .cloned()
+                .collect())
         }
 
-        async fn get_project(&self, project_id: ProjectId) -> Result<Option<Project>, WorkspaceServiceError> {
+        async fn get_project(
+            &self,
+            project_id: ProjectId,
+        ) -> Result<Option<Project>, WorkspaceServiceError> {
             let data = self.data.lock().expect("lock");
             Ok(data.projects.get(&project_id.0).cloned())
         }
 
-        async fn list_assets_for_project(&self, project_id: ProjectId) -> Result<Vec<Asset>, WorkspaceServiceError> {
+        async fn list_assets_for_project(
+            &self,
+            project_id: ProjectId,
+        ) -> Result<Vec<Asset>, WorkspaceServiceError> {
             let data = self.data.lock().expect("lock");
-            Ok(data.project_assets.get(&project_id.0).cloned().unwrap_or_default())
+            Ok(data
+                .project_assets
+                .get(&project_id.0)
+                .cloned()
+                .unwrap_or_default())
         }
 
         async fn link_asset_to_project(
@@ -644,17 +695,35 @@ mod tests {
             caller_subject_id: Uuid,
         ) -> Result<(), WorkspaceServiceError> {
             let mut data = self.data.lock().expect("lock");
-            let asset = data.assets_by_id.get(&asset_id.0).cloned().ok_or(WorkspaceServiceError::Db(dubbridge_db::error::DbError::NotFound))?;
+            let asset =
+                data.assets_by_id
+                    .get(&asset_id.0)
+                    .cloned()
+                    .ok_or(WorkspaceServiceError::Db(
+                        dubbridge_db::error::DbError::NotFound,
+                    ))?;
             if asset.uploader_id != caller_subject_id {
-                return Err(WorkspaceServiceError::Db(dubbridge_db::error::DbError::NotFound));
+                return Err(WorkspaceServiceError::Db(
+                    dubbridge_db::error::DbError::NotFound,
+                ));
             }
-            data.project_assets.entry(project_id.0).or_default().push(asset);
+            data.project_assets
+                .entry(project_id.0)
+                .or_default()
+                .push(asset);
             Ok(())
         }
 
-        async fn list_target_languages(&self, project_id: ProjectId) -> Result<Vec<TargetLanguage>, WorkspaceServiceError> {
+        async fn list_target_languages(
+            &self,
+            project_id: ProjectId,
+        ) -> Result<Vec<TargetLanguage>, WorkspaceServiceError> {
             let data = self.data.lock().expect("lock");
-            Ok(data.target_languages.get(&project_id.0).cloned().unwrap_or_default())
+            Ok(data
+                .target_languages
+                .get(&project_id.0)
+                .cloned()
+                .unwrap_or_default())
         }
 
         async fn replace_target_languages(
@@ -666,7 +735,9 @@ mod tests {
             let mut data = self.data.lock().expect("lock");
             let stored: Vec<TargetLanguage> = target_languages
                 .into_iter()
-                .map(|target_lang| TargetLanguage::new(project_id, source_lang.clone(), target_lang))
+                .map(|target_lang| {
+                    TargetLanguage::new(project_id, source_lang.clone(), target_lang)
+                })
                 .collect();
             data.target_languages.insert(project_id.0, stored.clone());
             Ok(stored)
@@ -677,7 +748,10 @@ mod tests {
     struct StubVerifier;
 
     impl TokenVerifier for StubVerifier {
-        fn verify_access_token(&self, _token: &str) -> Result<AuthenticatedPrincipal, TokenVerificationError> {
+        fn verify_access_token(
+            &self,
+            _token: &str,
+        ) -> Result<AuthenticatedPrincipal, TokenVerificationError> {
             Err(TokenVerificationError::MalformedToken)
         }
     }
@@ -710,7 +784,12 @@ mod tests {
         }
     }
 
-    fn seed_org(service: &Arc<FakeWorkspaceService>, org: &Organization, subject_id: Uuid, role: OrgRole) {
+    fn seed_org(
+        service: &Arc<FakeWorkspaceService>,
+        org: &Organization,
+        subject_id: Uuid,
+        role: OrgRole,
+    ) {
         let mut data = service.data.lock().expect("lock");
         data.orgs.insert(org.id.0, org.clone());
         data.members.push(OrgMember::new(org.id, subject_id, role));
@@ -744,7 +823,9 @@ mod tests {
         let (status, Json(response)) = create_org(
             State(state),
             Extension(principal(subject_id, &["workspaces:write"])),
-            Json(CreateOrgRequest { name: "Acme".to_string() }),
+            Json(CreateOrgRequest {
+                name: "Acme".to_string(),
+            }),
         )
         .await
         .expect("create org");
@@ -766,7 +847,9 @@ mod tests {
         let err = create_org(
             State(state),
             Extension(principal(Uuid::new_v4(), &["workspaces:write"])),
-            Json(CreateOrgRequest { name: "Acme".to_string() }),
+            Json(CreateOrgRequest {
+                name: "Acme".to_string(),
+            }),
         )
         .await
         .expect_err("error");
@@ -781,9 +864,12 @@ mod tests {
         seed_org(&service, &org, subject_id, OrgRole::Owner);
         let state = fake_state(service);
 
-        let Json(orgs) = list_orgs(State(state), Extension(principal(subject_id, &["workspaces:read"])))
-            .await
-            .expect("list orgs");
+        let Json(orgs) = list_orgs(
+            State(state),
+            Extension(principal(subject_id, &["workspaces:read"])),
+        )
+        .await
+        .expect("list orgs");
         assert_eq!(orgs.len(), 1);
         assert_eq!(orgs[0].id, org.id.0);
     }
@@ -800,7 +886,10 @@ mod tests {
         let (status, Json(response)) = add_member(
             State(state),
             Extension(member_principal(actor_id, org.id, OrgRole::Owner)),
-            Json(AddMemberRequest { subject_id: target_id, role: OrgRole::Reviewer }),
+            Json(AddMemberRequest {
+                subject_id: target_id,
+                role: OrgRole::Reviewer,
+            }),
         )
         .await
         .expect("add member");
@@ -819,7 +908,12 @@ mod tests {
         let actor_id = Uuid::new_v4();
         let viewer_id = Uuid::new_v4();
         seed_org(&service, &org, actor_id, OrgRole::Owner);
-        service.data.lock().expect("lock").members.push(OrgMember::new(org.id, viewer_id, OrgRole::Viewer));
+        service
+            .data
+            .lock()
+            .expect("lock")
+            .members
+            .push(OrgMember::new(org.id, viewer_id, OrgRole::Viewer));
         let state = fake_state(service);
 
         let Json(members) = list_members(
@@ -929,7 +1023,10 @@ mod tests {
         let err = get_project_detail(
             State(state),
             Extension(member_principal(actor_id, org.id, OrgRole::Owner)),
-            Path(ProjectPath { org_id: org.id.0, project_id: project.id.0 }),
+            Path(ProjectPath {
+                org_id: org.id.0,
+                project_id: project.id.0,
+            }),
         )
         .await
         .expect_err("error");
@@ -979,8 +1076,13 @@ mod tests {
         let Json(detail) = link_project_asset(
             State(state),
             Extension(member_principal(actor_id, org.id, OrgRole::Owner)),
-            Path(ProjectPath { org_id: org.id.0, project_id: project.id.0 }),
-            Json(LinkProjectAssetRequest { asset_id: asset.id.0 }),
+            Path(ProjectPath {
+                org_id: org.id.0,
+                project_id: project.id.0,
+            }),
+            Json(LinkProjectAssetRequest {
+                asset_id: asset.id.0,
+            }),
         )
         .await
         .expect("link asset");
@@ -1023,7 +1125,10 @@ mod tests {
         let Json(stored) = set_target_languages(
             State(state.clone()),
             Extension(member_principal(actor_id, org.id, OrgRole::Owner)),
-            Path(ProjectPath { org_id: org.id.0, project_id: project.id.0 }),
+            Path(ProjectPath {
+                org_id: org.id.0,
+                project_id: project.id.0,
+            }),
             Json(SetTargetLanguagesRequest {
                 source_lang: "en".to_string(),
                 target_languages: vec!["es-ES".to_string(), "fr-FR".to_string()],
@@ -1036,7 +1141,10 @@ mod tests {
         let Json(read_back) = get_target_languages(
             State(state),
             Extension(member_principal(actor_id, org.id, OrgRole::Owner)),
-            Path(ProjectPath { org_id: org.id.0, project_id: project.id.0 }),
+            Path(ProjectPath {
+                org_id: org.id.0,
+                project_id: project.id.0,
+            }),
         )
         .await
         .expect("get target languages");
