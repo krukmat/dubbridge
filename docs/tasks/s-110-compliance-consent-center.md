@@ -42,7 +42,7 @@ S-110-T0 (BDD) ─▶ S-110-T0b (ADR X-S-110-1) ─▶ S-110-T1a (migration SQL)
 | S-110-T0 | BDD `.feature` specs + mapping | — | 11 | Low | S | ✅ done 2026-06-12 |
 | S-110-T0b | ADR authoring: voice-consent ledger + TTS precondition (X24 → X-S-110-1) | S-110-T0 | 18 | Low | S | ✅ done 2026-06-12 |
 | S-110-T1a | Migration SQL: `0013_create_voice_consents.sql` + RULES + CHECK constraints | S-110-T0b | 51 | Med-high | M | ✅ done 2026-06-12 |
-| S-110-T1b | Domain entity: `consent.rs` — types, status derivation, grant validation | S-110-T1a | 27 | Moderate | M |
+| S-110-T1b | Domain entity: `consent.rs` — types, status derivation, grant validation | S-110-T1a | 27 | Moderate | M | ✅ done 2026-06-12 |
 | S-110-T1c | DB repo: `consent_repo.rs` — append, latest_status, list | S-110-T1a | 31 | Moderate | M |
 | S-110-T2 | Consent gate + TTS precondition + audit (X11) | S-110-T1b, S-110-T1c | 66 | Complex | L |
 | S-110-T3 | Compliance read API (audit/rights viewer) | S-110-T2 | 44 | Med-high | L |
@@ -222,7 +222,7 @@ S-110-T0 (BDD) ─▶ S-110-T0b (ADR X-S-110-1) ─▶ S-110-T1a (migration SQL)
 
 ## S-110-T1b — Domain entity: `crates/domain/src/consent.rs`
 
-- **Status:** [ ] Not started
+- **Status:** [x] Done — 2026-06-12
 - **Type:** Development (Rust) · **Effort:** M
 - **RRI:** 27 → band **Moderate (26–40)** → **Confirm tests exist in the area.**
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4.6` · thinking Off
@@ -262,6 +262,40 @@ S-110-T0 (BDD) ─▶ S-110-T0b (ADR X-S-110-1) ─▶ S-110-T1a (migration SQL)
   > Add `crates/domain/src/consent.rs` (ConsentScope, ConsentStatus, ConsentRow, new_grant,
   > new_revoke, derive_status, is_active) + `pub mod consent` in lib.rs. AC: fail-closed decode,
   > missing evidence_ref rejected, HP-1/HP-2/EC-1/EC-2 unit tests, ≥90% cov. Stop; do not touch db crate.
+
+### Reflection log
+
+Required passes: 2 (`27` → `Moderate`)
+
+#### Pass 1
+
+- **Draft verdict:** All types, constructors, and helpers implemented.
+- **Critique findings:** No issues — `FromStr` fails closed for unknown strings, `new_grant` rejects whitespace-only `evidence_ref`, `Display` values match CHECK constraint strings exactly.
+- **Revisions applied:** None.
+
+#### Pass 2
+
+- **Draft verdict:** Implementation from Pass 1 unchanged; test suite complete.
+- **Critique findings:** All HP-# and EC-# cases have dedicated tests; `derive_status` on empty slice returns `None` without panic; 95.08% line coverage > 90% gate.
+- **Revisions applied:** None.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | `new_grant` with valid evidence → `derive_status` = `Some(Grant)`; `is_active` = true | `crates/domain/src/consent.rs::tests::hp1_grant_produces_active_status` | passed |
+| HP-2 | Happy path | grant + revoke → `derive_status` = `Some(Revoke)`; `is_active` = false; both rows present | `crates/domain/src/consent.rs::tests::hp2_revoke_after_grant_produces_inactive_status` | passed |
+| EC-1 | Edge case | empty `evidence_ref` on grant → `Err(MissingEvidenceRef)` | `crates/domain/src/consent.rs::tests::ec1_empty_evidence_ref_rejected` | passed |
+| EC-1 | Edge case | whitespace-only `evidence_ref` on grant → `Err(MissingEvidenceRef)` | `crates/domain/src/consent.rs::tests::ec1_whitespace_evidence_ref_rejected` | passed |
+| EC-2 | Edge case | unknown scope string → `Err(UnknownScope)` | `crates/domain/src/consent.rs::tests::ec2_unknown_scope_fails_closed` | passed |
+| EC-2 | Edge case | unknown status string → `Err(UnknownStatus)` | `crates/domain/src/consent.rs::tests::ec2_unknown_status_fails_closed` | passed |
+
+### Owner final verification
+
+- Owner: `claude-sonnet-4-6`
+- Date: `2026-06-12`
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
+- Commands run: `cargo test -p dubbridge-domain`, `cargo llvm-cov --package dubbridge-domain --summary-only`
 
 ---
 
