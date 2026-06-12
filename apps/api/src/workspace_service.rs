@@ -102,18 +102,16 @@ impl WorkspaceService for PgWorkspaceService {
         owner_membership: OrgMember,
         audit_event: AuditEvent,
     ) -> Result<(), WorkspaceServiceError> {
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(|error| WorkspaceServiceError::Db(dubbridge_db::error::DbError::QueryFailed(error)))?;
+        let mut tx = self.pool.begin().await.map_err(|error| {
+            WorkspaceServiceError::Db(dubbridge_db::error::DbError::QueryFailed(error))
+        })?;
 
         dubbridge_db::workspace_repo::insert_org_tx(&mut tx, &organization).await?;
         dubbridge_db::workspace_repo::add_org_member_tx(&mut tx, &owner_membership).await?;
         dubbridge_db::audit_repo::insert_audit_event_tx(&mut tx, &audit_event).await?;
-        tx.commit()
-            .await
-            .map_err(|error| WorkspaceServiceError::Db(dubbridge_db::error::DbError::QueryFailed(error)))?;
+        tx.commit().await.map_err(|error| {
+            WorkspaceServiceError::Db(dubbridge_db::error::DbError::QueryFailed(error))
+        })?;
         Ok(())
     }
 
@@ -129,16 +127,14 @@ impl WorkspaceService for PgWorkspaceService {
         member: OrgMember,
         audit_event: AuditEvent,
     ) -> Result<(), WorkspaceServiceError> {
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(|error| WorkspaceServiceError::Db(dubbridge_db::error::DbError::QueryFailed(error)))?;
+        let mut tx = self.pool.begin().await.map_err(|error| {
+            WorkspaceServiceError::Db(dubbridge_db::error::DbError::QueryFailed(error))
+        })?;
         dubbridge_db::workspace_repo::add_org_member_tx(&mut tx, &member).await?;
         dubbridge_db::audit_repo::insert_audit_event_tx(&mut tx, &audit_event).await?;
-        tx.commit()
-            .await
-            .map_err(|error| WorkspaceServiceError::Db(dubbridge_db::error::DbError::QueryFailed(error)))?;
+        tx.commit().await.map_err(|error| {
+            WorkspaceServiceError::Db(dubbridge_db::error::DbError::QueryFailed(error))
+        })?;
         Ok(())
     }
 
@@ -156,11 +152,9 @@ impl WorkspaceService for PgWorkspaceService {
         caller_subject_id: Uuid,
         audit_event: AuditEvent,
     ) -> Result<(), WorkspaceServiceError> {
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(|error| WorkspaceServiceError::Db(dubbridge_db::error::DbError::QueryFailed(error)))?;
+        let mut tx = self.pool.begin().await.map_err(|error| {
+            WorkspaceServiceError::Db(dubbridge_db::error::DbError::QueryFailed(error))
+        })?;
         dubbridge_db::workspace_repo::insert_project_tx(&mut tx, &project).await?;
         for asset_id in asset_ids {
             dubbridge_db::workspace_repo::link_asset_to_project_tx(
@@ -172,9 +166,9 @@ impl WorkspaceService for PgWorkspaceService {
             .await?;
         }
         dubbridge_db::audit_repo::insert_audit_event_tx(&mut tx, &audit_event).await?;
-        tx.commit()
-            .await
-            .map_err(|error| WorkspaceServiceError::Db(dubbridge_db::error::DbError::QueryFailed(error)))?;
+        tx.commit().await.map_err(|error| {
+            WorkspaceServiceError::Db(dubbridge_db::error::DbError::QueryFailed(error))
+        })?;
         Ok(())
     }
 
@@ -227,11 +221,9 @@ impl WorkspaceService for PgWorkspaceService {
         source_lang: String,
         target_languages: Vec<String>,
     ) -> Result<Vec<TargetLanguage>, WorkspaceServiceError> {
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(|error| WorkspaceServiceError::Db(dubbridge_db::error::DbError::QueryFailed(error)))?;
+        let mut tx = self.pool.begin().await.map_err(|error| {
+            WorkspaceServiceError::Db(dubbridge_db::error::DbError::QueryFailed(error))
+        })?;
         dubbridge_db::workspace_repo::delete_target_languages_for_project_tx(&mut tx, project_id)
             .await?;
 
@@ -243,9 +235,9 @@ impl WorkspaceService for PgWorkspaceService {
             created.push(target_language);
         }
 
-        tx.commit()
-            .await
-            .map_err(|error| WorkspaceServiceError::Db(dubbridge_db::error::DbError::QueryFailed(error)))?;
+        tx.commit().await.map_err(|error| {
+            WorkspaceServiceError::Db(dubbridge_db::error::DbError::QueryFailed(error))
+        })?;
         Ok(created)
     }
 }
