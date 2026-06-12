@@ -4,6 +4,7 @@
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -196,6 +197,211 @@ class CliBehavior(unittest.TestCase):
     def test_cc_below_one(self):
         r = self.run_cli("--cc", "0", "--F", "1", "--D", "2", "--K", "2",
                          "--P", "2", "--T", "2", "--A", "0", "--X", "2")
+        self.assertNotEqual(r.returncode, 0)
+
+
+class AutoCcMeasurement(unittest.TestCase):
+    """Tests for measure_cc_radon and --auto-cc wiring."""
+
+    def test_no_py_files_returns_none(self):
+        cc, ev = rri.measure_cc_radon(["crates/auth/src/lib.rs", "infra/migrations/001.sql"])
+        self.assertIsNone(cc)
+        self.assertIn("no local .py", ev)
+
+    def test_nonexistent_file_treated_as_non_py(self):
+        # A .py path that does not exist on disk is skipped (not an error).
+        cc, ev = rri.measure_cc_radon(["scripts/does_not_exist.py"])
+        self.assertIsNone(cc)
+
+    def test_auto_cc_fallback_marks_low_confidence(self):
+        # With the python profile and no .py files, radon is never called: score
+        # defaults to 0 with C added to low_conf -> C score bumped to 1. Pinning the
+        # profile keeps this deterministic regardless of the host toolchain.
+        r = rri.evaluate(auto_cc=True, f_override=0, d=0, k=0, p=0, t=0, a=0, x=0,
+                         touches=["crates/auth/src/lib.rs"],  # no .py files
+                         profile=rri.PROFILES["python"])
+        self.assertEqual(r["confidence"]["C"], "Low")
+        # Score is 0 bumped +1 -> 1.
+        self.assertEqual(r["scores"]["C"], 1)
+        self.assertIn("auto-cc fallback", r["evidence"]["C"])
+
+    def test_auto_cc_cli_flag_accepted(self):
+        # CLI: --auto-cc must not crash when there are no .py files in --touches.
+        r = subprocess.run(
+            [sys.executable, SCRIPT,
+             "--auto-cc", "--touches", "crates/auth/src/lib.rs",
+             "--D", "0", "--K", "0", "--P", "0", "--T", "0", "--A", "0", "--X", "0"],
+            capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("Final RRI:", r.stdout)
+
+    def test_auto_cc_mutually_exclusive_with_cc(self):
+        r = subprocess.run(
+            [sys.executable, SCRIPT,
+             "--cc", "12", "--auto-cc",
+             "--D", "0", "--K", "0", "--P", "0", "--T", "0", "--A", "0", "--X", "0"],
+            capture_output=True, text=True)
+        self.assertNotEqual(r.returncode, 0)
+
+    def test_auto_cc_mutually_exclusive_with_C(self):
+        r = subprocess.run(
+            [sys.executable, SCRIPT,
+             "--C", "2", "--auto-cc",
+             "--D", "0", "--K", "0", "--P", "0", "--T", "0", "--A", "0", "--X", "0"],
+            capture_output=True, text=True)
+        self.assertNotEqual(r.returncode, 0)
+
+
+class PlatformDetection(unittest.TestCase):
+    """detect_platform resolves the right profile from marker files."""
+
+    def _detect_in(self, marker):
+        with tempfile.TemporaryDirectory() as d:
+            open(os.path.join(d, marker), "w").close()
+            return rri.detect_platform(d).name
+
+    def test_cargo_toml_detects_rust(self):
+        self.assertEqual(self._detect_in("Cargo.toml"), "rust")
+
+    def test_go_mod_detects_go(self):
+        self.assertEqual(self._detect_in("go.mod"), "go")
+
+    def test_package_json_detects_rn(self):
+        self.assertEqual(self._detect_in("package.json"), "rn")
+
+    def test_pyproject_detects_python(self):
+        self.assertEqual(self._detect_in("pyproject.toml"), "python")
+
+    def test_no_marker_falls_back_to_generic(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(rri.detect_platform(d).name, "generic")
+
+    def test_dubbridge_marker_beats_generic_rust(self):
+        # A dir with both Cargo.toml and the policy file must resolve to dubbridge.
+        with tempfile.TemporaryDirectory() as d:
+            open(os.path.join(d, "Cargo.toml"), "w").close()
+            os.makedirs(os.path.join(d, "docs", "policies"))
+            open(os.path.join(d, "docs", "policies", "RRI_POLICY.md"), "w").close()
+            self.assertEqual(rri.detect_platform(d).name, "dubbridge")
+
+    def test_resolve_platform_explicit_overrides_detection(self):
+        self.assertEqual(rri.resolve_platform("go").name, "go")
+
+    def test_resolve_platform_auto_detects(self):
+        # 'auto' from this repo's cwd resolves to dubbridge.
+        self.assertEqual(rri.resolve_platform("auto").name, "dubbridge")
+
+
+class PlatformMeasurers(unittest.TestCase):
+    """Every measurer degrades gracefully when its tool/files are absent."""
+
+    def test_clippy_no_rs_files(self):
+        cc, ev = rri.measure_cc_clippy(["docs/x.md", "main.py"])
+        self.assertIsNone(cc)
+        self.assertIn("no local .rs", ev)
+
+    def test_gocyclo_no_go_files(self):
+        cc, ev = rri.measure_cc_gocyclo(["docs/x.md"])
+        self.assertIsNone(cc)
+        self.assertIn("no local .go", ev)
+
+    def test_eslint_no_js_files(self):
+        cc, ev = rri.measure_cc_eslint(["docs/x.md"])
+        self.assertIsNone(cc)
+        self.assertIn("no local JS/TS", ev)
+
+    def test_generic_measurer_is_noop(self):
+        cc, ev = rri.measure_cc_none(["anything.rs"])
+        self.assertIsNone(cc)
+        self.assertIn("generic platform", ev)
+
+    def test_filter_existing_by_suffix_and_disk(self):
+        # This test file exists; a fabricated .rs path does not.
+        kept = rri._filter_existing([__file__, "nope.rs"], (".py",))
+        self.assertEqual(kept, [__file__])
+
+    def test_clippy_cc_parser(self):
+        self.assertEqual(
+            rri._parse_clippy_cc("the function has a cognitive complexity of (12/7)"), 12)
+        self.assertIsNone(rri._parse_clippy_cc("unrelated message"))
+
+    def test_eslint_cc_parser(self):
+        self.assertEqual(
+            rri._parse_eslint_cc("Function 'f' has a complexity of 9. Maximum allowed is 0."), 9)
+        self.assertIsNone(rri._parse_eslint_cc("no number here"))
+
+
+class PlatformRubric(unittest.TestCase):
+    """Generic rubric vs DubBridge rubric, selected by profile."""
+
+    def test_generic_auth_raises_floors(self):
+        r = rri.evaluate(c_score=0, touches=["internal/auth/token.go"],
+                         d=0, k=0, p=0, t=0, a=0, x=0,
+                         profile=rri.PROFILES["go"])
+        self.assertEqual(r["scores"]["P"], 4)
+        self.assertEqual(r["scores"]["D"], 4)
+        self.assertEqual(r["scores"]["K"], 4)
+        self.assertIn("auth_security", r["penalties"])
+
+    def test_generic_migrations_raises_p_to_five(self):
+        r = rri.evaluate(c_score=0, touches=["db/migrations/001_init.sql"],
+                         d=0, k=0, p=0, t=0, a=0, x=0,
+                         profile=rri.PROFILES["rn"])
+        self.assertEqual(r["scores"]["P"], 5)
+
+    def test_generic_docs_floor_zero(self):
+        r = rri.evaluate(c_score=0, touches=["docs/guide.md"],
+                         d=0, k=0, p=0, t=0, a=0, x=0,
+                         profile=rri.PROFILES["python"])
+        self.assertEqual(r["scores"]["P"], 0)
+
+    def test_dubbridge_rubric_keeps_adr_floors(self):
+        r = rri.evaluate(c_score=0, touches=["crates/auth/src/lib.rs"],
+                         d=0, k=0, p=0, t=0, a=0, x=0,
+                         profile=rri.PROFILES["dubbridge"])
+        self.assertEqual(r["scores"]["P"], 4)
+        self.assertIn("ADR-023", r["evidence"]["P"])
+
+    def test_platform_name_in_output(self):
+        r = rri.evaluate(c_score=0, f_override=0, d=0, k=0, p=0, t=0, a=0, x=0,
+                         profile=rri.PROFILES["go"])
+        self.assertEqual(r["platform"], "go")
+        self.assertIn("**Platform:** go", rri.render_markdown(r))
+
+    def test_platform_in_json(self):
+        import json
+        r = rri.evaluate(c_score=0, f_override=0, d=0, k=0, p=0, t=0, a=0, x=0,
+                         profile=rri.PROFILES["rust"])
+        data = json.loads(rri.render_json(r))
+        self.assertEqual(data["platform"], "rust")
+
+
+class PlatformCli(unittest.TestCase):
+    """--platform flag wiring via subprocess."""
+
+    def run_cli(self, *args):
+        return subprocess.run([sys.executable, SCRIPT, *args],
+                              capture_output=True, text=True)
+
+    def test_platform_go_forces_generic_rubric(self):
+        r = self.run_cli("--platform", "go", "--C", "2",
+                         "--touches", "internal/auth/token.go",
+                         "--D", "0", "--K", "0", "--P", "0",
+                         "--T", "1", "--A", "0", "--X", "1")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("**Platform:** go", r.stdout)
+        self.assertIn("auth", r.stdout)
+
+    def test_platform_default_is_auto_dubbridge(self):
+        r = self.run_cli("--C", "1", "--F", "1", "--D", "0", "--K", "0",
+                         "--P", "0", "--T", "0", "--A", "0", "--X", "0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("**Platform:** dubbridge", r.stdout)
+
+    def test_unknown_platform_rejected(self):
+        r = self.run_cli("--platform", "cobol", "--C", "1", "--F", "1",
+                         "--D", "0", "--K", "0", "--P", "0",
+                         "--T", "0", "--A", "0", "--X", "0")
         self.assertNotEqual(r.returncode, 0)
 
 

@@ -1,8 +1,8 @@
 import { act, cleanup, render, waitFor } from "@testing-library/react-native";
 import { Text } from "react-native";
 import { makeRedirectUri } from "expo-auth-session";
-import { useLinkingURL } from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
+import { Linking } from "react-native";
 
 import { createGatewayClient } from "../src/api/client";
 import {
@@ -24,6 +24,21 @@ import { readRuntimeConfig } from "../src/config/env";
     IS_REACT_ACT_ENVIRONMENT?: boolean;
   }
 ).IS_REACT_ACT_ENVIRONMENT = true;
+
+let mockExtra: {
+  e2eEnabled?: boolean | string;
+} = {};
+
+jest.mock("expo-constants", () => ({
+  __esModule: true,
+  default: {
+    get expoConfig() {
+      return {
+        extra: mockExtra,
+      };
+    },
+  },
+}));
 
 jest.mock("../src/auth/session", () => ({
   loadSessionRef: jest.fn(),
@@ -49,10 +64,6 @@ jest.mock("expo-web-browser", () => ({
   openAuthSessionAsync: jest.fn(),
 }));
 
-jest.mock("expo-linking", () => ({
-  useLinkingURL: jest.fn(),
-}));
-
 const OPAQUE_REF = "opaque-session-abc123";
 const JWT_LIKE = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.SomeSignatureValue";
 const ROTATED_REF = "rotated-session-xyz789";
@@ -71,7 +82,8 @@ const mockOpenAuthSessionAsync =
   WebBrowser.openAuthSessionAsync as jest.MockedFunction<
     typeof WebBrowser.openAuthSessionAsync
   >;
-const mockUseLinkingURL = useLinkingURL as jest.MockedFunction<typeof useLinkingURL>;
+const mockLinkingGetInitialURL = jest.spyOn(Linking, "getInitialURL");
+const mockLinkingAddEventListener = jest.spyOn(Linking, "addEventListener");
 
 type MockGatewayClient = {
   post: jest.Mock;
@@ -90,7 +102,9 @@ function createDeferred<T>() {
 
 let latestAuthValue: AuthContextValue | null = null;
 let mockGatewayClient: MockGatewayClient;
-let mockLinkingUrl: string | null = null;
+let linkingEventListener:
+  | ((event: { url: string }) => void | Promise<void>)
+  | null = null;
 const originalE2EEnabled = process.env.EXPO_PUBLIC_E2E_ENABLED;
 
 function AuthProbe() {
@@ -110,7 +124,9 @@ describe("AuthProvider", () => {
   beforeEach(() => {
     latestAuthValue = null;
     jest.clearAllMocks();
-    mockLinkingUrl = null;
+    linkingEventListener = null;
+    mockLinkingGetInitialURL.mockReset();
+    mockLinkingAddEventListener.mockReset();
 
     mockLoadSessionRef.mockResolvedValue(null);
     mockSaveSessionRef.mockResolvedValue(undefined);
@@ -139,12 +155,24 @@ describe("AuthProvider", () => {
     mockCreateGatewayClient.mockReturnValue(
       mockGatewayClient as unknown as ReturnType<typeof createGatewayClient>,
     );
-    mockUseLinkingURL.mockImplementation(() => mockLinkingUrl);
+    mockLinkingGetInitialURL.mockResolvedValue(null);
+    mockLinkingAddEventListener.mockImplementation((_event, listener) => {
+      linkingEventListener = listener as typeof linkingEventListener;
+      return {
+        remove: jest.fn(() => {
+          linkingEventListener = null;
+        }),
+      } as unknown as ReturnType<typeof Linking.addEventListener>;
+    });
+    mockExtra = {
+      e2eEnabled: false,
+    };
     delete process.env.EXPO_PUBLIC_E2E_ENABLED;
   });
 
   afterEach(() => {
     cleanup();
+    mockExtra = {};
     if (originalE2EEnabled === undefined) {
       delete process.env.EXPO_PUBLIC_E2E_ENABLED;
     } else {
@@ -505,7 +533,9 @@ describe("AuthProvider", () => {
   describe("V5 HP-1: dev-gated bootstrap redeems an inbound handoff deep link", () => {
     it("hydrates from an initial callback URL and becomes authed without opening the browser", async () => {
       process.env.EXPO_PUBLIC_E2E_ENABLED = "true";
-      mockLinkingUrl = `${REDIRECT_URI}?handoff_code=${HANDOFF_CODE}`;
+      mockLinkingGetInitialURL.mockResolvedValueOnce(
+        `${REDIRECT_URI}?handoff_code=${HANDOFF_CODE}`,
+      );
       mockGatewayClient.post.mockResolvedValueOnce({
         ok: true,
         value: {
@@ -540,7 +570,9 @@ describe("AuthProvider", () => {
 
   describe("V5 EC-1: bootstrap listener stays inert when the flag is off", () => {
     it("ignores inbound deep links when EXPO_PUBLIC_E2E_ENABLED is not true", async () => {
-      mockLinkingUrl = `${REDIRECT_URI}?handoff_code=${HANDOFF_CODE}`;
+      mockLinkingGetInitialURL.mockResolvedValueOnce(
+        `${REDIRECT_URI}?handoff_code=${HANDOFF_CODE}`,
+      );
 
       const view = await render(
         <AuthProvider>
@@ -564,7 +596,9 @@ describe("AuthProvider", () => {
   describe("V5 EC-2: JWT-like session_ref from bootstrap is rejected", () => {
     it("does not persist a JWT-looking session ref from an inbound deep link", async () => {
       process.env.EXPO_PUBLIC_E2E_ENABLED = "true";
-      mockLinkingUrl = `${REDIRECT_URI}?handoff_code=${HANDOFF_CODE}`;
+      mockLinkingGetInitialURL.mockResolvedValueOnce(
+        `${REDIRECT_URI}?handoff_code=${HANDOFF_CODE}`,
+      );
       mockGatewayClient.post.mockResolvedValueOnce({
         ok: true,
         value: {
@@ -594,7 +628,9 @@ describe("AuthProvider", () => {
   describe("V5 EC-3: 401 bootstrap redemption stays unauthenticated cleanly", () => {
     it("maps a failed inbound redemption to session_expired without crashing", async () => {
       process.env.EXPO_PUBLIC_E2E_ENABLED = "true";
-      mockLinkingUrl = `${REDIRECT_URI}?handoff_code=${HANDOFF_CODE}`;
+      mockLinkingGetInitialURL.mockResolvedValueOnce(
+        `${REDIRECT_URI}?handoff_code=${HANDOFF_CODE}`,
+      );
       mockGatewayClient.post.mockResolvedValueOnce({
         ok: false,
         error: { kind: "session_expired" },
@@ -619,7 +655,7 @@ describe("AuthProvider", () => {
     it("deduplicates the same callback URL across initial and event delivery", async () => {
       process.env.EXPO_PUBLIC_E2E_ENABLED = "true";
       const bootstrapUrl = `${REDIRECT_URI}?handoff_code=${HANDOFF_CODE}`;
-      mockLinkingUrl = bootstrapUrl;
+      mockLinkingGetInitialURL.mockResolvedValueOnce(bootstrapUrl);
       mockGatewayClient.post.mockResolvedValueOnce({
         ok: true,
         value: {
@@ -641,20 +677,54 @@ describe("AuthProvider", () => {
         expect(view.getByText("status:authed")).toBeTruthy();
       });
 
-      mockLinkingUrl = null;
-      view.rerender(
-        <AuthProvider>
-          <AuthProbe />
-        </AuthProvider>,
-      );
-      mockLinkingUrl = bootstrapUrl;
-      view.rerender(
+      await act(async () => {
+        await linkingEventListener?.({ url: bootstrapUrl });
+      });
+
+      expect(mockGatewayClient.post).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("V5 HP-2: live url events redeem after mount", () => {
+    it("redeems a callback URL delivered through the runtime listener", async () => {
+      process.env.EXPO_PUBLIC_E2E_ENABLED = "true";
+      mockGatewayClient.post.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          data: {
+            session_ref: OPAQUE_REF,
+          },
+          sessionRotation: null,
+        },
+      });
+      mockIsJwtLike.mockReturnValueOnce(false);
+
+      const view = await render(
         <AuthProvider>
           <AuthProbe />
         </AuthProvider>,
       );
 
-      expect(mockGatewayClient.post).toHaveBeenCalledTimes(1);
+      await waitFor(() => {
+        expect(view.getByText("status:unauthed")).toBeTruthy();
+      });
+
+      await act(async () => {
+        await linkingEventListener?.({
+          url: `${REDIRECT_URI}?handoff_code=${HANDOFF_CODE}`,
+        });
+      });
+
+      await waitFor(() => {
+        expect(view.getByText("status:authed")).toBeTruthy();
+      });
+
+      expect(mockGatewayClient.post).toHaveBeenCalledWith(
+        "/auth/mobile/session",
+        null,
+        { handoff_code: HANDOFF_CODE },
+      );
+      expect(mockSaveSessionRef).toHaveBeenCalledWith(OPAQUE_REF);
     });
   });
 
@@ -681,12 +751,9 @@ describe("AuthProvider", () => {
         </AuthProvider>,
       );
 
-      mockLinkingUrl = bootstrapUrl;
-      view.rerender(
-        <AuthProvider>
-          <AuthProbe />
-        </AuthProvider>,
-      );
+      await act(async () => {
+        await linkingEventListener?.({ url: bootstrapUrl });
+      });
 
       expect(mockGatewayClient.post).not.toHaveBeenCalled();
 

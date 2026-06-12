@@ -6,9 +6,10 @@ import {
   useRef,
   useState,
 } from "react";
+import Constants from "expo-constants";
 import { makeRedirectUri } from "expo-auth-session";
-import { useLinkingURL } from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
+import { Linking } from "react-native";
 
 import { createGatewayClient } from "../api/client";
 import {
@@ -69,7 +70,19 @@ function getGatewayClient() {
 }
 
 function isE2EBootstrapEnabled(): boolean {
-  return __DEV__ && process.env.EXPO_PUBLIC_E2E_ENABLED === "true";
+  if (!__DEV__) {
+    return false;
+  }
+
+  if (process.env.EXPO_PUBLIC_E2E_ENABLED === "true") {
+    return true;
+  }
+
+  const extra =
+    Constants.expoConfig?.extra ??
+    (Constants.manifest as { extra?: { e2eEnabled?: unknown } } | null)?.extra;
+
+  return extra?.e2eEnabled === true || extra?.e2eEnabled === "true";
 }
 
 function getHandoffCodeFromCallbackUrl(url: string): string | null {
@@ -104,7 +117,6 @@ export function AuthProvider({
   const [sessionRef, setSessionRef] = useState<string | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [loginError, setLoginError] = useState<string | null>(null);
-  const bootstrapUrl = useLinkingURL();
   const statusRef = useRef<AuthStatus>("loading");
   const lastHandledBootstrapUrlRef = useRef<string | null>(null);
   const lastRedeemedHandoffCodeRef = useRef<string | null>(null);
@@ -249,20 +261,37 @@ export function AuthProvider({
   }
 
   useEffect(() => {
-    if (!isE2EBootstrapEnabled()) {
-      return;
-    }
-
-    void queueBootstrapUrl(bootstrapUrl);
-  }, [bootstrapUrl]);
-
-  useEffect(() => {
     if (!isE2EBootstrapEnabled() || status !== "unauthed") {
       return;
     }
 
     void redeemPendingBootstrapUrl();
   }, [status]);
+
+  useEffect(() => {
+    if (!isE2EBootstrapEnabled()) {
+      return;
+    }
+
+    let isMounted = true;
+
+    void Linking.getInitialURL().then((url) => {
+      if (!isMounted) {
+        return;
+      }
+
+      void queueBootstrapUrl(url);
+    });
+
+    const subscription = Linking.addEventListener("url", ({ url }) => {
+      void queueBootstrapUrl(url);
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.remove();
+    };
+  }, []);
 
   async function logout(): Promise<void> {
     const previousSessionRef = sessionRef;

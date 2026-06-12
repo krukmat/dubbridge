@@ -64,7 +64,7 @@ posture of the API itself.
 ## Concrete decisions (accepted 2026-06-03, P1 T0)
 
 These decisions resolve the implementation choices the proposed text left open and
-are binding for slice **P1** (`docs/plan/p1-session-gateway-bff.md`) and its
+are binding for slice **P1** (`docs/plan/s-040-session-gateway-bff.md`) and its
 first-party consumers — the web app and slice **P3** (mobile, React Native + Expo).
 
 ### Login flow
@@ -179,10 +179,10 @@ first-party consumers — the web app and slice **P3** (mobile, React Native + E
 - ADR-018 (traceable governance events) — the verified subject remains the
   auditable actor.
 - Implemented by: slice **P1** — `apps/gateway/src/{auth,proxy,session,cookie}.rs`,
-  `docs/plan/p1-session-gateway-bff.md`, `docs/tasks/p1-session-gateway-bff.md`,
-  `docs/tasks/p1-t7-mobile-session-handoff.md` (cookie policy, CSRF posture,
+  `docs/plan/s-040-session-gateway-bff.md`, `docs/tasks/s-040-session-gateway-bff.md`,
+  `docs/tasks/s-040-t7-mobile-session-handoff.md` (cookie policy, CSRF posture,
   session store, TTL, auth routes, authenticated proxy, and the complete
   mobile-safe handoff / explicit-session-header transport delivered in P1 T0-T7).
 - Consumed by (planned): slice **P3** — first-party mobile client (React Native +
-  Expo), `docs/plan/p3-mobile-client.md`, `docs/tasks/p3-mobile-client.md`. Mobile
+  Expo), `docs/plan/s-050-mobile-client.md`, `docs/tasks/s-050-mobile-client.md`. Mobile
   is the second transport of the same opaque-session contract.

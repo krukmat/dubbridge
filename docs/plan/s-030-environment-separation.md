@@ -1,4 +1,4 @@
-# Plan: P0 Environment Separation & Fail-Closed Configuration
+# Plan: S-030 - Environment Separation & Fail-Closed Configuration
 
 ## Objective
 
@@ -32,7 +32,7 @@ local default, never degrade silently. This slice is governed by ADR-026.
 
 ### Excluded (deferred — documented as later phases)
 
-- **Phase 2 (couples with S2):** wiring `build_adapter` to consume the storage backend
+- **Phase 2 (couples with S-080):** wiring `build_adapter` to consume the storage backend
   selector, and parameterizing `init_tracing` to emit JSON + an exporter in
   production (ADR-018). Phase 0 lands the *schema and validation* for these fields;
   Phase 2 lands the *behavior*.
@@ -53,7 +53,7 @@ local default, never degrade silently. This slice is governed by ADR-026.
 - ADR-018: Structured observability — environment-driven log format / exporter
   (schema in Phase 0, behavior in Phase 2).
 - ADR-006: PostgreSQL for metadata, object storage for binaries — the storage backend
-  seam (selector in P0, adapter in S2).
+  seam (selector in S-030, adapter in S-080).
 
 ## Affected Files
 
@@ -126,7 +126,7 @@ gate.
 ### Schema now, behavior staged
 Phase 0 introduces the `storage.backend` selector and the `observability.log_format`
 fields and validates them, but `build_adapter` and `init_tracing` consume them only in
-Phase 2 (with S2 / the observability work). Consequence: a production-like
+Phase 2 (with S-080 / the observability work). Consequence: a production-like
 configuration can now pass `validate()` when it selects `storage.backend = s3`,
 uses non-local datastore URLs, provides auth, and selects JSON logs; however,
 runtime behavior still remains incomplete until `build_adapter` and
@@ -141,14 +141,14 @@ production). No secret is committed; a CI guard rejects secret-looking keys in
 banner; the production deployment artifact is separate (Phase 3).
 
 This split is the precise boundary into which the owner-credential secret-store
-(roadmap X20, ADR-025) later plugs (F6 — ADR-026 §4). When S3-P1 adds owner-platform
+(roadmap X20, ADR-025) later plugs (F6 — ADR-026 §4). When S-090-C1 adds owner-platform
 credential handling, those credentials must be resolved from the **injected-secret
 layer** (env vars supplied by the secret store at deploy time) — never from committed
 `config/*.toml` profiles. The `AppConfig` schema may expose a credential *reference*
 or *handle* (an opaque identifier pointing into the store, not the credential itself),
 but the actual token, refresh token, or API key must arrive only through the env layer
-and must be redacted from all logs and traces (ADR-018, ADR-025). P0 establishes the
-layer; the store mechanism itself is decided during S3-P1 and requires its own ADR.
+and must be redacted from all logs and traces (ADR-018, ADR-025). S-030 establishes the
+layer; the store mechanism itself is decided during S-090-C1 and requires its own ADR.
 
 ### Single reader: consolidate three env readers today (F1 — ADR-026 §3)
 Today there are three independent env readers: `crates/config` (`AppConfig` +
@@ -203,5 +203,5 @@ no crate re-reads the environment directly — only through `AppConfig::load()`.
 
 ## Lines Affected After Implementation
 
-Tracked per-task in `docs/tasks/p0-environment-separation.md`. Updated after each
+Tracked per-task in `docs/tasks/s-030-environment-separation.md`. Updated after each
 task completes.

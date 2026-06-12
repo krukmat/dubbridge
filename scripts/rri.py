@@ -16,7 +16,10 @@ import argparse
 import json
 import subprocess
 import sys
+from dataclasses import dataclass, field
 from fnmatch import fnmatchcase
+from pathlib import Path
+from typing import Callable, Optional
 
 # --- Formula weights (sum = 1.00; verified in RRI_POLICY.md) ---------------------
 WEIGHTS = {"C": 0.18, "F": 0.12, "D": 0.15, "T": 0.15,
@@ -40,6 +43,190 @@ def cc_to_score(cc):
     return 5
 
 
+# --- Platform C measurers (Strategy) --------------------------------------------
+# Every measurer has the same signature: (paths) -> (raw_cc | None, evidence).
+# A None result means "tool absent or no matching files"; the caller falls back to
+# score 0 + Low-confidence. No measurer requires its tool to be installed.
+
+def _filter_existing(paths, suffixes):
+    """Return the paths whose suffix is in `suffixes` and that exist on disk."""
+    return [p for p in paths
+            if Path(p).suffix in suffixes and Path(p).exists()]
+
+
+def measure_cc_radon(paths):
+    """Return (max_cc, evidence) by running radon over .py files in paths."""
+    py_files = _filter_existing(paths, (".py",))
+    if not py_files:
+        return None, "no local .py files in --touches; radon skipped"
+    try:
+        out = subprocess.run(
+            ["radon", "cc", "--min", "A", "--show-complexity", "--total-average",
+             *py_files],
+            capture_output=True, text=True, check=True)
+    except FileNotFoundError:
+        return None, "radon not installed (pip install radon); --auto-cc skipped"
+    except subprocess.CalledProcessError as exc:
+        return None, f"radon error: {exc.stderr.strip()[:120]}"
+
+    # Parse "M <file>:<line> <name> - <grade> (<cc>)" lines.
+    max_cc = 1
+    for line in out.stdout.splitlines():
+        line = line.strip()
+        if not line or line.startswith("Average"):
+            continue
+        if "(" in line and line.endswith(")"):
+            try:
+                raw = int(line[line.rfind("(") + 1:-1])
+                max_cc = max(max_cc, raw)
+            except ValueError:
+                continue
+    return max_cc, f"radon cc over {len(py_files)} file(s) -> max CC {max_cc}"
+
+
+def measure_cc_clippy(paths):
+    """Return (max_cc, evidence) via `cargo clippy` cognitive_complexity warnings.
+
+    Runs once over the whole crate graph (clippy cannot target single files), then
+    keeps only diagnostics whose span file is in the requested .rs path set. Slow:
+    it compiles. Returns (None, reason) when cargo is unavailable or no .rs files.
+    """
+    rs_files = _filter_existing(paths, (".rs",))
+    if not rs_files:
+        return None, "no local .rs files in --touches; clippy skipped"
+    try:
+        out = subprocess.run(
+            ["cargo", "clippy", "--message-format=json", "--quiet",
+             "--", "-W", "clippy::cognitive_complexity"],
+            capture_output=True, text=True, check=False)
+    except FileNotFoundError:
+        return None, "cargo not installed; clippy --auto-cc skipped"
+
+    wanted = {str(Path(p)) for p in rs_files}
+    max_cc = 1
+    found = 0
+    for line in out.stdout.splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            msg = json.loads(line).get("message", {})
+        except json.JSONDecodeError:
+            continue
+        text = msg.get("message", "")
+        if "cognitive complexity" not in text:
+            continue
+        # Diagnostic spans tell us which file the complex fn lives in.
+        in_scope = any(str(Path(s.get("file_name", ""))) in wanted
+                       for s in msg.get("spans", []))
+        if not in_scope:
+            continue
+        # Message form: "the function has a cognitive complexity of (N/M)".
+        cc = _parse_clippy_cc(text)
+        if cc is not None:
+            max_cc = max(max_cc, cc)
+            found += 1
+    if found == 0:
+        return 1, (f"cargo clippy over crate graph -> no cognitive-complexity "
+                   f"warnings in {len(rs_files)} touched file(s) -> CC 1")
+    return max_cc, (f"cargo clippy cognitive_complexity -> max CC {max_cc} "
+                    f"across {found} warning(s) in touched .rs files")
+
+
+def _parse_clippy_cc(text):
+    """Extract N from 'cognitive complexity of (N/M)' in a clippy message."""
+    marker = "complexity of ("
+    i = text.find(marker)
+    if i == -1:
+        return None
+    rest = text[i + len(marker):]
+    num = rest.split("/", 1)[0].strip()
+    try:
+        return int(num)
+    except ValueError:
+        return None
+
+
+def measure_cc_gocyclo(paths):
+    """Return (max_cc, evidence) via `gocyclo` over .go files in paths."""
+    go_files = _filter_existing(paths, (".go",))
+    if not go_files:
+        return None, "no local .go files in --touches; gocyclo skipped"
+    try:
+        out = subprocess.run(
+            ["gocyclo", "-over", "0", *go_files],
+            capture_output=True, text=True, check=False)
+    except FileNotFoundError:
+        return None, "gocyclo not installed (go install ...gocyclo); skipped"
+
+    # Each line: "<cc> <package> <func> <file:line:col>".
+    max_cc = 1
+    for line in out.stdout.splitlines():
+        head = line.strip().split(" ", 1)[0]
+        try:
+            max_cc = max(max_cc, int(head))
+        except ValueError:
+            continue
+    return max_cc, f"gocyclo over {len(go_files)} file(s) -> max CC {max_cc}"
+
+
+def measure_cc_eslint(paths):
+    """Return (max_cc, evidence) via ESLint's `complexity` rule over JS/TS files."""
+    js_files = _filter_existing(paths, (".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"))
+    if not js_files:
+        return None, "no local JS/TS files in --touches; eslint skipped"
+    try:
+        out = subprocess.run(
+            ["eslint", "--no-eslintrc", "--format", "json",
+             "--rule", '{"complexity":["warn",0]}', *js_files],
+            capture_output=True, text=True, check=False)
+    except FileNotFoundError:
+        return None, "eslint not installed (npm i -D eslint); --auto-cc skipped"
+
+    try:
+        report = json.loads(out.stdout or "[]")
+    except json.JSONDecodeError:
+        return None, f"eslint produced no JSON ({(out.stderr or '').strip()[:80]})"
+
+    # complexity messages read: "... has a complexity of N. Maximum allowed is 0."
+    max_cc = 1
+    found = 0
+    for file_report in report:
+        for m in file_report.get("messages", []):
+            if m.get("ruleId") != "complexity":
+                continue
+            cc = _parse_eslint_cc(m.get("message", ""))
+            if cc is not None:
+                max_cc = max(max_cc, cc)
+                found += 1
+    if found == 0:
+        return 1, (f"eslint complexity over {len(js_files)} file(s) -> "
+                   f"no complexity warnings -> CC 1")
+    return max_cc, (f"eslint complexity -> max CC {max_cc} "
+                    f"across {found} warning(s) in {len(js_files)} file(s)")
+
+
+def _parse_eslint_cc(text):
+    """Extract N from 'complexity of N' in an ESLint complexity message."""
+    marker = "complexity of "
+    i = text.find(marker)
+    if i == -1:
+        return None
+    rest = text[i + len(marker):]
+    num = ""
+    for ch in rest:
+        if ch.isdigit():
+            num += ch
+        else:
+            break
+    return int(num) if num else None
+
+
+def measure_cc_none(paths):
+    """No-op measurer for the generic profile: always defers to agent judgment."""
+    return None, "generic platform: no automatic CC measurer; pass --cc or --C"
+
+
 def count_to_f(n):
     """Map an affected-file count to its 0-5 RRI F score."""
     for upper, score in F_TABLE:
@@ -49,40 +236,73 @@ def count_to_f(n):
 
 
 # --- Anchor rubric: path glob -> (D, P, K) floor + ADR -------------------------
-# Ordered most-specific-first; the first matching row wins. fnmatchcase '*' spans
-# '/', so a single '*' covers a subtree. RRI_POLICY.md "DubBridge anchor rubric".
-RUBRIC = [
-    ("crates/domain/src/rights*", 4, 5, 4, "ADR-008, ADR-018", "crates/domain rights-ledger"),
-    ("crates/audit/*", 4, 5, 4, "ADR-008, ADR-018", "crates/audit"),
-    ("infra/migrations/*", 4, 5, 4, "ADR-008, ADR-018", "infra/migrations"),
-    ("apps/gateway/src/auth/*", 4, 4, 4, "ADR-024", "apps/gateway/src/auth"),
-    ("crates/auth/*", 4, 4, 4, "ADR-023", "crates/auth"),
-    ("crates/db/*", 3, 3, 3, "ADR-006, ADR-018", "crates/db"),
-    ("crates/storage/*", 3, 3, 3, "ADR-006, ADR-018", "crates/storage"),
-    ("crates/jobs/*", 3, 3, 3, "ADR-006, ADR-018", "crates/jobs"),
-    ("crates/connectors/*", 3, 3, 3, "ADR-006, ADR-018", "crates/connectors"),
-    ("crates/ingestion/*", 3, 3, 3, "ADR-006, ADR-018", "crates/ingestion"),
-    ("crates/observability/*", 3, 3, 3, "ADR-006, ADR-018", "crates/observability"),
-    ("crates/qc/*", 2, 2, 2, "—", "crates/qc"),
-    ("crates/media/*", 2, 2, 2, "—", "crates/media"),
-    ("crates/providers/*", 2, 2, 2, "—", "crates/providers"),
-    ("crates/domain/*", 2, 2, 2, "—", "crates/domain"),
-    ("config/README.md", 1, 1, 1, "ADR-026", "config/README.md"),
-    ("docs/*", 0, 0, 0, "—", "docs"),
-    ("config/*.toml", 0, 0, 0, "—", "config (non-secret)"),
+# Each row maps a path glob to D/P/K floors plus an ADR citation and a label.
+# Rows are ordered most-specific-first; the first matching row wins. fnmatchcase
+# '*' spans '/', so a single '*' covers a subtree.
+@dataclass(frozen=True)
+class RubricRow:
+    glob: str
+    d: int
+    p: int
+    k: int
+    adr: str
+    label: str
+
+
+# DubBridge rubric (RRI_POLICY.md "DubBridge anchor rubric"). ADR-anchored.
+_DUBBRIDGE_RUBRIC = [
+    RubricRow("crates/domain/src/rights*", 4, 5, 4, "ADR-008, ADR-018", "crates/domain rights-ledger"),
+    RubricRow("crates/audit/*", 4, 5, 4, "ADR-008, ADR-018", "crates/audit"),
+    RubricRow("infra/migrations/*", 4, 5, 4, "ADR-008, ADR-018", "infra/migrations"),
+    RubricRow("apps/gateway/src/auth/*", 4, 4, 4, "ADR-024", "apps/gateway/src/auth"),
+    RubricRow("crates/auth/*", 4, 4, 4, "ADR-023", "crates/auth"),
+    RubricRow("crates/db/*", 3, 3, 3, "ADR-006, ADR-018", "crates/db"),
+    RubricRow("crates/storage/*", 3, 3, 3, "ADR-006, ADR-018", "crates/storage"),
+    RubricRow("crates/jobs/*", 3, 3, 3, "ADR-006, ADR-018", "crates/jobs"),
+    RubricRow("crates/connectors/*", 3, 3, 3, "ADR-006, ADR-018", "crates/connectors"),
+    RubricRow("crates/ingestion/*", 3, 3, 3, "ADR-006, ADR-018", "crates/ingestion"),
+    RubricRow("crates/observability/*", 3, 3, 3, "ADR-006, ADR-018", "crates/observability"),
+    RubricRow("crates/qc/*", 2, 2, 2, "—", "crates/qc"),
+    RubricRow("crates/media/*", 2, 2, 2, "—", "crates/media"),
+    RubricRow("crates/providers/*", 2, 2, 2, "—", "crates/providers"),
+    RubricRow("crates/domain/*", 2, 2, 2, "—", "crates/domain"),
+    RubricRow("config/README.md", 1, 1, 1, "ADR-026", "config/README.md"),
+    RubricRow("docs/*", 0, 0, 0, "—", "docs"),
+    RubricRow("config/*.toml", 0, 0, 0, "—", "config (non-secret)"),
+]
+
+# Generic cross-language rubric by directory convention (no project-specific ADRs).
+# Used by the rust/python/go/rn profiles so the tool is useful in any repo.
+_GENERIC_RUBRIC = [
+    RubricRow("*/migrations/*", 4, 5, 4, "—", "migrations (data/schema)"),
+    RubricRow("migrations/*", 4, 5, 4, "—", "migrations (data/schema)"),
+    RubricRow("*/auth/*", 4, 4, 4, "—", "auth"),
+    RubricRow("auth/*", 4, 4, 4, "—", "auth"),
+    RubricRow("*/security/*", 4, 4, 4, "—", "security"),
+    RubricRow("security/*", 4, 4, 4, "—", "security"),
+    RubricRow("*/crypto/*", 4, 4, 4, "—", "crypto"),
+    RubricRow("crypto/*", 4, 4, 4, "—", "crypto"),
+    RubricRow("*/payments/*", 3, 4, 3, "—", "payments"),
+    RubricRow("*/db/*", 3, 3, 3, "—", "db"),
+    RubricRow("*/database/*", 3, 3, 3, "—", "database"),
+    RubricRow("*/api/*", 3, 3, 3, "—", "api surface"),
+    RubricRow("*/services/*", 3, 3, 3, "—", "services"),
+    RubricRow("*/test*/*", 0, 0, 0, "—", "tests"),
+    RubricRow("test*/*", 0, 0, 0, "—", "tests"),
+    RubricRow("docs/*", 0, 0, 0, "—", "docs"),
 ]
 
 
-def first_matching_row(path):
+def first_matching_row(path, rubric):
     """Return the most-specific rubric row matching path, or None."""
-    for row in RUBRIC:
-        if fnmatchcase(path, row[0]):
+    for row in rubric:
+        if fnmatchcase(path, row.glob):
             return row
     return None
 
 
-def match_rubric(paths):
-    """Derive D/P/K floors from the paths a task touches.
+def match_rubric(paths, rubric):
+    """Derive D/P/K floors from the paths a task touches, using `rubric`.
 
     Returns (floors, rows, advisories, matched_auth) where floors maps each of
     D/P/K to its highest floor across all paths, rows records which rubric label
@@ -93,22 +313,86 @@ def match_rubric(paths):
     rows = {"D": None, "P": None, "K": None}
     advisories = []
     for path in paths:
-        row = first_matching_row(path)
+        row = first_matching_row(path, rubric)
         if row is None:
             advisories.append(
                 f"{path}: no anchor-rubric match — agent judgment governs D/P/K")
             continue
-        _, d, p, k, adr, label = row
-        for dim, val in (("D", d), ("P", p), ("K", k)):
+        for dim, val in (("D", row.d), ("P", row.p), ("K", row.k)):
             if val > floors[dim]:
                 floors[dim] = val
-                rows[dim] = (label, adr)
+                rows[dim] = (row.label, row.adr)
         if fnmatchcase(path, "config/*.toml"):
             advisories.append(
                 f"{path}: config floor is 0 (non-secret); if it wires env/secrets, "
                 f"raise D/P/K to >= 1 (ADR-026)")
     matched_auth = floors["P"] >= 4
     return floors, rows, advisories, matched_auth
+
+
+# --- Platform profiles (Strategy + Registry) ------------------------------------
+@dataclass(frozen=True)
+class PlatformProfile:
+    """Bundles a platform's CC measurer, anchor rubric, and detection markers."""
+    name: str
+    markers: tuple = ()
+    source_suffixes: tuple = ()
+    measure_cc: Callable = measure_cc_none
+    rubric: list = field(default_factory=list)
+
+
+PROFILES = {
+    # DubBridge: this repo. clippy measurer + ADR-anchored rubric. The marker is the
+    # policy file itself so this repo never degrades to the generic rust profile.
+    "dubbridge": PlatformProfile(
+        name="dubbridge",
+        markers=("docs/policies/RRI_POLICY.md",),
+        source_suffixes=(".rs",),
+        measure_cc=measure_cc_clippy,
+        rubric=_DUBBRIDGE_RUBRIC),
+    "rust": PlatformProfile(
+        name="rust", markers=("Cargo.toml",), source_suffixes=(".rs",),
+        measure_cc=measure_cc_clippy, rubric=_GENERIC_RUBRIC),
+    "go": PlatformProfile(
+        name="go", markers=("go.mod",), source_suffixes=(".go",),
+        measure_cc=measure_cc_gocyclo, rubric=_GENERIC_RUBRIC),
+    "rn": PlatformProfile(
+        name="rn", markers=("package.json",),
+        source_suffixes=(".js", ".jsx", ".ts", ".tsx"),
+        measure_cc=measure_cc_eslint, rubric=_GENERIC_RUBRIC),
+    "python": PlatformProfile(
+        name="python", markers=("pyproject.toml", "setup.py", "setup.cfg"),
+        source_suffixes=(".py",), measure_cc=measure_cc_radon,
+        rubric=_GENERIC_RUBRIC),
+    # Fallback when nothing is detected: no measurer, empty rubric -> agent judgment.
+    "generic": PlatformProfile(name="generic"),
+}
+
+# Detection order: dubbridge before rust (the policy marker is more specific than
+# Cargo.toml), then the remaining ecosystems.
+DETECTION_ORDER = ["dubbridge", "rust", "go", "rn", "python"]
+
+
+def detect_platform(start_dir="."):
+    """Return the PlatformProfile for the nearest marker found walking up from start_dir.
+
+    Walks from start_dir toward the filesystem root; at each level, the first profile
+    in DETECTION_ORDER whose marker exists wins. Falls back to the generic profile.
+    """
+    base = Path(start_dir).resolve()
+    for cur in [base, *base.parents]:
+        for name in DETECTION_ORDER:
+            prof = PROFILES[name]
+            if any((cur / marker).exists() for marker in prof.markers):
+                return prof
+    return PROFILES["generic"]
+
+
+def resolve_platform(name):
+    """Resolve a --platform value to a profile; 'auto' triggers detection."""
+    if name in (None, "auto"):
+        return detect_platform()
+    return PROFILES[name]
 
 
 # --- Penalties (RRI_POLICY.md "Penalties") --------------------------------------
@@ -212,27 +496,25 @@ def git_diff_paths(base):
     return [line for line in out.stdout.splitlines() if line.strip()]
 
 
-def evaluate(*, cc=None, c_score=None, touches=None, f_override=None, base="main",
+def evaluate(*, cc=None, c_score=None, auto_cc=False, touches=None,
+             f_override=None, base="main",
              d=0, k=0, p=0, t=0, a=0, x=0, manual_penalties=None, low_conf=None,
-             git=git_diff_paths):
+             git=git_diff_paths, profile=None):
     """Compute a full RRI result dict from resolved inputs.
 
-    Exactly one of cc / c_score must be set. F comes from touches, else f_override,
-    else git. D/K/P are raised to their anchor-rubric floors; low-confidence vars are
-    bumped +1 (capped at 5). Returns a dict ready for rendering.
+    Exactly one of cc / c_score / auto_cc must drive C. F comes from touches,
+    else f_override, else git. D/K/P are raised to their anchor-rubric floors;
+    low-confidence vars are bumped +1 (capped at 5). The active platform `profile`
+    (auto-detected when None) supplies the --auto-cc measurer and the anchor rubric.
+    Returns a dict ready for rendering.
     """
     manual_penalties = set(manual_penalties or [])
     low_conf = list(low_conf or [])
-
-    # C: raw CC mapped via the policy table, else the pre-computed score.
-    if cc is not None:
-        c = cc_to_score(cc)
-        c_ev = f"raw CC {cc} -> score {c} (policy CC table)"
-    else:
-        c = c_score
-        c_ev = "agent-supplied score"
+    if profile is None:
+        profile = detect_platform()
 
     # F + the path set used for the anchor rubric.
+    # Resolved first so --auto-cc can reuse the same list without a second git call.
     if touches:
         paths = list(touches)
         f = count_to_f(len(paths))
@@ -246,7 +528,27 @@ def evaluate(*, cc=None, c_score=None, touches=None, f_override=None, base="main
         f = count_to_f(len(paths))
         f_ev = f"git diff --name-only {base}...HEAD -> {len(paths)} files"
 
-    floors, rows, advisories, matched_auth = match_rubric(paths)
+    # C: raw CC mapped via the policy table, else the pre-computed score, else
+    # auto-measured by the active platform's measurer over the resolved path list.
+    if cc is not None:
+        c = cc_to_score(cc)
+        c_ev = f"raw CC {cc} -> score {c} (policy CC table)"
+    elif auto_cc:
+        measured, measure_ev = profile.measure_cc(paths)
+        if measured is not None:
+            c = cc_to_score(measured)
+            c_ev = f"{measure_ev} -> score {c} (policy CC table)"
+        else:
+            # Fallback: score 0 marked Low-confidence so the output is honest.
+            c = 0
+            c_ev = f"auto-cc fallback (score=0): {measure_ev}"
+            if "C" not in low_conf:
+                low_conf = list(low_conf) + ["C"]
+    else:
+        c = c_score
+        c_ev = "agent-supplied score"
+
+    floors, rows, advisories, matched_auth = match_rubric(paths, profile.rubric)
 
     # Agent judgments, with D/P/K raised to the rubric floor (never lowered).
     agent = {"D": d, "K": k, "P": p}
@@ -292,7 +594,7 @@ def evaluate(*, cc=None, c_score=None, touches=None, f_override=None, base="main
         "scores": scores, "evidence": evidence, "confidence": confidence,
         "base": base_val, "penalties": applied, "penalty_total": penalty_total,
         "final": final, "band": band, "triggers": triggers,
-        "advisories": advisories,
+        "advisories": advisories, "platform": profile.name,
     }
 
 
@@ -305,7 +607,11 @@ TABLE_ORDER = ["C", "F", "D", "T", "A", "K", "P", "X"]
 
 def render_markdown(r):
     """Render the result as the RRI_POLICY.md reporting-format markdown block."""
-    lines = ["| Variable | Score | Evidence | Confidence |", "|---|---|---|---|"]
+    lines = []
+    if r.get("platform"):
+        lines.append(f"**Platform:** {r['platform']}")
+        lines.append("")
+    lines += ["| Variable | Score | Evidence | Confidence |", "|---|---|---|---|"]
     for v in TABLE_ORDER:
         lines.append(
             f"| {VAR_LABELS[v]} | {r['scores'][v]} | {r['evidence'][v]} | {r['confidence'][v]} |")
@@ -336,6 +642,7 @@ def render_markdown(r):
 def render_json(r):
     """Render the result as a machine-parseable JSON object."""
     return json.dumps({
+        "platform": r.get("platform"),
         "variables": {v: {"score": r["scores"][v], "evidence": r["evidence"][v],
                           "confidence": r["confidence"][v]} for v in TABLE_ORDER},
         "base": r["base"],
@@ -371,6 +678,11 @@ def build_parser():
                         help="Raw cyclomatic complexity (radon/mccabe/clippy) -> mapped to C score")
     cgroup.add_argument("--C", dest="c_score", type=_score_arg("--C"), metavar="0-5",
                         help="Pre-computed C score (use when raw CC is unavailable)")
+    cgroup.add_argument("--auto-cc", action="store_true", default=False,
+                        help="Measure CC automatically via the detected platform's "
+                             "measurer (clippy/gocyclo/eslint/radon) over --touches "
+                             "paths; falls back to score=0 + Low-confidence if the "
+                             "tool is unavailable or no matching source files found)")
     for name in ("T", "A", "X"):
         p.add_argument(f"--{name}", required=True, type=_score_arg(f"--{name}"),
                        metavar="0-5")
@@ -386,6 +698,10 @@ def build_parser():
                    metavar="KEY", help=f"Manual penalty; repeatable. One of: {sorted(MANUAL_PENALTIES)}")
     p.add_argument("--low-confidence", default="", metavar="VARS",
                    help="Comma list (e.g. D,K) bumped +1 and marked Low")
+    p.add_argument("--platform", default="auto",
+                   choices=["auto", *DETECTION_ORDER, "generic"],
+                   help="Platform profile (CC measurer + anchor rubric). "
+                        "'auto' detects by marker file (default).")
     p.add_argument("--json", action="store_true", help="Emit JSON instead of markdown")
     return p
 
@@ -394,20 +710,22 @@ def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    if args.cc is not None and args.cc < 1:
-        parser.error("--cc must be >= 1 (cyclomatic complexity starts at 1)")
-
     low = [v.strip().upper() for v in args.low_confidence.split(",") if v.strip()]
     bad = [v for v in low if v not in VARS]
     if bad:
         parser.error(f"--low-confidence has unknown variable(s) {bad}; valid: {VARS}")
 
+    if args.cc is not None and args.cc < 1:
+        parser.error("--cc must be >= 1 (cyclomatic complexity starts at 1)")
+
+    profile = resolve_platform(args.platform)
+
     try:
         result = evaluate(
-            cc=args.cc, c_score=args.c_score, touches=args.touches,
-            f_override=args.f_override, base=args.base,
+            cc=args.cc, c_score=args.c_score, auto_cc=args.auto_cc,
+            touches=args.touches, f_override=args.f_override, base=args.base,
             d=args.D, k=args.K, p=args.P, t=args.T, a=args.A, x=args.X,
-            manual_penalties=args.penalty, low_conf=low)
+            manual_penalties=args.penalty, low_conf=low, profile=profile)
     except RuntimeError as exc:
         parser.error(str(exc))
 

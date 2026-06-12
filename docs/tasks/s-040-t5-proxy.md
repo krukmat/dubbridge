@@ -1,7 +1,7 @@
 # Tasks: P1-T5 — Authenticated proxy to `apps/api` with transparent refresh
 
-**Parent task:** T5 in `docs/tasks/p1-session-gateway-bff.md`
-**Plan:** `docs/plan/p1-session-gateway-bff.md`
+**Parent task:** T5 in `docs/tasks/s-040-session-gateway-bff.md`
+**Plan:** `docs/plan/s-040-session-gateway-bff.md`
 **Depends on:** P1-T4 (login/callback/logout routes)
 **Unlocks:** P1-T6 (end-to-end lifecycle tests)
 
@@ -220,9 +220,9 @@ T5.1 → T5.2 → T5.3
 ## Agent handoff prompt (delegation-ready)
 
 > Implement sub-tasks **T5.1 → T5.2 → T5.3** from
-> `docs/tasks/p1-t5-proxy.md` in the `dubbridge` repo.
-> Parent context: `docs/tasks/p1-session-gateway-bff.md` (T5),
-> `docs/plan/p1-session-gateway-bff.md`.
+> `docs/tasks/s-040-t5-proxy.md` in the `dubbridge` repo.
+> Parent context: `docs/tasks/s-040-session-gateway-bff.md` (T5),
+> `docs/plan/s-040-session-gateway-bff.md`.
 > T4 is complete — `GatewayState` carries `session_store` and `pending_store`;
 > cookie/session helpers live in `src/cookie.rs` and `src/session/`.
 > Key types: `extract_session_id` in `src/auth/logout.rs` (move to shared module

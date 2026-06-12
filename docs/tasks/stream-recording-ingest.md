@@ -719,7 +719,7 @@ track `stable` to match CI. Record the chosen Rust version policy in the README
 - `infra/local/docker-compose.yml`
 - `README.md` (Rust version policy note, if changed)
 
-### Status: [x] Done — closed by `docs/tasks/p0-environment-separation.md` Task 6 on 2026-06-03
+### Status: [x] Done — closed by `docs/tasks/s-030-environment-separation.md` Task 6 on 2026-06-03
 
 ---
 

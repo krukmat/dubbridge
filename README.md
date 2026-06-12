@@ -85,7 +85,7 @@ keeps auth secrets in a local `.env`.
 
 Local and production are separated by a fail-closed layered configuration model
 governed by ADR-026 and delivered in slice P0
-(`docs/plan/p0-environment-separation.md`). `crates/config` now requires an explicit
+(`docs/plan/s-030-environment-separation.md`). `crates/config` now requires an explicit
 `DUBBRIDGE_ENV`, loads committed non-secret `config/<env>.toml` profiles, accepts
 secrets only through injected environment variables, and runs a production
 `validate()` that rejects local defaults (localhost datastores, local-fs storage,
@@ -117,6 +117,8 @@ into a single score with penalties for high-risk combinations.
 
 The RRI also drives model-tier selection (Economy / Balanced / Premium) and
 thinking-mode activation. Full procedure: `docs/policies/RRI_POLICY.md`.
+
+Background and design rationale: `docs/prompts/medium-article-rri-output.md`.
 
 ## Repository layout
 

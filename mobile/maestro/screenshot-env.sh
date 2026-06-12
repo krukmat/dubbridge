@@ -14,6 +14,10 @@
 # gatewayBaseUrl=http://localhost:8081 works on the emulator because
 # adb reverse maps emulator localhost:8081 -> host gateway :8081.
 
+export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}"
+export ANDROID_HOME="$ANDROID_SDK_ROOT"
+export JAVA_HOME="${JAVA_HOME_OVERRIDE:-/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home}"
+export PATH="/opt/homebrew/opt/maestro/bin:/opt/homebrew/opt/openjdk@17/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
 export DUBBRIDGE_ENV=local
 export EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL=http://localhost:8081
 export EXPO_PUBLIC_E2E_ENABLED=true

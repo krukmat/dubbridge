@@ -1,9 +1,9 @@
-# Plan: P3-V — Maestro screenshot / visual-audit suite (mobile)
+# Plan: S-055 - Maestro Screenshot / Visual-audit Suite (Mobile)
 
-**Roadmap position:** Sub-slice of **P3** (first-party mobile client, React Native +
-Expo). It is a **supporting / hardening capability**, not on the linear media
-pipeline (S0–S9). It belongs to the "follow-up mobile hardening backlog" the P3
-plan defers (`docs/plan/p3-mobile-client.md` → *Excluded (deferred)*).
+**Roadmap phase:** `S-055`. This is the hardening follow-up to `S-050`
+(first-party mobile client, React Native + Expo). It belongs to the mobile
+hardening backlog that `S-050` defers
+(`docs/plan/s-050-mobile-client.md` → *Excluded (deferred)*).
 
 **Source pattern:** `/Users/matiasleandrokruk/Documents/FenixCRM/docs/maestro-replication-guide.md`
 (two-phase Maestro screenshot suite, derived from FenixCRM). This plan **adapts**
@@ -40,7 +40,7 @@ device or any Maestro artifact.**
 
 | FenixCRM pattern | DubBridge constraint | DubBridge adaptation |
 |---|---|---|
-| Phase-2 deep link injects a raw **JWT** (`...e2e-bootstrap?token=<JWT>`) into the app auth store | **ADR-024:** the device must never hold a JWT/refresh token; it stores only an opaque `session_ref` | Phase-2 deep link carries a **`handoff_code`** (single-use, 90 s TTL), redeemed via the existing `POST /auth/mobile/session` → `{ session_ref }`. Reuses the real P1 mobile seam; no new bypass. |
+| Phase-2 deep link injects a raw **JWT** (`...e2e-bootstrap?token=<JWT>`) into the app auth store | **ADR-024:** the device must never hold a JWT/refresh token; it stores only an opaque `session_ref` | Phase-2 deep link carries a **`handoff_code`** (single-use, 90 s TTL), redeemed via the existing `POST /auth/mobile/session` → `{ session_ref }`. Reuses the real S-040 mobile seam; no new bypass. |
 | Custom `/e2e-bootstrap` deep-link handler in the app | DubBridge already returns `dubbridge://auth/callback?handoff_code=...` from the real callback | Reuse the existing callback deep-link shape. Only add a **dev-gated root `Linking` listener** if `openAuthSessionAsync` cannot be driven by Maestro for an externally-opened URL. |
 | Go seed: `go run scripts/e2e_seed.go` mints a JWT | DubBridge backend is **Rust**; minting a session requires a `TokenSet` the gateway owns | Seed drives the **real gateway HTTP handoff** (`GET /auth/login?return_uri` → `GET /auth/callback` → extract `handoff_code`) against a **mock token endpoint** fixture. No gateway code change, no JWT emitted. |
 | Backend health at `:8080/health`; BFF at `:3000` | Gateway exposes `/health/live` + `/health/ready` on `:8081`; apps/api on `:8080`; there is no `:3000` BFF | Health checks target gateway `:8081/health/ready` and api `:8080`. Drop the `:3000` BFF leg. |
@@ -56,7 +56,7 @@ device or any Maestro artifact.**
 
 **How Phase 2 obtains an authenticated session** — three options. **Approved:
 Option A** (mock-token-endpoint + real gateway handoff; no gateway code change). The
-task list in `docs/tasks/p3-maestro-screenshot-suite.md` is written for Option A and
+task list in `docs/tasks/s-055-maestro-screenshot-suite.md` is written for Option A and
 notes where B/C diverge.
 
 - **Option A (recommended): mock-token-endpoint + real gateway handoff (no gateway
@@ -65,14 +65,14 @@ notes where B/C diverge.
   `token_url` pointed at a local **mock token server** that returns a deterministic
   fixture `TokenSet`. The seed extracts the `handoff_code` from the `Location`
   redirect and emits it as JSON. Pros: reuses the exact production seam; adds **no
-  prod-reachable code path** to the P1-owned gateway; ADR-024-clean (only a
+  prod-reachable code path** to the S-040-owned gateway; ADR-024-clean (only a
   `handoff_code` ever leaves the gateway). Cons: requires a small mock token server
   fixture; depends on apps/api accepting the fixture access token in local mode (or
   running apps/api with auth disabled locally — to be confirmed in V4a).
 - **Option B: dev-only gateway seed endpoint.** Add a `#[cfg(debug)]` /
   env-fail-closed `POST /auth/dev/seed-session` to the gateway that mints a
   `StoredSession` from a fixture `TokenSet` and returns a `handoff_code`. Pros: one
-  HTTP call, no mock AS. Cons: **touches the P1-owned gateway contract** (the P3
+  HTTP call, no mock AS. Cons: **touches the S-040-owned gateway contract** (the S-050
   plan lists gateway changes as out-of-scope) and adds a session-minting path that
   must be proven unreachable in production.
 - **Option C: drive real system-browser OAuth in Maestro.** No bypass; Maestro fills
@@ -80,33 +80,67 @@ notes where B/C diverge.
   exactly what the two-phase pattern exists to avoid.
 
 **Recommendation:** Option A. It is the only option that is simultaneously
-ADR-024-clean, leaves the P1 gateway contract untouched, and keeps Phase 2 stable.
+ADR-024-clean, leaves the S-040 gateway contract untouched, and keeps Phase 2 stable.
 
 ---
 
-## Sequencing decision (APPROVED 2026-06-07: Option S2 — defer until after P3 T4)
+## Sequencing decision (APPROVED 2026-06-07: Option S2 — defer until after S-050-T4)
 
 At planning time, Phase 2 needed (a) a working deep-link → `session_ref`
 redemption in the app and (b) authenticated screens worth capturing. That
-prerequisite is now satisfied: **P3 T4 and P3 T5 completed on 2026-06-07**, so the
+prerequisite is now satisfied: **S-050-T4 and S-050-T5 completed on 2026-06-07**, so the
 core screens (`Login`, `Home`, `AssetList`, `AssetDetail`) and the real auth flow
 from T3b-ii/iii exist.
 
-**Approved: Option S2 — defer the entire P3-V sub-slice until after P3 T4 is done.**
-That gate is now **satisfied**. The deferral achieved its purpose: P3-V can start
+**Approved: Option S2 — defer the entire S-055 sub-phase until after S-050-T4 is done.**
+That gate is now **satisfied**. The deferral achieved its purpose: S-055 can start
 from a stable, complete first pass over the implemented auth flow and core screens
 instead of growing around placeholders.
 
 Options considered:
-- **Option S1 (not chosen): land the suite infrastructure now, grow the flows
+- **Option S-010 (not chosen): land the suite infrastructure now, grow the flows
   later** — build the screen-agnostic parts immediately and extend Phase-2 flows as
   screens land.
-- **Option S2 (APPROVED): defer the whole suite until after P3 T4.**
+- **Option S2 (APPROVED): defer the whole suite until after S-050-T4.**
 
-**Consequence for this plan:** every task below still depends on **P3 T4 complete**
-as a historical prerequisite, and that prerequisite is now met. **P3-V is unblocked
-and queued at V1**; execution still follows the per-task approval workflow in
-`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` / `docs/policies/HITL_AUTONOMY_POLICY.md`.
+**Consequence for this plan:** every task below still depends on **S-050-T4 complete**
+as a historical prerequisite, and that prerequisite is now met. **S-055 is unblocked
+and partially built**; execution now resumes at the Phase-2 bootstrap closure task
+documented as `V6b` in `docs/tasks/s-055-maestro-screenshot-suite.md`. Execution still
+follows the per-task approval workflow in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` /
+`docs/policies/HITL_AUTONOMY_POLICY.md`.
+
+## Current implementation status (reconciled 2026-06-11)
+
+S-055 is no longer only planned. The repo contains the early suite pieces, but not
+the one-command runner or final screenshots command.
+
+Built:
+- screen root `testID`s for the currently captured surfaces:
+  `login-screen`, `home-screen`, and `config-error-screen`;
+- managed-Expo Android build policy and recorded `appId` / APK path;
+- screenshot env profile with Metro on `:8082`, gateway on `:8081`, API on `:8080`,
+  and `EXPO_PUBLIC_E2E_ENABLED=true`;
+- mock OAuth fixture and handoff-code seed CLI under `scripts/e2e-seed/`;
+- dev-gated E2E bootstrap in the mobile auth provider;
+- Maestro flow files for Phase 1 and Phase 2.
+
+Verified:
+- Phase 1 `auth-surface.yaml` reached `login-screen` and captured
+  `01_auth_login.png` in the 2026-06-08 local emulator run.
+
+Still missing or blocked:
+- Phase 2 `authenticated-audit.yaml` has not captured `02_home.png`; the app stayed
+  on `login-screen` after the seeded deep link in the last recorded live run.
+- `mobile/maestro/seed-and-run.sh` does not exist yet.
+- `mobile/package.json` does not expose `npm run screenshots`.
+- From a clean checkout, `mobile/node_modules`, `mobile/android/`, and the debug APK
+  may be absent and must be regenerated before live verification.
+
+The next executable task is **V6b — Phase-2 deep-link bootstrap diagnosis +
+hardening**. It must prove whether the failure is deep-link delivery, runtime env /
+bundle mismatch, gateway redemption, session storage, or navigation state before V7
+runner work starts.
 
 ---
 
@@ -135,27 +169,27 @@ and queued at V1**; execution still follows the per-task approval workflow in
 ### Excluded (deferred)
 - iOS screenshot capture (Android emulator first).
 - CI wiring of the suite (a follow-up once it is stable locally).
-- Any change to the **P1 gateway contract** (unless Option B is chosen) or to the
+- Any change to the **S-040 gateway contract** (unless Option B is chosen) or to the
   apps/api trust boundary (ADR-023).
 - Real IdP integration for screenshots (the mock token endpoint is intentional).
 - Rich domain-entity seeding (assets/ingestion fixtures) beyond what the available
-  screens render — grows with P3 T4.
+  screens render — grows with S-050-T4.
 
 ---
 
 ## Hard dependencies
 - **Maestro pattern source** (read-only reference): the FenixCRM guide above.
-- **P1 gateway mobile seam (done):** `GET /auth/login?return_uri`,
+- **S-040 gateway mobile seam (done):** `GET /auth/login?return_uri`,
   `GET /auth/callback` → `dubbridge://auth/callback?handoff_code=...`,
   `POST /auth/mobile/session` → `{ session_ref }`, `X-Dubbridge-Session` transport
   (`apps/gateway/src/auth/{login,handoff,mobile_session}.rs`).
-- **P3 T2 (done):** typed gateway client (`mobile/src/api/client.ts`) — reused by the
+- **S-050 T2 (done):** typed gateway client (`mobile/src/api/client.ts`) — reused by the
   E2E bootstrap to redeem the handoff code.
-- **P3 T3a (done):** `mobile/src/auth/session.ts` secure-store primitives + JWT guard.
-- **P3 T4 / T5 (done 2026-06-07) — historical gate for the entire P3-V
-  sub-slice (approved sequencing S2).** The gate is satisfied: T3b-ii (`login()`),
-  T3b-iii (navigation wiring), the core screens, and the P3 verification pass are
-  complete. P3-V remains documented-not-built, but it is no longer blocked on P3.
+- **S-050 T3a (done):** `mobile/src/auth/session.ts` secure-store primitives + JWT guard.
+- **S-050-T4 / T5 (done 2026-06-07) — historical gate for the entire S-055
+  sub-phase (approved sequencing S2).** The gate is satisfied: T3b-ii (`login()`),
+  T3b-iii (navigation wiring), the core screens, and the S-050 verification pass are
+  complete. S-055 is no longer blocked on S-050.
 - **Local stack:** running emulator + `adb`, gateway (`:8081`), apps/api (`:8080`),
   Redis (session store), Node ≥ 18, Maestro CLI, Android SDK/platform-tools.
 
@@ -196,8 +230,8 @@ and queued at V1**; execution still follows the per-task approval workflow in
   (ADR-026 fail-closed preserved).
 
 ### Modified — docs
-- `docs/tasks/p3-mobile-client.md` — cross-link this sub-slice.
-- `docs/plan/roadmap.md` — note P3-V under the P3 row / hardening backlog.
+- `docs/tasks/s-050-mobile-client.md` — cross-link this sub-phase.
+- `docs/plan/roadmap.md` — note S-055 under the S-050 row / hardening backlog.
 - `docs/architecture.md` — only if a new runtime surface is added (Option B).
 
 ---
@@ -212,7 +246,7 @@ separates this suite from the FenixCRM source.
 
 ### D2 — Reuse the production seam, don't invent a bypass (Option A)
 The seed drives the real `/auth/login → /auth/callback` flow; the only fixture is the
-token endpoint. This keeps the P1 gateway contract untouched and guarantees the
+token endpoint. This keeps the S-040 gateway contract untouched and guarantees the
 screenshot path exercises the same redemption code the real app uses.
 
 ### D3 — Port deconfliction
@@ -250,7 +284,7 @@ reference rather than injecting a token.
 ### D7 — Screen root `testID` convention
 Every screen captured or asserted by Maestro exposes a stable root `testID` using
 the convention `<feature>-screen`. V1 establishes the first set:
-`login-screen`, `home-screen`, and `config-error-screen`. Later P3-V tasks and any
+`login-screen`, `home-screen`, and `config-error-screen`. Later S-055 tasks and any
 new mobile screens captured by Maestro must follow the same pattern so visual flows
 assert by `id` rather than brittle text.
 
@@ -309,19 +343,19 @@ flowchart LR
 ## Proposed execution order
 
 ```text
-[HARD GATE] P3 T4 complete (core screens + T3b-ii/iii auth) — nothing below starts first
+[HARD GATE] S-050-T4 complete (core screens + T3b-ii/iii auth) — nothing below starts first
 V1  testIDs + naming convention                                         (RRI ~18)
   -> V2a decide prebuild strategy + android/ commit policy              (RRI ~20)
   -> V2b execute debug build + verify emulator launch          [XL]     (RRI ~49)
   -> V3  screenshot env + port deconfliction                           (RRI ~24)
   -> V4a mock token endpoint + screenshot token_url override            (RRI ~36)
   -> V4b seed orchestration (handoff-code mint) + no-JWT check  [auth]  (RRI ~57)
+  -> V5  app-side E2E deep-link bootstrap                      [auth]  (RRI ~59)
   -> V6  Maestro flow files (auth-surface + minimal authenticated-audit)(RRI ~36)
+  -> V6b Phase-2 deep-link bootstrap diagnosis + hardening              (RRI TBD)
   -> V7a runner: preconditions + stack bring-up                        (RRI ~38)
   -> V7b runner: seed→env + 2-phase maestro + copy + sanitize          (RRI ~45)
   -> V8  package.json script + README + docs/roadmap sync               (RRI ~18)
-  (V5 app-side E2E deep-link bootstrap — gated on P3 T3b-ii/iii; slot before V6
-   Phase-2 if openAuthSessionAsync cannot be Maestro-driven)            (RRI ~59 [auth])
 ```
 
 > **RRI decomposition (2026-06-07).** Applying `docs/policies/RRI_POLICY.md`, three
@@ -334,9 +368,9 @@ V1  testIDs + naming convention                                         (RRI ~18
 > Complex) — further subdivision cannot lower `D`/`P`/auth-penalty, so they remain
 > single Complex tasks with mandatory human diff review. Full per-task RRI tables are
 > produced at each task's presentation. See the decomposition summary table in
-> `docs/tasks/p3-maestro-screenshot-suite.md`.
+> `docs/tasks/s-055-maestro-screenshot-suite.md`.
 
 ## Lines affected after implementation
-Tracked per task in `docs/tasks/p3-maestro-screenshot-suite.md`.
+Tracked per task in `docs/tasks/s-055-maestro-screenshot-suite.md`.
 </content>
 </invoke>

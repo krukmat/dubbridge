@@ -1,7 +1,7 @@
-# Tasks: P3-V — Maestro screenshot / visual-audit suite (mobile)
+# Tasks: S-055 - Maestro Screenshot / Visual-audit Suite (Mobile)
 
-**Plan:** `docs/plan/p3-maestro-screenshot-suite.md`
-**Roadmap slice:** P3 sub-slice (mobile hardening backlog). **Source pattern:**
+**Plan:** `docs/plan/s-055-maestro-screenshot-suite.md`
+**Roadmap phase:** `S-055` (mobile hardening backlog). **Source pattern:**
 `/Users/matiasleandrokruk/Documents/FenixCRM/docs/maestro-replication-guide.md`.
 
 **Governing guides:** `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` (authoritative),
@@ -10,72 +10,80 @@
 
 > **Approved options (2026-06-07) drive this list:** **Option A**
 > (mock-token-endpoint + real gateway handoff; no gateway change) and **Option S2**
-> (defer the entire sub-slice until after **P3 T4**). The sequencing gate is now
-> satisfied because **P3 T4/T5 completed on 2026-06-07**. See the plan's *Central
+> (defer the entire sub-phase until after **S-050-T4**). The sequencing gate is now
+> satisfied because **S-050-T4/S-050-T5 completed on 2026-06-07**. See the plan's *Central
 > design decision* and *Sequencing decision*.
 
-> **HISTORICAL GATE — P3 T4.** The required P3 screen/auth milestone is already
-> complete in `docs/tasks/p3-mobile-client.md`: core screens
+> **HISTORICAL GATE — S-050-T4.** The required S-050 screen/auth milestone is already
+> complete in `docs/tasks/s-050-mobile-client.md`: core screens
 > `Login`/`Home`/`AssetList`/`AssetDetail` plus real auth from T3b-ii/iii are done,
-> and `T5` closed on 2026-06-07. **V1 is now the next executable task**, subject to
-> the normal per-task presentation/approval rules.
+> and `T5` closed on 2026-06-07. That gate no longer blocks S-055. The sub-phase has
+> advanced past V1: the next executable work is the resumption task **V6b**, which
+> closes the remaining Phase-2 deep-link bootstrap blocker before V7/V8 can start.
 
-> **Task namespace (avoid the V/T twin hazard).** This sub-slice uses the **`V`**
-> prefix (`V1`–`V8`); the P3 client slice in `docs/tasks/p3-mobile-client.md` uses
+> **Task namespace (avoid the V/T twin hazard).** This sub-phase uses the **`V`**
+> prefix (`V1`–`V8`); the S-050 client slice in `docs/tasks/s-050-mobile-client.md` uses
 > the **`T`** prefix (`T0`–`T5`). They are **separate namespaces** — `V4` (this
-> file, the seed) is **not** `T4` (P3, core screens). Because `V1–V5` numerically
-> shadow `T1–T5`, **always fully qualify cross-slice references**: write `P3 T4`
+> file, the seed) is **not** `T4` (S-050, core screens). Because `V1–V5` numerically
+> shadow `T1–T5`, **always fully qualify cross-slice references**: write `S-050-T4`
 > (never bare `T4`) when referring to the gate, and `V4a/V4b` for the seed. The gate
-> below is the **existing** P3 `T4` (Core screens), not a task defined here.
+> below is the **existing** S-050 `T4` (Core screens), not a task defined here.
 
-## ⚠ TODO — Sub-slice suspended (2026-06-08, out of scope after team migration)
+## Current status — resumed plan of record (2026-06-11)
 
-> **This entire sub-slice (V3–V8) is suspended and out of scope.**
-> The team migrated to a shared team plan after V4b/V5 were completed.
-> V6 was the last executed task and ended in a **partial pass** (Phase 1 only).
-> Do not pick up any task here without explicit re-scoping approval from the team.
+> This ledger is the plan of record for completing S-055 in this repository. It was
+> previously suspended after a team-plan migration note on 2026-06-08, but the actual
+> checked-in work now shows the sub-phase as partially built rather than merely
+> planned. Resume from **V6b**, not V1. Continue to present each implementation task
+> under the normal RRI/HITL workflow before editing code or running destructive
+> operations.
 
-### Where we stopped
+### Built so far
 
 | Task | State | Blocker |
 |---|---|---|
 | V1–V2b, V4a–V4b, V5 | ✅ Done | — |
 | **V3** | ✅ Done (2026-06-09) | — resolved; was the root cause of Metro/gateway `:8081` collision |
 | **V6 Phase 1** | ✅ Done | `auth-surface.yaml` executes; `01_auth_login.png` captured |
-| **V6 Phase 2** | ❌ Blocked | `authenticated-audit.yaml` fails on `id: home-screen` |
-| V7a, V7b, V8 | ⏸ Not started | Suspended; blocked on V6 Phase 2 |
+| **V6 Phase 2 / V6b** | ✅ Done (2026-06-11) | `authenticated-audit.yaml` passes; `02_home.png` captured |
+| V7a, V7b, V8 | ⏸ Not started | Next up |
 
-### Open issues (unresolved at suspension)
+### Current workspace reality
 
-1. **Home screen not reached after deep-link bootstrap.**
-   After `openLink ${SEED_BOOTSTRAP_DEEPLINK}` (or equivalent manual
-   `adb shell am start -a android.intent.action.VIEW -d "dubbridge://auth/callback?handoff_code=..."`),
-   the app stays on `login-screen`. The Linking listener in `AuthProvider.tsx` (V5)
-   does not visibly process the incoming deep link under the current emulator setup.
-   Evidence: `/tmp/v6-manual-openlink.png`; Maestro assertion failure logged in
-   `mobile/maestro/authenticated-audit.yaml` run on 2026-06-08.
+- `mobile/maestro/auth-surface.yaml` and `mobile/maestro/authenticated-audit.yaml`
+  exist.
+- `scripts/e2e-seed/mock-oauth-server.mjs` and
+  `scripts/e2e-seed/mint-handoff-code.mjs` exist with tests.
+- `mobile/maestro/screenshot-env.sh` exists and documents Metro on `:8082`,
+  gateway on `:8081`, and `EXPO_PUBLIC_E2E_ENABLED=true`.
+- `mobile/maestro/seed-and-run.sh` does **not** exist yet.
+- `mobile/package.json` does **not** expose `npm run screenshots` yet.
+- From a clean checkout, `mobile/android/`, the debug APK, and `mobile/node_modules`
+  may be absent because the native project and dependencies are regenerated locally.
+  Rehydrate those before attempting live Maestro verification.
 
-2. **Chrome-free migration (V5 workaround) did not unblock Phase 2 on emulator.**
-   V5 was implemented to bypass `openAuthSessionAsync` + Chrome. However, the actual
-   emulator run showed that even with `EXPO_PUBLIC_E2E_ENABLED=true` and the Linking
-   listener in place, the app remained on `login-screen` after the deep-link was fired.
-   Root cause is unresolved — candidates: Metro transport instability
-   (`Cannot connect to Expo CLI ... URL: 10.0.2.2:8081` warnings visible in logcat),
-   or the Linking handler not firing in time before the app re-renders to the
-   unauthenticated state. No Chrome dependency has been confirmed or ruled out.
+### Open issues (2026-06-11 — all prior blockers resolved)
 
-### Next step if resumed
+**All Phase-2 blockers from 2026-06-08 were diagnosed and resolved on 2026-06-11:**
 
-- Diagnose whether the `Linking` event fires inside the app when the deep link is
-  delivered from `adb am start`. Add a temporary `console.log` in the V5 listener
-  and capture logcat output to confirm or rule out listener execution.
-- If the listener fires but the session redemption fails, check the `session_ref`
-  storage path and the `AuthProvider` state machine transition.
-- If the listener does not fire, investigate whether Metro transport instability
-  prevents JS from executing deep-link events on the emulator (V3 port deconfliction
-  may be a prerequisite — V3 is **not started**).
-- If resumed as a team, re-scope from V3 (port deconfliction) as the entry point,
-  since V3 is the unblocked prerequisite for a stable Metro runtime during Maestro runs.
+1. ~~Home screen not reached after deep-link bootstrap~~ — **Resolved.** Root causes
+   were: (a) APK Metro port hardcoded to `:8081` (RN default) while Metro ran on
+   `:8082`; (b) `app.config` asset in APK had `dubbridgeEnv: {}` (null serialized as
+   empty object) because env vars were not set during `expo prebuild`; (c) real Rust
+   gateway not available, so `POST /auth/mobile/session` call failed silently.
+   Fixes: `reactNativeDevServerPort=8082` in `gradle.properties`; injected correct
+   `android/app/src/main/assets/app.config` before rebuild; added
+   `scripts/e2e-seed/mock-gateway-server.mjs` as a minimal in-process gateway stub.
+
+2. ~~`SEED_BOOTSTRAP_DEEPLINK` env var not passed to Maestro~~ — **Resolved.** Shell
+   `export` inside a compound command did not propagate. Fixed by using
+   `maestro test --env SEED_BOOTSTRAP_DEEPLINK=<value>`.
+
+### Next executable work
+
+- **V7a** — stack bring-up script (start mock-oauth, mock-gateway, Metro, adb reverse).
+- **V7b** — run + collect + sanitize (full Maestro suite run, screenshot archive, report).
+- **V8** — `npm run screenshots`, README, docs closure.
 
 ---
 
@@ -85,9 +93,9 @@
 ## Task dependency order
 
 ```text
-[gate satisfied: P3 T4/T5 done 2026-06-07] ──▶ V1 -> V2a -> V2b -> V3 -> V4a -> V4b -> V6 -> V7a -> V7b -> V8
-                                                       (V5 inserted before V6 Phase-2 if
-                                                        openAuthSessionAsync is not Maestro-drivable)
+[gate satisfied: S-050-T4/S-050-T5 done 2026-06-07] ──▶ V1 -> V2a -> V2b -> V3 -> V4a -> V4b -> V5 -> V6 Phase 1
+                                                                                                  -> V6b -> V6 Phase 2
+                                                                                                          -> V7a -> V7b -> V8
 ```
 
 ## RRI review & decomposition (2026-06-07)
@@ -112,7 +120,7 @@ below are the planning estimate that drove the split.
 > **Irreducible auth floor (repo precedent).** Per the DubBridge anchor rubric, any
 > task touching the auth/credential boundary scores `D≥4, P≥5` and takes the `+10`
 > auth penalty, so its structural minimum is ~56 (Complex) — exactly as recorded for
-> P3 `T3b-i-β` (RRI 67) and `T3b-ii` (RRI 57). Splitting **V4b** or **V5** further
+> S-050 `T3b-i-β` (RRI 67) and `T3b-ii` (RRI 57). Splitting **V4b** or **V5** further
 > reduces `F`/`C` but cannot lower `D`, `P`, or the auth penalty. They are therefore
 > kept as single Complex tasks with mandatory human diff review rather than split
 > below their floor. Writing tests first (TDD) removes the `T≥4 ∧ P≥4` `+10` penalty
@@ -131,7 +139,7 @@ below are the planning estimate that drove the split.
 - **Effort:** S · **Indicative RRI:** ~18 (Low)
 - **Type:** Development
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4`
-- **Depends on:** **P3 T4 done** (gate). All captured screens exist by then.
+- **Depends on:** **S-050-T4 done** (gate). All captured screens exist by then.
 - **Objective:** Add stable `testID`s to every screen Maestro will assert against and
   document the convention (`<feature>-screen`, e.g. `login-screen`, `home-screen`,
   `config-error-screen`). Apply to existing screens; record the convention so
@@ -254,7 +262,7 @@ below are the planning estimate that drove the split.
 - Chosen repo policy: generated `mobile/android/` is **gitignored** in the root
   `.gitignore` and regenerated on demand; the repo remains managed-workflow-first.
 - Created the initial `mobile/maestro/README.md` stub to hold the build strategy and
-  recorded identifiers for later P3-V tasks.
+  recorded identifiers for later S-055 tasks.
 
 ### Owner final verification
 
@@ -697,14 +705,14 @@ below are the planning estimate that drove the split.
 
 ## V5 — (Conditional) app-side E2E deep-link bootstrap  (dev-gated, auth-adjacent)
 
-- **Status:** [x] Done — 2026-06-07 · depends on V4b and delivered P3 T3b-ii/T3b-iii auth
+- **Status:** [x] Done — 2026-06-07 · depends on V4b and delivered S-050 T3b-ii/T3b-iii auth
 - **Effort:** L · **Indicative RRI:** ~59 (Complex, 56–70) — `+10` auth penalty,
   irreducible auth floor (P=5, ADR-024). Not split: further subdivision cannot lower
   `D`/`P`/auth penalty. Human reviews the **diff**; thinking **On**.
 - **Type:** Development
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Opus 4.1`
   — thinking **On**
-- **Depends on:** V4b; **P3 T3b-ii** (`login()` redemption path) and **T3b-iii**
+- **Depends on:** V4b; **S-050 T3b-ii** (`login()` redemption path) and **T3b-iii**
   (navigation wired to `AuthProvider`)
 - **Objective:** Only if Maestro cannot drive `openAuthSessionAsync` for an
   externally-opened callback URL: add a **dev-gated root `Linking` listener** that,
@@ -907,6 +915,86 @@ below are the planning estimate that drove the split.
 
 ---
 
+## V6b — Phase-2 deep-link bootstrap diagnosis + hardening
+
+- **Status:** [x] Done — 2026-06-11 · `authenticated-audit.yaml` passed; `02_home.png` captured at 19:06 UTC-3
+- **Effort:** M · **Indicative RRI:** ~38–45 (Moderate/Med-high; final RRI required
+  at presentation)
+- **Type:** Development / ops diagnosis
+- **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4`
+- **Depends on:** V3 (stable screenshot env/ports), V4b (seed handoff code), V5
+  (dev-gated bootstrap), V6 Phase 1 (Maestro flow files)
+- **Objective:** Resolve the remaining V6 Phase-2 blocker by proving and, if needed,
+  hardening the path:
+  `openLink/adb am start` -> app receives `dubbridge://auth/callback` ->
+  `POST /auth/mobile/session` -> opaque `session_ref` stored -> `AuthProvider`
+  becomes `authed` -> `home-screen` renders -> `02_home.png` captured.
+- **Inputs:** `mobile/src/auth/AuthProvider.tsx`,
+  `mobile/maestro/authenticated-audit.yaml`,
+  `mobile/maestro/screenshot-env.sh`,
+  `scripts/e2e-seed/mint-handoff-code.mjs`, V6 execution evidence.
+- **Outputs:** Any minimal code/test/YAML/docs changes required to make Phase 2
+  deterministic; refreshed V6 completion record once `02_home.png` is captured.
+- **Acceptance criteria:**
+  - The live emulator run proves whether the callback URL reaches JS, whether the
+    gateway redemption is called, and whether the auth state transitions to `authed`.
+  - `authenticated-audit.yaml` captures `02_home.png` after asserting
+    `id: home-screen`.
+  - If `AuthProvider` changes, unit tests cover the chosen delivery path and preserve
+    the ADR-024 invariant: no JWT/refresh token is stored or exposed.
+  - The debugging evidence is removed or gated before completion; no temporary
+    `console.log`/logcat-only instrumentation remains in production-reachable code.
+- **Happy paths considered:**
+  - `HP-1`: fresh seed deep link delivered by Maestro -> handoff code redeems once
+    -> opaque `session_ref` saved -> `home-screen` visible -> `02_home.png`.
+- **Edge cases considered:**
+  - `EC-1`: callback URL arrives while `AuthProvider` is still loading -> queued and
+    replayed once the app becomes `unauthed`.
+  - `EC-2`: stale or reused handoff code returns `401` -> app remains unauthenticated
+    with a clear failure signal instead of hanging.
+  - `EC-3`: E2E flag/env missing or stale APK bundle -> bootstrap remains inert and
+    diagnosis identifies env/build mismatch before changing app logic.
+  - `EC-4`: direct `adb am start` delivery differs from Maestro `openLink` -> the
+    final flow documents the supported invocation and keeps the YAML aligned.
+- **Handoff prompt:**
+  > V6b — resolve S-055 Phase-2 bootstrap. Docs: this task file + plan. Rehydrate the
+  > mobile env, rebuild/refresh the debug APK with screenshot env, run the seed,
+  > then prove whether `dubbridge://auth/callback?...` reaches JS, posts to
+  > `/auth/mobile/session`, stores an opaque ref, and renders `home-screen`. Harden
+  > `AuthProvider`/YAML only as needed. AC: `authenticated-audit.yaml` captures
+  > `02_home.png`; no JWT leaks; temporary diagnostics removed. Stop before V7.
+
+### Progress note (2026-06-11)
+
+- Replaced the app-side E2E bootstrap path in `mobile/src/auth/AuthProvider.tsx`:
+  it now listens through explicit `Linking.getInitialURL()` + `Linking.addEventListener("url", ...)`
+  instead of `useLinkingURL()`, while preserving queued replay of callback URLs that
+  arrive during the initial auth hydration window.
+- Broadened `isE2EBootstrapEnabled()` so the bootstrap can activate from either
+  `process.env.EXPO_PUBLIC_E2E_ENABLED === "true"` or Expo `extra.e2eEnabled === true`,
+  which keeps the path aligned with the screenshot env profile recorded in V3.
+- Updated `mobile/__tests__/auth.provider.test.tsx` so V5/V6 coverage now exercises
+  the same runtime delivery mechanisms the emulator uses: initial URL delivery, live
+  `url` events, duplicate delivery deduplication, and queued replay during loading.
+- Verified green locally:
+  `cd mobile && npm run typecheck`
+  `cd mobile && npm test -- --runInBand --watchman=false __tests__/auth.provider.test.tsx __tests__/mobile.auth-flow.test.tsx`
+- Rehydrated the local Android/Maestro toolchain for the final live-emulator pass:
+  installed `adb`, Android command-line tools, emulator + SDK packages, Homebrew
+  `openjdk@17`, and the correct Maestro CLI formula from `mobile-dev-inc/tap`;
+  regenerated `mobile/android/` with `expo prebuild`; rebuilt
+  `mobile/android/app/build/outputs/apk/debug/app-debug.apk`; created a working
+  `Pixel_7_API_36` AVD; verified `adb devices` sees `emulator-5554`; and installed
+  the rebuilt debug APK successfully on that emulator.
+- Updated `mobile/maestro/screenshot-env.sh` so the suite now exports the working
+  `JAVA_HOME`, `ANDROID_SDK_ROOT`, and Maestro CLI path, which avoids the stale
+  shell-level `zulu-17` Java path that broke local CLI execution on this machine.
+- Remaining blocker for task closure: the environment is now ready, but the final
+  live Phase-2 proof (`authenticated-audit.yaml` capturing `02_home.png`) still has
+  not been re-run after the bootstrap hardening and toolchain refresh.
+
+---
+
 ## V7 — Runner script (`seed-and-run.sh`) + report sanitization  (SPLIT)
 
 > **Decomposition (2026-06-07):** V7's base RRI ~53 rises to ~63 (Complex) if the
@@ -993,12 +1081,12 @@ below are the planning estimate that drove the split.
   testID convention), and sync status docs.
 - **Inputs:** all prior tasks; FenixCRM guide §Step 3 / §Step 9 / §Step 10.
 - **Outputs:** `mobile/package.json` script; `mobile/maestro/README.md`;
-  `docs/tasks/p3-mobile-client.md` + `docs/plan/roadmap.md` cross-links updated.
+  `docs/tasks/s-050-mobile-client.md` + `docs/plan/roadmap.md` cross-links updated.
 - **Acceptance criteria:**
   - `cd mobile && npm run screenshots` runs the suite.
   - README documents prerequisites, the full local startup order, port map, and the
     splash-stuck/ANR troubleshooting.
-  - `docs/plan/roadmap.md` and `docs/tasks/p3-mobile-client.md` reference P3-V.
+  - `docs/plan/roadmap.md` and `docs/tasks/s-050-mobile-client.md` reference S-055.
 - **Happy paths considered:**
   - `HP-1`: a new developer follows the README and produces screenshots in one
     command.
@@ -1008,25 +1096,25 @@ below are the planning estimate that drove the split.
 - **Handoff prompt:**
   > V8 — script + README + docs sync. Docs: this task file + plan. Add npm
   > "screenshots" script, write mobile/maestro/README.md, cross-link roadmap +
-  > p3-mobile-client.md. AC: one-command run, documented startup/troubleshooting,
+  > s-050-mobile-client.md. AC: one-command run, documented startup/troubleshooting,
   > status docs synced. Stop after docs are consistent.
 
 ---
 
-## Agent handoff prompt (delegation-ready, whole sub-slice)
+## Agent handoff prompt (delegation-ready, whole sub-phase)
 
-> Implement sub-slice **P3-V — Maestro screenshot / visual-audit suite** in the
-> `dubbridge` repo. **Do not start until P3 T4 is `[x] Done` (approved sequencing
+> Implement sub-phase **S-055 — Maestro screenshot / visual-audit suite** in the
+> `dubbridge` repo. **Do not start until S-050-T4 is `[x] Done` (approved sequencing
 > S2).** Then implement one task at a time in order V1→V8 (V5 only if
 > `openAuthSessionAsync` cannot be Maestro-driven),
-> per `docs/tasks/p3-maestro-screenshot-suite.md` and
-> `docs/plan/p3-maestro-screenshot-suite.md`. Read the canonical guides first
+> per `docs/tasks/s-055-maestro-screenshot-suite.md` and
+> `docs/plan/s-055-maestro-screenshot-suite.md`. Read the canonical guides first
 > (`README_AGENT_ORDER.md`, `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`,
 > `docs/policies/HITL_AUTONOMY_POLICY.md`, `AGENTS.md`) and ADR-024/026/023.
 > **Hard invariant (ADR-024): no JWT/refresh token may ever reach the device or any
 > Maestro artifact** — Phase 2 transports only a single-use `handoff_code` redeemed
 > into an opaque `session_ref`. Use **Option A** (mock token endpoint + real gateway
-> handoff) unless the approver chose otherwise; do not modify the P1 gateway contract.
+> handoff) unless the approver chose otherwise; do not modify the S-040 gateway contract.
 > The gateway is on `:8081`, so Metro must move to `:8082`. The mobile app is managed
 > Expo (no `android/` yet) — V2 is the XL native-build task. Present each task for
 > explicit approval before implementing it (RRI > 25); mark progress in this file

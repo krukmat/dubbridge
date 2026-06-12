@@ -1,0 +1,11 @@
+For every file operation, always include the exact relative path from the workspace root.
+
+Before using replace_in_file, first read_file the target file.
+
+Do not call replace_in_file unless the path is known with certainty.
+
+For complex edits, provide a patch plan first and wait for confirmation.
+
+Prefer editing one file at a time.
+
+If a tool call fails because of a missing parameter, do not retry blindly. Re-read the target file and call the tool again with all required parameters.

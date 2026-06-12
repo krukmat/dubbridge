@@ -1,8 +1,8 @@
-# Tasks: P1 — First-party session gateway / BFF
+# Tasks: S-040 - First-party Session Gateway / BFF
 
-**Plan:** `docs/plan/p1-session-gateway-bff.md`
-**Roadmap slice:** P1 (supporting platform). Depends on S0 (ADR-023) + external
-authorization-server contract. Prerequisite for the web frontend and for **P3**
+**Plan:** `docs/plan/s-040-session-gateway-bff.md`
+**Roadmap phase:** `S-040`. Depends on `S-000` (ADR-023) + external
+authorization-server contract. Prerequisite for the web frontend and for `S-050`
 (mobile, React Native + Expo).
 
 **Governing guides:** `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` (authoritative),
@@ -29,23 +29,23 @@ T0 -> T1 -> T2 -> T3 -> T4 -> T5 -> T6 -> T7
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4`
 - **Depends on:** —
 - **Objective:** Move ADR-024 from *Proposed* to *Accepted* by recording the
-  concrete decisions P1 needs: cookie attributes (`HttpOnly`, `Secure`, `SameSite`
+  concrete decisions S-040 needs: cookie attributes (`HttpOnly`, `Secure`, `SameSite`
   value), CSRF strategy (double-submit token vs. `SameSite=Strict` + origin check),
   session-store choice (Redis-backed, in-memory for tests), session TTL/idle
-  policy, and the **transport-agnostic session seam** that lets P3 (mobile) reuse
+  policy, and the **transport-agnostic session seam** that lets S-050 (mobile) reuse
   the gateway without a parallel auth path.
 - **Inputs:** ADR-024 (current Proposed text), ADR-023, ADR-026, this plan.
 - **Outputs:** Updated `docs/adr/ADR-024-...md` (Status → Accepted; decisions added;
-  `Implemented by: docs/tasks/p1-session-gateway-bff.md`); no code.
+  `Implemented by: docs/tasks/s-040-session-gateway-bff.md`); no code.
 - **Acceptance criteria:**
   - ADR-024 Status is `Accepted` with date.
   - Cookie policy, CSRF posture, session store, and TTL are stated unambiguously.
-  - A short subsection states how a native mobile client (P3) reuses the same
+  - A short subsection states how a native mobile client (S-050) reuses the same
     session contract (opaque session id; cookie is one transport).
   - No code is changed in this task.
 - **Completion record (2026-06-03):**
   - ADR-024 moved `Proposed -> Accepted` (header dated 2026-06-03).
-  - Added a "Concrete decisions (accepted 2026-06-03, P1 T0)" section to
+  - Added a "Concrete decisions (accepted 2026-06-03, S-040 T0)" section to
     `docs/adr/ADR-024-...md` recording:
     - Login: Authorization Code + PKCE (`S256`) + single-use `state`.
     - Cookie: opaque session id only; `HttpOnly` + `Secure` + `SameSite=Lax` +
@@ -55,10 +55,10 @@ T0 -> T1 -> T2 -> T3 -> T4 -> T5 -> T6 -> T7
       `TokenSet`, subject, CSRF token, timestamps.
     - TTL: 8h absolute + 30m idle, env-configurable (ADR-026); transparent access-
       token refresh while the session is valid.
-    - Mobile seam: opaque session id is canonical; cookie is one transport; P3
+    - Mobile seam: opaque session id is canonical; cookie is one transport; S-050
       (RN/Expo) reuses the same gateway via system-browser OAuth + secure-store,
       never holding access/refresh tokens.
-  - Added `Implemented by (planned): P1` and `Consumed by (planned): P3` references
+  - Added `Implemented by (planned): S-040` and `Consumed by (planned): S-050` references
     to the ADR's Related section.
   - No code changed (docs/ADR-only).
 
@@ -296,12 +296,12 @@ T0 -> T1 -> T2 -> T3 -> T4 -> T5 -> T6 -> T7
 ## T5 — Authenticated proxy to `apps/api` with transparent refresh
 
 - **Status:** [x] Done — 2026-06-04
-- **Effort:** L → split into 3 sub-tasks (see `docs/tasks/p1-t5-proxy.md`)
+- **Effort:** L → split into 3 sub-tasks (see `docs/tasks/s-040-t5-proxy.md`)
 - **Complexity:** High
 - **Type:** Development
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4`
 - **Depends on:** T4
-- **Sub-tasks:** `docs/tasks/p1-t5-proxy.md`
+- **Sub-tasks:** `docs/tasks/s-040-t5-proxy.md`
   - T5.1 — Shared cookie extractor + session resolver (Effort: S)
   - T5.2 — Token expiry check + transparent refresh logic (Effort: M)
   - T5.3 — HTTP proxy handler + route mount (Effort: M)
@@ -357,13 +357,13 @@ T0 -> T1 -> T2 -> T3 -> T4 -> T5 -> T6 -> T7
   → refresh → logout, plus the failure branches. Synchronize status artifacts.
 - **Inputs:** all prior tasks; stub harness pattern from `crates/auth` tests.
 - **Outputs:** `apps/gateway` integration tests; updated `docs/architecture.md`
-  (gateway promoted to operational), `docs/plan/roadmap.md` (P1 status + P3 note),
+  (gateway promoted to operational), `docs/plan/roadmap.md` (S-040 status + S-050 note),
   ADR-024 `Implemented by` reference confirmed.
 - **Acceptance criteria:**
   - Full lifecycle test passes deterministically (no real network).
   - A test asserts the access token never appears in any client-visible response or
     cookie.
-  - `docs/architecture.md` and `docs/plan/roadmap.md` reflect P1 as built; ADR-024
+  - `docs/architecture.md` and `docs/plan/roadmap.md` reflect S-040 as built; ADR-024
     references this slice.
   - Coverage meets the repository gate (≥90%, per T1/X6).
 - **Happy paths considered:**
@@ -386,12 +386,12 @@ T0 -> T1 -> T2 -> T3 -> T4 -> T5 -> T6 -> T7
   - Updated `docs/architecture.md`: promoted the first-party session gateway / BFF
     to an operational supporting surface and documented `apps/gateway` under
     operational runtime surfaces.
-  - Updated `docs/plan/roadmap.md`: marked P1 done and recorded that the hard P3
+  - Updated `docs/plan/roadmap.md`: marked S-040 done and recorded that the hard S-050
     dependency is now satisfied.
-  - Updated `docs/plan/p1-session-gateway-bff.md`: implementation status now shows
-    T0-T6 complete and P1 implemented.
+  - Updated `docs/plan/s-040-session-gateway-bff.md`: implementation status now shows
+    T0-T6 complete and S-040 implemented.
   - Updated `docs/adr/ADR-024-low-friction-first-party-api-access-via-session-gateway.md`:
-    replaced `Implemented by (planned)` with the delivered P1 implementation references.
+    replaced `Implemented by (planned)` with the delivered S-040 implementation references.
   - Verification:
     - `~/.cargo/bin/cargo test -p dubbridge-gateway` — 95/95 passed
     - `make qa-docs` — passed
@@ -402,27 +402,27 @@ T0 -> T1 -> T2 -> T3 -> T4 -> T5 -> T6 -> T7
 ## T7 — Mobile-safe session handoff / deep-link return
 
 - **Status:** [x] Done — 2026-06-04
-- **Effort:** L -> split into 4 sub-tasks (see `docs/tasks/p1-t7-mobile-session-handoff.md`)
+- **Effort:** L -> split into 4 sub-tasks (see `docs/tasks/s-040-t7-mobile-session-handoff.md`)
 - **Complexity:** High as a combined task; split target is Med-high or lower per
   subtask
 - **Type:** Development + docs sync
 - **Recommended model:** Codex current Premium coding model · Claude Code current
   Premium model, thinking On
-- **Depends on:** T6; P3 T0 blocked verification
-- **Sub-tasks:** `docs/tasks/p1-t7-mobile-session-handoff.md`
+- **Depends on:** T6; S-050 T0 blocked verification
+- **Sub-tasks:** `docs/tasks/s-040-t7-mobile-session-handoff.md`
   - T7.1 — Define the mobile return and handoff contract (Effort: S)
   - T7.2 — Mobile login intent + callback handoff code (Effort: M)
   - T7.3 — Handoff redemption + explicit mobile session header (Effort: M)
   - T7.4 — Mobile refresh/logout parity + e2e/status sync (Effort: M)
-- **Objective:** Extend the delivered P1 browser-oriented gateway contract with the
+- **Objective:** Extend the delivered S-040 browser-oriented gateway contract with the
   missing mobile-safe return and opaque session-reference transport required by
-  ADR-024 and P3. OAuth still completes through the same gateway PKCE/state flow;
+  ADR-024 and S-050. OAuth still completes through the same gateway PKCE/state flow;
   the mobile app receives only opaque gateway session material and never receives
   access or refresh tokens.
-- **Inputs:** P3 T0 blocker record, ADR-024 mobile seam, current gateway auth routes
+- **Inputs:** S-050 T0 blocker record, ADR-024 mobile seam, current gateway auth routes
   and session resolver.
 - **Outputs:** Mobile contract docs, gateway mobile handoff implementation, tests,
-  and synchronized P1/P3/roadmap/ADR status.
+  and synchronized S-040/S-050/roadmap/ADR status.
 - **Acceptance criteria:**
   - System-browser OAuth can return control to the mobile app through a registered
     mobile URI or app-link contract.
@@ -433,7 +433,7 @@ T0 -> T1 -> T2 -> T3 -> T4 -> T5 -> T6 -> T7
   - Browser cookie behavior remains compatible with T4-T6.
   - No access token or refresh token is exposed to, persisted by, or expected from
     the mobile device.
-  - Status artifacts state clearly whether P3 T1+ is unblocked after completion.
+  - Status artifacts state clearly whether S-050 T1+ is unblocked after completion.
 - **Happy paths considered:**
   - mobile login -> system browser -> gateway callback -> registered mobile return
     -> handoff redeem -> gateway `/api/*` call succeeds with server-side bearer
@@ -455,7 +455,7 @@ T0 -> T1 -> T2 -> T3 -> T4 -> T5 -> T6 -> T7
     cookie/header conflict rule for `/api/*`.
   - T7.4 implemented mobile refresh rotation signaling via response header,
     header-based logout parity, deterministic mobile e2e lifecycle coverage, and
-    final P1/P3/roadmap/ADR status sync.
+    final S-040/S-050/roadmap/ADR status sync.
   - Verification:
     - `~/.cargo/bin/cargo test -p dubbridge-gateway` — passed
     - `~/.cargo/bin/cargo test -p dubbridge-config` — passed
@@ -465,16 +465,16 @@ T0 -> T1 -> T2 -> T3 -> T4 -> T5 -> T6 -> T7
 
 ## Agent handoff prompt (delegation-ready)
 
-> Implement slice **P1 — first-party session gateway / BFF** in the `dubbridge`
-> repo, one task at a time in order T0→T7, per `docs/tasks/p1-session-gateway-bff.md`
-> and `docs/plan/p1-session-gateway-bff.md`. Read the canonical guides first
+> Implement slice **S-040 — first-party session gateway / BFF** in the `dubbridge`
+> repo, one task at a time in order T0→T7, per `docs/tasks/s-040-session-gateway-bff.md`
+> and `docs/plan/s-040-session-gateway-bff.md`. Read the canonical guides first
 > (`README_AGENT_ORDER.md`, `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`,
 > `docs/policies/HITL_AUTONOMY_POLICY.md`, `AGENTS.md`) and ADR-024/023/026/018.
 > Build a new `apps/gateway` Axum service; **do not modify the `apps/api` JWT
 > resource-server trust boundary** (ADR-023). Tokens must live server-side only;
 > the client sees only an opaque gateway session reference (a hardened cookie for
 > browser, explicit opaque session header for mobile) (ADR-024). Keep the session
-> contract transport-agnostic so slice **P3 (mobile, React Native + Expo)** can
+> contract transport-agnostic so slice **S-050 (mobile, React Native + Expo)** can
 > reuse the same gateway. TDD: write tests first, then implement, then run all
 > tests. Do not commit with broken tests. Present each task for explicit approval
 > before implementing it; mark progress in this file after each task.

@@ -1,14 +1,13 @@
-# Plan: P1 — First-party session gateway / BFF
+# Plan: S-040 - First-party Session Gateway / BFF
 
-**Roadmap position:** Supporting platform slice **P1**. Depends on **S0** (JWT
-resource-server boundary, ADR-023) and an external authorization-server contract.
-It does **not** sit on the linear media pipeline (S0–S9). It is the hard
-architectural prerequisite for any first-party interactive client — the planned
-web app (`web/`) and the planned mobile app (slice **P3**, React Native + Expo).
+**Roadmap phase:** `S-040`. Depends on `S-000` (JWT resource-server boundary,
+ADR-023) and an external authorization-server contract. It is the hard
+architectural prerequisite for any first-party interactive client: the planned
+web app (`web/`) and the planned mobile app (`S-050`, React Native + Expo).
 
-> P1 must be planned and built before a first-party browser, operator console, or
+> `S-040` must be planned and built before a first-party browser, operator console, or
 > mobile client auth flow exists. Per ADR-024 and `docs/plan/roadmap.md` (lines
-> 103–107), it does not block S2 or S3.
+> 103–107), it does not block S-080 or S-090.
 
 **Implementation status (2026-06-04):**
 - `T0` complete — ADR-024 accepted with concrete cookie / CSRF / session decisions.
@@ -29,25 +28,25 @@ web app (`web/`) and the planned mobile app (slice **P3**, React Native + Expo).
   rotation remain gateway-owned; mobile only transports and persists the current
   opaque reference.
 
-**Slice status:** P1 is complete. The gateway now serves both first-party
+**Slice status:** S-040 is complete. The gateway now serves both first-party
 transports defined by ADR-024:
 - browser/cookie transport
 - mobile-safe handoff + explicit session-header transport
 
-P3 is unblocked to start `T1+`.
+S-050 is unblocked to start `T1+`.
 
 ## Objective
 
 Introduce a **backend-for-frontend (BFF) / session gateway** as a new
 frontend-facing service that lets first-party interactive clients (browser today,
-mobile in P3) authenticate once against the external authorization server and then
+mobile in S-050) authenticate once against the external authorization server and then
 call the protected DubBridge API **without ever holding long-lived access or
 refresh tokens on the client**. The gateway maintains a server-side session,
 represented to the client by a hardened cookie, and translates that session into a
 `Bearer <JWT>` call to `apps/api`.
 
 The core protected API (`apps/api`) **remains an unchanged JWT-validating resource
-server** (ADR-023). P1 adds a surface in front of it; it never weakens or bypasses
+server** (ADR-023). S-040 adds a surface in front of it; it never weakens or bypasses
 per-request identity verification.
 
 ## Scope
@@ -72,26 +71,26 @@ per-request identity verification.
   that crossed idle or absolute expiry.
 - A typed gateway configuration in `crates/config` (authorization-server endpoints,
   client id, client secret reference, cookie policy, upstream `apps/api` base URL,
-  session TTL) consistent with the P0 fail-closed layered model (ADR-026).
+  session TTL) consistent with the `S-030` fail-closed layered model (ADR-026).
 - Deterministic tests with a stubbed authorization server and a stubbed upstream
   API, covering the login → callback → authenticated-proxy → logout lifecycle and
   the failure branches.
-- A **transport-agnostic session contract** so P3 (React Native / Expo) can reuse
+- A **transport-agnostic session contract** so S-050 (React Native / Expo) can reuse
   the same gateway. The cookie is the browser representation; the underlying
-  session-id mechanism must not assume a browser cookie jar. P3 T0 verified that
+  session-id mechanism must not assume a browser cookie jar. S-050 T0 verified that
   the delivered T0-T6 implementation still exposes only the browser cookie
   transport, so T7 adds the mobile-safe return/handoff seam without creating a
   parallel auth path.
 
 ### Excluded (deferred)
 - The web frontend itself (`web/` React app) — a separate frontend slice.
-- The mobile app — slice **P3** (React Native + Expo).
+- The mobile app — slice **S-050** (React Native + Expo).
 - Production identity hardening: JWKS discovery and automatic key rotation — slice
-  **P2** (ADR-023 follow-up). P1 consumes whatever verification the resource server
+  **S-070** (ADR-023 follow-up). S-040 consumes whatever verification the resource server
   already enforces; it does not add JWKS.
 - The external authorization-server deployment/selection itself (owned outside this
-  slice; P1 codes against its standard OAuth endpoints).
-- Owner-platform credential handling for downloads (S3 / ADR-025) — unrelated
+  slice; S-040 codes against its standard OAuth endpoints).
+- Owner-platform credential handling for downloads (S-090 / ADR-025) — unrelated
   credential class.
 
 ## Governing ADRs
@@ -99,7 +98,7 @@ per-request identity verification.
   primary decision; **Accepted** on 2026-06-03 with the concrete cookie policy,
   CSRF posture, session-store choice, TTL, and mobile transport seam recorded in T0).
 - **ADR-023**: API client authentication and principal propagation — the protected
-  API trust boundary P1 must preserve unchanged.
+  API trust boundary S-040 must preserve unchanged.
 - **ADR-026**: Layered fail-closed configuration — gateway config (client secret,
   endpoints, cookie policy) follows the committed-profile + injected-secret split.
 - **ADR-018**: Traceable governance events — the verified subject remains the
@@ -142,15 +141,15 @@ per-request identity verification.
 ### docs/adr/
 - `ADR-024-...md` — move from **Proposed** to **Accepted**; record concrete cookie
   policy, CSRF posture, session-store choice, and the transport-agnostic seam for
-  mobile (P3). Add an `Implemented by` reference to this slice.
+  mobile (S-050). Add an `Implemented by` reference to this slice.
 
 ### docs/architecture.md
 - Promote the session gateway / BFF row from "Planned supporting surface" to its
   operational state and describe `apps/gateway` in Runtime surfaces.
 
 ### docs/plan/roadmap.md
-- Update P1 status from "⬜ no plan yet" to the plan/task ledger reference and its
-  progress; note P3 (mobile) depends on it.
+- Update S-040 status from "⬜ no plan yet" to the plan/task ledger reference and its
+  progress; note S-050 (mobile) depends on it.
 
 ### Cargo.toml (workspace root)
 - Add `apps/gateway` to the workspace members; add shared deps as needed.
@@ -180,7 +179,7 @@ trait, so sessions survive a single gateway restart and can scale horizontally
 later.
 
 ### Transport-agnostic session seam (mobile-ready)
-Native mobile clients (P3) do not share the browser cookie jar the same way. P1
+Native mobile clients (S-050) do not share the browser cookie jar the same way. S-040
 defines the session contract around an opaque session id; the cookie is one
 transport of that id. T7 extends the implemented gateway contract with a mobile
 transport:
@@ -193,12 +192,12 @@ transport:
   an explicit gateway session header;
 - access tokens and refresh tokens remain server-side only.
 - if the gateway rotates the opaque session reference on the mobile transport, it
-  returns the replacement in `X-Dubbridge-Session`; P3 must store that value and
+  returns the replacement in `X-Dubbridge-Session`; S-050 must store that value and
   treat stale references as invalid.
 
-P1 does **not** build the mobile client, but it must not bake in browser-only
-assumptions that would force a parallel auth path in P3. This is the single most
-important forward-looking constraint, since P3 reuses this exact gateway.
+S-040 does **not** build the mobile client, but it must not bake in browser-only
+assumptions that would force a parallel auth path in S-050. This is the single most
+important forward-looking constraint, since S-050 reuses this exact gateway.
 
 ### Fail-closed configuration
 Gateway config follows ADR-026: missing required values (authorization-server
@@ -219,7 +218,7 @@ apps/gateway --(Authorization: Bearer <JWT>)--> apps/api  (unchanged ADR-023 res
 apps/gateway <--(token exchange / refresh)--> external authorization server
 ```
 
-P3 (mobile) later attaches as another first-party client of `apps/gateway`, reusing
+S-050 (mobile) later attaches as another first-party client of `apps/gateway`, reusing
 the same session contract — no new trust boundary.
 
 ## Architecture Diagram
@@ -228,11 +227,11 @@ the same session contract — no new trust boundary.
 flowchart LR
     subgraph FirstParty["First-party clients"]
         Web["Web app (web/)"]
-        Mobile["Mobile app (P3, RN/Expo)"]
+        Mobile["Mobile app (S-050, RN/Expo)"]
     end
     Prog["Programmatic clients / CLI"]
 
-    subgraph GW["apps/gateway (BFF, P1)"]
+    subgraph GW["apps/gateway (BFF, S-040)"]
         Login["/auth/login + /auth/callback (PKCE)"]
         Sess["Server-side session store (Redis)"]
         Proxy["Authenticated proxy /api/*"]
@@ -253,16 +252,16 @@ flowchart LR
 ## Proposed execution order
 
 ```text
-P1 T0 ADR-024 decision finalize (cookie policy, CSRF, session store, mobile seam)
-  -> P1 T1 apps/gateway scaffold + GatewayState + fail-closed config + health
-  -> P1 T2 OAuth client (PKCE token exchange/refresh) — pure builder + IO executor
-  -> P1 T3 session store (trait + in-memory + Redis) + hardened cookie + CSRF
-  -> P1 T4 login/callback/logout routes wired to store
-  -> P1 T5 authenticated proxy to apps/api with transparent refresh
-  -> P1 T6 end-to-end lifecycle tests (stub AS + stub upstream) + docs/ADR sync
-  -> P1 T7 mobile-safe session handoff / deep-link return (post-P3-T0 unblock)
+S-040 T0 ADR-024 decision finalize (cookie policy, CSRF, session store, mobile seam)
+  -> S-040 T1 apps/gateway scaffold + GatewayState + fail-closed config + health
+  -> S-040 T2 OAuth client (PKCE token exchange/refresh) — pure builder + IO executor
+  -> S-040 T3 session store (trait + in-memory + Redis) + hardened cookie + CSRF
+  -> S-040 T4 login/callback/logout routes wired to store
+  -> S-040 T5 authenticated proxy to apps/api with transparent refresh
+  -> S-040 T6 end-to-end lifecycle tests (stub AS + stub upstream) + docs/ADR sync
+  -> S-040-T7 mobile-safe session handoff / deep-link return (post-S-050-T0 unblock)
 ```
 
 ## Lines Affected After Implementation
 
-Tracked per task in `docs/tasks/p1-session-gateway-bff.md`.
+Tracked per task in `docs/tasks/s-040-session-gateway-bff.md`.

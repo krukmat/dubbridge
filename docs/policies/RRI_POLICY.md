@@ -247,7 +247,7 @@ floors, or penalties manually.** The script is the canonical RRI calculator.
 
 | Decided by `scripts/rri.py` (objective / derivable) | Supplied by the agent (irreducible judgment) |
 |---|---|
-| F score — counts `--touches` paths or `git diff`, maps to 0–5 | **C** — agent measures raw CC (radon/mccabe/clippy), passes as `--cc <raw>` |
+| F score — counts `--touches` paths or `git diff`, maps to 0–5 | **C** — agent measures raw CC (radon/mccabe/clippy/gocyclo/eslint), passes as `--cc <raw>` (or `--auto-cc` to let the script measure it per platform) |
 | C score — maps raw CC to 0–5 via the policy CC table | **T** — agent measures via `cargo llvm-cov`, passes as `--T` |
 | D / P / K floors — derived from the anchor rubric; raises agent input, never lowers | **A** — task ambiguity (has acceptance criteria + examples?) |
 | `many_files`, `complex_and_domain`, `no_tests_high_impact`, `auth_security` penalties | **X** — context size required |
@@ -295,6 +295,37 @@ python3 scripts/rri.py ... --json
 - **Python:** `python3 -m mccabe --min 1 <file>` or `radon cc -s <file>`
 - **Rust:** `cargo clippy -- -W clippy::cognitive_complexity` or count branch points manually with the CC formula in this policy.
 - Take the highest CC value across all functions that will be created or materially changed.
+- **Automated:** pass `--auto-cc` instead of `--cc <raw>` to let the script run the
+  detected platform's measurer for you (see [Platform profiles](#platform-profiles)).
+  If the tool is unavailable, the script falls back to `C=0` marked **Low**
+  confidence — never a silent wrong value.
+
+### Platform profiles
+
+The script is **portable across language ecosystems.** A *platform profile* bundles
+two platform-specific concerns; everything else (formula, weights, penalties, bands)
+is universal and identical on every platform.
+
+| Profile | Marker file | C measurer (`--auto-cc`) | Anchor rubric |
+|---|---|---|---|
+| `dubbridge` | `docs/policies/RRI_POLICY.md` | `cargo clippy` (cognitive_complexity) | DubBridge ADR-anchored rubric |
+| `rust` | `Cargo.toml` | `cargo clippy` (cognitive_complexity) | generic convention rubric |
+| `go` | `go.mod` | `gocyclo` | generic convention rubric |
+| `rn` | `package.json` | `eslint` (`complexity` rule) | generic convention rubric |
+| `python` | `pyproject.toml` / `setup.py` | `radon cc` | generic convention rubric |
+| `generic` | _(none detected)_ | — (agent supplies `--cc`/`--C`) | empty (agent judgment) |
+
+**Selection.** `--platform auto` (the default) walks up from the working directory
+and picks the first profile whose marker file exists. The `dubbridge` marker is
+checked before generic `rust`, so this repo never degrades to the generic Rust
+rubric. Override with `--platform {rust,go,rn,python,dubbridge,generic}`.
+
+**Generic rubric** (used by the non-DubBridge profiles) raises D/P/K floors by
+directory convention: `**/auth/**`, `**/security/**`, `**/crypto/**` → 4/4/4;
+`**/migrations/**` → 4/5/4; `**/db/**`, `**/api/**`, `**/services/**` → 3/3/3;
+`docs/**`, `**/test*/**` → 0/0/0. It cites no ADRs (the `—` ADR column). Each
+project's own critical paths should eventually graduate to a dedicated profile like
+`dubbridge` when ADR anchoring is warranted.
 
 ### Copy the output into the task presentation
 

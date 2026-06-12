@@ -40,7 +40,7 @@ exactly as the rights gate refuses to process without authorization.
 
 This ADR fixes the configuration architecture and the local ↔ production separation
 model. It is the governing decision for slice P0 (`docs/plan/roadmap.md`,
-`docs/plan/p0-environment-separation.md`).
+`docs/plan/s-030-environment-separation.md`).
 
 ## Decision
 
@@ -169,5 +169,5 @@ multiple live environments or teams justify it.
 - ADR-025 (owner-authorized credentials) — the secret-store (roadmap X20) plugs into
   the injected-secret layer defined here.
 - Roadmap: `docs/plan/roadmap.md` (slice P0, X21, X18, X2). Plan:
-  `docs/plan/p0-environment-separation.md`; Tasks:
-  `docs/tasks/p0-environment-separation.md`.
+  `docs/plan/s-030-environment-separation.md`; Tasks:
+  `docs/tasks/s-030-environment-separation.md`.

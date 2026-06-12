@@ -1,8 +1,8 @@
-# Tasks: P1 T7 — Mobile-safe session handoff / deep-link return
+# Tasks: S-040-T7 - Mobile-safe Session Handoff / Deep-link Return
 
-**Parent task:** `docs/tasks/p1-session-gateway-bff.md#t7--mobile-safe-session-handoff--deep-link-return`
-**Plan:** `docs/plan/p1-session-gateway-bff.md`
-**Roadmap slice:** P1 (supporting platform). This is a post-T6 unblock for P3.
+**Parent task:** `docs/tasks/s-040-session-gateway-bff.md#t7--mobile-safe-session-handoff--deep-link-return`
+**Plan:** `docs/plan/s-040-session-gateway-bff.md`
+**Roadmap phase:** `S-040`. This is a post-T6 unblock for `S-050`.
 
 **Governing guides:** `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` (authoritative),
 `docs/policies/HITL_AUTONOMY_POLICY.md`, `docs/policies/RRI_POLICY.md`,
@@ -41,27 +41,27 @@ RRI band (<= 55) after the contract is fixed in T7.1.
 - **Type:** Docs / contract (no code)
 - **Recommended model tier:** Balanced -> Premium, thinking On
 - **RRI target:** 52.8 (Med-high)
-- **Depends on:** P1 T6; P3 T0 blocked verification
+- **Depends on:** S-040 T6; S-050 T0 blocked verification
 - **Objective:** Record the exact mobile-safe return contract before code changes:
   system-browser OAuth still terminates at the gateway, the gateway returns to a
   registered mobile URI with a short-lived one-time handoff code, and the app
   redeems that code for an opaque gateway session reference. Neither the handoff
   code nor the session reference is an access token or refresh token.
-- **Inputs:** ADR-024, P3 T0 completion record, current `apps/gateway` auth routes.
-- **Outputs:** Updated P1 plan/task docs, P3 task blocker text, and roadmap status.
+- **Inputs:** ADR-024, S-050 T0 completion record, current `apps/gateway` auth routes.
+- **Outputs:** Updated S-040 plan/task docs, S-050 task blocker text, and roadmap status.
 - **Acceptance criteria:**
   - The contract names the mobile start, callback return, handoff redemption,
     `/api/*`, and `/auth/logout` surfaces.
   - The deep-link / app-link return carries only a short-lived opaque handoff code,
     not a JWT, refresh token, or long-lived gateway session id.
   - The mobile app stores only the redeemed opaque session reference in
-    `expo-secure-store` later in P3.
+    `expo-secure-store` later in S-050.
   - The contract states that subsequent mobile calls use an explicit gateway
     session header, not browser cookies and not `Authorization: Bearer <JWT>`.
-  - P3 T1+ remains blocked until the implementation subtasks complete.
+  - S-050 T1+ remains blocked until the implementation subtasks complete.
 - **Happy paths considered:**
   - mobile login -> system browser -> gateway callback -> registered mobile return
-    with handoff code -> redeem -> opaque session reference stored later by P3.
+    with handoff code -> redeem -> opaque session reference stored later by S-050.
   - mobile `/api/*` request with the opaque session reference -> gateway resolves
     the server-side session and forwards with a server-side bearer token.
 - **Edge cases considered:**
@@ -73,8 +73,8 @@ RRI band (<= 55) after the contract is fixed in T7.1.
 
 ### Mobile return and handoff contract (decided 2026-06-04, T7.1)
 
-This contract is binding for T7.2–T7.4 implementation and for P3 T1+. The
-ADR-024 mobile-seam decision (accepted 2026-06-03, P1 T0) is extended here with
+This contract is binding for T7.2–T7.4 implementation and for S-050 T1+. The
+ADR-024 mobile-seam decision (accepted 2026-06-03, S-040 T0) is extended here with
 exact surface definitions, header names, payload shapes, TTL bounds, and
 invariants that every implementation subtask must honour.
 
@@ -108,7 +108,7 @@ When the decoded `state` blob carries a mobile `return_uri`:
 1. Gateway validates `state` (single-use, matches pending store) and exchanges
    the authorization code for tokens — identical to the browser path.
 2. Gateway creates the server-side session (same `StoredSession` structure,
-   same TTL policy: 8 h absolute + 30 min idle from P1 T0 decisions).
+   same TTL policy: 8 h absolute + 30 min idle from S-040 T0 decisions).
 3. Gateway generates a **one-time opaque handoff code**:
    - 32 cryptographically random bytes, base64url-encoded → 43-character string.
    - Stored in a transient in-process store keyed by the code value, referencing
@@ -163,8 +163,8 @@ Failure responses:
 - Unknown or already-redeemed handoff code: `401 Unauthorized`, no `session_ref`.
 - Malformed request (missing or non-string `handoff_code`): `400 Bad Request`.
 
-P3 must store the returned `session_ref` in `expo-secure-store` (Keychain on iOS,
-Keystore on Android). P3 must not persist the handoff code after redemption.
+S-050 must store the returned `session_ref` in `expo-secure-store` (Keychain on iOS,
+Keystore on Android). S-050 must not persist the handoff code after redemption.
 
 #### Surface 4 — Authenticated API calls: `ANY /api/*` with session header
 
@@ -222,10 +222,10 @@ These invariants must hold across every surface and every test in T7.2–T7.4:
    token is stored server-side only and never serialized into any client-visible
    surface.
 
-3. **No parallel auth path.** P3 must not call `apps/api` directly with
+3. **No parallel auth path.** S-050 must not call `apps/api` directly with
    `Authorization: Bearer <JWT>`. All authenticated calls go through the gateway
    carrying the opaque session reference in `X-Dubbridge-Session`. This is the
-   architectural guarantee that prevents P3 from re-introducing a
+   architectural guarantee that prevents S-050 from re-introducing a
    token-on-device pattern and preserves the ADR-023 trust boundary.
 
 4. **Two mobile-visible session credentials only:**
@@ -234,7 +234,7 @@ These invariants must hold across every surface and every test in T7.2–T7.4:
    - The **opaque session reference** (`session_ref`): stored in
      `expo-secure-store`. Subject to the same absolute TTL and idle TTL as a
      browser session (8 h / 30 min, T0 decisions). Rotated by the gateway after
-     a transparent access-token refresh (T7.4); P3 must update its stored value
+     a transparent access-token refresh (T7.4); S-050 must update its stored value
      upon receiving a rotation signal.
 
 #### Implementation notes for T7.2–T7.4
@@ -274,13 +274,13 @@ These invariants must hold across every surface and every test in T7.2–T7.4:
     `/api/*` → refresh rotation → logout → stale-session 401.
   - Assert in the e2e test that access tokens and refresh tokens never appear in
     any mobile-visible redirect URL, JSON body, header, cookie, or test log.
-  - Synchronize P1/P3/roadmap/ADR-024 status; state clearly whether P3 T1+ is
+  - Synchronize S-040/S-050/roadmap/ADR-024 status; state clearly whether S-050 T1+ is
     unblocked.
 
 #### Completion record (2026-06-04, T7.1)
 
 - Contract defined and recorded as the authoritative specification for T7.2–T7.4
-  implementation and for P3 T1+ unblocking. No code changed.
+  implementation and for S-050 T1+ unblocking. No code changed.
 - Five surfaces specified with exact endpoint paths, parameter names, header
   names (`X-Dubbridge-Session`), payload schemas, TTL bounds (≤ 90 s handoff
   code), and conflict rules.
@@ -288,9 +288,9 @@ These invariants must hold across every surface and every test in T7.2–T7.4:
   token on device, no parallel auth path, two permitted mobile credentials only).
 - Implementation notes added for T7.2–T7.4 referencing the exact files each
   subtask must modify.
-- P3 task blocker updated: T7.1 contract complete; P3 T1+ remains blocked
+- S-050 task blocker updated: T7.1 contract complete; S-050 T1+ remains blocked
   pending T7.2–T7.4 gateway implementation.
-- P1 task and plan status updated; roadmap P1/P3 rows synced.
+- S-040 task and plan status updated; roadmap S-040/S-050 rows synced.
 - `make qa-docs` result: **passed** (2026-06-04) — documentation consistency
   check confirms no dangling ADR references, no ADR status mismatches, and no
   missing index rows introduced by this task.
@@ -457,13 +457,13 @@ These invariants must hold across every surface and every test in T7.2–T7.4:
 - **RRI target:** 54.2 (Med-high)
 - **Depends on:** T7.3
 - **Objective:** Make mobile session behavior complete across refresh rotation and
-  logout, add deterministic end-to-end coverage, and synchronize P1/P3/roadmap
+  logout, add deterministic end-to-end coverage, and synchronize S-040/S-050/roadmap
   status artifacts.
 - **Inputs:** `apps/gateway/src/proxy.rs`, `apps/gateway/src/auth/logout.rs`,
-  `apps/gateway/tests/e2e_lifecycle.rs`, P1/P3/roadmap docs.
+  `apps/gateway/tests/e2e_lifecycle.rs`, S-040/S-050/roadmap docs.
 - **Outputs:** Refresh responses expose the rotated opaque session reference to
   mobile callers, logout accepts the explicit session header, e2e mobile lifecycle
-  tests, and status docs marking whether P3 is unblocked.
+  tests, and status docs marking whether S-050 is unblocked.
 - **Acceptance criteria:**
   - Mobile `/api/*` with an expired stored access token refreshes server-side and
     returns the rotated opaque session reference to the mobile caller.
@@ -473,13 +473,13 @@ These invariants must hold across every surface and every test in T7.2–T7.4:
     call -> refresh rotation -> logout -> stale-session 401.
   - Tests assert access tokens and refresh tokens never appear in mobile-visible
     redirect URLs, JSON bodies, headers, cookies, or logs under test.
-  - P1 plan/tasks, P3 tasks, roadmap, and ADR-024 references are synchronized.
-  - The final status states clearly whether P3 T1+ is unblocked or still blocked.
+  - S-040 plan/tasks, S-050 tasks, roadmap, and ADR-024 references are synchronized.
+  - The final status states clearly whether S-050 T1+ is unblocked or still blocked.
 - **Happy paths considered:**
   - full mobile session lifecycle succeeds with only opaque gateway session
     references visible to the app.
   - refreshed server-side session id is delivered to mobile so secure-store can be
-    updated later in P3.
+    updated later in S-050.
 - **Edge cases considered:**
   - refresh token revoked -> server-side session invalidated, mobile receives 401,
     no upstream API call.
@@ -516,8 +516,8 @@ These invariants must hold across every surface and every test in T7.2–T7.4:
 - Added no-token-leak assertions across mobile-visible redirect URLs, JSON bodies,
   response headers, cookies, and upstream-forwarded headers.
 - Final status sync completed:
-  - P1 slice complete
-  - P3 `T1+` unblocked
+  - S-040 slice complete
+  - S-050 `T1+` unblocked
   - roadmap and ADR-024 references updated to the delivered mobile transport
 - Verification:
   - `~/.cargo/bin/cargo fmt --all`

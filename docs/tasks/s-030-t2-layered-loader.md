@@ -1,18 +1,18 @@
-# Tasks: P0-T2 — Layered Loader (subdivided)
+# Tasks: S-030-T2 — Layered Loader (subdivided)
 
-Parent task: `docs/tasks/p0-environment-separation.md` § Task 2
-Plan: `docs/plan/p0-environment-separation.md`
+Parent task: `docs/tasks/s-030-environment-separation.md` § Task 2
+Plan: `docs/plan/s-030-environment-separation.md`
 ADR: ADR-026 — Decisions 2, 3, 4
 
 ## Why this file exists
 
-Task 2 of P0 is an L-effort task that touches six distinct files across four crates.
+Task 2 of S-030 is an L-effort task that touches six distinct files across four crates.
 Executing it as one block makes review and recovery hard. This document breaks it into
 six focused sub-tasks that can each be approved, implemented, tested, and marked done
 independently.
 
 Each sub-task has its own acceptance criteria and evidence field. The parent task in
-`p0-environment-separation.md` is marked [x] only after all six sub-tasks below are [x].
+`s-030-environment-separation.md` is marked [x] only after all six sub-tasks below are [x].
 
 ## Status legend
 - [ ] Not started
@@ -323,13 +323,13 @@ the workspace root).
 ## Agent handoff prompt (for delegation)
 
 ```
-You are implementing P0-T2 of DubBridge — layered fail-closed configuration loader.
+You are implementing S-030-T2 of DubBridge — layered fail-closed configuration loader.
 Work one sub-task at a time in this order: T2-A → T2-B → T2-C → T2-D → T2-E → T2-F.
 
 Repo: /Users/matiasleandrokruk/Documents/dubbridge
-Sub-task document: docs/tasks/p0-t2-layered-loader.md
-Parent tasks: docs/tasks/p0-environment-separation.md § Task 2
-Plan: docs/plan/p0-environment-separation.md
+Sub-task document: docs/tasks/s-030-t2-layered-loader.md
+Parent tasks: docs/tasks/s-030-environment-separation.md § Task 2
+Plan: docs/plan/s-030-environment-separation.md
 ADR: docs/adr/ADR-026-layered-fail-closed-configuration-and-environment-separation.md
 
 Key invariants:
@@ -342,5 +342,5 @@ Key invariants:
 - All communication to the user must be in Spanish.
 
 After each sub-task: run cargo test --workspace (or make qa-local), mark it [x] in
-docs/tasks/p0-t2-layered-loader.md with evidence, report in Spanish, and wait for approval.
+docs/tasks/s-030-t2-layered-loader.md with evidence, report in Spanish, and wait for approval.
 ```

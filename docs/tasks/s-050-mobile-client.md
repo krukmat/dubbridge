@@ -1,8 +1,8 @@
-# Tasks: P3 — First-party mobile client (React Native + Expo)
+# Tasks: S-050 - First-party Mobile Client (React Native + Expo)
 
-**Plan:** `docs/plan/p3-mobile-client.md`
-**Roadmap slice:** P3 (supporting platform). **Hard dependency: P1** (session
-gateway / BFF, ADR-024). Benefits from **P2** (production identity hardening).
+**Plan:** `docs/plan/s-050-mobile-client.md`
+**Roadmap phase:** `S-050`. **Hard dependency:** `S-040`
+(session gateway / BFF, ADR-024). Benefits from `S-070` (production identity hardening).
 
 **Governing guides:** `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` (authoritative),
 `docs/policies/HITL_AUTONOMY_POLICY.md`, `AGENTS.md`.
@@ -15,30 +15,30 @@ gateway / BFF, ADR-024). Benefits from **P2** (production identity hardening).
 ## Task dependency order
 
 ```text
-P1 T7 (mobile handoff built) -> T0 -> T1 -> T2 -> T3 -> T4 -> T5
+S-040-T7 (mobile handoff built) -> T0 -> T1 -> T2 -> T3 -> T4 -> T5
 ```
 
-> **Gate note:** P1 T7 is now complete (2026-06-04). The mobile-safe session
+> **Gate note:** S-040-T7 is now complete (2026-06-04). The mobile-safe session
 > handoff / deep-link return contract is live in the gateway, and `T1+` is
 > unblocked.
 
 ---
 
-## T0 — Gate: confirm P1 gateway session contract is available
+## T0 — Gate: confirm S-040 gateway session contract is available
 
 - **Status:** [x] Done — 2026-06-04; gate outcome: initially blocked, now
-  unblocked after P1 T7.4 completion
+  unblocked after S-040-T7.4 completion
 - **Effort:** S
 - **Complexity:** Low
 - **Type:** Verification / docs (no app code)
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4`
-- **Depends on:** P1 built
-- **Objective:** Confirm the P1 gateway exposes a stable, documented session
+- **Depends on:** S-040 built
+- **Objective:** Confirm the S-040 gateway exposes a stable, documented session
   contract usable by a native client: login start, callback, logout, authenticated
-  proxy, and the transport-agnostic session mechanism defined in P1 T0. Record the
+  proxy, and the transport-agnostic session mechanism defined in S-040 T0. Record the
   exact endpoints, redirect/callback scheme, and session-transport expectations the
   mobile app will rely on.
-- **Inputs:** P1 deliverables (`apps/gateway`, ADR-024 final), this plan.
+- **Inputs:** S-040 deliverables (`apps/gateway`, ADR-024 final), this plan.
 - **Outputs:** A short "gateway contract for mobile" note appended to this task
   (endpoints, deep-link/redirect scheme, session transport); confirmation that no
   parallel auth path is required.
@@ -47,9 +47,9 @@ P1 T7 (mobile handoff built) -> T0 -> T1 -> T2 -> T3 -> T4 -> T5
     documented and confirmed reachable.
   - The native redirect/deep-link scheme to return from the system browser to the
     app is decided and recorded.
-  - If P1 is not yet built/stable, this gate **blocks** and the slice does not start.
+  - If S-040 is not yet built/stable, this gate **blocks** and the slice does not start.
 - **Completion record (2026-06-04):**
-  - Verified the implemented P1 gateway surface in `apps/gateway`:
+  - Verified the implemented S-040 gateway surface in `apps/gateway`:
     - `GET /auth/login` starts Authorization Code + PKCE and redirects to the
       authorization server.
     - `GET /auth/callback?code=...&state=...` validates single-use `state`,
@@ -87,12 +87,12 @@ P1 T7 (mobile handoff built) -> T0 -> T1 -> T2 -> T3 -> T4 -> T5
       companion `dubbridge_session_csrf` cookie, but the mobile handoff contract
       for that browser-oriented state is not yet defined.
   - **Gate outcome (at T0 completion time):** blocked.
-    - P1 is built and stable for the browser/cookie transport.
+    - S-040 is built and stable for the browser/cookie transport.
     - The mobile-specific deep-link / return scheme and app-readable opaque-session
       handoff required by ADR-024 and this slice are not yet implemented or
       documented.
-    - P1 tracks the unblock as `T7 — Mobile-safe session handoff / deep-link
-      return`, decomposed in `docs/tasks/p1-t7-mobile-session-handoff.md`.
+    - S-040 tracks the unblock as `T7 — Mobile-safe session handoff / deep-link
+      return`, decomposed in `docs/tasks/s-040-t7-mobile-session-handoff.md`.
     - T7.1 contract is now defined (2026-06-04): five gateway surfaces named
       (`/auth/login?return_uri`, mobile callback redirect, `POST
       /auth/mobile/session`, `ANY /api/*` + `POST /auth/logout` with
@@ -107,7 +107,7 @@ P1 T7 (mobile handoff built) -> T0 -> T1 -> T2 -> T3 -> T4 -> T5
     - T7.4 is now implemented: mobile refresh returns the rotated opaque session
       reference in `X-Dubbridge-Session`, mobile logout accepts the same header,
       and deterministic e2e coverage proves the full mobile lifecycle.
-    - **Current gate status:** unblocked. `T1+` may proceed on the delivered P1
+    - **Current gate status:** unblocked. `T1+` may proceed on the delivered S-040
       gateway contract.
 
 ---
@@ -119,11 +119,11 @@ P1 T7 (mobile handoff built) -> T0 -> T1 -> T2 -> T3 -> T4 -> T5
 - **Complexity:** Medium
 - **Type:** Development
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4`
-- **Depends on:** T0 with gate outcome unblocked after P1 T7 completion
+- **Depends on:** T0 with gate outcome unblocked after S-040-T7 completion
 - **Objective:** Create the `mobile/` Expo React Native TypeScript app with an
   environment-driven gateway base URL (per ADR-026 — no hardcoded URL), a navigation
   shell (authed vs. unauthed trees), and a placeholder home screen.
-- **Inputs:** Expo SDK, T0 gateway contract after P1 T7 completion.
+- **Inputs:** Expo SDK, T0 gateway contract after S-040-T7 completion.
 - **Outputs:** `mobile/{package.json, app.config.ts, tsconfig.json, babel.config.js}`,
   `src/config/env.ts`, `src/navigation/`, a placeholder `Home` screen.
 - **Acceptance criteria:**
@@ -194,7 +194,7 @@ P1 T7 (mobile handoff built) -> T0 -> T1 -> T2 -> T3 -> T4 -> T5
 - **Type:** Development
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4`
 - **Depends on:** T1
-- **Objective:** Implement a typed API client that calls the **P1 gateway** `/api/*`
+- **Objective:** Implement a typed API client that calls the **S-040 gateway** `/api/*`
   proxy (never `apps/api` directly with a raw token), carrying the gateway session
   transport, capturing gateway-owned session rotations, and mapping responses/errors
   (401 → unauthenticated, 403 → forbidden, network/timeout). No raw access/refresh
@@ -916,35 +916,35 @@ Gate: confirm existing T1 tests pass with new context API.
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4`
 - **Depends on:** T3
 - **Objective:** Build the core authenticated screens against the gateway client:
-  Login entry, authenticated Home, AssetList (from S1 asset/ingestion state), and
+  Login entry, authenticated Home, AssetList (from S-010 asset/ingestion state), and
   AssetDetail / ingestion status. Handle loading/empty/error states and degrade
-  gracefully where S4–S9 backend surfaces do not yet exist.
+  gracefully where S-120–S-180 backend surfaces do not yet exist.
 - **Inputs:** T2 client, T3 auth context.
 - **Outputs:** `src/screens/{Login,Home,AssetList,AssetDetail}.tsx`.
 - **Acceptance criteria:**
   - Authenticated screens render real data fetched through the gateway (no mocked
     backend data; only test doubles in tests).
   - Loading, empty, and error states are handled on each data screen.
-  - Screens that would depend on unbuilt slices (S4–S9) show a clear
+  - Screens that would depend on unbuilt slices (S-120–S-180) show a clear
     "not available yet" state instead of failing.
 - **Happy paths considered:**
   - `HP-1`: authed user opens `AssetList` → assets load via gateway → tapping one
     opens `AssetDetail`.
-  - `HP-2`: authed user opens `AssetDetail` → available S1 asset summary and
+  - `HP-2`: authed user opens `AssetDetail` → available S-010 asset summary and
     ingestion status render successfully.
 - **Edge cases considered:**
   - `EC-1`: empty asset list → friendly empty state.
   - `EC-2`: gateway/network failure on asset loading → clear error state.
-  - `EC-3`: unavailable mobile asset surfaces or downstream S4–S9 product data →
+  - `EC-3`: unavailable mobile asset surfaces or downstream S-120–S-180 product data →
     explicit `not available yet` state.
 
 - **Completion record (2026-06-07):**
   - Added `mobile/src/screens/AssetListScreen.tsx` with gateway-backed asset-list
     loading, empty/error handling, and a fail-clear `404 => not available yet`
     branch for the currently unshipped mobile list endpoint.
-  - Added `mobile/src/screens/AssetDetailScreen.tsx` with gateway-backed S1 asset
+  - Added `mobile/src/screens/AssetDetailScreen.tsx` with gateway-backed S-010 asset
     detail rendering and an explicit downstream `not available yet` panel for
-    S4–S9 product surfaces that do not exist yet.
+    S-120–S-180 product surfaces that do not exist yet.
   - Updated `mobile/src/screens/HomeScreen.tsx` to expose the authenticated asset
     entry point and aligned `mobile/src/screens/LoginScreen.tsx` copy with the
     real gateway login flow.
@@ -961,12 +961,12 @@ Gate: confirm existing T1 tests pass with new context API.
   `GET /api/assets?view=mobile`, renders cards from gateway data, and emits the
   selected asset through `onOpenAsset`; unit proof in
   `mobile/__tests__/asset.screens.test.tsx::T4 HP-1: authenticated user opens AssetList and assets render > loads asset list data through the gateway and opens an asset`.
-- `HP-2`: authenticated user opens `AssetDetail` and sees the available S1 asset
+- `HP-2`: authenticated user opens `AssetDetail` and sees the available S-010 asset
   summary and ingestion status.
   Evidence: `mobile/src/screens/AssetDetailScreen.tsx` calls
   `GET /api/assets/{id}` and renders title/status/uploader metadata; unit proof
   in
-  `mobile/__tests__/asset.screens.test.tsx::T4 HP-2: authenticated user opens an asset and sees detail/status > loads asset detail and shows the available S1 summary`.
+  `mobile/__tests__/asset.screens.test.tsx::T4 HP-2: authenticated user opens an asset and sees detail/status > loads asset detail and shows the available S-010 summary`.
 
 ### Edge cases covered
 
@@ -978,24 +978,24 @@ Gate: confirm existing T1 tests pass with new context API.
   Evidence: `mobile/src/screens/AssetListScreen.tsx` maps gateway errors into a
   dedicated error panel; unit proof in
   `mobile/__tests__/asset.screens.test.tsx::T4 EC-2: gateway or network failure renders a clear error state > shows an error state when the gateway request fails`.
-- `EC-3`: unavailable mobile surfaces or downstream S4–S9 data render explicit
+- `EC-3`: unavailable mobile surfaces or downstream S-120–S-180 data render explicit
   `not available yet` messaging.
   Evidence: `mobile/src/screens/AssetListScreen.tsx` maps `404` to `Asset list not available yet`,
   and `mobile/src/screens/AssetDetailScreen.tsx` renders a downstream
-  `Not available yet` panel even on successful S1 detail load; unit proof in
+  `Not available yet` panel even on successful S-010 detail load; unit proof in
   `mobile/__tests__/asset.screens.test.tsx::T4 EC-3: unavailable surfaces render not available yet > shows a not-available state when the mobile asset list endpoint is not live`
   and
-  `mobile/__tests__/asset.screens.test.tsx::T4 HP-2: authenticated user opens an asset and sees detail/status > loads asset detail and shows the available S1 summary`.
+  `mobile/__tests__/asset.screens.test.tsx::T4 HP-2: authenticated user opens an asset and sees detail/status > loads asset detail and shows the available S-010 summary`.
 
 ### Unit coverage certification
 
 | Case ID | Type | Behavior | Unit test evidence | Result |
 |---|---|---|---|---|
 | HP-1 | Happy path | `AssetList` loads gateway data and selected asset opens detail | `mobile/__tests__/asset.screens.test.tsx::T4 HP-1: authenticated user opens AssetList and assets render > loads asset list data through the gateway and opens an asset` | passed |
-| HP-2 | Happy path | `AssetDetail` renders the available S1 asset summary and status | `mobile/__tests__/asset.screens.test.tsx::T4 HP-2: authenticated user opens an asset and sees detail/status > loads asset detail and shows the available S1 summary` | passed |
+| HP-2 | Happy path | `AssetDetail` renders the available S-010 asset summary and status | `mobile/__tests__/asset.screens.test.tsx::T4 HP-2: authenticated user opens an asset and sees detail/status > loads asset detail and shows the available S-010 summary` | passed |
 | EC-1 | Edge case | empty asset list → friendly empty state | `mobile/__tests__/asset.screens.test.tsx::T4 EC-1: empty asset list renders a friendly empty state > shows an empty state when the gateway returns no assets` | passed |
 | EC-2 | Edge case | gateway/network failure → clear error state | `mobile/__tests__/asset.screens.test.tsx::T4 EC-2: gateway or network failure renders a clear error state > shows an error state when the gateway request fails` | passed |
-| EC-3 | Edge case | unavailable mobile/downstream surfaces → explicit `not available yet` state | `mobile/__tests__/asset.screens.test.tsx::T4 EC-3: unavailable surfaces render not available yet > shows a not-available state when the mobile asset list endpoint is not live` / `mobile/__tests__/asset.screens.test.tsx::T4 HP-2: authenticated user opens an asset and sees detail/status > loads asset detail and shows the available S1 summary` | passed |
+| EC-3 | Edge case | unavailable mobile/downstream surfaces → explicit `not available yet` state | `mobile/__tests__/asset.screens.test.tsx::T4 EC-3: unavailable surfaces render not available yet > shows a not-available state when the mobile asset list endpoint is not live` / `mobile/__tests__/asset.screens.test.tsx::T4 HP-2: authenticated user opens an asset and sees detail/status > loads asset detail and shows the available S-010 summary` | passed |
 
 ### Owner final verification
 
@@ -1021,12 +1021,12 @@ Gate: confirm existing T1 tests pass with new context API.
   against a stubbed gateway. Synchronize status artifacts.
 - **Inputs:** all prior tasks; a stubbed gateway harness.
 - **Outputs:** `mobile/__tests__/*`; updated `docs/architecture.md` (mobile in
-  first-party client surfaces), `docs/plan/roadmap.md` (P3 status), ADR-024 mobile
+  first-party client surfaces), `docs/plan/roadmap.md` (S-050 status), ADR-024 mobile
   reference confirmed.
 - **Acceptance criteria:**
   - Unit + component + auth-flow tests pass deterministically (no real network).
   - A test asserts no JWT/refresh token is ever stored on device or exposed to UI.
-  - `docs/architecture.md` and `docs/plan/roadmap.md` reflect P3 as built.
+  - `docs/architecture.md` and `docs/plan/roadmap.md` reflect S-050 as built.
 - **Happy paths considered:**
   - `HP-1`: full mobile login → asset list → detail flow stays green against the
     stubbed gateway.
@@ -1046,7 +1046,7 @@ Gate: confirm existing T1 tests pass with new context API.
     JWT-like values are rejected before secure-store persistence, and the UI never
     renders raw session values during the integrated auth flow.
   - Updated `docs/architecture.md` to mark the mobile app as an operational
-    first-party client surface and `docs/plan/roadmap.md` to mark `P3` complete.
+    first-party client surface and `docs/plan/roadmap.md` to mark `S-050` complete.
   - Verified with `npm test` and `npm run typecheck` — both pass clean.
 
 ### Happy paths covered
@@ -1106,29 +1106,31 @@ Gate: confirm existing T1 tests pass with new context API.
 
 ## Related sub-slices
 
-- **P3-V — Maestro screenshot / visual-audit suite**
-  (`docs/plan/p3-maestro-screenshot-suite.md`,
-  `docs/tasks/p3-maestro-screenshot-suite.md`). Mobile-hardening backlog capability
+- **S-055 — Maestro screenshot / visual-audit suite**
+  (`docs/plan/s-055-maestro-screenshot-suite.md`,
+  `docs/tasks/s-055-maestro-screenshot-suite.md`). Mobile-hardening backlog capability
   that auto-captures screenshots of every mobile screen on an Android emulator via a
   two-phase Maestro flow. The historical gate for starting it, **this slice's T4**
   (core screens + T3b-ii/iii auth), is already satisfied; `T5` also closed on
   2026-06-07. Approved 2026-06-07 with **Option A** (ADR-024-clean handoff-code
   bootstrap — no JWT on device) and sequencing **S2** (defer the entire suite until
   after T4). Uses a `V`-prefixed task namespace (`V1`–`V8`) distinct from this
-  file's `T` prefix; `V4 ≠ T4`. Documented, not built; next task is `V1`.
+  file's `T` prefix; `V4 ≠ T4`. S-055 is now partially built: V1–V5 are done, V6
+  Phase 1 captured the login screen, and V6 Phase 2 is blocked on the deep-link
+  bootstrap. Resume at `V6b` before V7/V8.
 
 ---
 
 ## Agent handoff prompt (delegation-ready)
 
-> Implement slice **P3 — first-party mobile client (React Native + Expo, TypeScript)**
+> Implement slice **S-050 — first-party mobile client (React Native + Expo, TypeScript)**
 > in the `dubbridge` repo, one task at a time in order T0→T5, per
-> `docs/tasks/p3-mobile-client.md` and `docs/plan/p3-mobile-client.md`. Read the
+> `docs/tasks/s-050-mobile-client.md` and `docs/plan/s-050-mobile-client.md`. Read the
 > canonical guides first (`README_AGENT_ORDER.md`,
 > `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`, `docs/policies/HITL_AUTONOMY_POLICY.md`,
-> `AGENTS.md`) and ADR-024/023/026. **Hard prerequisite: slice P1 (session gateway /
+> `AGENTS.md`) and ADR-024/023/026. **Hard prerequisite: slice S-040 (session gateway /
 > BFF) must already be built and stable** — T0 is a gate that blocks if it is not.
-> The device authenticates only through the P1 gateway and stores only an opaque
+> The device authenticates only through the S-040 gateway and stores only an opaque
 > session reference in `expo-secure-store`; it must **never** hold or persist an
 > access/refresh JWT (ADR-024). Gateway-owned renewal/rotation is the only session
 > extension path: mobile sends the current opaque reference, persists a rotated

@@ -1,6 +1,6 @@
-# Tasks: P0 Environment Separation & Fail-Closed Configuration
+# Tasks: S-030 - Environment Separation & Fail-Closed Configuration
 
-Plan: `docs/plan/p0-environment-separation.md` · ADR: ADR-026 · Roadmap: P0, X21, X18, X2
+Plan: `docs/plan/s-030-environment-separation.md` · ADR: ADR-026 · Roadmap: S-030, X21, X18, X2
 
 ## Status Legend
 - [ ] Not started
@@ -117,10 +117,10 @@ In `crates/config/src/lib.rs`, introduce:
   `config/production.toml` `config/README.md` (new)
 - `.env.example` (new)
 
-### Status: [x] Done — completed via `docs/tasks/p0-t2-layered-loader.md`
+### Status: [x] Done — completed via `docs/tasks/s-030-t2-layered-loader.md`
 
 **Evidence (2026-06-03):**
-- T2-A through T2-F marked `[x]` in `docs/tasks/p0-t2-layered-loader.md`.
+- T2-A through T2-F marked `[x]` in `docs/tasks/s-030-t2-layered-loader.md`.
 - `crates/config` now owns the layered typed loader (`AppEnv`, `ConfigError`, `AppConfig::load()`) and committed `config/*.toml` profiles.
 - `crates/storage` no longer reads `DUBBRIDGE_*`; integration tests now use `DUBBRIDGE_DATABASE_URL`; `/.env.example` documents the injected env contract.
 - Verification across sub-tasks: `make qa-deny` green, `cargo test -p dubbridge-config` green, `cargo check --workspace` green, `make qa-local` green, `make qa-docs` green.
@@ -150,7 +150,7 @@ or Redis URL, `StorageBackend::LocalFs`, `auth.is_none()`, and `LogFormat::Prett
 - `local` permits all of the above (local is not production-like).
 - The committed `config/production.toml` + a representative secret env set passes
   validation with `storage.backend = s3`; runtime adapter behavior remains deferred
-  to S2 and later observability wiring.
+  to S-080 and later observability wiring.
 - `cargo test -p dubbridge-config` passes.
 
 ### Files affected
@@ -258,7 +258,7 @@ or Redis URL, `StorageBackend::LocalFs`, `auth.is_none()`, and `LogFormat::Prett
   `DUBBRIDGE_AUTH_RSA_PUBLIC_KEY_PATH`) are left as an `env_file: .env` reference —
   they are secrets and must not be hardcoded in the Compose file.
 - Update every reference to the old path (`README.md`, `docs/architecture.md`,
-  `docs/plan/p0-environment-separation.md`, and any script).
+  `docs/plan/s-030-environment-separation.md`, and any script).
 
 ### Acceptance criteria
 - `docker compose -f infra/local/docker-compose.yml up -d postgres redis minio`
@@ -271,7 +271,7 @@ or Redis URL, `StorageBackend::LocalFs`, `auth.is_none()`, and `LogFormat::Prett
 
 ### Files affected
 - `infra/local/docker-compose.yml` (moved; env wiring added)
-- `README.md`, `docs/architecture.md`, `docs/plan/p0-environment-separation.md`
+- `README.md`, `docs/architecture.md`, `docs/plan/s-030-environment-separation.md`
 
 ### Status: [x] Done
 
@@ -322,14 +322,14 @@ or Redis URL, `StorageBackend::LocalFs`, `auth.is_none()`, and `LogFormat::Prett
   - `bash scripts/check-config-secrets.sh /tmp/dubbridge-task6-fixture/bad.toml` → fails with `Secret-looking config key found ... client_secret`.
   - `make qa-ci` → passes locally.
 
-With Task 6 complete, the current P0 task ledger (Tasks 1-6) is complete for the
+With Task 6 complete, the current S-030 task ledger (Tasks 1-6) is complete for the
 Phase 0 / Phase 1 scope defined in this slice.
 
 ---
 
 ## Deferred (out of scope for this slice — documented follow-ups)
 
-- **Phase 2 (couples with S2):** wire `build_adapter` (`crates/storage`) to consume
+- **Phase 2 (couples with S-080):** wire `build_adapter` (`crates/storage`) to consume
   `storage.backend`, and parameterize `init_tracing` (`crates/observability`) to emit
   JSON + an exporter in production from `observability` settings (ADR-018). Phase 0
   already lands the schema + validation for both fields.
@@ -346,11 +346,11 @@ Phase 0 / Phase 1 scope defined in this slice.
 ## Agent handoff prompt (for delegation)
 
 ```
-You are implementing P0 of DubBridge — environment separation & fail-closed configuration.
+You are implementing S-030 of DubBridge — environment separation & fail-closed configuration.
 
 Repo: /Users/matiasleandrokruk/Documents/dubbridge
-Plan: docs/plan/p0-environment-separation.md
-Tasks: docs/tasks/p0-environment-separation.md
+Plan: docs/plan/s-030-environment-separation.md
+Tasks: docs/tasks/s-030-environment-separation.md
 Governing ADR: docs/adr/ADR-026-layered-fail-closed-configuration-and-environment-separation.md
 
 Work one task at a time, in order (Tasks 1–6). TDD: write tests first, then implement,
