@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { createGatewayClient } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
+import { Badge, statusTone } from "../components/Badge";
+import { Button } from "../components/Button";
+import { Panel } from "../components/Panel";
+import { Screen } from "../components/Screen";
+import { ScreenHeader } from "../components/ScreenHeader";
+import { StateView } from "../components/StateView";
+import { color, fieldStyle, space, type } from "../theme";
 
 type ConsentStatus = "grant" | "revoke";
 type ConsentScope = "voice_clone" | "tts_synthesis";
@@ -78,32 +85,50 @@ export function ConsentScreen({ assetId, gatewayBaseUrl }: Props) {
     setError(result.error.kind === "forbidden" ? "You cannot change consent for this asset." : "Could not update consent.");
   }, [assetId, auth, evidenceRef, gatewayBaseUrl, loadLedger, scope]);
 
+  const onRetry = useCallback(() => {
+    void loadLedger();
+  }, [loadLedger]);
+
   return (
-    <ScrollView testID="consent-screen" style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.kicker}>Append-only ledger</Text>
-        <Text style={styles.title}>Voice consent</Text>
-      </View>
-      {loading ? <Text>Loading consent...</Text> : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+    <Screen testID="consent-screen" scroll edges={["bottom"]}>
+      <ScreenHeader kicker="Append-only ledger" title="Voice consent" />
+
+      {loading && !ledger ? (
+        <StateView kind="loading" title="Loading consent..." />
+      ) : null}
+
+      {!loading && error && !ledger ? (
+        <StateView
+          kind="error"
+          title="Could not load consent"
+          message={error}
+          onRetry={onRetry}
+        />
+      ) : null}
+
       {ledger ? (
         <>
-          <View style={styles.panel}>
+          <Panel>
             <Text style={styles.panelTitle}>Current status</Text>
-            <Text testID="consent-status" style={styles.status}>{ledger.current_status === "grant" ? "Active" : "Inactive"}</Text>
-          </View>
-          <View style={styles.panel}>
+            <Badge
+              testID="consent-status"
+              label={ledger.current_status === "grant" ? "Active" : "Inactive"}
+              tone={statusTone(ledger.current_status)}
+            />
+          </Panel>
+
+          <Panel>
             <Text style={styles.panelTitle}>Scope</Text>
             <View style={styles.scopeButtons}>
               {(["voice_clone", "tts_synthesis"] as ConsentScope[]).map((candidate) => (
-                <Pressable
+                <Button
                   key={candidate}
                   testID={`consent-scope-${candidate}`}
+                  label={candidate.replaceAll("_", " ")}
                   onPress={() => setScope(candidate)}
-                  style={[styles.scopeButton, scope === candidate && styles.scopeSelected]}
-                >
-                  <Text>{candidate.replaceAll("_", " ")}</Text>
-                </Pressable>
+                  variant={scope === candidate ? "primary" : "secondary"}
+                  size="sm"
+                />
               ))}
             </View>
             <TextInput
@@ -113,20 +138,29 @@ export function ConsentScreen({ assetId, gatewayBaseUrl }: Props) {
               onChangeText={setEvidenceRef}
               placeholder="Evidence URI or reference ID"
               autoCapitalize="none"
-              style={styles.input}
+              style={fieldStyle}
             />
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
             <View style={styles.actions}>
-              <Pressable testID="consent-grant" onPress={() => void mutate("grant")} style={styles.grantButton}>
-                <Text style={styles.buttonText}>Grant</Text>
-              </Pressable>
-              <Pressable testID="consent-revoke" onPress={() => void mutate("revoke")} style={styles.revokeButton}>
-                <Text style={styles.buttonText}>Revoke</Text>
-              </Pressable>
+              <Button
+                testID="consent-grant"
+                label="Grant"
+                onPress={() => void mutate("grant")}
+              />
+              <Button
+                testID="consent-revoke"
+                label="Revoke"
+                onPress={() => void mutate("revoke")}
+                variant="danger"
+              />
             </View>
-          </View>
-          <View style={styles.panel}>
+          </Panel>
+
+          <Panel>
             <Text style={styles.panelTitle}>History</Text>
-            {ledger.rows.length === 0 ? <Text testID="consent-history-empty">No consent history.</Text> : null}
+            {ledger.rows.length === 0 ? (
+              <Text testID="consent-history-empty" style={styles.emptyText}>No consent history.</Text>
+            ) : null}
             {ledger.rows.map((row) => (
               <View key={row.id} testID={`consent-row-${row.id}`} style={styles.row}>
                 <Text style={styles.rowTitle}>{row.status} / {row.scope}</Text>
@@ -134,33 +168,20 @@ export function ConsentScreen({ assetId, gatewayBaseUrl }: Props) {
                 {row.evidence_ref ? <Text style={styles.meta}>{row.evidence_ref}</Text> : null}
               </View>
             ))}
-          </View>
+          </Panel>
         </>
       ) : null}
-    </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#edf3ef" },
-  content: { gap: 16, padding: 24, paddingBottom: 40 },
-  header: { gap: 8, marginTop: 20 },
-  kicker: { color: "#1a6a58", fontSize: 12, fontWeight: "700", textTransform: "uppercase" },
-  title: { color: "#10212a", fontSize: 32, fontWeight: "700" },
-  panel: { backgroundColor: "#fff", borderColor: "#cbdad2", borderRadius: 10, borderWidth: 1, gap: 10, padding: 18 },
-  panelTitle: { color: "#10212a", fontSize: 19, fontWeight: "700" },
-  status: { color: "#1a6a58", fontSize: 28, fontWeight: "700" },
-  error: { color: "#9f2d24", fontSize: 14 },
-  scopeButtons: { flexDirection: "row", gap: 8 },
-  scopeButton: { backgroundColor: "#e8eeeb", borderRadius: 6, paddingHorizontal: 12, paddingVertical: 9 },
-  scopeSelected: { backgroundColor: "#bcd3ca" },
-  input: { borderColor: "#aebdb5", borderRadius: 7, borderWidth: 1, color: "#10212a", paddingHorizontal: 12, paddingVertical: 10 },
-  actions: { flexDirection: "row", gap: 10 },
-  grantButton: { backgroundColor: "#1a6a58", borderRadius: 7, paddingHorizontal: 16, paddingVertical: 11 },
-  revokeButton: { backgroundColor: "#8b342d", borderRadius: 7, paddingHorizontal: 16, paddingVertical: 11 },
-  buttonText: { color: "#fff", fontWeight: "700" },
-  row: { borderTopColor: "#dce6e0", borderTopWidth: 1, gap: 4, paddingTop: 10 },
-  rowTitle: { color: "#17372f", fontSize: 15, fontWeight: "700" },
-  meta: { color: "#61746c", fontSize: 12 },
+  panelTitle: { ...type.heading, color: color.ink900 },
+  emptyText: { ...type.body, color: color.ink500 },
+  errorText: { ...type.meta, color: color.danger },
+  scopeButtons: { flexDirection: "row", gap: space.sm },
+  actions: { flexDirection: "row", gap: space.sm },
+  row: { borderTopColor: color.border, borderTopWidth: 1, gap: space.xs, paddingTop: space.sm },
+  rowTitle: { ...type.bodyStrong, color: color.ink900 },
+  meta: { ...type.meta, color: color.ink400 },
 });
-

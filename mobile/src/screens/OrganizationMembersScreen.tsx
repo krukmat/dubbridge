@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { createGatewayClient } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
+import { Button } from "../components/Button";
+import { Panel } from "../components/Panel";
+import { Screen } from "../components/Screen";
+import { ScreenHeader } from "../components/ScreenHeader";
+import { StateView } from "../components/StateView";
+import { color, fieldStyle, space, type } from "../theme";
 import type { OrgRole } from "./OrganizationListScreen";
 
 type OrgMember = {
@@ -80,16 +86,20 @@ export function OrganizationMembersScreen({ gatewayBaseUrl, orgId, viewerRole }:
     setAddError(result.error.kind === "forbidden" ? "You cannot manage members in this organization." : "Could not add member.");
   }, [auth, gatewayBaseUrl, orgId, role, subjectId]);
 
+  const onRetry = useCallback(() => {
+    void loadMembers();
+  }, [loadMembers]);
+
   return (
-    <View testID="organization-members-screen" style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.kicker}>Organization</Text>
-        <Text style={styles.title}>Members</Text>
-        <Text style={styles.copy}>Your role: {viewerRole}</Text>
-      </View>
+    <Screen testID="organization-members-screen" edges={["bottom"]}>
+      <ScreenHeader
+        kicker="Organization"
+        title="Members"
+        copy={`Your role: ${viewerRole}`}
+      />
 
       {canManage ? (
-        <View testID="member-add-controls" style={styles.panel}>
+        <Panel testID="member-add-controls">
           <Text style={styles.sectionTitle}>Add member</Text>
           <TextInput
             testID="member-subject-input"
@@ -98,72 +108,70 @@ export function OrganizationMembersScreen({ gatewayBaseUrl, orgId, viewerRole }:
             onChangeText={setSubjectId}
             placeholder="User subject UUID"
             autoCapitalize="none"
-            style={styles.input}
+            style={fieldStyle}
           />
           <View style={styles.roles}>
             {ASSIGNABLE_ROLES.map((candidate) => (
-              <Pressable
+              <Button
                 key={candidate}
                 testID={`member-role-${candidate}`}
+                label={candidate}
                 onPress={() => setRole(candidate)}
-                style={[styles.roleButton, role === candidate && styles.roleButtonSelected]}
-              >
-                <Text style={styles.roleText}>{candidate}</Text>
-              </Pressable>
+                variant={role === candidate ? "primary" : "secondary"}
+                size="sm"
+              />
             ))}
           </View>
           {addError ? <Text style={styles.errorText}>{addError}</Text> : null}
-          <Pressable testID="member-add" onPress={() => void addMember()} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>Add member</Text>
-          </Pressable>
-        </View>
+          <Button
+            testID="member-add"
+            label="Add member"
+            onPress={() => void addMember()}
+          />
+        </Panel>
       ) : null}
 
-      {loading ? <Text>Loading members...</Text> : null}
-      {error ? (
-        <View style={styles.panel}>
-          <Text style={styles.errorText}>{error}</Text>
-          <Pressable onPress={() => void loadMembers()} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>Retry</Text>
-          </Pressable>
-        </View>
+      {loading ? (
+        <StateView kind="loading" title="Loading members..." />
       ) : null}
-      {!loading && !error && members.length === 0 ? <Text testID="member-list-empty">No members yet.</Text> : null}
-      {!loading && !error ? (
+
+      {!loading && error ? (
+        <StateView
+          kind="error"
+          title="Could not load members"
+          message={error}
+          onRetry={onRetry}
+        />
+      ) : null}
+
+      {!loading && !error && members.length === 0 ? (
+        <StateView
+          testID="member-list-empty"
+          kind="empty"
+          title="No members yet"
+          message="This organization has no members."
+        />
+      ) : null}
+
+      {!loading && !error && members.length > 0 ? (
         <ScrollView contentContainerStyle={styles.list}>
           {members.map((member) => (
-            <View key={member.subject_id} testID={`member-row-${member.subject_id}`} style={styles.memberCard}>
+            <Panel key={member.subject_id} testID={`member-row-${member.subject_id}`}>
               <Text style={styles.memberId}>{member.subject_id}</Text>
               <Text style={styles.memberRole}>{member.role}</Text>
-            </View>
+            </Panel>
           ))}
         </ScrollView>
       ) : null}
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f2f4ee", padding: 24, gap: 18 },
-  header: { marginTop: 20, gap: 8 },
-  kicker: { color: "#537462", fontSize: 12, fontWeight: "700", textTransform: "uppercase" },
-  title: { color: "#10212a", fontSize: 32, fontWeight: "700" },
-  copy: { color: "#52616a", fontSize: 15 },
-  panel: { backgroundColor: "#fff", borderColor: "#d7dfd7", borderRadius: 10, borderWidth: 1, gap: 10, padding: 16 },
-  sectionTitle: { color: "#10212a", fontSize: 18, fontWeight: "700" },
-  input: { borderColor: "#aebdb5", borderRadius: 7, borderWidth: 1, color: "#10212a", paddingHorizontal: 12, paddingVertical: 10 },
-  roles: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  roleButton: { backgroundColor: "#e8eeeb", borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8 },
-  roleButtonSelected: { backgroundColor: "#bcd3ca" },
-  roleText: { color: "#14312d", fontSize: 13, fontWeight: "700", textTransform: "capitalize" },
-  errorText: { color: "#9f2d24", fontSize: 14 },
-  primaryButton: { alignSelf: "flex-start", backgroundColor: "#1a5d50", borderRadius: 7, paddingHorizontal: 15, paddingVertical: 10 },
-  primaryButtonText: { color: "#fff", fontSize: 14, fontWeight: "700" },
-  secondaryButton: { alignSelf: "flex-start", backgroundColor: "#dfe8e5", borderRadius: 7, paddingHorizontal: 15, paddingVertical: 10 },
-  secondaryButtonText: { color: "#14312d", fontSize: 14, fontWeight: "700" },
-  list: { gap: 10, paddingBottom: 24 },
-  memberCard: { backgroundColor: "#fff", borderColor: "#d7dfd7", borderRadius: 9, borderWidth: 1, gap: 5, padding: 14 },
-  memberId: { color: "#10212a", fontSize: 14, fontWeight: "600" },
-  memberRole: { color: "#537462", fontSize: 13, fontWeight: "700", textTransform: "uppercase" },
+  sectionTitle: { ...type.heading, color: color.ink900 },
+  errorText: { ...type.meta, color: color.danger },
+  roles: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
+  list: { gap: space.sm, paddingBottom: space.xl },
+  memberId: { ...type.bodyStrong, color: color.ink900 },
+  memberRole: { ...type.label, color: color.primary },
 });
-

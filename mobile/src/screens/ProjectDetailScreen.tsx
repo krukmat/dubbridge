@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  View,
 } from "react-native";
 
 import { createGatewayClient } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
+import { Badge, statusTone } from "../components/Badge";
+import { Card } from "../components/Card";
+import { Panel } from "../components/Panel";
+import { Screen } from "../components/Screen";
+import { ScreenHeader } from "../components/ScreenHeader";
+import { StateView } from "../components/StateView";
+import { color, space, type } from "../theme";
 
 export type ProjectAssetSummary = {
   id: string;
@@ -44,6 +48,13 @@ type ViewState =
   | { kind: "loading" }
   | { kind: "ready"; detail: ProjectDetail }
   | { kind: "error"; message: string };
+
+function formatStatus(status: string): string {
+  return status
+    .split("_")
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
 
 export function ProjectDetailScreen({
   gatewayBaseUrl,
@@ -126,169 +137,74 @@ export function ProjectDetailScreen({
   }, [loadDetail]);
 
   return (
-    <View testID="project-detail-screen" style={styles.container}>
+    <Screen testID="project-detail-screen" edges={["bottom"]}>
       {viewState.kind === "loading" ? (
-        <View style={styles.centerPanel}>
-          <ActivityIndicator size="small" color="#1a5d50" />
-          <Text style={styles.panelTitle}>Loading project…</Text>
-          <Text style={styles.panelCopy}>
-            Fetching project details from the gateway.
-          </Text>
-        </View>
+        <StateView
+          kind="loading"
+          title="Loading project…"
+          message="Fetching project details from the gateway."
+        />
       ) : null}
 
       {viewState.kind === "error" ? (
-        <View style={styles.centerPanel}>
-          <Text style={styles.panelTitle}>Could not load project</Text>
-          <Text style={styles.panelCopy}>{viewState.message}</Text>
-          <Pressable onPress={onRetry} style={styles.retryButton}>
-            <Text style={styles.retryLabel}>Retry</Text>
-          </Pressable>
-        </View>
+        <StateView
+          kind="error"
+          title="Could not load project"
+          message={viewState.message}
+          onRetry={onRetry}
+        />
       ) : null}
 
       {viewState.kind === "ready" ? (
-        <ScrollView contentContainerStyle={styles.listContent}>
-          <View style={styles.header}>
-            <Text style={styles.kicker}>Project</Text>
-            <Text style={styles.title}>{viewState.detail.name}</Text>
-          </View>
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.listContent}>
+          <ScreenHeader kicker="Project" title={viewState.detail.name} />
 
           <Text style={styles.sectionHeader}>Linked assets</Text>
 
           {viewState.detail.assets.length === 0 ? (
-            <View testID="project-detail-empty-assets" style={styles.emptyPanel}>
-              <Text style={styles.panelTitle}>No assets linked</Text>
-              <Text style={styles.panelCopy}>
-                This project does not have any linked assets yet.
-              </Text>
-            </View>
+            <StateView
+              testID="project-detail-empty-assets"
+              kind="empty"
+              title="No assets linked"
+              message="This project does not have any linked assets yet."
+            />
           ) : (
             viewState.detail.assets.map((asset) => (
-              <Pressable
+              <Card
                 key={asset.id}
                 testID={`asset-row-${asset.id}`}
                 onPress={() => onOpenAsset(asset.id, asset.title)}
-                style={styles.assetCard}
               >
                 <Text style={styles.assetTitle}>{asset.title}</Text>
-                <Text style={styles.assetMeta}>{asset.status}</Text>
-              </Pressable>
+                <Badge label={formatStatus(asset.status)} tone={statusTone(asset.status)} />
+              </Card>
             ))
           )}
 
           <Text style={styles.sectionHeader}>Target languages</Text>
           {viewState.detail.target_languages.length === 0 ? (
-            <View testID="project-detail-empty-languages" style={styles.emptyPanel}>
-              <Text style={styles.panelTitle}>No target languages</Text>
-              <Text style={styles.panelCopy}>This project has no target languages configured.</Text>
-            </View>
+            <StateView
+              testID="project-detail-empty-languages"
+              kind="empty"
+              title="No target languages"
+              message="This project has no target languages configured."
+            />
           ) : (
             viewState.detail.target_languages.map((language) => (
-              <View key={language.id} testID={`target-language-${language.id}`} style={styles.languageCard}>
+              <Panel key={language.id} testID={`target-language-${language.id}`}>
                 <Text style={styles.assetTitle}>{language.source_lang} to {language.target_lang}</Text>
-              </View>
+              </Panel>
             ))
           )}
         </ScrollView>
       ) : null}
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f2f4ee",
-    padding: 24,
-    gap: 20,
-  },
-  header: {
-    marginTop: 24,
-    gap: 10,
-    marginBottom: 8,
-  },
-  kicker: {
-    fontSize: 12,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    color: "#537462",
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "700",
-    color: "#10212a",
-  },
-  sectionHeader: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#10212a",
-    marginBottom: 4,
-  },
-  centerPanel: {
-    borderRadius: 10,
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#d7dfd7",
-    padding: 20,
-    gap: 10,
-  },
-  emptyPanel: {
-    borderRadius: 10,
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#d7dfd7",
-    padding: 20,
-    gap: 10,
-  },
-  panelTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#10212a",
-  },
-  panelCopy: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: "#52616a",
-  },
-  retryButton: {
-    marginTop: 4,
-    alignSelf: "flex-start",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: "#1a5d50",
-  },
-  retryLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#ffffff",
-  },
-  listContent: {
-    gap: 12,
-    paddingBottom: 24,
-  },
-  assetCard: {
-    borderRadius: 10,
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#d7dfd7",
-    padding: 16,
-    gap: 8,
-  },
-  languageCard: {
-    borderRadius: 10,
-    backgroundColor: "#e4ece7",
-    padding: 16,
-  },
-  assetTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#10212a",
-  },
-  assetMeta: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#5a6870",
-  },
+  scroll: { flex: 1 },
+  listContent: { gap: space.md, paddingBottom: space.xl },
+  sectionHeader: { ...type.bodyStrong, color: color.ink900 },
+  assetTitle: { ...type.heading, color: color.ink900 },
 });

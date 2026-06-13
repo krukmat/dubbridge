@@ -2,6 +2,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import { AuthProvider, useAuth } from "../auth/AuthProvider";
+import { color, type } from "../theme";
 import { readRuntimeConfig } from "../config/env";
 import { AssetDetailScreen } from "../screens/AssetDetailScreen";
 import { AssetListScreen } from "../screens/AssetListScreen";
@@ -41,8 +42,8 @@ const AuthedStack = createNativeStackNavigator<AuthedStackParamList>();
 
 function UnauthedNavigator() {
   return (
-    <UnauthedStack.Navigator>
-      <UnauthedStack.Screen name="Login" options={{ title: "DubBridge" }}>
+    <UnauthedStack.Navigator screenOptions={{ headerShown: false }}>
+      <UnauthedStack.Screen name="Login">
         {() => <LoginScreen />}
       </UnauthedStack.Screen>
     </UnauthedStack.Navigator>
@@ -57,8 +58,14 @@ function AuthedNavigator({
   dubbridgeEnv: string;
 }) {
   return (
-    <AuthedStack.Navigator>
-      <AuthedStack.Screen name="Home" options={{ title: "Home" }}>
+    <AuthedStack.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: color.raised },
+        headerTintColor: color.primary,
+        headerTitleStyle: { ...type.heading, color: color.ink900 },
+      }}
+    >
+      <AuthedStack.Screen name="Home" options={{ headerShown: false }}>
         {({ navigation }) => (
           <HomeScreen
             dubbridgeEnv={dubbridgeEnv}

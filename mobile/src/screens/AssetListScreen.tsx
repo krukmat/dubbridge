@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  View,
 } from "react-native";
 
 import { createGatewayClient } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
+import { Badge, statusTone } from "../components/Badge";
+import { Card } from "../components/Card";
+import { Screen } from "../components/Screen";
+import { ScreenHeader } from "../components/ScreenHeader";
+import { StateView } from "../components/StateView";
+import { color, space, type } from "../theme";
 
 export type AssetSummary = {
   id: string;
@@ -85,7 +88,6 @@ export function AssetListScreen({
 
     void (async () => {
       setViewState({ kind: "loading" });
-      // Only apply state from this effect invocation if it's still current.
       const client = createGatewayClient({ gatewayBaseUrl });
       const result = await client.get<AssetSummary[]>(
         "/api/assets",
@@ -136,149 +138,74 @@ export function AssetListScreen({
   }, [loadAssets]);
 
   return (
-    <View testID="asset-list-screen" style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.kicker}>My assets</Text>
-        <Text style={styles.title}>Asset list</Text>
-      </View>
+    <Screen testID="asset-list-screen" edges={["bottom"]}>
+      <ScreenHeader kicker="Assets" title="Asset list" />
 
       {viewState.kind === "loading" ? (
-        <View style={styles.centerPanel}>
-          <ActivityIndicator size="small" color="#1a5d50" />
-          <Text style={styles.panelTitle}>Loading assets…</Text>
-          <Text style={styles.panelCopy}>
-            Fetching your assets from the gateway.
-          </Text>
-        </View>
+        <StateView
+          kind="loading"
+          title="Loading assets…"
+          message="Fetching your assets from the gateway."
+        />
       ) : null}
 
       {viewState.kind === "empty" ? (
         <ScrollView
-          contentContainerStyle={styles.centerPanelScroll}
+          style={styles.scroll}
+          contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
-          <View testID="asset-list-empty-state" style={styles.centerPanel}>
-            <Text style={styles.panelTitle}>No assets yet</Text>
-            <Text style={styles.panelCopy}>
-              Your authenticated workspace does not have any assets to show.
-            </Text>
-          </View>
+          <StateView
+            testID="asset-list-empty-state"
+            kind="empty"
+            title="No assets yet"
+            message="Your workspace does not have any assets to show."
+          />
         </ScrollView>
       ) : null}
 
       {viewState.kind === "error" ? (
-        <View style={styles.centerPanel}>
-          <Text style={styles.panelTitle}>Could not load assets</Text>
-          <Text style={styles.panelCopy}>{viewState.message}</Text>
-          <Pressable onPress={onRetry} style={styles.retryButton}>
-            <Text style={styles.retryLabel}>Retry</Text>
-          </Pressable>
-        </View>
+        <StateView
+          kind="error"
+          title="Could not load assets"
+          message={viewState.message}
+          onRetry={onRetry}
+        />
       ) : null}
 
       {viewState.kind === "ready" ? (
         <ScrollView
+          style={styles.scroll}
           contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
           {viewState.assets.map((asset) => (
-            <Pressable
+            <Card
               key={asset.id}
               testID={`asset-card-${asset.id}`}
               onPress={() => onOpenAsset(asset)}
-              style={styles.assetCard}
             >
               <Text style={styles.assetTitle}>{asset.title}</Text>
-              <Text style={styles.assetMeta}>{formatStatus(asset.status)}</Text>
+              <Badge
+                label={formatStatus(asset.status)}
+                tone={statusTone(asset.status)}
+              />
               <Text style={styles.assetMeta}>{asset.id}</Text>
-            </Pressable>
+            </Card>
           ))}
         </ScrollView>
       ) : null}
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f2f4ee",
-    padding: 24,
-    gap: 20,
-  },
-  header: {
-    marginTop: 24,
-    gap: 10,
-  },
-  kicker: {
-    fontSize: 12,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    color: "#537462",
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "700",
-    color: "#10212a",
-  },
-  centerPanelScroll: {
-    flexGrow: 1,
-  },
-  centerPanel: {
-    borderRadius: 10,
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#d7dfd7",
-    padding: 20,
-    gap: 10,
-  },
-  panelTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#10212a",
-  },
-  panelCopy: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: "#52616a",
-  },
-  retryButton: {
-    marginTop: 4,
-    alignSelf: "flex-start",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: "#1a5d50",
-  },
-  retryLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#ffffff",
-  },
-  listContent: {
-    gap: 12,
-    paddingBottom: 24,
-  },
-  assetCard: {
-    borderRadius: 10,
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#d7dfd7",
-    padding: 16,
-    gap: 8,
-  },
-  assetTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#10212a",
-  },
-  assetMeta: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#5a6870",
-  },
+  scroll: { flex: 1 },
+  listContent: { gap: space.md, paddingBottom: space.xl },
+  assetTitle: { ...type.heading, color: color.ink900 },
+  assetMeta: { ...type.meta, color: color.ink500 },
 });

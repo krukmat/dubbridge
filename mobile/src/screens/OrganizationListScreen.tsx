@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,6 +9,13 @@ import {
 
 import { createGatewayClient } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
+import { Badge, statusTone } from "../components/Badge";
+import { Button } from "../components/Button";
+import { Panel } from "../components/Panel";
+import { Screen } from "../components/Screen";
+import { ScreenHeader } from "../components/ScreenHeader";
+import { StateView } from "../components/StateView";
+import { color, fieldStyle, space, type } from "../theme";
 
 export type OrgRole = "owner" | "admin" | "editor" | "reviewer" | "viewer";
 
@@ -115,15 +120,20 @@ export function OrganizationListScreen({
     );
   }, [auth, gatewayBaseUrl, name, onOpenProjects]);
 
-  return (
-    <View testID="organization-list-screen" style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.kicker}>Workspace</Text>
-        <Text style={styles.title}>Organizations</Text>
-        <Text style={styles.copy}>Choose the organization whose projects and members you want to manage.</Text>
-      </View>
+  const onRetry = useCallback(() => {
+    setViewState({ kind: "loading" });
+    void loadOrganizations();
+  }, [loadOrganizations]);
 
-      <View style={styles.createPanel}>
+  return (
+    <Screen testID="organization-list-screen" edges={["bottom"]}>
+      <ScreenHeader
+        kicker="Workspace"
+        title="Organizations"
+        copy="Choose the organization whose projects and members you want to manage."
+      />
+
+      <Panel>
         <Text style={styles.sectionTitle}>Create organization</Text>
         <TextInput
           testID="organization-name-input"
@@ -132,94 +142,77 @@ export function OrganizationListScreen({
           onChangeText={setName}
           placeholder="Organization name"
           autoCapitalize="words"
-          style={styles.input}
+          style={fieldStyle}
         />
         {createError ? <Text style={styles.errorText}>{createError}</Text> : null}
-        <Pressable
+        <Button
           testID="organization-create"
-          disabled={creating}
+          label={creating ? "Creating..." : "Create and open"}
           onPress={() => void createOrganization()}
-          style={[styles.primaryButton, creating && styles.disabledButton]}
-        >
-          <Text style={styles.primaryButtonText}>{creating ? "Creating..." : "Create and open"}</Text>
-        </Pressable>
-      </View>
+          loading={creating}
+          disabled={creating}
+        />
+      </Panel>
 
       {viewState.kind === "loading" ? (
-        <View style={styles.panel}>
-          <ActivityIndicator color="#1a5d50" />
-          <Text style={styles.panelTitle}>Loading organizations...</Text>
-        </View>
+        <StateView kind="loading" title="Loading organizations..." />
       ) : null}
 
       {viewState.kind === "error" ? (
-        <View style={styles.panel}>
-          <Text style={styles.panelTitle}>Could not load organizations</Text>
-          <Text style={styles.copy}>{viewState.message}</Text>
-          <Pressable testID="organization-retry" onPress={() => void loadOrganizations()} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>Retry</Text>
-          </Pressable>
-        </View>
+        <StateView
+          testID="organization"
+          kind="error"
+          title="Could not load organizations"
+          message={viewState.message}
+          onRetry={onRetry}
+        />
       ) : null}
 
       {viewState.kind === "ready" && viewState.organizations.length === 0 ? (
-        <View testID="organization-list-empty" style={styles.panel}>
-          <Text style={styles.panelTitle}>No organizations yet</Text>
-          <Text style={styles.copy}>Create your first organization above.</Text>
-        </View>
+        <StateView
+          testID="organization-list-empty"
+          kind="empty"
+          title="No organizations yet"
+          message="Create your first organization above."
+        />
       ) : null}
 
       {viewState.kind === "ready" && viewState.organizations.length > 0 ? (
         <ScrollView contentContainerStyle={styles.list}>
           {viewState.organizations.map((organization) => (
-            <View key={organization.id} testID={`organization-card-${organization.id}`} style={styles.card}>
+            <Panel key={organization.id} testID={`organization-card-${organization.id}`}>
               <Text style={styles.cardTitle}>{organization.name}</Text>
-              <Text style={styles.role}>{organization.viewer_role}</Text>
+              <Badge
+                label={organization.viewer_role}
+                tone={statusTone(organization.viewer_role)}
+              />
               <View style={styles.cardActions}>
-                <Pressable
+                <Button
                   testID={`organization-projects-${organization.id}`}
+                  label="Projects"
                   onPress={() => onOpenProjects(organization)}
-                  style={styles.primaryButton}
-                >
-                  <Text style={styles.primaryButtonText}>Projects</Text>
-                </Pressable>
-                <Pressable
+                  size="sm"
+                />
+                <Button
                   testID={`organization-members-${organization.id}`}
+                  label="Members"
                   onPress={() => onOpenMembers(organization)}
-                  style={styles.secondaryButton}
-                >
-                  <Text style={styles.secondaryButtonText}>Members</Text>
-                </Pressable>
+                  variant="secondary"
+                  size="sm"
+                />
               </View>
-            </View>
+            </Panel>
           ))}
         </ScrollView>
       ) : null}
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f2f4ee", padding: 24, gap: 18 },
-  header: { marginTop: 20, gap: 8 },
-  kicker: { color: "#537462", fontSize: 12, fontWeight: "700", textTransform: "uppercase" },
-  title: { color: "#10212a", fontSize: 32, fontWeight: "700" },
-  copy: { color: "#52616a", fontSize: 15, lineHeight: 22 },
-  createPanel: { backgroundColor: "#fff", borderColor: "#d7dfd7", borderRadius: 10, borderWidth: 1, gap: 10, padding: 16 },
-  sectionTitle: { color: "#10212a", fontSize: 18, fontWeight: "700" },
-  input: { borderColor: "#aebdb5", borderRadius: 7, borderWidth: 1, color: "#10212a", paddingHorizontal: 12, paddingVertical: 10 },
-  errorText: { color: "#9f2d24", fontSize: 14 },
-  panel: { backgroundColor: "#fff", borderColor: "#d7dfd7", borderRadius: 10, borderWidth: 1, gap: 10, padding: 18 },
-  panelTitle: { color: "#10212a", fontSize: 18, fontWeight: "700" },
-  list: { gap: 12, paddingBottom: 24 },
-  card: { backgroundColor: "#fff", borderColor: "#d7dfd7", borderRadius: 10, borderWidth: 1, gap: 8, padding: 16 },
-  cardTitle: { color: "#10212a", fontSize: 20, fontWeight: "700" },
-  role: { color: "#537462", fontSize: 13, fontWeight: "700", textTransform: "uppercase" },
-  cardActions: { flexDirection: "row", gap: 10, marginTop: 6 },
-  primaryButton: { alignSelf: "flex-start", backgroundColor: "#1a5d50", borderRadius: 7, paddingHorizontal: 15, paddingVertical: 10 },
-  primaryButtonText: { color: "#fff", fontSize: 14, fontWeight: "700" },
-  secondaryButton: { alignSelf: "flex-start", backgroundColor: "#dfe8e5", borderRadius: 7, paddingHorizontal: 15, paddingVertical: 10 },
-  secondaryButtonText: { color: "#14312d", fontSize: 14, fontWeight: "700" },
-  disabledButton: { opacity: 0.55 },
+  sectionTitle: { ...type.heading, color: color.ink900 },
+  errorText: { ...type.meta, color: color.danger },
+  list: { gap: space.md, paddingBottom: space.xl },
+  cardTitle: { ...type.title, color: color.ink900 },
+  cardActions: { flexDirection: "row", gap: space.sm },
 });
-

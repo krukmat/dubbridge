@@ -179,15 +179,15 @@ describe("mobile auth flow integration", () => {
       const view = await render(<RootNavigator />);
 
       await waitFor(() => {
-        expect(view.getByText("Sign in with session gateway")).toBeTruthy();
+        expect(view.getByText("Sign in")).toBeTruthy();
       });
 
       await act(async () => {
-        fireEvent.press(view.getByText("Sign in with session gateway"));
+        fireEvent.press(view.getByText("Sign in"));
       });
 
       await waitFor(() => {
-        expect(view.getByText("Mobile home")).toBeTruthy();
+        expect(view.getByText("Your workspace")).toBeTruthy();
       });
 
       expect(mockSaveSessionRef).toHaveBeenCalledWith(OPAQUE_REF);
@@ -225,7 +225,7 @@ describe("mobile auth flow integration", () => {
       const view = await render(<RootNavigator />);
 
       await waitFor(() => {
-        expect(view.getByText("Mobile home")).toBeTruthy();
+        expect(view.getByText("Your workspace")).toBeTruthy();
       });
 
       expect(mockSaveSessionRef).toHaveBeenCalledWith(OPAQUE_REF);

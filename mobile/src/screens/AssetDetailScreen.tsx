@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { StyleSheet, Text } from "react-native";
 
 import { createGatewayClient } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
+import { Badge, statusTone } from "../components/Badge";
+import { Button } from "../components/Button";
+import { Panel } from "../components/Panel";
+import { Screen } from "../components/Screen";
+import { ScreenHeader } from "../components/ScreenHeader";
+import { StateView } from "../components/StateView";
+import { color, type } from "../theme";
 import type { AssetSummary } from "./AssetListScreen";
 
 type AssetDetailScreenProps = {
@@ -95,146 +95,65 @@ export function AssetDetailScreen({
   }, [assetId, auth, gatewayBaseUrl]);
 
   return (
-    <ScrollView
-      testID="asset-detail-screen"
-      style={styles.container}
-      contentContainerStyle={styles.content}
-    >
-      <View style={styles.header}>
-        <Text style={styles.kicker}>Gateway asset detail</Text>
-        <Text style={styles.title}>Asset detail</Text>
-        <Text style={styles.copy}>
-          This screen reads the current S1 asset summary through the session
-          gateway.
-        </Text>
-      </View>
+    <Screen testID="asset-detail-screen" scroll edges={["bottom"]}>
+      <ScreenHeader kicker="Asset" title="Asset detail" />
 
       {viewState.kind === "loading" ? (
-        <View style={styles.panel}>
-          <ActivityIndicator size="small" color="#855f19" />
-          <Text style={styles.panelTitle}>Loading asset detail…</Text>
-        </View>
+        <StateView kind="loading" title="Loading asset detail…" />
       ) : null}
 
       {viewState.kind === "error" ? (
-        <View style={styles.panel}>
-          <Text style={styles.panelTitle}>Could not load asset detail</Text>
-          <Text style={styles.panelCopy}>{viewState.message}</Text>
-        </View>
+        <StateView
+          kind="error"
+          title="Could not load asset detail"
+          message={viewState.message}
+        />
       ) : null}
 
       {viewState.kind === "not_available" ? (
-        <View style={styles.panel}>
-          <Text style={styles.panelTitle}>Asset detail not available yet</Text>
-          <Text style={styles.panelCopy}>
-            This asset detail surface is not available on the current backend.
-          </Text>
-        </View>
+        <StateView
+          kind="empty"
+          title="Asset detail not available yet"
+          message="This asset detail surface is not available on the current backend."
+        />
       ) : null}
 
       {viewState.kind === "ready" ? (
         <>
-          <View style={styles.panel}>
+          <Panel>
             <Text style={styles.assetTitle}>{viewState.asset.title}</Text>
             <Text style={styles.metaLabel}>Status</Text>
-            <Text style={styles.metaValue}>
-              {formatStatus(viewState.asset.status)}
-            </Text>
+            <Badge
+              label={formatStatus(viewState.asset.status)}
+              tone={statusTone(viewState.asset.status)}
+            />
             <Text style={styles.metaLabel}>Asset ID</Text>
             <Text style={styles.metaValue}>{viewState.asset.id}</Text>
             <Text style={styles.metaLabel}>Uploader ID</Text>
             <Text style={styles.metaValue}>{viewState.asset.uploader_id}</Text>
-          </View>
+          </Panel>
 
-          <View style={styles.panel}>
+          <Panel>
             <Text style={styles.panelTitle}>Compliance and consent</Text>
             <Text style={styles.panelCopy}>
               Review the immutable audit trail, rights evidence, and voice consent ledger.
             </Text>
-            <Pressable testID="asset-open-compliance" onPress={onOpenCompliance} style={styles.button}>
-              <Text style={styles.buttonText}>Open compliance center</Text>
-            </Pressable>
-          </View>
+            <Button
+              testID="asset-open-compliance"
+              label="Open compliance center"
+              onPress={onOpenCompliance}
+            />
+          </Panel>
         </>
       ) : null}
-    </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f7f0e4",
-  },
-  content: {
-    padding: 24,
-    gap: 20,
-  },
-  header: {
-    marginTop: 24,
-    gap: 10,
-  },
-  kicker: {
-    fontSize: 12,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    color: "#855f19",
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "700",
-    color: "#1f1305",
-  },
-  copy: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: "#594b39",
-  },
-  panel: {
-    borderRadius: 10,
-    backgroundColor: "#fffaf2",
-    borderWidth: 1,
-    borderColor: "#e8d9c4",
-    padding: 20,
-    gap: 8,
-  },
-  panelTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1f1305",
-  },
-  panelCopy: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: "#6a5d4a",
-  },
-  assetTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#1f1305",
-    marginBottom: 6,
-  },
-  metaLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    color: "#8c6d34",
-  },
-  metaValue: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: "#3f3324",
-  },
-  button: {
-    alignSelf: "flex-start",
-    borderRadius: 7,
-    backgroundColor: "#855f19",
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-  },
-  buttonText: {
-    color: "#fffaf2",
-    fontSize: 14,
-    fontWeight: "700",
-  },
+  assetTitle: { ...type.title, color: color.ink900 },
+  metaLabel: { ...type.label, color: color.ink400 },
+  metaValue: { ...type.meta, color: color.ink700 },
+  panelTitle: { ...type.heading, color: color.ink900 },
+  panelCopy: { ...type.body, color: color.ink500 },
 });

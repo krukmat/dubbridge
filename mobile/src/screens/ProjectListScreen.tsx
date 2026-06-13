@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  View,
 } from "react-native";
 
 import { createGatewayClient } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
+import { Card } from "../components/Card";
+import { Screen } from "../components/Screen";
+import { ScreenHeader } from "../components/ScreenHeader";
+import { StateView } from "../components/StateView";
+import { color, space, type } from "../theme";
 
 export type ProjectSummary = {
   id: string;
@@ -126,148 +128,70 @@ export function ProjectListScreen({
   }, [loadProjects]);
 
   return (
-    <View testID="project-list-screen" style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.kicker}>Organization projects</Text>
-        <Text style={styles.title}>Projects</Text>
-      </View>
+    <Screen testID="project-list-screen" edges={["bottom"]}>
+      <ScreenHeader kicker="Organization projects" title="Projects" />
 
       {viewState.kind === "loading" ? (
-        <View style={styles.centerPanel}>
-          <ActivityIndicator size="small" color="#1a5d50" />
-          <Text style={styles.panelTitle}>Loading projects…</Text>
-          <Text style={styles.panelCopy}>
-            Fetching your organization's projects from the gateway.
-          </Text>
-        </View>
+        <StateView
+          kind="loading"
+          title="Loading projects…"
+          message="Fetching your organization's projects from the gateway."
+        />
       ) : null}
 
       {viewState.kind === "empty" ? (
         <ScrollView
-          contentContainerStyle={styles.centerPanelScroll}
+          style={styles.scroll}
+          contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
-          <View testID="project-list-empty-state" style={styles.centerPanel}>
-            <Text style={styles.panelTitle}>No projects yet</Text>
-            <Text style={styles.panelCopy}>
-              This organization does not have any projects to show.
-            </Text>
-          </View>
+          <StateView
+            testID="project-list-empty-state"
+            kind="empty"
+            title="No projects yet"
+            message="This organization does not have any projects to show."
+          />
         </ScrollView>
       ) : null}
 
       {viewState.kind === "error" ? (
-        <View style={styles.centerPanel}>
-          <Text style={styles.panelTitle}>Could not load projects</Text>
-          <Text style={styles.panelCopy}>{viewState.message}</Text>
-          <Pressable onPress={onRetry} style={styles.retryButton}>
-            <Text style={styles.retryLabel}>Retry</Text>
-          </Pressable>
-        </View>
+        <StateView
+          kind="error"
+          title="Could not load projects"
+          message={viewState.message}
+          onRetry={onRetry}
+        />
       ) : null}
 
       {viewState.kind === "ready" ? (
         <ScrollView
+          style={styles.scroll}
           contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
           {viewState.projects.map((project) => (
-            <Pressable
+            <Card
               key={project.id}
               testID={`project-card-${project.id}`}
               onPress={() => onOpenProject(project)}
-              style={styles.projectCard}
             >
               <Text style={styles.projectName}>{project.name}</Text>
               <Text style={styles.projectMeta}>{project.id}</Text>
-            </Pressable>
+            </Card>
           ))}
         </ScrollView>
       ) : null}
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f2f4ee",
-    padding: 24,
-    gap: 20,
-  },
-  header: {
-    marginTop: 24,
-    gap: 10,
-  },
-  kicker: {
-    fontSize: 12,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    color: "#537462",
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "700",
-    color: "#10212a",
-  },
-  centerPanelScroll: {
-    flexGrow: 1,
-  },
-  centerPanel: {
-    borderRadius: 10,
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#d7dfd7",
-    padding: 20,
-    gap: 10,
-  },
-  panelTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#10212a",
-  },
-  panelCopy: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: "#52616a",
-  },
-  retryButton: {
-    marginTop: 4,
-    alignSelf: "flex-start",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: "#1a5d50",
-  },
-  retryLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#ffffff",
-  },
-  listContent: {
-    gap: 12,
-    paddingBottom: 24,
-  },
-  projectCard: {
-    borderRadius: 10,
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#d7dfd7",
-    padding: 16,
-    gap: 8,
-  },
-  projectName: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#10212a",
-  },
-  projectMeta: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#5a6870",
-  },
+  scroll: { flex: 1 },
+  listContent: { gap: space.md, paddingBottom: space.xl },
+  projectName: { ...type.heading, color: color.ink900 },
+  projectMeta: { ...type.meta, color: color.ink500 },
 });

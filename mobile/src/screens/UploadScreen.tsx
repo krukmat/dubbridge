@@ -2,9 +2,6 @@ import * as DocumentPicker from 'expo-document-picker';
 import Constants from 'expo-constants';
 import { useState } from 'react';
 import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -14,6 +11,12 @@ import {
 import { createGatewayClient } from '../api/client';
 import type { GatewayErrorKind, MultipartUpload } from '../api/client';
 import { useAuth } from '../auth/AuthProvider';
+import { Button } from '../components/Button';
+import { Panel } from '../components/Panel';
+import { Screen } from '../components/Screen';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { StateView } from '../components/StateView';
+import { color, fieldStyle, space, type } from '../theme';
 import type { AssetSummary } from './AssetListScreen';
 
 export type RightsFormData = {
@@ -244,190 +247,95 @@ export function UploadScreen({
   }
 
   return (
-    <View testID="upload-screen" style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.kicker}>Upload</Text>
-        <Text style={styles.title}>New asset</Text>
-      </View>
+    <Screen testID="upload-screen" edges={["bottom"]}>
+      <ScreenHeader kicker="Upload" title="New asset" />
 
       {viewState.kind === 'rights_form' ? (
-        <ScrollView contentContainerStyle={styles.formContent}>
+        <View style={styles.form}>
           <Text style={styles.stepLabel}>Step 1 — Rights details</Text>
           <TextInput
             testID="upload-field-owner"
-            style={styles.input}
+            style={fieldStyle}
             placeholder="Owner"
             value={viewState.fields.owner}
             onChangeText={(v) => handleFieldChange('owner', v)}
           />
           <TextInput
             testID="upload-field-license-type"
-            style={styles.input}
+            style={fieldStyle}
             placeholder="License type"
             value={viewState.fields.license_type}
             onChangeText={(v) => handleFieldChange('license_type', v)}
           />
           <TextInput
             testID="upload-field-source-type"
-            style={styles.input}
+            style={fieldStyle}
             placeholder="Source type"
             value={viewState.fields.source_type}
             onChangeText={(v) => handleFieldChange('source_type', v)}
           />
           <TextInput
             testID="upload-field-proof-reference"
-            style={styles.input}
+            style={fieldStyle}
             placeholder="Proof reference"
             value={viewState.fields.proof_reference}
             onChangeText={(v) => handleFieldChange('proof_reference', v)}
           />
-          <Pressable
+          <Button
             testID="upload-submit-rights"
+            label="Continue"
             onPress={handleRightsSubmit}
-            style={styles.button}
-          >
-            <Text style={styles.buttonText}>Continue</Text>
-          </Pressable>
-        </ScrollView>
-      ) : null}
-
-      {viewState.kind === 'file_pending' ? (
-        <View style={styles.panel}>
-          <Text style={styles.stepLabel}>Step 2 — Pick your file</Text>
-          <Pressable
-            testID="upload-pick-file"
-            onPress={() => void handlePickFile(viewState.rights)}
-            style={styles.button}
-          >
-            <Text style={styles.buttonText}>Pick file</Text>
-          </Pressable>
+          />
         </View>
       ) : null}
 
+      {viewState.kind === 'file_pending' ? (
+        <Panel>
+          <Text style={styles.stepLabel}>Step 2 — Pick your file</Text>
+          <Button
+            testID="upload-pick-file"
+            label="Pick file"
+            variant="secondary"
+            onPress={() => void handlePickFile(viewState.rights)}
+          />
+        </Panel>
+      ) : null}
+
       {viewState.kind === 'ready' ? (
-        <View style={styles.panel}>
+        <Panel>
           <Text style={styles.stepLabel}>Step 3 — Review and finalize</Text>
           <Text style={styles.fileName} numberOfLines={1}>
             {viewState.file.name}
           </Text>
-          <Pressable
+          <Button
             testID="upload-finalize"
+            label="Upload & finalize"
             onPress={() => void handleFinalize(viewState.rights, viewState.file)}
-            style={styles.button}
-          >
-            <Text style={styles.buttonText}>Upload & finalize</Text>
-          </Pressable>
-        </View>
+          />
+        </Panel>
       ) : null}
 
       {viewState.kind === 'processing' ? (
-        <View style={styles.panel}>
-          <ActivityIndicator size="small" color="#1a5d50" />
-          <Text style={styles.statusText}>Uploading…</Text>
-        </View>
+        <StateView kind="loading" title="Uploading…" />
       ) : null}
 
       {viewState.kind === 'error' ? (
-        <View style={styles.panel}>
+        <Panel>
           <Text style={styles.errorText}>{viewState.message}</Text>
-          <Pressable
+          <Button
+            label="Try again"
+            variant="secondary"
             onPress={() => setViewState(viewState.recovery)}
-            style={styles.secondaryButton}
-          >
-            <Text style={styles.secondaryButtonText}>Try again</Text>
-          </Pressable>
-        </View>
+          />
+        </Panel>
       ) : null}
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f2f4ee',
-    padding: 24,
-    gap: 20,
-  },
-  header: {
-    marginTop: 24,
-    gap: 10,
-  },
-  kicker: {
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    color: '#537462',
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#10212a',
-  },
-  formContent: {
-    gap: 12,
-  },
-  stepLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    color: '#537462',
-    marginBottom: 4,
-  },
-  input: {
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#cfdbd6',
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: '#10212a',
-  },
-  panel: {
-    borderRadius: 10,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#d7dfd7',
-    padding: 20,
-    gap: 12,
-  },
-  button: {
-    alignSelf: 'flex-start',
-    borderRadius: 8,
-    backgroundColor: '#1a5d50',
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-  },
-  buttonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#f8fbf9',
-  },
-  secondaryButton: {
-    alignSelf: 'flex-start',
-    borderRadius: 8,
-    backgroundColor: '#dfe8e5',
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-  },
-  secondaryButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#14312d',
-  },
-  fileName: {
-    fontSize: 15,
-    color: '#3c4954',
-    fontFamily: 'monospace',
-  },
-  statusText: {
-    fontSize: 15,
-    color: '#3c4954',
-  },
-  errorText: {
-    fontSize: 15,
-    color: '#b91c1c',
-    lineHeight: 22,
-  },
+  form: { gap: space.md },
+  stepLabel: { ...type.label, color: color.primary },
+  fileName: { ...type.meta, color: color.ink700 },
+  errorText: { ...type.body, color: color.danger },
 });

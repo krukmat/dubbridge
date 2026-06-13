@@ -51,8 +51,8 @@ describe("RootNavigator", () => {
 
     const view = await render(<RootNavigator />);
 
-    expect(view.getByText("DubBridge mobile")).toBeTruthy();
-    expect(view.getByText("Sign in with session gateway")).toBeTruthy();
+    expect(view.getByText("DubBridge")).toBeTruthy();
+    expect(view.getByText("Sign in")).toBeTruthy();
     expect(view.getByTestId("login-screen")).toBeTruthy();
   });
 
@@ -68,8 +68,8 @@ describe("RootNavigator", () => {
 
     const view = await render(<RootNavigator />);
 
-    expect(view.getByText("DubBridge mobile")).toBeTruthy();
-    expect(view.getByText("Sign in with session gateway")).toBeTruthy();
+    expect(view.getByText("DubBridge")).toBeTruthy();
+    expect(view.getByText("Sign in")).toBeTruthy();
     expect(view.getByTestId("login-screen")).toBeTruthy();
   });
 
@@ -86,7 +86,7 @@ describe("RootNavigator", () => {
 
     const view = await render(<RootNavigator />);
 
-    expect(view.getByText("Mobile home")).toBeTruthy();
+    expect(view.getByText("Your workspace")).toBeTruthy();
     expect(view.getByText("local")).toBeTruthy();
     expect(view.getByText("http://127.0.0.1:4000")).toBeTruthy();
     expect(view.getByText("Browse assets")).toBeTruthy();
@@ -137,7 +137,7 @@ describe("RootNavigator", () => {
 
     const view = await render(<RootNavigator />);
 
-    fireEvent.press(view.getByText("Sign in with session gateway"));
+    fireEvent.press(view.getByText("Sign in"));
 
     expect(mockAuthValue.login).toHaveBeenCalledTimes(1);
   });

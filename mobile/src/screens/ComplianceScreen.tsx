@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { createGatewayClient } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
+import { Badge, statusTone } from "../components/Badge";
+import { Button } from "../components/Button";
+import { Panel } from "../components/Panel";
+import { Screen } from "../components/Screen";
+import { ScreenHeader } from "../components/ScreenHeader";
+import { StateView } from "../components/StateView";
+import { color, space, type } from "../theme";
 
 type AuditEvent = {
   id: string;
@@ -106,30 +113,39 @@ export function ComplianceScreen({ assetId, gatewayBaseUrl, onManageConsent }: P
     void loadCompliance();
   }, [loadCompliance]);
 
-  return (
-    <ScrollView testID="compliance-screen" style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.kicker}>Governance</Text>
-        <Text style={styles.title}>Compliance center</Text>
-        <Text style={styles.copy}>Audit history, rights evidence, and voice consent for this asset.</Text>
-      </View>
+  const onRetry = useCallback(() => {
+    void loadCompliance();
+  }, [loadCompliance]);
 
-      {viewState.kind === "loading" ? <Text>Loading compliance data...</Text> : null}
+  return (
+    <Screen testID="compliance-screen" scroll edges={["bottom"]}>
+      <ScreenHeader
+        kicker="Governance"
+        title="Compliance center"
+        copy="Audit history, rights evidence, and voice consent for this asset."
+      />
+
+      {viewState.kind === "loading" ? (
+        <StateView kind="loading" title="Loading compliance data..." />
+      ) : null}
+
       {viewState.kind === "error" ? (
-        <View style={styles.panel}>
-          <Text style={styles.panelTitle}>Could not load compliance data</Text>
-          <Text style={styles.copy}>{viewState.message}</Text>
-          <Pressable testID="compliance-retry" onPress={() => void loadCompliance()} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>Retry</Text>
-          </Pressable>
-        </View>
+        <StateView
+          testID="compliance"
+          kind="error"
+          title="Could not load compliance data"
+          message={viewState.message}
+          onRetry={onRetry}
+        />
       ) : null}
 
       {viewState.kind === "ready" ? (
         <>
-          <View testID="audit-timeline" style={styles.panel}>
+          <Panel testID="audit-timeline">
             <Text style={styles.panelTitle}>Audit timeline</Text>
-            {viewState.data.audit.events.length === 0 ? <Text testID="audit-empty">No audit events.</Text> : null}
+            {viewState.data.audit.events.length === 0 ? (
+              <Text testID="audit-empty" style={styles.emptyText}>No audit events.</Text>
+            ) : null}
             {viewState.data.audit.events.map((event) => (
               <View key={event.id} testID={`audit-event-${event.id}`} style={styles.row}>
                 <Text style={styles.rowTitle}>{event.event_kind.replaceAll("_", " ")}</Text>
@@ -137,11 +153,13 @@ export function ComplianceScreen({ assetId, gatewayBaseUrl, onManageConsent }: P
                 {event.detail ? <Text style={styles.copy}>{event.detail}</Text> : null}
               </View>
             ))}
-          </View>
+          </Panel>
 
-          <View testID="rights-ledger" style={styles.panel}>
+          <Panel testID="rights-ledger">
             <Text style={styles.panelTitle}>Rights ledger</Text>
-            {viewState.data.rights.entries.length === 0 ? <Text testID="rights-empty">No rights records.</Text> : null}
+            {viewState.data.rights.entries.length === 0 ? (
+              <Text testID="rights-empty" style={styles.emptyText}>No rights records.</Text>
+            ) : null}
             {viewState.data.rights.entries.map((entry) => (
               <View key={entry.id} testID={`rights-entry-${entry.id}`} style={styles.row}>
                 <Text style={styles.rowTitle}>{entry.owner}</Text>
@@ -149,39 +167,33 @@ export function ComplianceScreen({ assetId, gatewayBaseUrl, onManageConsent }: P
                 <Text style={styles.meta}>{entry.proof_reference}</Text>
               </View>
             ))}
-          </View>
+          </Panel>
 
-          <View style={styles.panel}>
+          <Panel>
             <Text style={styles.panelTitle}>Voice consent</Text>
-            <Text testID="consent-current-status" style={styles.status}>
-              {viewState.data.consent.current_status === "grant" ? "Active" : "Inactive"}
-            </Text>
+            <Badge
+              testID="consent-current-status"
+              label={viewState.data.consent.current_status === "grant" ? "Active" : "Inactive"}
+              tone={statusTone(viewState.data.consent.current_status)}
+            />
             <Text style={styles.copy}>{viewState.data.consent.rows.length} ledger entries</Text>
-            <Pressable testID="consent-open" onPress={onManageConsent} style={styles.primaryButton}>
-              <Text style={styles.primaryButtonText}>Manage consent</Text>
-            </Pressable>
-          </View>
+            <Button
+              testID="consent-open"
+              label="Manage consent"
+              onPress={onManageConsent}
+            />
+          </Panel>
         </>
       ) : null}
-    </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#edf3ef" },
-  content: { gap: 16, padding: 24, paddingBottom: 40 },
-  header: { gap: 8, marginTop: 20 },
-  kicker: { color: "#1a6a58", fontSize: 12, fontWeight: "700", textTransform: "uppercase" },
-  title: { color: "#10212a", fontSize: 32, fontWeight: "700" },
-  copy: { color: "#52616a", fontSize: 15, lineHeight: 22 },
-  panel: { backgroundColor: "#fff", borderColor: "#cbdad2", borderRadius: 10, borderWidth: 1, gap: 10, padding: 18 },
-  panelTitle: { color: "#10212a", fontSize: 19, fontWeight: "700" },
-  row: { borderTopColor: "#dce6e0", borderTopWidth: 1, gap: 4, paddingTop: 10 },
-  rowTitle: { color: "#17372f", fontSize: 15, fontWeight: "700", textTransform: "capitalize" },
-  meta: { color: "#61746c", fontSize: 12 },
-  status: { color: "#1a6a58", fontSize: 24, fontWeight: "700" },
-  primaryButton: { alignSelf: "flex-start", backgroundColor: "#1a5d50", borderRadius: 7, paddingHorizontal: 15, paddingVertical: 10 },
-  primaryButtonText: { color: "#fff", fontSize: 14, fontWeight: "700" },
-  secondaryButton: { alignSelf: "flex-start", backgroundColor: "#dfe8e5", borderRadius: 7, paddingHorizontal: 15, paddingVertical: 10 },
-  secondaryButtonText: { color: "#14312d", fontSize: 14, fontWeight: "700" },
+  panelTitle: { ...type.heading, color: color.ink900 },
+  emptyText: { ...type.body, color: color.ink500 },
+  copy: { ...type.body, color: color.ink500 },
+  row: { borderTopColor: color.border, borderTopWidth: 1, gap: space.xs, paddingTop: space.sm },
+  rowTitle: { ...type.bodyStrong, color: color.ink900, textTransform: "capitalize" },
+  meta: { ...type.meta, color: color.ink400 },
 });
