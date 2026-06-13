@@ -166,6 +166,7 @@ async fn create_org_creates_owner_membership_and_audit() {
 
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(body["name"], "Acme");
+    assert_eq!(body["viewer_role"], "owner");
 
     let owner_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM org_members WHERE org_id = $1 AND subject_id = $2 AND role = 'owner'",
@@ -210,6 +211,7 @@ async fn list_orgs_returns_only_subject_memberships() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body.as_array().expect("array").len(), 1);
     assert_eq!(body[0]["id"], admin_org.id.0.to_string());
+    assert_eq!(body[0]["viewer_role"], "owner");
 }
 
 #[tokio::test]
@@ -561,6 +563,21 @@ async fn json_body(response: axum::response::Response) -> serde_json::Value {
 }
 
 async fn migrate_and_reset(pool: &PgPool) {
+    // Fail-closed tests drop audit_events intentionally. If it's missing,
+    // remove its migration records so sqlx re-creates it.
+    let audit_exists: Option<i32> = sqlx::query_scalar(
+        "SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='audit_events'",
+    )
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    if audit_exists.is_none() {
+        sqlx::query("DELETE FROM _sqlx_migrations WHERE version IN (4, 9)")
+            .execute(pool)
+            .await
+            .expect("clear stale migration records");
+    }
+
     sqlx::migrate!("../../infra/migrations")
         .run(pool)
         .await
