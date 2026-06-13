@@ -186,3 +186,6 @@ first-party consumers — the web app and slice **P3** (mobile, React Native + E
 - Consumed by (planned): slice **P3** — first-party mobile client (React Native +
   Expo), `docs/plan/s-050-mobile-client.md`, `docs/tasks/s-050-mobile-client.md`. Mobile
   is the second transport of the same opaque-session contract.
+- Surface selection is governed separately by ADR-029. ADR-024 remains the access
+  and session-contract decision even when only one first-party authenticated UI is
+  operational.

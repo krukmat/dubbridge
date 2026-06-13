@@ -40,7 +40,7 @@ operational surfaces from planned ones. Delivery sequence lives in
 | Media preparation through publication | Planned | S4..S9 |
 | Environment separation + reproducible app-container runtime wiring | Planned supporting surface | P0, ADR-026 |
 | First-party session gateway / BFF | Operational supporting surface | P1, ADR-024 |
-| First-party mobile client (React Native + Expo) | Operational supporting surface | P3, ADR-024 |
+| First-party mobile client (React Native + Expo) | Canonical authenticated product surface | P3, S-105, ADR-024/029 |
 
 ## Runtime surfaces
 
@@ -55,7 +55,9 @@ operational surfaces from planned ones. Delivery sequence lives in
 - `mobile/` is the first-party React Native + Expo client surface. It authenticates
   only through the session gateway, persists only the gateway-owned opaque
   `session_ref` in secure storage, and uses the authenticated gateway `/api/*`
-  proxy for product requests (P3, ADR-024).
+  proxy for product requests (P3, S-105, ADR-024/029). It is the only operational
+  first-party authenticated UI. The former `web/` console was retired by S-105;
+  any future public website or player is a separate product decision.
 - `apps/worker-runner` is the Rust background-job execution surface; its real queue
   consumption remains to be implemented as slices require it.
 - `apps/cli` hosts local operational commands for development and administration.
@@ -103,7 +105,6 @@ operational surfaces from planned ones. Delivery sequence lives in
 
 ```text
 programmatic client -- JWT bearer token --> apps/api
-first-party browser -- hardened session --> session gateway / BFF -- JWT/internal credential --> apps/api
 first-party mobile -- opaque session ref --> session gateway / BFF -- JWT/internal credential --> apps/api
 
 apps/api direct upload ---------------+
@@ -112,7 +113,7 @@ RTMP/SRT live recording (S3b) --------+
 ```
 
 Direct upload and the first-party session gateway are operational. The gateway is
-the only authenticated entrypoint for first-party browser/mobile product API calls;
+the only authenticated entrypoint for first-party mobile product API calls;
 it renews or rotates first-party sessions when allowed and proxies `/api/*` to
 `apps/api`. **Platform
 download (primary S3, ADR-025)** is planned; **RTMP/SRT live recording is the
