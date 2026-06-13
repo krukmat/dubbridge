@@ -2,6 +2,7 @@
 pub mod artifact_repo;
 pub mod asset_repo;
 pub mod audit_repo;
+pub mod consent_repo;
 pub mod error;
 pub mod pending_ingestion_repo;
 pub mod rights_repo;
