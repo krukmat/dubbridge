@@ -36,6 +36,10 @@ pub enum AuditEventKind {
     OrgCreated,
     OrgMemberAdded,
     ProjectCreated,
+    // S-110-T2b: voice-consent governance events (ADR-018, ADR-028).
+    ConsentGranted,
+    ConsentRevoked,
+    ConsentCheckDenied,
 }
 
 impl std::fmt::Display for AuditEventKind {
@@ -62,6 +66,9 @@ impl std::fmt::Display for AuditEventKind {
             Self::OrgCreated => "org_created",
             Self::OrgMemberAdded => "org_member_added",
             Self::ProjectCreated => "project_created",
+            Self::ConsentGranted => "consent_granted",
+            Self::ConsentRevoked => "consent_revoked",
+            Self::ConsentCheckDenied => "consent_check_denied",
         };
         write!(f, "{s}")
     }
@@ -149,6 +156,24 @@ impl AuditEvent {
         Self {
             id: Uuid::new_v4(),
             asset_id: None,
+            event_kind,
+            ingest_token: None,
+            recording_session_id: None,
+            platform_ingest_session_id: None,
+            detail,
+            happened_at: OffsetDateTime::now_utc(),
+        }
+    }
+
+    /// Constructor for S-110 voice-consent governance events (ADR-018, ADR-028).
+    pub fn new_consent(
+        asset_id: AssetId,
+        event_kind: AuditEventKind,
+        detail: Option<String>,
+    ) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            asset_id: Some(asset_id),
             event_kind,
             ingest_token: None,
             recording_session_id: None,
@@ -324,5 +349,34 @@ mod tests {
             AuditEventKind::ProjectCreated.to_string(),
             "project_created"
         );
+        assert_eq!(
+            AuditEventKind::ConsentGranted.to_string(),
+            "consent_granted"
+        );
+        assert_eq!(
+            AuditEventKind::ConsentRevoked.to_string(),
+            "consent_revoked"
+        );
+        assert_eq!(
+            AuditEventKind::ConsentCheckDenied.to_string(),
+            "consent_check_denied"
+        );
+    }
+
+    #[test]
+    fn new_consent_sets_asset_id_and_no_correlation_ids() {
+        use crate::asset::AssetId;
+        let asset_id = AssetId::new();
+        let event = AuditEvent::new_consent(
+            asset_id,
+            AuditEventKind::ConsentGranted,
+            Some("scope=voice_clone".to_string()),
+        );
+        assert_eq!(event.asset_id, Some(asset_id));
+        assert!(event.ingest_token.is_none());
+        assert!(event.recording_session_id.is_none());
+        assert!(event.platform_ingest_session_id.is_none());
+        assert_eq!(event.event_kind, AuditEventKind::ConsentGranted);
+        assert_eq!(event.detail.as_deref(), Some("scope=voice_clone"));
     }
 }

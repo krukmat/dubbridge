@@ -26,7 +26,8 @@ qa-config-secrets:
 
 qa-coverage:
 	$(CARGO) llvm-cov --workspace --summary-only --fail-under-lines $(COVERAGE_MIN) \
-		--ignore-filename-regex '$(COVERAGE_IGNORE_REGEX)'
+		--ignore-filename-regex '$(COVERAGE_IGNORE_REGEX)' \
+		-- --test-threads=1
 
 qa-build-release:
 	$(CARGO) build --workspace --release

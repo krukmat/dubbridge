@@ -78,6 +78,22 @@ jobs:
   coverage:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: dubbridge_test
+          POSTGRES_USER: dubbridge
+          POSTGRES_PASSWORD: dubbridge
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DUBBRIDGE_DATABASE_URL: postgresql://dubbridge:dubbridge@localhost:5432/dubbridge_test
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
