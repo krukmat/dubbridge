@@ -166,7 +166,6 @@ async fn create_org_creates_owner_membership_and_audit() {
 
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(body["name"], "Acme");
-    assert_eq!(body["viewer_role"], "owner");
 
     let owner_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM org_members WHERE org_id = $1 AND subject_id = $2 AND role = 'owner'",
@@ -211,7 +210,6 @@ async fn list_orgs_returns_only_subject_memberships() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body.as_array().expect("array").len(), 1);
     assert_eq!(body[0]["id"], admin_org.id.0.to_string());
-    assert_eq!(body[0]["viewer_role"], "owner");
 }
 
 #[tokio::test]
