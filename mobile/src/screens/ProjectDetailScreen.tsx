@@ -21,8 +21,16 @@ export type ProjectDetail = {
   id: string;
   org_id: string;
   name: string;
-  asset_summaries: ProjectAssetSummary[];
+  assets: ProjectAssetSummary[];
+  target_languages: Array<{
+    id: string;
+    project_id: string;
+    source_lang: string;
+    target_lang: string;
+    created_at: string;
+  }>;
   created_at: string;
+  updated_at: string;
 };
 
 type ProjectDetailScreenProps = {
@@ -148,7 +156,7 @@ export function ProjectDetailScreen({
 
           <Text style={styles.sectionHeader}>Linked assets</Text>
 
-          {viewState.detail.asset_summaries.length === 0 ? (
+          {viewState.detail.assets.length === 0 ? (
             <View testID="project-detail-empty-assets" style={styles.emptyPanel}>
               <Text style={styles.panelTitle}>No assets linked</Text>
               <Text style={styles.panelCopy}>
@@ -156,7 +164,7 @@ export function ProjectDetailScreen({
               </Text>
             </View>
           ) : (
-            viewState.detail.asset_summaries.map((asset) => (
+            viewState.detail.assets.map((asset) => (
               <Pressable
                 key={asset.id}
                 testID={`asset-row-${asset.id}`}
@@ -166,6 +174,20 @@ export function ProjectDetailScreen({
                 <Text style={styles.assetTitle}>{asset.title}</Text>
                 <Text style={styles.assetMeta}>{asset.status}</Text>
               </Pressable>
+            ))
+          )}
+
+          <Text style={styles.sectionHeader}>Target languages</Text>
+          {viewState.detail.target_languages.length === 0 ? (
+            <View testID="project-detail-empty-languages" style={styles.emptyPanel}>
+              <Text style={styles.panelTitle}>No target languages</Text>
+              <Text style={styles.panelCopy}>This project has no target languages configured.</Text>
+            </View>
+          ) : (
+            viewState.detail.target_languages.map((language) => (
+              <View key={language.id} testID={`target-language-${language.id}`} style={styles.languageCard}>
+                <Text style={styles.assetTitle}>{language.source_lang} to {language.target_lang}</Text>
+              </View>
             ))
           )}
         </ScrollView>
@@ -253,6 +275,11 @@ const styles = StyleSheet.create({
     borderColor: "#d7dfd7",
     padding: 16,
     gap: 8,
+  },
+  languageCard: {
+    borderRadius: 10,
+    backgroundColor: "#e4ece7",
+    padding: 16,
   },
   assetTitle: {
     fontSize: 18,

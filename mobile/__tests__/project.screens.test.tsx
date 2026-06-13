@@ -43,8 +43,18 @@ const PROJECT_DETAIL = {
   id: PROJECT_A.id,
   org_id: PROJECT_A.org_id,
   name: PROJECT_A.name,
-  asset_summaries: [ASSET_A, ASSET_B],
+  assets: [ASSET_A, ASSET_B],
+  target_languages: [
+    {
+      id: "lang-001",
+      project_id: PROJECT_A.id,
+      source_lang: "en",
+      target_lang: "es-ES",
+      created_at: "2026-06-02T00:00:00Z",
+    },
+  ],
   created_at: PROJECT_A.created_at,
+  updated_at: PROJECT_A.created_at,
 };
 
 let mockAuthValue: AuthContextValue;
@@ -216,6 +226,8 @@ describe("project screens", () => {
       expect(view.getByTestId("project-detail-screen")).toBeTruthy();
       expect(view.getByTestId("asset-row-asset-111")).toBeTruthy();
       expect(view.getByTestId("asset-row-asset-222")).toBeTruthy();
+      expect(view.getByTestId("target-language-lang-001")).toBeTruthy();
+      expect(view.getByText("en to es-ES")).toBeTruthy();
       expect(mockClient.get).toHaveBeenCalledWith(
         "/api/orgs/org-abc/projects/proj-001",
         "opaque-session-abc123",
@@ -232,7 +244,7 @@ describe("project screens", () => {
       mockClient.get.mockResolvedValueOnce({
         ok: true,
         value: {
-          data: { ...PROJECT_DETAIL, asset_summaries: [] },
+          data: { ...PROJECT_DETAIL, assets: [], target_languages: [] },
           sessionRotation: null,
         },
       });
@@ -251,6 +263,7 @@ describe("project screens", () => {
       });
 
       expect(view.queryByText("Could not load project")).toBeNull();
+      expect(view.getByTestId("project-detail-empty-languages")).toBeTruthy();
     });
   });
 

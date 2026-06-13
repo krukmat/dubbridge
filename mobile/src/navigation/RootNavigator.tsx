@@ -6,8 +6,12 @@ import { readRuntimeConfig } from "../config/env";
 import { AssetDetailScreen } from "../screens/AssetDetailScreen";
 import { AssetListScreen } from "../screens/AssetListScreen";
 import { ConfigErrorScreen } from "../screens/ConfigErrorScreen";
+import { ComplianceScreen } from "../screens/ComplianceScreen";
+import { ConsentScreen } from "../screens/ConsentScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { LoginScreen } from "../screens/LoginScreen";
+import { OrganizationListScreen, type OrganizationSummary } from "../screens/OrganizationListScreen";
+import { OrganizationMembersScreen } from "../screens/OrganizationMembersScreen";
 import { ProjectDetailScreen } from "../screens/ProjectDetailScreen";
 import { ProjectListScreen } from "../screens/ProjectListScreen";
 import { UploadScreen } from "../screens/UploadScreen";
@@ -23,8 +27,12 @@ type AuthedStackParamList = {
     assetId: string;
     assetTitle: string;
   };
+  Compliance: { assetId: string; assetTitle: string };
+  Consent: { assetId: string; assetTitle: string };
   Upload: undefined;
-  ProjectList: { orgId: string };
+  OrganizationList: undefined;
+  OrganizationMembers: { orgId: string; orgName: string; viewerRole: OrganizationSummary["viewer_role"] };
+  ProjectList: { orgId: string; orgName: string };
   ProjectDetail: { orgId: string; projectId: string; projectName: string };
 };
 
@@ -57,7 +65,7 @@ function AuthedNavigator({
             gatewayBaseUrl={gatewayBaseUrl}
             onOpenAssets={() => navigation.navigate("AssetList")}
             onOpenUpload={() => navigation.navigate("Upload")}
-            onOpenProjects={(orgId) => navigation.navigate("ProjectList", { orgId })}
+            onOpenOrganizations={() => navigation.navigate("OrganizationList")}
           />
         )}
       </AuthedStack.Screen>
@@ -78,12 +86,41 @@ function AuthedNavigator({
         name="AssetDetail"
         options={({ route }) => ({ title: route.params.assetTitle })}
       >
-        {({ route }) => (
+        {({ route, navigation }) => (
           <AssetDetailScreen
             assetId={route.params.assetId}
             gatewayBaseUrl={gatewayBaseUrl}
+            onOpenCompliance={() =>
+              navigation.navigate("Compliance", {
+                assetId: route.params.assetId,
+                assetTitle: route.params.assetTitle,
+              })
+            }
           />
         )}
+      </AuthedStack.Screen>
+      <AuthedStack.Screen
+        name="Compliance"
+        options={({ route }) => ({ title: `${route.params.assetTitle} compliance` })}
+      >
+        {({ route, navigation }) => (
+          <ComplianceScreen
+            assetId={route.params.assetId}
+            gatewayBaseUrl={gatewayBaseUrl}
+            onManageConsent={() =>
+              navigation.navigate("Consent", {
+                assetId: route.params.assetId,
+                assetTitle: route.params.assetTitle,
+              })
+            }
+          />
+        )}
+      </AuthedStack.Screen>
+      <AuthedStack.Screen
+        name="Consent"
+        options={({ route }) => ({ title: `${route.params.assetTitle} consent` })}
+      >
+        {({ route }) => <ConsentScreen assetId={route.params.assetId} gatewayBaseUrl={gatewayBaseUrl} />}
       </AuthedStack.Screen>
       <AuthedStack.Screen name="Upload" options={{ title: "Upload" }}>
         {({ navigation }) => (
@@ -93,9 +130,41 @@ function AuthedNavigator({
           />
         )}
       </AuthedStack.Screen>
+      <AuthedStack.Screen name="OrganizationList" options={{ title: "Organizations" }}>
+        {({ navigation }) => (
+          <OrganizationListScreen
+            gatewayBaseUrl={gatewayBaseUrl}
+            onOpenProjects={(organization) =>
+              navigation.navigate("ProjectList", {
+                orgId: organization.id,
+                orgName: organization.name,
+              })
+            }
+            onOpenMembers={(organization) =>
+              navigation.navigate("OrganizationMembers", {
+                orgId: organization.id,
+                orgName: organization.name,
+                viewerRole: organization.viewer_role,
+              })
+            }
+          />
+        )}
+      </AuthedStack.Screen>
+      <AuthedStack.Screen
+        name="OrganizationMembers"
+        options={({ route }) => ({ title: `${route.params.orgName} members` })}
+      >
+        {({ route }) => (
+          <OrganizationMembersScreen
+            gatewayBaseUrl={gatewayBaseUrl}
+            orgId={route.params.orgId}
+            viewerRole={route.params.viewerRole}
+          />
+        )}
+      </AuthedStack.Screen>
       <AuthedStack.Screen
         name="ProjectList"
-        options={{ title: "Projects" }}
+        options={({ route }) => ({ title: route.params.orgName })}
       >
         {({ route, navigation }) => (
           <ProjectListScreen

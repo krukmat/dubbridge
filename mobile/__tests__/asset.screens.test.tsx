@@ -158,6 +158,7 @@ describe("asset screens", () => {
         <AssetDetailScreen
           assetId={ASSET.id}
           gatewayBaseUrl="http://127.0.0.1:4000"
+          onOpenCompliance={jest.fn()}
         />,
       );
 
@@ -171,12 +172,8 @@ describe("asset screens", () => {
         "opaque-session-abc123",
       );
       expect(view.getByText("Finalized")).toBeTruthy();
-      expect(view.getByText("Downstream processing")).toBeTruthy();
-      expect(
-        view.getByText(
-          "Not available yet. S4–S9 product surfaces have not been delivered on this mobile client.",
-        ),
-      ).toBeTruthy();
+      expect(view.getByText("Compliance and consent")).toBeTruthy();
+      expect(view.getByTestId("asset-open-compliance")).toBeTruthy();
     });
   });
 

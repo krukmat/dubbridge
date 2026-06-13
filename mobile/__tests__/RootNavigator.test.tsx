@@ -90,6 +90,7 @@ describe("RootNavigator", () => {
     expect(view.getByText("local")).toBeTruthy();
     expect(view.getByText("http://127.0.0.1:4000")).toBeTruthy();
     expect(view.getByText("Browse assets")).toBeTruthy();
+    expect(view.getByText("Organizations and projects")).toBeTruthy();
     expect(view.getByText("Sign out")).toBeTruthy();
     expect(view.getByTestId("home-screen")).toBeTruthy();
   });

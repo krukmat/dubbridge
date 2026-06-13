@@ -210,7 +210,7 @@ describe("mobile auth flow integration", () => {
 
       await waitFor(() => {
         expect(view.getByText("Asset detail")).toBeTruthy();
-        expect(view.getByText("Downstream processing")).toBeTruthy();
+        expect(view.getByText("Compliance and consent")).toBeTruthy();
       });
     });
   });

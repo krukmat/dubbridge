@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,6 +15,7 @@ import type { AssetSummary } from "./AssetListScreen";
 type AssetDetailScreenProps = {
   assetId: string;
   gatewayBaseUrl: string;
+  onOpenCompliance: () => void;
 };
 
 type AssetDetailViewState =
@@ -32,6 +34,7 @@ function formatStatus(status: string): string {
 export function AssetDetailScreen({
   assetId,
   gatewayBaseUrl,
+  onOpenCompliance,
 }: AssetDetailScreenProps) {
   const auth = useAuth();
   const [viewState, setViewState] = useState<AssetDetailViewState>({
@@ -144,11 +147,13 @@ export function AssetDetailScreen({
           </View>
 
           <View style={styles.panel}>
-            <Text style={styles.panelTitle}>Downstream processing</Text>
+            <Text style={styles.panelTitle}>Compliance and consent</Text>
             <Text style={styles.panelCopy}>
-              Not available yet. S4–S9 product surfaces have not been delivered
-              on this mobile client.
+              Review the immutable audit trail, rights evidence, and voice consent ledger.
             </Text>
+            <Pressable testID="asset-open-compliance" onPress={onOpenCompliance} style={styles.button}>
+              <Text style={styles.buttonText}>Open compliance center</Text>
+            </Pressable>
           </View>
         </>
       ) : null}
@@ -219,5 +224,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     color: "#3f3324",
+  },
+  button: {
+    alignSelf: "flex-start",
+    borderRadius: 7,
+    backgroundColor: "#855f19",
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+  },
+  buttonText: {
+    color: "#fffaf2",
+    fontSize: 14,
+    fontWeight: "700",
   },
 });

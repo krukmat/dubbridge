@@ -7,13 +7,13 @@ export function HomeScreen({
   gatewayBaseUrl,
   onOpenAssets,
   onOpenUpload,
-  onOpenProjects,
+  onOpenOrganizations,
 }: {
   dubbridgeEnv: string;
   gatewayBaseUrl: string;
   onOpenAssets: () => void;
   onOpenUpload: () => void;
-  onOpenProjects: (orgId: string) => void;
+  onOpenOrganizations: () => void;
 }) {
   const auth = useAuth();
 
@@ -50,6 +50,14 @@ export function HomeScreen({
           style={styles.secondaryButton}
         >
           <Text style={styles.secondaryButtonText}>Upload asset</Text>
+        </Pressable>
+
+        <Pressable
+          testID="home-open-organizations"
+          onPress={onOpenOrganizations}
+          style={styles.secondaryButton}
+        >
+          <Text style={styles.secondaryButtonText}>Organizations and projects</Text>
         </Pressable>
 
         <Pressable
