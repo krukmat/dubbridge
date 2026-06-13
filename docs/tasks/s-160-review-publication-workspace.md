@@ -36,8 +36,8 @@ S-160-T5 (web review console) = cancelled / superseded by S-160-T6
 | S-160-T0 | BDD `.feature` specs + mapping | — | 11 | Low | S |
 | S-160-T0b | ADR authoring: review/decision/publication gate model (X23 → X-S-160-1) | S-160-T0 | 18 | Low | S | ✅ done 2026-06-13 |
 | S-160-T1 | ~~Schema + domain + repos (review/decisions/publications)~~ decomposed → T1a + T1b + T1c | S-160-T0b | 77 | High | XL | decomposed 2026-06-13 |
-| S-160-T1a | Migration SQL: `0014`/`0015`/`0016` review schema | S-160-T0b | 49 | Med-high | L |
-| S-160-T1b | Domain entity: `review.rs` — task, verdict, publication-state derivation | S-160-T1a | 29 | Moderate | M |
+| S-160-T1a | Migration SQL: `0014`/`0015`/`0016` review schema | S-160-T0b | 54 | Med-high | L | ✅ done 2026-06-13 |
+| S-160-T1b | Domain entity: `review.rs` — task, verdict, publication-state derivation | S-160-T1a | 29 | Moderate | M | ✅ done 2026-06-13 |
 | S-160-T1c | DB repo: `review_repo.rs` — append decision, latest state, queue queries | S-160-T1b | 40 | Moderate | M |
 | S-160-T2 | Review state machine + publication gate + audit | S-160-T1c | 66 | Complex | L |
 | S-160-T3 | Review/publication API | S-160-T2 | 44 | Med-high | L |
@@ -207,9 +207,9 @@ S-160-T5 (web review console) = cancelled / superseded by S-160-T6
 
 ## S-160-T1a — Migration SQL: `0014`/`0015`/`0016` review schema
 
-- **Status:** [ ] Not started
+- **Status:** [x] Done — 2026-06-13
 - **Type:** Development (SQL migrations) · **Effort:** L
-- **RRI:** 49 → band **Med-high (41–55)** → **Plan + explicit acceptance criteria before approval; thinking On.**
+- **RRI:** 54 → band **Med-high (41–55)** → **Plan + explicit acceptance criteria before approval; thinking On.**
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4.6` · thinking On
 - **Depends on:** S-160-T0b
 - **Objective:** Create the persisted review/publication schema as three migrations:
@@ -219,6 +219,7 @@ S-160-T5 (web review console) = cancelled / superseded by S-160-T6
   - `infra/migrations/0014_create_review_tasks.sql`
   - `infra/migrations/0015_create_review_decisions.sql`
   - `infra/migrations/0016_create_publications.sql`
+  - `apps/api/tests/review_schema_test.rs`
 - **Acceptance criteria:**
   - `review_tasks` stores the reviewable unit (`asset_id`, target/scope reference, assignee, timestamps) with FK integrity.
   - `review_decisions` is append-only via RULES / equivalent DB-level protection; verdict constrained to supported values only.
@@ -237,19 +238,81 @@ S-160-T5 (web review console) = cancelled / superseded by S-160-T6
   | P | 5 | schema/data impact floor 5 | High |
   | X | 1 | migration-only scope | High |
 
-  **Base 39 · penalties auth_security (+10, P floor ≥ 4) · Final 49 → Med-high.**
+  **Base 44 · penalties auth_security (+10, P floor ≥ 4) · Final 54 → Med-high.**
 
+- **Happy paths considered:**
+  - HP-1: valid project/asset/target scope creates a review task row. (SC-REVIEW-1)
+  - HP-2: append an `approved` decision row and preserve it as immutable history. (SC-REVIEW-2)
+  - HP-3: create one publication row for the governed review task. (SC-PUBLISH-1)
+- **Edge cases considered:**
+  - EC-1: `UPDATE`/`DELETE` against `review_decisions` is blocked at the DB layer.
+  - EC-2: unknown `verdict` storage value is rejected by constraint. (SC-PUBLISH-2)
+  - EC-3: duplicate publication for the same governed review task is rejected.
+  - EC-4: malformed relational scope (wrong project target or unlinked asset) is rejected.
 - **Handoff prompt:**
   > S-160-T1a — create `0014_create_review_tasks.sql`, `0015_create_review_decisions.sql`,
   > and `0016_create_publications.sql`. Use the append-only governance posture from `0007` and
   > ADR-030. AC: constrained verdicts, append-only decisions, publication FK/uniqueness, clean
   > migration order after `0013`. Stop after SQL + verification; do not start `S-160-T1b`.
 
+- **Completion summary:**
+  - Added `review_tasks` as the governed review-unit anchor with composite FKs that enforce
+    org/project scope, asset membership through `project_assets`, target-language scope, and
+    assignee membership when present.
+  - Added append-only `review_decisions` with strict `verdict` storage constraints and a
+    latest-decision lookup index for the downstream derived-state repo/gate work.
+  - Added `publications` anchored to `review_task_id`, with one-publication-per-governed-unit
+    uniqueness.
+  - Added `apps/api/tests/review_schema_test.rs` to verify valid scope insertion, append-only
+    decision behavior, strict verdict rejection, cross-project target rejection, project-asset
+    FK rejection, and duplicate publication rejection.
+
+### Reflection log
+
+Required passes: 3 (`54` → `Med-high`)
+
+#### Pass 1
+
+- **Draft verdict:** Initial migrations created the three tables with baseline FKs and append-only rules.
+- **Critique findings:** Project/org and target/project scope were not enforced tightly enough for `review_tasks`, which would make `T1c` responsible for rejecting malformed cross-project review units.
+- **Revisions applied:** Added composite uniqueness on `projects (id, org_id)` and `target_languages (id, project_id)`, then used composite FKs in `review_tasks` to bind org/project scope, project-assets membership, and target-language scope at the DB layer.
+
+#### Pass 2
+
+- **Draft verdict:** Scope FKs were correct; append-only and publication shape still needed fail-closed review.
+- **Critique findings:** The decision ledger needed storage-level protection against silent mutation, and publication needed a single governed anchor rather than duplicated asset/target columns that could drift.
+- **Revisions applied:** Added `review_decisions` RULES to block `UPDATE`/`DELETE`, strict `verdict`/`state` `CHECK`s, a latest-decision index, and a unique `review_task_id` anchor in `publications`.
+
+#### Pass 3
+
+- **Draft verdict:** Schema shape was stable and ready for verification.
+- **Critique findings:** The approved `EC-4` required explicit evidence for malformed relational scope, not just a happy-path migration run.
+- **Revisions applied:** Added `apps/api/tests/review_schema_test.rs` with six DB-backed schema tests covering valid insertion, append-only no-op mutation attempts, unknown verdict rejection, target-language cross-project rejection, asset/project FK rejection, and duplicate publication rejection.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | valid project/asset/target scope creates one review task | `apps/api/tests/review_schema_test.rs::review_task_accepts_valid_project_asset_target_scope` | passed |
+| HP-2 | Happy path | approved review decision row is inserted and preserved as immutable history | `apps/api/tests/review_schema_test.rs::review_decisions_are_append_only_noops_for_update_and_delete` | passed |
+| HP-3 | Happy path | first publication row for a governed review task is accepted | `apps/api/tests/review_schema_test.rs::publications_reject_duplicate_review_task_rows` | passed |
+| EC-1 | Edge case | `UPDATE`/`DELETE` against `review_decisions` becomes a no-op; prior row remains intact | `apps/api/tests/review_schema_test.rs::review_decisions_are_append_only_noops_for_update_and_delete` | passed |
+| EC-2 | Edge case | unknown stored verdict is rejected by DB constraint | `apps/api/tests/review_schema_test.rs::review_decision_rejects_unknown_verdict` | passed |
+| EC-3 | Edge case | duplicate publication for the same governed review task is rejected | `apps/api/tests/review_schema_test.rs::publications_reject_duplicate_review_task_rows` | passed |
+| EC-4 | Edge case | invalid relational scope is rejected: target language from another project or asset not linked to the project | `apps/api/tests/review_schema_test.rs::review_task_rejects_target_language_from_another_project`, `apps/api/tests/review_schema_test.rs::review_task_rejects_asset_not_linked_to_project` | passed |
+
+### Owner final verification
+
+- Owner: `Codex`
+- Date: 2026-06-13
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
+- Commands run: `cargo fmt --all`, `cargo test -p dubbridge-api --test review_schema_test`
+
 ---
 
 ## S-160-T1b — Domain entity: `review.rs`
 
-- **Status:** [ ] Not started
+- **Status:** [x] Done — 2026-06-13
 - **Type:** Development (Rust domain) · **Effort:** M
 - **RRI:** 29 → band **Moderate (26–40)** → **Confirm tests exist in the affected area.**
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4.6` · thinking Off
@@ -282,10 +345,12 @@ S-160-T5 (web review console) = cancelled / superseded by S-160-T6
   **Base 29 · penalties none · Final 29 → Moderate.**
 
 - **Happy paths considered:**
-  - `HP-1`: latest persisted decision `approved` derives `ReviewTaskState::Approved`. (SC-REVIEW-2)
+  - HP-1: latest persisted decision `approved` derives `ReviewTaskState::Approved`. (SC-REVIEW-2)
+  - HP-2: absence of decisions derives `ReviewTaskState::Pending`. (SC-REVIEW-1)
 - **Edge cases considered:**
-  - `EC-1`: unknown verdict string from storage fails decode instead of defaulting. (SC-PUBLISH-2)
-  - `EC-2`: rejected latest decision derives `ReviewTaskState::Rejected`, never publishable. (SC-REVIEW-3)
+  - EC-1: unknown verdict string from storage fails decode instead of defaulting. (SC-PUBLISH-2)
+  - EC-2: rejected latest decision derives `ReviewTaskState::Rejected`, never publishable. (SC-REVIEW-3)
+  - EC-3: unknown persisted publication state fails decode.
 - **Diagram:**
 
   ```mermaid
@@ -300,6 +365,49 @@ S-160-T5 (web review console) = cancelled / superseded by S-160-T6
   > verdict/state/publication primitives, latest-decision derivation, and strict decode. AC:
   > no silent fallback on unknown values; unit tests cover derive/decode behavior. Stop after
   > tests; do not start `S-160-T1c`.
+
+- **Completion summary:**
+  - Added `crates/domain/src/review.rs` with `ReviewTaskId`, `ReviewVerdict`,
+    `ReviewTaskState`, `PublicationStatus`, `ReviewTask`, `ReviewDecisionRow`,
+    `PublicationRow`, and `derive_review_state`.
+  - Exported the module from `crates/domain/src/lib.rs`.
+  - Kept all decode boundaries fail-closed via explicit `FromStr` implementations and
+    added `is_publishable()` as the pure gate helper the next repo/service tasks can consume.
+  - Verified the package test suite and coverage, with `review.rs` at 96.15% line coverage
+    and `dubbridge-domain` overall at 93.17% line coverage.
+
+### Reflection log
+
+Required passes: 2 (`29` → `Moderate`)
+
+#### Pass 1
+
+- **Draft verdict:** Initial domain model covered verdicts, task state derivation, and publication status parse/display paths.
+- **Critique findings:** `T1c` and `T2` would need stable typed anchors, not just enums, so leaving out `ReviewTaskId`, `ReviewDecisionRow`, and `PublicationRow` would force downstream tasks to recreate domain semantics around raw UUIDs and strings.
+- **Revisions applied:** Added the missing typed identifiers and row structs, and kept their fields aligned with the `S-160-T1a` schema so the repo layer can map directly without inventing a second model.
+
+#### Pass 2
+
+- **Draft verdict:** Typed model was complete and tests existed for derive/decode behavior.
+- **Critique findings:** The fail-closed posture needed to cover more than `ReviewVerdict`; unknown derived-state or publication-state strings also needed explicit rejection, and the publish gate needed a pure boolean helper instead of duplicating `Approved` checks later.
+- **Revisions applied:** Added `FromStr` for `ReviewTaskState` and `PublicationStatus`, plus `ReviewTaskState::is_publishable()`, and extended tests to cover unknown task/publication values and pending/rejected behavior.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | latest persisted decision `approved` derives `ReviewTaskState::Approved` | `crates/domain/src/review.rs::tests::hp1_latest_approved_derives_approved_state` | passed |
+| HP-2 | Happy path | absence of decisions derives `ReviewTaskState::Pending` | `crates/domain/src/review.rs::tests::hp2_no_decisions_derives_pending_state` | passed |
+| EC-1 | Edge case | unknown verdict string fails decode instead of defaulting | `crates/domain/src/review.rs::tests::ec1_unknown_verdict_fails_closed` | passed |
+| EC-2 | Edge case | latest rejected decision derives `ReviewTaskState::Rejected` and is not publishable | `crates/domain/src/review.rs::tests::ec2_latest_rejected_is_not_publishable` | passed |
+| EC-3 | Edge case | unknown persisted publication state fails decode | `crates/domain/src/review.rs::tests::ec3_unknown_publication_state_fails_closed` | passed |
+
+### Owner final verification
+
+- Owner: `Codex`
+- Date: 2026-06-13
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
+- Commands run: `cargo fmt --all`, `cargo test -p dubbridge-domain`, `cargo llvm-cov --package dubbridge-domain --summary-only`
 
 ---
 
