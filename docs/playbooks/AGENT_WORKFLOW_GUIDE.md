@@ -353,7 +353,8 @@ Agent-specific resolution rules:
 
 - For RRI 0–25, use the local Ollama/Gemma delegation protocol in
   `docs/policies/RRI_POLICY.md § Low RRI local delegation`; do not resolve to a
-  cloud vendor model.
+  cloud vendor model. For the step-by-step handoff discipline for local-model
+  work, see `docs/playbooks/LOW_RRI_LOCAL_MODEL_HANDOFF.md`.
 - Resolve each capability label to the best currently available model in the
   active agent environment.
 - When naming a concrete vendor model ID, verify the current vendor guidance
@@ -451,7 +452,9 @@ Required pass count by RRI band:
 | 41–55 | Med-high | 3 |
 | 56–70 | Complex | 4 |
 
-For RRI 71+, follow the decomposition and human-review gates in
+MANDATORY:
+---------
+For RRI 56+, follow the decomposition and human-review gates in
 `docs/policies/RRI_POLICY.md` before implementation. If an exceptional approved
 development task still proceeds without decomposition, apply at least the Complex
 band minimum of 4 Reflection passes in addition to the RRI-policy gates.

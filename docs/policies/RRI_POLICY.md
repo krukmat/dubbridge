@@ -214,6 +214,10 @@ agent) deterministically builds the diff and applies it. Gemma must not evaluate
 approve, or mark its own delegated work as complete; the delegating agent owns
 that decision.
 
+For the operational step-by-step handoff discipline, packet-shaping rules, and
+scope-reduction guidance for local-model work, see
+`docs/playbooks/LOW_RRI_LOCAL_MODEL_HANDOFF.md`.
+
 **Why file contents, not a diff:** small local models reliably write correct file
 bodies but botch unified-diff framing — merged hunks, missing headers, wrong line
 counts — especially across multiple files. The model returns each changed file in

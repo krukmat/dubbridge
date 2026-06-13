@@ -1,5 +1,9 @@
 # Tasks: S-100 — Collaborative Localization Workspace
 
+> **Historical note (S-105, 2026-06-13):** S-100-T4/T5 remain completed historical
+> tasks, but their `web/` artifacts and Playwright coverage were removed by
+> S-105-T3 after equivalent mobile behavior was certified.
+
 **Plan:** `docs/plan/s-100-collaborative-workspace.md`
 **Roadmap phase:** `S-100` (foundation for `S-110`, `S-160`).
 **Governing guides:** `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` (authoritative),

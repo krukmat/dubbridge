@@ -85,6 +85,14 @@
 
 All tasks V1–V8 are done. S-055 is closed.
 
+**Retrospective BDD source of truth**
+([mobile/bdd/s-055-maestro-suite.feature](/Users/matias/Documents/projects/dubbridge/mobile/bdd/s-055-maestro-suite.feature:1),
+[mobile/bdd/README.md](/Users/matias/Documents/projects/dubbridge/mobile/bdd/README.md:30)).
+This sub-slice predated the mobile BDD convention; its shipped suite guarantees
+were backfilled into a dedicated retrospective `.feature` spec on 2026-06-12
+without altering the original implementation history. The retrospective mapping
+is backed by the shipped Maestro flows and runner/sanitizer artifacts.
+
 ---
 
 ## Status legend

@@ -1,19 +1,20 @@
 # Tasks: S-160 — Human Review & Publication Workspace
 
 **Plan:** `docs/plan/s-160-review-publication-workspace.md`
-**Roadmap phase:** `S-160` (depends on `S-100`).
+**Roadmap phase:** `S-160` (depends on `S-105`).
 **Governing guides:** `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` (authoritative),
 `docs/policies/HITL_AUTONOMY_POLICY.md`, `docs/policies/RRI_POLICY.md`, `AGENTS.md`.
-**Governing ADRs:** ADR-008, ADR-018, ADR-023, ADR-024, ADR-006.
+**Governing ADRs:** ADR-008, ADR-018, ADR-023, ADR-024, ADR-006, ADR-027, ADR-030.
 
 > **Namespace.** This phase uses the **`S-160-T`** prefix (`S-160-T0`–`S-160-T7`). Always fully
 > qualify cross-slice references (`S-160-T2`, `S-100-T1`), never bare `T2`.
 
 > **RRI provenance.** Every RRI below was computed with `python3 scripts/rri.py`
 > (platform `dubbridge`) at planning time, not by hand. Final RRI is recomputed at
-> presentation. All tasks scored ≤ 70 → no mandatory decomposition; `S-160-T1`, `S-160-T2`,
-> and `S-160-T4` land in **Complex (56–70)** and therefore require a reviewed plan before
-> implementation — this ledger + the plan provide it.
+> presentation. `S-160-T1` was decomposed 2026-06-13 into `T1a`/`T1b`/`T1c` after
+> recomputing the real implementation surface (`RRI 77`, `F >= 4 && K >= 3` trigger).
+> `S-160-T2` and `S-160-T4` remain in **Complex (56–70)** and therefore require a
+> reviewed plan before implementation — this ledger + the plan provide it.
 
 ## Status legend
 - [ ] Not started · [~] In progress · [x] Done
@@ -21,22 +22,29 @@
 ## Task dependency order
 
 ```text
-S-160-T0 (BDD) ─▶ S-160-T0b (ADR X-S-160-1) ─▶ S-160-T1 (schema+domain+repos) ─▶ S-160-T2 (review state machine + publication gate + audit) ─▶ S-160-T3 (review/publication API) ─┬─▶ S-160-T4 (notifications) ─┬─▶ S-160-T5 (web console) ─┐
-                                                                                                                                                                        │                          ├─▶ S-160-T6 (mobile + push) ┤
-                                                                                                                                                                        └──────────────────────────┴─▶ S-160-T7 (E2E + docs) ◀───┘
+S-160-T0 (BDD) ─▶ S-160-T0b (ADR) ─▶ S-160-T1a (migration SQL)
+  ─▶ S-160-T1b (domain entity) ─▶ S-160-T1c (DB repo)
+  ─▶ S-160-T2 (state machine + publication gate) ─▶ S-160-T3 (API)
+  ─▶ S-160-T4 (notifications) ─▶ S-160-T6 (complete mobile reviewer)
+  ─▶ S-160-T7 (mock fixtures + Maestro + docs)
+
+S-160-T5 (web review console) = cancelled / superseded by S-160-T6
 ```
 
 | Task | Title | Depends on | RRI | Band | Effort |
 |---|---|---|---|---|---|
 | S-160-T0 | BDD `.feature` specs + mapping | — | 11 | Low | S |
-| S-160-T0b | ADR authoring: review/decision/publication gate model (X23 → X-S-160-1) | S-160-T0 | 18 | Low | S |
-| S-160-T1 | Schema + domain + repos (review/decisions/publications) | S-160-T0b | 63 | Complex | L |
-| S-160-T2 | Review state machine + publication gate + audit | S-160-T1 | 66 | Complex | L |
+| S-160-T0b | ADR authoring: review/decision/publication gate model (X23 → X-S-160-1) | S-160-T0 | 18 | Low | S | ✅ done 2026-06-13 |
+| S-160-T1 | ~~Schema + domain + repos (review/decisions/publications)~~ decomposed → T1a + T1b + T1c | S-160-T0b | 77 | High | XL | decomposed 2026-06-13 |
+| S-160-T1a | Migration SQL: `0014`/`0015`/`0016` review schema | S-160-T0b | 49 | Med-high | L |
+| S-160-T1b | Domain entity: `review.rs` — task, verdict, publication-state derivation | S-160-T1a | 29 | Moderate | M |
+| S-160-T1c | DB repo: `review_repo.rs` — append decision, latest state, queue queries | S-160-T1b | 40 | Moderate | M |
+| S-160-T2 | Review state machine + publication gate + audit | S-160-T1c | 66 | Complex | L |
 | S-160-T3 | Review/publication API | S-160-T2 | 44 | Med-high | L |
 | S-160-T4 | Notifications mechanism (table + emit + push) | S-160-T3 | 66 | Complex | L |
-| S-160-T5 | Web review console | S-160-T3, S-160-T4 | 33 | Moderate | M |
-| S-160-T6 | Mobile reviewer surfaces + push | S-160-T3, S-160-T4 | 31 | Moderate | M |
-| S-160-T7 | E2E fixtures + docs/roadmap sync | S-160-T5, S-160-T6 | 24 | Low | S |
+| S-160-T5 | Web review console — cancelled / superseded | — | 33 | Moderate | M |
+| S-160-T6 | Complete mobile reviewer surface + push | S-160-T3, S-160-T4, S-105 | Recompute | — | L |
+| S-160-T7 | Mock fixtures + Maestro + docs/roadmap sync | S-160-T6 | Recompute | — | M |
 
 ## Model resolution (capability → current vendor model)
 
@@ -46,22 +54,23 @@ S-160-T0 (BDD) ─▶ S-160-T0b (ADR X-S-160-1) ─▶ S-160-T1 (schema+domain+r
 | Moderate (26–40) | `GPT-5.2-Codex` | `Claude Sonnet 4.6` | Off |
 | Med-high (41–55) | `GPT-5.2-Codex` | `Claude Sonnet 4.6` (escalate to `Claude Opus 4.8` if it stalls) | On |
 | Complex (56–70) | `GPT-5.2-Codex` | `Claude Opus 4.8` | On |
+| High (71–85) | `GPT-5.2-Codex` | `Claude Opus 4.8` | On |
 
 ---
 
-## S-160-T0 — BDD `.feature` specs + BDD⇄web⇄mobile⇄unit mapping
+## S-160-T0 — BDD `.feature` specs + mapping
 
-- **Status:** [ ] Not started
+- **Status:** [x] Done — 2026-06-13
 - **Type:** Planning / docs (BDD authoring) · **Effort:** S
 - **RRI:** 11 → band **Low (0–25)** → **auto-execute**
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Haiku 4.5` · thinking Off
 - **Depends on:** — (BDD-first)
 - **Objective:** Author the Gherkin specs defining acceptance for the review/publication
-  slice and the mapping convention (scenario ID ⇄ web/mobile flow ⇄ `HP-#`/`EC-#`).
+  slice and the mapping convention (scenario ID ⇄ executable evidence ⇄ `HP-#`/`EC-#`).
 - **Inputs:** plan §D1–§D6; S-100 role model; S-010 artifact lineage; ADR-008.
-- **Outputs:** `docs/bdd/p5-review.feature`; mapping rows appended to `docs/bdd/README.md`.
+- **Outputs:** `docs/bdd/s-160-review.feature`; mapping rows appended to `docs/bdd/README.md`.
 - **Acceptance criteria:**
-  - Each scenario has a stable ID and maps to one web/mobile flow and ≥1 `HP-#`/`EC-#`.
+  - Each scenario has a stable ID and maps to executable evidence and ≥1 `HP-#`/`EC-#`.
   - Scenarios are behavioral; `make qa-docs` passes.
 - **RRI variable table (script output):**
 
@@ -114,22 +123,31 @@ S-160-T0 (BDD) ─▶ S-160-T0b (ADR X-S-160-1) ─▶ S-160-T1 (schema+domain+r
       Then I receive a notification referencing the task
   ```
 
-- **Handoff prompt:**
-  > S-160-T0 — author BDD specs. Docs: this ledger + plan §D1–§D6. Create
-  > `docs/bdd/p5-review.feature` (SC-REVIEW-1/2/3, SC-PUBLISH-1/2, SC-NOTIFY-1) and append
-  > mapping rows to `docs/bdd/README.md`. AC: stable IDs mapped to web/mobile + HP/EC,
-  > qa-docs green. Stop after docs; do not start S-160-T0b.
+- **Completion summary:**
+  - Authored `docs/bdd/s-160-review.feature` with six stable scenarios:
+    `SC-REVIEW-1/2/3`, `SC-PUBLISH-1/2`, and `SC-NOTIFY-1`.
+  - Added the `S-160` mapping table to `docs/bdd/README.md` using the
+    mobile-only and backend-evidence convention.
+  - Verified documentation consistency with `make qa-docs`.
+
+- **Owner final verification:**
+  - Owner: `Codex`
+  - Date: `2026-06-13`
+  - Statement: I verified the `S-160` scenarios exist with stable IDs in
+    `docs/bdd/s-160-review.feature`, the mapping rows were added to
+    `docs/bdd/README.md`, and the documentation checks pass.
+  - Commands run: `make qa-docs`
 
 ---
 
 ## S-160-T0b — ADR authoring: review/decision/publication gate model (X23 → X-S-160-1)
 
-- **Status:** [ ] Not started
+- **Status:** [x] Done — 2026-06-13
 - **Type:** Architecture decision · **Effort:** S
 - **RRI:** 18 → band **Low (0–25)** → **auto-execute**
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Haiku 4.5` · thinking Off
 - **Depends on:** S-160-T0, S-100 (org/role model)
-- **Blocks:** S-160-T1, S-160-T2 — **neither may start until this ADR is merged**
+- **Blocks:** S-160-T1a, S-160-T2 — **neither may start until this ADR is merged**
 - **Objective:** Author and merge the ADR that defines the review/decision/publication gate
   model: how review tasks are created and assigned, how append-only decisions derive
   task state, and how the publication gate enforces approval as a fail-closed precondition
@@ -141,7 +159,7 @@ S-160-T0 (BDD) ─▶ S-160-T0b (ADR X-S-160-1) ─▶ S-160-T1 (schema+domain+r
   - `docs/plan/s-160-review-publication-workspace.md` §D1–§D3
   - S-100-T0b ADR (role model — reviewer role gate)
 - **Outputs:**
-  - `docs/adr/ADR-NNN-review-publication-gate.md` — decision record covering:
+  - `docs/adr/ADR-030-review-decision-ledger-and-fail-closed-publication-gate.md` — decision record covering:
     - Review task lifecycle: Pending → Approved | Rejected (state = latest decision row)
     - `review_decisions` is append-only; no UPDATE/DELETE paths
     - Publication gate: `publications` row only created when latest decision = Approved
@@ -156,72 +174,189 @@ S-160-T0 (BDD) ─▶ S-160-T0b (ADR X-S-160-1) ─▶ S-160-T1 (schema+domain+r
   - ADR text covers: task lifecycle, append-only decision invariant, publication gate,
     fail-closed posture, role gate, audit obligation, and S-140/S-150 forward dependency.
   - `make qa-docs` passes.
-- **Handoff prompt:**
-  > S-160-T0b — author ADR for review/decision/publication gate (X23). Inputs:
-  > ADR-008, ADR-018, migration 0007, plan §D1–§D3, S-100-T0b ADR. Create
-  > `docs/adr/ADR-NNN-review-publication-gate.md` (task lifecycle, append-only decisions,
-  > publication gate fail-closed, role gate, audit obligation, S-140/S-150 forward dep)
-  > and update `docs/adr/README.md` index. AC: real ADR number, index updated, qa-docs
-  > green. Stop after docs; do not start S-160-T1.
+- **Completion summary:**
+  - Authored `ADR-030` to define the review-task lifecycle, append-only decision
+    ledger, org-scoped reviewer authorization, and fail-closed publication gate.
+  - Updated `docs/adr/README.md` and the S-160 plan/roadmap references to mark
+    `X23 / X-S-160-1` closed.
+  - Verified ADR/document consistency with `make qa-docs`.
+
+- **Owner final verification:**
+  - Owner: `Codex`
+  - Date: `2026-06-13`
+  - Statement: I verified `ADR-030` exists, the ADR index and canonical S-160
+    references were synchronized, and the documentation checks pass.
+  - Commands run: `make qa-docs`
 
 ---
 
 ## S-160-T1 — Schema + domain + repos (review tasks, decisions, publications)
 
-- **Status:** [ ] Not started
-- **Type:** Development (Rust + SQL) · **Effort:** L
-- **RRI:** 63 → band **Complex (56–70)** → **Plan first; human reviews the plan; thinking On.**
+- **Status:** [~] Decomposed into `S-160-T1a`/`T1b`/`T1c` — 2026-06-13
+- **Type:** Historical parent task (do not implement directly) · **Effort:** XL
+- **RRI:** 77 → band **High (71–85)** → **Characterization/evidence + diff review + mandatory decomposition.**
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Opus 4.8` · thinking On
-- **Depends on:** S-160-T0
-- **Objective:** Introduce the review/publication data model — `review_tasks`,
-  append-only `review_decisions`, `publications` — plus domain entities and repos. (Plan §D1.)
-- **Inputs:** `infra/migrations/` (next free index 0013), `migration 0007` (append-only
-  governance posture), `crates/db/src/rights_repo.rs` (append-only patterns).
+- **Depends on:** S-160-T0b
+- **Objective:** Historical aggregate only. The original schema/domain/repo scope exceeded the
+  decomposition gate and was split into `S-160-T1a`, `S-160-T1b`, and `S-160-T1c`.
+- **Decomposition trigger:** realistic implementation footprint raised the task to `RRI 77`,
+  activating both `RRI > 70` and `F >= 4 && K >= 3` from `docs/policies/RRI_POLICY.md`.
+- **Disposition:** implement the child tasks only; `S-160-T2` depends on `S-160-T1c`.
+
+---
+
+## S-160-T1a — Migration SQL: `0014`/`0015`/`0016` review schema
+
+- **Status:** [ ] Not started
+- **Type:** Development (SQL migrations) · **Effort:** L
+- **RRI:** 49 → band **Med-high (41–55)** → **Plan + explicit acceptance criteria before approval; thinking On.**
+- **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4.6` · thinking On
+- **Depends on:** S-160-T0b
+- **Objective:** Create the persisted review/publication schema as three migrations:
+  `review_tasks`, append-only `review_decisions`, and `publications`.
+- **Inputs:** `infra/migrations/0013_create_voice_consents.sql`, `infra/migrations/0007_harden_governance_invariants.sql`, ADR-008, ADR-018, ADR-030.
 - **Outputs:**
-  - `0013_create_review_tasks.sql`, `0014_create_review_decisions.sql` (append-only),
-    `0015_create_publications.sql`.
-  - `crates/domain/src/review.rs` (review task / verdict / publication state derivation).
-  - `crates/db/src/review_repo.rs` (insert decision, derive latest state, list queue).
-  - Unit/integration tests; ≥90% coverage.
+  - `infra/migrations/0014_create_review_tasks.sql`
+  - `infra/migrations/0015_create_review_decisions.sql`
+  - `infra/migrations/0016_create_publications.sql`
 - **Acceptance criteria:**
-  - `review_decisions` is append-only (no UPDATE/DELETE path); current state = latest row.
-  - Task state decodes strictly; unknown verdict rejected (fail-closed).
-  - Migrations apply cleanly, FK-constrained to assets/projects.
-  - ≥90% coverage; all tests green.
+  - `review_tasks` stores the reviewable unit (`asset_id`, target/scope reference, assignee, timestamps) with FK integrity.
+  - `review_decisions` is append-only via RULES / equivalent DB-level protection; verdict constrained to supported values only.
+  - `publications` references the governing review task and asset/target identity with uniqueness that prevents duplicate publication rows for the same governed unit.
+  - Migrations apply cleanly on a fresh DB and after `0013_create_voice_consents.sql`.
 - **RRI variable table (script output):**
 
   | Variable | Score | Evidence | Confidence |
   |---|---|---|---|
-  | C | 2 | raw CC 12 → 2 | High |
-  | F | 2 | 5 files | High |
-  | D | 4 | anchor: `infra/migrations` (ADR-008, ADR-018) floor 4 | High |
-  | T | 2 | db/domain area has tests | High |
-  | A | 0 | criteria + examples present | High |
+  | C | 0 | raw CC 4 → 0 | High |
+  | F | 2 | 3 files | High |
+  | D | 4 | anchor: `infra/migrations` floor 4 | High |
+  | T | 2 | migration checks exist in CI | High |
+  | A | 0 | criteria present | High |
   | K | 4 | anchor: `infra/migrations` floor 4 | High |
-  | P | 5 | anchor: `infra/migrations` floor 5 (schema/data) | High |
-  | X | 3 | migrations + domain + repo | High |
+  | P | 5 | schema/data impact floor 5 | High |
+  | X | 1 | migration-only scope | High |
 
-  **Base 53 · penalties auth_security (+10, P floor ≥ 4) · Final 63 → Complex → plan-first.**
+  **Base 39 · penalties auth_security (+10, P floor ≥ 4) · Final 49 → Med-high.**
+
+- **Handoff prompt:**
+  > S-160-T1a — create `0014_create_review_tasks.sql`, `0015_create_review_decisions.sql`,
+  > and `0016_create_publications.sql`. Use the append-only governance posture from `0007` and
+  > ADR-030. AC: constrained verdicts, append-only decisions, publication FK/uniqueness, clean
+  > migration order after `0013`. Stop after SQL + verification; do not start `S-160-T1b`.
+
+---
+
+## S-160-T1b — Domain entity: `review.rs`
+
+- **Status:** [ ] Not started
+- **Type:** Development (Rust domain) · **Effort:** M
+- **RRI:** 29 → band **Moderate (26–40)** → **Confirm tests exist in the affected area.**
+- **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4.6` · thinking Off
+- **Depends on:** S-160-T1a
+- **Objective:** Add the review domain model and strict decode boundary used by the repo and
+  gate layers: task identity, verdict, derived review state, and publication status.
+- **Inputs:** ADR-030, `crates/domain/src/consent.rs`, `crates/domain/src/rights.rs`.
+- **Outputs:**
+  - `crates/domain/src/review.rs`
+  - `crates/domain/src/lib.rs`
+  - Unit tests for strict verdict/state decoding and latest-decision derivation
+- **Acceptance criteria:**
+  - `review.rs` defines typed verdict/state/publication primitives with strict parsing.
+  - Latest decision derives the current task state deterministically.
+  - Unknown persisted verdict/state values fail closed at decode time.
+  - Unit tests cover the derivation and strict-decode paths.
+- **RRI variable table (script output):**
+
+  | Variable | Score | Evidence | Confidence |
+  |---|---|---|---|
+  | C | 1 | raw CC 8 → 1 | High |
+  | F | 1 | 2 files | High |
+  | D | 2 | anchor: `crates/domain` floor 2 | High |
+  | T | 2 | partial domain tests | High |
+  | A | 0 | criteria + examples present | High |
+  | K | 2 | internal domain module | High |
+  | P | 2 | typed internal contract | High |
+  | X | 2 | one module + crate export | High |
+
+  **Base 29 · penalties none · Final 29 → Moderate.**
 
 - **Happy paths considered:**
-  - `HP-1`: insert approve decision → task state derives `approved`. (SC-REVIEW-2)
+  - `HP-1`: latest persisted decision `approved` derives `ReviewTaskState::Approved`. (SC-REVIEW-2)
 - **Edge cases considered:**
-  - `EC-1`: attempt to UPDATE a decision row → not supported; supersede via new row only.
-  - `EC-2`: unknown verdict string → decode error, no row.
+  - `EC-1`: unknown verdict string from storage fails decode instead of defaulting. (SC-PUBLISH-2)
+  - `EC-2`: rejected latest decision derives `ReviewTaskState::Rejected`, never publishable. (SC-REVIEW-3)
 - **Diagram:**
 
   ```mermaid
-  erDiagram
-    assets ||--o{ review_tasks : reviewed_by
-    review_tasks ||--o{ review_decisions : append_only
-    review_tasks ||--o| publications : gates
+  stateDiagram-v2
+    [*] --> Pending
+    Pending --> Approved: latest decision = approve
+    Pending --> Rejected: latest decision = reject
   ```
 
 - **Handoff prompt:**
-  > S-160-T1 — review/publication schema + domain + repos. Docs: this ledger + plan §D1, ADR-008/018.
-  > Add migrations 0013–0015, `crates/domain/src/review.rs`, `crates/db/src/review_repo.rs`.
-  > AC: append-only decisions, latest-state derivation, strict decode, ≥90% cov. Stop after tests;
-  > do not start S-160-T2.
+  > S-160-T1b — add `crates/domain/src/review.rs` and export it from `lib.rs`. Implement typed
+  > verdict/state/publication primitives, latest-decision derivation, and strict decode. AC:
+  > no silent fallback on unknown values; unit tests cover derive/decode behavior. Stop after
+  > tests; do not start `S-160-T1c`.
+
+---
+
+## S-160-T1c — DB repo: `review_repo.rs`
+
+- **Status:** [ ] Not started
+- **Type:** Development (Rust DB) · **Effort:** M
+- **RRI:** 40 → band **Moderate (26–40)** → **Confirm tests exist in the affected area.**
+- **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4.6` · thinking Off
+- **Depends on:** S-160-T1b
+- **Objective:** Implement persistence and query operations for review tasks/decisions/publications,
+  using the new schema and domain types.
+- **Inputs:** `crates/db/src/consent_repo.rs`, `crates/db/src/workspace_repo.rs`, ADR-030.
+- **Outputs:**
+  - `crates/db/src/review_repo.rs`
+  - `crates/db/src/lib.rs`
+  - Repo-focused tests covering append, latest-state derivation, and queue queries
+- **Acceptance criteria:**
+  - Repo can insert review tasks and append approve/reject decisions without any mutation path for existing decision rows.
+  - Queue/list queries are org/project scoped and return derived state from the latest decision row.
+  - Publication persistence reads the same governed identity expected by the gate layer.
+  - Tests prove append-only behavior and latest-state derivation.
+- **RRI variable table (script output):**
+
+  | Variable | Score | Evidence | Confidence |
+  |---|---|---|---|
+  | C | 1 | raw CC 10 → 1 | High |
+  | F | 2 | 3 files | High |
+  | D | 3 | anchor: `crates/db` floor 3 | High |
+  | T | 2 | partial repo coverage | High |
+  | A | 0 | criteria + examples present | High |
+  | K | 3 | DB/repo coupling | High |
+  | P | 3 | persisted internal contract | High |
+  | X | 2 | repo + export + tests | High |
+
+  **Base 40 · penalties none · Final 40 → Moderate.**
+
+- **Happy paths considered:**
+  - `HP-1`: append approve decision through repo → queue/read model reflects approved. (SC-REVIEW-2)
+- **Edge cases considered:**
+  - `EC-1`: second decision supersedes current derived state without mutating prior history. (SC-REVIEW-3)
+  - `EC-2`: query outside org/project scope returns no review tasks. (SC-REVIEW-1)
+- **Diagram:**
+
+  ```mermaid
+  flowchart LR
+    RT[(review_tasks)] --> RR[review_repo]
+    RD[(review_decisions)] --> RR
+    RR --> DS[derived current state]
+    RR --> Q[queue query]
+  ```
+
+- **Handoff prompt:**
+  > S-160-T1c — implement `crates/db/src/review_repo.rs` and export it from `crates/db/src/lib.rs`.
+  > Cover task insert, append-only decisions, derived latest state, and queue reads. AC: no
+  > in-place mutation of decision history, tests prove derived-state behavior. Stop after tests;
+  > do not start `S-160-T2`.
 
 ---
 
@@ -231,11 +366,11 @@ S-160-T0 (BDD) ─▶ S-160-T0b (ADR X-S-160-1) ─▶ S-160-T1 (schema+domain+r
 - **Type:** Development (Rust) · **Effort:** L
 - **RRI:** 66 → band **Complex (56–70)** → **Plan first; human reviews the plan; thinking On.**
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Opus 4.8` · thinking On
-- **Depends on:** S-160-T1
+- **Depends on:** S-160-T1c
 - **Objective:** Implement the review transition rules and the **fail-closed publication
   gate**: a publication cannot be created unless its governing review task is `approved`.
   Emit durable audit on decisions and publish attempts. (Plan §D2.)
-- **Inputs:** `review_repo` (S-160-T1), `crates/audit` emission, ADR-008 (rights gate as the
+- **Inputs:** `review_repo` (S-160-T1c), `crates/audit` emission, ADR-008 (rights gate as the
   template), `finalize_ingestion_core` (reusable-gate pattern).
 - **Outputs:**
   - `apps/api/src/services/review_gate.rs` (transition rules + `require_approved_for_publish`).
@@ -328,7 +463,7 @@ S-160-T0 (BDD) ─▶ S-160-T0b (ADR X-S-160-1) ─▶ S-160-T1 (schema+domain+r
 
   ```mermaid
   flowchart LR
-    C[web/mobile] -->|POST /api/review/{id}/decision| G[gateway] --> A[apps/api review routes]
+    C[mobile] -->|POST /api/review/{id}/decision| G[gateway] --> A[apps/api review routes]
     A --> M[org_scope guard] --> GT[review_gate] --> DB[(review_repo)]
     GT --> AU[(audit_events)]
   ```
@@ -349,10 +484,10 @@ S-160-T0 (BDD) ─▶ S-160-T0b (ADR X-S-160-1) ─▶ S-160-T1 (schema+domain+r
 - **Depends on:** S-160-T3
 - **Objective:** Add a `notifications` table, emission on assignment/decision/publish, and
   mobile push-token registration. Payloads carry references only (no PII). (Plan §D5.)
-- **Inputs:** `infra/migrations/` (next free index 0016), `review_gate` emit points,
+- **Inputs:** `infra/migrations/` (next free index 0017), `review_gate` emit points,
   ADR-018 (redaction), Expo push.
 - **Outputs:**
-  - `0016_create_notifications.sql` (recipient, kind, ref, read_at).
+  - `0017_create_notifications.sql` (recipient, kind, ref, read_at).
   - `crates/db/src/notification_repo.rs`; emit hooks at decision/publish/assignment.
   - `apps/api/src/routes/notifications.rs` (list/mark-read).
   - `mobile/src/push/registerPush.ts` (Expo push token registration).
@@ -391,23 +526,23 @@ S-160-T0 (BDD) ─▶ S-160-T0b (ADR X-S-160-1) ─▶ S-160-T1 (schema+domain+r
   ```
 
 - **Handoff prompt:**
-  > S-160-T4 — notifications. Docs: this ledger + plan §D5, ADR-018. Add migration 0016,
+  > S-160-T4 — notifications. Docs: this ledger + plan §D5, ADR-018. Add migration 0017,
   > `notification_repo`, emit hooks, `routes/notifications.rs`, `mobile/src/push/registerPush.ts`.
   > AC: rows on assign/decide/publish, no-PII payload, owner-scoped list, ≥90% cov. Stop after tests;
-  > do not start S-160-T5.
+  > do not start S-160-T6.
 
 ---
 
 ## S-160-T5 — Web review console
 
-- **Status:** [ ] Not started
+- **Status:** [-] Cancelled / superseded by S-160-T6 — 2026-06-13
 - **Type:** Development (TS/web) · **Effort:** M
 - **RRI:** 33 → band **Moderate (26–40)** → **Confirm tests exist in the area.**
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4.6` · thinking Off
 - **Depends on:** S-160-T3, S-160-T4
-- **Objective:** Build the web review console: queue, side-by-side preview (original vs
-  derived output), approve/reject with comment, and a publish action gated on state.
-- **Inputs:** S-100-T4 web shell/client, S-160-T3 endpoints, S-160-T4 notifications, BDD scenarios.
+- **Objective:** Historical proposal only. S-105 removed the authenticated web-console
+  product surface before implementation.
+- **Inputs:** None; do not implement.
 - **Outputs:** `ReviewQueueScreen.tsx`, `ReviewDetailScreen.tsx`, `SideBySidePreview.tsx`;
   `data-testid`s (`review-queue-screen`, `review-detail-screen`, `review-approve`,
   `review-reject`, `publish-action`); component tests.
@@ -445,27 +580,27 @@ S-160-T0 (BDD) ─▶ S-160-T0b (ADR X-S-160-1) ─▶ S-160-T1 (schema+domain+r
     decided --> published: publish (if approved)
   ```
 
-- **Handoff prompt:**
-  > S-160-T5 — web review console. Docs: this ledger + plan §D6. Build ReviewQueue/ReviewDetail/
-  > SideBySidePreview against S-160-T3/S-160-T4, gated publish, data-testids, component tests.
-  > AC: SC-REVIEW-1/2/3 + SC-PUBLISH-2, tests+typecheck green. Stop after tests; do not start S-160-T7.
+- **Disposition:** All user-facing behavior is owned by S-160-T6.
 
 ---
 
-## S-160-T6 — Mobile reviewer surfaces + push
+## S-160-T6 — Complete mobile reviewer surface + push
 
 - **Status:** [ ] Not started
-- **Type:** Development (TS/RN) · **Effort:** M
-- **RRI:** 31 → band **Moderate (26–40)** → **Confirm tests exist in the area.**
+- **Type:** Development (TS/RN) · **Effort:** L
+- **RRI:** Recompute from the expanded mobile-only scope before presentation.
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Sonnet 4.6` · thinking Off
-- **Depends on:** S-160-T3, S-160-T4
-- **Objective:** Add a mobile reviewer inbox and a decide screen (approve/reject on the go),
-  wired to push notifications from S-160-T4.
+- **Depends on:** S-160-T3, S-160-T4, S-105
+- **Objective:** Add the complete mobile review experience: inbox, original/derived
+  comparison through an alternable or stacked view, approve/reject with comments,
+  publish visible only when approved, notifications, and deep links.
 - **Inputs:** `mobile/src/api/client.ts`, nav, S-160-T3 endpoints, `registerPush.ts` (S-160-T4).
-- **Outputs:** `ReviewInboxScreen.tsx`, `ReviewDecisionScreen.tsx`, nav route,
-  `review-inbox-screen`/`review-decision-screen` testIDs, component tests.
+- **Outputs:** `ReviewInboxScreen.tsx`, `ReviewDetailScreen.tsx`, comparison and
+  decision/publish controls, nav/deep links, testIDs, and component tests.
 - **Acceptance criteria:**
-  - Inbox lists assigned tasks; decision screen posts approve/reject. (SC-REVIEW-1/2/3)
+  - Inbox lists assigned tasks; detail compares original and derived content and
+    posts approve/reject with a comment. (SC-REVIEW-1/2/3)
+  - Publish action is visible only for approved state; backend remains authoritative.
   - A push notification deep-links to the relevant task. (SC-NOTIFY-1)
   - testIDs present; `npm test` + typecheck green.
 - **RRI variable table (script output):**
@@ -493,14 +628,15 @@ S-160-T0 (BDD) ─▶ S-160-T0b (ADR X-S-160-1) ─▶ S-160-T1 (schema+domain+r
   ```mermaid
   flowchart LR
     PUSH[push notification] --> INBOX[review-inbox-screen]
-    INBOX --> DEC[review-decision-screen]
-    DEC --> API[/api/review/{id}/decision]
+    INBOX --> DEC[review-detail-screen]
+    DEC --> CMP[original / derived comparison]
+    DEC --> API[/api/review/{id}/decision or publish]
   ```
 
 - **Handoff prompt:**
-  > S-160-T6 — mobile reviewer + push. Docs: this ledger + plan §D5–§D6. Add ReviewInbox/
-  > ReviewDecision + nav + testIDs, push deep-link via registerPush. AC: SC-REVIEW-1/2/3 +
-  > SC-NOTIFY-1, 401→logout, tests+typecheck green. Stop after tests; do not start S-160-T7.
+  > S-160-T6 — complete mobile reviewer + push. Build inbox/detail, alternable or
+  > stacked comparison, commented decisions, approved-only publish visibility, nav,
+  > notifications and deep links. Keep publication fail-closed in backend.
 
 ---
 
@@ -510,14 +646,14 @@ S-160-T0 (BDD) ─▶ S-160-T0b (ADR X-S-160-1) ─▶ S-160-T1 (schema+domain+r
 - **Type:** Development (Node fixture) / ops / docs · **Effort:** S
 - **RRI:** 24 → band **Low (0–25)** → **auto-execute**
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Haiku 4.5` · thinking Off
-- **Depends on:** S-160-T5, S-160-T6
+- **Depends on:** S-160-T6
 - **Objective:** Extend the mock-gateway with review/publication/notification fixtures,
-  author web (Playwright) + mobile (Maestro) review flows, and sync status docs.
+  author the mobile Maestro review flow, and sync status docs.
 - **Inputs:** `mock-gateway-server.mjs`, S-160-T3/T4 contracts, S-055 env, `docs/plan/roadmap.md`.
-- **Outputs:** `/api/*` review fixtures + `node --test`; `web/e2e/review.spec.ts`;
+- **Outputs:** `/api/*` review fixtures + `node --test`;
   `mobile/maestro/review.yaml`; roadmap row updated; X-S-160-1/2/3 recorded; BDD mapping closed.
 - **Acceptance criteria:**
-  - Web + mobile review flows pass against the deterministic mock-gateway, including the
+  - The mobile review flow passes against the deterministic mock-gateway, including the
     publish-blocked-without-approval narrative. (SC-PUBLISH-2)
   - `make qa-docs` green; status docs consistent; follow-ups recorded.
 - **RRI variable table (script output):**
@@ -542,8 +678,8 @@ S-160-T0 (BDD) ─▶ S-160-T0b (ADR X-S-160-1) ─▶ S-160-T1 (schema+domain+r
   - `EC-2`: non-reviewer fixture session → decide denied in the flow.
 - **Handoff prompt:**
   > S-160-T7 — E2E fixtures + docs sync. Docs: this ledger + plan + roadmap. Add mock-gateway
-  > review/publication/notification `/api/*` + `node --test`, `web/e2e/review.spec.ts`,
-  > `mobile/maestro/review.yaml`, sync roadmap + X-S-160-1/2/3. AC: flows pass, qa-docs green.
+  > review/publication/notification `/api/*` + `node --test`,
+  > `mobile/maestro/review.yaml`, sync roadmap + X-S-160-1/2/3. AC: flow passes, qa-docs green.
   > Stop after sync.
 
 ---
@@ -551,7 +687,7 @@ S-160-T0 (BDD) ─▶ S-160-T0b (ADR X-S-160-1) ─▶ S-160-T1 (schema+domain+r
 ## Coverage contract
 
 This ledger does **not** declare `Behavioral coverage contract: unit-v1`. Development
-tasks (S-160-T1…S-160-T6) still require the standard `Unit coverage certification` + `Owner
+tasks (S-160-T1a…S-160-T6) still require the standard `Unit coverage certification` + `Owner
 final verification` completion record per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
 before being marked `[x] Done`. The BDD `.feature` scenarios (S-160-T0) are the behavioral
 source of truth from which each task's `HP-#`/`EC-#` cases are derived.

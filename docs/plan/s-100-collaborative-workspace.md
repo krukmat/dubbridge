@@ -1,5 +1,10 @@
 # Plan: S-100 — Collaborative Localization Workspace
 
+> **Historical note (S-105, 2026-06-13):** S-100's web prototype was delivered as
+> recorded below, then retired after mobile workspace parity was certified. The
+> `web/` artifacts no longer exist; S-105 makes `mobile/` the canonical
+> authenticated UI. This document preserves the original implementation history.
+
 > **Status:** Planned (plan exists, not built). Authored 2026-06-11.
 > **Roadmap phase:** `S-100` — collaborative product foundation
 > before the ML localization phases. Foundation for `S-110` and `S-160`.
