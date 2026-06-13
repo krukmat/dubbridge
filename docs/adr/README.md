@@ -36,6 +36,8 @@ Run `make qa-docs` before reporting an ADR change complete.
 | [ADR-026](ADR-026-layered-fail-closed-configuration-and-environment-separation.md) | Layered fail-closed configuration and environment separation | Proposed (scope: P0 environment separation) |
 | [ADR-027](ADR-027-org-membership-authorization.md) | Organization membership authorization | Accepted |
 | [ADR-028](ADR-028-voice-consent-ledger.md) | Voice-consent ledger and fail-closed TTS precondition | Accepted |
+| [ADR-029](ADR-029-mobile-as-sole-authenticated-product-surface.md) | Mobile as the sole authenticated product surface | Accepted |
+| [ADR-030](ADR-030-review-decision-ledger-and-fail-closed-publication-gate.md) | Review-decision ledger and fail-closed publication gate | Accepted |
 
 ## Backfill note
 
