@@ -153,7 +153,7 @@ async fn create_org(
 
     Ok((
         StatusCode::CREATED,
-        Json(OrganizationResponse::from(organization)),
+        Json(OrganizationResponse::new(organization, OrgRole::Owner)),
     ))
 }
 
@@ -168,7 +168,9 @@ async fn list_orgs(
         .map_err(ApiError::from_workspace_service)?;
 
     Ok(Json(
-        orgs.into_iter().map(OrganizationResponse::from).collect(),
+        orgs.into_iter()
+            .map(|(org, role)| OrganizationResponse::new(org, role))
+            .collect(),
     ))
 }
 
@@ -582,14 +584,14 @@ mod tests {
         async fn list_orgs_for_subject(
             &self,
             subject_id: Uuid,
-        ) -> Result<Vec<Organization>, WorkspaceServiceError> {
+        ) -> Result<Vec<(Organization, OrgRole)>, WorkspaceServiceError> {
             let data = self.data.lock().expect("lock");
             let mut orgs = Vec::new();
             for member in &data.members {
                 if member.subject_id == subject_id
                     && let Some(org) = data.orgs.get(&member.org_id.0)
                 {
-                    orgs.push(org.clone());
+                    orgs.push((org.clone(), member.role));
                 }
             }
             Ok(orgs)
@@ -837,6 +839,7 @@ mod tests {
         assert_eq!(data.members[0].role, OrgRole::Owner);
         assert_eq!(data.audits.len(), 1);
         assert_eq!(response.name, "Acme");
+        assert_eq!(response.viewer_role, OrgRole::Owner);
     }
 
     #[tokio::test]
@@ -872,6 +875,7 @@ mod tests {
         .expect("list orgs");
         assert_eq!(orgs.len(), 1);
         assert_eq!(orgs[0].id, org.id.0);
+        assert_eq!(orgs[0].viewer_role, OrgRole::Owner);
     }
 
     #[tokio::test]

@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use dubbridge_domain::{
     asset::{Asset, AssetId},
     audit::AuditEvent,
-    workspace::{OrgId, OrgMember, Organization, Project, ProjectId, TargetLanguage},
+    workspace::{OrgId, OrgMember, OrgRole, Organization, Project, ProjectId, TargetLanguage},
 };
 use sqlx::PgPool;
 use thiserror::Error;
@@ -28,7 +28,7 @@ pub trait WorkspaceService: Send + Sync {
     async fn list_orgs_for_subject(
         &self,
         subject_id: Uuid,
-    ) -> Result<Vec<Organization>, WorkspaceServiceError>;
+    ) -> Result<Vec<(Organization, OrgRole)>, WorkspaceServiceError>;
 
     async fn add_member_with_audit(
         &self,
@@ -118,7 +118,7 @@ impl WorkspaceService for PgWorkspaceService {
     async fn list_orgs_for_subject(
         &self,
         subject_id: Uuid,
-    ) -> Result<Vec<Organization>, WorkspaceServiceError> {
+    ) -> Result<Vec<(Organization, OrgRole)>, WorkspaceServiceError> {
         Ok(dubbridge_db::workspace_repo::list_orgs_for_subject(&self.pool, subject_id).await?)
     }
 

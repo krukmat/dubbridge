@@ -1,4 +1,4 @@
-use dubbridge_domain::workspace::{OrgMember, Organization, Project, TargetLanguage};
+use dubbridge_domain::workspace::{OrgMember, OrgRole, Organization, Project, TargetLanguage};
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -14,15 +14,17 @@ pub struct CreateOrgRequest {
 pub struct OrganizationResponse {
     pub id: Uuid,
     pub name: String,
+    pub viewer_role: OrgRole,
     pub created_at: OffsetDateTime,
     pub updated_at: OffsetDateTime,
 }
 
-impl From<Organization> for OrganizationResponse {
-    fn from(org: Organization) -> Self {
+impl OrganizationResponse {
+    pub fn new(org: Organization, viewer_role: OrgRole) -> Self {
         Self {
             id: org.id.0,
             name: org.name,
+            viewer_role,
             created_at: org.created_at,
             updated_at: org.updated_at,
         }
@@ -156,9 +158,10 @@ mod tests {
     #[test]
     fn organization_response_maps_domain_fields() {
         let org = Organization::new("Acme".to_string());
-        let response = OrganizationResponse::from(org.clone());
+        let response = OrganizationResponse::new(org.clone(), OrgRole::Owner);
         assert_eq!(response.id, org.id.0);
         assert_eq!(response.name, "Acme");
+        assert_eq!(response.viewer_role, OrgRole::Owner);
         assert_eq!(response.created_at, org.created_at);
         assert_eq!(response.updated_at, org.updated_at);
     }

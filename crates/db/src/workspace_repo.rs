@@ -58,6 +58,7 @@ pub async fn insert_org_tx(
     Ok(())
 }
 
+#[cfg(test)]
 #[derive(sqlx::FromRow)]
 struct OrgRow {
     id: Uuid,
@@ -66,6 +67,16 @@ struct OrgRow {
     updated_at: OffsetDateTime,
 }
 
+#[derive(sqlx::FromRow)]
+struct OrgMembershipRow {
+    id: Uuid,
+    name: String,
+    created_at: OffsetDateTime,
+    updated_at: OffsetDateTime,
+    role: String,
+}
+
+#[cfg(test)]
 fn org_from_row(r: OrgRow) -> Organization {
     Organization {
         id: OrgId(r.id),
@@ -79,10 +90,10 @@ fn org_from_row(r: OrgRow) -> Organization {
 pub async fn list_orgs_for_subject(
     pool: &PgPool,
     subject_id: Uuid,
-) -> Result<Vec<Organization>, DbError> {
-    let rows = sqlx::query_as::<_, OrgRow>(
+) -> Result<Vec<(Organization, OrgRole)>, DbError> {
+    let rows = sqlx::query_as::<_, OrgMembershipRow>(
         r#"
-        SELECT o.id, o.name, o.created_at, o.updated_at
+        SELECT o.id, o.name, o.created_at, o.updated_at, m.role
         FROM organizations o
         JOIN org_members m ON m.org_id = o.id
         WHERE m.subject_id = $1
@@ -94,7 +105,20 @@ pub async fn list_orgs_for_subject(
     .await
     .map_err(DbError::QueryFailed)?;
 
-    Ok(rows.into_iter().map(org_from_row).collect())
+    rows.into_iter()
+        .map(|row| {
+            let role = require_org_role(&row.role)?;
+            Ok((
+                Organization {
+                    id: OrgId(row.id),
+                    name: row.name,
+                    created_at: row.created_at,
+                    updated_at: row.updated_at,
+                },
+                role,
+            ))
+        })
+        .collect()
 }
 
 // ── Members ───────────────────────────────────────────────────────────────────
