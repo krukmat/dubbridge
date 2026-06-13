@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+
+echo "Running pre-commit gates..."
+make qa-fmt qa-lint qa-docs
+echo "Pre-commit gates passed."
