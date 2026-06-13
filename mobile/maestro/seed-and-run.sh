@@ -227,8 +227,9 @@ MAESTRO_OUT_4="/tmp/dubbridge-maestro-asset-detail-$$"
 MAESTRO_OUT_5="/tmp/dubbridge-maestro-asset-ingestion-$$"
 MAESTRO_OUT_5B="/tmp/dubbridge-maestro-asset-ingestion-no-rights-$$"
 MAESTRO_OUT_6="/tmp/dubbridge-maestro-projects-$$"
+MAESTRO_OUT_7="/tmp/dubbridge-maestro-compliance-$$"
 mkdir -p "$MAESTRO_OUT_1" "$MAESTRO_OUT_2" "$MAESTRO_OUT_3" "$MAESTRO_OUT_3E" \
-         "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6"
+         "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" "$MAESTRO_OUT_7"
 
 # --- S-055 Phase 1: auth surface ---
 
@@ -373,6 +374,26 @@ maestro test \
 
 info "Phase 6 passed."
 
+# --- S-110 Phase 7: mobile compliance and consent ---
+
+info "Minting handoff code for Phase 7 (compliance surfaces)..."
+DEEPLINK_COMPLIANCE=$(curl -sf --max-time 10 -X POST "$GATEWAY_URL/e2e/issue-handoff") \
+  || die "Seed request for Phase 7 failed."
+DEEPLINK_COMPLIANCE=$(SEED_JSON="$DEEPLINK_COMPLIANCE" node -e "
+  const raw = process.env.SEED_JSON;
+  try { const p = JSON.parse(raw); process.stdout.write(p.auth.bootstrap_deeplink); }
+  catch(e) { process.exit(1); }
+") || die "Could not parse bootstrap_deeplink for Phase 7."
+
+info "Phase 7 — compliance surfaces (compliance.yaml)..."
+maestro test \
+  --test-output-dir "$MAESTRO_OUT_7" \
+  --env SEED_BOOTSTRAP_DEEPLINK="$DEEPLINK_COMPLIANCE" \
+  "$REPO_ROOT/mobile/maestro/compliance.yaml" \
+  || die "Phase 7 (compliance.yaml) failed. Check $MAESTRO_OUT_7 for details."
+
+info "Phase 7 passed."
+
 # ---------------------------------------------------------------------------
 # Copy screenshots
 # ---------------------------------------------------------------------------
@@ -382,7 +403,7 @@ mkdir -p "$SCREENSHOTS_DIR"
 
 info "Copying screenshots to $SCREENSHOTS_DIR ..."
 find "$MAESTRO_OUT_1" "$MAESTRO_OUT_2" "$MAESTRO_OUT_3" "$MAESTRO_OUT_3E" \
-     "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" -name "*.png" | while IFS= read -r png; do
+     "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" "$MAESTRO_OUT_7" -name "*.png" | while IFS= read -r png; do
   cp "$png" "$SCREENSHOTS_DIR/"
   info "  Copied: $(basename "$png")"
 done
@@ -421,19 +442,20 @@ sanitize_dir "$MAESTRO_OUT_4"
 sanitize_dir "$MAESTRO_OUT_5"
 sanitize_dir "$MAESTRO_OUT_5B"
 sanitize_dir "$MAESTRO_OUT_6"
+sanitize_dir "$MAESTRO_OUT_7"
 
 # Assert absence of sensitive values post-sanitization
 LEAK_HANDOFF=$(grep -r 'handoff_code=' \
   "$MAESTRO_OUT_1" "$MAESTRO_OUT_2" "$MAESTRO_OUT_3" "$MAESTRO_OUT_3E" \
-  "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" 2>/dev/null \
+  "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" "$MAESTRO_OUT_7" 2>/dev/null \
   | grep -v 'handoff_code=\[REDACTED\]' || true)
 LEAK_SESSION=$(grep -r 'session_ref=' \
   "$MAESTRO_OUT_1" "$MAESTRO_OUT_2" "$MAESTRO_OUT_3" "$MAESTRO_OUT_3E" \
-  "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" 2>/dev/null \
+  "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" "$MAESTRO_OUT_7" 2>/dev/null \
   | grep -v 'session_ref=\[REDACTED\]' || true)
 LEAK_SESSION_JSON=$(grep -r '"session_ref":"' \
   "$MAESTRO_OUT_1" "$MAESTRO_OUT_2" "$MAESTRO_OUT_3" "$MAESTRO_OUT_3E" \
-  "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" 2>/dev/null \
+  "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" "$MAESTRO_OUT_7" 2>/dev/null \
   | grep -v '"session_ref":"\[REDACTED\]"' || true)
 
 if [[ -n "$LEAK_HANDOFF" || -n "$LEAK_SESSION" || -n "$LEAK_SESSION_JSON" ]]; then
@@ -461,3 +483,4 @@ info "  Phase 4 out    : $MAESTRO_OUT_4   (04_asset_detail)"
 info "  Phase 5 out    : $MAESTRO_OUT_5   (05_upload → 06_ingest_complete)"
 info "  Phase 5b out   : $MAESTRO_OUT_5B  (07_ingest_no_rights — SC-INGEST-2)"
 info "  Phase 6 out    : $MAESTRO_OUT_6   (08_home_for_projects → 09_project_list → 10_project_detail)"
+info "  Phase 7 out    : $MAESTRO_OUT_7   (11_compliance_center → 12_consent_active → 13_consent_revoked)"

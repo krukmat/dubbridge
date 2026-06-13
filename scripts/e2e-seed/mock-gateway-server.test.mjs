@@ -7,6 +7,8 @@ import {
   SEED_PROJECT,
   SEED_MEMBER,
   NON_MEMBER_SESSION,
+  SEED_AUDIT_EVENTS,
+  SEED_RIGHTS_RECORDS,
   createMockGatewayServer,
 } from "./mock-gateway-server.mjs";
 
@@ -202,6 +204,44 @@ test("mock gateway creates org and returns seed shape", async () => {
 
     assert.equal(response.status, 201);
     assert.deepEqual(await response.json(), SEED_ORG);
+  });
+});
+
+test("mock gateway serves compliance ledgers and append-only consent mutations", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const auditResponse = await fetch(`${baseUrl}/api/assets/${SEED_ASSETS[0].id}/audit`, { headers: SESSION_HEADERS });
+    const rightsResponse = await fetch(`${baseUrl}/api/assets/${SEED_ASSETS[0].id}/rights`, { headers: SESSION_HEADERS });
+    assert.deepEqual((await auditResponse.json()).events, SEED_AUDIT_EVENTS);
+    assert.deepEqual((await rightsResponse.json()).entries, SEED_RIGHTS_RECORDS);
+
+    const grantResponse = await fetch(`${baseUrl}/api/consents`, {
+      method: "POST",
+      headers: { ...SESSION_HEADERS, "content-type": "application/json" },
+      body: JSON.stringify({
+        asset_id: SEED_ASSETS[0].id,
+        scope: "voice_clone",
+        status: "grant",
+        evidence_ref: "proof://voice",
+      }),
+    });
+    assert.equal(grantResponse.status, 201);
+
+    const revokeResponse = await fetch(`${baseUrl}/api/consents`, {
+      method: "POST",
+      headers: { ...SESSION_HEADERS, "content-type": "application/json" },
+      body: JSON.stringify({
+        asset_id: SEED_ASSETS[0].id,
+        scope: "voice_clone",
+        status: "revoke",
+        evidence_ref: null,
+      }),
+    });
+    assert.equal(revokeResponse.status, 201);
+
+    const ledgerResponse = await fetch(`${baseUrl}/api/assets/${SEED_ASSETS[0].id}/consents`, { headers: SESSION_HEADERS });
+    const ledger = await ledgerResponse.json();
+    assert.equal(ledger.current_status, "revoke");
+    assert.deepEqual(ledger.rows.map((row) => row.status), ["grant", "revoke"]);
   });
 });
 

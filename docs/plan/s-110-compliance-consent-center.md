@@ -1,6 +1,7 @@
 # Plan: S-110 — Compliance & Consent Center
 
-> **Status:** Planned (plan exists, not built). Authored 2026-06-11.
+> **Status:** Complete 2026-06-13 — T0–T3, T5, and T6 done; T4 cancelled and
+> superseded by T5 under S-105. Authored 2026-06-11; replanned mobile-only 2026-06-13.
 > **Roadmap phase:** `S-110` — governance/product phase before
 > `S-150`. Surfaces the immutable audit trail and rights ledger to content owners,
 > and adds the voice-cloning consent ledger that gates TTS derivatives
@@ -35,18 +36,19 @@ Deliver a governed compliance and consent surface:
 - **Consent precondition (X11)**: a fail-closed gate that blocks any TTS/voice-cloning
   derivative without a valid, unrevoked consent — defined and unit-proven now, enforced
   when S-150 is built.
-- **Surfaces**: a web compliance dashboard and mobile consent capture/summary.
-- **Prove it**: Gherkin BDD mapped to web + mobile + backend unit evidence.
+- **Surface**: a complete mobile compliance and consent center.
+- **Prove it**: Gherkin BDD mapped to mobile component/Maestro evidence and backend
+  ownership/consent-gate tests.
 
 ## Scope decisions (confirmed 2026-06-11)
 
 | Decision | Choice |
 |---|---|
-| Feature scope | Read-only audit/rights viewer + append-only voice-consent ledger + fail-closed TTS precondition + web dashboard + mobile consent |
+| Feature scope | Read-only audit/rights viewer + append-only voice-consent ledger + fail-closed TTS precondition + complete mobile center |
 | Audit/rights posture | **Read-only.** S-110 never mutates `audit_events` or `rights_records`; it only reads them, ownership/org-scoped |
 | Consent posture | `voice_consents` is append-only (grant/revoke rows); current status is derived from the latest row (mirrors rights ledger, ADR-008) |
 | Enforcement | The consent precondition (X11) is built and unit-tested here as a reusable gate; S-150 calls it when TTS lands (forward dependency) |
-| BDD home | `docs/bdd/p6-compliance.feature`; mapped to web + mobile flows + `HP-#`/`EC-#` |
+| BDD home | `docs/bdd/p6-compliance.feature`; mapped to mobile flows, component tests, backend ownership/gate evidence, and `HP-#`/`EC-#` |
 
 ## Affected components
 
@@ -58,8 +60,7 @@ Deliver a governed compliance and consent surface:
 | Backend service | `apps/api/src/services/consent_gate.rs` (new) | Fail-closed TTS-derivative precondition (X11) + audit |
 | Backend API | `apps/api/src/routes/compliance.rs`, `dto/compliance.rs` (new) | Ownership-scoped audit/rights read + consent grant/revoke |
 | Backend DB (read) | `crates/db/src/audit_repo.rs`, `rights_repo.rs` | Add ownership/org-scoped read queries (no mutation) |
-| Frontend (web) | `web/src/screens/Compliance*.tsx`, `ConsentScreen.tsx`, `components/AuditTimeline.tsx` | Compliance dashboard |
-| Mobile | `mobile/src/screens/ConsentScreen.tsx`, `ComplianceScreen.tsx`, nav | Consent capture + compliance summary |
+| Mobile | `mobile/src/screens/ConsentScreen.tsx`, `ComplianceScreen.tsx`, nav | Timeline, rights ledger, consent history/current state, grant/revoke, and error states |
 | E2E backend | `scripts/e2e-seed/mock-gateway-server.mjs` | `/api/*` compliance/consent fixtures |
 | BDD | `docs/bdd/p6-compliance.feature`, `docs/bdd/README.md` | Cross-surface Gherkin specs + mapping |
 
@@ -96,11 +97,12 @@ the existing immutable ledgers. Ownership scoping is the same fail-closed defaul
 > question (S-060 follow-up X-S-060-1). The compliance reads are ownership-scoped from
 > the start; the by-id reconciliation remains that slice's follow-up, not changed here.
 
-### D4 — Web compliance dashboard + mobile consent + BDD mapping
+### D4 — Mobile compliance and consent center + BDD mapping
 
-The web dashboard shows an audit timeline per asset, the rights ledger, and consent
-management (grant/revoke). Mobile provides consent capture (grant/revoke from the
-device) and a compliance summary. `data-testid`/`testID` are the flow contract.
+Mobile shows the chronological audit timeline, rights ledger, consent history and
+current state, and grant/revoke actions. It handles loading, empty, forbidden,
+network-error, and expired-session states. `testID` values are the UI-flow contract;
+ownership and synthesis authorization remain backend-enforced.
 
 ## Module dependency direction
 
@@ -110,28 +112,27 @@ flowchart TD
     T1["S-110-T1 · schema + domain + repo<br/>(voice_consents, RRI 58)"]
     T2["S-110-T2 · consent ledger + TTS precondition + audit<br/>(X11, RRI 66)"]
     T3["S-110-T3 · compliance read API<br/>(audit/rights viewer, RRI 44)"]
-    T4["S-110-T4 · web compliance dashboard<br/>(RRI 30)"]
-    T5["S-110-T5 · mobile consent + compliance<br/>(RRI 31)"]
-    T6["S-110-T6 · E2E fixtures + docs sync<br/>(RRI 24)"]
+    T4["S-110-T4 · web dashboard<br/>cancelled / superseded"]
+    T5["S-110-T5 · mobile compliance + consent center<br/>(RRI 41)"]
+    T6["S-110-T6 · mock fixtures + Maestro + docs"]
 
     T0 --> T1
     T1 --> T2
     T2 --> T3
-    T3 --> T4
     T3 --> T5
-    T4 --> T6
     T5 --> T6
 ```
 
 - **T0** fixes acceptance. **T1** lays the consent schema + domain.
 - **T2** owns the governance core (append-only consent + fail-closed TTS precondition, X11).
-- **T3** adds the read-only audit/rights/consent API; **T4/T5** build web + mobile.
-- **T6** wires E2E fixtures + syncs docs.
+- **T3** adds the read-only audit/rights/consent API; **T4** is retained only as a
+  cancelled historical task; **T5** owns the complete mobile surface.
+- **T6** wires deterministic fixtures, the Maestro mobile flow, and docs.
 
 ## Relationship to other slices
 
 - **Depends on (built/planned):** S-000, S-010 (`audit_events`, `rights_records`
-  already persisted), S-040, S-050, and **S-100** (org context + web console skeleton).
+  already persisted), S-040, S-050, and **S-105-T2** (mobile workspace context).
 - **Closes obligation:** X11 (consent/voice-cloning permission before TTS) at the
   contract level.
 - **Forward integration:** S-150 (TTS/voice synthesis) calls `consent_gate` before any

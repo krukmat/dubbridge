@@ -35,6 +35,7 @@ export const SEED_ASSETS = [
 export const SEED_ORG = {
   id: "org-seed-1",
   name: "E2E Org",
+  viewer_role: "owner",
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-01T00:00:00Z",
 };
@@ -50,9 +51,34 @@ export const SEED_PROJECT = {
 export const SEED_MEMBER = {
   org_id: "org-seed-1",
   subject_id: "e2e-user",
-  role: "Owner",
+  role: "owner",
   joined_at: "2026-01-01T00:00:00Z",
 };
+
+export const SEED_AUDIT_EVENTS = [
+  {
+    id: "audit-seed-1",
+    asset_id: "asset-seed-1",
+    event_kind: "ingest_finalized",
+    ingest_token: null,
+    recording_session_id: null,
+    platform_ingest_session_id: null,
+    detail: "seeded mobile compliance event",
+    happened_at: "2026-01-01T10:00:00Z",
+  },
+];
+
+export const SEED_RIGHTS_RECORDS = [
+  {
+    id: "rights-seed-1",
+    asset_id: "asset-seed-1",
+    owner: "E2E Org",
+    license_type: "owned",
+    source_type: "direct_upload",
+    proof_reference: "proof://e2e-owned",
+    created_at: "2026-01-01T09:00:00Z",
+  },
+];
 
 // Session used for the non-member EC-2 / SC-MEMBER-2 fixture.
 export const NON_MEMBER_SESSION = "e2e-non-member-session";
@@ -93,6 +119,7 @@ export function createMockGatewayServer({
   const sessionModes = new Map();
   // In-memory ingest token mode: token → "no_rights" | undefined
   const ingestTokenModes = new Map();
+  const consentRows = [];
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
@@ -189,6 +216,48 @@ export function createMockGatewayServer({
         return sendJson(res, 422, { error: "rights_required" });
       }
       return sendJson(res, 201, SEED_ASSETS[0]);
+    }
+
+    const complianceMatch = url.pathname.match(/^\/api\/assets\/([^/]+)\/(audit|rights|consents)$/);
+    if (req.method === "GET" && complianceMatch) {
+      const [, assetId, resource] = complianceMatch;
+      if (assetId !== SEED_ASSETS[0].id) {
+        return sendJson(res, 403, { error: "asset_not_found" });
+      }
+      if (resource === "audit") {
+        return sendJson(res, 200, { asset_id: assetId, events: SEED_AUDIT_EVENTS });
+      }
+      if (resource === "rights") {
+        return sendJson(res, 200, { asset_id: assetId, entries: SEED_RIGHTS_RECORDS });
+      }
+      return sendJson(res, 200, {
+        asset_id: assetId,
+        current_status: consentRows.at(-1)?.status ?? null,
+        rows: consentRows,
+      });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/consents") {
+      const request = JSON.parse((await readBody(req)) || "{}");
+      if (request.status === "grant" && !request.evidence_ref) {
+        return sendJson(res, 422, { error: "evidence reference is required" });
+      }
+      const row = {
+        id: `consent-seed-${consentRows.length + 1}`,
+        asset_id: request.asset_id,
+        scope: request.scope,
+        status: request.status,
+        evidence_ref: request.evidence_ref ?? null,
+        granted_by: "00000000-0000-0000-0000-000000000001",
+        happened_at: `2026-01-01T1${consentRows.length + 1}:00:00Z`,
+      };
+      consentRows.push(row);
+      return sendJson(res, 201, {
+        asset_id: row.asset_id,
+        scope: row.scope,
+        current_status: row.status,
+        happened_at: row.happened_at,
+      });
     }
 
     // -------------------------------------------------------------------------

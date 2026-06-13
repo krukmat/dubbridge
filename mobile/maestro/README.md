@@ -1,8 +1,8 @@
-# Maestro screenshot suite — S-055 + S-060
+# Maestro screenshot suite — S-055 through S-110
 
-Reproducible six-phase screenshot capture for every DubBridge mobile screen on an
-Android emulator. S-055 (V1–V8) delivered phases 1–2; S-060 T6 integrated phases 3–5
-into the same one-command runner; X-P3F-2b completed phases 5 and 5b. Complete as of 2026-06-12.
+Reproducible seven-phase screenshot capture for DubBridge authenticated mobile
+surfaces on an Android emulator. S-055 delivered phases 1–2, S-060 phases 3–5,
+S-100/S-105 phase 6, and S-110 phase 7.
 
 ## Overview
 
@@ -15,6 +15,8 @@ into the same one-command runner; X-P3F-2b completed phases 5 and 5b. Complete a
 | 4 — Asset detail | `asset-detail.yaml` | `SC-DETAIL-1` | `04_asset_detail.png` |
 | 5 — Asset ingestion (SC-INGEST-1) | `asset-ingestion.yaml` | `SC-INGEST-1` | `05_upload.png`, `06_ingest_complete.png` |
 | 5b — Asset ingestion no-rights (SC-INGEST-2) | `asset-ingestion-no-rights.yaml` | `SC-INGEST-2` | `07_ingest_no_rights.png` |
+| 6 — Organizations and projects | `projects.yaml` | `SC-ORG-1`, `SC-PROJECT-1`, `SC-LANG-1` | `08_home_for_projects.png`, `09_project_list.png`, `10_project_detail.png` |
+| 7 — Compliance and consent | `compliance.yaml` | `SC-AUDIT-1`, `SC-RIGHTS-1`, `SC-CONSENT-1/2` | `11_compliance_center.png`, `12_consent_active.png`, `13_consent_revoked.png` |
 
 The list flow supports two mock-gateway seed modes:
 
@@ -79,7 +81,7 @@ Metro **must** run on `:8082` — never `:8081` — to avoid collision with the 
 node scripts/e2e-seed/mock-oauth-server.mjs &
 node scripts/e2e-seed/mock-gateway-server.mjs &
 
-# Then run the full suite (all 5 phases)
+# Then run the full suite (all 7 phases)
 cd mobile && npm run screenshots
 ```
 
@@ -97,9 +99,11 @@ cd mobile && npm run screenshots
 10. Mints a handoff code; runs **Phase 4** (`asset-detail.yaml` / SC-DETAIL-1) — captures `04_asset_detail.png`.
 11. Mints a handoff code; runs **Phase 5** (`asset-ingestion.yaml` / SC-INGEST-1) — captures `05_upload.png` + `06_ingest_complete.png`.
 12. Mints a `ingest_seed=no_rights` handoff code; runs **Phase 5b** (`asset-ingestion-no-rights.yaml` / SC-INGEST-2) — captures `07_ingest_no_rights.png`.
-13. Copies all PNGs to `mobile/artifacts/screenshots/`.
-14. Sanitizes `handoff_code` and `session_ref` from all Maestro JSON reports.
-15. Asserts no sensitive values remain in reports.
+13. Mints a handoff code; runs **Phase 6** (`projects.yaml`) — captures organization/project screens.
+14. Mints a handoff code; runs **Phase 7** (`compliance.yaml`) — captures compliance and consent states.
+15. Copies all PNGs to `mobile/artifacts/screenshots/`.
+16. Sanitizes `handoff_code` and `session_ref` from all Maestro JSON reports.
+17. Asserts no sensitive values remain in reports.
 
 Set `START_MOCK_SERVERS=1` to have the script start mock-oauth and mock-gateway
 automatically:

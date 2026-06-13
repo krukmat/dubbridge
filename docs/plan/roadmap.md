@@ -106,27 +106,29 @@ Plan: `docs/plan/h1-governance-atomicity-hardening.md`
 | **S-080** | Object storage switchover (MinIO/S3 behind `StorageAdapter`) | S-010-T4 | ⬜ no plan yet | — |
 | **S-090** | Platform ingest (owner-authorized download: first supported provider) | S-000-T2, S-010, S-020; S-080 prudent before heavy writes | 🟡 REPLANNED 2026-05-31 — foundation T0/T0c/T1/T2 done; S-040/S-070/S-050 done; later connector work deferred | `docs/plan/stream-recording-ingest.md` |
 | **S-095** | Stream recording ingest (RTMP/SRT live capture) | S-090 foundation | ⬜ deferred — built only for live-broadcast clients | `docs/plan/stream-recording-ingest.md` |
-| **S-100** | Collaborative localization workspace: orgs, roles, projects, target languages, org authz, first web console, mobile project surfaces | S-000, S-010, S-040, S-050; coordinates with S-055/S-060 | ✅ done — T0–T7 complete as of 2026-06-12; BDD specs authored; ADR-027 delivered (org-membership authz); workspace API + web console + mobile project screens built; E2E fixtures + Maestro Phase 6 + Playwright spec wired; follow-ups X-S-100-3 (non-hierarchical roles), X-S-100-4 (auth server scope config) recorded | `docs/plan/s-100-collaborative-workspace.md`, `docs/tasks/s-100-collaborative-workspace.md` |
-| **S-110** | Compliance & consent center: audit/rights viewer, voice-consent ledger, fail-closed TTS precondition | S-100, S-010 audit/rights data | 📄 Planned — S-110-T0..S-110-T6 defined 2026-06-11, not built; closes X11 at contract level before S-150 | `docs/plan/s-110-compliance-consent-center.md`, `docs/tasks/s-110-compliance-consent-center.md` |
+| **S-100** | Collaborative localization workspace: orgs, roles, projects, target languages, org authz, historical web prototype, mobile project surfaces | S-000, S-010, S-040, S-050; coordinates with S-055/S-060 | ✅ done — T0–T7 complete as of 2026-06-12; workspace API, authz, mobile projects, and a historical web prototype delivered. The web artifacts were retired by S-105. | `docs/plan/s-100-collaborative-workspace.md`, `docs/tasks/s-100-collaborative-workspace.md` |
+| **S-105** | Mobile workspace parity and authenticated web-console retirement | S-100, S-050, S-060 | ✅ done — T0–T3 complete 2026-06-13; organization selection, members, target languages, compliance navigation, mobile-only BDD evidence, and web removal delivered | `docs/plan/s-105-mobile-workspace-parity.md`, `docs/tasks/s-105-mobile-workspace-parity.md` |
+| **S-110** | Mobile compliance & consent center: audit/rights viewer, voice-consent ledger, fail-closed TTS precondition | S-105, S-010 audit/rights data | ✅ done — T0–T3, T5, and T6 complete 2026-06-13; T4 web dashboard cancelled and superseded by the complete mobile center; X11 closed at contract level | `docs/plan/s-110-compliance-consent-center.md`, `docs/tasks/s-110-compliance-consent-center.md` |
 | **S-120** | Media preparation (ffprobe metadata + HLS transcode) | S-010, S-080 | ⬜ no plan yet | — |
 | **S-130** | Processing / ASR (transcription) | S-100 target-language intent, S-120 | ⬜ worker contract only | `workers/asr-worker-py` |
 | **S-140** | Subtitle generation | S-130 | ⬜ no plan yet | — |
 | **S-150** | Translation + dubbing (TTS / voice cloning) | S-140, S-110 consent precondition | ⬜ worker contracts only | `workers/translation-worker-py`, `workers/tts-worker-py` |
-| **S-160** | Human review & publication workspace: review tasks, decisions, publication gate, notifications, web/mobile surfaces | S-100; forward-integrates S-140/S-150 derived artifacts | 📄 Planned — S-160-T0..S-160-T7 defined 2026-06-11, not built | `docs/plan/s-160-review-publication-workspace.md`, `docs/tasks/s-160-review-publication-workspace.md` |
+| **S-160** | Human review & publication workspace: review tasks, decisions, publication gate, notifications, complete mobile surface | S-105; forward-integrates S-140/S-150 derived artifacts | 📄 Replanned mobile-only 2026-06-13 — S-160-T5 cancelled; T6 owns inbox, comparison, decisions, publish visibility, notifications, and deep links; T7 produces Maestro only | `docs/plan/s-160-review-publication-workspace.md`, `docs/tasks/s-160-review-publication-workspace.md` |
 | **S-170** | Human review runtime (HITL execution over generated artifacts) | S-140, S-150, S-160 | ⬜ no plan yet | — |
 | **S-180** | Publication runtime | S-170, S-160 publication gate | ⬜ no plan yet | — |
 
 `S-040` must be planned before building a first-party browser, operator-console, or
 mobile auth flow. It does not block S-080 or S-090.
 
-**Product-layer phases.** `S-100`, `S-110`, and `S-160` turn the governed pipeline
+**Product-layer phases.** `S-100`, `S-105`, `S-110`, and `S-160` turn the governed pipeline
 into a team-usable product. `S-100` is the collaboration foundation: orgs, roles,
-projects, target languages, and the first web console. `S-110` is intentionally
+projects, and target languages. `S-105` establishes mobile as the only authenticated
+product UI (ADR-029) and retires the historical web prototype. `S-110` is intentionally
 placed before `S-150` because TTS/dubbing must fail closed without voice consent.
 `S-160` can be built against fixtures before `S-140/S-150` land, but its canonical
 runtime role is to supply the review/publication gate that `S-170/S-180` adopt.
-Each phase introduces real architecture decisions recorded as open follow-ups
-(X-S-100-1, X-S-110-1, X-S-160-1) to be promoted to ADRs before implementation.
+These product-layer phases introduced architecture decisions that are now captured
+by ADR-027, ADR-028, ADR-029, and ADR-030.
 
 `S-050` (mobile) is a first-party interactive client and therefore a hard consumer of
 the `S-040` gateway (ADR-024): the device must terminate in the same session-gateway
@@ -151,8 +153,7 @@ mobile refresh returns the rotated opaque session reference in
 deterministic end-to-end mobile lifecycle is covered by tests. Session renewal and
 rotation are gateway-owned: mobile carries only the current opaque reference and
 persists a rotated replacement when the gateway returns one. Stack decision
-(2026-06-03): React Native + Expo,
-coherent with the React line reserved in `web/README.md`. The mobile
+(2026-06-03): React Native + Expo. The mobile
 app is now implemented in `mobile/` with gateway-backed auth, navigation, asset
 list/detail surfaces, and deterministic Jest coverage. A planned
 mobile-hardening sub-slice, **S-055** (Maestro screenshot / visual-audit suite,
@@ -305,8 +306,8 @@ S-095 — live recorder (DEFERRED): ex-T3 recorder crate, ex-T4 jobs/storage,
 | **X22** | Define the org/membership/role authorization model: multi-tenant boundary, RBAC scopes layered over ADR-023 principal, org-scoped API enforcement | ✅ closed by ADR-027 (S-100-T0b, 2026-06-12); org-membership guard + `workspaces:*` scopes delivered in S-100-T2/T3 |
 | **X-S-100-3** | Non-hierarchical role extensions: current linear role order (`Viewer < Reviewer < Editor < Admin < Owner`) may not fit all future governance patterns; flat RBAC or per-resource role overrides deferred | open — revisit before S-110 membership model adds consent-specific roles |
 | **X-S-100-4** | Configure external authorization server to issue `workspaces:write` and `workspaces:read` scopes; tests currently stub the verifier | open — required before workspace endpoints are usable in production deployment |
-| **X23** | Define the review/decision/publication gate model: append-only decision ledger, fail-closed publication precondition (ADR-008 spirit), S-140/S-150 artifact contract; no dedicated ADR yet — must be authored as **X-S-160-1** before `S-160-T1`/`S-160-T2` | `S-160-T1`/`S-160-T2` (review state machine + gate); ADR to be authored |
-| **X24** | Define the voice-consent ledger and TTS precondition: append-only consent rows, evidence stored by reference (ADR-025 spirit), fail-closed gate before any TTS derivative; closes **X11** at the contract level; no dedicated ADR yet — must be authored as **X-S-110-1** before `S-110-T1`/`S-110-T2` | `S-110-T1`/`S-110-T2` (consent ledger + gate); ADR to be authored; `S-150` enforces it |
+| **X23** | Define the review/decision/publication gate model: append-only decision ledger, fail-closed publication precondition (ADR-008 spirit), S-140/S-150 artifact contract | ✅ closed by ADR-030 (S-160-T0b, 2026-06-13); S-160-T1/T2 consume it |
+| **X24** | Define the voice-consent ledger and TTS precondition: append-only consent rows, evidence stored by reference (ADR-025 spirit), fail-closed gate before any TTS derivative; closes **X11** at the contract level | ✅ closed by ADR-028 (S-110-T0b, 2026-06-12); S-110-T1/T2 implemented it; `S-150` will enforce it |
 
 ## Known planning gaps
 
@@ -341,11 +342,7 @@ S-095 — live recorder (DEFERRED): ex-T3 recorder crate, ex-T4 jobs/storage,
   ADR materially changes; do not introduce new active `P*` or bare `S0`–`S9` phase IDs.
 - ADR-021 is generalized to all non-upload intake; ADR-019/020/022 are scoped to the
   deferred `S-095` live-recording sub-case (their technical decisions are unchanged).
-- **ADR candidates for product-layer phases (X22/X23/X24).** X22 is now closed (ADR-027, 2026-06-12). Two remain open before their respective implementation tasks start:
+- **ADR candidates for product-layer phases (X22/X23/X24).** These are now all closed:
   - **X22 → X-S-100-1:** ✅ closed by ADR-027 (S-100-T0b). Org-membership guard + `workspaces:*` scopes delivered in S-100. Open follow-ups: X-S-100-3 (role extensions), X-S-100-4 (auth server scope config).
-  - **X23 → X-S-160-1:** review/decision/publication gate model (append-only decisions,
-    fail-closed publication precondition, ADR-008 spirit). Must be authored before
-    `S-160-T1`/`S-160-T2`. Tracked in `docs/plan/s-160-review-publication-workspace.md`.
-  - **X24 → X-S-110-1:** voice-consent ledger + TTS fail-closed precondition (closes X11
-    at contract level; evidence stored by reference, ADR-025 spirit). Must be authored
-    before `S-110-T1`/`S-110-T2`. Tracked in `docs/plan/s-110-compliance-consent-center.md`.
+  - **X23 → X-S-160-1:** ✅ closed by ADR-030 (S-160-T0b). Review/publication gate model fixed before S-160 schema/runtime work.
+  - **X24 → X-S-110-1:** ✅ closed by ADR-028 (S-110-T0b). Voice-consent ledger + TTS fail-closed precondition fixed before S-110 implementation.

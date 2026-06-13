@@ -1,0 +1,91 @@
+appId: com.dubbridge.mobile
+name: Mobile compliance and consent center
+tags:
+  - android
+  - s-110
+  - compliance
+# BDD: SC-AUDIT-1, SC-RIGHTS-1, SC-CONSENT-1, SC-CONSENT-2
+---
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: login-screen
+    timeout: 20000
+
+- openLink: ${SEED_BOOTSTRAP_DEEPLINK}
+
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 30000
+
+- tapOn:
+    id: home-open-assets
+
+- extendedWaitUntil:
+    visible:
+      id: asset-list-screen
+    timeout: 20000
+
+- tapOn:
+    id: asset-card-asset-seed-1
+
+- extendedWaitUntil:
+    visible:
+      id: asset-detail-screen
+    timeout: 20000
+
+- tapOn:
+    id: asset-open-compliance
+
+- extendedWaitUntil:
+    visible:
+      id: compliance-screen
+    timeout: 20000
+
+- assertVisible:
+    id: audit-event-audit-seed-1
+
+- assertVisible:
+    id: rights-entry-rights-seed-1
+
+- takeScreenshot: 11_compliance_center
+
+- tapOn:
+    id: consent-open
+
+- extendedWaitUntil:
+    visible:
+      id: consent-screen
+    timeout: 20000
+
+- tapOn:
+    id: consent-evidence-input
+
+- inputText: proof-e2e-voice
+
+- tapOn:
+    id: consent-grant
+
+- extendedWaitUntil:
+    visible: Active
+    timeout: 20000
+
+- assertVisible:
+    id: consent-row-consent-seed-1
+
+- takeScreenshot: 12_consent_active
+
+- tapOn:
+    id: consent-revoke
+
+- extendedWaitUntil:
+    visible: Inactive
+    timeout: 20000
+
+- assertVisible:
+    id: consent-row-consent-seed-2
+
+- takeScreenshot: 13_consent_revoked

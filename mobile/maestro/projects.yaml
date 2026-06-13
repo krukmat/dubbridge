@@ -4,7 +4,7 @@ tags:
   - android
   - s-100
   - projects
-# BDD scenarios: SC-ORG-1, SC-PROJECT-1, SC-MEMBER-2
+# BDD scenarios: SC-ORG-1, SC-PROJECT-1
 ---
 - launchApp:
     clearState: true
@@ -49,8 +49,9 @@ tags:
 
 - takeScreenshot: 08_home_for_projects
 
-# SC-ORG-1 / SC-PROJECT-1: navigate to project list and assert seed project is visible
-- openLink: dubbridge://workspace/orgs/org-seed-1/projects
+# SC-ORG-1: choose a real organization context from the authenticated UI
+- tapOn:
+    id: home-open-organizations
 
 - repeat:
     times: 3
@@ -61,6 +62,17 @@ tags:
               text: ".*isn't responding.*"
           commands:
             - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: organization-list-screen
+    timeout: 20000
+
+- assertVisible:
+    id: organization-card-org-seed-1
+
+- tapOn:
+    id: organization-projects-org-seed-1
 
 - extendedWaitUntil:
     visible:
