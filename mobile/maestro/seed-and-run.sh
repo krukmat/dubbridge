@@ -27,6 +27,8 @@ METRO_PORT=8082
 HEALTH_TIMEOUT=30   # seconds to wait for each service
 METRO_TIMEOUT=60    # seconds to wait for Metro to be ready
 START_MOCK_SERVERS="${START_MOCK_SERVERS:-0}"
+# Set SKIP_METRO=1 when the APK has an embedded bundle and doesn't need Metro
+SKIP_METRO="${SKIP_METRO:-0}"
 
 # PIDs of processes started by this script — killed in cleanup
 _STARTED_PIDS=()
@@ -99,7 +101,14 @@ cleanup() {
 trap cleanup EXIT
 
 # ---------------------------------------------------------------------------
-# 1. Dependency checks
+# 1. Load screenshot environment (ports, env vars, SDK paths)
+# ---------------------------------------------------------------------------
+
+# shellcheck source=screenshot-env.sh
+. "$REPO_ROOT/mobile/maestro/screenshot-env.sh"
+
+# ---------------------------------------------------------------------------
+# 2. Dependency checks
 # ---------------------------------------------------------------------------
 
 info "Checking dependencies..."
@@ -110,18 +119,11 @@ command -v curl   > /dev/null 2>&1 || die "'curl' not found."
 command -v maestro > /dev/null 2>&1 || die "'maestro' not found. Install via: brew install mobile-dev-inc/tap/maestro"
 
 # ---------------------------------------------------------------------------
-# 2. Load screenshot environment (ports, env vars, SDK paths)
-# ---------------------------------------------------------------------------
-
-# shellcheck source=screenshot-env.sh
-. "$REPO_ROOT/mobile/maestro/screenshot-env.sh"
-
-# ---------------------------------------------------------------------------
 # 3. Verify Android emulator is booted and unlocked
 # ---------------------------------------------------------------------------
 
 info "Checking for a running Android emulator..."
-EMULATOR_SERIAL=$(adb devices 2>/dev/null | awk '/emulator-[0-9]+\s+device/{print $1; exit}')
+EMULATOR_SERIAL=$(adb devices 2>/dev/null | awk '/emulator-[0-9]+[[:space:]]+device/{print $1; exit}')
 if [[ -z "$EMULATOR_SERIAL" ]]; then
   die "No running Android emulator found. Start one with Android Studio or 'emulator -avd <AVD_NAME>' and try again."
 fi
@@ -160,19 +162,23 @@ fi
 # ---------------------------------------------------------------------------
 
 wait_for_http "gateway (:8081)" "$GATEWAY_URL/health/ready" "$HEALTH_TIMEOUT"
-wait_for_http "api (:8080)"     "$API_URL/health/live"       "$HEALTH_TIMEOUT"
+if [[ "$START_MOCK_SERVERS" != "1" ]]; then
+  wait_for_http "api (:8080)"   "$API_URL/health/live"       "$HEALTH_TIMEOUT"
+fi
 
 # ---------------------------------------------------------------------------
 # 7. Start Metro on :8082 if not already running
 # ---------------------------------------------------------------------------
 
-if curl -sf --max-time 2 "http://127.0.0.1:$METRO_PORT/status" 2>/dev/null | grep -q "packager-status:running"; then
+if [[ "$SKIP_METRO" == "1" ]]; then
+  info "SKIP_METRO=1 — skipping Metro (APK has embedded bundle)."
+elif curl -sf --max-time 2 "http://127.0.0.1:$METRO_PORT/status" 2>/dev/null | grep -q "packager-status:running"; then
   info "Metro already running on :$METRO_PORT."
 else
   info "Starting Metro on :$METRO_PORT..."
   (
     cd "$REPO_ROOT/mobile"
-    npx expo start --port "$METRO_PORT" --clear > /tmp/dubbridge-metro.log 2>&1
+    EXPO_PUBLIC_E2E_ENABLED=true npx expo start --port "$METRO_PORT" --clear > /tmp/dubbridge-metro.log 2>&1
   ) &
   _STARTED_PIDS+=($!)
   wait_for_metro
@@ -228,8 +234,10 @@ MAESTRO_OUT_5="/tmp/dubbridge-maestro-asset-ingestion-$$"
 MAESTRO_OUT_5B="/tmp/dubbridge-maestro-asset-ingestion-no-rights-$$"
 MAESTRO_OUT_6="/tmp/dubbridge-maestro-projects-$$"
 MAESTRO_OUT_7="/tmp/dubbridge-maestro-compliance-$$"
+MAESTRO_OUT_8="/tmp/dubbridge-maestro-review-$$"
 mkdir -p "$MAESTRO_OUT_1" "$MAESTRO_OUT_2" "$MAESTRO_OUT_3" "$MAESTRO_OUT_3E" \
-         "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" "$MAESTRO_OUT_7"
+         "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" \
+         "$MAESTRO_OUT_7" "$MAESTRO_OUT_8"
 
 # --- S-055 Phase 1: auth surface ---
 
@@ -394,6 +402,26 @@ maestro test \
 
 info "Phase 7 passed."
 
+# --- S-160 Phase 8: review and publication flow (SC-REVIEW-1/2, SC-PUBLISH-1/2) ---
+
+info "Minting handoff code for Phase 8 (review flow)..."
+DEEPLINK_REVIEW=$(curl -sf --max-time 10 -X POST "$GATEWAY_URL/e2e/issue-handoff") \
+  || die "Seed request for Phase 8 failed."
+DEEPLINK_REVIEW=$(SEED_JSON="$DEEPLINK_REVIEW" node -e "
+  const raw = process.env.SEED_JSON;
+  try { const p = JSON.parse(raw); process.stdout.write(p.auth.bootstrap_deeplink); }
+  catch(e) { process.exit(1); }
+") || die "Could not parse bootstrap_deeplink for Phase 8."
+
+info "Phase 8 — review and publication (review.yaml / SC-REVIEW-1/2, SC-PUBLISH-1/2)..."
+maestro test \
+  --test-output-dir "$MAESTRO_OUT_8" \
+  --env SEED_BOOTSTRAP_DEEPLINK="$DEEPLINK_REVIEW" \
+  "$REPO_ROOT/mobile/maestro/review.yaml" \
+  || die "Phase 8 (review.yaml) failed. Check $MAESTRO_OUT_8 for details."
+
+info "Phase 8 passed."
+
 # ---------------------------------------------------------------------------
 # Copy screenshots
 # ---------------------------------------------------------------------------
@@ -403,7 +431,8 @@ mkdir -p "$SCREENSHOTS_DIR"
 
 info "Copying screenshots to $SCREENSHOTS_DIR ..."
 find "$MAESTRO_OUT_1" "$MAESTRO_OUT_2" "$MAESTRO_OUT_3" "$MAESTRO_OUT_3E" \
-     "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" "$MAESTRO_OUT_7" -name "*.png" | while IFS= read -r png; do
+     "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" \
+     "$MAESTRO_OUT_7" "$MAESTRO_OUT_8" -name "*.png" | while IFS= read -r png; do
   cp "$png" "$SCREENSHOTS_DIR/"
   info "  Copied: $(basename "$png")"
 done
@@ -443,19 +472,23 @@ sanitize_dir "$MAESTRO_OUT_5"
 sanitize_dir "$MAESTRO_OUT_5B"
 sanitize_dir "$MAESTRO_OUT_6"
 sanitize_dir "$MAESTRO_OUT_7"
+sanitize_dir "$MAESTRO_OUT_8"
 
 # Assert absence of sensitive values post-sanitization
 LEAK_HANDOFF=$(grep -r 'handoff_code=' \
   "$MAESTRO_OUT_1" "$MAESTRO_OUT_2" "$MAESTRO_OUT_3" "$MAESTRO_OUT_3E" \
-  "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" "$MAESTRO_OUT_7" 2>/dev/null \
+  "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" \
+  "$MAESTRO_OUT_7" "$MAESTRO_OUT_8" 2>/dev/null \
   | grep -v 'handoff_code=\[REDACTED\]' || true)
 LEAK_SESSION=$(grep -r 'session_ref=' \
   "$MAESTRO_OUT_1" "$MAESTRO_OUT_2" "$MAESTRO_OUT_3" "$MAESTRO_OUT_3E" \
-  "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" "$MAESTRO_OUT_7" 2>/dev/null \
+  "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" \
+  "$MAESTRO_OUT_7" "$MAESTRO_OUT_8" 2>/dev/null \
   | grep -v 'session_ref=\[REDACTED\]' || true)
 LEAK_SESSION_JSON=$(grep -r '"session_ref":"' \
   "$MAESTRO_OUT_1" "$MAESTRO_OUT_2" "$MAESTRO_OUT_3" "$MAESTRO_OUT_3E" \
-  "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" "$MAESTRO_OUT_7" 2>/dev/null \
+  "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" \
+  "$MAESTRO_OUT_7" "$MAESTRO_OUT_8" 2>/dev/null \
   | grep -v '"session_ref":"\[REDACTED\]"' || true)
 
 if [[ -n "$LEAK_HANDOFF" || -n "$LEAK_SESSION" || -n "$LEAK_SESSION_JSON" ]]; then
@@ -473,7 +506,7 @@ info "Sanitization verified: no handoff_code or session_ref values remain in rep
 # ---------------------------------------------------------------------------
 
 info ""
-info "Suite complete — 7 phases, $(echo "$PNG_COUNT") screenshot(s)."
+info "Suite complete — 8 phases, $(echo "$PNG_COUNT") screenshot(s)."
 info "  Screenshots    : $SCREENSHOTS_DIR"
 info "  Phase 1 out    : $MAESTRO_OUT_1   (01_auth_login)"
 info "  Phase 2 out    : $MAESTRO_OUT_2   (02_home)"
@@ -484,3 +517,4 @@ info "  Phase 5 out    : $MAESTRO_OUT_5   (05_upload → 06_ingest_complete)"
 info "  Phase 5b out   : $MAESTRO_OUT_5B  (07_ingest_no_rights — SC-INGEST-2)"
 info "  Phase 6 out    : $MAESTRO_OUT_6   (08_home_for_projects → 09_project_list → 10_project_detail)"
 info "  Phase 7 out    : $MAESTRO_OUT_7   (11_compliance_center → 12_consent_active → 13_consent_revoked)"
+info "  Phase 8 out    : $MAESTRO_OUT_8   (14_review_inbox → 15_review_detail → 16_review_approved → 17_review_published)"

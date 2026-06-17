@@ -12,12 +12,14 @@ export function HomeScreen({
   gatewayBaseUrl,
   onOpenAssets,
   onOpenUpload,
+  onOpenReview,
   onOpenOrganizations,
 }: {
   dubbridgeEnv: string;
   gatewayBaseUrl: string;
   onOpenAssets: () => void;
   onOpenUpload: () => void;
+  onOpenReview: () => void;
   onOpenOrganizations: () => void;
 }) {
   const auth = useAuth();
@@ -43,6 +45,13 @@ export function HomeScreen({
           label="Upload asset"
           variant="secondary"
           onPress={onOpenUpload}
+          fullWidth
+        />
+        <Button
+          testID="home-open-review"
+          label="Review inbox"
+          variant="secondary"
+          onPress={onOpenReview}
           fullWidth
         />
         <Button

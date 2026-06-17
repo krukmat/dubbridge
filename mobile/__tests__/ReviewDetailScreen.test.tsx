@@ -1,0 +1,225 @@
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+
+import { createGatewayClient } from "../src/api/client";
+import type { AuthContextValue } from "../src/auth/AuthProvider";
+import { ReviewDetailScreen } from "../src/screens/ReviewDetailScreen";
+
+jest.mock("../src/auth/AuthProvider", () => ({ useAuth: () => mockAuth }));
+jest.mock("../src/api/client", () => ({ createGatewayClient: jest.fn() }));
+jest.mock("../src/components/Button", () => {
+  const React = require("react");
+  const { Pressable, Text } = require("react-native");
+  return {
+    Button: ({ testID, label, onPress, ...props }: any) => {
+      if (testID) {
+        mockButtonProps[testID] = { testID, label, onPress, ...props };
+      }
+      return React.createElement(
+        Pressable,
+        { testID, onPress },
+        React.createElement(Text, null, label),
+      );
+    },
+  };
+});
+
+(
+  globalThis as typeof globalThis & {
+    IS_REACT_ACT_ENVIRONMENT?: boolean;
+  }
+).IS_REACT_ACT_ENVIRONMENT = true;
+
+const mockCreateGatewayClient = createGatewayClient as jest.MockedFunction<
+  typeof createGatewayClient
+>;
+
+const BASE_TASK = {
+  id: "task-001",
+  org_id: "org-001",
+  project_id: "proj-001",
+  asset_id: "asset-001",
+  target_language_id: "lang-001",
+  assignee_subject_id: "reviewer-001",
+  state: "pending" as const,
+  created_at: "2026-06-13T00:00:00Z",
+  updated_at: "2026-06-13T00:00:00Z",
+  assigned_at: "2026-06-13T00:00:00Z",
+};
+
+let mockAuth: AuthContextValue;
+let mockClient: { get: jest.Mock; post: jest.Mock; postMultipart: jest.Mock };
+let mockButtonProps: Record<string, any>;
+
+describe("ReviewDetailScreen", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockButtonProps = {};
+    mockAuth = {
+      sessionRef: "opaque-session",
+      status: "authed",
+      loginError: null,
+      login: jest.fn().mockResolvedValue(undefined),
+      logout: jest.fn().mockResolvedValue(undefined),
+      onSessionRotation: jest.fn().mockResolvedValue(undefined),
+    };
+    mockClient = { get: jest.fn(), post: jest.fn(), postMultipart: jest.fn() };
+    mockCreateGatewayClient.mockReturnValue(
+      mockClient as unknown as ReturnType<typeof createGatewayClient>,
+    );
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("HP-1: approve posts a scoped decision, rotates session, and reveals publish", async () => {
+    mockClient.post.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        data: { review_task_id: BASE_TASK.id, state: "approved" },
+        sessionRotation: "rot-review",
+      },
+    });
+
+    await render(
+      <ReviewDetailScreen
+        task={BASE_TASK}
+        gatewayBaseUrl="http://gateway"
+        onBack={jest.fn()}
+      />,
+    );
+
+    expect(mockButtonProps["review-approve"].fullWidth).toBe(true);
+    expect(mockButtonProps["review-reject"].fullWidth).toBe(true);
+    await waitFor(() => expect(screen.getByTestId("review-detail-screen")).toBeTruthy());
+    fireEvent(screen.getByTestId("review-comment-input"), "changeText", "Looks good");
+    await waitFor(() =>
+      expect(screen.getByTestId("review-comment-input").props.value).toBe("Looks good"),
+    );
+    fireEvent.press(screen.getByTestId("review-approve"));
+
+    await waitFor(() => expect(screen.getByTestId("publish-action")).toBeTruthy());
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/orgs/org-001/projects/proj-001/review-tasks/task-001/decision",
+      "opaque-session",
+      { verdict: "approved", comment: "Looks good" },
+    );
+    expect(mockAuth.onSessionRotation).toHaveBeenCalledWith("rot-review");
+  });
+
+  it("HP-2: approved task publishes and shows the published timestamp", async () => {
+    mockClient.post.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        data: {
+          review_task_id: BASE_TASK.id,
+          status: "published",
+          published_by: "reviewer-001",
+          published_at: "2026-06-13T10:00:00Z",
+        },
+        sessionRotation: "rot-publish",
+      },
+    });
+
+    await render(
+      <ReviewDetailScreen
+        task={{ ...BASE_TASK, state: "approved" }}
+        gatewayBaseUrl="http://gateway"
+        onBack={jest.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("publish-action")).toBeTruthy());
+    fireEvent.press(screen.getByTestId("publish-action"));
+
+    await waitFor(() => expect(screen.getByText(/Published/)).toBeTruthy());
+    expect(screen.getByText(/Published/).props.accessibilityLiveRegion).toBe("polite");
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/orgs/org-001/projects/proj-001/review-tasks/task-001/publish",
+      "opaque-session",
+      {},
+    );
+    expect(mockAuth.onSessionRotation).toHaveBeenCalledWith("rot-publish");
+  });
+
+  it("EC-1: pending task hides the publish action", async () => {
+    await render(
+      <ReviewDetailScreen
+        task={BASE_TASK}
+        gatewayBaseUrl="http://gateway"
+        onBack={jest.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("review-detail-screen")).toBeTruthy());
+    expect(screen.queryByTestId("publish-action")).toBeNull();
+  });
+
+  it("EC-2: session_expired on decision logs out immediately", async () => {
+    mockClient.post.mockResolvedValueOnce({
+      ok: false,
+      error: { kind: "session_expired" },
+    });
+
+    await render(
+      <ReviewDetailScreen
+        task={BASE_TASK}
+        gatewayBaseUrl="http://gateway"
+        onBack={jest.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("review-approve")).toBeTruthy());
+    fireEvent.press(screen.getByTestId("review-approve"));
+
+    await waitFor(() => expect(mockAuth.logout).toHaveBeenCalledTimes(1));
+  });
+
+  it("EC-3: forbidden publish shows an inline error without logout", async () => {
+    mockClient.post.mockResolvedValueOnce({
+      ok: false,
+      error: { kind: "forbidden" },
+    });
+
+    await render(
+      <ReviewDetailScreen
+        task={{ ...BASE_TASK, state: "approved" }}
+        gatewayBaseUrl="http://gateway"
+        onBack={jest.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("publish-action")).toBeTruthy());
+    fireEvent.press(screen.getByTestId("publish-action"));
+
+    await waitFor(() =>
+      expect(screen.getByText("Insufficient role to publish.")).toBeTruthy(),
+    );
+    expect(screen.getByText("Insufficient role to publish.").props.accessibilityRole).toBe("alert");
+    expect(screen.getByText("Insufficient role to publish.").props.accessibilityLiveRegion).toBe("assertive");
+    expect(mockAuth.logout).not.toHaveBeenCalled();
+  });
+
+  it("EC-3b: forbidden decision shows an inline error without logout", async () => {
+    mockClient.post.mockResolvedValueOnce({
+      ok: false,
+      error: { kind: "forbidden" },
+    });
+
+    await render(
+      <ReviewDetailScreen
+        task={BASE_TASK}
+        gatewayBaseUrl="http://gateway"
+        onBack={jest.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("review-approve")).toBeTruthy());
+    fireEvent.press(screen.getByTestId("review-approve"));
+
+    await waitFor(() =>
+      expect(screen.getByText("Insufficient role to submit a decision.")).toBeTruthy(),
+    );
+    expect(mockAuth.logout).not.toHaveBeenCalled();
+  });
+});

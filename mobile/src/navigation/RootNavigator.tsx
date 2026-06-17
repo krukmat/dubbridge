@@ -1,6 +1,9 @@
-import { NavigationContainer } from "@react-navigation/native";
+import { useEffect, useRef, useState } from "react";
+import { NavigationContainer, type NavigationContainerRef } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import * as Notifications from "expo-notifications";
 
+import { createGatewayClient } from "../api/client";
 import { AuthProvider, useAuth } from "../auth/AuthProvider";
 import { color, type } from "../theme";
 import { readRuntimeConfig } from "../config/env";
@@ -16,6 +19,10 @@ import { OrganizationMembersScreen } from "../screens/OrganizationMembersScreen"
 import { ProjectDetailScreen } from "../screens/ProjectDetailScreen";
 import { ProjectListScreen } from "../screens/ProjectListScreen";
 import { UploadScreen } from "../screens/UploadScreen";
+import { ReviewInboxScreen } from "../screens/ReviewInboxScreen";
+import { ReviewDetailScreen } from "../screens/ReviewDetailScreen";
+import type { ReviewTaskSummary } from "../api/review";
+import { registerPush } from "../push/registerPush";
 
 type UnauthedStackParamList = {
   Login: undefined;
@@ -35,6 +42,8 @@ type AuthedStackParamList = {
   OrganizationMembers: { orgId: string; orgName: string; viewerRole: OrganizationSummary["viewer_role"] };
   ProjectList: { orgId: string; orgName: string };
   ProjectDetail: { orgId: string; projectId: string; projectName: string };
+  ReviewInbox: { initialTaskId?: string } | undefined;
+  ReviewDetail: { task: ReviewTaskSummary };
 };
 
 const UnauthedStack = createNativeStackNavigator<UnauthedStackParamList>();
@@ -72,6 +81,7 @@ function AuthedNavigator({
             gatewayBaseUrl={gatewayBaseUrl}
             onOpenAssets={() => navigation.navigate("AssetList")}
             onOpenUpload={() => navigation.navigate("Upload")}
+            onOpenReview={() => navigation.navigate("ReviewInbox")}
             onOpenOrganizations={() => navigation.navigate("OrganizationList")}
           />
         )}
@@ -202,20 +212,88 @@ function AuthedNavigator({
           />
         )}
       </AuthedStack.Screen>
+      <AuthedStack.Screen name="ReviewInbox" options={{ title: "Review inbox" }}>
+        {({ navigation, route }) => (
+          <ReviewInboxScreen
+            gatewayBaseUrl={gatewayBaseUrl}
+            initialTaskId={route.params?.initialTaskId ?? null}
+            onOpenTask={(task) => navigation.navigate("ReviewDetail", { task })}
+          />
+        )}
+      </AuthedStack.Screen>
+      <AuthedStack.Screen name="ReviewDetail" options={{ title: "Review task" }}>
+        {({ route, navigation }) => (
+          <ReviewDetailScreen
+            task={route.params.task}
+            gatewayBaseUrl={gatewayBaseUrl}
+            onBack={() => navigation.navigate("ReviewInbox")}
+          />
+        )}
+      </AuthedStack.Screen>
     </AuthedStack.Navigator>
   );
 }
 
+type PendingDeepLink = { taskId: string };
+
 function RootNavigatorContent() {
   const auth = useAuth();
   const runtimeConfig = readRuntimeConfig();
+  const navRef = useRef<NavigationContainerRef<AuthedStackParamList>>(null);
+  const [pendingDeepLink, setPendingDeepLink] = useState<PendingDeepLink | null>(null);
+
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const data = response.notification.request.content.data as Record<string, unknown>;
+        const refEntityType = data["ref_entity_type"];
+        const refEntityId = data["ref_entity_id"];
+
+        if (refEntityType !== "review_task" || typeof refEntityId !== "string") {
+          return;
+        }
+
+        if (auth.status !== "authed") {
+          // Logged out: store intent; the authed navigator will pick it up on mount.
+          setPendingDeepLink({ taskId: refEntityId });
+          return;
+        }
+
+        // Authed: navigate immediately if the navigator is ready.
+        if (navRef.current?.isReady()) {
+          navigateToReviewInbox(navRef.current, refEntityId);
+        } else {
+          setPendingDeepLink({ taskId: refEntityId });
+        }
+      },
+    );
+    return () => subscription.remove();
+  }, [auth.status]);
+
+  useEffect(() => {
+    if (!runtimeConfig.ok || auth.status !== "authed") {
+      return;
+    }
+
+    const client = createGatewayClient({
+      gatewayBaseUrl: runtimeConfig.value.gatewayBaseUrl,
+    });
+    void registerPush(client, auth.sessionRef);
+  }, [auth.sessionRef, auth.status, runtimeConfig]);
+
+  function onNavReady() {
+    if (pendingDeepLink && auth.status === "authed" && navRef.current) {
+      navigateToReviewInbox(navRef.current, pendingDeepLink.taskId);
+      setPendingDeepLink(null);
+    }
+  }
 
   if (!runtimeConfig.ok) {
     return <ConfigErrorScreen message={runtimeConfig.message} />;
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navRef} onReady={onNavReady}>
       {auth.status === "authed" ? (
         <AuthedNavigator
           dubbridgeEnv={runtimeConfig.value.dubbridgeEnv}
@@ -226,6 +304,13 @@ function RootNavigatorContent() {
       )}
     </NavigationContainer>
   );
+}
+
+function navigateToReviewInbox(
+  nav: NavigationContainerRef<AuthedStackParamList>,
+  taskId: string,
+) {
+  nav.navigate("ReviewInbox", { initialTaskId: taskId });
 }
 
 export function RootNavigator() {

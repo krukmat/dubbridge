@@ -32,6 +32,7 @@ export function statusTone(status: string | null | undefined): BadgeTone {
     case "grant":
     case "granted":
     case "active":
+    case "approved":
     case "finalized":
     case "published":
       return "success";

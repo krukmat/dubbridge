@@ -1,0 +1,125 @@
+appId: com.dubbridge.mobile
+name: Review and publication workspace
+tags:
+  - android
+  - s-160
+  - review
+# BDD scenarios: SC-REVIEW-1, SC-REVIEW-2, SC-PUBLISH-1, SC-PUBLISH-2
+---
+- launchApp:
+    clearState: true
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: login-screen
+    timeout: 20000
+
+- assertVisible:
+    id: login-screen
+
+- openLink: ${SEED_BOOTSTRAP_DEEPLINK}
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 30000
+
+- assertVisible:
+    id: home-screen
+
+# SC-REVIEW-1: Reviewer opens the review inbox
+- tapOn:
+    id: home-open-review
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: review-inbox-screen
+    timeout: 20000
+
+- assertVisible:
+    id: review-inbox-screen
+
+- takeScreenshot: 14_review_inbox
+
+# SC-REVIEW-2: Open the first review task
+- tapOn:
+    id: review-task-review-task-seed-1
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: review-detail-screen
+    timeout: 20000
+
+- assertVisible:
+    id: review-detail-screen
+
+- takeScreenshot: 15_review_detail
+
+# SC-PUBLISH-2: publish action must be absent for a pending task
+- assertNotVisible:
+    id: publish-action
+
+# SC-REVIEW-2: Approve the task
+- tapOn:
+    id: review-approve
+
+- extendedWaitUntil:
+    visible:
+      text: "approved"
+    timeout: 20000
+
+- takeScreenshot: 16_review_approved
+
+# SC-PUBLISH-1: publish action visible after approval — tap to publish
+- assertVisible:
+    id: publish-action
+
+- tapOn:
+    id: publish-action
+
+- extendedWaitUntil:
+    visible:
+      text: "published"
+    timeout: 20000
+
+- takeScreenshot: 17_review_published

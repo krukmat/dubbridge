@@ -55,6 +55,10 @@ jest.mock("expo-web-browser", () => ({
   openAuthSessionAsync: jest.fn(),
 }));
 
+jest.mock("../src/push/registerPush", () => ({
+  registerPush: jest.fn().mockResolvedValue(undefined),
+}));
+
 const mockLoadSessionRef = loadSessionRef as jest.MockedFunction<typeof loadSessionRef>;
 const mockSaveSessionRef = saveSessionRef as jest.MockedFunction<typeof saveSessionRef>;
 const mockClearSessionRef = clearSessionRef as jest.MockedFunction<typeof clearSessionRef>;

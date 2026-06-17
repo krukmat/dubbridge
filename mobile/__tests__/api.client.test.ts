@@ -28,6 +28,8 @@ function makeMockResponse(
   bodyObj: unknown,
   responseHeaders: Record<string, string> = {}
 ): Response {
+  const bodyText =
+    bodyObj === undefined ? '' : typeof bodyObj === 'string' ? bodyObj : JSON.stringify(bodyObj);
   return {
     status,
     ok: status >= 200 && status < 300,
@@ -41,6 +43,7 @@ function makeMockResponse(
       },
     },
     json: () => Promise.resolve(bodyObj),
+    text: () => Promise.resolve(bodyText),
   } as unknown as Response;
 }
 
@@ -222,6 +225,21 @@ describe('createGatewayClient', () => {
       expect(result.ok).toBe(true);
       const calledInit = mockFetch.mock.calls[0]?.[1] as RequestInit;
       expect(calledInit.body).toBe(JSON.stringify(payload));
+    });
+  });
+
+  describe('POST 204/empty body succeeds for void endpoints', () => {
+    it('returns ok with undefined data when the response body is empty', async () => {
+      mockFetch.mockResolvedValueOnce(makeMockResponse(204, undefined));
+
+      const result = await client.post<void>('/api/notifications/mark-read', SESSION_REF, {
+        ids: ['notif-1'],
+      });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.data).toBeUndefined();
+      }
     });
   });
 

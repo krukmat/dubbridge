@@ -36,6 +36,19 @@ function extractRotation(headers: { get(name: string): string | null }): string 
   return trimmed;
 }
 
+async function parseResponseBody<T>(res: Response): Promise<T> {
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
+  const text = await res.text();
+  if (text.trim() === '') {
+    return undefined as T;
+  }
+
+  return JSON.parse(text) as T;
+}
+
 export function createGatewayClient(config: ClientConfig): GatewayClient {
   const { gatewayBaseUrl, timeoutMs = 10_000 } = config;
 
@@ -75,7 +88,7 @@ export function createGatewayClient(config: ClientConfig): GatewayClient {
       }
 
       const sessionRotation = extractRotation(res.headers);
-      const data = (await res.json()) as T;
+      const data = await parseResponseBody<T>(res);
       return { ok: true, value: { data, sessionRotation } };
     } catch (err: unknown) {
       const error = err as Error;

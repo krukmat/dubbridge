@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render } from "@testing-library/react-native";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react-native";
 
 import type { AuthContextValue } from "../src/auth/AuthProvider";
 import { RootNavigator } from "../src/navigation/RootNavigator";
@@ -9,10 +9,82 @@ let mockExtra: {
 } = {};
 
 let mockAuthValue: AuthContextValue;
+let mockNotificationResponseListener:
+  | ((response: {
+      notification: { request: { content: { data: Record<string, unknown> } } };
+    }) => void)
+  | null = null;
+
+const mockDeepLinkTask = {
+  id: "task-push-001",
+  org_id: "org-001",
+  project_id: "proj-001",
+  asset_id: "asset-001",
+  target_language_id: "lang-001",
+  assignee_subject_id: "reviewer-001",
+  state: "pending" as const,
+  created_at: "2026-06-13T00:00:00Z",
+  updated_at: "2026-06-13T00:00:00Z",
+  assigned_at: "2026-06-13T00:00:00Z",
+};
+
+(
+  globalThis as typeof globalThis & {
+    IS_REACT_ACT_ENVIRONMENT?: boolean;
+  }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 jest.mock("../src/auth/AuthProvider", () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => children,
   useAuth: () => mockAuthValue,
+}));
+
+jest.mock("../src/push/registerPush", () => ({
+  registerPush: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("expo-notifications", () => ({
+  addNotificationResponseReceivedListener: jest.fn((listener) => {
+    mockNotificationResponseListener = listener;
+    return { remove: jest.fn() };
+  }),
+}));
+
+jest.mock("../src/screens/ReviewInboxScreen", () => ({
+  ReviewInboxScreen: ({
+    initialTaskId,
+    onOpenTask,
+  }: {
+    initialTaskId?: string | null;
+    onOpenTask: (task: typeof mockDeepLinkTask) => void;
+  }) => {
+    const React = require("react");
+    const { Text } = require("react-native");
+    React.useEffect(() => {
+      if (initialTaskId) {
+        onOpenTask({
+          id: initialTaskId,
+          org_id: "org-001",
+          project_id: "proj-001",
+          asset_id: "asset-001",
+          target_language_id: "lang-001",
+          assignee_subject_id: "reviewer-001",
+          state: "pending",
+          created_at: "2026-06-13T00:00:00Z",
+          updated_at: "2026-06-13T00:00:00Z",
+          assigned_at: "2026-06-13T00:00:00Z",
+        });
+      }
+    }, [initialTaskId, onOpenTask]);
+    return <Text testID="mock-review-inbox">{initialTaskId ?? "review-inbox"}</Text>;
+  },
+}));
+
+jest.mock("../src/screens/ReviewDetailScreen", () => ({
+  ReviewDetailScreen: ({ task }: { task: typeof mockDeepLinkTask }) => {
+    const { Text } = require("react-native");
+    return <Text testID="review-detail-screen">{task.id}</Text>;
+  },
 }));
 
 jest.mock("expo-constants", () => ({
@@ -30,6 +102,7 @@ describe("RootNavigator", () => {
   afterEach(() => {
     cleanup();
     mockExtra = {};
+    mockNotificationResponseListener = null;
   });
 
   beforeEach(() => {
@@ -90,6 +163,7 @@ describe("RootNavigator", () => {
     expect(view.getByText("local")).toBeTruthy();
     expect(view.getByText("http://127.0.0.1:4000")).toBeTruthy();
     expect(view.getByText("Browse assets")).toBeTruthy();
+    expect(view.getByText("Review inbox")).toBeTruthy();
     expect(view.getByText("Organizations and projects")).toBeTruthy();
     expect(view.getByText("Sign out")).toBeTruthy();
     expect(view.getByTestId("home-screen")).toBeTruthy();
@@ -158,5 +232,70 @@ describe("RootNavigator", () => {
     fireEvent.press(view.getByText("Sign out"));
 
     expect(mockAuthValue.logout).toHaveBeenCalledTimes(1);
+  });
+
+  it("deep-links a push review_task notification to ReviewDetail when authenticated", async () => {
+    mockExtra = {
+      dubbridgeEnv: "local",
+      gatewayBaseUrl: "http://127.0.0.1:4000",
+    };
+    mockAuthValue = {
+      ...mockAuthValue,
+      sessionRef: "opaque-session-abc123",
+      status: "authed",
+    };
+
+    const view = await render(<RootNavigator />);
+
+    await waitFor(() =>
+      expect(view.getByTestId("home-screen")).toBeTruthy(),
+    );
+
+    await act(async () => {
+      mockNotificationResponseListener?.({
+        notification: {
+          request: {
+            content: {
+              data: {
+                ref_entity_type: "review_task",
+                ref_entity_id: mockDeepLinkTask.id,
+              },
+            },
+          },
+        },
+      });
+    });
+
+    await waitFor(() =>
+      expect(view.getByTestId("review-detail-screen")).toBeTruthy(),
+    );
+    expect(view.getByText(mockDeepLinkTask.id)).toBeTruthy();
+  });
+
+  it("keeps the login screen visible on push tap while logged out", async () => {
+    mockExtra = {
+      dubbridgeEnv: "local",
+      gatewayBaseUrl: "http://127.0.0.1:4000",
+    };
+
+    const view = await render(<RootNavigator />);
+
+    await act(async () => {
+      mockNotificationResponseListener?.({
+        notification: {
+          request: {
+            content: {
+              data: {
+                ref_entity_type: "review_task",
+                ref_entity_id: mockDeepLinkTask.id,
+              },
+            },
+          },
+        },
+      });
+    });
+
+    expect(view.getByTestId("login-screen")).toBeTruthy();
+    expect(view.queryByTestId("review-detail-screen")).toBeNull();
   });
 });
