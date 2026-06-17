@@ -7,8 +7,10 @@ import {
   SEED_PROJECT,
   SEED_MEMBER,
   NON_MEMBER_SESSION,
+  NON_REVIEWER_SESSION,
   SEED_AUDIT_EVENTS,
   SEED_RIGHTS_RECORDS,
+  SEED_REVIEW_TASK,
   createMockGatewayServer,
 } from "./mock-gateway-server.mjs";
 
@@ -364,5 +366,177 @@ test("mock gateway returns happy-path ingest shapes", async () => {
 
     assert.equal(finalizeResponse.status, 201);
     assert.deepEqual(await finalizeResponse.json(), SEED_ASSETS[0]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Review route tests (S-160-T8 — HP-1, EC-1, EC-2)
+// ---------------------------------------------------------------------------
+
+test("mock gateway returns review queue for reviewer session (HP-1 / SC-REVIEW-1)", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const response = await fetch(
+      `${baseUrl}/api/orgs/${SEED_ORG.id}/projects/${SEED_PROJECT.id}/review-tasks`,
+      { headers: SESSION_HEADERS },
+    );
+
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.org_id, SEED_ORG.id);
+    assert.equal(body.project_id, SEED_PROJECT.id);
+    assert.equal(body.tasks.length, 1);
+    assert.equal(body.tasks[0].id, SEED_REVIEW_TASK.id);
+    assert.equal(body.tasks[0].state, "pending");
+  });
+});
+
+test("mock gateway rejects review queue without session (EC-1 / SC-REVIEW-1)", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const response = await fetch(
+      `${baseUrl}/api/orgs/${SEED_ORG.id}/projects/${SEED_PROJECT.id}/review-tasks`,
+    );
+    assert.equal(response.status, 401);
+  });
+});
+
+test("mock gateway denies non-reviewer decide attempt (EC-2)", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const response = await fetch(
+      `${baseUrl}/api/orgs/${SEED_ORG.id}/projects/${SEED_PROJECT.id}/review-tasks/${SEED_REVIEW_TASK.id}/decision`,
+      {
+        method: "POST",
+        headers: { "x-dubbridge-session": NON_REVIEWER_SESSION, "content-type": "application/json" },
+        body: JSON.stringify({ verdict: "approved", comment: null }),
+      },
+    );
+    assert.equal(response.status, 403);
+  });
+});
+
+test("mock gateway approve→publish flow emits notifications (HP-1 / SC-REVIEW-2, SC-PUBLISH-1)", async () => {
+  await withServer(async ({ baseUrl }) => {
+    // Approve
+    const decisionResponse = await fetch(
+      `${baseUrl}/api/orgs/${SEED_ORG.id}/projects/${SEED_PROJECT.id}/review-tasks/${SEED_REVIEW_TASK.id}/decision`,
+      {
+        method: "POST",
+        headers: { ...SESSION_HEADERS, "content-type": "application/json" },
+        body: JSON.stringify({ verdict: "approved", comment: "LGTM" }),
+      },
+    );
+    assert.equal(decisionResponse.status, 200);
+    const decisionBody = await decisionResponse.json();
+    assert.equal(decisionBody.state, "approved");
+
+    // Publish
+    const publishResponse = await fetch(
+      `${baseUrl}/api/orgs/${SEED_ORG.id}/projects/${SEED_PROJECT.id}/review-tasks/${SEED_REVIEW_TASK.id}/publish`,
+      {
+        method: "POST",
+        headers: { ...SESSION_HEADERS, "content-type": "application/json" },
+        body: JSON.stringify({}),
+      },
+    );
+    assert.equal(publishResponse.status, 201);
+    const publishBody = await publishResponse.json();
+    assert.equal(publishBody.status, "published");
+
+    // Notifications emitted
+    const notifResponse = await fetch(`${baseUrl}/api/notifications`, { headers: SESSION_HEADERS });
+    assert.equal(notifResponse.status, 200);
+    const notifBody = await notifResponse.json();
+    assert.ok(notifBody.notifications.length >= 2, "expected at least 2 notifications after approve+publish");
+  });
+});
+
+test("mock gateway refuses publish on pending task (EC-1 / SC-PUBLISH-2)", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const response = await fetch(
+      `${baseUrl}/api/orgs/${SEED_ORG.id}/projects/${SEED_PROJECT.id}/review-tasks/${SEED_REVIEW_TASK.id}/publish`,
+      {
+        method: "POST",
+        headers: { ...SESSION_HEADERS, "content-type": "application/json" },
+        body: JSON.stringify({}),
+      },
+    );
+    assert.equal(response.status, 409);
+    const body = await response.json();
+    assert.equal(body.error, "review_not_approved");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Notification route tests (S-160-T8)
+// ---------------------------------------------------------------------------
+
+test("mock gateway lists seeded notification for authenticated session", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/api/notifications`, { headers: SESSION_HEADERS });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.ok(Array.isArray(body.notifications));
+    assert.ok(body.notifications.length >= 1);
+    assert.equal(body.notifications[0].ref_entity_type, "review_task");
+  });
+});
+
+test("mock gateway mark-read updates read_at for caller notifications", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const listBefore = await fetch(`${baseUrl}/api/notifications`, { headers: SESSION_HEADERS });
+    const { notifications } = await listBefore.json();
+    const ids = notifications.map((n) => n.id);
+
+    const markResponse = await fetch(`${baseUrl}/api/notifications/mark-read`, {
+      method: "POST",
+      headers: { ...SESSION_HEADERS, "content-type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    assert.equal(markResponse.status, 200);
+
+    const listAfter = await fetch(`${baseUrl}/api/notifications`, { headers: SESSION_HEADERS });
+    const afterBody = await listAfter.json();
+    for (const n of afterBody.notifications) {
+      if (ids.includes(n.id)) {
+        assert.ok(n.read_at !== null, `expected read_at to be set for id=${n.id}`);
+      }
+    }
+  });
+});
+
+test("mock gateway push-token registration returns 201 and 409 on duplicate", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const token = `ExponentPushToken[e2e-${Date.now()}]`;
+
+    const firstResponse = await fetch(`${baseUrl}/api/notifications/push-tokens`, {
+      method: "POST",
+      headers: { ...SESSION_HEADERS, "content-type": "application/json" },
+      body: JSON.stringify({ token, platform: "ios" }),
+    });
+    assert.equal(firstResponse.status, 201);
+
+    const dupeResponse = await fetch(`${baseUrl}/api/notifications/push-tokens`, {
+      method: "POST",
+      headers: { ...SESSION_HEADERS, "content-type": "application/json" },
+      body: JSON.stringify({ token, platform: "ios" }),
+    });
+    assert.equal(dupeResponse.status, 409);
+  });
+});
+
+test("mock gateway rejects push-token with missing or invalid platform", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const badPlatform = await fetch(`${baseUrl}/api/notifications/push-tokens`, {
+      method: "POST",
+      headers: { ...SESSION_HEADERS, "content-type": "application/json" },
+      body: JSON.stringify({ token: "tok", platform: "web" }),
+    });
+    assert.equal(badPlatform.status, 422);
+
+    const emptyToken = await fetch(`${baseUrl}/api/notifications/push-tokens`, {
+      method: "POST",
+      headers: { ...SESSION_HEADERS, "content-type": "application/json" },
+      body: JSON.stringify({ token: "   ", platform: "android" }),
+    });
+    assert.equal(emptyToken.status, 422);
   });
 });

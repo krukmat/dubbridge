@@ -114,7 +114,7 @@ Plan: `docs/plan/h1-governance-atomicity-hardening.md`
 | **S-130** | Processing / ASR (transcription) | S-100 target-language intent, S-120 | ⬜ worker contract only | `workers/asr-worker-py` |
 | **S-140** | Subtitle generation | S-130 | ⬜ no plan yet | — |
 | **S-150** | Translation + dubbing (TTS / voice cloning) | S-140, S-110 consent precondition | ⬜ worker contracts only | `workers/translation-worker-py`, `workers/tts-worker-py` |
-| **S-160** | Human review & publication workspace: review tasks, decisions, publication gate, notifications, complete mobile surface | S-105; forward-integrates S-140/S-150 derived artifacts | 📄 Replanned mobile-only 2026-06-13 — S-160-T5 cancelled; T6 owns inbox, comparison, decisions, publish visibility, notifications, and deep links; T7 produces Maestro only | `docs/plan/s-160-review-publication-workspace.md`, `docs/tasks/s-160-review-publication-workspace.md` |
+| **S-160** | Human review & publication workspace: review tasks, decisions, publication gate, notifications, complete mobile surface | S-105, S-115; forward-integrates S-140/S-150 derived artifacts | ✅ done 2026-06-13 — T0–T8 complete; review schema/domain/repo/gate/API (T0–T3), notifications (T4a–T4d), complete mobile reviewer surface + push (T6), S-115 design-system hardening (T7), E2E fixtures + Maestro + docs sync (T8) | `docs/plan/s-160-review-publication-workspace.md`, `docs/tasks/s-160-review-publication-workspace.md` |
 | **S-170** | Human review runtime (HITL execution over generated artifacts) | S-140, S-150, S-160 | ⬜ no plan yet | — |
 | **S-180** | Publication runtime | S-170, S-160 publication gate | ⬜ no plan yet | — |
 
@@ -346,4 +346,6 @@ S-095 — live recorder (DEFERRED): ex-T3 recorder crate, ex-T4 jobs/storage,
 - **ADR candidates for product-layer phases (X22/X23/X24).** These are now all closed:
   - **X22 → X-S-100-1:** ✅ closed by ADR-027 (S-100-T0b). Org-membership guard + `workspaces:*` scopes delivered in S-100. Open follow-ups: X-S-100-3 (role extensions), X-S-100-4 (auth server scope config).
   - **X23 → X-S-160-1:** ✅ closed by ADR-030 (S-160-T0b). Review/publication gate model fixed before S-160 schema/runtime work.
+  - **X-S-160-2:** ✅ closed 2026-06-13 (S-160-T8). E2E mock-gateway review/notification fixtures and Maestro review flow (`mobile/maestro/review.yaml`) authored and passing. BDD mapping rows (SC-REVIEW-1/2/3, SC-PUBLISH-1/2, SC-NOTIFY-1) closed with executable evidence.
+  - **X-S-160-3:** open — S-160 operates on fixtures (`asset-seed-1`, `project-seed-1`). Once S-140/S-150 derived artifacts land, review tasks must be created against real derived-asset identities. Gate: S-140 or S-150 delivery.
   - **X24 → X-S-110-1:** ✅ closed by ADR-028 (S-110-T0b). Voice-consent ledger + TTS fail-closed precondition fixed before S-110 implementation.

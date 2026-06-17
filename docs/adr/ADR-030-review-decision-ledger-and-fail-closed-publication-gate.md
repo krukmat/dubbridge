@@ -128,4 +128,4 @@ parallel path.
 - ADR-018 (structured observability) — review and publication decisions are auditable events.
 - ADR-023 (API client authentication and principal propagation) — verified identity remains the outer auth boundary.
 - ADR-027 (organization membership authorization) — reviewer assignment and action scope are role-gated by org membership.
-- Implemented by: `docs/tasks/s-160-review-publication-workspace.md` S-160-T0b; consumed by S-160-T1/T2/T3/T6/T7.
+- Implemented by: `docs/tasks/s-160-review-publication-workspace.md` S-160-T0b; consumed by S-160-T1/T2/T3/T6/T7/T8.

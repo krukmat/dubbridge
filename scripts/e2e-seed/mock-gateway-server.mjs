@@ -83,6 +83,33 @@ export const SEED_RIGHTS_RECORDS = [
 // Session used for the non-member EC-2 / SC-MEMBER-2 fixture.
 export const NON_MEMBER_SESSION = "e2e-non-member-session";
 
+// Session used for the non-reviewer EC-2 / review fixture.
+export const NON_REVIEWER_SESSION = "e2e-non-reviewer-session";
+
+export const SEED_REVIEW_TASK = {
+  id: "review-task-seed-1",
+  org_id: "org-seed-1",
+  project_id: "project-seed-1",
+  asset_id: "asset-seed-1",
+  target_language_id: "lang-seed-1",
+  assignee_subject_id: "e2e-user",
+  state: "pending",
+  created_at: "2026-06-13T10:00:00Z",
+  updated_at: "2026-06-13T10:00:00Z",
+  assigned_at: "2026-06-13T10:00:00Z",
+};
+
+export const SEED_NOTIFICATION = {
+  id: "notification-seed-1",
+  recipient_subject_id: "e2e-user",
+  notification_kind: "review_task_decided",
+  ref_entity_type: "review_task",
+  ref_entity_id: "review-task-seed-1",
+  actor_subject_id: "e2e-user",
+  read_at: null,
+  created_at: "2026-06-13T10:00:00Z",
+};
+
 function sendJson(res, status, body) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(body));
@@ -120,6 +147,10 @@ export function createMockGatewayServer({
   // In-memory ingest token mode: token → "no_rights" | undefined
   const ingestTokenModes = new Map();
   const consentRows = [];
+  // In-memory review / notification state — mutable per-request
+  let reviewTaskStore = { ...SEED_REVIEW_TASK };
+  const notificationStore = [{ ...SEED_NOTIFICATION }];
+  const pushTokenStore = [];
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
@@ -267,6 +298,8 @@ export function createMockGatewayServer({
 
     const isNonMember =
       req.headers["x-dubbridge-session"] === NON_MEMBER_SESSION;
+    const isNonReviewer =
+      req.headers["x-dubbridge-session"] === NON_REVIEWER_SESSION;
 
     // GET /api/orgs — list orgs for the session
     if (req.method === "GET" && url.pathname === "/api/orgs") {
@@ -322,7 +355,149 @@ export function createMockGatewayServer({
         });
       }
 
+      // GET /api/orgs/{orgId}/projects/{projectId}/review-tasks — reviewer queue
+      const reviewQueueMatch = subPath.match(/^\/projects\/([^/]+)\/review-tasks$/);
+      if (req.method === "GET" && reviewQueueMatch) {
+        const projectId = reviewQueueMatch[1];
+        if (isNonReviewer) {
+          return sendJson(res, 403, { error: "forbidden" });
+        }
+        return sendJson(res, 200, {
+          org_id: orgId,
+          project_id: projectId,
+          tasks: projectId === SEED_PROJECT.id ? [reviewTaskStore] : [],
+        });
+      }
+
+      // POST /api/orgs/{orgId}/projects/{projectId}/review-tasks/{id}/decision
+      const reviewDecisionMatch = subPath.match(
+        /^\/projects\/([^/]+)\/review-tasks\/([^/]+)\/decision$/,
+      );
+      if (req.method === "POST" && reviewDecisionMatch) {
+        if (isNonReviewer) {
+          return sendJson(res, 403, { error: "forbidden" });
+        }
+        const taskId = reviewDecisionMatch[2];
+        if (taskId !== reviewTaskStore.id) {
+          return sendJson(res, 404, { error: "review_task_not_found" });
+        }
+        let body;
+        try {
+          body = JSON.parse(await readBody(req));
+        } catch {
+          return sendJson(res, 400, { error: "invalid_json" });
+        }
+        const verdict = body?.verdict;
+        if (verdict !== "approved" && verdict !== "rejected") {
+          return sendJson(res, 422, { error: "invalid_verdict" });
+        }
+        reviewTaskStore = { ...reviewTaskStore, state: verdict, updated_at: new Date().toISOString() };
+        notificationStore.push({
+          id: `notification-seed-${notificationStore.length + 2}`,
+          recipient_subject_id: reviewTaskStore.assignee_subject_id ?? "e2e-user",
+          notification_kind: "review_task_decided",
+          ref_entity_type: "review_task",
+          ref_entity_id: reviewTaskStore.id,
+          actor_subject_id: "e2e-user",
+          read_at: null,
+          created_at: new Date().toISOString(),
+        });
+        return sendJson(res, 200, {
+          review_task_id: taskId,
+          state: reviewTaskStore.state,
+          sessionRotation: null,
+        });
+      }
+
+      // POST /api/orgs/{orgId}/projects/{projectId}/review-tasks/{id}/publish
+      const reviewPublishMatch = subPath.match(
+        /^\/projects\/([^/]+)\/review-tasks\/([^/]+)\/publish$/,
+      );
+      if (req.method === "POST" && reviewPublishMatch) {
+        const taskId = reviewPublishMatch[2];
+        if (taskId !== reviewTaskStore.id) {
+          return sendJson(res, 404, { error: "review_task_not_found" });
+        }
+        if (reviewTaskStore.state !== "approved") {
+          return sendJson(res, 409, { error: "review_not_approved" });
+        }
+        const now = new Date().toISOString();
+        notificationStore.push({
+          id: `notification-seed-${notificationStore.length + 2}`,
+          recipient_subject_id: reviewTaskStore.assignee_subject_id ?? "e2e-user",
+          notification_kind: "review_task_published",
+          ref_entity_type: "review_task",
+          ref_entity_id: reviewTaskStore.id,
+          actor_subject_id: "e2e-user",
+          read_at: null,
+          created_at: now,
+        });
+        return sendJson(res, 201, {
+          review_task_id: taskId,
+          status: "published",
+          published_by: "e2e-user",
+          published_at: now,
+          sessionRotation: null,
+        });
+      }
+
       void orgId;
+    }
+
+    // -------------------------------------------------------------------------
+    // Notification routes (S-160-T4c / T4d) — session-gated, caller-scoped
+    // -------------------------------------------------------------------------
+
+    // GET /api/notifications — list caller's notifications
+    if (req.method === "GET" && url.pathname === "/api/notifications") {
+      const callerRows = notificationStore.filter(
+        (n) => n.recipient_subject_id === "e2e-user",
+      );
+      return sendJson(res, 200, { notifications: callerRows });
+    }
+
+    // POST /api/notifications/mark-read
+    if (req.method === "POST" && url.pathname === "/api/notifications/mark-read") {
+      let body;
+      try {
+        body = JSON.parse(await readBody(req));
+      } catch {
+        return sendJson(res, 400, { error: "invalid_json" });
+      }
+      const ids = Array.isArray(body?.ids) ? body.ids : [];
+      const now = new Date().toISOString();
+      for (const n of notificationStore) {
+        if (ids.includes(n.id) && n.recipient_subject_id === "e2e-user") {
+          n.read_at = now;
+        }
+      }
+      return sendJson(res, 200, {});
+    }
+
+    // POST /api/notifications/push-tokens — register push token
+    if (req.method === "POST" && url.pathname === "/api/notifications/push-tokens") {
+      let body;
+      try {
+        body = JSON.parse(await readBody(req));
+      } catch {
+        return sendJson(res, 400, { error: "invalid_json" });
+      }
+      if (!body?.token || typeof body.token !== "string" || body.token.trim() === "") {
+        return sendJson(res, 422, { error: "token_required" });
+      }
+      if (body.platform !== "ios" && body.platform !== "android") {
+        return sendJson(res, 422, { error: "invalid_platform" });
+      }
+      const existing = pushTokenStore.find((t) => t.device_token === body.token);
+      if (existing) {
+        return sendJson(res, 409, { error: "duplicate_token" });
+      }
+      pushTokenStore.push({
+        device_token: body.token,
+        platform: body.platform,
+        subject_id: "e2e-user",
+      });
+      return sendJson(res, 201, {});
     }
 
     sendJson(res, 404, { error: "not_found", path: url.pathname });
@@ -365,7 +540,8 @@ export function createMockGatewayServer({
 }
 
 async function main() {
-  const server = createMockGatewayServer();
+  const port = process.env.GATEWAY_PORT ? parseInt(process.env.GATEWAY_PORT, 10) : DEFAULT_PORT;
+  const server = createMockGatewayServer({ port });
   const binding = await server.start();
 
   console.log(`[mock-gateway] listening on ${binding.baseUrl}`);

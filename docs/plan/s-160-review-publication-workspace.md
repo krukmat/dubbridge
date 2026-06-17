@@ -1,8 +1,10 @@
 # Plan: S-160 — Human Review & Publication Workspace
 
 > **Status:** Planned, replanned mobile-only 2026-06-13. `T5` is cancelled; `T6`
-> owns the complete reviewer UI; `T1` was decomposed into `T1a`/`T1b`/`T1c` on
-> 2026-06-13 after RRI review. Authored 2026-06-11.
+> owns the complete reviewer UI and is complete as of 2026-06-13; `T1` was
+> decomposed into `T1a`/`T1b`/`T1c` on 2026-06-13 after RRI review. `T7` is the
+> approved S-115 compliance hardening task; `T8` remains pending for Maestro +
+> fixture/doc sync. Authored 2026-06-11.
 > **Roadmap phase:** `S-160` — review/publication product phase
 > that S-170/S-180 adopt when the generated artifacts exist.
 > **Tasks ledger:** `docs/tasks/s-160-review-publication-workspace.md`.
@@ -60,6 +62,7 @@ Deliver a governed, end-to-end human-review and publication workspace:
 | Backend API | `apps/api/src/routes/review.rs`, `notifications.rs`, dto (new) | Queue, decide, publish, list notifications |
 | Mobile | `mobile/src/push/registerPush.ts` (new) | Expo push token registration |
 | Mobile | `mobile/src/screens/ReviewInboxScreen.tsx`, `ReviewDetailScreen.tsx`, nav | Inbox, compare, decide, publish, notifications + deep links |
+| Mobile UX | S-115 tokens/primitives + reviewer screen tests | Safe-area, semantic status, touch-target, and accessibility compliance before Maestro baselines |
 | E2E backend | `scripts/e2e-seed/mock-gateway-server.mjs` | `/api/*` review/publication/notification fixtures |
 | BDD | `docs/bdd/s-160-review.feature`, `docs/bdd/README.md` | Cross-surface Gherkin specs + mapping |
 
@@ -114,6 +117,13 @@ stacked view, approve/reject with comments, and publish visible only for approve
 tasks. Notifications deep-link to the relevant detail. `testID` values are the
 contract between Maestro and screens; the backend publication gate remains authoritative.
 
+### D7 — S-115 is the governing mobile presentation contract
+
+The S-160 reviewer screens inherit the completed S-115 design system. New review UI must
+use its tokens and primitives, native-header-aware safe-area edges, shared semantic status
+mapping, minimum touch targets, and accessible state announcements. `S-160-T7` verifies and
+hardens that integration before `S-160-T8` records Maestro flows and visual baselines.
+
 ## Module dependency direction
 
 ```mermaid
@@ -122,35 +132,50 @@ flowchart TD
     T1a["S-160-T1a · migration SQL<br/>(RRI 49)"]
     T1b["S-160-T1b · review domain model<br/>(RRI 29)"]
     T1c["S-160-T1c · review repo<br/>(RRI 40)"]
-    T2["S-160-T2 · review state machine + publication gate + audit<br/>(RRI 66)"]
+    T2a["S-160-T2a · review gate core<br/>(RRI 51)"]
+    T2b["S-160-T2b · audit wiring in gate<br/>(RRI 47)"]
     T3["S-160-T3 · review/publication API<br/>(apps/api, RRI 44)"]
-    T4["S-160-T4 · notifications mechanism<br/>(table + emit + push, RRI 66)"]
+    T4a["S-160-T4a · notification schema SQL<br/>(RRI 55)"]
+    T4b["S-160-T4b · notification repo<br/>(RRI 37)"]
+    T4c["S-160-T4c · emit hooks + notifications API<br/>(RRI 49)"]
+    T4d["S-160-T4d · mobile push registration<br/>(RRI 35)"]
     T5["S-160-T5 · web review console<br/>cancelled / superseded"]
     T6["S-160-T6 · complete mobile reviewer + push<br/>(RRI recalculated at presentation)"]
-    T7["S-160-T7 · mock fixtures + Maestro + docs"]
+    T7["S-160-T7 · S-115 compliance hardening<br/>(RRI 22)"]
+    T8["S-160-T8 · mock fixtures + Maestro + docs<br/>(RRI 24)"]
 
     T0 --> T1a
     T1a --> T1b
     T1b --> T1c
-    T1c --> T2
-    T2 --> T3
-    T3 --> T4
-    T4 --> T6
+    T1c --> T2a
+    T2a --> T2b
+    T2b --> T3
+    T3 --> T4a
+    T4a --> T4b
+    T4b --> T4c
+    T4c --> T4d
+    T4d --> T6
     T3 --> T6
     T6 --> T7
+    T7 --> T8
 ```
 
 - **T0** fixes acceptance. **T1a/T1b/T1c** isolate schema, domain, and repo seams so
   each subtask stays below the decomposition target.
-- **T2** owns the governance core (derived state + fail-closed publication gate).
-- **T3** exposes the API; **T4** adds notifications (table + emit + push registration).
+- **T2a/T2b** isolate the governance core from audit emission so each executable task stays
+  below the post-policy `56+` decomposition gate.
+- **T3** exposes the API; **T4a/T4b/T4c/T4d** split notifications into schema,
+  repo, backend emit/API, and mobile push registration so each executable task stays
+  below the `56+` decomposition gate.
 - **T5** is cancelled under S-105; **T6** builds the complete mobile surface; **T7**
-  wires mock fixtures, Maestro, and docs.
+  hardens it against the inherited S-115 design-system contract; **T8** wires mock
+  fixtures, Maestro, and docs after the final UI shape is stable.
 
 ## Relationship to other slices
 
-- **Depends on (built/planned):** S-000, S-010, S-040, S-050, and **S-105**
-  (mobile workspace context and canonical authenticated UI).
+- **Depends on (built/planned):** S-000, S-010, S-040, S-050, **S-105**
+  (mobile workspace context and canonical authenticated UI), and **S-115**
+  (mobile design-system, safe-area, interaction, and accessibility contract).
 - **Forward integration:** S-140 (subtitles) and S-150 (translation/dubbing) create
   the derived artifacts that become review targets; S-170/S-180 adopt this gate and
   surfaces.
