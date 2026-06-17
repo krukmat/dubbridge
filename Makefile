@@ -1,4 +1,4 @@
-.PHONY: qa-fmt qa-lint qa-test qa-check qa-local qa-deny qa-config-secrets qa-coverage qa-build-release qa-task-unit-coverage qa-docs qa-rri qa-ci install-hooks
+.PHONY: qa-fmt qa-lint qa-test qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-task-unit-coverage qa-docs qa-rri qa-ci install-hooks
 
 COVERAGE_MIN ?= 90
 COVERAGE_IGNORE_REGEX ?= (apps/(api|cli|worker-runner)/src/(main|cleanup)\.rs|apps/api/src/(dto/ingestion|lib|routes/ingestion|state)\.rs|crates/(db|jobs|observability)/src/lib\.rs|crates/db/src/(artifact_repo|asset_repo|audit_repo|pending_ingestion_repo|rights_repo)\.rs|crates/(audit|ingestion)/src/lib\.rs)
@@ -24,6 +24,9 @@ qa-deny:
 qa-config-secrets:
 	bash scripts/check-config-secrets.sh
 
+qa-roadmap-drift:
+	bash scripts/check-roadmap-drift.sh
+
 qa-coverage:
 	$(CARGO) llvm-cov --workspace --summary-only --fail-under-lines $(COVERAGE_MIN) \
 		--ignore-filename-regex '$(COVERAGE_IGNORE_REGEX)' \
@@ -38,11 +41,13 @@ qa-task-unit-coverage:
 qa-docs:
 	bash scripts/check-doc-consistency.sh
 	bash scripts/check-task-unit-coverage.sh
+	bash scripts/check-roadmap-drift.sh
 
 qa-rri:
 	python3 scripts/rri_test.py
+	python3 scripts/check_roadmap_drift_test.py
 
-qa-ci: qa-local qa-docs qa-rri qa-deny qa-config-secrets qa-coverage qa-build-release
+qa-ci: qa-local qa-docs qa-rri qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release
 
 install-hooks:
 	cp scripts/hooks/pre-commit .git/hooks/pre-commit

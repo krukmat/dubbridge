@@ -15,6 +15,14 @@ jobs:
       - name: Run docs consistency gate
         run: make qa-docs
 
+  roadmap-drift:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject roadmap done-state drift
+        run: make qa-roadmap-drift
+
   fmt:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
