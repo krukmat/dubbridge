@@ -34,7 +34,7 @@ operational surfaces from planned ones. Delivery sequence lives in
 | Upload ingestion + rights ledger | Operational | S1, ADR-006/008/018 |
 | Pending-upload durability, TTL, cleanup, coverage gate | Operational | T1 |
 | Finalize atomicity + centralized durable audit emission | Planned blocking hardening | H1 |
-| MinIO/S3 storage adapter | Planned | S2 |
+| MinIO/S3 storage adapter | Operational | S-080, ADR-006/018/026 |
 | Platform ingest (owner-authorized download) | Planned (primary S3); foundation T0/T0c/T1/T2 done | S3, ADR-025/021/006/008/018 |
 | RTMP/SRT live recording ingest | Deferred sub-case (S3b); shares the S3 foundation | S3b, ADR-019/020/022 |
 | Media preparation through publication | Planned | S4..S9 |
@@ -126,16 +126,16 @@ parallel path (ADR-021, producer-agnostic).
 
 - PostgreSQL stores assets, rights records, artifact references, audit events, and
   pending-ingestion lifecycle state.
-- `StorageAdapter` owns binary access and key layout. `LocalFsAdapter` is currently
-  operational; S2 adds MinIO/S3 behavior behind the same trait. The S1 upload route
-  still builds its `ingests/{token}/...` key locally; S2 must move that convention
-  behind `crates/storage`.
-- The upload API currently buffers multipart file bytes in memory before
-  `StorageAdapter::put`. S2 must choose a streaming or presigned object-store flow
-  before production-scale uploads.
+- `StorageAdapter` owns binary access and canonical key layout. Local-fs and
+  S3-compatible backends are selected by config, keeping API routes and workers
+  storage-agnostic.
+- Uploads use a bounded-memory staging path through `StorageAdapter::put_file`
+  before metadata is committed.
 - Redis is reserved for job coordination.
-- Cross-store writes are not atomic. Object-store orphan reconciliation is required
-  in S2; relational writes inside finalize must become atomic in H1.
+- Cross-store writes are not atomic. Immediate cleanup attempts repair
+  object-write/metadata-write divergence, and periodic reconciliation lists
+  canonical `ingests/` keys, compares them against relational references, and deletes
+  only planner-approved orphan candidates.
 
 ## Identity boundaries
 
@@ -168,8 +168,8 @@ paths. Recording lifecycle events must reuse that contract.
 ## Local development topology
 
 Local development uses PostgreSQL for primary state, Redis for job coordination, and
-MinIO for object storage. Until S2 lands, the API storage adapter still resolves to
-`LocalFsAdapter`.
+MinIO for object storage. The default app profile still uses local-fs storage, and
+`DUBBRIDGE_STORAGE_BACKEND=s3` exercises the S3-compatible adapter against MinIO.
 
 The infrastructure containers are usable today with
 `docker compose -f infra/local/docker-compose.yml up -d postgres redis minio`. That Compose

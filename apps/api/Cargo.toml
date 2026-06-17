@@ -19,6 +19,7 @@ time.workspace = true
 sha2 = "0.10"
 thiserror = "2.0"
 async-trait = "0.1"
+tempfile = "3"
 dubbridge-config = { path = "../../crates/config" }
 dubbridge-observability = { path = "../../crates/observability" }
 dubbridge-auth = { path = "../../crates/auth" }
@@ -29,7 +30,6 @@ dubbridge-ingestion = { path = "../../crates/ingestion" }
 dubbridge-audit    = { path = "../../crates/audit" }
 
 [dev-dependencies]
-tempfile = "3"
 tower = { version = "0.5", features = ["util"] }
 
 [lints]

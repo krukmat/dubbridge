@@ -1,4 +1,4 @@
-use std::{borrow::Cow, sync::Arc};
+use std::sync::Arc;
 
 use axum::{
     Extension, Json, Router,
@@ -24,6 +24,7 @@ use dubbridge_domain::{
 };
 use sha2::{Digest, Sha256};
 use time::{Duration, OffsetDateTime};
+use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
 
 use crate::{
@@ -72,9 +73,9 @@ async fn create_ingestion(
     let mut title: Option<String> = None;
     let mut filename: Option<String> = None;
     let mut content_type: Option<String> = None;
-    let mut file_bytes: Option<Vec<u8>> = None;
+    let mut staged_upload: Option<StagedUpload> = None;
 
-    while let Some(field) = multipart.next_field().await.map_err(|error| {
+    while let Some(mut field) = multipart.next_field().await.map_err(|error| {
         if is_body_size_limit_error(&error) {
             ApiError::payload_too_large("request body exceeds the maximum allowed size")
         } else {
@@ -90,45 +91,61 @@ async fn create_ingestion(
             Some("file") => {
                 filename = field.file_name().map(ToOwned::to_owned);
                 content_type = field.content_type().map(ToOwned::to_owned);
-                file_bytes = Some(
-                    field
-                        .bytes()
-                        .await
-                        .map_err(|error| {
-                            // multer wraps DefaultBodyLimit's LengthLimitError as a
-                            // body-read failure. Surface it as 413 so clients know the
-                            // body was too large, not malformed.
-                            if is_body_size_limit_error(&error) {
-                                ApiError::payload_too_large(
-                                    "request body exceeds the maximum allowed size",
-                                )
-                            } else {
-                                ApiError::bad_request(format!("invalid file field: {error}"))
-                            }
-                        })?
-                        .to_vec(),
-                );
+                let spool = tempfile::NamedTempFile::new().map_err(|error| {
+                    ApiError::internal(format!("failed to allocate upload spool file: {error}"))
+                })?;
+                let mut spool_file =
+                    tokio::fs::File::from_std(spool.reopen().map_err(|error| {
+                        ApiError::internal(format!("failed to open upload spool file: {error}"))
+                    })?);
+                let mut checksum = Sha256::new();
+                let mut size_bytes: usize = 0;
+
+                while let Some(chunk) = field.chunk().await.map_err(|error| {
+                    if is_body_size_limit_error(&error) {
+                        ApiError::payload_too_large("request body exceeds the maximum allowed size")
+                    } else {
+                        ApiError::bad_request(format!("invalid file field: {error}"))
+                    }
+                })? {
+                    checksum.update(&chunk);
+                    size_bytes = size_bytes
+                        .checked_add(chunk.len())
+                        .ok_or_else(|| ApiError::internal("uploaded file is too large"))?;
+                    spool_file.write_all(&chunk).await.map_err(|error| {
+                        ApiError::internal(format!("failed to spool upload chunk: {error}"))
+                    })?;
+                }
+
+                spool_file.flush().await.map_err(|error| {
+                    ApiError::internal(format!("failed to flush upload spool file: {error}"))
+                })?;
+
+                staged_upload = Some(StagedUpload {
+                    spool,
+                    checksum: format!("{:x}", checksum.finalize()),
+                    size_bytes,
+                });
             }
             _ => {}
         }
     }
 
-    let file_bytes =
-        file_bytes.ok_or_else(|| ApiError::bad_request("multipart field 'file' is required"))?;
-    let storage_key = build_storage_key(ingest_token, filename.as_deref());
+    let staged_upload =
+        staged_upload.ok_or_else(|| ApiError::bad_request("multipart field 'file' is required"))?;
+    let storage_key = dubbridge_storage::ingest_key(ingest_token, filename.as_deref());
     let content_type = content_type.unwrap_or_else(|| "application/octet-stream".to_string());
     let resolved_title = title
         .map(|title| title.trim().to_string())
         .filter(|title| !title.is_empty())
         .or_else(|| filename.clone())
         .unwrap_or_else(|| format!("upload-{ingest_token}"));
-    let checksum = sha256_hex(&file_bytes);
-    let size_bytes = i64::try_from(file_bytes.len())
+    let size_bytes = i64::try_from(staged_upload.size_bytes)
         .map_err(|_| ApiError::internal("uploaded file is too large"))?;
 
     state
         .storage
-        .put(&storage_key, file_bytes)
+        .put_file(&storage_key, staged_upload.spool.path())
         .await
         .map_err(|error| ApiError::internal(format!("failed to store upload: {error}")))?;
 
@@ -139,7 +156,7 @@ async fn create_ingestion(
         storage_key: storage_key.clone(),
         content_type: content_type.clone(),
         file_size_bytes: size_bytes,
-        checksum: checksum.clone(),
+        checksum: staged_upload.checksum.clone(),
         rights_basis: None,
         created_at: now,
         updated_at: now,
@@ -175,6 +192,12 @@ async fn create_ingestion(
             size_bytes: pending_ingestion.file_size_bytes,
         }),
     ))
+}
+
+struct StagedUpload {
+    spool: tempfile::NamedTempFile,
+    checksum: String,
+    size_bytes: usize,
 }
 
 async fn submit_rights(
@@ -329,25 +352,6 @@ fn is_body_size_limit_error(error: &dyn std::error::Error) -> bool {
         maybe = e.source();
     }
     false
-}
-
-fn build_storage_key(ingest_token: Uuid, filename: Option<&str>) -> String {
-    let filename = sanitize_filename(filename.unwrap_or("upload.bin"));
-    format!("ingests/{ingest_token}/{filename}")
-}
-
-fn sanitize_filename(filename: &str) -> Cow<'_, str> {
-    if filename.contains('/') || filename.contains('\\') {
-        Cow::Owned(filename.replace(['/', '\\'], "_"))
-    } else {
-        Cow::Borrowed(filename)
-    }
-}
-
-fn sha256_hex(bytes: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(bytes);
-    format!("{:x}", hasher.finalize())
 }
 
 struct ApiError {

@@ -1,7 +1,11 @@
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use anyhow::{Context, anyhow};
-use dubbridge_api::{build_app, cleanup::cleanup_expired_ingestions, state::AppState};
+use dubbridge_api::{
+    build_app,
+    cleanup::{cleanup_expired_ingestions, run_ingest_reconciliation},
+    state::AppState,
+};
 use dubbridge_auth::{AuthConfig, RsaJwtTokenVerifier, SharedTokenVerifier};
 
 // T1-T2: cleanup interval for expired pending ingestions.
@@ -16,7 +20,8 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("failed to create database pool")?;
     let storage_config = dubbridge_storage::StorageConfig::from(&config.storage);
-    let storage = dubbridge_storage::build_adapter(&storage_config);
+    let storage = dubbridge_storage::build_adapter(&storage_config)
+        .context("failed to initialize configured storage backend")?;
     let app_state = Arc::new(AppState::new(
         pool,
         storage,
@@ -33,13 +38,22 @@ async fn main() -> anyhow::Result<()> {
     // T1-T2: spawn background task that periodically removes expired pending sessions
     // and their stored blobs. The task is detached; it runs until the process exits.
     let cleanup_pool = app_state.pool.clone();
-    let cleanup_storage = dubbridge_storage::build_adapter(&storage_config);
+    let cleanup_storage = dubbridge_storage::build_adapter(&storage_config)
+        .context("failed to initialize cleanup storage backend")?;
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(CLEANUP_INTERVAL);
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             interval.tick().await;
             cleanup_expired_ingestions(&cleanup_pool, cleanup_storage.as_ref()).await;
+            if let Err(error) =
+                run_ingest_reconciliation(&cleanup_pool, cleanup_storage.as_ref()).await
+            {
+                tracing::warn!(
+                    error = %error,
+                    "failed to run ingest object reconciliation"
+                );
+            }
         }
     });
 

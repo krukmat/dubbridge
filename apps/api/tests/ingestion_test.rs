@@ -1,17 +1,29 @@
-use std::{collections::HashMap, env, path::PathBuf, sync::Arc};
+use std::{
+    collections::HashMap,
+    env, io,
+    io::Write,
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+};
 
+use async_trait::async_trait;
 use axum::{
     body::{Body, to_bytes},
     http::{Request, StatusCode, header},
 };
-use dubbridge_api::{build_app, cleanup::cleanup_expired_ingestions, state::AppState};
+use dubbridge_api::{
+    build_app,
+    cleanup::{cleanup_expired_ingestions, plan_ingest_reconciliation, run_ingest_reconciliation},
+    state::AppState,
+};
 use dubbridge_auth::{
     AuthenticatedPrincipal, SharedTokenVerifier, TokenVerificationError, TokenVerifier,
 };
-use dubbridge_storage::LocalFsAdapter;
+use dubbridge_storage::{LocalFsAdapter, StorageAdapter, StorageError};
 use sqlx::PgPool;
 use tempfile::TempDir;
 use tower::ServiceExt;
+use tracing_subscriber::fmt::MakeWriter;
 use uuid::Uuid;
 
 #[derive(Clone, Default)]
@@ -54,6 +66,21 @@ struct TestContext {
 
 impl TestContext {
     async fn new() -> Option<Self> {
+        let storage_dir = Arc::new(TempDir::new().expect("temp dir"));
+        let storage_path = storage_dir.path().to_path_buf();
+        Self::new_with_storage(
+            storage_dir,
+            storage_path.clone(),
+            Box::new(LocalFsAdapter::new(&storage_path)),
+        )
+        .await
+    }
+
+    async fn new_with_storage(
+        storage_dir: Arc<TempDir>,
+        storage_path: PathBuf,
+        storage: Box<dyn StorageAdapter + Send + Sync>,
+    ) -> Option<Self> {
         let database_url = match env::var("DUBBRIDGE_DATABASE_URL") {
             Ok(url) => url,
             Err(_) => return None,
@@ -64,8 +91,6 @@ impl TestContext {
             .expect("connect database");
         migrate_and_reset(&pool).await;
 
-        let storage_dir = Arc::new(TempDir::new().expect("temp dir"));
-        let storage_path = storage_dir.path().to_path_buf();
         let ingest_token = "ingest-token".to_string();
         let read_token = "read-token".to_string();
         let principal_id = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").expect("uuid");
@@ -92,7 +117,7 @@ impl TestContext {
         let config = dubbridge_config::AppConfig::from_env();
         let state = Arc::new(AppState::new(
             pool.clone(),
-            Box::new(LocalFsAdapter::new(&storage_path)),
+            storage,
             verifier.clone(),
             config,
         ));
@@ -107,6 +132,151 @@ impl TestContext {
             read_token,
             principal_id,
         })
+    }
+}
+
+struct FailingStorageAdapter;
+
+#[async_trait]
+impl StorageAdapter for FailingStorageAdapter {
+    async fn put(&self, _key: &str, _bytes: Vec<u8>) -> Result<String, StorageError> {
+        Err(StorageError::Backend("intentional put failure".to_string()))
+    }
+
+    async fn put_file(&self, _key: &str, _path: &Path) -> Result<String, StorageError> {
+        Err(StorageError::Backend(
+            "intentional put_file failure".to_string(),
+        ))
+    }
+
+    async fn get(&self, key: &str) -> Result<Vec<u8>, StorageError> {
+        Err(StorageError::NotFound {
+            key: key.to_string(),
+        })
+    }
+
+    async fn delete(&self, _key: &str) -> Result<(), StorageError> {
+        Ok(())
+    }
+
+    async fn list_keys(&self, _prefix: &str) -> Result<Vec<String>, StorageError> {
+        Ok(Vec::new())
+    }
+
+    fn object_url(&self, key: &str) -> String {
+        format!("fail://{key}")
+    }
+}
+
+#[derive(Debug, Default)]
+struct TrackingStorageState {
+    put_file_keys: Vec<String>,
+    delete_keys: Vec<String>,
+}
+
+struct TrackingStorageAdapter {
+    state: Arc<Mutex<TrackingStorageState>>,
+    delete_error: Option<String>,
+}
+
+impl TrackingStorageAdapter {
+    fn new(state: Arc<Mutex<TrackingStorageState>>, delete_error: Option<&str>) -> Self {
+        Self {
+            state,
+            delete_error: delete_error.map(str::to_string),
+        }
+    }
+}
+
+#[async_trait]
+impl StorageAdapter for TrackingStorageAdapter {
+    async fn put(&self, key: &str, _bytes: Vec<u8>) -> Result<String, StorageError> {
+        self.state
+            .lock()
+            .expect("tracking storage state")
+            .put_file_keys
+            .push(key.to_string());
+        Ok(key.to_string())
+    }
+
+    async fn put_file(&self, key: &str, _path: &Path) -> Result<String, StorageError> {
+        self.state
+            .lock()
+            .expect("tracking storage state")
+            .put_file_keys
+            .push(key.to_string());
+        Ok(key.to_string())
+    }
+
+    async fn get(&self, key: &str) -> Result<Vec<u8>, StorageError> {
+        Err(StorageError::NotFound {
+            key: key.to_string(),
+        })
+    }
+
+    async fn delete(&self, key: &str) -> Result<(), StorageError> {
+        self.state
+            .lock()
+            .expect("tracking storage state")
+            .delete_keys
+            .push(key.to_string());
+
+        if let Some(message) = &self.delete_error {
+            return Err(StorageError::Backend(message.clone()));
+        }
+
+        Ok(())
+    }
+
+    async fn list_keys(&self, prefix: &str) -> Result<Vec<String>, StorageError> {
+        let mut keys = self
+            .state
+            .lock()
+            .expect("tracking storage state")
+            .put_file_keys
+            .iter()
+            .filter(|key| key.starts_with(prefix))
+            .cloned()
+            .collect::<Vec<_>>();
+        keys.sort();
+        Ok(keys)
+    }
+
+    fn object_url(&self, key: &str) -> String {
+        format!("tracking://{key}")
+    }
+}
+
+#[derive(Clone, Default)]
+struct SharedLogBuffer(Arc<Mutex<Vec<u8>>>);
+
+impl SharedLogBuffer {
+    fn contents(&self) -> String {
+        String::from_utf8(self.0.lock().expect("shared log buffer").clone()).expect("utf8 logs")
+    }
+}
+
+struct SharedLogWriter(Arc<Mutex<Vec<u8>>>);
+
+impl<'a> MakeWriter<'a> for SharedLogBuffer {
+    type Writer = SharedLogWriter;
+
+    fn make_writer(&'a self) -> Self::Writer {
+        SharedLogWriter(self.0.clone())
+    }
+}
+
+impl Write for SharedLogWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.0
+            .lock()
+            .expect("shared log buffer")
+            .extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
     }
 }
 
@@ -268,6 +438,456 @@ async fn finalize_rollback_on_constraint_violation() {
         pending_count, 1,
         "failed finalize must leave pending ingestion intact"
     );
+}
+
+#[tokio::test]
+async fn ingestion_records_checksum_and_size_for_chunked_upload() {
+    let Some(mut ctx) = TestContext::new().await else {
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    let payload = b"chunked upload payload for metadata verification";
+    let response = create_ingestion_with_payload(
+        &mut ctx,
+        "Chunked Video",
+        "chunked.mp4",
+        "video/mp4",
+        payload,
+    )
+    .await;
+    let status = response.status();
+    let body = json_body(response).await;
+    let ingest_token =
+        Uuid::parse_str(body["ingest_token"].as_str().expect("token")).expect("uuid");
+
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(
+        body["size_bytes"].as_i64().expect("size bytes"),
+        payload.len() as i64
+    );
+
+    let row = sqlx::query_as::<_, (String, i64)>(
+        "SELECT checksum, file_size_bytes FROM pending_ingestions WHERE ingest_token = $1",
+    )
+    .bind(ingest_token)
+    .fetch_one(&ctx.pool)
+    .await
+    .expect("pending ingestion row");
+
+    let expected_checksum = {
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(payload);
+        format!("{:x}", hasher.finalize())
+    };
+
+    assert_eq!(row.0, expected_checksum);
+    assert_eq!(row.1, payload.len() as i64);
+}
+
+#[tokio::test]
+async fn storage_failure_does_not_persist_pending_ingestion_row() {
+    let storage_dir = Arc::new(TempDir::new().expect("temp dir"));
+    let storage_path = storage_dir.path().to_path_buf();
+    let Some(mut ctx) =
+        TestContext::new_with_storage(storage_dir, storage_path, Box::new(FailingStorageAdapter))
+            .await
+    else {
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    let response = create_ingestion_with_payload(
+        &mut ctx,
+        "Broken Upload",
+        "broken.mp4",
+        "video/mp4",
+        b"this write should fail",
+    )
+    .await;
+    let status = response.status();
+    let body = json_body(response).await;
+
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    assert!(
+        body["error"]
+            .as_str()
+            .expect("error")
+            .contains("failed to store upload")
+    );
+
+    let pending_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pending_ingestions")
+        .fetch_one(&ctx.pool)
+        .await
+        .expect("pending count");
+    assert_eq!(
+        pending_count, 0,
+        "storage failure must not commit metadata rows"
+    );
+}
+
+#[tokio::test]
+async fn pending_ingestion_persistence_failure_deletes_stored_object_once() {
+    let storage_dir = Arc::new(TempDir::new().expect("temp dir"));
+    let storage_path = storage_dir.path().to_path_buf();
+    let state = Arc::new(Mutex::new(TrackingStorageState::default()));
+    let Some(mut ctx) = TestContext::new_with_storage(
+        storage_dir,
+        storage_path,
+        Box::new(TrackingStorageAdapter::new(state.clone(), None)),
+    )
+    .await
+    else {
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    install_pending_ingestion_insert_failure_trigger(&ctx.pool).await;
+
+    let response = create_ingestion_with_payload(
+        &mut ctx,
+        "FORCE_DB_INSERT_FAILURE: cleanup success",
+        "broken-after-store.mp4",
+        "video/mp4",
+        b"stored-before-db-failure",
+    )
+    .await;
+    let status = response.status();
+    let body = json_body(response).await;
+
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    assert!(
+        body["error"]
+            .as_str()
+            .expect("error")
+            .contains("forced pending_ingestion insert failure for S-080-T5a")
+    );
+
+    let state = state.lock().expect("tracking storage state");
+    assert_eq!(
+        state.put_file_keys.len(),
+        1,
+        "upload should be stored exactly once"
+    );
+    assert_eq!(
+        state.delete_keys.len(),
+        1,
+        "cleanup should delete exactly once"
+    );
+    assert_eq!(
+        state.delete_keys, state.put_file_keys,
+        "cleanup should target the same storage key that was written"
+    );
+    assert!(
+        state.delete_keys[0].starts_with("ingests/"),
+        "cleanup should operate on canonical ingest keys"
+    );
+    drop(state);
+
+    let pending_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pending_ingestions")
+        .fetch_one(&ctx.pool)
+        .await
+        .expect("pending count");
+    assert_eq!(
+        pending_count, 0,
+        "failed metadata persistence must not leave a pending_ingestions row behind"
+    );
+}
+
+#[tokio::test]
+async fn pending_ingestion_persistence_failure_logs_orphan_context_and_preserves_db_error() {
+    let storage_dir = Arc::new(TempDir::new().expect("temp dir"));
+    let storage_path = storage_dir.path().to_path_buf();
+    let state = Arc::new(Mutex::new(TrackingStorageState::default()));
+    let Some(mut ctx) = TestContext::new_with_storage(
+        storage_dir,
+        storage_path,
+        Box::new(TrackingStorageAdapter::new(
+            state.clone(),
+            Some("intentional delete failure"),
+        )),
+    )
+    .await
+    else {
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    install_pending_ingestion_insert_failure_trigger(&ctx.pool).await;
+
+    let logs = SharedLogBuffer::default();
+    let subscriber = tracing_subscriber::fmt()
+        .with_ansi(false)
+        .without_time()
+        .with_max_level(tracing::Level::WARN)
+        .with_writer(logs.clone())
+        .finish();
+    let _guard = tracing::subscriber::set_default(subscriber);
+
+    let response = create_ingestion_with_payload(
+        &mut ctx,
+        "FORCE_DB_INSERT_FAILURE: cleanup failure",
+        "orphaned.mp4",
+        "video/mp4",
+        b"stored-before-cleanup-failure",
+    )
+    .await;
+    let status = response.status();
+    let body = json_body(response).await;
+
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    let error = body["error"].as_str().expect("error");
+    assert!(
+        error.contains("forced pending_ingestion insert failure for S-080-T5a"),
+        "route must return the original DB insert failure"
+    );
+    assert!(
+        !error.contains("intentional delete failure"),
+        "cleanup failure must not replace the original DB error"
+    );
+
+    let state = state.lock().expect("tracking storage state");
+    assert_eq!(
+        state.put_file_keys.len(),
+        1,
+        "upload should be stored exactly once"
+    );
+    assert_eq!(
+        state.delete_keys.len(),
+        1,
+        "cleanup should still be attempted once"
+    );
+    assert_eq!(
+        state.delete_keys, state.put_file_keys,
+        "cleanup attempt should target the written storage key"
+    );
+    let storage_key = state.delete_keys[0].clone();
+    drop(state);
+
+    let logs = logs.contents();
+    assert!(
+        logs.contains("failed to clean up stored upload after pending-ingestion persistence error")
+    );
+    assert!(logs.contains("ingest_token="));
+    assert!(logs.contains("storage_key="));
+    assert!(logs.contains(&storage_key));
+    assert!(logs.contains("intentional delete failure"));
+}
+
+#[tokio::test]
+async fn reconciliation_run_deletes_orphan_and_second_run_is_noop() {
+    let Some(ctx) = TestContext::new().await else {
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    let storage = LocalFsAdapter::new(&ctx.storage_path);
+    let orphan_key = dubbridge_storage::ingest_key(Uuid::new_v4(), Some("orphan.mp4"));
+    storage
+        .put(&orphan_key, b"unreferenced object".to_vec())
+        .await
+        .unwrap();
+
+    let run = run_ingest_reconciliation(&ctx.pool, &storage)
+        .await
+        .expect("reconciliation run");
+
+    assert_eq!(run.deleted, vec![orphan_key.clone()]);
+    assert!(run.already_absent.is_empty());
+    assert!(run.failed.is_empty());
+    assert!(matches!(
+        storage.get(&orphan_key).await.unwrap_err(),
+        StorageError::NotFound { .. }
+    ));
+
+    let second_run = run_ingest_reconciliation(&ctx.pool, &storage)
+        .await
+        .expect("second reconciliation run");
+
+    assert!(second_run.plan.orphan_candidates.is_empty());
+    assert!(second_run.deleted.is_empty());
+    assert!(second_run.already_absent.is_empty());
+    assert!(second_run.failed.is_empty());
+}
+
+#[tokio::test]
+async fn reconciliation_run_records_delete_failure_for_retry() {
+    let storage_dir = Arc::new(TempDir::new().expect("temp dir"));
+    let storage_path = storage_dir.path().to_path_buf();
+    let state = Arc::new(Mutex::new(TrackingStorageState::default()));
+    let Some(ctx) = TestContext::new_with_storage(
+        storage_dir,
+        storage_path,
+        Box::new(TrackingStorageAdapter::new(
+            state.clone(),
+            Some("intentional reconciliation delete failure"),
+        )),
+    )
+    .await
+    else {
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    let orphan_key = dubbridge_storage::ingest_key(Uuid::new_v4(), Some("orphan.mp4"));
+    {
+        state
+            .lock()
+            .expect("tracking storage state")
+            .put_file_keys
+            .push(orphan_key.clone());
+    }
+
+    let logs = SharedLogBuffer::default();
+    let subscriber = tracing_subscriber::fmt()
+        .with_ansi(false)
+        .without_time()
+        .with_max_level(tracing::Level::WARN)
+        .with_writer(logs.clone())
+        .finish();
+    let _guard = tracing::subscriber::set_default(subscriber);
+
+    let execution_storage = TrackingStorageAdapter::new(
+        state.clone(),
+        Some("intentional reconciliation delete failure"),
+    );
+    let run = run_ingest_reconciliation(&ctx.pool, &execution_storage)
+        .await
+        .expect("reconciliation run");
+
+    assert!(run.deleted.is_empty());
+    assert!(run.already_absent.is_empty());
+    assert_eq!(run.failed.len(), 1);
+    assert_eq!(run.failed[0].key, orphan_key);
+    assert!(
+        run.failed[0]
+            .error
+            .contains("intentional reconciliation delete failure")
+    );
+
+    let state = state.lock().expect("tracking storage state");
+    assert_eq!(state.delete_keys, vec![run.failed[0].key.clone()]);
+    drop(state);
+
+    let logs = logs.contents();
+    assert!(logs.contains("failed to delete orphaned ingest object during reconciliation"));
+    assert!(logs.contains("storage_key="));
+    assert!(logs.contains(&run.failed[0].key));
+    assert!(logs.contains("intentional reconciliation delete failure"));
+}
+
+#[tokio::test]
+async fn reconciliation_run_never_deletes_retained_or_skipped_keys() {
+    let storage_dir = Arc::new(TempDir::new().expect("temp dir"));
+    let storage_path = storage_dir.path().to_path_buf();
+    let state = Arc::new(Mutex::new(TrackingStorageState::default()));
+    let Some(mut ctx) = TestContext::new_with_storage(
+        storage_dir,
+        storage_path,
+        Box::new(TrackingStorageAdapter::new(state.clone(), None)),
+    )
+    .await
+    else {
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    let referenced_token = create_ingestion(&mut ctx).await;
+    let referenced_key: String =
+        sqlx::query_scalar("SELECT storage_key FROM pending_ingestions WHERE ingest_token = $1")
+            .bind(referenced_token)
+            .fetch_one(&ctx.pool)
+            .await
+            .expect("pending storage key");
+    let malformed_key = "ingests/not-a-uuid/file.mp4".to_string();
+    {
+        state
+            .lock()
+            .expect("tracking storage state")
+            .put_file_keys
+            .push(malformed_key.clone());
+    }
+
+    let execution_storage = TrackingStorageAdapter::new(state.clone(), None);
+    let run = run_ingest_reconciliation(&ctx.pool, &execution_storage)
+        .await
+        .expect("reconciliation run");
+
+    assert_eq!(run.plan.retained, vec![referenced_key]);
+    assert_eq!(run.plan.skipped.len(), 1);
+    assert_eq!(run.plan.skipped[0].key, malformed_key);
+    assert!(run.plan.orphan_candidates.is_empty());
+    assert!(run.deleted.is_empty());
+    assert!(run.failed.is_empty());
+    assert!(
+        state
+            .lock()
+            .expect("tracking storage state")
+            .delete_keys
+            .is_empty(),
+        "executor must not delete retained or skipped keys"
+    );
+}
+
+#[tokio::test]
+async fn reconciliation_plan_retains_referenced_objects_and_flags_orphans() {
+    let Some(mut ctx) = TestContext::new().await else {
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    let auth_token = ctx.ingest_token.clone();
+    let ingest_token = create_ingestion(&mut ctx).await;
+    submit_rights(&mut ctx, ingest_token, valid_rights_body()).await;
+    let finalize = finalize(&mut ctx, ingest_token, &auth_token).await;
+    assert_eq!(finalize.status(), StatusCode::CREATED);
+
+    let referenced_key: String =
+        sqlx::query_scalar("SELECT storage_key FROM artifact_records WHERE ingest_token = $1")
+            .bind(ingest_token)
+            .fetch_one(&ctx.pool)
+            .await
+            .expect("artifact storage key");
+
+    let storage = LocalFsAdapter::new(&ctx.storage_path);
+    let orphan_key = dubbridge_storage::ingest_key(Uuid::new_v4(), Some("orphan.mp4"));
+    storage
+        .put(&orphan_key, b"unreferenced object".to_vec())
+        .await
+        .unwrap();
+
+    let plan = plan_ingest_reconciliation(&ctx.pool, &storage)
+        .await
+        .expect("reconciliation plan");
+
+    assert_eq!(plan.retained, vec![referenced_key]);
+    assert_eq!(plan.orphan_candidates, vec![orphan_key]);
+    assert_eq!(plan.skipped, Vec::new());
+}
+
+#[tokio::test]
+async fn reconciliation_plan_skips_malformed_storage_candidates() {
+    let Some(ctx) = TestContext::new().await else {
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    let storage = LocalFsAdapter::new(&ctx.storage_path);
+    let malformed_key = "ingests/not-a-uuid/file.mp4";
+    storage
+        .put(malformed_key, b"malformed object".to_vec())
+        .await
+        .unwrap();
+
+    let plan = plan_ingest_reconciliation(&ctx.pool, &storage)
+        .await
+        .expect("reconciliation plan");
+
+    assert!(plan.retained.is_empty());
+    assert!(plan.orphan_candidates.is_empty());
+    assert_eq!(plan.skipped.len(), 1);
+    assert_eq!(plan.skipped[0].key, malformed_key);
 }
 
 #[tokio::test]
@@ -877,12 +1497,46 @@ fn valid_rights_body() -> &'static str {
 }
 
 async fn create_ingestion(ctx: &mut TestContext) -> Uuid {
+    let response = create_ingestion_with_payload(
+        ctx,
+        "Test Video",
+        "test.mp4",
+        "video/mp4",
+        b"hello dubbridge",
+    )
+    .await;
+    let status = response.status();
+    let body = json_body(response).await;
+
+    assert_eq!(status, StatusCode::CREATED);
+    Uuid::parse_str(body["ingest_token"].as_str().expect("token")).expect("uuid")
+}
+
+async fn create_ingestion_with_payload(
+    ctx: &mut TestContext,
+    title: &str,
+    filename: &str,
+    content_type: &str,
+    payload: &[u8],
+) -> axum::response::Response {
     let boundary = "X-BOUNDARY";
-    let body = format!(
-        "--{boundary}\r\nContent-Disposition: form-data; name=\"title\"\r\n\r\nTest Video\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"test.mp4\"\r\nContent-Type: video/mp4\r\n\r\nhello dubbridge\r\n--{boundary}--\r\n"
+    let mut body = Vec::new();
+    body.extend_from_slice(
+        format!(
+            "--{boundary}\r\nContent-Disposition: form-data; name=\"title\"\r\n\r\n{title}\r\n"
+        )
+        .as_bytes(),
     );
-    let response = ctx
-        .app
+    body.extend_from_slice(
+        format!(
+            "--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{filename}\"\r\nContent-Type: {content_type}\r\n\r\n"
+        )
+        .as_bytes(),
+    );
+    body.extend_from_slice(payload);
+    body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+
+    ctx.app
         .clone()
         .oneshot(
             Request::builder()
@@ -900,12 +1554,7 @@ async fn create_ingestion(ctx: &mut TestContext) -> Uuid {
                 .expect("request"),
         )
         .await
-        .expect("response");
-    let status = response.status();
-    let body = json_body(response).await;
-
-    assert_eq!(status, StatusCode::CREATED);
-    Uuid::parse_str(body["ingest_token"].as_str().expect("token")).expect("uuid")
+        .expect("response")
 }
 
 async fn submit_rights(ctx: &mut TestContext, ingest_token: Uuid, body: &str) {
@@ -998,6 +1647,42 @@ async fn migrate_and_reset(pool: &PgPool) {
     .execute(pool)
     .await
     .expect("truncate");
+}
+
+async fn install_pending_ingestion_insert_failure_trigger(pool: &PgPool) {
+    sqlx::query(
+        r#"
+        CREATE OR REPLACE FUNCTION fail_pending_ingestion_insert_for_t5a()
+        RETURNS trigger AS $$
+        BEGIN
+            IF NEW.title LIKE 'FORCE_DB_INSERT_FAILURE:%' THEN
+                RAISE EXCEPTION 'forced pending_ingestion insert failure for S-080-T5a';
+            END IF;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql
+        "#,
+    )
+    .execute(pool)
+    .await
+    .expect("create pending_ingestions insert failure function");
+
+    sqlx::query("DROP TRIGGER IF EXISTS pending_ingestion_fail_for_t5a ON pending_ingestions")
+        .execute(pool)
+        .await
+        .expect("drop pending_ingestions insert failure trigger");
+
+    sqlx::query(
+        r#"
+        CREATE TRIGGER pending_ingestion_fail_for_t5a
+        BEFORE INSERT ON pending_ingestions
+        FOR EACH ROW
+        EXECUTE FUNCTION fail_pending_ingestion_insert_for_t5a()
+        "#,
+    )
+    .execute(pool)
+    .await
+    .expect("create pending_ingestions insert failure trigger");
 }
 
 async fn count_audit_events(pool: &PgPool, ingest_token: Uuid, event_kind: &str) -> i64 {

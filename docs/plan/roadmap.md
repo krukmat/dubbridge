@@ -103,7 +103,7 @@ Plan: `docs/plan/h1-governance-atomicity-hardening.md`
 | **S-055** | Maestro screenshot / visual-audit suite | S-050 | ✅ done — V1–V8 complete as of 2026-06-12; two-phase Maestro suite captures `01_auth_login` + `02_home`; `npm run screenshots` wired | `docs/plan/s-055-maestro-screenshot-suite.md`, `docs/tasks/s-055-maestro-screenshot-suite.md` |
 | **S-060** | First-party mobile asset lifecycle: `GET /assets`, mobile list, upload→rights→finalize, BDD/Maestro, mock `/api/*` | S-050, S-055 infra, S-010 | ✅ done — T0–T6 + X-P3F-1/X-P3F-2 complete as of 2026-06-12; `GET /assets/{id}` ownership-enforced; `postMultipart` uses `expo-file-system/legacy` uploadAsync; SC-INGEST-1/SC-INGEST-2 Maestro flows complete (6 phases in runner) | `docs/plan/s-060-mobile-asset-lifecycle.md`, `docs/tasks/s-060-mobile-asset-lifecycle.md` |
 | **S-070** | Production identity hardening (JWKS discovery, automatic key rotation, subject mapping if needed) | S-000 | ⬜ no plan yet | ADR-023 |
-| **S-080** | Object storage switchover (MinIO/S3 behind `StorageAdapter`) | S-010-T4 | ⬜ no plan yet | — |
+| **S-080** | Object storage switchover (MinIO/S3 behind `StorageAdapter`) | S-010-T4 | 🟡 in progress 2026-06-17 — T0-T5d complete; bounded-memory upload path, immediate orphan-cleanup regression coverage, storage-side candidate listing, reconciliation planning, and reconciliation execution delivered; T6 docs closeout currently blocked by `qa-docs` roadmap drift in the dirty worktree | `docs/plan/s-080-object-storage-switchover.md`, `docs/tasks/s-080-object-storage-switchover.md` |
 | **S-090** | Platform ingest (owner-authorized download: first supported provider) | S-000-T2, S-010, S-020; S-080 prudent before heavy writes | 🟡 REPLANNED 2026-05-31 — foundation T0/T0c/T1/T2 done; S-040/S-070/S-050 done; later connector work deferred | `docs/plan/stream-recording-ingest.md` |
 | **S-095** | Stream recording ingest (RTMP/SRT live capture) | S-090 foundation | ⬜ deferred — built only for live-broadcast clients | `docs/plan/stream-recording-ingest.md` |
 | **S-100** | Collaborative localization workspace: orgs, roles, projects, target languages, org authz, historical web prototype, mobile project surfaces | S-000, S-010, S-040, S-050; coordinates with S-055/S-060 | ✅ done — T0–T7 complete as of 2026-06-12; workspace API, authz, mobile projects, and a historical web prototype delivered. The web artifacts were retired by S-105. | `docs/plan/s-100-collaborative-workspace.md`, `docs/tasks/s-100-collaborative-workspace.md` |
@@ -326,7 +326,7 @@ S-095 — live recorder (DEFERRED): ex-T3 recorder crate, ex-T4 jobs/storage,
 - The owner-credential secrets-store mechanism (X20) has no dedicated ADR yet and
   must be decided during `S-090-C1`–`S-090-C6`; `S-030` establishes the config/secret
   split it plugs into.
-- `S-080`, `S-120`, and `S-070` need plan/task ledgers before execution. `S-030` now has
+- `S-120` and `S-070` need plan/task ledgers before execution. `S-030` now has
   `docs/plan/s-030-environment-separation.md` + `docs/tasks/s-030-environment-separation.md`
   with its current Phase 0 / Phase 1 scope complete. `S-040` now has
   `docs/plan/s-040-session-gateway-bff.md` + `docs/tasks/s-040-session-gateway-bff.md`
