@@ -60,6 +60,8 @@ Poor-fit tasks:
 - State the goal in one or two short sentences.
 - List the **exact files** that may be modified.
 - Say what must **not** be changed.
+- State the required output contract explicitly: tagged text blocks with complete
+  file contents, never JSON and never a unified diff.
 - Prefer concrete edits such as:
   - add one note;
   - replace one bullet;
@@ -74,6 +76,7 @@ Poor-fit tasks:
 Before accepting the result, verify all of the following:
 
 - the changed files are within the allowed scope;
+- the response matches the tagged-block contract with no extra text;
 - the patch applies cleanly;
 - the file structure is preserved;
 - the change actually matches the requested objective;
@@ -84,7 +87,8 @@ Before accepting the result, verify all of the following:
 
 - If the model returns an out-of-scope path, reject it and retry with a smaller,
   more explicit packet.
-- If the patch format or application fails, do not broaden the packet; simplify it.
+- If the tagged-block format or application fails, do not broaden the packet;
+  simplify it.
 - If the patch applies but the semantic result is destructive, reject it and retry
   with a smaller target.
 - Use at most the bounded repair cycle allowed by the governing policy.

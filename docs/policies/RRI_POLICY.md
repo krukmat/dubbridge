@@ -184,8 +184,8 @@ band — never derive one output from another (e.g. do not infer capability from
 | **0–25** | Low | **S** | Local Gemma via Ollama | Local Gemma via Ollama | Off | **Local delegation:** do not present the full task for approval; delegate to local Gemma, validate and apply only an in-scope diff, review against requirements, verify, and report. |
 | **26–40** | Moderate | **M** | Balanced | Balanced | Off | Confirm tests exist in the affected area. |
 | **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Plan + explicit acceptance criteria required before approval. |
-| **56–70** | Complex | **L** | Premium | Premium | On | Plan first. Do not implement before producing and approving a clear plan. Human reviews the plan. |
-| **71–85** | High | **XL** | Premium | Premium | On | Characterization tests + explicit acceptance criteria + human reviews the **diff** (not just the plan). |
+| **56–70** | Complex | **L** | Premium | Premium | On | Plan first. **Decompose into subtasks before implementation.** Human reviews the plan. |
+| **71–85** | High | **XL** | Premium | Premium | On | Characterization tests + explicit acceptance criteria + human reviews the **diff** (not just the plan). **Decomposition remains mandatory.** |
 | **86–100** | Very high | **XL** | Premium | Premium | On | Do not implement directly. Produce an ADR + risk analysis + decompose into subtasks. |
 | **> 100** | Excessive | **XL** | Premium | Premium | On | Architecture/design work must happen first. Re-scope before any implementation. |
 
@@ -263,22 +263,22 @@ The wrapper resolves:
 | `DUBBRIDGE_LOW_RRI_MODEL` | `gemma4:12b-it-q4_K_M` | Local model |
 | `DUBBRIDGE_LOW_RRI_IDLE_TIMEOUT_SECONDS` | `60` | Seconds without a token = stall |
 | `DUBBRIDGE_LOW_RRI_MAX_WALL_SECONDS` | `900` | Hard generation cap |
-| `DUBBRIDGE_LOW_RRI_NUM_CTX` | `16384` | Context window for packet + schema |
+| `DUBBRIDGE_LOW_RRI_NUM_CTX` | `16384` | Context window for packet + tagged contract |
 
-Gemma's response content must be JSON with full file contents (never a diff):
+Gemma's response content must be tagged text with full file contents (never a
+diff and never JSON):
 
-```json
-{
-  "status": "patch",
-  "summary": "<short implementation summary>",
-  "files": [
-    {"path": "<repo-relative path>",
-     "action": "create | modify | delete",
-     "contents": "<COMPLETE final file contents>"}
-  ],
-  "test_commands": ["<command>"],
-  "risk_notes": ["<note>"]
-}
+```text
+STATUS: PATCH|NO_PATCH|BLOCKED
+SUMMARY: <short implementation summary>
+TEST: <optional verification command>
+RISK: <optional risk note>
+=== FILE START ===
+PATH: <repo-relative path>
+ACTION: create|modify|delete
+--- CONTENT ---
+<COMPLETE final file contents>
+=== FILE END ===
 ```
 
 The script then enforces the allowed-path scope, builds the unified diff with git,
@@ -289,15 +289,16 @@ all task requirements and acceptance criteria, and run the required checks — t
 evaluation is performed by the delegating agent, not by Gemma. If requirements are
 missed or checks fail, the orchestrator may run one bounded repair request through
 Gemma with the same allowed paths and the failure evidence. A second failure, an
-out-of-scope path, invalid JSON, unavailable Ollama/model, or a post-application
-RRI above 25 must escalate to the normal human-gated workflow. If the delegation
-times out (exit 124), report it explicitly as `Gemma timeout (idle|wall)` in the
-final task summary.
+out-of-scope path, invalid tagged response, unavailable Ollama/model, or a
+post-application RRI above 25 must escalate to the normal human-gated workflow.
+If the delegation times out (exit 124), report it explicitly as `Gemma timeout
+(idle|wall)` in the final task summary.
 
 ## Decomposition triggers
 
 Split a task into subtasks before implementing if **any** of the following apply:
 
+- Final RRI ≥ 56. This is the default hard gate for Complex, High, Very high, and Excessive tasks.
 - RRI > 70, or base RRI > 100 (before penalties).
 - F ≥ 4 **and** K ≥ 3 — large change surface with high coupling; isolate each seam.
 - C ≥ 4 **and** D ≥ 3 — the +10 penalty activates; separate complex logic into a
@@ -306,6 +307,10 @@ Split a task into subtasks before implementing if **any** of the following apply
   refactor from functional change into distinct tasks/commits.
 - T ≥ 4 **and** P ≥ 4 (no tests + high impact) — first subtask must be
   characterization tests; implementation is the second subtask.
+
+**Interpretation note:** the `56+` gate is unconditional. The lower bullets remain relevant
+because they can force decomposition even below 56, and they help explain why a task that
+started below 56 must still be split after recomputation.
 
 **Split target:** divide until each subtask scores RRI ≤ 55 with A ∈ {0, 1}
 (own acceptance criteria + happy/edge examples per the workflow guide).

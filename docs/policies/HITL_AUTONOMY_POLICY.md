@@ -38,10 +38,11 @@ The delegating agent must:
 2. Build a local delegation packet with the task excerpt, acceptance criteria, RRI
    output, allowed paths, relevant file snippets, and stop conditions.
 3. Send the packet to Ollama/Gemma with `scripts/delegate-low-rri.py`, which uses
-   the 120-second timeout and structured-output protocol defined in
-   `docs/policies/RRI_POLICY.md`; require structured JSON with a unified diff.
-4. Validate the JSON, check the diff with `git apply --check`, and reject any patch
-   outside the allowed task scope.
+   the 120-second timeout and tagged-block response protocol defined in
+   `docs/policies/RRI_POLICY.md`; require complete file contents, not JSON and not
+   a unified diff.
+4. Validate the tagged response, check the wrapper-built diff with
+   `git apply --check`, and reject any patch outside the allowed task scope.
 5. Apply only a valid in-scope patch.
 6. Personally review the solution against every task requirement and acceptance
    criterion; this evaluation must be performed by the delegating agent, not Gemma.

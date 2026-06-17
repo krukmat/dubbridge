@@ -6,7 +6,6 @@ Run: python3 scripts/delegate_low_rri_test.py
 """
 
 import importlib.util
-import io
 import json
 import os
 import socket
@@ -41,6 +40,38 @@ def _valid_payload(**overrides):
     }
     base.update(overrides)
     return base
+
+
+def _tagged_response(
+        status="PATCH",
+        summary="ok",
+        tests=None,
+        risks=None,
+        files=None):
+    tests = tests or []
+    risks = risks or []
+    files = files or [
+        {"path": "scripts/x.py", "action": "create", "contents": "x = 1\n"},
+    ]
+    lines = [
+        f"STATUS: {status}",
+        f"SUMMARY: {summary}",
+    ]
+    for cmd in tests:
+        lines.append(f"TEST: {cmd}")
+    for risk in risks:
+        lines.append(f"RISK: {risk}")
+    for entry in files:
+        lines.extend([
+            "=== FILE START ===",
+            f"PATH: {entry['path']}",
+            f"ACTION: {entry['action']}",
+            "--- CONTENT ---",
+        ])
+        if entry["contents"]:
+            lines.extend(entry["contents"].splitlines())
+        lines.append("=== FILE END ===")
+    return "\n".join(lines)
 
 
 def _ndjson_lines(*chunks, done_last=True):
@@ -115,37 +146,108 @@ class ValidatePayload(unittest.TestCase):
 # parse_stream_content
 # ---------------------------------------------------------------------------
 class ParseStreamContent(unittest.TestCase):
-    def test_clean_json(self):
-        content = json.dumps(_valid_payload())
+    def test_single_file_tagged_response(self):
+        content = _tagged_response()
         result = _mod.parse_stream_content(content)
         self.assertEqual(result["status"], "patch")
+        self.assertEqual(result["files"][0]["path"], "scripts/x.py")
 
-    def test_strips_markdown_fences(self):
-        inner = json.dumps(_valid_payload())
-        fenced = f"```json\n{inner}\n```"
-        result = _mod.parse_stream_content(fenced)
-        self.assertEqual(result["status"], "patch")
+    def test_multiple_file_blocks_parse(self):
+        content = _tagged_response(files=[
+            {"path": "scripts/a.py", "action": "create", "contents": "a = 1\n"},
+            {"path": "scripts/b.py", "action": "modify", "contents": "b = 2\n"},
+        ])
+        result = _mod.parse_stream_content(content)
+        self.assertEqual(len(result["files"]), 2)
+        self.assertEqual(result["files"][1]["action"], "modify")
 
-    def test_strips_plain_fences(self):
-        inner = json.dumps(_valid_payload())
-        fenced = f"```\n{inner}\n```"
-        result = _mod.parse_stream_content(fenced)
-        self.assertEqual(result["status"], "patch")
+    def test_no_patch_allowed_without_files(self):
+        content = "STATUS: NO_PATCH\nSUMMARY: too broad"
+        result = _mod.parse_stream_content(content)
+        self.assertEqual(result["status"], "no_patch")
+        self.assertEqual(result["files"], [])
 
-    def test_non_json_raises(self):
+    def test_blocked_allowed_without_files(self):
+        content = "STATUS: BLOCKED\nSUMMARY: waiting"
+        result = _mod.parse_stream_content(content)
+        self.assertEqual(result["status"], "blocked")
+
+    def test_unexpected_text_raises(self):
         with self.assertRaises(RuntimeError) as ctx:
-            _mod.parse_stream_content("this is not json")
-        self.assertIn("non-JSON", str(ctx.exception))
+            _mod.parse_stream_content("hello\nSTATUS: PATCH\nSUMMARY: nope")
+        self.assertIn("unexpected text", str(ctx.exception))
 
     def test_whitespace_stripped(self):
-        content = "\n\n" + json.dumps(_valid_payload()) + "\n"
+        content = "\n\n" + _tagged_response() + "\n"
         result = _mod.parse_stream_content(content)
         self.assertEqual(result["status"], "patch")
 
-    def test_invalid_payload_inside_json_raises(self):
-        bad = _valid_payload(status="bogus")
-        with self.assertRaises(RuntimeError):
-            _mod.parse_stream_content(json.dumps(bad))
+    def test_missing_path_raises(self):
+        content = "\n".join([
+            "STATUS: PATCH",
+            "SUMMARY: ok",
+            "=== FILE START ===",
+            "ACTION: create",
+            "--- CONTENT ---",
+            "x = 1",
+            "=== FILE END ===",
+        ])
+        with self.assertRaises(RuntimeError) as ctx:
+            _mod.parse_stream_content(content)
+        self.assertIn("PATH", str(ctx.exception))
+
+    def test_missing_action_raises(self):
+        content = "\n".join([
+            "STATUS: PATCH",
+            "SUMMARY: ok",
+            "=== FILE START ===",
+            "PATH: scripts/x.py",
+            "--- CONTENT ---",
+            "x = 1",
+            "=== FILE END ===",
+        ])
+        with self.assertRaises(RuntimeError) as ctx:
+            _mod.parse_stream_content(content)
+        self.assertIn("ACTION", str(ctx.exception))
+
+    def test_missing_end_marker_raises(self):
+        content = "\n".join([
+            "STATUS: PATCH",
+            "SUMMARY: ok",
+            "=== FILE START ===",
+            "PATH: scripts/x.py",
+            "ACTION: create",
+            "--- CONTENT ---",
+            "x = 1",
+        ])
+        with self.assertRaises(RuntimeError) as ctx:
+            _mod.parse_stream_content(content)
+        self.assertIn("file end", str(ctx.exception))
+
+    def test_invalid_action_raises(self):
+        content = _tagged_response(files=[
+            {"path": "scripts/x.py", "action": "rename", "contents": "x = 1\n"},
+        ])
+        with self.assertRaises(RuntimeError) as ctx:
+            _mod.parse_stream_content(content)
+        self.assertIn("unknown ACTION", str(ctx.exception))
+
+    def test_duplicate_path_raises(self):
+        content = _tagged_response(files=[
+            {"path": "scripts/x.py", "action": "create", "contents": "x = 1\n"},
+            {"path": "scripts/x.py", "action": "modify", "contents": "x = 2\n"},
+        ])
+        with self.assertRaises(RuntimeError) as ctx:
+            _mod.parse_stream_content(content)
+        self.assertIn("duplicate path", str(ctx.exception))
+
+    def test_delete_requires_empty_content(self):
+        content = _tagged_response(files=[
+            {"path": "scripts/x.py", "action": "delete", "contents": "still here\n"},
+        ])
+        with self.assertRaises(RuntimeError) as ctx:
+            _mod.parse_stream_content(content)
+        self.assertIn("delete action requires empty content", str(ctx.exception))
 
 
 # ---------------------------------------------------------------------------
@@ -168,20 +270,20 @@ class BuildPayload(unittest.TestCase):
         p = _mod.build_payload("model", "text", 8192)
         self.assertEqual(p["options"]["num_ctx"], 8192)
 
-    def test_format_is_schema(self):
+    def test_no_json_schema_format(self):
         p = _mod.build_payload("model", "text", 16384)
-        self.assertEqual(p["format"]["type"], "object")
-        self.assertIn("status", p["format"]["properties"])
+        self.assertNotIn("format", p)
 
     def test_packet_in_user_message(self):
         p = _mod.build_payload("model", "MY PACKET", 16384)
         user_msg = next(m for m in p["messages"] if m["role"] == "user")
         self.assertIn("MY PACKET", user_msg["content"])
 
-    def test_system_prompt_contains_schema(self):
+    def test_system_prompt_contains_tagged_contract(self):
         p = _mod.build_payload("model", "text", 16384)
         sys_msg = next(m for m in p["messages"] if m["role"] == "system")
-        self.assertIn("schema", sys_msg["content"])
+        self.assertIn("=== FILE START ===", sys_msg["content"])
+        self.assertIn("no JSON", sys_msg["content"])
 
 
 # ---------------------------------------------------------------------------
@@ -226,10 +328,9 @@ class StreamChatTimeouts(unittest.TestCase):
             )
 
     def test_happy_path_assembles_content(self):
-        lines = _ndjson_lines('{"status":"patch"', ',"summary":"ok"',
-                              ',"unified_diff":"","test_commands":[],"risk_notes":[]}')
+        lines = _ndjson_lines("STATUS: PATCH\n", "SUMMARY: ok\n")
         content = self._call(lines)
-        self.assertIn("status", content)
+        self.assertIn("STATUS: PATCH", content)
 
     def test_idle_timeout_on_stall(self):
         lines = _ndjson_lines("partial")
@@ -304,6 +405,48 @@ class EnforceScope(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# validate_file_actions — reject impossible create/modify/delete intents
+# ---------------------------------------------------------------------------
+class ValidateFileActions(unittest.TestCase):
+    def test_create_rejects_existing_target(self):
+        with tempfile.TemporaryDirectory() as d:
+            target = os.path.join(d, "a.txt")
+            with open(target, "w") as f:
+                f.write("x\n")
+            with self.assertRaises(RuntimeError) as ctx:
+                _mod.validate_file_actions(
+                    [{"path": "a.txt", "action": "create", "contents": "y\n"}], d)
+            self.assertIn("create targets existing", str(ctx.exception))
+
+    def test_modify_rejects_missing_target(self):
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(RuntimeError) as ctx:
+                _mod.validate_file_actions(
+                    [{"path": "a.txt", "action": "modify", "contents": "y\n"}], d)
+            self.assertIn("modify targets missing", str(ctx.exception))
+
+    def test_delete_rejects_missing_target(self):
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(RuntimeError) as ctx:
+                _mod.validate_file_actions(
+                    [{"path": "a.txt", "action": "delete", "contents": ""}], d)
+            self.assertIn("delete targets missing", str(ctx.exception))
+
+    def test_valid_actions_pass(self):
+        with tempfile.TemporaryDirectory() as d:
+            target = os.path.join(d, "a.txt")
+            with open(target, "w") as f:
+                f.write("x\n")
+            _mod.validate_file_actions(
+                [
+                    {"path": "a.txt", "action": "modify", "contents": "y\n"},
+                    {"path": "b.txt", "action": "create", "contents": "z\n"},
+                ],
+                d,
+            )
+
+
+# ---------------------------------------------------------------------------
 # build_diff + apply_diff — deterministic, git-owned diff framing
 # ---------------------------------------------------------------------------
 class BuildAndApplyDiff(unittest.TestCase):
@@ -357,6 +500,19 @@ class BuildAndApplyDiff(unittest.TestCase):
         diff = _mod.build_diff(files, d)
         self.assertEqual(diff.strip(), "")
         self.assertIn("nothing to apply", _mod.apply_diff(diff, d))
+
+    def test_delete_existing_file(self):
+        d = self._git_repo()
+        target = os.path.join(d, "a.txt")
+        with open(target, "w") as f:
+            f.write("gone\n")
+        subprocess.run(["git", "add", "-A"], cwd=d, check=True)
+        subprocess.run(["git", "commit", "-qm", "init"], cwd=d, check=True)
+        files = [{"path": "a.txt", "action": "delete", "contents": ""}]
+        diff = _mod.build_diff(files, d)
+        outcome = _mod.apply_diff(diff, d)
+        self.assertEqual(outcome, "applied")
+        self.assertFalse(os.path.exists(target))
 
 
 # ---------------------------------------------------------------------------

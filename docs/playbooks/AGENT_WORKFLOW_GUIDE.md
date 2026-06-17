@@ -454,10 +454,11 @@ Required pass count by RRI band:
 
 MANDATORY:
 ---------
-For RRI 56+, follow the decomposition and human-review gates in
-`docs/policies/RRI_POLICY.md` before implementation. If an exceptional approved
-development task still proceeds without decomposition, apply at least the Complex
-band minimum of 4 Reflection passes in addition to the RRI-policy gates.
+For RRI 56+, decomposition is mandatory before implementation. Follow the
+decomposition and human-review gates in `docs/policies/RRI_POLICY.md`, split the
+task to the policy target, and only then implement the approved subtasks. Apply
+at least the Complex band minimum of 4 Reflection passes to any 56+ development
+subtask that proceeds after decomposition.
 
 Task-presentation requirement for development tasks:
 
@@ -555,11 +556,12 @@ For RRI 0–25 local Gemma delegation, build a delegation packet instead of the
 human-agent handoff prompt. It must contain only: task excerpt, acceptance
 criteria, RRI output, allowed paths, relevant file snippets, and stop conditions.
 Send the packet with `scripts/delegate-low-rri.py`, which performs the local
-Ollama request with schema-constrained JSON and the repository timeout. Gemma
-must return structured JSON with a unified diff; the delegating agent must
-validate the diff, personally review the solution against the requirements, run
-verification, and perform at most one bounded repair cycle before escalating.
-Gemma must not evaluate or approve its own delegated work.
+Ollama request with the repository timeout. Gemma must return the tagged-block
+contract with complete file contents for each changed file; the delegating agent
+must validate the tagged response, let the wrapper build and check the diff,
+personally review the solution against the requirements, run verification, and
+perform at most one bounded repair cycle before escalating. Gemma must not
+evaluate or approve its own delegated work.
 
 ## Language
 

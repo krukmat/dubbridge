@@ -2,8 +2,8 @@
 """Delegate a Low-RRI task packet to local Ollama/Gemma.
 
 The script intentionally keeps Gemma sandboxed: it receives a packet and returns
-structured JSON containing a proposed unified diff. The orchestrating agent still
-validates, applies, reviews, and verifies any patch.
+tagged text with complete file contents. The orchestrating agent still validates,
+builds the diff, applies it, reviews it, and verifies any patch.
 
 Transport: streaming (`stream: true`).  Each NDJSON chunk resets the idle
 timer (`--idle-timeout`, default 60 s).  A separate `--max-wall` cap (default
@@ -34,44 +34,14 @@ DEFAULT_HOST = "http://localhost:11434"
 DEFAULT_MODEL = "gemma4:12b-it-q4_K_M"
 DEFAULT_IDLE_TIMEOUT_SECONDS = 60
 DEFAULT_MAX_WALL_SECONDS = 900
-# Context window large enough to hold any realistic delegation packet + schema.
+# Context window large enough to hold any realistic delegation packet + contract.
 DEFAULT_NUM_CTX = 16384
 
-# Gemma returns FULL FILE CONTENTS, never a diff. Small local models reliably
-# write correct file bodies but botch unified-diff framing (merged hunks, missing
-# headers, wrong line counts) — especially across multiple files. The caller (this
-# script) owns the deterministic work the model cannot: building the diff and
-# applying it via git. This moves the failure-prone step out of the model.
-RESPONSE_SCHEMA = {
-    "type": "object",
-    "additionalProperties": False,
-    "properties": {
-        "status": {"type": "string", "enum": ["patch", "no_patch", "blocked"]},
-        "summary": {"type": "string"},
-        "files": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "path": {"type": "string"},
-                    "action": {"type": "string", "enum": ["create", "modify", "delete"]},
-                    "contents": {"type": "string"},
-                },
-                "required": ["path", "action", "contents"],
-            },
-        },
-        "test_commands": {"type": "array", "items": {"type": "string"}},
-        "risk_notes": {"type": "array", "items": {"type": "string"}},
-    },
-    "required": [
-        "status",
-        "summary",
-        "files",
-        "test_commands",
-        "risk_notes",
-    ],
-}
+STATUS_VALUES = {"PATCH": "patch", "NO_PATCH": "no_patch", "BLOCKED": "blocked"}
+ACTION_VALUES = {"create", "modify", "delete"}
+FILE_START_MARKER = "=== FILE START ==="
+FILE_END_MARKER = "=== FILE END ==="
+CONTENT_MARKER = "--- CONTENT ---"
 
 
 class DelegationIdleTimeout(RuntimeError):
@@ -146,7 +116,7 @@ def parse_args():
         ),
         help=(
             f"Context window size for Ollama; default {DEFAULT_NUM_CTX}. "
-            "Raise if the packet + schema is truncated."
+            "Raise if the packet + tagged contract is truncated."
         ),
     )
     parser.add_argument(
@@ -154,7 +124,7 @@ def parse_args():
         default=None,
         metavar="FILE",
         help=(
-            "Write the validated JSON result atomically to FILE instead of stdout. "
+            "Write the validated result JSON atomically to FILE instead of stdout. "
             "Recommended for agent invocations: the agent polls/reads FILE on exit 0."
         ),
     )
@@ -222,12 +192,10 @@ def ensure_model_available(host, model, timeout):
 
 
 def build_payload(model, packet, num_ctx):
-    schema_text = json.dumps(RESPONSE_SCHEMA, indent=2, sort_keys=True)
     return {
         "model": model,
         "stream": True,
         "think": False,
-        "format": RESPONSE_SCHEMA,
         "keep_alive": "10m",
         "options": {
             "temperature": 0.1,
@@ -239,14 +207,21 @@ def build_payload(model, packet, num_ctx):
                 "role": "system",
                 "content": (
                     "You are a sandboxed local delegation model for DubBridge "
-                    "Low-RRI tasks. Return only JSON matching this schema:\n"
-                    f"{schema_text}\n"
-                    "Do NOT write diffs, patches, or hunk headers. For each file "
-                    "you change, emit one object in `files` with its path, an "
-                    "action (create/modify/delete), and the COMPLETE final file "
-                    "contents in `contents` (the entire file, not a fragment). "
-                    "For action `delete`, set `contents` to an empty string. "
-                    "Do not include markdown fences anywhere."
+                    "Low-RRI tasks.\n"
+                    "Return ONLY tagged text in this exact shape:\n"
+                    "STATUS: PATCH|NO_PATCH|BLOCKED\n"
+                    "SUMMARY: short summary\n"
+                    "TEST: optional verification command\n"
+                    "RISK: optional risk note\n"
+                    "=== FILE START ===\n"
+                    "PATH: relative/path.ext\n"
+                    "ACTION: create|modify|delete\n"
+                    "--- CONTENT ---\n"
+                    "<COMPLETE final file contents>\n"
+                    "=== FILE END ===\n"
+                    "Rules: no JSON, no markdown fences, no unified diff, no "
+                    "explanations, no extra text outside these sections. For "
+                    "ACTION delete, emit empty content."
                 ),
             },
             {
@@ -258,7 +233,8 @@ def build_payload(model, packet, num_ctx):
 
 
 def validate_delegation_payload(payload):
-    missing = [key for key in RESPONSE_SCHEMA["required"] if key not in payload]
+    required = ["status", "summary", "files", "test_commands", "risk_notes"]
+    missing = [key for key in required if key not in payload]
     if missing:
         raise RuntimeError(f"Gemma response is missing required keys: {missing}")
     if payload["status"] not in {"patch", "no_patch", "blocked"}:
@@ -351,25 +327,125 @@ def stream_chat(url, payload, idle_timeout, max_wall):
 def parse_stream_content(content):
     if not isinstance(content, str):
         raise RuntimeError("stream produced no content string")
-    content = content.strip()
-    # Strip markdown fences that some models emit despite instructions.
-    if content.startswith("```"):
-        lines = content.splitlines()
-        inner = []
-        in_fence = False
-        for line in lines:
-            if line.startswith("```"):
-                in_fence = not in_fence
-                continue
-            if in_fence:
-                inner.append(line)
-        content = "\n".join(inner).strip()
-    try:
-        payload = json.loads(content)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"Gemma returned non-JSON content: {exc}") from exc
+    content = content.replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not content:
+        raise RuntimeError("invalid tagged response: empty content")
+    payload = parse_tagged_response(content)
     validate_delegation_payload(payload)
     return payload
+
+
+def parse_tagged_response(content):
+    lines = content.split("\n")
+    idx = 0
+    status = None
+    summary = None
+    test_commands = []
+    risk_notes = []
+    files = []
+    seen_paths = set()
+
+    def skip_blank(i):
+        while i < len(lines) and not lines[i].strip():
+            i += 1
+        return i
+
+    idx = skip_blank(idx)
+    while idx < len(lines):
+        line = lines[idx]
+        if line == FILE_START_MARKER:
+            block, idx = parse_file_block(lines, idx)
+            path = block["path"]
+            if path in seen_paths:
+                raise RuntimeError(f"invalid tagged response: duplicate path {path!r}")
+            seen_paths.add(path)
+            files.append(block)
+            idx = skip_blank(idx)
+            continue
+        if line.startswith("STATUS: "):
+            if status is not None:
+                raise RuntimeError("invalid tagged response: duplicate STATUS header")
+            raw_status = line[len("STATUS: "):].strip()
+            if raw_status not in STATUS_VALUES:
+                raise RuntimeError(f"invalid tagged response: unknown STATUS {raw_status!r}")
+            status = STATUS_VALUES[raw_status]
+        elif line.startswith("SUMMARY: "):
+            if summary is not None:
+                raise RuntimeError("invalid tagged response: duplicate SUMMARY header")
+            summary = line[len("SUMMARY: "):].strip()
+        elif line.startswith("TEST: "):
+            test_commands.append(line[len("TEST: "):].strip())
+        elif line.startswith("RISK: "):
+            risk_notes.append(line[len("RISK: "):].strip())
+        else:
+            raise RuntimeError(
+                f"invalid tagged response: unexpected text outside sections: {line!r}"
+            )
+        idx += 1
+        idx = skip_blank(idx)
+
+    if status is None:
+        raise RuntimeError("invalid tagged response: missing STATUS header")
+    if summary is None:
+        raise RuntimeError("invalid tagged response: missing SUMMARY header")
+    return {
+        "status": status,
+        "summary": summary,
+        "files": files,
+        "test_commands": [cmd for cmd in test_commands if cmd],
+        "risk_notes": [note for note in risk_notes if note],
+    }
+
+
+def parse_file_block(lines, start_idx):
+    idx = start_idx
+    if lines[idx] != FILE_START_MARKER:
+        raise RuntimeError("invalid tagged response: missing file start marker")
+    idx += 1
+    path_line, idx = _next_nonempty_line(lines, idx, "PATH")
+    action_line, idx = _next_nonempty_line(lines, idx, "ACTION")
+    content_line, idx = _next_nonempty_line(lines, idx, CONTENT_MARKER)
+
+    path = _parse_header_value(path_line, "PATH")
+    action = _parse_header_value(action_line, "ACTION")
+    if action not in ACTION_VALUES:
+        raise RuntimeError(f"invalid tagged response: unknown ACTION {action!r}")
+    if content_line != CONTENT_MARKER:
+        raise RuntimeError("invalid tagged response: missing content marker")
+
+    content_lines = []
+    while idx < len(lines) and lines[idx] != FILE_END_MARKER:
+        content_lines.append(lines[idx])
+        idx += 1
+    if idx >= len(lines):
+        raise RuntimeError("invalid tagged response: missing file end marker")
+    idx += 1
+    contents = "\n".join(content_lines)
+    if action == "delete" and contents:
+        raise RuntimeError("invalid tagged response: delete action requires empty content")
+    return {
+        "path": path,
+        "action": action,
+        "contents": contents,
+    }, idx
+
+
+def _next_nonempty_line(lines, idx, label):
+    while idx < len(lines) and not lines[idx].strip():
+        idx += 1
+    if idx >= len(lines):
+        raise RuntimeError(f"invalid tagged response: missing {label} line")
+    return lines[idx], idx + 1
+
+
+def _parse_header_value(line, label):
+    prefix = f"{label}: "
+    if not line.startswith(prefix):
+        raise RuntimeError(f"invalid tagged response: expected {prefix!r}")
+    value = line[len(prefix):].strip()
+    if not value:
+        raise RuntimeError(f"invalid tagged response: empty {label} value")
+    return value
 
 
 def write_result(delegation, out_path):
@@ -414,6 +490,26 @@ def enforce_scope(files, allowed):
         if not ok:
             raise RuntimeError(
                 f"out-of-scope path {entry['path']!r}; allowed: {allowed}")
+
+
+def validate_file_actions(files, repo_root):
+    for entry in files:
+        rel = _normalize(entry["path"])
+        target = os.path.join(repo_root, rel)
+        action = entry["action"]
+        exists = os.path.exists(target)
+        if action == "create" and exists:
+            raise RuntimeError(
+                f"invalid file action: create targets existing path {entry['path']!r}"
+            )
+        if action == "modify" and not exists:
+            raise RuntimeError(
+                f"invalid file action: modify targets missing path {entry['path']!r}"
+            )
+        if action == "delete" and not exists:
+            raise RuntimeError(
+                f"invalid file action: delete targets missing path {entry['path']!r}"
+            )
 
 
 def build_diff(files, repo_root):
@@ -523,10 +619,12 @@ def main():
     )
     delegation = parse_stream_content(content)
 
-    # Caller-side, deterministic: enforce scope, build the diff with git, apply it.
-    # The model never frames a diff; this is the orchestrator's responsibility.
+    # Caller-side, deterministic: enforce scope, validate file actions, build the
+    # diff with git, and apply it. The model never frames a diff; this is the
+    # orchestrator's responsibility.
     if args.allow_path and delegation["status"] == "patch":
         enforce_scope(delegation["files"], args.allow_path)
+        validate_file_actions(delegation["files"], args.repo_root)
         diff = build_diff(delegation["files"], args.repo_root)
         delegation["unified_diff"] = diff
         print(f"[delegate] built diff: {len(diff.splitlines())} lines from "
