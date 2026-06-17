@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'WORKFLOW CHECK: (1) presented task? (2) ran scripts/rri.py? (3) explicit approval received (RRI 26+)? (4) Reflection passes planned (Moderate=2, Med-high=3, Complex=4)? See docs/playbooks/AGENT_WORKFLOW_GUIDE.md' >&2"
+          }
+        ]
+      }
+    ]
+  }
+}
