@@ -40,6 +40,11 @@ pub enum AuditEventKind {
     ConsentGranted,
     ConsentRevoked,
     ConsentCheckDenied,
+    // S-160-T2b: review/publication governance events (ADR-018, ADR-030).
+    ReviewApproved,
+    ReviewRejected,
+    PublicationSucceeded,
+    PublicationRefused,
 }
 
 impl std::fmt::Display for AuditEventKind {
@@ -69,6 +74,10 @@ impl std::fmt::Display for AuditEventKind {
             Self::ConsentGranted => "consent_granted",
             Self::ConsentRevoked => "consent_revoked",
             Self::ConsentCheckDenied => "consent_check_denied",
+            Self::ReviewApproved => "review_approved",
+            Self::ReviewRejected => "review_rejected",
+            Self::PublicationSucceeded => "publication_succeeded",
+            Self::PublicationRefused => "publication_refused",
         };
         write!(f, "{s}")
     }
@@ -167,6 +176,24 @@ impl AuditEvent {
 
     /// Constructor for S-110 voice-consent governance events (ADR-018, ADR-028).
     pub fn new_consent(
+        asset_id: AssetId,
+        event_kind: AuditEventKind,
+        detail: Option<String>,
+    ) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            asset_id: Some(asset_id),
+            event_kind,
+            ingest_token: None,
+            recording_session_id: None,
+            platform_ingest_session_id: None,
+            detail,
+            happened_at: OffsetDateTime::now_utc(),
+        }
+    }
+
+    /// Constructor for S-160 review/publication governance events.
+    pub fn new_review_event(
         asset_id: AssetId,
         event_kind: AuditEventKind,
         detail: Option<String>,
@@ -361,6 +388,22 @@ mod tests {
             AuditEventKind::ConsentCheckDenied.to_string(),
             "consent_check_denied"
         );
+        assert_eq!(
+            AuditEventKind::ReviewApproved.to_string(),
+            "review_approved"
+        );
+        assert_eq!(
+            AuditEventKind::ReviewRejected.to_string(),
+            "review_rejected"
+        );
+        assert_eq!(
+            AuditEventKind::PublicationSucceeded.to_string(),
+            "publication_succeeded"
+        );
+        assert_eq!(
+            AuditEventKind::PublicationRefused.to_string(),
+            "publication_refused"
+        );
     }
 
     #[test]
@@ -378,5 +421,22 @@ mod tests {
         assert!(event.platform_ingest_session_id.is_none());
         assert_eq!(event.event_kind, AuditEventKind::ConsentGranted);
         assert_eq!(event.detail.as_deref(), Some("scope=voice_clone"));
+    }
+
+    #[test]
+    fn new_review_event_sets_asset_id_and_no_correlation_ids() {
+        use crate::asset::AssetId;
+        let asset_id = AssetId::new();
+        let event = AuditEvent::new_review_event(
+            asset_id,
+            AuditEventKind::ReviewApproved,
+            Some("review_task_id=demo".to_string()),
+        );
+        assert_eq!(event.asset_id, Some(asset_id));
+        assert!(event.ingest_token.is_none());
+        assert!(event.recording_session_id.is_none());
+        assert!(event.platform_ingest_session_id.is_none());
+        assert_eq!(event.event_kind, AuditEventKind::ReviewApproved);
+        assert_eq!(event.detail.as_deref(), Some("review_task_id=demo"));
     }
 }

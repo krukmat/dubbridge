@@ -49,6 +49,10 @@ fn parse_event_kind(value: &str) -> Result<AuditEventKind, DbError> {
         "consent_granted" => Ok(AuditEventKind::ConsentGranted),
         "consent_revoked" => Ok(AuditEventKind::ConsentRevoked),
         "consent_check_denied" => Ok(AuditEventKind::ConsentCheckDenied),
+        "review_approved" => Ok(AuditEventKind::ReviewApproved),
+        "review_rejected" => Ok(AuditEventKind::ReviewRejected),
+        "publication_succeeded" => Ok(AuditEventKind::PublicationSucceeded),
+        "publication_refused" => Ok(AuditEventKind::PublicationRefused),
         other => Err(DbError::UnknownStoredValue {
             field: "audit_events.event_kind",
             value: other.to_owned(),
@@ -166,6 +170,10 @@ mod tests {
         assert!(matches!(
             parse_event_kind("org_created"),
             Ok(AuditEventKind::OrgCreated)
+        ));
+        assert!(matches!(
+            parse_event_kind("review_approved"),
+            Ok(AuditEventKind::ReviewApproved)
         ));
     }
 

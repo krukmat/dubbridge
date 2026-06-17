@@ -4,7 +4,9 @@ pub mod asset_repo;
 pub mod audit_repo;
 pub mod consent_repo;
 pub mod error;
+pub mod notification_repo;
 pub mod pending_ingestion_repo;
+pub mod review_repo;
 pub mod rights_repo;
 pub mod workspace_repo;
 
