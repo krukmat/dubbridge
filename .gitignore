@@ -11,3 +11,6 @@ coverage
 tmp
 mobile/.expo/*
 mobile/android/
+.claude/
+__pycache__/
+*.pyc
