@@ -196,6 +196,13 @@ impl ApiError {
         }
     }
 
+    fn conflict(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::CONFLICT,
+            message: message.into(),
+        }
+    }
+
     fn internal(message: impl Into<String>) -> Self {
         Self {
             status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -205,6 +212,7 @@ impl ApiError {
 
     fn from_db(error: DbError) -> Self {
         match error {
+            DbError::Conflict => Self::conflict("conflict"),
             DbError::NotFound => Self::forbidden("asset not found"),
             DbError::ConnectionFailed(source) | DbError::QueryFailed(source) => {
                 Self::internal(format!("database operation failed: {source}"))

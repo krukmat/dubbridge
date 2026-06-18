@@ -415,6 +415,7 @@ impl ApiError {
 
     fn from_db(error: dubbridge_db::error::DbError) -> Self {
         match error {
+            dubbridge_db::error::DbError::Conflict => Self::conflict("conflict"),
             dubbridge_db::error::DbError::NotFound => Self::not_found("record not found"),
             dubbridge_db::error::DbError::ConnectionFailed(source)
             | dubbridge_db::error::DbError::QueryFailed(source) => {

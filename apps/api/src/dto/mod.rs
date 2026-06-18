@@ -1,3 +1,4 @@
+pub mod auth;
 pub mod compliance;
 pub mod ingestion;
 pub mod notifications;

@@ -142,6 +142,10 @@ struct ApiError {
 impl ApiError {
     fn from_db(error: DbError) -> Self {
         match error {
+            DbError::Conflict => Self {
+                status: StatusCode::CONFLICT,
+                message: "conflict".into(),
+            },
             DbError::NotFound => Self {
                 status: StatusCode::NOT_FOUND,
                 message: "not found".into(),

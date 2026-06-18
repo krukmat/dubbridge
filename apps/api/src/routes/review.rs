@@ -262,6 +262,7 @@ impl ApiError {
 
     fn from_db(error: DbError) -> Self {
         match error {
+            DbError::Conflict => Self::conflict("conflict"),
             DbError::NotFound => Self::forbidden("resource not found"),
             DbError::ConnectionFailed(source) | DbError::QueryFailed(source) => {
                 Self::internal(format!("database operation failed: {source}"))
