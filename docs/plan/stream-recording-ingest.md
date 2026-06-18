@@ -1,3 +1,10 @@
+---
+type: Plan
+title: "Plan: Asset Intake — Platform Ingest (primary) + Stream Recording (S3b)"
+status: planned
+slice: S-095
+governed_by: [ADR-019, ADR-020, ADR-021, ADR-022]
+---
 # Plan: Asset Intake — Platform Ingest (primary) + Stream Recording (S3b)
 
 > **2026-05-31 REPLAN (S3-REPLAN).** The S3 primary intake use case changed. It is

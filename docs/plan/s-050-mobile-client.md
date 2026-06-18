@@ -1,3 +1,9 @@
+---
+type: Plan
+title: "Plan: S-050 - First-party Mobile Client (React Native + Expo)"
+status: closed
+slice: S-050
+---
 # Plan: S-050 - First-party Mobile Client (React Native + Expo)
 
 **Roadmap phase:** `S-050`. Depends on `S-040-T7`

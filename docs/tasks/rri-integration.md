@@ -1,3 +1,9 @@
+---
+type: TaskList
+title: "Tasks: RRI Integration — Required Reasoning Index adoption"
+status: closed
+plan: docs/plan/rri-integration.md
+---
 # Tasks: RRI Integration — Required Reasoning Index adoption
 
 **Plan:** `docs/plan/rri-integration.md`

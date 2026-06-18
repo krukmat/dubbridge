@@ -1,3 +1,8 @@
+---
+type: Plan
+title: "Plan: Documentation Consistency Guardrails (ADR change propagation)"
+status: closed
+---
 # Plan: Documentation Consistency Guardrails (ADR change propagation)
 
 **Roadmap position:** Cross-cutting governance tooling (a "G"-class item, sibling to

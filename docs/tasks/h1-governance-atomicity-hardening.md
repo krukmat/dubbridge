@@ -1,3 +1,9 @@
+---
+type: TaskList
+title: "Tasks: H1 Governance Atomicity + Durable Audit Hardening"
+status: closed
+plan: docs/plan/h1-governance-atomicity-hardening.md
+---
 # Tasks: H1 Governance Atomicity + Durable Audit Hardening
 
 Governing plan: `docs/plan/h1-governance-atomicity-hardening.md`

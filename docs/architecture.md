@@ -1,3 +1,8 @@
+---
+type: Architecture
+title: "Architecture Overview"
+---
+
 # Architecture Overview
 
 DubBridge is a Rust-first platform for processing authorized audiovisual media into
@@ -30,17 +35,19 @@ operational surfaces from planned ones. Delivery sequence lives in
 
 | Capability | Status | Source |
 |------------|--------|--------|
-| JWT API principal verification + scopes | Operational | S0, ADR-023 |
+| JWT API principal verification + scopes | Operational (RS256 resource server; superseded-by-decision, ADR-031/S-200 replaces it with in-house HS256 issuance) | S0, ADR-023 → ADR-031 |
 | Upload ingestion + rights ledger | Operational | S1, ADR-006/008/018 |
 | Pending-upload durability, TTL, cleanup, coverage gate | Operational | T1 |
 | Finalize atomicity + centralized durable audit emission | Planned blocking hardening | H1 |
 | MinIO/S3 storage adapter | Operational | S-080, ADR-006/018/026 |
 | Platform ingest (owner-authorized download) | Planned (primary S3); foundation T0/T0c/T1/T2 done | S3, ADR-025/021/006/008/018 |
 | RTMP/SRT live recording ingest | Deferred sub-case (S3b); shares the S3 foundation | S3b, ADR-019/020/022 |
-| Media preparation through publication | Planned | S4..S9 |
+| Media preparation through publication | Planned | S-120..S-180 |
+| HLS playback delivery | Planned | S-125, ADR-032 |
 | Environment separation + reproducible app-container runtime wiring | Planned supporting surface | P0, ADR-026 |
-| First-party session gateway / BFF | Operational supporting surface | P1, ADR-024 |
-| First-party mobile client (React Native + Expo) | Canonical authenticated product surface | P3, S-105, ADR-024/029 |
+| First-party session gateway / BFF | Operational supporting surface (opaque-session transport; superseded-by-decision, ADR-031/S-200 reduces it to a transparent relay) | P1, ADR-024 → ADR-031 |
+| First-party mobile client (React Native + Expo) | Canonical authenticated product surface (opaque `session_ref` transport; ADR-031/S-200 moves it to a backend-issued bearer JWT) | P3, S-105, ADR-024/029 → ADR-031 |
+| Mobile credential login with backend-issued JWT (FenixCRM parity) | Decision accepted (ADR-031); implementation planned (S-200) | S-200, ADR-031 |
 
 ## Runtime surfaces
 
@@ -51,13 +58,20 @@ operational surfaces from planned ones. Delivery sequence lives in
   `/auth/logout`) plus the authenticated `/api/*` proxy. It owns first-party session
   validation, renewal, rotation, expiry, logout, and backend token refresh while
   keeping tokens server-side and preserving JWT verification at `apps/api` (P1,
-  ADR-024/023).
+  ADR-024/023). **Superseded-by-decision (ADR-031, 2026-06-17):** S-200 reduces this
+  surface to a transparent relay (forward `/auth/*` and `Bearer` `/api/*`); the
+  session store, opaque-reference, and rotation behavior described here remain in the
+  tree only until the S-200 implementation tasks land.
 - `mobile/` is the first-party React Native + Expo client surface. It authenticates
   only through the session gateway, persists only the gateway-owned opaque
   `session_ref` in secure storage, and uses the authenticated gateway `/api/*`
   proxy for product requests (P3, S-105, ADR-024/029). It is the only operational
   first-party authenticated UI. The former `web/` console was retired by S-105;
   any future public website or player is a separate product decision.
+  **Superseded-by-decision (ADR-031, 2026-06-17):** S-200 replaces the opaque
+  `session_ref` with a backend-issued HS256 bearer JWT stored in secure storage and
+  an email/password login form; mobile remains the sole authenticated surface
+  (ADR-029 unchanged on that point).
 - `apps/worker-runner` is the Rust background-job execution surface; its real queue
   consumption remains to be implemented as slices require it.
 - `apps/cli` hosts local operational commands for development and administration.
@@ -78,6 +92,12 @@ operational surfaces from planned ones. Delivery sequence lives in
   authentication (ADR-022). Its v1 output contract was fixed by S3 Task 0c (local
   HLS fMP4 staging + one assembled MP4). It is built only when a real
   live-broadcast client need exists; it is not on the primary S3 critical path.
+- `S-125` HLS playback delivery (ADR-032) will expose prepared HLS manifests and
+  segments through a backend-owned grant boundary. It consumes S-120 HLS artifacts,
+  validates readiness and caller/publication policy, and returns manifest/segment
+  URLs without exposing raw object-store keys. It is a delivery API boundary, not a
+  public website or revived authenticated web console.
+
 ## Shared crates
 
 - `domain`: Core entities and invariants.
@@ -137,6 +157,19 @@ parallel path (ADR-021, producer-agnostic).
   canonical `ingests/` keys, compares them against relational references, and deletes
   only planner-approved orphan candidates.
 
+## Prepared media and playback boundaries
+
+S-120 turns a source artifact into prepared media: durable probe metadata plus a
+canonical HLS package stored behind `StorageAdapter`. That package is not itself a
+client contract. S-125 owns the playback-delivery boundary for `.m3u8` manifests and
+segments (ADR-032).
+
+Playback callers receive a backend-issued grant, rewritten manifest, or signed URL
+set that is scoped, expiring, and policy-checked. Clients never construct MinIO/S3
+keys. Review-time playback is gated by authenticated workspace/reviewer policy;
+audience-facing playback is additionally gated by the S-180 publication runtime and
+ADR-030's fail-closed approval rule.
+
 ## Identity boundaries
 
 `apps/api` is an OAuth 2.0 resource server. Protected routes consume a verified JWT
@@ -151,6 +184,17 @@ sessions themselves; they carry the current opaque session transport and update 
 only when the gateway returns a rotated reference. `apps/api` never receives a
 browser/mobile session reference; it receives an authenticated backend request from
 the gateway and continues to enforce protected-resource authorization.
+
+> **Superseded-by-decision (ADR-031, 2026-06-17, S-200-T0).** The two paragraphs
+> above describe the ADR-023/ADR-024 model that is in the tree today but is now
+> superseded by ADR-031. Under the accepted decision (implemented by slice S-200):
+> `apps/api` becomes its own credential issuer — it validates email/password and
+> issues a backend-signed **HS256** JWT — and the gateway is reduced to a transparent
+> relay. The mobile device holds the bearer JWT directly (no opaque session). The
+> uploader-identity invariant is preserved (the actor is still the verified token
+> subject, never request-body input). The accepted security regressions (long-lived
+> device token, symmetric signing secret, no pre-expiry revocation) are recorded in
+> ADR-031 §Risk analysis; RS256 hardening is the recommended follow-up X-S-200-1.
 
 Intake-source credentials are a separate concern from the API principal and from
 each other: owner platform credentials for downloads are stored by reference and

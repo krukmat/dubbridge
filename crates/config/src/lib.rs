@@ -111,6 +111,9 @@ pub struct AuthSettings {
     pub issuer: String,
     pub audience: String,
     pub rsa_public_key_path: String,
+    pub jwt_secret: Option<String>,
+    #[serde(default = "default_auth_jwt_expiry_hours")]
+    pub jwt_expiry_hours: u64,
     pub clock_skew_leeway_seconds: u64,
 }
 
@@ -138,6 +141,10 @@ pub struct GatewaySessionSettings {
     pub cookie_name: String,
     pub absolute_ttl_seconds: u64,
     pub idle_ttl_seconds: u64,
+}
+
+fn default_auth_jwt_expiry_hours() -> u64 {
+    24
 }
 
 impl AppConfig {
@@ -361,6 +368,11 @@ impl AuthSettings {
             issuer,
             audience,
             rsa_public_key_path,
+            jwt_secret: std::env::var("DUBBRIDGE_AUTH_JWT_SECRET").ok(),
+            jwt_expiry_hours: std::env::var("DUBBRIDGE_AUTH_JWT_EXPIRY_HOURS")
+                .ok()
+                .and_then(|value| value.parse().ok())
+                .unwrap_or_else(default_auth_jwt_expiry_hours),
             clock_skew_leeway_seconds: std::env::var("DUBBRIDGE_AUTH_CLOCK_SKEW_LEEWAY_SECONDS")
                 .ok()
                 .and_then(|value| value.parse().ok())
@@ -669,6 +681,56 @@ mod tests {
     }
 
     #[test]
+    fn auth_settings_schema_reads_jwt_expiry_hours_from_toml() {
+        use figment::{
+            Figment,
+            providers::{Format, Toml},
+        };
+
+        let dir = fixtures_dir();
+        let cfg: AppConfig = Figment::new()
+            .merge(Toml::file(format!("{dir}/default.toml")))
+            .merge(Toml::file(format!("{dir}/local.toml")))
+            .merge(Toml::string(
+                r#"
+                [auth]
+                issuer = "https://issuer.example"
+                audience = "dubbridge-api"
+                rsa_public_key_path = "/tmp/public.pem"
+                jwt_expiry_hours = 48
+                clock_skew_leeway_seconds = 30
+                "#,
+            ))
+            .extract()
+            .expect("config with auth expiry should deserialize");
+
+        assert_eq!(cfg.auth.expect("auth settings").jwt_expiry_hours, 48);
+    }
+
+    #[test]
+    fn app_config_load_env_override_reads_auth_jwt_expiry_hours() {
+        let config_dir = fixtures_dir();
+        temp_env::with_vars(
+            [
+                ("DUBBRIDGE_ENV", Some("local")),
+                ("DUBBRIDGE_CONFIG_DIR", Some(config_dir.as_str())),
+                ("DUBBRIDGE_AUTH__ISSUER", Some("https://issuer.example")),
+                ("DUBBRIDGE_AUTH__AUDIENCE", Some("dubbridge-api")),
+                (
+                    "DUBBRIDGE_AUTH__RSA_PUBLIC_KEY_PATH",
+                    Some("/tmp/public.pem"),
+                ),
+                ("DUBBRIDGE_AUTH__JWT_EXPIRY_HOURS", Some("12")),
+                ("DUBBRIDGE_AUTH__CLOCK_SKEW_LEEWAY_SECONDS", Some("30")),
+            ],
+            || {
+                let cfg = AppConfig::load().expect("config with auth expiry override should load");
+                assert_eq!(cfg.auth.expect("auth settings").jwt_expiry_hours, 12);
+            },
+        );
+    }
+
+    #[test]
     fn app_config_load_bad_config_dir_returns_load_error() {
         temp_env::with_vars(
             [
@@ -695,6 +757,8 @@ mod tests {
             issuer: "https://issuer.example".to_string(),
             audience: "dubbridge-api".to_string(),
             rsa_public_key_path: "/tmp/public.pem".to_string(),
+            jwt_secret: Some("production-test-secret".to_string()),
+            jwt_expiry_hours: 24,
             clock_skew_leeway_seconds: 30,
         }
     }
@@ -908,6 +972,7 @@ mod tests {
                     "DUBBRIDGE_AUTH__RSA_PUBLIC_KEY_PATH",
                     Some("/tmp/public.pem"),
                 ),
+                ("DUBBRIDGE_AUTH__JWT_SECRET", Some("prod-jwt-secret")),
                 ("DUBBRIDGE_AUTH__CLOCK_SKEW_LEEWAY_SECONDS", Some("30")),
                 (
                     "DUBBRIDGE_GATEWAY__OAUTH__CLIENT_SECRET",
@@ -945,6 +1010,7 @@ mod tests {
                     "DUBBRIDGE_AUTH__RSA_PUBLIC_KEY_PATH",
                     Some("/tmp/public.pem"),
                 ),
+                ("DUBBRIDGE_AUTH__JWT_SECRET", Some("prod-jwt-secret")),
                 ("DUBBRIDGE_AUTH__CLOCK_SKEW_LEEWAY_SECONDS", Some("30")),
                 (
                     "DUBBRIDGE_GATEWAY__OAUTH__CLIENT_SECRET",
@@ -1038,11 +1104,35 @@ mod tests {
                 ("DUBBRIDGE_AUTH_ISSUER", Some("https://issuer")),
                 ("DUBBRIDGE_AUTH_AUDIENCE", Some("api")),
                 ("DUBBRIDGE_AUTH_RSA_PUBLIC_KEY_PATH", Some("/key.pem")),
+                ("DUBBRIDGE_AUTH_JWT_SECRET", None),
+                ("DUBBRIDGE_AUTH_JWT_EXPIRY_HOURS", None),
                 ("DUBBRIDGE_AUTH_CLOCK_SKEW_LEEWAY_SECONDS", None),
             ],
             || {
                 let settings = AuthSettings::from_env().unwrap();
+                assert_eq!(settings.jwt_expiry_hours, 24);
                 assert_eq!(settings.clock_skew_leeway_seconds, 30);
+                assert_eq!(settings.jwt_secret, None);
+            },
+        );
+    }
+
+    #[test]
+    fn auth_settings_reads_optional_jwt_secret_from_env() {
+        temp_env::with_vars(
+            [
+                ("DUBBRIDGE_AUTH_ISSUER", Some("https://issuer")),
+                ("DUBBRIDGE_AUTH_AUDIENCE", Some("api")),
+                ("DUBBRIDGE_AUTH_RSA_PUBLIC_KEY_PATH", Some("/key.pem")),
+                ("DUBBRIDGE_AUTH_JWT_SECRET", Some("local-secret")),
+                ("DUBBRIDGE_AUTH_JWT_EXPIRY_HOURS", Some("36")),
+                ("DUBBRIDGE_AUTH_CLOCK_SKEW_LEEWAY_SECONDS", Some("45")),
+            ],
+            || {
+                let settings = AuthSettings::from_env().unwrap();
+                assert_eq!(settings.jwt_secret.as_deref(), Some("local-secret"));
+                assert_eq!(settings.jwt_expiry_hours, 36);
+                assert_eq!(settings.clock_skew_leeway_seconds, 45);
             },
         );
     }

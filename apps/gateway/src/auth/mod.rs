@@ -1,30 +1,17 @@
-// P1-T2: OAuth 2.0 client module (PKCE token exchange + refresh)
-pub mod handoff;
-pub mod mobile_session;
-pub mod oauth_client;
-// P1-T4: pending state/verifier store, login/callback/logout routes
-pub mod login;
-pub mod logout;
-pub mod pending;
+// Public auth surface retained after legacy OAuth/session retirement.
+pub mod relay;
 
 use std::sync::Arc;
 
-use axum::{
-    Router,
-    routing::{get, post},
-};
+use axum::{Router, routing::post};
 
 use crate::state::GatewayState;
-use login::{callback_handler, login_handler};
-use logout::logout_handler;
-use mobile_session::mobile_session_handler;
+use relay::{login_relay_handler, register_relay_handler};
 
-/// Builds the /auth sub-router: login, callback, logout.
+/// Builds the public /auth sub-router for direct credential relay.
 /// State is NOT fixed here — it is inherited from the parent router via nest().
 pub fn auth_router() -> Router<Arc<GatewayState>> {
     Router::new()
-        .route("/login", get(login_handler))
-        .route("/callback", get(callback_handler))
-        .route("/mobile/session", post(mobile_session_handler))
-        .route("/logout", post(logout_handler))
+        .route("/login", post(login_relay_handler))
+        .route("/register", post(register_relay_handler))
 }

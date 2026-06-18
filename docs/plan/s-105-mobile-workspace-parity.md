@@ -1,3 +1,9 @@
+---
+type: Plan
+title: "Plan: S-105 - Mobile Workspace Parity and Web Console Retirement"
+status: closed
+slice: S-105
+---
 # Plan: S-105 - Mobile Workspace Parity and Web Console Retirement
 
 > **Status:** Complete. Approved and delivered 2026-06-13.

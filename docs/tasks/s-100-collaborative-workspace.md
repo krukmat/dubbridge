@@ -1,3 +1,11 @@
+---
+type: TaskList
+title: "Tasks: S-100 — Collaborative Localization Workspace"
+status: closed
+slice: S-100
+plan: docs/plan/s-100-collaborative-workspace.md
+governed_by: [ADR-027]
+---
 # Tasks: S-100 — Collaborative Localization Workspace
 
 > **Historical note (S-105, 2026-06-13):** S-100-T4/T5 remain completed historical

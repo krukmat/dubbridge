@@ -1,3 +1,8 @@
+---
+type: Plan
+title: "Plan: RRI Multi-Platform Profiles"
+status: closed
+---
 # Plan: RRI Multi-Platform Profiles
 
 **Roadmap position:** Cross-cutting process tooling. Continuation of

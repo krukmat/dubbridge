@@ -1,3 +1,9 @@
+---
+type: ADR
+title: "ADR-028: Voice-consent ledger and fail-closed TTS precondition"
+status: Accepted
+---
+
 # ADR-028: Voice-consent ledger and fail-closed TTS precondition
 
 - **Status:** Accepted

@@ -1,8 +1,22 @@
+---
+type: ADR
+title: "ADR-024: Low-friction first-party API access via session gateway"
+status: Superseded
+superseded_by: ADR-031
+---
+
 # ADR-024: Low-friction first-party API access via session gateway
 
-- **Status:** Accepted
-- **Date:** 2026-05-31 (proposed); 2026-06-03 (accepted)
+- **Status:** Superseded by ADR-031
+- **Date:** 2026-05-31 (proposed); 2026-06-03 (accepted); 2026-06-17 (superseded, S-200-T0)
 - **Deciders:** DubBridge platform team
+
+> **Superseded by [ADR-031](ADR-031-mobile-jwt-credential-auth-fenix-parity.md)
+> (2026-06-17, S-200-T0).** The server-side session / opaque-reference transport and
+> the "client never holds a token" property decided here are replaced by a
+> transparent relay plus a bearer JWT stored on the device. This ADR is retained as
+> the auditable record of the prior decision. Until the S-200 implementation tasks
+> land, the gateway code described here remains in force in the tree.
 
 ## Context
 

@@ -1,3 +1,9 @@
+---
+type: Proposal
+title: "Proposal: Stream Recording Module"
+status: Proposed
+---
+
 # Proposal: Stream Recording Module
 
 - **Status:** Internal decision context; execution contract superseded by the S3

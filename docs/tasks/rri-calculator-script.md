@@ -1,3 +1,9 @@
+---
+type: TaskList
+title: "Tasks: RRI Calculator Script"
+status: closed
+plan: docs/plan/rri-calculator-script.md
+---
 # Tasks: RRI Calculator Script
 
 **Plan:** `docs/plan/rri-calculator-script.md`

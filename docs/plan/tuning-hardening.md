@@ -1,3 +1,8 @@
+---
+type: Plan
+title: "Plan: T1 Tuning / Hardening"
+status: closed
+---
 # Plan: T1 Tuning / Hardening
 
 **Roadmap position:** Post-slice reliability and operability phase. Execute when a

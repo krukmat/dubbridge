@@ -6,6 +6,9 @@ pub enum DbError {
     #[error("database connection failed: {0}")]
     ConnectionFailed(#[from] sqlx::Error),
 
+    #[error("conflict")]
+    Conflict,
+
     #[error("record not found")]
     NotFound,
 

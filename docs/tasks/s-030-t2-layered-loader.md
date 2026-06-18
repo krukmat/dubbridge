@@ -1,3 +1,11 @@
+---
+type: TaskList
+title: "Tasks: S-030-T2 — Layered Loader (subdivided)"
+status: closed
+slice: S-030
+plan: docs/plan/s-030-environment-separation.md
+governed_by: [ADR-026]
+---
 # Tasks: S-030-T2 — Layered Loader (subdivided)
 
 Parent task: `docs/tasks/s-030-environment-separation.md` § Task 2

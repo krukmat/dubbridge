@@ -1,33 +1,58 @@
-// P3 T3a: secure session reference storage primitives
-// Pure storage module — no React, no HTTP. Stores only the opaque session reference;
-// never persists a JWT or refresh token (ADR-024).
+import * as SecureStore from "expo-secure-store";
 
-import * as SecureStore from 'expo-secure-store';
+const SESSION_KEY = "dubbridge_auth_session";
 
-const SESSION_KEY = 'dubbridge_session_ref';
+export type AuthSession = {
+  token: string;
+  userId: string;
+  workspaceId: string;
+};
 
-// Three base64url segments separated by dots — matches JWT structure.
-// Used to guard against accidental JWT persistence in updateSessionRef.
-const JWT_PATTERN = /^[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+$/;
-
-export function isJwtLike(value: string): boolean {
-  return JWT_PATTERN.test(value);
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
 }
 
-export async function saveSessionRef(ref: string): Promise<void> {
-  await SecureStore.setItemAsync(SESSION_KEY, ref);
+function isAuthSession(value: unknown): value is AuthSession {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  return (
+    isNonEmptyString(candidate.token) &&
+    isNonEmptyString(candidate.userId) &&
+    isNonEmptyString(candidate.workspaceId)
+  );
 }
 
-export async function loadSessionRef(): Promise<string | null> {
-  return SecureStore.getItemAsync(SESSION_KEY);
+export async function saveAuthSession(session: AuthSession): Promise<void> {
+  await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(session));
 }
 
-export async function clearSessionRef(): Promise<void> {
+export async function loadAuthSession(): Promise<AuthSession | null> {
+  const rawValue = await SecureStore.getItemAsync(SESSION_KEY);
+
+  if (rawValue === null) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue) as unknown;
+    if (!isAuthSession(parsed)) {
+      return null;
+    }
+
+    return {
+      token: parsed.token.trim(),
+      userId: parsed.userId.trim(),
+      workspaceId: parsed.workspaceId.trim(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function clearAuthSession(): Promise<void> {
   await SecureStore.deleteItemAsync(SESSION_KEY);
-}
-
-export async function updateSessionRef(rotation: string | null): Promise<void> {
-  if (rotation === null) return;
-  if (isJwtLike(rotation)) return;
-  await saveSessionRef(rotation);
 }

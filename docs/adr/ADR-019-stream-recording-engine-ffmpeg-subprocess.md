@@ -1,3 +1,9 @@
+---
+type: ADR
+title: "ADR-019: Stream recording engine — FFmpeg subprocess orchestration"
+status: Proposed
+---
+
 # ADR-019: Stream recording engine — FFmpeg subprocess orchestration
 
 - **Status:** Proposed — **scope narrowed to the S3b live-recording sub-case

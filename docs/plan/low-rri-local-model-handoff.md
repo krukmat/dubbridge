@@ -1,3 +1,8 @@
+---
+type: Plan
+title: "Plan: Low-RRI Local Model Handoff"
+status: closed
+---
 # Plan: Low-RRI Local Model Handoff
 
 ## Objective

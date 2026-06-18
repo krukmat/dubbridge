@@ -1,3 +1,8 @@
+---
+type: Prompt
+title: "How Much Does This Task Actually Cost? A Score for AI Agents"
+---
+
 # How Much Does This Task Actually Cost? A Score for AI Agents
 
 > Task complexity is cost. Measure it or pay for it later.

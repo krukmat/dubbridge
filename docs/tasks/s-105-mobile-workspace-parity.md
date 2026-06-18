@@ -1,3 +1,10 @@
+---
+type: TaskList
+title: "Tasks: S-105 - Mobile Workspace Parity and Web Console Retirement"
+status: closed
+slice: S-105
+plan: docs/plan/s-105-mobile-workspace-parity.md
+---
 # Tasks: S-105 - Mobile Workspace Parity and Web Console Retirement
 
 **Plan:** `docs/plan/s-105-mobile-workspace-parity.md`

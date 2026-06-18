@@ -1,3 +1,11 @@
+---
+type: TaskList
+title: "Tasks: S-110 — Compliance & Consent Center"
+status: closed
+slice: S-110
+plan: docs/plan/s-110-compliance-consent-center.md
+governed_by: [ADR-028, ADR-008]
+---
 # Tasks: S-110 — Compliance & Consent Center
 
 **Plan:** `docs/plan/s-110-compliance-consent-center.md`

@@ -8,6 +8,7 @@ pub mod notification_repo;
 pub mod pending_ingestion_repo;
 pub mod review_repo;
 pub mod rights_repo;
+pub mod user_account;
 pub mod workspace_repo;
 
 use sqlx::PgPool;

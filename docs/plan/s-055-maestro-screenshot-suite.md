@@ -1,3 +1,9 @@
+---
+type: Plan
+title: "Plan: S-055 - Maestro Screenshot / Visual-audit Suite (Mobile)"
+status: closed
+slice: S-055
+---
 # Plan: S-055 - Maestro Screenshot / Visual-audit Suite (Mobile)
 
 **Roadmap phase:** `S-055`. This is the hardening follow-up to `S-050`

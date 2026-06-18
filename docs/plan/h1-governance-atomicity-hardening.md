@@ -1,3 +1,8 @@
+---
+type: Plan
+title: "Plan: H1 Governance Atomicity + Durable Audit Hardening"
+status: closed
+---
 # Plan: H1 Governance Atomicity + Durable Audit Hardening
 
 **Roadmap position:** Blocking foundation gate after S1 and S3 Task 0, before

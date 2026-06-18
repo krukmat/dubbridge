@@ -1,3 +1,9 @@
+---
+type: Playbook
+title: "Low-RRI Local Model Handoff"
+governs: "local model delegation for Low-band RRI tasks"
+---
+
 # Low-RRI Local Model Handoff
 
 ## Purpose

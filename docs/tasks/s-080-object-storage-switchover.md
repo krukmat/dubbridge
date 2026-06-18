@@ -1,3 +1,11 @@
+---
+type: TaskList
+title: "Tasks: S-080 — Object Storage Switchover"
+status: closed
+slice: S-080
+plan: docs/plan/s-080-object-storage-switchover.md
+governed_by: [ADR-006]
+---
 # Tasks: S-080 — Object Storage Switchover
 
 Plan: `docs/plan/s-080-object-storage-switchover.md` · ADRs: ADR-006, ADR-018, ADR-021, ADR-025, ADR-026 · Roadmap: S-080, X9

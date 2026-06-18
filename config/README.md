@@ -21,6 +21,12 @@ default.toml  ←  <env>.toml  ←  DUBBRIDGE_* env vars
 
 An env var always wins. Use env vars for secrets and per-deploy overrides.
 
+For structured settings, `AppConfig::load()` uses `__` as the nesting separator, so
+`auth.jwt_expiry_hours` maps to `DUBBRIDGE_AUTH__JWT_EXPIRY_HOURS`. The legacy
+`AuthSettings::from_env()` helper still accepts flat aliases such as
+`DUBBRIDGE_AUTH_JWT_SECRET`, `DUBBRIDGE_AUTH_JWT_EXPIRY_HOURS`, and
+`DUBBRIDGE_AUTH_CLOCK_SKEW_LEEWAY_SECONDS` until that path is removed.
+
 ## Variable × environment parity table
 
 | Variable | default | local | staging | production | Env var override |
@@ -36,10 +42,12 @@ An env var always wins. Use env vars for secrets and per-deploy overrides.
 | `storage.endpoint_url` | — | — | — | — | `DUBBRIDGE_STORAGE_ENDPOINT_URL` |
 | `observability.log_format` | — | `pretty` | `json` | `json` | `DUBBRIDGE_OBSERVABILITY_LOG_FORMAT` |
 | `observability.filter` | `info` | — | — | — | `DUBBRIDGE_OBSERVABILITY_FILTER` |
-| `auth.issuer` | — | — (optional) | — (secret) | — (secret) | `DUBBRIDGE_AUTH_ISSUER` |
-| `auth.audience` | — | — (optional) | — (secret) | — (secret) | `DUBBRIDGE_AUTH_AUDIENCE` |
-| `auth.rsa_public_key_path` | — | — (optional) | — (secret) | — (secret) | `DUBBRIDGE_AUTH_RSA_PUBLIC_KEY_PATH` |
-| `auth.clock_skew_leeway_seconds` | — | — | — | — | `DUBBRIDGE_AUTH_CLOCK_SKEW_LEEWAY_SECONDS` |
+| `auth.issuer` | — | — (optional) | — (secret) | — (secret) | `DUBBRIDGE_AUTH__ISSUER` |
+| `auth.audience` | — | — (optional) | — (secret) | — (secret) | `DUBBRIDGE_AUTH__AUDIENCE` |
+| `auth.rsa_public_key_path` | — | — (optional) | — (secret) | — (secret) | `DUBBRIDGE_AUTH__RSA_PUBLIC_KEY_PATH` |
+| `auth.jwt_secret` | — | — (optional) | — (secret) | — (secret) | `DUBBRIDGE_AUTH__JWT_SECRET` |
+| `auth.jwt_expiry_hours` | — | — (optional, default `24`) | — (secret/profile) | — (secret/profile) | `DUBBRIDGE_AUTH__JWT_EXPIRY_HOURS` |
+| `auth.clock_skew_leeway_seconds` | — | — | — | — | `DUBBRIDGE_AUTH__CLOCK_SKEW_LEEWAY_SECONDS` |
 
 ## DATABASE_URL alias rule (ADR-026 §2, F2)
 

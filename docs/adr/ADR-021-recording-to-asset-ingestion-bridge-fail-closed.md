@@ -1,3 +1,9 @@
+---
+type: ADR
+title: "ADR-021: Recording-to-asset ingestion bridge with fail-closed rights"
+status: Accepted
+---
+
 # ADR-021: Recording-to-asset ingestion bridge with fail-closed rights
 
 - **Status:** Accepted — **generalized to all non-upload intake

@@ -1,3 +1,9 @@
+---
+type: ADR
+title: "ADR-020: Recording session lifecycle and segment model"
+status: Accepted
+---
+
 # ADR-020: Recording session lifecycle and segment model
 
 - **Status:** Accepted — **applies to the S3b live-recording sub-case

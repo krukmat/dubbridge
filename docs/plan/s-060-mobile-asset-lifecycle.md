@@ -1,3 +1,9 @@
+---
+type: Plan
+title: "Plan: S-060 - First-party Mobile Asset Lifecycle (Functional Surface + BDD/Maestro)"
+status: closed
+slice: S-060
+---
 # Plan: S-060 - First-party Mobile Asset Lifecycle (Functional Surface + BDD/Maestro)
 
 > **Status:** Complete. Authored 2026-06-11; implemented and closed 2026-06-12.

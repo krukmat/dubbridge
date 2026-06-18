@@ -8,7 +8,7 @@ export type GatewayErrorKind =
 
 export type GatewayResponse<T> = {
   data: T;
-  /** Rotated opaque session reference from X-Dubbridge-Session, or null if absent/rejected. */
+  /** Bearer auth keeps this null; retained temporarily for caller compatibility. */
   sessionRotation: string | null;
 };
 

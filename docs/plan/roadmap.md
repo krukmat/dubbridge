@@ -1,3 +1,7 @@
+---
+type: Roadmap
+title: "DubBridge Roadmap (General Plan)"
+---
 # DubBridge Roadmap (General Plan)
 
 ## Purpose
@@ -26,6 +30,9 @@ profile to fail-closed local config. Updated again on 2026-06-03 after `S-030` T
 aligned the local Rust image with `rust-toolchain.toml` and added the committed-config
 secret guard. Updated 2026-06-07 after `S-050` T0–T5 completion: the mobile app is now
 implemented, tested, and reflected in the architecture/task status documents.
+Updated 2026-06-18 to add `S-125` HLS playback delivery and ADR-032 so prepared
+`.m3u8` packages are served through an explicit backend boundary instead of being
+hidden inside later publication work.
 
 ## Status legend
 - ✅ Done · 🟡 In progress · ⬜ Not started · 📄 Planned (plan exists, not built)
@@ -37,6 +44,10 @@ implemented, tested, and reflected in the architecture/task status documents.
 - PostgreSQL is the system of record for structured metadata; immutable binary
   artifacts live behind `StorageAdapter` with explicit lineage and checksums
   (ADR-006).
+- Prepared HLS packages are storage-backed artifacts, not direct client contracts.
+  Playback of `.m3u8` manifests and segments must go through the `S-125` backend
+  delivery boundary with readiness, authorization, expiry, and publication gates
+  enforced fail-closed (ADR-032).
 - Rights are a mandatory fail-closed precondition for every intake mode and every
   downstream derivative (ADR-008).
 - Runtime configuration is fail-closed and environment-explicit: no environment-
@@ -49,6 +60,10 @@ implemented, tested, and reflected in the architecture/task status documents.
   structured tracing (ADR-018).
 - API caller identity is verified at the Axum boundary; first-party browser access
   may add a session gateway without weakening the protected API (ADR-023, ADR-024).
+  **Superseded by ADR-031 (2026-06-17, S-200):** the directive adopts FenixCRM
+  parity — `apps/api` issues its own HS256 JWT, the gateway becomes a transparent
+  relay, and the mobile device holds the bearer token. ADR-023/ADR-024 are
+  `Superseded by ADR-031`; the inversion is implemented by slice S-200.
 - Every non-upload intake is authorized-only and fail-closed before any bytes move:
   - **Platform download (primary S-090, ADR-025):** the content owner grants scoped
     access to their own platform account; credentials are stored by reference and
@@ -65,7 +80,9 @@ implemented, tested, and reflected in the architecture/task status documents.
 ```text
 S-000 auth -> S-010 ingestion + rights gate -> S-120 media preparation
        -> S-130 ASR -> S-140 subtitles -> S-150 translation + dubbing
-       -> S-170 human review -> S-180 publication
+       -> S-170 human review runtime -> S-180 publication
+
+S-120 prepared HLS -> S-125 playback delivery -> S-170/S-180 playback consumers
 ```
 
 Both intake modes converge on the same ingestion and rights boundary:
@@ -94,29 +111,31 @@ Plan: `docs/plan/h1-governance-atomicity-hardening.md`
 
 | Phase | Name | Depends on | Status | Source |
 |-------|------|------------|--------|--------|
-| **S-000** | API client authentication + principal propagation | — | ✅ done | `docs/plan/s0-api-client-authentication.md` |
+| **S-000** | API client authentication + principal propagation | — | ✅ done — auth model superseded by ADR-031/S-200 (RS256 resource server → in-house HS256 issuer) | `docs/plan/s0-api-client-authentication.md` |
 | **S-010** | Asset ingestion + rights ledger (upload) | S-000-T2 for HTTP endpoints | ✅ done | `docs/plan/s1-asset-ingestion-rights-ledger.md` |
 | **S-020** | Ingestion hardening: pending-upload durability, cleanup, coverage, finalize atomicity, durable audit | S-010 | ✅ done | `docs/plan/tuning-hardening.md`, `docs/plan/h1-governance-atomicity-hardening.md` |
 | **S-030** | Environment separation + deployment runtime wiring | S-000, S-010 | ✅ done — Phase 0 and Phase 1 complete; later env-driven runtime behavior stays deferred to S-080+ | `docs/plan/s-030-environment-separation.md`, `docs/tasks/s-030-environment-separation.md` |
-| **S-040** | First-party session gateway / BFF | S-000, external authorization-server contract | ✅ done — browser/cookie transport and full mobile-safe gateway transport delivered | `docs/plan/s-040-session-gateway-bff.md`, `docs/tasks/s-040-session-gateway-bff.md`, `docs/tasks/s-040-t7-mobile-session-handoff.md` (ADR-024) |
-| **S-050** | First-party mobile client (React Native + Expo) | S-040-T7; S-070 recommended for production device login | ✅ done — T0–T5 complete as of 2026-06-07 | `docs/plan/s-050-mobile-client.md`, `docs/tasks/s-050-mobile-client.md` (ADR-024) |
+| **S-040** | First-party session gateway / BFF | S-000, external authorization-server contract | ✅ done — browser/cookie + mobile-safe gateway transport delivered; transport superseded by ADR-031/S-200 (gateway → transparent relay) | `docs/plan/s-040-session-gateway-bff.md`, `docs/tasks/s-040-session-gateway-bff.md`, `docs/tasks/s-040-t7-mobile-session-handoff.md` (ADR-024 → ADR-031) |
+| **S-050** | First-party mobile client (React Native + Expo) | S-040-T7; S-070 recommended for production device login | ✅ done — T0–T5 complete as of 2026-06-07; auth transport superseded by ADR-031/S-200 (opaque `session_ref` → backend-issued bearer JWT) | `docs/plan/s-050-mobile-client.md`, `docs/tasks/s-050-mobile-client.md` (ADR-024 → ADR-031) |
 | **S-055** | Maestro screenshot / visual-audit suite | S-050 | ✅ done — V1–V8 complete as of 2026-06-12; two-phase Maestro suite captures `01_auth_login` + `02_home`; `npm run screenshots` wired | `docs/plan/s-055-maestro-screenshot-suite.md`, `docs/tasks/s-055-maestro-screenshot-suite.md` |
 | **S-060** | First-party mobile asset lifecycle: `GET /assets`, mobile list, upload→rights→finalize, BDD/Maestro, mock `/api/*` | S-050, S-055 infra, S-010 | ✅ done — T0–T6 + X-P3F-1/X-P3F-2 complete as of 2026-06-12; `GET /assets/{id}` ownership-enforced; `postMultipart` uses `expo-file-system/legacy` uploadAsync; SC-INGEST-1/SC-INGEST-2 Maestro flows complete (6 phases in runner) | `docs/plan/s-060-mobile-asset-lifecycle.md`, `docs/tasks/s-060-mobile-asset-lifecycle.md` |
 | **S-070** | Production identity hardening (JWKS discovery, automatic key rotation, subject mapping if needed) | S-000 | ⬜ no plan yet | ADR-023 |
-| **S-080** | Object storage switchover (MinIO/S3 behind `StorageAdapter`) | S-010-T4 | ✅ done 2026-06-18 — T0-T6 complete; S3-compatible adapter, bounded-memory upload path, orphan reconciliation, and final docs/QA closeout are all delivered. The roadmap-drift gate now follows canonical roadmap evidence paths, so `qa-docs` passes without false positives from unrelated SID mentions. | `docs/plan/s-080-object-storage-switchover.md`, `docs/tasks/s-080-object-storage-switchover.md` |
+| **S-080** | Object storage switchover (MinIO/S3 behind `StorageAdapter`) | S-010-T4 | 🟡 in progress 2026-06-18 — T0-T5d complete and T6 verification/docs sync is complete in the worktree; S3-compatible adapter, bounded-memory upload path, orphan reconciliation, and the drift-gate false-positive fix are all delivered. Final closeout is deferred until the updated `S-080` plan/task evidence is committed, which is the remaining `qa-docs` safeguard. | `docs/plan/s-080-object-storage-switchover.md`, `docs/tasks/s-080-object-storage-switchover.md` |
 | **S-090** | Platform ingest (owner-authorized download: first supported provider) | S-000-T2, S-010, S-020; S-080 prudent before heavy writes | 🟡 REPLANNED 2026-05-31 — foundation T0/T0c/T1/T2 done; S-040/S-070/S-050 done; later connector work deferred | `docs/plan/stream-recording-ingest.md` |
 | **S-095** | Stream recording ingest (RTMP/SRT live capture) | S-090 foundation | ⬜ deferred — built only for live-broadcast clients | `docs/plan/stream-recording-ingest.md` |
 | **S-100** | Collaborative localization workspace: orgs, roles, projects, target languages, org authz, historical web prototype, mobile project surfaces | S-000, S-010, S-040, S-050; coordinates with S-055/S-060 | ✅ done — T0–T7 complete as of 2026-06-12; workspace API, authz, mobile projects, and a historical web prototype delivered. The web artifacts were retired by S-105. | `docs/plan/s-100-collaborative-workspace.md`, `docs/tasks/s-100-collaborative-workspace.md` |
 | **S-105** | Mobile workspace parity and authenticated web-console retirement | S-100, S-050, S-060 | ✅ done — T0–T3 complete 2026-06-13; organization selection, members, target languages, compliance navigation, mobile-only BDD evidence, and web removal delivered | `docs/plan/s-105-mobile-workspace-parity.md`, `docs/tasks/s-105-mobile-workspace-parity.md` |
 | **S-110** | Mobile compliance & consent center: audit/rights viewer, voice-consent ledger, fail-closed TTS precondition | S-105, S-010 audit/rights data | ✅ done — T0–T3, T5, and T6 complete 2026-06-13; T4 web dashboard cancelled and superseded by the complete mobile center; X11 closed at contract level | `docs/plan/s-110-compliance-consent-center.md`, `docs/tasks/s-110-compliance-consent-center.md` |
 | **S-115** | Mobile UX foundation & design-system adoption: theme tokens + primitives, single "ink + teal" palette (ADR-029 mobile surface), safe-area correctness, consistent state/touch/accessibility, behavior- and testID-preserving migration | S-105, S-110 | ✅ done — T0–T5 complete 2026-06-13; design-system (tokens + 7 primitives) + SafeAreaProvider + all 13 screens migrated; a11y pass + Maestro syntax valid; 10 suites / 117 tests green | `docs/plan/s-115-mobile-ux-foundation.md`, `docs/tasks/s-115-mobile-ux-foundation.md` |
-| **S-120** | Media preparation (ffprobe metadata + HLS transcode) | S-010, S-080 | ⬜ no plan yet | — |
+| **S-120** | Media preparation (ffprobe metadata + HLS transcode) | S-010, S-080 | 📄 Planned 2026-06-18 — plan/task ledger created; implementation remains gated behind `S-080` closeout and per-task approval | `docs/plan/s-120-media-preparation.md`, `docs/tasks/s-120-media-preparation.md` |
+| **S-125** | HLS playback delivery (authorized `.m3u8` + segment serving) | S-120, S-080, S-160 review/publication gate contract | ⬜ no plan yet — ADR-032 created; must define playback grants, manifest rewriting or signed URLs, readiness gates, and review/publication policy integration | ADR-032 |
 | **S-130** | Processing / ASR (transcription) | S-100 target-language intent, S-120 | ⬜ worker contract only | `workers/asr-worker-py` |
 | **S-140** | Subtitle generation | S-130 | ⬜ no plan yet | — |
 | **S-150** | Translation + dubbing (TTS / voice cloning) | S-140, S-110 consent precondition | ⬜ worker contracts only | `workers/translation-worker-py`, `workers/tts-worker-py` |
 | **S-160** | Human review & publication workspace: review tasks, decisions, publication gate, notifications, complete mobile surface | S-105, S-115; forward-integrates S-140/S-150 derived artifacts | ✅ done 2026-06-13 — T0–T8 complete; review schema/domain/repo/gate/API (T0–T3), notifications (T4a–T4d), complete mobile reviewer surface + push (T6), S-115 design-system hardening (T7), E2E fixtures + Maestro + docs sync (T8) | `docs/plan/s-160-review-publication-workspace.md`, `docs/tasks/s-160-review-publication-workspace.md` |
-| **S-170** | Human review runtime (HITL execution over generated artifacts) | S-140, S-150, S-160 | ⬜ no plan yet | — |
-| **S-180** | Publication runtime | S-170, S-160 publication gate | ⬜ no plan yet | — |
+| **S-170** | Human review runtime (HITL execution over generated artifacts) | S-125, S-140, S-150, S-160 | ⬜ no plan yet | — |
+| **S-180** | Publication runtime | S-125, S-170, S-160 publication gate | ⬜ no plan yet | — |
+| **S-200** | Mobile credential login with backend-issued JWT (FenixCRM parity) | S-000, S-040, S-050 (re-architects their auth) | ✅ done 2026-06-18 — T0–T7 complete; ADR-031 Accepted; HS256 issuer + alg pinning (T1), user_account migration + repo (T2), bcrypt + AuthService (T3), apps/api auth handlers (T4), gateway relay (T5), mobile bearer auth runtime (T6), BDD + Maestro + docs sync (T7) | `docs/plan/s-200-mobile-jwt-credential-auth.md`, `docs/tasks/s-200-mobile-jwt-credential-auth.md` (ADR-031) |
 
 `S-040` must be planned before building a first-party browser, operator-console, or
 mobile auth flow. It does not block S-080 or S-090.
@@ -128,8 +147,10 @@ product UI (ADR-029) and retires the historical web prototype. `S-110` is intent
 placed before `S-150` because TTS/dubbing must fail closed without voice consent.
 `S-160` can be built against fixtures before `S-140/S-150` land, but its canonical
 runtime role is to supply the review/publication gate that `S-170/S-180` adopt.
+`S-125` supplies the shared HLS playback-delivery boundary those runtime slices use
+for review preview and publication playback; it is not a public web/player UI.
 These product-layer phases introduced architecture decisions that are now captured
-by ADR-027, ADR-028, ADR-029, and ADR-030.
+by ADR-027, ADR-028, ADR-029, ADR-030, and ADR-032.
 
 `S-050` (mobile) is a first-party interactive client and therefore a hard consumer of
 the `S-040` gateway (ADR-024): the device must terminate in the same session-gateway
@@ -309,6 +330,7 @@ S-095 — live recorder (DEFERRED): ex-T3 recorder crate, ex-T4 jobs/storage,
 | **X-S-100-4** | Configure external authorization server to issue `workspaces:write` and `workspaces:read` scopes; tests currently stub the verifier | open — required before workspace endpoints are usable in production deployment |
 | **X23** | Define the review/decision/publication gate model: append-only decision ledger, fail-closed publication precondition (ADR-008 spirit), S-140/S-150 artifact contract | ✅ closed by ADR-030 (S-160-T0b, 2026-06-13); S-160-T1a/T1b/T1c/T2 consume it |
 | **X24** | Define the voice-consent ledger and TTS precondition: append-only consent rows, evidence stored by reference (ADR-025 spirit), fail-closed gate before any TTS derivative; closes **X11** at the contract level | ✅ closed by ADR-028 (S-110-T0b, 2026-06-12); S-110-T1/T2 implemented it; `S-150` will enforce it |
+| **X25** | Define and implement HLS playback delivery for prepared `.m3u8` manifests and segments without exposing raw object-store keys | ADR-032 created; implement as `S-125` before S-170/S-180 runtime consumers |
 
 ## Known planning gaps
 
@@ -326,9 +348,13 @@ S-095 — live recorder (DEFERRED): ex-T3 recorder crate, ex-T4 jobs/storage,
 - The owner-credential secrets-store mechanism (X20) has no dedicated ADR yet and
   must be decided during `S-090-C1`–`S-090-C6`; `S-030` establishes the config/secret
   split it plugs into.
-- `S-120` and `S-070` need plan/task ledgers before execution. `S-030` now has
-  `docs/plan/s-030-environment-separation.md` + `docs/tasks/s-030-environment-separation.md`
-  with its current Phase 0 / Phase 1 scope complete. `S-040` now has
+- `S-070` still needs plan/task ledgers before execution. `S-120` now has
+  `docs/plan/s-120-media-preparation.md` + `docs/tasks/s-120-media-preparation.md`.
+  `S-125` is now created as an ADR-backed roadmap phase for HLS playback delivery,
+  but still needs plan/task ledgers before execution.
+  `S-030` now has `docs/plan/s-030-environment-separation.md` +
+  `docs/tasks/s-030-environment-separation.md` with its current Phase 0 / Phase 1
+  scope complete. `S-040` now has
   `docs/plan/s-040-session-gateway-bff.md` + `docs/tasks/s-040-session-gateway-bff.md`
   (complete). `S-080` must include the object-store adapter, storage-key
   ownership, orphan reconciliation, and upload memory-safety strategy.
@@ -349,3 +375,14 @@ S-095 — live recorder (DEFERRED): ex-T3 recorder crate, ex-T4 jobs/storage,
   - **X-S-160-2:** ✅ closed 2026-06-13 (S-160-T8). E2E mock-gateway review/notification fixtures and Maestro review flow (`mobile/maestro/review.yaml`) authored and passing. BDD mapping rows (SC-REVIEW-1/2/3, SC-PUBLISH-1/2, SC-NOTIFY-1) closed with executable evidence.
   - **X-S-160-3:** open — S-160 operates on fixtures (`asset-seed-1`, `project-seed-1`). Once S-140/S-150 derived artifacts land, review tasks must be created against real derived-asset identities. Gate: S-140 or S-150 delivery.
   - **X24 → X-S-110-1:** ✅ closed by ADR-028 (S-110-T0b). Voice-consent ledger + TTS fail-closed precondition fixed before S-110 implementation.
+- **S-200 mobile auth re-architecture (planned 2026-06-17, ADR-031 Proposed).** A
+  platform directive adapts mobile auth to the FenixCRM reference flow at full
+  fidelity: `apps/api` issues its own HS256 JWT, the gateway becomes a transparent
+  relay, and the device stores the token directly. This **inverts** ADR-023
+  (resource-server-only, RS256) and ADR-024 (no token on device, opaque session) and
+  amends ADR-029 (transport only). It is a deliberate, directive-driven security
+  downgrade with the accepted regressions recorded in ADR-031 §Risk analysis. The
+  initiative RRI is 109 (Excessive), so only the ADR + risk + decomposition package
+  exists today; ADR-031 acceptance (S-200-T0) and every code task require explicit
+  approval. Recommended hardening X-S-200-1 (RS256) and X-S-200-2 (revocation) remain
+  open.

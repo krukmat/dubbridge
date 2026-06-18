@@ -1,3 +1,9 @@
+---
+type: ADR
+title: "ADR-022: Source protocol support (RTMP + SRT) and ingest authentication"
+status: Proposed
+---
+
 # ADR-022: Source protocol support (RTMP + SRT) and ingest authentication
 
 - **Status:** Proposed — **scope narrowed to the S3b live-recording sub-case

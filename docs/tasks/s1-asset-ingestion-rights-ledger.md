@@ -1,3 +1,11 @@
+---
+type: TaskList
+title: "Tasks: S1 Asset Ingestion with Rights Ledger"
+status: closed
+slice: S-001
+plan: docs/plan/s1-asset-ingestion-rights-ledger.md
+governed_by: [ADR-006, ADR-008, ADR-018]
+---
 # Tasks: S1 Asset Ingestion with Rights Ledger
 
 ## Status Legend

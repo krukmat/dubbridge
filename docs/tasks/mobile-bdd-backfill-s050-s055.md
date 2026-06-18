@@ -1,3 +1,9 @@
+---
+type: TaskList
+title: "Tasks: Mobile BDD Backfill for S-050 and S-055"
+status: closed
+plan: docs/plan/mobile-bdd-backfill-s050-s055.md
+---
 # Tasks: Mobile BDD Backfill for S-050 and S-055
 
 **Plan:** `docs/plan/mobile-bdd-backfill-s050-s055.md`

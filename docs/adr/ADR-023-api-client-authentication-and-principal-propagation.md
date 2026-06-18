@@ -1,8 +1,23 @@
+---
+type: ADR
+title: "ADR-023: API client authentication and principal propagation"
+status: Superseded
+superseded_by: ADR-031
+---
+
 # ADR-023: API client authentication and principal propagation
 
-- **Status:** Accepted
-- **Date:** 2026-05-31
+- **Status:** Superseded by ADR-031
+- **Date:** 2026-05-31 (accepted); 2026-06-17 (superseded, S-200-T0)
 - **Deciders:** DubBridge platform team
+
+> **Superseded by [ADR-031](ADR-031-mobile-jwt-credential-auth-fenix-parity.md)
+> (2026-06-17, S-200-T0).** The resource-server-only boundary and RS256 asymmetric
+> verification decided here are replaced by in-house credential login and
+> backend-issued HS256 tokens. This ADR is retained as the auditable record of the
+> prior decision; its RS256 key-separation property is preserved only as the
+> recommended hardening X-S-200-1. Until the S-200 implementation tasks land, the
+> code described here remains in force in the tree.
 
 ## Context
 

@@ -1,3 +1,8 @@
+---
+type: Prompt
+title: "Prompt: Medium Article on RRI (Required Reasoning Index)"
+---
+
 # Prompt: Medium Article on RRI (Required Reasoning Index)
 
 **Target model:** `gemma4:12b-it-q4_K_M`

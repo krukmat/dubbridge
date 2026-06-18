@@ -45,6 +45,10 @@ pub enum AuditEventKind {
     ReviewRejected,
     PublicationSucceeded,
     PublicationRefused,
+    // S-200-T4c: auth governance events for API-issued credential login (ADR-018, ADR-031).
+    AuthLoginSucceeded,
+    AuthLoginFailed,
+    AuthRegistered,
 }
 
 impl std::fmt::Display for AuditEventKind {
@@ -78,6 +82,9 @@ impl std::fmt::Display for AuditEventKind {
             Self::ReviewRejected => "review_rejected",
             Self::PublicationSucceeded => "publication_succeeded",
             Self::PublicationRefused => "publication_refused",
+            Self::AuthLoginSucceeded => "auth_login_succeeded",
+            Self::AuthLoginFailed => "auth_login_failed",
+            Self::AuthRegistered => "auth_registered",
         };
         write!(f, "{s}")
     }
@@ -201,6 +208,20 @@ impl AuditEvent {
         Self {
             id: Uuid::new_v4(),
             asset_id: Some(asset_id),
+            event_kind,
+            ingest_token: None,
+            recording_session_id: None,
+            platform_ingest_session_id: None,
+            detail,
+            happened_at: OffsetDateTime::now_utc(),
+        }
+    }
+
+    /// Constructor for S-200 auth governance events.
+    pub fn new_auth_event(event_kind: AuditEventKind, detail: Option<String>) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            asset_id: None,
             event_kind,
             ingest_token: None,
             recording_session_id: None,
@@ -404,6 +425,18 @@ mod tests {
             AuditEventKind::PublicationRefused.to_string(),
             "publication_refused"
         );
+        assert_eq!(
+            AuditEventKind::AuthLoginSucceeded.to_string(),
+            "auth_login_succeeded"
+        );
+        assert_eq!(
+            AuditEventKind::AuthLoginFailed.to_string(),
+            "auth_login_failed"
+        );
+        assert_eq!(
+            AuditEventKind::AuthRegistered.to_string(),
+            "auth_registered"
+        );
     }
 
     #[test]
@@ -438,5 +471,20 @@ mod tests {
         assert!(event.platform_ingest_session_id.is_none());
         assert_eq!(event.event_kind, AuditEventKind::ReviewApproved);
         assert_eq!(event.detail.as_deref(), Some("review_task_id=demo"));
+    }
+
+    #[test]
+    fn new_auth_event_sets_no_correlation_ids() {
+        let event = AuditEvent::new_auth_event(
+            AuditEventKind::AuthLoginFailed,
+            Some("email=owner@example.com".to_string()),
+        );
+
+        assert!(event.asset_id.is_none());
+        assert!(event.ingest_token.is_none());
+        assert!(event.recording_session_id.is_none());
+        assert!(event.platform_ingest_session_id.is_none());
+        assert_eq!(event.event_kind, AuditEventKind::AuthLoginFailed);
+        assert_eq!(event.detail.as_deref(), Some("email=owner@example.com"));
     }
 }

@@ -1,3 +1,10 @@
+---
+type: Plan
+title: "Plan: S0 API Client Authentication"
+status: closed
+slice: S-000
+governed_by: [ADR-023]
+---
 # Plan: S0 API Client Authentication
 
 **Roadmap position:** Foundation slice **S0** — execute before S1 Task 5, the first

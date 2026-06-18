@@ -1,3 +1,8 @@
+---
+type: Plan
+title: "Plan: Mobile BDD Backfill for S-050 and S-055"
+status: closed
+---
 # Plan: Mobile BDD Backfill for S-050 and S-055
 
 > **Status:** Planned. Authored 2026-06-12.

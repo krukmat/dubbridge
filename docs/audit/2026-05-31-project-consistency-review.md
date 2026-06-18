@@ -1,3 +1,9 @@
+---
+type: Audit
+title: "Project Consistency Review — 2026-05-31"
+date: 2026-05-31
+---
+
 # Project Consistency Review — 2026-05-31
 
 Scope: full-repository review requested before approving the Stream Recording

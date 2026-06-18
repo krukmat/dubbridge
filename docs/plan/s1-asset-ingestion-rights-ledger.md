@@ -1,3 +1,10 @@
+---
+type: Plan
+title: "Plan: S1 Asset Ingestion with Rights Ledger"
+status: closed
+slice: S-001
+governed_by: [ADR-006, ADR-008, ADR-018]
+---
 # Plan: S1 Asset Ingestion with Rights Ledger
 
 ## Objective

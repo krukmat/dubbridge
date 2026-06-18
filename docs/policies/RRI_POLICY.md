@@ -1,3 +1,9 @@
+---
+type: Policy
+title: "Required Reasoning Index (RRI) Policy"
+governs: "task complexity scoring and model selection"
+---
+
 # Required Reasoning Index (RRI) Policy
 
 > **Status:** Active. Adopted by `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` as the

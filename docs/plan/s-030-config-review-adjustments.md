@@ -1,3 +1,10 @@
+---
+type: Plan
+title: "Adjustment Plan: S-030 Configuration Review — Pre-Implementation Findings"
+status: closed
+slice: S-030
+governed_by: [ADR-026]
+---
 # Adjustment Plan: S-030 Configuration Review — Pre-Implementation Findings
 
 ## Purpose

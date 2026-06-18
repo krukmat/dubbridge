@@ -1,0 +1,47 @@
+appId: com.dubbridge.mobile
+name: S-200 Credential Login (Bearer JWT)
+tags:
+  - android
+  - s-200
+  - auth
+---
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: login-screen
+    timeout: 20000
+
+- assertVisible:
+    id: login-screen
+
+- takeScreenshot: 01_login_screen
+
+# Enter credentials
+- tapOn:
+    id: email-input
+- typeText: test@dubbridge.dev
+
+- tapOn:
+    id: password-input
+- typeText: testpassword123
+
+- takeScreenshot: 02_credentials_entered
+
+- tapOn:
+    id: login-button
+
+# Wait for home surface after token issuance
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 15000
+
+- assertVisible:
+    id: home-screen
+
+- assertNotVisible:
+    id: login-screen
+
+- takeScreenshot: 03_authenticated_home

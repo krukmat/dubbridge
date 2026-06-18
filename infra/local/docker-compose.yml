@@ -30,14 +30,6 @@ services:
     volumes:
       - minio-data:/data
 
-  minio-init:
-    image: minio/mc:latest
-    depends_on:
-      - minio
-    command: >
-      sh -c "until mc alias set local http://minio:9000 dubbridge dubbridge123; do sleep 1; done;
-      mc mb --ignore-existing local/dubbridge-local"
-
   api:
     image: rust:stable
     profiles: ["app"]
@@ -50,15 +42,10 @@ services:
       DUBBRIDGE_ENV: local
       DUBBRIDGE_DATABASE_URL: postgres://dubbridge:dubbridge@postgres:5432/dubbridge
       DUBBRIDGE_REDIS_URL: redis://redis:6379
-      DUBBRIDGE_STORAGE__BACKEND: ${DUBBRIDGE_STORAGE_BACKEND:-local_fs}
       DUBBRIDGE_STORAGE_BASE_PATH: /tmp/dubbridge-storage
       DUBBRIDGE_STORAGE_BUCKET: dubbridge-local
       DUBBRIDGE_STORAGE__BASE_PATH: /tmp/dubbridge-storage
       DUBBRIDGE_STORAGE__BUCKET: dubbridge-local
-      DUBBRIDGE_STORAGE__ENDPOINT_URL: ${DUBBRIDGE_STORAGE_ENDPOINT_URL:-http://minio:9000}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-dubbridge}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-dubbridge123}
-      AWS_REGION: ${AWS_REGION:-us-east-1}
       DUBBRIDGE_CONFIG_DIR: /workspace/config
       DUBBRIDGE_AUTH__ISSUER: ${DUBBRIDGE_AUTH_ISSUER:-}
       DUBBRIDGE_AUTH__AUDIENCE: ${DUBBRIDGE_AUTH_AUDIENCE:-}
@@ -67,12 +54,9 @@ services:
     volumes:
       - ../..:/workspace
     depends_on:
-      postgres:
-        condition: service_started
-      redis:
-        condition: service_started
-      minio-init:
-        condition: service_completed_successfully
+      - postgres
+      - redis
+      - minio
 
   worker-runner:
     image: rust:stable
@@ -86,25 +70,17 @@ services:
       DUBBRIDGE_ENV: local
       DUBBRIDGE_DATABASE_URL: postgres://dubbridge:dubbridge@postgres:5432/dubbridge
       DUBBRIDGE_REDIS_URL: redis://redis:6379
-      DUBBRIDGE_STORAGE__BACKEND: ${DUBBRIDGE_STORAGE_BACKEND:-local_fs}
       DUBBRIDGE_STORAGE_BASE_PATH: /tmp/dubbridge-storage
       DUBBRIDGE_STORAGE_BUCKET: dubbridge-local
       DUBBRIDGE_STORAGE__BASE_PATH: /tmp/dubbridge-storage
       DUBBRIDGE_STORAGE__BUCKET: dubbridge-local
-      DUBBRIDGE_STORAGE__ENDPOINT_URL: ${DUBBRIDGE_STORAGE_ENDPOINT_URL:-http://minio:9000}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-dubbridge}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-dubbridge123}
-      AWS_REGION: ${AWS_REGION:-us-east-1}
       DUBBRIDGE_CONFIG_DIR: /workspace/config
     volumes:
       - ../..:/workspace
     depends_on:
-      postgres:
-        condition: service_started
-      redis:
-        condition: service_started
-      minio-init:
-        condition: service_completed_successfully
+      - postgres
+      - redis
+      - minio
 
   asr-worker-py:
     build:

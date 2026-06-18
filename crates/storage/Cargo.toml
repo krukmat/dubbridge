@@ -6,13 +6,11 @@ license.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-tokio = { workspace = true, features = ["fs", "io-util"] }
+tokio = { workspace = true, features = ["fs"] }
 async-trait = "0.1"
-futures-util = "0.3"
 thiserror = "2.0"
 uuid.workspace = true
 serde = { workspace = true, features = ["derive"] }
-object_store.workspace = true
 dubbridge-config = { path = "../config" }
 
 [dev-dependencies]

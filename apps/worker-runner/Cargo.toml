@@ -12,7 +12,6 @@ tracing.workspace = true
 dubbridge-config = { path = "../../crates/config" }
 dubbridge-jobs = { path = "../../crates/jobs" }
 dubbridge-observability = { path = "../../crates/observability" }
-dubbridge-storage = { path = "../../crates/storage" }
 
 [lints]
 workspace = true

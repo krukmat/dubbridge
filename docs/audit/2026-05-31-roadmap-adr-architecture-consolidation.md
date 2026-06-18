@@ -1,3 +1,9 @@
+---
+type: Audit
+title: "Roadmap / ADR / Architecture Consolidation Review — 2026-05-31"
+date: 2026-05-31
+---
+
 # Roadmap / ADR / Architecture Consolidation Review — 2026-05-31
 
 ## Scope

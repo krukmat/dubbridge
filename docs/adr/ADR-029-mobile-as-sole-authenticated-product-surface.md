@@ -1,9 +1,23 @@
+---
+type: ADR
+title: "ADR-029: Mobile as the sole authenticated product surface"
+status: Accepted
+---
+
 # ADR-029: Mobile as the sole authenticated product surface
 
-- **Status:** Accepted
-- **Date:** 2026-06-13
+- **Status:** Accepted (transport amended by ADR-031)
+- **Date:** 2026-06-13; 2026-06-17 (transport amended, S-200-T0)
 - **Deciders:** DubBridge platform team
 - **Closes:** S-105 surface-consolidation decision
+
+> **Amended by [ADR-031](ADR-031-mobile-jwt-credential-auth-fenix-parity.md)
+> (2026-06-17, S-200-T0).** This ADR's product-surface decision is unchanged: mobile
+> remains the sole authenticated first-party UI, and UI visibility is never an
+> authorization boundary. What changes is the **transport**: ADR-031 supersedes
+> ADR-024, so mobile carries a backend-issued bearer JWT instead of an opaque
+> gateway session. Read every reference to "ADR-024 session gateway / opaque
+> session" below as superseded by ADR-031.
 
 ## Context
 

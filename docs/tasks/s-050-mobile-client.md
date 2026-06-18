@@ -1,3 +1,10 @@
+---
+type: TaskList
+title: "Tasks: S-050 - First-party Mobile Client (React Native + Expo)"
+status: closed
+slice: S-050
+plan: docs/plan/s-050-mobile-client.md
+---
 # Tasks: S-050 - First-party Mobile Client (React Native + Expo)
 
 **Plan:** `docs/plan/s-050-mobile-client.md`

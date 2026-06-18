@@ -1,16 +1,12 @@
-import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react-native";
-import { makeRedirectUri } from "expo-auth-session";
-import * as WebBrowser from "expo-web-browser";
-import { Linking } from "react-native";
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 
 import { createGatewayClient } from "../src/api/client";
 import { RootNavigator } from "../src/navigation/RootNavigator";
 import {
-  clearSessionRef,
-  isJwtLike,
-  loadSessionRef,
-  saveSessionRef,
-  updateSessionRef,
+  clearAuthSession,
+  loadAuthSession,
+  saveAuthSession,
+  type AuthSession,
 } from "../src/auth/session";
 
 (
@@ -36,55 +32,51 @@ jest.mock("expo-constants", () => ({
 }));
 
 jest.mock("../src/auth/session", () => ({
-  loadSessionRef: jest.fn(),
-  saveSessionRef: jest.fn(),
-  clearSessionRef: jest.fn(),
-  updateSessionRef: jest.fn(),
-  isJwtLike: jest.fn(),
+  loadAuthSession: jest.fn(),
+  saveAuthSession: jest.fn(),
+  clearAuthSession: jest.fn(),
 }));
 
 jest.mock("../src/api/client", () => ({
   createGatewayClient: jest.fn(),
 }));
 
-jest.mock("expo-auth-session", () => ({
-  makeRedirectUri: jest.fn(),
-}));
-
-jest.mock("expo-web-browser", () => ({
-  openAuthSessionAsync: jest.fn(),
-}));
-
 jest.mock("../src/push/registerPush", () => ({
   registerPush: jest.fn().mockResolvedValue(undefined),
 }));
 
-const mockLoadSessionRef = loadSessionRef as jest.MockedFunction<typeof loadSessionRef>;
-const mockSaveSessionRef = saveSessionRef as jest.MockedFunction<typeof saveSessionRef>;
-const mockClearSessionRef = clearSessionRef as jest.MockedFunction<typeof clearSessionRef>;
-const mockUpdateSessionRef =
-  updateSessionRef as jest.MockedFunction<typeof updateSessionRef>;
-const mockIsJwtLike = isJwtLike as jest.MockedFunction<typeof isJwtLike>;
+jest.mock("expo-notifications", () => ({
+  addNotificationResponseReceivedListener: jest.fn(() => ({
+    remove: jest.fn(),
+  })),
+}));
+
+const mockLoadAuthSession =
+  loadAuthSession as jest.MockedFunction<typeof loadAuthSession>;
+const mockSaveAuthSession =
+  saveAuthSession as jest.MockedFunction<typeof saveAuthSession>;
+const mockClearAuthSession =
+  clearAuthSession as jest.MockedFunction<typeof clearAuthSession>;
 const mockCreateGatewayClient =
   createGatewayClient as jest.MockedFunction<typeof createGatewayClient>;
-const mockMakeRedirectUri = makeRedirectUri as jest.MockedFunction<typeof makeRedirectUri>;
-const mockOpenAuthSessionAsync =
-  WebBrowser.openAuthSessionAsync as jest.MockedFunction<
-    typeof WebBrowser.openAuthSessionAsync
-  >;
-const mockLinkingGetInitialURL = jest.spyOn(Linking, "getInitialURL");
-const mockLinkingAddEventListener = jest.spyOn(Linking, "addEventListener");
 
-const REDIRECT_URI = "dubbridge://auth/callback";
-const OPAQUE_REF = "opaque-session-abc123";
-const HANDOFF_CODE = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNO12345";
-const JWT_LIKE =
-  "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.SomeSignatureValue";
-const originalE2EEnabled = process.env.EXPO_PUBLIC_E2E_ENABLED;
+const LOGIN_SESSION: AuthSession = {
+  token: "token-abc",
+  userId: "user-123",
+  workspaceId: "workspace-456",
+};
+
+const ASSET_SUMMARY = {
+  id: "asset-123",
+  title: "Test Video",
+  uploader_id: "user-123",
+  status: "finalized",
+  created_at: "2026-06-07T10:00:00Z",
+  updated_at: "2026-06-07T10:05:00Z",
+};
 
 describe("mobile auth flow integration", () => {
   beforeEach(() => {
-    cleanup();
     jest.clearAllMocks();
 
     mockExtra = {
@@ -92,23 +84,9 @@ describe("mobile auth flow integration", () => {
       gatewayBaseUrl: "http://127.0.0.1:4000",
     };
 
-    mockLoadSessionRef.mockResolvedValue(null);
-    mockSaveSessionRef.mockResolvedValue(undefined);
-    mockClearSessionRef.mockResolvedValue(undefined);
-    mockUpdateSessionRef.mockResolvedValue(undefined);
-    mockIsJwtLike.mockImplementation((value: string) => value === JWT_LIKE);
-    mockMakeRedirectUri.mockReturnValue(REDIRECT_URI);
-    mockOpenAuthSessionAsync.mockResolvedValue({
-      type: "success",
-      url: `${REDIRECT_URI}?handoff_code=${HANDOFF_CODE}`,
-    } as Awaited<ReturnType<typeof WebBrowser.openAuthSessionAsync>>);
-    mockLinkingGetInitialURL.mockResolvedValue(null);
-    mockLinkingAddEventListener.mockImplementation(
-      () =>
-        ({
-          remove: jest.fn(),
-        }) as unknown as ReturnType<typeof Linking.addEventListener>,
-    );
+    mockLoadAuthSession.mockResolvedValue(null);
+    mockSaveAuthSession.mockResolvedValue(undefined);
+    mockClearAuthSession.mockResolvedValue(undefined);
 
     const mockClient = {
       get: jest
@@ -116,30 +94,14 @@ describe("mobile auth flow integration", () => {
         .mockResolvedValueOnce({
           ok: true,
           value: {
-            data: [
-              {
-                id: "asset-123",
-                title: "Test Video",
-                uploader_id: "user-123",
-                status: "finalized",
-                created_at: "2026-06-07T10:00:00Z",
-                updated_at: "2026-06-07T10:05:00Z",
-              },
-            ],
+            data: [ASSET_SUMMARY],
             sessionRotation: null,
           },
         })
         .mockResolvedValueOnce({
           ok: true,
           value: {
-            data: {
-              id: "asset-123",
-              title: "Test Video",
-              uploader_id: "user-123",
-              status: "finalized",
-              created_at: "2026-06-07T10:00:00Z",
-              updated_at: "2026-06-07T10:05:00Z",
-            },
+            data: ASSET_SUMMARY,
             sessionRotation: null,
           },
         }),
@@ -148,9 +110,7 @@ describe("mobile auth flow integration", () => {
         .mockResolvedValueOnce({
           ok: true,
           value: {
-            data: {
-              session_ref: OPAQUE_REF,
-            },
+            data: LOGIN_SESSION,
             sessionRotation: null,
           },
         })
@@ -161,6 +121,7 @@ describe("mobile auth flow integration", () => {
             sessionRotation: null,
           },
         }),
+      postMultipart: jest.fn(),
     };
 
     mockCreateGatewayClient.mockReturnValue(
@@ -168,72 +129,60 @@ describe("mobile auth flow integration", () => {
     );
   });
 
-  afterEach(() => {
-    cleanup();
-    mockExtra = {};
-    if (originalE2EEnabled === undefined) {
-      delete process.env.EXPO_PUBLIC_E2E_ENABLED;
-    } else {
-      process.env.EXPO_PUBLIC_E2E_ENABLED = originalE2EEnabled;
-    }
-  });
+  it("HP-1 + HP-2 + EC-1: bearer login reaches home and asset detail without any browser handoff", async () => {
+    const view = await render(<RootNavigator />);
 
-  describe("T5 HP-1: full mobile login to asset detail flow stays green against the stub", () => {
-    it("signs in through the gateway, opens the asset list, and renders asset detail", async () => {
-      const view = await render(<RootNavigator />);
-
-      await waitFor(() => {
-        expect(view.getByText("Sign in")).toBeTruthy();
-      });
-
-      await act(async () => {
-        fireEvent.press(view.getByText("Sign in"));
-      });
-
-      await waitFor(() => {
-        expect(view.getByText("Your workspace")).toBeTruthy();
-      });
-
-      expect(mockSaveSessionRef).toHaveBeenCalledWith(OPAQUE_REF);
-      expect(mockSaveSessionRef).not.toHaveBeenCalledWith(JWT_LIKE);
-      expect(view.queryByText(OPAQUE_REF)).toBeNull();
-      expect(view.queryByText(JWT_LIKE)).toBeNull();
-
-      await act(async () => {
-        fireEvent.press(view.getByText("Browse assets"));
-      });
-
-      await waitFor(() => {
-        expect(view.getByText("Asset list")).toBeTruthy();
-        expect(view.getByText("Test Video")).toBeTruthy();
-      });
-
-      await act(async () => {
-        fireEvent.press(view.getByText("Test Video"));
-      });
-
-      await waitFor(() => {
-        expect(view.getByText("Asset detail")).toBeTruthy();
-        expect(view.getByText("Compliance and consent")).toBeTruthy();
-      });
+    await waitFor(() => {
+      expect(view.getByTestId("login-email-input")).toBeTruthy();
     });
-  });
 
-  describe("V5 HP-1: root navigator enters the authed tree from an inbound handoff deep link", () => {
-    it("boots directly to the home screen when E2E bootstrap is enabled", async () => {
-      process.env.EXPO_PUBLIC_E2E_ENABLED = "true";
-      mockLinkingGetInitialURL.mockResolvedValueOnce(
-        `${REDIRECT_URI}?handoff_code=${HANDOFF_CODE}`,
-      );
+    await act(async () => {
+      fireEvent.changeText(view.getByTestId("login-email-input"), "user@example.com");
+      fireEvent.changeText(view.getByTestId("login-password-input"), "password-123456");
+    });
 
-      const view = await render(<RootNavigator />);
+    await waitFor(() => {
+      expect(view.getByTestId("login-submit-button").props.accessibilityState.disabled).toBe(false);
+    });
 
-      await waitFor(() => {
-        expect(view.getByText("Your workspace")).toBeTruthy();
-      });
+    await act(async () => {
+      fireEvent.press(view.getByTestId("login-submit-button"));
+    });
 
-      expect(mockSaveSessionRef).toHaveBeenCalledWith(OPAQUE_REF);
+    await waitFor(() => {
       expect(view.getByTestId("home-screen")).toBeTruthy();
+    });
+
+    expect(mockSaveAuthSession).toHaveBeenCalledWith(LOGIN_SESSION);
+
+    const mockClient = mockCreateGatewayClient.mock.results[0]?.value as {
+      post: jest.Mock;
+    };
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/auth/login",
+      null,
+      {
+        email: "user@example.com",
+        password: "password-123456",
+      },
+    );
+
+    await act(async () => {
+      fireEvent.press(view.getByText("Browse assets"));
+    });
+
+    await waitFor(() => {
+      expect(view.getByTestId("asset-list-screen")).toBeTruthy();
+      expect(view.getByText("Test Video")).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.press(view.getByText("Test Video"));
+    });
+
+    await waitFor(() => {
+      expect(view.getByTestId("asset-detail-screen")).toBeTruthy();
+      expect(view.getByText("Compliance and consent")).toBeTruthy();
     });
   });
 });

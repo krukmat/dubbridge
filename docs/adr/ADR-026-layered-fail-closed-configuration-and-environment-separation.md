@@ -1,3 +1,9 @@
+---
+type: ADR
+title: "ADR-026: Layered fail-closed configuration and environment separation"
+status: Proposed
+---
+
 # ADR-026: Layered fail-closed configuration and environment separation
 
 - **Status:** Proposed (scope: P0 environment separation)

@@ -1,3 +1,10 @@
+---
+type: TaskList
+title: "Tasks: S-115 — Mobile UX Foundation & Design-System Adoption"
+status: closed
+slice: S-115
+plan: docs/plan/s-115-mobile-ux-foundation.md
+---
 # Tasks: S-115 — Mobile UX Foundation & Design-System Adoption
 
 > **Plan:** `docs/plan/s-115-mobile-ux-foundation.md`

@@ -1,3 +1,10 @@
+---
+type: TaskList
+title: "Tasks: S-055 - Maestro Screenshot / Visual-audit Suite (Mobile)"
+status: closed
+slice: S-055
+plan: docs/plan/s-055-maestro-screenshot-suite.md
+---
 # Tasks: S-055 - Maestro Screenshot / Visual-audit Suite (Mobile)
 
 **Plan:** `docs/plan/s-055-maestro-screenshot-suite.md`

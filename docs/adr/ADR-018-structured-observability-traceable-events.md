@@ -1,3 +1,9 @@
+---
+type: ADR
+title: "ADR-018: Structured observability; every governance event must be traceable"
+status: Accepted
+---
+
 # ADR-018: Structured observability; every governance event must be traceable
 
 - **Status:** Accepted (backfilled from S1 implementation)

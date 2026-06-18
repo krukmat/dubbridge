@@ -1,3 +1,9 @@
+---
+type: TaskList
+title: "Tasks: RRI Multi-Platform Profiles"
+status: closed
+plan: docs/plan/rri-multiplatform-profiles.md
+---
 # Tasks: RRI Multi-Platform Profiles
 
 **Plan:** `docs/plan/rri-multiplatform-profiles.md`

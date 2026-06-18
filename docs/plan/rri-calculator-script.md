@@ -1,3 +1,8 @@
+---
+type: Plan
+title: "Plan: RRI Calculator Script"
+status: closed
+---
 # Plan: RRI Calculator Script
 
 **Roadmap position:** Cross-cutting process tooling. Not a product slice.

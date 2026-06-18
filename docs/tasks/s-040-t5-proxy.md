@@ -1,3 +1,10 @@
+---
+type: TaskList
+title: "Tasks: P1-T5 — Authenticated proxy to `apps/api` with transparent refresh"
+status: closed
+slice: S-040
+plan: docs/plan/s-040-session-gateway-bff.md
+---
 # Tasks: P1-T5 — Authenticated proxy to `apps/api` with transparent refresh
 
 **Parent task:** T5 in `docs/tasks/s-040-session-gateway-bff.md`

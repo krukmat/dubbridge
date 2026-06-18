@@ -30,14 +30,17 @@ Run `make qa-docs` before reporting an ADR change complete.
 | [ADR-020](ADR-020-recording-session-lifecycle-and-segment-model.md) | Recording session lifecycle and segment model | Accepted (scope: S3b live recording) |
 | [ADR-021](ADR-021-recording-to-asset-ingestion-bridge-fail-closed.md) | Intake-to-asset ingestion bridge with fail-closed rights (generalized) | Accepted |
 | [ADR-022](ADR-022-source-protocol-support-and-ingest-authentication.md) | Source protocol support (RTMP + SRT) and ingest authentication | Proposed (scope: S3b live recording) |
-| [ADR-023](ADR-023-api-client-authentication-and-principal-propagation.md) | API client authentication and principal propagation | Accepted |
-| [ADR-024](ADR-024-low-friction-first-party-api-access-via-session-gateway.md) | Low-friction first-party API access via session gateway | Accepted |
+| [ADR-023](ADR-023-api-client-authentication-and-principal-propagation.md) | API client authentication and principal propagation | Superseded by ADR-031 |
+| [ADR-024](ADR-024-low-friction-first-party-api-access-via-session-gateway.md) | Low-friction first-party API access via session gateway | Superseded by ADR-031 |
 | [ADR-025](ADR-025-platform-connector-ingest-and-owner-authorized-credentials.md) | Platform connector ingest and owner-authorized credential model | Proposed (primary S3 intake) |
 | [ADR-026](ADR-026-layered-fail-closed-configuration-and-environment-separation.md) | Layered fail-closed configuration and environment separation | Proposed (scope: P0 environment separation) |
 | [ADR-027](ADR-027-org-membership-authorization.md) | Organization membership authorization | Accepted |
 | [ADR-028](ADR-028-voice-consent-ledger.md) | Voice-consent ledger and fail-closed TTS precondition | Accepted |
 | [ADR-029](ADR-029-mobile-as-sole-authenticated-product-surface.md) | Mobile as the sole authenticated product surface | Accepted |
 | [ADR-030](ADR-030-review-decision-ledger-and-fail-closed-publication-gate.md) | Review-decision ledger and fail-closed publication gate | Accepted |
+| [ADR-031](ADR-031-mobile-jwt-credential-auth-fenix-parity.md) | Mobile credential login with backend-issued JWT (FenixCRM parity) | Accepted (supersedes ADR-023/024; amends ADR-029; slice S-200) |
+| [ADR-032](ADR-032-hls-playback-delivery-boundary.md) | HLS playback delivery boundary | Proposed |
+| [ADR-033](ADR-033-open-knowledge-format-adoption.md) | Adopt the Open Knowledge Format (OKF) for repository knowledge | Accepted |
 
 ## Backfill note
 

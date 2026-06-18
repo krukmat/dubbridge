@@ -1,3 +1,11 @@
+---
+type: TaskList
+title: "Tasks: S-030 - Environment Separation & Fail-Closed Configuration"
+status: closed
+slice: S-030
+plan: docs/plan/s-030-environment-separation.md
+governed_by: [ADR-026]
+---
 # Tasks: S-030 - Environment Separation & Fail-Closed Configuration
 
 Plan: `docs/plan/s-030-environment-separation.md` · ADR: ADR-026 · Roadmap: S-030, X21, X18, X2

@@ -1,3 +1,9 @@
+---
+type: TaskList
+title: "Tasks: T1 Tuning / Hardening"
+status: closed
+plan: docs/plan/tuning-hardening.md
+---
 # Tasks: T1 Tuning / Hardening
 
 Governing plan: `docs/plan/tuning-hardening.md`

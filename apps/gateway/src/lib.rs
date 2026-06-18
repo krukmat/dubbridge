@@ -1,8 +1,5 @@
-pub mod auth; // P1-T2: OAuth client (PKCE, token exchange/refresh) + P1-T4: routes
-pub mod cookie; // P1-T3: hardened session cookie + CSRF helpers
-pub mod cookie_ext; // P1-T5.1: shared cookie extraction + session resolver
-pub mod proxy; // P1-T5.2: token refresh logic + P1-T5.3: HTTP proxy handler
-pub mod session; // P1-T3: server-side session store (ADR-024)
+pub mod auth; // public credential relay routes
+pub mod proxy; // bearer-only HTTP proxy handler
 pub mod state;
 
 use std::sync::Arc;
@@ -53,20 +50,14 @@ mod tests {
     };
     use tower::ServiceExt;
 
-    use crate::{build_app, session::store::InMemorySessionStore, state::GatewayState};
+    use crate::{build_app, state::GatewayState};
 
     #[tokio::test]
     async fn health_endpoints_are_public() {
-        let store = Arc::new(InMemorySessionStore::new());
-        let pending = Arc::new(crate::auth::pending::PendingAuthStore::with_default_ttl());
-        let handoff = Arc::new(crate::auth::handoff::HandoffStore::with_default_ttl());
         let state = Arc::new(GatewayState::new(
             reqwest::Client::new(),
             sample_config(),
             sample_gateway_settings(),
-            store,
-            pending,
-            handoff,
         ));
         let app = build_app(state);
 

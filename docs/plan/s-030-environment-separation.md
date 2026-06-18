@@ -1,3 +1,10 @@
+---
+type: Plan
+title: "Plan: S-030 - Environment Separation & Fail-Closed Configuration"
+status: closed
+slice: S-030
+governed_by: [ADR-026]
+---
 # Plan: S-030 - Environment Separation & Fail-Closed Configuration
 
 ## Objective

@@ -28,6 +28,13 @@ token_url = "http://localhost:9000/oauth/token"
 client_id = "dubbridge-web-local"
 redirect_url = "http://localhost:8081/auth/callback"
 
+[auth]
+issuer = "http://localhost:8080"
+audience = "dubbridge-local"
+rsa_public_key_path = "/dev/null"
+jwt_expiry_hours = 24
+clock_skew_leeway_seconds = 30
+
 [gateway.session]
 cookie_name = "dubbridge_session"
 absolute_ttl_seconds = 28800

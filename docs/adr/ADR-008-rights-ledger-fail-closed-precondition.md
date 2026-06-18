@@ -1,3 +1,9 @@
+---
+type: ADR
+title: "ADR-008: Rights ledger is a mandatory, fail-closed precondition"
+status: Accepted
+---
+
 # ADR-008: Rights ledger is a mandatory, fail-closed precondition
 
 - **Status:** Accepted (backfilled from S1 implementation)

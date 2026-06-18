@@ -1,3 +1,10 @@
+---
+type: Plan
+title: "Plan: S-110 — Compliance & Consent Center"
+status: closed
+slice: S-110
+governed_by: [ADR-028, ADR-008]
+---
 # Plan: S-110 — Compliance & Consent Center
 
 > **Status:** Complete 2026-06-13 — T0–T3, T5, and T6 done; T4 cancelled and

@@ -1,3 +1,10 @@
+---
+type: Plan
+title: "Plan: S-160 — Human Review & Publication Workspace"
+status: closed
+slice: S-160
+governed_by: [ADR-030]
+---
 # Plan: S-160 — Human Review & Publication Workspace
 
 > **Status:** Planned, replanned mobile-only 2026-06-13. `T5` is cancelled; `T6`

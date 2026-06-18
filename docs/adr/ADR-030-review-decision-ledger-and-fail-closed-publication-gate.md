@@ -1,3 +1,9 @@
+---
+type: ADR
+title: "ADR-030: Review-decision ledger and fail-closed publication gate"
+status: Accepted
+---
+
 # ADR-030: Review-decision ledger and fail-closed publication gate
 
 - **Status:** Accepted

@@ -1,3 +1,9 @@
+---
+type: TaskList
+title: "Tasks: Low-RRI Local Model Handoff"
+status: closed
+plan: docs/plan/low-rri-local-model-handoff.md
+---
 # Tasks: Low-RRI Local Model Handoff
 
 **Plan:** `docs/plan/low-rri-local-model-handoff.md`

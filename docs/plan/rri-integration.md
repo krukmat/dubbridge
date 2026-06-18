@@ -1,3 +1,8 @@
+---
+type: Plan
+title: "Plan: RRI Integration — Required Reasoning Index adoption"
+status: closed
+---
 # Plan: RRI Integration — Required Reasoning Index adoption
 
 **Roadmap position:** Cross-cutting process improvement. Not a product slice.

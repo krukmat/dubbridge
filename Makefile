@@ -42,6 +42,10 @@ qa-docs:
 	bash scripts/check-doc-consistency.sh
 	bash scripts/check-task-unit-coverage.sh
 	bash scripts/check-roadmap-drift.sh
+	python3 scripts/check_okf_frontmatter.py
+
+qa-okf-frontmatter:
+	python3 scripts/check_okf_frontmatter.py
 
 qa-rri:
 	python3 scripts/rri_test.py

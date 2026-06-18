@@ -1,3 +1,10 @@
+---
+type: TaskList
+title: "Tasks: S-040-T7 - Mobile-safe Session Handoff / Deep-link Return"
+status: closed
+slice: S-040
+plan: docs/plan/s-040-session-gateway-bff.md
+---
 # Tasks: S-040-T7 - Mobile-safe Session Handoff / Deep-link Return
 
 **Parent task:** `docs/tasks/s-040-session-gateway-bff.md#t7--mobile-safe-session-handoff--deep-link-return`

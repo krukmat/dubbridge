@@ -1,3 +1,9 @@
+---
+type: Policy
+title: "Human-in-the-Loop (HITL) Autonomy Policy"
+governs: "when explicit human approval is required and what autonomy is permitted"
+---
+
 # Human-in-the-Loop (HITL) Autonomy Policy
 
 > **Status:** Scaffold. This policy consolidates the approval and autonomy rules

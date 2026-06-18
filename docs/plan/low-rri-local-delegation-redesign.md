@@ -1,3 +1,8 @@
+---
+type: Plan
+title: "Plan: Low-RRI Local Delegation Redesign"
+status: closed
+---
 # Plan: Low-RRI Local Delegation Redesign
 
 ## Objective

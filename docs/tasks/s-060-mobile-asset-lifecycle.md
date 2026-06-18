@@ -1,3 +1,10 @@
+---
+type: TaskList
+title: "Tasks: S-060 - First-party Mobile Asset Lifecycle (Functional Surface + BDD/Maestro)"
+status: closed
+slice: S-060
+plan: docs/plan/s-060-mobile-asset-lifecycle.md
+---
 # Tasks: S-060 - First-party Mobile Asset Lifecycle (Functional Surface + BDD/Maestro)
 
 **Plan:** `docs/plan/s-060-mobile-asset-lifecycle.md`

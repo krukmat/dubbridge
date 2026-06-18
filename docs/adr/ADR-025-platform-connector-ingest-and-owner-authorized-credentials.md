@@ -1,3 +1,9 @@
+---
+type: ADR
+title: "ADR-025: Platform connector ingest and owner-authorized credential model"
+status: Proposed
+---
+
 # ADR-025: Platform connector ingest and owner-authorized credential model
 
 - **Status:** Proposed

@@ -1,3 +1,11 @@
+---
+type: TaskList
+title: "Tasks: S-160 — Human Review & Publication Workspace"
+status: closed
+slice: S-160
+plan: docs/plan/s-160-review-publication-workspace.md
+governed_by: [ADR-030]
+---
 # Tasks: S-160 — Human Review & Publication Workspace
 
 **Plan:** `docs/plan/s-160-review-publication-workspace.md`

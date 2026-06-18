@@ -1,3 +1,9 @@
+---
+type: ADR
+title: "ADR-027: Organization membership authorization"
+status: Accepted
+---
+
 # ADR-027: Organization membership authorization
 
 - **Status:** Accepted

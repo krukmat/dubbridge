@@ -3,44 +3,18 @@ pub mod adapter;
 pub mod config;
 pub mod error;
 pub mod local;
-pub mod s3;
 
 pub use adapter::StorageAdapter;
 pub use config::StorageConfig;
 pub use error::StorageError;
 pub use local::LocalFsAdapter;
-pub use s3::S3Adapter;
 
-use std::borrow::Cow;
-
-use config::{StorageBackend, StorageConfig as Cfg};
-use uuid::Uuid;
-
-pub const INGESTS_PREFIX: &str = "ingests/";
+use config::StorageConfig as Cfg;
 
 /// Build the appropriate adapter from config.
-pub fn build_adapter(config: &Cfg) -> Result<Box<dyn StorageAdapter>, StorageError> {
-    match config.backend {
-        StorageBackend::LocalFs => Ok(Box::new(LocalFsAdapter::new(&config.base_path))),
-        StorageBackend::S3 => {
-            if config.bucket.trim().is_empty() {
-                return Err(StorageError::Backend(
-                    "storage.bucket is required for s3 backend".to_string(),
-                ));
-            }
-            if let Some(endpoint) = &config.endpoint_url {
-                let endpoint = endpoint.trim();
-                if endpoint.is_empty()
-                    || !(endpoint.starts_with("http://") || endpoint.starts_with("https://"))
-                {
-                    return Err(StorageError::Backend(
-                        "storage.endpoint_url must be an http(s) URL for s3 backend".to_string(),
-                    ));
-                }
-            }
-            Ok(Box::new(S3Adapter::new(config)?))
-        }
-    }
+/// Currently always returns LocalFsAdapter; S2 adds the MinIO/S3 variant.
+pub fn build_adapter(config: &Cfg) -> Box<dyn StorageAdapter> {
+    Box::new(LocalFsAdapter::new(&config.base_path))
 }
 
 // Path helpers — owned by this crate so key layout stays in one place (ADR-006).
@@ -52,28 +26,9 @@ pub fn recording_prefix(session_id: &str) -> String {
     format!("recordings/{session_id}/")
 }
 
-/// Canonical upload key for an ingest session.
-/// `ingests/{token}/{safe_filename}` — callers must not hand-roll this path.
-pub fn ingest_key(token: Uuid, filename: Option<&str>) -> String {
-    let safe = sanitize_filename(filename.unwrap_or("upload.bin"));
-    format!("ingests/{token}/{safe}")
-}
-
-pub(crate) fn sanitize_filename(name: &str) -> Cow<'_, str> {
-    if name.contains('/') || name.contains('\\') {
-        Cow::Owned(name.replace(['/', '\\'], "_"))
-    } else {
-        Cow::Borrowed(name)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Arc;
-
-    use object_store::memory::InMemory;
-    use tempfile::TempDir;
 
     // T1-T3: ADR-006 storage key layout contract
     #[test]
@@ -100,135 +55,5 @@ mod tests {
         assert!(recording_prefix(id).starts_with("recordings/"));
         assert!(recording_prefix(id).contains(id));
         assert!(recording_prefix(id).ends_with('/'));
-    }
-
-    // S-080-T1: ingest_key canonical key contract
-    #[test]
-    fn ingest_key_normal_filename() {
-        let token = Uuid::nil();
-        let key = ingest_key(token, Some("episode.mp4"));
-        assert_eq!(key, format!("ingests/{token}/episode.mp4"));
-    }
-
-    #[test]
-    fn ingest_key_none_filename_defaults() {
-        let token = Uuid::nil();
-        let key = ingest_key(token, None);
-        assert_eq!(key, format!("ingests/{token}/upload.bin"));
-    }
-
-    #[test]
-    fn ingest_key_empty_filename_defaults() {
-        let token = Uuid::nil();
-        let key = ingest_key(token, Some(""));
-        // empty string falls through to unwrap_or("upload.bin") — but empty str is Some,
-        // so sanitize_filename("") returns "" which produces "ingests/{token}/".
-        // Verify determinism: no panic, consistent output.
-        assert!(key.starts_with(&format!("ingests/{token}/")));
-    }
-
-    #[test]
-    fn ingest_key_sanitizes_forward_slash() {
-        let token = Uuid::nil();
-        let key = ingest_key(token, Some("../../etc/passwd"));
-        // slashes are replaced with underscores; dots in filenames are not stripped
-        // because the key is a string prefix, not an OS path — no traversal risk.
-        assert_eq!(key, format!("ingests/{token}/.._.._etc_passwd"));
-        assert!(!key[key.rfind('/').unwrap() + 1..].contains('/'));
-    }
-
-    #[test]
-    fn ingest_key_sanitizes_backslash() {
-        let token = Uuid::nil();
-        let key = ingest_key(token, Some("dir\\file.mp4"));
-        assert_eq!(key, format!("ingests/{token}/dir_file.mp4"));
-    }
-
-    #[test]
-    fn build_adapter_local_fs_returns_file_adapter() {
-        let dir = TempDir::new().unwrap();
-        let config = Cfg {
-            backend: StorageBackend::LocalFs,
-            bucket: "dubbridge-local".to_string(),
-            base_path: dir.path().to_string_lossy().into_owned(),
-            endpoint_url: None,
-        };
-
-        let adapter = build_adapter(&config).unwrap();
-        let url = adapter.object_url("ingests/token/file.mp4");
-
-        assert!(url.starts_with("file://"));
-        assert!(url.contains("ingests/token/file.mp4"));
-    }
-
-    #[test]
-    fn build_adapter_s3_returns_s3_adapter() {
-        let config = Cfg {
-            backend: StorageBackend::S3,
-            bucket: "dubbridge-local".to_string(),
-            base_path: "/tmp/dubbridge-storage".to_string(),
-            endpoint_url: Some("http://localhost:9000".to_string()),
-        };
-
-        let adapter = build_adapter(&config).unwrap();
-
-        assert_eq!(
-            adapter.object_url("ingests/token/file.mp4"),
-            "s3://dubbridge-local/ingests/token/file.mp4"
-        );
-    }
-
-    #[test]
-    fn build_adapter_s3_requires_bucket() {
-        let config = Cfg {
-            backend: StorageBackend::S3,
-            bucket: " ".to_string(),
-            base_path: "/tmp/dubbridge-storage".to_string(),
-            endpoint_url: Some("http://localhost:9000".to_string()),
-        };
-
-        match build_adapter(&config) {
-            Err(StorageError::Backend(message)) => assert!(message.contains("storage.bucket")),
-            Err(err) => panic!("expected StorageError::Backend, got {err:?}"),
-            Ok(_) => panic!("expected s3 adapter construction to fail"),
-        }
-    }
-
-    #[test]
-    fn build_adapter_s3_rejects_invalid_endpoint() {
-        let config = Cfg {
-            backend: StorageBackend::S3,
-            bucket: "dubbridge-local".to_string(),
-            base_path: "/tmp/dubbridge-storage".to_string(),
-            endpoint_url: Some("not-a-url".to_string()),
-        };
-
-        match build_adapter(&config) {
-            Err(StorageError::Backend(_)) => {}
-            Err(err) => panic!("expected StorageError::Backend, got {err:?}"),
-            Ok(_) => panic!("expected s3 adapter construction to fail"),
-        }
-    }
-
-    #[tokio::test]
-    async fn local_fs_and_s3_list_the_same_canonical_ingest_keys() {
-        let dir = TempDir::new().unwrap();
-        let local = LocalFsAdapter::new(dir.path());
-        let s3 = S3Adapter::new_for_tests(Arc::new(InMemory::new()), "test-bucket");
-
-        for key in [
-            "ingests/token-b/zeta.mp4",
-            "ingests/token-a/alpha.mp4",
-            "ingests/token-a/beta.mp4",
-            "assets/other/file.bin",
-        ] {
-            local.put(key, vec![1]).await.unwrap();
-            s3.put(key, vec![1]).await.unwrap();
-        }
-
-        assert_eq!(
-            local.list_keys(INGESTS_PREFIX).await.unwrap(),
-            s3.list_keys(INGESTS_PREFIX).await.unwrap()
-        );
     }
 }

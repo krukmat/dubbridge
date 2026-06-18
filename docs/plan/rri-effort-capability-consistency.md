@@ -1,3 +1,8 @@
+---
+type: Plan
+title: "Plan: RRI ↔ Effort ↔ Capability Consistency"
+status: closed
+---
 # Plan: RRI ↔ Effort ↔ Capability Consistency
 
 Governing guides: `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`, `docs/policies/RRI_POLICY.md`,

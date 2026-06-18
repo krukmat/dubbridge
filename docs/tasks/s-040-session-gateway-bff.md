@@ -1,3 +1,10 @@
+---
+type: TaskList
+title: "Tasks: S-040 - First-party Session Gateway / BFF"
+status: closed
+slice: S-040
+plan: docs/plan/s-040-session-gateway-bff.md
+---
 # Tasks: S-040 - First-party Session Gateway / BFF
 
 **Plan:** `docs/plan/s-040-session-gateway-bff.md`

@@ -1,3 +1,9 @@
+---
+type: Plan
+title: "Plan: S-115 — Mobile UX Foundation & Design-System Adoption"
+status: closed
+slice: S-115
+---
 # Plan: S-115 — Mobile UX Foundation & Design-System Adoption
 
 > **Status:** Proposed. Awaiting approval (2026-06-13).

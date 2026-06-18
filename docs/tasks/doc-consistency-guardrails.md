@@ -1,3 +1,9 @@
+---
+type: TaskList
+title: "Tasks: Documentation Consistency Guardrails"
+status: closed
+plan: docs/plan/doc-consistency-guardrails.md
+---
 # Tasks: Documentation Consistency Guardrails
 
 Governing plan: `docs/plan/doc-consistency-guardrails.md`

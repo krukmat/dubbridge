@@ -1,3 +1,9 @@
+---
+type: Playbook
+title: "Agent Workflow Guide"
+governs: "all agent-facing workflow decisions in the repository"
+---
+
 # Agent Workflow Guide
 
 > **Status:** Authoritative. This guide is the highest-authority source for **all**

@@ -1,3 +1,11 @@
+---
+type: TaskList
+title: "Tasks: Asset Intake — Platform Ingest (primary) + Stream Recording (S3b)"
+status: planned
+slice: S-095
+plan: docs/plan/stream-recording-ingest.md
+governed_by: [ADR-019, ADR-020, ADR-021, ADR-022]
+---
 # Tasks: Asset Intake — Platform Ingest (primary) + Stream Recording (S3b)
 
 > **2026-05-31 REPLAN (S3-REPLAN).** Primary S3 intake is now owner-authorized

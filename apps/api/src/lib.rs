@@ -25,6 +25,7 @@ pub fn build_app(state: Arc<AppState>, verifier: dubbridge_auth::SharedTokenVeri
     Router::new()
         .route("/health/live", get(live))
         .route("/health/ready", get(ready))
+        .merge(routes::auth::router())
         .merge(routes::compliance::router(verifier.clone()))
         .merge(routes::ingestion::router(verifier.clone()))
         .merge(routes::notifications::router(verifier.clone()))

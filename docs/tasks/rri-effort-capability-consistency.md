@@ -1,3 +1,9 @@
+---
+type: TaskList
+title: "Tasks: RRI ↔ Effort ↔ Capability Consistency"
+status: closed
+plan: docs/plan/rri-effort-capability-consistency.md
+---
 # Tasks: RRI ↔ Effort ↔ Capability Consistency
 
 Governing plan: `docs/plan/rri-effort-capability-consistency.md`

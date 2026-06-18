@@ -1,3 +1,10 @@
+---
+type: Plan
+title: "Plan: S-080 — Object Storage Switchover"
+status: closed
+slice: S-080
+governed_by: [ADR-006]
+---
 # Plan: S-080 — Object Storage Switchover
 
 > **Status:** Complete 2026-06-18. Authored 2026-06-17 after roadmap review and

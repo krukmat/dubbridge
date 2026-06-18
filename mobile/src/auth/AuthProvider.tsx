@@ -3,21 +3,15 @@ import {
   type ReactNode,
   useContext,
   useEffect,
-  useRef,
   useState,
 } from "react";
-import Constants from "expo-constants";
-import { makeRedirectUri } from "expo-auth-session";
-import * as WebBrowser from "expo-web-browser";
-import { Linking } from "react-native";
 
 import { createGatewayClient } from "../api/client";
 import {
-  clearSessionRef,
-  isJwtLike,
-  loadSessionRef,
-  saveSessionRef,
-  updateSessionRef,
+  clearAuthSession,
+  loadAuthSession,
+  saveAuthSession,
+  type AuthSession,
 } from "./session";
 import { readRuntimeConfig } from "../config/env";
 
@@ -27,7 +21,7 @@ export type AuthContextValue = {
   sessionRef: string | null;
   status: AuthStatus;
   loginError: string | null;
-  login: () => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   onSessionRotation: (rotation: string | null) => Promise<void>;
 };
@@ -35,7 +29,18 @@ export type AuthContextValue = {
 const missingAuthProviderError =
   "useAuth must be used within an AuthProvider";
 
-const createStubAsync = (): Promise<void> => Promise.resolve();
+const createStubAsync = (_rotation: string | null): Promise<void> =>
+  Promise.resolve();
+
+type GatewayClientBundle = {
+  client: ReturnType<typeof createGatewayClient>;
+};
+
+type AuthSuccessPayload = {
+  token: string;
+  userId: string;
+  workspaceId: string;
+};
 
 export const AuthContext =
   createContext<AuthContextValue | undefined>(undefined);
@@ -54,7 +59,7 @@ type AuthProviderProps = {
   children: ReactNode;
 };
 
-function getGatewayClient() {
+function getGatewayClient(): GatewayClientBundle | null {
   const runtimeConfig = readRuntimeConfig();
 
   if (!runtimeConfig.ok) {
@@ -65,96 +70,73 @@ function getGatewayClient() {
     client: createGatewayClient({
       gatewayBaseUrl: runtimeConfig.value.gatewayBaseUrl,
     }),
-    gatewayBaseUrl: runtimeConfig.value.gatewayBaseUrl,
   };
 }
 
-function isE2EBootstrapEnabled(): boolean {
-  if (!__DEV__) {
+function isAuthSuccessPayload(value: unknown): value is AuthSuccessPayload {
+  if (typeof value !== "object" || value === null) {
     return false;
   }
 
-  if (process.env.EXPO_PUBLIC_E2E_ENABLED === "true") {
-    return true;
-  }
+  const candidate = value as Record<string, unknown>;
 
-  const extra =
-    Constants.expoConfig?.extra ??
-    (Constants.manifest as { extra?: { e2eEnabled?: unknown } } | null)?.extra;
-
-  return extra?.e2eEnabled === true || extra?.e2eEnabled === "true";
+  return (
+    typeof candidate.token === "string" &&
+    candidate.token.trim().length > 0 &&
+    typeof candidate.userId === "string" &&
+    candidate.userId.trim().length > 0 &&
+    typeof candidate.workspaceId === "string" &&
+    candidate.workspaceId.trim().length > 0
+  );
 }
 
-function getHandoffCodeFromCallbackUrl(url: string): string | null {
-  try {
-    const parsedUrl = new URL(url);
-
-    if (parsedUrl.protocol !== "dubbridge:") {
-      return null;
-    }
-
-    const normalizedPath = parsedUrl.pathname.replace(/^\/+/, "");
-    const route =
-      parsedUrl.host.length > 0
-        ? `${parsedUrl.host}/${normalizedPath}`
-        : normalizedPath;
-
-    if (route !== "auth/callback") {
-      return null;
-    }
-
-    const handoffCode = parsedUrl.searchParams.get("handoff_code")?.trim();
-
-    return handoffCode ? handoffCode : null;
-  } catch {
-    return null;
-  }
+function toAuthSession(payload: AuthSuccessPayload): AuthSession {
+  return {
+    token: payload.token.trim(),
+    userId: payload.userId.trim(),
+    workspaceId: payload.workspaceId.trim(),
+  };
 }
 
 export function AuthProvider({
   children,
 }: AuthProviderProps): ReactNode {
-  const [sessionRef, setSessionRef] = useState<string | null>(null);
+  const [session, setSession] = useState<AuthSession | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [loginError, setLoginError] = useState<string | null>(null);
-  const statusRef = useRef<AuthStatus>("loading");
-  const lastHandledBootstrapUrlRef = useRef<string | null>(null);
-  const lastRedeemedHandoffCodeRef = useRef<string | null>(null);
-  const pendingBootstrapUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
 
     async function hydrateSession(): Promise<void> {
-      const storedSessionRef = await loadSessionRef();
-
-      if (!isMounted) {
-        return;
-      }
-
-      if (storedSessionRef === null) {
-        setSessionRef(null);
-        setStatus("unauthed");
-        setLoginError(null);
-        return;
-      }
-
-      if (isJwtLike(storedSessionRef)) {
-        await clearSessionRef();
+      try {
+        const storedSession = await loadAuthSession();
 
         if (!isMounted) {
           return;
         }
 
-        setSessionRef(null);
+        if (storedSession === null) {
+          setSession(null);
+          setStatus("unauthed");
+          setLoginError(null);
+          return;
+        }
+
+        setSession(storedSession);
+        setStatus("authed");
+        setLoginError(null);
+      } catch {
+        await clearAuthSession();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setSession(null);
         setStatus("unauthed");
         setLoginError(null);
-        return;
       }
-
-      setSessionRef(storedSessionRef);
-      setStatus("authed");
-      setLoginError(null);
     }
 
     void hydrateSession();
@@ -164,213 +146,66 @@ export function AuthProvider({
     };
   }, []);
 
-  async function redeemHandoffCode(
-    handoffCode: string,
-    gateway = getGatewayClient(),
-  ): Promise<void> {
-    if (lastRedeemedHandoffCodeRef.current === handoffCode) {
-      return;
-    }
-
-    lastRedeemedHandoffCodeRef.current = handoffCode;
+  async function logout(): Promise<void> {
+    setSession(null);
+    setStatus("unauthed");
     setLoginError(null);
+    await clearAuthSession();
+  }
+
+  async function login(email: string, password: string): Promise<void> {
+    const gateway = getGatewayClient();
 
     if (gateway === null) {
+      setSession(null);
       setStatus("unauthed");
-      setSessionRef(null);
       setLoginError("missing_runtime_config");
       return;
     }
 
-    const redeemResult = await gateway.client.post<{ session_ref: string }>(
-      "/auth/mobile/session",
+    const loginResult = await gateway.client.post<AuthSuccessPayload>(
+      "/auth/login",
       null,
-      { handoff_code: handoffCode },
+      {
+        email: email.trim(),
+        password,
+      },
     );
 
-    if (!redeemResult.ok) {
+    if (!loginResult.ok) {
+      await clearAuthSession();
+      setSession(null);
       setStatus("unauthed");
-      setSessionRef(null);
       setLoginError(
-        redeemResult.error.kind === "session_expired"
-          ? "session_expired"
+        loginResult.error.kind === "network"
+          ? "network_error"
           : "login_failed",
       );
       return;
     }
 
-    const nextSessionRef = redeemResult.value.data.session_ref;
-
-    if (!nextSessionRef || isJwtLike(nextSessionRef)) {
+    if (!isAuthSuccessPayload(loginResult.value.data)) {
+      await clearAuthSession();
+      setSession(null);
       setStatus("unauthed");
-      setSessionRef(null);
-      setLoginError("invalid_session_ref");
+      setLoginError("login_failed");
       return;
     }
 
-    await saveSessionRef(nextSessionRef);
-    setSessionRef(nextSessionRef);
-    setStatus("authed");
-    setLoginError(null);
-  }
-
-  useEffect(() => {
-    statusRef.current = status;
-  }, [status]);
-
-  async function redeemPendingBootstrapUrl(): Promise<void> {
-    if (!isE2EBootstrapEnabled() || statusRef.current !== "unauthed") {
-      return;
-    }
-
-    const pendingUrl = pendingBootstrapUrlRef.current;
-
-    if (!pendingUrl || lastHandledBootstrapUrlRef.current === pendingUrl) {
-      return;
-    }
-
-    const handoffCode = getHandoffCodeFromCallbackUrl(pendingUrl);
-
-    pendingBootstrapUrlRef.current = null;
-
-    if (!handoffCode) {
-      return;
-    }
-
-    lastHandledBootstrapUrlRef.current = pendingUrl;
-    await redeemHandoffCode(handoffCode);
-  }
-
-  async function queueBootstrapUrl(url: string | null): Promise<void> {
-    if (!url || statusRef.current === "authed") {
-      return;
-    }
-
-    const handoffCode = getHandoffCodeFromCallbackUrl(url);
-
-    if (
-      !handoffCode ||
-      lastHandledBootstrapUrlRef.current === url ||
-      pendingBootstrapUrlRef.current === url
-    ) {
-      return;
-    }
-
-    pendingBootstrapUrlRef.current = url;
-    await redeemPendingBootstrapUrl();
-  }
-
-  useEffect(() => {
-    if (!isE2EBootstrapEnabled() || status !== "unauthed") {
-      return;
-    }
-
-    void redeemPendingBootstrapUrl();
-  }, [status]);
-
-  useEffect(() => {
-    if (!isE2EBootstrapEnabled()) {
-      return;
-    }
-
-    let isMounted = true;
-
-    void Linking.getInitialURL().then((url) => {
-      if (!isMounted) {
-        return;
-      }
-
-      void queueBootstrapUrl(url);
-    });
-
-    const subscription = Linking.addEventListener("url", ({ url }) => {
-      void queueBootstrapUrl(url);
-    });
-
-    return () => {
-      isMounted = false;
-      subscription.remove();
-    };
-  }, []);
-
-  async function logout(): Promise<void> {
-    const previousSessionRef = sessionRef;
-
-    setSessionRef(null);
-    setStatus("unauthed");
-    setLoginError(null);
-
-    await clearSessionRef();
-
-    if (previousSessionRef === null) {
-      return;
-    }
-
-    const gateway = getGatewayClient();
-
-    if (gateway === null) {
-      return;
-    }
-
-    await gateway.client.post("/auth/logout", previousSessionRef, {});
-  }
-
-  async function login(): Promise<void> {
-    const gateway = getGatewayClient();
-
-    if (gateway === null) {
-      setStatus("unauthed");
-      setSessionRef(null);
-      setLoginError("missing_runtime_config");
-      return;
-    }
-
-    const redirectUri = makeRedirectUri({
-      scheme: "dubbridge",
-      path: "auth/callback",
-    });
-    const loginUrl = new URL("/auth/login", gateway.gatewayBaseUrl);
-    loginUrl.searchParams.set("return_uri", redirectUri);
-
-    const result = await WebBrowser.openAuthSessionAsync(
-      loginUrl.toString(),
-      redirectUri,
-    );
-
-    if (result.type !== "success") {
-      return;
-    }
-
-    const handoffCode = new URL(result.url).searchParams.get("handoff_code");
-
-    if (!handoffCode) {
-      setStatus("unauthed");
-      setSessionRef(null);
-      setLoginError("missing_handoff_code");
-      return;
-    }
-
-    await redeemHandoffCode(handoffCode, gateway);
-  }
-
-  async function onSessionRotation(rotation: string | null): Promise<void> {
-    if (rotation === null || isJwtLike(rotation)) {
-      return;
-    }
-
-    await updateSessionRef(rotation);
-    setSessionRef(rotation);
+    const nextSession = toAuthSession(loginResult.value.data);
+    await saveAuthSession(nextSession);
+    setSession(nextSession);
     setStatus("authed");
     setLoginError(null);
   }
 
   const value: AuthContextValue = {
-    sessionRef,
+    sessionRef: session?.token ?? null,
     status,
     loginError,
     login,
     logout,
-    onSessionRotation,
+    onSessionRotation: createStubAsync,
   };
 
   return (

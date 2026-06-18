@@ -1,3 +1,9 @@
+---
+type: Plan
+title: "Plan: S-040 - First-party Session Gateway / BFF"
+status: closed
+slice: S-040
+---
 # Plan: S-040 - First-party Session Gateway / BFF
 
 **Roadmap phase:** `S-040`. Depends on `S-000` (JWT resource-server boundary,

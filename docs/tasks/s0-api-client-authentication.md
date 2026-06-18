@@ -1,3 +1,11 @@
+---
+type: TaskList
+title: "Tasks: S0 API Client Authentication"
+status: closed
+slice: S-000
+plan: docs/plan/s0-api-client-authentication.md
+governed_by: [ADR-023]
+---
 # Tasks: S0 API Client Authentication
 
 Governing plan: `docs/plan/s0-api-client-authentication.md`

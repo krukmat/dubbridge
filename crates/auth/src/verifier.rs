@@ -8,7 +8,7 @@ use serde::Deserialize;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::{AuthConfig, AuthenticatedPrincipal};
+use crate::{AuthConfig, AuthenticatedPrincipal, ParseError, parse_jwt};
 
 const ACCESS_TOKEN_TYPES: [&str; 2] = ["at+jwt", "application/at+jwt"];
 
@@ -35,6 +35,8 @@ pub enum VerifierInitError {
     },
     #[error("configured RSA public key is invalid")]
     InvalidPublicKey,
+    #[error("HMAC verification secret must not be empty")]
+    InvalidSecret,
 }
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
@@ -120,6 +122,50 @@ impl TokenVerifier for RsaJwtTokenVerifier {
         Ok(AuthenticatedPrincipal::new(
             subject_id,
             claims.scope_tokens(),
+        ))
+    }
+}
+
+/// HS256 access-token verifier that implements [`TokenVerifier`] by delegating
+/// to [`parse_jwt`] from the in-house issuer module (ADR-031 §Decision 2).
+pub struct Hs256TokenVerifier {
+    secret: String,
+}
+
+impl Hs256TokenVerifier {
+    /// Build a verifier. Fails closed when the secret is empty or whitespace.
+    pub fn new(secret: &str) -> Result<Self, VerifierInitError> {
+        if secret.trim().is_empty() {
+            return Err(VerifierInitError::InvalidSecret);
+        }
+        Ok(Self {
+            secret: secret.to_owned(),
+        })
+    }
+}
+
+impl TokenVerifier for Hs256TokenVerifier {
+    fn verify_access_token(
+        &self,
+        token: &str,
+    ) -> Result<AuthenticatedPrincipal, TokenVerificationError> {
+        let claims = parse_jwt(token, &self.secret).map_err(|e| match e {
+            ParseError::InvalidAlgorithm => TokenVerificationError::InvalidAlgorithm,
+            ParseError::InvalidSignature => TokenVerificationError::InvalidSignature,
+            ParseError::Expired => TokenVerificationError::Expired,
+            ParseError::NotYetValid => TokenVerificationError::NotYetValid,
+            ParseError::InvalidSubject | ParseError::InvalidWorkspace => {
+                TokenVerificationError::InvalidSubject
+            }
+            ParseError::MalformedToken => TokenVerificationError::MalformedToken,
+        })?;
+
+        let subject_id =
+            Uuid::parse_str(&claims.sub).map_err(|_| TokenVerificationError::InvalidSubject)?;
+
+        Ok(AuthenticatedPrincipal::new(
+            subject_id,
+            claims.scope.split_whitespace().map(str::to_owned),
         ))
     }
 }
@@ -243,6 +289,11 @@ impl ScopeClaim {
 
 #[cfg(test)]
 mod tests {
+    // S-200-T1a characterization baseline (RS256, pre-S-200).
+    // These tests pin the *current* RsaJwtTokenVerifier accept/reject contract so the
+    // RS256 -> HS256 inversion in S-200-T1c is provably deliberate, not an accidental
+    // regression. The key invariant to be inverted by T1c is asserted in
+    // `verify_rejects_algorithm_substitution` (an HS256-signed token is rejected today).
     use std::{
         fs,
         time::{Duration, SystemTime, UNIX_EPOCH},
@@ -526,6 +577,10 @@ kVd/An7O44WxAYGh9pHHhn7YVZ+g3YrcVcyQt9bFgETyYqecCVgQ7fTFychxKTLc
         assert!(principal.has_scope("recordings:write"));
     }
 
+    // T1a baseline: RsaJwtTokenVerifier rejects HS256 (algorithm-substitution).
+    // S-200-T1c inverted the system-level invariant: the system now ACCEPTS HS256 and
+    // rejects RS256. That is tested in `hs256_verifier_rejects_rs256_algorithm` below.
+    // This test remains to pin RsaJwtTokenVerifier's own behavior.
     #[test]
     fn verify_rejects_algorithm_substitution() {
         let verifier = verifier(Duration::from_secs(30));
@@ -543,5 +598,252 @@ kVd/An7O44WxAYGh9pHHhn7YVZ+g3YrcVcyQt9bFgETyYqecCVgQ7fTFychxKTLc
             .expect_err("invalid algorithm");
 
         assert_eq!(error, TokenVerificationError::InvalidAlgorithm);
+    }
+
+    // Gap pinned by S-200-T1a: a non-JWT string fails `decode_header` -> MalformedToken,
+    // before any algorithm, typ, signature, or claim check.
+    #[test]
+    fn verify_rejects_malformed_token() {
+        let verifier = verifier(Duration::from_secs(30));
+
+        let error = verifier
+            .verify_access_token("not-a-jwt-token")
+            .expect_err("malformed token");
+
+        assert_eq!(error, TokenVerificationError::MalformedToken);
+    }
+
+    // Gap pinned by S-200-T1a: a missing `typ` header (None) is rejected as InvalidType,
+    // distinct from the wrong-`typ` branch covered by `verify_rejects_invalid_typ`.
+    #[test]
+    fn verify_rejects_missing_typ() {
+        let verifier = verifier(Duration::from_secs(30));
+        let token = encode_rs256_token(&valid_claims(), None);
+
+        let error = verifier
+            .verify_access_token(&token)
+            .expect_err("missing typ");
+
+        assert_eq!(error, TokenVerificationError::InvalidType);
+    }
+
+    // -------------------------------------------------------------------------
+    // S-200-T1c-i: Hs256TokenVerifier tests
+    // -------------------------------------------------------------------------
+
+    use crate::{Claims as Hs256Claims, Hs256Issuer};
+
+    const HS256_SECRET: &str = "hs256-verifier-test-secret-0123456789";
+
+    fn hs256_verifier() -> Hs256TokenVerifier {
+        Hs256TokenVerifier::new(HS256_SECRET).expect("hs256 verifier")
+    }
+
+    fn valid_hs256_token() -> String {
+        Hs256Issuer::new(HS256_SECRET, Duration::from_secs(3600))
+            .expect("issuer")
+            .generate_jwt(
+                Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").expect("uuid"),
+                Uuid::new_v4(),
+                &["assets:read".to_string()],
+            )
+            .expect("token")
+    }
+
+    // HP: valid HS256 token → Ok(AuthenticatedPrincipal) with correct subject + scopes.
+    #[test]
+    fn hs256_verifier_accepts_valid_token() {
+        let verifier = hs256_verifier();
+        let token = valid_hs256_token();
+
+        let principal = verifier
+            .verify_access_token(&token)
+            .expect("valid hs256 token");
+
+        assert_eq!(
+            principal.subject_id,
+            Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").expect("uuid"),
+        );
+        assert!(principal.has_scope("assets:read"));
+    }
+
+    // AC-1/2: empty and whitespace secret → InvalidSecret (fail-closed).
+    #[test]
+    fn hs256_verifier_rejects_empty_secret() {
+        assert!(matches!(
+            Hs256TokenVerifier::new(""),
+            Err(VerifierInitError::InvalidSecret),
+        ));
+        assert!(matches!(
+            Hs256TokenVerifier::new("   "),
+            Err(VerifierInitError::InvalidSecret),
+        ));
+    }
+
+    // AC-4 (inversion of T1a): RS256-signed token → InvalidAlgorithm.
+    #[test]
+    fn hs256_verifier_rejects_rs256_algorithm() {
+        let verifier = hs256_verifier();
+        let token = encode_rs256_token(&valid_claims(), Some("at+jwt"));
+
+        let error = verifier
+            .verify_access_token(&token)
+            .expect_err("RS256 rejected by HS256 verifier");
+
+        assert_eq!(error, TokenVerificationError::InvalidAlgorithm);
+    }
+
+    // AC-5: alg:none token → MalformedToken or InvalidAlgorithm.
+    #[test]
+    fn hs256_verifier_rejects_alg_none() {
+        let verifier = hs256_verifier();
+        let header_b64 = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0";
+        let payload_b64 = "eyJzdWIiOiJ0ZXN0IiwiaWF0IjowfQ";
+        let token = format!("{header_b64}.{payload_b64}.");
+
+        let err = verifier
+            .verify_access_token(&token)
+            .expect_err("alg:none rejected");
+
+        assert!(
+            matches!(
+                err,
+                TokenVerificationError::MalformedToken | TokenVerificationError::InvalidAlgorithm
+            ),
+            "expected MalformedToken or InvalidAlgorithm, got {err:?}",
+        );
+    }
+
+    // AC-6: wrong secret → InvalidSignature.
+    #[test]
+    fn hs256_verifier_rejects_wrong_secret() {
+        let verifier = Hs256TokenVerifier::new("completely-different-secret").expect("verifier");
+        let token = valid_hs256_token();
+
+        let error = verifier
+            .verify_access_token(&token)
+            .expect_err("wrong secret");
+
+        assert_eq!(error, TokenVerificationError::InvalidSignature);
+    }
+
+    // AC-7: expired token (exp > 60s in the past, exceeding default jsonwebtoken leeway).
+    #[test]
+    fn hs256_verifier_rejects_expired_token() {
+        let verifier = hs256_verifier();
+        let now = now_secs();
+        let claims = Hs256Claims {
+            sub: Uuid::new_v4().to_string(),
+            workspace_id: Uuid::new_v4().to_string(),
+            iat: now - 7200,
+            nbf: now - 7200,
+            exp: now - 120,
+            scope: String::new(),
+        };
+        let token = encode(
+            &Header::new(Algorithm::HS256),
+            &claims,
+            &EncodingKey::from_secret(HS256_SECRET.as_bytes()),
+        )
+        .expect("encode");
+
+        let error = verifier
+            .verify_access_token(&token)
+            .expect_err("expired token");
+
+        assert_eq!(error, TokenVerificationError::Expired);
+    }
+
+    // AC-8: future nbf (> 60s ahead, exceeding default jsonwebtoken leeway) → NotYetValid.
+    #[test]
+    fn hs256_verifier_rejects_future_nbf() {
+        let verifier = hs256_verifier();
+        let now = now_secs();
+        let claims = Hs256Claims {
+            sub: Uuid::new_v4().to_string(),
+            workspace_id: Uuid::new_v4().to_string(),
+            iat: now,
+            nbf: now + 120,
+            exp: now + 3600,
+            scope: String::new(),
+        };
+        let token = encode(
+            &Header::new(Algorithm::HS256),
+            &claims,
+            &EncodingKey::from_secret(HS256_SECRET.as_bytes()),
+        )
+        .expect("encode");
+
+        let error = verifier
+            .verify_access_token(&token)
+            .expect_err("future nbf");
+
+        assert_eq!(error, TokenVerificationError::NotYetValid);
+    }
+
+    // AC-9: non-UUID sub → InvalidSubject.
+    #[test]
+    fn hs256_verifier_rejects_non_uuid_sub() {
+        let verifier = hs256_verifier();
+        let now = now_secs();
+        let claims = Hs256Claims {
+            sub: "not-a-uuid".to_string(),
+            workspace_id: Uuid::new_v4().to_string(),
+            iat: now,
+            nbf: now,
+            exp: now + 3600,
+            scope: String::new(),
+        };
+        let token = encode(
+            &Header::new(Algorithm::HS256),
+            &claims,
+            &EncodingKey::from_secret(HS256_SECRET.as_bytes()),
+        )
+        .expect("encode");
+
+        let error = verifier
+            .verify_access_token(&token)
+            .expect_err("non-UUID sub");
+
+        assert_eq!(error, TokenVerificationError::InvalidSubject);
+    }
+
+    // AC-10: malformed input → MalformedToken.
+    #[test]
+    fn hs256_verifier_rejects_malformed_input() {
+        let verifier = hs256_verifier();
+
+        let error = verifier
+            .verify_access_token("not-a-jwt")
+            .expect_err("malformed");
+
+        assert_eq!(error, TokenVerificationError::MalformedToken);
+    }
+
+    // ParseError::InvalidWorkspace branch: non-UUID workspace_id → InvalidSubject.
+    #[test]
+    fn hs256_verifier_rejects_non_uuid_workspace_id() {
+        let verifier = hs256_verifier();
+        let now = now_secs();
+        let claims = Hs256Claims {
+            sub: Uuid::new_v4().to_string(),
+            workspace_id: "not-a-uuid".to_string(),
+            iat: now,
+            nbf: now,
+            exp: now + 3600,
+            scope: String::new(),
+        };
+        let token = encode(
+            &Header::new(Algorithm::HS256),
+            &claims,
+            &EncodingKey::from_secret(HS256_SECRET.as_bytes()),
+        )
+        .expect("encode");
+
+        let error = verifier
+            .verify_access_token(&token)
+            .expect_err("non-UUID workspace_id");
+
+        assert_eq!(error, TokenVerificationError::InvalidSubject);
     }
 }

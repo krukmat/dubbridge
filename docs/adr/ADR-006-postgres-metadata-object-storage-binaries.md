@@ -1,3 +1,9 @@
+---
+type: ADR
+title: "ADR-006: PostgreSQL for metadata, object storage for binary artifacts"
+status: Accepted
+---
+
 # ADR-006: PostgreSQL for metadata, object storage for binary artifacts
 
 - **Status:** Accepted (backfilled from S1 implementation)

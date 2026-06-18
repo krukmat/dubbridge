@@ -1,3 +1,9 @@
+---
+type: TaskList
+title: "Tasks: Low-RRI Local Delegation Redesign"
+status: closed
+plan: docs/plan/low-rri-local-delegation-redesign.md
+---
 # Tasks: Low-RRI Local Delegation Redesign
 
 **Plan:** `docs/plan/low-rri-local-delegation-redesign.md`
