@@ -82,8 +82,9 @@ Default model recommendations:
 - Claude Code: `Claude Sonnet 4`
 
 For RRI 0–25 Low-band tasks, follow the repository workflow guide instead of
-these defaults: delegate to local Gemma through Ollama, then review, verify, and
-report as the orchestrator of record.
+these defaults: use local Gemma through Ollama only for eligible simple code
+patches; otherwise handle the task directly and report as the orchestrator of
+record.
 
 Escalate Claude Code to `Claude Opus 4.1` only for heavy synthesis, long-context comparison, or repeated failure under Sonnet 4.
 

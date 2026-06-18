@@ -21,18 +21,24 @@ human sign-off.
 - Schema migrations and changes to governance-critical invariants.
 
 The only exception to the approval gate is when the user explicitly says "proceed
-without asking" (or equivalent) for a clearly bounded scope, **or when the
-computed RRI is 0–25** (see the local delegation rule below).
+without asking" (or equivalent) for a clearly bounded scope, or when the
+computed RRI is 0–25 and the task stays within the low-band handling rules below.
 
 ## Local delegation (RRI 0–25)
 
 When the computed RRI falls in the **0–25 Low band**, the agent must not present
-the full task for human approval. Instead, it delegates the task to the local
-Gemma model through Ollama and remains the reviewer/orchestrator of record.
-Gemma must not evaluate, approve, or mark its own delegated work as complete.
-Only the delegating agent may decide whether the task satisfies the requirements.
+the full task for human approval. The default low-band path is **direct execution
+by the primary agent**. Local Gemma delegation through Ollama is reserved only for
+**simple code patching**: narrow, mechanical code or test edits with a small
+allowed path set and low editorial risk. Docs, plans, task ledgers, ADRs,
+policies, workflow scripts, and other structure-heavy or interpretation-heavy work
+must stay with the primary agent even when the RRI is Low.
 
-The delegating agent must:
+When Gemma delegation is used, Gemma must not evaluate, approve, or mark its own
+delegated work as complete. Only the delegating agent may decide whether the task
+satisfies the requirements.
+
+For eligible simple code patches, the delegating agent must:
 
 1. Compute RRI with `scripts/rri.py`.
 2. Build a local delegation packet with the task excerpt, acceptance criteria, RRI
@@ -56,9 +62,9 @@ The delegating agent must:
     requirement-review result, verification commands, and whether a repair cycle
     was needed. If delegation times out, report `Gemma timeout after 120s`.
 
-If penalties are present and the final RRI is still ≤ 25, local delegation still
-applies; state all active penalties explicitly in the delegation packet and final
-report so the score is transparent.
+If penalties are present and the final RRI is still ≤ 25, the low-band handling
+still applies. When delegation is used, state all active penalties explicitly in
+the delegation packet and final report so the score is transparent.
 
 ## Approval checkpoint wording
 

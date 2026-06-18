@@ -28,7 +28,8 @@ the `dubbridge` repository.
    presentation contract only when approval is required.
 4. If the computed RRI requires approval, wait for explicit approval (see the HITL
    policy). If the task is in the RRI 0–25 Low band (normally `Effort: S` under the
-   canonical mapping), use local Gemma delegation through Ollama instead.
+   canonical mapping), use local Gemma delegation through Ollama only for eligible
+   simple code patches; otherwise handle the task directly as the primary agent.
 5. Implement one task at a time, in order.
 6. Verify (tests/checks), mark progress in the tasks document, report, and wait.
 

@@ -147,10 +147,9 @@ the gate defined by `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and
 
 Under the canonical RRI mapping in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and
 `docs/policies/RRI_POLICY.md`, `Effort: S` normally corresponds to the **RRI 0–25**
-Low band. Those tasks use local Gemma delegation through Ollama: do not present the
-full task for approval; delegate to the resolved local Gemma model, validate and
-apply only an in-scope diff, review the result against task requirements, verify,
-and report unless another explicit safety rule overrides that default.
+Low band. Those tasks skip the full approval presentation; use local Gemma
+delegation through Ollama only for eligible simple code patches, and otherwise
+handle them directly as the primary agent while still following the low-band gate.
 
 ## Language
 

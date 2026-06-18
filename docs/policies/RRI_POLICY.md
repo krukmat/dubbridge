@@ -171,17 +171,18 @@ Apply each penalty independently; they are additive.
 
 ## Bands, autonomy gates, and model tiers
 
-The HITL approval requirement applies at every band **except RRI 0–25**, which
-uses local Gemma delegation (see below). For all other bands, what the band
-controls is the evidence and gates the agent must satisfy before and after that
-approval.
+The HITL approval requirement applies at every band **except RRI 0–25**. Low-band
+tasks skip the full approval presentation, but they do **not** all use Gemma.
+Simple code patches may use local Gemma delegation; all other low-band work stays
+with the primary agent. For all other bands, what the band controls is the
+evidence and gates the agent must satisfy before and after that approval.
 
 Effort, capability, thinking, and gate are each derived **in parallel** from the RRI
 band — never derive one output from another (e.g. do not infer capability from Effort).
 
 | RRI band | Label | Effort | Capability (Codex) | Capability (Claude Code) | Thinking | Gate |
 |---|---|---|---|---|---|---|
-| **0–25** | Low | **S** | Local Gemma via Ollama | Local Gemma via Ollama | Off | **Local delegation:** do not present the full task for approval; delegate to local Gemma, validate and apply only an in-scope diff, review against requirements, verify, and report. |
+| **0–25** | Low | **S** | Primary agent or Local Gemma via Ollama | Primary agent or Local Gemma via Ollama | Off | **Low-band handling:** do not present the full task for approval; use local Gemma only for eligible simple code patches, otherwise execute directly with the primary agent. |
 | **26–40** | Moderate | **M** | Balanced | Balanced | Off | Confirm tests exist in the affected area. |
 | **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Plan + explicit acceptance criteria required before approval. |
 | **56–70** | Complex | **L** | Premium | Premium | On | Plan first. **Decompose into subtasks before implementation.** Human reviews the plan. |
@@ -196,23 +197,30 @@ IDs per the resolution table in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` (Model
 tier resolution). Resolve against official vendor documentation at
 task-presentation time — do not rely on stale memory for "latest" or "best".
 
-The Low band is special: it resolves to the local Ollama/Gemma delegation path,
-not to a cloud vendor model recommendation. Use `OLLAMA_HOST` when set, otherwise
-`http://localhost:11434`. Use `DUBBRIDGE_LOW_RRI_MODEL` when set, otherwise
-`gemma4:12b-it-q4_K_M`.
+The Low band is special: vendor model resolution does not apply. Low-band tasks
+are either handled directly by the primary agent or, for eligible simple code
+patches only, delegated to the local Ollama/Gemma path. When delegation is used,
+use `OLLAMA_HOST` when set, otherwise `http://localhost:11434`. Use
+`DUBBRIDGE_LOW_RRI_MODEL` when set, otherwise `gemma4:12b-it-q4_K_M`.
 
 Thinking mode: activate for Balanced→Premium and above when the task requires
 multi-step reasoning that cannot be validated incrementally. Do **not** activate
 for config edits, doc updates, or tasks where the strategy is fully pre-defined.
 
-### Low RRI local delegation
+### Low RRI handling
 
 For final **RRI 0–25**, the active agent remains the orchestrator and reviewer.
-Gemma has no direct filesystem or shell authority; it returns **full file
-contents** plus verification intent, and the caller (the script + orchestrating
-agent) deterministically builds the diff and applies it. Gemma must not evaluate,
-approve, or mark its own delegated work as complete; the delegating agent owns
-that decision.
+The default path is direct execution by the primary agent. Local Gemma delegation
+is allowed only for **simple code patches**: narrow, mechanical code or test edits
+with a small allowed path set and low editorial risk. Do not use Gemma for docs,
+plans, task ledgers, ADRs, policy/workflow edits, or structure-heavy multi-file
+changes even when they score in the Low band.
+
+When Gemma is used, it has no direct filesystem or shell authority; it returns
+**full file contents** plus verification intent, and the caller (the script +
+orchestrating agent) deterministically builds the diff and applies it. Gemma must
+not evaluate, approve, or mark its own delegated work as complete; the delegating
+agent owns that decision.
 
 For the operational step-by-step handoff discipline, packet-shaping rules, and
 scope-reduction guidance for local-model work, see

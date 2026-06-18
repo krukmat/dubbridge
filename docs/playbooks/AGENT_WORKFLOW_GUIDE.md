@@ -21,9 +21,11 @@
    - at least one **edge case example** with a stable `EC-#` ID — a concrete
      boundary, invalid-input, or failure flow the task must handle or reject.
 4. **Gate by RRI** — compute RRI with `scripts/rri.py`. For RRI 0–25, skip the
-   full human approval presentation and use local Gemma delegation through Ollama.
-   For RRI 26+, show the plan and tasks and wait for explicit approval before
-   starting implementation, even if a plan was approved in a prior session.
+   full human approval presentation. Use local Gemma delegation through Ollama
+   only for eligible simple code patches; otherwise execute directly as the
+   primary agent. For RRI 26+, show the plan and tasks and wait for explicit
+   approval before starting implementation, even if a plan was approved in a
+   prior session.
 5. **Implement** — one task at a time, in the defined order.
 6. **Mark progress** — update the tasks document after each completed task (it is
    the crash-safe progress ledger).
@@ -59,8 +61,9 @@
 
 - Present the next task using the `AGENTS.md` presentation contract before executing
   it when approval is required. For RRI 0–25, do not present the full task for
-  approval; prepare a local delegation packet for Gemma and report after review
-  and verification.
+  approval. If the task is an eligible simple code patch, prepare a local
+  delegation packet for Gemma and report after review and verification; otherwise
+  execute directly and report normally.
 - **Pre-task summary for development tasks:** when the task will write or modify
   code, the task presentation must include two explicit sections:
   - **Happy paths considered** — the primary success flows the agent expects to

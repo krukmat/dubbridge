@@ -13,19 +13,21 @@ Use this playbook when all of the following are true:
 
 - the task is in the **Low (0–25)** RRI band;
 - the task is suitable for local delegation;
+- the task is a **simple code patch** or similarly narrow test patch;
 - the task can be expressed as a small, concrete change with clear acceptance
   criteria.
 
 Best-fit tasks:
 
 - pure development tasks with narrow, mechanical scope;
-- tightly scoped mechanical edits;
-- single-file or very small multi-file updates;
-- predictable additions such as boilerplate, tests, or isolated doc fixes.
+- tightly scoped mechanical code edits;
+- single-file or very small multi-file code/test updates;
+- predictable additions such as boilerplate or focused tests.
 
 Poor-fit tasks:
 
 - broad documentation rewrites;
+- policy, workflow, ADR, roadmap, plan, or task-ledger edits;
 - large ledger rewrites or structure-heavy edits;
 - mixed work types in one pass;
 - tasks that require wide editorial reinterpretation.
@@ -34,8 +36,8 @@ Poor-fit tasks:
 
 1. Delegate **step by step**. One objective, one narrow change, one file or one
    tightly scoped change at a time when possible.
-2. Prefer **pure development work** or tightly scoped mechanical edits.
-3. Do not delegate broad doc rewrites, large ledgers, or mixed work types in a
+2. Prefer **pure code/test development work** or tightly scoped mechanical edits.
+3. Do not delegate broad doc rewrites, policy/workflow changes, large ledgers, or mixed work types in a
    single handoff.
 4. Instructions must be **simple, concrete, and replacement-oriented**.
 5. The orchestrator must validate not only that the patch applies, but that
@@ -67,6 +69,9 @@ Poor-fit tasks:
   - replace one bullet;
   - insert one short paragraph after a named heading;
   - create one new file with a named structure.
+- Use those document-oriented patterns only inside code-adjacent files such as
+  tests or narrowly scoped developer-facing comments, not for repository policy or
+  planning artifacts.
 - Prefer expected wording or expected sections over open-ended prose requests.
 - Avoid “improve”, “clean up”, “rewrite”, or other broad editorial instructions.
 - Avoid mixing convention updates, structural rewrites, and sync work in one packet.
