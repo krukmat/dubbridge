@@ -1,8 +1,8 @@
 # Plan: S-080 — Object Storage Switchover
 
-> **Status:** In progress. Authored 2026-06-17 after roadmap review and approved
-> decomposition. Tasks T0-T5d are complete; T6 final verification/docs sync is
-> currently blocked by the docs QA gate in the existing dirty worktree.
+> **Status:** Complete 2026-06-18. Authored 2026-06-17 after roadmap review and
+> approved decomposition. Tasks T0-T6 are complete, the final docs QA gate passes,
+> and the slice is ready for downstream work such as `S-120`.
 > **Roadmap phase:** `S-080` — object storage switchover behind `StorageAdapter`.
 > **Tasks ledger:** `docs/tasks/s-080-object-storage-switchover.md`.
 

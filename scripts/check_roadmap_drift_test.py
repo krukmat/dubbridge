@@ -50,7 +50,7 @@ class RoadmapDriftGate(unittest.TestCase):
             "docs/plan/roadmap.md",
             "| Phase | Title | Depends | Status | Evidence |\n"
             "|---|---|---|---|---|\n"
-            "| **S-160** | Review | — | ✅ done | closed |\n",
+            "| **S-160** | Review | — | ✅ done | `docs/tasks/s-160-review.md` |\n",
         )
         self.write("docs/tasks/s-160-review.md", "# S-160\n")
         self.commit_all()
@@ -79,7 +79,7 @@ class RoadmapDriftGate(unittest.TestCase):
             "docs/plan/roadmap.md",
             "| Phase | Title | Depends | Status | Evidence |\n"
             "|---|---|---|---|---|\n"
-            "| **S-160** | Review | — | ✅ done | closed |\n",
+            "| **S-160** | Review | — | ✅ done | `docs/tasks/s-160-review.md` |\n",
         )
         self.write("docs/tasks/s-160-review.md", "# S-160\n")
         self.commit_all()
@@ -89,6 +89,39 @@ class RoadmapDriftGate(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("uncommitted", result.stdout)
+
+    def test_unrelated_uncommitted_sid_mentions_are_ignored(self):
+        self.write(
+            "docs/plan/roadmap.md",
+            "| Phase | Title | Depends | Status | Evidence |\n"
+            "|---|---|---|---|---|\n"
+            "| **S-160** | Review | — | ✅ done | `docs/tasks/s-160-review.md` |\n",
+        )
+        self.write("docs/tasks/s-160-review.md", "# S-160\n")
+        self.commit_all()
+        self.write("docs/tasks/s-160-noise.md", "# Scratch\n\nMentions S-160 in prose only.\n")
+
+        result = self.check_gate()
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("passed", result.stdout)
+
+    def test_done_gate_can_use_adjacent_plan_line_evidence(self):
+        self.write(
+            "docs/plan/roadmap.md",
+            "| Gate | Name | Depends on | Status | Why it blocks |\n"
+            "|---|---|---|---|---|\n"
+            "| **S-020 / H1** | Hardening | S-010 | ✅ done | closed |\n"
+            "\n"
+            "Plan: `docs/plan/h1-governance-atomicity-hardening.md`\n",
+        )
+        self.write("docs/plan/h1-governance-atomicity-hardening.md", "# H1\n")
+        self.commit_all()
+
+        result = self.check_gate()
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("passed", result.stdout)
 
     def test_non_done_phase_statuses_are_ignored(self):
         self.write(

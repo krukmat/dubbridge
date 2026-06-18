@@ -564,26 +564,27 @@ async fn pending_ingestion_persistence_failure_deletes_stored_object_once() {
             .contains("forced pending_ingestion insert failure for S-080-T5a")
     );
 
-    let state = state.lock().expect("tracking storage state");
-    assert_eq!(
-        state.put_file_keys.len(),
-        1,
-        "upload should be stored exactly once"
-    );
-    assert_eq!(
-        state.delete_keys.len(),
-        1,
-        "cleanup should delete exactly once"
-    );
-    assert_eq!(
-        state.delete_keys, state.put_file_keys,
-        "cleanup should target the same storage key that was written"
-    );
-    assert!(
-        state.delete_keys[0].starts_with("ingests/"),
-        "cleanup should operate on canonical ingest keys"
-    );
-    drop(state);
+    {
+        let state = state.lock().expect("tracking storage state");
+        assert_eq!(
+            state.put_file_keys.len(),
+            1,
+            "upload should be stored exactly once"
+        );
+        assert_eq!(
+            state.delete_keys.len(),
+            1,
+            "cleanup should delete exactly once"
+        );
+        assert_eq!(
+            state.delete_keys, state.put_file_keys,
+            "cleanup should target the same storage key that was written"
+        );
+        assert!(
+            state.delete_keys[0].starts_with("ingests/"),
+            "cleanup should operate on canonical ingest keys"
+        );
+    }
 
     let pending_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pending_ingestions")
         .fetch_one(&ctx.pool)
