@@ -208,7 +208,7 @@ async fn migrate_and_reset(pool: &PgPool) {
         .await
         .expect("migrations");
     sqlx::query(
-        "TRUNCATE TABLE user_account, organizations, assets, ingest_sessions, audit_events RESTART IDENTITY CASCADE",
+        "TRUNCATE TABLE user_account, organizations, assets, pending_ingestions, audit_events RESTART IDENTITY CASCADE",
     )
     .execute(pool)
     .await
