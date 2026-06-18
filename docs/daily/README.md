@@ -8,12 +8,21 @@ trabajo del día. Vive en `docs/daily/YYYY-MM-DD.md`.
 | Momento | Acción | Quién |
 |---|---|---|
 | Apertura | `bash scripts/daily-open.sh` → genera el día | orquestador |
-| Apertura | Completar §1 foco + §5 decisiones pendientes | humano |
-| Cierre | Completar §3 issues + §4 mejoras + §6 reconciliación | orquestador/humano |
+| Apertura | Completar §1 foco + §2 pipelines GH rotos + §6 decisiones pendientes | humano |
+| Cierre | Completar §4 issues + §5 mejoras + §7 reconciliación | orquestador/humano |
 | Cierre | Commitear la entrada del día | orquestador |
 
 El script rellena lo mecánico (git, roadmap pulse, drift-check, semáforo de
 gates). El juicio lo aporta el humano o el orquestador, no el script.
+
+## Pipelines GH rotos (§2)
+
+El daily debe registrar cualquier workflow de GitHub en rojo que siga abierto al
+arrancar o cerrar el día.
+
+- Si hay pipelines rotos, cada uno debe quedar con owner o task siguiente.
+- Si no hay rotos, se deja evidencia explícita (`ninguno`).
+- Un pipeline rojo sin acción asignada cuenta como issue operativo incompleto.
 
 ## Drift-check
 
@@ -24,7 +33,7 @@ Cruza cada fase `✅ done` del roadmap contra evidencia en git y archivos. Emite
 
 Fases `🟡 REPLANNED`, `⬜`, `cancelled`, `superseded` se omiten: no exigen cierre.
 
-## Taxonomía de issues (§3)
+## Taxonomía de issues (§4)
 
 | Tipo | Cuándo usarlo |
 |---|---|
@@ -39,7 +48,7 @@ Fases `🟡 REPLANNED`, `⬜`, `cancelled`, `superseded` se omiten: no exigen ci
 
 ## Mapeo a RRI
 
-Los issues de §3 y las mejoras de §4 pueden escalar a tasks:
+Los issues de §4 y las mejoras de §5 pueden escalar a tasks:
 
 - **O-xx** con esfuerzo S y dominio bajo → candidato Low → Gemma local
 - **D-xx** BLOCKER → abre task con RRI explícito antes de la siguiente sesión

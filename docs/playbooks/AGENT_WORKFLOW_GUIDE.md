@@ -158,11 +158,11 @@ in the same change — not as a follow-up.
 
 | ADR change | Must review and update in the same change |
 |---|---|
-| **New ADR** | `docs/adr/README.md` index row; `docs/architecture.md` if it adds or alters a runtime/crate boundary; `docs/plan/roadmap.md` if it changes slice scope or dependencies; the affected `docs/plan/*` and `docs/tasks/*` files |
-| **Status change** (`Proposed` → `Accepted` → `Superseded` / `Deprecated`) | index `Status` column; every canonical doc (`architecture.md`, `roadmap.md`, plan/tasks) that cites the ADR as authority for a decision |
+| **New ADR** | `docs/adr/README.md` index row; ADR frontmatter block (`type: ADR`, `title:`, `status:`); `docs/architecture.md` if it adds or alters a runtime/crate boundary; `docs/plan/roadmap.md` if it changes slice scope or dependencies; the affected `docs/plan/*` and `docs/tasks/*` files |
+| **Status change** (`Proposed` → `Accepted` → `Superseded` / `Deprecated`) | ADR frontmatter `status:` field (must mirror the prose `- **Status:**` token); index `Status` column; every canonical doc (`architecture.md`, `roadmap.md`, plan/tasks) that cites the ADR as authority for a decision |
 | **Scope narrowed or broadened** | index scope annotation; `docs/architecture.md`; `docs/plan/roadmap.md`; affected plan/tasks; `README.md` if the change is outward-facing |
 | **Content / decision change** (the decision itself, not just status or scope) | every canonical doc whose prose describes that decision — **this is semantic and not machine-verifiable**; Layer 2/3 confirm references still resolve, but human review owns whether the prose is still accurate |
-| **Superseded by ADR-YYY** | both ADRs' `Status` field; the index row for each; every doc citing the superseded ADR |
+| **Superseded by ADR-YYY** | both ADRs' frontmatter (`status:` / `supersedes:` / `superseded_by:`); both ADRs' prose `Status` field; the index row for each; every doc citing the superseded ADR |
 | **Deletion or renumbering** | see the deletion rule below; update the index, every doc citation, **and every code/migration comment** (`.rs`, `.sql`) in the same change |
 
 **Deletion rule.** An `Accepted` ADR is part of the auditable decision record and
@@ -172,13 +172,15 @@ A `Proposed` ADR that was never adopted may be deleted only after every referenc
 a delete + create and must update all references atomically.
 
 **Definition of done for any ADR change:**
-- [ ] The ADR file's `Status` field is updated.
+- [ ] The ADR file's prose `- **Status:**` line is updated.
+- [ ] The ADR file's frontmatter `status:` mirrors the prose token; `supersedes:` /
+      `superseded_by:` are set where applicable (frontmatter parity).
 - [ ] `docs/adr/README.md` index row matches (status token + title).
 - [ ] Every doc in the matching propagation row above has been reviewed and updated
       if its content describes the changed decision.
 - [ ] No code or migration comment cites a missing ADR number.
 - [ ] `make qa-docs` passes (index parity, completeness, dangling refs in docs and
-      code/migrations, superseded-successor existence).
+      code/migrations, superseded-successor existence, OKF frontmatter parity).
 
 ### What this contract does and does not guarantee
 

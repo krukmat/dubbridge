@@ -81,6 +81,32 @@ Local app-container wiring now lives in the opt-in `app` profile of
 `infra/local/docker-compose.yml`; it targets container DNS (`postgres`, `redis`) and
 keeps auth secrets in a local `.env`.
 
+The default local app profile still uses `storage.backend = local_fs`. To exercise
+the S3-compatible path against local MinIO, start the app profile with:
+
+```bash
+DUBBRIDGE_STORAGE_BACKEND=s3 docker compose -f infra/local/docker-compose.yml --profile app up
+```
+
+The compose file points the Rust containers at `http://minio:9000`, bucket
+`dubbridge-local`, and the local-only MinIO credentials `dubbridge` /
+`dubbridge123`. Keep production object-store credentials in deployment secrets, not
+committed config.
+
+### Object cleanup and reconciliation
+
+Uploads write the object first, then persist the relational pending-ingestion row.
+If the relational write fails, the API attempts immediate cleanup of the just-written
+object and logs any cleanup failure with the ingest token and storage key.
+
+The API also runs periodic storage reconciliation from the same cleanup worker. The
+reconciliation pass lists canonical `ingests/` keys through `StorageAdapter`, compares
+them with `pending_ingestions.storage_key` and `artifact_records.storage_key`, and
+deletes only planner-approved orphan candidates. Referenced objects are retained, and
+malformed or unexpected keys are skipped and logged. Delete failures keep enough
+context for a later run to retry; rerunning reconciliation after successful deletion is
+a no-op for already-repaired state.
+
 ### Environments (local vs production)
 
 Local and production are separated by a fail-closed layered configuration model
@@ -120,6 +146,33 @@ Ollama — no cloud call, no approval gate. The orchestrating agent reviews the
 output and reports before marking the task done. Full procedure: `docs/policies/RRI_POLICY.md`.
 
 Background and design rationale: `docs/prompts/medium-article-rri-output.md`.
+
+## Knowledge format (OKF)
+
+Every documentation file in `docs/` carries a YAML frontmatter block that declares its type:
+
+```yaml
+---
+type: ADR        # one of 10 closed values
+status: Accepted
+---
+```
+
+The closed vocabulary and rules live in [`docs/knowledge/README.md`](docs/knowledge/README.md). The validator runs on every commit:
+
+```mermaid
+graph LR
+    DOCS[docs/**/*.md] -->|parsed by| VAL[check_okf_frontmatter.py]
+    VAL -->|type + status valid?| HOOK[pre-commit hook]
+    VAL -->|included in| CI[CI qa-docs job]
+    HOOK & CI -->|fail-closed| BLOCK[commit / PR blocked]
+    HOOK & CI -->|pass| OK[green ✅]
+```
+
+```bash
+make qa-okf-frontmatter   # run the validator alone
+make qa-docs              # full doc gate (includes OKF)
+```
 
 ## Repository layout
 

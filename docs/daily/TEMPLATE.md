@@ -14,7 +14,18 @@
 
 ---
 
-## 2. Ayer → Hoy
+## 2. Pipelines GH rotos
+
+| Workflow | Último fallo | Estado | Acción |
+|---|---|---|---|
+| `ci.yml` | ninguno \| \<run / job roto\> | limpio \| abierto \| mitigado | vigilar \| \<task / owner\> |
+
+> Registrar aquí cualquier GitHub Actions en rojo que siga roto al abrir o cerrar
+> el día. Si no hay ninguno, dejar `ninguno` explícito.
+
+---
+
+## 3. Ayer → Hoy
 
 | Estado | Task | Banda RRI | Nota |
 |---|---|---|---|
@@ -27,7 +38,7 @@
 
 ---
 
-## 3. Issues ledger
+## 4. Issues ledger
 
 | ID | Sev | Tipo | Descripción | Estado | Acción |
 |---|---|---|---|---|---|
@@ -38,7 +49,7 @@
 
 ---
 
-## 4. Optimizaciones y mejoras
+## 5. Optimizaciones y mejoras
 
 | ID | Tipo | Propuesta | Impacto | Esfuerzo | → Task? |
 |---|---|---|---|---|---|
@@ -50,16 +61,17 @@
 
 ---
 
-## 5. Decisiones pendientes (HITL gate)
+## 6. Decisiones pendientes (HITL gate)
 
 - [ ] \<decisión que espera al humano — p.ej. aprobar plan S-120, elegir ADR para X20\>
 
 ---
 
-## 6. Cierre del día ✓
+## 7. Cierre del día ✓
 
 - [ ] `git status` limpio — sin trabajo declarado "done" sin commitear
 - [ ] Roadmap ↔ ledgers ↔ git consistentes (drift-check emite 0 🔴)
+- [ ] Pipelines GH rotos revisados; si existe alguno, quedó con owner o task
 - [ ] 8 gates verdes (`qa-fmt`, `qa-lint`, `qa-test`, `qa-check`, `qa-deny`, `qa-config-secrets`, `qa-coverage`, `qa-docs`) — o issue BLOCKER explicando cuál y por qué
 - [ ] X-items tocados hoy reflejados en roadmap
 - [ ] Daily de mañana sembrado con lo `[~]` que queda

@@ -21,6 +21,40 @@ value not listed below is a validator error.
 | `Audit` | `docs/audit/*.md` | May include `date:`. |
 | `Prompt` | `docs/prompts/*.md` | May include `governs:`. |
 
+## System overview
+
+```mermaid
+graph TD
+    subgraph "Documents in scope"
+        ADR[docs/adr/ADR-*.md]
+        PL[docs/playbooks/*.md]
+        PO[docs/policies/*.md]
+        PLAN[docs/plan/*.md]
+        TASK[docs/tasks/*.md]
+        ARCH[docs/architecture.md]
+        PROP[docs/proposals/*.md]
+        AUD[docs/audit/*.md]
+        PROM[docs/prompts/*.md]
+    end
+
+    subgraph "Contract"
+        VOC[docs/knowledge/README.md\nclosed type vocabulary]
+        GUIDE[AGENT_WORKFLOW_GUIDE.md\nADR propagation contract]
+    end
+
+    subgraph "Enforcement"
+        VAL[check_okf_frontmatter.py]
+        HOOK[pre-commit hook]
+        CI[CI qa-docs job]
+    end
+
+    VOC -->|defines 10 types| VAL
+    ADR & PL & PO & PLAN & TASK & ARCH & PROP & AUD & PROM -->|validated by| VAL
+    VAL -->|included in| HOOK
+    VAL -->|included in| CI
+    GUIDE -->|instructs agents on| ADR
+```
+
 ## Out-of-scope paths (validator skips these)
 
 - `docs/daily/*` — ephemeral daily notes

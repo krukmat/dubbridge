@@ -25,8 +25,8 @@ governed_by: [ADR-033]
 | OKF-T2 | Frontmatter on 18 ADRs (status mirrors prose) | M | 38 Moderate (`scripts/rri.py`) | T1 | ✅ Done |
 | OKF-T3 | Frontmatter on playbooks + policies | S | ~26 Moderate (est.) | T1 | ✅ Done |
 | OKF-T4 | Frontmatter on plans + task ledgers | M | ~40 Moderate (est.) | T1 | ✅ Done |
-| OKF-T5 | Frontmatter on architecture + proposals + audits + prompts | S | ~28 Moderate (est.) | T1 | ⬜ Not started |
-| OKF-T6 | Add frontmatter clause to ADR change-propagation contract | M | ~40 Moderate (est.) | T2–T5 | ⬜ Not started |
+| OKF-T5 | Frontmatter on architecture + proposals + audits + prompts | S | ~28 Moderate (est.) | T1 | ✅ Done |
+| OKF-T6 | Add frontmatter clause to ADR change-propagation contract | M | ~40 Moderate (est.) | T2–T5 | ✅ Done |
 
 Subtask RRIs marked `(est.)` are pending a fresh `scripts/rri.py` run at presentation
 time (the workflow requires a fresh run before each task is presented). T0/T1/T2 were
