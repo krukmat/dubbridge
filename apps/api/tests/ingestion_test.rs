@@ -1878,7 +1878,7 @@ async fn install_finalize_artifact_deletion_trigger(pool: &PgPool) {
         CREATE OR REPLACE FUNCTION delete_finalize_artifact_for_t5a()
         RETURNS trigger AS $$
         BEGIN
-            IF NEW.kind = 'ingestion_finalized' THEN
+            IF NEW.event_kind = 'ingestion_finalized' THEN
                 DELETE FROM artifact_records WHERE ingest_token = NEW.ingest_token;
             END IF;
             RETURN NEW;
