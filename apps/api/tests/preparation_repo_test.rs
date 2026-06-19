@@ -27,15 +27,14 @@ async fn setup_pool() -> Option<PgPool> {
 
 async fn insert_asset(pool: &PgPool) -> AssetId {
     let asset_id = AssetId::new();
-    sqlx::query(
-        "INSERT INTO assets (id, uploader_subject_id, ingestion_status, created_at) VALUES ($1, $2, $3, now())"
-    )
-    .bind(asset_id.0)
-    .bind(Uuid::new_v4())
-    .bind("finalized")
-    .execute(pool)
-    .await
-    .expect("insert asset");
+    sqlx::query("INSERT INTO assets (id, title, uploader_id, status) VALUES ($1, $2, $3, $4)")
+        .bind(asset_id.0)
+        .bind("test-asset")
+        .bind(Uuid::new_v4())
+        .bind("finalized")
+        .execute(pool)
+        .await
+        .expect("insert asset");
     asset_id
 }
 
