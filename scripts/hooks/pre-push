@@ -3,6 +3,7 @@ set -e
 
 echo "Running pre-push gates..."
 make qa-test
+make qa-maintainability
 
 if [ -n "$DUBBRIDGE_DATABASE_URL" ]; then
     echo "Running coverage with DB..."

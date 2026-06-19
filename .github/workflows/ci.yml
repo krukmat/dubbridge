@@ -65,6 +65,18 @@ jobs:
       - name: Run cargo check
         run: make qa-check
 
+  maintainability:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    env:
+      DUBBRIDGE_MAINTAINABILITY_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reject generated-code bloat in backend/mobile diffs
+        run: make qa-maintainability
+
   deny:
     runs-on: ubuntu-latest
     steps:
