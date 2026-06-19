@@ -491,7 +491,7 @@ async fn malformed_hls_output_does_not_persist_artifacts() {
 
     let asset_id = insert_asset(&pool).await;
     let _source = insert_source_artifact(&pool, asset_id).await;
-    let invalid_manifest = "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-ENDLIST\n";
+    let invalid_manifest = "#EXTM3U\n#EXT-X-VERSION:3\n#EXTINF:6.0,\n#EXT-X-ENDLIST\n";
 
     let err = validate_hls_outputs(invalid_manifest, &["segment_00000.ts"]).unwrap_err();
     assert!(err.to_string().contains("no segment references"));
