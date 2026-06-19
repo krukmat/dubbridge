@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// Minimal mock gateway for E2E screenshot suite.
-// Provides only the endpoints the mobile bootstrap flow needs:
-//   GET  /health/ready         — seed CLI health-check gate
-//   POST /auth/mobile/session  — handoff code → session_ref exchange
-//
-// The handoff store is in-memory. Use /e2e/issue-handoff to pre-seed a code
-// so that mint-handoff-code.mjs (or Maestro) can redeem it.
+// Minimal mock gateway for E2E screenshot suite (S-200 credential auth).
+// Endpoints:
+//   GET  /health/ready     — health-check gate
+//   POST /auth/login       — email/password → bearer token
+//   POST /auth/register    — registration → bearer token
+//   POST /e2e/seed         — set per-phase asset_seed / ingest_seed mode
+//   GET  /api/*            — mocked API responses gated by Authorization: Bearer
 
 import http from "node:http";
 import { randomUUID } from "node:crypto";
@@ -80,11 +80,18 @@ export const SEED_RIGHTS_RECORDS = [
   },
 ];
 
+// E2E credential constants — used by seed-and-run.sh and the mock /auth/login handler.
+export const E2E_EMAIL = "e2e@dubbridge.dev";
+export const E2E_PASSWORD = "e2etestpass123";
+export const E2E_BEARER_TOKEN = "e2e-bearer-token";
+
 // Session used for the non-member EC-2 / SC-MEMBER-2 fixture.
 export const NON_MEMBER_SESSION = "e2e-non-member-session";
+export const NON_MEMBER_BEARER = "e2e-non-member-bearer";
 
 // Session used for the non-reviewer EC-2 / review fixture.
 export const NON_REVIEWER_SESSION = "e2e-non-reviewer-session";
+export const NON_REVIEWER_BEARER = "e2e-non-reviewer-bearer";
 
 export const SEED_REVIEW_TASK = {
   id: "review-task-seed-1",
@@ -121,18 +128,21 @@ async function readBody(req) {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-function hasSession(req) {
-  const session = req.headers["x-dubbridge-session"];
-  return typeof session === "string" && session.trim().length > 0;
+function extractBearer(req) {
+  const auth = req.headers["authorization"] ?? "";
+  if (auth.startsWith("Bearer ")) return auth.slice(7).trim();
+  return null;
 }
 
-function getAssetSeedMode(req, sessionModes) {
-  const session = req.headers["x-dubbridge-session"];
-  if (typeof session !== "string") {
-    return "default";
-  }
+function hasAuth(req) {
+  const token = extractBearer(req);
+  return typeof token === "string" && token.trim().length > 0;
+}
 
-  return sessionModes.get(session)?.assetSeed ?? "default";
+function getAssetSeedMode(req, tokenModes) {
+  const token = extractBearer(req);
+  if (!token) return "default";
+  return tokenModes.get(token)?.assetSeed ?? "default";
 }
 
 export function createMockGatewayServer({
@@ -141,9 +151,8 @@ export function createMockGatewayServer({
   logger = console,
 } = {}) {
   let boundPort = port;
-  // In-memory handoff store: code → seeded session info (single-use)
-  const handoffStore = new Map();
-  const sessionModes = new Map();
+  // In-memory bearer token → seed mode mapping
+  const tokenModes = new Map();
   // In-memory ingest token mode: token → "no_rights" | undefined
   const ingestTokenModes = new Map();
   const consentRows = [];
@@ -163,61 +172,66 @@ export function createMockGatewayServer({
       return sendJson(res, 200, { service: "gateway", status: "live" });
     }
 
-    // Pre-seed a handoff code (used by mint-handoff-code.mjs substitute)
-    if (req.method === "POST" && url.pathname === "/e2e/issue-handoff") {
-      const sessionRef = `e2e-session-${randomUUID()}`;
-      const handoffCode = `e2e-handoff-${randomUUID()}`;
-      const assetSeed = url.searchParams.get("asset_seed") === "empty" ? "empty" : "default";
-      const ingestSeed = url.searchParams.get("ingest_seed") === "no_rights" ? "no_rights" : undefined;
-      handoffStore.set(handoffCode, { sessionRef, assetSeed, ingestSeed });
-      logger.log?.(`[mock-gateway] issued handoff_code=${handoffCode}`);
-      return sendJson(res, 200, {
-        auth: {
-          handoff_code: handoffCode,
-          bootstrap_deeplink: `dubbridge://auth/callback?handoff_code=${handoffCode}`,
-        },
-        meta: {
-          gateway_base_url: `http://localhost:${boundPort}`,
-          asset_seed: assetSeed,
-        },
-      });
-    }
-
-    // Mobile session redemption
-    if (req.method === "POST" && url.pathname === "/auth/mobile/session") {
+    // S-200 bearer auth — relay login (mock issues a fixed E2E token)
+    if (req.method === "POST" && url.pathname === "/auth/login") {
       let payload;
-      try {
-        payload = JSON.parse(await readBody(req));
-      } catch {
+      try { payload = JSON.parse(await readBody(req)); } catch {
         return sendJson(res, 400, { error: "invalid_json" });
       }
-
-      const code = typeof payload?.handoff_code === "string" ? payload.handoff_code.trim() : null;
-      if (!code) return sendJson(res, 400, { error: "missing_handoff_code" });
-
-      const sessionInfo = handoffStore.get(code);
-      if (!sessionInfo) {
-        logger.log?.(`[mock-gateway] handoff_code not found: ${code}`);
-        return sendJson(res, 401, { error: "invalid_handoff_code" });
+      const { email, password } = payload ?? {};
+      if (!email || !password) return sendJson(res, 400, { error: "missing_fields" });
+      if (email !== E2E_EMAIL || password !== E2E_PASSWORD) {
+        return sendJson(res, 401, { error: "invalid_credentials" });
       }
-
-      handoffStore.delete(code);
-      sessionModes.set(sessionInfo.sessionRef, {
-        assetSeed: sessionInfo.assetSeed,
-        ingestSeed: sessionInfo.ingestSeed,
+      // Preserve any mode pre-seeded via /e2e/seed (e.g. ingest_seed=no_rights):
+      // the Maestro phase seeds the mode BEFORE launching the app, and the app
+      // logs in on launch. Overwriting here would wipe the seeded mode.
+      if (!tokenModes.has(E2E_BEARER_TOKEN)) {
+        tokenModes.set(E2E_BEARER_TOKEN, { assetSeed: "default" });
+      }
+      logger.log?.(`[mock-gateway] login ok -> token=${E2E_BEARER_TOKEN}`);
+      return sendJson(res, 200, {
+        token: E2E_BEARER_TOKEN,
+        userId: "00000000-0000-0000-0000-000000000001",
+        workspaceId: "00000000-0000-0000-0000-000000000002",
       });
-      logger.log?.(
-        `[mock-gateway] redeemed handoff_code=${code} -> session_ref=${sessionInfo.sessionRef}`,
-      );
-      return sendJson(res, 200, { session_ref: sessionInfo.sessionRef });
     }
 
-    if (url.pathname.startsWith("/api/") && !hasSession(req)) {
-      return sendJson(res, 401, { error: "missing_session" });
+    // S-200 bearer auth — relay register
+    if (req.method === "POST" && url.pathname === "/auth/register") {
+      let payload;
+      try { payload = JSON.parse(await readBody(req)); } catch {
+        return sendJson(res, 400, { error: "invalid_json" });
+      }
+      const { email, password, workspaceName } = payload ?? {};
+      if (!email || !password || !workspaceName) return sendJson(res, 400, { error: "missing_fields" });
+      // Preserve any mode pre-seeded via /e2e/seed (see /auth/login note).
+      if (!tokenModes.has(E2E_BEARER_TOKEN)) {
+        tokenModes.set(E2E_BEARER_TOKEN, { assetSeed: "default" });
+      }
+      logger.log?.(`[mock-gateway] register ok -> token=${E2E_BEARER_TOKEN}`);
+      return sendJson(res, 201, {
+        token: E2E_BEARER_TOKEN,
+        userId: "00000000-0000-0000-0000-000000000001",
+        workspaceId: "00000000-0000-0000-0000-000000000002",
+      });
+    }
+
+    // E2E seed control — set asset/ingest mode for a token without going through the UI
+    if (req.method === "POST" && url.pathname === "/e2e/seed") {
+      const assetSeed = url.searchParams.get("asset_seed") === "empty" ? "empty" : "default";
+      const ingestSeed = url.searchParams.get("ingest_seed") === "no_rights" ? "no_rights" : undefined;
+      tokenModes.set(E2E_BEARER_TOKEN, { assetSeed, ingestSeed });
+      logger.log?.(`[mock-gateway] e2e/seed asset_seed=${assetSeed} ingest_seed=${ingestSeed}`);
+      return sendJson(res, 200, { ok: true, asset_seed: assetSeed });
+    }
+
+    if (url.pathname.startsWith("/api/") && !hasAuth(req)) {
+      return sendJson(res, 401, { error: "missing_auth" });
     }
 
     if (req.method === "GET" && url.pathname === "/api/assets") {
-      const assetSeed = getAssetSeedMode(req, sessionModes);
+      const assetSeed = getAssetSeedMode(req, tokenModes);
       return sendJson(res, 200, assetSeed === "empty" ? [] : SEED_ASSETS);
     }
 
@@ -230,8 +244,8 @@ export function createMockGatewayServer({
 
     if (req.method === "POST" && url.pathname === "/api/ingest") {
       const ingestToken = randomUUID();
-      const sessionMode = sessionModes.get(req.headers["x-dubbridge-session"]);
-      if (sessionMode?.ingestSeed === "no_rights") {
+      const tokenMode = tokenModes.get(extractBearer(req));
+      if (tokenMode?.ingestSeed === "no_rights") {
         ingestTokenModes.set(ingestToken, "no_rights");
       }
       return sendJson(res, 201, { ingest_token: ingestToken });
@@ -296,10 +310,9 @@ export function createMockGatewayServer({
     // Non-member sessions (NON_MEMBER_SESSION) are rejected on org-scoped routes.
     // -------------------------------------------------------------------------
 
-    const isNonMember =
-      req.headers["x-dubbridge-session"] === NON_MEMBER_SESSION;
-    const isNonReviewer =
-      req.headers["x-dubbridge-session"] === NON_REVIEWER_SESSION;
+    const bearer = extractBearer(req);
+    const isNonMember = bearer === NON_MEMBER_BEARER;
+    const isNonReviewer = bearer === NON_REVIEWER_BEARER;
 
     // GET /api/orgs — list orgs for the session
     if (req.method === "GET" && url.pathname === "/api/orgs") {

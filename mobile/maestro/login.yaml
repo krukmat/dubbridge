@@ -20,17 +20,20 @@ tags:
 
 # Enter credentials
 - tapOn:
-    id: email-input
-- typeText: test@dubbridge.dev
+    id: login-email-input
+- inputText: e2e@dubbridge.dev
 
 - tapOn:
-    id: password-input
-- typeText: testpassword123
+    id: login-password-input
+- inputText: e2etestpass123
+
+# Dismiss the soft keyboard so the Sign in button is on-screen and tappable
+- hideKeyboard
 
 - takeScreenshot: 02_credentials_entered
 
 - tapOn:
-    id: login-button
+    id: login-submit-button
 
 # Wait for home surface after token issuance
 - extendedWaitUntil:

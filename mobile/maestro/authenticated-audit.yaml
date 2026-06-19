@@ -27,23 +27,7 @@ tags:
 - assertVisible:
     id: login-screen
 
-- openLink: ${SEED_BOOTSTRAP_DEEPLINK}
-
-- repeat:
-    times: 20
-    commands:
-      - runFlow:
-          when:
-            visible:
-              text: ".*isn't responding.*"
-          commands:
-            - tapOn: Wait
-      - waitForAnimationToEnd
-
-- extendedWaitUntil:
-    visible:
-      id: home-screen
-    timeout: 30000
+- runFlow: e2e-login.yaml
 
 - assertVisible:
     id: home-screen

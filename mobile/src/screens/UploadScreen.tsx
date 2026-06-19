@@ -1,4 +1,5 @@
 import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import Constants from 'expo-constants';
 import { useState } from 'react';
 import {
@@ -60,10 +61,12 @@ const E2E_RIGHTS: RightsFormData = {
 };
 
 function isE2EEnabled(): boolean {
-  if (!__DEV__) {
-    return false;
-  }
-
+  // EXPO_PUBLIC_E2E_ENABLED is a build-time opt-in injected only by the
+  // screenshot/E2E tooling — it is never set in production or release builds.
+  // It is the authoritative signal and must NOT be gated behind __DEV__: the
+  // Maestro suite runs a release-mode export bundle (where __DEV__ is false)
+  // because dev bundles crash when launched standalone inside the APK
+  // ("Cannot create devtools websocket connections in embedded environments").
   if (process.env.EXPO_PUBLIC_E2E_ENABLED === 'true') {
     return true;
   }
@@ -126,11 +129,17 @@ export function UploadScreen({
 
   async function handlePickFile(rights: RightsFormData) {
     if (isE2EEnabled()) {
+      // Materialize a real, readable file in the app cache dir. A hardcoded
+      // file:///tmp path is not readable on the device, which rejects the
+      // multipart upload (FileSystem.uploadAsync -> IOException). The mock
+      // gateway does not validate file bytes, so any small placeholder works.
+      const uri = `${FileSystem.cacheDirectory ?? ''}dubbridge-e2e-upload.mov`;
+      await FileSystem.writeAsStringAsync(uri, 'dubbridge-e2e-placeholder');
       setViewState({
         kind: 'ready',
         rights,
         file: {
-          uri: 'file:///tmp/dubbridge-e2e-upload.mov',
+          uri,
           name: 'dubbridge-e2e-upload.mov',
           mimeType: 'video/quicktime',
         },

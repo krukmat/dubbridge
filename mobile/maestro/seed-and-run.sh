@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# S-055 V7a — Stack bring-up + cleanup trap for the Maestro screenshot suite.
+# S-200 — Stack bring-up + cleanup trap for the Maestro screenshot suite.
+# Auth: email/password + HS256 JWT bearer token (S-200 credential auth).
 #
 # Usage (from repo root):
 #   bash mobile/maestro/seed-and-run.sh
@@ -7,20 +8,22 @@
 # Prerequisites:
 #   - Android emulator booted (adb devices shows a running emulator)
 #   - debug APK built at mobile/android/app/build/outputs/apk/debug/app-debug.apk
-#   - mock-oauth-server and mock-gateway-server are started externally, OR
-#     set START_MOCK_SERVERS=1 to have this script start them
+#     (must contain S-200 JS bundle — patch with expo export + zip -u if stale)
+#   - mock-gateway-server started externally, OR set START_MOCK_SERVERS=1
 #
 # Port map (must match screenshot-env.sh):
-#   apps/gateway / mock-gateway  :8081
+#   mock-gateway-server          :8081
 #   apps/api                     :8080
 #   Metro (JS bundler)           :8082
-#   mock-oauth                   :9000  (host-only; gateway contacts it directly)
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 APK_PATH="$REPO_ROOT/mobile/android/app/build/outputs/apk/debug/app-debug.apk"
+PATCHED_APK_PATH="/tmp/dubbridge-app-patched.apk"
 APP_ID="com.dubbridge.mobile"
+KEYSTORE_PATH="$REPO_ROOT/mobile/android/app/debug.keystore"
+# APKSIGNER resolved after screenshot-env.sh is sourced (sets ANDROID_HOME)
 GATEWAY_URL="http://127.0.0.1:8081"
 API_URL="http://127.0.0.1:8080"
 METRO_PORT=8082
@@ -95,6 +98,8 @@ cleanup() {
   done
   # Remove any temp files written by this script
   rm -f /tmp/dubbridge-seed-output.json
+  rm -rf /tmp/dubbridge-expo-export
+  rm -f /tmp/dubbridge-app-patched.apk
   info "Cleanup done."
 }
 
@@ -133,14 +138,55 @@ info "Emulator detected: $EMULATOR_SERIAL"
 adb -s "$EMULATOR_SERIAL" shell input keyevent 82 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
-# 4. Install or refresh the debug APK
+# 4. Patch APK with fresh JS bundle, then install
+#
+# expo export produces a fresh Hermes HBC bundle that must replace the stale
+# one baked into app-debug.apk at Gradle build time. Without this step any
+# JS change since the last assembleDebug (including S-200 auth) is invisible.
 # ---------------------------------------------------------------------------
 
 info "Checking debug APK..."
 [[ -f "$APK_PATH" ]] || die "Debug APK not found at $APK_PATH. Run 'npx expo prebuild --platform android && cd mobile/android && ./gradlew assembleDebug' first."
 
-info "Installing APK: $APK_PATH"
-adb -s "$EMULATOR_SERIAL" install -r "$APK_PATH" \
+info "Exporting fresh Hermes bundle via expo export..."
+# Release-mode export (NOT --dev): dev bundles crash when launched standalone
+# inside the APK ("Cannot create devtools websocket connections in embedded
+# environments"). The upload screen's E2E fast-path keys off the build-time
+# EXPO_PUBLIC_E2E_ENABLED flag (not __DEV__), so it works in a release bundle.
+(cd "$REPO_ROOT/mobile" && \
+  DUBBRIDGE_ENV=local \
+  EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL=http://localhost:8081 \
+  EXPO_PUBLIC_E2E_ENABLED=true \
+  npx expo export --platform android --output-dir /tmp/dubbridge-expo-export 2>&1 \
+  | grep -E '(Bundled|hbc|error|Error)' || true)
+
+# --dev export produces a plain index-*.js bundle (no Hermes bytecode); a
+# release export produces index-*.hbc. The APK's assets/index.android.bundle
+# accepts either form, so take whichever the bundler emitted under android/.
+HBC_FILE=$(find /tmp/dubbridge-expo-export/_expo/static/js/android \
+  -type f \( -name "*.hbc" -o -name "*.js" \) | head -1)
+[[ -n "$HBC_FILE" ]] || die "expo export did not produce an android bundle. Check output above."
+info "Bundle: $HBC_FILE ($(du -h "$HBC_FILE" | cut -f1))"
+
+info "Patching APK with fresh bundle..."
+cp "$APK_PATH" "$PATCHED_APK_PATH"
+BUNDLE_TMPDIR=$(mktemp -d)
+mkdir -p "$BUNDLE_TMPDIR/assets"
+cp "$HBC_FILE" "$BUNDLE_TMPDIR/assets/index.android.bundle"
+(cd "$BUNDLE_TMPDIR" && zip -u "$PATCHED_APK_PATH" assets/index.android.bundle > /dev/null)
+rm -rf "$BUNDLE_TMPDIR"
+
+info "Signing patched APK..."
+APKSIGNER="${ANDROID_HOME}/build-tools/36.0.0/apksigner"
+[[ -f "$APKSIGNER" ]] || die "apksigner not found at $APKSIGNER. Check ANDROID_HOME."
+"$APKSIGNER" sign \
+  --ks "$KEYSTORE_PATH" \
+  --ks-pass pass:android \
+  --key-pass pass:android \
+  "$PATCHED_APK_PATH" || die "APK signing failed."
+
+info "Installing patched APK..."
+adb -s "$EMULATOR_SERIAL" install -r "$PATCHED_APK_PATH" \
   || die "APK install failed. Try 'adb uninstall $APP_ID' then re-run."
 
 # ---------------------------------------------------------------------------
@@ -148,10 +194,6 @@ adb -s "$EMULATOR_SERIAL" install -r "$APK_PATH" \
 # ---------------------------------------------------------------------------
 
 if [[ "$START_MOCK_SERVERS" == "1" ]]; then
-  info "Starting mock-oauth-server on :9000..."
-  node "$REPO_ROOT/scripts/e2e-seed/mock-oauth-server.mjs" &
-  _STARTED_PIDS+=($!)
-
   info "Starting mock-gateway-server on :8081..."
   node "$REPO_ROOT/scripts/e2e-seed/mock-gateway-server.mjs" &
   _STARTED_PIDS+=($!)
@@ -204,22 +246,18 @@ info ""
 info "---"
 
 # ---------------------------------------------------------------------------
-# V7b — Seed handoff code
+# S-200 — Verify mock gateway supports bearer auth (smoke check)
 # ---------------------------------------------------------------------------
 
-info "Minting handoff code via POST $GATEWAY_URL/e2e/issue-handoff ..."
-SEED_JSON=$(curl -sf --max-time 10 -X POST "$GATEWAY_URL/e2e/issue-handoff") \
-  || die "Seed request to $GATEWAY_URL/e2e/issue-handoff failed. Is the mock-gateway running?"
+info "Smoke-checking mock gateway bearer auth ..."
+curl -sf --max-time 10 \
+  -X POST "$GATEWAY_URL/auth/login" \
+  -H "content-type: application/json" \
+  -d '{"email":"e2e@dubbridge.dev","password":"e2etestpass123"}' \
+  | grep -q "token" \
+  || die "Mock gateway /auth/login smoke check failed. Is mock-gateway running with S-200 support?"
 
-DEEPLINK=$(SEED_JSON="$SEED_JSON" node -e "
-  const raw = process.env.SEED_JSON;
-  try { const p = JSON.parse(raw); process.stdout.write(p.auth.bootstrap_deeplink); }
-  catch(e) { process.exit(1); }
-") \
-  || die "Could not parse bootstrap_deeplink from seed response: $SEED_JSON"
-
-[[ -n "$DEEPLINK" ]] || die "Seed returned an empty bootstrap_deeplink. Response: $SEED_JSON"
-info "Handoff code obtained. Deeplink: ${DEEPLINK:0:60}..."
+info "Bearer auth smoke check passed."
 
 # ---------------------------------------------------------------------------
 # Full Maestro suite (S-055 phases 1–2 + S-060 phases 3–5)
@@ -239,7 +277,7 @@ mkdir -p "$MAESTRO_OUT_1" "$MAESTRO_OUT_2" "$MAESTRO_OUT_3" "$MAESTRO_OUT_3E" \
          "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" \
          "$MAESTRO_OUT_7" "$MAESTRO_OUT_8"
 
-# --- S-055 Phase 1: auth surface ---
+# --- S-055 Phase 1: auth surface (login screen visible, no credentials needed) ---
 
 info "Phase 1 — auth surface (auth-surface.yaml)..."
 maestro test \
@@ -249,32 +287,25 @@ maestro test \
 
 info "Phase 1 passed."
 
-# --- S-055 Phase 2: authenticated audit (home screen) ---
+# --- S-055 Phase 2: authenticated audit (home screen via credential login) ---
 
 info "Phase 2 — authenticated audit (authenticated-audit.yaml)..."
 maestro test \
   --test-output-dir "$MAESTRO_OUT_2" \
-  --env SEED_BOOTSTRAP_DEEPLINK="$DEEPLINK" \
   "$REPO_ROOT/mobile/maestro/authenticated-audit.yaml" \
   || die "Phase 2 (authenticated-audit.yaml) failed. Check $MAESTRO_OUT_2 for details."
 
 info "Phase 2 passed."
 
-# --- S-060 Phase 3: asset list (SC-LIST-1 populated) ---
+# --- S-060 Phase 3: asset list populated (SC-LIST-1) ---
 
-info "Minting handoff code for Phase 3 (asset list — populated)..."
-DEEPLINK_LIST=$(curl -sf --max-time 10 -X POST "$GATEWAY_URL/e2e/issue-handoff") \
+info "Seeding default asset mode for Phase 3 (asset list — populated)..."
+curl -sf --max-time 10 -X POST "$GATEWAY_URL/e2e/seed" > /dev/null \
   || die "Seed request for Phase 3 failed."
-DEEPLINK_LIST=$(SEED_JSON="$DEEPLINK_LIST" node -e "
-  const raw = process.env.SEED_JSON;
-  try { const p = JSON.parse(raw); process.stdout.write(p.auth.bootstrap_deeplink); }
-  catch(e) { process.exit(1); }
-") || die "Could not parse bootstrap_deeplink for Phase 3."
 
 info "Phase 3 — asset list populated (asset-list.yaml / SC-LIST-1)..."
 maestro test \
   --test-output-dir "$MAESTRO_OUT_3" \
-  --env SEED_BOOTSTRAP_DEEPLINK="$DEEPLINK_LIST" \
   "$REPO_ROOT/mobile/maestro/asset-list.yaml" \
   || die "Phase 3 (asset-list.yaml) failed. Check $MAESTRO_OUT_3 for details."
 
@@ -282,20 +313,13 @@ info "Phase 3 passed."
 
 # --- S-060 Phase 3b: asset list empty (SC-LIST-2) ---
 
-info "Minting empty handoff code for Phase 3b (asset list — empty)..."
-DEEPLINK_LIST_EMPTY=$(curl -sf --max-time 10 -X POST \
-  "$GATEWAY_URL/e2e/issue-handoff?asset_seed=empty") \
+info "Seeding empty asset mode for Phase 3b..."
+curl -sf --max-time 10 -X POST "$GATEWAY_URL/e2e/seed?asset_seed=empty" > /dev/null \
   || die "Seed request for Phase 3b failed."
-DEEPLINK_LIST_EMPTY=$(SEED_JSON="$DEEPLINK_LIST_EMPTY" node -e "
-  const raw = process.env.SEED_JSON;
-  try { const p = JSON.parse(raw); process.stdout.write(p.auth.bootstrap_deeplink); }
-  catch(e) { process.exit(1); }
-") || die "Could not parse bootstrap_deeplink for Phase 3b."
 
 info "Phase 3b — asset list empty (asset-list.yaml / SC-LIST-2)..."
 maestro test \
   --test-output-dir "$MAESTRO_OUT_3E" \
-  --env SEED_BOOTSTRAP_DEEPLINK="$DEEPLINK_LIST_EMPTY" \
   "$REPO_ROOT/mobile/maestro/asset-list.yaml" \
   || die "Phase 3b (asset-list.yaml empty) failed. Check $MAESTRO_OUT_3E for details."
 
@@ -303,19 +327,13 @@ info "Phase 3b passed."
 
 # --- S-060 Phase 4: asset detail (SC-DETAIL-1) ---
 
-info "Minting handoff code for Phase 4 (asset detail)..."
-DEEPLINK_DETAIL=$(curl -sf --max-time 10 -X POST "$GATEWAY_URL/e2e/issue-handoff") \
+info "Seeding default asset mode for Phase 4 (asset detail)..."
+curl -sf --max-time 10 -X POST "$GATEWAY_URL/e2e/seed" > /dev/null \
   || die "Seed request for Phase 4 failed."
-DEEPLINK_DETAIL=$(SEED_JSON="$DEEPLINK_DETAIL" node -e "
-  const raw = process.env.SEED_JSON;
-  try { const p = JSON.parse(raw); process.stdout.write(p.auth.bootstrap_deeplink); }
-  catch(e) { process.exit(1); }
-") || die "Could not parse bootstrap_deeplink for Phase 4."
 
 info "Phase 4 — asset detail (asset-detail.yaml / SC-DETAIL-1)..."
 maestro test \
   --test-output-dir "$MAESTRO_OUT_4" \
-  --env SEED_BOOTSTRAP_DEEPLINK="$DEEPLINK_DETAIL" \
   "$REPO_ROOT/mobile/maestro/asset-detail.yaml" \
   || die "Phase 4 (asset-detail.yaml) failed. Check $MAESTRO_OUT_4 for details."
 
@@ -323,19 +341,13 @@ info "Phase 4 passed."
 
 # --- S-060 Phase 5: asset ingestion upload (SC-INGEST-1) ---
 
-info "Minting handoff code for Phase 5 (asset ingestion)..."
-DEEPLINK_INGEST=$(curl -sf --max-time 10 -X POST "$GATEWAY_URL/e2e/issue-handoff") \
+info "Seeding default ingest mode for Phase 5..."
+curl -sf --max-time 10 -X POST "$GATEWAY_URL/e2e/seed" > /dev/null \
   || die "Seed request for Phase 5 failed."
-DEEPLINK_INGEST=$(SEED_JSON="$DEEPLINK_INGEST" node -e "
-  const raw = process.env.SEED_JSON;
-  try { const p = JSON.parse(raw); process.stdout.write(p.auth.bootstrap_deeplink); }
-  catch(e) { process.exit(1); }
-") || die "Could not parse bootstrap_deeplink for Phase 5."
 
 info "Phase 5 — asset ingestion (asset-ingestion.yaml / SC-INGEST-1)..."
 maestro test \
   --test-output-dir "$MAESTRO_OUT_5" \
-  --env SEED_BOOTSTRAP_DEEPLINK="$DEEPLINK_INGEST" \
   "$REPO_ROOT/mobile/maestro/asset-ingestion.yaml" \
   || die "Phase 5 (asset-ingestion.yaml) failed. Check $MAESTRO_OUT_5 for details."
 
@@ -343,40 +355,23 @@ info "Phase 5 passed."
 
 # --- S-060 Phase 5b: asset ingestion no-rights (SC-INGEST-2) ---
 
-info "Minting handoff code for Phase 5b (ingest no-rights — SC-INGEST-2)..."
-DEEPLINK_INGEST_NR=$(curl -sf --max-time 10 -X POST \
-  "$GATEWAY_URL/e2e/issue-handoff?ingest_seed=no_rights") \
+info "Seeding no-rights ingest mode for Phase 5b..."
+curl -sf --max-time 10 -X POST "$GATEWAY_URL/e2e/seed?ingest_seed=no_rights" > /dev/null \
   || die "Seed request for Phase 5b failed."
-DEEPLINK_INGEST_NR=$(SEED_JSON="$DEEPLINK_INGEST_NR" node -e "
-  const raw = process.env.SEED_JSON;
-  try { const p = JSON.parse(raw); process.stdout.write(p.auth.bootstrap_deeplink); }
-  catch(e) { process.exit(1); }
-") || die "Could not parse bootstrap_deeplink for Phase 5b."
 
 info "Phase 5b — asset ingestion no-rights (asset-ingestion-no-rights.yaml / SC-INGEST-2)..."
 maestro test \
   --test-output-dir "$MAESTRO_OUT_5B" \
-  --env SEED_BOOTSTRAP_DEEPLINK="$DEEPLINK_INGEST_NR" \
   "$REPO_ROOT/mobile/maestro/asset-ingestion-no-rights.yaml" \
   || die "Phase 5b (asset-ingestion-no-rights.yaml) failed. Check $MAESTRO_OUT_5B for details."
 
 info "Phase 5b passed."
 
-# --- S-100 Phase 6: project list + detail (SC-ORG-1, SC-PROJECT-1, SC-MEMBER-2) ---
-
-info "Minting handoff code for Phase 6 (project surfaces)..."
-DEEPLINK_PROJECTS=$(curl -sf --max-time 10 -X POST "$GATEWAY_URL/e2e/issue-handoff") \
-  || die "Seed request for Phase 6 failed."
-DEEPLINK_PROJECTS=$(SEED_JSON="$DEEPLINK_PROJECTS" node -e "
-  const raw = process.env.SEED_JSON;
-  try { const p = JSON.parse(raw); process.stdout.write(p.auth.bootstrap_deeplink); }
-  catch(e) { process.exit(1); }
-") || die "Could not parse bootstrap_deeplink for Phase 6."
+# --- S-100 Phase 6: project list + detail (SC-ORG-1, SC-PROJECT-1) ---
 
 info "Phase 6 — project surfaces (projects.yaml / SC-ORG-1, SC-PROJECT-1)..."
 maestro test \
   --test-output-dir "$MAESTRO_OUT_6" \
-  --env SEED_BOOTSTRAP_DEEPLINK="$DEEPLINK_PROJECTS" \
   "$REPO_ROOT/mobile/maestro/projects.yaml" \
   || die "Phase 6 (projects.yaml) failed. Check $MAESTRO_OUT_6 for details."
 
@@ -384,19 +379,9 @@ info "Phase 6 passed."
 
 # --- S-110 Phase 7: mobile compliance and consent ---
 
-info "Minting handoff code for Phase 7 (compliance surfaces)..."
-DEEPLINK_COMPLIANCE=$(curl -sf --max-time 10 -X POST "$GATEWAY_URL/e2e/issue-handoff") \
-  || die "Seed request for Phase 7 failed."
-DEEPLINK_COMPLIANCE=$(SEED_JSON="$DEEPLINK_COMPLIANCE" node -e "
-  const raw = process.env.SEED_JSON;
-  try { const p = JSON.parse(raw); process.stdout.write(p.auth.bootstrap_deeplink); }
-  catch(e) { process.exit(1); }
-") || die "Could not parse bootstrap_deeplink for Phase 7."
-
 info "Phase 7 — compliance surfaces (compliance.yaml)..."
 maestro test \
   --test-output-dir "$MAESTRO_OUT_7" \
-  --env SEED_BOOTSTRAP_DEEPLINK="$DEEPLINK_COMPLIANCE" \
   "$REPO_ROOT/mobile/maestro/compliance.yaml" \
   || die "Phase 7 (compliance.yaml) failed. Check $MAESTRO_OUT_7 for details."
 
@@ -404,19 +389,9 @@ info "Phase 7 passed."
 
 # --- S-160 Phase 8: review and publication flow (SC-REVIEW-1/2, SC-PUBLISH-1/2) ---
 
-info "Minting handoff code for Phase 8 (review flow)..."
-DEEPLINK_REVIEW=$(curl -sf --max-time 10 -X POST "$GATEWAY_URL/e2e/issue-handoff") \
-  || die "Seed request for Phase 8 failed."
-DEEPLINK_REVIEW=$(SEED_JSON="$DEEPLINK_REVIEW" node -e "
-  const raw = process.env.SEED_JSON;
-  try { const p = JSON.parse(raw); process.stdout.write(p.auth.bootstrap_deeplink); }
-  catch(e) { process.exit(1); }
-") || die "Could not parse bootstrap_deeplink for Phase 8."
-
 info "Phase 8 — review and publication (review.yaml / SC-REVIEW-1/2, SC-PUBLISH-1/2)..."
 maestro test \
   --test-output-dir "$MAESTRO_OUT_8" \
-  --env SEED_BOOTSTRAP_DEEPLINK="$DEEPLINK_REVIEW" \
   "$REPO_ROOT/mobile/maestro/review.yaml" \
   || die "Phase 8 (review.yaml) failed. Check $MAESTRO_OUT_8 for details."
 
@@ -442,64 +417,11 @@ PNG_COUNT=$(find "$SCREENSHOTS_DIR" -name "*.png" | wc -l | tr -d ' ')
 info "$PNG_COUNT screenshot(s) written to $SCREENSHOTS_DIR"
 
 # ---------------------------------------------------------------------------
-# Sanitize Maestro reports (redact handoff_code / session_ref)
+# Report hygiene (S-200: bearer token is a fixed non-secret constant; no
+# sanitization needed — the e2e-bearer-token value has no production meaning)
 # ---------------------------------------------------------------------------
 
-info "Sanitizing Maestro reports..."
-
-sanitize_dir() {
-  local dir="$1"
-  find "$dir" -name "*.json" | while IFS= read -r f; do
-    # URL-encoded and plain query-param forms
-    sed -i '' \
-      -e 's/handoff_code=[^&" ]*/handoff_code=[REDACTED]/g' \
-      -e 's/session_ref=[^&" ]*/session_ref=[REDACTED]/g' \
-      "$f"
-    # JSON value forms
-    sed -i '' \
-      -e 's/"handoff_code":"[^"]*"/"handoff_code":"[REDACTED]"/g' \
-      -e 's/"session_ref":"[^"]*"/"session_ref":"[REDACTED]"/g' \
-      "$f"
-  done
-}
-
-sanitize_dir "$MAESTRO_OUT_1"
-sanitize_dir "$MAESTRO_OUT_2"
-sanitize_dir "$MAESTRO_OUT_3"
-sanitize_dir "$MAESTRO_OUT_3E"
-sanitize_dir "$MAESTRO_OUT_4"
-sanitize_dir "$MAESTRO_OUT_5"
-sanitize_dir "$MAESTRO_OUT_5B"
-sanitize_dir "$MAESTRO_OUT_6"
-sanitize_dir "$MAESTRO_OUT_7"
-sanitize_dir "$MAESTRO_OUT_8"
-
-# Assert absence of sensitive values post-sanitization
-LEAK_HANDOFF=$(grep -r 'handoff_code=' \
-  "$MAESTRO_OUT_1" "$MAESTRO_OUT_2" "$MAESTRO_OUT_3" "$MAESTRO_OUT_3E" \
-  "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" \
-  "$MAESTRO_OUT_7" "$MAESTRO_OUT_8" 2>/dev/null \
-  | grep -v 'handoff_code=\[REDACTED\]' || true)
-LEAK_SESSION=$(grep -r 'session_ref=' \
-  "$MAESTRO_OUT_1" "$MAESTRO_OUT_2" "$MAESTRO_OUT_3" "$MAESTRO_OUT_3E" \
-  "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" \
-  "$MAESTRO_OUT_7" "$MAESTRO_OUT_8" 2>/dev/null \
-  | grep -v 'session_ref=\[REDACTED\]' || true)
-LEAK_SESSION_JSON=$(grep -r '"session_ref":"' \
-  "$MAESTRO_OUT_1" "$MAESTRO_OUT_2" "$MAESTRO_OUT_3" "$MAESTRO_OUT_3E" \
-  "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" \
-  "$MAESTRO_OUT_7" "$MAESTRO_OUT_8" 2>/dev/null \
-  | grep -v '"session_ref":"\[REDACTED\]"' || true)
-
-if [[ -n "$LEAK_HANDOFF" || -n "$LEAK_SESSION" || -n "$LEAK_SESSION_JSON" ]]; then
-  echo "[seed-and-run] SANITIZER LEAK DETECTED:" >&2
-  [[ -n "$LEAK_HANDOFF" ]]      && echo "$LEAK_HANDOFF" >&2
-  [[ -n "$LEAK_SESSION" ]]      && echo "$LEAK_SESSION" >&2
-  [[ -n "$LEAK_SESSION_JSON" ]] && echo "$LEAK_SESSION_JSON" >&2
-  die "Sanitizer missed sensitive values in Maestro reports. See above."
-fi
-
-info "Sanitization verified: no handoff_code or session_ref values remain in reports."
+info "Report hygiene: no sensitive values to redact (S-200 bearer auth uses fixed E2E constants)."
 
 # ---------------------------------------------------------------------------
 # Done

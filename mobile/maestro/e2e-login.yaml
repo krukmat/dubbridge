@@ -1,0 +1,24 @@
+appId: com.dubbridge.mobile
+name: E2E Login subflow
+# Reusable subflow: assumes login-screen is already visible.
+# Fills email/password with E2E credentials and waits for home-screen.
+# Usage: runFlow: mobile/maestro/e2e-login.yaml
+---
+- tapOn:
+    id: login-email-input
+- inputText: e2e@dubbridge.dev
+
+- tapOn:
+    id: login-password-input
+- inputText: e2etestpass123
+
+# Dismiss the soft keyboard so the Sign in button is on-screen and tappable
+- hideKeyboard
+
+- tapOn:
+    id: login-submit-button
+
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 20000

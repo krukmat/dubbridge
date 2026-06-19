@@ -27,22 +27,7 @@ tags:
 - assertVisible:
     id: login-screen
 
-- openLink: ${SEED_BOOTSTRAP_DEEPLINK}
-
-- repeat:
-    times: 3
-    commands:
-      - runFlow:
-          when:
-            visible:
-              text: ".*isn't responding.*"
-          commands:
-            - tapOn: Wait
-
-- extendedWaitUntil:
-    visible:
-      id: home-screen
-    timeout: 30000
+- runFlow: e2e-login.yaml
 
 - assertVisible:
     id: home-screen
@@ -73,7 +58,7 @@ tags:
 
 # SC-REVIEW-2: Open the first review task
 - tapOn:
-    id: review-task-review-task-seed-1
+    id: review-task-card-review-task-seed-1
 
 - repeat:
     times: 3
@@ -99,27 +84,36 @@ tags:
 - assertNotVisible:
     id: publish-action
 
-# SC-REVIEW-2: Approve the task
+# SC-REVIEW-2: Approve the task. The status Badge renders capitalized
+# ("Approved"); Maestro anchors text: as a regex, so match the rendered casing.
 - tapOn:
     id: review-approve
 
 - extendedWaitUntil:
     visible:
-      text: "approved"
+      text: "Approved"
     timeout: 20000
 
 - takeScreenshot: 16_review_approved
 
-# SC-PUBLISH-1: publish action visible after approval — tap to publish
+# SC-PUBLISH-1: the Publication panel renders below the fold after approval —
+# scroll it into view before asserting and tapping the publish action.
+- scrollUntilVisible:
+    element:
+      id: publish-action
+    direction: DOWN
+    timeout: 10000
+
 - assertVisible:
     id: publish-action
 
 - tapOn:
     id: publish-action
 
+# After publish the panel shows "Published <timestamp>"; match with a wildcard.
 - extendedWaitUntil:
     visible:
-      text: "published"
+      text: "Published.*"
     timeout: 20000
 
 - takeScreenshot: 17_review_published

@@ -14,12 +14,7 @@ tags:
       id: login-screen
     timeout: 20000
 
-- openLink: ${SEED_BOOTSTRAP_DEEPLINK}
-
-- extendedWaitUntil:
-    visible:
-      id: home-screen
-    timeout: 30000
+- runFlow: e2e-login.yaml
 
 - tapOn:
     id: home-open-assets
@@ -65,6 +60,8 @@ tags:
     id: consent-evidence-input
 
 - inputText: proof-e2e-voice
+
+- hideKeyboard
 
 - tapOn:
     id: consent-grant
