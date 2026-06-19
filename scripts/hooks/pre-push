@@ -2,7 +2,12 @@
 set -e
 
 echo "Running pre-push gates..."
-make qa-test
+
+# Run unit/compile tests without DB, mirroring the CI 'test' job which has no
+# DUBBRIDGE_DATABASE_URL. Integration tests self-skip when the var is absent,
+# matching CI behaviour and avoiding parallel-DB race conditions in qa-test.
+DUBBRIDGE_DATABASE_URL= make qa-test
+
 make qa-maintainability
 
 if [ -d mobile/node_modules ]; then
