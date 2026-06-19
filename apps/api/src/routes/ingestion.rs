@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{
     Extension, Json, Router,
-    extract::{DefaultBodyLimit, Multipart, Path, Query, State},
+    extract::{DefaultBodyLimit, Multipart, Path, Query, State, multipart::Field},
     http::StatusCode,
     middleware,
     routing::{get, post},
@@ -17,7 +17,7 @@ use dubbridge_auth::{
 };
 use dubbridge_db::pending_ingestion_repo::PENDING_INGESTION_TTL_HOURS; // T1-T2
 use dubbridge_domain::{
-    artifact::ArtifactKind,
+    artifact::{ArtifactKind, PreparationStatus},
     asset::AssetId,
     audit::{AuditEvent, AuditEventKind},
     ingestion::IngestionError,
@@ -89,43 +89,10 @@ async fn create_ingestion(
                 })?);
             }
             Some("file") => {
-                filename = field.file_name().map(ToOwned::to_owned);
-                content_type = field.content_type().map(ToOwned::to_owned);
-                let spool = tempfile::NamedTempFile::new().map_err(|error| {
-                    ApiError::internal(format!("failed to allocate upload spool file: {error}"))
-                })?;
-                let mut spool_file =
-                    tokio::fs::File::from_std(spool.reopen().map_err(|error| {
-                        ApiError::internal(format!("failed to open upload spool file: {error}"))
-                    })?);
-                let mut checksum = Sha256::new();
-                let mut size_bytes: usize = 0;
-
-                while let Some(chunk) = field.chunk().await.map_err(|error| {
-                    if is_body_size_limit_error(&error) {
-                        ApiError::payload_too_large("request body exceeds the maximum allowed size")
-                    } else {
-                        ApiError::bad_request(format!("invalid file field: {error}"))
-                    }
-                })? {
-                    checksum.update(&chunk);
-                    size_bytes = size_bytes
-                        .checked_add(chunk.len())
-                        .ok_or_else(|| ApiError::internal("uploaded file is too large"))?;
-                    spool_file.write_all(&chunk).await.map_err(|error| {
-                        ApiError::internal(format!("failed to spool upload chunk: {error}"))
-                    })?;
-                }
-
-                spool_file.flush().await.map_err(|error| {
-                    ApiError::internal(format!("failed to flush upload spool file: {error}"))
-                })?;
-
-                staged_upload = Some(StagedUpload {
-                    spool,
-                    checksum: format!("{:x}", checksum.finalize()),
-                    size_bytes,
-                });
+                let (file_name, file_content_type, staged) = spool_upload_field(&mut field).await?;
+                filename = file_name;
+                content_type = file_content_type;
+                staged_upload = Some(staged);
             }
             _ => {}
         }
@@ -200,6 +167,54 @@ struct StagedUpload {
     size_bytes: usize,
 }
 
+/// Streams one multipart `file` field to a spooled temp file, computing its
+/// SHA-256 checksum and byte size as it goes. Returns the field's filename and
+/// declared content type alongside the staged upload.
+async fn spool_upload_field(
+    field: &mut Field<'_>,
+) -> Result<(Option<String>, Option<String>, StagedUpload), ApiError> {
+    let filename = field.file_name().map(ToOwned::to_owned);
+    let content_type = field.content_type().map(ToOwned::to_owned);
+    let spool = tempfile::NamedTempFile::new().map_err(|error| {
+        ApiError::internal(format!("failed to allocate upload spool file: {error}"))
+    })?;
+    let mut spool_file = tokio::fs::File::from_std(spool.reopen().map_err(|error| {
+        ApiError::internal(format!("failed to open upload spool file: {error}"))
+    })?);
+    let mut checksum = Sha256::new();
+    let mut size_bytes: usize = 0;
+
+    while let Some(chunk) = field.chunk().await.map_err(|error| {
+        if is_body_size_limit_error(&error) {
+            ApiError::payload_too_large("request body exceeds the maximum allowed size")
+        } else {
+            ApiError::bad_request(format!("invalid file field: {error}"))
+        }
+    })? {
+        checksum.update(&chunk);
+        size_bytes = size_bytes
+            .checked_add(chunk.len())
+            .ok_or_else(|| ApiError::internal("uploaded file is too large"))?;
+        spool_file.write_all(&chunk).await.map_err(|error| {
+            ApiError::internal(format!("failed to spool upload chunk: {error}"))
+        })?;
+    }
+
+    spool_file.flush().await.map_err(|error| {
+        ApiError::internal(format!("failed to flush upload spool file: {error}"))
+    })?;
+
+    Ok((
+        filename,
+        content_type,
+        StagedUpload {
+            spool,
+            checksum: format!("{:x}", checksum.finalize()),
+            size_bytes,
+        },
+    ))
+}
+
 async fn submit_rights(
     Path(token): Path<Uuid>,
     State(state): State<Arc<AppState>>,
@@ -247,9 +262,70 @@ async fn finalize_ingestion(
     )
     .await
     {
-        Ok(asset) => Ok((StatusCode::CREATED, Json(asset.into()))),
+        Ok(asset) => {
+            schedule_preparation_job(&state, asset.id, token).await?;
+            Ok((StatusCode::CREATED, Json(asset.into())))
+        }
         Err(error) => Err(map_service_error(&state, token, error).await),
     }
+}
+
+async fn schedule_preparation_job(
+    state: &AppState,
+    asset_id: AssetId,
+    ingest_token: Uuid,
+) -> Result<(), ApiError> {
+    let source_artifact =
+        match dubbridge_db::preparation_repo::find_source_artifact(&state.pool, asset_id)
+            .await
+            .map_err(ApiError::from_db)?
+        {
+            Some(source_artifact) => source_artifact,
+            None => {
+                let detail = "source artifact missing after finalize";
+                dubbridge_db::preparation_repo::upsert_preparation_status(
+                    &state.pool,
+                    asset_id,
+                    PreparationStatus::Failed,
+                    Some(detail),
+                )
+                .await
+                .map_err(ApiError::from_db)?;
+                return Err(ApiError::internal(detail));
+            }
+        };
+
+    dubbridge_db::preparation_repo::upsert_preparation_status(
+        &state.pool,
+        asset_id,
+        PreparationStatus::Pending,
+        None,
+    )
+    .await
+    .map_err(ApiError::from_db)?;
+
+    let job = dubbridge_jobs::PreparationJob::new(asset_id.0, source_artifact.id, ingest_token);
+
+    if let Err(error) = state.preparation_queue.enqueue(job) {
+        let detail = format!("preparation enqueue failed: {error}");
+        dubbridge_db::preparation_repo::upsert_preparation_status(
+            &state.pool,
+            asset_id,
+            PreparationStatus::Failed,
+            Some(&detail),
+        )
+        .await
+        .map_err(ApiError::from_db)?;
+        tracing::error!(
+            asset_id = %asset_id,
+            ingest_token = %ingest_token,
+            error = %error,
+            "failed to enqueue preparation job after finalize"
+        );
+        return Err(ApiError::internal(detail));
+    }
+
+    Ok(())
 }
 
 // H1-T3: async so rejection audit can be awaited before returning.

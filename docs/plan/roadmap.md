@@ -127,7 +127,7 @@ Plan: `docs/plan/h1-governance-atomicity-hardening.md`
 | **S-105** | Mobile workspace parity and authenticated web-console retirement | S-100, S-050, S-060 | ✅ done — T0–T3 complete 2026-06-13; organization selection, members, target languages, compliance navigation, mobile-only BDD evidence, and web removal delivered | `docs/plan/s-105-mobile-workspace-parity.md`, `docs/tasks/s-105-mobile-workspace-parity.md` |
 | **S-110** | Mobile compliance & consent center: audit/rights viewer, voice-consent ledger, fail-closed TTS precondition | S-105, S-010 audit/rights data | ✅ done — T0–T3, T5, and T6 complete 2026-06-13; T4 web dashboard cancelled and superseded by the complete mobile center; X11 closed at contract level | `docs/plan/s-110-compliance-consent-center.md`, `docs/tasks/s-110-compliance-consent-center.md` |
 | **S-115** | Mobile UX foundation & design-system adoption: theme tokens + primitives, single "ink + teal" palette (ADR-029 mobile surface), safe-area correctness, consistent state/touch/accessibility, behavior- and testID-preserving migration | S-105, S-110 | ✅ done — T0–T5 complete 2026-06-13; design-system (tokens + 7 primitives) + SafeAreaProvider + all 13 screens migrated; a11y pass + Maestro syntax valid; 10 suites / 117 tests green | `docs/plan/s-115-mobile-ux-foundation.md`, `docs/tasks/s-115-mobile-ux-foundation.md` |
-| **S-120** | Media preparation (ffprobe metadata + HLS transcode) | S-010, S-080 | 📄 Planned 2026-06-18 — plan/task ledger created; implementation remains gated behind `S-080` closeout and per-task approval | `docs/plan/s-120-media-preparation.md`, `docs/tasks/s-120-media-preparation.md` |
+| **S-120** | Media preparation (ffprobe metadata + HLS transcode) | S-010, S-080 | 🟡 in progress 2026-06-19 — T1–T5c are complete in the worktree; preparation schema/lineage, probe persistence, HLS persistence, finalize enqueue, worker execution, and evidence-driven readiness gating are delivered. Final roadmap closeout is deferred until the updated `S-120` plan/task evidence is committed, which is the remaining drift-gate safeguard. | `docs/plan/s-120-media-preparation.md`, `docs/tasks/s-120-media-preparation.md` |
 | **S-125** | HLS playback delivery (authorized `.m3u8` + segment serving) | S-120, S-080, S-160 review/publication gate contract | ⬜ no plan yet — ADR-032 created; must define playback grants, manifest rewriting or signed URLs, readiness gates, and review/publication policy integration | ADR-032 |
 | **S-130** | Processing / ASR (transcription) | S-100 target-language intent, S-120 | ⬜ worker contract only | `workers/asr-worker-py` |
 | **S-140** | Subtitle generation | S-130 | ⬜ no plan yet | — |
@@ -348,8 +348,9 @@ S-095 — live recorder (DEFERRED): ex-T3 recorder crate, ex-T4 jobs/storage,
 - The owner-credential secrets-store mechanism (X20) has no dedicated ADR yet and
   must be decided during `S-090-C1`–`S-090-C6`; `S-030` establishes the config/secret
   split it plugs into.
-- `S-070` still needs plan/task ledgers before execution. `S-120` now has
-  `docs/plan/s-120-media-preparation.md` + `docs/tasks/s-120-media-preparation.md`.
+- `S-070` still needs plan/task ledgers before execution. `S-120` is now complete
+  with `docs/plan/s-120-media-preparation.md` + `docs/tasks/s-120-media-preparation.md`
+  synchronized through `T5c`.
   `S-125` is now created as an ADR-backed roadmap phase for HLS playback delivery,
   but still needs plan/task ledgers before execution.
   `S-030` now has `docs/plan/s-030-environment-separation.md` +

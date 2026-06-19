@@ -1,12 +1,12 @@
 ---
 type: Plan
 title: "Plan: S-120 — Media Preparation"
-status: planned
+status: closed
 slice: S-120
 ---
 # Plan: S-120 — Media Preparation
 
-> **Status:** Planned. Authored 2026-06-18 after roadmap review and S-080 unblock analysis.
+> **Status:** Complete 2026-06-19. Authored 2026-06-18 after roadmap review and S-080 unblock analysis; implementation and docs sync are now complete through `T5c`.
 > **Roadmap phase:** `S-120` — media preparation (`ffprobe` metadata + HLS transcode).
 > **Tasks ledger:** `docs/tasks/s-120-media-preparation.md`.
 

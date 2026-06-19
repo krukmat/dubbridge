@@ -25,12 +25,14 @@ dubbridge-observability = { path = "../../crates/observability" }
 dubbridge-auth = { path = "../../crates/auth" }
 dubbridge-db = { path = "../../crates/db" }
 dubbridge-domain = { path = "../../crates/domain" }
+dubbridge-jobs = { path = "../../crates/jobs" }
 dubbridge-storage = { path = "../../crates/storage" }
 dubbridge-ingestion = { path = "../../crates/ingestion" }
 dubbridge-audit    = { path = "../../crates/audit" }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
+dubbridge-media = { path = "../../crates/media" }
 
 [lints]
 workspace = true

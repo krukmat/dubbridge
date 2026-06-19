@@ -52,6 +52,30 @@ pub fn recording_prefix(session_id: &str) -> String {
     format!("recordings/{session_id}/")
 }
 
+pub fn prepared_prefix(asset_id: &str) -> String {
+    format!("assets/{asset_id}/prepared/")
+}
+
+pub fn probe_metadata_key(asset_id: &str) -> String {
+    format!("{}probe.json", prepared_prefix(asset_id))
+}
+
+pub fn hls_prefix(asset_id: &str) -> String {
+    format!("{}hls/", prepared_prefix(asset_id))
+}
+
+pub fn hls_manifest_key(asset_id: &str) -> String {
+    format!("{}index.m3u8", hls_prefix(asset_id))
+}
+
+pub fn hls_segment_key(asset_id: &str, filename: &str) -> String {
+    let safe = sanitize_filename(match filename.trim() {
+        "" => "segment.ts",
+        other => other,
+    });
+    format!("{}{}", hls_prefix(asset_id), safe)
+}
+
 /// Canonical upload key for an ingest session.
 /// `ingests/{token}/{safe_filename}` — callers must not hand-roll this path.
 pub fn ingest_key(token: Uuid, filename: Option<&str>) -> String {
@@ -100,6 +124,43 @@ mod tests {
         assert!(recording_prefix(id).starts_with("recordings/"));
         assert!(recording_prefix(id).contains(id));
         assert!(recording_prefix(id).ends_with('/'));
+    }
+
+    #[test]
+    fn prepared_prefix_format() {
+        assert_eq!(prepared_prefix("asset-123"), "assets/asset-123/prepared/");
+    }
+
+    #[test]
+    fn probe_metadata_key_format() {
+        assert_eq!(
+            probe_metadata_key("asset-123"),
+            "assets/asset-123/prepared/probe.json"
+        );
+    }
+
+    #[test]
+    fn hls_manifest_key_format() {
+        assert_eq!(
+            hls_manifest_key("asset-123"),
+            "assets/asset-123/prepared/hls/index.m3u8"
+        );
+    }
+
+    #[test]
+    fn hls_segment_key_uses_canonical_prefix_and_filename() {
+        assert_eq!(
+            hls_segment_key("asset-123", "segment_00000.ts"),
+            "assets/asset-123/prepared/hls/segment_00000.ts"
+        );
+    }
+
+    #[test]
+    fn hls_segment_key_sanitizes_slashes() {
+        assert_eq!(
+            hls_segment_key("asset-123", "../segment_00000.ts"),
+            "assets/asset-123/prepared/hls/.._segment_00000.ts"
+        );
     }
 
     // S-080-T1: ingest_key canonical key contract

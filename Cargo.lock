@@ -602,6 +602,8 @@ dependencies = [
  "dubbridge-db",
  "dubbridge-domain",
  "dubbridge-ingestion",
+ "dubbridge-jobs",
+ "dubbridge-media",
  "dubbridge-observability",
  "dubbridge-storage",
  "serde",
@@ -658,6 +660,7 @@ dependencies = [
  "dubbridge-config",
  "dubbridge-observability",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -748,6 +751,7 @@ version = "0.1.0"
 dependencies = [
  "apalis",
  "serde",
+ "uuid",
 ]
 
 [[package]]
@@ -755,6 +759,8 @@ name = "dubbridge-media"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 
@@ -804,12 +810,20 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "apalis",
+ "async-trait",
  "dubbridge-config",
+ "dubbridge-db",
+ "dubbridge-domain",
  "dubbridge-jobs",
+ "dubbridge-media",
  "dubbridge-observability",
  "dubbridge-storage",
+ "sha2",
+ "sqlx",
+ "tempfile",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

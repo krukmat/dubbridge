@@ -19,6 +19,11 @@ use dubbridge_api::{
 use dubbridge_auth::{
     AuthenticatedPrincipal, SharedTokenVerifier, TokenVerificationError, TokenVerifier,
 };
+use dubbridge_domain::artifact::PreparationStatus;
+use dubbridge_jobs::{
+    InMemoryPreparationJobQueue, PreparationJob, PreparationJobQueue, QueueError,
+    SharedPreparationJobQueue,
+};
 use dubbridge_storage::{LocalFsAdapter, StorageAdapter, StorageError};
 use sqlx::PgPool;
 use tempfile::TempDir;
@@ -59,9 +64,36 @@ struct TestContext {
     storage_dir: Arc<TempDir>,
     storage_path: PathBuf,
     app: axum::Router,
+    preparation_queue: Option<Arc<InMemoryPreparationJobQueue>>,
     ingest_token: String,
     read_token: String,
     principal_id: Uuid,
+}
+
+fn build_test_verifier(
+    ingest_token: &str,
+    read_token: &str,
+    principal_id: Uuid,
+) -> SharedTokenVerifier {
+    Arc::new(
+        StubTokenVerifier::default()
+            .with_token(
+                ingest_token,
+                Ok(AuthenticatedPrincipal::new(
+                    principal_id,
+                    ["assets:ingest", "assets:read"]
+                        .into_iter()
+                        .map(str::to_string),
+                )),
+            )
+            .with_token(
+                read_token,
+                Ok(AuthenticatedPrincipal::new(
+                    principal_id,
+                    ["assets:read"].into_iter().map(str::to_string),
+                )),
+            ),
+    )
 }
 
 impl TestContext {
@@ -81,6 +113,24 @@ impl TestContext {
         storage_path: PathBuf,
         storage: Box<dyn StorageAdapter + Send + Sync>,
     ) -> Option<Self> {
+        let preparation_queue = Arc::new(InMemoryPreparationJobQueue::default());
+        Self::new_with_storage_and_queue(
+            storage_dir,
+            storage_path,
+            storage,
+            preparation_queue.clone(),
+            Some(preparation_queue),
+        )
+        .await
+    }
+
+    async fn new_with_storage_and_queue(
+        storage_dir: Arc<TempDir>,
+        storage_path: PathBuf,
+        storage: Box<dyn StorageAdapter + Send + Sync>,
+        preparation_queue: SharedPreparationJobQueue,
+        observed_preparation_queue: Option<Arc<InMemoryPreparationJobQueue>>,
+    ) -> Option<Self> {
         let database_url = match env::var("DUBBRIDGE_DATABASE_URL") {
             Ok(url) => url,
             Err(_) => return None,
@@ -94,32 +144,15 @@ impl TestContext {
         let ingest_token = "ingest-token".to_string();
         let read_token = "read-token".to_string();
         let principal_id = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").expect("uuid");
-        let verifier: SharedTokenVerifier = Arc::new(
-            StubTokenVerifier::default()
-                .with_token(
-                    &ingest_token,
-                    Ok(AuthenticatedPrincipal::new(
-                        principal_id,
-                        ["assets:ingest", "assets:read"]
-                            .into_iter()
-                            .map(str::to_string),
-                    )),
-                )
-                .with_token(
-                    &read_token,
-                    Ok(AuthenticatedPrincipal::new(
-                        principal_id,
-                        ["assets:read"].into_iter().map(str::to_string),
-                    )),
-                ),
-        );
+        let verifier = build_test_verifier(&ingest_token, &read_token, principal_id);
 
         let config = dubbridge_config::AppConfig::from_env();
-        let state = Arc::new(AppState::new(
+        let state = Arc::new(AppState::with_preparation_queue(
             pool.clone(),
             storage,
             verifier.clone(),
             config,
+            preparation_queue,
         ));
         let app = build_app(state, verifier);
 
@@ -128,10 +161,21 @@ impl TestContext {
             storage_dir,
             storage_path,
             app,
+            preparation_queue: observed_preparation_queue,
             ingest_token,
             read_token,
             principal_id,
         })
+    }
+}
+
+struct FailingPreparationQueue;
+
+impl PreparationJobQueue for FailingPreparationQueue {
+    fn enqueue(&self, _job: PreparationJob) -> Result<(), QueueError> {
+        Err(QueueError::Unavailable(
+            "intentional preparation queue failure".to_string(),
+        ))
     }
 }
 
@@ -325,6 +369,23 @@ async fn successful_ingestion_creates_asset_rights_artifact_and_audit() {
     assert_eq!(rights_count, 1);
     assert_eq!(artifact_count, 1);
     assert_eq!(audit_count, 1);
+    let preparation_status = dubbridge_db::preparation_repo::get_preparation_status(
+        &ctx.pool,
+        dubbridge_domain::asset::AssetId(asset_id),
+    )
+    .await
+    .expect("preparation status")
+    .expect("preparation status row");
+    let queued_jobs = ctx
+        .preparation_queue
+        .as_ref()
+        .expect("observed preparation queue")
+        .queued_jobs();
+
+    assert_eq!(preparation_status.status, PreparationStatus::Pending);
+    assert_eq!(queued_jobs.len(), 1);
+    assert_eq!(queued_jobs[0].asset_id, asset_id);
+    assert_eq!(queued_jobs[0].ingest_token, ingest_token);
 }
 
 #[tokio::test]
@@ -398,6 +459,131 @@ async fn duplicate_finalization_does_not_create_duplicate_artifact() {
     assert_eq!(
         duplicate_audit_count, 1,
         "duplicate finalize must persist one duplicate-token audit row"
+    );
+    assert_eq!(
+        ctx.preparation_queue
+            .as_ref()
+            .expect("observed preparation queue")
+            .queued_jobs()
+            .len(),
+        1,
+        "duplicate finalize must not enqueue duplicate preparation jobs"
+    );
+}
+
+#[tokio::test]
+async fn finalize_marks_preparation_failed_when_enqueue_fails() {
+    let storage_dir = Arc::new(TempDir::new().expect("temp dir"));
+    let storage_path = storage_dir.path().to_path_buf();
+    let queue: SharedPreparationJobQueue = Arc::new(FailingPreparationQueue);
+    let Some(mut ctx) = TestContext::new_with_storage_and_queue(
+        storage_dir,
+        storage_path.clone(),
+        Box::new(LocalFsAdapter::new(&storage_path)),
+        queue,
+        None,
+    )
+    .await
+    else {
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    let auth_token = ctx.ingest_token.clone();
+    let ingest_token = create_ingestion(&mut ctx).await;
+    submit_rights(&mut ctx, ingest_token, valid_rights_body()).await;
+
+    let response = finalize(&mut ctx, ingest_token, &auth_token).await;
+    let status = response.status();
+    let body = json_body(response).await;
+
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    assert!(
+        body["error"]
+            .as_str()
+            .expect("error")
+            .contains("preparation enqueue failed")
+    );
+
+    let asset_id: Uuid = sqlx::query_scalar(
+        "SELECT id FROM assets WHERE uploader_id = $1 ORDER BY created_at DESC LIMIT 1",
+    )
+    .bind(ctx.principal_id)
+    .fetch_one(&ctx.pool)
+    .await
+    .expect("asset id");
+    let preparation_status = dubbridge_db::preparation_repo::get_preparation_status(
+        &ctx.pool,
+        dubbridge_domain::asset::AssetId(asset_id),
+    )
+    .await
+    .expect("preparation status")
+    .expect("preparation status row");
+
+    assert_eq!(preparation_status.status, PreparationStatus::Failed);
+    assert!(
+        preparation_status
+            .error_detail
+            .as_deref()
+            .expect("error detail")
+            .contains("intentional preparation queue failure")
+    );
+}
+
+#[tokio::test]
+async fn finalize_fails_closed_when_source_artifact_is_missing_for_preparation() {
+    let Some(mut ctx) = TestContext::new().await else {
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    install_finalize_artifact_deletion_trigger(&ctx.pool).await;
+
+    let auth_token = ctx.ingest_token.clone();
+    let ingest_token = create_ingestion(&mut ctx).await;
+    submit_rights(&mut ctx, ingest_token, valid_rights_body()).await;
+
+    let response = finalize(&mut ctx, ingest_token, &auth_token).await;
+    let status = response.status();
+    let body = json_body(response).await;
+
+    uninstall_finalize_artifact_deletion_trigger(&ctx.pool).await;
+
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    assert!(
+        body["error"]
+            .as_str()
+            .expect("error")
+            .contains("source artifact missing after finalize")
+    );
+
+    let asset_id: Uuid = sqlx::query_scalar(
+        "SELECT id FROM assets WHERE uploader_id = $1 ORDER BY created_at DESC LIMIT 1",
+    )
+    .bind(ctx.principal_id)
+    .fetch_one(&ctx.pool)
+    .await
+    .expect("asset id");
+    let preparation_status = dubbridge_db::preparation_repo::get_preparation_status(
+        &ctx.pool,
+        dubbridge_domain::asset::AssetId(asset_id),
+    )
+    .await
+    .expect("preparation status")
+    .expect("preparation status row");
+
+    assert_eq!(preparation_status.status, PreparationStatus::Failed);
+    assert_eq!(
+        preparation_status.error_detail.as_deref(),
+        Some("source artifact missing after finalize")
+    );
+    assert!(
+        ctx.preparation_queue
+            .as_ref()
+            .expect("observed preparation queue")
+            .queued_jobs()
+            .is_empty(),
+        "missing-source failure must not enqueue a preparation job"
     );
 }
 
@@ -1686,6 +1872,53 @@ async fn install_pending_ingestion_insert_failure_trigger(pool: &PgPool) {
     .expect("create pending_ingestions insert failure trigger");
 }
 
+async fn install_finalize_artifact_deletion_trigger(pool: &PgPool) {
+    sqlx::query(
+        r#"
+        CREATE OR REPLACE FUNCTION delete_finalize_artifact_for_t5a()
+        RETURNS trigger AS $$
+        BEGIN
+            IF NEW.kind = 'ingestion_finalized' THEN
+                DELETE FROM artifact_records WHERE ingest_token = NEW.ingest_token;
+            END IF;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql
+        "#,
+    )
+    .execute(pool)
+    .await
+    .expect("create finalize artifact deletion function");
+
+    sqlx::query("DROP TRIGGER IF EXISTS delete_finalize_artifact_for_t5a ON audit_events")
+        .execute(pool)
+        .await
+        .expect("drop finalize artifact deletion trigger");
+
+    sqlx::query(
+        r#"
+        CREATE TRIGGER delete_finalize_artifact_for_t5a
+        AFTER INSERT ON audit_events
+        FOR EACH ROW
+        EXECUTE FUNCTION delete_finalize_artifact_for_t5a()
+        "#,
+    )
+    .execute(pool)
+    .await
+    .expect("create finalize artifact deletion trigger");
+}
+
+async fn uninstall_finalize_artifact_deletion_trigger(pool: &PgPool) {
+    sqlx::query("DROP TRIGGER IF EXISTS delete_finalize_artifact_for_t5a ON audit_events")
+        .execute(pool)
+        .await
+        .expect("drop finalize artifact deletion trigger");
+    sqlx::query("DROP FUNCTION IF EXISTS delete_finalize_artifact_for_t5a()")
+        .execute(pool)
+        .await
+        .expect("drop finalize artifact deletion function");
+}
+
 async fn count_audit_events(pool: &PgPool, ingest_token: Uuid, event_kind: &str) -> i64 {
     sqlx::query_scalar(
         "SELECT COUNT(*) FROM audit_events WHERE ingest_token = $1 AND event_kind = $2",
@@ -1808,6 +2041,7 @@ fn rebuild_context(ctx: &TestContext) -> TestContext {
         storage_dir: Arc::clone(&ctx.storage_dir),
         storage_path: ctx.storage_path.clone(),
         app: build_app(state, verifier),
+        preparation_queue: None,
         ingest_token: ctx.ingest_token.clone(),
         read_token: ctx.read_token.clone(),
         principal_id: ctx.principal_id,
