@@ -6,6 +6,9 @@ on:
   schedule:
     - cron: '0 3 * * *'
 
+env:
+  CARGO_NET_RETRY: 5
+
 jobs:
   qa-docs:
     if: github.event_name != 'schedule'
@@ -42,6 +45,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+      - uses: Swatinem/rust-cache@v2
       - name: Run clippy gate
         run: make qa-lint
 
@@ -51,6 +55,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Prefetch workspace dependencies
+        run: cargo fetch --locked
       - name: Run workspace tests
         run: make qa-test
 
@@ -62,6 +69,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+      - uses: Swatinem/rust-cache@v2
       - name: Run cargo check
         run: make qa-check
 
@@ -82,6 +90,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: Install cargo-deny
         run: cargo install cargo-deny --version 0.19.4 --locked
       - name: Run dependency policy gate
@@ -119,6 +128,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
       - name: Install cargo-llvm-cov
         run: cargo install cargo-llvm-cov --version 0.6.13 --locked
       - name: Enforce 90% line coverage
@@ -130,5 +140,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: Run release build gate
         run: make qa-build-release
