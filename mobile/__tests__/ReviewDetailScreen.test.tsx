@@ -200,6 +200,33 @@ describe("ReviewDetailScreen", () => {
     expect(mockAuth.logout).not.toHaveBeenCalled();
   });
 
+  it("T2/HP-1: rendered detail panel contains no raw ISO timestamp and no mid-token id cut", async () => {
+    const LONG_TASK = {
+      ...BASE_TASK,
+      asset_id: "asset-seed-longid",
+      target_language_id: "lang-seed-longid",
+      org_id: "org-seed-longid",
+      project_id: "project-seed-longid",
+    };
+    await render(
+      <ReviewDetailScreen
+        task={LONG_TASK}
+        gatewayBaseUrl="http://gateway"
+        onBack={jest.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("review-approve")).toBeTruthy());
+    const tree = JSON.stringify(screen.toJSON());
+    // No raw ISO pattern.
+    expect(tree).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/);
+    // Full ids must appear (proves they were not truncated mid-token).
+    expect(tree).toContain("asset-seed-longid");
+    expect(tree).toContain("lang-seed-longid");
+    expect(tree).toContain("org-seed-longid");
+    expect(tree).toContain("project-seed-longid");
+  });
+
   it("EC-3b: forbidden decision shows an inline error without logout", async () => {
     mockClient.post.mockResolvedValueOnce({
       ok: false,

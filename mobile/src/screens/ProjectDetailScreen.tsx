@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  FlatList,
   ScrollView,
   StyleSheet,
   Text,
+  View,
 } from "react-native";
 
 import { createGatewayClient } from "../api/client";
@@ -161,41 +163,52 @@ export function ProjectDetailScreen({
 
           <Text style={styles.sectionHeader}>Linked assets</Text>
 
-          {viewState.detail.assets.length === 0 ? (
-            <StateView
-              testID="project-detail-empty-assets"
-              kind="empty"
-              title="No assets linked"
-              message="This project does not have any linked assets yet."
-            />
-          ) : (
-            viewState.detail.assets.map((asset) => (
+          <FlatList
+            data={viewState.detail.assets}
+            keyExtractor={(asset) => asset.id}
+            renderItem={({ item: asset }) => (
               <Card
-                key={asset.id}
                 testID={`asset-row-${asset.id}`}
                 onPress={() => onOpenAsset(asset.id, asset.title)}
+                trailing="chevron"
               >
                 <Text style={styles.assetTitle}>{asset.title}</Text>
                 <Badge label={formatStatus(asset.status)} tone={statusTone(asset.status)} />
               </Card>
-            ))
-          )}
+            )}
+            ListEmptyComponent={
+              <StateView
+                testID="project-detail-empty-assets"
+                kind="empty"
+                title="No assets linked"
+                message="This project does not have any linked assets yet."
+              />
+            }
+            scrollEnabled={false}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+          />
 
           <Text style={styles.sectionHeader}>Target languages</Text>
-          {viewState.detail.target_languages.length === 0 ? (
-            <StateView
-              testID="project-detail-empty-languages"
-              kind="empty"
-              title="No target languages"
-              message="This project has no target languages configured."
-            />
-          ) : (
-            viewState.detail.target_languages.map((language) => (
-              <Panel key={language.id} testID={`target-language-${language.id}`}>
+
+          <FlatList
+            data={viewState.detail.target_languages}
+            keyExtractor={(language) => language.id}
+            renderItem={({ item: language }) => (
+              <Panel testID={`target-language-${language.id}`}>
                 <Text style={styles.assetTitle}>{language.source_lang} to {language.target_lang}</Text>
               </Panel>
-            ))
-          )}
+            )}
+            ListEmptyComponent={
+              <StateView
+                testID="project-detail-empty-languages"
+                kind="empty"
+                title="No target languages"
+                message="This project has no target languages configured."
+              />
+            }
+            scrollEnabled={false}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+          />
         </ScrollView>
       ) : null}
     </Screen>
@@ -207,4 +220,5 @@ const styles = StyleSheet.create({
   listContent: { gap: space.md, paddingBottom: space.xl },
   sectionHeader: { ...type.bodyStrong, color: color.ink900 },
   assetTitle: { ...type.heading, color: color.ink900 },
+  separator: { height: space.md, backgroundColor: "transparent" },
 });

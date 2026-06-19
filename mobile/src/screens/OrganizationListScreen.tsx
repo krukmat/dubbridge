@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  ScrollView,
+  FlatList,
   StyleSheet,
   Text,
   TextInput,
@@ -178,9 +178,12 @@ export function OrganizationListScreen({
       ) : null}
 
       {viewState.kind === "ready" && viewState.organizations.length > 0 ? (
-        <ScrollView contentContainerStyle={styles.list}>
-          {viewState.organizations.map((organization) => (
-            <Panel key={organization.id} testID={`organization-card-${organization.id}`}>
+        <FlatList
+          contentContainerStyle={styles.list}
+          data={viewState.organizations}
+          keyExtractor={(organization) => organization.id}
+          renderItem={({ item: organization }) => (
+            <Panel testID={`organization-card-${organization.id}`}>
               <Text style={styles.cardTitle}>{organization.name}</Text>
               <Badge
                 label={organization.viewer_role}
@@ -202,8 +205,8 @@ export function OrganizationListScreen({
                 />
               </View>
             </Panel>
-          ))}
-        </ScrollView>
+          )}
+        />
       ) : null}
     </Screen>
   );

@@ -11,5 +11,38 @@
         ]
       }
     ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(make qa-docs *)",
+      "Bash(make qa-docs)",
+      "Bash(make qa-okf-frontmatter)",
+      "Bash(make qa-rri)",
+      "Bash(adb devices *)",
+      "Bash(adb devices)",
+      "Bash(adb -s emulator-5554 reverse *)",
+      "Bash(adb -s emulator-5554 shell am start *)",
+      "Bash(adb -s emulator-5554 shell am force-stop *)",
+      "Bash(adb -s emulator-5554 install *)",
+      "Bash(adb install *)",
+      "Bash(adb logcat *)",
+      "Bash(adb shell *)",
+      "Bash(bash mobile/maestro/seed-and-run.sh)",
+      "Bash(bash mobile/maestro/seed-and-run.sh *)",
+      "Bash(npm test -- *)",
+      "Bash(npm run typecheck)",
+      "Bash(cargo test *)",
+      "Bash(cargo fmt *)",
+      "Bash(cargo clippy *)",
+      "Bash(cargo check *)",
+      "Bash(cargo llvm-cov *)",
+      "Bash(docker compose *)",
+      "Bash(docker ps *)",
+      "Bash(docker ps)",
+      "Bash(xcrun simctl *)",
+      "Bash(curl -sf *)",
+      "Bash(curl -s *)",
+      "Bash(curl -v *)"
+    ]
   }
 }

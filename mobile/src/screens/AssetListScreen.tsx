@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  FlatList,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
 } from "react-native";
@@ -149,23 +149,6 @@ export function AssetListScreen({
         />
       ) : null}
 
-      {viewState.kind === "empty" ? (
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-        >
-          <StateView
-            testID="asset-list-empty-state"
-            kind="empty"
-            title="No assets yet"
-            message="Your workspace does not have any assets to show."
-          />
-        </ScrollView>
-      ) : null}
-
       {viewState.kind === "error" ? (
         <StateView
           kind="error"
@@ -175,19 +158,19 @@ export function AssetListScreen({
         />
       ) : null}
 
-      {viewState.kind === "ready" ? (
-        <ScrollView
+      {(viewState.kind === "ready" || viewState.kind === "empty") ? (
+        <FlatList
           style={styles.scroll}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          contentContainerStyle={
+            viewState.kind === "empty" ? styles.emptyContent : styles.listContent
           }
-        >
-          {viewState.assets.map((asset) => (
+          data={viewState.kind === "ready" ? viewState.assets : []}
+          keyExtractor={(asset) => asset.id}
+          renderItem={({ item: asset }) => (
             <Card
-              key={asset.id}
               testID={`asset-card-${asset.id}`}
               onPress={() => onOpenAsset(asset)}
+              trailing="chevron"
             >
               <Text style={styles.assetTitle}>{asset.title}</Text>
               <Badge
@@ -196,8 +179,19 @@ export function AssetListScreen({
               />
               <Text style={styles.assetMeta}>{asset.id}</Text>
             </Card>
-          ))}
-        </ScrollView>
+          )}
+          ListEmptyComponent={
+            <StateView
+              testID="asset-list-empty-state"
+              kind="empty"
+              title="No assets yet"
+              message="Your workspace does not have any assets to show."
+            />
+          }
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        />
       ) : null}
     </Screen>
   );
@@ -206,6 +200,7 @@ export function AssetListScreen({
 const styles = StyleSheet.create({
   scroll: { flex: 1 },
   listContent: { gap: space.md, paddingBottom: space.xl },
+  emptyContent: { flexGrow: 1 },
   assetTitle: { ...type.heading, color: color.ink900 },
   assetMeta: { ...type.meta, color: color.ink500 },
 });

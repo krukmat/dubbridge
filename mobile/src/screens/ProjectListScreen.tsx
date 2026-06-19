@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  FlatList,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
 } from "react-native";
@@ -139,23 +139,6 @@ export function ProjectListScreen({
         />
       ) : null}
 
-      {viewState.kind === "empty" ? (
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-        >
-          <StateView
-            testID="project-list-empty-state"
-            kind="empty"
-            title="No projects yet"
-            message="This organization does not have any projects to show."
-          />
-        </ScrollView>
-      ) : null}
-
       {viewState.kind === "error" ? (
         <StateView
           kind="error"
@@ -165,25 +148,36 @@ export function ProjectListScreen({
         />
       ) : null}
 
-      {viewState.kind === "ready" ? (
-        <ScrollView
+      {(viewState.kind === "ready" || viewState.kind === "empty") ? (
+        <FlatList
           style={styles.scroll}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          contentContainerStyle={
+            viewState.kind === "empty" ? styles.emptyContent : styles.listContent
           }
-        >
-          {viewState.projects.map((project) => (
+          data={viewState.kind === "ready" ? viewState.projects : []}
+          keyExtractor={(project) => project.id}
+          renderItem={({ item: project }) => (
             <Card
-              key={project.id}
               testID={`project-card-${project.id}`}
               onPress={() => onOpenProject(project)}
+              trailing="chevron"
             >
               <Text style={styles.projectName}>{project.name}</Text>
               <Text style={styles.projectMeta}>{project.id}</Text>
             </Card>
-          ))}
-        </ScrollView>
+          )}
+          ListEmptyComponent={
+            <StateView
+              testID="project-list-empty-state"
+              kind="empty"
+              title="No projects yet"
+              message="This organization does not have any projects to show."
+            />
+          }
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        />
       ) : null}
     </Screen>
   );
@@ -192,6 +186,7 @@ export function ProjectListScreen({
 const styles = StyleSheet.create({
   scroll: { flex: 1 },
   listContent: { gap: space.md, paddingBottom: space.xl },
+  emptyContent: { flexGrow: 1 },
   projectName: { ...type.heading, color: color.ink900 },
   projectMeta: { ...type.meta, color: color.ink500 },
 });

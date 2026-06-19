@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { RefreshControl, StyleSheet, Text, View } from "react-native";
+import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
+
+import { formatId, formatTimestamp } from "../format";
 
 import { createGatewayClient } from "../api/client";
 import {
@@ -47,6 +49,39 @@ type ReviewInboxScreenProps = {
   initialTaskId?: string | null;
   onOpenTask: (task: ReviewTaskSummary) => void;
 };
+
+type ProjectOutcome =
+  | { kind: "ok"; org: OrganizationSummary; projects: ProjectSummary[]; sessionRotation: string | null }
+  | { kind: "session_expired" }
+  | { kind: "forbidden" }
+  | { kind: "error"; message: string };
+
+type QueueOutcome =
+  | { kind: "ok"; tasks: ReviewTaskSummary[]; sessionRotation: string | null }
+  | { kind: "session_expired" }
+  | { kind: "forbidden" }
+  | { kind: "error"; message: string };
+
+// Run fn over items with at most cap concurrent in-flight calls.
+const CONCURRENCY_CAP = 3;
+
+async function concurrentMap<T, R>(
+  items: T[],
+  cap: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  if (items.length === 0) return [];
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker(): Promise<void> {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(cap, items.length) }, worker));
+  return results;
+}
 
 function stateLabel(state: ReviewTaskSummary["state"]): string {
   if (state === "approved") return "Approved";
@@ -103,58 +138,70 @@ export function ReviewInboxScreen({
       (organization) => organization.viewer_role !== "viewer",
     );
 
-    const tasks: ReviewTaskSummary[] = [];
-    for (const organization of accessibleOrganizations) {
-      const projectResult = await client.get<ProjectSummary[]>(
-        `/api/orgs/${organization.id}/projects`,
-        auth.sessionRef,
-      );
-
-      if (!projectResult.ok) {
-        if (projectResult.error.kind === "session_expired") {
-          await auth.logout();
-          return;
+    // Phase 1: fetch project lists with bounded concurrency.
+    const projectOutcomes = await concurrentMap<OrganizationSummary, ProjectOutcome>(
+      accessibleOrganizations,
+      CONCURRENCY_CAP,
+      async (org) => {
+        const result = await client.get<ProjectSummary[]>(
+          `/api/orgs/${org.id}/projects`,
+          auth.sessionRef,
+        );
+        if (result.ok) {
+          return { kind: "ok", org, projects: result.value.data, sessionRotation: result.value.sessionRotation };
         }
-        if (projectResult.error.kind === "forbidden") {
-          continue;
-        }
+        if (result.error.kind === "session_expired") return { kind: "session_expired" };
+        if (result.error.kind === "forbidden") return { kind: "forbidden" };
         const message =
-          projectResult.error.kind === "network"
-            ? projectResult.error.message
-            : `Could not load review scopes (${projectResult.error.status}).`;
-        setViewState({ kind: "error", message });
-        return;
+          result.error.kind === "network"
+            ? result.error.message
+            : `Could not load review scopes (${result.error.status}).`;
+        return { kind: "error", message };
+      },
+    );
+
+    const pairs: { org: OrganizationSummary; project: ProjectSummary }[] = [];
+    for (const outcome of projectOutcomes) {
+      if (outcome.kind === "session_expired") { await auth.logout(); return; }
+      if (outcome.kind === "forbidden") continue;
+      if (outcome.kind === "error") { setViewState({ kind: "error", message: outcome.message }); return; }
+      await auth.onSessionRotation(outcome.sessionRotation);
+      for (const project of outcome.projects) {
+        pairs.push({ org: outcome.org, project });
       }
+    }
 
-      await auth.onSessionRotation(projectResult.value.sessionRotation);
-
-      for (const project of projectResult.value.data) {
-        const queueResult = await listReviewQueueForScope(
+    // Phase 2: fetch review queues with bounded concurrency.
+    const queueOutcomes = await concurrentMap<{ org: OrganizationSummary; project: ProjectSummary }, QueueOutcome>(
+      pairs,
+      CONCURRENCY_CAP,
+      async ({ org, project }) => {
+        const result = await listReviewQueueForScope(
           client,
           auth.sessionRef,
-          organization.id,
+          org.id,
           project.id,
         );
-
-        if (!queueResult.ok) {
-          if (queueResult.error.kind === "session_expired") {
-            await auth.logout();
-            return;
-          }
-          if (queueResult.error.kind === "forbidden") {
-            continue;
-          }
-          const message =
-            queueResult.error.kind === "network"
-              ? queueResult.error.message
-              : `Could not load review queue (${queueResult.error.status}).`;
-          setViewState({ kind: "error", message });
-          return;
+        if (result.ok) {
+          return { kind: "ok", tasks: result.value.data.tasks, sessionRotation: result.value.sessionRotation };
         }
+        if (result.error.kind === "session_expired") return { kind: "session_expired" };
+        if (result.error.kind === "forbidden") return { kind: "forbidden" };
+        const message =
+          result.error.kind === "network"
+            ? result.error.message
+            : `Could not load review queue (${result.error.status}).`;
+        return { kind: "error", message };
+      },
+    );
 
-        await auth.onSessionRotation(queueResult.value.sessionRotation);
-        tasks.push(...queueResult.value.data.tasks);
-      }
+    const tasks: ReviewTaskSummary[] = [];
+    for (const outcome of queueOutcomes) {
+      if (outcome.kind === "session_expired") { await auth.logout(); return; }
+      if (outcome.kind === "forbidden") continue;
+      if (outcome.kind === "error") { setViewState({ kind: "error", message: outcome.message }); return; }
+      await auth.onSessionRotation(outcome.sessionRotation);
+      tasks.push(...outcome.tasks);
     }
 
     const sortedTasks = [...tasks].sort(compareTasks);
@@ -263,14 +310,7 @@ export function ReviewInboxScreen({
       : null;
 
   return (
-    <Screen
-      testID="review-inbox-screen"
-      scroll
-      edges={["bottom"]}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />
-      }
-    >
+    <Screen testID="review-inbox-screen" edges={["bottom"]}>
       <ScreenHeader
         kicker="Review"
         title="Review inbox"
@@ -301,41 +341,54 @@ export function ReviewInboxScreen({
         />
       ) : null}
 
-      {viewState.kind === "empty" ? (
-        <StateView
-          kind="empty"
-          title="No tasks assigned"
-          message="You have no review tasks at the moment."
-        />
-      ) : null}
-
-      {viewState.kind === "ready"
-        ? viewState.tasks.map((task) => (
+      {(viewState.kind === "ready" || viewState.kind === "empty") ? (
+        <FlatList
+          style={styles.scroll}
+          contentContainerStyle={
+            viewState.kind === "empty" ? styles.emptyContent : styles.listContent
+          }
+          data={viewState.kind === "ready" ? viewState.tasks : []}
+          keyExtractor={(task) => task.id}
+          renderItem={({ item: task }) => (
             <Card
-              key={task.id}
               testID={`review-task-card-${task.id}`}
               onPress={() => onOpenTask(task)}
               accessibilityLabel={`Review task ${task.id}, state ${stateLabel(task.state)}`}
+              trailing="chevron"
             >
               <View style={styles.cardRow}>
                 <Text style={styles.taskId} numberOfLines={1}>
-                  Task {task.id.slice(0, 8)}
+                  Task {formatId(task.id)}
                 </Text>
                 <Badge label={stateLabel(task.state)} tone={statusTone(task.state)} />
               </View>
-              <Text style={styles.meta}>Asset {task.asset_id.slice(0, 8)}</Text>
+              <Text style={styles.meta}>Asset {formatId(task.asset_id)}</Text>
               <Text style={styles.meta}>
-                Project {task.project_id.slice(0, 8)} · Updated{" "}
-                {new Date(task.updated_at).toLocaleDateString()}
+                Project {formatId(task.project_id)} · Updated{" "}
+                {formatTimestamp(task.updated_at)}
               </Text>
             </Card>
-          ))
-        : null}
+          )}
+          ListEmptyComponent={
+            <StateView
+              kind="empty"
+              title="No tasks assigned"
+              message="You have no review tasks at the moment."
+            />
+          }
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />
+          }
+        />
+      ) : null}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  scroll: { flex: 1 },
+  listContent: { gap: space.md, paddingBottom: space.xl },
+  emptyContent: { flexGrow: 1 },
   cardRow: {
     flexDirection: "row",
     justifyContent: "space-between",

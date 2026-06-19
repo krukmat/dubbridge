@@ -134,4 +134,51 @@ describe("organization screens", () => {
     await waitFor(() => expect(view.getByTestId("member-list-empty")).toBeTruthy());
     expect(view.queryByTestId("member-add-controls")).toBeNull();
   });
+
+  it("HP-1 large-list: 100 organizations render with stable testIDs", async () => {
+    const organizations = Array.from({ length: 100 }, (_, i) => ({
+      id: `org-${String(i).padStart(3, "0")}`,
+      name: `Studio ${i}`,
+      viewer_role: "viewer" as const,
+      created_at: "2026-06-01T00:00:00Z",
+      updated_at: "2026-06-01T00:00:00Z",
+    }));
+
+    mockClient.get.mockResolvedValueOnce({
+      ok: true,
+      value: { data: organizations, sessionRotation: null },
+    });
+
+    const view = await render(
+      <OrganizationListScreen
+        gatewayBaseUrl="http://gateway"
+        onOpenProjects={jest.fn()}
+        onOpenMembers={jest.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(view.getByTestId("organization-card-org-005")).toBeTruthy());
+    expect(view.getByTestId("organization-card-org-005")).toBeTruthy();
+  });
+
+  it("HP-2 large-list: 100 members render with stable testIDs and role copy preserved", async () => {
+    const members = Array.from({ length: 100 }, (_, i) => ({
+      org_id: "org-001",
+      subject_id: `user-${String(i).padStart(3, "0")}`,
+      role: (i % 2 === 0 ? "viewer" : "reviewer") as "viewer" | "reviewer",
+      joined_at: "2026-06-01T00:00:00Z",
+    }));
+
+    mockClient.get.mockResolvedValueOnce({ ok: true, value: { data: members, sessionRotation: null } });
+
+    const view = await render(
+      <OrganizationMembersScreen gatewayBaseUrl="http://gateway" orgId="org-001" viewerRole="owner" />,
+    );
+
+    await waitFor(() => expect(view.getByTestId("member-row-user-005")).toBeTruthy());
+
+    const row = view.getByTestId("member-row-user-005");
+    expect(row).toBeTruthy();
+    expect(view.getAllByText(members[5].role).length).toBeGreaterThan(0);
+  });
 });

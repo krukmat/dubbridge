@@ -2,7 +2,6 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
 import { color, space, type } from "../theme";
 import { Button } from "./Button";
-import { Panel } from "./Panel";
 
 export type StateViewKind = "loading" | "empty" | "error";
 
@@ -17,8 +16,9 @@ export type StateViewProps = {
 };
 
 /**
- * Consistent loading / empty / error surface. Replaces the per-screen ad-hoc
- * states (rich panels in some screens, bare `<Text>Loading...</Text>` in others).
+ * Consistent loading / empty / error surface. Renders centered within its
+ * parent — the parent container must grow (flexGrow:1) for centering to work
+ * when nested inside a ScrollView contentContainer.
  */
 export function StateView({
   kind,
@@ -29,7 +29,7 @@ export function StateView({
   testID,
 }: StateViewProps) {
   return (
-    <Panel testID={testID}>
+    <View style={styles.container} testID={testID}>
       {kind === "loading" ? (
         <ActivityIndicator size="small" color={color.primary} />
       ) : null}
@@ -44,11 +44,18 @@ export function StateView({
           testID={testID ? `${testID}-retry` : undefined}
         />
       ) : null}
-    </Panel>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  title: { ...type.heading, color: color.ink900 },
-  message: { ...type.body, color: color.ink500 },
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: space.md,
+    padding: space.xl,
+  },
+  title: { ...type.heading, color: color.ink900, textAlign: "center" },
+  message: { ...type.body, color: color.ink500, textAlign: "center" },
 });

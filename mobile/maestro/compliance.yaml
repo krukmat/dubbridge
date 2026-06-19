@@ -79,6 +79,13 @@ tags:
     id: consent-revoke
 
 - extendedWaitUntil:
+    visible: "Revoke"
+    timeout: 5000
+
+- tapOn:
+    text: "Revoke"
+
+- extendedWaitUntil:
     visible: Inactive
     timeout: 20000
 

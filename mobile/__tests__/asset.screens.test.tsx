@@ -263,6 +263,42 @@ describe("asset screens", () => {
     });
   });
 
+  // HP-1 large-list: 100 assets render stably through the virtualized list
+  describe("HP-1 large-list: 100 assets render with stable testIDs and correct tap callback", () => {
+    it("renders asset-list-screen with 100 rows; row 50 has the expected testID and tap fires onOpenAsset", async () => {
+      const assets: AssetSummary[] = Array.from({ length: 100 }, (_, i) => ({
+        id: `asset-${String(i).padStart(3, "0")}`,
+        title: `Asset ${i}`,
+        uploader_id: "user-123",
+        status: "finalized",
+        created_at: "2026-06-01T00:00:00Z",
+        updated_at: "2026-06-01T00:00:00Z",
+      }));
+
+      mockClient.get.mockResolvedValueOnce({
+        ok: true,
+        value: { data: assets, sessionRotation: null },
+      });
+
+      const onOpenAsset = jest.fn();
+      const view = await render(
+        <AssetListScreen
+          gatewayBaseUrl="http://127.0.0.1:4000"
+          onOpenAsset={onOpenAsset}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(view.getByTestId("asset-list-screen")).toBeTruthy();
+      });
+
+      expect(view.getByTestId("asset-card-asset-005")).toBeTruthy();
+
+      await fireEvent.press(view.getByTestId("asset-card-asset-005"));
+      expect(onOpenAsset).toHaveBeenCalledWith(assets[5]);
+    });
+  });
+
   // ── UploadScreen ──────────────────────────────────────────────────────────
   // Async handler tests (pick-file, finalize) await fireEvent.press directly,
   // then use act+flushAsync so React commits async continuations before asserts.

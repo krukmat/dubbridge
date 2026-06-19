@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { formatTimestamp } from "../format";
+
 import { createGatewayClient } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { Badge, statusTone } from "../components/Badge";
@@ -149,7 +151,7 @@ export function ComplianceScreen({ assetId, gatewayBaseUrl, onManageConsent }: P
             {viewState.data.audit.events.map((event) => (
               <View key={event.id} testID={`audit-event-${event.id}`} style={styles.row}>
                 <Text style={styles.rowTitle}>{event.event_kind.replaceAll("_", " ")}</Text>
-                <Text style={styles.meta}>{event.happened_at}</Text>
+                <Text style={styles.meta}>{formatTimestamp(event.happened_at)}</Text>
                 {event.detail ? <Text style={styles.copy}>{event.detail}</Text> : null}
               </View>
             ))}

@@ -142,6 +142,7 @@ export function AssetDetailScreen({
               testID="asset-open-compliance"
               label="Open compliance center"
               onPress={onOpenCompliance}
+              fullWidth
             />
           </Panel>
         </>

@@ -20,6 +20,7 @@ export type ButtonProps = {
   disabled?: boolean;
   loading?: boolean;
   fullWidth?: boolean;
+  selected?: boolean;
   testID?: string;
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
@@ -49,6 +50,7 @@ export function Button({
   disabled = false,
   loading = false,
   fullWidth = false,
+  selected,
   testID,
   accessibilityLabel,
   style,
@@ -64,7 +66,7 @@ export function Button({
       disabled={isInert}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{ disabled: isInert, busy: loading }}
+      accessibilityState={{ disabled: isInert, busy: loading, ...(selected !== undefined && { selected }) }}
       style={({ pressed }) => [
         styles.base,
         size === "md" ? styles.md : styles.sm,

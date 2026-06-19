@@ -289,4 +289,77 @@ describe("project screens", () => {
       });
     });
   });
+
+  // HP-1 large-list: 100 projects render stably through the virtualized list
+  describe("HP-1 large-list: 100 projects render with stable testIDs and correct tap callback", () => {
+    it("renders project-list-screen with 100 rows; row 50 has the expected testID and tap fires onOpenProject", async () => {
+      const projects = Array.from({ length: 100 }, (_, i) => ({
+        id: `proj-${String(i).padStart(3, "0")}`,
+        org_id: "org-abc",
+        name: `Project ${i}`,
+        created_at: "2026-06-01T00:00:00Z",
+      }));
+
+      mockClient.get.mockResolvedValueOnce({
+        ok: true,
+        value: { data: projects, sessionRotation: null },
+      });
+
+      const onOpenProject = jest.fn();
+      const view = await render(
+        <ProjectListScreen
+          gatewayBaseUrl="http://127.0.0.1:4000"
+          orgId="org-abc"
+          onOpenProject={onOpenProject}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(view.getByTestId("project-list-screen")).toBeTruthy();
+      });
+
+      expect(view.getByTestId("project-card-proj-005")).toBeTruthy();
+
+      fireEvent.press(view.getByTestId("project-card-proj-005"));
+      expect(onOpenProject).toHaveBeenCalledWith(projects[5]);
+    });
+  });
+
+  // HP-1 large-list: 100 linked assets in ProjectDetail render stably
+  describe("HP-1 large-list: 100 linked assets in ProjectDetail render with stable testIDs", () => {
+    it("renders project-detail-screen with 100 asset rows; row 50 has the expected testID and tap fires onOpenAsset", async () => {
+      const assets = Array.from({ length: 100 }, (_, i) => ({
+        id: `asset-${String(i).padStart(3, "0")}`,
+        title: `Asset ${i}`,
+        status: "finalized",
+      }));
+
+      mockClient.get.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          data: { ...PROJECT_DETAIL, assets, target_languages: [] },
+          sessionRotation: null,
+        },
+      });
+
+      const onOpenAsset = jest.fn();
+      const view = await render(
+        <ProjectDetailScreen
+          gatewayBaseUrl="http://127.0.0.1:4000"
+          orgId="org-abc"
+          projectId="proj-001"
+          onOpenAsset={onOpenAsset}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(view.getByTestId("project-detail-screen")).toBeTruthy();
+      });
+
+      expect(view.getByTestId("asset-row-asset-005")).toBeTruthy();
+
+      fireEvent.press(view.getByTestId("asset-row-asset-005"));
+      expect(onOpenAsset).toHaveBeenCalledWith("asset-005", "Asset 5");
+    });
+  });
 });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { createGatewayClient } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
@@ -154,14 +154,17 @@ export function OrganizationMembersScreen({ gatewayBaseUrl, orgId, viewerRole }:
       ) : null}
 
       {!loading && !error && members.length > 0 ? (
-        <ScrollView contentContainerStyle={styles.list}>
-          {members.map((member) => (
-            <Panel key={member.subject_id} testID={`member-row-${member.subject_id}`}>
+        <FlatList
+          contentContainerStyle={styles.list}
+          data={members}
+          keyExtractor={(member) => member.subject_id}
+          renderItem={({ item: member }) => (
+            <Panel testID={`member-row-${member.subject_id}`}>
               <Text style={styles.memberId}>{member.subject_id}</Text>
               <Text style={styles.memberRole}>{member.role}</Text>
             </Panel>
-          ))}
-        </ScrollView>
+          )}
+        />
       ) : null}
     </Screen>
   );

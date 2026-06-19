@@ -293,6 +293,44 @@ describe("ReviewInboxScreen", () => {
     );
   });
 
+  it("T2/HP-1: rendered inbox card contains no raw ISO timestamp and no mid-token id cut", async () => {
+    const LONG_TASK = {
+      ...REVIEW_TASK,
+      id: "task-seed-longid",
+      asset_id: "asset-seed-longid",
+      project_id: "project-seed-longid",
+      updated_at: "2026-06-13T08:00:00Z",
+    };
+    mockClient.get.mockImplementation(async (path: string) => {
+      switch (path) {
+        case "/api/orgs":
+          return { ok: true, value: { data: [{ id: "org-001", name: "Acme", viewer_role: "reviewer" }], sessionRotation: null } };
+        case "/api/orgs/org-001/projects":
+          return { ok: true, value: { data: [{ id: "proj-001", org_id: "org-001", name: "Trailer" }], sessionRotation: null } };
+        case "/api/orgs/org-001/projects/proj-001/review-tasks":
+          return { ok: true, value: { data: { org_id: "org-001", project_id: "proj-001", tasks: [LONG_TASK] }, sessionRotation: null } };
+        case "/api/notifications":
+          return { ok: true, value: { data: { notifications: [] }, sessionRotation: null } };
+        default:
+          throw new Error(`Unexpected GET ${path}`);
+      }
+    });
+
+    await render(
+      <ReviewInboxScreen gatewayBaseUrl="http://gateway" onOpenTask={jest.fn()} />,
+    );
+    await waitFor(() => expect(screen.getByTestId(`review-task-card-${LONG_TASK.id}`)).toBeTruthy());
+
+    const card = screen.getByTestId(`review-task-card-${LONG_TASK.id}`);
+    const cardText = JSON.stringify(card);
+    // No raw ISO pattern.
+    expect(cardText).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/);
+    // Full ids must appear in the card (proves they were not truncated mid-token).
+    expect(cardText).toContain("task-seed-longid");
+    expect(cardText).toContain("asset-seed-longid");
+    expect(cardText).toContain("project-seed-longid");
+  });
+
   it("EC-1: notification errors are announced accessibly", async () => {
     mockClient.get.mockImplementation(async (path: string) => {
       switch (path) {
@@ -340,5 +378,129 @@ describe("ReviewInboxScreen", () => {
     await waitFor(() => expect(screen.getByTestId("review-notification-message")).toBeTruthy());
     expect(screen.getByTestId("review-notification-message").props.accessibilityRole).toBe("alert");
     expect(screen.getByTestId("review-notification-message").props.accessibilityLiveRegion).toBe("polite");
+  });
+
+  it("T7b/HP-1: tasks from two orgs and multiple projects are all aggregated", async () => {
+    const TASK_A = { ...REVIEW_TASK, id: "task-a", project_id: "proj-001" };
+    const TASK_B = { ...REVIEW_TASK, id: "task-b", project_id: "proj-002" };
+    const TASK_C = { ...REVIEW_TASK, id: "task-c", org_id: "org-002", project_id: "proj-003" };
+
+    mockClient.get.mockImplementation(async (path: string) => {
+      switch (path) {
+        case "/api/orgs":
+          return { ok: true, value: { data: [
+            { id: "org-001", name: "Acme", viewer_role: "reviewer" },
+            { id: "org-002", name: "Beta", viewer_role: "reviewer" },
+          ], sessionRotation: null } };
+        case "/api/orgs/org-001/projects":
+          return { ok: true, value: { data: [
+            { id: "proj-001", org_id: "org-001", name: "Alpha" },
+            { id: "proj-002", org_id: "org-001", name: "Bravo" },
+          ], sessionRotation: null } };
+        case "/api/orgs/org-002/projects":
+          return { ok: true, value: { data: [
+            { id: "proj-003", org_id: "org-002", name: "Gamma" },
+          ], sessionRotation: null } };
+        case "/api/orgs/org-001/projects/proj-001/review-tasks":
+          return { ok: true, value: { data: { org_id: "org-001", project_id: "proj-001", tasks: [TASK_A] }, sessionRotation: null } };
+        case "/api/orgs/org-001/projects/proj-002/review-tasks":
+          return { ok: true, value: { data: { org_id: "org-001", project_id: "proj-002", tasks: [TASK_B] }, sessionRotation: null } };
+        case "/api/orgs/org-002/projects/proj-003/review-tasks":
+          return { ok: true, value: { data: { org_id: "org-002", project_id: "proj-003", tasks: [TASK_C] }, sessionRotation: null } };
+        case "/api/notifications":
+          return { ok: true, value: { data: { notifications: [] }, sessionRotation: null } };
+        default:
+          throw new Error(`Unexpected GET ${path}`);
+      }
+    });
+
+    await render(<ReviewInboxScreen gatewayBaseUrl="http://gateway" onOpenTask={jest.fn()} />);
+    await waitFor(() => expect(screen.getByTestId("review-task-card-task-a")).toBeTruthy());
+    expect(screen.getByTestId("review-task-card-task-b")).toBeTruthy();
+    expect(screen.getByTestId("review-task-card-task-c")).toBeTruthy();
+  });
+
+  it("T7b/EC-1: forbidden project scope is skipped; other projects still contribute tasks", async () => {
+    mockClient.get.mockImplementation(async (path: string) => {
+      switch (path) {
+        case "/api/orgs":
+          return { ok: true, value: { data: [{ id: "org-001", name: "Acme", viewer_role: "reviewer" }], sessionRotation: null } };
+        case "/api/orgs/org-001/projects":
+          return { ok: true, value: { data: [
+            { id: "proj-001", org_id: "org-001", name: "Forbidden" },
+            { id: "proj-002", org_id: "org-001", name: "Allowed" },
+          ], sessionRotation: null } };
+        case "/api/orgs/org-001/projects/proj-001/review-tasks":
+          return { ok: false, error: { kind: "forbidden" } };
+        case "/api/orgs/org-001/projects/proj-002/review-tasks":
+          return { ok: true, value: { data: { org_id: "org-001", project_id: "proj-002", tasks: [REVIEW_TASK] }, sessionRotation: null } };
+        case "/api/notifications":
+          return { ok: true, value: { data: { notifications: [] }, sessionRotation: null } };
+        default:
+          throw new Error(`Unexpected GET ${path}`);
+      }
+    });
+
+    await render(<ReviewInboxScreen gatewayBaseUrl="http://gateway" onOpenTask={jest.fn()} />);
+    await waitFor(() => expect(screen.getByTestId(`review-task-card-${REVIEW_TASK.id}`)).toBeTruthy());
+  });
+
+  it("T7b/EC-2: session_expired during queue fetch logs out exactly once", async () => {
+    mockClient.get.mockImplementation(async (path: string) => {
+      switch (path) {
+        case "/api/orgs":
+          return { ok: true, value: { data: [{ id: "org-001", name: "Acme", viewer_role: "reviewer" }], sessionRotation: null } };
+        case "/api/orgs/org-001/projects":
+          return { ok: true, value: { data: [{ id: "proj-001", org_id: "org-001", name: "Trailer" }], sessionRotation: null } };
+        case "/api/orgs/org-001/projects/proj-001/review-tasks":
+          return { ok: false, error: { kind: "session_expired" } };
+        default:
+          throw new Error(`Unexpected GET ${path}`);
+      }
+    });
+
+    await render(<ReviewInboxScreen gatewayBaseUrl="http://gateway" onOpenTask={jest.fn()} />);
+    await waitFor(() => expect(mockAuth.logout).toHaveBeenCalledTimes(1));
+    expect(mockAuth.logout).toHaveBeenCalledTimes(1);
+  });
+
+  it("T7b/EC-3: second project queue request starts before slow first project resolves", async () => {
+    let proj1CallCount = 0;
+    let proj2CallCount = 0;
+    let resolveProj1!: (v: unknown) => void;
+
+    mockClient.get.mockImplementation(async (path: string) => {
+      switch (path) {
+        case "/api/orgs":
+          return { ok: true, value: { data: [{ id: "org-001", name: "Acme", viewer_role: "reviewer" }], sessionRotation: null } };
+        case "/api/orgs/org-001/projects":
+          return { ok: true, value: { data: [
+            { id: "proj-001", org_id: "org-001", name: "Slow" },
+            { id: "proj-002", org_id: "org-001", name: "Fast" },
+          ], sessionRotation: null } };
+        case "/api/orgs/org-001/projects/proj-001/review-tasks":
+          proj1CallCount++;
+          return new Promise((res) => { resolveProj1 = res; });
+        case "/api/orgs/org-001/projects/proj-002/review-tasks":
+          proj2CallCount++;
+          return { ok: true, value: { data: { org_id: "org-001", project_id: "proj-002", tasks: [] }, sessionRotation: null } };
+        case "/api/notifications":
+          return { ok: true, value: { data: { notifications: [] }, sessionRotation: null } };
+        default:
+          throw new Error(`Unexpected GET ${path}`);
+      }
+    });
+
+    render(<ReviewInboxScreen gatewayBaseUrl="http://gateway" onOpenTask={jest.fn()} />);
+
+    // Both queue requests must be in-flight concurrently before the first resolves.
+    await waitFor(() => {
+      expect(proj1CallCount).toBe(1);
+      expect(proj2CallCount).toBe(1);
+    });
+
+    // Resolve the slow first project and let the screen settle.
+    resolveProj1({ ok: true, value: { data: { org_id: "org-001", project_id: "proj-001", tasks: [] }, sessionRotation: null } });
+    await waitFor(() => expect(screen.getByText("No tasks assigned")).toBeTruthy());
   });
 });

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+
+import { formatTimestamp } from "../format";
 
 import { createGatewayClient } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
@@ -31,6 +33,7 @@ export function ConsentScreen({ assetId, gatewayBaseUrl }: Props) {
   const [evidenceRef, setEvidenceRef] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   const loadLedger = useCallback(async () => {
     setLoading(true);
@@ -61,6 +64,7 @@ export function ConsentScreen({ assetId, gatewayBaseUrl }: Props) {
       return;
     }
     setError(null);
+    setSubmitting(true);
     const client = createGatewayClient({ gatewayBaseUrl });
     const result = await client.post(
       "/api/consents",
@@ -76,14 +80,27 @@ export function ConsentScreen({ assetId, gatewayBaseUrl }: Props) {
       await auth.onSessionRotation(result.value.sessionRotation);
       setEvidenceRef("");
       await loadLedger();
+      setSubmitting(false);
       return;
     }
+    setSubmitting(false);
     if (result.error.kind === "session_expired") {
       await auth.logout();
       return;
     }
     setError(result.error.kind === "forbidden" ? "You cannot change consent for this asset." : "Could not update consent.");
   }, [assetId, auth, evidenceRef, gatewayBaseUrl, loadLedger, scope]);
+
+  const onPressRevoke = useCallback(() => {
+    Alert.alert(
+      "Revoke consent",
+      "This will add an irrevocable revoke entry to the ledger. This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Revoke", style: "destructive", onPress: () => void mutate("revoke") },
+      ],
+    );
+  }, [mutate]);
 
   const onRetry = useCallback(() => {
     void loadLedger();
@@ -128,6 +145,7 @@ export function ConsentScreen({ assetId, gatewayBaseUrl }: Props) {
                   onPress={() => setScope(candidate)}
                   variant={scope === candidate ? "primary" : "secondary"}
                   size="sm"
+                  selected={scope === candidate}
                 />
               ))}
             </View>
@@ -146,12 +164,14 @@ export function ConsentScreen({ assetId, gatewayBaseUrl }: Props) {
                 testID="consent-grant"
                 label="Grant"
                 onPress={() => void mutate("grant")}
+                disabled={submitting}
               />
               <Button
                 testID="consent-revoke"
                 label="Revoke"
-                onPress={() => void mutate("revoke")}
+                onPress={onPressRevoke}
                 variant="danger"
+                disabled={submitting}
               />
             </View>
           </Panel>
@@ -164,7 +184,7 @@ export function ConsentScreen({ assetId, gatewayBaseUrl }: Props) {
             {ledger.rows.map((row) => (
               <View key={row.id} testID={`consent-row-${row.id}`} style={styles.row}>
                 <Text style={styles.rowTitle}>{row.status} / {row.scope}</Text>
-                <Text style={styles.meta}>{row.happened_at}</Text>
+                <Text style={styles.meta}>{formatTimestamp(row.happened_at)}</Text>
                 {row.evidence_ref ? <Text style={styles.meta}>{row.evidence_ref}</Text> : null}
               </View>
             ))}

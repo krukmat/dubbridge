@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 
+import { formatId, formatTimestamp } from "../format";
+
 import { createGatewayClient } from "../api/client";
 import {
   type ReviewTaskSummary,
@@ -133,14 +135,14 @@ export function ReviewDetailScreen({
         <View style={styles.comparisonStack}>
           <View style={styles.comparisonPanel}>
             <Text style={styles.comparisonHeading}>Original</Text>
-            <Text style={styles.comparisonBody}>Asset {task.asset_id.slice(0, 8)}</Text>
-            <Text style={styles.comparisonMeta}>Created {new Date(task.created_at).toLocaleDateString()}</Text>
+            <Text style={styles.comparisonBody}>Asset {formatId(task.asset_id)}</Text>
+            <Text style={styles.comparisonMeta}>Created {formatTimestamp(task.created_at)}</Text>
           </View>
           <View style={styles.comparisonPanel}>
             <Text style={styles.comparisonHeading}>Derived</Text>
-            <Text style={styles.comparisonBody}>Target {task.target_language_id.slice(0, 8)}</Text>
+            <Text style={styles.comparisonBody}>Target {formatId(task.target_language_id)}</Text>
             <Text style={styles.comparisonMeta}>
-              Scope {task.org_id.slice(0, 8)} / {task.project_id.slice(0, 8)}
+              Scope {formatId(task.org_id)} / {formatId(task.project_id)}
             </Text>
           </View>
         </View>
