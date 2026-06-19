@@ -186,6 +186,20 @@ infra/              — local infrastructure and database migrations
 docs/               — architecture decisions, pipeline design, and development policy
 ```
 
+## Mobile client
+
+The first-party mobile app (React Native + Expo) puts the full content lifecycle in your pocket — from uploading a raw file to approving the final localized output before it goes live.
+
+**Sign in** — Authentication is the entry point. Users log in with their credentials and land on a personalized home screen. ([Login](mobile/artifacts/screenshots/01_auth_login.png))
+
+**Home & projects** — The [home screen](mobile/artifacts/screenshots/02_home.png) surfaces what matters right now. Once you have active projects, it adapts to show them front and center. From there you can drill into the [project list](mobile/artifacts/screenshots/09_project_list.png) and open any [project detail](mobile/artifacts/screenshots/10_project_detail.png) to see its current state, assets, and history.
+
+**My assets** — Your content library is always a tap away. The [asset list](mobile/artifacts/screenshots/03_asset_list.png) gives an overview of everything you own; the [asset detail](mobile/artifacts/screenshots/04_asset_detail.png) shows its full metadata, status, and lineage. To add new content you go through the [upload flow](mobile/artifacts/screenshots/05_upload.png), which hands the file off to the ingestion pipeline. If rights are confirmed, ingestion completes cleanly ([complete](mobile/artifacts/screenshots/06_ingest_complete.png)); if authorization is missing or invalid, the pipeline stops and tells you exactly why ([no rights](mobile/artifacts/screenshots/07_ingest_no_rights.png)). Nothing moves forward without a valid rights basis.
+
+**Compliance** — The [compliance center](mobile/artifacts/screenshots/11_compliance_center.png) is where consent is managed. Every asset carries a consent record that you can inspect at any time — [active](mobile/artifacts/screenshots/12_consent_active.png) when authorization is in place, [revoked](mobile/artifacts/screenshots/13_consent_revoked.png) when it has been withdrawn. A revocation propagates immediately: no further processing is allowed until consent is reinstated.
+
+**Review** — Once the localization pipeline has run, the output lands in a reviewer's [inbox](mobile/artifacts/screenshots/14_review_inbox.png). Opening a job shows the [review detail](mobile/artifacts/screenshots/15_review_detail.png) — the translated audio, subtitles, and any quality flags raised during processing. The reviewer either clears it ([approved](mobile/artifacts/screenshots/16_review_approved.png)) or sends it back. Approved content moves to the final step: [publication](mobile/artifacts/screenshots/17_review_published.png), the point at which the localized asset becomes available to its audience.
+
 ---
 
 *DubBridge is under active development. JWT-protected upload ingestion, the rights ledger, the first-party mobile client (React Native + Expo), and the full mobile asset lifecycle — asset list, detail, and upload flow with a Maestro screenshot suite — are operational. Platform-download intake (primary), live stream recording (deferred sub-case), media preparation, transcription, dubbing, and publication remain planned work.*
