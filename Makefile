@@ -1,4 +1,4 @@
-.PHONY: qa-fmt qa-lint qa-test qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-task-unit-coverage qa-docs qa-rri qa-ci install-hooks
+.PHONY: qa-fmt qa-lint qa-test qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-mobile qa-task-unit-coverage qa-docs qa-rri qa-ci install-hooks
 
 COVERAGE_MIN ?= 90
 COVERAGE_IGNORE_REGEX ?= (apps/(api|cli|worker-runner)/src/(main|cleanup)\.rs|apps/api/src/(dto/ingestion|lib|routes/ingestion|state)\.rs|crates/(db|jobs|observability)/src/lib\.rs|crates/db/src/(artifact_repo|asset_repo|audit_repo|pending_ingestion_repo|rights_repo)\.rs|crates/(audit|ingestion)/src/lib\.rs)
@@ -38,6 +38,12 @@ qa-build-release:
 qa-maintainability:
 	python3 scripts/check-maintainability.py
 
+# Mobile production-readiness + correctness: strict types, AST lint (no any /
+# console / debugger / ts-suppression), and the Jest suite. Replaces the former
+# regex production-readiness scan for the mobile surface.
+qa-mobile:
+	cd mobile && npm run typecheck && npm run lint && npm test
+
 qa-task-unit-coverage:
 	bash scripts/check-task-unit-coverage.sh
 
@@ -54,7 +60,7 @@ qa-rri:
 	python3 scripts/rri_test.py
 	python3 scripts/check_roadmap_drift_test.py
 
-qa-ci: qa-local qa-docs qa-rri qa-deny qa-config-secrets qa-roadmap-drift qa-maintainability qa-coverage qa-build-release
+qa-ci: qa-local qa-docs qa-rri qa-deny qa-config-secrets qa-roadmap-drift qa-maintainability qa-mobile qa-coverage qa-build-release
 
 install-hooks:
 	cp scripts/hooks/pre-commit .git/hooks/pre-commit

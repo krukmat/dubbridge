@@ -85,9 +85,15 @@ pub async fn exists_for_token_tx(
 }
 
 // H1-T2: fail-closed — unknown stored kind must not silently coerce to OriginalMedia (ADR-008).
+// S-120-T2: preparation-derived kinds added.
 fn parse_kind(s: &str) -> Result<ArtifactKind, DbError> {
     match s {
         "original_media" => Ok(ArtifactKind::OriginalMedia),
+        "recorded_stream_media" => Ok(ArtifactKind::RecordedStreamMedia),
+        "downloaded_platform_media" => Ok(ArtifactKind::DownloadedPlatformMedia),
+        "probe_metadata" => Ok(ArtifactKind::ProbeMetadata),
+        "hls_manifest" => Ok(ArtifactKind::HlsManifest),
+        "hls_segment" => Ok(ArtifactKind::HlsSegment),
         other => Err(DbError::UnknownStoredValue {
             field: "artifact_records.kind",
             value: other.to_owned(),
@@ -137,6 +143,23 @@ mod tests {
         assert!(matches!(
             parse_kind("original_media"),
             Ok(ArtifactKind::OriginalMedia)
+        ));
+    }
+
+    // S-120-T2: new preparation-derived kinds must parse successfully (fail-closed).
+    #[test]
+    fn parse_kind_preparation_variants_succeed() {
+        assert!(matches!(
+            parse_kind("probe_metadata"),
+            Ok(ArtifactKind::ProbeMetadata)
+        ));
+        assert!(matches!(
+            parse_kind("hls_manifest"),
+            Ok(ArtifactKind::HlsManifest)
+        ));
+        assert!(matches!(
+            parse_kind("hls_segment"),
+            Ok(ArtifactKind::HlsSegment)
         ));
     }
 

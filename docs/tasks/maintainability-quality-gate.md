@@ -89,7 +89,9 @@ markers before review.
 - [x] Backend Rust and mobile TypeScript/TSX paths are both covered by the same
       gate.
 - [x] The gate checks added-line budget, uninterrupted added-code block size,
-      repeated added lines, duplicate added blocks, and generated-code markers.
+      repeated added lines, declaration bursts, total diff budgets, file-count
+      budgets, generic-name bursts, long-line bursts, duplicate added blocks,
+      and generated-code markers.
 - [x] The gate can be run through `make qa-maintainability`.
 - [x] CI runs `make qa-maintainability`.
 - [x] The pre-push hook runs `make qa-maintainability`.
@@ -128,6 +130,12 @@ markers before review.
 - EC-2: generated-source markers are blocked in backend/mobile app code.
 - EC-3: repeated added lines are blocked before they become review noise.
 - EC-4: duplicated added blocks are blocked across backend/mobile changed files.
+- EC-5: oversized multi-file source diffs are blocked even if no single file
+  individually exceeds its budget.
+- EC-6: declaration/import bursts in a changed file are blocked.
+- EC-7: too many changed source files in one diff are blocked.
+- EC-8: bursts of generic generated-style identifiers are blocked.
+- EC-9: bursts of long added lines are blocked.
 
 ### Reflection strategy
 
@@ -201,6 +209,11 @@ Required passes: 3 (`49` -> `Med-high`)
 | EC-2 | Edge case | backend Rust diff containing a generated-source marker fails closed | `scripts/check_maintainability_test.py::MaintainabilityGateTest.test_ec2_backend_generated_marker_fails` | passed |
 | EC-3 | Edge case | repeated added code lines in one changed file fail | `scripts/check_maintainability_test.py::MaintainabilityGateTest.test_ec3_repeated_added_lines_fail` | passed |
 | EC-4 | Edge case | duplicated normalized added blocks across changed code fail | `scripts/check_maintainability_test.py::MaintainabilityGateTest.test_ec4_duplicate_added_blocks_across_files_fail` | passed |
+| EC-5 | Edge case | oversized multi-file source diffs fail even when split across files | `scripts/check_maintainability_test.py::MaintainabilityGateTest.test_ec5_total_source_diff_budget_fails` | passed |
+| EC-6 | Edge case | declaration/import bursts in a changed file fail | `scripts/check_maintainability_test.py::MaintainabilityGateTest.test_ec6_mobile_declaration_burst_fails` | passed |
+| EC-7 | Edge case | too many changed source files in one diff fail | `scripts/check_maintainability_test.py::MaintainabilityGateTest.test_ec7_source_file_count_budget_fails` | passed |
+| EC-8 | Edge case | generic generated-style identifier bursts fail | `scripts/check_maintainability_test.py::MaintainabilityGateTest.test_ec8_generic_name_burst_fails` | passed |
+| EC-9 | Edge case | long-line bursts fail | `scripts/check_maintainability_test.py::MaintainabilityGateTest.test_ec9_long_line_burst_fails` | passed |
 
 ### Owner final verification
 

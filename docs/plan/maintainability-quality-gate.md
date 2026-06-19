@@ -39,8 +39,13 @@ bloat while preserving the current baseline.
 - Evaluate changed files and added diff lines, not all historical code.
 - Fail on common generated-code signals:
   - excessive added lines per file;
+  - excessive added lines across the whole source/test diff;
+  - too many changed source/test files in one diff;
   - large uninterrupted added code blocks;
   - repeated added lines;
+  - declaration/import bursts in a single changed file;
+  - generic generated-style identifier bursts;
+  - long-line bursts that usually signal pasted bulk;
   - duplicated added normalized blocks;
   - generated-code markers in app source.
 - Keep thresholds explicit and centralized in the script.
@@ -73,8 +78,9 @@ flowchart LR
 
 - `MQG-T1` is complete: `scripts/check-maintainability.py` now checks changed
   backend Rust and mobile TypeScript/TSX code for oversized added diffs,
-  uninterrupted generated-like blocks, repeated added lines, duplicated added
-  blocks, and generated-source markers.
+  total diff budgets, file-count budgets, uninterrupted generated-like blocks,
+  repeated added lines, declaration bursts, generic-name bursts, long-line
+  bursts, duplicated added blocks, and generated-source markers.
 - The gate is available through `make qa-maintainability`, runs in CI, and runs
   from the pre-push hook.
 - Unit coverage for the gate lives in `scripts/check_maintainability_test.py`.

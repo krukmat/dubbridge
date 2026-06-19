@@ -71,15 +71,7 @@ pub async fn finalize_ingestion_core(
                     // H1-T3: persist durable audit row before returning — drop tx first so
                     // the pool connection is released before the audit pool write.
                     drop(tx);
-                    let event = AuditEvent::new(
-                        None,
-                        AuditEventKind::IngestionRejectedDuplicateToken,
-                        ingest_token,
-                        Some("duplicate finalization rejected".into()),
-                    );
-                    emit_governance_audit(pool, &event)
-                        .await
-                        .map_err(|e| IngestionServiceError::Internal(e.to_string()))?;
+                    emit_duplicate_rejection(pool, ingest_token).await?;
                     return Err(IngestionServiceError::AlreadyFinalized);
                 }
                 return Err(IngestionServiceError::SessionNotFound);
@@ -94,15 +86,7 @@ pub async fn finalize_ingestion_core(
     // H1-T3: idempotency guard — emit durable audit before returning.
     if dubbridge_db::artifact_repo::exists_for_token_tx(&mut tx, ingest_token).await? {
         drop(tx);
-        let event = AuditEvent::new(
-            None,
-            AuditEventKind::IngestionRejectedDuplicateToken,
-            ingest_token,
-            Some("duplicate finalization rejected".into()),
-        );
-        emit_governance_audit(pool, &event)
-            .await
-            .map_err(|e| IngestionServiceError::Internal(e.to_string()))?;
+        emit_duplicate_rejection(pool, ingest_token).await?;
         return Err(IngestionServiceError::AlreadyFinalized);
     }
 
@@ -183,6 +167,23 @@ pub async fn finalize_ingestion_core(
         .ok_or_else(|| {
             IngestionServiceError::Internal("asset disappeared after finalization".into())
         })
+}
+
+/// Emits the durable duplicate-finalization audit row (H1-T3). The caller must
+/// drop its transaction first so the pool connection is free for this write.
+async fn emit_duplicate_rejection(
+    pool: &PgPool,
+    ingest_token: Uuid,
+) -> Result<(), IngestionServiceError> {
+    let event = AuditEvent::new(
+        None,
+        AuditEventKind::IngestionRejectedDuplicateToken,
+        ingest_token,
+        Some("duplicate finalization rejected".into()),
+    );
+    emit_governance_audit(pool, &event)
+        .await
+        .map_err(|e| IngestionServiceError::Internal(e.to_string()))
 }
 
 fn is_unique_violation(error: &dubbridge_db::error::DbError) -> bool {

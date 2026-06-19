@@ -28,10 +28,13 @@ GENERATED_MARKERS = (
 @dataclass(frozen=True)
 class Profile:
     name: str
-    added_line_budget: int
     added_block_budget: int
     repeated_line_budget: int
     duplicate_window: int
+    declaration_budget: int
+    duplicate_min_chars: int
+    generic_name_budget: int
+    long_line_budget: int
 
 
 @dataclass(frozen=True)
@@ -48,10 +51,39 @@ class Violation:
     message: str
 
 
-RUST_SOURCE = Profile("backend Rust source", 300, 140, 10, 6)
-RUST_TEST = Profile("backend Rust test", 500, 220, 14, 8)
-MOBILE_SOURCE = Profile("mobile source", 220, 110, 10, 6)
-MOBILE_TEST = Profile("mobile test", 450, 220, 14, 8)
+RUST_SOURCE = Profile("backend Rust source", 65, 8, 4, 40, 90, 10, 15)
+RUST_TEST = Profile("backend Rust test", 120, 10, 5, 60, 120, 18, 20)
+MOBILE_SOURCE = Profile("mobile source", 45, 4, 3, 20, 70, 8, 8)
+MOBILE_TEST = Profile("mobile test", 120, 6, 5, 40, 110, 14, 12)
+
+GENERIC_NAME_RE = re.compile(
+    r"\b("
+    r"generated[a-zA-Z0-9_]*|"
+    r"temp[a-zA-Z0-9_]*|"
+    r"placeholder[a-zA-Z0-9_]*|"
+    r"foo|bar|baz|qux|"
+    r"value\d+|item\d+|field\d+|data\d+|result\d+|thing\d+"
+    r")\b"
+)
+
+# Panic-on-error calls that are grandfathered in existing source but must not be
+# *added* to production Rust. Macro-based risks (panic!/todo!/dbg!/print*) are
+# enforced workspace-wide by clippy ([workspace.lints.clippy]); unwrap/expect
+# have hundreds of historical call sites, so they cannot be denied globally and
+# are ratcheted here on the diff instead. Tests keep their freedom to unwrap.
+RUNTIME_RISK_RE = re.compile(r"\.unwrap\(\)|\.expect\(")
+
+
+def _find_cfg_test_line(path: str) -> int | None:
+    """Return the 1-indexed line number of the first #[cfg(test)] in a Rust file."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            for i, line in enumerate(f, 1):
+                if line.strip() == "#[cfg(test)]":
+                    return i
+    except OSError:
+        pass
+    return None
 
 
 def run_git(args: list[str]) -> str:
@@ -171,6 +203,23 @@ def normalize_line(text: str) -> str:
     return stripped.rstrip(",;")
 
 
+def is_declaration_line(path: str, text: str) -> bool:
+    normalized = normalize_line(text)
+    if classify_path(path) in {RUST_SOURCE, RUST_TEST}:
+        return bool(
+            re.match(
+                r"^(pub )?(async )?fn\b|^impl\b|^(pub )?(struct|enum|trait|mod)\b|^type\b|^use\b",
+                normalized,
+            )
+        )
+    return bool(
+        re.match(
+            r"^(export )?(async )?function\b|^(export )?const\b|^(export )?(type|interface|class)\b|^import\b",
+            normalized,
+        )
+    )
+
+
 def group_by_path(lines: Iterable[AddedLine]) -> dict[str, list[AddedLine]]:
     grouped: dict[str, list[AddedLine]] = {}
     for line in lines:
@@ -178,22 +227,17 @@ def group_by_path(lines: Iterable[AddedLine]) -> dict[str, list[AddedLine]]:
     return grouped
 
 
-def check_added_line_budgets(grouped: dict[str, list[AddedLine]]) -> list[Violation]:
-    violations: list[Violation] = []
-    for path, lines in grouped.items():
-        profile = classify_path(path)
-        if profile is None:
-            continue
-        meaningful_count = sum(1 for line in lines if is_meaningful_line(line.text))
-        if meaningful_count > profile.added_line_budget:
-            violations.append(
-                Violation(
-                    path,
-                    f"{meaningful_count} meaningful added lines exceed {profile.name} budget "
-                    f"of {profile.added_line_budget}",
-                )
-            )
-    return violations
+def _longest_meaningful_run(hunk_lines: list[AddedLine]) -> int:
+    """Return the length of the longest contiguous run of meaningful lines."""
+    max_run = current_run = 0
+    for line in hunk_lines:
+        if is_meaningful_line(line.text):
+            current_run += 1
+            if current_run > max_run:
+                max_run = current_run
+        else:
+            current_run = 0
+    return max_run
 
 
 def check_added_blocks(grouped: dict[str, list[AddedLine]]) -> list[Violation]:
@@ -202,17 +246,25 @@ def check_added_blocks(grouped: dict[str, list[AddedLine]]) -> list[Violation]:
         profile = classify_path(path)
         if profile is None:
             continue
-        block_counts: Counter[int] = Counter()
+        # For RUST_SOURCE files that contain a #[cfg(test)] module, lines past
+        # that module boundary use the RUST_TEST budget.
+        test_start = _find_cfg_test_line(path) if profile is RUST_SOURCE else None
+
+        hunk_buckets: dict[tuple[int, bool], list[AddedLine]] = {}
         for line in lines:
-            if is_meaningful_line(line.text):
-                block_counts[line.hunk] += 1
-        for hunk, count in sorted(block_counts.items()):
-            if count > profile.added_block_budget:
+            is_test = test_start is not None and line.line_no >= test_start
+            hunk_buckets.setdefault((line.hunk, is_test), []).append(line)
+
+        for (hunk, is_test), hunk_lines in sorted(hunk_buckets.items()):
+            budget_profile = RUST_TEST if is_test else profile
+            longest = _longest_meaningful_run(hunk_lines)
+            if longest > budget_profile.added_block_budget:
+                label = "test module, " if is_test else ""
                 violations.append(
                     Violation(
                         path,
-                        f"hunk {hunk} adds {count} uninterrupted meaningful lines; "
-                        f"budget is {profile.added_block_budget}",
+                        f"hunk {hunk} ({label}longest contiguous run {longest} meaningful lines; "
+                        f"budget is {budget_profile.added_block_budget})",
                     )
                 )
     return violations
@@ -257,6 +309,72 @@ def check_repeated_lines(grouped: dict[str, list[AddedLine]]) -> list[Violation]
     return violations
 
 
+def check_declaration_bursts(grouped: dict[str, list[AddedLine]]) -> list[Violation]:
+    violations: list[Violation] = []
+    for path, lines in grouped.items():
+        profile = classify_path(path)
+        if profile is None:
+            continue
+        # Exclude declarations that fall inside a #[cfg(test)] module.
+        test_start = _find_cfg_test_line(path) if profile is RUST_SOURCE else None
+        declaration_count = sum(
+            1
+            for line in lines
+            if is_meaningful_line(line.text)
+            and is_declaration_line(path, line.text)
+            and (test_start is None or line.line_no < test_start)
+        )
+        if declaration_count > profile.declaration_budget:
+            violations.append(
+                Violation(
+                    path,
+                    f"{declaration_count} declaration/import lines exceed {profile.name} declaration budget "
+                    f"of {profile.declaration_budget}",
+                )
+            )
+    return violations
+
+
+def check_generic_name_bursts(grouped: dict[str, list[AddedLine]]) -> list[Violation]:
+    violations: list[Violation] = []
+    for path, lines in grouped.items():
+        profile = classify_path(path)
+        if profile is None:
+            continue
+        count = sum(
+            1
+            for line in lines
+            if is_meaningful_line(line.text) and GENERIC_NAME_RE.search(normalize_line(line.text))
+        )
+        if count > profile.generic_name_budget:
+            violations.append(
+                Violation(
+                    path,
+                    f"{count} generic generated-style identifiers exceed {profile.name} generic-name budget "
+                    f"of {profile.generic_name_budget}",
+                )
+            )
+    return violations
+
+
+def check_long_line_bursts(grouped: dict[str, list[AddedLine]]) -> list[Violation]:
+    violations: list[Violation] = []
+    for path, lines in grouped.items():
+        profile = classify_path(path)
+        if profile is None:
+            continue
+        count = sum(1 for line in lines if is_meaningful_line(line.text) and len(line.text.rstrip()) >= 100)
+        if count > profile.long_line_budget:
+            violations.append(
+                Violation(
+                    path,
+                    f"{count} added lines are 100+ chars, exceeding {profile.name} long-line budget "
+                    f"of {profile.long_line_budget}",
+                )
+            )
+    return violations
+
+
 def check_duplicate_blocks(grouped: dict[str, list[AddedLine]]) -> list[Violation]:
     seen: dict[tuple[str, ...], tuple[str, int]] = {}
     violations: list[Violation] = []
@@ -275,7 +393,7 @@ def check_duplicate_blocks(grouped: dict[str, list[AddedLine]]) -> list[Violatio
 
         for index in range(0, len(normalized) - profile.duplicate_window + 1):
             window = tuple(normalized[index : index + profile.duplicate_window])
-            if len("\n".join(window)) < 160:
+            if len("\n".join(window)) < profile.duplicate_min_chars:
                 continue
             previous = seen.get(window)
             if previous is not None and previous[0] != path:
@@ -292,14 +410,48 @@ def check_duplicate_blocks(grouped: dict[str, list[AddedLine]]) -> list[Violatio
     return violations
 
 
+def check_runtime_risk_additions(grouped: dict[str, list[AddedLine]]) -> list[Violation]:
+    """Block newly-added unwrap()/expect() in production Rust source.
+
+    Existing call sites are grandfathered because the gate only inspects added
+    diff lines, not the historical baseline. Lines inside a #[cfg(test)] module
+    are exempt even when the file is otherwise classified as RUST_SOURCE.
+    """
+    violations: list[Violation] = []
+    for path, lines in grouped.items():
+        if classify_path(path) is not RUST_SOURCE:
+            continue
+        test_start = _find_cfg_test_line(path)
+        for line in lines:
+            if test_start is not None and line.line_no >= test_start:
+                continue
+            if not is_meaningful_line(line.text):
+                continue
+            match = RUNTIME_RISK_RE.search(line.text)
+            if match is None:
+                continue
+            call = "unwrap()" if match.group(0).startswith(".unwrap") else "expect()"
+            violations.append(
+                Violation(
+                    path,
+                    f"adds .{call} at line {line.line_no}; return Result/Option and "
+                    f"propagate with `?` instead of panicking in production source",
+                )
+            )
+    return violations
+
+
 def analyze_added_lines(added_lines: list[AddedLine]) -> list[Violation]:
     grouped = group_by_path(added_lines)
     violations: list[Violation] = []
-    violations.extend(check_added_line_budgets(grouped))
     violations.extend(check_added_blocks(grouped))
     violations.extend(check_generated_markers(grouped))
     violations.extend(check_repeated_lines(grouped))
+    violations.extend(check_declaration_bursts(grouped))
+    violations.extend(check_generic_name_bursts(grouped))
+    violations.extend(check_long_line_bursts(grouped))
     violations.extend(check_duplicate_blocks(grouped))
+    violations.extend(check_runtime_risk_additions(grouped))
     return violations
 
 

@@ -1,0 +1,8 @@
+# Exempt test code from the production-readiness restriction lints declared in
+# Cargo.toml ([workspace.lints.clippy]). Tests legitimately panic, print, and
+# use dbg!/unwrap/expect to assert behaviour.
+allow-panic-in-tests = true
+allow-print-in-tests = true
+allow-dbg-in-tests = true
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true

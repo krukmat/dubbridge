@@ -46,17 +46,6 @@ class MaintainabilityGateTest(unittest.TestCase):
 
         self.assertEqual(checker.analyze_added_lines(lines), [])
 
-    def test_ec1_mobile_source_added_line_budget_fails(self) -> None:
-        lines = added(
-            "mobile/src/screens/HugeGeneratedScreen.tsx",
-            [f"const generatedValue{i} = {i};" for i in range(checker.MOBILE_SOURCE.added_line_budget + 1)],
-        )
-
-        violations = checker.analyze_added_lines(lines)
-
-        self.assertTrue(any("exceed mobile source budget" in item.message for item in violations))
-        self.assertTrue(any(item.path == "mobile/src/screens/HugeGeneratedScreen.tsx" for item in violations))
-
     def test_ec2_backend_generated_marker_fails(self) -> None:
         lines = added(
             "crates/domain/src/generatedish.rs",
@@ -89,15 +78,44 @@ class MaintainabilityGateTest(unittest.TestCase):
             "const betaGeneratedField = normalizeGeneratedField(betaInput);",
             "const gammaGeneratedField = normalizeGeneratedField(gammaInput);",
             "const deltaGeneratedField = normalizeGeneratedField(deltaInput);",
-            "const epsilonGeneratedField = normalizeGeneratedField(epsilonInput);",
-            "const zetaGeneratedField = normalizeGeneratedField(zetaInput);",
         ]
         lines = added("mobile/src/screens/FirstScreen.tsx", block)
         lines += added("mobile/src/screens/SecondScreen.tsx", block)
 
         violations = checker.analyze_added_lines(lines)
 
-        self.assertTrue(any("duplicates a 6-line added block" in item.message for item in violations))
+        self.assertTrue(any("duplicates a 3-line added block" in item.message for item in violations))
+
+    def test_ec6_mobile_declaration_burst_fails(self) -> None:
+        lines = added(
+            "mobile/src/screens/DeclarationBurst.tsx",
+            [f"const generatedField{i} = buildField({i});" for i in range(checker.MOBILE_SOURCE.declaration_budget + 1)],
+        )
+
+        violations = checker.analyze_added_lines(lines)
+
+        self.assertTrue(any("declaration budget" in item.message for item in violations))
+
+    def test_ec8_generic_name_burst_fails(self) -> None:
+        lines = added(
+            "crates/domain/src/generic_names.rs",
+            [f"let generatedValue{i} = tempResult{i} + value{i};" for i in range(checker.RUST_SOURCE.generic_name_budget + 1)],
+        )
+
+        violations = checker.analyze_added_lines(lines)
+
+        self.assertTrue(any("generic-name budget" in item.message for item in violations))
+
+    def test_ec9_long_line_burst_fails(self) -> None:
+        long_line = 'const veryLongLine = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz";'
+        lines = added(
+            "mobile/src/screens/LongLines.tsx",
+            [long_line for _ in range(checker.MOBILE_SOURCE.long_line_budget + 1)],
+        )
+
+        violations = checker.analyze_added_lines(lines)
+
+        self.assertTrue(any("long-line budget" in item.message for item in violations))
 
     def test_parse_added_lines_only_keeps_supported_code_paths(self) -> None:
         diff = """diff --git a/README.md b/README.md

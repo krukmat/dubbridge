@@ -5,6 +5,14 @@ echo "Running pre-push gates..."
 make qa-test
 make qa-maintainability
 
+if [ -d mobile/node_modules ]; then
+    echo "Running mobile gate..."
+    make qa-mobile
+else
+    echo "WARNING: mobile/node_modules missing — skipping mobile gate."
+    echo "  To enable: (cd mobile && npm ci)"
+fi
+
 if [ -n "$DUBBRIDGE_DATABASE_URL" ]; then
     echo "Running coverage with DB..."
     make qa-coverage
