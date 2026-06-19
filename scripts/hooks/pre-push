@@ -17,9 +17,10 @@ if [ -n "$DUBBRIDGE_DATABASE_URL" ]; then
     echo "Running coverage with DB..."
     make qa-coverage
 else
-    echo "WARNING: DUBBRIDGE_DATABASE_URL not set — skipping coverage gate."
-    echo "  To enable: export DUBBRIDGE_DATABASE_URL=postgresql://dubbridge:dubbridge@localhost:5432/dubbridge_test"
-    echo "  Then spin up Postgres: docker compose -f infra/local/docker-compose.yml up -d postgres"
+    echo "ERROR: DUBBRIDGE_DATABASE_URL not set — integration tests require a live database."
+    echo "  export DUBBRIDGE_DATABASE_URL=postgresql://dubbridge:dubbridge@localhost:5432/dubbridge_test"
+    echo "  docker compose -f infra/local/docker-compose.yml up -d postgres"
+    exit 1
 fi
 
 echo "Pre-push gates passed."
