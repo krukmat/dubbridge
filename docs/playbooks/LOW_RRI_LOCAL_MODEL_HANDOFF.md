@@ -70,6 +70,27 @@ Poor-fit tasks:
 - Say what must **not** be changed.
 - State the required output contract explicitly: tagged text blocks with complete
   file contents, never JSON and never a unified diff.
+- **Always include the current content of every file to be modified** in a
+  `## Current file content` section. The local model has no filesystem access —
+  without this it will hallucinate the file structure and produce a rewrite that
+  bears no resemblance to the real file.
+  - For **small files** (under ~150 lines): include the complete file.
+  - For **large files**: include only the relevant section — the function or
+    block being changed plus enough surrounding lines (imports, enclosing struct,
+    adjacent functions) for Gemma to preserve context. Clearly mark the
+    truncation with `// ... (rest of file unchanged)` at the top and bottom so
+    the model knows it must emit the full file in its response, not just the
+    excerpt. Before sending, estimate the packet size: if the excerpt + instructions
+    exceed ~8k tokens, reduce the excerpt further or split into a smaller task.
+- **Show the exact block to replace and the exact replacement block** as code
+  fences, not as prose descriptions. Prose instructions (“remove the closure”,
+  “simplify the error handling”) are ambiguous to a small model; literal before/after
+  blocks are not.
+- **Verify every symbol mentioned in the packet before writing it.** If the packet
+  asks to remove an import, confirm first that no other site in the file still
+  references that symbol after the change. If the packet asks to delete a helper,
+  confirm it has no other callers. Mistakes here produce compile errors that the
+  model cannot catch.
 - Prefer concrete edits such as:
   - add one note;
   - replace one bullet;
@@ -92,7 +113,12 @@ Before accepting the result, verify all of the following:
 - the file structure is preserved;
 - the change actually matches the requested objective;
 - no unrelated sections were rewritten;
-- the resulting document or code still reads coherently in context.
+- the resulting document or code still reads coherently in context;
+- **read the unified diff in `result.json` line by line** — confirm only the
+  lines described in the packet changed; any deletion or addition outside that
+  scope is a scope violation even if the patch applied cleanly;
+- **run `cargo build --workspace` (or the equivalent for the platform)** and
+  confirm zero new errors and zero new warnings before marking the task done.
 
 ## Failure and retry rules
 

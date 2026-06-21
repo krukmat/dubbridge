@@ -259,6 +259,31 @@ pub async fn insert_push_token(pool: &PgPool, row: &PushTokenRow) -> Result<(), 
     Ok(())
 }
 
+/// Inserts a push token, or updates `subject_id` and `updated_at` if
+/// `(provider, device_token)` already exists. Idempotent for re-registration.
+pub async fn upsert_push_token(pool: &PgPool, row: &PushTokenRow) -> Result<(), DbError> {
+    sqlx::query(
+        r#"
+        INSERT INTO push_tokens (id, subject_id, provider, device_token, platform, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (provider, device_token)
+        DO UPDATE SET subject_id = EXCLUDED.subject_id, updated_at = EXCLUDED.updated_at
+        "#,
+    )
+    .bind(row.id)
+    .bind(row.subject_id)
+    .bind(&row.provider)
+    .bind(&row.device_token)
+    .bind(&row.platform)
+    .bind(row.created_at)
+    .bind(row.updated_at)
+    .execute(pool)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    Ok(())
+}
+
 pub async fn list_push_tokens_for_subject(
     pool: &PgPool,
     subject_id: Uuid,

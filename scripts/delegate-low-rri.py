@@ -36,6 +36,7 @@ DEFAULT_IDLE_TIMEOUT_SECONDS = 60
 DEFAULT_MAX_WALL_SECONDS = 900
 # Context window large enough to hold any realistic delegation packet + contract.
 DEFAULT_NUM_CTX = 16384
+DEFAULT_NUM_PREDICT = 4096
 
 STATUS_VALUES = {"PATCH": "patch", "NO_PATCH": "no_patch", "BLOCKED": "blocked"}
 ACTION_VALUES = {"create", "modify", "delete"}
@@ -120,6 +121,18 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--num-predict",
+        type=int,
+        dest="num_predict",
+        default=int(
+            os.environ.get("DUBBRIDGE_LOW_RRI_NUM_PREDICT", str(DEFAULT_NUM_PREDICT))
+        ),
+        help=(
+            f"Max tokens Ollama may generate; default {DEFAULT_NUM_PREDICT}. "
+            "Raise when the response is truncated before the final FILE END marker."
+        ),
+    )
+    parser.add_argument(
         "--out",
         default=None,
         metavar="FILE",
@@ -191,7 +204,7 @@ def ensure_model_available(host, model, timeout):
         )
 
 
-def build_payload(model, packet, num_ctx):
+def build_payload(model, packet, num_ctx, num_predict):
     return {
         "model": model,
         "stream": True,
@@ -199,7 +212,7 @@ def build_payload(model, packet, num_ctx):
         "keep_alive": "10m",
         "options": {
             "temperature": 0.1,
-            "num_predict": 4096,
+            "num_predict": num_predict,
             "num_ctx": num_ctx,
         },
         "messages": [
@@ -602,7 +615,7 @@ def main():
     if not packet:
         raise RuntimeError("delegation packet is empty")
 
-    payload = build_payload(args.model, packet, args.num_ctx)
+    payload = build_payload(args.model, packet, args.num_ctx, args.num_predict)
     if args.dry_run:
         print(json.dumps(payload, indent=2, sort_keys=True))
         return 0

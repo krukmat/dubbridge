@@ -184,29 +184,36 @@ async fn list_notifications_for_unknown_recipient_returns_empty() {
     assert!(rows.is_empty());
 }
 
-// EC-3: insert duplicate push token (same provider+device) → error surfaced
+// EC-3: upsert same (provider, device_token) from a new subject → subject_id updated, no error
 #[tokio::test]
-async fn insert_duplicate_push_token_surfaces_error() {
+async fn upsert_push_token_reassigns_subject_on_conflict() {
     let Some(pool) = setup_pool().await else {
         eprintln!("skipping: DUBBRIDGE_DATABASE_URL not set");
         return;
     };
 
-    let device_token = format!("ExponentPushToken[dup-test-{}]", Uuid::new_v4());
+    let device_token = format!("ExponentPushToken[upsert-test-{}]", Uuid::new_v4());
+    let first_subject = Uuid::new_v4();
+    let second_subject = Uuid::new_v4();
 
-    let first = new_push_token(Uuid::new_v4(), &device_token);
-    notification_repo::insert_push_token(&pool, &first)
+    let first = new_push_token(first_subject, &device_token);
+    notification_repo::upsert_push_token(&pool, &first)
         .await
-        .expect("insert first push token");
+        .expect("upsert first push token");
 
-    let duplicate = new_push_token(Uuid::new_v4(), &device_token);
-    let err = notification_repo::insert_push_token(&pool, &duplicate)
+    let second = new_push_token(second_subject, &device_token);
+    notification_repo::upsert_push_token(&pool, &second)
         .await
-        .expect_err("duplicate push token must fail");
+        .expect("upsert same token for new subject must succeed");
 
-    assert!(
-        err.to_string()
-            .contains("push_tokens_provider_device_unique"),
-        "expected uniqueness error, got: {err}"
+    let tokens = notification_repo::list_push_tokens_for_subject(&pool, second_subject)
+        .await
+        .expect("list tokens for second subject");
+
+    assert_eq!(tokens.len(), 1, "exactly one row after upsert");
+    assert_eq!(tokens[0].device_token, device_token);
+    assert_eq!(
+        tokens[0].subject_id, second_subject,
+        "subject_id must be updated"
     );
 }

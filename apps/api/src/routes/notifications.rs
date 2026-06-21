@@ -106,31 +106,11 @@ async fn register_push_token(
         updated_at: now,
     };
 
-    notification_repo::insert_push_token(&state.pool, &row)
+    notification_repo::upsert_push_token(&state.pool, &row)
         .await
-        .map_err(|e| {
-            if is_unique_violation(&e) {
-                return ApiError {
-                    status: StatusCode::CONFLICT,
-                    message: "token already registered".into(),
-                };
-            }
-            ApiError::from_db(e)
-        })?;
+        .map_err(ApiError::from_db)?;
 
     Ok(StatusCode::CREATED)
-}
-
-fn is_unique_violation(e: &DbError) -> bool {
-    let sqlx_err = match e {
-        DbError::QueryFailed(inner) => inner,
-        _ => return false,
-    };
-    sqlx_err
-        .as_database_error()
-        .and_then(|d| d.code())
-        .as_deref()
-        == Some("23505")
 }
 
 #[derive(Debug)]
