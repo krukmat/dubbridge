@@ -14,3 +14,5 @@ mobile/android/
 .claude/settings.local.json
 __pycache__/
 *.pyc
+.codex_tmp/*
+.claude/*

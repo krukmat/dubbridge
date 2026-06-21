@@ -128,6 +128,68 @@ describe("organization screens", () => {
     });
   });
 
+  it("EC-2 members: blank subject id is rejected without sending a request", async () => {
+    mockClient.get.mockResolvedValueOnce({ ok: true, value: { data: [], sessionRotation: null } });
+    const view = await render(<OrganizationMembersScreen gatewayBaseUrl="http://gateway" orgId="org-001" viewerRole="owner" />);
+
+    await waitFor(() => expect(view.getByTestId("member-list-empty")).toBeTruthy());
+    await act(async () => {
+      fireEvent.press(view.getByTestId("member-add"));
+    });
+
+    expect(view.getByText("Subject ID is required.")).toBeTruthy();
+    expect(mockClient.post).not.toHaveBeenCalled();
+  });
+
+  it("regression: multiple rapid presses of add button only trigger one request", async () => {
+    mockClient.get.mockResolvedValueOnce({ ok: true, value: { data: [], sessionRotation: null } });
+
+    let resolvePost!: (value: any) => void;
+    const pendingPost = new Promise<any>((resolve) => {
+      resolvePost = resolve;
+    });
+
+    mockClient.post.mockImplementationOnce(() => pendingPost);
+
+    const member = {
+      org_id: "org-001",
+      subject_id: "11111111-1111-1111-1111-111111111111",
+      role: "reviewer",
+      joined_at: "2026-06-13T00:00:00Z",
+    };
+
+    const view = await render(
+      <OrganizationMembersScreen gatewayBaseUrl="http://gateway" orgId="org-001" viewerRole="owner" />,
+    );
+
+    await waitFor(() => expect(view.getByTestId("member-list-empty")).toBeTruthy());
+
+    await act(async () => {
+      fireEvent.changeText(view.getByTestId("member-subject-input"), member.subject_id);
+      fireEvent.press(view.getByTestId("member-role-reviewer"));
+    });
+
+    await act(async () => {
+      fireEvent.press(view.getByTestId("member-add"));
+      fireEvent.press(view.getByTestId("member-add"));
+    });
+
+    await waitFor(() => expect(mockClient.post).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(view.getByTestId("member-add").props.accessibilityState).toMatchObject({
+        busy: true,
+        disabled: true,
+      }),
+    );
+
+    await act(async () => {
+      resolvePost({ ok: true, value: { data: member, sessionRotation: null } });
+      await pendingPost;
+    });
+
+    await waitFor(() => expect(view.getByTestId(`member-row-${member.subject_id}`)).toBeTruthy());
+  });
+
   it.each(["viewer", "reviewer", "editor"] as const)("EC-1: %s cannot see add-member controls", async (viewerRole) => {
     mockClient.get.mockResolvedValueOnce({ ok: true, value: { data: [], sessionRotation: null } });
     const view = await render(<OrganizationMembersScreen gatewayBaseUrl="http://gateway" orgId="org-001" viewerRole={viewerRole} />);

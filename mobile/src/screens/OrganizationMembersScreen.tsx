@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { FlatList, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { createGatewayClient } from "../api/client";
@@ -34,6 +34,8 @@ export function OrganizationMembersScreen({ gatewayBaseUrl, orgId, viewerRole }:
   const [subjectId, setSubjectId] = useState("");
   const [role, setRole] = useState<OrgRole>("viewer");
   const [addError, setAddError] = useState<string | null>(null);
+  const [isAddingMemberLoading, setIsAddingMemberLoading] = useState(false);
+  const isAddingMember = useRef(false);
   const canManage = viewerRole === "owner" || viewerRole === "admin";
 
   const loadMembers = useCallback(async () => {
@@ -60,30 +62,36 @@ export function OrganizationMembersScreen({ gatewayBaseUrl, orgId, viewerRole }:
   }, [loadMembers]);
 
   const addMember = useCallback(async () => {
+    if (isAddingMember.current) return;
     const normalizedSubject = subjectId.trim();
     if (!normalizedSubject) {
       setAddError("Subject ID is required.");
       return;
     }
     setAddError(null);
-    const client = createGatewayClient({ gatewayBaseUrl });
-    const result = await client.post<OrgMember>(
-      `/api/orgs/${orgId}/members`,
-      auth.sessionRef,
-      { subject_id: normalizedSubject, role },
-    );
+    isAddingMember.current = true;
+    setIsAddingMemberLoading(true);
+    try {
+      const client = createGatewayClient({ gatewayBaseUrl });
+      const result = await client.post<OrgMember>(
+        `/api/orgs/${orgId}/members`,
+        auth.sessionRef,
+        { subject_id: normalizedSubject, role },
+      );
 
-    if (result.ok) {
-      await auth.onSessionRotation(result.value.sessionRotation);
-      setMembers((current) => [...current.filter((item) => item.subject_id !== result.value.data.subject_id), result.value.data]);
-      setSubjectId("");
-      return;
+      if (result.ok) {
+        await auth.onSessionRotation(result.value.sessionRotation);
+        setMembers((current) => [...current.filter((item) => item.subject_id !== result.value.data.subject_id), result.value.data]);
+        setSubjectId("");
+      } else if (result.error.kind === "session_expired") {
+        await auth.logout();
+      } else {
+        setAddError(result.error.kind === "forbidden" ? "You cannot manage members in this organization." : "Could not add member.");
+      }
+    } finally {
+      isAddingMember.current = false;
+      setIsAddingMemberLoading(false);
     }
-    if (result.error.kind === "session_expired") {
-      await auth.logout();
-      return;
-    }
-    setAddError(result.error.kind === "forbidden" ? "You cannot manage members in this organization." : "Could not add member.");
   }, [auth, gatewayBaseUrl, orgId, role, subjectId]);
 
   const onRetry = useCallback(() => {
@@ -127,6 +135,8 @@ export function OrganizationMembersScreen({ gatewayBaseUrl, orgId, viewerRole }:
             testID="member-add"
             label="Add member"
             onPress={() => void addMember()}
+            loading={isAddingMemberLoading}
+            disabled={isAddingMemberLoading}
           />
         </Panel>
       ) : null}

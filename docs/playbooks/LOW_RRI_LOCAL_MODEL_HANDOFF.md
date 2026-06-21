@@ -50,6 +50,9 @@ Poor-fit tasks:
    **structure, scope, and meaning are preserved**.
 6. If a step fails, reduce scope before retrying.
 7. Do not expand the packet after failure; make the next attempt smaller.
+8. For **test code**, especially async UI tests, the orchestrator must not ask the
+   local model to invent the control flow. Provide the exact `act(...)`,
+   `waitFor(...)`, promise-resolution, and assertion pattern to use.
 
 ## Step-by-step process
 
@@ -114,10 +117,28 @@ scripts/delegate-low-rri.py packet.md \
 The `--before-file` content must be copied verbatim from the current target
 file. The BEFORE block must match exactly once — the wrapper rejects ambiguous
 matches before building any diff.
+- When using `--mode before-after`, the model must also see the **same BEFORE
+  block inside the packet itself**. The wrapper needs `--before-file`, but the
+  model still needs the literal block in the prompt to produce a valid
+  replacement.
+- Do not use `--mode before-after` for a whole small file just because the task
+  is conceptually simple. For small files, prefer `full-file`; reserve
+  `before-after` for a genuinely narrow region replacement or for large files.
 - **Show the exact block to replace and the exact replacement block** as code
   fences, not as prose descriptions. Prose instructions (“remove the closure”,
   “simplify the error handling”) are ambiguous to a small model; literal before/after
   blocks are not.
+- For async tests, “exact replacement block” means the orchestrator should
+  effectively pre-design the test:
+  - specify where each awaited `act(async () => ...)` starts and ends;
+  - specify whether multiple user events must happen inside the same `act`;
+  - specify whether state assertions must use `waitFor`;
+  - specify how pending promises are created and resolved;
+  - specify the exact assertion shape (`toHaveBeenCalledTimes`, `toMatchObject`,
+    etc.) instead of describing intent in prose.
+- When a test packet is delicate or timing-sensitive, prefer “Emit exactly this
+  AFTER block” over a looser goal statement. Treat Gemma as a mechanical
+  transcriber, not as the designer of the async test strategy.
 - **Verify every symbol mentioned in the packet before writing it.** If the packet
   asks to remove an import, confirm first that no other site in the file still
   references that symbol after the change. If the packet asks to delete a helper,
@@ -158,8 +179,17 @@ Before accepting the result, verify all of the following:
   more explicit packet.
 - If the tagged-block format or application fails, do not broaden the packet;
   simplify it.
+- If a `before-after` response is rejected because the model emitted a partial or
+  malformed replacement, the next attempt must narrow to a smaller block and
+  include a more literal AFTER contract. Do not retry with the same semantic
+  prompt and hope for better formatting.
 - If the patch applies but the semantic result is destructive, reject it and retry
   with a smaller target.
+- If a delegated async test fails verification, do not send only the failure
+  symptom back. Send a replacement-oriented repair packet that includes:
+  - the exact failing BEFORE block;
+  - the exact async pattern that must replace it;
+  - the specific synchronization rule that was previously wrong.
 - Use at most the bounded repair cycle allowed by the governing policy.
 - After a failed repair cycle, escalate instead of substituting a larger manual
   rewrite under the guise of local delegation.
@@ -171,6 +201,9 @@ Before accepting the result, verify all of the following:
 - Giving a local model a large context dump when a short instruction would do.
 - Accepting a patch because it applies without checking structural preservation.
 - Asking the local model to infer the desired scope from broad background context.
+- Asking the local model to design an async test from behavioral intent alone.
+- Retrying the same test packet after a timing or `act()` failure without turning
+  it into a literal replacement contract.
 
 ## Relationship to repo policy
 
