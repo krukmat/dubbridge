@@ -7,6 +7,7 @@ pub mod audit;
 pub mod consent;
 pub mod ingestion;
 pub mod platform_ingest;
+pub mod playback;
 pub mod recording;
 pub mod review;
 pub mod rights;
