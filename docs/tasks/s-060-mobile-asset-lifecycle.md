@@ -71,8 +71,8 @@ Resolved against the active environment at planning time; reconfirm at presentat
   and the mapping convention (scenario ID ⇄ Maestro flow ⇄ `HP-#`/`EC-#`).
 - **Inputs:** plan §D5; current screens; backend endpoint contracts.
 - **Outputs:**
-  - `mobile/bdd/asset-lifecycle.feature` (scenarios below).
-  - `mobile/bdd/README.md` — the mapping table + convention.
+  - `docs/bdd/s-060-mobile-asset-lifecycle.feature` (scenarios below).
+  - `docs/bdd/README.md` — the mapping table + convention.
 - **Acceptance criteria:**
   - Each scenario has a stable ID and maps to one Maestro flow and ≥1 `HP-#`/`EC-#`.
   - Scenarios are written in behavioral terms (no implementation calls).
@@ -125,17 +125,17 @@ Resolved against the active environment at planning time; reconfirm at presentat
 
 - **Handoff prompt:**
   > T0 — author BDD specs. Docs: this ledger + plan §D5. Create
-  > `mobile/bdd/asset-lifecycle.feature` (SC-LIST-1/2, SC-DETAIL-1, SC-INGEST-1/2)
-  > and `mobile/bdd/README.md` mapping table. AC: stable scenario IDs, mapped to
+  > `docs/bdd/s-060-mobile-asset-lifecycle.feature` (SC-LIST-1/2, SC-DETAIL-1, SC-INGEST-1/2)
+  > and `docs/bdd/README.md` mapping table. AC: stable scenario IDs, mapped to
   > Maestro + HP/EC, qa-docs green. Stop after docs; do not start T1.
 
 ### Completion record (2026-06-12)
 
-- Created `mobile/bdd/asset-lifecycle.feature` with five Gherkin scenarios:
+- Created `docs/bdd/s-060-mobile-asset-lifecycle.feature` with five Gherkin scenarios:
   `SC-LIST-1`, `SC-LIST-2`, `SC-DETAIL-1`, `SC-INGEST-1`, `SC-INGEST-2`.
   Scenarios are written in behavioral terms only — no implementation calls or UI
   selectors.
-- Created `mobile/bdd/README.md` with the mapping table (scenario ID → task →
+- Created `docs/bdd/README.md` with the mapping table (scenario ID → task →
   Maestro flow → HP/EC), the naming convention, and instructions for adding new
   scenarios.
 - `make qa-docs` passes (documentation consistency + task unit coverage checks).
@@ -750,7 +750,7 @@ await waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1));
 - Extended `scripts/e2e-seed/mock-gateway-server.mjs` with a per-session
   `asset_seed=empty` mode so `SC-LIST-2` can reuse the same handoff bootstrap and
   assert the empty-state flow against the mock gateway.
-- Updated `mobile/maestro/README.md` and `mobile/bdd/README.md` to map the new
+- Updated `mobile/maestro/README.md` and `docs/bdd/README.md` to map the new
   flow files back to their BDD scenario IDs and document the manual invocation
   commands pending T6 runner integration.
 

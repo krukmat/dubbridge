@@ -1,6 +1,85 @@
 # BDD Mapping
 
-... (existing content) ...
+Canonical home for repository BDD artifacts: `docs/bdd/`.
+
+## Convention
+
+- All DubBridge `.feature` specs live in `docs/bdd/`.
+- Scenario IDs remain stable and behavioral.
+- Mobile-owned executable evidence may still live in `mobile/maestro/` or mobile
+  tests even when the canonical `.feature` file lives in `docs/bdd/`.
+- Retrospective slices may map to shipped unit/integration evidence or runner
+  artifacts when no standalone Maestro flow exists.
+
+## Canonical spec files
+
+- `p4-workspace.feature`
+- `p6-compliance.feature`
+- `s-050-mobile-client.feature`
+- `s-055-maestro-suite.feature`
+- `s-060-mobile-asset-lifecycle.feature`
+- `s-120-media-preparation.feature`
+- `s-125-hls-playback-delivery.feature`
+- `s-160-review.feature`
+- `s-200-mobile-auth.feature`
+
+## S-050 — First-party mobile client
+Spec: `docs/bdd/s-050-mobile-client.feature`
+
+| Scenario ID | Description | Task | Executable Evidence | Mobile Flow | HP / EC |
+| --- | --- | --- | --- | --- | --- |
+| SC-AUTH-1 | Sign in through the mobile gateway handoff | `MBF-T1` | `mobile/__tests__/mobile.auth-flow.test.tsx`; `mobile/__tests__/auth.provider.test.tsx` | — | HP |
+| SC-AUTH-2 | Login fails closed when the handoff is missing or invalid | `MBF-T1` | `mobile/__tests__/mobile.auth-flow.test.tsx`; `mobile/__tests__/auth.provider.test.tsx` | — | EC |
+| SC-AUTH-3 | Token-like session values are rejected on device | `MBF-T1` | `mobile/__tests__/auth.provider.test.tsx`; `mobile/__tests__/auth.session.test.ts` | — | EC |
+| SC-NAV-1 | Auth state controls the root navigation tree | `MBF-T1` | `mobile/__tests__/RootNavigator.test.tsx`; `mobile/__tests__/mobile.auth-flow.test.tsx` | — | HP / EC |
+| SC-ASSET-1 | Browse my asset list and open asset detail | `MBF-T1` | `mobile/__tests__/asset.screens.test.tsx`; `mobile/__tests__/mobile.auth-flow.test.tsx` | — | HP |
+| SC-ASSET-2 | Asset surfaces handle empty, failed, or unavailable responses clearly | `MBF-T1` | `mobile/__tests__/asset.screens.test.tsx` | — | EC |
+
+## S-055 — Maestro screenshot / visual-audit suite
+Spec: `docs/bdd/s-055-maestro-suite.feature`
+
+| Scenario ID | Description | Task | Executable Evidence | Mobile Flow | HP / EC |
+| --- | --- | --- | --- | --- | --- |
+| SC-SUITE-1 | Capture the unauthenticated auth surface | `MBF-T2` | `mobile/maestro/auth-surface.yaml` | `mobile/maestro/auth-surface.yaml` | HP |
+| SC-SUITE-2 | Bootstrap an authenticated session without UI login | `MBF-T2` | `mobile/maestro/authenticated-audit.yaml` | `mobile/maestro/authenticated-audit.yaml` | HP |
+| SC-SUITE-3 | Screenshot artifacts remain free of sensitive session values | `MBF-T2` | `mobile/maestro/seed-and-run.sh` | — | EC |
+
+## S-060 — Mobile asset lifecycle
+Spec: `docs/bdd/s-060-mobile-asset-lifecycle.feature`
+
+| Scenario ID | Description | Task | Executable Evidence | Mobile Flow | HP / EC |
+| --- | --- | --- | --- | --- | --- |
+| SC-LIST-1 | Browse my assets (populated list) | `T2` | `docs/tasks/s-060-mobile-asset-lifecycle.md` | `mobile/maestro/asset-list.yaml` | HP |
+| SC-LIST-2 | Empty asset list | `T2` | `docs/tasks/s-060-mobile-asset-lifecycle.md` | `mobile/maestro/asset-list.yaml` | EC |
+| SC-DETAIL-1 | Open an asset from the list | `T2` | `docs/tasks/s-060-mobile-asset-lifecycle.md` | `mobile/maestro/asset-detail.yaml` | HP |
+| SC-INGEST-1 | Upload a new asset (happy path) | `T3a`, `T3b` | `docs/tasks/s-060-mobile-asset-lifecycle.md` | `mobile/maestro/asset-ingestion.yaml` | HP |
+| SC-INGEST-2 | Upload rejected without rights | `T3b` | `docs/tasks/s-060-mobile-asset-lifecycle.md` | `mobile/maestro/asset-ingestion-no-rights.yaml` | EC |
+
+## S-120 — Media preparation
+Spec: `docs/bdd/s-120-media-preparation.feature`
+
+| Scenario ID | Description | Task | Executable Evidence | Mobile Flow | HP / EC |
+| --- | --- | --- | --- | --- | --- |
+| S120_HP1 | Successful preparation produces metadata and HLS outputs | S-120-T2 | `s-120-media-preparation.feature` | — | HP |
+| S120_EC1 | Downstream processing is blocked while asset is not prepared | S-120-T3 | `s-120-media-preparation.feature` | — | EC |
+| S120_EC2 | Preparation failure leaves the asset not ready and observable | S-120-T4 | `s-120-media-preparation.feature` | — | EC |
+| S120_EC3 | Malformed probe/transcode result does not mark the asset prepared | S-120-T5 | `s-120-media-preparation.feature` | — | EC |
+
+## S-125 — HLS playback delivery
+Spec: `docs/bdd/s-125-hls-playback-delivery.feature`
+
+> Planned 2026-06-21. Scenarios are authored ahead of implementation; executable
+> evidence is certified per task (T1, T2, T3a, T3b, T4, T5) as each lands. T3a (the
+> pure manifest rewriter) is RRI 21 and delegated to local Gemma; the orchestrator
+> certifies its evidence.
+
+| Scenario ID | Description | Task | Executable Evidence | Mobile Flow | HP / EC |
+| --- | --- | --- | --- | --- | --- |
+| S125_HP1 | Authorized reviewer obtains a playback grant for a ready asset | S-125-T4 | planned | — | HP |
+| S125_EC1 | Grant issuance is denied for an asset that is not ready | S-125-T2 | planned | — | EC |
+| S125_EC2 | Unauthorized caller cannot obtain a playback grant | S-125-T4 | planned | — | EC |
+| S125_HP2 | Manifest is returned with backend-routed segment references only | S-125-T3a | planned | — | HP |
+| S125_EC3 | Segment fetched with an expired grant is denied | S-125-T5 | planned | — | EC |
 
 ## S-200 — Mobile credential login with backend-issued JWT (FenixCRM parity)
 Spec: `docs/bdd/s-200-mobile-auth.feature`
@@ -15,13 +94,3 @@ Spec: `docs/bdd/s-200-mobile-auth.feature`
 | SC-AUTH-6 | Logout clears stored token | S-200-T6a | `mobile/` `AuthProvider` logout path; secure-store clear; T6a completion record | — | EC |
 | SC-AUTH-7 | Registration rejects duplicate email (409 Conflict) | S-200-T2c, T3b, T4d | `crates/db/src/user_account.rs::build_registration_result_conflict_propagates`; `crates/auth/src/service.rs::register_duplicate_email_returns_conflict_and_does_not_issue_token`; 409 mapping in T4d integration tests | — | EC |
 | SC-AUTH-8 | Algorithm substitution rejected before signature/claim check | S-200-T1b-ii, T1c-i | `crates/auth/src/issuer.rs::parse_rejects_rs256_algorithm`; `crates/auth/src/verifier.rs::hs256_verifier_rejects_rs256_algorithm`; `parse_rejects_alg_none` | — | EC |
-
-## S-120 — Media preparation
-Spec: `docs/bdd/s-120-media-preparation.feature`
-
-| Scenario ID | Description | Task | Executable Evidence | Mobile Flow | HP / EC |
-| --- | --- | --- | --- | --- | --- |
-| S120_HP1 | Successful preparation produces metadata and HLS outputs | S-120-T2 | `s-120-media-preparation.feature` | — | HP |
-| S120_EC1 | Downstream processing is blocked while asset is not prepared | S-120-T3 | `s-120-media-preparation.feature` | — | EC |
-| S120_EC2 | Preparation failure leaves the asset not ready and observable | S-120-T4 | `s-120-media-preparation.feature` | — | EC |
-| S120_EC3 | Malformed probe/transcode result does not mark the asset prepared | S-120-T5 | `s-120-media-preparation.feature` | — | EC |

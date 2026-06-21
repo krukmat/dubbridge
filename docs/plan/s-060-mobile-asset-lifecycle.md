@@ -55,7 +55,7 @@ Deliver a working, BDD-verified mobile asset lifecycle:
 | Decision | Choice |
 |---|---|
 | Feature scope | Full functional surface: list endpoint + mobile list + mobile ingestion flow |
-| BDD format | Gherkin `.feature` files (`mobile/bdd/*.feature`) mapped 1:1 to Maestro flows and to each task's `HP-#`/`EC-#` cases |
+| BDD format | Gherkin `.feature` files (`docs/bdd/*.feature`) mapped 1:1 to Maestro flows and to each task's `HP-#`/`EC-#` cases |
 | Maestro E2E backend | Extend `scripts/e2e-seed/mock-gateway-server.mjs` to serve `/api/*` fixtures (deterministic, no Postgres) |
 
 ## Affected components
@@ -70,7 +70,7 @@ Deliver a working, BDD-verified mobile asset lifecycle:
 | Mobile | `mobile/src/screens/UploadScreen.tsx` (new) | Upload → rights → finalize 3-step flow |
 | Mobile | `mobile/src/navigation/RootNavigator.tsx` | Register the upload route + entry point from Home/List |
 | E2E backend | `scripts/e2e-seed/mock-gateway-server.mjs` | Serve `GET /api/assets`, `GET /api/assets/{id}`, `POST /api/ingest*` with static seed fixtures |
-| BDD | `mobile/bdd/*.feature` (new) | Gherkin specs for list, detail, and ingestion |
+| BDD | `docs/bdd/*.feature` (new) | Gherkin specs for list, detail, and ingestion |
 | Maestro | `mobile/maestro/*.yaml` (new) | Flows for list, detail, ingestion + screenshots |
 | Maestro | `mobile/maestro/seed-and-run.sh`, `mobile/package.json` | Runner integration + `npm run screenshots` |
 
@@ -141,10 +141,10 @@ This is dev/test-only fixture code; it must never ship in a production path
 
 Each Gherkin scenario gets a stable ID and maps to exactly one Maestro assertion path
 and one or more `HP-#`/`EC-#` unit cases. The mapping table lives in
-`mobile/bdd/README.md` (authored in T0) and is mirrored per task in the ledger.
+`docs/bdd/README.md` (authored in T0) and is mirrored per task in the ledger.
 
 ```text
-mobile/bdd/asset-lifecycle.feature
+docs/bdd/s-060-mobile-asset-lifecycle.feature
   Scenario: Browse my assets            -> HP (T2) -> mobile/maestro/asset-list.yaml
   Scenario: Empty asset list            -> EC (T2) -> asset-list.yaml (empty assertion)
   Scenario: Open an asset from the list -> HP (T2/detail) -> asset-detail.yaml

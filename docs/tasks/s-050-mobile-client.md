@@ -1114,8 +1114,8 @@ Gate: confirm existing T1 tests pass with new context API.
 ## Related sub-slices
 
 - **Retrospective BDD source of truth**
-  ([mobile/bdd/s-050-mobile-client.feature](/Users/matias/Documents/projects/dubbridge/mobile/bdd/s-050-mobile-client.feature:1),
-  [mobile/bdd/README.md](/Users/matias/Documents/projects/dubbridge/mobile/bdd/README.md:16)).
+  ([docs/bdd/s-050-mobile-client.feature](/Users/matias/Documents/projects/dubbridge/docs/bdd/s-050-mobile-client.feature:1),
+  [docs/bdd/README.md](/Users/matias/Documents/projects/dubbridge/docs/bdd/README.md:16)).
   This slice predated the repo-wide BDD-first convention; the shipped mobile-client
   behaviors were backfilled into a dedicated retrospective `.feature` spec on
   2026-06-12 without changing runtime scope or historical task order. The

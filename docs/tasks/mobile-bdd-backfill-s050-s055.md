@@ -36,20 +36,19 @@ MBF-T0 (mobile BDD convention + index) ─┬─▶ MBF-T1 (S-050 feature + mapp
 
 ## Contract correction note
 
-The original backfill intent was correct, but the artifact contract needs to be
-read precisely:
+The original backfill intent was correct, but the home-location contract has
+since been superseded by `BDC-T1` on 2026-06-21:
 
-- mobile-only slices live in `mobile/bdd/`;
-- cross-surface slices live in `docs/bdd/`;
+- all canonical `.feature` specs now live in `docs/bdd/`;
 - retrospective slices may map to shipped unit/integration evidence or runner
   artifacts when no standalone Maestro flow exists;
 - mobile-first executable slices still map to Maestro flows when they own that
   executable surface.
 
-Under that contract, `S-050` is retrospective and test-evidence-backed, `S-055`
-is retrospective and Maestro/runner-backed, `S-060` remains the mobile-first
-Maestro precedent in `mobile/bdd/`, and `S-100` remains cross-surface in
-`docs/bdd/`.
+Under the current contract, `S-050` remains retrospective and
+test-evidence-backed, `S-055` remains retrospective and Maestro/runner-backed,
+and `S-060` remains the mobile-first Maestro precedent, but their canonical BDD
+files now live together in `docs/bdd/`.
 
 ---
 
@@ -60,12 +59,13 @@ Maestro precedent in `mobile/bdd/`, and `S-100` remains cross-surface in
 - **RRI:** 13 → band **Low (0–25)** → **auto-execute**
 - **Recommended model:** Codex `GPT-5.2-Codex` · Claude Code `Claude Haiku 4.5` · thinking Off
 - **Depends on:** —
-- **Objective:** Normalize the mobile BDD home so `S-050`, `S-055`, and `S-060`
-  can coexist under `mobile/bdd/` with one index and clear per-slice spec files.
-- **Inputs:** `mobile/bdd/README.md`, `docs/tasks/s-050-mobile-client.md`,
+- **Objective:** Normalize the canonical BDD home so `S-050`, `S-055`, and
+  `S-060` can coexist under `docs/bdd/` with one index and clear per-slice spec
+  files.
+- **Inputs:** `docs/bdd/README.md`, `docs/tasks/s-050-mobile-client.md`,
   `docs/tasks/s-055-maestro-screenshot-suite.md`, `docs/tasks/s-060-mobile-asset-lifecycle.md`.
 - **Outputs:**
-  - updated `mobile/bdd/README.md` as a multi-slice mobile BDD index;
+  - updated `docs/bdd/README.md` as a multi-slice mobile BDD index;
   - naming convention for new per-slice `.feature` files.
 - **Acceptance criteria:**
   - The index no longer reads as S-060-only.
@@ -91,10 +91,10 @@ Maestro precedent in `mobile/bdd/`, and `S-100` remains cross-surface in
 
 ### Completion record (2026-06-12)
 
-- Reworked `mobile/bdd/README.md` from an `S-060`-only note into a multi-slice
+- Reworked `docs/bdd/README.md` from an `S-060`-only note into a multi-slice
   mobile BDD index.
-- Recorded the file-home decision that mobile-only retrospective specs for `S-050`
-  and `S-055` live under `mobile/bdd/` as one file per slice.
+- Recorded the retrospective-spec index structure that was later consolidated
+  into `docs/bdd/` by `BDC-T1` on 2026-06-21.
 - Reserved explicit index entries for `S-050` and `S-055` backfill without
   inventing scenario IDs before the actual `.feature` work in `MBF-T1` / `MBF-T2`.
 - Preserved the existing `S-060` mapping table unchanged at the scenario level.
@@ -113,8 +113,8 @@ Maestro precedent in `mobile/bdd/`, and `S-100` remains cross-surface in
 - **Inputs:** `docs/tasks/s-050-mobile-client.md`, `mobile/__tests__/auth.provider.test.tsx`,
   `mobile/__tests__/asset.screens.test.tsx`, `mobile/__tests__/mobile.auth-flow.test.tsx`.
 - **Outputs:**
-  - `mobile/bdd/s-050-mobile-client.feature`
-  - `mobile/bdd/README.md` rows for `S-050`
+  - `docs/bdd/s-050-mobile-client.feature`
+  - `docs/bdd/README.md` rows for `S-050`
 - **Acceptance criteria:**
   - Scenarios cover the delivered surface: auth entry, authenticated home, asset list,
     asset detail, and fail-closed token/session handling.
@@ -139,10 +139,10 @@ Maestro precedent in `mobile/bdd/`, and `S-100` remains cross-surface in
 
 ### Completion record (2026-06-12)
 
-- Added `mobile/bdd/s-050-mobile-client.feature` with six retrospective
+- Added `docs/bdd/s-050-mobile-client.feature` with six retrospective
   behavioral scenarios covering the shipped mobile surface:
   `SC-AUTH-1`, `SC-AUTH-2`, `SC-AUTH-3`, `SC-NAV-1`, `SC-ASSET-1`, `SC-ASSET-2`.
-- Updated `mobile/bdd/README.md` with the `S-050` mapping rows, pointing only to
+- Updated `docs/bdd/README.md` with the `S-050` mapping rows, pointing only to
   evidence that already exists in the `S-050` test suite.
 - Kept the backfill strictly retrospective: no new runtime flows were invented, no
   standalone Maestro entry was promised where none exists today, and the mapping
@@ -163,8 +163,8 @@ Maestro precedent in `mobile/bdd/`, and `S-100` remains cross-surface in
   `mobile/maestro/authenticated-audit.yaml`, `mobile/maestro/seed-and-run.sh`,
   `mobile/maestro/README.md`.
 - **Outputs:**
-  - `mobile/bdd/s-055-maestro-suite.feature`
-  - `mobile/bdd/README.md` rows for `S-055`
+  - `docs/bdd/s-055-maestro-suite.feature`
+  - `docs/bdd/README.md` rows for `S-055`
 - **Acceptance criteria:**
   - Scenarios cover phase 1 auth capture, phase 2 authed capture, and artifact sanitization.
   - Each scenario maps only to flows/checks that exist today.
@@ -188,10 +188,10 @@ Maestro precedent in `mobile/bdd/`, and `S-100` remains cross-surface in
 
 ### Completion record (2026-06-12)
 
-- Added `mobile/bdd/s-055-maestro-suite.feature` with three retrospective
+- Added `docs/bdd/s-055-maestro-suite.feature` with three retrospective
   behavioral scenarios covering the shipped `S-055` suite:
   `SC-SUITE-1`, `SC-SUITE-2`, `SC-SUITE-3`.
-- Updated `mobile/bdd/README.md` with the `S-055` mapping rows, pointing to the
+- Updated `docs/bdd/README.md` with the `S-055` mapping rows, pointing to the
   existing phase YAMLs and to the runner sanitization evidence already delivered.
 - Kept the backfill behavioral and retrospective: the spec describes the suite's
   observable guarantees, and its verification remains backed by shipped Maestro
@@ -211,7 +211,7 @@ Maestro precedent in `mobile/bdd/`, and `S-100` remains cross-surface in
 - **Inputs:** MBF-T1 and MBF-T2 outputs; `docs/tasks/s-050-mobile-client.md`;
   `docs/tasks/s-055-maestro-screenshot-suite.md`.
 - **Outputs:** updated cross-references in the two historical ledgers and any needed
-  note in `mobile/bdd/README.md`.
+  note in `docs/bdd/README.md`.
 - **Acceptance criteria:**
   - Readers of `S-050` and `S-055` can discover the retrospective BDD specs quickly.
   - No mapping row points to a missing file.
@@ -239,7 +239,7 @@ Maestro precedent in `mobile/bdd/`, and `S-100` remains cross-surface in
   `docs/tasks/s-050-mobile-client.md` and
   `docs/tasks/s-055-maestro-screenshot-suite.md`, so readers of the historical
   ledgers can discover the new `.feature` sources of truth directly.
-- Verified that `mobile/bdd/README.md` now points only to existing files for
+- Verified that `docs/bdd/README.md` now points only to existing files for
   `S-050`, `S-055`, and `S-060`.
 - Closed the mobile BDD backfill loop without rewriting the original slice
   execution histories.
