@@ -87,7 +87,7 @@ to `Accepted` with full propagation (ADR change-propagation contract).
 **Effort:** L (RRI 42 — Med-high)
 **Recommended model:** Codex `GPT-5.2-Codex` (Balanced→Premium); Claude Code `Claude Opus 4.1` — thinking On.
 **Depends on:** S-125-T0
-**Status:** Not started
+**Status:** Done (2026-06-21)
 **Type:** development
 **Objective:** Define the `PlaybackGrant` domain type — its scope, expiry, principal/
 org/project binding, status, and denial reasons — with strict, fail-closed decoding of
@@ -122,6 +122,52 @@ API ergonomics for the repo/API consumers in T2/T4.
 **Agent handoff prompt:** Add a pure `crates/domain` playback-grant contract with
 strict fail-closed decoding and clock-injected expiry. No persistence, no API. Stop
 after unit tests + coverage are green; do not start T2.
+
+**Happy paths covered:**
+- HP-1: `PlaybackGrant::new` with valid timestamps → `GrantStatus::Active` (`valid_grant_is_active`).
+- HP-2: `is_valid_at` before expiry → `true`; at/after expiry → `false`
+  (`grant_is_valid_before_expiry`, `grant_is_invalid_at_expiry`, `grant_is_invalid_after_expiry`).
+
+**Edge cases covered:**
+- EC-1: `"unknown_token".parse::<GrantStatus>()` → `PlaybackError::UnknownGrantStatus`; same for empty string and for `PlaybackScope` (`unknown_*_is_error`, `empty_string_*_is_error`). No branch returns a default-allow.
+- EC-2: `expires_at == issued_at` and `expires_at < issued_at` both → `PlaybackError::InvalidExpiry` (`expiry_equal_to_issued_is_rejected`, `expiry_before_issued_is_rejected`).
+
+**Correction to ledger (applied in-place):** the ledger cited `UnknownStoredValue` as a pattern in `crates/domain`; it is actually a `DbError` variant in `crates/db` used by the repo layer. T1 follows the actual domain pattern: `FromStr` returning a domain-level `PlaybackError`, which T2's repo layer will map to `DbError::UnknownStoredValue` (identical to `review.rs:68-77`).
+
+### Reflection log
+
+Required passes: 3 (RRI 42 → Med-high)
+
+#### Pass 1
+- **Draft verdict:** grant construction and expiry logic correct against HP-1/HP-2.
+- **Critique findings:** `is_valid_at` boundary at exactly `expires_at` needed an explicit test; only before/after were covered.
+- **Revisions applied:** added `grant_is_invalid_at_expiry` test.
+
+#### Pass 2
+- **Draft verdict:** fail-closed decode solid; `FromStr` never falls through to allow.
+- **Critique findings:** empty-string tokens were not tested; only named-unknown tokens were.
+- **Revisions applied:** added `empty_string_grant_status_is_error` and `empty_string_playback_scope_is_error`.
+
+#### Pass 3
+- **Draft verdict:** coverage complete; ergonomics for T2/T4 verified.
+- **Critique findings:** `PlaybackScope::Display` formatting failed `cargo fmt` (multiline `write!`). No logic issues.
+- **Revisions applied:** reformatted `Display` impl to pass `cargo fmt`.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | valid fields → `Active` grant | `crates/domain/src/playback.rs::tests::valid_grant_is_active` | passed |
+| HP-2 | Happy path | before expiry → valid; at/after → invalid | `::grant_is_valid_before_expiry`, `::grant_is_invalid_at_expiry`, `::grant_is_invalid_after_expiry` | passed |
+| EC-1 | Edge case | unknown token → typed error, never allow | `::unknown_grant_status_is_error`, `::unknown_playback_scope_is_error`, `::empty_string_grant_status_is_error`, `::empty_string_playback_scope_is_error` | passed |
+| EC-2 | Edge case | expiry ≤ issued → construction rejected | `::expiry_equal_to_issued_is_rejected`, `::expiry_before_issued_is_rejected` | passed |
+
+### Owner final verification
+
+- Owner: Claude Sonnet 4.6
+- Date: 2026-06-21
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
+- Commands run: `cargo test -p dubbridge-domain -- playback` (14 passed), `cargo test -p dubbridge-domain` (102 passed, 0 failed), `cargo clippy -p dubbridge-domain -- -D warnings` (clean), `cargo fmt -p dubbridge-domain -- --check` (clean)
 
 ---
 
