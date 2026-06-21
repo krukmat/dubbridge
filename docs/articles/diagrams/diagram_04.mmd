@@ -1,0 +1,12 @@
+flowchart TD
+    File["A document"] --> Frontmatter{"Does it have a label?"}
+    Frontmatter -->|no| Fail1["Stop"]
+    Frontmatter -->|yes| Type{"Is the type a real one?"}
+    Type -->|no| Fail2["Stop"]
+    Type -->|yes| Location{"Is it filed in the right place?"}
+    Location -->|no| Fail3["Stop"]
+    Location -->|yes| Status{"Does the status match what the text says?"}
+    Status -->|no| Fail4["Stop"]
+    Status -->|yes| Refs{"Do the things it points to actually exist?"}
+    Refs -->|no| Fail5["Stop"]
+    Refs -->|yes| Pass["All good"]

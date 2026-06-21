@@ -1,0 +1,8 @@
+flowchart LR
+    Agent["AI assistant"] --> Query["Find what's relevant"]
+    Query --> ADRs["Decisions in force"]
+    Query --> Plans["Active plans"]
+    Query --> Tasks["Checklists by what governs them"]
+    ADRs --> Work["Safer, better-informed work"]
+    Plans --> Work
+    Tasks --> Work

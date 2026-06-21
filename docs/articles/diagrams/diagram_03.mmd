@@ -1,0 +1,6 @@
+graph LR
+    DOCS[docs/**/*.md] -->|parsed by| VAL[check_okf_frontmatter.py]
+    VAL -->|type + status valid?| HOOK[pre-commit hook]
+    VAL -->|included in| CI[CI qa-docs job]
+    HOOK & CI -->|fail-closed| BLOCK[commit / PR blocked]
+    HOOK & CI -->|pass| OK[green ✅]

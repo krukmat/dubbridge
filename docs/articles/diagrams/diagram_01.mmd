@@ -1,0 +1,6 @@
+flowchart TB
+    Q["&quot;Which of our 30 plans is still active?&quot;"]
+    Q --> Before["Without labels:<br/>open and read every file"]
+    Q --> After["With labels:<br/>just look at the ones marked 'active'"]
+    Before --> Slow["Slow · manual · easy to miss one"]
+    After --> Fast["Instant · reliable · automatic"]
