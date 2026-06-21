@@ -443,9 +443,6 @@ fn map_project_asset_error(error: ApiError) -> ApiError {
     if error.status == StatusCode::NOT_FOUND {
         return ApiError::forbidden("asset not found");
     }
-    if error.message == "record not found" {
-        return ApiError::forbidden("asset not found");
-    }
     error
 }
 

@@ -43,6 +43,9 @@ ACTION_VALUES = {"create", "modify", "delete"}
 FILE_START_MARKER = "=== FILE START ==="
 FILE_END_MARKER = "=== FILE END ==="
 CONTENT_MARKER = "--- CONTENT ---"
+REPLACEMENT_START_MARKER = "=== REPLACEMENT START ==="
+REPLACEMENT_END_MARKER = "=== REPLACEMENT END ==="
+AFTER_MARKER = "--- AFTER ---"
 
 
 class DelegationIdleTimeout(RuntimeError):
@@ -171,6 +174,37 @@ def parse_args():
         action="store_true",
         help="Print the Ollama request payload without sending it.",
     )
+    parser.add_argument(
+        "--mode",
+        choices=["full-file", "before-after"],
+        default="full-file",
+        dest="mode",
+        help=(
+            "Delegation mode. 'full-file' (default): Gemma emits the complete file. "
+            "'before-after': Gemma emits only the replacement block; the wrapper "
+            "performs a literal find-and-replace on the target file. Use for files "
+            "over ~400 lines. Requires --target-path and --before-file."
+        ),
+    )
+    parser.add_argument(
+        "--target-path",
+        default=None,
+        dest="target_path",
+        metavar="PATH",
+        help=(
+            "Repo-relative path of the file to modify. Required for --mode before-after."
+        ),
+    )
+    parser.add_argument(
+        "--before-file",
+        default=None,
+        dest="before_file",
+        metavar="FILE",
+        help=(
+            "File containing the exact block to replace, copied verbatim from the "
+            "current target file. Required for --mode before-after."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -202,6 +236,48 @@ def ensure_model_available(host, model, timeout):
         raise RuntimeError(
             f"local Ollama model {model!r} is not installed; available: {available}",
         )
+
+
+def build_replacement_payload(model, packet, num_ctx, num_predict):
+    return {
+        "model": model,
+        "stream": True,
+        "think": False,
+        "keep_alive": "10m",
+        "options": {
+            "temperature": 0.1,
+            "num_predict": num_predict,
+            "num_ctx": num_ctx,
+        },
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are a sandboxed local delegation model for DubBridge "
+                    "Low-RRI tasks.\n"
+                    "Return ONLY tagged text in this exact shape:\n"
+                    "STATUS: PATCH|NO_PATCH|BLOCKED\n"
+                    "SUMMARY: short summary\n"
+                    "TEST: optional verification command\n"
+                    "RISK: optional risk note\n"
+                    "=== REPLACEMENT START ===\n"
+                    "PATH: relative/path.ext\n"
+                    "--- AFTER ---\n"
+                    "<replacement block only — not the full file>\n"
+                    "=== REPLACEMENT END ===\n"
+                    "Rules: no JSON, no markdown fences, no unified diff, no "
+                    "explanations, no extra text outside these sections. "
+                    "Emit only the lines that replace the BEFORE block. "
+                    "For a deletion, emit nothing between --- AFTER --- and "
+                    "=== REPLACEMENT END ===."
+                ),
+            },
+            {
+                "role": "user",
+                "content": packet,
+            },
+        ],
+    }
 
 
 def build_payload(model, packet, num_ctx, num_predict):
@@ -329,6 +405,10 @@ def stream_chat(url, payload, idle_timeout, max_wall):
                     )
 
                 if chunk.get("done"):
+                    if chunk.get("done_reason") == "length":
+                        raise RuntimeError(
+                            "response cut by token limit; output may be truncated"
+                        )
                     break
 
     except (TimeoutError, socket.timeout) as exc:
@@ -346,6 +426,171 @@ def parse_stream_content(content):
     payload = parse_tagged_response(content)
     validate_delegation_payload(payload)
     return payload
+
+
+def parse_replacement_response(content):
+    """Parse a before-after mode response into a validated payload dict.
+
+    Returns dict with keys: status, summary, test_commands, risk_notes,
+    path, after_block (str or None).
+    Raises RuntimeError for any malformed, truncated, or out-of-contract response.
+    """
+    if not isinstance(content, str):
+        raise RuntimeError("replacement stream produced no content string")
+    content = content.replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not content:
+        raise RuntimeError("invalid replacement response: empty content")
+
+    lines = content.split("\n")
+    status = None
+    summary = None
+    test_commands = []
+    risk_notes = []
+    path = None
+    after_block = None
+    replacement_block_count = 0
+    idx = 0
+
+    def skip_blank(i):
+        while i < len(lines) and not lines[i].strip():
+            i += 1
+        return i
+
+    idx = skip_blank(idx)
+    while idx < len(lines):
+        line = lines[idx]
+
+        if line == REPLACEMENT_START_MARKER:
+            replacement_block_count += 1
+            if replacement_block_count > 1:
+                raise RuntimeError(
+                    "invalid replacement response: multiple replacement blocks"
+                )
+            path, after_block, idx = _parse_replacement_block(lines, idx)
+            idx = skip_blank(idx)
+            continue
+
+        if line.startswith("STATUS: "):
+            if status is not None:
+                raise RuntimeError(
+                    "invalid replacement response: duplicate STATUS header"
+                )
+            raw = line[len("STATUS: "):].strip()
+            if raw not in STATUS_VALUES:
+                raise RuntimeError(
+                    f"invalid replacement response: unknown STATUS {raw!r}"
+                )
+            status = STATUS_VALUES[raw]
+        elif line.startswith("SUMMARY: "):
+            if summary is not None:
+                raise RuntimeError(
+                    "invalid replacement response: duplicate SUMMARY header"
+                )
+            summary = line[len("SUMMARY: "):].strip()
+        elif line.startswith("TEST: "):
+            test_commands.append(line[len("TEST: "):].strip())
+        elif line.startswith("RISK: "):
+            risk_notes.append(line[len("RISK: "):].strip())
+        else:
+            raise RuntimeError(
+                "invalid replacement response: unexpected text outside sections: "
+                f"{line!r}"
+            )
+        idx += 1
+        idx = skip_blank(idx)
+
+    if status is None:
+        raise RuntimeError("invalid replacement response: missing STATUS header")
+    if summary is None:
+        raise RuntimeError("invalid replacement response: missing SUMMARY header")
+
+    return {
+        "status": status,
+        "summary": summary,
+        "test_commands": [c for c in test_commands if c],
+        "risk_notes": [n for n in risk_notes if n],
+        "path": path,
+        "after_block": after_block,
+    }
+
+
+def _parse_replacement_block(lines, start_idx):
+    """Parse one REPLACEMENT START...END block. Returns (path, after_block, next_idx)."""
+    idx = start_idx
+    if lines[idx] != REPLACEMENT_START_MARKER:
+        raise RuntimeError(
+            "invalid replacement response: missing replacement start marker"
+        )
+    idx += 1
+
+    while idx < len(lines) and not lines[idx].strip():
+        idx += 1
+    if idx >= len(lines):
+        raise RuntimeError("invalid replacement response: missing PATH line")
+    path_line = lines[idx]
+    idx += 1
+
+    path = _parse_header_value(path_line, "PATH")
+
+    while idx < len(lines) and not lines[idx].strip():
+        idx += 1
+    if idx >= len(lines) or lines[idx] != AFTER_MARKER:
+        raise RuntimeError(
+            "invalid replacement response: missing --- AFTER --- marker"
+        )
+    idx += 1
+
+    after_lines = []
+    while idx < len(lines) and lines[idx] != REPLACEMENT_END_MARKER:
+        after_lines.append(lines[idx])
+        idx += 1
+
+    if idx >= len(lines):
+        raise RuntimeError(
+            "invalid replacement response: missing replacement end marker "
+            "(response may be truncated)"
+        )
+    idx += 1  # consume REPLACEMENT_END_MARKER
+
+    after_block = "\n".join(after_lines)
+    return path, after_block, idx
+
+
+def validate_replacement_payload(payload, allow_paths, target_path):
+    """Validate a parsed replacement payload against scope and contract rules.
+
+    Raises RuntimeError on any violation. Must be called after
+    parse_replacement_response() and before building any diff.
+    """
+    status = payload["status"]
+    path = payload["path"]
+    after_block = payload["after_block"]
+
+    if status == "patch":
+        if path is None:
+            raise RuntimeError(
+                "invalid replacement response: STATUS PATCH requires a replacement block"
+            )
+        norm_path = _normalize(path)
+        norm_target = _normalize(target_path)
+        if norm_path != norm_target:
+            raise RuntimeError(
+                f"replacement response PATH {path!r} does not match "
+                f"--target-path {target_path!r}"
+            )
+        if allow_paths:
+            norm_allowed = [_normalize(a) for a in allow_paths]
+            ok = any(
+                norm_path == a
+                or norm_path.startswith(a.rstrip("/") + "/")
+                or fnmatch.fnmatch(norm_path, a)
+                for a in norm_allowed
+            )
+            if not ok:
+                raise RuntimeError(
+                    f"replacement response PATH {path!r} is outside --allow-path "
+                    f"{allow_paths}"
+                )
 
 
 def parse_tagged_response(content):
@@ -609,19 +854,110 @@ def apply_diff(diff_text, repo_root):
     return "applied"
 
 
+def is_line_subset(after_text, before_text):
+    """Return True if every non-empty line in after_text exists in before_text."""
+    before_lines = set(before_text.splitlines())
+    for line in after_text.splitlines():
+        if line and line not in before_lines:
+            return False
+    return True
+
+
+def apply_before_after(target_path, before_file, after_block, allow_paths, repo_root, do_apply):
+    """Perform a literal find-and-replace on target_path using before_file and after_block.
+
+    Reads the current target file and the BEFORE block from before_file, verifies
+    the BEFORE block occurs exactly once, composes the final file contents, then
+    delegates to the existing build_diff / apply_diff pipeline.
+    Returns a dict with 'unified_diff' and optionally 'apply_result'.
+    """
+    abs_target = os.path.join(repo_root, _normalize(target_path))
+    if not os.path.exists(abs_target):
+        raise RuntimeError(
+            f"before-after target file not found: {target_path!r}"
+        )
+    with open(abs_target, encoding="utf-8") as f:
+        original = f.read()
+    with open(before_file, encoding="utf-8") as f:
+        before = f.read()
+
+    # Strip trailing whitespace per line to avoid whitespace-sensitivity failures.
+    def _strip_trailing(text):
+        return "\n".join(line.rstrip() for line in text.splitlines())
+
+    original_stripped = _strip_trailing(original)
+    before_stripped = _strip_trailing(before)
+
+    count = original_stripped.count(before_stripped)
+    if count == 0:
+        raise RuntimeError(
+            "before-after: BEFORE block not found in target file; "
+            "ensure the block is copied verbatim from the current file"
+        )
+    if count > 1:
+        raise RuntimeError(
+            f"before-after: BEFORE block found {count} times in target file; "
+            "must match exactly once to avoid editing the wrong occurrence"
+        )
+
+    after_stripped = _strip_trailing(after_block)
+
+    # Deletion guard: if AFTER is a strict subset of BEFORE, enforce line-subset rule.
+    after_lines = [l for l in after_stripped.splitlines() if l.strip()]
+    before_lines = [l for l in before_stripped.splitlines() if l.strip()]
+    is_deletion = len(after_lines) < len(before_lines)
+    if is_deletion and not is_line_subset(after_stripped, before_stripped):
+        raise RuntimeError(
+            "before-after deletion mode: AFTER block contains lines not present "
+            "in BEFORE; only line removal is allowed in deletion mode"
+        )
+
+    final_contents = original_stripped.replace(before_stripped, after_stripped, 1)
+    # Preserve trailing newline if the original had one.
+    if original.endswith("\n") and not final_contents.endswith("\n"):
+        final_contents += "\n"
+
+    files = [{"path": target_path, "action": "modify", "contents": final_contents}]
+    enforce_scope(files, allow_paths)
+    validate_file_actions(files, repo_root)
+    diff = build_diff(files, repo_root)
+    result = {"unified_diff": diff}
+    print(
+        f"[delegate] before-after: built diff: {len(diff.splitlines())} lines",
+        file=sys.stderr,
+    )
+    if do_apply:
+        outcome = apply_diff(diff, repo_root)
+        result["apply_result"] = outcome
+        print(f"[delegate] {outcome}", file=sys.stderr)
+    return result
+
+
 def main():
     args = parse_args()
     packet = read_packet(args.packet).strip()
     if not packet:
         raise RuntimeError("delegation packet is empty")
 
-    payload = build_payload(args.model, packet, args.num_ctx, args.num_predict)
+    if args.apply and not args.allow_path:
+        raise RuntimeError("--apply requires at least one --allow-path")
+
+    if args.mode == "before-after":
+        if not args.target_path:
+            raise RuntimeError("--mode before-after requires --target-path")
+        if not args.before_file:
+            raise RuntimeError("--mode before-after requires --before-file")
+
+    if args.mode == "before-after":
+        payload = build_replacement_payload(
+            args.model, packet, args.num_ctx, args.num_predict
+        )
+    else:
+        payload = build_payload(args.model, packet, args.num_ctx, args.num_predict)
+
     if args.dry_run:
         print(json.dumps(payload, indent=2, sort_keys=True))
         return 0
-
-    if args.apply and not args.allow_path:
-        raise RuntimeError("--apply requires at least one --allow-path")
 
     ensure_model_available(args.host, args.model, args.idle_timeout)
     content = stream_chat(
@@ -630,22 +966,36 @@ def main():
         idle_timeout=args.idle_timeout,
         max_wall=args.max_wall,
     )
-    delegation = parse_stream_content(content)
 
-    # Caller-side, deterministic: enforce scope, validate file actions, build the
-    # diff with git, and apply it. The model never frames a diff; this is the
-    # orchestrator's responsibility.
-    if args.allow_path and delegation["status"] == "patch":
-        enforce_scope(delegation["files"], args.allow_path)
-        validate_file_actions(delegation["files"], args.repo_root)
-        diff = build_diff(delegation["files"], args.repo_root)
-        delegation["unified_diff"] = diff
-        print(f"[delegate] built diff: {len(diff.splitlines())} lines from "
-              f"{len(delegation['files'])} file(s)", file=sys.stderr)
-        if args.apply:
-            outcome = apply_diff(diff, args.repo_root)
-            delegation["apply_result"] = outcome
-            print(f"[delegate] {outcome}", file=sys.stderr)
+    if args.mode == "before-after":
+        delegation = parse_replacement_response(content)
+        validate_replacement_payload(delegation, args.allow_path, args.target_path)
+        if delegation["status"] == "patch":
+            patch_result = apply_before_after(
+                target_path=args.target_path,
+                before_file=args.before_file,
+                after_block=delegation["after_block"] or "",
+                allow_paths=args.allow_path,
+                repo_root=args.repo_root,
+                do_apply=args.apply,
+            )
+            delegation.update(patch_result)
+    else:
+        delegation = parse_stream_content(content)
+        # Caller-side, deterministic: enforce scope, validate file actions, build the
+        # diff with git, and apply it. The model never frames a diff; this is the
+        # orchestrator's responsibility.
+        if args.allow_path and delegation["status"] == "patch":
+            enforce_scope(delegation["files"], args.allow_path)
+            validate_file_actions(delegation["files"], args.repo_root)
+            diff = build_diff(delegation["files"], args.repo_root)
+            delegation["unified_diff"] = diff
+            print(f"[delegate] built diff: {len(diff.splitlines())} lines from "
+                  f"{len(delegation['files'])} file(s)", file=sys.stderr)
+            if args.apply:
+                outcome = apply_diff(diff, args.repo_root)
+                delegation["apply_result"] = outcome
+                print(f"[delegate] {outcome}", file=sys.stderr)
 
     result_json = json.dumps(delegation, indent=2, sort_keys=True)
     if args.out:

@@ -74,14 +74,46 @@ Poor-fit tasks:
   `## Current file content` section. The local model has no filesystem access —
   without this it will hallucinate the file structure and produce a rewrite that
   bears no resemblance to the real file.
-  - For **small files** (under ~150 lines): include the complete file.
-  - For **large files**: include only the relevant section — the function or
-    block being changed plus enough surrounding lines (imports, enclosing struct,
-    adjacent functions) for Gemma to preserve context. Clearly mark the
-    truncation with `// ... (rest of file unchanged)` at the top and bottom so
-    the model knows it must emit the full file in its response, not just the
-    excerpt. Before sending, estimate the packet size: if the excerpt + instructions
-    exceed ~8k tokens, reduce the excerpt further or split into a smaller task.
+  - For **small files** (under ~400 lines / ~3000 estimated tokens): include
+    the complete file. Use `--mode full-file` (the default).
+  - For **large files** (400+ lines): do **not** ask Gemma to emit the complete
+    file — the model's output token ceiling (~8 192 tokens on current hardware)
+    makes full-file regeneration unsafe and has caused silent file destruction
+    (see `docs/evaluations/large-file-delegation-2026-06-21.md`). Use
+    `--mode before-after` instead: include only the exact BEFORE block (the
+    function or region to change) in the packet. Gemma emits only the
+    replacement AFTER block; the wrapper performs a literal
+    `replace(before, after, 1)` on the original file.
+
+**Mode selection rule (orchestrator-owned):**
+
+```python
+estimated_file_tokens = len(file_content) // 4
+if estimated_file_tokens > 3000:   # approximately 400 lines
+    mode = "before-after"
+else:
+    mode = "full-file"
+```
+
+The wrapper (`scripts/delegate-low-rri.py`) never infers the mode itself — it
+fails closed if `--mode before-after` is supplied without `--target-path` or
+`--before-file`. Mode selection is the orchestrator's decision.
+
+Example invocation for a large file:
+
+```bash
+scripts/delegate-low-rri.py packet.md \
+  --mode before-after \
+  --target-path apps/api/src/routes/workspace.rs \
+  --before-file /tmp/workspace-before.txt \
+  --allow-path apps/api/src/routes/workspace.rs \
+  --apply \
+  --out result.json
+```
+
+The `--before-file` content must be copied verbatim from the current target
+file. The BEFORE block must match exactly once — the wrapper rejects ambiguous
+matches before building any diff.
 - **Show the exact block to replace and the exact replacement block** as code
   fences, not as prose descriptions. Prose instructions (“remove the closure”,
   “simplify the error handling”) are ambiguous to a small model; literal before/after
