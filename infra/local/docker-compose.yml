@@ -34,9 +34,14 @@ services:
     image: minio/mc:latest
     depends_on:
       - minio
-    command: >
-      sh -c "until mc alias set local http://minio:9000 dubbridge dubbridge123; do sleep 1; done;
-      mc mb --ignore-existing local/dubbridge-local"
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        until mc alias set local http://minio:9000 dubbridge dubbridge123; do
+          sleep 1
+        done
+        mc mb --ignore-existing local/dubbridge-local
 
   api:
     image: rust:stable

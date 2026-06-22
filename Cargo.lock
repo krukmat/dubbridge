@@ -607,6 +607,7 @@ dependencies = [
  "dubbridge-observability",
  "dubbridge-playback",
  "dubbridge-storage",
+ "jsonwebtoken",
  "serde",
  "serde_json",
  "sha2",
