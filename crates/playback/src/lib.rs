@@ -11,6 +11,17 @@ pub enum ManifestRewriteError {
     MissingSegmentReference(String),
 }
 
+pub fn manifest_segment_names(manifest: &str) -> Vec<String> {
+    manifest
+        .lines()
+        .filter(|line| !line.starts_with('#') && !line.trim().is_empty())
+        .map(|line| {
+            let trimmed = line.trim();
+            trimmed.rsplit('/').next().unwrap_or(trimmed).to_string()
+        })
+        .collect()
+}
+
 /// Rewrite every media-segment URI in a prepared `.m3u8` so it points at
 /// `routed_base` instead of the raw object-store key prefix.
 /// Non-segment tag lines pass through unchanged; order is preserved.
@@ -19,14 +30,9 @@ pub fn rewrite_manifest(manifest: &str, routed_base: &str) -> Result<String, Man
     let base = routed_base.trim_end_matches('/');
     rewrite_manifest_with_refs(
         manifest,
-        &manifest
-            .lines()
-            .filter(|line| !line.starts_with('#') && !line.trim().is_empty())
-            .map(|line| {
-                let trimmed = line.trim();
-                let name = trimmed.rsplit('/').next().unwrap_or(trimmed).to_string();
-                (name.clone(), format!("{base}/{name}"))
-            })
+        &manifest_segment_names(manifest)
+            .into_iter()
+            .map(|name| (name.clone(), format!("{base}/{name}")))
             .collect(),
     )
 }
@@ -86,6 +92,14 @@ mod tests {
         assert_eq!(segs.len(), 2);
         assert!(segs[0].ends_with("segment_00000.ts"));
         assert!(segs[1].ends_with("segment_00001.ts"));
+    }
+
+    #[test]
+    fn manifest_segment_names_ignores_comments_and_extracts_filenames() {
+        assert_eq!(
+            manifest_segment_names("#EXTM3U\n#EXTINF:4,\nsegments/a.ts\n\nb.m4s\n"),
+            vec!["a.ts".to_string(), "b.m4s".to_string()]
+        );
     }
 
     #[test]

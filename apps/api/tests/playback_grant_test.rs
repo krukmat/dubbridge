@@ -160,12 +160,8 @@ async fn prepare_reviewer_ready_fixture(
     ctx: &PlaybackTestContext,
     fixture: &support::PlaybackFixture,
 ) {
-    insert_membership(
-        &ctx.pool,
-        fixture.org.id,
-        ctx.reviewer_id,
-        OrgRole::Reviewer,
-    )
-    .await;
+    let org_id = fixture.org.id;
+    let reviewer_id = ctx.reviewer_id;
+    insert_membership(&ctx.pool, org_id, reviewer_id, OrgRole::Reviewer).await;
     mark_asset_ready_with_manifest(&ctx.pool, fixture.asset.id).await;
 }

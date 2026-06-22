@@ -29,7 +29,7 @@ use crate::{
     playback_policy::{PlaybackAudiencePolicyContext, apply_audience_policy_hook},
     state::AppState,
 };
-use dubbridge_playback::rewrite_manifest_with_refs;
+use dubbridge_playback::{manifest_segment_names, rewrite_manifest_with_refs};
 use dubbridge_storage::{get_hls_manifest, get_hls_segment};
 
 const PLAYBACK_GRANT_TTL_HOURS: i64 = 1;
@@ -202,24 +202,13 @@ fn build_segment_refs(
     asset_id: AssetId,
     manifest: &str,
 ) -> Result<HashMap<String, String>, ApiError> {
-    segment_names(manifest)
+    manifest_segment_names(manifest)
         .into_iter()
         .try_fold(HashMap::new(), |mut refs, filename| {
             let reference = mint_segment_reference(state, asset_id, &filename)?;
             refs.insert(filename, reference);
             Ok(refs)
         })
-}
-
-fn segment_names(manifest: &str) -> Vec<String> {
-    manifest
-        .lines()
-        .filter(|line| !line.starts_with('#') && !line.trim().is_empty())
-        .map(|line| {
-            let trimmed = line.trim();
-            trimmed.rsplit('/').next().unwrap_or(trimmed).to_string()
-        })
-        .collect()
 }
 
 fn mint_segment_reference(
@@ -401,17 +390,4 @@ async fn emit_refusal_audit(
     emit_governance_audit(pool, &event)
         .await
         .map_err(ApiError::from_audit_emit)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::segment_names;
-
-    #[test]
-    fn segment_names_ignores_comments_and_extracts_filenames() {
-        assert_eq!(
-            segment_names("#EXTM3U\n#EXTINF:4,\nsegments/a.ts\n\nb.m4s\n"),
-            vec!["a.ts".to_string(), "b.m4s".to_string()]
-        );
-    }
 }
