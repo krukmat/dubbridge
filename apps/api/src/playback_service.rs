@@ -23,9 +23,14 @@ use time::{Duration, OffsetDateTime};
 use tracing::debug;
 use uuid::Uuid;
 
-use crate::state::AppState;
+use crate::{
+    playback_api_error::ApiError,
+    playback_audit::playback_grant_refused_event,
+    playback_policy::{PlaybackAudiencePolicyContext, apply_audience_policy_hook},
+    state::AppState,
+};
 use dubbridge_playback::rewrite_manifest_with_refs;
-use dubbridge_storage::{StorageError, get_hls_manifest, get_hls_segment};
+use dubbridge_storage::{get_hls_manifest, get_hls_segment};
 
 const PLAYBACK_GRANT_TTL_HOURS: i64 = 1;
 const PLAYBACK_SEGMENT_TTL_SECONDS: u64 = 60;
@@ -362,43 +367,6 @@ async fn ensure_asset_ready_for_playback(pool: &PgPool, asset_id: AssetId) -> Re
     }
 }
 
-/// Policy context reserved for S-180 audience-facing decisions.
-/// T4c ships a no-op default so the grant contract does not need to change later.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct PlaybackAudiencePolicyContext {
-    asset_id: AssetId,
-    actor_subject_id: Uuid,
-    org_id: OrgId,
-    project_id: ProjectId,
-    scope: PlaybackScope,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(not(test), allow(dead_code))]
-enum PlaybackAudiencePolicyDecision {
-    Allow,
-    Deny { reason: &'static str },
-}
-
-fn apply_audience_policy_hook(context: &PlaybackAudiencePolicyContext) -> Result<(), ApiError> {
-    enforce_audience_policy_decision(default_audience_policy_hook(context))
-}
-
-fn default_audience_policy_hook(
-    _context: &PlaybackAudiencePolicyContext,
-) -> PlaybackAudiencePolicyDecision {
-    PlaybackAudiencePolicyDecision::Allow
-}
-
-fn enforce_audience_policy_decision(
-    decision: PlaybackAudiencePolicyDecision,
-) -> Result<(), ApiError> {
-    match decision {
-        PlaybackAudiencePolicyDecision::Allow => Ok(()),
-        PlaybackAudiencePolicyDecision::Deny { reason } => Err(ApiError::forbidden(reason)),
-    }
-}
-
 async fn emit_success_audit(pool: &PgPool, grant: &PlaybackGrant) -> Result<(), ApiError> {
     let event = AuditEvent::new_playback_event(
         grant.asset_id,
@@ -428,163 +396,22 @@ async fn emit_refusal_audit(
     project_id: Option<ProjectId>,
     reason: &'static str,
 ) -> Result<(), ApiError> {
-    let event = AuditEvent::new_playback_event(
-        asset_id,
-        AuditEventKind::PlaybackGrantRefused,
-        Some(
-            json!({
-                "asset_id": asset_id.0,
-                "actor_subject_id": actor_subject_id,
-                "org_id": org_id.map(|value| value.0),
-                "project_id": project_id.map(|value| value.0),
-                "reason": reason,
-            })
-            .to_string(),
-        ),
-    );
+    let event =
+        playback_grant_refused_event(asset_id, Some(actor_subject_id), org_id, project_id, reason);
     emit_governance_audit(pool, &event)
         .await
         .map_err(ApiError::from_audit_emit)
 }
 
-#[derive(Debug)]
-pub struct ApiError {
-    status: StatusCode,
-    message: String,
-}
-
-impl ApiError {
-    fn forbidden(message: impl Into<String>) -> Self {
-        Self {
-            status: StatusCode::FORBIDDEN,
-            message: message.into(),
-        }
-    }
-
-    fn conflict(message: impl Into<String>) -> Self {
-        Self {
-            status: StatusCode::CONFLICT,
-            message: message.into(),
-        }
-    }
-
-    fn internal(message: impl Into<String>) -> Self {
-        Self {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            message: message.into(),
-        }
-    }
-
-    fn from_audit_emit(error: dubbridge_audit::AuditEmitError) -> Self {
-        Self::internal(error.to_string())
-    }
-
-    fn from_db(error: DbError) -> Self {
-        match error {
-            DbError::Conflict => Self::conflict("conflict"),
-            DbError::NotFound => Self::forbidden("asset not found"),
-            DbError::ConnectionFailed(source) | DbError::QueryFailed(source) => {
-                Self::internal(format!("database operation failed: {source}"))
-            }
-            DbError::UnknownStoredValue { field, value } => {
-                Self::internal(format!("corrupt stored value in {field}: {value}"))
-            }
-        }
-    }
-
-    fn from_playback_denial(error: dubbridge_domain::playback::PlaybackDenial) -> Self {
-        match error {
-            dubbridge_domain::playback::PlaybackDenial::GrantInvalid => {
-                Self::forbidden("playback grant expired or revoked")
-            }
-            dubbridge_domain::playback::PlaybackDenial::NotReady => {
-                Self::conflict("asset not ready for playback")
-            }
-            dubbridge_domain::playback::PlaybackDenial::MissingManifest => {
-                Self::internal("prepared HLS manifest not found")
-            }
-            dubbridge_domain::playback::PlaybackDenial::Unauthenticated => {
-                Self::forbidden("authentication required")
-            }
-            dubbridge_domain::playback::PlaybackDenial::Unauthorized => {
-                Self::forbidden("asset not found")
-            }
-        }
-    }
-
-    fn from_storage(error: StorageError) -> Self {
-        match error {
-            StorageError::NotFound { .. } => Self::internal("prepared HLS manifest not found"),
-            StorageError::Io { source, .. } => {
-                Self::internal(format!("storage read failed: {source}"))
-            }
-            StorageError::Backend(message) => {
-                Self::internal(format!("storage read failed: {message}"))
-            }
-        }
-    }
-
-    fn audit_reason(&self) -> Option<&'static str> {
-        match (self.status, self.message.as_str()) {
-            (StatusCode::FORBIDDEN, "asset not found") => Some("asset_not_found"),
-            (StatusCode::CONFLICT, "asset not ready for playback") => Some("asset_not_ready"),
-            _ => None,
-        }
-    }
-}
-
-impl IntoResponse for ApiError {
-    fn into_response(self) -> axum::response::Response {
-        (
-            self.status,
-            Json(json!({
-                "error": self.message,
-            })),
-        )
-            .into_response()
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    fn audience_policy_context() -> PlaybackAudiencePolicyContext {
-        PlaybackAudiencePolicyContext {
-            asset_id: AssetId(
-                Uuid::parse_str("550e8400-e29b-41d4-a716-446655440120").expect("uuid"),
-            ),
-            actor_subject_id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440121")
-                .expect("uuid"),
-            org_id: OrgId(Uuid::parse_str("550e8400-e29b-41d4-a716-446655440122").expect("uuid")),
-            project_id: ProjectId(
-                Uuid::parse_str("550e8400-e29b-41d4-a716-446655440123").expect("uuid"),
-            ),
-            scope: PlaybackScope::Review,
-        }
-    }
+    use super::segment_names;
 
     #[test]
-    fn default_audience_policy_hook_allows_by_default() {
+    fn segment_names_ignores_comments_and_extracts_filenames() {
         assert_eq!(
-            default_audience_policy_hook(&audience_policy_context()),
-            PlaybackAudiencePolicyDecision::Allow
+            segment_names("#EXTM3U\n#EXTINF:4,\nsegments/a.ts\n\nb.m4s\n"),
+            vec!["a.ts".to_string(), "b.m4s".to_string()]
         );
-    }
-
-    #[test]
-    fn apply_audience_policy_hook_is_pass_through_by_default() {
-        assert!(apply_audience_policy_hook(&audience_policy_context()).is_ok());
-    }
-
-    #[test]
-    fn denied_audience_policy_decision_maps_to_forbidden_api_error() {
-        let error = enforce_audience_policy_decision(PlaybackAudiencePolicyDecision::Deny {
-            reason: "policy_denied",
-        })
-        .expect_err("deny should error");
-
-        assert_eq!(error.status, StatusCode::FORBIDDEN);
-        assert_eq!(error.message, "policy_denied");
     }
 }

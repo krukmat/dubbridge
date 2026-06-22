@@ -3,6 +3,9 @@ pub mod consent_gate; // S-110-T2a
 pub mod dto;
 pub mod ingestion_service; // S3-T0: transport-agnostic finalization core
 pub mod middleware;
+pub mod playback_api_error;
+pub mod playback_audit;
+pub mod playback_policy;
 pub mod playback_service; // S-125-T4a-i: playback-grant issuance skeleton
 pub mod review_gate; // S-160-T2a
 pub mod routes;
