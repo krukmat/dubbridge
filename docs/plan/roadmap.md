@@ -128,7 +128,7 @@ Plan: `docs/plan/h1-governance-atomicity-hardening.md`
 | **S-110** | Mobile compliance & consent center: audit/rights viewer, voice-consent ledger, fail-closed TTS precondition | S-105, S-010 audit/rights data | ✅ done — T0–T3, T5, and T6 complete 2026-06-13; T4 web dashboard cancelled and superseded by the complete mobile center; X11 closed at contract level | `docs/plan/s-110-compliance-consent-center.md`, `docs/tasks/s-110-compliance-consent-center.md` |
 | **S-115** | Mobile UX foundation & design-system adoption: theme tokens + primitives, single "ink + teal" palette (ADR-029 mobile surface), safe-area correctness, consistent state/touch/accessibility, behavior- and testID-preserving migration | S-105, S-110 | ✅ done — T0–T5 complete 2026-06-13; design-system (tokens + 7 primitives) + SafeAreaProvider + all 13 screens migrated; a11y pass + Maestro syntax valid; 10 suites / 117 tests green | `docs/plan/s-115-mobile-ux-foundation.md`, `docs/tasks/s-115-mobile-ux-foundation.md` |
 | **S-120** | Media preparation (ffprobe metadata + HLS transcode) | S-010, S-080 | ✅ done 2026-06-19 — T1–T5c complete; preparation schema/lineage, probe persistence, HLS persistence, finalize enqueue, worker execution, and evidence-driven readiness gating delivered | `docs/plan/s-120-media-preparation.md`, `docs/tasks/s-120-media-preparation.md` |
-| **S-125** | HLS playback delivery (authorized `.m3u8` + segment serving) | S-120, S-080, S-160 review/publication gate contract | 📄 planned 2026-06-21 — plan + task ledger authored (T0–T5); decomposes the RRI-100 slice into bounded grant-contract / schema-repo / pure-rewriter / issuance-API / delivery tasks; no code task started (all RRI 26+, approval-gated) | `docs/plan/s-125-hls-playback-delivery.md`, `docs/tasks/s-125-hls-playback-delivery.md` (ADR-032) |
+| **S-125** | HLS playback delivery (authorized `.m3u8` + segment serving) | S-120, S-080, S-160 review/publication gate contract | 🟡 in progress 2026-06-22 — implementation and docs are complete through T5c; playback grants, rewritten manifests, short-lived scoped segment references, and ADR-032 acceptance are all delivered, with the roadmap row held in-progress until the current uncommitted plan/task evidence files are committed | `docs/plan/s-125-hls-playback-delivery.md`, `docs/tasks/s-125-hls-playback-delivery.md` (ADR-032) |
 | **S-130** | Processing / ASR (transcription) | S-100 target-language intent, S-120 | ⬜ worker contract only | `workers/asr-worker-py` |
 | **S-140** | Subtitle generation | S-130 | ⬜ no plan yet | — |
 | **S-150** | Translation + dubbing (TTS / voice cloning) | S-140, S-110 consent precondition | ⬜ worker contracts only | `workers/translation-worker-py`, `workers/tts-worker-py` |
@@ -351,12 +351,10 @@ S-095 — live recorder (DEFERRED): ex-T3 recorder crate, ex-T4 jobs/storage,
 - `S-070` still needs plan/task ledgers before execution. `S-120` is now complete
   with `docs/plan/s-120-media-preparation.md` + `docs/tasks/s-120-media-preparation.md`
   synchronized through `T5c`.
-  `S-125` is created as an ADR-backed roadmap phase for HLS playback delivery and now
-  has `docs/plan/s-125-hls-playback-delivery.md` + `docs/tasks/s-125-hls-playback-delivery.md`
-  (planned 2026-06-21). The slice scores RRI 100 as one task, so the ledger decomposes it
-  into T0–T5 (grant contract, schema/repo, pure rewriter, issuance API, delivery + ADR sync);
-  every code task is RRI 26+ and approval-gated, and no code task has started. ADR-032
-  stays `Proposed` until `S-125-T5` delivers the boundary.
+  `S-125` is now complete: `docs/plan/s-125-hls-playback-delivery.md` +
+  `docs/tasks/s-125-hls-playback-delivery.md` record the delivered grant contract,
+  schema/repo, pure rewriter, issuance API, rewritten manifests, short-lived scoped
+  segment references, and ADR/docs propagation. ADR-032 is `Accepted`.
   `S-030` now has `docs/plan/s-030-environment-separation.md` +
   `docs/tasks/s-030-environment-separation.md` with its current Phase 0 / Phase 1
   scope complete. `S-040` now has

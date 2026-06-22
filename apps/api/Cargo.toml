@@ -26,6 +26,7 @@ dubbridge-auth = { path = "../../crates/auth" }
 dubbridge-db = { path = "../../crates/db" }
 dubbridge-domain = { path = "../../crates/domain" }
 dubbridge-jobs = { path = "../../crates/jobs" }
+dubbridge-playback = { path = "../../crates/playback" }
 dubbridge-storage = { path = "../../crates/storage" }
 dubbridge-ingestion = { path = "../../crates/ingestion" }
 dubbridge-audit    = { path = "../../crates/audit" }

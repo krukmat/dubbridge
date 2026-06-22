@@ -43,7 +43,7 @@ operational surfaces from planned ones. Delivery sequence lives in
 | Platform ingest (owner-authorized download) | Planned (primary S3); foundation T0/T0c/T1/T2 done | S3, ADR-025/021/006/008/018 |
 | RTMP/SRT live recording ingest | Deferred sub-case (S3b); shares the S3 foundation | S3b, ADR-019/020/022 |
 | Media preparation through publication | Planned | S-120..S-180 |
-| HLS playback delivery | Planned | S-125, ADR-032 |
+| HLS playback delivery | Operational | S-125, ADR-032 |
 | Environment separation + reproducible app-container runtime wiring | Planned supporting surface | P0, ADR-026 |
 | First-party session gateway / BFF | Operational supporting surface (opaque-session transport; superseded-by-decision, ADR-031/S-200 reduces it to a transparent relay) | P1, ADR-024 → ADR-031 |
 | First-party mobile client (React Native + Expo) | Canonical authenticated product surface (opaque `session_ref` transport; ADR-031/S-200 moves it to a backend-issued bearer JWT) | P3, S-105, ADR-024/029 → ADR-031 |
@@ -92,11 +92,12 @@ operational surfaces from planned ones. Delivery sequence lives in
   authentication (ADR-022). Its v1 output contract was fixed by S3 Task 0c (local
   HLS fMP4 staging + one assembled MP4). It is built only when a real
   live-broadcast client need exists; it is not on the primary S3 critical path.
-- `S-125` HLS playback delivery (ADR-032) will expose prepared HLS manifests and
+- `S-125` HLS playback delivery (ADR-032) exposes prepared HLS manifests and
   segments through a backend-owned grant boundary. It consumes S-120 HLS artifacts,
-  validates readiness and caller/publication policy, and returns manifest/segment
-  URLs without exposing raw object-store keys. It is a delivery API boundary, not a
-  public website or revived authenticated web console.
+  validates readiness and caller/publication policy, and returns rewritten manifests
+  plus short-lived scoped segment references without exposing raw object-store keys.
+  It is a delivery API boundary, not a public website or revived authenticated web
+  console.
 
 ## Shared crates
 

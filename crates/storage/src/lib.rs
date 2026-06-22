@@ -83,6 +83,45 @@ pub fn ingest_key(token: Uuid, filename: Option<&str>) -> String {
     format!("ingests/{token}/{safe}")
 }
 
+// ── HLS scoped-read helper (ADR-032) ─────────────────────────────────────────
+//
+// Callers receive manifest bytes, never a raw object-store key. Key construction
+// stays inside this crate (ADR-006).
+
+#[derive(Debug)]
+pub struct HlsManifestBytes(pub Vec<u8>);
+
+#[derive(Debug)]
+pub struct HlsSegmentBytes(pub Vec<u8>);
+
+/// Fetch the prepared HLS manifest for `asset_id` from `adapter`.
+///
+/// Returns the manifest bytes wrapped in a newtype so the caller cannot
+/// accidentally treat them as a storage key. Returns `StorageError::NotFound`
+/// if the key is absent.
+pub async fn get_hls_manifest(
+    adapter: &dyn StorageAdapter,
+    asset_id: &str,
+) -> Result<HlsManifestBytes, StorageError> {
+    let key = hls_manifest_key(asset_id);
+    let bytes = adapter.get(&key).await?;
+    Ok(HlsManifestBytes(bytes))
+}
+
+/// Fetch the prepared HLS segment for `asset_id` / `filename` from `adapter`.
+///
+/// Returns segment bytes wrapped in a newtype so callers never work with the
+/// canonical storage key directly.
+pub async fn get_hls_segment(
+    adapter: &dyn StorageAdapter,
+    asset_id: &str,
+    filename: &str,
+) -> Result<HlsSegmentBytes, StorageError> {
+    let key = hls_segment_key(asset_id, filename);
+    let bytes = adapter.get(&key).await?;
+    Ok(HlsSegmentBytes(bytes))
+}
+
 pub(crate) fn sanitize_filename(name: &str) -> Cow<'_, str> {
     if name.contains('/') || name.contains('\\') {
         Cow::Owned(name.replace(['/', '\\'], "_"))
@@ -269,6 +308,89 @@ mod tests {
             Err(err) => panic!("expected StorageError::Backend, got {err:?}"),
             Ok(_) => panic!("expected s3 adapter construction to fail"),
         }
+    }
+
+    // S-125-T3b: get_hls_manifest scoped-read helper (ADR-032)
+
+    // HP-1: returns manifest bytes; caller never receives a raw storage key.
+    #[tokio::test]
+    async fn get_hls_manifest_returns_bytes_not_key() {
+        let dir = TempDir::new().unwrap();
+        let adapter = LocalFsAdapter::new(dir.path());
+        let asset_id = "asset-abc";
+        let manifest_bytes = b"#EXTM3U\n#EXT-X-ENDLIST\n".to_vec();
+
+        adapter
+            .put(&hls_manifest_key(asset_id), manifest_bytes.clone())
+            .await
+            .unwrap();
+
+        let result = get_hls_manifest(&adapter, asset_id).await.unwrap();
+        assert_eq!(result.0, manifest_bytes);
+    }
+
+    // EC-1: absent key → NotFound error, no fabricated bytes.
+    #[tokio::test]
+    async fn get_hls_manifest_returns_not_found_for_absent_key() {
+        let dir = TempDir::new().unwrap();
+        let adapter = LocalFsAdapter::new(dir.path());
+
+        let err = get_hls_manifest(&adapter, "nonexistent-asset")
+            .await
+            .unwrap_err();
+        assert!(matches!(err, StorageError::NotFound { .. }));
+    }
+
+    // EC-2: the returned value contains no raw object-store path string.
+    #[tokio::test]
+    async fn get_hls_manifest_result_contains_no_raw_key() {
+        let dir = TempDir::new().unwrap();
+        let adapter = LocalFsAdapter::new(dir.path());
+        let asset_id = "asset-abc";
+        let manifest_bytes = b"#EXTM3U\n#EXT-X-ENDLIST\n".to_vec();
+
+        adapter
+            .put(&hls_manifest_key(asset_id), manifest_bytes.clone())
+            .await
+            .unwrap();
+
+        let result = get_hls_manifest(&adapter, asset_id).await.unwrap();
+        let as_str = std::str::from_utf8(&result.0).unwrap();
+        assert!(!as_str.contains("s3://"));
+        assert!(!as_str.contains("minio"));
+        assert!(!as_str.contains("prepared/hls/"));
+    }
+
+    #[tokio::test]
+    async fn get_hls_segment_returns_bytes_not_key() {
+        let dir = TempDir::new().unwrap();
+        let adapter = LocalFsAdapter::new(dir.path());
+        let asset_id = "asset-segment";
+        let segment_bytes = vec![0, 1, 2, 3];
+
+        adapter
+            .put(
+                &hls_segment_key(asset_id, "segment_00000.ts"),
+                segment_bytes.clone(),
+            )
+            .await
+            .unwrap();
+
+        let result = get_hls_segment(&adapter, asset_id, "segment_00000.ts")
+            .await
+            .unwrap();
+        assert_eq!(result.0, segment_bytes);
+    }
+
+    #[tokio::test]
+    async fn get_hls_segment_returns_not_found_for_absent_key() {
+        let dir = TempDir::new().unwrap();
+        let adapter = LocalFsAdapter::new(dir.path());
+
+        let err = get_hls_segment(&adapter, "asset-segment", "missing.ts")
+            .await
+            .unwrap_err();
+        assert!(matches!(err, StorageError::NotFound { .. }));
     }
 
     #[tokio::test]

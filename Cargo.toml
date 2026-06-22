@@ -17,6 +17,7 @@ members = [
   "crates/config",
   "crates/connectors",
   "crates/observability",
+  "crates/playback",
 ]
 resolver = "3"
 

@@ -53,6 +53,8 @@ fn parse_event_kind(value: &str) -> Result<AuditEventKind, DbError> {
         "review_rejected" => Ok(AuditEventKind::ReviewRejected),
         "publication_succeeded" => Ok(AuditEventKind::PublicationSucceeded),
         "publication_refused" => Ok(AuditEventKind::PublicationRefused),
+        "playback_grant_issued" => Ok(AuditEventKind::PlaybackGrantIssued),
+        "playback_grant_refused" => Ok(AuditEventKind::PlaybackGrantRefused),
         other => Err(DbError::UnknownStoredValue {
             field: "audit_events.event_kind",
             value: other.to_owned(),
@@ -175,6 +177,14 @@ mod tests {
             parse_event_kind("review_approved"),
             Ok(AuditEventKind::ReviewApproved)
         ));
+        assert!(matches!(
+            parse_event_kind("playback_grant_issued"),
+            Ok(AuditEventKind::PlaybackGrantIssued)
+        ));
+        assert!(matches!(
+            parse_event_kind("playback_grant_refused"),
+            Ok(AuditEventKind::PlaybackGrantRefused)
+        ));
     }
 
     #[test]
@@ -208,6 +218,27 @@ mod tests {
         assert_eq!(event.asset_id, Some(AssetId(asset_id)));
         assert_eq!(event.event_kind, AuditEventKind::RecordingRecorded);
         assert_eq!(event.recording_session_id, Some(recording_session_id));
+        assert!(event.platform_ingest_session_id.is_none());
+    }
+
+    #[test]
+    fn row_to_event_round_trips_playback_kind() {
+        let asset_id = Uuid::new_v4();
+        let row = AuditEventRow {
+            id: Uuid::new_v4(),
+            asset_id: Some(asset_id),
+            event_kind: "playback_grant_refused".to_string(),
+            ingest_token: None,
+            detail: Some("reason=asset_not_ready".to_string()),
+            happened_at: OffsetDateTime::now_utc(),
+            recording_session_id: None,
+        };
+
+        let event = row_to_event(row).expect("event");
+        assert_eq!(event.asset_id, Some(AssetId(asset_id)));
+        assert_eq!(event.event_kind, AuditEventKind::PlaybackGrantRefused);
+        assert_eq!(event.detail.as_deref(), Some("reason=asset_not_ready"));
+        assert!(event.recording_session_id.is_none());
         assert!(event.platform_ingest_session_id.is_none());
     }
 }

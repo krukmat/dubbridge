@@ -605,6 +605,7 @@ dependencies = [
  "dubbridge-jobs",
  "dubbridge-media",
  "dubbridge-observability",
+ "dubbridge-playback",
  "dubbridge-storage",
  "serde",
  "serde_json",
@@ -771,6 +772,13 @@ dependencies = [
  "dubbridge-config",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "dubbridge-playback"
+version = "0.1.0"
+dependencies = [
+ "thiserror 2.0.18",
 ]
 
 [[package]]

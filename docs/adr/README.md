@@ -39,7 +39,7 @@ Run `make qa-docs` before reporting an ADR change complete.
 | [ADR-029](ADR-029-mobile-as-sole-authenticated-product-surface.md) | Mobile as the sole authenticated product surface | Accepted |
 | [ADR-030](ADR-030-review-decision-ledger-and-fail-closed-publication-gate.md) | Review-decision ledger and fail-closed publication gate | Accepted |
 | [ADR-031](ADR-031-mobile-jwt-credential-auth-fenix-parity.md) | Mobile credential login with backend-issued JWT (FenixCRM parity) | Accepted (supersedes ADR-023/024; amends ADR-029; slice S-200) |
-| [ADR-032](ADR-032-hls-playback-delivery-boundary.md) | HLS playback delivery boundary | Proposed |
+| [ADR-032](ADR-032-hls-playback-delivery-boundary.md) | HLS playback delivery boundary | Accepted |
 | [ADR-033](ADR-033-open-knowledge-format-adoption.md) | Adopt the Open Knowledge Format (OKF) for repository knowledge | Accepted |
 
 ## Backfill note

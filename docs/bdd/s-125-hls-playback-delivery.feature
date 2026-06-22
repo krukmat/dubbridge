@@ -27,16 +27,16 @@ Feature: HLS Playback Delivery
     Then grant issuance should be denied before any grant is created
     And the refusal should be observable
 
-  Scenario: Manifest is returned with backend-routed segment references only
+  Scenario: Manifest is returned with short-lived scoped segment references only
     Given a valid playback grant for prepared asset "video_04"
     When the client fetches the manifest using the grant
     Then a rewritten ".m3u8" should be returned
-    And every segment reference must be backend-routed or scoped
+    And every segment reference must be scoped and expiring
     And no raw object-store key must appear in the manifest
 
-  Scenario: Segment fetched with an expired grant is denied
+  Scenario: Segment fetched with an expired scoped reference is denied
     Given a client previously fetched the manifest for asset "video_05"
-    And the playback grant has since expired
-    When the client fetches a segment using that grant
+    And the scoped segment reference has since expired
+    When the client fetches a segment using that scoped reference
     Then the segment request should be denied fail-closed
     And the previously fetched manifest must not grant durable access

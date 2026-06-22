@@ -1,12 +1,12 @@
 ---
 type: ADR
 title: "ADR-032: HLS playback delivery boundary"
-status: Proposed
+status: Accepted
 ---
 
 # ADR-032: HLS playback delivery boundary
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-06-18
 - **Deciders:** DubBridge platform team
 - **Closes:** X25 / S-125 planning gap
@@ -64,8 +64,10 @@ storage layout. The playback boundary either rewrites manifests to routed segmen
 URLs or issues manifests whose segment references are already scoped, expiring,
 and authorized.
 
-Segment requests are authorized by the same playback grant. A valid manifest alone
-is not a durable permission to fetch media forever.
+Segment access must remain bounded by the same playback grant, but the boundary may
+enforce that either by re-checking the grant on every segment request or by issuing
+short-lived, scoped, expiring segment references when the manifest is generated. A
+valid manifest alone is not a durable permission to fetch media forever.
 
 ### Playback is readiness-gated and publication-gated
 

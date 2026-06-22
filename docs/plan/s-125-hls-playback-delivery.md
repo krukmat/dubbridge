@@ -1,17 +1,18 @@
 ---
 type: Plan
 title: "Plan: S-125 — HLS Playback Delivery"
-status: planned
+status: completed
 slice: S-125
 ---
 # Plan: S-125 — HLS Playback Delivery
 
-> **Status:** Planned 2026-06-21. Authored after the roadmap review that created the
-> `S-125` phase and ADR-032. No implementation has started; this plan and the linked
-> task ledger require explicit approval before any code task begins.
+> **Status:** Done 2026-06-22. Authored after the roadmap review that created the
+> `S-125` phase and ADR-032. Grant issuance (`T1` through `T4d`), manifest delivery
+> (`T5a`), short-lived segment references (`T5b`), and ADR/docs propagation (`T5c`)
+> are implemented and verified. ADR-032 is now `Accepted`.
 > **Roadmap phase:** `S-125` — HLS playback delivery (authorized `.m3u8` + segment serving).
 > **Tasks ledger:** `docs/tasks/s-125-hls-playback-delivery.md`.
-> **Governing ADR:** `docs/adr/ADR-032-hls-playback-delivery-boundary.md` (Proposed).
+> **Governing ADR:** `docs/adr/ADR-032-hls-playback-delivery-boundary.md` (Accepted).
 
 ## Purpose
 
@@ -37,10 +38,11 @@ Deliver a fail-closed HLS playback-delivery boundary that:
 
 - issues backend-owned, scoped, expiring **playback grants** for a prepared asset
   instead of exposing object-store keys;
-- serves `.m3u8` manifests rewritten so the client follows backend-routed segment
-  URLs (or pre-scoped/expiring segment references) without knowing storage layout;
-- authorizes every segment request against the same grant, so a manifest is not a
-  durable permission to fetch media forever;
+- serves `.m3u8` manifests rewritten so the client follows short-lived, scoped,
+  expiring segment references without knowing storage layout;
+- binds segment access to the same grant by minting short-lived segment references
+  at manifest-delivery time, so a manifest is not a durable permission to fetch
+  media forever;
 - gates playback on `S-120` prepared-media readiness and, for review playback, on
   the `S-100`/`S-160` authenticated workspace/reviewer rules;
 - reserves audience-facing playback for the `S-180` publication runtime and ADR-030's
@@ -55,8 +57,9 @@ Deliver a fail-closed HLS playback-delivery boundary that:
 - A **playback grant** contract: a backend-issued, scoped, expiring authorization to
   play one prepared asset's HLS package, persisted as the system of record.
 - A manifest-delivery path that returns a `.m3u8` whose segment references are
-  backend-routed (or pre-signed/expiring), never raw object-store keys.
-- A segment-delivery path authorized by the same grant (backend proxy or signed URL).
+  scoped/expiring, never raw object-store keys.
+- A short-lived segment-reference mechanism bound to the same grant (signed URL or
+  equivalent scoped reference), rather than a durable direct object-store path.
 - Readiness gating against the `S-120` `PreparationStatus` (`Ready` only) and the
   derived `HlsManifest`/`HlsSegment` lineage rows.
 - Review-time authorization integration with the `S-100`/`S-160` org/project/reviewer
@@ -106,8 +109,8 @@ Deliver a fail-closed HLS playback-delivery boundary that:
 | Persistence | `infra/migrations/0021_create_playback_grants.sql` (new) | playback-grant table: asset/grant id, scope, principal/org/project ref, expiry, status |
 | Persistence | `crates/db/src/playback_repo.rs` (new) | issue/lookup/expire grant rows; resolve grant → prepared HLS lineage |
 | Storage | `crates/storage/src/lib.rs` | canonical read access + scoped/signed reference helper for prepared HLS keys (no client key construction) |
-| Playback core | `crates/playback/src/lib.rs` (new) | pure manifest rewriter (storage keys → routed/scoped segment URLs) + grant-decision logic, IO-free |
-| API integration | `apps/api/src/playback_service.rs` (new) + routes | grant issuance, manifest fetch, segment fetch handlers behind verified principal |
+| Playback core | `crates/playback/src/lib.rs` (new) | pure manifest rewriter (storage keys → scoped/expiring segment references) + grant-decision logic, IO-free |
+| API integration | `apps/api/src/playback_service.rs` (new) + routes | grant issuance, manifest fetch, and short-lived segment-reference generation behind verified principal |
 | Authorization | reuse `S-100`/`S-160` org-membership guard | review-time authorization for grant issuance |
 | Observability | `crates/observability` / existing audit emission | durable grant audit rows + segment trace/metrics split |
 | Docs / contract | `docs/architecture.md`, ADR-032, roadmap, BDD | record the delivered playback contract and flip ADR-032 to Accepted |
@@ -118,15 +121,17 @@ Deliver a fail-closed HLS playback-delivery boundary that:
 
 A `.m3u8` is a transient view. Authorization, scope, and expiry live in a durable
 **playback grant** row (PostgreSQL, ADR-006). A manifest is rendered from a grant;
-holding a manifest never extends access. Every segment request re-validates the grant.
+holding a manifest never extends access forever because the segment references emitted
+into that manifest are themselves short-lived and scoped to that grant window.
 
 ### D2 — Manifest rewriting is a pure, IO-free transform
 
 `crates/playback` owns a pure function that takes the prepared `.m3u8` plus a grant
-context and returns a rewritten manifest whose segment references are backend-routed
-(or pre-scoped/expiring). It performs no storage IO and no network calls, mirroring the
+context and returns a rewritten manifest whose segment references are scoped/expiring.
+It performs no storage IO and no network calls, mirroring the
 `crates/media` pure-builder seam, so manifest rewriting is fully unit-testable. The
-executor layer in `apps/api` performs the storage reads and signing.
+executor layer in `apps/api` performs the storage reads and short-lived reference
+generation.
 
 ### D3 — Storage keys never leave `crates/storage`
 
@@ -153,15 +158,18 @@ The audience-facing path is intentionally a hook the `S-180` publication runtime
 ### D6 — Observability is split by volume and governance weight
 
 Grant create/refuse produces a durable audit row + correlated trace (ADR-018). Segment
-requests are high-volume delivery: they carry trace/correlation IDs and metrics but do
-not write one durable audit row per segment unless a later policy requires it (ADR-032).
+delivery is high-volume traffic: v1 records metrics/access evidence at the signed-
+reference or storage boundary and does not write one durable audit row per segment
+unless a later policy requires it (ADR-032).
 
 ### D7 — Delivery mechanism is pluggable behind one contract
 
 ADR-032 permits short-lived signed object-store URLs, backend proxying, or CDN-signed
-URLs. `S-125` fixes the **API contract** (grant → manifest → segment, all backend-
-authorized) and selects one v1 mechanism in the implementation task; the contract does
-not change if the mechanism is later swapped.
+URLs. `S-125` fixes the **API contract** (grant → manifest → short-lived segment
+reference) and selects one v1 mechanism in the implementation task; the contract does
+not change if the mechanism is later swapped. **Chosen v1 direction:** validate the
+grant strongly at manifest delivery, then emit short-lived scoped segment references
+instead of re-authorizing every segment request through the API.
 
 ## Task decomposition strategy
 
@@ -185,9 +193,13 @@ and authorization/observability can each be approved and verified independently:
    orchestrator/reviewer of record (see the ledger's "T3 split" note and
    `LOW_RRI_LOCAL_MODEL_HANDOFF.md`).
 6. `S-125-T4` — grant issuance API behind the verified principal + `S-100`/`S-160`
-   review authorization, with durable grant audit (`apps/api`, observability).
-7. `S-125-T5` — manifest + segment delivery handlers, readiness/expiry re-validation,
-   segment trace/metrics, and docs/architecture/ADR-032-Accepted sync.
+   review authorization, with durable grant audit (`apps/api`, observability). This
+   is now further split into `T4a-i`, `T4a-ii`, `T4b-i`, `T4b-ii`, `T4b-iii`, `T4c`,
+   and `T4d`.
+7. `S-125-T5a` — manifest delivery handler + rewritten-manifest integration tests.
+8. `S-125-T5b` — short-lived segment-reference generation, storage helper(s), and
+   delivery observability (no durable per-segment audit).
+9. `S-125-T5c` — ADR-032 `Accepted` propagation + architecture/roadmap/BDD sync.
 
 The original T3 was split because exactly one S-125 sub-part qualifies for local Gemma
 delegation: the pure manifest rewriter clears RRI ≤ 25 with legitimately low D/K/P,
@@ -211,9 +223,10 @@ its own RRI, Reflection strategy, and approval checkpoint in the task ledger.
 
 ## Open follow-ups
 
-- **F1 — v1 delivery mechanism (D7):** decide in `S-125-T3b`/`T5` whether v1 uses
-  short-lived signed object-store URLs or backend proxying; the API contract is fixed
-  regardless, but the choice affects storage adapter surface and CDN readiness.
+- **F1 — v1 delivery mechanism (D7):** narrowed on 2026-06-22 to the short-lived
+  scoped-reference path. `T5b` still needs to decide the concrete helper shape
+  (signed object-store URL vs equivalent storage-owned scoped reference), but not the
+  broader “proxy every segment vs sign at manifest time” direction anymore.
 - **F2 — grant lifetime + revocation:** decide the default grant TTL and whether an
   explicit revoke path is needed before `S-180`, or whether expiry alone suffices for
   review playback. Resolve in `S-125-T1`/`T2`.

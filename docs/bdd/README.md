@@ -78,8 +78,8 @@ Spec: `docs/bdd/s-125-hls-playback-delivery.feature`
 | S125_HP1 | Authorized reviewer obtains a playback grant for a ready asset | S-125-T4 | planned | — | HP |
 | S125_EC1 | Grant issuance is denied for an asset that is not ready | S-125-T2 | planned | — | EC |
 | S125_EC2 | Unauthorized caller cannot obtain a playback grant | S-125-T4 | planned | — | EC |
-| S125_HP2 | Manifest is returned with backend-routed segment references only | S-125-T3a | planned | — | HP |
-| S125_EC3 | Segment fetched with an expired grant is denied | S-125-T5 | planned | — | EC |
+| S125_HP2 | Manifest is returned with short-lived scoped segment references only | S-125-T5b | `apps/api/tests/playback_delivery_test.rs::valid_grant_returns_manifest_with_short_lived_segment_references` | — | HP |
+| S125_EC3 | Segment fetched with an expired scoped reference is denied | S-125-T5b | `apps/api/tests/playback_delivery_test.rs::expired_short_lived_segment_reference_is_denied_fail_closed` | — | EC |
 
 ## S-200 — Mobile credential login with backend-issued JWT (FenixCRM parity)
 Spec: `docs/bdd/s-200-mobile-auth.feature`

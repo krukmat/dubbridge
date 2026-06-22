@@ -7,6 +7,7 @@ pub mod consent_repo;
 pub mod error;
 pub mod notification_repo;
 pub mod pending_ingestion_repo;
+pub mod playback_repo;
 pub mod preparation_repo;
 pub mod review_repo;
 pub mod rights_repo;

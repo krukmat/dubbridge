@@ -45,6 +45,9 @@ pub enum AuditEventKind {
     ReviewRejected,
     PublicationSucceeded,
     PublicationRefused,
+    // S-125-T4b-i: playback-grant governance events (ADR-018, ADR-032).
+    PlaybackGrantIssued,
+    PlaybackGrantRefused,
     // S-200-T4c: auth governance events for API-issued credential login (ADR-018, ADR-031).
     AuthLoginSucceeded,
     AuthLoginFailed,
@@ -82,6 +85,8 @@ impl std::fmt::Display for AuditEventKind {
             Self::ReviewRejected => "review_rejected",
             Self::PublicationSucceeded => "publication_succeeded",
             Self::PublicationRefused => "publication_refused",
+            Self::PlaybackGrantIssued => "playback_grant_issued",
+            Self::PlaybackGrantRefused => "playback_grant_refused",
             Self::AuthLoginSucceeded => "auth_login_succeeded",
             Self::AuthLoginFailed => "auth_login_failed",
             Self::AuthRegistered => "auth_registered",
@@ -201,6 +206,24 @@ impl AuditEvent {
 
     /// Constructor for S-160 review/publication governance events.
     pub fn new_review_event(
+        asset_id: AssetId,
+        event_kind: AuditEventKind,
+        detail: Option<String>,
+    ) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            asset_id: Some(asset_id),
+            event_kind,
+            ingest_token: None,
+            recording_session_id: None,
+            platform_ingest_session_id: None,
+            detail,
+            happened_at: OffsetDateTime::now_utc(),
+        }
+    }
+
+    /// Constructor for S-125 playback-grant governance events.
+    pub fn new_playback_event(
         asset_id: AssetId,
         event_kind: AuditEventKind,
         detail: Option<String>,
@@ -429,6 +452,14 @@ mod tests {
             "publication_refused"
         );
         assert_eq!(
+            AuditEventKind::PlaybackGrantIssued.to_string(),
+            "playback_grant_issued"
+        );
+        assert_eq!(
+            AuditEventKind::PlaybackGrantRefused.to_string(),
+            "playback_grant_refused"
+        );
+        assert_eq!(
             AuditEventKind::AuthLoginSucceeded.to_string(),
             "auth_login_succeeded"
         );
@@ -489,5 +520,23 @@ mod tests {
         assert!(event.platform_ingest_session_id.is_none());
         assert_eq!(event.event_kind, AuditEventKind::AuthLoginFailed);
         assert_eq!(event.detail.as_deref(), Some("email=owner@example.com"));
+    }
+
+    #[test]
+    fn new_playback_event_sets_asset_id_and_no_correlation_ids() {
+        use crate::asset::AssetId;
+        let asset_id = AssetId::new();
+        let event = AuditEvent::new_playback_event(
+            asset_id,
+            AuditEventKind::PlaybackGrantIssued,
+            Some("grant_id=demo".to_string()),
+        );
+
+        assert_eq!(event.asset_id, Some(asset_id));
+        assert!(event.ingest_token.is_none());
+        assert!(event.recording_session_id.is_none());
+        assert!(event.platform_ingest_session_id.is_none());
+        assert_eq!(event.event_kind, AuditEventKind::PlaybackGrantIssued);
+        assert_eq!(event.detail.as_deref(), Some("grant_id=demo"));
     }
 }
