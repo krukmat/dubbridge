@@ -32,6 +32,7 @@ dubbridge-ingestion = { path = "../../crates/ingestion" }
 dubbridge-audit    = { path = "../../crates/audit" }
 
 [dev-dependencies]
+jsonwebtoken.workspace = true
 tower = { version = "0.5", features = ["util"] }
 dubbridge-media = { path = "../../crates/media" }
 

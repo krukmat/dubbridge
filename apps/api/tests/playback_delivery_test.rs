@@ -1,9 +1,10 @@
-use std::time::Duration;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::http::{Method, StatusCode, header};
-use dubbridge_auth::Hs256Issuer;
+use dubbridge_auth::Claims;
 use dubbridge_db::playback_repo;
 use dubbridge_domain::{asset::AssetId, playback::PlaybackGrantId, workspace::OrgRole};
+use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use uuid::Uuid;
 
 mod support;
@@ -287,7 +288,6 @@ async fn expired_short_lived_segment_reference_is_denied_fail_closed() {
     .await;
 
     let expired_token = expired_segment_token(fixture.asset.id, "segment_00000.ts");
-    tokio::time::sleep(Duration::from_secs(1)).await;
 
     let response = send_request(
         &ctx.app,
@@ -388,13 +388,23 @@ fn manifest_segment_urls(manifest: &str) -> Vec<String> {
 }
 
 fn expired_segment_token(asset_id: AssetId, filename: &str) -> String {
-    let issuer = Hs256Issuer::new("local-dev-jwt-secret-placeholder", Duration::from_secs(0))
-        .expect("issuer");
-    issuer
-        .generate_jwt(
-            asset_id.0,
-            asset_id.0,
-            &[format!("playback_segment:{filename}")],
-        )
-        .expect("token")
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("unix epoch")
+        .as_secs();
+    let claims = Claims {
+        sub: asset_id.0.to_string(),
+        workspace_id: asset_id.0.to_string(),
+        iat: now - 7200,
+        nbf: now - 7200,
+        exp: now - 3600,
+        scope: format!("playback_segment:{filename}"),
+    };
+
+    encode(
+        &Header::new(Algorithm::HS256),
+        &claims,
+        &EncodingKey::from_secret("local-dev-jwt-secret-placeholder".as_bytes()),
+    )
+    .expect("token")
 }
