@@ -51,8 +51,8 @@ tags:
 - tapOn:
     id: consent-open
 
-- pause:
-    milliseconds: 2000
+- waitForAnimationToEnd:
+    timeout: 5000
 
 - extendedWaitUntil:
     visible:
