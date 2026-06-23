@@ -1,6 +1,8 @@
-.PHONY: qa-fmt qa-lint qa-test qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-mobile qa-task-unit-coverage qa-docs qa-rri qa-ci install-hooks
+.PHONY: qa-fmt qa-lint qa-test qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-mobile qa-task-unit-coverage qa-docs qa-rri qa-ci qa-gemma-review install-hooks
 
 COVERAGE_MIN ?= 90
+GEMMA_REVIEW_BASE   ?= HEAD
+GEMMA_REVIEW_RESULT ?= /tmp/dubbridge-gemma-review.json
 COVERAGE_IGNORE_REGEX ?= (apps/(api|cli|worker-runner)/src/(main|cleanup)\.rs|apps/api/src/(dto/ingestion|lib|routes/ingestion|state)\.rs|crates/(db|jobs|observability)/src/lib\.rs|crates/db/src/(artifact_repo|asset_repo|audit_repo|pending_ingestion_repo|rights_repo)\.rs|crates/(audit|ingestion)/src/lib\.rs)
 CARGO ?= $(if $(shell command -v cargo 2>/dev/null),$(shell command -v cargo),$(HOME)/.cargo/bin/cargo)
 
@@ -61,6 +63,20 @@ qa-rri:
 	python3 scripts/check_roadmap_drift_test.py
 
 qa-ci: qa-local qa-docs qa-rri qa-deny qa-config-secrets qa-roadmap-drift qa-maintainability qa-mobile qa-coverage qa-build-release
+
+qa-gemma-review:
+	@if [ "$${DUBBRIDGE_SKIP_GEMMA_REVIEW:-0}" = "1" ]; then \
+		echo "[gemma-review] skipped (DUBBRIDGE_SKIP_GEMMA_REVIEW=1)"; exit 0; \
+	fi; \
+	code_changes=$$(git diff --name-only $(GEMMA_REVIEW_BASE) 2>/dev/null \
+		| grep -vE '^(docs/|[^/]+\.md$$)' || true); \
+	if [ -z "$$code_changes" ]; then \
+		echo "[gemma-review] no code changes vs $(GEMMA_REVIEW_BASE); skipped"; exit 0; \
+	fi; \
+	{ echo "# Gemma Reviewer packet (base: $(GEMMA_REVIEW_BASE))"; echo ""; \
+	  git diff $(GEMMA_REVIEW_BASE); } \
+	| python3 scripts/gemma-code-review.py --out "$(GEMMA_REVIEW_RESULT)" - \
+	&& echo "[gemma-review] result written to $(GEMMA_REVIEW_RESULT)"
 
 install-hooks:
 	cp scripts/hooks/pre-commit .git/hooks/pre-commit

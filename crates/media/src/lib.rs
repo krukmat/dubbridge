@@ -102,16 +102,21 @@ pub fn validate_hls_outputs(
 
     let mut manifest_segments = Vec::new();
     let mut saw_extinf = false;
+    let mut pending_extinf = false;
     for line in manifest_raw.lines().map(str::trim) {
         if line.is_empty() {
             continue;
         }
         if line.starts_with("#EXTINF:") {
             saw_extinf = true;
+            pending_extinf = true;
             continue;
         }
         if line.starts_with('#') {
             continue;
+        }
+        if !pending_extinf {
+            bail!("HLS manifest segment reference missing #EXTINF, got '{line}'");
         }
         if line.contains('/') || line.contains('\\') {
             bail!("HLS manifest segment reference must be a file name, got '{line}'");
@@ -120,6 +125,7 @@ pub fn validate_hls_outputs(
             bail!("HLS manifest segment reference must end with '.ts', got '{line}'");
         }
         manifest_segments.push(line.to_string());
+        pending_extinf = false;
     }
 
     if !saw_extinf {
@@ -298,6 +304,22 @@ segment_00001.ts
         )
         .expect("valid HLS outputs");
         assert_eq!(segments.len(), 2);
+    }
+
+    #[test]
+    fn validate_hls_outputs_rejects_orphan_segment_without_extinf() {
+        let manifest = r#"#EXTM3U
+#EXT-X-VERSION:3
+#EXTINF:6.0,
+segment_00000.ts
+segment_00001.ts
+#EXT-X-ENDLIST
+"#;
+
+        let err =
+            validate_hls_outputs(manifest, &["segment_00000.ts", "segment_00001.ts"]).unwrap_err();
+
+        assert!(err.to_string().contains("missing #EXTINF"));
     }
 
     #[test]

@@ -93,6 +93,20 @@ When approval is required (RRI > 25), end the presentation with:
 - Report outcomes faithfully: failing tests, skipped steps, and assumptions must be
   stated plainly.
 
+## Gemma Reviewer availability
+
+Gemma Reviewer is **required-when-available** for Low (0–25) and Moderate (26–40)
+development task code reviews. Its absence never opens a human approval gate that
+the RRI band would not otherwise require, and never blocks task completion.
+
+When Ollama or the configured model is unavailable, the agent records
+`BLOCKED` review evidence in the task completion record, performs the normal
+primary-agent Reflection review, and reports the skipped Gemma evidence explicitly.
+This is the complete reporting obligation — no additional gate is added.
+
+See `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer` for the full
+authority boundary and evidence format.
+
 ## Related
 
 - `CLAUDE.md`, `AGENTS.md`, `README_AGENT_ORDER.md`

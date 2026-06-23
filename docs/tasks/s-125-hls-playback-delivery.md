@@ -512,7 +512,7 @@ in `crates/domain/src/playback.rs`) — `assert_eq!` on denial variants is valid
 ## S-125-T3a: Pure manifest rewriter (local Gemma delegation)
 **Effort:** S (RRI 21 — Low)
 **Recommended model:** Local Gemma via Ollama (`DUBBRIDGE_LOW_RRI_MODEL`, default
-`gemma4:12b-it-q4_K_M`). The primary agent remains orchestrator/reviewer of record.
+`gemma4:26b-a4b-it-qat`). The primary agent remains orchestrator/reviewer of record.
 **Depends on:** S-125-T3b (crate scaffold must exist first — Gemma cannot create the
 crate/workspace wiring), S-125-T1 (grant-context type for the routed-base input).
 **Status:** Done (2026-06-21)

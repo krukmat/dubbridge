@@ -205,6 +205,28 @@ Before accepting the result, verify all of the following:
 - Retrying the same test packet after a timing or `act()` failure without turning
   it into a literal replacement contract.
 
+## Patch delegation vs. code review
+
+This playbook covers **Gemma Developer** — the patch-delegation path where Gemma
+returns file contents that the wrapper applies. It does not cover **Gemma
+Reviewer**, which is a separate read-only role.
+
+Key distinction:
+
+| Gemma Developer | Gemma Reviewer |
+|---|---|
+| Returns tagged file blocks with complete contents | Returns only tagged finding blocks — no file contents, no diffs |
+| Used for simple code patch delegation (Low band) | Used for post-implementation code review (Low and Moderate bands) |
+| `scripts/delegate-low-rri.py` | `scripts/gemma-code-review.py` |
+
+A single task may use both in sequence: Gemma Developer for the patch, then
+Gemma Reviewer for advisory code review in a fresh invocation. The primary agent
+must perform an independent review and may not delegate final acceptance to either
+Gemma role.
+
+See `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer` for the Gemma
+Reviewer authority boundary, trigger conditions, and completion evidence format.
+
 ## Relationship to repo policy
 
 - Workflow authority: `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`

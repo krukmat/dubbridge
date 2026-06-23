@@ -244,7 +244,7 @@ Do not collapse these into one undocumented guess.
 
 The **RRI 0–25 Low band** is the exception to vendor model resolution: it uses
 local Gemma delegation through Ollama. Resolve the local model from
-`DUBBRIDGE_LOW_RRI_MODEL`, defaulting to `gemma4:12b-it-q4_K_M`, and the
+`DUBBRIDGE_LOW_RRI_MODEL`, defaulting to `gemma4:26b-a4b-it-qat`, and the
 Ollama endpoint from `OLLAMA_HOST`, defaulting to `http://localhost:11434`.
 
 When preparing a task for presentation or local delegation, the agent must compute
@@ -574,6 +574,12 @@ personally review the solution against the requirements, run verification, and
 perform at most one bounded repair cycle before escalating. Gemma must not
 evaluate or approve its own delegated work.
 
+For harder but still Low-RRI attempts, the wrapper supports explicit generation
+knobs such as `--temperature` / `DUBBRIDGE_LOW_RRI_TEMPERATURE` and `--think` /
+`--no-think` / `DUBBRIDGE_LOW_RRI_THINK`. Keep thinking mode off by default; use
+it only for a bounded experiment because it can consume the token budget before
+the tagged response is completed.
+
 ## Language
 
 - User-facing communication: Spanish.
@@ -588,8 +594,68 @@ Agent communication must follow a **Socratic doubt model**:
 - **No hallucination.** Do not infer positions from tone or phrasing. Do not attribute intent, agreement, or correctness to a message that does not state them. If a message is ambiguous, ask — do not deduce.
 - **Challenge your own output.** Before reporting a result, ask whether it could be wrong and whether the source you used is current. The RRI self-scoring error in T1 (estimated ~16/28 by hand; script returned 27) is the canonical example of why this matters.
 
+## Gemma Reviewer
+
+**Gemma Reviewer** is a read-only local model role that runs after implementation
+and before the primary agent's final Reflection cycle for Low (0–25) and Moderate
+(26–40) RRI development tasks. It is distinct from **Gemma Developer**, which is
+the patch-delegation path for eligible simple code patches.
+
+### Authority boundary
+
+- Gemma Reviewer may report findings (correctness, fail-closed, side-effect, and
+  missing-test issues). It may not write files, apply patches, approve tasks,
+  certify coverage, or mark tasks complete.
+- A finding — including a `BLOCKING` one — never fails the review gate by itself.
+  Gemma Reviewer is advisory evidence; the primary agent owns the final judgment.
+- Gemma-authored Low-RRI patches require an independent primary-agent review even
+  when Gemma Reviewer also runs.
+
+### When it runs
+
+For development tasks with RRI 0–40, after implementation is complete:
+
+1. Implementation completes (primary agent or eligible Gemma Developer).
+2. Gemma Reviewer runs (advisory findings via `scripts/gemma-code-review.py`).
+3. The primary agent runs its Reflection cycle, treating Gemma Reviewer findings
+   as one input and recording the disposition in `### Reflection log`.
+
+Gemma Reviewer does not add a separate sign-off step; it feeds the existing
+Reflection cycle.
+
+### Availability
+
+Gemma Reviewer is **required-when-available**. Absence of a local Ollama/model
+never blocks closing a Low/Moderate task. When unavailable, the agent records
+`BLOCKED` review evidence, runs the normal primary-agent Reflection cycle, and
+reports the skipped Gemma evidence in the task completion record.
+
+### Scope
+
+Does not apply to docs-only, config-only, migration-only, ADR, plan,
+task-ledger, or policy-only work.
+
+### Completion evidence block
+
+Task completion records for Low/Moderate development tasks must include:
+
+```md
+### Gemma Reviewer evidence
+
+- Model: `<resolved DUBBRIDGE_REVIEW_MODEL, else DUBBRIDGE_LOW_RRI_MODEL>`
+- Command: `<exact command>`
+- Status: `PASS|FINDINGS|BLOCKED`
+- Primary-agent disposition: `<accepted findings / rejected false positives / repaired>`
+- Result artifact: `<path to local result JSON or markdown, if persisted>`
+```
+
+Run the reviewer with `make qa-gemma-review` (local only; not required in
+GitHub-hosted CI until an Ollama-capable runner is available).
+
 ## Related
 
 - `CLAUDE.md`, `AGENTS.md`, `README_AGENT_ORDER.md`
 - `docs/policies/HITL_AUTONOMY_POLICY.md`
 - `docs/policies/RRI_POLICY.md` — RRI formula, anchor rubric, bands, and gates
+- `docs/playbooks/LOW_RRI_LOCAL_MODEL_HANDOFF.md` — patch delegation vs. review delegation
+- `docs/gemma-local-improve.md` — active local Gemma contract summary

@@ -1,15 +1,58 @@
-# Local Ollama Delegation Rules
+# Local Ollama Rules
 
-This document summarizes the **active** Low-RRI local delegation contract used in
-DubBridge. It is guidance, not the governing authority.
+This document summarizes the **active** local Gemma contracts used in DubBridge.
+It is guidance, not the governing authority.
 
 Authoritative sources:
 
 - `docs/policies/RRI_POLICY.md`
-- `docs/playbooks/LOW_RRI_LOCAL_MODEL_HANDOFF.md`
-- `scripts/delegate-low-rri.py`
+- `docs/playbooks/LOW_RRI_LOCAL_MODEL_HANDOFF.md` — Gemma Developer (patch delegation)
+- `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer` — Gemma Reviewer (code review)
+- `scripts/delegate-low-rri.py` — patch delegation wrapper
+- `scripts/gemma-code-review.py` — review-only wrapper
 
-## Core rule
+## Gemma Developer vs. Gemma Reviewer
+
+| | Gemma Developer | Gemma Reviewer |
+|---|---|---|
+| **Purpose** | Implement a simple code patch | Review code for correctness and safety |
+| **Trigger** | Low RRI (0–25) eligible simple code patches | Low/Moderate RRI (0–40) development task completion |
+| **Returns** | Tagged file blocks with complete contents | Tagged finding blocks only |
+| **Can write files?** | Yes (via wrapper + git apply) | No |
+| **Can approve?** | No | No |
+| **Script** | `scripts/delegate-low-rri.py` | `scripts/gemma-code-review.py` |
+| **Make target** | n/a (invoked by agent directly) | `make qa-gemma-review` |
+
+## Gemma Reviewer response contract
+
+For the active review-only protocol, the model must return tagged finding blocks:
+
+```text
+STATUS: PASS
+SUMMARY: short summary
+=== FINDING START ===
+PATH: repo/relative/path
+LINE: integer line number
+SEVERITY: blocking|major|minor|nit
+DETAIL: concise issue description
+SUGGESTION: concise remediation
+=== FINDING END ===
+```
+
+Use exactly one status value: `PASS` (no findings), `FINDINGS` (one or more
+finding blocks), or `BLOCKED` (packet not reviewable). The model must never
+return file contents, JSON, or a unified diff in review mode.
+
+Exit codes for `scripts/gemma-code-review.py`:
+
+- Exit `0`: review ran; result artifact written (`PASS` or `FINDINGS`).
+- Exit non-zero: operational failure only (Ollama unavailable, invalid response,
+  or `STATUS: BLOCKED`).
+
+A `BLOCKING` finding does not fail the gate by itself. The primary agent reads
+the artifact and decides disposition.
+
+## Gemma Developer response contract (patch delegation)
 
 The local model never writes files and never authors a unified diff.
 

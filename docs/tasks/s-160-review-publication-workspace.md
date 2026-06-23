@@ -1600,7 +1600,7 @@ Required passes: 3 (`52` → `Med-high`)
 - **Type:** Development (TS/RN) · **Effort:** S
 - **RRI:** 22 → band **Low (0–25)** → local Gemma delegation through Ollama; thinking Off
 - **Recommended model:** Codex orchestrator + resolved local Gemma model
-  (`DUBBRIDGE_LOW_RRI_MODEL`, default `gemma4:12b-it-q4_K_M`)
+  (`DUBBRIDGE_LOW_RRI_MODEL`, default `gemma4:26b-a4b-it-qat`)
 - **Depends on:** S-160-T6, S-115-T1, S-115-T2, S-115-T5
 - **Objective:** Bring the reviewer inbox/detail introduced by `S-160-T6` into full
   compliance with the inherited `S-115` mobile design-system contract before E2E

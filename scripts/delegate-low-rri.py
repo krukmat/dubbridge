@@ -21,22 +21,25 @@ import argparse
 import fnmatch
 import json
 import os
-import socket
 import subprocess
 import sys
 import tempfile
-import time
-import urllib.error
-import urllib.request
+from urllib.error import URLError
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gemma_local
 
 
-DEFAULT_HOST = "http://localhost:11434"
-DEFAULT_MODEL = "gemma4:12b-it-q4_K_M"
-DEFAULT_IDLE_TIMEOUT_SECONDS = 60
-DEFAULT_MAX_WALL_SECONDS = 900
-# Context window large enough to hold any realistic delegation packet + contract.
-DEFAULT_NUM_CTX = 16384
-DEFAULT_NUM_PREDICT = 4096
+DEFAULT_HOST = gemma_local.DEFAULT_HOST
+DEFAULT_MODEL = gemma_local.DEFAULT_MODEL
+DEFAULT_IDLE_TIMEOUT_SECONDS = gemma_local.DEFAULT_IDLE_TIMEOUT_SECONDS
+DEFAULT_MAX_WALL_SECONDS = gemma_local.DEFAULT_MAX_WALL_SECONDS
+DEFAULT_NUM_CTX = gemma_local.DEFAULT_NUM_CTX
+DEFAULT_NUM_PREDICT = gemma_local.DEFAULT_NUM_PREDICT
+DEFAULT_TEMPERATURE = gemma_local.DEFAULT_TEMPERATURE
+DEFAULT_THINK = gemma_local.DEFAULT_THINK
+DelegationIdleTimeout = gemma_local.GemmaIdleTimeout
+DelegationWallTimeout = gemma_local.GemmaWallTimeout
 
 STATUS_VALUES = {"PATCH": "patch", "NO_PATCH": "no_patch", "BLOCKED": "blocked"}
 ACTION_VALUES = {"create", "modify", "delete"}
@@ -46,19 +49,6 @@ CONTENT_MARKER = "--- CONTENT ---"
 REPLACEMENT_START_MARKER = "=== REPLACEMENT START ==="
 REPLACEMENT_END_MARKER = "=== REPLACEMENT END ==="
 AFTER_MARKER = "--- AFTER ---"
-
-
-class DelegationIdleTimeout(RuntimeError):
-    def __init__(self, idle):
-        super().__init__(f"Gemma idle timeout after {idle}s without a token")
-        self.exit_code = 124
-
-
-class DelegationWallTimeout(RuntimeError):
-    def __init__(self, wall):
-        super().__init__(f"Gemma wall timeout after {wall}s total")
-        self.exit_code = 124
-
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -136,6 +126,33 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--temperature",
+        type=float,
+        default=float(
+            os.environ.get("DUBBRIDGE_LOW_RRI_TEMPERATURE", str(DEFAULT_TEMPERATURE))
+        ),
+        help=(
+            "Sampling temperature for Ollama; default "
+            f"{DEFAULT_TEMPERATURE}. Raise slightly for harder local delegation "
+            "tasks when the tagged contract remains stable."
+        ),
+    )
+    parser.add_argument(
+        "--think",
+        action="store_true",
+        default=gemma_local.bool_from_env("DUBBRIDGE_LOW_RRI_THINK", DEFAULT_THINK),
+        help=(
+            "Enable Ollama thinking mode for models that support it. Defaults to "
+            "off unless DUBBRIDGE_LOW_RRI_THINK is truthy."
+        ),
+    )
+    parser.add_argument(
+        "--no-think",
+        action="store_false",
+        dest="think",
+        help="Disable thinking mode for this invocation, overriding the environment.",
+    )
+    parser.add_argument(
         "--out",
         default=None,
         metavar="FILE",
@@ -209,116 +226,87 @@ def parse_args():
 
 
 def read_packet(path):
-    if not path or path == "-":
-        return sys.stdin.read()
-    with open(path, encoding="utf-8") as handle:
-        return handle.read()
+    return gemma_local.read_packet(path)
 
 
 def endpoint(host, path):
-    return f"{host.rstrip('/')}{path}"
+    return gemma_local.endpoint(host, path)
 
 
 def get_json(url, timeout):
-    request = urllib.request.Request(url, method="GET")
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except (TimeoutError, socket.timeout) as exc:
+        return gemma_local.get_json(url, timeout)
+    except gemma_local.GemmaIdleTimeout as exc:
         raise DelegationIdleTimeout(timeout) from exc
 
 
 def ensure_model_available(host, model, timeout):
-    tags = get_json(endpoint(host, "/api/tags"), timeout)
-    installed = {item.get("name") for item in tags.get("models", [])}
-    if model not in installed:
-        available = ", ".join(sorted(name for name in installed if name)) or "<none>"
-        raise RuntimeError(
-            f"local Ollama model {model!r} is not installed; available: {available}",
-        )
+    return gemma_local.ensure_model_available(host, model, timeout)
 
 
-def build_replacement_payload(model, packet, num_ctx, num_predict):
-    return {
-        "model": model,
-        "stream": True,
-        "think": False,
-        "keep_alive": "10m",
-        "options": {
-            "temperature": 0.1,
-            "num_predict": num_predict,
-            "num_ctx": num_ctx,
-        },
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "You are a sandboxed local delegation model for DubBridge "
-                    "Low-RRI tasks.\n"
-                    "Return ONLY tagged text in this exact shape:\n"
-                    "STATUS: PATCH|NO_PATCH|BLOCKED\n"
-                    "SUMMARY: short summary\n"
-                    "TEST: optional verification command\n"
-                    "RISK: optional risk note\n"
-                    "=== REPLACEMENT START ===\n"
-                    "PATH: relative/path.ext\n"
-                    "--- AFTER ---\n"
-                    "<replacement block only — not the full file>\n"
-                    "=== REPLACEMENT END ===\n"
-                    "Rules: no JSON, no markdown fences, no unified diff, no "
-                    "explanations, no extra text outside these sections. "
-                    "Emit only the lines that replace the BEFORE block. "
-                    "For a deletion, emit nothing between --- AFTER --- and "
-                    "=== REPLACEMENT END ===."
-                ),
-            },
-            {
-                "role": "user",
-                "content": packet,
-            },
-        ],
-    }
+def build_replacement_payload(model, packet, num_ctx, num_predict, temperature, think):
+    system_prompt = (
+        "You are a sandboxed local delegation model for DubBridge "
+        "Low-RRI tasks.\n"
+        "Return ONLY tagged text in this exact shape:\n"
+        "STATUS: PATCH\n"
+        "SUMMARY: short summary\n"
+        "TEST: optional verification command\n"
+        "RISK: optional risk note\n"
+        "=== REPLACEMENT START ===\n"
+        "PATH: relative/path.ext\n"
+        "--- AFTER ---\n"
+        "<replacement block only — not the full file>\n"
+        "=== REPLACEMENT END ===\n"
+        "Rules: use exactly one STATUS value: PATCH, NO_PATCH, or "
+        "BLOCKED. Do not output the pipe-separated list. "
+        "no JSON, no markdown fences, no unified diff, no "
+        "explanations, no extra text outside these sections. "
+        "Emit only the lines that replace the BEFORE block. "
+        "For a deletion, emit nothing between --- AFTER --- and "
+        "=== REPLACEMENT END ===."
+    )
+    return gemma_local.build_chat_payload(
+        model=model,
+        system_prompt=system_prompt,
+        packet=packet,
+        num_ctx=num_ctx,
+        num_predict=num_predict,
+        temperature=temperature,
+        think=think,
+    )
 
 
-def build_payload(model, packet, num_ctx, num_predict):
-    return {
-        "model": model,
-        "stream": True,
-        "think": False,
-        "keep_alive": "10m",
-        "options": {
-            "temperature": 0.1,
-            "num_predict": num_predict,
-            "num_ctx": num_ctx,
-        },
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "You are a sandboxed local delegation model for DubBridge "
-                    "Low-RRI tasks.\n"
-                    "Return ONLY tagged text in this exact shape:\n"
-                    "STATUS: PATCH|NO_PATCH|BLOCKED\n"
-                    "SUMMARY: short summary\n"
-                    "TEST: optional verification command\n"
-                    "RISK: optional risk note\n"
-                    "=== FILE START ===\n"
-                    "PATH: relative/path.ext\n"
-                    "ACTION: create|modify|delete\n"
-                    "--- CONTENT ---\n"
-                    "<COMPLETE final file contents>\n"
-                    "=== FILE END ===\n"
-                    "Rules: no JSON, no markdown fences, no unified diff, no "
-                    "explanations, no extra text outside these sections. For "
-                    "ACTION delete, emit empty content."
-                ),
-            },
-            {
-                "role": "user",
-                "content": packet,
-            },
-        ],
-    }
+def build_payload(model, packet, num_ctx, num_predict, temperature, think):
+    system_prompt = (
+        "You are a sandboxed local delegation model for DubBridge "
+        "Low-RRI tasks.\n"
+        "Return ONLY tagged text in this exact shape:\n"
+        "STATUS: PATCH\n"
+        "SUMMARY: short summary\n"
+        "TEST: optional verification command\n"
+        "RISK: optional risk note\n"
+        "=== FILE START ===\n"
+        "PATH: relative/path.ext\n"
+        "ACTION: create|modify|delete\n"
+        "--- CONTENT ---\n"
+        "<COMPLETE final file contents>\n"
+        "=== FILE END ===\n"
+        "Rules: use exactly one STATUS value: PATCH, NO_PATCH, or "
+        "BLOCKED. Do not output the pipe-separated list. "
+        "no JSON, no markdown fences, no unified diff, no "
+        "explanations, no extra text outside these sections. For "
+        "ACTION delete, emit empty content."
+    )
+    return gemma_local.build_chat_payload(
+        model=model,
+        system_prompt=system_prompt,
+        packet=packet,
+        num_ctx=num_ctx,
+        num_predict=num_predict,
+        temperature=temperature,
+        think=think,
+    )
 
 
 def validate_delegation_payload(payload):
@@ -352,77 +340,22 @@ def validate_delegation_payload(payload):
 
 
 def stream_chat(url, payload, idle_timeout, max_wall):
-    """POST to /api/chat with stream:true, return the assembled content string.
-
-    Reads NDJSON lines from the response.  Each received line resets the idle
-    timer.  Raises DelegationIdleTimeout if no data arrives within `idle_timeout`
-    seconds; raises DelegationWallTimeout if the total elapsed time exceeds
-    `max_wall` seconds.
-    """
-    data = json.dumps(payload).encode("utf-8")
-    request = urllib.request.Request(
-        url,
-        data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    wall_start = time.monotonic()
-    content_parts = []
-    tokens_received = 0
-
     try:
-        with urllib.request.urlopen(request, timeout=idle_timeout) as response:
-            while True:
-                elapsed = time.monotonic() - wall_start
-                if elapsed > max_wall:
-                    raise DelegationWallTimeout(max_wall)
-
-                # Read one NDJSON line.  urlopen's timeout applies per read
-                # attempt, acting as our idle-timeout: if Gemma stalls and
-                # sends nothing for `idle_timeout` seconds, socket.timeout fires.
-                try:
-                    line = response.readline()
-                except (TimeoutError, socket.timeout) as exc:
-                    raise DelegationIdleTimeout(idle_timeout) from exc
-
-                if not line:
-                    break
-
-                try:
-                    chunk = json.loads(line.decode("utf-8"))
-                except json.JSONDecodeError:
-                    continue
-
-                msg = chunk.get("message", {})
-                fragment = msg.get("content", "")
-                if fragment:
-                    content_parts.append(fragment)
-                    tokens_received += 1
-                    print(
-                        f"[delegate] tokens: {tokens_received} "
-                        f"elapsed: {time.monotonic() - wall_start:.0f}s",
-                        file=sys.stderr,
-                    )
-
-                if chunk.get("done"):
-                    if chunk.get("done_reason") == "length":
-                        raise RuntimeError(
-                            "response cut by token limit; output may be truncated"
-                        )
-                    break
-
-    except (TimeoutError, socket.timeout) as exc:
+        return gemma_local.stream_chat(
+            url,
+            payload,
+            idle_timeout=idle_timeout,
+            max_wall=max_wall,
+            progress_label="delegate",
+        )
+    except gemma_local.GemmaIdleTimeout as exc:
         raise DelegationIdleTimeout(idle_timeout) from exc
-
-    return "".join(content_parts)
+    except gemma_local.GemmaWallTimeout as exc:
+        raise DelegationWallTimeout(max_wall) from exc
 
 
 def parse_stream_content(content):
-    if not isinstance(content, str):
-        raise RuntimeError("stream produced no content string")
-    content = content.replace("\r\n", "\n").replace("\r", "\n").strip()
-    if not content:
-        raise RuntimeError("invalid tagged response: empty content")
+    content = gemma_local.normalize_tagged_content(content, "tagged")
     payload = parse_tagged_response(content)
     validate_delegation_payload(payload)
     return payload
@@ -435,11 +368,7 @@ def parse_replacement_response(content):
     path, after_block (str or None).
     Raises RuntimeError for any malformed, truncated, or out-of-contract response.
     """
-    if not isinstance(content, str):
-        raise RuntimeError("replacement stream produced no content string")
-    content = content.replace("\r\n", "\n").replace("\r", "\n").strip()
-    if not content:
-        raise RuntimeError("invalid replacement response: empty content")
+    content = gemma_local.normalize_tagged_content(content, "replacement")
 
     lines = content.split("\n")
     status = None
@@ -689,30 +618,20 @@ def parse_file_block(lines, start_idx):
 
 
 def _next_nonempty_line(lines, idx, label):
-    while idx < len(lines) and not lines[idx].strip():
-        idx += 1
-    if idx >= len(lines):
-        raise RuntimeError(f"invalid tagged response: missing {label} line")
-    return lines[idx], idx + 1
+    return gemma_local.next_nonempty_line(
+        lines,
+        idx,
+        label,
+        "invalid tagged response",
+    )
 
 
 def _parse_header_value(line, label):
-    prefix = f"{label}: "
-    if not line.startswith(prefix):
-        raise RuntimeError(f"invalid tagged response: expected {prefix!r}")
-    value = line[len(prefix):].strip()
-    if not value:
-        raise RuntimeError(f"invalid tagged response: empty {label} value")
-    return value
+    return gemma_local.parse_header_value(line, label, "invalid tagged response")
 
 
 def write_result(delegation, out_path):
-    """Write JSON atomically: write to a temp file then rename."""
-    tmp = out_path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(delegation, f, indent=2, sort_keys=True)
-        f.write("\n")
-    os.replace(tmp, out_path)
+    return gemma_local.write_result(delegation, out_path)
 
 
 # --- Caller-side patch construction (the work the small model can't do) ---------
@@ -854,15 +773,6 @@ def apply_diff(diff_text, repo_root):
     return "applied"
 
 
-def is_line_subset(after_text, before_text):
-    """Return True if every non-empty line in after_text exists in before_text."""
-    before_lines = set(before_text.splitlines())
-    for line in after_text.splitlines():
-        if line and line not in before_lines:
-            return False
-    return True
-
-
 def apply_before_after(target_path, before_file, after_block, allow_paths, repo_root, do_apply):
     """Perform a literal find-and-replace on target_path using before_file and after_block.
 
@@ -902,16 +812,6 @@ def apply_before_after(target_path, before_file, after_block, allow_paths, repo_
 
     after_stripped = _strip_trailing(after_block)
 
-    # Deletion guard: if AFTER is a strict subset of BEFORE, enforce line-subset rule.
-    after_lines = [l for l in after_stripped.splitlines() if l.strip()]
-    before_lines = [l for l in before_stripped.splitlines() if l.strip()]
-    is_deletion = len(after_lines) < len(before_lines)
-    if is_deletion and not is_line_subset(after_stripped, before_stripped):
-        raise RuntimeError(
-            "before-after deletion mode: AFTER block contains lines not present "
-            "in BEFORE; only line removal is allowed in deletion mode"
-        )
-
     final_contents = original_stripped.replace(before_stripped, after_stripped, 1)
     # Preserve trailing newline if the original had one.
     if original.endswith("\n") and not final_contents.endswith("\n"):
@@ -950,10 +850,22 @@ def main():
 
     if args.mode == "before-after":
         payload = build_replacement_payload(
-            args.model, packet, args.num_ctx, args.num_predict
+            args.model,
+            packet,
+            args.num_ctx,
+            args.num_predict,
+            args.temperature,
+            args.think,
         )
     else:
-        payload = build_payload(args.model, packet, args.num_ctx, args.num_predict)
+        payload = build_payload(
+            args.model,
+            packet,
+            args.num_ctx,
+            args.num_predict,
+            args.temperature,
+            args.think,
+        )
 
     if args.dry_run:
         print(json.dumps(payload, indent=2, sort_keys=True))
@@ -1012,7 +924,7 @@ if __name__ == "__main__":
     except (DelegationIdleTimeout, DelegationWallTimeout) as exc:
         print(str(exc), file=sys.stderr)
         raise SystemExit(124)
-    except urllib.error.URLError as exc:
+    except URLError as exc:
         print(f"Gemma/Ollama request failed: {exc}", file=sys.stderr)
         raise SystemExit(2)
     except RuntimeError as exc:

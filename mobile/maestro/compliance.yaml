@@ -51,6 +51,9 @@ tags:
 - tapOn:
     id: consent-open
 
+- pause:
+    milliseconds: 2000
+
 - extendedWaitUntil:
     visible:
       id: consent-screen

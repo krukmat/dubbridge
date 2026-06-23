@@ -207,7 +207,7 @@ The Low band is special: vendor model resolution does not apply. Low-band tasks
 are either handled directly by the primary agent or, for eligible simple code
 patches only, delegated to the local Ollama/Gemma path. When delegation is used,
 use `OLLAMA_HOST` when set, otherwise `http://localhost:11434`. Use
-`DUBBRIDGE_LOW_RRI_MODEL` when set, otherwise `gemma4:12b-it-q4_K_M`.
+`DUBBRIDGE_LOW_RRI_MODEL` when set, otherwise `gemma4:26b-a4b-it-qat`.
 
 Thinking mode: activate for Balanced→Premium and above when the task requires
 multi-step reasoning that cannot be validated incrementally. Do **not** activate
@@ -274,16 +274,19 @@ The wrapper resolves:
 | Env var | Default | Purpose |
 |---|---|---|
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint |
-| `DUBBRIDGE_LOW_RRI_MODEL` | `gemma4:12b-it-q4_K_M` | Local model |
+| `DUBBRIDGE_LOW_RRI_MODEL` | `gemma4:26b-a4b-it-qat` | Local model |
 | `DUBBRIDGE_LOW_RRI_IDLE_TIMEOUT_SECONDS` | `60` | Seconds without a token = stall |
 | `DUBBRIDGE_LOW_RRI_MAX_WALL_SECONDS` | `900` | Hard generation cap |
 | `DUBBRIDGE_LOW_RRI_NUM_CTX` | `16384` | Context window for packet + tagged contract |
+| `DUBBRIDGE_LOW_RRI_NUM_PREDICT` | `4096` | Maximum generated tokens |
+| `DUBBRIDGE_LOW_RRI_TEMPERATURE` | `0.1` | Sampling temperature; raise slightly for harder bounded attempts |
+| `DUBBRIDGE_LOW_RRI_THINK` | `0` | Ollama thinking mode flag; keep off by default for Low-RRI wrapper reliability |
 
 Gemma's response content must be tagged text with full file contents (never a
 diff and never JSON):
 
 ```text
-STATUS: PATCH|NO_PATCH|BLOCKED
+STATUS: PATCH
 SUMMARY: <short implementation summary>
 TEST: <optional verification command>
 RISK: <optional risk note>
@@ -294,6 +297,9 @@ ACTION: create|modify|delete
 <COMPLETE final file contents>
 === FILE END ===
 ```
+
+Use exactly one status value: `PATCH`, `NO_PATCH`, or `BLOCKED`. Do not output the
+pipe-separated list.
 
 The script then enforces the allowed-path scope, builds the unified diff with git,
 and (with `--apply`) runs `git apply --check` followed by `git apply`, recording
@@ -449,6 +455,21 @@ project's own critical paths should eventually graduate to a dedicated profile l
 Run the script, then paste its markdown output directly into the task presentation
 block. Do not reformat or recompute. The script output **is** the RRI report.
 
+## Gemma Developer vs. Gemma Reviewer
+
+The **Low band (0–25)** distinguishes two separate local model roles:
+
+| Role | When | Can write files? | Can approve? |
+|---|---|---|---|
+| **Gemma Developer** | Simple code patch delegation | Yes (tagged-block contract) | No |
+| **Gemma Reviewer** | Post-implementation code review for RRI 0–40 development tasks | No | No |
+
+A task may use Gemma Developer for its implementation and Gemma Reviewer for its
+code review in separate invocations. Gemma Reviewer must not be used as a
+substitute for the primary agent's final Reflection cycle; it is advisory input
+to that cycle. See `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer` for
+the full trigger, authority boundary, and completion evidence contract.
+
 ## Related
 
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` — highest authority; adopts this policy
@@ -456,3 +477,4 @@ block. Do not reformat or recompute. The script output **is** the RRI report.
 - `docs/tasks/rri-integration.md` — integration task ledger
 - `scripts/rri.py` — canonical calculator
 - `scripts/rri_test.py` — unit tests (run via `make qa-rri`)
+- `scripts/gemma-code-review.py` — Gemma Reviewer wrapper

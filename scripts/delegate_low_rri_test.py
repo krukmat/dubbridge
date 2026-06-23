@@ -254,36 +254,93 @@ class ParseStreamContent(unittest.TestCase):
 # build_payload
 # ---------------------------------------------------------------------------
 class BuildPayload(unittest.TestCase):
+    def _build_payload(self, model="model", packet="text", num_ctx=16384):
+        return _mod.build_payload(
+            model,
+            packet,
+            num_ctx,
+            _mod.DEFAULT_NUM_PREDICT,
+            _mod.DEFAULT_TEMPERATURE,
+            _mod.DEFAULT_THINK,
+        )
+
+    def _build_replacement_payload(self, model="model", packet="text", num_ctx=16384):
+        return _mod.build_replacement_payload(
+            model,
+            packet,
+            num_ctx,
+            _mod.DEFAULT_NUM_PREDICT,
+            _mod.DEFAULT_TEMPERATURE,
+            _mod.DEFAULT_THINK,
+        )
+
     def test_stream_true(self):
-        p = _mod.build_payload("gemma4:12b-it-q4_K_M", "packet text", 16384)
+        p = self._build_payload("gemma4:26b-a4b-it-qat", "packet text")
         self.assertTrue(p["stream"])
 
     def test_think_false(self):
-        p = _mod.build_payload("gemma4:12b-it-q4_K_M", "packet text", 16384)
+        p = self._build_payload("gemma4:26b-a4b-it-qat", "packet text")
         self.assertFalse(p["think"])
 
+    def test_custom_think_true(self):
+        p = _mod.build_payload(
+            "model",
+            "text",
+            16384,
+            _mod.DEFAULT_NUM_PREDICT,
+            _mod.DEFAULT_TEMPERATURE,
+            True,
+        )
+        self.assertTrue(p["think"])
+
+    def test_temperature_default(self):
+        p = self._build_payload()
+        self.assertEqual(p["options"]["temperature"], _mod.DEFAULT_TEMPERATURE)
+
+    def test_custom_temperature(self):
+        p = _mod.build_payload(
+            "model",
+            "text",
+            16384,
+            _mod.DEFAULT_NUM_PREDICT,
+            0.25,
+            _mod.DEFAULT_THINK,
+        )
+        self.assertEqual(p["options"]["temperature"], 0.25)
+
     def test_num_ctx_set(self):
-        p = _mod.build_payload("gemma4:12b-it-q4_K_M", "packet text", 16384)
+        p = self._build_payload("gemma4:26b-a4b-it-qat", "packet text")
         self.assertEqual(p["options"]["num_ctx"], 16384)
 
     def test_custom_num_ctx(self):
-        p = _mod.build_payload("model", "text", 8192)
+        p = self._build_payload(num_ctx=8192)
         self.assertEqual(p["options"]["num_ctx"], 8192)
 
     def test_no_json_schema_format(self):
-        p = _mod.build_payload("model", "text", 16384)
+        p = self._build_payload()
         self.assertNotIn("format", p)
 
     def test_packet_in_user_message(self):
-        p = _mod.build_payload("model", "MY PACKET", 16384)
+        p = self._build_payload(packet="MY PACKET")
         user_msg = next(m for m in p["messages"] if m["role"] == "user")
         self.assertIn("MY PACKET", user_msg["content"])
 
     def test_system_prompt_contains_tagged_contract(self):
-        p = _mod.build_payload("model", "text", 16384)
+        p = self._build_payload()
         sys_msg = next(m for m in p["messages"] if m["role"] == "system")
         self.assertIn("=== FILE START ===", sys_msg["content"])
         self.assertIn("no JSON", sys_msg["content"])
+        self.assertIn("STATUS: PATCH\n", sys_msg["content"])
+        self.assertNotIn("STATUS: PATCH|NO_PATCH|BLOCKED", sys_msg["content"])
+        self.assertIn("Do not output the pipe-separated list", sys_msg["content"])
+
+    def test_replacement_prompt_uses_single_status_example(self):
+        p = self._build_replacement_payload()
+        sys_msg = next(m for m in p["messages"] if m["role"] == "system")
+        self.assertIn("=== REPLACEMENT START ===", sys_msg["content"])
+        self.assertIn("STATUS: PATCH\n", sys_msg["content"])
+        self.assertNotIn("STATUS: PATCH|NO_PATCH|BLOCKED", sys_msg["content"])
+        self.assertIn("Do not output the pipe-separated list", sys_msg["content"])
 
 
 # ---------------------------------------------------------------------------
@@ -501,6 +558,27 @@ class BuildAndApplyDiff(unittest.TestCase):
         self.assertEqual(diff.strip(), "")
         self.assertIn("nothing to apply", _mod.apply_diff(diff, d))
 
+    def test_before_after_allows_shorter_replacement_with_new_lines(self):
+        d = self._git_repo()
+        target = os.path.join(d, "a.py")
+        with open(target, "w") as f:
+            f.write("def f():\n    first()\n    second()\n    third()\n")
+        before = os.path.join(d, "before.txt")
+        with open(before, "w") as f:
+            f.write("    first()\n    second()\n    third()\n")
+
+        result = _mod.apply_before_after(
+            "a.py",
+            before,
+            "    return 1\n",
+            ["a.py"],
+            d,
+            do_apply=False,
+        )
+
+        self.assertIn("+    return 1", result["unified_diff"])
+        self.assertIn("-    first()", result["unified_diff"])
+
     def test_delete_existing_file(self):
         d = self._git_repo()
         target = os.path.join(d, "a.txt")
@@ -548,11 +626,12 @@ class WriteResult(unittest.TestCase):
 # CLI: --dry-run, --out, exit codes
 # ---------------------------------------------------------------------------
 class CliBehavior(unittest.TestCase):
-    def run_cli(self, *args, stdin=None):
+    def run_cli(self, *args, stdin=None, env=None):
         return subprocess.run(
             [sys.executable, _SCRIPT, *args],
             capture_output=True, text=True,
             input=stdin,
+            env=env,
         )
 
     def test_dry_run_prints_payload_no_network(self):
@@ -598,6 +677,41 @@ class CliBehavior(unittest.TestCase):
             r = self.run_cli(fname, "--dry-run", "--num-ctx", "8192")
             data = json.loads(r.stdout)
             self.assertEqual(data["options"]["num_ctx"], 8192)
+        finally:
+            os.unlink(fname)
+
+    def test_dry_run_custom_temperature(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write("# p\n")
+            fname = f.name
+        try:
+            r = self.run_cli(fname, "--dry-run", "--temperature", "0.25")
+            data = json.loads(r.stdout)
+            self.assertEqual(data["options"]["temperature"], 0.25)
+        finally:
+            os.unlink(fname)
+
+    def test_dry_run_think_enabled(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write("# p\n")
+            fname = f.name
+        try:
+            r = self.run_cli(fname, "--dry-run", "--think")
+            data = json.loads(r.stdout)
+            self.assertTrue(data["think"])
+        finally:
+            os.unlink(fname)
+
+    def test_dry_run_no_think_overrides_env(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write("# p\n")
+            fname = f.name
+        try:
+            env = os.environ.copy()
+            env["DUBBRIDGE_LOW_RRI_THINK"] = "1"
+            r = self.run_cli(fname, "--dry-run", "--no-think", env=env)
+            data = json.loads(r.stdout)
+            self.assertFalse(data["think"])
         finally:
             os.unlink(fname)
 

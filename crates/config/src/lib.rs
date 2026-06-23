@@ -512,6 +512,7 @@ mod tests {
         // DUBBRIDGE__ (double underscore) is figment's nesting separator for env vars.
         temp_env::with_vars(
             [
+                ("DUBBRIDGE_ENV", Some("staging")),
                 (
                     "DUBBRIDGE_DATABASE_URL",
                     Some("postgres://user:pass@staging-db/dubbridge"),
@@ -545,6 +546,7 @@ mod tests {
         // Inject secrets that production.toml intentionally omits (they arrive via env at deploy time).
         temp_env::with_vars(
             [
+                ("DUBBRIDGE_ENV", Some("production")),
                 (
                     "DUBBRIDGE_DATABASE_URL",
                     Some("postgres://user:pass@prod-db/dubbridge"),

@@ -4,6 +4,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from typing import Dict, List, Optional
 
 import yaml
 
@@ -11,7 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Closed type vocabulary: type -> glob pattern relative to repo root.
 # Order matters for the location check (most-specific first).
-VOCAB: dict[str, re.Pattern[str]] = {
+VOCAB: Dict[str, re.Pattern] = {
     "Roadmap":      re.compile(r"^docs/plan/roadmap\.md$"),
     "ADR":          re.compile(r"^docs/adr/ADR-\d+.*\.md$"),
     "Playbook":     re.compile(r"^docs/playbooks/[^/]+\.md$"),
@@ -53,7 +54,7 @@ def should_skip(rel: str) -> bool:
     return any(p.search(rel) for p in SKIP_PATTERNS)
 
 
-def parse_frontmatter(text: str) -> dict | None:
+def parse_frontmatter(text: str) -> Optional[dict]:
     """Return parsed YAML frontmatter dict, or None if absent/malformed."""
     if not text.startswith("---"):
         return None
@@ -70,7 +71,7 @@ def parse_frontmatter(text: str) -> dict | None:
         return None
 
 
-def extract_prose_status(text: str) -> str | None:
+def extract_prose_status(text: str) -> Optional[str]:
     """Extract the status token from the prose '- **Status:** ...' line."""
     m = re.search(r"^- \*\*Status:\*\*\s*(.+)$", text, re.MULTILINE)
     if not m:
@@ -95,7 +96,7 @@ def adr_exists(ref: str) -> bool:
     return len(matches) > 0
 
 
-def collect_in_scope_files() -> list[Path]:
+def collect_in_scope_files() -> List[Path]:
     docs = REPO_ROOT / "docs"
     files = []
     for path in sorted(docs.rglob("*.md")):
@@ -108,8 +109,8 @@ def collect_in_scope_files() -> list[Path]:
     return files
 
 
-def validate(files: list[Path]) -> list[str]:
-    errors: list[str] = []
+def validate(files: List[Path]) -> List[str]:
+    errors: List[str] = []
 
     for path in files:
         rel = _rel(path)
