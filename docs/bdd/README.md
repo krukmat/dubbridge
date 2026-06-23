@@ -68,16 +68,15 @@ Spec: `docs/bdd/s-120-media-preparation.feature`
 ## S-125 — HLS playback delivery
 Spec: `docs/bdd/s-125-hls-playback-delivery.feature`
 
-> Planned 2026-06-21. Scenarios are authored ahead of implementation; executable
-> evidence is certified per task (T1, T2, T3a, T3b, T4, T5) as each lands. T3a (the
-> pure manifest rewriter) is RRI 21 and delegated to local Gemma; the orchestrator
-> certifies its evidence.
+> Delivered 2026-06-22. Executable evidence is now certified in the completed
+> `S-125` ledger and mapped here to the concrete integration tests that prove the
+> grant-issuance and playback-delivery boundary.
 
 | Scenario ID | Description | Task | Executable Evidence | Mobile Flow | HP / EC |
 | --- | --- | --- | --- | --- | --- |
-| S125_HP1 | Authorized reviewer obtains a playback grant for a ready asset | S-125-T4 | planned | — | HP |
-| S125_EC1 | Grant issuance is denied for an asset that is not ready | S-125-T2 | planned | — | EC |
-| S125_EC2 | Unauthorized caller cannot obtain a playback grant | S-125-T4 | planned | — | EC |
+| S125_HP1 | Authorized reviewer obtains a playback grant for a ready asset | S-125-T4 | `apps/api/tests/playback_grant_test.rs::authorized_reviewer_ready_asset_receives_grant_and_audit_row` | — | HP |
+| S125_EC1 | Grant issuance is denied for an asset that is not ready | S-125-T4 | `apps/api/tests/playback_grant_test.rs::not_ready_asset_returns_fail_closed_denial_and_writes_no_grant_row` | — | EC |
+| S125_EC2 | Unauthorized caller cannot obtain a playback grant | S-125-T4 | `apps/api/tests/playback_grant_test.rs::authenticated_non_member_returns_403_and_writes_no_grant_row`; `apps/api/tests/playback_grant_test.rs::unauthenticated_request_returns_401_and_writes_no_grant_row` | — | EC |
 | S125_HP2 | Manifest is returned with short-lived scoped segment references only | S-125-T5b | `apps/api/tests/playback_delivery_test.rs::valid_grant_returns_manifest_with_short_lived_segment_references` | — | HP |
 | S125_EC3 | Segment fetched with an expired scoped reference is denied | S-125-T5b | `apps/api/tests/playback_delivery_test.rs::expired_short_lived_segment_reference_is_denied_fail_closed` | — | EC |
 
