@@ -18,6 +18,7 @@ HS256 JWT bearer token) via the mock gateway.
 | 6 — Organizations and projects | `projects.yaml` | `SC-ORG-1`, `SC-PROJECT-1` | `08_home_for_projects.png`, `09_project_list.png`, `10_project_detail.png` |
 | 7 — Compliance and consent | `compliance.yaml` | `SC-AUDIT-1`, `SC-RIGHTS-1`, `SC-CONSENT-1/2` | `11_compliance_center.png`, `12_consent_active.png`, `13_consent_revoked.png` |
 | 8 — Review and publication | `review.yaml` | `SC-REVIEW-1/2`, `SC-PUBLISH-1/2` | `14_review_inbox.png`, `15_review_detail.png`, `16_review_approved.png`, `17_review_published.png` |
+| 8b — Playback surfaces | `playback.yaml` | `SC-PLAYBACK-1`, `SC-PLAYBACK-3` | `playback_review.png`, `playback_asset_detail.png` |
 
 All phases from 2 onwards authenticate via the reusable `e2e-login.yaml` subflow
 using the fixed E2E credentials (`e2e@dubbridge.dev` / `e2etestpass123`). The mock
@@ -106,7 +107,8 @@ cd mobile && npm run screenshots
 13. Runs **Phase 6** (`projects.yaml`) — captures organization/project screens.
 14. Runs **Phase 7** (`compliance.yaml`) — captures compliance and consent states.
 15. Runs **Phase 8** (`review.yaml`) — captures review and publication states.
-16. Copies all PNGs to `mobile/artifacts/screenshots/`.
+16. Runs **Phase 8b** (`playback.yaml`) — captures the review-player and asset-detail playback surfaces.
+17. Copies all PNGs to `mobile/artifacts/screenshots/`.
 
 Set `START_MOCK_SERVERS=1` to have the script start mock-gateway automatically:
 
@@ -163,6 +165,10 @@ maestro test mobile/maestro/asset-ingestion.yaml \
 curl -sf -X POST "http://127.0.0.1:8081/e2e/seed?ingest_seed=no_rights"
 maestro test mobile/maestro/asset-ingestion-no-rights.yaml \
   --test-output-dir /tmp/dubbridge-maestro-asset-ingestion-no-rights
+
+# 12. Phase 8b — playback surfaces (SC-PLAYBACK-1 / SC-PLAYBACK-3)
+maestro test mobile/maestro/playback.yaml \
+  --test-output-dir /tmp/dubbridge-maestro-playback
 ```
 
 ## E2E credentials

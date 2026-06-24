@@ -1,11 +1,39 @@
-import { cleanup, fireEvent, render } from "@testing-library/react-native";
+import { act, cleanup, fireEvent, render } from "@testing-library/react-native";
 import { StyleSheet, Text } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+
+const mockPlayerListeners: Record<string, ((payload?: unknown) => void) | undefined> = {};
+
+jest.mock("expo", () => {
+  const actual = jest.requireActual("expo");
+  return {
+    ...actual,
+    useEventListener: jest.fn(
+      (_player: unknown, eventName: string, listener: (payload?: unknown) => void) => {
+        mockPlayerListeners[eventName] = listener;
+      },
+    ),
+  };
+});
+
+jest.mock("expo-video", () => ({
+  VideoView: ({ testID, ...props }: Record<string, unknown>) =>
+    require("react").createElement(
+      require("react-native").Text,
+      { testID: testID ?? "mock-video-view" },
+      JSON.stringify(props),
+    ),
+  useVideoPlayer: jest.fn(() => ({
+    status: "idle",
+    loop: false,
+  })),
+}));
 
 import { Badge, statusTone } from "../src/components/Badge";
 import { Button } from "../src/components/Button";
 import { Screen } from "../src/components/Screen";
 import { StateView } from "../src/components/StateView";
+import { VideoPlayer } from "../src/components/VideoPlayer";
 import { color, space } from "../src/theme";
 
 const METRICS = {
@@ -14,6 +42,11 @@ const METRICS = {
 };
 
 afterEach(cleanup);
+afterEach(() => {
+  for (const key of Object.keys(mockPlayerListeners)) {
+    delete mockPlayerListeners[key];
+  }
+});
 
 describe("Button", () => {
   it("HP-1: primary renders its label, fires onPress, and exposes button role", async () => {
@@ -145,5 +178,84 @@ describe("Screen", () => {
     expect(view.getByText("Hello")).toBeTruthy();
     const flat = StyleSheet.flatten(view.getByTestId("screen").props.style);
     expect(flat.paddingTop).toBe(space.xxl);
+  });
+});
+
+describe("VideoPlayer", () => {
+  it("HP-5: renders the expo-video shell inside the tokenized player container", async () => {
+    const view = await render(
+      <VideoPlayer testID="player" source="https://example.com/manifest.m3u8" />,
+    );
+
+    expect(view.getByTestId("player")).toBeTruthy();
+    expect(view.getByText("Original track")).toBeTruthy();
+    expect(view.getByText("Loading video")).toBeTruthy();
+  });
+
+  it("HP-6: binds an error overlay through StateView without embedding reducer logic", async () => {
+    const onRetry = jest.fn();
+    const view = await render(
+      <VideoPlayer
+        testID="player"
+        source="https://example.com/manifest.m3u8"
+        onRetry={onRetry}
+      />,
+    );
+
+    await act(async () => {
+      mockPlayerListeners.statusChange?.({
+        status: "error",
+        error: { message: "Manifest request failed" },
+      });
+    });
+
+    expect(view.getByText("Playback error")).toBeTruthy();
+    expect(view.getByText("Manifest request failed")).toBeTruthy();
+    fireEvent.press(view.getByTestId("player-overlay-retry"));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it("HP-7: statusChange ready hides the overlay and loading shows it again", async () => {
+    const view = await render(
+      <VideoPlayer testID="player" source="https://example.com/manifest.m3u8" />,
+    );
+
+    await act(async () => {
+      mockPlayerListeners.statusChange?.({ status: "readyToPlay" });
+    });
+
+    expect(view.queryByTestId("player-overlay")).toBeNull();
+
+    await act(async () => {
+      mockPlayerListeners.statusChange?.({ status: "loading" });
+    });
+
+    expect(view.getByText("Loading video")).toBeTruthy();
+  });
+
+  it("HP-8: playToEnd shows the end overlay after playback is ready", async () => {
+    const view = await render(
+      <VideoPlayer testID="player" source="https://example.com/manifest.m3u8" />,
+    );
+
+    await act(async () => {
+      mockPlayerListeners.statusChange?.({ status: "readyToPlay" });
+    });
+
+    await act(async () => {
+      mockPlayerListeners.playToEnd?.();
+    });
+
+    expect(view.getByText("Playback finished")).toBeTruthy();
+  });
+
+  it("EC-4: null source keeps the shell safe and shows a waiting overlay", async () => {
+    const view = await render(<VideoPlayer testID="player" source={null} />);
+
+    expect(view.getByTestId("player")).toBeTruthy();
+    expect(view.getByText("Waiting for media")).toBeTruthy();
+    expect(
+      view.getByText("A playback source is required before the player can start."),
+    ).toBeTruthy();
   });
 });

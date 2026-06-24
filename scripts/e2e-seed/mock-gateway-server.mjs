@@ -117,6 +117,23 @@ export const SEED_NOTIFICATION = {
   created_at: "2026-06-13T10:00:00Z",
 };
 
+const PLAYBACK_TOKEN = "e2e-playback-token";
+
+function sendText(
+  res,
+  status,
+  body,
+  contentType = "text/plain; charset=utf-8",
+) {
+  res.writeHead(status, { "content-type": contentType });
+  res.end(body);
+}
+
+function sendBytes(res, status, body, contentType) {
+  res.writeHead(status, { "content-type": contentType });
+  res.end(body);
+}
+
 function sendJson(res, status, body) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(body));
@@ -240,6 +257,57 @@ export function createMockGatewayServer({
       const asset = SEED_ASSETS.find((seed) => seed.id === assetMatch[1]);
       if (!asset) return sendJson(res, 404, { error: "asset_not_found" });
       return sendJson(res, 200, asset);
+    }
+
+    const playbackGrantMatch = url.pathname.match(/^\/api\/assets\/([^/]+)\/playback-grants$/);
+    if (req.method === "POST" && playbackGrantMatch) {
+      const asset = SEED_ASSETS.find((seed) => seed.id === playbackGrantMatch[1]);
+      if (!asset) {
+        return sendJson(res, 404, { error: "asset_not_found" });
+      }
+      if (asset.status !== "finalized") {
+        return sendJson(res, 409, { error: "asset_not_ready" });
+      }
+      return sendJson(res, 201, { grant_id: `grant-${asset.id}` });
+    }
+
+    const playbackManifestMatch = url.pathname.match(
+      /^\/api\/assets\/([^/]+)\/playback\/([^/]+)\/manifest$/,
+    );
+    if (req.method === "GET" && playbackManifestMatch) {
+      const asset = SEED_ASSETS.find((seed) => seed.id === playbackManifestMatch[1]);
+      if (!asset) {
+        return sendJson(res, 404, { error: "asset_not_found" });
+      }
+      const manifest = [
+        "#EXTM3U",
+        "#EXT-X-VERSION:3",
+        "#EXT-X-TARGETDURATION:6",
+        "#EXT-X-MEDIA-SEQUENCE:0",
+        "#EXTINF:6.0,",
+        `http://${req.headers.host}/api/assets/${asset.id}/playback/segments/segment-00000.ts?token=${PLAYBACK_TOKEN}`,
+        "#EXT-X-ENDLIST",
+      ].join("\n");
+      return sendText(res, 200, manifest, "application/vnd.apple.mpegurl");
+    }
+
+    const playbackSegmentMatch = url.pathname.match(
+      /^\/api\/assets\/([^/]+)\/playback\/segments\/([^/]+)$/,
+    );
+    if (req.method === "GET" && playbackSegmentMatch) {
+      const asset = SEED_ASSETS.find((seed) => seed.id === playbackSegmentMatch[1]);
+      if (!asset) {
+        return sendJson(res, 404, { error: "asset_not_found" });
+      }
+      if (url.searchParams.get("token") !== PLAYBACK_TOKEN) {
+        return sendJson(res, 403, { error: "forbidden" });
+      }
+      return sendBytes(
+        res,
+        200,
+        Buffer.from("DUBBRIDGE_PLAYBACK_E2E_SEGMENT"),
+        "video/mp2t",
+      );
     }
 
     if (req.method === "POST" && url.pathname === "/api/ingest") {

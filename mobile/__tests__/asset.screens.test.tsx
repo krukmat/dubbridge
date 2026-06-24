@@ -23,6 +23,18 @@ jest.mock("../src/auth/AuthProvider", () => ({
 jest.mock("../src/api/client", () => ({
   createGatewayClient: jest.fn(),
 }));
+jest.mock("../src/components/VideoPlayer", () => {
+  const React = require("react");
+  const { Text } = require("react-native");
+  return {
+    VideoPlayer: ({ testID, source, ...props }: any) => {
+      if (testID) {
+        mockVideoPlayerProps[testID] = { testID, source, ...props };
+      }
+      return React.createElement(Text, { testID }, `Video:${source}`);
+    },
+  };
+});
 
 const mockCreateGatewayClient =
   createGatewayClient as jest.MockedFunction<typeof createGatewayClient>;
@@ -43,6 +55,7 @@ let mockClient: {
   post: jest.Mock;
   postMultipart: jest.Mock;
 };
+let mockVideoPlayerProps: Record<string, any>;
 
 // Await fireEvent.press directly first; RNTL v14 wraps it in its own act scope.
 // Then use a separate act() to flush async handler continuations.
@@ -53,6 +66,7 @@ function flushAsync() {
 describe("asset screens", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockVideoPlayerProps = {};
 
     mockAuthValue = {
       sessionRef: "opaque-session-abc123",
@@ -174,6 +188,249 @@ describe("asset screens", () => {
       expect(view.getByText("Finalized")).toBeTruthy();
       expect(view.getByText("Compliance and consent")).toBeTruthy();
       expect(view.getByTestId("asset-open-compliance")).toBeTruthy();
+    });
+
+    it("HP-1: finalized asset shows Play and opens inline playback after an explicit tap", async () => {
+      mockClient.get.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          data: ASSET,
+          sessionRotation: null,
+        },
+      });
+      mockClient.post.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          data: { grant_id: "grant-asset-001" },
+          sessionRotation: "rot-playback",
+        },
+      });
+
+      const view = await render(
+        <AssetDetailScreen
+          assetId={ASSET.id}
+          gatewayBaseUrl="http://127.0.0.1:4000"
+          onOpenCompliance={jest.fn()}
+        />,
+      );
+
+      await waitFor(() => expect(view.getByTestId("asset-play-button")).toBeTruthy());
+      expect(mockClient.post).not.toHaveBeenCalled();
+      await act(async () => {
+        fireEvent.press(view.getByTestId("asset-play-button"));
+      });
+
+      await waitFor(() => expect(view.getByTestId("asset-inline-player")).toBeTruthy());
+      expect(mockClient.post).toHaveBeenCalledWith(
+        `/api/assets/${ASSET.id}/playback-grants`,
+        "opaque-session-abc123",
+        {},
+      );
+      expect(mockVideoPlayerProps["asset-inline-player"].source).toBe(
+        "http://127.0.0.1:4000/api/assets/asset-123/playback/grant-asset-001/manifest",
+      );
+      expect(mockClient.post).toHaveBeenCalledTimes(1);
+      expect(mockAuthValue.onSessionRotation).toHaveBeenCalledWith("rot-playback");
+    });
+
+    it("HP-1b: same-asset rerender with rotated session keeps the inline player visible", async () => {
+      mockClient.get.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          data: ASSET,
+          sessionRotation: null,
+        },
+      });
+      mockClient.post.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          data: { grant_id: "grant-asset-002" },
+          sessionRotation: "rot-playback-2",
+        },
+      });
+
+      const view = await render(
+        <AssetDetailScreen
+          assetId={ASSET.id}
+          gatewayBaseUrl="http://127.0.0.1:4000"
+          onOpenCompliance={jest.fn()}
+        />,
+      );
+
+      await waitFor(() => expect(view.getByTestId("asset-play-button")).toBeTruthy());
+      await act(async () => {
+        fireEvent.press(view.getByTestId("asset-play-button"));
+      });
+      await waitFor(() => expect(view.getByTestId("asset-inline-player")).toBeTruthy());
+
+      mockAuthValue = {
+        ...mockAuthValue,
+        sessionRef: "rotated-session-after-playback",
+      };
+
+      view.rerender(
+        <AssetDetailScreen
+          assetId={ASSET.id}
+          gatewayBaseUrl="http://127.0.0.1:4000"
+          onOpenCompliance={jest.fn()}
+        />,
+      );
+
+      expect(view.getByTestId("asset-inline-player")).toBeTruthy();
+      expect(view.queryByTestId("asset-playback-loading")).toBeNull();
+      expect(view.queryByText("Loading asset detail…")).toBeNull();
+      expect(mockClient.get).toHaveBeenCalledTimes(1);
+      expect(mockClient.post).toHaveBeenCalledTimes(1);
+    });
+
+    it("HP-2: non-finalized asset hides the Play button and never issues a grant", async () => {
+      mockClient.get.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          data: { ...ASSET, status: "pending" },
+          sessionRotation: null,
+        },
+      });
+
+      const view = await render(
+        <AssetDetailScreen
+          assetId={ASSET.id}
+          gatewayBaseUrl="http://127.0.0.1:4000"
+          onOpenCompliance={jest.fn()}
+        />,
+      );
+
+      await waitFor(() => expect(view.getByText("Test Video")).toBeTruthy());
+      expect(view.queryByTestId("asset-play-button")).toBeNull();
+      expect(mockClient.post).not.toHaveBeenCalled();
+    });
+
+    it("EC-1: playback denial shows a not-ready state and keeps compliance access usable", async () => {
+      mockClient.get.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          data: ASSET,
+          sessionRotation: null,
+        },
+      });
+      mockClient.post.mockResolvedValueOnce({
+        ok: false,
+        error: { kind: "http", status: 409 },
+      });
+
+      const onOpenCompliance = jest.fn();
+      const view = await render(
+        <AssetDetailScreen
+          assetId={ASSET.id}
+          gatewayBaseUrl="http://127.0.0.1:4000"
+          onOpenCompliance={onOpenCompliance}
+        />,
+      );
+
+      await waitFor(() => expect(view.getByTestId("asset-play-button")).toBeTruthy());
+      await act(async () => {
+        fireEvent.press(view.getByTestId("asset-play-button"));
+      });
+
+      await waitFor(() => expect(view.getByText("Media not ready yet")).toBeTruthy());
+      expect(view.getByTestId("asset-open-compliance")).toBeTruthy();
+      fireEvent.press(view.getByTestId("asset-open-compliance"));
+      expect(onOpenCompliance).toHaveBeenCalledTimes(1);
+      expect(view.queryByTestId("asset-inline-player")).toBeNull();
+    });
+
+    it("EC-1b: playback denial also maps 422 to the not-ready state", async () => {
+      mockClient.get.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          data: ASSET,
+          sessionRotation: null,
+        },
+      });
+      mockClient.post.mockResolvedValueOnce({
+        ok: false,
+        error: { kind: "http", status: 422 },
+      });
+
+      const view = await render(
+        <AssetDetailScreen
+          assetId={ASSET.id}
+          gatewayBaseUrl="http://127.0.0.1:4000"
+          onOpenCompliance={jest.fn()}
+        />,
+      );
+
+      await waitFor(() => expect(view.getByTestId("asset-play-button")).toBeTruthy());
+      await act(async () => {
+        fireEvent.press(view.getByTestId("asset-play-button"));
+      });
+
+      await waitFor(() => expect(view.getByText("Media not ready yet")).toBeTruthy());
+      expect(view.queryByTestId("asset-inline-player")).toBeNull();
+    });
+
+    it("EC-2: playback failure shows an error state and keeps compliance access usable", async () => {
+      mockClient.get.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          data: ASSET,
+          sessionRotation: null,
+        },
+      });
+      mockClient.post.mockResolvedValueOnce({
+        ok: false,
+        error: { kind: "forbidden" },
+      });
+
+      const onOpenCompliance = jest.fn();
+      const view = await render(
+        <AssetDetailScreen
+          assetId={ASSET.id}
+          gatewayBaseUrl="http://127.0.0.1:4000"
+          onOpenCompliance={onOpenCompliance}
+        />,
+      );
+
+      await waitFor(() => expect(view.getByTestId("asset-play-button")).toBeTruthy());
+      await act(async () => {
+        fireEvent.press(view.getByTestId("asset-play-button"));
+      });
+
+      await waitFor(() =>
+        expect(view.getByText("You do not have access to this playback stream.")).toBeTruthy(),
+      );
+      expect(view.getByTestId("asset-playback-error-retry")).toBeTruthy();
+      fireEvent.press(view.getByTestId("asset-open-compliance"));
+      expect(onOpenCompliance).toHaveBeenCalledTimes(1);
+    });
+
+    it("EC-2b: session_expired on playback grant logs out", async () => {
+      mockClient.get.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          data: ASSET,
+          sessionRotation: null,
+        },
+      });
+      mockClient.post.mockResolvedValueOnce({
+        ok: false,
+        error: { kind: "session_expired" },
+      });
+
+      const view = await render(
+        <AssetDetailScreen
+          assetId={ASSET.id}
+          gatewayBaseUrl="http://127.0.0.1:4000"
+          onOpenCompliance={jest.fn()}
+        />,
+      );
+
+      await waitFor(() => expect(view.getByTestId("asset-play-button")).toBeTruthy());
+      await act(async () => {
+        fireEvent.press(view.getByTestId("asset-play-button"));
+      });
+
+      await waitFor(() => expect(mockAuthValue.logout).toHaveBeenCalledTimes(1));
     });
   });
 

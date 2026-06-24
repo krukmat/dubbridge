@@ -9,3 +9,4 @@ export {
   type StateViewProps,
   type StateViewKind,
 } from "./StateView";
+export { VideoPlayer, type VideoPlayerProps } from "./VideoPlayer";

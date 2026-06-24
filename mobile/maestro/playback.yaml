@@ -1,0 +1,98 @@
+appId: com.dubbridge.mobile
+name: Playback surfaces
+tags:
+  - android
+  - s-127
+  - playback
+# BDD scenarios: SC-PLAYBACK-1, SC-PLAYBACK-3
+---
+- launchApp:
+    clearState: true
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: login-screen
+    timeout: 20000
+
+- assertVisible:
+    id: login-screen
+
+- runFlow: e2e-login.yaml
+
+- assertVisible:
+    id: home-screen
+
+# SC-PLAYBACK-1: review detail opens with embedded playback.
+- tapOn:
+    id: home-open-review
+
+- extendedWaitUntil:
+    visible:
+      id: review-inbox-screen
+    timeout: 20000
+
+- tapOn:
+    id: review-task-card-review-task-seed-1
+
+- extendedWaitUntil:
+    visible:
+      id: review-detail-screen
+    timeout: 20000
+
+- assertVisible:
+    id: review-player
+
+- takeScreenshot: playback_review
+
+# SC-PLAYBACK-3: asset detail opens inline playback after explicit Play.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: login-screen
+    timeout: 20000
+
+- runFlow: e2e-login.yaml
+
+- assertVisible:
+    id: home-screen
+
+- tapOn:
+    id: home-open-assets
+
+- extendedWaitUntil:
+    visible:
+      id: asset-list-screen
+    timeout: 20000
+
+- tapOn:
+    id: asset-card-asset-seed-1
+
+- extendedWaitUntil:
+    visible:
+      id: asset-detail-screen
+    timeout: 20000
+
+- assertVisible:
+    id: asset-play-button
+
+- tapOn:
+    id: asset-play-button
+
+- extendedWaitUntil:
+    visible:
+      id: asset-inline-player
+    timeout: 20000
+
+- takeScreenshot: playback_asset_detail

@@ -20,6 +20,7 @@ Canonical home for repository BDD artifacts: `docs/bdd/`.
 - `s-060-mobile-asset-lifecycle.feature`
 - `s-120-media-preparation.feature`
 - `s-125-hls-playback-delivery.feature`
+- `s-127-mobile-review-player.feature`
 - `s-160-review.feature`
 - `s-200-mobile-auth.feature`
 
@@ -79,6 +80,16 @@ Spec: `docs/bdd/s-125-hls-playback-delivery.feature`
 | S125_EC2 | Unauthorized caller cannot obtain a playback grant | S-125-T4 | `apps/api/tests/playback_grant_test.rs::authenticated_non_member_returns_403_and_writes_no_grant_row`; `apps/api/tests/playback_grant_test.rs::unauthenticated_request_returns_401_and_writes_no_grant_row` | — | EC |
 | S125_HP2 | Manifest is returned with short-lived scoped segment references only | S-125-T5b | `apps/api/tests/playback_delivery_test.rs::valid_grant_returns_manifest_with_short_lived_segment_references` | — | HP |
 | S125_EC3 | Segment fetched with an expired scoped reference is denied | S-125-T5b | `apps/api/tests/playback_delivery_test.rs::expired_short_lived_segment_reference_is_denied_fail_closed` | — | EC |
+
+## S-127 — Mobile review player surface
+Spec: `docs/bdd/s-127-mobile-review-player.feature`
+
+| Scenario ID | Description | Task | Executable Evidence | Mobile Flow | HP / EC |
+| --- | --- | --- | --- | --- | --- |
+| SC-PLAYBACK-1 | Review detail loads embedded playback after grant success | `S-127-T3` | `mobile/__tests__/ReviewDetailScreen.test.tsx::HP-1: approve posts a scoped decision, rotates session, and reveals publish`; `mobile/maestro/playback.yaml` | `mobile/maestro/playback.yaml` | HP |
+| SC-PLAYBACK-2 | Review detail keeps the decision flow usable when playback is unavailable | `S-127-T3` | `mobile/__tests__/ReviewDetailScreen.test.tsx::EC-5: playback denial shows a not-ready empty state and keeps decision controls usable`; `mobile/__tests__/ReviewDetailScreen.test.tsx::EC-6: playback failure shows an error state and keeps decision controls usable` | `mobile/maestro/playback.yaml` | EC |
+| SC-PLAYBACK-3 | Asset detail opens inline playback after an explicit play action | `S-127-T4` | `mobile/__tests__/asset.screens.test.tsx::HP-1: finalized asset shows Play and opens inline playback after an explicit tap`; `mobile/maestro/playback.yaml` | `mobile/maestro/playback.yaml` | HP |
+| SC-PLAYBACK-4 | Asset detail denial or failure leaves the rest of the screen usable | `S-127-T4` | `mobile/__tests__/asset.screens.test.tsx::EC-1: playback denial shows a not-ready state and keeps compliance access usable`; `mobile/__tests__/asset.screens.test.tsx::EC-2: playback failure shows an error state and keeps compliance access usable` | `mobile/maestro/playback.yaml` | EC |
 
 ## S-200 — Mobile credential login with backend-issued JWT (FenixCRM parity)
 Spec: `docs/bdd/s-200-mobile-auth.feature`

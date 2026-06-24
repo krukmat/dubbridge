@@ -273,9 +273,10 @@ MAESTRO_OUT_5B="/tmp/dubbridge-maestro-asset-ingestion-no-rights-$$"
 MAESTRO_OUT_6="/tmp/dubbridge-maestro-projects-$$"
 MAESTRO_OUT_7="/tmp/dubbridge-maestro-compliance-$$"
 MAESTRO_OUT_8="/tmp/dubbridge-maestro-review-$$"
+MAESTRO_OUT_8B="/tmp/dubbridge-maestro-playback-$$"
 mkdir -p "$MAESTRO_OUT_1" "$MAESTRO_OUT_2" "$MAESTRO_OUT_3" "$MAESTRO_OUT_3E" \
          "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" \
-         "$MAESTRO_OUT_7" "$MAESTRO_OUT_8"
+         "$MAESTRO_OUT_7" "$MAESTRO_OUT_8" "$MAESTRO_OUT_8B"
 
 # --- S-055 Phase 1: auth surface (login screen visible, no credentials needed) ---
 
@@ -397,6 +398,16 @@ maestro test \
 
 info "Phase 8 passed."
 
+# --- S-127 Phase 8b: review + asset playback surfaces (SC-PLAYBACK-1, SC-PLAYBACK-3) ---
+
+info "Phase 8b — playback surfaces (playback.yaml / SC-PLAYBACK-1, SC-PLAYBACK-3)..."
+maestro test \
+  --test-output-dir "$MAESTRO_OUT_8B" \
+  "$REPO_ROOT/mobile/maestro/playback.yaml" \
+  || die "Phase 8b (playback.yaml) failed. Check $MAESTRO_OUT_8B for details."
+
+info "Phase 8b passed."
+
 # ---------------------------------------------------------------------------
 # Copy screenshots
 # ---------------------------------------------------------------------------
@@ -407,7 +418,7 @@ mkdir -p "$SCREENSHOTS_DIR"
 info "Copying screenshots to $SCREENSHOTS_DIR ..."
 find "$MAESTRO_OUT_1" "$MAESTRO_OUT_2" "$MAESTRO_OUT_3" "$MAESTRO_OUT_3E" \
      "$MAESTRO_OUT_4" "$MAESTRO_OUT_5" "$MAESTRO_OUT_5B" "$MAESTRO_OUT_6" \
-     "$MAESTRO_OUT_7" "$MAESTRO_OUT_8" -name "*.png" | while IFS= read -r png; do
+     "$MAESTRO_OUT_7" "$MAESTRO_OUT_8" "$MAESTRO_OUT_8B" -name "*.png" | while IFS= read -r png; do
   cp "$png" "$SCREENSHOTS_DIR/"
   info "  Copied: $(basename "$png")"
 done
