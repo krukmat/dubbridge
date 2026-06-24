@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 _SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gemma-code-review.py")
@@ -209,6 +210,417 @@ class CliBehavior(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         payload = json.loads(r.stdout)
         self.assertFalse(payload["think"])
+
+
+# ---------------------------------------------------------------------------
+# AuditEmission — verify append_audit_log is called with the right shape
+# ---------------------------------------------------------------------------
+class AuditEmission(unittest.TestCase):
+    def _run(self, stream_response, extra_args=None):
+        captured = []
+        with tempfile.TemporaryDirectory() as tmp:
+            out_path = os.path.join(tmp, "result.json")
+            packet_file = os.path.join(tmp, "packet.md")
+            with open(packet_file, "w") as f:
+                f.write(_packet())
+
+            # --passes 1 keeps the single-pass audit path (T3); multi-pass
+            # audit is added by T6.
+            argv = [_SCRIPT, packet_file, "--out", out_path, "--passes", "1"] + (extra_args or [])
+            with patch("sys.argv", argv), \
+                 patch.object(_mod.gemma_local, "ensure_model_available"), \
+                 patch.object(_mod.gemma_local, "stream_chat",
+                              return_value=stream_response), \
+                 patch.object(_mod.gemma_local, "append_audit_log",
+                              side_effect=lambda r: captured.append(r)):
+                _mod.main()
+        return captured
+
+    def test_pass_emits_one_record_with_reviewer_role(self):
+        records = self._run("STATUS: PASS\nSUMMARY: clean")
+        self.assertEqual(len(records), 1)
+        r = records[0]
+        self.assertEqual(r["role"], "reviewer")
+        self.assertEqual(r["outcome"], "PASS")
+        self.assertEqual(r["done_reason"], "stop")
+        self.assertFalse(r["escalated"])
+        self.assertEqual(r["findings_count"], 0)
+        self.assertEqual(r["findings_by_severity"], {"blocking": 0, "major": 0, "minor": 0, "nit": 0})
+        self.assertEqual(r["out_of_scope"], 0)
+        self.assertIsNone(r["dispositions"])
+        self.assertIn("system_prompt", r)
+        self.assertIn("user_prompt", r)
+
+    def test_findings_counts_by_severity(self):
+        records = self._run(_response("FINDINGS", severity="major"))
+        r = records[0]
+        self.assertEqual(r["outcome"], "FINDINGS")
+        self.assertEqual(r["findings_count"], 1)
+        self.assertEqual(r["findings_by_severity"]["major"], 1)
+        self.assertEqual(r["findings_by_severity"]["blocking"], 0)
+
+    def test_out_of_scope_counted(self):
+        records = self._run(_response("FINDINGS", finding_path="scripts/other.py"))
+        r = records[0]
+        self.assertEqual(r["out_of_scope"], 1)
+
+    def test_blocked_emits_escalated_true(self):
+        records = self._run("STATUS: BLOCKED\nSUMMARY: cannot review")
+        r = records[0]
+        self.assertEqual(r["outcome"], "BLOCKED")
+        self.assertTrue(r["escalated"])
+        self.assertEqual(r["findings_count"], 0)
+
+    def test_task_id_and_attempt_passed_through(self):
+        records = self._run(
+            "STATUS: PASS\nSUMMARY: ok",
+            extra_args=["--task-id", "T3", "--attempt", "1"],
+        )
+        r = records[0]
+        self.assertEqual(r["task_id"], "T3")
+        self.assertEqual(r["attempt"], 1)
+
+
+# ---------------------------------------------------------------------------
+# Reconcile — unit tests for the D8 deterministic reconciliation function
+# ---------------------------------------------------------------------------
+
+def _finding(path="scripts/a.py", line=10, severity="major", scope="in-scope", **kw):
+    return {"path": path, "line": line, "severity": severity,
+            "scope": scope, "detail": "d", "suggestion": "s", **kw}
+
+
+def _pass_result(status="pass", findings=None, summary="ok"):
+    return {"status": status, "summary": summary,
+            "findings": findings or [], "changed_paths": ["scripts/a.py"]}
+
+
+class ReconcileUnit(unittest.TestCase):
+    def test_hp1_three_pass_all_pass_no_findings(self):
+        passes = [_pass_result("pass"), _pass_result("pass"), _pass_result("pass")]
+        agg = _mod.reconcile(passes, ["scripts/a.py"])
+        self.assertEqual(agg["status"], "pass")
+        self.assertEqual(agg["findings"], [])
+        self.assertEqual(agg["reconciliation"]["consensus_count"], 0)
+
+    def test_consensus_finding_present_in_two_passes(self):
+        f = _finding()
+        passes = [
+            _pass_result("findings", [f]),
+            _pass_result("findings", [f]),
+            _pass_result("pass"),
+        ]
+        agg = _mod.reconcile(passes, ["scripts/a.py"])
+        self.assertEqual(agg["reconciliation"]["consensus_count"], 1)
+        self.assertEqual(agg["reconciliation"]["pass_specific_count"], 0)
+        self.assertEqual(agg["findings"], agg["reconciliation"]["consensus"])
+
+    def test_pass_specific_finding_in_one_pass_only(self):
+        f = _finding()
+        passes = [
+            _pass_result("findings", [f]),
+            _pass_result("pass"),
+        ]
+        agg = _mod.reconcile(passes, ["scripts/a.py"])
+        self.assertEqual(agg["reconciliation"]["pass_specific_count"], 1)
+        self.assertEqual(agg["reconciliation"]["consensus_count"], 0)
+
+    def test_severity_inconsistent_same_path_line_different_severity(self):
+        f_major = _finding(severity="major")
+        f_minor = _finding(severity="minor")
+        passes = [
+            _pass_result("findings", [f_major]),
+            _pass_result("findings", [f_minor]),
+        ]
+        agg = _mod.reconcile(passes, ["scripts/a.py"])
+        self.assertEqual(agg["reconciliation"]["severity_inconsistent_count"], 2)
+        self.assertEqual(agg["reconciliation"]["pass_specific_count"], 0)
+
+    def test_location_inconsistent_within_three_lines_different_passes(self):
+        f1 = _finding(line=10)
+        f2 = _finding(line=12)
+        passes = [
+            _pass_result("findings", [f1]),
+            _pass_result("findings", [f2]),
+        ]
+        agg = _mod.reconcile(passes, ["scripts/a.py"])
+        self.assertEqual(agg["reconciliation"]["location_inconsistent_count"], 2)
+
+    def test_location_not_clustered_beyond_three_lines(self):
+        f1 = _finding(line=10)
+        f2 = _finding(line=14)
+        passes = [
+            _pass_result("findings", [f1]),
+            _pass_result("findings", [f2]),
+        ]
+        agg = _mod.reconcile(passes, ["scripts/a.py"])
+        self.assertEqual(agg["reconciliation"]["location_inconsistent_count"], 0)
+        # both are truly solo pass-specific
+        self.assertEqual(agg["reconciliation"]["pass_specific_count"], 2)
+
+    def test_likely_false_positive_pass_specific_and_out_of_scope(self):
+        f = _finding(path="scripts/other.py", scope="out-of-scope")
+        passes = [
+            _pass_result("findings", [f]),
+            _pass_result("pass"),
+        ]
+        agg = _mod.reconcile(passes, ["scripts/a.py"])
+        self.assertEqual(agg["reconciliation"]["likely_false_positive_count"], 1)
+        self.assertEqual(agg["reconciliation"]["pass_specific_count"], 0)
+
+    def test_aggregate_status_findings_when_any_pass_has_findings(self):
+        passes = [
+            _pass_result("findings", [_finding()]),
+            _pass_result("pass"),
+        ]
+        agg = _mod.reconcile(passes, ["scripts/a.py"])
+        self.assertEqual(agg["status"], "findings")
+
+    def test_aggregate_status_pass_when_all_passes_pass(self):
+        passes = [_pass_result("pass"), _pass_result("pass")]
+        agg = _mod.reconcile(passes, ["scripts/a.py"])
+        self.assertEqual(agg["status"], "pass")
+
+
+# ---------------------------------------------------------------------------
+# MultiPassCli — integration tests for the N-pass loop and quorum via CLI
+# ---------------------------------------------------------------------------
+
+class MultiPassCli(unittest.TestCase):
+    def _run_multi(self, pass_responses, extra_args=None):
+        """Run main() with --passes N mocking stream_chat to return each response in order."""
+        responses = list(pass_responses)
+        call_count = [0]
+
+        def _mock_stream(*a, **kw):
+            idx = call_count[0]
+            call_count[0] += 1
+            resp = responses[idx] if idx < len(responses) else "STATUS: PASS\nSUMMARY: ok"
+            if isinstance(resp, Exception):
+                raise resp
+            return resp
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out_path = os.path.join(tmp, "result.json")
+            packet_file = os.path.join(tmp, "packet.md")
+            with open(packet_file, "w") as f:
+                f.write(_packet())
+
+            n = len(pass_responses)
+            argv = ([_SCRIPT, packet_file, "--out", out_path, "--passes", str(n)]
+                    + (extra_args or []))
+            with patch("sys.argv", argv), \
+                 patch.object(_mod.gemma_local, "ensure_model_available"), \
+                 patch.object(_mod.gemma_local, "stream_chat", side_effect=_mock_stream), \
+                 patch.object(_mod.gemma_local, "append_audit_log"):
+                exit_code = _mod.main()
+
+            aggregate = None
+            if os.path.exists(out_path):
+                with open(out_path) as f:
+                    aggregate = json.load(f)
+
+            pass_artifacts = []
+            for k in range(1, n + 1):
+                p = out_path.replace(".json", f".pass{k}.json")
+                if os.path.exists(p):
+                    with open(p) as f:
+                        pass_artifacts.append(json.load(f))
+                else:
+                    pass_artifacts.append(None)
+
+        return exit_code, aggregate, pass_artifacts
+
+    def test_hp1_three_of_three_pass_exit_zero_no_degraded(self):
+        ec, agg, _ = self._run_multi([
+            "STATUS: PASS\nSUMMARY: ok",
+            "STATUS: PASS\nSUMMARY: ok",
+            "STATUS: PASS\nSUMMARY: ok",
+        ])
+        self.assertEqual(ec, 0)
+        self.assertFalse(agg["degraded"])
+        self.assertEqual(agg["passes_run"], 3)
+        self.assertEqual(agg["passes_succeeded"], 3)
+
+    def test_two_of_three_degraded_exit_zero(self):
+        ec, agg, _ = self._run_multi([
+            "STATUS: PASS\nSUMMARY: ok",
+            RuntimeError("simulated failure"),
+            "STATUS: PASS\nSUMMARY: ok",
+        ])
+        self.assertEqual(ec, 0)
+        self.assertTrue(agg["degraded"])
+        self.assertEqual(agg["passes_succeeded"], 2)
+
+    def test_one_of_three_quorum_fails_exit_nonzero_no_aggregate(self):
+        ec, agg, _ = self._run_multi([
+            "STATUS: PASS\nSUMMARY: ok",
+            RuntimeError("fail"),
+            RuntimeError("fail"),
+        ])
+        self.assertNotEqual(ec, 0)
+        self.assertIsNone(agg)
+
+    def test_truncation_fails_pass(self):
+        ec, agg, _ = self._run_multi([
+            "STATUS: PASS\nSUMMARY: ok",
+            RuntimeError("done_reason='length' truncated"),
+            "STATUS: PASS\nSUMMARY: ok",
+        ])
+        self.assertEqual(ec, 0)
+        self.assertTrue(agg["degraded"])
+
+    def test_per_pass_artifacts_written(self):
+        _, _, artifacts = self._run_multi([
+            "STATUS: PASS\nSUMMARY: ok",
+            "STATUS: PASS\nSUMMARY: ok",
+            "STATUS: PASS\nSUMMARY: ok",
+        ])
+        self.assertEqual(len([a for a in artifacts if a is not None]), 3)
+
+    def test_passes_1_backward_compat_no_reconciliation(self):
+        """--passes 1 must produce output without a reconciliation block."""
+        with tempfile.TemporaryDirectory() as tmp:
+            out_path = os.path.join(tmp, "result.json")
+            packet_file = os.path.join(tmp, "packet.md")
+            with open(packet_file, "w") as f:
+                f.write(_packet())
+            argv = [_SCRIPT, packet_file, "--out", out_path, "--passes", "1"]
+            with patch("sys.argv", argv), \
+                 patch.object(_mod.gemma_local, "ensure_model_available"), \
+                 patch.object(_mod.gemma_local, "stream_chat",
+                              return_value="STATUS: PASS\nSUMMARY: ok"), \
+                 patch.object(_mod.gemma_local, "append_audit_log"):
+                ec = _mod.main()
+            with open(out_path) as f:
+                result = json.load(f)
+        self.assertEqual(ec, 0)
+        self.assertNotIn("reconciliation", result)
+        self.assertNotIn("passes_run", result)
+
+    def test_aggregate_has_reconciliation_block(self):
+        ec, agg, _ = self._run_multi([
+            "STATUS: PASS\nSUMMARY: ok",
+            "STATUS: PASS\nSUMMARY: ok",
+        ])
+        self.assertEqual(ec, 0)
+        self.assertIn("reconciliation", agg)
+        rec = agg["reconciliation"]
+        for key in ("consensus", "pass_specific", "severity_inconsistent",
+                    "location_inconsistent", "likely_false_positive",
+                    "consensus_count", "pass_specific_count"):
+            self.assertIn(key, rec)
+
+    def test_consensus_finding_in_aggregate(self):
+        finding_response = _response("FINDINGS", severity="major")
+        ec, agg, _ = self._run_multi([finding_response, finding_response])
+        self.assertEqual(ec, 0)
+        self.assertEqual(agg["reconciliation"]["consensus_count"], 1)
+        self.assertEqual(agg["reconciliation"]["pass_specific_count"], 0)
+
+
+# ---------------------------------------------------------------------------
+# MultiPassCliAudit — verify append_audit_log is called with D12 fields
+# ---------------------------------------------------------------------------
+
+class MultiPassCliAudit(unittest.TestCase):
+    def _run_audit(self, pass_responses, extra_args=None):
+        """Run multi-pass main() and capture audit records."""
+        responses = list(pass_responses)
+        call_count = [0]
+        captured = []
+
+        def _mock_stream(*a, **kw):
+            idx = call_count[0]
+            call_count[0] += 1
+            resp = responses[idx] if idx < len(responses) else "STATUS: PASS\nSUMMARY: ok"
+            if isinstance(resp, Exception):
+                raise resp
+            return resp
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out_path = os.path.join(tmp, "result.json")
+            packet_file = os.path.join(tmp, "packet.md")
+            with open(packet_file, "w") as f:
+                f.write(_packet())
+
+            n = len(pass_responses)
+            argv = ([_SCRIPT, packet_file, "--out", out_path, "--passes", str(n)]
+                    + (extra_args or []))
+            with patch("sys.argv", argv), \
+                 patch.object(_mod.gemma_local, "ensure_model_available"), \
+                 patch.object(_mod.gemma_local, "stream_chat", side_effect=_mock_stream), \
+                 patch.object(_mod.gemma_local, "append_audit_log",
+                              side_effect=lambda r: captured.append(r)):
+                _mod.main()
+
+        return captured
+
+    def test_multipass_pass_emits_one_record_with_d12_fields(self):
+        records = self._run_audit([
+            "STATUS: PASS\nSUMMARY: ok",
+            "STATUS: PASS\nSUMMARY: ok",
+            "STATUS: PASS\nSUMMARY: ok",
+        ])
+        self.assertEqual(len(records), 1)
+        r = records[0]
+        self.assertEqual(r["role"], "reviewer")
+        self.assertEqual(r["outcome"], "PASS")
+        self.assertEqual(r["passes_run"], 3)
+        self.assertEqual(r["passes_succeeded"], 3)
+        self.assertFalse(r["degraded"])
+        self.assertIn("consensus_count", r)
+        self.assertIn("pass_specific_count", r)
+        self.assertIn("severity_inconsistent_count", r)
+        self.assertIn("likely_false_positive_count", r)
+
+    def test_degraded_run_reflected_in_audit_record(self):
+        records = self._run_audit([
+            "STATUS: PASS\nSUMMARY: ok",
+            RuntimeError("fail"),
+            "STATUS: PASS\nSUMMARY: ok",
+        ])
+        self.assertEqual(len(records), 1)
+        r = records[0]
+        self.assertTrue(r["degraded"])
+        self.assertEqual(r["passes_succeeded"], 2)
+        self.assertEqual(r["passes_run"], 3)
+
+    def test_quorum_failure_emits_no_audit_record(self):
+        records = self._run_audit([
+            "STATUS: PASS\nSUMMARY: ok",
+            RuntimeError("fail"),
+            RuntimeError("fail"),
+        ])
+        self.assertEqual(records, [])
+
+    def test_consensus_count_in_audit_record(self):
+        finding_response = _response("FINDINGS", severity="major")
+        records = self._run_audit([finding_response, finding_response])
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["consensus_count"], 1)
+        self.assertEqual(records[0]["pass_specific_count"], 0)
+
+    def test_passes_1_audit_has_no_d12_fields(self):
+        """--passes 1 (T3 path) must not include D12 fields in the audit record."""
+        captured = []
+        with tempfile.TemporaryDirectory() as tmp:
+            out_path = os.path.join(tmp, "result.json")
+            packet_file = os.path.join(tmp, "packet.md")
+            with open(packet_file, "w") as f:
+                f.write(_packet())
+            argv = [_SCRIPT, packet_file, "--out", out_path, "--passes", "1"]
+            with patch("sys.argv", argv), \
+                 patch.object(_mod.gemma_local, "ensure_model_available"), \
+                 patch.object(_mod.gemma_local, "stream_chat",
+                              return_value="STATUS: PASS\nSUMMARY: ok"), \
+                 patch.object(_mod.gemma_local, "append_audit_log",
+                              side_effect=lambda r: captured.append(r)):
+                _mod.main()
+        self.assertEqual(len(captured), 1)
+        r = captured[0]
+        self.assertNotIn("passes_run", r)
+        self.assertNotIn("consensus_count", r)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,8 @@
+{
+  "outcome": "BLOCKED",
+  "passes_run": 3,
+  "passes_succeeded": 1,
+  "quorum_met": false,
+  "reason": "Quorum not met: only 1 of 3 passes succeeded. Pass 2 returned BLOCKED (packet not reviewable). Pass 3 exceeded wall timeout (900s). Aggregate not written.",
+  "action_required": "Spawn context-isolated subagent as mandatory fallback reviewer (should_adjudicate(aggregate, band, gemma_blocked=True) == True). Feed isolation packet: diff + acceptance criteria + partial findings from pass 1."
+}

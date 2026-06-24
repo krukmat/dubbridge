@@ -95,17 +95,22 @@ When approval is required (RRI > 25), end the presentation with:
 
 ## Gemma Reviewer availability
 
-Gemma Reviewer is **required-when-available** for Low (0–25) and Moderate (26–40)
-development task code reviews. Its absence never opens a human approval gate that
-the RRI band would not otherwise require, and never blocks task completion.
+The review step is **mandatory** for all Low (0–25) and Moderate (26–40)
+development tasks. Gemma is the preferred reviewer; the context-isolated subagent
+(D14, `scripts/adjudicator-packet.py`) is the required fallback.
 
-When Ollama or the configured model is unavailable, the agent records
-`BLOCKED` review evidence in the task completion record, performs the normal
-primary-agent Reflection review, and reports the skipped Gemma evidence explicitly.
-This is the complete reporting obligation — no additional gate is added.
+When Ollama is unavailable, the model is absent, or fewer than 2 of N passes
+succeed (quorum failure), the agent **must** spawn a context-isolated subagent as
+the mandatory fallback reviewer. The subagent receives an isolation packet
+(diff + acceptance criteria + any partial findings) and its output is advisory,
+exactly as Gemma's would be. The primary agent reconciles and records
+`disposition_divergence` in the audit log.
+
+Neither quorum failure nor Gemma unavailability opens a human approval gate
+beyond what the RRI band already requires. The review is never skipped.
 
 See `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer` for the full
-authority boundary and evidence format.
+authority boundary, trigger conditions, and evidence format.
 
 ## Related
 

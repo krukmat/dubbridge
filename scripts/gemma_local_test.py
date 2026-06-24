@@ -111,6 +111,112 @@ class TaggedHelpers(unittest.TestCase):
         self.assertIn("STATUS", str(ctx.exception))
 
 
+class AuditLog(unittest.TestCase):
+    def _run(self, record, *, now=None, tmp=None):
+        import datetime as dt
+        ts = now or dt.datetime(2026, 6, 24, 12, 0, 0)
+        log_dir = os.path.join(tmp, "logs", "gemma-audit")
+        orig_cwd = os.getcwd()
+        os.chdir(tmp)
+        try:
+            gemma_local.append_audit_log(record, now=ts)
+        finally:
+            os.chdir(orig_cwd)
+        log_path = os.path.join(log_dir, "2026-06.jsonl")
+        return log_path
+
+    def test_hp1_automatic_fields_only(self):
+        import datetime as dt
+        with tempfile.TemporaryDirectory() as tmp:
+            record = {
+                "ts": "2026-06-24T12:00:00Z", "role": "developer",
+                "outcome": "PATCH", "done_reason": "stop", "mode": "full-file",
+                "elapsed_s": 1.2, "escalated": False,
+                "system_prompt": "sys", "user_prompt": "user",
+                "task_id": None, "rri": None, "band": None,
+                "attempt": None, "disposition": None,
+            }
+            log_path = self._run(record, tmp=tmp)
+            with open(log_path, encoding="utf-8") as f:
+                lines = f.readlines()
+            self.assertEqual(len(lines), 1)
+            parsed = json.loads(lines[0])
+            self.assertEqual(parsed["role"], "developer")
+            self.assertIsNone(parsed["task_id"])
+            self.assertEqual(parsed["system_prompt"], "sys")
+
+    def test_hp2_orchestrator_fields_populated(self):
+        import datetime as dt
+        with tempfile.TemporaryDirectory() as tmp:
+            record = {
+                "ts": "2026-06-24T12:00:00Z", "role": "reviewer",
+                "outcome": "FINDINGS", "done_reason": "stop", "mode": "n/a",
+                "elapsed_s": 3.0, "escalated": False,
+                "system_prompt": "sys", "user_prompt": "user",
+                "task_id": "T5", "rri": 40, "band": "Moderate",
+                "attempt": 1, "disposition": None,
+            }
+            log_path = self._run(record, tmp=tmp)
+            with open(log_path, encoding="utf-8") as f:
+                parsed = json.loads(f.read())
+            self.assertEqual(parsed["task_id"], "T5")
+            self.assertEqual(parsed["band"], "Moderate")
+
+    def test_ec1_directory_auto_created(self):
+        import datetime as dt
+        with tempfile.TemporaryDirectory() as tmp:
+            record = {"role": "developer", "system_prompt": "s", "user_prompt": "u"}
+            log_path = self._run(record, tmp=tmp)
+            self.assertTrue(os.path.exists(log_path))
+
+    def test_ec2_secret_redacted_in_prompts(self):
+        import datetime as dt
+        with tempfile.TemporaryDirectory() as tmp:
+            record = {
+                "role": "developer",
+                "system_prompt": "normal text",
+                "user_prompt": "API_KEY=supersecret do something",
+            }
+            log_path = self._run(record, tmp=tmp)
+            with open(log_path, encoding="utf-8") as f:
+                line = f.read()
+            self.assertNotIn("supersecret", line)
+            self.assertIn("REDACTED", line)
+
+    def test_ec3_two_appends_produce_two_lines(self):
+        import datetime as dt
+        with tempfile.TemporaryDirectory() as tmp:
+            ts = dt.datetime(2026, 6, 24, 12, 0, 0)
+            record = {"role": "developer", "system_prompt": "s", "user_prompt": "u"}
+            orig_cwd = os.getcwd()
+            os.chdir(tmp)
+            try:
+                gemma_local.append_audit_log(record, now=ts)
+                gemma_local.append_audit_log(record, now=ts)
+            finally:
+                os.chdir(orig_cwd)
+            log_path = os.path.join(tmp, "logs", "gemma-audit", "2026-06.jsonl")
+            with open(log_path, encoding="utf-8") as f:
+                lines = [l for l in f.readlines() if l.strip()]
+            self.assertEqual(len(lines), 2)
+
+    def test_month_rollover(self):
+        import datetime as dt
+        with tempfile.TemporaryDirectory() as tmp:
+            record = {"role": "reviewer", "system_prompt": "s", "user_prompt": "u"}
+            orig_cwd = os.getcwd()
+            os.chdir(tmp)
+            try:
+                gemma_local.append_audit_log(record, now=dt.datetime(2026, 5, 31))
+                gemma_local.append_audit_log(record, now=dt.datetime(2026, 6, 1))
+            finally:
+                os.chdir(orig_cwd)
+            log_dir = os.path.join(tmp, "logs", "gemma-audit")
+            files = sorted(os.listdir(log_dir))
+            self.assertIn("2026-05.jsonl", files)
+            self.assertIn("2026-06.jsonl", files)
+
+
 class _FakeResponse:
     def __init__(self, lines, block_after=None, delay_per_line=0):
         self._lines = list(lines)

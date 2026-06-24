@@ -6,6 +6,7 @@ Run: python3 scripts/delegate_low_rri_test.py
 """
 
 import importlib.util
+import io
 import json
 import os
 import socket
@@ -742,6 +743,91 @@ class TimeoutExitCodes(unittest.TestCase):
         exc = _mod.DelegationWallTimeout(900)
         self.assertEqual(exc.exit_code, 124)
         self.assertIn("900", str(exc))
+
+
+# ---------------------------------------------------------------------------
+# AuditEmission — verify append_audit_log is called with the right shape
+# ---------------------------------------------------------------------------
+class AuditEmission(unittest.TestCase):
+    def _run(self, stream_response, extra_args=None):
+        captured = []
+        with tempfile.TemporaryDirectory() as tmp:
+            out_path = os.path.join(tmp, "result.json")
+            packet_file = os.path.join(tmp, "packet.md")
+            with open(packet_file, "w") as f:
+                f.write("# test packet\n")
+
+            argv = [_SCRIPT, packet_file, "--out", out_path] + (extra_args or [])
+            with patch("sys.argv", argv), \
+                 patch.object(_mod, "ensure_model_available"), \
+                 patch.object(_mod, "stream_chat", return_value=stream_response), \
+                 patch.object(_mod.gemma_local, "append_audit_log",
+                              side_effect=lambda r: captured.append(r)):
+                _mod.main()
+        return captured
+
+    def test_patch_emits_one_record_with_developer_role(self):
+        response = "STATUS: PATCH\nSUMMARY: ok\n=== FILE START ===\nPATH: scripts/x.py\nACTION: create\n--- CONTENT ---\nx = 1\n=== FILE END ==="
+        records = self._run(response)
+        self.assertEqual(len(records), 1)
+        r = records[0]
+        self.assertEqual(r["role"], "developer")
+        self.assertEqual(r["outcome"], "PATCH")
+        self.assertEqual(r["done_reason"], "stop")
+        self.assertFalse(r["escalated"])
+        self.assertIn("system_prompt", r)
+        self.assertIn("user_prompt", r)
+        self.assertIsNone(r["task_id"])
+        self.assertIsNone(r["attempt"])
+        self.assertEqual(r["apply_result"], "skipped")
+
+    def test_no_patch_emits_skipped_apply_result(self):
+        records = self._run("STATUS: NO_PATCH\nSUMMARY: nothing to do")
+        self.assertEqual(len(records), 1)
+        r = records[0]
+        self.assertEqual(r["outcome"], "NO_PATCH")
+        self.assertEqual(r["apply_result"], "skipped")
+        self.assertFalse(r["escalated"])
+
+    def test_blocked_emits_escalated_true(self):
+        records = self._run("STATUS: BLOCKED\nSUMMARY: cannot proceed")
+        self.assertEqual(len(records), 1)
+        r = records[0]
+        self.assertEqual(r["outcome"], "BLOCKED")
+        self.assertTrue(r["escalated"])
+        self.assertEqual(r["apply_result"], "skipped")
+
+    def test_task_id_and_attempt_passed_through(self):
+        records = self._run(
+            "STATUS: NO_PATCH\nSUMMARY: ok",
+            extra_args=["--task-id", "T2", "--attempt", "2"],
+        )
+        r = records[0]
+        self.assertEqual(r["task_id"], "T2")
+        self.assertEqual(r["attempt"], 2)
+
+    def test_diff_added_removed_counted(self):
+        response = "STATUS: PATCH\nSUMMARY: ok\n=== FILE START ===\nPATH: scripts/x.py\nACTION: create\n--- CONTENT ---\nx = 1\n=== FILE END ==="
+        fake_diff = "+++ b/scripts/x.py\n+x = 1\n+y = 2\n--- a/scripts/x.py\n-old = 0\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            out_path = os.path.join(tmp, "result.json")
+            packet_file = os.path.join(tmp, "packet.md")
+            with open(packet_file, "w") as f:
+                f.write("# test packet\n")
+            argv = [_SCRIPT, packet_file, "--out", out_path,
+                    "--allow-path", "scripts/"]
+            captured = []
+            with patch("sys.argv", argv), \
+                 patch.object(_mod, "ensure_model_available"), \
+                 patch.object(_mod, "stream_chat", return_value=response), \
+                 patch.object(_mod, "build_diff", return_value=fake_diff), \
+                 patch.object(_mod, "validate_file_actions"), \
+                 patch.object(_mod.gemma_local, "append_audit_log",
+                              side_effect=lambda r: captured.append(r)):
+                _mod.main()
+        r = captured[0]
+        self.assertEqual(r["diff_added"], 2)
+        self.assertEqual(r["diff_removed"], 1)
 
 
 if __name__ == "__main__":

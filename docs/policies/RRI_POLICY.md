@@ -467,8 +467,15 @@ The **Low band (0–25)** distinguishes two separate local model roles:
 A task may use Gemma Developer for its implementation and Gemma Reviewer for its
 code review in separate invocations. Gemma Reviewer must not be used as a
 substitute for the primary agent's final Reflection cycle; it is advisory input
-to that cycle. See `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer` for
-the full trigger, authority boundary, and completion evidence contract.
+to that cycle.
+
+The review step is **mandatory for all development tasks**. Gemma is the preferred
+path (N sequential passes, default 3); the context-isolated subagent (D14) is the
+required fallback when Gemma is unavailable or quorum fails. The completion evidence
+block records passes run/succeeded, quorum result, aggregate status,
+consensus/disagreement counts, `degraded` flag, isolated adjudicator status, and
+`disposition_divergence`. See `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma
+Reviewer` for the full trigger, authority boundary, and evidence format.
 
 ## Related
 

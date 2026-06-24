@@ -41,6 +41,7 @@ Run `make qa-docs` before reporting an ADR change complete.
 | [ADR-031](ADR-031-mobile-jwt-credential-auth-fenix-parity.md) | Mobile credential login with backend-issued JWT (FenixCRM parity) | Accepted (supersedes ADR-023/024; amends ADR-029; slice S-200) |
 | [ADR-032](ADR-032-hls-playback-delivery-boundary.md) | HLS playback delivery boundary | Accepted |
 | [ADR-033](ADR-033-open-knowledge-format-adoption.md) | Adopt the Open Knowledge Format (OKF) for repository knowledge | Accepted |
+| [ADR-034](ADR-034-gemma-process-audit-and-reviewer-reconciliation.md) | Gemma process audit log and reviewer multi-pass reconciliation contract | Accepted (scope: gemma-audit-and-triple-pass slice) |
 
 ## Backfill note
 

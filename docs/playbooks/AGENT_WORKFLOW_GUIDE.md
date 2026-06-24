@@ -616,7 +616,14 @@ the patch-delegation path for eligible simple code patches.
 For development tasks with RRI 0–40, after implementation is complete:
 
 1. Implementation completes (primary agent or eligible Gemma Developer).
-2. Gemma Reviewer runs (advisory findings via `scripts/gemma-code-review.py`).
+2. Gemma Reviewer runs N sequential passes (default 3, `--passes N`,
+   env `DUBBRIDGE_REVIEW_PASSES`) via `scripts/gemma-code-review.py`.
+   - **≥2 of N passes succeed** → deterministic reconciliation produces an
+     aggregate (exactly 2/N ⇒ `degraded: true`). Findings are classified as
+     `consensus`, `pass-specific`, `severity-inconsistent`,
+     `location-inconsistent`, or `likely-false-positive`.
+   - **`--passes 1`** → reproduces the previous single-pass behavior exactly.
+   - **<2 passes succeed or Gemma unavailable** → see Availability below.
 3. The primary agent runs its Reflection cycle, treating Gemma Reviewer findings
    as one input and recording the disposition in `### Reflection log`.
 
@@ -625,10 +632,45 @@ Reflection cycle.
 
 ### Availability
 
-Gemma Reviewer is **required-when-available**. Absence of a local Ollama/model
-never blocks closing a Low/Moderate task. When unavailable, the agent records
-`BLOCKED` review evidence, runs the normal primary-agent Reflection cycle, and
-reports the skipped Gemma evidence in the task completion record.
+The review step is **mandatory for all Low/Moderate development tasks**.
+Gemma is the preferred path; the **context-isolated subagent** (D14) is the
+required fallback.
+
+- **Gemma available, quorum met (≥2 passes):** run `make qa-gemma-review`.
+- **Gemma unavailable or quorum fails (<2 passes):** the agent must spawn a
+  context-isolated subagent as the mandatory fallback reviewer. The subagent
+  receives an isolation packet (diff + acceptance criteria + any partial
+  findings) and its output is advisory, exactly as Gemma's. The primary agent
+  reconciles and records `disposition_divergence` in the audit log.
+- **Neither path may be skipped.** No additional human approval gate beyond
+  what the RRI band already requires is opened by using the fallback.
+
+Docs-only, config-only, migration-only, ADR, plan, task-ledger, and policy-only
+work are exempt from this review requirement.
+
+### Context-isolated adjudicator (D14)
+
+When the D14 trigger fires, the disposition of findings is adjudicated by a
+fresh subagent or fresh session — fed **only** the final diff, the acceptance
+criteria, and the reconciled findings — never the development transcript or
+chain-of-thought. The `scripts/adjudicator-packet.py` module implements the
+trigger gate (`should_adjudicate()`) and the isolation packet builder
+(`build_adjudicator_packet()`).
+
+**Trigger conditions (any one fires):**
+
+| Condition | Detail |
+|---|---|
+| Gemma blocked / quorum failure | `gemma_blocked=True` — mandatory fallback |
+| Consensus blocking or major finding | any `consensus` finding with `severity` in `blocking`, `major` |
+| Band ≥ Med-high | slice band is `Med-high` or `Complex` |
+| Inter-pass disagreement | `severity_inconsistent_count > 0` or `location_inconsistent_count > 0` |
+
+**Authority:** the adjudicator is advisory — it never closes the task. The
+primary agent reconciles its disposition against the adjudicator's and records
+`disposition_divergence` (`"none"`, `"partial"`, or `"full"`) in the audit log.
+Simulated self-review ("re-read as if reviewing someone else's code") is
+retained **only** when none of the above trigger conditions are present.
 
 ### Scope
 
@@ -643,14 +685,21 @@ Task completion records for Low/Moderate development tasks must include:
 ### Gemma Reviewer evidence
 
 - Model: `<resolved DUBBRIDGE_REVIEW_MODEL, else DUBBRIDGE_LOW_RRI_MODEL>`
-- Command: `<exact command>`
-- Status: `PASS|FINDINGS|BLOCKED`
+- Command: `<exact command, e.g. make qa-gemma-review>`
+- Passes run / succeeded: `<N>/<N>` (e.g. `3/3`, `2/3 degraded`)
+- Quorum: `met | failed`
+- Aggregate status: `PASS | FINDINGS | BLOCKED`
+- Consensus findings: `<count>` | Pass-specific: `<count>` | Disagreement: `<count>`
+- Degraded: `true | false`
+- Artifacts: `<path to result.json and per-pass result.passK.json, if persisted>`
+- Isolated adjudicator: `spawned | not triggered` — trigger: `<condition or n/a>`
+- disposition_divergence: `none | partial | full | null`
 - Primary-agent disposition: `<accepted findings / rejected false positives / repaired>`
-- Result artifact: `<path to local result JSON or markdown, if persisted>`
 ```
 
-Run the reviewer with `make qa-gemma-review` (local only; not required in
-GitHub-hosted CI until an Ollama-capable runner is available).
+`--passes 1` collapses to the single-pass form (no reconciliation fields, no
+per-pass artifacts). Run the reviewer with `make qa-gemma-review` (local only;
+not required in GitHub-hosted CI until an Ollama-capable runner is available).
 
 ## Related
 

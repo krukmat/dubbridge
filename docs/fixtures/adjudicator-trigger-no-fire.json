@@ -1,0 +1,43 @@
+{
+  "scenario": "Low band, 3/3 PASS, no findings — trigger does not fire; no packet, no spawn.",
+  "input": {
+    "band": "Low",
+    "gemma_blocked": false,
+    "aggregate": {
+      "status": "pass",
+      "summary": "No issues found. append_audit_log writes correctly to the monthly JSONL file.",
+      "changed_paths": ["scripts/gemma_local.py"],
+      "findings": [],
+      "degraded": false,
+      "passes_run": 3,
+      "passes_succeeded": 3,
+      "reconciliation": {
+        "consensus": [],
+        "consensus_count": 0,
+        "pass_specific": [],
+        "pass_specific_count": 0,
+        "severity_inconsistent": [],
+        "severity_inconsistent_count": 0,
+        "location_inconsistent": [],
+        "location_inconsistent_count": 0,
+        "likely_false_positive": [],
+        "likely_false_positive_count": 0
+      }
+    }
+  },
+  "trigger_evaluation": {
+    "should_adjudicate": false,
+    "reasons": [
+      "band=Low is below Med-high threshold",
+      "no consensus blocking or major findings",
+      "no inter-pass disagreement (severity_inconsistent_count=0, location_inconsistent_count=0)",
+      "gemma_blocked=False"
+    ]
+  },
+  "isolation_packet": null,
+  "adjudicator_output": null,
+  "primary_reconciliation": {
+    "note": "Trigger did not fire. Primary agent runs simulated self-review (Reflection cycle) as per workflow guide — retained below trigger threshold.",
+    "disposition_divergence": null
+  }
+}

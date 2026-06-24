@@ -1,0 +1,24 @@
+{
+  "changed_paths": [
+    "scripts/delegate-low-rri.py",
+    "scripts/delegate_low_rri_test.py"
+  ],
+  "degraded": true,
+  "findings": [],
+  "passes_run": 3,
+  "passes_succeeded": 2,
+  "reconciliation": {
+    "consensus": [],
+    "consensus_count": 0,
+    "likely_false_positive": [],
+    "likely_false_positive_count": 0,
+    "location_inconsistent": [],
+    "location_inconsistent_count": 0,
+    "pass_specific": [],
+    "pass_specific_count": 0,
+    "severity_inconsistent": [],
+    "severity_inconsistent_count": 0
+  },
+  "status": "pass",
+  "summary": "No consensus issues found across the two successful passes. Pass 3 failed (Ollama wall timeout). Aggregate is degraded; primary agent should treat findings with reduced confidence and consider re-running when Ollama is stable."
+}

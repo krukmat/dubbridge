@@ -5,8 +5,11 @@ transport, common generation options, timeout behavior, packet IO, and atomic
 result writing so developer and reviewer roles do not drift.
 """
 
+import datetime
 import json
 import os
+import pathlib
+import re
 import socket
 import sys
 import time
@@ -189,6 +192,26 @@ def parse_header_value(line, label, error_prefix):
     if not value:
         raise RuntimeError(f"{error_prefix}: empty {label} value")
     return value
+
+
+_SECRET_PATTERN = re.compile(
+    r'(api[_\-]?key|token|password|secret|credential)[^\s]*\s*[=:]\s*\S+',
+    re.IGNORECASE,
+)
+
+
+def _redact(value):
+    return _SECRET_PATTERN.sub(r'\1=***REDACTED***', value)
+
+
+def append_audit_log(record, *, now=None):
+    ts = now or datetime.datetime.utcnow()
+    log_dir = pathlib.Path("logs/gemma-audit")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / ts.strftime("%Y-%m.jsonl")
+    safe = {k: (_redact(v) if isinstance(v, str) else v) for k, v in record.items()}
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(safe, sort_keys=True) + "\n")
 
 
 def write_result(delegation, out_path):

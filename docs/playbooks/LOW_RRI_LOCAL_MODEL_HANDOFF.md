@@ -227,6 +227,28 @@ Gemma role.
 See `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer` for the Gemma
 Reviewer authority boundary, trigger conditions, and completion evidence format.
 
+## Audit log
+
+Every invocation of Gemma Developer (`scripts/delegate-low-rri.py`) and Gemma
+Reviewer (`scripts/gemma-code-review.py`) appends one JSONL record to
+`logs/gemma-audit/YYYY-MM.jsonl` via `scripts/gemma_local.py:append_audit_log()`.
+The log is local telemetry only — git-ignored, never committed, never required
+by remote CI.
+
+Developer-specific audit fields: `mode`, `file_lines`, `file_tokens_est`,
+`packet_tokens_est`, `response_tokens`, `done_reason`, `diff_added`,
+`diff_removed`, `scope_violations`, `apply_result`, `verify_ok`, `elapsed_s`,
+`escalated`.
+
+Reviewer-specific audit fields (multi-pass): `findings_count`,
+`findings_by_severity`, `out_of_scope`, `passes_run`, `passes_succeeded`,
+`degraded`, `consensus_count`, `pass_specific_count`,
+`severity_inconsistent_count`, `likely_false_positive_count`,
+`dispositions`, `disposition_divergence`.
+
+Run `python3 scripts/gemma-audit-report.py` for per-role process metrics and
+calibration signals (truncation rate, escalation rate, inter-pass disagreement).
+
 ## Relationship to repo policy
 
 - Workflow authority: `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`

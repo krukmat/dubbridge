@@ -1,0 +1,79 @@
+{
+  "scenario": "Consensus blocking finding on a Med-high task — trigger fires; packet built with diff + criteria + findings only.",
+  "input": {
+    "band": "Med-high",
+    "gemma_blocked": false,
+    "aggregate": {
+      "status": "findings",
+      "summary": "Null pointer dereference when token list is empty.",
+      "changed_paths": ["mobile/src/api/playback.ts"],
+      "findings": [
+        {
+          "path": "mobile/src/api/playback.ts",
+          "line": 47,
+          "severity": "blocking",
+          "detail": "fetchSegments() dereferences response.data.items[0] without checking that items is non-empty. Empty playlist returns 500.",
+          "suggestion": "Guard with 'if (!response.data.items?.length) throw new PlaybackError(...)' before access.",
+          "scope": "in-scope"
+        }
+      ],
+      "degraded": false,
+      "passes_run": 3,
+      "passes_succeeded": 3,
+      "reconciliation": {
+        "consensus": [
+          {
+            "path": "mobile/src/api/playback.ts",
+            "line": 47,
+            "severity": "blocking",
+            "detail": "fetchSegments() dereferences response.data.items[0] without checking that items is non-empty. Empty playlist returns 500.",
+            "suggestion": "Guard with 'if (!response.data.items?.length) throw new PlaybackError(...)' before access.",
+            "scope": "in-scope"
+          }
+        ],
+        "consensus_count": 1,
+        "pass_specific": [],
+        "pass_specific_count": 0,
+        "severity_inconsistent": [],
+        "severity_inconsistent_count": 0,
+        "location_inconsistent": [],
+        "location_inconsistent_count": 0,
+        "likely_false_positive": [],
+        "likely_false_positive_count": 0
+      }
+    }
+  },
+  "trigger_evaluation": {
+    "should_adjudicate": true,
+    "reasons": [
+      "consensus blocking finding (severity=blocking in reconciliation.consensus)",
+      "band=Med-high >= Med-high threshold"
+    ]
+  },
+  "isolation_packet": {
+    "diff": "--- a/mobile/src/api/playback.ts\n+++ b/mobile/src/api/playback.ts\n@@ -44,7 +44,10 @@ export async function fetchSegments(assetId: string): Promise<Segment[]> {\n   const response = await axios.get(`/api/assets/${assetId}/segments`);\n-  return response.data.items[0];\n+  if (!response.data.items?.length) {\n+    throw new PlaybackError('empty segment list', { assetId });\n+  }\n+  return response.data.items[0];",
+    "criteria": "fetchSegments must throw PlaybackError when segment list is empty. Must not crash on 500. Unit test covers the empty-list case.",
+    "reconciled_findings": [
+      {
+        "path": "mobile/src/api/playback.ts",
+        "line": 47,
+        "severity": "blocking",
+        "detail": "fetchSegments() dereferences response.data.items[0] without checking that items is non-empty. Empty playlist returns 500.",
+        "suggestion": "Guard with 'if (!response.data.items?.length) throw new PlaybackError(...)' before access.",
+        "scope": "in-scope"
+      }
+    ],
+    "sections_present": ["diff", "criteria", "reconciled_findings"],
+    "isolation_verified": true,
+    "dev_context_present": false
+  },
+  "adjudicator_output": {
+    "verdict": "The guard clause in the diff correctly addresses the finding. The empty-list check precedes the index access and throws a typed error. Finding accepted.",
+    "disposition": "accepted"
+  },
+  "primary_reconciliation": {
+    "primary_disposition": "accepted",
+    "adjudicator_disposition": "accepted",
+    "disposition_divergence": "none"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "changed_paths": [
+    "scripts/gemma-code-review.py",
+    "scripts/gemma_code_review_test.py"
+  ],
+  "degraded": false,
+  "findings": [
+    {
+      "detail": "reconcile() does not handle the case where pass_results contains zero successful passes before indexing pass_results[0].get('summary'). If succeeded is empty this raises IndexError.",
+      "path": "scripts/gemma-code-review.py",
+      "scope": "in-scope",
+      "severity": "major",
+      "suggestion": "Guard with 'if succeeded:' before accessing succeeded[0] for the summary field, or fall back to an empty string.",
+      "line": 382
+    }
+  ],
+  "passes_run": 3,
+  "passes_succeeded": 3,
+  "reconciliation": {
+    "consensus": [
+      {
+        "detail": "reconcile() does not handle the case where pass_results contains zero successful passes before indexing pass_results[0].get('summary'). If succeeded is empty this raises IndexError.",
+        "path": "scripts/gemma-code-review.py",
+        "scope": "in-scope",
+        "severity": "major",
+        "suggestion": "Guard with 'if succeeded:' before accessing succeeded[0] for the summary field, or fall back to an empty string.",
+        "line": 382
+      }
+    ],
+    "consensus_count": 1,
+    "likely_false_positive": [],
+    "likely_false_positive_count": 0,
+    "location_inconsistent": [],
+    "location_inconsistent_count": 0,
+    "pass_specific": [
+      {
+        "detail": "Consider adding a type annotation to the 'reconcile' function signature for clarity.",
+        "path": "scripts/gemma-code-review.py",
+        "scope": "in-scope",
+        "severity": "nit",
+        "suggestion": "Add '-> dict' return annotation.",
+        "line": 363
+      }
+    ],
+    "pass_specific_count": 1,
+    "severity_inconsistent": [],
+    "severity_inconsistent_count": 0
+  },
+  "status": "findings",
+  "summary": "One consensus major finding (IndexError risk in reconcile when no passes succeeded). One pass-specific nit (missing return annotation). Disagreement: none."
+}

@@ -7,10 +7,12 @@ It never applies patches or approves task completion.
 """
 
 import argparse
+import datetime
 import json
 import os
 import re
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gemma_local
@@ -152,6 +154,27 @@ def parse_args():
         "--dry-run",
         action="store_true",
         help="Print the Ollama request payload without sending it.",
+    )
+    parser.add_argument(
+        "--passes",
+        type=int,
+        default=int(os.environ.get("DUBBRIDGE_REVIEW_PASSES", "3")),
+        metavar="N",
+        help="Number of sequential review passes (default: 3; env DUBBRIDGE_REVIEW_PASSES).",
+    )
+    parser.add_argument(
+        "--task-id",
+        default=None,
+        dest="task_id",
+        metavar="ID",
+        help="Optional task ID recorded in the audit log.",
+    )
+    parser.add_argument(
+        "--attempt",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Optional attempt number recorded in the audit log.",
     )
     return parser.parse_args()
 
@@ -317,6 +340,140 @@ def parse_finding_block(lines, start_idx):
     return fields, idx
 
 
+def _pass_artifact_path(out_path, k):
+    stem, ext = os.path.splitext(out_path)
+    return f"{stem}.pass{k}{ext}"
+
+
+def _empty_reconciliation():
+    return {
+        "consensus": [],
+        "pass_specific": [],
+        "severity_inconsistent": [],
+        "location_inconsistent": [],
+        "likely_false_positive": [],
+        "consensus_count": 0,
+        "pass_specific_count": 0,
+        "severity_inconsistent_count": 0,
+        "location_inconsistent_count": 0,
+        "likely_false_positive_count": 0,
+    }
+
+
+def reconcile(pass_results, changed_paths):
+    """Deterministic D8 reconciliation of ≥2 successful pass results.
+
+    Returns an aggregate result dict with a reconciliation block. The top-level
+    findings list contains only consensus findings (≥2 passes exact match).
+    The reconciliation block contains all five classified finding sets.
+    """
+    import collections
+
+    # Tag each finding with its pass index for cross-pass comparisons.
+    tagged = []
+    for pass_idx, result in enumerate(pass_results):
+        for f in result["findings"]:
+            tagged.append({**f, "_pass_idx": pass_idx})
+
+    if not tagged:
+        statuses = {r["status"] for r in pass_results}
+        agg_status = "findings" if "findings" in statuses else "pass"
+        return {
+            "status": agg_status,
+            "summary": pass_results[0].get("summary", ""),
+            "changed_paths": changed_paths,
+            "findings": [],
+            "reconciliation": _empty_reconciliation(),
+        }
+
+    # Step 1: exact consensus — same (path, line, severity) in ≥2 passes.
+    exact_groups = collections.defaultdict(list)
+    for f in tagged:
+        exact_groups[(f["path"], f["line"], f["severity"])].append(f)
+
+    consensus_tagged = []
+    solo_tagged = []
+    for group in exact_groups.values():
+        if len(group) >= 2:
+            consensus_tagged.append(group[0])
+        else:
+            solo_tagged.append(group[0])
+
+    # Step 2: severity-inconsistent — same (path, line), different severity among solo.
+    line_groups = collections.defaultdict(list)
+    for f in solo_tagged:
+        line_groups[(f["path"], f["line"])].append(f)
+
+    severity_inconsistent_tagged = []
+    remaining_solo = []
+    for group in line_groups.values():
+        severities = {f["severity"] for f in group}
+        if len(severities) > 1 and len(group) >= 2:
+            severity_inconsistent_tagged.extend(group)
+        else:
+            remaining_solo.extend(group)
+
+    # Step 3: location-inconsistent — same path, line ±3, from different passes.
+    path_groups = collections.defaultdict(list)
+    for f in remaining_solo:
+        path_groups[f["path"]].append(f)
+
+    location_inconsistent_tagged = []
+    truly_solo = []
+    for findings in path_groups.values():
+        if len(findings) < 2:
+            truly_solo.extend(findings)
+            continue
+        sorted_f = sorted(findings, key=lambda x: x["line"])
+        clustered = set()
+        for i in range(len(sorted_f)):
+            for j in range(i + 1, len(sorted_f)):
+                fi, fj = sorted_f[i], sorted_f[j]
+                if (abs(fi["line"] - fj["line"]) <= 3
+                        and fi["_pass_idx"] != fj["_pass_idx"]):
+                    clustered.add(i)
+                    clustered.add(j)
+        for i, f in enumerate(sorted_f):
+            (location_inconsistent_tagged if i in clustered else truly_solo).append(f)
+
+    # Step 4: pass_specific vs likely_false_positive.
+    pass_specific_tagged = []
+    likely_fp_tagged = []
+    for f in truly_solo:
+        (likely_fp_tagged if f.get("scope") == "out-of-scope" else pass_specific_tagged).append(f)
+
+    def _clean(findings):
+        return [{k: v for k, v in f.items() if k != "_pass_idx"} for f in findings]
+
+    consensus = _clean(consensus_tagged)
+    severity_inconsistent = _clean(severity_inconsistent_tagged)
+    location_inconsistent = _clean(location_inconsistent_tagged)
+    pass_specific = _clean(pass_specific_tagged)
+    likely_false_positive = _clean(likely_fp_tagged)
+
+    statuses = {r["status"] for r in pass_results}
+    agg_status = "findings" if "findings" in statuses else "pass"
+
+    return {
+        "status": agg_status,
+        "summary": pass_results[0].get("summary", ""),
+        "changed_paths": changed_paths,
+        "findings": consensus,
+        "reconciliation": {
+            "consensus": consensus,
+            "pass_specific": pass_specific,
+            "severity_inconsistent": severity_inconsistent,
+            "location_inconsistent": location_inconsistent,
+            "likely_false_positive": likely_false_positive,
+            "consensus_count": len(consensus),
+            "pass_specific_count": len(pass_specific),
+            "severity_inconsistent_count": len(severity_inconsistent),
+            "location_inconsistent_count": len(location_inconsistent),
+            "likely_false_positive_count": len(likely_false_positive),
+        },
+    }
+
+
 def main():
     args = parse_args()
     packet = gemma_local.read_packet(args.packet).strip()
@@ -332,26 +489,151 @@ def main():
         args.think,
     )
     if args.dry_run:
+        # Audit is not emitted for dry-run: no real invocation occurred.
         print(json.dumps(payload, indent=2, sort_keys=True))
         return 0
 
+    system_prompt = payload["messages"][0]["content"]
+    user_prompt = payload["messages"][1]["content"]
+    changed_paths = changed_paths_from_packet(packet)
+
     gemma_local.ensure_model_available(args.host, args.model, args.idle_timeout)
-    content = gemma_local.stream_chat(
-        gemma_local.endpoint(args.host, "/api/chat"),
-        payload,
-        idle_timeout=args.idle_timeout,
-        max_wall=args.max_wall,
-        progress_label="review",
-    )
-    result = parse_review_response(content, changed_paths_from_packet(packet))
+
+    if args.passes == 1:
+        # Single-pass: exact current behavior (T3) — no reconciliation block.
+        wall_start = time.monotonic()
+        content = gemma_local.stream_chat(
+            gemma_local.endpoint(args.host, "/api/chat"),
+            payload,
+            idle_timeout=args.idle_timeout,
+            max_wall=args.max_wall,
+            progress_label="review",
+        )
+        result = parse_review_response(content, changed_paths)
+
+        if args.out:
+            gemma_local.write_result(result, args.out)
+            print(f"[review] result written to {args.out}", file=sys.stderr)
+        else:
+            print(json.dumps(result, indent=2, sort_keys=True))
+
+        findings_by_severity = {"blocking": 0, "major": 0, "minor": 0, "nit": 0}
+        for f in result["findings"]:
+            sev = f.get("severity", "")
+            if sev in findings_by_severity:
+                findings_by_severity[sev] += 1
+        out_of_scope = sum(1 for f in result["findings"] if f.get("scope") == "out-of-scope")
+
+        gemma_local.append_audit_log({
+            "ts": datetime.datetime.utcnow().isoformat() + "Z",
+            "role": "reviewer",
+            "outcome": result["status"].upper(),
+            "done_reason": "stop",
+            "mode": "n/a",
+            "elapsed_s": round(time.monotonic() - wall_start, 3),
+            "escalated": result["status"] == "blocked",
+            "system_prompt": system_prompt,
+            "user_prompt": user_prompt,
+            "task_id": args.task_id,
+            "rri": None,
+            "band": None,
+            "attempt": args.attempt,
+            "disposition": None,
+            "findings_count": len(result["findings"]),
+            "findings_by_severity": findings_by_severity,
+            "out_of_scope": out_of_scope,
+            "dispositions": None,
+            "disposition_divergence": None,
+            "file_lines": None,
+            "file_tokens_est": None,
+            "packet_tokens_est": None,
+            "response_tokens": None,
+        })
+
+        return 2 if result["status"] == "blocked" else 0
+
+    # Multi-pass path (args.passes >= 2).
+    wall_start = time.monotonic()
+    pass_results = []
+    for k in range(1, args.passes + 1):
+        try:
+            content = gemma_local.stream_chat(
+                gemma_local.endpoint(args.host, "/api/chat"),
+                payload,
+                idle_timeout=args.idle_timeout,
+                max_wall=args.max_wall,
+                progress_label=f"review pass {k}/{args.passes}",
+            )
+            result = parse_review_response(content, changed_paths)
+            if args.out:
+                pass_out = _pass_artifact_path(args.out, k)
+                gemma_local.write_result(result, pass_out)
+                print(f"[review] pass {k} written to {pass_out}", file=sys.stderr)
+            pass_results.append(("ok", result))
+        except (RuntimeError, gemma_local.GemmaIdleTimeout, gemma_local.GemmaWallTimeout) as exc:
+            print(f"[review] pass {k} failed: {exc}", file=sys.stderr)
+            pass_results.append(("fail", None))
+
+    succeeded = [r for status, r in pass_results if status == "ok"]
+    if len(succeeded) < 2:
+        print(
+            f"[review] quorum not met ({len(succeeded)}/{args.passes} passed)",
+            file=sys.stderr,
+        )
+        return 3
+
+    aggregate = reconcile(succeeded, changed_paths)
+    aggregate["degraded"] = len(succeeded) < args.passes
+    aggregate["passes_run"] = args.passes
+    aggregate["passes_succeeded"] = len(succeeded)
 
     if args.out:
-        gemma_local.write_result(result, args.out)
-        print(f"[review] result written to {args.out}", file=sys.stderr)
+        gemma_local.write_result(aggregate, args.out)
+        print(f"[review] aggregate written to {args.out}", file=sys.stderr)
     else:
-        print(json.dumps(result, indent=2, sort_keys=True))
+        print(json.dumps(aggregate, indent=2, sort_keys=True))
 
-    return 2 if result["status"] == "blocked" else 0
+    rec = aggregate.get("reconciliation", {})
+    findings_by_severity = {"blocking": 0, "major": 0, "minor": 0, "nit": 0}
+    for f in aggregate.get("findings", []):
+        sev = f.get("severity", "")
+        if sev in findings_by_severity:
+            findings_by_severity[sev] += 1
+
+    gemma_local.append_audit_log({
+        "ts": datetime.datetime.utcnow().isoformat() + "Z",
+        "role": "reviewer",
+        "outcome": aggregate["status"].upper(),
+        "done_reason": "stop",
+        "mode": "n/a",
+        "elapsed_s": round(time.monotonic() - wall_start, 3),
+        "escalated": aggregate["status"] == "blocked",
+        "system_prompt": system_prompt,
+        "user_prompt": user_prompt,
+        "task_id": args.task_id,
+        "rri": None,
+        "band": None,
+        "attempt": args.attempt,
+        "disposition": None,
+        "findings_count": len(aggregate.get("findings", [])),
+        "findings_by_severity": findings_by_severity,
+        "out_of_scope": rec.get("likely_false_positive_count", 0),
+        "dispositions": None,
+        "disposition_divergence": None,
+        "passes_run": aggregate["passes_run"],
+        "passes_succeeded": aggregate["passes_succeeded"],
+        "degraded": aggregate["degraded"],
+        "consensus_count": rec.get("consensus_count", 0),
+        "pass_specific_count": rec.get("pass_specific_count", 0),
+        "severity_inconsistent_count": rec.get("severity_inconsistent_count", 0),
+        "likely_false_positive_count": rec.get("likely_false_positive_count", 0),
+        "file_lines": None,
+        "file_tokens_est": None,
+        "packet_tokens_est": None,
+        "response_tokens": None,
+    })
+
+    return 2 if aggregate["status"] == "blocked" else 0
 
 
 if __name__ == "__main__":

@@ -8,8 +8,19 @@ Authoritative sources:
 - `docs/policies/RRI_POLICY.md`
 - `docs/playbooks/LOW_RRI_LOCAL_MODEL_HANDOFF.md` — Gemma Developer (patch delegation)
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer` — Gemma Reviewer (code review)
+- `docs/adr/ADR-034-gemma-process-audit-and-reviewer-reconciliation.md` — audit + multi-pass ADR
 - `scripts/delegate-low-rri.py` — patch delegation wrapper
-- `scripts/gemma-code-review.py` — review-only wrapper
+- `scripts/gemma-code-review.py` — review wrapper (N-pass + reconciliation)
+- `scripts/adjudicator-packet.py` — D14 trigger gate + isolation packet builder
+- `scripts/gemma-audit-report.py` — read-only audit report tool
+
+## Audit log
+
+Every invocation of both roles appends one JSONL record to
+`logs/gemma-audit/YYYY-MM.jsonl` (local only — git-ignored, never committed).
+Run `python3 scripts/gemma-audit-report.py` to read per-role metrics and
+calibration signals: truncation rate, escalation rate, inter-pass disagreement,
+out-of-scope findings, dismissed-major rate.
 
 ## Gemma Developer vs. Gemma Reviewer
 
@@ -22,6 +33,26 @@ Authoritative sources:
 | **Can approve?** | No | No |
 | **Script** | `scripts/delegate-low-rri.py` | `scripts/gemma-code-review.py` |
 | **Make target** | n/a (invoked by agent directly) | `make qa-gemma-review` |
+| **Audit fields** | `mode`, `diff_added/removed`, `scope_violations`, `apply_result`, `verify_ok` | `passes_run/succeeded`, `degraded`, `consensus_count`, `disposition_divergence` |
+
+## Multi-pass review and mandatory fallback
+
+The Reviewer runs **N sequential passes** (default 3, `--passes N`,
+`DUBBRIDGE_REVIEW_PASSES`). A deterministic wrapper-owned reconciliation step
+classifies findings as `consensus`, `pass-specific`, `severity-inconsistent`,
+`location-inconsistent`, or `likely-false-positive`. `--passes 1` reproduces the
+previous single-pass contract exactly.
+
+**The review is mandatory for all development tasks.** Gemma is the preferred
+path. When Gemma is unavailable or quorum fails (<2 passes succeed), the agent
+must spawn a **context-isolated subagent** as the fallback reviewer. The subagent
+receives an isolation packet (diff + acceptance criteria + any partial findings)
+built by `scripts/adjudicator-packet.py`. Its output is advisory; the primary
+agent reconciles and records `disposition_divergence` in the audit log.
+
+The D14 trigger (`should_adjudicate()` in `scripts/adjudicator-packet.py`) also
+fires on: consensus blocking/major findings, slice band ≥ Med-high, or inter-pass
+disagreement — in addition to the mandatory `gemma_blocked=True` path.
 
 ## Gemma Reviewer response contract
 

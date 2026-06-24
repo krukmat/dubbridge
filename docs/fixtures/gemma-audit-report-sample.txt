@@ -1,0 +1,43 @@
+# Sample output of: python3 scripts/gemma-audit-report.py --log-dir <fixture-log>
+#
+# Fixture log contains 5 records:
+#   - 2 developer invocations (T1 PATCH, T2 PATCH)
+#   - 3 reviewer invocations (T1 3/3 PASS, T5 3/3 FINDINGS+major, T6 2/3 degraded PASS)
+#
+# Command: python3 scripts/gemma-audit-report.py --log-dir docs/fixtures/audit-log/
+
+total_records:      5
+  developer:  2
+  reviewer:  3
+
+outcome_counts:
+  FINDINGS: 1
+  PASS: 2
+  PATCH: 2
+
+escalated_count:    0
+blocked_rate:       0.0%
+truncated_count:    0
+truncation_rate:    0.0%
+mean_elapsed_s:     20.000
+
+mode_distribution (developer):
+  full-file: 2
+
+reviewer findings:
+  total:          1
+  blocking:      0
+  major:      1
+  minor:      0
+  nit:      0
+  out_of_scope:   0
+  out_of_scope_rate: 0.0%
+  consensus_rate: 100.0%
+
+threshold_flags:    none
+
+# Notes:
+# - T6 degraded aggregate (2/3 passes) is captured in the reviewer record.
+# - T5 consensus major finding: disposition_divergence="none" (adjudicator agreed).
+# - threshold_flags: none — no calibration signal thresholds breached in this sample.
+# - To run against the real local log: python3 scripts/gemma-audit-report.py

@@ -18,12 +18,14 @@ The agent watches for completion (exit 0 → read result.json) or timeout (124).
 """
 
 import argparse
+import datetime
 import fnmatch
 import json
 import os
 import subprocess
 import sys
 import tempfile
+import time
 from urllib.error import URLError
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -190,6 +192,20 @@ def parse_args():
         "--dry-run",
         action="store_true",
         help="Print the Ollama request payload without sending it.",
+    )
+    parser.add_argument(
+        "--task-id",
+        default=None,
+        dest="task_id",
+        metavar="ID",
+        help="Optional task ID recorded in the audit log.",
+    )
+    parser.add_argument(
+        "--attempt",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Optional attempt number recorded in the audit log.",
     )
     parser.add_argument(
         "--mode",
@@ -868,10 +884,15 @@ def main():
         )
 
     if args.dry_run:
+        # Audit is not emitted for dry-run: no real invocation occurred.
         print(json.dumps(payload, indent=2, sort_keys=True))
         return 0
 
+    system_prompt = payload["messages"][0]["content"]
+    user_prompt = payload["messages"][1]["content"]
+
     ensure_model_available(args.host, args.model, args.idle_timeout)
+    wall_start = time.monotonic()
     content = stream_chat(
         endpoint(args.host, "/api/chat"),
         payload,
@@ -915,6 +936,38 @@ def main():
         print(f"[delegate] result written to {args.out}", file=sys.stderr)
     else:
         print(result_json)
+
+    unified_diff = delegation.get("unified_diff", "")
+    diff_lines = unified_diff.splitlines()
+    diff_added = sum(1 for l in diff_lines if l.startswith("+") and not l.startswith("+++"))
+    diff_removed = sum(1 for l in diff_lines if l.startswith("-") and not l.startswith("---"))
+
+    gemma_local.append_audit_log({
+        "ts": datetime.datetime.utcnow().isoformat() + "Z",
+        "role": "developer",
+        "outcome": delegation["status"].upper(),
+        "done_reason": "stop",
+        "mode": args.mode,
+        "elapsed_s": round(time.monotonic() - wall_start, 3),
+        "escalated": delegation["status"] == "blocked",
+        "system_prompt": system_prompt,
+        "user_prompt": user_prompt,
+        "task_id": args.task_id,
+        "rri": None,
+        "band": None,
+        "attempt": args.attempt,
+        "disposition": None,
+        "diff_added": diff_added,
+        "diff_removed": diff_removed,
+        "scope_violations": 0,
+        "apply_result": delegation.get("apply_result", "skipped"),
+        "verify_ok": None,
+        "file_lines": None,
+        "file_tokens_est": None,
+        "packet_tokens_est": None,
+        "response_tokens": None,
+    })
+
     return 0
 
 
