@@ -1,4 +1,4 @@
-import type { GatewayClient, GatewayResult } from "./client";
+import type { GatewayClient, GatewayErrorKind, GatewayResult } from "./client";
 
 type IssuePlaybackGrantApiResponse = {
   grant_id: string;
@@ -34,6 +34,16 @@ export async function issuePlaybackGrant(
       sessionRotation: result.value.sessionRotation,
     },
   };
+}
+
+export function resolvePlaybackErrorMessage(error: GatewayErrorKind): string {
+  if (error.kind === "forbidden") {
+    return "You do not have access to this playback stream.";
+  }
+  if (error.kind === "network") {
+    return error.message;
+  }
+  return `Could not load playback (${(error as Extract<GatewayErrorKind, { kind: "http" }>).status}).`;
 }
 
 export function buildManifestUrl(

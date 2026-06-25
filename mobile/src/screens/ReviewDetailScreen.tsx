@@ -1,10 +1,9 @@
-import { useEffect, useEffectEvent, useState } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 
 import { formatId, formatTimestamp } from "../format";
 
 import { createGatewayClient } from "../api/client";
-import { buildManifestUrl, issuePlaybackGrant } from "../api/playback";
 import {
   type ReviewTaskSummary,
   postDecision,
@@ -14,10 +13,11 @@ import { useAuth } from "../auth/AuthProvider";
 import { Badge, statusTone } from "../components/Badge";
 import { Button } from "../components/Button";
 import { Panel } from "../components/Panel";
+import { PlaybackStateView } from "../components/PlaybackStateView";
 import { Screen } from "../components/Screen";
 import { ScreenHeader } from "../components/ScreenHeader";
-import { StateView } from "../components/StateView";
-import { VideoPlayer } from "../components/VideoPlayer";
+import { usePlaybackLoader } from "../hooks/usePlaybackLoader";
+
 import { color, fieldStyle, radius, space, type } from "../theme";
 
 type ReviewDetailScreenProps = {
@@ -31,11 +31,6 @@ type MutationState =
   | { kind: "submitting" }
   | { kind: "error"; message: string };
 
-type PlaybackState =
-  | { kind: "loading" }
-  | { kind: "ready"; source: string }
-  | { kind: "not_ready" }
-  | { kind: "error"; message: string };
 
 export function ReviewDetailScreen({
   task,
@@ -43,20 +38,16 @@ export function ReviewDetailScreen({
   onBack,
 }: ReviewDetailScreenProps) {
   const auth = useAuth();
-  const handlePlaybackLogout = useEffectEvent(async () => {
-    await auth.logout();
-  });
-  const handlePlaybackSessionRotation = useEffectEvent(async (rotation: string | null) => {
-    await auth.onSessionRotation(rotation);
-  });
   const [taskState, setTaskState] = useState(task.state);
   const [comment, setComment] = useState("");
   const [publishedAt, setPublishedAt] = useState<string | null>(null);
   const [mutation, setMutation] = useState<MutationState>({ kind: "idle" });
-  const [playbackState, setPlaybackState] = useState<PlaybackState>({
-    kind: "loading",
-  });
   const [playbackAttempt, setPlaybackAttempt] = useState(0);
+  const playbackState = usePlaybackLoader({
+    assetId: task.asset_id,
+    gatewayBaseUrl,
+    attempt: playbackAttempt,
+  });
 
   useEffect(() => {
     setTaskState(task.state);
@@ -64,59 +55,6 @@ export function ReviewDetailScreen({
     setPublishedAt(null);
     setMutation({ kind: "idle" });
   }, [task.id, task.state]);
-
-  useEffect(() => {
-    let isActive = true;
-
-    async function loadPlayback(): Promise<void> {
-      setPlaybackState({ kind: "loading" });
-
-      const client = createGatewayClient({ gatewayBaseUrl });
-      const result = await issuePlaybackGrant(client, auth.sessionRef, task.asset_id);
-
-      if (!isActive) {
-        return;
-      }
-
-      if (!result.ok) {
-        if (result.error.kind === "session_expired") {
-          await handlePlaybackLogout();
-          return;
-        }
-
-        if (result.error.kind === "http" && (result.error.status === 409 || result.error.status === 422)) {
-          setPlaybackState({ kind: "not_ready" });
-          return;
-        }
-
-        const message =
-          result.error.kind === "forbidden"
-            ? "You do not have access to this playback stream."
-            : result.error.kind === "network"
-              ? result.error.message
-              : `Could not load playback (${result.error.status}).`;
-        setPlaybackState({ kind: "error", message });
-        return;
-      }
-
-      await handlePlaybackSessionRotation(result.value.sessionRotation);
-
-      if (!isActive) {
-        return;
-      }
-
-      setPlaybackState({
-        kind: "ready",
-        source: buildManifestUrl(gatewayBaseUrl, task.asset_id, result.value.data.grantId),
-      });
-    }
-
-    void loadPlayback();
-
-    return () => {
-      isActive = false;
-    };
-  }, [auth.sessionRef, gatewayBaseUrl, playbackAttempt, task.asset_id, task.id]);
 
   async function decide(verdict: "approved" | "rejected"): Promise<void> {
     if (mutation.kind === "submitting") return;
@@ -207,44 +145,11 @@ export function ReviewDetailScreen({
         <Text style={styles.body}>
           Watch the original track before submitting the review decision.
         </Text>
-        {playbackState.kind === "loading" ? (
-          <View style={styles.playbackSurface}>
-            <StateView
-              testID="review-player-loading"
-              kind="loading"
-              title="Loading playback…"
-              message="Preparing the original track."
-            />
-          </View>
-        ) : null}
-        {playbackState.kind === "not_ready" ? (
-          <View style={styles.playbackSurface}>
-            <StateView
-              testID="review-player-empty"
-              kind="empty"
-              title="Media not ready yet"
-              message="Playback is not available for this asset yet."
-            />
-          </View>
-        ) : null}
-        {playbackState.kind === "error" ? (
-          <View style={styles.playbackSurface}>
-            <StateView
-              testID="review-player-error"
-              kind="error"
-              title="Could not load playback"
-              message={playbackState.message}
-              onRetry={() => setPlaybackAttempt((attempt) => attempt + 1)}
-            />
-          </View>
-        ) : null}
-        {playbackState.kind === "ready" ? (
-          <VideoPlayer
-            testID="review-player"
-            source={playbackState.source}
-            onRetry={() => setPlaybackAttempt((attempt) => attempt + 1)}
-          />
-        ) : null}
+        <PlaybackStateView
+          state={playbackState}
+          testIdPrefix="review-player"
+          onRetry={() => setPlaybackAttempt((attempt) => attempt + 1)}
+        />
       </Panel>
 
       <Panel>
@@ -356,9 +261,6 @@ const styles = StyleSheet.create({
   comparisonHeading: { ...type.label, color: color.primary },
   comparisonBody: { ...type.bodyStrong, color: color.ink900 },
   comparisonMeta: { ...type.meta, color: color.ink500 },
-  playbackSurface: {
-    minHeight: 220,
-  },
   body: { ...type.body, color: color.ink500 },
   commentInput: { minHeight: space.xxxl * 2, textAlignVertical: "top" },
   actions: { flexDirection: "row", gap: space.sm },

@@ -1,17 +1,17 @@
 import { useEffect, useEffectEvent, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text } from "react-native";
 
 import { createGatewayClient } from "../api/client";
-import { buildManifestUrl, issuePlaybackGrant } from "../api/playback";
+import { buildManifestUrl, issuePlaybackGrant, resolvePlaybackErrorMessage } from "../api/playback";
 import { useAuth } from "../auth/AuthProvider";
 import { Badge, statusTone } from "../components/Badge";
 import { Button } from "../components/Button";
 import { Panel } from "../components/Panel";
+import { PlaybackStateView, type PlaybackViewState } from "../components/PlaybackStateView";
 import { Screen } from "../components/Screen";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { StateView } from "../components/StateView";
-import { VideoPlayer } from "../components/VideoPlayer";
-import { color, space, type } from "../theme";
+import { color, type } from "../theme";
 import type { AssetSummary } from "./AssetListScreen";
 
 type AssetDetailScreenProps = {
@@ -25,13 +25,6 @@ type AssetDetailViewState =
   | { kind: "ready"; asset: AssetSummary }
   | { kind: "error"; message: string }
   | { kind: "not_available" };
-
-type AssetPlaybackState =
-  | { kind: "idle" }
-  | { kind: "loading" }
-  | { kind: "ready"; source: string }
-  | { kind: "not_ready" }
-  | { kind: "error"; message: string };
 
 function formatStatus(status: string): string {
   return status
@@ -55,7 +48,7 @@ export function AssetDetailScreen({
   const [viewState, setViewState] = useState<AssetDetailViewState>({
     kind: "loading",
   });
-  const [playbackState, setPlaybackState] = useState<AssetPlaybackState>({
+  const [playbackState, setPlaybackState] = useState<PlaybackViewState>({
     kind: "idle",
   });
 
@@ -137,13 +130,7 @@ export function AssetDetailScreen({
         return;
       }
 
-      const message =
-        result.error.kind === "forbidden"
-          ? "You do not have access to this playback stream."
-          : result.error.kind === "network"
-            ? result.error.message
-            : `Could not load playback (${result.error.status}).`;
-      setPlaybackState({ kind: "error", message });
+      setPlaybackState({ kind: "error", message: resolvePlaybackErrorMessage(result.error) });
       return;
     }
 
@@ -208,47 +195,12 @@ export function AssetDetailScreen({
                 disabled={playbackState.kind === "loading"}
               />
 
-              {playbackState.kind === "loading" ? (
-                <View style={styles.playbackSurface}>
-                  <StateView
-                    testID="asset-playback-loading"
-                    kind="loading"
-                    title="Loading playback…"
-                    message="Preparing the original track."
-                  />
-                </View>
-              ) : null}
-
-              {playbackState.kind === "not_ready" ? (
-                <View style={styles.playbackSurface}>
-                  <StateView
-                    testID="asset-playback-empty"
-                    kind="empty"
-                    title="Media not ready yet"
-                    message="Playback is not available for this asset yet."
-                  />
-                </View>
-              ) : null}
-
-              {playbackState.kind === "error" ? (
-                <View style={styles.playbackSurface}>
-                  <StateView
-                    testID="asset-playback-error"
-                    kind="error"
-                    title="Could not load playback"
-                    message={playbackState.message}
-                    onRetry={() => void loadPlayback(viewState.asset)}
-                  />
-                </View>
-              ) : null}
-
-              {playbackState.kind === "ready" ? (
-                <VideoPlayer
-                  testID="asset-inline-player"
-                  source={playbackState.source}
-                  onRetry={() => void loadPlayback(viewState.asset)}
-                />
-              ) : null}
+              <PlaybackStateView
+                state={playbackState}
+                testIdPrefix="asset-playback"
+                testIdPlayer="asset-inline-player"
+                onRetry={() => void loadPlayback(viewState.asset)}
+              />
             </Panel>
           ) : null}
 
@@ -276,5 +228,4 @@ const styles = StyleSheet.create({
   metaValue: { ...type.meta, color: color.ink700 },
   panelTitle: { ...type.heading, color: color.ink900 },
   panelCopy: { ...type.body, color: color.ink500 },
-  playbackSurface: { minHeight: 220, marginTop: space.md },
 });

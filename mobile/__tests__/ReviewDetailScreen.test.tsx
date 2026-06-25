@@ -9,14 +9,11 @@ jest.mock("../src/api/client", () => ({ createGatewayClient: jest.fn() }));
 jest.mock("../src/components/VideoPlayer", () => {
   const React = require("react");
   const { Text } = require("react-native");
-  return {
-    VideoPlayer: ({ testID, source, ...props }: any) => {
-      if (testID) {
-        mockVideoPlayerProps[testID] = { testID, source, ...props };
-      }
-      return React.createElement(Text, { testID }, `Video:${source}`);
-    },
+  const fn = ({ testID, source, ...rest }: any) => {
+    if (testID) { mockVideoPlayerProps[testID] = { testID, source, ...rest }; }
+    return React.createElement(Text, { testID }, `Video:${source}`);
   };
+  return { VideoPlayer: fn };
 });
 jest.mock("../src/components/Button", () => {
   const React = require("react");
