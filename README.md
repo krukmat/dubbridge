@@ -188,18 +188,68 @@ docs/               — architecture decisions, pipeline design, and development
 
 ## Mobile client
 
-The first-party mobile app (React Native + Expo) puts the full content lifecycle in your pocket — from uploading a raw file to approving the final localized output before it goes live.
+The first-party mobile app (React Native + Expo) puts the governed DubBridge
+workflow in your pocket: sign in, bring content in, confirm its rights posture,
+review the output, and publish only after the last human checkpoint has passed.
 
-**Sign in** — Authentication is the entry point. Users log in with their credentials and land on a personalized home screen. ([Login](mobile/artifacts/screenshots/01_auth_login.png))
+**Sign in and orient the workspace** — Mobile starts with authenticated access and
+lands the user in a workspace that adapts to active projects, so the next action is
+never far away.
 
-**Home & projects** — The [home screen](mobile/artifacts/screenshots/02_home.png) surfaces what matters right now. Once you have active projects, it adapts to show them front and center. From there you can drill into the [project list](mobile/artifacts/screenshots/09_project_list.png) and open any [project detail](mobile/artifacts/screenshots/10_project_detail.png) to see its current state, assets, and history.
+<p align="center">
+  <img src="mobile/artifacts/screenshots/01_auth_login.png" width="220" alt="DubBridge mobile login screen" />
+  <img src="mobile/artifacts/screenshots/08_home_for_projects.png" width="220" alt="DubBridge mobile home screen with active projects" />
+</p>
 
-**My assets** — Your content library is always a tap away. The [asset list](mobile/artifacts/screenshots/03_asset_list.png) gives an overview of everything you own; the [asset detail](mobile/artifacts/screenshots/04_asset_detail.png) shows its full metadata, status, and lineage. To add new content you go through the [upload flow](mobile/artifacts/screenshots/05_upload.png), which hands the file off to the ingestion pipeline. If rights are confirmed, ingestion completes cleanly ([complete](mobile/artifacts/screenshots/06_ingest_complete.png)); if authorization is missing or invalid, the pipeline stops and tells you exactly why ([no rights](mobile/artifacts/screenshots/07_ingest_no_rights.png)). Nothing moves forward without a valid rights basis.
+**Bring assets into the pipeline** — The asset library and upload flow keep intake
+simple on the surface, but still route every file through the governed ingestion
+path.
 
-**Compliance** — The [compliance center](mobile/artifacts/screenshots/11_compliance_center.png) is where consent is managed. Every asset carries a consent record that you can inspect at any time — [active](mobile/artifacts/screenshots/12_consent_active.png) when authorization is in place, [revoked](mobile/artifacts/screenshots/13_consent_revoked.png) when it has been withdrawn. A revocation propagates immediately: no further processing is allowed until consent is reinstated.
+<p align="center">
+  <img src="mobile/artifacts/screenshots/03_asset_list.png" width="220" alt="DubBridge mobile asset library" />
+  <img src="mobile/artifacts/screenshots/05_upload.png" width="220" alt="DubBridge mobile upload flow" />
+</p>
 
-**Review** — Once the localization pipeline has run, the output lands in a reviewer's [inbox](mobile/artifacts/screenshots/14_review_inbox.png). Opening a job shows the [review detail](mobile/artifacts/screenshots/15_review_detail.png) — the translated audio, subtitles, and any quality flags raised during processing. The reviewer either clears it ([approved](mobile/artifacts/screenshots/16_review_approved.png)) or sends it back. Approved content moves to the final step: [publication](mobile/artifacts/screenshots/17_review_published.png), the point at which the localized asset becomes available to its audience.
+**Stop early when rights are not in place, and preview finalized media inline** —
+If the authorization basis is missing, the mobile app surfaces the failure instead
+of letting the asset drift further downstream. When an asset is finalized, the same
+detail view lets the user open inline playback and verify the original track in
+context.
+
+<p align="center">
+  <img src="mobile/artifacts/screenshots/07_ingest_no_rights.png" width="220" alt="DubBridge mobile ingest stopped because rights are missing" />
+  <img src="mobile/artifacts/screenshots/18_asset_detail_playback.png" width="220" alt="DubBridge mobile asset detail with inline playback" />
+</p>
+
+**Inspect consent and compliance without leaving mobile** — The compliance center
+keeps the audit trail close to the asset. Operators can inspect consent status and
+see immediately when a revocation has pushed the workflow back into a fail-closed
+state.
+
+<p align="center">
+  <img src="mobile/artifacts/screenshots/11_compliance_center.png" width="220" alt="DubBridge mobile compliance center" />
+  <img src="mobile/artifacts/screenshots/13_consent_revoked.png" width="220" alt="DubBridge mobile consent status after revocation" />
+</p>
+
+**Review with playback before deciding** — Once localization work is ready, it
+lands in the review inbox. Opening a task now brings playback directly into the
+review workspace so the reviewer can listen before approving or rejecting the
+derived output.
+
+<p align="center">
+  <img src="mobile/artifacts/screenshots/14_review_inbox.png" width="220" alt="DubBridge mobile review inbox" />
+  <img src="mobile/artifacts/screenshots/19_review_detail_playback.png" width="220" alt="DubBridge mobile review detail with inline playback" />
+</p>
+
+**Approve, then publish** — Approval and publication remain distinct checkpoints.
+The reviewer clears the work first; only then does the app expose the final publish
+step that makes the localized asset available to its audience.
+
+<p align="center">
+  <img src="mobile/artifacts/screenshots/16_review_approved.png" width="220" alt="DubBridge mobile review task approved" />
+  <img src="mobile/artifacts/screenshots/17_review_published.png" width="220" alt="DubBridge mobile review task published" />
+</p>
 
 ---
 
-*DubBridge is under active development. JWT-protected upload ingestion, the rights ledger, the first-party mobile client (React Native + Expo), and the full mobile asset lifecycle — asset list, detail, and upload flow with a Maestro screenshot suite — are operational. Platform-download intake (primary), live stream recording (deferred sub-case), media preparation, transcription, dubbing, and publication remain planned work.*
+*DubBridge is under active development. JWT-protected upload ingestion, the rights ledger, the first-party mobile client (React Native + Expo), the mobile compliance and review workspace, and inline playback on asset detail and review detail are operational. Platform-download intake (primary), live stream recording (deferred sub-case), media preparation, transcription, dubbing, and publication pipeline automation remain planned work.*
