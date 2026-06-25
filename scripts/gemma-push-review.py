@@ -297,9 +297,9 @@ def resolve_shas(run_info, event, args):
     before = args.before
     after = args.after or run_info.get("head_sha")
     if not before:
-        before = event.get("before") or (
-            (event.get("workflow_run") or {}).get("head_commit", {}).get("id")
-        )
+        # event["before"] exists in push events; workflow_run events have no "before" field.
+        # head_commit.id in workflow_run payloads equals head_sha (the "after" SHA) — never use it here.
+        before = event.get("before")
     if not before and after:
         try:
             result = subprocess.run(
