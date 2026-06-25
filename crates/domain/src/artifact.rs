@@ -23,6 +23,10 @@ pub enum ArtifactKind {
     HlsManifest,
     /// S-120: individual HLS media segment derived from the source artifact.
     HlsSegment,
+    /// S-130: full-text transcript derived from the source artifact.
+    TranscriptText,
+    /// S-130: word-level alignment derived from the source artifact.
+    WordAlignment,
 }
 
 impl std::fmt::Display for ArtifactKind {
@@ -34,6 +38,8 @@ impl std::fmt::Display for ArtifactKind {
             Self::ProbeMetadata => "probe_metadata",
             Self::HlsManifest => "hls_manifest",
             Self::HlsSegment => "hls_segment",
+            Self::TranscriptText => "transcript_text",
+            Self::WordAlignment => "word_alignment",
         };
         write!(f, "{s}")
     }
@@ -51,6 +57,8 @@ pub fn parse_artifact_kind(s: &str) -> ArtifactKind {
         "probe_metadata" => ArtifactKind::ProbeMetadata,
         "hls_manifest" => ArtifactKind::HlsManifest,
         "hls_segment" => ArtifactKind::HlsSegment,
+        "transcript_text" => ArtifactKind::TranscriptText,
+        "word_alignment" => ArtifactKind::WordAlignment,
         _ => ArtifactKind::OriginalMedia,
     }
 }
@@ -143,6 +151,38 @@ pub struct ArtifactRecord {
     /// SHA-256 hex digest of the stored object — required per ADR-006.
     pub checksum: String,
     pub created_at: OffsetDateTime,
+}
+
+/// S-130-T1: Transcription readiness state for an asset.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TranscriptionStatus {
+    Pending,
+    InProgress,
+    Ready,
+    /// Transcription failed. `error_detail` in the persisted row records why.
+    Failed,
+}
+
+impl std::fmt::Display for TranscriptionStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::Pending => "pending",
+            Self::InProgress => "in_progress",
+            Self::Ready => "ready",
+            Self::Failed => "failed",
+        };
+        write!(f, "{s}")
+    }
+}
+
+/// S-130-T1: Persisted transcription status record for an asset.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TranscriptionStatusRecord {
+    pub asset_id: AssetId,
+    pub status: TranscriptionStatus,
+    pub error_detail: Option<String>,
+    pub updated_at: OffsetDateTime,
 }
 
 impl ArtifactRecord {
@@ -258,6 +298,37 @@ mod tests {
         assert_eq!(PreparationStatus::InProgress.to_string(), "in_progress");
         assert_eq!(PreparationStatus::Ready.to_string(), "ready");
         assert_eq!(PreparationStatus::Failed.to_string(), "failed");
+    }
+
+    // S-130-T1: transcript artifact kinds
+    #[test]
+    fn parse_transcript_text() {
+        assert_eq!(
+            parse_artifact_kind("transcript_text"),
+            ArtifactKind::TranscriptText
+        );
+    }
+
+    #[test]
+    fn parse_word_alignment() {
+        assert_eq!(
+            parse_artifact_kind("word_alignment"),
+            ArtifactKind::WordAlignment
+        );
+    }
+
+    #[test]
+    fn artifact_kind_display_transcript_variants() {
+        assert_eq!(ArtifactKind::TranscriptText.to_string(), "transcript_text");
+        assert_eq!(ArtifactKind::WordAlignment.to_string(), "word_alignment");
+    }
+
+    #[test]
+    fn transcription_status_display_all_variants() {
+        assert_eq!(TranscriptionStatus::Pending.to_string(), "pending");
+        assert_eq!(TranscriptionStatus::InProgress.to_string(), "in_progress");
+        assert_eq!(TranscriptionStatus::Ready.to_string(), "ready");
+        assert_eq!(TranscriptionStatus::Failed.to_string(), "failed");
     }
 
     #[test]

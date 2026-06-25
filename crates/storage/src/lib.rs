@@ -68,6 +68,14 @@ pub fn hls_manifest_key(asset_id: &str) -> String {
     format!("{}index.m3u8", hls_prefix(asset_id))
 }
 
+pub fn transcript_key(asset_id: &str) -> String {
+    format!("transcripts/{asset_id}/transcript.json")
+}
+
+pub fn alignment_key(asset_id: &str) -> String {
+    format!("transcripts/{asset_id}/alignment.json")
+}
+
 pub fn hls_segment_key(asset_id: &str, filename: &str) -> String {
     let safe = sanitize_filename(match filename.trim() {
         "" => "segment.ts",
@@ -184,6 +192,29 @@ mod tests {
             hls_manifest_key("asset-123"),
             "assets/asset-123/prepared/hls/index.m3u8"
         );
+    }
+
+    // S-130-T1: transcript storage key contract
+    #[test]
+    fn transcript_key_format() {
+        assert_eq!(
+            transcript_key("asset-123"),
+            "transcripts/asset-123/transcript.json"
+        );
+    }
+
+    #[test]
+    fn alignment_key_format() {
+        assert_eq!(
+            alignment_key("asset-123"),
+            "transcripts/asset-123/alignment.json"
+        );
+    }
+
+    #[test]
+    fn transcript_and_alignment_keys_differ() {
+        let id = "asset-456";
+        assert_ne!(transcript_key(id), alignment_key(id));
     }
 
     #[test]
