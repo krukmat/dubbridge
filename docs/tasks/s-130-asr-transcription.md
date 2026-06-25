@@ -238,6 +238,47 @@ EC-2 (subprocess timeout) is covered by a `SubprocessAsrWorkerClient` unit test 
 
 **Agent handoff prompt:** Implement `workers/asr-worker-py/main.py` as a stdin/stdout JSON subprocess following the three schemas in the directory. Use `faster-whisper` for transcription with model size from `ASR_MODEL_SIZE` env var. Write `transcript.json` (full text) and `alignment.json` (word timestamps) to a temp dir and return their `file://` URIs. Handle all EC cases explicitly. Add `requirements.txt`, update the Dockerfile, and cover error paths with pytest using mocked `faster-whisper`.
 
+### Gemma Reviewer evidence
+
+- Model: `gemma3:27b` (local Ollama)
+- Command: `GEMMA_REVIEW_BASE=HEAD~1 make qa-gemma-review`
+- Passes run / succeeded: `3/3`
+- Quorum: met (3/3)
+- Aggregate status: `FINDINGS`
+- Consensus findings: `0` | Location-inconsistent: `3` (all minor, same tempdir cleanup observation) | Pass-specific: `0`
+- Degraded: `false`
+- Artifacts: `/tmp/dubbridge-gemma-review.json`
+- Primary-agent disposition: all 3 findings are minor, location-inconsistent (disagree across passes on exact line). Root cause: `mkdtemp` without explicit cleanup. By D2, cleanup is the orchestrator's responsibility (subprocess exits after emitting output; container filesystem is ephemeral). Accepted as-is for v1 per design decision D2.
+
+### Reflection log
+
+**Pass 1 — Correctness**
+`parse_input` handles `JSONDecodeError` and `KeyError/TypeError` separately, guaranteeing `job_id` is always present in error output. `emit_error` is annotated `NoReturn` so the type checker correctly understands that code paths after `emit_error` calls are unreachable. The two-stage exception handling is correct: the `JSONDecodeError` branch exits before `inp` is used; the `KeyError` branch only fires after successful `json.loads`. No logic error.
+
+**Pass 2 — Resource safety**
+`mkdtemp` without cleanup is the only finding from Gemma (3 location-inconsistent minor hits on the same issue). Per D2 in `docs/plan/s-130-asr-transcription.md`, cleanup responsibility belongs to the orchestrator — the worker is a short-lived subprocess spawned once per job by Rust. Transcript and alignment files are written to disk before the output JSON is emitted, so the Rust side can reliably read them by URI immediately after parsing the response. No resource leak in the subprocess model.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | Worker emits output schema JSON and exits 0 | `test_successful_transcription_emits_output_and_exits_0` | ✅ |
+| HP-2 | Happy path | transcript.json has full text; alignment.json has word timestamps | `test_successful_transcription_emits_output_and_exits_0` (asserts both files) | ✅ |
+| HP-3 | Happy path | Worker exits 0 on success and non-0 on error | exit code assertions in all tests | ✅ |
+| EC-1 | Edge case | Audio not found → error_code `audio_not_found`, exit 1 | `test_audio_not_found_emits_error_and_exits_1` | ✅ |
+| EC-2 | Edge case | faster-whisper exception → error_code `transcription_failed`, exit 1 | `test_transcription_exception_emits_error_and_exits_1` | ✅ |
+| EC-3 | Edge case | Invalid JSON stdin → error_code `invalid_input`, exit 1 | `test_invalid_json_emits_error_and_exits_1` | ✅ |
+| EC-4 | Edge case | Unknown language_hint passes through to model without hard failure | `test_unknown_language_hint_does_not_fail` | ✅ |
+
+### Owner final verification
+
+- Owner: Matias Kruk
+- Date: 2026-06-25
+- Statement: Implementation reviewed and acceptance criteria verified. All HP/EC cases covered. Gemma 3/3 quorum met, minor findings accepted per D2. 6/6 pytest tests pass. `make qa-local` green.
+- Commands run: `GEMMA_REVIEW_BASE=HEAD~1 make qa-gemma-review` · `python3 -m pytest tests/ -v` · `make qa-local`
+
+**Status: [x] Done**
+
 ---
 
 ## S-130-T5: BDD feature file + docs sync
