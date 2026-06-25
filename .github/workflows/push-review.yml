@@ -24,24 +24,23 @@ jobs:
 
       - name: Run advisory push review
         id: push_review
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
+          DUBBRIDGE_PUSH_REVIEW_EVENT_PATH: ${{ github.event_path }}
           DUBBRIDGE_PUSH_REVIEW_RUN_ID: ${{ github.event.workflow_run.id }}
+          DUBBRIDGE_PUSH_REVIEW_WORKFLOW: ${{ github.event.workflow_run.name }}
           DUBBRIDGE_PUSH_REVIEW_BRANCH: ${{ github.event.workflow_run.head_branch }}
           DUBBRIDGE_PUSH_REVIEW_AFTER: ${{ github.event.workflow_run.head_sha }}
-          DUBBRIDGE_PUSH_REVIEW_OUT_DIR: logs/gemma-push-review/${{ github.event.workflow_run.head_sha }}
+          DUBBRIDGE_PUSH_REVIEW_OUT_DIR: logs/gemma-push-review/${{ github.event.workflow_run.head_sha }}/${{ github.run_id }}
         run: make qa-gemma-push-review
 
       - name: Upload push-review artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: push-review-${{ github.event.workflow_run.head_sha }}
-          path: |
-            logs/gemma-push-review/
-            docs/reports/push-review/
+          name: push-review-${{ github.event.workflow_run.head_sha }}-${{ github.run_id }}
+          path: logs/gemma-push-review/${{ github.event.workflow_run.head_sha }}/${{ github.run_id }}/
           if-no-files-found: ignore
 
       - name: Advisory summary

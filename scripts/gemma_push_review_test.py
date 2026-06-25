@@ -129,7 +129,7 @@ class NormalizeRun(unittest.TestCase):
     def test_normalize_workflow_run_event_shape(self):
         raw = {
             "id": 999, "name": "ci", "event": "push",
-            "headBranch": "main", "headSha": "deadbeef", "runAttempt": 2,
+            "head_branch": "main", "head_sha": "deadbeef", "run_attempt": 2,
             "status": "completed", "conclusion": "failure",
             "html_url": "https://github.com/owner/repo/actions/runs/999",
             "created_at": "2026-06-25T00:00:00Z", "updated_at": "2026-06-25T00:02:00Z",
@@ -289,9 +289,9 @@ class ResolveRunFromEvent(unittest.TestCase):
             "action": "completed",
             "workflow_run": {
                 "id": 555, "name": "ci", "event": "push",
-                "headBranch": "main",
-                "headSha": "feed1234feed1234feed1234feed1234feed1234",
-                "runAttempt": 1, "status": "completed", "conclusion": "success",
+                "head_branch": "main",
+                "head_sha": "feed1234feed1234feed1234feed1234feed1234",
+                "run_attempt": 1, "status": "completed", "conclusion": "success",
                 "html_url": "https://github.com/owner/repo/actions/runs/555",
                 "created_at": "2026-06-25T00:00:00Z",
                 "updated_at": "2026-06-25T00:01:00Z",
@@ -312,6 +312,8 @@ class ResolveRunFromEvent(unittest.TestCase):
             run = _mod.resolve_run(args)
             self.assertEqual(run["run_id"], 555)
             self.assertEqual(run["conclusion"], "success")
+            self.assertEqual(run["branch"], "main")
+            self.assertEqual(run["head_sha"], "feed1234feed1234feed1234feed1234feed1234")
 
     def test_gh_not_called_when_event_present(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -329,7 +331,7 @@ class ResolveRunById(unittest.TestCase):
     def test_calls_gh_with_run_id(self):
         raw = {
             "databaseId": 777, "workflowName": "ci", "event": "push",
-            "headBranch": "main", "headSha": "cafe0001", "runAttempt": 1,
+            "headBranch": "main", "headSha": "cafe0001", "attempt": 1,
             "status": "completed", "conclusion": "success",
             "url": "https://github.com/owner/repo/actions/runs/777",
             "createdAt": "2026-06-25T00:00:00Z", "updatedAt": "2026-06-25T00:01:00Z",
@@ -358,6 +360,16 @@ class ResolveRunById(unittest.TestCase):
         with patch.object(_mod, "_run_gh", return_value=(json.dumps(raw), 0)) as mock_gh:
             _mod.resolve_run(args)
         self.assertEqual(mock_gh.call_count, 1)
+
+    def test_tries_run_attempt_field_first(self):
+        args = argparse.Namespace(
+            run_id="777", workflow=None, branch=None,
+            before=None, after=None, event_path=None,
+        )
+        with patch.object(_mod, "_run_gh", return_value=(json.dumps({}), 0)) as mock_gh:
+            _mod.resolve_run(args)
+        gh_args = mock_gh.call_args.args[0]
+        self.assertIn("runAttempt", gh_args[-1])
 
     def test_falls_back_to_attempt_field_when_run_attempt_is_unknown(self):
         raw = {
@@ -808,6 +820,53 @@ class RunPushAuditParserRejection(unittest.TestCase):
         self.assertIn(data["blocked_reason"], ("parser_rejection", "patch_like_output"))
         self.assertIn("run_context", data)
         self.assertIn("run_id", data["run_context"])
+
+    def test_ec2_blocked_report_keeps_workflow_run_identity(self):
+        args = _model_args()
+        raw_run = {
+            "id": 555,
+            "name": "ci",
+            "event": "push",
+            "head_branch": "main",
+            "head_sha": "feed1234feed1234feed1234feed1234feed1234",
+            "run_attempt": 1,
+            "status": "completed",
+            "conclusion": "failure",
+            "html_url": "https://github.com/owner/repo/actions/runs/555",
+        }
+        run = _mod._normalize_run(raw_run)
+        packet = _make_packet(
+            run_info=run,
+            after_sha=run["head_sha"],
+            changed_paths=["scripts/example.py"],
+        )
+        invalid_resp = "\n".join([
+            "STATUS: FINDINGS",
+            "SUMMARY: x",
+            "=== FINDING START ===",
+            "PATH: scripts/example.py",
+            "LINE: 0",
+            "SEVERITY: minor",
+            "DETAIL: style issue",
+            "SUGGESTION: rename variable",
+            "=== FINDING END ===",
+        ])
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(_mod.gemma_local, "ensure_model_available"):
+                with patch.object(_mod.gemma_local, "stream_chat", return_value=invalid_resp):
+                    rc = _mod.run_push_audit(packet, run, args, tmp, repo_root=tmp)
+            self.assertEqual(rc, 2)
+            with open(os.path.join(tmp, "blocked.json"), encoding="utf-8") as fh:
+                data = json.load(fh)
+            self.assertEqual(data["run_context"]["run_id"], 555)
+            self.assertEqual(data["run_context"]["branch"], "main")
+            self.assertEqual(
+                data["run_context"]["head_sha"],
+                "feed1234feed1234feed1234feed1234feed1234",
+            )
+            markdown_path = data["reports"]["markdown_summary_path"]
+            self.assertTrue(os.path.isfile(markdown_path))
+            self.assertTrue(markdown_path.endswith("feed123.md"))
 
 
 class RunPushAuditHappyPath(unittest.TestCase):
@@ -1508,13 +1567,13 @@ class DispatchPureLowCandidates(unittest.TestCase):
 class PushAuditReports(unittest.TestCase):
     def test_report_paths_deterministic_from_date_and_short_sha(self):
         path = _mod._push_report_markdown_path(
-            "/tmp/repo",
+            "/tmp/out",
             "abcdef1234567890abcdef1234567890abcdef12",
             "2026-06-25T10:00:00Z",
         )
         self.assertEqual(
             path,
-            "/tmp/repo/docs/reports/push-review/2026-06-25-abcdef1.md",
+            "/tmp/out/reports/2026-06-25-abcdef1.md",
         )
 
     def test_hp1_delegated_low_and_moderate_rendered(self):
@@ -1531,6 +1590,7 @@ class PushAuditReports(unittest.TestCase):
             aggregate_path, markdown_path = _mod.write_push_reports(aggregate, out_dir, repo_root=repo_root)
             self.assertTrue(os.path.isfile(aggregate_path))
             self.assertTrue(os.path.isfile(markdown_path))
+            self.assertTrue(markdown_path.startswith(os.path.join(out_dir, "reports")))
             with open(markdown_path, encoding="utf-8") as fh:
                 text = fh.read()
         self.assertIn("Delegated development reports", text)
@@ -1590,6 +1650,10 @@ class PushAuditReports(unittest.TestCase):
             with open(markdown_path, encoding="utf-8") as fh:
                 text = fh.read()
         self.assertEqual(updated["reports"]["fallback_packet_path"], blocked_path)
+        self.assertEqual(
+            updated["reports"]["markdown_summary_path"],
+            os.path.join(out_dir, "reports", "2026-06-25-abcdef1.md"),
+        )
         self.assertIn("quorum_failed", text)
         self.assertIn("blocked.json", text)
 
@@ -1625,7 +1689,7 @@ class PushAuditReports(unittest.TestCase):
                             })()
                             rc = _mod.run_push_audit(packet, run, args, tmp, repo_root=tmp)
             self.assertEqual(rc, 0)
-            report_dir = os.path.join(tmp, "docs", "reports", "push-review")
+            report_dir = os.path.join(tmp, "reports")
             self.assertTrue(os.path.isdir(report_dir))
             self.assertEqual(len(os.listdir(report_dir)), 1)
 

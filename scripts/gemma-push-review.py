@@ -213,6 +213,13 @@ def _load_event(event_path):
         return {}
 
 
+def _first_present(raw, *keys):
+    for key in keys:
+        if key in raw and raw.get(key) is not None:
+            return raw.get(key)
+    return None
+
+
 def resolve_run(args):
     event = _load_event(args.event_path)
     run_fields = [
@@ -248,18 +255,19 @@ def resolve_run(args):
 
 
 def _normalize_run(raw):
+    head_commit = raw.get("head_commit") or {}
     return {
-        "run_id": raw.get("databaseId") or raw.get("id"),
-        "workflow_name": raw.get("workflowName") or raw.get("name"),
-        "event": raw.get("event"),
-        "branch": raw.get("headBranch"),
-        "head_sha": raw.get("headSha"),
-        "run_attempt": raw.get("runAttempt", raw.get("attempt", 1)),
-        "status": raw.get("status"),
-        "conclusion": raw.get("conclusion"),
-        "url": raw.get("url") or raw.get("html_url"),
-        "created_at": raw.get("createdAt") or raw.get("created_at"),
-        "updated_at": raw.get("updatedAt") or raw.get("updated_at"),
+        "run_id": _first_present(raw, "databaseId", "id"),
+        "workflow_name": _first_present(raw, "workflowName", "workflow_name", "name"),
+        "event": _first_present(raw, "event"),
+        "branch": _first_present(raw, "headBranch", "head_branch"),
+        "head_sha": _first_present(raw, "headSha", "head_sha") or head_commit.get("id"),
+        "run_attempt": _first_present(raw, "runAttempt", "run_attempt", "attempt") or 1,
+        "status": _first_present(raw, "status"),
+        "conclusion": _first_present(raw, "conclusion"),
+        "url": _first_present(raw, "url", "html_url", "htmlUrl"),
+        "created_at": _first_present(raw, "createdAt", "created_at"),
+        "updated_at": _first_present(raw, "updatedAt", "updated_at"),
     }
 
 
@@ -975,9 +983,9 @@ def _report_date(ts=None):
     return datetime.datetime.utcnow().strftime("%Y-%m-%d")
 
 
-def _push_report_markdown_path(repo_root, after_sha, ts=None):
+def _push_report_markdown_path(out_dir, after_sha, ts=None):
     filename = f"{_report_date(ts)}-{_short_sha(after_sha)}.md"
-    return os.path.join(repo_root, "docs", "reports", "push-review", filename)
+    return os.path.join(out_dir, "reports", filename)
 
 
 def _repo_rel_or_raw(path, repo_root):
@@ -1154,7 +1162,7 @@ def _render_push_report_markdown(aggregate, *, repo_root):
 def write_push_reports(aggregate, out_dir, *, repo_root="."):
     after_sha = aggregate.get("after") or "unknown"
     aggregate_path = os.path.join(out_dir, "aggregate.json")
-    markdown_path = _push_report_markdown_path(repo_root, after_sha, aggregate.get("ts"))
+    markdown_path = _push_report_markdown_path(out_dir, after_sha, aggregate.get("ts"))
 
     aggregate["push_range"] = {
         "before": aggregate.get("before"),
@@ -1206,7 +1214,11 @@ def _render_blocked_report_markdown(artifact, *, blocked_path, repo_root):
 
 def write_blocked_report(blocked_path, artifact, *, repo_root="."):
     ctx = artifact.get("run_context") or {}
-    markdown_path = _push_report_markdown_path(repo_root, ctx.get("head_sha"), artifact.get("ts"))
+    markdown_path = _push_report_markdown_path(
+        os.path.dirname(blocked_path),
+        ctx.get("head_sha"),
+        artifact.get("ts"),
+    )
     artifact["reports"] = {
         "blocked_json_path": blocked_path,
         "markdown_summary_path": markdown_path,
