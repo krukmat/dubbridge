@@ -32,6 +32,12 @@ guide listed above without exception.
 This `CLAUDE.md` and the user's global `CLAUDE.md` remain authoritative only for
 topics not covered by `AGENT_WORKFLOW_GUIDE.md`.
 
+When answering about development-task completion or before marking a
+development task done, first determine whether the task is exempt (docs-only,
+config-only, migration-only, planning, ADR, task-ledger, or policy-only) or
+whether the workflow requires the mandatory `Gemma Reviewer` / D14 review gate
+before certification or final verification is discussed.
+
 ## Task Presentation Contract
 
 Before executing a task that belongs to a staged plan or task list, present the task first when the workflow or the user requires approval.
@@ -136,6 +142,15 @@ Skip diagrams for simple documentation tasks unless the subject itself is archit
 When approval is required, end with:
 
 `Execution has not started. Approve this task to proceed.`
+
+## Development Closure Rule
+
+For development-task closure, do not present unit coverage certification,
+owner final verification, or `[x] Done` as the first completion step. First
+state whether the mandatory `Gemma Reviewer` / D14 review gate applies under
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and
+`docs/policies/HITL_AUTONOMY_POLICY.md`, then list the remaining closure
+requirements in order.
 
 ## Language
 

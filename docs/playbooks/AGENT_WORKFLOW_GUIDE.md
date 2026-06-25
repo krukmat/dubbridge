@@ -714,6 +714,84 @@ Task completion records for Low/Moderate development tasks must include:
 `--passes 1` collapses to the single-pass form (no reconciliation fields, no
 per-pass artifacts). Run the reviewer with `make qa-gemma-review` (local only;
 not required in GitHub-hosted CI until an Ollama-capable runner is available).
+For task ledgers that declare `Behavioral coverage contract: unit-v1`, `make
+qa-docs` rejects completed development sections that omit required `Gemma
+Reviewer evidence` for RRI 0–40 or omit the `Reflection log` required for
+RRI 26+.
+
+## Push Reviewer
+
+**Gemma Push Reviewer** is a separate post-pipeline audit role. It is not a
+code-review replacement, not a patch approver, and not a final RRI authority.
+
+### Authority boundary
+
+- Push Reviewer starts only from completed GitHub pipeline evidence (`workflow_run`
+  or local replay against a completed run).
+- It may collect run metadata, job status, failed-step summaries, annotations,
+  and available logs/artifacts before model analysis.
+- It may normalize findings into candidate tasks, pass them through
+  `scripts/rri.py`, and dispatch only pure Low eligible incidents to Gemma Developer.
+- It may not compute the final RRI itself, accept a delegated patch, certify
+  coverage, or close the work item.
+- Post-development review of any delegated patch remains a non-Gemma-agent responsibility.
+
+### Daily consumption
+
+- Daily opening and close should inspect the newest push-review summary when one
+  exists.
+- Non-pure-Low or Moderate+ findings must be carried into the daily ledger as
+  non-Gemma review work or HITL decisions.
+- Delegated pure Low patches must remain visible as `in_review` until their
+  post-development review is completed and recorded.
+
+## Development task closure checklist
+
+A development task is not done until the closure gates for its band have been
+checked in order. Evaluate the review gate first; do not start the closure
+summary with unit coverage certification or owner final verification.
+
+Low/Moderate review gate:
+
+- **RRI 0–40 development tasks:** `Gemma Reviewer` is mandatory unless the task
+  is exempt (`docs-only`, `config-only`, `migration-only`, `ADR`, `plan`,
+  `task-ledger`, or `policy-only`).
+- **RRI 0–25 direct primary-agent development tasks:** record whether the review
+  ran through Gemma quorum or the D14 fallback before describing any completion
+  certification.
+- **RRI 0–25 delegated Gemma Developer tasks:** the delegating agent records the
+  mandatory review and reflection in the final report rather than inside the
+  delegated task entry, but the task is still not complete until that review is
+  reconciled.
+
+Moderate+ task-entry checklist:
+
+```
+[ ] 1. Gemma Reviewer / D14 adjudicator
+       - Run `make qa-gemma-review`
+       - If Gemma unavailable OR band ≥ Med-high: spawn D14 context-isolated
+         subagent (mandatory fallback — not optional)
+       - Record `### Gemma Reviewer evidence` block in the task entry
+
+[ ] 2. Reflection log
+       - Moderate (26–40): 2 passes
+       - Med-high (41–55): 3 passes
+       - Complex  (56–70): 4 passes
+       - Record `### Reflection log` block in the task entry
+
+[ ] 3. Unit coverage certification
+       - Table: Case ID | Type | Behavior | Unit test evidence | Result
+       - Every HP-# and EC-# must map to at least one passing test
+       - Record `### Unit coverage certification` block in the task entry
+
+[ ] 4. Owner final verification
+       - Owner, date, statement, exact commands run
+       - Record `### Owner final verification` block in the task entry
+```
+
+Only after the applicable review gate and all required completion blocks are
+checked may the task status be flipped to `[x] Done` and the completion
+reported to the user.
 
 ## Related
 

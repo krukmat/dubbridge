@@ -1,0 +1,54 @@
+name: push-review
+
+on:
+  workflow_run:
+    workflows: ["ci"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  advisory-push-review:
+    if: github.event.workflow_run.event == 'push'
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Run advisory push review
+        id: push_review
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          DUBBRIDGE_PUSH_REVIEW_RUN_ID: ${{ github.event.workflow_run.id }}
+          DUBBRIDGE_PUSH_REVIEW_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          DUBBRIDGE_PUSH_REVIEW_AFTER: ${{ github.event.workflow_run.head_sha }}
+          DUBBRIDGE_PUSH_REVIEW_OUT_DIR: logs/gemma-push-review/${{ github.event.workflow_run.head_sha }}
+        run: make qa-gemma-push-review
+
+      - name: Upload push-review artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: push-review-${{ github.event.workflow_run.head_sha }}
+          path: |
+            logs/gemma-push-review/
+            docs/reports/push-review/
+          if-no-files-found: ignore
+
+      - name: Advisory summary
+        if: always()
+        run: |
+          echo "Primary CI remains authoritative."
+          echo "Push review is advisory and post-pipeline."
+          if [ "${{ steps.push_review.outcome }}" != "success" ]; then
+            echo "Push review produced a blocked/degraded result or operational failure."
+          fi

@@ -134,7 +134,10 @@ def parse_args():
         action="store_true",
         default=gemma_local.bool_from_env(
             "DUBBRIDGE_REVIEW_THINK",
-            gemma_local.bool_from_env("DUBBRIDGE_LOW_RRI_THINK", True),
+            gemma_local.bool_from_env(
+                "DUBBRIDGE_LOW_RRI_THINK",
+                gemma_local.DEFAULT_THINK,
+            ),
         ),
         help="Enable Ollama thinking mode for models that support it.",
     )
@@ -241,6 +244,10 @@ def parse_review_response(content, changed_paths):
     format_warnings = []
     idx = 0
 
+    def warn(msg):
+        print(f"[review] warning: {msg}", file=sys.stderr)
+        format_warnings.append(msg)
+
     def skip_blank(i):
         while i < len(lines) and not lines[i].strip():
             i += 1
@@ -258,25 +265,33 @@ def parse_review_response(content, changed_paths):
             idx = skip_blank(idx)
             continue
         if line.startswith("STATUS: ") or line.strip() in STATUS_VALUES:
-            if status is not None:
-                raise RuntimeError("invalid review response: duplicate STATUS header")
-            if not line.startswith("STATUS: "):
-                msg = f"bare STATUS value accepted (non-standard format): {line!r}"
-                print(f"[review] warning: {msg}", file=sys.stderr)
-                format_warnings.append(msg)
             raw = (line[len("STATUS: "):] if line.startswith("STATUS: ") else line).strip()
             if raw not in STATUS_VALUES:
                 raise RuntimeError(f"invalid review response: unknown STATUS {raw!r}")
-            status = STATUS_VALUES[raw]
+            parsed_status = STATUS_VALUES[raw]
+            if status is not None:
+                if status != parsed_status:
+                    raise RuntimeError("invalid review response: conflicting STATUS headers")
+                warn(f"duplicate STATUS header repeated with same value {raw!r}, skipping")
+                idx += 1
+                idx = skip_blank(idx)
+                continue
+            if not line.startswith("STATUS: "):
+                warn(f"bare STATUS value accepted (non-standard format): {line!r}")
+            status = parsed_status
         elif line.startswith("SUMMARY: "):
+            parsed_summary = line[len("SUMMARY: "):].strip()
             if summary is not None:
-                raise RuntimeError("invalid review response: duplicate SUMMARY header")
-            summary = line[len("SUMMARY: "):].strip()
+                if summary != parsed_summary:
+                    raise RuntimeError("invalid review response: conflicting SUMMARY headers")
+                warn(f"duplicate SUMMARY header repeated with same value {parsed_summary!r}, skipping")
+                idx += 1
+                idx = skip_blank(idx)
+                continue
+            summary = parsed_summary
         elif line == FINDING_END_MARKER:
             # stray end marker without a preceding start — model format artifact, skip
-            msg = f"stray {FINDING_END_MARKER!r} outside finding block, skipping"
-            print(f"[review] warning: {msg}", file=sys.stderr)
-            format_warnings.append(msg)
+            warn(f"stray {FINDING_END_MARKER!r} outside finding block, skipping")
         else:
             raise RuntimeError(
                 "invalid review response: unexpected text outside sections: "
@@ -290,7 +305,8 @@ def parse_review_response(content, changed_paths):
     if summary is None:
         raise RuntimeError("invalid review response: missing SUMMARY header")
     if status == "pass" and findings:
-        raise RuntimeError("invalid review response: STATUS PASS cannot include findings")
+        warn("STATUS PASS with findings coerced to FINDINGS")
+        status = "findings"
     if status == "findings" and not findings:
         raise RuntimeError("invalid review response: STATUS FINDINGS requires findings")
 

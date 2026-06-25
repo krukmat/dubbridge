@@ -29,6 +29,12 @@ presentation contract summary, not a replacement for the workflow guide.
 Task-type-specific requirements defined there are mandatory even when they are
 not restated verbatim below.
 
+When answering questions about development-task completion or before marking a
+development task done, the agent must explicitly determine whether the task is
+exempt (docs-only, config-only, migration-only, planning, ADR, task-ledger, or
+policy-only) or whether the workflow requires `Gemma Reviewer` / D14 review
+before citing unit coverage certification or owner final verification.
+
 ## Required Task Presentation Format
 
 Before execution, present:
@@ -155,6 +161,15 @@ Under the canonical RRI mapping in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and
 Low band. Those tasks skip the full approval presentation; use local Gemma
 delegation through Ollama only for eligible simple code patches, and otherwise
 handle them directly as the primary agent while still following the low-band gate.
+
+## Development Closure Rule
+
+For development-task closure, do not describe certification, final verification,
+or status flips as the first completion step. First determine whether the task
+must pass the mandatory `Gemma Reviewer` / D14 review gate under
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and
+`docs/policies/HITL_AUTONOMY_POLICY.md`, then describe the remaining closure
+blocks in order.
 
 ## Language
 

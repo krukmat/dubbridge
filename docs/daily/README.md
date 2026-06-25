@@ -8,12 +8,25 @@ trabajo del día. Vive en `docs/daily/YYYY-MM-DD.md`.
 | Momento | Acción | Quién |
 |---|---|---|
 | Apertura | `bash scripts/daily-open.sh` → genera el día | orquestador |
-| Apertura | Completar §1 foco + §2 pipelines GH rotos + §6 decisiones pendientes | humano |
+| Apertura | Completar §1 foco + §2 pipelines GH rotos + §3 push-review + §6 decisiones pendientes | humano |
 | Cierre | Completar §4 issues + §5 mejoras + §7 reconciliación | orquestador/humano |
 | Cierre | Commitear la entrada del día | orquestador |
 
 El script rellena lo mecánico (git, roadmap pulse, drift-check, semáforo de
 gates). El juicio lo aporta el humano o el orquestador, no el script.
+
+## Push Reviewer (§3)
+
+El daily debe inspeccionar el report más reciente de Push Reviewer al abrir y al
+cerrar el día cuando exista uno en `docs/reports/push-review/`.
+
+- Si el pipeline terminó y hay report, se registra su conclusión, estado de la
+  auditoría y referencia al artifact/resumen.
+- Si hay findings no `pure Low`, deben quedar visibles como trabajo diferido de
+  revisión no-Gemma o como decisión HITL pendiente.
+- Si hubo dispatch a Gemma Developer, el daily debe registrar que el patch sigue
+  `in_review` hasta completar la revisión post-development por un agente no-Gemma.
+- Si no hay report nuevo, dejar evidencia explícita (`ninguno` o `sin cambios`).
 
 ## Pipelines GH rotos (§2)
 
@@ -52,6 +65,8 @@ Los issues de §4 y las mejoras de §5 pueden escalar a tasks:
 
 - **O-xx** con esfuerzo S y dominio bajo → candidato Low → Gemma local
 - **D-xx** BLOCKER → abre task con RRI explícito antes de la siguiente sesión
+- Findings del Push Reviewer con RRI final no-Low o no-pure-Low → task o decisión
+  explícita para revisión no-Gemma; no se autoaplican.
 
 ## Límite
 

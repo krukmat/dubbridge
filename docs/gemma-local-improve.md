@@ -13,6 +13,7 @@ Authoritative sources:
 - `scripts/gemma-code-review.py` — review wrapper (N-pass + reconciliation)
 - `scripts/adjudicator-packet.py` — D14 trigger gate + isolation packet builder
 - `scripts/gemma-audit-report.py` — read-only audit report tool
+- `scripts/gemma-push-review.py` — Push Reviewer wrapper (post-pipeline audit + routing)
 
 ## Audit log
 
@@ -21,6 +22,27 @@ Every invocation of both roles appends one JSONL record to
 Run `python3 scripts/gemma-audit-report.py` to read per-role metrics and
 calibration signals: truncation rate, escalation rate, inter-pass disagreement,
 out-of-scope findings, dismissed-major rate.
+
+## Push Reviewer
+
+**Gemma Push Reviewer** is a separate local Gemma role. It starts only after a
+GitHub push pipeline has completed, collects GitHub run metadata/log evidence,
+runs a push-audit quorum, routes findings through `scripts/rri.py`, and may
+dispatch only pure Low eligible incidents to Gemma Developer.
+
+It is an **audit/dispatch orchestrator**, not an approver:
+
+- It does not replace Gemma Reviewer code review.
+- It does not compute final RRI itself; `scripts/rri.py` is the only final RRI source.
+- It does not accept or close delegated patches.
+- Any Gemma Developer patch created from Push Reviewer findings remains
+  `review_status: in_review` until a non-Gemma agent completes post-development review.
+
+Operational surfaces:
+
+- Automatic GitHub trigger: `.github/workflows/push-review.yml` via `workflow_run`
+  after `ci` completes on a `self-hosted` runner.
+- Local replay/debug: `make qa-gemma-push-review`.
 
 ## Gemma Developer vs. Gemma Reviewer
 
@@ -34,6 +56,14 @@ out-of-scope findings, dismissed-major rate.
 | **Script** | `scripts/delegate-low-rri.py` | `scripts/gemma-code-review.py` |
 | **Make target** | n/a (invoked by agent directly) | `make qa-gemma-review` |
 | **Audit fields** | `mode`, `diff_added/removed`, `scope_violations`, `apply_result`, `verify_ok` | `passes_run/succeeded`, `degraded`, `consensus_count`, `disposition_divergence` |
+
+## Relationship between the three local Gemma roles
+
+| Role | Primary input | Purpose | Final authority |
+|---|---|---|---|
+| **Push Reviewer** | Completed GitHub pipeline run + diff | Audit a push, score/reroute findings, optionally dispatch pure Low work | Primary agent / daily workflow |
+| **Gemma Developer** | Low-RRI delegation packet | Propose a narrow code/test patch | Delegating agent |
+| **Gemma Reviewer** | Final code diff + acceptance criteria | Review completed development work | Primary agent |
 
 ## Multi-pass review and mandatory fallback
 

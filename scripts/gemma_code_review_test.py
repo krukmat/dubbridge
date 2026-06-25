@@ -93,6 +93,41 @@ class ParseReviewResponse(unittest.TestCase):
         self.assertEqual(result["status"], "pass")
         self.assertEqual(result["findings"], [])
 
+    def test_duplicate_identical_status_header_is_accepted_with_warning(self):
+        result = _mod.parse_review_response(
+            "STATUS: PASS\nSTATUS: PASS\nSUMMARY: clean",
+            ["scripts/a.py"],
+        )
+        self.assertEqual(result["status"], "pass")
+        self.assertIn("duplicate STATUS header repeated with same value 'PASS', skipping", result["format_warnings"])
+
+    def test_conflicting_status_headers_rejected(self):
+        with self.assertRaises(RuntimeError) as ctx:
+            _mod.parse_review_response(
+                "STATUS: PASS\nSTATUS: FINDINGS\nSUMMARY: clean",
+                ["scripts/a.py"],
+            )
+        self.assertIn("conflicting STATUS headers", str(ctx.exception))
+
+    def test_duplicate_identical_summary_header_is_accepted_with_warning(self):
+        result = _mod.parse_review_response(
+            "STATUS: PASS\nSUMMARY: clean\nSUMMARY: clean",
+            ["scripts/a.py"],
+        )
+        self.assertEqual(result["summary"], "clean")
+        self.assertIn(
+            "duplicate SUMMARY header repeated with same value 'clean', skipping",
+            result["format_warnings"],
+        )
+
+    def test_conflicting_summary_headers_rejected(self):
+        with self.assertRaises(RuntimeError) as ctx:
+            _mod.parse_review_response(
+                "STATUS: PASS\nSUMMARY: clean\nSUMMARY: changed",
+                ["scripts/a.py"],
+            )
+        self.assertIn("conflicting SUMMARY headers", str(ctx.exception))
+
     def test_finding_in_scope(self):
         result = _mod.parse_review_response(_response(), ["scripts/a.py"])
         self.assertEqual(result["status"], "findings")
@@ -134,7 +169,7 @@ class ParseReviewResponse(unittest.TestCase):
             )
         self.assertIn("patch-like", str(ctx.exception))
 
-    def test_pass_with_findings_rejected(self):
+    def test_pass_with_findings_coerced_to_findings(self):
         content = "\n".join([
             "STATUS: PASS",
             "SUMMARY: x",
@@ -146,9 +181,13 @@ class ParseReviewResponse(unittest.TestCase):
             "SUGGESTION: fix",
             "=== FINDING END ===",
         ])
-        with self.assertRaises(RuntimeError) as ctx:
-            _mod.parse_review_response(content, ["scripts/a.py"])
-        self.assertIn("PASS", str(ctx.exception))
+        result = _mod.parse_review_response(content, ["scripts/a.py"])
+        self.assertEqual(result["status"], "findings")
+        self.assertEqual(len(result["findings"]), 1)
+        self.assertIn(
+            "STATUS PASS with findings coerced to FINDINGS",
+            result["format_warnings"],
+        )
 
     def test_findings_without_finding_block_rejected(self):
         with self.assertRaises(RuntimeError) as ctx:

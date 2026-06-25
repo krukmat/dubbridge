@@ -1,4 +1,4 @@
-.PHONY: qa-fmt qa-lint qa-test qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-mobile qa-design qa-task-unit-coverage qa-docs qa-rri qa-ci qa-gemma-review install-hooks
+.PHONY: qa-fmt qa-lint qa-test qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-mobile qa-design qa-task-unit-coverage qa-docs qa-rri qa-ci qa-gemma-review qa-gemma-push-review install-hooks
 
 COVERAGE_MIN ?= 90
 GEMMA_REVIEW_BASE   ?= HEAD
@@ -55,6 +55,7 @@ qa-task-unit-coverage:
 	bash scripts/check-task-unit-coverage.sh
 
 qa-docs:
+	$(MAKE) qa-gemma-review
 	bash scripts/check-doc-consistency.sh
 	bash scripts/check-task-unit-coverage.sh
 	bash scripts/check-roadmap-drift.sh
@@ -82,6 +83,44 @@ qa-gemma-review:
 	  git diff $(GEMMA_REVIEW_BASE); } \
 	| python3 scripts/gemma-code-review.py --out "$(GEMMA_REVIEW_RESULT)" - \
 	&& echo "[gemma-review] result written to $(GEMMA_REVIEW_RESULT)"
+
+qa-gemma-push-review:
+	@if [ "$${DUBBRIDGE_SKIP_GEMMA_PUSH_REVIEW:-0}" = "1" ]; then \
+		echo "[gemma-push-review] skipped (DUBBRIDGE_SKIP_GEMMA_PUSH_REVIEW=1)"; exit 0; \
+	fi; \
+	set -- python3 scripts/gemma-push-review.py; \
+	if [ -n "$${DUBBRIDGE_PUSH_REVIEW_RUN_ID:-}" ]; then \
+		set -- "$$@" --run-id "$${DUBBRIDGE_PUSH_REVIEW_RUN_ID}"; \
+	fi; \
+	if [ -n "$${DUBBRIDGE_PUSH_REVIEW_WORKFLOW:-}" ]; then \
+		set -- "$$@" --workflow "$${DUBBRIDGE_PUSH_REVIEW_WORKFLOW}"; \
+	fi; \
+	if [ -n "$${DUBBRIDGE_PUSH_REVIEW_BRANCH:-}" ]; then \
+		set -- "$$@" --branch "$${DUBBRIDGE_PUSH_REVIEW_BRANCH}"; \
+	fi; \
+	if [ -n "$${DUBBRIDGE_PUSH_REVIEW_BEFORE:-}" ]; then \
+		set -- "$$@" --before "$${DUBBRIDGE_PUSH_REVIEW_BEFORE}"; \
+	fi; \
+	if [ -n "$${DUBBRIDGE_PUSH_REVIEW_AFTER:-}" ]; then \
+		set -- "$$@" --after "$${DUBBRIDGE_PUSH_REVIEW_AFTER}"; \
+	fi; \
+	if [ -n "$${DUBBRIDGE_PUSH_REVIEW_EVENT_PATH:-}" ]; then \
+		set -- "$$@" --event-path "$${DUBBRIDGE_PUSH_REVIEW_EVENT_PATH}"; \
+	fi; \
+	if [ -n "$${DUBBRIDGE_PUSH_REVIEW_OUT_DIR:-}" ]; then \
+		set -- "$$@" --out-dir "$${DUBBRIDGE_PUSH_REVIEW_OUT_DIR}"; \
+	fi; \
+	if [ "$${DUBBRIDGE_PUSH_REVIEW_FORCE:-0}" = "1" ]; then \
+		set -- "$$@" --force; \
+	fi; \
+	if [ "$${DUBBRIDGE_PUSH_REVIEW_COLLECT_ONLY:-0}" = "1" ]; then \
+		set -- "$$@" --collect-only; \
+	fi; \
+	if [ "$${DUBBRIDGE_PUSH_REVIEW_DRY_RUN:-0}" = "1" ]; then \
+		set -- "$$@" --dry-run; \
+	fi; \
+	echo "[gemma-push-review] running $$1"; \
+	"$$@"
 
 install-hooks:
 	cp scripts/hooks/pre-commit .git/hooks/pre-commit

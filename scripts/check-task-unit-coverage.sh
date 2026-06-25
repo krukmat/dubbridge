@@ -35,7 +35,12 @@ case_ids_for_prefix() {
 is_completed_development_section() {
   local section="$1"
   printf '%s\n' "$section" | grep -Eq 'Status:.*\[[xX]\].*([Dd]one|DONE)' \
-    && printf '%s\n' "$section" | grep -Eq 'Type:.*Development'
+    && printf '%s\n' "$section" | grep -Eiq 'Type:.*development'
+}
+
+section_rri_value() {
+  local section="$1"
+  printf '%s\n' "$section" | sed -n 's/.*RRI:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -n1
 }
 
 find_certification_row() {
@@ -138,6 +143,42 @@ validate_owner_verification() {
   fi
 }
 
+validate_gemma_reviewer_evidence() {
+  local task_file="$1"
+  local section_title="$2"
+  local section="$3"
+
+  if ! printf '%s\n' "$section" | grep -q 'Gemma Reviewer evidence'; then
+    add_violation "$task_file: $section_title: missing Gemma Reviewer evidence section"
+    return
+  fi
+
+  if ! printf '%s\n' "$section" | grep -Eq '^[[:space:]]*-[[:space:]]*Command:[[:space:]]*[^[:space:]].*'; then
+    add_violation "$task_file: $section_title: Gemma Reviewer evidence missing exact Command"
+  fi
+  if ! printf '%s\n' "$section" | grep -Eq '^[[:space:]]*-[[:space:]]*Quorum:[[:space:]]*(met|failed)[[:space:]]*$'; then
+    add_violation "$task_file: $section_title: Gemma Reviewer evidence must record Quorum as met or failed"
+  fi
+  if ! printf '%s\n' "$section" | grep -Eq '^[[:space:]]*-[[:space:]]*Primary-agent disposition:[[:space:]]*[^[:space:]].*'; then
+    add_violation "$task_file: $section_title: Gemma Reviewer evidence missing Primary-agent disposition"
+  fi
+}
+
+validate_reflection_log() {
+  local task_file="$1"
+  local section_title="$2"
+  local section="$3"
+
+  if ! printf '%s\n' "$section" | grep -q 'Reflection log'; then
+    add_violation "$task_file: $section_title: missing Reflection log section"
+    return
+  fi
+
+  if ! printf '%s\n' "$section" | grep -Eq 'Required passes:[[:space:]]*[0-9]+'; then
+    add_violation "$task_file: $section_title: Reflection log missing Required passes header"
+  fi
+}
+
 validate_section() {
   local task_file="$1"
   local section_title="$2"
@@ -155,6 +196,19 @@ validate_section() {
   fi
   if ! printf '%s\n' "$section" | grep -q 'Edge cases considered'; then
     add_violation "$task_file: $section_title: missing Edge cases considered section"
+  fi
+
+  local rri
+  rri="$(section_rri_value "$section")"
+
+  if [[ -z "$rri" ]]; then
+    add_violation "$task_file: $section_title: completed development section must declare numeric RRI"
+  elif (( rri <= 40 )); then
+    validate_gemma_reviewer_evidence "$task_file" "$section_title" "$section"
+  fi
+
+  if [[ -n "$rri" ]] && (( rri >= 26 )); then
+    validate_reflection_log "$task_file" "$section_title" "$section"
   fi
 
   local hp_ids
@@ -234,7 +288,7 @@ for task_file in "${task_files[@]}"; do
 done
 
 if [[ -n "$violations" ]]; then
-  printf 'Task unit coverage certification check failed:\n'
+  printf 'Task completion evidence check failed:\n'
   old_ifs="$IFS"
   IFS=$'\n'
   for violation in $violations; do
@@ -245,4 +299,4 @@ if [[ -n "$violations" ]]; then
   exit 1
 fi
 
-printf 'Task unit coverage certification check passed.\n'
+printf 'Task completion evidence check passed.\n'

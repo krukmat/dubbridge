@@ -25,7 +25,19 @@
 
 ---
 
-## 3. Ayer → Hoy
+## 3. Push-review post-pipeline
+
+| Run / SHA | Conclusión pipeline | Estado push-review | RRI / routing | Acción |
+|---|---|---|---|---|
+| `<run-id o sha corto>` | success \| failure \| cancelled \| timed_out | PASS \| FINDINGS \| BLOCKED \| ninguno | pure Low dispatched \| non-Gemma review \| HITL \| n/a | `<reporte / task / owner>` |
+
+> Revisar el report más reciente en `docs/reports/push-review/` o el artifact
+> local correspondiente. Registrar findings no-pure-Low, patches delegados que
+> siguen `in_review`, y cualquier `BLOCKED` que requiera seguimiento.
+
+---
+
+## 4. Ayer → Hoy
 
 | Estado | Task | Banda RRI | Nota |
 |---|---|---|---|
@@ -38,7 +50,7 @@
 
 ---
 
-## 4. Issues ledger
+## 5. Issues ledger
 
 | ID | Sev | Tipo | Descripción | Estado | Acción |
 |---|---|---|---|---|---|
@@ -49,7 +61,7 @@
 
 ---
 
-## 5. Optimizaciones y mejoras
+## 6. Optimizaciones y mejoras
 
 | ID | Tipo | Propuesta | Impacto | Esfuerzo | → Task? |
 |---|---|---|---|---|---|
@@ -61,17 +73,18 @@
 
 ---
 
-## 6. Decisiones pendientes (HITL gate)
+## 7. Decisiones pendientes (HITL gate)
 
 - [ ] \<decisión que espera al humano — p.ej. aprobar plan S-120, elegir ADR para X20\>
 
 ---
 
-## 7. Cierre del día ✓
+## 8. Cierre del día ✓
 
 - [ ] `git status` limpio — sin trabajo declarado "done" sin commitear
 - [ ] Roadmap ↔ ledgers ↔ git consistentes (drift-check emite 0 🔴)
 - [ ] Pipelines GH rotos revisados; si existe alguno, quedó con owner o task
+- [ ] Push-review más reciente revisado; findings no-pure-Low y patches `in_review` registrados o referenciados
 - [ ] 8 gates verdes (`qa-fmt`, `qa-lint`, `qa-test`, `qa-check`, `qa-deny`, `qa-config-secrets`, `qa-coverage`, `qa-docs`) — o issue BLOCKER explicando cuál y por qué
 - [ ] X-items tocados hoy reflejados en roadmap
 - [ ] Daily de mañana sembrado con lo `[~]` que queda
