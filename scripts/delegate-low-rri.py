@@ -767,6 +767,9 @@ def _relabel_diff(diff_text, old, new, rel, action):
             out.append("--- /dev/null" if old == os.devnull else f"--- a/{rel}")
         elif line.startswith("+++ "):
             out.append("+++ /dev/null" if new == os.devnull else f"+++ b/{rel}")
+        elif line.startswith("old mode ") or line.startswith("new mode "):
+            # tempfile permission artifact — not a real mode change; strip it
+            pass
         else:
             out.append(line)
     return "\n".join(out) + "\n"

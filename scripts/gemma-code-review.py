@@ -561,23 +561,38 @@ def main():
     wall_start = time.monotonic()
     pass_results = []
     for k in range(1, args.passes + 1):
-        try:
-            content = gemma_local.stream_chat(
-                gemma_local.endpoint(args.host, "/api/chat"),
-                payload,
-                idle_timeout=args.idle_timeout,
-                max_wall=args.max_wall,
-                progress_label=f"review pass {k}/{args.passes}",
-            )
-            result = parse_review_response(content, changed_paths)
-            if args.out:
-                pass_out = _pass_artifact_path(args.out, k)
-                gemma_local.write_result(result, pass_out)
-                print(f"[review] pass {k} written to {pass_out}", file=sys.stderr)
-            pass_results.append(("ok", result))
-        except (RuntimeError, gemma_local.GemmaIdleTimeout, gemma_local.GemmaWallTimeout) as exc:
-            print(f"[review] pass {k} failed: {exc}", file=sys.stderr)
-            pass_results.append(("fail", None))
+        format_retry_used = False
+        for attempt in range(2):
+            try:
+                content = gemma_local.stream_chat(
+                    gemma_local.endpoint(args.host, "/api/chat"),
+                    payload,
+                    idle_timeout=args.idle_timeout,
+                    max_wall=args.max_wall,
+                    progress_label=f"review pass {k}/{args.passes}" + (" (retry)" if attempt else ""),
+                )
+                result = parse_review_response(content, changed_paths)
+                if format_retry_used:
+                    result["format_retry"] = True
+                if args.out:
+                    pass_out = _pass_artifact_path(args.out, k)
+                    gemma_local.write_result(result, pass_out)
+                    print(f"[review] pass {k} written to {pass_out}", file=sys.stderr)
+                pass_results.append(("ok", result))
+                break
+            except RuntimeError as exc:
+                msg = str(exc)
+                if attempt == 0 and "STATUS PASS cannot include findings" in msg:
+                    print(f"[review] pass {k} format error (STATUS PASS + findings), retrying: {exc}", file=sys.stderr)
+                    format_retry_used = True
+                    continue
+                print(f"[review] pass {k} failed: {exc}", file=sys.stderr)
+                pass_results.append(("fail", None))
+                break
+            except (gemma_local.GemmaIdleTimeout, gemma_local.GemmaWallTimeout) as exc:
+                print(f"[review] pass {k} failed: {exc}", file=sys.stderr)
+                pass_results.append(("fail", None))
+                break
 
     succeeded = [r for status, r in pass_results if status == "ok"]
     if len(succeeded) < 2:

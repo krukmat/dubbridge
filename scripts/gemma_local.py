@@ -55,6 +55,8 @@ def read_packet(path):
 
 
 def endpoint(host, path):
+    if host and "://" not in host:
+        host = f"http://{host}"
     return f"{host.rstrip('/')}{path}"
 
 
