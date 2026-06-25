@@ -295,7 +295,10 @@ fn parse_license_type(value: &str) -> Result<LicenseType, DbError> {
         "public_domain" => Ok(LicenseType::PublicDomain),
         "licensed_distribution" => Ok(LicenseType::LicensedDistribution),
         "internal_only" => Ok(LicenseType::InternalOnly),
-        _ => Err(DbError::UnknownStoredValue { field: "pending_ingestions.license_type", value: value.to_owned() }),
+        _ => Err(DbError::UnknownStoredValue {
+            field: "pending_ingestions.license_type",
+            value: value.to_owned(),
+        }),
     }
 }
 
@@ -306,6 +309,9 @@ fn parse_source_type(value: &str) -> Result<SourceType, DbError> {
         "internal_feed" => Ok(SourceType::InternalFeed),
         "licensed_source" => Ok(SourceType::LicensedSource),
         "public_domain_with_proof" => Ok(SourceType::PublicDomainWithProof),
-        _ => Err(DbError::UnknownStoredValue { field: "pending_ingestions.source_type", value: value.to_owned() }),
+        _ => Err(DbError::UnknownStoredValue {
+            field: "pending_ingestions.source_type",
+            value: value.to_owned(),
+        }),
     }
 }
