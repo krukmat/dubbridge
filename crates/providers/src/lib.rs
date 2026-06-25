@@ -81,12 +81,16 @@ impl AsrWorkerClient for SubprocessAsrWorkerClient {
                 message: format!("failed to spawn ASR worker '{}': {e}", binary),
             })?;
 
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin.write_all(&input_json).map_err(|e| AsrError {
+        if let Some(mut stdin) = child.stdin.take()
+            && let Err(e) = stdin.write_all(&input_json)
+        {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(AsrError {
                 job_id: input.job_id.clone(),
                 error_code: "STDIN_WRITE_FAILED".into(),
                 message: format!("failed to write ASR input: {e}"),
-            })?;
+            });
         }
 
         let output = wait_with_timeout(child, self.timeout).map_err(|e| AsrError {
@@ -128,6 +132,7 @@ fn wait_with_timeout(
             Ok(None) => {
                 if start.elapsed() >= timeout {
                     let _ = child.kill();
+                    let _ = child.wait();
                     return Err(format!("ASR worker timed out after {}s", timeout.as_secs()));
                 }
                 std::thread::sleep(Duration::from_millis(100));
