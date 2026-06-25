@@ -238,6 +238,7 @@ def parse_review_response(content, changed_paths):
     status = None
     summary = None
     findings = []
+    format_warnings = []
     idx = 0
 
     def skip_blank(i):
@@ -260,10 +261,9 @@ def parse_review_response(content, changed_paths):
             if status is not None:
                 raise RuntimeError("invalid review response: duplicate STATUS header")
             if not line.startswith("STATUS: "):
-                print(
-                    f"[review] warning: bare STATUS value accepted (non-standard format): {line!r}",
-                    file=sys.stderr,
-                )
+                msg = f"bare STATUS value accepted (non-standard format): {line!r}"
+                print(f"[review] warning: {msg}", file=sys.stderr)
+                format_warnings.append(msg)
             raw = (line[len("STATUS: "):] if line.startswith("STATUS: ") else line).strip()
             if raw not in STATUS_VALUES:
                 raise RuntimeError(f"invalid review response: unknown STATUS {raw!r}")
@@ -272,6 +272,11 @@ def parse_review_response(content, changed_paths):
             if summary is not None:
                 raise RuntimeError("invalid review response: duplicate SUMMARY header")
             summary = line[len("SUMMARY: "):].strip()
+        elif line == FINDING_END_MARKER:
+            # stray end marker without a preceding start — model format artifact, skip
+            msg = f"stray {FINDING_END_MARKER!r} outside finding block, skipping"
+            print(f"[review] warning: {msg}", file=sys.stderr)
+            format_warnings.append(msg)
         else:
             raise RuntimeError(
                 "invalid review response: unexpected text outside sections: "
@@ -294,6 +299,7 @@ def parse_review_response(content, changed_paths):
         "summary": summary,
         "changed_paths": changed_paths,
         "findings": findings,
+        "format_warnings": format_warnings,
     }
 
 
@@ -549,6 +555,7 @@ def main():
             "out_of_scope": out_of_scope,
             "dispositions": None,
             "disposition_divergence": None,
+            "format_warnings": result.get("format_warnings") or None,
             "file_lines": None,
             "file_tokens_est": None,
             "packet_tokens_est": None,
@@ -595,6 +602,7 @@ def main():
                 break
 
     succeeded = [r for status, r in pass_results if status == "ok"]
+    all_format_warnings = [w for _, r in pass_results if r for w in r.get("format_warnings") or []]
     if len(succeeded) < 2:
         print(
             f"[review] quorum not met ({len(succeeded)}/{args.passes} passed)",
@@ -640,6 +648,7 @@ def main():
         "out_of_scope": rec.get("likely_false_positive_count", 0),
         "dispositions": None,
         "disposition_divergence": None,
+        "format_warnings": all_format_warnings or None,
         "passes_run": aggregate["passes_run"],
         "passes_succeeded": aggregate["passes_succeeded"],
         "degraded": aggregate["degraded"],

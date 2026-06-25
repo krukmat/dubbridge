@@ -83,8 +83,8 @@ pub async fn insert_audit_event_tx(
 ) -> Result<(), DbError> {
     sqlx::query(
         r#"
-        INSERT INTO audit_events (id, asset_id, event_kind, ingest_token, detail, happened_at)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO audit_events (id, asset_id, event_kind, ingest_token, detail, happened_at, recording_session_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         "#,
     )
     .bind(event.id)
@@ -93,6 +93,7 @@ pub async fn insert_audit_event_tx(
     .bind(event.ingest_token)
     .bind(&event.detail)
     .bind(event.happened_at)
+    .bind(event.recording_session_id)
     .execute(&mut **tx)
     .await
     .map_err(DbError::QueryFailed)?;
@@ -102,8 +103,8 @@ pub async fn insert_audit_event_tx(
 pub async fn insert_audit_event(pool: &PgPool, event: &AuditEvent) -> Result<(), DbError> {
     sqlx::query(
         r#"
-        INSERT INTO audit_events (id, asset_id, event_kind, ingest_token, detail, happened_at)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO audit_events (id, asset_id, event_kind, ingest_token, detail, happened_at, recording_session_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         "#,
     )
     .bind(event.id)
@@ -112,6 +113,7 @@ pub async fn insert_audit_event(pool: &PgPool, event: &AuditEvent) -> Result<(),
     .bind(event.ingest_token)
     .bind(&event.detail)
     .bind(event.happened_at)
+    .bind(event.recording_session_id)
     .execute(pool)
     .await
     .map_err(DbError::QueryFailed)?;
