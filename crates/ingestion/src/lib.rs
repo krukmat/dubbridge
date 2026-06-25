@@ -106,7 +106,9 @@ pub async fn finalize_ingestion_core(
     let rights_basis = pending
         .rights_basis
         .clone()
-        .expect("validated rights_basis");
+        .ok_or(IngestionServiceError::Validation(
+            IngestionError::MissingRightsBasis,
+        ))?;
     let asset =
         dubbridge_domain::asset::Asset::new_pending(command.asset_title.clone(), uploader_id);
 
