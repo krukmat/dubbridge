@@ -487,6 +487,20 @@ class ParsePushAuditResponse(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             _mod.parse_push_audit_response(resp, ["scripts/a.py"])
 
+    def test_non_integer_line_normalized_to_one(self):
+        # B-07: Gemma sometimes returns LINE: N/A; parser must not raise, must normalize.
+        resp = "\n".join([
+            "STATUS: FINDINGS", "SUMMARY: one issue",
+            "=== FINDING START ===",
+            "PATH: scripts/gemma-push-review.py", "LINE: N/A", "SEVERITY: minor",
+            "DETAIL: missing check", "SUGGESTION: add check",
+            "=== FINDING END ===",
+        ])
+        result = _mod.parse_push_audit_response(resp, ["scripts/gemma-push-review.py"])
+        self.assertEqual(result["status"], "findings")
+        self.assertEqual(result["findings"][0]["line"], 1)
+        self.assertTrue(any("N/A" in w for w in result["format_warnings"]))
+
     def test_parser_is_separate_from_code_review(self):
         # parse_push_audit_response must be defined in gemma_push_review, not imported
         import inspect

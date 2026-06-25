@@ -1,5 +1,102 @@
 # CLAUDE.md
 
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Development commands
+
+```bash
+# Local QA (run before committing)
+make qa-local          # fmt + clippy + test + cargo check
+make qa-coverage       # 90% line coverage gate (llvm-cov, --test-threads=1)
+make qa-ci             # full CI mirror: local + docs + rri + deny + mobile + coverage + release build
+
+# Individual gates
+make qa-fmt            # cargo fmt --check
+make qa-lint           # cargo clippy -D warnings
+make qa-test           # cargo test --workspace --all-features
+make qa-deny           # dependency advisories / policy
+make qa-docs           # Gemma review + doc consistency + task coverage + roadmap drift + OKF frontmatter
+make qa-mobile         # cd mobile && typecheck + lint + Jest
+make qa-roadmap-drift  # script: ledger ↔ roadmap consistency
+make qa-maintainability # python3 scripts/check-maintainability.py
+
+# Single crate/test
+cargo test -p <crate-name>
+cargo test -p <crate-name> -- <test_name> --nocapture
+
+# RRI scoring for a task before implementation
+python3 scripts/rri.py
+
+# OKF frontmatter validator (all docs/ .md files need YAML frontmatter)
+make qa-okf-frontmatter
+```
+
+Local infrastructure (Postgres + Redis + MinIO — never the production descriptor):
+
+```bash
+docker compose -f infra/local/docker-compose.yml up -d postgres redis minio
+DUBBRIDGE_ENV=local cargo run -p dubbridge-api
+```
+
+Install git hooks once per clone:
+
+```bash
+git config core.hooksPath .githooks
+# or: make install-hooks
+```
+
+Mobile:
+
+```bash
+cd mobile && npm install
+npm run typecheck && npm run lint && npm test
+npm run screenshots   # Maestro E2E visual suite (requires Java + device)
+```
+
+## Architecture
+
+**Rust workspace** (`Cargo.toml`) owns API, orchestration, persistence, and all governance gates. Python is isolated to AI workers behind typed JSON contracts (`workers/*-py`).
+
+### Apps
+
+| App | Role |
+|-----|------|
+| `apps/api` | Axum HTTP API; asset ingestion, rights, finalize, HLS playback endpoints |
+| `apps/gateway` | Session gateway / BFF; transparent JWT relay after ADR-031/S-200 |
+| `apps/worker-runner` | Background job execution surface (apalis) |
+| `apps/cli` | Local operational utilities |
+
+### Shared crates (dependency order: domain → db/storage → ingestion → apps)
+
+| Crate | Role |
+|-------|------|
+| `domain` | Core entities and invariants (no DB, no IO) |
+| `db` | SQLx repositories; PostgreSQL is the system of record |
+| `storage` | `StorageAdapter` abstraction; local-fs and S3-compatible backends; canonical key layout |
+| `ingestion` | `finalize_ingestion_core` — the single fail-closed finalize boundary reused by all intake modes (ADR-021) |
+| `auth` | JWT verification, scope enforcement, principal propagation |
+| `audit` | Centralized durable audit-emission boundary; domain event types stay in `domain` |
+| `jobs` | Job type definitions and apalis scheduling adapters |
+| `media` | ffprobe metadata extraction + HLS transcode orchestration |
+| `playback` | HLS grant issuance, manifest rewriting, short-lived scoped segment references (ADR-032) |
+| `qc` | Deterministic quality checks |
+| `config` | Typed fail-closed config loader; requires `DUBBRIDGE_ENV ∈ {local,staging,production}`; production rejects localhost defaults (ADR-026) |
+| `connectors` | Planned: `PlatformConnector` trait for owner-authorized platform downloads (ADR-025) |
+| `observability` | Tracing/logging helpers; production requires JSON format (ADR-018) |
+
+### Key invariants
+
+- **Rights gate is fail-closed (ADR-008):** no asset moves to any processing stage without a confirmed rights basis.
+- **Single finalize path (ADR-021):** all intake modes (upload, platform download, live recording) must use `finalize_ingestion_core`; no parallel weaker path.
+- **Immutable artifacts (ADR-006):** ingested originals are never modified; derivatives carry explicit lineage and SHA-256 checksums.
+- **Durable audit (ADR-018):** every governance-significant event requires a PostgreSQL audit row plus correlated structured tracing. No fire-and-forget.
+- **Compiled defaults forbidden (ADR-026):** `crates/config` loads `config/<env>.toml` + env vars; nothing environment-specific is baked into the binary.
+- **Mobile is the only authenticated product UI (ADR-029):** `apps/gateway` is a relay; `mobile/` is the sole first-party surface.
+
+### OKF frontmatter
+
+Every file in `docs/` must have YAML frontmatter declaring `type:` (one of 10 closed values — see `docs/knowledge/README.md`) and `status:`. The `pre-commit` hook and `make qa-docs` enforce this; missing or invalid frontmatter blocks commits.
+
 ## Purpose
 
 This file defines how Claude Code should present staged tasks in the `dubbridge` repository.

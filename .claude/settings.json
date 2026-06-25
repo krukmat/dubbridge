@@ -126,10 +126,8 @@
       "Bash(xxd)",
       "Bash(git checkout *)",
       "Bash(git rebase *)",
-      "Bash(GIT_EDITOR=true git rebase --continue)",
-      "Bash(EDITOR=\":\" git rebase --continue)",
-      "Bash(GIT_SEQUENCE_EDITOR=true git rebase --continue)",
-      "Bash(echo \"Exit: $?\")"
+      "Bash(git pull *)",
+      "Bash(python3 -c \"import json; json.load\\(open\\('.claude/settings.json'\\)\\)\")"
     ]
   },
   "hooks": {

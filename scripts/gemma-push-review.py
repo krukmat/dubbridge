@@ -506,7 +506,9 @@ def build_push_audit_system_prompt():
         "Use PASS with no finding blocks when no issues are found. Use FINDINGS "
         "with one or more finding blocks. Use BLOCKED only when the packet is not "
         "auditable. RRI_HINT is optional and advisory only — never a final score. "
-        "No markdown fences, no JSON, no diff, no patch, no file bodies."
+        "No markdown fences, no JSON, no diff, no patch, no file bodies. "
+        "LINE must be a positive integer (the line number where the issue begins). "
+        "If you cannot determine the exact line number, use 1."
     )
 
 
@@ -547,7 +549,7 @@ def parse_push_audit_response(content, changed_paths):
     while idx < len(lines):
         line = lines[idx]
         if line == FINDING_START_MARKER:
-            finding, idx = _parse_push_finding_block(lines, idx)
+            finding, idx = _parse_push_finding_block(lines, idx, format_warnings)
             finding["scope"] = (
                 "in-scope" if finding["path"] in changed_paths else "out-of-scope"
             )
@@ -598,7 +600,9 @@ def parse_push_audit_response(content, changed_paths):
     }
 
 
-def _parse_push_finding_block(lines, start_idx):
+def _parse_push_finding_block(lines, start_idx, format_warnings=None):
+    if format_warnings is None:
+        format_warnings = []
     idx = start_idx + 1
     fields = {}
     while idx < len(lines) and lines[idx] != FINDING_END_MARKER:
@@ -639,8 +643,13 @@ def _parse_push_finding_block(lines, start_idx):
         )
     try:
         fields["line"] = int(fields["line"])
-    except ValueError as exc:
-        raise RuntimeError("invalid push-audit response: LINE must be an integer") from exc
+    except ValueError:
+        # Gemma returned a non-integer (e.g. "N/A"); normalize to 1 so the finding
+        # still reaches evidence grounding instead of blocking the entire response.
+        msg = f"non-integer LINE value {fields['line']!r} normalized to 1"
+        print(f"[push-audit] warning: {msg}", file=sys.stderr)
+        format_warnings.append(msg)
+        fields["line"] = 1
     if fields["line"] < 1:
         raise RuntimeError("invalid push-audit response: LINE must be >= 1")
 
