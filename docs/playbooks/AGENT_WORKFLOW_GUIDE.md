@@ -671,6 +671,15 @@ trigger gate (`should_adjudicate()`) and the isolation packet builder
 | Band ≥ Med-high | slice band is `Med-high` or `Complex` |
 | Inter-pass disagreement | `severity_inconsistent_count > 0` or `location_inconsistent_count > 0` |
 
+**Model:** the subagent must be spawned at the **Balanced** tier — a capable
+but token-efficient model, not Premium. The adjudicator role is read-only and
+analytical (diff + criteria + findings), not generative or synthesis-heavy;
+a Premium model is wasteful and must not be used unless the primary agent
+explicitly overrides with a documented reason recorded in the audit log.
+Resolve the concrete Balanced-tier model from the active environment per
+`docs/policies/RRI_POLICY.md` §Model tier resolution; do not pin a model ID
+in this guide.
+
 **Authority:** the adjudicator is advisory — it never closes the task. The
 primary agent reconciles its disposition against the adjudicator's and records
 `disposition_divergence` (`"none"`, `"partial"`, or `"full"`) in the audit log.
