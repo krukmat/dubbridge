@@ -123,7 +123,13 @@
       "Bash(scripts/delegate-low-rri.py /tmp/playback-rewrite-packet.md --mode full-file --allow-path crates/playback/src/lib.rs --apply --out /tmp/playback-rewrite-result.json)",
       "Bash(python3 -c \"import json;d=json.load\\(open\\('/tmp/playback-rewrite-result.json'\\)\\);print\\(list\\(d.keys\\(\\)\\)\\);print\\('---DIFF---'\\);print\\(d.get\\('diff','<none>'\\)[:2000]\\)\")",
       "Bash(python3 -c \"import json;d=json.load\\(open\\('/tmp/playback-rewrite-result.json'\\)\\);print\\('STATUS:',d['status']\\);print\\('SUMMARY:',d['summary']\\);print\\('APPLY:',d['apply_result']\\);print\\('TEST_CMDS:',d['test_commands']\\);print\\('RISK:',d['risk_notes']\\);print\\('=== UNIFIED DIFF ==='\\);print\\(d['unified_diff']\\)\")",
-      "Bash(xxd)"
+      "Bash(xxd)",
+      "Bash(git checkout *)",
+      "Bash(git rebase *)",
+      "Bash(GIT_EDITOR=true git rebase --continue)",
+      "Bash(EDITOR=\":\" git rebase --continue)",
+      "Bash(GIT_SEQUENCE_EDITOR=true git rebase --continue)",
+      "Bash(echo \"Exit: $?\")"
     ]
   },
   "hooks": {
