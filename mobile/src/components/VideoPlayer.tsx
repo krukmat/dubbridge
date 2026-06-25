@@ -72,8 +72,6 @@ export function VideoPlayer({
   });
 
   const overlay = shellSnapshot.overlay;
-  const showOverlay = overlay.kind !== null;
-  const overlayKind = overlay.kind === "end" ? "empty" : overlay.kind;
 
   return (
     <View
@@ -89,13 +87,14 @@ export function VideoPlayer({
         fullscreenOptions={{ enable: true }}
       />
 
-      {showOverlay ? (
+      {overlay.kind !== null ? (
         <View pointerEvents="box-none" style={styles.overlay}>
           <StateView
             testID={testID ? `${testID}-overlay` : undefined}
-            kind={overlayKind ?? "loading"}
+            kind={overlay.kind === "end" ? "empty" : overlay.kind}
             title={overlay.title}
             message={overlay.message}
+            appearance="inverse"
             onRetry={overlay.kind === "error" ? onRetry : undefined}
           />
         </View>

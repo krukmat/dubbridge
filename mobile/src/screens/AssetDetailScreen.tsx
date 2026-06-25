@@ -4,6 +4,7 @@ import { StyleSheet, Text } from "react-native";
 import { createGatewayClient } from "../api/client";
 import { buildManifestUrl, issuePlaybackGrant, resolvePlaybackErrorMessage } from "../api/playback";
 import { useAuth } from "../auth/AuthProvider";
+import { formatId } from "../format";
 import { Badge, statusTone } from "../components/Badge";
 import { Button } from "../components/Button";
 import { Panel } from "../components/Panel";
@@ -175,9 +176,13 @@ export function AssetDetailScreen({
               tone={statusTone(viewState.asset.status)}
             />
             <Text style={styles.metaLabel}>Asset ID</Text>
-            <Text style={styles.metaValue}>{viewState.asset.id}</Text>
+            <Text style={styles.metaValue} numberOfLines={1} ellipsizeMode="tail">
+              {formatId(viewState.asset.id)}
+            </Text>
             <Text style={styles.metaLabel}>Uploader ID</Text>
-            <Text style={styles.metaValue}>{viewState.asset.uploader_id}</Text>
+            <Text style={styles.metaValue} numberOfLines={1} ellipsizeMode="tail">
+              {formatId(viewState.asset.uploader_id)}
+            </Text>
           </Panel>
 
           {viewState.asset.status === "finalized" ? (

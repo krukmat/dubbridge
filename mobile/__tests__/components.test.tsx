@@ -122,6 +122,20 @@ describe("StateView", () => {
     expect(view.getByText("Loading assets…")).toBeTruthy();
     expect(view.getByText("Fetching…")).toBeTruthy();
   });
+
+  it("EC-2b: inverse appearance switches text to dark-surface-safe foreground colors", async () => {
+    const view = await render(
+      <StateView
+        kind="loading"
+        title="Loading assets…"
+        message="Fetching…"
+        appearance="inverse"
+      />,
+    );
+
+    expect(StyleSheet.flatten(view.getByText("Loading assets…").props.style).color).toBe(color.onPrimary);
+    expect(StyleSheet.flatten(view.getByText("Fetching…").props.style).color).toBe(color.canvas);
+  });
 });
 
 describe("Badge", () => {
@@ -190,6 +204,10 @@ describe("VideoPlayer", () => {
     expect(view.getByTestId("player")).toBeTruthy();
     expect(view.getByText("Original track")).toBeTruthy();
     expect(view.getByText("Loading video")).toBeTruthy();
+    expect(StyleSheet.flatten(view.getByText("Loading video").props.style).color).toBe(color.onPrimary);
+    expect(
+      StyleSheet.flatten(view.getByText("Preparing the player for playback.").props.style).color,
+    ).toBe(color.canvas);
   });
 
   it("HP-6: binds an error overlay through StateView without embedding reducer logic", async () => {

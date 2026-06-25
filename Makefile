@@ -1,4 +1,4 @@
-.PHONY: qa-fmt qa-lint qa-test qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-mobile qa-task-unit-coverage qa-docs qa-rri qa-ci qa-gemma-review install-hooks
+.PHONY: qa-fmt qa-lint qa-test qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-mobile qa-design qa-task-unit-coverage qa-docs qa-rri qa-ci qa-gemma-review install-hooks
 
 COVERAGE_MIN ?= 90
 GEMMA_REVIEW_BASE   ?= HEAD
@@ -45,6 +45,11 @@ qa-maintainability:
 # regex production-readiness scan for the mobile surface.
 qa-mobile:
 	cd mobile && npm run typecheck && npm run lint && npm test
+
+# DESIGN.md stays on an explicit opt-in gate for now because the Google CLI and
+# spec are still alpha and should not widen the main CI surface by default.
+qa-design:
+	npx -y @google/design.md lint DESIGN.md
 
 qa-task-unit-coverage:
 	bash scripts/check-task-unit-coverage.sh

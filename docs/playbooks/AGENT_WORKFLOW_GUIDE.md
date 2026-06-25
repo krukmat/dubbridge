@@ -16,6 +16,11 @@ governs: "all agent-facing workflow decisions in the repository"
 ## Mandatory workflow before implementing
 
 1. **Analyze** — read context, dependencies, and affected files.
+   - For **mobile UI / presentation tasks** under `mobile/`, also read the root
+     `DESIGN.md` before planning or implementation. `DESIGN.md` governs visual
+     intent and component-usage expectations for the mobile surface. It does not
+     replace task files, runtime tokens in `mobile/src/theme/tokens.ts`, or the
+     workflow authority of this guide.
 2. **Plan** — create `docs/plan/<plan-name>.md` with: objective, affected files,
    design decisions, and module dependencies.
 3. **Tasks** — create `docs/tasks/<tasks-name>.md` with: an ordered task list,

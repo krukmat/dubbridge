@@ -200,6 +200,26 @@ describe("asset screens", () => {
       expect(view.getByTestId("asset-open-compliance")).toBeTruthy();
     });
 
+    it("HP-2b: long metadata ids use single-line tail ellipsis without dropping the full value", async () => {
+      mockGetAsset({
+        id: "asset-seed-super-long-id",
+        uploader_id: "uploader-seed-super-long-id",
+      });
+
+      const view = await renderDetail();
+
+      await waitFor(() => {
+        expect(view.getByText("Test Video")).toBeTruthy();
+      });
+
+      const assetId = view.getByText("asset-seed-super-long-id");
+      const uploaderId = view.getByText("uploader-seed-super-long-id");
+      expect(assetId.props.numberOfLines).toBe(1);
+      expect(assetId.props.ellipsizeMode).toBe("tail");
+      expect(uploaderId.props.numberOfLines).toBe(1);
+      expect(uploaderId.props.ellipsizeMode).toBe("tail");
+    });
+
     it("HP-1: finalized asset shows Play and opens inline playback after an explicit tap", async () => {
       mockClient.post.mockResolvedValueOnce({
         ok: true,

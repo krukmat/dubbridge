@@ -133,6 +133,11 @@ Priority order:
 5. prompt files
 6. configs/templates
 
+For mobile UI / presentation tasks under `mobile/`, include root `DESIGN.md` in
+`Related documents` when it materially constrains the visual work. Treat it as the
+mobile design-intent contract, while plan/task files remain authoritative for
+behavior, acceptance criteria, and verification.
+
 ## Approval Boundary
 
 If the current workflow says the agent must wait for approval before executing a task, the presentation must end with a direct approval checkpoint.

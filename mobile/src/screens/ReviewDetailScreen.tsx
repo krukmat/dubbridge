@@ -125,11 +125,15 @@ export function ReviewDetailScreen({
       <Panel>
         <View style={styles.row}>
           <Text style={styles.label}>Task ID</Text>
-          <Text style={styles.value}>{task.id}</Text>
+          <Text style={styles.value} numberOfLines={1} ellipsizeMode="tail">
+            {formatId(task.id)}
+          </Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Asset</Text>
-          <Text style={styles.value}>{task.asset_id}</Text>
+          <Text style={styles.value} numberOfLines={1} ellipsizeMode="tail">
+            {formatId(task.asset_id)}
+          </Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>State</Text>
@@ -247,7 +251,7 @@ export function ReviewDetailScreen({
 const styles = StyleSheet.create({
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   label: { ...type.label, color: color.ink400 },
-  value: { ...type.meta, color: color.ink700, flex: 1, textAlign: "right" },
+  value: { ...type.meta, color: color.ink700, flex: 1, flexShrink: 1, textAlign: "right", marginLeft: space.md },
   sectionTitle: { ...type.heading, color: color.ink900 },
   comparisonStack: { gap: space.md },
   comparisonPanel: {

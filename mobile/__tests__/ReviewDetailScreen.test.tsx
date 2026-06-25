@@ -368,6 +368,30 @@ describe("ReviewDetailScreen", () => {
     expect(tree).toContain("project-seed-longid");
   });
 
+  it("HP-1b: summary-row ids use single-line tail ellipsis without dropping the full value", async () => {
+    const LONG_TASK = {
+      ...BASE_TASK,
+      id: "review-task-seed-super-long-id",
+      asset_id: "asset-seed-super-long-id",
+    };
+
+    await render(
+      <ReviewDetailScreen
+        task={LONG_TASK}
+        gatewayBaseUrl="http://gateway"
+        onBack={jest.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("review-player")).toBeTruthy());
+    const summaryTaskId = screen.getAllByText("review-task-seed-super-long-id")[0];
+    const summaryAssetId = screen.getAllByText("asset-seed-super-long-id")[0];
+    expect(summaryTaskId.props.numberOfLines).toBe(1);
+    expect(summaryTaskId.props.ellipsizeMode).toBe("tail");
+    expect(summaryAssetId.props.numberOfLines).toBe(1);
+    expect(summaryAssetId.props.ellipsizeMode).toBe("tail");
+  });
+
   it("EC-3b: forbidden decision shows an inline error without logout", async () => {
     mockClient.post
       .mockResolvedValueOnce(playbackGrantSuccess("grant-decision-forbidden"))

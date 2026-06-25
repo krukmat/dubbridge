@@ -137,6 +137,7 @@ Plan: `docs/plan/h1-governance-atomicity-hardening.md`
 | **S-170** | Human review runtime (HITL execution over generated artifacts) | S-125, S-140, S-150, S-160 | ⬜ no plan yet | — |
 | **S-180** | Publication runtime | S-125, S-170, S-160 publication gate | ⬜ no plan yet | — |
 | **S-200** | Mobile credential login with backend-issued JWT (FenixCRM parity) | S-000, S-040, S-050 (re-architects their auth) | ✅ done 2026-06-18 — T0–T7 complete; ADR-031 Accepted; HS256 issuer + alg pinning (T1), user_account migration + repo (T2), bcrypt + AuthService (T3), apps/api auth handlers (T4), gateway relay (T5), mobile bearer auth runtime (T6), BDD + Maestro + docs sync (T7) | `docs/plan/s-200-mobile-jwt-credential-auth.md`, `docs/tasks/s-200-mobile-jwt-credential-auth.md` (ADR-031) |
+| **S-205** | Mobile DESIGN.md adoption: agent-readable mobile design-intent contract, lint command, workflow integration, and playback-surface audit | S-115, S-190, S-127 | ✅ done 2026-06-25 — root `DESIGN.md` authored; `make qa-design` added as an opt-in alpha gate; mobile UI workflow now reads `DESIGN.md`; playback audit completed with two narrow follow-up patches delivered as separate tasks | `docs/plan/mobile-design-md-adoption.md`, `docs/tasks/mobile-design-md-adoption.md` |
 
 `S-040` must be planned before building a first-party browser, operator-console, or
 mobile auth flow. It does not block S-080 or S-090.

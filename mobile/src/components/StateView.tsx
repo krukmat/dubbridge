@@ -4,6 +4,7 @@ import { color, space, type } from "../theme";
 import { Button } from "./Button";
 
 export type StateViewKind = "loading" | "empty" | "error";
+export type StateViewAppearance = "default" | "inverse";
 
 export type StateViewProps = {
   kind: StateViewKind;
@@ -13,6 +14,7 @@ export type StateViewProps = {
   onRetry?: () => void;
   retryLabel?: string;
   testID?: string;
+  appearance?: StateViewAppearance;
 };
 
 /**
@@ -27,14 +29,20 @@ export function StateView({
   onRetry,
   retryLabel = "Retry",
   testID,
+  appearance = "default",
 }: StateViewProps) {
+  const foreground =
+    appearance === "inverse"
+      ? { title: color.onPrimary, message: color.canvas }
+      : { title: color.ink900, message: color.ink500 };
+
   return (
     <View style={styles.container} testID={testID}>
       {kind === "loading" ? (
         <ActivityIndicator size="small" color={color.primary} />
       ) : null}
-      {title ? <Text style={styles.title}>{title}</Text> : null}
-      {message ? <Text style={styles.message}>{message}</Text> : null}
+      {title ? <Text style={[styles.title, { color: foreground.title }]}>{title}</Text> : null}
+      {message ? <Text style={[styles.message, { color: foreground.message }]}>{message}</Text> : null}
       {kind === "error" && onRetry ? (
         <Button
           label={retryLabel}
@@ -56,6 +64,6 @@ const styles = StyleSheet.create({
     gap: space.md,
     padding: space.xl,
   },
-  title: { ...type.heading, color: color.ink900, textAlign: "center" },
-  message: { ...type.body, color: color.ink500, textAlign: "center" },
+  title: { ...type.heading, textAlign: "center" },
+  message: { ...type.body, textAlign: "center" },
 });
