@@ -134,7 +134,7 @@ def parse_args():
         action="store_true",
         default=gemma_local.bool_from_env(
             "DUBBRIDGE_REVIEW_THINK",
-            gemma_local.bool_from_env("DUBBRIDGE_LOW_RRI_THINK", gemma_local.DEFAULT_THINK),
+            gemma_local.bool_from_env("DUBBRIDGE_LOW_RRI_THINK", True),
         ),
         help="Enable Ollama thinking mode for models that support it.",
     )
