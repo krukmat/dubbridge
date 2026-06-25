@@ -162,3 +162,120 @@ impl AsrWorkerClient for StubAsrWorkerClient {
         self.result.clone()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_input() -> AsrInput {
+        AsrInput {
+            job_id: "job-1".into(),
+            audio_uri: "file:///tmp/audio.wav".into(),
+            language_hint: "en".into(),
+        }
+    }
+
+    fn sample_output() -> AsrOutput {
+        AsrOutput {
+            job_id: "job-1".into(),
+            transcript_uri: "file:///tmp/transcript.json".into(),
+            alignment_uri: "file:///tmp/alignment.json".into(),
+            status: "ok".into(),
+        }
+    }
+
+    fn sample_error() -> AsrError {
+        AsrError {
+            job_id: "job-1".into(),
+            error_code: "MODEL_LOAD_FAILED".into(),
+            message: "whisper model not found".into(),
+        }
+    }
+
+    #[test]
+    fn stub_ok_returns_output() {
+        let client = StubAsrWorkerClient::ok(sample_output());
+        let result = client.transcribe(sample_input());
+        assert!(result.is_ok());
+        let out = result.unwrap();
+        assert_eq!(out.status, "ok");
+        assert_eq!(out.job_id, "job-1");
+    }
+
+    #[test]
+    fn stub_err_returns_error() {
+        let client = StubAsrWorkerClient::err(sample_error());
+        let result = client.transcribe(sample_input());
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.error_code, "MODEL_LOAD_FAILED");
+    }
+
+    #[test]
+    fn asr_error_display_includes_code_and_message() {
+        let err = sample_error();
+        let s = err.to_string();
+        assert!(s.contains("MODEL_LOAD_FAILED"));
+        assert!(s.contains("whisper model not found"));
+    }
+
+    #[test]
+    fn subprocess_client_returns_spawn_failed_for_nonexistent_binary() {
+        let client = SubprocessAsrWorkerClient::new(vec!["/nonexistent/binary".into()]);
+        let result = client.transcribe(sample_input());
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.error_code, "SPAWN_FAILED");
+    }
+
+    #[test]
+    fn subprocess_client_parses_valid_output_json() {
+        // Use `echo` to emit a valid AsrOutput JSON to stdout and exit 0.
+        let output = sample_output();
+        let json = serde_json::to_string(&output).unwrap();
+        let client = SubprocessAsrWorkerClient::new(vec![
+            "sh".into(),
+            "-c".into(),
+            format!("echo '{json}'"),
+        ]);
+        let result = client.transcribe(sample_input());
+        assert!(result.is_ok(), "expected Ok, got: {:?}", result);
+        assert_eq!(result.unwrap().job_id, "job-1");
+    }
+
+    #[test]
+    fn subprocess_client_returns_error_on_nonzero_exit_with_json() {
+        let err = sample_error();
+        let json = serde_json::to_string(&err).unwrap();
+        let client = SubprocessAsrWorkerClient::new(vec![
+            "sh".into(),
+            "-c".into(),
+            format!("echo '{json}'; exit 1"),
+        ]);
+        let result = client.transcribe(sample_input());
+        assert!(result.is_err());
+        let e = result.unwrap_err();
+        assert_eq!(e.error_code, "MODEL_LOAD_FAILED");
+    }
+
+    #[test]
+    fn subprocess_client_timeout_kills_and_returns_error() {
+        let client =
+            SubprocessAsrWorkerClient::new(vec!["sh".into(), "-c".into(), "sleep 60".into()])
+                .with_timeout(Duration::from_millis(200));
+        let result = client.transcribe(sample_input());
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.error_code, "TIMEOUT");
+        assert!(err.message.contains("timed out"));
+    }
+
+    #[test]
+    fn default_timeout_is_300_seconds() {
+        let client = SubprocessAsrWorkerClient::new(vec!["sh".into()]);
+        assert_eq!(
+            client.timeout,
+            Duration::from_secs(DEFAULT_ASR_TIMEOUT_SECS)
+        );
+    }
+}
