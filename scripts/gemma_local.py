@@ -14,6 +14,8 @@ import socket
 import sys
 import time
 import urllib.request
+from dataclasses import dataclass
+from typing import Optional
 
 
 DEFAULT_HOST = "http://localhost:11434"
@@ -26,6 +28,19 @@ DEFAULT_TEMPERATURE = 0.1
 DEFAULT_THINK = False
 
 TRUTHY_ENV_VALUES = {"1", "true", "TRUE", "yes", "YES", "on", "ON"}
+
+
+@dataclass(frozen=True)
+class StreamUsage:
+    response_tokens: Optional[int] = None
+    prompt_tokens: Optional[int] = None
+    done_reason: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class StreamChatResult:
+    content: str
+    usage: StreamUsage
 
 
 class GemmaIdleTimeout(RuntimeError):
@@ -112,8 +127,59 @@ def build_chat_payload(
     }
 
 
+def _coerce_usage_int(value):
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    return None
+
+
+def estimate_text_tokens(text):
+    """Return a deterministic local token estimate for comparative telemetry only.
+
+    This heuristic is intentionally simple and stable across runs. It is useful
+    for local audit comparisons, but it is not a billing-grade substitute for a
+    model/runtime-reported token count.
+    """
+    if not text:
+        return 0
+    return max(1, (len(text.encode("utf-8")) + 3) // 4)
+
+
+def estimate_payload_tokens(payload):
+    serialized = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return estimate_text_tokens(serialized)
+
+
+def stream_result_content(result):
+    if isinstance(result, StreamChatResult):
+        return result.content
+    return result
+
+
+def stream_result_usage(result):
+    if isinstance(result, StreamChatResult):
+        return result.usage
+    return StreamUsage()
+
+
+def sum_measured_tokens(values):
+    values = list(values)
+    if not values:
+        return None
+    if any(value is None for value in values):
+        return None
+    return sum(values)
+
+
 def stream_chat(url, payload, idle_timeout, max_wall, progress_label="delegate"):
-    """POST to /api/chat with stream:true, return the assembled content string."""
+    """POST to /api/chat with stream:true, return content plus usage metadata."""
     data = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(
         url,
@@ -124,6 +190,7 @@ def stream_chat(url, payload, idle_timeout, max_wall, progress_label="delegate")
     wall_start = time.monotonic()
     content_parts = []
     tokens_received = 0
+    usage = StreamUsage()
 
     try:
         with urllib.request.urlopen(request, timeout=idle_timeout) as response:
@@ -157,6 +224,11 @@ def stream_chat(url, payload, idle_timeout, max_wall, progress_label="delegate")
                     )
 
                 if chunk.get("done"):
+                    usage = StreamUsage(
+                        response_tokens=_coerce_usage_int(chunk.get("eval_count")),
+                        prompt_tokens=_coerce_usage_int(chunk.get("prompt_eval_count")),
+                        done_reason=chunk.get("done_reason"),
+                    )
                     if chunk.get("done_reason") == "length":
                         raise RuntimeError(
                             "response cut by token limit; output may be truncated"
@@ -166,7 +238,7 @@ def stream_chat(url, payload, idle_timeout, max_wall, progress_label="delegate")
     except (TimeoutError, socket.timeout) as exc:
         raise GemmaIdleTimeout(idle_timeout) from exc
 
-    return "".join(content_parts)
+    return StreamChatResult(content="".join(content_parts), usage=usage)
 
 
 def normalize_tagged_content(content, label):

@@ -84,6 +84,15 @@ def _mean(values):
     return round(sum(values) / len(values), 3) if values else None
 
 
+def _token_summary(records, field):
+    values = [r.get(field) for r in records if r.get(field) is not None]
+    return {
+        "records_with_data": len(values),
+        "sum": sum(values) if values else None,
+        "mean": round(sum(values) / len(values), 3) if values else None,
+    }
+
+
 def compute_metrics(records):
     if not records:
         return {"total_records": 0}
@@ -107,6 +116,8 @@ def compute_metrics(records):
 
     elapsed_values = [r.get("elapsed_s") for r in records]
     mean_elapsed_s = _mean(elapsed_values)
+    response_tokens = _token_summary(records, "response_tokens")
+    packet_tokens_est = _token_summary(records, "packet_tokens_est")
 
     # Developer-specific metrics
     dev_records = [r for r in records if r.get("role") == "developer"]
@@ -191,6 +202,8 @@ def compute_metrics(records):
         "truncation_rate": round(truncation_rate, 4),
         "mean_elapsed_s": mean_elapsed_s,
         "mode_distribution": mode_distribution,
+        "response_tokens": response_tokens,
+        "packet_tokens_est": packet_tokens_est,
         "findings_by_severity": findings_by_severity,
         "total_findings": total_findings,
         "total_out_of_scope": total_out_of_scope,
@@ -229,6 +242,20 @@ def format_text(metrics, skipped):
     lines.append(f"truncation_rate:    {metrics['truncation_rate']:.1%}")
     if metrics.get("mean_elapsed_s") is not None:
         lines.append(f"mean_elapsed_s:     {metrics['mean_elapsed_s']:.3f}")
+
+    response_tokens = metrics.get("response_tokens", {})
+    packet_tokens_est = metrics.get("packet_tokens_est", {})
+    if response_tokens.get("records_with_data", 0) > 0 or packet_tokens_est.get("records_with_data", 0) > 0:
+        lines.append("")
+        lines.append("token_telemetry:")
+        lines.append(
+            f"  response_tokens:   records={response_tokens.get('records_with_data', 0)} "
+            f"sum={response_tokens.get('sum')} mean={response_tokens.get('mean')}"
+        )
+        lines.append(
+            f"  packet_tokens_est: records={packet_tokens_est.get('records_with_data', 0)} "
+            f"sum={packet_tokens_est.get('sum')} mean={packet_tokens_est.get('mean')}"
+        )
 
     if metrics.get("mode_distribution"):
         lines.append("")

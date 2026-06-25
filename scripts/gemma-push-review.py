@@ -741,7 +741,7 @@ def run_push_audit(packet, run_info, args, out_dir, repo_root="."):
 
     wall_start = time.monotonic()
     try:
-        content = gemma_local.stream_chat(
+        stream_result = gemma_local.stream_chat(
             gemma_local.endpoint(args.host, "/api/chat"),
             payload,
             idle_timeout=args.idle_timeout,
@@ -764,6 +764,8 @@ def run_push_audit(packet, run_info, args, out_dir, repo_root="."):
         return 2
 
     elapsed = time.monotonic() - wall_start
+    content = gemma_local.stream_result_content(stream_result)
+    usage = gemma_local.stream_result_usage(stream_result)
 
     try:
         result = parse_push_audit_response(content, changed_paths)
@@ -867,6 +869,9 @@ def run_push_audit(packet, run_info, args, out_dir, repo_root="."):
         "system_prompt": system_prompt,
         "user_prompt": user_prompt,
         "markdown_summary_path": markdown_path,
+        "file_tokens_est": None,
+        "packet_tokens_est": gemma_local.estimate_payload_tokens(payload),
+        "response_tokens": usage.response_tokens,
     })
 
     return 0

@@ -529,13 +529,15 @@ def main():
     if args.passes == 1:
         # Single-pass: exact current behavior (T3) — no reconciliation block.
         wall_start = time.monotonic()
-        content = gemma_local.stream_chat(
+        stream_result = gemma_local.stream_chat(
             gemma_local.endpoint(args.host, "/api/chat"),
             payload,
             idle_timeout=args.idle_timeout,
             max_wall=args.max_wall,
             progress_label="review",
         )
+        content = gemma_local.stream_result_content(stream_result)
+        usage = gemma_local.stream_result_usage(stream_result)
         result = parse_review_response(content, changed_paths)
 
         if args.out:
@@ -574,8 +576,8 @@ def main():
             "format_warnings": result.get("format_warnings") or None,
             "file_lines": None,
             "file_tokens_est": None,
-            "packet_tokens_est": None,
-            "response_tokens": None,
+            "packet_tokens_est": gemma_local.estimate_payload_tokens(payload),
+            "response_tokens": usage.response_tokens,
         })
 
         return 2 if result["status"] == "blocked" else 0
@@ -583,17 +585,21 @@ def main():
     # Multi-pass path (args.passes >= 2).
     wall_start = time.monotonic()
     pass_results = []
+    usage_results = []
+    per_call_packet_tokens = gemma_local.estimate_payload_tokens(payload)
     for k in range(1, args.passes + 1):
         format_retry_used = False
         for attempt in range(2):
             try:
-                content = gemma_local.stream_chat(
+                stream_result = gemma_local.stream_chat(
                     gemma_local.endpoint(args.host, "/api/chat"),
                     payload,
                     idle_timeout=args.idle_timeout,
                     max_wall=args.max_wall,
                     progress_label=f"review pass {k}/{args.passes}" + (" (retry)" if attempt else ""),
                 )
+                usage_results.append(gemma_local.stream_result_usage(stream_result))
+                content = gemma_local.stream_result_content(stream_result)
                 result = parse_review_response(content, changed_paths)
                 if format_retry_used:
                     result["format_retry"] = True
@@ -674,8 +680,10 @@ def main():
         "likely_false_positive_count": rec.get("likely_false_positive_count", 0),
         "file_lines": None,
         "file_tokens_est": None,
-        "packet_tokens_est": None,
-        "response_tokens": None,
+        "packet_tokens_est": per_call_packet_tokens * len(usage_results),
+        "response_tokens": gemma_local.sum_measured_tokens(
+            usage.response_tokens for usage in usage_results
+        ),
     })
 
     return 2 if aggregate["status"] == "blocked" else 0

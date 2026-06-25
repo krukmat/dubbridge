@@ -75,6 +75,25 @@ class Payload(unittest.TestCase):
         self.assertEqual(payload["messages"][0]["content"], "system")
         self.assertEqual(payload["messages"][1]["content"], "packet")
 
+    def test_estimate_payload_tokens_is_deterministic(self):
+        payload = gemma_local.build_chat_payload(
+            model="m",
+            system_prompt="system",
+            packet="packet",
+            num_ctx=8192,
+            num_predict=2048,
+            temperature=0.25,
+            think=True,
+        )
+        self.assertEqual(
+            gemma_local.estimate_payload_tokens(payload),
+            gemma_local.estimate_payload_tokens(payload),
+        )
+
+    def test_sum_measured_tokens_requires_complete_data(self):
+        self.assertEqual(gemma_local.sum_measured_tokens([2, 3]), 5)
+        self.assertIsNone(gemma_local.sum_measured_tokens([2, None]))
+
 
 class TaggedHelpers(unittest.TestCase):
     def test_normalize_tagged_content_strips_crlf(self):
@@ -242,28 +261,35 @@ class _FakeResponse:
         return line + b"\n"
 
 
-def _chunk(text="", done=False, done_reason=None):
+def _chunk(text="", done=False, done_reason=None, eval_count=None, prompt_eval_count=None):
     data = {"message": {"content": text}, "done": done}
     if done_reason is not None:
         data["done_reason"] = done_reason
+    if eval_count is not None:
+        data["eval_count"] = eval_count
+    if prompt_eval_count is not None:
+        data["prompt_eval_count"] = prompt_eval_count
     return json.dumps(data).encode("utf-8")
 
 
 class StreamChat(unittest.TestCase):
     def test_stream_chat_assembles_content(self):
-        response = _FakeResponse([_chunk("a"), _chunk("b", done=True)])
+        response = _FakeResponse([
+            _chunk("a"),
+            _chunk("b", done=True, eval_count=7, prompt_eval_count=11),
+        ])
         with patch("urllib.request.urlopen", return_value=response):
             with patch("sys.stderr", new=io.StringIO()):
-                self.assertEqual(
-                    gemma_local.stream_chat(
-                        "http://host/api/chat",
-                        {"stream": True},
-                        idle_timeout=60,
-                        max_wall=900,
-                        progress_label="review",
-                    ),
-                    "ab",
+                result = gemma_local.stream_chat(
+                    "http://host/api/chat",
+                    {"stream": True},
+                    idle_timeout=60,
+                    max_wall=900,
+                    progress_label="review",
                 )
+        self.assertEqual(result.content, "ab")
+        self.assertEqual(result.usage.response_tokens, 7)
+        self.assertEqual(result.usage.prompt_tokens, 11)
 
     def test_stream_chat_rejects_length_done_reason(self):
         response = _FakeResponse([_chunk(done=True, done_reason="length")])
@@ -271,6 +297,11 @@ class StreamChat(unittest.TestCase):
             with self.assertRaises(RuntimeError) as ctx:
                 gemma_local.stream_chat("http://host/api/chat", {}, 60, 900)
         self.assertIn("token limit", str(ctx.exception))
+
+    def test_stream_result_helpers_accept_legacy_string(self):
+        self.assertEqual(gemma_local.stream_result_content("hello"), "hello")
+        usage = gemma_local.stream_result_usage("hello")
+        self.assertIsNone(usage.response_tokens)
 
     def test_stream_chat_idle_timeout(self):
         response = _FakeResponse([], block_after=0)

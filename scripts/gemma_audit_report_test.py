@@ -37,6 +37,8 @@ def _dev_record(**kwargs):
         "scope_violations": 0,
         "apply_result": "clean",
         "verify_ok": None,
+        "packet_tokens_est": None,
+        "response_tokens": None,
         "task_id": None,
         "rri": None,
         "band": None,
@@ -60,6 +62,8 @@ def _rev_record(**kwargs):
         "out_of_scope": 0,
         "dispositions": None,
         "disposition_divergence": None,
+        "packet_tokens_est": None,
+        "response_tokens": None,
         "task_id": None,
         "rri": None,
         "band": None,
@@ -203,6 +207,29 @@ class ComputeMetrics(unittest.TestCase):
         m = _mod.compute_metrics(records)
         self.assertAlmostEqual(m["mean_elapsed_s"], 5.0, places=3)
 
+    def test_token_telemetry_summaries_ignore_nulls(self):
+        records = [
+            _dev_record(packet_tokens_est=100, response_tokens=30),
+            _rev_record(packet_tokens_est=None, response_tokens=None),
+            _rev_record(packet_tokens_est=140, response_tokens=50),
+        ]
+        m = _mod.compute_metrics(records)
+        self.assertEqual(m["packet_tokens_est"]["records_with_data"], 2)
+        self.assertEqual(m["packet_tokens_est"]["sum"], 240)
+        self.assertAlmostEqual(m["packet_tokens_est"]["mean"], 120.0, places=3)
+        self.assertEqual(m["response_tokens"]["records_with_data"], 2)
+        self.assertEqual(m["response_tokens"]["sum"], 80)
+        self.assertAlmostEqual(m["response_tokens"]["mean"], 40.0, places=3)
+
+    def test_token_telemetry_all_null_stays_none(self):
+        m = _mod.compute_metrics([_dev_record(), _rev_record()])
+        self.assertEqual(m["packet_tokens_est"]["records_with_data"], 0)
+        self.assertIsNone(m["packet_tokens_est"]["sum"])
+        self.assertIsNone(m["packet_tokens_est"]["mean"])
+        self.assertEqual(m["response_tokens"]["records_with_data"], 0)
+        self.assertIsNone(m["response_tokens"]["sum"])
+        self.assertIsNone(m["response_tokens"]["mean"])
+
 
 class FormatText(unittest.TestCase):
     def test_empty_records_prints_no_records(self):
@@ -219,6 +246,21 @@ class FormatText(unittest.TestCase):
         )
         output = _mod.format_text(m, skipped=0)
         self.assertIn("escalation_rate", output)
+
+    def test_token_telemetry_block_shown_when_data_present(self):
+        m = _mod.compute_metrics([
+            _dev_record(packet_tokens_est=100, response_tokens=30),
+            _rev_record(packet_tokens_est=140, response_tokens=50),
+        ])
+        output = _mod.format_text(m, skipped=0)
+        self.assertIn("token_telemetry:", output)
+        self.assertIn("response_tokens:", output)
+        self.assertIn("packet_tokens_est:", output)
+
+    def test_token_telemetry_block_omitted_when_no_data(self):
+        m = _mod.compute_metrics([_dev_record(), _rev_record()])
+        output = _mod.format_text(m, skipped=0)
+        self.assertNotIn("token_telemetry:", output)
 
     def test_no_threshold_flags_label(self):
         m = _mod.compute_metrics([_dev_record()])

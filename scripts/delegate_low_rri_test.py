@@ -387,8 +387,8 @@ class StreamChatTimeouts(unittest.TestCase):
 
     def test_happy_path_assembles_content(self):
         lines = _ndjson_lines("STATUS: PATCH\n", "SUMMARY: ok\n")
-        content = self._call(lines)
-        self.assertIn("STATUS: PATCH", content)
+        result = self._call(lines)
+        self.assertIn("STATUS: PATCH", result.content)
 
     def test_idle_timeout_on_stall(self):
         lines = _ndjson_lines("partial")
@@ -402,23 +402,23 @@ class StreamChatTimeouts(unittest.TestCase):
             self._call(lines, wall=0.5, delay=0.4)
 
     def test_empty_response_returns_empty_string(self):
-        content = self._call([])
-        self.assertEqual(content, "")
+        result = self._call([])
+        self.assertEqual(result.content, "")
 
     def test_done_flag_stops_iteration(self):
         lines = [
             json.dumps({"message": {"content": "hello"}, "done": True}).encode(),
             json.dumps({"message": {"content": " SHOULD_NOT_APPEAR"}, "done": False}).encode(),
         ]
-        content = self._call(lines)
-        self.assertIn("hello", content)
-        self.assertNotIn("SHOULD_NOT_APPEAR", content)
+        result = self._call(lines)
+        self.assertIn("hello", result.content)
+        self.assertNotIn("SHOULD_NOT_APPEAR", result.content)
 
     def test_malformed_ndjson_line_skipped(self):
         lines = [b"not-json\n",
                  json.dumps({"message": {"content": "ok"}, "done": True}).encode()]
-        content = self._call(lines)
-        self.assertIn("ok", content)
+        result = self._call(lines)
+        self.assertIn("ok", result.content)
 
 
 # ---------------------------------------------------------------------------
@@ -767,7 +767,10 @@ class AuditEmission(unittest.TestCase):
         return captured
 
     def test_patch_emits_one_record_with_developer_role(self):
-        response = "STATUS: PATCH\nSUMMARY: ok\n=== FILE START ===\nPATH: scripts/x.py\nACTION: create\n--- CONTENT ---\nx = 1\n=== FILE END ==="
+        response = _mod.gemma_local.StreamChatResult(
+            content="STATUS: PATCH\nSUMMARY: ok\n=== FILE START ===\nPATH: scripts/x.py\nACTION: create\n--- CONTENT ---\nx = 1\n=== FILE END ===",
+            usage=_mod.gemma_local.StreamUsage(response_tokens=13),
+        )
         records = self._run(response)
         self.assertEqual(len(records), 1)
         r = records[0]
@@ -780,6 +783,8 @@ class AuditEmission(unittest.TestCase):
         self.assertIsNone(r["task_id"])
         self.assertIsNone(r["attempt"])
         self.assertEqual(r["apply_result"], "skipped")
+        self.assertEqual(r["response_tokens"], 13)
+        self.assertGreater(r["packet_tokens_est"], 0)
 
     def test_no_patch_emits_skipped_apply_result(self):
         records = self._run("STATUS: NO_PATCH\nSUMMARY: nothing to do")
@@ -788,6 +793,7 @@ class AuditEmission(unittest.TestCase):
         self.assertEqual(r["outcome"], "NO_PATCH")
         self.assertEqual(r["apply_result"], "skipped")
         self.assertFalse(r["escalated"])
+        self.assertIsNone(r["response_tokens"])
 
     def test_blocked_emits_escalated_true(self):
         records = self._run("STATUS: BLOCKED\nSUMMARY: cannot proceed")

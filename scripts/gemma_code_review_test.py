@@ -276,7 +276,10 @@ class AuditEmission(unittest.TestCase):
         return captured
 
     def test_pass_emits_one_record_with_reviewer_role(self):
-        records = self._run("STATUS: PASS\nSUMMARY: clean")
+        records = self._run(_mod.gemma_local.StreamChatResult(
+            content="STATUS: PASS\nSUMMARY: clean",
+            usage=_mod.gemma_local.StreamUsage(response_tokens=17),
+        ))
         self.assertEqual(len(records), 1)
         r = records[0]
         self.assertEqual(r["role"], "reviewer")
@@ -289,6 +292,8 @@ class AuditEmission(unittest.TestCase):
         self.assertIsNone(r["dispositions"])
         self.assertIn("system_prompt", r)
         self.assertIn("user_prompt", r)
+        self.assertEqual(r["response_tokens"], 17)
+        self.assertGreater(r["packet_tokens_est"], 0)
 
     def test_findings_counts_by_severity(self):
         records = self._run(_response("FINDINGS", severity="major"))
@@ -297,6 +302,11 @@ class AuditEmission(unittest.TestCase):
         self.assertEqual(r["findings_count"], 1)
         self.assertEqual(r["findings_by_severity"]["major"], 1)
         self.assertEqual(r["findings_by_severity"]["blocking"], 0)
+
+    def test_legacy_string_response_keeps_response_tokens_null(self):
+        records = self._run("STATUS: PASS\nSUMMARY: clean")
+        self.assertEqual(len(records), 1)
+        self.assertIsNone(records[0]["response_tokens"])
 
     def test_out_of_scope_counted(self):
         records = self._run(_response("FINDINGS", finding_path="scripts/other.py"))
@@ -597,9 +607,18 @@ class MultiPassCliAudit(unittest.TestCase):
 
     def test_multipass_pass_emits_one_record_with_d12_fields(self):
         records = self._run_audit([
-            "STATUS: PASS\nSUMMARY: ok",
-            "STATUS: PASS\nSUMMARY: ok",
-            "STATUS: PASS\nSUMMARY: ok",
+            _mod.gemma_local.StreamChatResult(
+                content="STATUS: PASS\nSUMMARY: ok",
+                usage=_mod.gemma_local.StreamUsage(response_tokens=5),
+            ),
+            _mod.gemma_local.StreamChatResult(
+                content="STATUS: PASS\nSUMMARY: ok",
+                usage=_mod.gemma_local.StreamUsage(response_tokens=7),
+            ),
+            _mod.gemma_local.StreamChatResult(
+                content="STATUS: PASS\nSUMMARY: ok",
+                usage=_mod.gemma_local.StreamUsage(response_tokens=11),
+            ),
         ])
         self.assertEqual(len(records), 1)
         r = records[0]
@@ -612,18 +631,40 @@ class MultiPassCliAudit(unittest.TestCase):
         self.assertIn("pass_specific_count", r)
         self.assertIn("severity_inconsistent_count", r)
         self.assertIn("likely_false_positive_count", r)
+        self.assertEqual(r["response_tokens"], 23)
+        self.assertGreater(r["packet_tokens_est"], 0)
 
     def test_degraded_run_reflected_in_audit_record(self):
         records = self._run_audit([
-            "STATUS: PASS\nSUMMARY: ok",
+            _mod.gemma_local.StreamChatResult(
+                content="STATUS: PASS\nSUMMARY: ok",
+                usage=_mod.gemma_local.StreamUsage(response_tokens=3),
+            ),
             RuntimeError("fail"),
-            "STATUS: PASS\nSUMMARY: ok",
+            _mod.gemma_local.StreamChatResult(
+                content="STATUS: PASS\nSUMMARY: ok",
+                usage=_mod.gemma_local.StreamUsage(response_tokens=4),
+            ),
         ])
         self.assertEqual(len(records), 1)
         r = records[0]
         self.assertTrue(r["degraded"])
         self.assertEqual(r["passes_succeeded"], 2)
         self.assertEqual(r["passes_run"], 3)
+
+    def test_multipass_partial_usage_keeps_response_tokens_null(self):
+        records = self._run_audit([
+            _mod.gemma_local.StreamChatResult(
+                content="STATUS: PASS\nSUMMARY: ok",
+                usage=_mod.gemma_local.StreamUsage(response_tokens=3),
+            ),
+            _mod.gemma_local.StreamChatResult(
+                content="STATUS: PASS\nSUMMARY: ok",
+                usage=_mod.gemma_local.StreamUsage(response_tokens=None),
+            ),
+        ])
+        self.assertEqual(len(records), 1)
+        self.assertIsNone(records[0]["response_tokens"])
 
     def test_quorum_failure_emits_no_audit_record(self):
         records = self._run_audit([

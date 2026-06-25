@@ -741,7 +741,14 @@ class RunPushAuditHappyPath(unittest.TestCase):
         response = _findings_response(path="scripts/example.py", line=1, with_rri_hint=True)
         with tempfile.TemporaryDirectory() as tmp:
             with patch.object(_mod.gemma_local, "ensure_model_available"):
-                with patch.object(_mod.gemma_local, "stream_chat", return_value=response):
+                with patch.object(
+                    _mod.gemma_local,
+                    "stream_chat",
+                    return_value=_mod.gemma_local.StreamChatResult(
+                        content=response,
+                        usage=_mod.gemma_local.StreamUsage(response_tokens=19),
+                    ),
+                ):
                     with patch.object(_mod.gemma_local, "append_audit_log") as mock_audit:
                         rc = _mod.run_push_audit(packet, run, args, tmp, repo_root=tmp)
             self.assertEqual(rc, 0)
@@ -762,6 +769,9 @@ class RunPushAuditHappyPath(unittest.TestCase):
         self.assertIn("branch", record)
         self.assertIn("conclusion", record)
         self.assertEqual(record["grounded_count"], 1)
+        self.assertEqual(record["response_tokens"], 19)
+        self.assertGreater(record["packet_tokens_est"], 0)
+        self.assertIn("file_tokens_est", record)
 
     def test_ec1_all_observe_does_not_block(self):
         """EC-1: all findings observe (not in diff) → rc=0, no blocked.json."""
@@ -798,6 +808,20 @@ class RunPushAuditHappyPath(unittest.TestCase):
         self.assertEqual(agg["grounded_count"], 0)
         self.assertEqual(agg["observe_count"], 0)
         self.assertEqual(agg["findings"], [])
+
+    def test_legacy_string_response_keeps_response_tokens_null(self):
+        args = _model_args()
+        packet = _make_packet()
+        run = _completed_run()
+        response = "STATUS: PASS\nSUMMARY: no issues"
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(_mod.gemma_local, "ensure_model_available"):
+                with patch.object(_mod.gemma_local, "stream_chat", return_value=response):
+                    with patch.object(_mod.gemma_local, "append_audit_log") as mock_audit:
+                        rc = _mod.run_push_audit(packet, run, args, tmp, repo_root=tmp)
+        self.assertEqual(rc, 0)
+        record = mock_audit.call_args[0][0]
+        self.assertIsNone(record["response_tokens"])
 
 
 # ===========================================================================

@@ -901,12 +901,14 @@ def main():
 
     ensure_model_available(args.host, args.model, args.idle_timeout)
     wall_start = time.monotonic()
-    content = stream_chat(
+    stream_result = stream_chat(
         endpoint(args.host, "/api/chat"),
         payload,
         idle_timeout=args.idle_timeout,
         max_wall=args.max_wall,
     )
+    content = gemma_local.stream_result_content(stream_result)
+    usage = gemma_local.stream_result_usage(stream_result)
 
     if args.mode == "before-after":
         delegation = parse_replacement_response(content)
@@ -972,8 +974,8 @@ def main():
         "verify_ok": None,
         "file_lines": None,
         "file_tokens_est": None,
-        "packet_tokens_est": None,
-        "response_tokens": None,
+        "packet_tokens_est": gemma_local.estimate_payload_tokens(payload),
+        "response_tokens": usage.response_tokens,
     })
 
     return 0
