@@ -259,6 +259,11 @@ def parse_review_response(content, changed_paths):
         if line.startswith("STATUS: ") or line.strip() in STATUS_VALUES:
             if status is not None:
                 raise RuntimeError("invalid review response: duplicate STATUS header")
+            if not line.startswith("STATUS: "):
+                print(
+                    f"[review] warning: bare STATUS value accepted (non-standard format): {line!r}",
+                    file=sys.stderr,
+                )
             raw = (line[len("STATUS: "):] if line.startswith("STATUS: ") else line).strip()
             if raw not in STATUS_VALUES:
                 raise RuntimeError(f"invalid review response: unknown STATUS {raw!r}")

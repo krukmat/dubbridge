@@ -83,7 +83,12 @@ export function ReviewDetailScreen({
     }
 
     await auth.onSessionRotation(result.value.sessionRotation);
-    setTaskState(result.value.data.state as ReviewTaskSummary["state"]);
+    const rawState = result.value.data.state;
+    if (rawState === "pending" || rawState === "approved" || rawState === "rejected") {
+      setTaskState(rawState);
+    } else {
+      console.warn(`[ReviewDetailScreen] unexpected task state from API: ${rawState}`);
+    }
     setComment("");
     setPublishedAt(null);
     setMutation({ kind: "idle" });

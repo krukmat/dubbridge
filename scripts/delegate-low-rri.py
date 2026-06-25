@@ -727,10 +727,15 @@ def build_diff(files, repo_root):
             old = target if os.path.exists(target) else os.devnull
             tmp = tempfile.NamedTemporaryFile(
                 mode="w", encoding="utf-8", suffix=".new", delete=False)
-            tmp.write(entry["contents"])
-            tmp.close()
-            new = tmp.name
             cleanup = tmp.name
+            try:
+                tmp.write(entry["contents"])
+                tmp.close()
+            except Exception:
+                os.unlink(cleanup)
+                cleanup = None
+                raise
+            new = tmp.name
 
         try:
             out = subprocess.run(
@@ -946,7 +951,7 @@ def main():
         "ts": datetime.datetime.utcnow().isoformat() + "Z",
         "role": "developer",
         "outcome": delegation["status"].upper(),
-        "done_reason": "stop",
+        "done_reason": "policy" if delegation["status"] == "blocked" else "stop",
         "mode": args.mode,
         "elapsed_s": round(time.monotonic() - wall_start, 3),
         "escalated": delegation["status"] == "blocked",
