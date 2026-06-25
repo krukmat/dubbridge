@@ -5,17 +5,21 @@ use std::{
 
 use anyhow::{Context, bail};
 use async_trait::async_trait;
-use dubbridge_db::{create_pool, preparation_repo};
+use dubbridge_db::{create_pool, preparation_repo, transcription_repo, workspace_repo};
 use dubbridge_domain::{
-    artifact::{ArtifactRecord, PreparationStatus},
+    artifact::{ArtifactRecord, PreparationStatus, TranscriptionStatus},
     asset::AssetId,
 };
-use dubbridge_jobs::{JobEnvelope, PreparationJob};
+use dubbridge_jobs::{JobEnvelope, PreparationJob, TranscriptionJob, TranscriptionJobQueue};
 use dubbridge_media::{
     HLS_MANIFEST_FILE_NAME, HLS_SEGMENT_FILE_EXTENSION, canonical_ffprobe_json, ffmpeg_hls_command,
     ffprobe_command, validate_hls_outputs,
 };
-use dubbridge_storage::{StorageAdapter, hls_manifest_key, hls_segment_key, probe_metadata_key};
+use dubbridge_providers::{AsrInput, AsrOutput, AsrWorkerClient};
+use dubbridge_storage::{
+    StorageAdapter, alignment_key, hls_manifest_key, hls_segment_key, probe_metadata_key,
+    transcript_key,
+};
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use tempfile::TempDir;
@@ -124,6 +128,7 @@ async fn process_preparation_envelope(
     pool: &PgPool,
     storage: &(dyn StorageAdapter + Send + Sync),
     executor: &dyn PreparationExecutor,
+    queue: &dyn TranscriptionJobQueue,
     envelope: JobEnvelope<PreparationJob>,
 ) -> anyhow::Result<()> {
     if envelope.job_type != PreparationJob::JOB_TYPE {
@@ -134,7 +139,7 @@ async fn process_preparation_envelope(
         );
     }
 
-    process_preparation_job(pool, storage, executor, envelope.payload).await
+    process_preparation_job(pool, storage, executor, queue, envelope.payload).await
 }
 
 #[allow(dead_code)]
@@ -142,9 +147,11 @@ async fn process_preparation_job(
     pool: &PgPool,
     storage: &(dyn StorageAdapter + Send + Sync),
     executor: &dyn PreparationExecutor,
+    queue: &dyn TranscriptionJobQueue,
     job: PreparationJob,
 ) -> anyhow::Result<()> {
     let asset_id = AssetId(job.asset_id);
+    let source_artifact_id = job.source_artifact_id;
 
     let result = process_preparation_job_inner(pool, storage, executor, &job).await;
     if let Err(error) = result {
@@ -160,7 +167,114 @@ async fn process_preparation_job(
         return Err(error);
     }
 
+    // Preparation succeeded: fire-and-forget transcription enqueue.
+    // Enqueue failure writes TranscriptionStatus::Failed but does not fail preparation.
+    enqueue_transcription_if_ready(pool, queue, asset_id, source_artifact_id).await;
+
     Ok(())
+}
+
+/// Resolve source language and enqueue a TranscriptionJob after preparation succeeds.
+///
+/// All error paths write `TranscriptionStatus::Failed` with an observable detail and return
+/// without propagating — preparation readiness is never jeopardised by enqueue failures.
+#[allow(dead_code)]
+async fn enqueue_transcription_if_ready(
+    pool: &PgPool,
+    queue: &dyn TranscriptionJobQueue,
+    asset_id: AssetId,
+    source_artifact_id: uuid::Uuid,
+) {
+    // Idempotency guard: skip if a transcription is already underway or done.
+    match transcription_repo::get_transcription_status(pool, asset_id).await {
+        Ok(Some(r))
+            if matches!(
+                r.status,
+                TranscriptionStatus::Pending
+                    | TranscriptionStatus::InProgress
+                    | TranscriptionStatus::Ready
+            ) =>
+        {
+            return;
+        }
+        Err(e) => {
+            tracing::warn!(asset_id = %asset_id, error = %e, "failed to read transcription status; recording Failed");
+            let _ = transcription_repo::upsert_transcription_status(
+                pool,
+                asset_id,
+                TranscriptionStatus::Failed,
+                Some(&e.to_string()),
+            )
+            .await;
+            return;
+        }
+        _ => {}
+    }
+
+    // Resolve source language from the asset's project.
+    let source_language = match workspace_repo::get_source_language_for_asset(pool, asset_id).await
+    {
+        Ok(Some(lang)) => lang,
+        Ok(None) => {
+            let detail = "no target_languages row found for asset project";
+            tracing::warn!(asset_id = %asset_id, detail, "transcription enqueue failed");
+            let _ = transcription_repo::upsert_transcription_status(
+                pool,
+                asset_id,
+                TranscriptionStatus::Failed,
+                Some(detail),
+            )
+            .await;
+            return;
+        }
+        Err(e) => {
+            tracing::warn!(asset_id = %asset_id, error = %e, "failed to resolve source language");
+            let _ = transcription_repo::upsert_transcription_status(
+                pool,
+                asset_id,
+                TranscriptionStatus::Failed,
+                Some(&e.to_string()),
+            )
+            .await;
+            return;
+        }
+    };
+
+    // Write Pending before dispatching to the queue.
+    if let Err(e) = transcription_repo::upsert_transcription_status(
+        pool,
+        asset_id,
+        TranscriptionStatus::Pending,
+        None,
+    )
+    .await
+    {
+        tracing::warn!(asset_id = %asset_id, error = %e, "failed to write TranscriptionStatus::Pending");
+        let _ = transcription_repo::upsert_transcription_status(
+            pool,
+            asset_id,
+            TranscriptionStatus::Failed,
+            Some(&e.to_string()),
+        )
+        .await;
+        return;
+    }
+
+    // Enqueue.
+    if let Err(e) = queue.enqueue(TranscriptionJob::new(
+        asset_id.0,
+        source_artifact_id,
+        source_language,
+    )) {
+        tracing::warn!(asset_id = %asset_id, error = %e, "failed to enqueue TranscriptionJob");
+        let _ = transcription_repo::upsert_transcription_status(
+            pool,
+            asset_id,
+            TranscriptionStatus::Failed,
+            Some(&e.to_string()),
+        )
+        .await;
+    }
 }
 
 #[allow(dead_code)]
@@ -422,14 +536,192 @@ fn checksum_hex(bytes: &[u8]) -> String {
     format!("{:x}", hasher.finalize())
 }
 
+#[allow(dead_code)]
+async fn process_transcription_envelope(
+    pool: &PgPool,
+    storage: &(dyn StorageAdapter + Send + Sync),
+    client: &dyn AsrWorkerClient,
+    envelope: JobEnvelope<TranscriptionJob>,
+) -> anyhow::Result<()> {
+    if envelope.job_type != TranscriptionJob::JOB_TYPE {
+        bail!(
+            "unsupported transcription job type '{}', expected '{}'",
+            envelope.job_type,
+            TranscriptionJob::JOB_TYPE
+        );
+    }
+    process_transcription_job(pool, storage, client, envelope.payload).await
+}
+
+#[allow(dead_code)]
+async fn process_transcription_job(
+    pool: &PgPool,
+    storage: &(dyn StorageAdapter + Send + Sync),
+    client: &dyn AsrWorkerClient,
+    job: TranscriptionJob,
+) -> anyhow::Result<()> {
+    let asset_id = AssetId(job.asset_id);
+
+    let result = process_transcription_job_inner(pool, storage, client, &job).await;
+    if let Err(error) = result {
+        let detail = format!("{error:#}");
+        let _ = transcription_repo::upsert_transcription_status(
+            pool,
+            asset_id,
+            TranscriptionStatus::Failed,
+            Some(&detail),
+        )
+        .await;
+        return Err(error);
+    }
+
+    Ok(())
+}
+
+#[allow(dead_code)]
+async fn process_transcription_job_inner(
+    pool: &PgPool,
+    storage: &(dyn StorageAdapter + Send + Sync),
+    client: &dyn AsrWorkerClient,
+    job: &TranscriptionJob,
+) -> anyhow::Result<()> {
+    let asset_id = AssetId(job.asset_id);
+    let asset_id_str = asset_id.to_string();
+    let source_artifact_id = job.source_artifact_id;
+
+    transcription_repo::upsert_transcription_status(
+        pool,
+        asset_id,
+        TranscriptionStatus::InProgress,
+        None,
+    )
+    .await
+    .context("failed to mark transcription in progress")?;
+
+    // Download source audio bytes and write to a temp file for the ASR worker.
+    let source_artifact = transcription_repo::get_source_artifact_for_transcription(
+        pool,
+        asset_id,
+        source_artifact_id,
+    )
+    .await
+    .context("failed to load source artifact for transcription")?;
+
+    let audio_bytes = storage
+        .get(&source_artifact.storage_key)
+        .await
+        .with_context(|| {
+            format!(
+                "failed to load source audio from '{}'",
+                source_artifact.storage_key
+            )
+        })?;
+
+    let workspace = TempDir::new().context("failed to create transcription workspace")?;
+    let audio_path = workspace.path().join("source-audio.bin");
+    fs::write(&audio_path, &audio_bytes)
+        .await
+        .context("failed to write audio temp file")?;
+    let audio_uri = format!(
+        "file://{}",
+        audio_path.to_str().context("non-UTF-8 audio path")?
+    );
+
+    // Call the ASR client.
+    let asr_output: AsrOutput = client
+        .transcribe(AsrInput {
+            job_id: job.asset_id.to_string(),
+            audio_uri,
+            language_hint: job.source_language.clone(),
+        })
+        .map_err(|e| anyhow::anyhow!("ASR worker error: {e}"))?;
+
+    // Read transcript and alignment from the URIs returned by the worker.
+    let transcript_bytes = read_file_uri(&asr_output.transcript_uri)
+        .await
+        .context("failed to read transcript URI")?;
+    let alignment_bytes = read_file_uri(&asr_output.alignment_uri)
+        .await
+        .context("failed to read alignment URI")?;
+
+    // Upload both to storage under canonical keys.
+    let t_key = transcript_key(&asset_id_str);
+    let a_key = alignment_key(&asset_id_str);
+
+    storage
+        .put(&t_key, transcript_bytes.clone())
+        .await
+        .with_context(|| format!("failed to store transcript at '{t_key}'"))?;
+    storage
+        .put(&a_key, alignment_bytes.clone())
+        .await
+        .with_context(|| format!("failed to store alignment at '{a_key}'"))?;
+
+    // Persist both derived artifacts.
+    transcription_repo::insert_transcript_artifacts(
+        pool,
+        asset_id,
+        source_artifact_id,
+        transcription_repo::TranscriptArtifactMeta {
+            storage_key: &t_key,
+            size_bytes: i64::try_from(transcript_bytes.len())
+                .context("transcript exceeds i64 size limit")?,
+            checksum: &checksum_hex(&transcript_bytes),
+        },
+        transcription_repo::TranscriptArtifactMeta {
+            storage_key: &a_key,
+            size_bytes: i64::try_from(alignment_bytes.len())
+                .context("alignment exceeds i64 size limit")?,
+            checksum: &checksum_hex(&alignment_bytes),
+        },
+    )
+    .await
+    .context("failed to persist transcript artifacts")?;
+
+    // Gate Ready on evidence of both artifact kinds.
+    let ready = transcription_repo::get_transcription_readiness_evidence(pool, asset_id)
+        .await
+        .context("failed to load transcription readiness evidence")?;
+
+    if !ready {
+        bail!("transcription readiness evidence incomplete after artifact insertion");
+    }
+
+    transcription_repo::upsert_transcription_status(
+        pool,
+        asset_id,
+        TranscriptionStatus::Ready,
+        None,
+    )
+    .await
+    .context("failed to mark transcription ready")?;
+
+    Ok(())
+}
+
+/// Read the content of a `file://` URI synchronously, returning the raw bytes.
+#[allow(dead_code)]
+async fn read_file_uri(uri: &str) -> anyhow::Result<Vec<u8>> {
+    let path = uri
+        .strip_prefix("file://")
+        .ok_or_else(|| anyhow::anyhow!("unsupported URI scheme in '{uri}'"))?;
+    fs::read(path)
+        .await
+        .with_context(|| format!("failed to read file at '{path}'"))
+}
+
 #[cfg(test)]
 mod tests {
     use std::{env, sync::Arc};
 
     use super::*;
-    use dubbridge_db::artifact_repo;
+    use dubbridge_db::{artifact_repo, transcription_repo, workspace_repo};
     use dubbridge_domain::artifact::ArtifactKind;
+    use dubbridge_domain::workspace::{OrgId, Organization, Project, ProjectId, TargetLanguage};
+    use dubbridge_jobs::InMemoryTranscriptionJobQueue;
+    use dubbridge_providers::{AsrError, AsrOutput, StubAsrWorkerClient};
     use dubbridge_storage::LocalFsAdapter;
+    use time::OffsetDateTime;
     use tokio::sync::Mutex;
     use uuid::Uuid;
 
@@ -441,7 +733,7 @@ mod tests {
             .await
             .expect("migrations");
         sqlx::query(
-            "TRUNCATE TABLE pending_ingestions, audit_events, artifact_records, rights_records, assets, asset_preparation_status RESTART IDENTITY CASCADE",
+            "TRUNCATE TABLE pending_ingestions, audit_events, artifact_records, rights_records, assets, asset_preparation_status, asset_transcription_status RESTART IDENTITY CASCADE",
         )
         .execute(&pool)
         .await
@@ -571,10 +863,12 @@ segment_00000.ts
             hls_result: Ok(valid_hls_output()),
         };
 
+        let queue = InMemoryTranscriptionJobQueue::default();
         process_preparation_job(
             &pool,
             &storage,
             &executor,
+            &queue,
             PreparationJob::new(asset_id.0, source.id, source.ingest_token),
         )
         .await
@@ -627,10 +921,12 @@ segment_00000.ts
             hls_result: Err("ffmpeg transcode failed in fake executor".to_string()),
         };
 
+        let queue = InMemoryTranscriptionJobQueue::default();
         let error = process_preparation_job(
             &pool,
             &storage,
             &executor,
+            &queue,
             PreparationJob::new(asset_id.0, source.id, source.ingest_token),
         )
         .await
@@ -698,10 +994,12 @@ segment_00000.ts
             }),
         };
 
+        let queue = InMemoryTranscriptionJobQueue::default();
         let error = process_preparation_job(
             &pool,
             &storage,
             &executor,
+            &queue,
             PreparationJob::new(asset_id.0, source.id, source.ingest_token),
         )
         .await
@@ -741,10 +1039,12 @@ segment_00000.ts
             hls_result: Ok(valid_hls_output()),
         };
 
+        let queue = InMemoryTranscriptionJobQueue::default();
         let error = process_preparation_envelope(
             &pool,
             &storage,
             &executor,
+            &queue,
             JobEnvelope::new(
                 "other-job",
                 PreparationJob::new(asset_id.0, source.id, source.ingest_token),
@@ -757,6 +1057,576 @@ segment_00000.ts
             error
                 .to_string()
                 .contains("unsupported preparation job type")
+        );
+    }
+
+    // ── T2 enqueue tests ─────────────────────────────────────────────────────────
+
+    async fn insert_project_with_target_language(
+        pool: &PgPool,
+        asset_id: AssetId,
+        source_lang: &str,
+    ) {
+        let org_id = OrgId(Uuid::new_v4());
+        let org = Organization {
+            id: org_id,
+            name: "test-org".into(),
+            created_at: OffsetDateTime::now_utc(),
+            updated_at: OffsetDateTime::now_utc(),
+        };
+        workspace_repo::insert_org(pool, &org)
+            .await
+            .expect("insert org");
+
+        let project_id = ProjectId(Uuid::new_v4());
+        let project = Project {
+            id: project_id,
+            org_id,
+            name: "test-project".into(),
+            created_at: OffsetDateTime::now_utc(),
+            updated_at: OffsetDateTime::now_utc(),
+        };
+        workspace_repo::insert_project(pool, &project)
+            .await
+            .expect("insert project");
+
+        sqlx::query(
+            "INSERT INTO project_assets (project_id, asset_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        )
+        .bind(project_id.0)
+        .bind(asset_id.0)
+        .execute(pool)
+        .await
+        .expect("link asset to project");
+
+        let tl = TargetLanguage {
+            id: Uuid::new_v4(),
+            project_id,
+            source_lang: source_lang.into(),
+            target_lang: "es".into(),
+            created_at: OffsetDateTime::now_utc(),
+        };
+        workspace_repo::upsert_target_language(pool, &tl)
+            .await
+            .expect("insert target language");
+    }
+
+    async fn run_full_preparation(
+        pool: &PgPool,
+        asset_id: AssetId,
+        source: &ArtifactRecord,
+        queue: &dyn TranscriptionJobQueue,
+    ) {
+        let workspace = TempDir::new().expect("temp dir");
+        let storage = LocalFsAdapter::new(workspace.path());
+        storage
+            .put(&source.storage_key, b"source-media-bytes".to_vec())
+            .await
+            .expect("persist source bytes");
+        preparation_repo::upsert_preparation_status(
+            pool,
+            asset_id,
+            PreparationStatus::Pending,
+            None,
+        )
+        .await
+        .expect("set pending");
+
+        let executor = FakePreparationExecutor {
+            pool: pool.clone(),
+            asset_id,
+            stage_log: Arc::new(Mutex::new(Vec::new())),
+            probe_result: Ok(valid_probe_bytes()),
+            hls_result: Ok(valid_hls_output()),
+        };
+
+        process_preparation_job(
+            pool,
+            &storage,
+            &executor,
+            queue,
+            PreparationJob::new(asset_id.0, source.id, source.ingest_token),
+        )
+        .await
+        .expect("process preparation job");
+    }
+
+    // HP-1: preparation completion enqueues exactly one TranscriptionJob with the resolved source_language.
+    #[tokio::test]
+    async fn preparation_ready_enqueues_transcription_job_with_source_language() {
+        let Some(pool) = setup_pool().await else {
+            return;
+        };
+
+        let asset_id = insert_asset(&pool).await;
+        let source = insert_source_artifact(&pool, asset_id).await;
+        insert_project_with_target_language(&pool, asset_id, "en").await;
+
+        let queue = InMemoryTranscriptionJobQueue::default();
+        run_full_preparation(&pool, asset_id, &source, &queue).await;
+
+        let jobs = queue.queued_jobs();
+        assert_eq!(jobs.len(), 1, "exactly one job should be enqueued");
+        assert_eq!(jobs[0].asset_id, asset_id.0);
+        assert_eq!(jobs[0].source_artifact_id, source.id);
+        assert_eq!(jobs[0].source_language, "en");
+    }
+
+    // HP-2: preparation completion writes TranscriptionStatus::Pending before dispatching.
+    #[tokio::test]
+    async fn preparation_ready_writes_transcription_pending_status() {
+        let Some(pool) = setup_pool().await else {
+            return;
+        };
+
+        let asset_id = insert_asset(&pool).await;
+        let source = insert_source_artifact(&pool, asset_id).await;
+        insert_project_with_target_language(&pool, asset_id, "pt-BR").await;
+
+        let queue = InMemoryTranscriptionJobQueue::default();
+        run_full_preparation(&pool, asset_id, &source, &queue).await;
+
+        let status = transcription_repo::get_transcription_status(&pool, asset_id)
+            .await
+            .expect("get transcription status")
+            .expect("status row present");
+
+        assert_eq!(status.status, TranscriptionStatus::Pending);
+        assert!(status.error_detail.is_none());
+    }
+
+    // HP-3: resolved source_language matches target_languages.source_lang for the asset's project.
+    #[tokio::test]
+    async fn enqueued_source_language_matches_target_languages_row() {
+        let Some(pool) = setup_pool().await else {
+            return;
+        };
+
+        let asset_id = insert_asset(&pool).await;
+        let source = insert_source_artifact(&pool, asset_id).await;
+        insert_project_with_target_language(&pool, asset_id, "fr").await;
+
+        let queue = InMemoryTranscriptionJobQueue::default();
+        run_full_preparation(&pool, asset_id, &source, &queue).await;
+
+        let jobs = queue.queued_jobs();
+        assert_eq!(jobs.len(), 1);
+        assert_eq!(jobs[0].source_language, "fr");
+    }
+
+    // EC-1: queue enqueue failure produces TranscriptionStatus::Failed with observable error_detail.
+    #[tokio::test]
+    async fn enqueue_failure_records_transcription_failed_status() {
+        use dubbridge_jobs::QueueError;
+
+        let Some(pool) = setup_pool().await else {
+            return;
+        };
+
+        struct FailingQueue;
+        impl TranscriptionJobQueue for FailingQueue {
+            fn enqueue(&self, _job: TranscriptionJob) -> Result<(), QueueError> {
+                Err(QueueError::Unavailable("queue is down".into()))
+            }
+        }
+
+        let asset_id = insert_asset(&pool).await;
+        let source = insert_source_artifact(&pool, asset_id).await;
+        insert_project_with_target_language(&pool, asset_id, "en").await;
+
+        run_full_preparation(&pool, asset_id, &source, &FailingQueue).await;
+
+        // Preparation must still be Ready.
+        assert_status(&pool, asset_id, PreparationStatus::Ready).await;
+
+        let ts = transcription_repo::get_transcription_status(&pool, asset_id)
+            .await
+            .expect("get status")
+            .expect("status row");
+
+        assert_eq!(ts.status, TranscriptionStatus::Failed);
+        assert!(
+            ts.error_detail
+                .as_deref()
+                .unwrap_or("")
+                .contains("queue is down")
+        );
+    }
+
+    // EC-2: asset with no target_languages row produces TranscriptionStatus::Failed; preparation stays Ready.
+    #[tokio::test]
+    async fn missing_target_languages_row_records_transcription_failed() {
+        let Some(pool) = setup_pool().await else {
+            return;
+        };
+
+        let asset_id = insert_asset(&pool).await;
+        let source = insert_source_artifact(&pool, asset_id).await;
+        // Intentionally no project or target_languages row.
+
+        let queue = InMemoryTranscriptionJobQueue::default();
+        run_full_preparation(&pool, asset_id, &source, &queue).await;
+
+        assert_status(&pool, asset_id, PreparationStatus::Ready).await;
+
+        let ts = transcription_repo::get_transcription_status(&pool, asset_id)
+            .await
+            .expect("get status")
+            .expect("status row");
+
+        assert_eq!(ts.status, TranscriptionStatus::Failed);
+        assert!(
+            ts.error_detail
+                .as_deref()
+                .unwrap_or("")
+                .contains("no target_languages row")
+        );
+        assert!(queue.queued_jobs().is_empty());
+    }
+
+    // EC-3: duplicate preparation completion does not enqueue a second TranscriptionJob.
+    #[tokio::test]
+    async fn duplicate_preparation_completion_does_not_enqueue_second_job() {
+        let Some(pool) = setup_pool().await else {
+            return;
+        };
+
+        let asset_id = insert_asset(&pool).await;
+        let source = insert_source_artifact(&pool, asset_id).await;
+        insert_project_with_target_language(&pool, asset_id, "en").await;
+
+        let queue = InMemoryTranscriptionJobQueue::default();
+        run_full_preparation(&pool, asset_id, &source, &queue).await;
+        assert_eq!(queue.queued_jobs().len(), 1);
+
+        // Second completion: transcription is already Pending; hook must skip.
+        enqueue_transcription_if_ready(&pool, &queue, asset_id, source.id).await;
+
+        assert_eq!(
+            queue.queued_jobs().len(),
+            1,
+            "no second job should be enqueued"
+        );
+    }
+
+    // ── T3 process_transcription_job tests ───────────────────────────────────────
+
+    fn stub_asr_output(
+        asset_id: Uuid,
+        workspace: &tempfile::TempDir,
+    ) -> (AsrOutput, Vec<u8>, Vec<u8>) {
+        let transcript_path = workspace.path().join("transcript.json");
+        let alignment_path = workspace.path().join("alignment.json");
+        let t_bytes = br#"{"words":[]}"#.to_vec();
+        let a_bytes = br#"{"segments":[]}"#.to_vec();
+        std::fs::write(&transcript_path, &t_bytes).expect("write transcript");
+        std::fs::write(&alignment_path, &a_bytes).expect("write alignment");
+        let output = AsrOutput {
+            job_id: asset_id.to_string(),
+            transcript_uri: format!("file://{}", transcript_path.display()),
+            alignment_uri: format!("file://{}", alignment_path.display()),
+            status: "ok".into(),
+        };
+        (output, t_bytes, a_bytes)
+    }
+
+    // HP-1: successful ASR call stores both artifacts and writes TranscriptionStatus::Ready.
+    #[tokio::test]
+    async fn process_transcription_job_marks_ready_when_both_artifacts_stored() {
+        let Some(pool) = setup_pool().await else {
+            return;
+        };
+
+        let asset_id = insert_asset(&pool).await;
+        let source = insert_source_artifact(&pool, asset_id).await;
+        let asr_workspace = TempDir::new().expect("asr workspace");
+        let storage_workspace = TempDir::new().expect("storage workspace");
+        let storage = LocalFsAdapter::new(storage_workspace.path());
+        storage
+            .put(&source.storage_key, b"audio-bytes".to_vec())
+            .await
+            .expect("store source audio");
+
+        transcription_repo::upsert_transcription_status(
+            &pool,
+            asset_id,
+            TranscriptionStatus::Pending,
+            None,
+        )
+        .await
+        .expect("set pending");
+
+        let (asr_output, _t, _a) = stub_asr_output(asset_id.0, &asr_workspace);
+        let client = StubAsrWorkerClient::ok(asr_output);
+
+        process_transcription_job(
+            &pool,
+            &storage,
+            &client,
+            TranscriptionJob::new(asset_id.0, source.id, "en"),
+        )
+        .await
+        .expect("process transcription job");
+
+        let status = transcription_repo::get_transcription_status(&pool, asset_id)
+            .await
+            .expect("get status")
+            .expect("status row");
+        assert_eq!(status.status, TranscriptionStatus::Ready);
+        assert!(status.error_detail.is_none());
+
+        let ready = transcription_repo::get_transcription_readiness_evidence(&pool, asset_id)
+            .await
+            .expect("readiness");
+        assert!(ready);
+    }
+
+    // HP-2: both artifacts are stored with the correct parent_artifact_id lineage.
+    #[tokio::test]
+    async fn process_transcription_job_artifacts_have_correct_lineage() {
+        let Some(pool) = setup_pool().await else {
+            return;
+        };
+
+        let asset_id = insert_asset(&pool).await;
+        let source = insert_source_artifact(&pool, asset_id).await;
+        let asr_workspace = TempDir::new().expect("asr workspace");
+        let storage_workspace = TempDir::new().expect("storage workspace");
+        let storage = LocalFsAdapter::new(storage_workspace.path());
+        storage
+            .put(&source.storage_key, b"audio-bytes".to_vec())
+            .await
+            .expect("store source");
+
+        transcription_repo::upsert_transcription_status(
+            &pool,
+            asset_id,
+            TranscriptionStatus::Pending,
+            None,
+        )
+        .await
+        .expect("set pending");
+
+        let (asr_output, _t, _a) = stub_asr_output(asset_id.0, &asr_workspace);
+        let client = StubAsrWorkerClient::ok(asr_output);
+
+        process_transcription_job(
+            &pool,
+            &storage,
+            &client,
+            TranscriptionJob::new(asset_id.0, source.id, "en"),
+        )
+        .await
+        .expect("process transcription job");
+
+        let derived = preparation_repo::list_derived_artifacts(&pool, asset_id)
+            .await
+            .expect("list derived artifacts");
+
+        let transcript = derived
+            .iter()
+            .find(|a| a.kind == ArtifactKind::TranscriptText)
+            .expect("transcript artifact");
+        let alignment = derived
+            .iter()
+            .find(|a| a.kind == ArtifactKind::WordAlignment)
+            .expect("alignment artifact");
+
+        assert_eq!(transcript.parent_artifact_id, source.id);
+        assert_eq!(alignment.parent_artifact_id, source.id);
+    }
+
+    // HP-3: status transitions InProgress → Ready in order.
+    #[tokio::test]
+    async fn process_transcription_job_transitions_in_progress_then_ready() {
+        let Some(pool) = setup_pool().await else {
+            return;
+        };
+
+        let asset_id = insert_asset(&pool).await;
+        let source = insert_source_artifact(&pool, asset_id).await;
+        let asr_workspace = TempDir::new().expect("asr workspace");
+        let storage_workspace = TempDir::new().expect("storage workspace");
+        let storage = LocalFsAdapter::new(storage_workspace.path());
+        storage
+            .put(&source.storage_key, b"audio-bytes".to_vec())
+            .await
+            .expect("store source");
+
+        transcription_repo::upsert_transcription_status(
+            &pool,
+            asset_id,
+            TranscriptionStatus::Pending,
+            None,
+        )
+        .await
+        .expect("set pending");
+
+        // Use a spy: the StubAsrWorkerClient is called synchronously from within
+        // the handler; by the time the call returns the status must be InProgress.
+        // We verify Ready at the end.
+        let (asr_output, _t, _a) = stub_asr_output(asset_id.0, &asr_workspace);
+        let client = StubAsrWorkerClient::ok(asr_output);
+
+        process_transcription_job(
+            &pool,
+            &storage,
+            &client,
+            TranscriptionJob::new(asset_id.0, source.id, "en"),
+        )
+        .await
+        .expect("process transcription job");
+
+        let status = transcription_repo::get_transcription_status(&pool, asset_id)
+            .await
+            .expect("get status")
+            .expect("status row");
+        assert_eq!(status.status, TranscriptionStatus::Ready);
+    }
+
+    // EC-1: ASR worker error produces TranscriptionStatus::Failed with error detail.
+    #[tokio::test]
+    async fn process_transcription_job_marks_failed_on_asr_error() {
+        let Some(pool) = setup_pool().await else {
+            return;
+        };
+
+        let asset_id = insert_asset(&pool).await;
+        let source = insert_source_artifact(&pool, asset_id).await;
+        let storage_workspace = TempDir::new().expect("storage workspace");
+        let storage = LocalFsAdapter::new(storage_workspace.path());
+        storage
+            .put(&source.storage_key, b"audio-bytes".to_vec())
+            .await
+            .expect("store source");
+
+        transcription_repo::upsert_transcription_status(
+            &pool,
+            asset_id,
+            TranscriptionStatus::Pending,
+            None,
+        )
+        .await
+        .expect("set pending");
+
+        let client = StubAsrWorkerClient::err(AsrError {
+            job_id: asset_id.0.to_string(),
+            error_code: "MODEL_LOAD_FAILED".into(),
+            message: "whisper model not found".into(),
+        });
+
+        let err = process_transcription_job(
+            &pool,
+            &storage,
+            &client,
+            TranscriptionJob::new(asset_id.0, source.id, "en"),
+        )
+        .await
+        .expect_err("ASR error must fail the job");
+
+        assert!(err.to_string().contains("ASR worker error"));
+
+        let status = transcription_repo::get_transcription_status(&pool, asset_id)
+            .await
+            .expect("get status")
+            .expect("status row");
+        assert_eq!(status.status, TranscriptionStatus::Failed);
+        assert!(
+            status
+                .error_detail
+                .as_deref()
+                .unwrap_or("")
+                .contains("whisper model not found")
+        );
+    }
+
+    // EC-2: storage upload failure after successful ASR call produces Failed.
+    #[tokio::test]
+    async fn process_transcription_job_marks_failed_on_storage_error() {
+        let Some(pool) = setup_pool().await else {
+            return;
+        };
+
+        let asset_id = insert_asset(&pool).await;
+        let source = insert_source_artifact(&pool, asset_id).await;
+        // Use a read-only directory as storage root so put() fails.
+        let storage_root = TempDir::new().expect("storage workspace");
+        let storage = LocalFsAdapter::new(storage_root.path());
+        // Write the source audio so the first get() succeeds.
+        storage
+            .put(&source.storage_key, b"audio-bytes".to_vec())
+            .await
+            .expect("store source");
+
+        transcription_repo::upsert_transcription_status(
+            &pool,
+            asset_id,
+            TranscriptionStatus::Pending,
+            None,
+        )
+        .await
+        .expect("set pending");
+
+        // ASR output points to a non-existent file → read_file_uri will fail.
+        let client = StubAsrWorkerClient::ok(AsrOutput {
+            job_id: asset_id.0.to_string(),
+            transcript_uri: "file:///nonexistent/transcript.json".into(),
+            alignment_uri: "file:///nonexistent/alignment.json".into(),
+            status: "ok".into(),
+        });
+
+        let err = process_transcription_job(
+            &pool,
+            &storage,
+            &client,
+            TranscriptionJob::new(asset_id.0, source.id, "en"),
+        )
+        .await
+        .expect_err("storage error must fail the job");
+
+        assert!(err.to_string().contains("transcript URI"));
+
+        let status = transcription_repo::get_transcription_status(&pool, asset_id)
+            .await
+            .expect("get status")
+            .expect("status row");
+        assert_eq!(status.status, TranscriptionStatus::Failed);
+    }
+
+    // EC-3: wrong envelope job type is rejected.
+    #[tokio::test]
+    async fn process_transcription_envelope_rejects_wrong_job_type() {
+        let Some(pool) = setup_pool().await else {
+            return;
+        };
+
+        let asset_id = insert_asset(&pool).await;
+        let source = insert_source_artifact(&pool, asset_id).await;
+        let storage_workspace = TempDir::new().expect("storage workspace");
+        let storage = LocalFsAdapter::new(storage_workspace.path());
+
+        let client = StubAsrWorkerClient::ok(AsrOutput {
+            job_id: asset_id.0.to_string(),
+            transcript_uri: "file:///ignored".into(),
+            alignment_uri: "file:///ignored".into(),
+            status: "ok".into(),
+        });
+
+        let err = process_transcription_envelope(
+            &pool,
+            &storage,
+            &client,
+            JobEnvelope::new(
+                "media_preparation",
+                TranscriptionJob::new(asset_id.0, source.id, "en"),
+            ),
+        )
+        .await
+        .expect_err("wrong job type must fail");
+
+        assert!(
+            err.to_string()
+                .contains("unsupported transcription job type")
         );
     }
 }

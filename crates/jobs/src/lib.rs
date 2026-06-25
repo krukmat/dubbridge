@@ -82,6 +82,59 @@ impl PreparationJobQueue for InMemoryPreparationJobQueue {
     }
 }
 
+pub type SharedTranscriptionJobQueue = Arc<dyn TranscriptionJobQueue>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TranscriptionJob {
+    pub asset_id: Uuid,
+    pub source_artifact_id: Uuid,
+    pub source_language: String,
+}
+
+impl TranscriptionJob {
+    pub const JOB_TYPE: &str = "asr_transcription";
+
+    pub fn new(
+        asset_id: Uuid,
+        source_artifact_id: Uuid,
+        source_language: impl Into<String>,
+    ) -> Self {
+        Self {
+            asset_id,
+            source_artifact_id,
+            source_language: source_language.into(),
+        }
+    }
+}
+
+pub trait TranscriptionJobQueue: Send + Sync {
+    fn enqueue(&self, job: TranscriptionJob) -> Result<(), QueueError>;
+}
+
+#[derive(Debug, Default)]
+pub struct InMemoryTranscriptionJobQueue {
+    jobs: Mutex<Vec<TranscriptionJob>>,
+}
+
+impl InMemoryTranscriptionJobQueue {
+    pub fn queued_jobs(&self) -> Vec<TranscriptionJob> {
+        self.jobs
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+}
+
+impl TranscriptionJobQueue for InMemoryTranscriptionJobQueue {
+    fn enqueue(&self, job: TranscriptionJob) -> Result<(), QueueError> {
+        self.jobs
+            .lock()
+            .map_err(|_| QueueError::Unavailable("transcription queue lock poisoned".into()))?
+            .push(job);
+        Ok(())
+    }
+}
+
 pub fn default_queue() -> &'static str {
     "dubbridge.default"
 }
@@ -94,6 +147,21 @@ mod tests {
     fn in_memory_queue_records_jobs() {
         let queue = InMemoryPreparationJobQueue::default();
         let job = PreparationJob::new(Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
+
+        queue.enqueue(job.clone()).expect("enqueue");
+
+        assert_eq!(queue.queued_jobs(), vec![job]);
+    }
+
+    #[test]
+    fn transcription_job_type_constant() {
+        assert_eq!(TranscriptionJob::JOB_TYPE, "asr_transcription");
+    }
+
+    #[test]
+    fn in_memory_transcription_queue_records_jobs() {
+        let queue = InMemoryTranscriptionJobQueue::default();
+        let job = TranscriptionJob::new(Uuid::new_v4(), Uuid::new_v4(), "en");
 
         queue.enqueue(job.clone()).expect("enqueue");
 

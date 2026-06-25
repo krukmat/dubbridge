@@ -10,6 +10,7 @@ apalis.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 sqlx.workspace = true
+time.workspace = true
 uuid.workspace = true
 async-trait = "0.1"
 sha2 = "0.10"
@@ -20,6 +21,7 @@ dubbridge-domain = { path = "../../crates/domain" }
 dubbridge-jobs = { path = "../../crates/jobs" }
 dubbridge-media = { path = "../../crates/media" }
 dubbridge-observability = { path = "../../crates/observability" }
+dubbridge-providers = { path = "../../crates/providers" }
 dubbridge-storage = { path = "../../crates/storage" }
 
 [lints]

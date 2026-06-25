@@ -518,6 +518,28 @@ struct TargetLanguageRow {
     created_at: OffsetDateTime,
 }
 
+/// Return the `source_lang` for the asset's project (from any `target_languages` row),
+/// or `None` if the asset is not linked to a project or the project has no target-language row.
+pub async fn get_source_language_for_asset(
+    pool: &PgPool,
+    asset_id: AssetId,
+) -> Result<Option<String>, DbError> {
+    let lang: Option<String> = sqlx::query_scalar(
+        r#"
+        SELECT tl.source_lang
+        FROM target_languages tl
+        JOIN project_assets pa ON pa.project_id = tl.project_id
+        WHERE pa.asset_id = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(asset_id.0)
+    .fetch_optional(pool)
+    .await
+    .map_err(DbError::QueryFailed)?;
+    Ok(lang)
+}
+
 pub async fn list_target_languages(
     pool: &PgPool,
     project_id: ProjectId,
