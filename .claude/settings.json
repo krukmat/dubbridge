@@ -127,7 +127,16 @@
       "Bash(git checkout *)",
       "Bash(git rebase *)",
       "Bash(git pull *)",
-      "Bash(python3 -c \"import json; json.load\\(open\\('.claude/settings.json'\\)\\)\")"
+      "Bash(python3 -c \"import json; json.load\\(open\\('.claude/settings.json'\\)\\)\")",
+      "Bash(python3 -c \"import json,sys; runs=json.load\\(sys.stdin\\); [print\\(f\\\\\"{r['databaseId']} {r['name'][:30]:<30} {r['status']:<12} {r.get\\('conclusion',''\\):<10} {r['headSha'][:7]} {r['event']}\\\\\"\\) for r in runs]\")",
+      "Bash(python3 -m py_compile /Users/matias/dubbridge/scripts/gemma-push-review.py)",
+      "Bash(python3 -m unittest scripts/gemma_push_review_test.py -k \"ParsePushAuditResponse\" -v)",
+      "Bash(python3 -m unittest scripts/gemma_push_review_test.py)",
+      "Bash(python3 -m unittest scripts/gemma_push_review_test.py -k \"prompt\" -v)",
+      "Bash(git commit -m ' *)",
+      "Bash(find /tmp /var/folders -name \"*.json\" -newer /Users/matias/dubbridge/scripts/gemma-push-review.py 2>/dev/null | xargs grep -l \"gemma-reviewer\\\\|code-reviewer\\\\|push-reviewer\" 2>/dev/null | head -5)",
+      "Read(//private/var/folders/**)",
+      "Bash(grep -vE '^\\(docs/|[^/]+\\\\.md$\\)')"
     ]
   },
   "hooks": {

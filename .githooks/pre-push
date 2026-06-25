@@ -69,10 +69,11 @@ fi
 if [ "$DOCS_CHANGED" -eq 1 ]; then
   if [ -n "$DIFF_RANGE" ]; then
     echo "pre-push: canonical docs changed in $DIFF_RANGE"
+    GEMMA_REVIEW_BASE="$DIFF_RANGE" make qa-docs
   else
     echo "pre-push: canonical docs changed"
+    make qa-docs
   fi
-  make qa-docs
 fi
 
 if [ "$RUST_CHANGED" -eq 1 ]; then
