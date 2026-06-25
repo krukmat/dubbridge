@@ -140,6 +140,17 @@ class NormalizeRun(unittest.TestCase):
         self.assertEqual(result["conclusion"], "failure")
         self.assertEqual(result["url"], "https://github.com/owner/repo/actions/runs/999")
 
+    def test_normalize_attempt_field_alias(self):
+        raw = {
+            "databaseId": 314, "workflowName": "ci", "event": "push",
+            "headBranch": "main", "headSha": "beadfeed", "attempt": 3,
+            "status": "completed", "conclusion": "success",
+            "url": "https://github.com/owner/repo/actions/runs/314",
+            "createdAt": "2026-06-25T00:00:00Z", "updatedAt": "2026-06-25T00:01:00Z",
+        }
+        result = _mod._normalize_run(raw)
+        self.assertEqual(result["run_attempt"], 3)
+
 
 class PendingRun(unittest.TestCase):
     def test_in_progress_returns_sentinel_path(self):
@@ -332,6 +343,48 @@ class ResolveRunById(unittest.TestCase):
         self.assertEqual(run["run_id"], 777)
         self.assertEqual(run["head_sha"], "cafe0001")
 
+    def test_legacy_run_attempt_field_does_not_retry(self):
+        raw = {
+            "databaseId": 777, "workflowName": "ci", "event": "push",
+            "headBranch": "main", "headSha": "cafe0001", "runAttempt": 1,
+            "status": "completed", "conclusion": "success",
+            "url": "https://github.com/owner/repo/actions/runs/777",
+            "createdAt": "2026-06-25T00:00:00Z", "updatedAt": "2026-06-25T00:01:00Z",
+        }
+        args = argparse.Namespace(
+            run_id="777", workflow=None, branch=None,
+            before=None, after=None, event_path=None,
+        )
+        with patch.object(_mod, "_run_gh", return_value=(json.dumps(raw), 0)) as mock_gh:
+            _mod.resolve_run(args)
+        self.assertEqual(mock_gh.call_count, 1)
+
+    def test_falls_back_to_attempt_field_when_run_attempt_is_unknown(self):
+        raw = {
+            "databaseId": 777, "workflowName": "ci", "event": "push",
+            "headBranch": "main", "headSha": "cafe0001", "attempt": 4,
+            "status": "completed", "conclusion": "success",
+            "url": "https://github.com/owner/repo/actions/runs/777",
+            "createdAt": "2026-06-25T00:00:00Z", "updatedAt": "2026-06-25T00:01:00Z",
+        }
+        args = argparse.Namespace(
+            run_id="777", workflow=None, branch=None,
+            before=None, after=None, event_path=None,
+        )
+        with patch.object(
+            _mod,
+            "_run_gh",
+            side_effect=[
+                RuntimeError('Unknown JSON field: "runAttempt"'),
+                (json.dumps(raw), 0),
+            ],
+        ) as mock_gh:
+            run = _mod.resolve_run(args)
+        self.assertEqual(run["run_attempt"], 4)
+        self.assertEqual(mock_gh.call_count, 2)
+        self.assertIn("runAttempt", mock_gh.call_args_list[0].args[0][-1])
+        self.assertIn("attempt", mock_gh.call_args_list[1].args[0][-1])
+
 
 class ResolveRunUnavailable(unittest.TestCase):
     def test_no_runs_returns_unavailable_sentinel(self):
@@ -342,6 +395,31 @@ class ResolveRunUnavailable(unittest.TestCase):
         with patch.object(_mod, "_run_gh", return_value=(json.dumps([]), 0)):
             run = _mod.resolve_run(args)
         self.assertEqual(run.get("_sentinel"), "pipeline_unavailable")
+
+    def test_run_list_falls_back_to_attempt_field(self):
+        raw = [{
+            "databaseId": 888, "workflowName": "ci", "event": "push",
+            "headBranch": "main", "headSha": "deadbeef", "attempt": 2,
+            "status": "completed", "conclusion": "success",
+            "url": "https://github.com/owner/repo/actions/runs/888",
+            "createdAt": "2026-06-25T00:00:00Z", "updatedAt": "2026-06-25T00:01:00Z",
+        }]
+        args = argparse.Namespace(
+            run_id=None, workflow=None, branch=None,
+            before=None, after=None, event_path=None,
+        )
+        with patch.object(
+            _mod,
+            "_run_gh",
+            side_effect=[
+                RuntimeError('Unknown JSON field: "runAttempt"'),
+                (json.dumps(raw), 0),
+            ],
+        ) as mock_gh:
+            run = _mod.resolve_run(args)
+        self.assertEqual(run["run_id"], 888)
+        self.assertEqual(run["run_attempt"], 2)
+        self.assertEqual(mock_gh.call_count, 2)
 
     def test_gh_failure_raises_runtime_error(self):
         args = argparse.Namespace(
