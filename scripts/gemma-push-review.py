@@ -53,6 +53,8 @@ FINDING_START_MARKER = "=== FINDING START ==="
 FINDING_END_MARKER = "=== FINDING END ==="
 DELEGATE_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "delegate-low-rri.py")
 FULL_FILE_MAX_LINES = 400
+GH_RUN_JSON_ATTEMPT_FIELD_SENTINEL = "__RUN_ATTEMPT_FIELD__"
+GH_RUN_ATTEMPT_FIELD_CANDIDATES = ("runAttempt", "attempt")
 PURE_LOW_CODE_EXTENSIONS = {
     ".py", ".rs", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
 }
@@ -175,6 +177,32 @@ def _run_gh(args, *, check=True):
         raise RuntimeError("gh CLI not found; install GitHub CLI to use this tool") from exc
 
 
+def _is_unknown_gh_json_field_error(message):
+    return "Unknown JSON field:" in (message or "")
+
+
+def _run_gh_json_with_attempt_compat(args_prefix, fields):
+    last_error = None
+    for attempt_field in GH_RUN_ATTEMPT_FIELD_CANDIDATES:
+        resolved_fields = [
+            attempt_field if field == GH_RUN_JSON_ATTEMPT_FIELD_SENTINEL else field
+            for field in fields
+        ]
+        try:
+            return _run_gh(args_prefix + ["--json", ",".join(resolved_fields)])
+        except RuntimeError as exc:
+            if (
+                GH_RUN_JSON_ATTEMPT_FIELD_SENTINEL not in fields
+                or not _is_unknown_gh_json_field_error(str(exc))
+                or attempt_field == GH_RUN_ATTEMPT_FIELD_CANDIDATES[-1]
+            ):
+                raise
+            last_error = exc
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("gh JSON compatibility helper exhausted without executing")
+
+
 def _load_event(event_path):
     if not event_path:
         return {}
@@ -187,15 +215,19 @@ def _load_event(event_path):
 
 def resolve_run(args):
     event = _load_event(args.event_path)
+    run_fields = [
+        "databaseId", "name", "event", "headBranch", "headSha",
+        GH_RUN_JSON_ATTEMPT_FIELD_SENTINEL, "status", "conclusion", "url",
+        "workflowName", "createdAt", "updatedAt",
+    ]
 
     if event.get("action") in ("completed", "requested") and "workflow_run" in event:
         return _normalize_run(event["workflow_run"])
 
     if args.run_id:
-        stdout, _ = _run_gh(
-            ["run", "view", str(args.run_id), "--json",
-             "databaseId,name,event,headBranch,headSha,runAttempt,status,conclusion,url,"
-             "workflowName,createdAt,updatedAt"],
+        stdout, _ = _run_gh_json_with_attempt_compat(
+            ["run", "view", str(args.run_id)],
+            run_fields,
         )
         return _normalize_run(json.loads(stdout))
 
@@ -204,11 +236,10 @@ def resolve_run(args):
         extra += ["--workflow", args.workflow]
     if args.branch:
         extra += ["--branch", args.branch]
-    stdout, _ = _run_gh(
+    stdout, _ = _run_gh_json_with_attempt_compat(
         ["run", "list", "--event", "push", "--status", "completed",
-         "--limit", "5", "--json",
-         "databaseId,name,event,headBranch,headSha,runAttempt,status,conclusion,url,"
-         "workflowName,createdAt,updatedAt"] + extra,
+         "--limit", "5"] + extra,
+        run_fields,
     )
     runs = json.loads(stdout)
     if not runs:
@@ -223,7 +254,7 @@ def _normalize_run(raw):
         "event": raw.get("event"),
         "branch": raw.get("headBranch"),
         "head_sha": raw.get("headSha"),
-        "run_attempt": raw.get("runAttempt", 1),
+        "run_attempt": raw.get("runAttempt", raw.get("attempt", 1)),
         "status": raw.get("status"),
         "conclusion": raw.get("conclusion"),
         "url": raw.get("url") or raw.get("html_url"),
