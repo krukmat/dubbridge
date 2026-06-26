@@ -218,7 +218,7 @@ def main():
 
     subprocess.run([
         "git", "commit", "-m",
-        f"chore(push-review): report {sha} + daily {today} entry",
+        f"chore(push-review): report {sha} + daily {today} entry [skip ci]",
     ], check=True)
     subprocess.run(["git", "push", "origin", "HEAD:main"], check=True)
     print(f"[push-review-commit] committed and pushed", file=sys.stderr)
