@@ -363,6 +363,7 @@ def _short_sha(sha):
 
 def _out_dir_for(after_sha, out_dir):
     if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
         return out_dir
     date = datetime.datetime.utcnow().strftime("%Y-%m-%d")
     short = _short_sha(after_sha)
