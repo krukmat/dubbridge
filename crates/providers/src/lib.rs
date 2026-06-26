@@ -250,7 +250,7 @@ mod tests {
         let client = SubprocessAsrWorkerClient::new(vec![
             "sh".into(),
             "-c".into(),
-            format!("echo '{json}'; exit 1"),
+            format!("read _; echo '{json}'; exit 1"),
         ]);
         let result = client.transcribe(sample_input());
         assert!(result.is_err());
