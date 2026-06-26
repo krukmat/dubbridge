@@ -748,6 +748,23 @@ class RunPushAuditTimeout(unittest.TestCase):
         self.assertEqual(data["blocked_reason"], "wall_timeout")
         self.assertIn("run_id", data["run_context"])
 
+    def test_ec3_stream_error_writes_blocked(self):
+        """B-08: token limit truncation raises RuntimeError → blocked artifact, exit 2."""
+        args = _model_args()
+        packet = _make_packet()
+        run = _completed_run()
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(_mod.gemma_local, "ensure_model_available"):
+                with patch.object(_mod.gemma_local, "stream_chat",
+                                  side_effect=RuntimeError("response cut by token limit; output may be truncated")):
+                    rc = _mod.run_push_audit(packet, run, args, tmp, repo_root=tmp)
+            self.assertEqual(rc, 2)
+            with open(os.path.join(tmp, "blocked.json")) as fh:
+                data = json.load(fh)
+        self.assertEqual(data["blocked_reason"], "stream_error")
+        self.assertIn("DUBBRIDGE_PUSH_REVIEW_NUM_PREDICT", data["blocked_message"])
+        self.assertIn("run_id", data["run_context"])
+
 
 class RunPushAuditParserRejection(unittest.TestCase):
     def test_ec2_patch_like_writes_blocked(self):

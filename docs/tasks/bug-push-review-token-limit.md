@@ -2,7 +2,7 @@
 type: TaskList
 title: "Bug B-08: push-review fatal — response cut by token limit"
 description: "Gemma Push Reviewer truncates its response when the push packet is too large, causing a fatal exit instead of a graceful blocked artifact."
-status: open
+status: done
 plan: docs/plan/gemma-push-review-hardening.md
 ---
 
@@ -15,7 +15,7 @@ plan: docs/plan/gemma-push-review-hardening.md
 > response was cut before completion.
 
 - **Task ID:** B-08
-- **Status:** Open
+- **Status:** Done — implemented 2026-06-26
 - **Effort:** S
 - **Complexity:** Low
 - **RRI:** ~18 → Low (0–25)
@@ -24,8 +24,9 @@ plan: docs/plan/gemma-push-review-hardening.md
 ## Objective
 
 Ensure that when Gemma's response is truncated by the token limit, the
-push-review exits with a `blocked` artifact (exit code 2, non-Gemma agent
-fallback) rather than a `fatal` error (exit code 1, no artifact written).
+push-review writes a `blocked` artifact (exit code 2) so the non-Gemma agent
+or human reviewer has full run context to process the push manually — instead
+of a `fatal` exit 1 that leaves no artifact and no fallback path.
 
 ## Context
 
@@ -88,8 +89,9 @@ except RuntimeError as exc:
     return 2
 ```
 
-Additionally, consider raising `--num-predict` via `DUBBRIDGE_PUSH_REVIEW_NUM_PREDICT`
-in the workflow env to reduce truncation frequency.
+The `blocked_message` in the artifact must include an operational hint so the
+non-Gemma agent or human reviewer knows what happened and what to do:
+`"response truncated by token limit — increase DUBBRIDGE_PUSH_REVIEW_NUM_PREDICT or review packet manually"`.
 
 ## Related documents
 
@@ -108,26 +110,48 @@ in the workflow env to reduce truncation frequency.
 
 - `run_push_audit` catches `RuntimeError` from `stream_chat` → `write_blocked("stream_error", ...)` → exit 2
 - New unit test: `stream_chat` raising `RuntimeError` produces a `blocked` artifact, not a `fatal`
-- Optionally: `DUBBRIDGE_PUSH_REVIEW_NUM_PREDICT` set in `.github/workflows/push-review.yml`
+- `blocked_message` includes operational hint: increase `DUBBRIDGE_PUSH_REVIEW_NUM_PREDICT` or review packet manually
+- `DEFAULT_NUM_PREDICT` for push-review raised from 4096 → 8192 to reduce truncation frequency on larger packets
+
+## Configuration context
+
+`done_reason="length"` fires when the model exhausts `num_predict` tokens on the *output* side — not when the context window fills.
+The B-08 run had a diff of only 4662 chars, so the pressure was on generation length, not context.
+
+| Param | Env var | Default | Controls |
+|---|---|---|---|
+| `num_predict` | `DUBBRIDGE_PUSH_REVIEW_NUM_PREDICT` | 4096 → **8192** (after fix) | max tokens generated |
+| `num_ctx` | `DUBBRIDGE_PUSH_REVIEW_NUM_CTX` | 32768 | total context window (prompt + response) |
+
+Raising `num_predict` to 8192 roughly doubles the headroom for Gemma's response on packets with long CI logs.
+The `except RuntimeError` handler remains as a hard safety net for cases that still exceed even 8192 tokens.
+
+To test locally without changing code:
+```bash
+DUBBRIDGE_PUSH_REVIEW_NUM_PREDICT=8192 python3 scripts/gemma-push-review.py --run-id <run_id>
+```
 
 ## Acceptance criteria
 
-- [ ] `run_push_audit` catches `RuntimeError` from `stream_chat` and writes a `blocked` artifact (exit 2), not a `fatal` (exit 1).
-- [ ] New unit test passes: mocked `stream_chat` raising `RuntimeError("response cut by token limit")` produces `blocked.json` with `blocked_reason="stream_error"`.
-- [ ] Existing timeout tests still pass.
-- [ ] `python3 -m unittest scripts/gemma_push_review_test.py` → all green.
-- [ ] `python3 -m py_compile scripts/gemma-push-review.py` passes.
+- [x] `run_push_audit` catches `RuntimeError` from `stream_chat` and writes a `blocked` artifact (exit 2), not a `fatal` (exit 1).
+- [x] New unit test passes: mocked `stream_chat` raising `RuntimeError("response cut by token limit")` produces `blocked.json` with `blocked_reason="stream_error"`.
+- [x] Existing timeout tests still pass.
+- [x] Default `num_predict` for push-review raised to 8192 (`scripts/gemma-push-review.py` argparse default).
+- [x] `python3 -m unittest scripts/gemma_push_review_test.py` → 122/122 green.
+- [x] `python3 -m py_compile scripts/gemma-push-review.py` passes.
 
 ## Execution summary
 
 1. In `run_push_audit`, add `except RuntimeError as exc` after the two existing timeout handlers, calling `write_blocked("stream_error", ...)` and returning 2.
-2. Add unit test mocking `gemma_local.stream_chat` to raise `RuntimeError`.
-3. Run full test suite.
+2. Raise the `--num-predict` argparse default (line ~124) from `gemma_local.DEFAULT_NUM_PREDICT` (4096) to `8192`.
+3. Add unit test mocking `gemma_local.stream_chat` to raise `RuntimeError`.
+4. Run full test suite.
 
 ## Diagram
 
 ```mermaid
 flowchart TD
+    P["num_predict default\n4096 → 8192"] -->|reduces frequency| A
     A["stream_chat()"] -->|GemmaIdleTimeout| B["write_blocked(idle_timeout) → exit 2"]
     A -->|GemmaWallTimeout| C["write_blocked(wall_timeout) → exit 2"]
     A -->|RuntimeError token limit| D{"currently: uncaught"}

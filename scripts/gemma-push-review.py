@@ -121,9 +121,9 @@ def parse_args():
     parser.add_argument("--num-predict", type=int, dest="num_predict",
         default=int(os.environ.get(
             "DUBBRIDGE_PUSH_REVIEW_NUM_PREDICT",
-            os.environ.get("DUBBRIDGE_LOW_RRI_NUM_PREDICT", str(gemma_local.DEFAULT_NUM_PREDICT)),
+            os.environ.get("DUBBRIDGE_LOW_RRI_NUM_PREDICT", "8192"),
         )),
-        help="Max tokens to generate (env DUBBRIDGE_PUSH_REVIEW_NUM_PREDICT).")
+        help="Max tokens to generate (env DUBBRIDGE_PUSH_REVIEW_NUM_PREDICT, default 8192).")
     parser.add_argument("--temperature", type=float,
         default=float(os.environ.get(
             "DUBBRIDGE_PUSH_REVIEW_TEMPERATURE",
@@ -776,6 +776,14 @@ def run_push_audit(packet, run_info, args, out_dir, repo_root="."):
         path = write_blocked("wall_timeout", str(exc), run_info, out_dir, after_sha)
         write_blocked_report(path, _load_json(path), repo_root=repo_root)
         print(f"[push-audit] blocked (wall timeout): {exc}", file=sys.stderr)
+        print(f"[push-audit] non-Gemma agent should review this push manually", file=sys.stderr)
+        print(f"[push-audit] blocked artifact: {path}", file=sys.stderr)
+        return 2
+    except RuntimeError as exc:
+        msg = str(exc) + " — increase DUBBRIDGE_PUSH_REVIEW_NUM_PREDICT or review packet manually"
+        path = write_blocked("stream_error", msg, run_info, out_dir, after_sha)
+        write_blocked_report(path, _load_json(path), repo_root=repo_root)
+        print(f"[push-audit] blocked (stream error): {exc}", file=sys.stderr)
         print(f"[push-audit] non-Gemma agent should review this push manually", file=sys.stderr)
         print(f"[push-audit] blocked artifact: {path}", file=sys.stderr)
         return 2
