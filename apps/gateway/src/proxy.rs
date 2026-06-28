@@ -57,7 +57,10 @@ pub async fn public_proxy_handler(
         .body(body_bytes.to_vec());
 
     for (name, value) in &headers {
-        if matches!(name, &header::COOKIE | &header::AUTHORIZATION | &header::HOST) {
+        if matches!(
+            name,
+            &header::COOKIE | &header::AUTHORIZATION | &header::HOST
+        ) {
             continue;
         }
         if name.as_str().eq_ignore_ascii_case("x-dubbridge-session") {
