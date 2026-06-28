@@ -61,6 +61,27 @@ async function fetchAssetList(
   return client.get<AssetSummary[]>("/api/assets", sessionRef);
 }
 
+function StatusFilterChips({ chips, statusFilter, onSelectStatus }: {
+  chips: string[];
+  statusFilter: string;
+  onSelectStatus: (s: string) => void;
+}) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+      {chips.map((chip) => (
+        <Button
+          key={chip}
+          testID={`asset-filter-${chip}`}
+          label={chip === "all" ? "All" : formatStatusLabel(chip)}
+          size="sm"
+          variant={statusFilter === chip ? "primary" : "secondary"}
+          onPress={() => onSelectStatus(chip)}
+        />
+      ))}
+    </ScrollView>
+  );
+}
+
 function LibraryFilterBar({
   query,
   onChangeQuery,
@@ -89,22 +110,7 @@ function LibraryFilterBar({
         accessibilityLabel="Search assets"
       />
       {availableStatuses.length > 0 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipRow}
-        >
-          {chips.map((chip) => (
-            <Button
-              key={chip}
-              testID={`asset-filter-${chip}`}
-              label={chip === "all" ? "All" : formatStatusLabel(chip)}
-              size="sm"
-              variant={statusFilter === chip ? "primary" : "secondary"}
-              onPress={() => onSelectStatus(chip)}
-            />
-          ))}
-        </ScrollView>
+        <StatusFilterChips chips={chips} statusFilter={statusFilter} onSelectStatus={onSelectStatus} />
       ) : null}
     </View>
   );
