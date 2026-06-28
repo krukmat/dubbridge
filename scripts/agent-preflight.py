@@ -23,7 +23,8 @@ SUMMARY_LINES = [
     "- CLAUDE.md and AGENTS.md are summaries for topics not overridden by the workflow guide.",
     "",
     "Before implementation:",
-    "- Analyze affected files and governing docs.",
+    "- Identify and read affected files plus material governing docs.",
+    "- Include docs/architecture.md, applicable ADRs, docs/plan/roadmap.md, slice plan/task ledger, BDD/product docs, and relevant policies/configs when they constrain the task.",
     "- Ensure plan/task ledger exists for staged work.",
     "- Run scripts/rri.py before presenting or delegating a task.",
     "- RRI 0-25: no full approval packet; use Gemma only for eligible simple code patches.",
@@ -72,6 +73,7 @@ def sentinel_payload(repo_root: Path) -> Dict[str, Any]:
         "marked_at": datetime.now(timezone.utc).isoformat(),
         "requirements": [
             "read AGENT_WORKFLOW_GUIDE.md before staged work",
+            "identify architecture, ADR, roadmap, plan, task, BDD/product, policy, and config docs that materially constrain the task",
             "run scripts/rri.py before implementation",
             "wait for approval when RRI is 26 or higher",
             "read DESIGN.md for mobile UI/presentation work",

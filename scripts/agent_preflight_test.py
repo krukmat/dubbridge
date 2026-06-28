@@ -37,6 +37,10 @@ class AgentPreflightTest(unittest.TestCase):
         summary = agent_preflight.preflight_summary()
 
         self.assertIn("AGENT_WORKFLOW_GUIDE.md", summary)
+        self.assertIn("docs/architecture.md", summary)
+        self.assertIn("ADRs", summary)
+        self.assertIn("docs/plan/roadmap.md", summary)
+        self.assertIn("BDD/product docs", summary)
         self.assertIn("scripts/rri.py", summary)
         self.assertIn("RRI 26+", summary)
         self.assertIn("DESIGN.md", summary)
@@ -79,4 +83,3 @@ class AgentPreflightTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
