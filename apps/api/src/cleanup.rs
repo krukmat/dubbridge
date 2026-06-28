@@ -55,6 +55,28 @@ pub enum ReconciliationSkipReason {
     UnexpectedObjectPath,
 }
 
+// clippy::cognitive_complexity overcounts tracing macro field expansions; the
+// actual branching here is a single Ok/Err match with no nested logic.
+#[allow(clippy::cognitive_complexity)]
+async fn delete_expired_blob(storage: &(dyn StorageAdapter + Send + Sync), token: Uuid, key: &str) {
+    match storage.delete(key).await {
+        Ok(()) => {
+            tracing::info!(ingest_token = %token, "expired pending ingestion blob deleted");
+        }
+        Err(error) => {
+            // DB row already gone (claimed atomically). Blob is now orphaned.
+            // ADR-006 assigns cross-store orphan reconciliation to S2.
+            tracing::warn!(
+                ingest_token = %token,
+                storage_key = %key,
+                error = %error,
+                "storage delete failed for claimed expired session; blob orphaned (reconcile via S2)"
+            );
+        }
+    }
+}
+
+#[allow(clippy::cognitive_complexity)]
 pub async fn cleanup_expired_ingestions(
     pool: &PgPool,
     storage: &(dyn StorageAdapter + Send + Sync),
@@ -77,21 +99,7 @@ pub async fn cleanup_expired_ingestions(
     );
 
     for (token, key) in claimed {
-        match storage.delete(&key).await {
-            Ok(()) => {
-                tracing::info!(ingest_token = %token, "expired pending ingestion blob deleted");
-            }
-            Err(error) => {
-                // DB row already gone (claimed atomically). Blob is now orphaned.
-                // ADR-006 assigns cross-store orphan reconciliation to S2.
-                tracing::warn!(
-                    ingest_token = %token,
-                    storage_key = %key,
-                    error = %error,
-                    "storage delete failed for claimed expired session; blob orphaned (reconcile via S2)"
-                );
-            }
-        }
+        delete_expired_blob(storage, token, &key).await;
     }
 }
 
@@ -104,6 +112,38 @@ pub async fn plan_ingest_reconciliation(
     Ok(plan_from_candidate_keys(candidates, referenced))
 }
 
+enum ReconcileOutcome {
+    Deleted,
+    AlreadyAbsent,
+    Failed(String),
+}
+
+#[allow(clippy::cognitive_complexity)]
+async fn reconcile_orphan_key(
+    storage: &(dyn StorageAdapter + Send + Sync),
+    key: &str,
+) -> ReconcileOutcome {
+    match storage.delete(key).await {
+        Ok(()) => {
+            tracing::info!(storage_key = %key, "deleted orphaned ingest object during reconciliation");
+            ReconcileOutcome::Deleted
+        }
+        Err(dubbridge_storage::StorageError::NotFound { .. }) => {
+            tracing::info!(storage_key = %key, "orphaned ingest object already absent during reconciliation");
+            ReconcileOutcome::AlreadyAbsent
+        }
+        Err(error) => {
+            let error = error.to_string();
+            tracing::warn!(
+                storage_key = %key,
+                error = %error,
+                "failed to delete orphaned ingest object during reconciliation; will retry on a later run"
+            );
+            ReconcileOutcome::Failed(error)
+        }
+    }
+}
+
 pub async fn run_ingest_reconciliation(
     pool: &PgPool,
     storage: &(dyn StorageAdapter + Send + Sync),
@@ -114,33 +154,13 @@ pub async fn run_ingest_reconciliation(
     let mut failed = Vec::new();
 
     for key in &plan.orphan_candidates {
-        match storage.delete(key).await {
-            Ok(()) => {
-                tracing::info!(
-                    storage_key = %key,
-                    "deleted orphaned ingest object during reconciliation"
-                );
-                deleted.push(key.clone());
-            }
-            Err(dubbridge_storage::StorageError::NotFound { .. }) => {
-                tracing::info!(
-                    storage_key = %key,
-                    "orphaned ingest object already absent during reconciliation"
-                );
-                already_absent.push(key.clone());
-            }
-            Err(error) => {
-                let error = error.to_string();
-                tracing::warn!(
-                    storage_key = %key,
-                    error = %error,
-                    "failed to delete orphaned ingest object during reconciliation; will retry on a later run"
-                );
-                failed.push(FailedReconciliationDelete {
-                    key: key.clone(),
-                    error,
-                });
-            }
+        match reconcile_orphan_key(storage, key).await {
+            ReconcileOutcome::Deleted => deleted.push(key.clone()),
+            ReconcileOutcome::AlreadyAbsent => already_absent.push(key.clone()),
+            ReconcileOutcome::Failed(error) => failed.push(FailedReconciliationDelete {
+                key: key.clone(),
+                error,
+            }),
         }
     }
 

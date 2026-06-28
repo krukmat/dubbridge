@@ -51,15 +51,9 @@ pub async fn finalize_ingestion_core(
     uploader_id: Uuid,
     artifact_kind: ArtifactKind,
 ) -> Result<Asset, IngestionServiceError> {
-    let mut tx = pool
-        .begin()
-        .await
-        .map_err(|e| IngestionServiceError::Db(dubbridge_db::error::DbError::QueryFailed(e)))?;
+    let mut tx = begin_tx(pool).await?;
 
-    // Lock the pending row for the duration of this transaction (H1-T1).
-    // If the row is not found, distinguish two cases:
-    //   - An artifact already exists → the session was previously finalized (409).
-    //   - No artifact exists → the session never existed or was never created (404).
+    // Lock the pending row (H1-T1). Distinguishes 409 vs 404 when not found.
     let pending =
         match dubbridge_db::pending_ingestion_repo::lock_for_finalize(&mut tx, ingest_token).await?
         {
@@ -67,10 +61,8 @@ pub async fn finalize_ingestion_core(
             None => {
                 let already_done =
                     dubbridge_db::artifact_repo::exists_for_token_tx(&mut tx, ingest_token).await?;
+                drop(tx);
                 if already_done {
-                    // H1-T3: persist durable audit row before returning — drop tx first so
-                    // the pool connection is released before the audit pool write.
-                    drop(tx);
                     emit_duplicate_rejection(pool, ingest_token).await?;
                     return Err(IngestionServiceError::AlreadyFinalized);
                 }
@@ -82,8 +74,7 @@ pub async fn finalize_ingestion_core(
         return Err(IngestionServiceError::SessionExpired);
     }
 
-    // Idempotency guard inside the transaction — no separate round-trip needed.
-    // H1-T3: idempotency guard — emit durable audit before returning.
+    // Idempotency guard inside the transaction (H1-T3).
     if dubbridge_db::artifact_repo::exists_for_token_tx(&mut tx, ingest_token).await? {
         drop(tx);
         emit_duplicate_rejection(pool, ingest_token).await?;
@@ -128,16 +119,7 @@ pub async fn finalize_ingestion_core(
         checksum: pending.checksum.clone(),
         created_at: OffsetDateTime::now_utc(),
     };
-
-    if let Err(e) =
-        dubbridge_db::artifact_repo::insert_artifact_record_tx(&mut tx, &artifact_record).await
-    {
-        if is_unique_violation(&e) {
-            tracing::info!(ingest_token = %ingest_token, "duplicate ingestion finalization rejected");
-            return Err(IngestionServiceError::AlreadyFinalized);
-        }
-        return Err(IngestionServiceError::Db(e));
-    }
+    insert_artifact_or_reject(&mut tx, &artifact_record, ingest_token).await?;
 
     dubbridge_db::asset_repo::update_asset_status_tx(
         &mut tx,
@@ -158,16 +140,49 @@ pub async fn finalize_ingestion_core(
     dubbridge_db::pending_ingestion_repo::delete_pending_ingestion_tx(&mut tx, ingest_token)
         .await?;
 
+    commit_and_fetch(pool, tx, asset.id, ingest_token).await
+}
+
+async fn begin_tx(
+    pool: &PgPool,
+) -> Result<sqlx::Transaction<'_, sqlx::Postgres>, IngestionServiceError> {
+    pool.begin()
+        .await
+        .map_err(|e| IngestionServiceError::Db(dubbridge_db::error::DbError::QueryFailed(e)))
+}
+
+async fn commit_and_fetch(
+    pool: &PgPool,
+    tx: sqlx::Transaction<'_, sqlx::Postgres>,
+    asset_id: dubbridge_domain::asset::AssetId,
+    ingest_token: Uuid,
+) -> Result<Asset, IngestionServiceError> {
     tx.commit()
         .await
         .map_err(|e| IngestionServiceError::Db(dubbridge_db::error::DbError::QueryFailed(e)))?;
-
-    tracing::info!(asset_id = %asset.id, ingest_token = %ingest_token, "ingestion finalized");
-
-    dubbridge_db::asset_repo::find_asset_by_id(pool, asset.id)
+    tracing::info!(asset_id = %asset_id, ingest_token = %ingest_token, "ingestion finalized");
+    dubbridge_db::asset_repo::find_asset_by_id(pool, asset_id)
         .await?
         .ok_or_else(|| {
             IngestionServiceError::Internal("asset disappeared after finalization".into())
+        })
+}
+
+/// Inserts the artifact record, mapping a unique-constraint violation to `AlreadyFinalized`.
+async fn insert_artifact_or_reject(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    artifact_record: &ArtifactRecord,
+    ingest_token: Uuid,
+) -> Result<(), IngestionServiceError> {
+    dubbridge_db::artifact_repo::insert_artifact_record_tx(tx, artifact_record)
+        .await
+        .map_err(|e| {
+            if is_unique_violation(&e) {
+                tracing::info!(ingest_token = %ingest_token, "duplicate ingestion finalization rejected");
+                IngestionServiceError::AlreadyFinalized
+            } else {
+                IngestionServiceError::Db(e)
+            }
         })
 }
 

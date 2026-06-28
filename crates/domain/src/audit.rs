@@ -348,7 +348,7 @@ mod tests {
     #[test]
     // Exhaustive one-assert-per-variant Display check; splitting it would only
     // obscure the intent.
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines, clippy::cognitive_complexity)]
     fn audit_event_kind_display_all_variants() {
         assert_eq!(
             AuditEventKind::IngestionFinalized.to_string(),

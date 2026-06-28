@@ -179,13 +179,28 @@ async fn process_preparation_job(
 /// All error paths write `TranscriptionStatus::Failed` with an observable detail and return
 /// without propagating — preparation readiness is never jeopardised by enqueue failures.
 #[allow(dead_code)]
+async fn record_transcription_failure(pool: &PgPool, asset_id: AssetId, detail: &str) {
+    let _ = transcription_repo::upsert_transcription_status(
+        pool,
+        asset_id,
+        TranscriptionStatus::Failed,
+        Some(detail),
+    )
+    .await;
+}
+
 async fn enqueue_transcription_if_ready(
     pool: &PgPool,
     queue: &dyn TranscriptionJobQueue,
     asset_id: AssetId,
     source_artifact_id: uuid::Uuid,
 ) {
-    // Idempotency guard: skip if a transcription is already underway or done.
+    if let Err(e) = try_enqueue_transcription(pool, queue, asset_id, source_artifact_id).await {
+        record_transcription_failure(pool, asset_id, &e).await;
+    }
+}
+
+async fn transcription_already_underway(pool: &PgPool, asset_id: AssetId) -> Result<bool, String> {
     match transcription_repo::get_transcription_status(pool, asset_id).await {
         Ok(Some(r))
             if matches!(
@@ -195,86 +210,61 @@ async fn enqueue_transcription_if_ready(
                     | TranscriptionStatus::Ready
             ) =>
         {
-            return;
+            Ok(true)
         }
+        Ok(_) => Ok(false),
         Err(e) => {
             tracing::warn!(asset_id = %asset_id, error = %e, "failed to read transcription status; recording Failed");
-            let _ = transcription_repo::upsert_transcription_status(
-                pool,
-                asset_id,
-                TranscriptionStatus::Failed,
-                Some(&e.to_string()),
-            )
-            .await;
-            return;
+            Err(e.to_string())
         }
-        _ => {}
+    }
+}
+
+async fn resolve_source_language(pool: &PgPool, asset_id: AssetId) -> Result<String, String> {
+    let result = workspace_repo::get_source_language_for_asset(pool, asset_id)
+        .await
+        .map_err(|e| {
+            tracing::warn!(asset_id = %asset_id, error = %e, "failed to resolve source language");
+            e.to_string()
+        })?;
+    result.ok_or_else(|| {
+        let detail = "no target_languages row found for asset project";
+        tracing::warn!(asset_id = %asset_id, detail, "transcription enqueue failed");
+        detail.to_string()
+    })
+}
+
+async fn try_enqueue_transcription(
+    pool: &PgPool,
+    queue: &dyn TranscriptionJobQueue,
+    asset_id: AssetId,
+    source_artifact_id: uuid::Uuid,
+) -> Result<(), String> {
+    if transcription_already_underway(pool, asset_id).await? {
+        return Ok(());
     }
 
-    // Resolve source language from the asset's project.
-    let source_language = match workspace_repo::get_source_language_for_asset(pool, asset_id).await
-    {
-        Ok(Some(lang)) => lang,
-        Ok(None) => {
-            let detail = "no target_languages row found for asset project";
-            tracing::warn!(asset_id = %asset_id, detail, "transcription enqueue failed");
-            let _ = transcription_repo::upsert_transcription_status(
-                pool,
-                asset_id,
-                TranscriptionStatus::Failed,
-                Some(detail),
-            )
-            .await;
-            return;
-        }
-        Err(e) => {
-            tracing::warn!(asset_id = %asset_id, error = %e, "failed to resolve source language");
-            let _ = transcription_repo::upsert_transcription_status(
-                pool,
-                asset_id,
-                TranscriptionStatus::Failed,
-                Some(&e.to_string()),
-            )
-            .await;
-            return;
-        }
-    };
+    let source_language = resolve_source_language(pool, asset_id).await?;
 
     // Write Pending before dispatching to the queue.
-    if let Err(e) = transcription_repo::upsert_transcription_status(
-        pool,
-        asset_id,
-        TranscriptionStatus::Pending,
-        None,
-    )
-    .await
-    {
-        tracing::warn!(asset_id = %asset_id, error = %e, "failed to write TranscriptionStatus::Pending");
-        let _ = transcription_repo::upsert_transcription_status(
-            pool,
-            asset_id,
-            TranscriptionStatus::Failed,
-            Some(&e.to_string()),
-        )
-        .await;
-        return;
-    }
+    transcription_repo::upsert_transcription_status(pool, asset_id, TranscriptionStatus::Pending, None)
+        .await
+        .map_err(|e| {
+            tracing::warn!(asset_id = %asset_id, error = %e, "failed to write TranscriptionStatus::Pending");
+            e.to_string()
+        })?;
 
     // Enqueue.
-    if let Err(e) = queue.enqueue(TranscriptionJob::new(
-        asset_id.0,
-        source_artifact_id,
-        source_language,
-    )) {
-        tracing::warn!(asset_id = %asset_id, error = %e, "failed to enqueue TranscriptionJob");
-        let _ = transcription_repo::upsert_transcription_status(
-            pool,
-            asset_id,
-            TranscriptionStatus::Failed,
-            Some(&e.to_string()),
-        )
-        .await;
-    }
+    queue
+        .enqueue(TranscriptionJob::new(
+            asset_id.0,
+            source_artifact_id,
+            source_language,
+        ))
+        .map_err(|e| {
+            tracing::warn!(asset_id = %asset_id, error = %e, "failed to enqueue TranscriptionJob");
+            e.to_string()
+        })
 }
 
 #[allow(dead_code)]

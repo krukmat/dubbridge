@@ -65,11 +65,14 @@ pub fn router(verifier: SharedTokenVerifier) -> Router<Arc<AppState>> {
     Router::new().merge(mutation_routes).merge(read_routes)
 }
 
-async fn create_ingestion(
-    State(state): State<Arc<AppState>>,
-    mut multipart: Multipart,
-) -> Result<(StatusCode, Json<IngestSessionResponse>), ApiError> {
-    let ingest_token = Uuid::new_v4();
+struct MultipartFields {
+    title: Option<String>,
+    filename: Option<String>,
+    content_type: Option<String>,
+    staged_upload: Option<StagedUpload>,
+}
+
+async fn parse_multipart_fields(mut multipart: Multipart) -> Result<MultipartFields, ApiError> {
     let mut title: Option<String> = None;
     let mut filename: Option<String> = None;
     let mut content_type: Option<String> = None;
@@ -97,6 +100,26 @@ async fn create_ingestion(
             _ => {}
         }
     }
+
+    Ok(MultipartFields {
+        title,
+        filename,
+        content_type,
+        staged_upload,
+    })
+}
+
+async fn create_ingestion(
+    State(state): State<Arc<AppState>>,
+    multipart: Multipart,
+) -> Result<(StatusCode, Json<IngestSessionResponse>), ApiError> {
+    let ingest_token = Uuid::new_v4();
+    let MultipartFields {
+        title,
+        filename,
+        content_type,
+        staged_upload,
+    } = parse_multipart_fields(multipart).await?;
 
     let staged_upload =
         staged_upload.ok_or_else(|| ApiError::bad_request("multipart field 'file' is required"))?;
