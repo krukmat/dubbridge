@@ -209,6 +209,10 @@ def main():
     if report_dst:
         files_to_add.append(report_dst)
 
+    # Detached HEAD: sync to current main tip before committing so the push is fast-forward.
+    subprocess.run(["git", "fetch", "origin", "main"], check=True)
+    subprocess.run(["git", "checkout", "-B", "_push-review-tmp", "origin/main"], check=True)
+
     subprocess.run(["git", "add"] + files_to_add, check=False)
 
     r = subprocess.run(["git", "diff", "--cached", "--quiet"], check=False)
