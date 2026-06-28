@@ -15,5 +15,6 @@ mobile/android/
 __pycache__/
 *.pyc
 .codex_tmp/*
+.agent/
 .claude/*
 logs/gemma-audit/

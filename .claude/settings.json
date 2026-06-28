@@ -140,10 +140,25 @@
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/matias/dubbridge/scripts/agent-preflight.py --print-summary --mark"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Write|Edit",
         "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/matias/dubbridge/scripts/agent-preflight.py --check >/dev/null || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"DubBridge agent preflight is missing or invalid. Run: python3 scripts/agent-preflight.py --print-summary --mark\"}}'"
+          },
           {
             "type": "command",
             "command": "echo 'WORKFLOW CHECK: (1) presented task? (2) ran scripts/rri.py? (3) explicit approval received (RRI 26+)? (4) Reflection passes planned (Moderate=2, Med-high=3, Complex=4)? See docs/playbooks/AGENT_WORKFLOW_GUIDE.md' >&2"
