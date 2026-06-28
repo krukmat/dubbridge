@@ -44,6 +44,7 @@ fi
 RUST_CHANGED=0
 DEPENDENCY_CHANGED=0
 DOCS_CHANGED=0
+MOBILE_CHANGED=0
 
 if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(Cargo\.toml$|Cargo\.lock$|rust-toolchain\.toml$|\.cargo/|build\.rs$|src/|tests/|benches/|examples/|crates/|apps/|deny\.toml$|\.clippy\.toml$|tarpaulin\.toml$|Makefile$|justfile$|\.github/workflows/|\.githooks/)'; then
   RUST_CHANGED=1
@@ -57,11 +58,15 @@ if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(Cargo\.toml$|Cargo\.lock$|apps/.
   DEPENDENCY_CHANGED=1
 fi
 
-if [ "$RUST_CHANGED" -eq 0 ] && [ "$DOCS_CHANGED" -eq 0 ]; then
+if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^mobile/'; then
+  MOBILE_CHANGED=1
+fi
+
+if [ "$RUST_CHANGED" -eq 0 ] && [ "$DOCS_CHANGED" -eq 0 ] && [ "$MOBILE_CHANGED" -eq 0 ]; then
   if [ -n "$DIFF_RANGE" ]; then
-    echo "pre-push: no Rust- or docs-impacting changes detected in $DIFF_RANGE, skipping QA"
+    echo "pre-push: no Rust-, docs-, or mobile-impacting changes detected in $DIFF_RANGE, skipping QA"
   else
-    echo "pre-push: no Rust- or docs-impacting changes detected, skipping QA"
+    echo "pre-push: no Rust-, docs-, or mobile-impacting changes detected, skipping QA"
   fi
   exit 0
 fi
@@ -74,6 +79,15 @@ if [ "$DOCS_CHANGED" -eq 1 ]; then
     echo "pre-push: canonical docs changed"
     make qa-docs
   fi
+fi
+
+if [ "$MOBILE_CHANGED" -eq 1 ]; then
+  if [ -n "$DIFF_RANGE" ]; then
+    echo "pre-push: mobile changes detected in $DIFF_RANGE"
+  else
+    echo "pre-push: mobile changes detected"
+  fi
+  make qa-maintainability
 fi
 
 if [ "$RUST_CHANGED" -eq 1 ]; then
