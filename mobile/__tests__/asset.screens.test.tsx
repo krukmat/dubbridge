@@ -132,7 +132,8 @@ describe("asset screens", () => {
       await fireEvent.press(view.getByText("Test Video"));
 
       expect(onOpenAsset).toHaveBeenCalledWith(ASSET);
-      expect(view.getByText("Ready")).toBeTruthy();
+      // "Ready" appears on both the asset badge and the status filter chip
+      expect(view.getAllByText("Ready").length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -477,6 +478,105 @@ describe("asset screens", () => {
 
       expect(view.queryByTestId("asset-list-empty-cta")).toBeNull();
       expect(view.queryByText("Upload asset")).toBeNull();
+    });
+  });
+
+  // T4: Library IA — search, filter, and zero-match state
+  describe("T4: Library IA — search, filter, and zero-match states", () => {
+    const ASSET_FINALIZED: AssetSummary = {
+      id: "asset-fin",
+      title: "Finalized Track",
+      uploader_id: "user-1",
+      status: "finalized",
+      created_at: "2026-06-01T10:00:00Z",
+      updated_at: "2026-06-01T10:00:00Z",
+    };
+    const ASSET_IN_REVIEW: AssetSummary = {
+      id: "asset-rev",
+      title: "Review Track",
+      uploader_id: "user-1",
+      status: "in_review",
+      created_at: "2026-06-02T10:00:00Z",
+      updated_at: "2026-06-02T10:00:00Z",
+    };
+
+    function mockAssets(...assets: AssetSummary[]) {
+      mockClient.get.mockResolvedValueOnce({
+        ok: true,
+        value: { data: assets, sessionRotation: null },
+      });
+    }
+
+    it("HP-1: status filter chips render for loaded statuses", async () => {
+      mockAssets(ASSET_FINALIZED, ASSET_IN_REVIEW);
+
+      const view = await render(
+        <AssetListScreen
+          gatewayBaseUrl="http://127.0.0.1:4000"
+          onOpenAsset={jest.fn()}
+        />,
+      );
+
+      await waitFor(() => expect(view.getByTestId("asset-card-asset-fin")).toBeTruthy());
+
+      expect(view.getByTestId("asset-filter-all")).toBeTruthy();
+      expect(view.getByTestId("asset-filter-finalized")).toBeTruthy();
+      expect(view.getByTestId("asset-filter-in_review")).toBeTruthy();
+    });
+
+    it("HP-1: selecting a status filter hides assets with other statuses", async () => {
+      mockAssets(ASSET_FINALIZED, ASSET_IN_REVIEW);
+
+      const view = await render(
+        <AssetListScreen
+          gatewayBaseUrl="http://127.0.0.1:4000"
+          onOpenAsset={jest.fn()}
+        />,
+      );
+
+      await waitFor(() => expect(view.getByTestId("asset-card-asset-fin")).toBeTruthy());
+
+      await fireEvent.press(view.getByTestId("asset-filter-finalized"));
+
+      expect(view.getByTestId("asset-card-asset-fin")).toBeTruthy();
+      expect(view.queryByTestId("asset-card-asset-rev")).toBeNull();
+    });
+
+    it("HP-2: search by title narrows the list", async () => {
+      mockAssets(ASSET_FINALIZED, ASSET_IN_REVIEW);
+
+      const view = await render(
+        <AssetListScreen
+          gatewayBaseUrl="http://127.0.0.1:4000"
+          onOpenAsset={jest.fn()}
+        />,
+      );
+
+      await waitFor(() => expect(view.getByTestId("asset-card-asset-fin")).toBeTruthy());
+
+      await fireEvent.changeText(view.getByTestId("asset-search"), "Finalized");
+
+      expect(view.getByTestId("asset-card-asset-fin")).toBeTruthy();
+      expect(view.queryByTestId("asset-card-asset-rev")).toBeNull();
+    });
+
+    it("EC-1: zero-match search shows no-results state, not empty-workspace state", async () => {
+      mockAssets(ASSET_FINALIZED);
+
+      const view = await render(
+        <AssetListScreen
+          gatewayBaseUrl="http://127.0.0.1:4000"
+          onOpenAsset={jest.fn()}
+        />,
+      );
+
+      await waitFor(() => expect(view.getByTestId("asset-card-asset-fin")).toBeTruthy());
+
+      await fireEvent.changeText(view.getByTestId("asset-search"), "xyznotfound");
+
+      await waitFor(() => expect(view.getByTestId("asset-list-no-results")).toBeTruthy());
+      expect(view.queryByTestId("asset-list-empty-state")).toBeNull();
+      expect(view.getByText("No assets match your search.")).toBeTruthy();
     });
   });
 

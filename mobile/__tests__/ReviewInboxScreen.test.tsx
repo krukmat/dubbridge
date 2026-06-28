@@ -145,7 +145,7 @@ describe("ReviewInboxScreen", () => {
 
     await waitFor(() => expect(screen.getByTestId(`review-task-card-${REVIEW_TASK.id}`)).toBeTruthy());
     expect(screen.getByText("1 unread notification")).toBeTruthy();
-    expect(mockScreenProps?.edges).toEqual(["bottom"]);
+    expect(mockScreenProps?.edges).toBeUndefined();
     expect(mockBadgeToneCalls).toContain("info");
     expect(mockClient.post).toHaveBeenCalledWith(
       "/api/notifications/mark-read",

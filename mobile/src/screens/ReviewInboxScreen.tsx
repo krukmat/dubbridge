@@ -69,7 +69,7 @@ export function ReviewInboxScreen(props: ReviewInboxScreenProps) {
   const { viewState, refreshing, onRefresh, load, unreadCopy, notificationMessage } = useReviewInboxLoader(props);
 
   return (
-    <Screen testID="review-inbox-screen" edges={["bottom"]}>
+    <Screen testID="review-inbox-screen">
       <ScreenHeader kicker="Review" title="Review inbox" copy={unreadCopy} />
 
       {notificationMessage ? (

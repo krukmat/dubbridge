@@ -184,6 +184,10 @@ function ReviewSummarySection({
   );
 }
 
+function CommunityModuleSlot() {
+  return <View testID="home-community-slot" />;
+}
+
 function RecentAssetsSection({
   recentAssets,
   onOpenAssets,
@@ -292,6 +296,7 @@ function DashboardContent({
         recentAssets={dashState.data.recentAssets}
         onOpenAssets={onOpenAssets}
       />
+      <CommunityModuleSlot />
       <QuickActionsSection
         onOpenAssets={onOpenAssets}
         onOpenUpload={onOpenUpload}
@@ -331,7 +336,7 @@ export function HomeScreen({
       <ScreenHeader
         kicker="DubBridge"
         title="Your workspace"
-        copy="Browse and manage your media assets."
+        copy="Pick up where you left off."
       />
 
       {dashState.kind === "loading" ? (

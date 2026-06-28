@@ -75,7 +75,7 @@ export function ConsentScreen({ assetId, gatewayBaseUrl }: Props) {
   };
 
   return (
-    <Screen testID="consent-screen" scroll edges={["bottom"]}>
+    <Screen testID="consent-screen" scroll>
       <ScreenHeader kicker="Append-only ledger" title="Voice consent" />
       {loading && !ledger ? <StateView kind="loading" title="Loading consent..." /> : null}
       {!loading && error && !ledger ? <StateView kind="error" title="Could not load consent" message={error} onRetry={onRetry} /> : null}

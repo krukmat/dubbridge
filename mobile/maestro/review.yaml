@@ -96,14 +96,8 @@ tags:
 
 - takeScreenshot: 16_review_approved
 
-# SC-PUBLISH-1: the Publication panel renders below the fold after approval —
-# scroll it into view before asserting and tapping the publish action.
-- scrollUntilVisible:
-    element:
-      id: publish-action
-    direction: DOWN
-    timeout: 10000
-
+# SC-PUBLISH-1: the Publish button is in a fixed ActionBar overlay, not inside
+# the ScrollView — scrollUntilVisible is not applicable here.
 - assertVisible:
     id: publish-action
 

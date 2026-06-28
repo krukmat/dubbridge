@@ -280,6 +280,36 @@ describe("ReviewDetailScreen", () => {
     expect(mockAuth.logout).not.toHaveBeenCalled();
   });
 
+  it("EC-3b: generic server error on publish shows inline error and is recoverable without logout", async () => {
+    mockClient.post
+      .mockResolvedValueOnce(playbackGrantSuccess("grant-publish-500"))
+      .mockResolvedValueOnce({
+        ok: false,
+        error: { kind: "http", status: 500 },
+      });
+
+    await render(
+      <ReviewDetailScreen
+        task={{ ...BASE_TASK, state: "approved" }}
+        gatewayBaseUrl="http://gateway"
+        onBack={jest.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("publish-action")).toBeTruthy());
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("publish-action"));
+    });
+
+    await waitFor(() =>
+      expect(screen.getByText("Could not publish (500).")).toBeTruthy(),
+    );
+    expect(screen.getByText("Could not publish (500).").props.accessibilityRole).toBe("alert");
+    // Publish button must still be present for retry
+    expect(screen.getByTestId("publish-action")).toBeTruthy();
+    expect(mockAuth.logout).not.toHaveBeenCalled();
+  });
+
   it("EC-4: session_expired on playback grant logs out before showing a player", async () => {
     mockClient.post.mockResolvedValueOnce({
       ok: false,

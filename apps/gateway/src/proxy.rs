@@ -8,7 +8,7 @@ use axum::{
     extract::{OriginalUri, State},
     http::{HeaderMap, Method, StatusCode, Uri, header},
     response::{IntoResponse, Response},
-    routing::any,
+    routing::{any, get},
 };
 
 use crate::state::GatewayState;
@@ -16,8 +16,62 @@ use crate::state::GatewayState;
 /// Builds the `/api/*` sub-router. State is inherited from the parent router.
 pub fn proxy_router() -> Router<Arc<GatewayState>> {
     Router::new()
+        // Playback manifest and segment are authorized by grantId in the path, not by session
+        // Bearer. The native video player cannot attach session headers, so these routes must
+        // bypass the session-Bearer gate and let the upstream API validate the grant.
+        .route(
+            "/assets/{id}/playback/{grant_id}/manifest",
+            get(public_proxy_handler),
+        )
+        .route(
+            "/assets/{id}/playback/segments/{filename}",
+            get(public_proxy_handler),
+        )
         .route("/", any(proxy_handler))
         .route("/{*path}", any(proxy_handler))
+}
+
+/// Grant-scoped passthrough for playback manifest and segment routes.
+/// No session Bearer required — the upstream API validates via the grantId path parameter.
+pub async fn public_proxy_handler(
+    State(app_state): State<Arc<GatewayState>>,
+    method: Method,
+    headers: HeaderMap,
+    OriginalUri(original_uri): OriginalUri,
+    body: Body,
+) -> Response {
+    let upstream_url =
+        match build_upstream_url(&app_state.gateway.upstream_api_base_url, &original_uri) {
+            Ok(url) => url,
+            Err(_) => return StatusCode::BAD_GATEWAY.into_response(),
+        };
+
+    let body_bytes = match to_bytes(body, usize::MAX).await {
+        Ok(bytes) => bytes,
+        Err(_) => return StatusCode::BAD_GATEWAY.into_response(),
+    };
+
+    let mut upstream_request = app_state
+        .http_client
+        .request(method, upstream_url)
+        .body(body_bytes.to_vec());
+
+    for (name, value) in &headers {
+        if matches!(name, &header::COOKIE | &header::AUTHORIZATION | &header::HOST) {
+            continue;
+        }
+        if name.as_str().eq_ignore_ascii_case("x-dubbridge-session") {
+            continue;
+        }
+        upstream_request = upstream_request.header(name, value);
+    }
+
+    let upstream_response = match upstream_request.send().await {
+        Ok(response) => response,
+        Err(_) => return StatusCode::BAD_GATEWAY.into_response(),
+    };
+
+    relay_upstream_response(upstream_response).await
 }
 
 /// Authenticated catch-all proxy into `apps/api`.
@@ -369,5 +423,62 @@ mod tests {
             "denied"
         );
         assert_eq!(read_body_text(response.into_body()).await, "forbidden");
+    }
+
+    #[tokio::test]
+    async fn playback_manifest_proxied_without_bearer() {
+        let upstream = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/assets/asset-abc/playback/grant-xyz/manifest"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("#EXTM3U"))
+            .mount(&upstream)
+            .await;
+
+        let app = build_app(make_state(&upstream.uri()));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/assets/asset-abc/playback/grant-xyz/manifest")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(read_body_text(response.into_body()).await, "#EXTM3U");
+        let requests = upstream.received_requests().await.unwrap();
+        assert_eq!(requests.len(), 1);
+        assert!(requests[0].headers.get("authorization").is_none());
+    }
+
+    #[tokio::test]
+    async fn playback_segment_proxied_without_bearer() {
+        let upstream = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/assets/asset-abc/playback/segments/seg0.ts"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![0u8, 1, 2]))
+            .mount(&upstream)
+            .await;
+
+        let app = build_app(make_state(&upstream.uri()));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/assets/asset-abc/playback/segments/seg0.ts")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let requests = upstream.received_requests().await.unwrap();
+        assert_eq!(requests.len(), 1);
+        assert!(requests[0].headers.get("authorization").is_none());
     }
 }

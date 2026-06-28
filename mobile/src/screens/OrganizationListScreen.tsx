@@ -59,7 +59,7 @@ function OrganizationListBody({ organizations, onOpenProjects, onOpenMembers }: 
 export function OrganizationListScreen({ gatewayBaseUrl, onOpenProjects, onOpenMembers }: Props) {
   const { viewState, name, setName, createError, creating, createOrganization, onRetry } = useOrganizationList(gatewayBaseUrl, onOpenProjects);
   return (
-    <Screen testID="organization-list-screen" edges={["bottom"]}>
+    <Screen testID="organization-list-screen">
       <ScreenHeader kicker="Workspace" title="Organizations" copy="Choose the organization whose projects and members you want to manage." />
       <OrganizationCreatePanel name={name} createError={createError} creating={creating} onChangeName={setName} onCreate={() => void createOrganization()} />
       {viewState.kind === "loading" ? <StateView kind="loading" title="Loading organizations..." /> : null}

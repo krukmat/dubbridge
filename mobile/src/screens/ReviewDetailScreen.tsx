@@ -84,7 +84,7 @@ export function ReviewDetailScreen({ task, gatewayBaseUrl, onBack }: ReviewDetai
 
   return (
     <View style={styles.container}>
-      <Screen testID="review-detail-screen" scroll edges={["bottom"]} extraBottomPadding={actionBarHeight}>
+      <Screen testID="review-detail-screen" scroll extraBottomPadding={actionBarHeight}>
         <ScreenHeader kicker="Review" title="Review task" />
         <Panel>
           <View style={styles.row}><Text style={styles.label}>Task ID</Text><Text style={styles.value} numberOfLines={1} ellipsizeMode="tail">{formatId(task.id)}</Text></View>

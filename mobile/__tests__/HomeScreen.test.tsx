@@ -193,6 +193,25 @@ describe("HomeScreen", () => {
     // sign-out absent during error (not rendered until ready)
   });
 
+  it("HP-CommunitySlot: community module slot is always present in the ready tree", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: { data: [ASSET_A], sessionRotation: null },
+    });
+    mockListNotifications.mockResolvedValue({
+      ok: true,
+      value: { data: { notifications: [] }, sessionRotation: null },
+    });
+
+    const { getByTestId } = await renderHome();
+
+    await waitFor(() => {
+      expect(getByTestId("home-recent-asset-asset-aaa")).toBeTruthy();
+    });
+
+    expect(getByTestId("home-community-slot")).toBeTruthy();
+  });
+
   it("EC-2: session expired — auth.logout invoked", async () => {
     mockClient.get.mockResolvedValue({
       ok: false,

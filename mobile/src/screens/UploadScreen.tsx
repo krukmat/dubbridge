@@ -96,7 +96,7 @@ export function UploadScreen({ gatewayBaseUrl, onSuccess }: { gatewayBaseUrl: st
 
   return (
     <View style={styles.container}>
-      <Screen testID="upload-screen" edges={["bottom"]} extraBottomPadding={actionBarHeight}>
+      <Screen testID="upload-screen" extraBottomPadding={actionBarHeight}>
         <ScreenHeader kicker="Upload" title="New asset" />
         {showProgress ? <StepProgress steps={STEP_LABELS} currentIndex={stepIndex} testID="upload-step-progress" /> : null}
         <UploadBody viewState={viewState} validationErrors={validationErrors} onFieldChange={handleFieldChange} onPickFile={handlePickFile} onSetViewState={setViewState} />

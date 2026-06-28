@@ -72,7 +72,7 @@ export function AssetDetailScreen({ assetId, gatewayBaseUrl, onOpenCompliance }:
 
   return (
     <View style={styles.container}>
-      <Screen testID="asset-detail-screen" scroll edges={["bottom"]} extraBottomPadding={assetScreenPadding(viewState, actionBarHeight)}>
+      <Screen testID="asset-detail-screen" scroll extraBottomPadding={assetScreenPadding(viewState, actionBarHeight)}>
         <ScreenHeader kicker="Asset" title="Asset detail" />
         {viewState.kind === "loading" ? <StateView kind="loading" title="Loading asset detail…" /> : null}
         {viewState.kind === "error" ? <StateView kind="error" title="Could not load asset detail" message={viewState.message} /> : null}

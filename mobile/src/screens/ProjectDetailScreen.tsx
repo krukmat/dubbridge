@@ -99,7 +99,7 @@ export function ProjectDetailScreen({ gatewayBaseUrl, orgId, projectId, onOpenAs
   const onRetry = useCallback(() => { void loadDetail(); }, [loadDetail]);
 
   return (
-    <Screen testID="project-detail-screen" edges={["bottom"]}>
+    <Screen testID="project-detail-screen">
       {viewState.kind === "loading" ? <StateView kind="loading" title="Loading project…" message="Fetching project details from the gateway." /> : null}
       {viewState.kind === "error" ? <StateView kind="error" title="Could not load project" message={viewState.message} onRetry={onRetry} /> : null}
       {viewState.kind === "ready" ? <ProjectDetailBody detail={viewState.detail} onOpenAsset={onOpenAsset} /> : null}

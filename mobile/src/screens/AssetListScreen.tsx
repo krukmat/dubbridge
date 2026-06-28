@@ -2,19 +2,23 @@ import { useCallback, useEffect, useState } from "react";
 import {
   FlatList,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
+  View,
 } from "react-native";
 
 import { createGatewayClient } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { formatStatusLabel } from "../format";
 import { Badge, statusTone } from "../components/Badge";
+import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { Screen } from "../components/Screen";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { StateView } from "../components/StateView";
-import { color, space, type } from "../theme";
+import { color, fieldStyle, space, type } from "../theme";
 
 export type AssetSummary = {
   id: string;
@@ -57,6 +61,55 @@ async function fetchAssetList(
   return client.get<AssetSummary[]>("/api/assets", sessionRef);
 }
 
+function LibraryFilterBar({
+  query,
+  onChangeQuery,
+  statusFilter,
+  onSelectStatus,
+  availableStatuses,
+}: {
+  query: string;
+  onChangeQuery: (q: string) => void;
+  statusFilter: string;
+  onSelectStatus: (s: string) => void;
+  availableStatuses: string[];
+}) {
+  const chips = ["all", ...availableStatuses];
+  return (
+    <View style={styles.filterBar}>
+      <TextInput
+        testID="asset-search"
+        style={fieldStyle}
+        placeholder="Search assets…"
+        value={query}
+        onChangeText={onChangeQuery}
+        autoCapitalize="none"
+        autoCorrect={false}
+        clearButtonMode="while-editing"
+        accessibilityLabel="Search assets"
+      />
+      {availableStatuses.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipRow}
+        >
+          {chips.map((chip) => (
+            <Button
+              key={chip}
+              testID={`asset-filter-${chip}`}
+              label={chip === "all" ? "All" : formatStatusLabel(chip)}
+              size="sm"
+              variant={statusFilter === chip ? "primary" : "secondary"}
+              onPress={() => onSelectStatus(chip)}
+            />
+          ))}
+        </ScrollView>
+      ) : null}
+    </View>
+  );
+}
+
 function AssetRow({
   asset,
   onOpenAsset,
@@ -71,7 +124,7 @@ function AssetRow({
       trailing="chevron"
       mediaTone={statusTone(asset.status)}
     >
-      <Text style={styles.assetTitle}>{asset.title}</Text>
+      <Text style={styles.assetTitle} numberOfLines={2}>{asset.title}</Text>
       <Badge
         label={formatStatusLabel(asset.status)}
         tone={statusTone(asset.status)}
@@ -81,13 +134,15 @@ function AssetRow({
 }
 
 function AssetListBody({
-  viewState,
+  assets,
+  isNoResults,
   refreshing,
   onRefresh,
   onOpenAsset,
   onOpenUpload,
 }: {
-  viewState: Extract<AssetListViewState, { kind: "ready" } | { kind: "empty" }>;
+  assets: AssetSummary[];
+  isNoResults: boolean;
   refreshing: boolean;
   onRefresh: () => void;
   onOpenAsset: (asset: AssetSummary) => void;
@@ -96,26 +151,33 @@ function AssetListBody({
   return (
     <FlatList
       style={styles.scroll}
-      contentContainerStyle={
-        viewState.kind === "empty" ? styles.emptyContent : styles.listContent
-      }
-      data={viewState.kind === "ready" ? viewState.assets : []}
+      contentContainerStyle={assets.length === 0 ? styles.emptyContent : styles.listContent}
+      data={assets}
       keyExtractor={(asset) => asset.id}
       renderItem={({ item: asset }) => (
         <AssetRow asset={asset} onOpenAsset={onOpenAsset} />
       )}
       ListEmptyComponent={
-        <StateView
-          testID="asset-list-empty-state"
-          kind="empty"
-          title="No assets yet"
-          message="Your workspace does not have any assets to show."
-          primaryAction={
-            onOpenUpload
-              ? { label: "Upload asset", onPress: onOpenUpload, testID: "asset-list-empty-cta" }
-              : undefined
-          }
-        />
+        isNoResults ? (
+          <StateView
+            testID="asset-list-no-results"
+            kind="empty"
+            title="No results"
+            message="No assets match your search."
+          />
+        ) : (
+          <StateView
+            testID="asset-list-empty-state"
+            kind="empty"
+            title="No assets yet"
+            message="Your workspace does not have any assets to show."
+            primaryAction={
+              onOpenUpload
+                ? { label: "Upload asset", onPress: onOpenUpload, testID: "asset-list-empty-cta" }
+                : undefined
+            }
+          />
+        )
       }
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -182,9 +244,19 @@ export function AssetListScreen({
     auth.onSessionRotation,
   );
 
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const loadedAssets = viewState.kind === "ready" ? viewState.assets : [];
+  const availableStatuses = [...new Set(loadedAssets.map((a) => a.status))];
+  const filteredAssets = loadedAssets
+    .filter((a) => (query ? a.title.toLowerCase().includes(query.toLowerCase()) : true))
+    .filter((a) => (statusFilter !== "all" ? a.status === statusFilter : true));
+  const isNoResults = loadedAssets.length > 0 && filteredAssets.length === 0;
+
   return (
-    <Screen testID="asset-list-screen" edges={["bottom"]}>
-      <ScreenHeader kicker="Assets" title="Asset list" />
+    <Screen testID="asset-list-screen">
+      <ScreenHeader kicker="Assets" title="Your library" copy="Browse and manage your media." />
 
       {viewState.kind === "loading" ? (
         <StateView
@@ -203,14 +275,38 @@ export function AssetListScreen({
         />
       ) : null}
 
-      {(viewState.kind === "ready" || viewState.kind === "empty") ? (
-        <AssetListBody
-          viewState={viewState}
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          onOpenAsset={onOpenAsset}
-          onOpenUpload={onOpenUpload}
+      {viewState.kind === "empty" ? (
+        <StateView
+          testID="asset-list-empty-state"
+          kind="empty"
+          title="No assets yet"
+          message="Your workspace does not have any assets to show."
+          primaryAction={
+            onOpenUpload
+              ? { label: "Upload asset", onPress: onOpenUpload, testID: "asset-list-empty-cta" }
+              : undefined
+          }
         />
+      ) : null}
+
+      {viewState.kind === "ready" ? (
+        <>
+          <LibraryFilterBar
+            query={query}
+            onChangeQuery={setQuery}
+            statusFilter={statusFilter}
+            onSelectStatus={setStatusFilter}
+            availableStatuses={availableStatuses}
+          />
+          <AssetListBody
+            assets={filteredAssets}
+            isNoResults={isNoResults}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            onOpenAsset={onOpenAsset}
+            onOpenUpload={onOpenUpload}
+          />
+        </>
       ) : null}
     </Screen>
   );
@@ -220,6 +316,8 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   listContent: { gap: space.md, paddingBottom: space.xl },
   emptyContent: { flexGrow: 1 },
+  filterBar: { gap: space.sm },
+  chipRow: { flexDirection: "row", gap: space.sm },
   assetTitle: { ...type.heading, color: color.ink900 },
   assetMeta: { ...type.meta, color: color.ink500 },
 });

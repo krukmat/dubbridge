@@ -51,7 +51,7 @@ function ComplianceReady({ data, onManageConsent }: { data: ComplianceData; onMa
 export function ComplianceScreen({ assetId, gatewayBaseUrl, onManageConsent }: Props) {
   const { viewState, onRetry } = useComplianceLoader(assetId, gatewayBaseUrl);
   return (
-    <Screen testID="compliance-screen" scroll edges={["bottom"]}>
+    <Screen testID="compliance-screen" scroll>
       <ScreenHeader kicker="Governance" title="Compliance center" copy="Audit history, rights evidence, and voice consent for this asset." />
       {viewState.kind === "loading" ? <StateView kind="loading" title="Loading compliance data..." /> : null}
       {viewState.kind === "error" ? <StateView testID="compliance" kind="error" title="Could not load compliance data" message={viewState.message} onRetry={onRetry} /> : null}

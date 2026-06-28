@@ -159,7 +159,7 @@ export function ProjectListScreen({
   );
 
   return (
-    <Screen testID="project-list-screen" edges={["bottom"]}>
+    <Screen testID="project-list-screen">
       <ScreenHeader kicker="Organization projects" title="Projects" />
 
       {viewState.kind === "loading" ? (

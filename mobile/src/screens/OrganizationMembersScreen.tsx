@@ -55,7 +55,7 @@ export function OrganizationMembersScreen({ gatewayBaseUrl, orgId, viewerRole }:
   const canManage = viewerRole === "owner" || viewerRole === "admin";
 
   return (
-    <Screen testID="organization-members-screen" edges={["bottom"]}>
+    <Screen testID="organization-members-screen">
       <ScreenHeader kicker="Organization" title="Members" copy={`Your role: ${viewerRole}`} />
       {canManage ? <AddMemberPanel subjectId={subjectId} role={role} addError={addError} isAddingMemberLoading={isAddingMemberLoading} onChangeSubjectId={setSubjectId} onChangeRole={setRole} onAddMember={() => void addMember()} /> : null}
       <MemberListBody loading={loading} error={error} members={members} onRetry={onRetry} />
