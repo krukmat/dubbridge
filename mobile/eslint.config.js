@@ -39,6 +39,10 @@ module.exports = [
       // No escape hatches around the type checker.
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/ban-ts-comment': 'error',
+      // SRP/SoC gates: functions must stay small and simple.
+      // CC > 10 signals mixed responsibilities; > 60 lines signals missing decomposition.
+      'complexity': ['error', 10],
+      'max-lines-per-function': ['error', 60],
     },
   },
 ];

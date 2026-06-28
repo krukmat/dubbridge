@@ -6,3 +6,7 @@ allow-print-in-tests = true
 allow-dbg-in-tests = true
 allow-unwrap-in-tests = true
 allow-expect-in-tests = true
+
+# SRP gate threshold for cognitive_complexity (deny in Cargo.toml).
+# McCabe-equivalent ceiling: functions above this must be decomposed.
+cognitive-complexity-threshold = 15

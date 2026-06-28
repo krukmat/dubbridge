@@ -585,6 +585,37 @@ knobs such as `--temperature` / `DUBBRIDGE_LOW_RRI_TEMPERATURE` and `--think` /
 it only for a bounded experiment because it can consume the token budget before
 the tagged response is completed.
 
+## Reviewability budget gate
+
+Local Gemma roles evaluate a change inside a fixed context window
+(`DEFAULT_NUM_CTX`) while reserving generation headroom (`DEFAULT_NUM_PREDICT`).
+A change larger than that effective window either overflows the context silently
+or truncates Gemma's response (`done_reason == "length"`). The before-after mode
+and the push-review token-limit handler protect against this *after* it happens;
+the **reviewability budget gate** (`make qa-review-budget`,
+`scripts/check-review-budget.py`) is the *proactive* counterpart that runs before
+delegation.
+
+The gate fails closed when the added/changed code lines of the change exceed a
+budget **derived from the context window** — not a fixed constant — so it tracks
+`DUBBRIDGE_REVIEW_NUM_CTX` / `DUBBRIDGE_REVIEW_NUM_PREDICT` rather than drifting
+from them. `DUBBRIDGE_REVIEW_MAX_DIFF_LINES` overrides the derived value when an
+operator needs an explicit ceiling, and `DUBBRIDGE_REVIEW_PACKET_OVERHEAD_TOKENS`
+tunes the fixed prompt/contract overhead the derivation reserves. Only code paths
+Gemma actually receives are counted; docs, config, and markdown are excluded,
+mirroring the `qa-gemma-review` packet filter.
+
+**Non-Gemma agents are responsible for staying inside this budget.** When a
+change is too large, the delivering agent must split it into smaller delegation
+units. If the change is genuinely irreducible (mechanical rename, atomic
+migration), the agent takes the **documented escape**: record a
+`D14-OVERRIDE: <reason>` line in the commit body or task entry, which passes the
+gate and routes the change to the non-Gemma context-isolated reviewer (D14)
+instead of Gemma. The override reason is captured for the audit log; an override
+without a reason does not satisfy the gate. The escape is for reviewability, not
+for skipping review — the D14 reviewer still runs and the primary agent records
+`disposition_divergence`.
+
 ## Language
 
 - User-facing communication: Spanish.

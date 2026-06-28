@@ -112,6 +112,22 @@ beyond what the RRI band already requires. The review is never skipped.
 See `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer` for the full
 authority boundary, trigger conditions, and evidence format.
 
+## Reviewability budget escape
+
+The reviewability budget gate (`make qa-review-budget`) fails closed when a
+change is too large for Gemma to evaluate in-context. Staying inside the budget
+by splitting the change is the default and requires no approval. When a change is
+genuinely irreducible, the delivering agent may **autonomously** take the
+documented escape — a `D14-OVERRIDE: <reason>` line in the commit body or task
+entry — which routes the change to the non-Gemma (D14) reviewer instead. This
+escape does **not** open a human approval gate and does **not** skip review: the
+D14 reviewer still runs and `disposition_divergence` is still recorded. Using the
+escape to avoid review, or recording it without a genuine reason, is a policy
+violation.
+
+See `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Reviewability budget gate` for the
+budget derivation and override mechanics.
+
 ## Related
 
 - `CLAUDE.md`, `AGENTS.md`, `README_AGENT_ORDER.md`

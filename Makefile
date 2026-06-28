@@ -1,4 +1,4 @@
-.PHONY: qa-fmt qa-lint qa-test qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-mobile qa-design qa-task-unit-coverage qa-docs qa-rri qa-ci qa-gemma-review qa-gemma-push-review install-hooks
+.PHONY: qa-fmt qa-lint qa-test qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-rri qa-ci qa-gemma-review qa-gemma-push-review install-hooks
 
 COVERAGE_MIN ?= 90
 GEMMA_REVIEW_BASE   ?= HEAD
@@ -40,6 +40,14 @@ qa-build-release:
 qa-maintainability:
 	python3 scripts/check-maintainability.py
 
+# Pre-delegation reviewability budget: fail closed when added/changed code lines
+# exceed the budget derived from Gemma's context window, so a change handed to
+# the local reviewer/developer fits in-context. Documented escape: a
+# `D14-OVERRIDE: <reason>` line in the commit body routes the change to a
+# non-Gemma (D14) reviewer instead.
+qa-review-budget:
+	python3 scripts/check-review-budget.py
+
 # Mobile production-readiness + correctness: strict types, AST lint (no any /
 # console / debugger / ts-suppression), and the Jest suite. Replaces the former
 # regex production-readiness scan for the mobile surface.
@@ -68,7 +76,7 @@ qa-rri:
 	python3 scripts/rri_test.py
 	python3 scripts/check_roadmap_drift_test.py
 
-qa-ci: qa-local qa-docs qa-rri qa-deny qa-config-secrets qa-roadmap-drift qa-maintainability qa-mobile qa-coverage qa-build-release
+qa-ci: qa-local qa-docs qa-rri qa-deny qa-config-secrets qa-roadmap-drift qa-maintainability qa-review-budget qa-mobile qa-coverage qa-build-release
 
 qa-gemma-review:
 	@if [ "$${DUBBRIDGE_SKIP_GEMMA_REVIEW:-0}" = "1" ]; then \

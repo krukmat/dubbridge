@@ -58,5 +58,8 @@ panic = "deny"
 print_stdout = "deny"
 print_stderr = "deny"
 # Readability: reject overly long functions (default threshold 100 lines).
-# Stable pedantic lint; cognitive_complexity is intentionally left off (nursery).
 too_many_lines = "deny"
+# SRP gate: functions must stay below the cognitive complexity threshold
+# configured in clippy.toml (cognitive-complexity-threshold = 15).
+# Stable as of clippy 0.1.96 (previously noted as nursery — incorrect).
+cognitive_complexity = "deny"
