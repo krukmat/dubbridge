@@ -46,9 +46,9 @@ pub async fn public_proxy_handler(
             Err(_) => return StatusCode::BAD_GATEWAY.into_response(),
         };
 
-    let body_bytes = match to_bytes(body, usize::MAX).await {
+    let body_bytes = match to_bytes(body, 16 * 1024).await {
         Ok(bytes) => bytes,
-        Err(_) => return StatusCode::BAD_GATEWAY.into_response(),
+        Err(_) => return StatusCode::PAYLOAD_TOO_LARGE.into_response(),
     };
 
     let mut upstream_request = app_state
