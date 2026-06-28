@@ -1,5 +1,7 @@
-import { cleanup, render } from "@testing-library/react-native";
+import { cleanup, render, waitFor } from "@testing-library/react-native";
 
+import { createGatewayClient } from "../src/api/client";
+import * as notifications from "../src/api/notifications";
 import type { AuthContextValue } from "../src/auth/AuthProvider";
 import { RootNavigator } from "../src/navigation/RootNavigator";
 
@@ -21,9 +23,20 @@ jest.mock("../src/auth/AuthProvider", () => ({
   useAuth: () => mockAuthValue,
 }));
 
+jest.mock("../src/api/client", () => ({
+  createGatewayClient: jest.fn(),
+}));
+
+jest.mock("../src/api/notifications", () => ({
+  listNotifications: jest.fn(),
+}));
+
 jest.mock("../src/push/registerPush", () => ({
   registerPush: jest.fn().mockResolvedValue(undefined),
 }));
+
+const mockCreateGatewayClient = createGatewayClient as jest.MockedFunction<typeof createGatewayClient>;
+const mockListNotifications = notifications.listNotifications as jest.MockedFunction<typeof notifications.listNotifications>;
 
 jest.mock("expo-notifications", () => ({
   addNotificationResponseReceivedListener: jest.fn(() => ({
@@ -52,6 +65,11 @@ jest.mock("expo-constants", () => ({
 
 describe("RootNavigator", () => {
   beforeEach(() => {
+    const mockClient = { get: jest.fn(), post: jest.fn(), postMultipart: jest.fn() };
+    mockClient.get.mockResolvedValue({ ok: true, value: { data: [], sessionRotation: null } });
+    mockCreateGatewayClient.mockReturnValue(mockClient as any);
+    mockListNotifications.mockResolvedValue({ ok: true, value: { data: { notifications: [] }, sessionRotation: null } });
+
     mockAuthValue = {
       sessionRef: null,
       status: "unauthed",
@@ -95,8 +113,9 @@ describe("RootNavigator", () => {
     const view = await render(<RootNavigator />);
 
     expect(view.getByTestId("home-screen")).toBeTruthy();
-    expect(view.getByTestId("home-sign-out")).toBeTruthy();
     expect(view.getByText("Your workspace")).toBeTruthy();
+    // AccountSection renders after dashboard data loads (ready state)
+    await waitFor(() => expect(view.getByTestId("home-sign-out")).toBeTruthy());
   });
 
   it("EC-1: renders a config error when the gateway URL is missing", async () => {

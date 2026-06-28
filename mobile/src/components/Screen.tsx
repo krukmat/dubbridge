@@ -26,6 +26,8 @@ export type ScreenProps = {
   /** Which safe-area edges to pad. Defaults to top + bottom. */
   edges?: ScreenEdge[];
   testID?: string;
+  /** Extra bottom padding added on top of safe-area — use when an ActionBar overlays the screen. */
+  extraBottomPadding?: number;
 };
 
 const ZERO_INSETS = { top: 0, bottom: 0, left: 0, right: 0 };
@@ -43,6 +45,7 @@ export function Screen({
   contentContainerStyle,
   edges = ["top", "bottom"],
   testID,
+  extraBottomPadding = 0,
 }: ScreenProps) {
   const insets = useContext(SafeAreaInsetsContext) ?? ZERO_INSETS;
   const padTop = edges.includes("top") ? insets.top : 0;
@@ -55,7 +58,7 @@ export function Screen({
         style={styles.canvas}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: space.xxl + padTop, paddingBottom: space.xxl + padBottom },
+          { paddingTop: space.xxl + padTop, paddingBottom: space.xxl + padBottom + extraBottomPadding },
           contentContainerStyle,
         ]}
         refreshControl={refreshControl}
@@ -71,7 +74,7 @@ export function Screen({
       style={[
         styles.canvas,
         styles.content,
-        { paddingTop: space.xxl + padTop, paddingBottom: space.xxl + padBottom },
+        { paddingTop: space.xxl + padTop, paddingBottom: space.xxl + padBottom + extraBottomPadding },
         contentContainerStyle,
       ]}
     >

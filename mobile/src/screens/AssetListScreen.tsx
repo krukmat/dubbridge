@@ -8,6 +8,7 @@ import {
 
 import { createGatewayClient } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
+import { formatStatusLabel } from "../format";
 import { Badge, statusTone } from "../components/Badge";
 import { Card } from "../components/Card";
 import { Screen } from "../components/Screen";
@@ -27,6 +28,7 @@ export type AssetSummary = {
 type AssetListScreenProps = {
   gatewayBaseUrl: string;
   onOpenAsset: (asset: AssetSummary) => void;
+  onOpenUpload?: () => void;
 };
 
 type AssetListViewState =
@@ -35,96 +37,123 @@ type AssetListViewState =
   | { kind: "empty" }
   | { kind: "error"; message: string };
 
-function formatStatus(status: string): string {
-  return status
-    .split("_")
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join(" ");
+function toAssetListViewState(assets: AssetSummary[]): AssetListViewState {
+  return assets.length === 0 ? { kind: "empty" } : { kind: "ready", assets };
 }
 
-export function AssetListScreen({
-  gatewayBaseUrl,
+function assetListErrorMessage(error: { kind: string; message?: string; status?: number }) {
+  return error.kind === "network"
+    ? error.message ?? "Network request failed."
+    : error.kind === "forbidden"
+      ? "You do not have access to the asset list."
+      : `Request failed with status ${error.status}.`;
+}
+
+async function fetchAssetList(
+  gatewayBaseUrl: string,
+  sessionRef: string | null,
+) {
+  const client = createGatewayClient({ gatewayBaseUrl });
+  return client.get<AssetSummary[]>("/api/assets", sessionRef);
+}
+
+function AssetRow({
+  asset,
   onOpenAsset,
-}: AssetListScreenProps) {
-  const auth = useAuth();
-  const [viewState, setViewState] = useState<AssetListViewState>({
-    kind: "loading",
-  });
+}: {
+  asset: AssetSummary;
+  onOpenAsset: (asset: AssetSummary) => void;
+}) {
+  return (
+    <Card
+      testID={`asset-card-${asset.id}`}
+      onPress={() => onOpenAsset(asset)}
+      trailing="chevron"
+      mediaTone={statusTone(asset.status)}
+    >
+      <Text style={styles.assetTitle}>{asset.title}</Text>
+      <Badge
+        label={formatStatusLabel(asset.status)}
+        tone={statusTone(asset.status)}
+      />
+    </Card>
+  );
+}
+
+function AssetListBody({
+  viewState,
+  refreshing,
+  onRefresh,
+  onOpenAsset,
+  onOpenUpload,
+}: {
+  viewState: Extract<AssetListViewState, { kind: "ready" } | { kind: "empty" }>;
+  refreshing: boolean;
+  onRefresh: () => void;
+  onOpenAsset: (asset: AssetSummary) => void;
+  onOpenUpload?: () => void;
+}) {
+  return (
+    <FlatList
+      style={styles.scroll}
+      contentContainerStyle={
+        viewState.kind === "empty" ? styles.emptyContent : styles.listContent
+      }
+      data={viewState.kind === "ready" ? viewState.assets : []}
+      keyExtractor={(asset) => asset.id}
+      renderItem={({ item: asset }) => (
+        <AssetRow asset={asset} onOpenAsset={onOpenAsset} />
+      )}
+      ListEmptyComponent={
+        <StateView
+          testID="asset-list-empty-state"
+          kind="empty"
+          title="No assets yet"
+          message="Your workspace does not have any assets to show."
+          primaryAction={
+            onOpenUpload
+              ? { label: "Upload asset", onPress: onOpenUpload, testID: "asset-list-empty-cta" }
+              : undefined
+          }
+        />
+      }
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    />
+  );
+}
+
+function useAssetListState(
+  gatewayBaseUrl: string,
+  sessionRef: string | null,
+  logout: () => Promise<void>,
+  onSessionRotation: (rotation: string | null) => Promise<void>,
+) {
+  const [viewState, setViewState] = useState<AssetListViewState>({ kind: "loading" });
   const [refreshing, setRefreshing] = useState(false);
 
   const loadAssets = useCallback(async (): Promise<void> => {
-    const client = createGatewayClient({ gatewayBaseUrl });
-    const result = await client.get<AssetSummary[]>(
-      "/api/assets",
-      auth.sessionRef,
-    );
+    const result = await fetchAssetList(gatewayBaseUrl, sessionRef);
 
     if (result.ok) {
-      await auth.onSessionRotation(result.value.sessionRotation);
-      if (result.value.data.length === 0) {
-        setViewState({ kind: "empty" });
-      } else {
-        setViewState({ kind: "ready", assets: result.value.data });
-      }
+      await onSessionRotation(result.value.sessionRotation);
+      setViewState(toAssetListViewState(result.value.data));
       return;
     }
-
     if (result.error.kind === "session_expired") {
-      await auth.logout();
+      await logout();
       return;
     }
-
-    const message =
-      result.error.kind === "network"
-        ? result.error.message
-        : result.error.kind === "forbidden"
-          ? "You do not have access to the asset list."
-          : `Request failed with status ${result.error.status}.`;
-    setViewState({ kind: "error", message });
-  }, [auth, gatewayBaseUrl]);
+    setViewState({ kind: "error", message: assetListErrorMessage(result.error) });
+  }, [gatewayBaseUrl, logout, onSessionRotation, sessionRef]);
 
   useEffect(() => {
-    let isActive = true;
-
     void (async () => {
       setViewState({ kind: "loading" });
-      const client = createGatewayClient({ gatewayBaseUrl });
-      const result = await client.get<AssetSummary[]>(
-        "/api/assets",
-        auth.sessionRef,
-      );
-
-      if (!isActive) return;
-
-      if (result.ok) {
-        await auth.onSessionRotation(result.value.sessionRotation);
-        if (!isActive) return;
-        if (result.value.data.length === 0) {
-          setViewState({ kind: "empty" });
-        } else {
-          setViewState({ kind: "ready", assets: result.value.data });
-        }
-        return;
-      }
-
-      if (result.error.kind === "session_expired") {
-        await auth.logout();
-        return;
-      }
-
-      const message =
-        result.error.kind === "network"
-          ? result.error.message
-          : result.error.kind === "forbidden"
-            ? "You do not have access to the asset list."
-            : `Request failed with status ${result.error.status}.`;
-      setViewState({ kind: "error", message });
+      await loadAssets();
     })();
-
-    return () => {
-      isActive = false;
-    };
-  }, [auth, gatewayBaseUrl]);
+  }, [loadAssets]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -136,6 +165,22 @@ export function AssetListScreen({
     setViewState({ kind: "loading" });
     void loadAssets();
   }, [loadAssets]);
+
+  return { viewState, refreshing, onRefresh, onRetry };
+}
+
+export function AssetListScreen({
+  gatewayBaseUrl,
+  onOpenAsset,
+  onOpenUpload,
+}: AssetListScreenProps) {
+  const auth = useAuth();
+  const { viewState, refreshing, onRefresh, onRetry } = useAssetListState(
+    gatewayBaseUrl,
+    auth.sessionRef,
+    auth.logout,
+    auth.onSessionRotation,
+  );
 
   return (
     <Screen testID="asset-list-screen" edges={["bottom"]}>
@@ -159,38 +204,12 @@ export function AssetListScreen({
       ) : null}
 
       {(viewState.kind === "ready" || viewState.kind === "empty") ? (
-        <FlatList
-          style={styles.scroll}
-          contentContainerStyle={
-            viewState.kind === "empty" ? styles.emptyContent : styles.listContent
-          }
-          data={viewState.kind === "ready" ? viewState.assets : []}
-          keyExtractor={(asset) => asset.id}
-          renderItem={({ item: asset }) => (
-            <Card
-              testID={`asset-card-${asset.id}`}
-              onPress={() => onOpenAsset(asset)}
-              trailing="chevron"
-            >
-              <Text style={styles.assetTitle}>{asset.title}</Text>
-              <Badge
-                label={formatStatus(asset.status)}
-                tone={statusTone(asset.status)}
-              />
-              <Text style={styles.assetMeta}>{asset.id}</Text>
-            </Card>
-          )}
-          ListEmptyComponent={
-            <StateView
-              testID="asset-list-empty-state"
-              kind="empty"
-              title="No assets yet"
-              message="Your workspace does not have any assets to show."
-            />
-          }
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
+        <AssetListBody
+          viewState={viewState}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          onOpenAsset={onOpenAsset}
+          onOpenUpload={onOpenUpload}
         />
       ) : null}
     </Screen>

@@ -65,7 +65,12 @@ tags:
     id: asset-detail-screen
 
 - assertVisible: Demo Reel 2026
-- assertVisible: Finalized
+- assertVisible: Ready
+
+# Technical details accordion (D5/T5): ids are hidden by default; expand before asserting
+- tapOn:
+    id: asset-tech-details-toggle
+
 - assertVisible: asset-seed-1
 - assertVisible: e2e-user
 

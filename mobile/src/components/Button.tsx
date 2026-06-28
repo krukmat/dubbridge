@@ -38,6 +38,50 @@ const FOREGROUNDS: Record<ButtonVariant, string> = {
   danger: color.onPrimary,
 };
 
+function createAccessibilityState(
+  isInert: boolean,
+  loading: boolean,
+  selected: boolean | undefined,
+) {
+  return { disabled: isInert, busy: loading, ...(selected !== undefined ? { selected } : {}) };
+}
+
+function resolveButtonLayout(size: ButtonSize, fullWidth: boolean) {
+  return [
+    styles.base,
+    size === "md" ? styles.md : styles.sm,
+    fullWidth ? styles.fullWidth : styles.inline,
+  ];
+}
+
+function resolveButtonBackground(
+  pressed: boolean,
+  isInert: boolean,
+  palette: { base: string; pressed: string },
+) {
+  return { backgroundColor: pressed && !isInert ? palette.pressed : palette.base };
+}
+
+function ButtonContent({
+  label,
+  loading,
+  foreground,
+}: {
+  label: string;
+  loading: boolean;
+  foreground: string;
+}) {
+  if (loading) {
+    return <ActivityIndicator size="small" color={foreground} />;
+  }
+
+  return (
+    <Text style={[styles.label, { color: foreground }]} numberOfLines={1}>
+      {label}
+    </Text>
+  );
+}
+
 /**
  * Primary action primitive. Comfortable touch target (>=44pt), explicit pressed
  * and disabled visuals, and a loading state that blocks presses.
@@ -66,23 +110,15 @@ export function Button({
       disabled={isInert}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{ disabled: isInert, busy: loading, ...(selected !== undefined && { selected }) }}
+      accessibilityState={createAccessibilityState(isInert, loading, selected)}
       style={({ pressed }) => [
-        styles.base,
-        size === "md" ? styles.md : styles.sm,
-        fullWidth ? styles.fullWidth : styles.inline,
-        { backgroundColor: pressed && !isInert ? palette.pressed : palette.base },
+        ...resolveButtonLayout(size, fullWidth),
+        resolveButtonBackground(pressed, isInert, palette),
         disabled ? styles.disabled : null,
         style,
       ]}
     >
-      {loading ? (
-        <ActivityIndicator size="small" color={foreground} />
-      ) : (
-        <Text style={[styles.label, { color: foreground }]} numberOfLines={1}>
-          {label}
-        </Text>
-      )}
+      <ButtonContent label={label} loading={loading} foreground={foreground} />
     </Pressable>
   );
 }

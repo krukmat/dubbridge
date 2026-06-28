@@ -340,7 +340,7 @@ describe("ReviewDetailScreen", () => {
     expect(screen.getByTestId("review-player-error-retry")).toBeTruthy();
   });
 
-  it("T2/HP-1: rendered detail panel contains no raw ISO timestamp and no mid-token id cut", async () => {
+  it("T2/HP-1: rendered detail panel contains no raw ISO timestamp; technical ids appear in full after expanding accordion", async () => {
     const LONG_TASK = {
       ...BASE_TASK,
       asset_id: "asset-seed-longid",
@@ -358,14 +358,20 @@ describe("ReviewDetailScreen", () => {
 
     await waitFor(() => expect(screen.getByTestId("review-player")).toBeTruthy());
     await waitFor(() => expect(screen.getByTestId("review-approve")).toBeTruthy());
-    const tree = JSON.stringify(screen.toJSON());
-    // No raw ISO pattern.
-    expect(tree).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/);
+
+    // No raw ISO pattern visible anywhere in the tree.
+    const treeBefore = JSON.stringify(screen.toJSON());
+    expect(treeBefore).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/);
+
+    // Expand the technical details accordion so all ids are rendered.
+    await fireEvent.press(screen.getByTestId("review-tech-details-toggle"));
+
+    const treeAfter = JSON.stringify(screen.toJSON());
     // Full ids must appear (proves they were not truncated mid-token).
-    expect(tree).toContain("asset-seed-longid");
-    expect(tree).toContain("lang-seed-longid");
-    expect(tree).toContain("org-seed-longid");
-    expect(tree).toContain("project-seed-longid");
+    expect(treeAfter).toContain("asset-seed-longid");
+    expect(treeAfter).toContain("lang-seed-longid");
+    expect(treeAfter).toContain("org-seed-longid");
+    expect(treeAfter).toContain("project-seed-longid");
   });
 
   it("HP-1b: summary-row ids use single-line tail ellipsis without dropping the full value", async () => {

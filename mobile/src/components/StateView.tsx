@@ -6,6 +6,12 @@ import { Button } from "./Button";
 export type StateViewKind = "loading" | "empty" | "error";
 export type StateViewAppearance = "default" | "inverse";
 
+export type StateViewPrimaryAction = {
+  label: string;
+  onPress: () => void;
+  testID?: string;
+};
+
 export type StateViewProps = {
   kind: StateViewKind;
   title?: string;
@@ -13,9 +19,29 @@ export type StateViewProps = {
   /** Error-only: when provided, renders a retry button. */
   onRetry?: () => void;
   retryLabel?: string;
+  /** Empty-only: when provided, renders a primary CTA button. */
+  primaryAction?: StateViewPrimaryAction;
   testID?: string;
   appearance?: StateViewAppearance;
 };
+
+function EmptyCta({
+  kind,
+  action,
+}: {
+  kind: StateViewKind;
+  action?: StateViewPrimaryAction;
+}) {
+  if (kind !== "empty" || !action) return null;
+  return (
+    <Button
+      label={action.label}
+      onPress={action.onPress}
+      variant="primary"
+      testID={action.testID}
+    />
+  );
+}
 
 /**
  * Consistent loading / empty / error surface. Renders centered within its
@@ -28,6 +54,7 @@ export function StateView({
   message,
   onRetry,
   retryLabel = "Retry",
+  primaryAction,
   testID,
   appearance = "default",
 }: StateViewProps) {
@@ -52,6 +79,7 @@ export function StateView({
           testID={testID ? `${testID}-retry` : undefined}
         />
       ) : null}
+      <EmptyCta kind={kind} action={primaryAction} />
     </View>
   );
 }

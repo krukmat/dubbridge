@@ -31,7 +31,10 @@ jest.mock("expo-video", () => ({
 
 import { Badge, statusTone } from "../src/components/Badge";
 import { Button } from "../src/components/Button";
+import { Card } from "../src/components/Card";
+import { IconBadge } from "../src/components/IconBadge";
 import { Screen } from "../src/components/Screen";
+import { ScreenHeader } from "../src/components/ScreenHeader";
 import { StateView } from "../src/components/StateView";
 import { VideoPlayer } from "../src/components/VideoPlayer";
 import { color, space } from "../src/theme";
@@ -166,6 +169,15 @@ describe("Badge", () => {
   });
 });
 
+describe("IconBadge", () => {
+  it("renders a restrained monogram icon with the requested tone", async () => {
+    const view = await render(<IconBadge testID="icon" symbol="RV" tone="info" />);
+    const flat = StyleSheet.flatten(view.getByTestId("icon").props.style);
+    expect(flat.backgroundColor).toBe(color.infoSubtle);
+    expect(view.getByText("RV")).toBeTruthy();
+  });
+});
+
 describe("Screen", () => {
   it("HP-4: applies safe-area top inset on top of base padding when a provider is present", async () => {
     const view = await render(
@@ -275,5 +287,86 @@ describe("VideoPlayer", () => {
     expect(
       view.getByText("A playback source is required before the player can start."),
     ).toBeTruthy();
+  });
+});
+
+describe("Card", () => {
+  it("renders a leading adornment alongside title content", async () => {
+    const view = await render(
+      <Card
+        title="Review inbox"
+        subtitle="2 pending"
+        leadingAdornment={<IconBadge testID="card-icon" symbol="RV" tone="info" />}
+      />,
+    );
+
+    expect(view.getByTestId("card-icon")).toBeTruthy();
+    expect(view.getByText("Review inbox")).toBeTruthy();
+    expect(view.getByText("2 pending")).toBeTruthy();
+  });
+});
+
+describe("Card", () => {
+  it("HP-1: title-mode renders title and subtitle without mediaTone", async () => {
+    const view = await render(
+      <Card title="Track Alpha" subtitle="Ready" />,
+    );
+    expect(view.getByText("Track Alpha")).toBeTruthy();
+    expect(view.getByText("Ready")).toBeTruthy();
+  });
+
+  it("HP-2: mediaTone renders without crash alongside title", async () => {
+    const view = await render(
+      <Card testID="card" title="Track Alpha" mediaTone="success" />,
+    );
+    expect(view.getByText("Track Alpha")).toBeTruthy();
+    expect(view.getByTestId("card")).toBeTruthy();
+  });
+
+  it("HP-3: children-mode without mediaTone preserves original children layout", async () => {
+    const view = await render(
+      <Card testID="card">
+        <Text>Child content</Text>
+      </Card>,
+    );
+    expect(view.getByText("Child content")).toBeTruthy();
+  });
+
+  it("HP-4: children-mode with mediaTone renders tile alongside children without crash", async () => {
+    const view = await render(
+      <Card testID="card" mediaTone="info">
+        <Text>Track Beta</Text>
+      </Card>,
+    );
+    expect(view.getByText("Track Beta")).toBeTruthy();
+    expect(view.getByTestId("card")).toBeTruthy();
+  });
+});
+
+describe("ScreenHeader", () => {
+  it("HP-1: full variant renders kicker, title, and optional copy", async () => {
+    const view = await render(
+      <ScreenHeader kicker="Assets" title="Asset list" copy="Browse your uploads." />,
+    );
+    expect(view.getByText("Assets")).toBeTruthy();
+    expect(view.getByText("Asset list")).toBeTruthy();
+    expect(view.getByText("Browse your uploads.")).toBeTruthy();
+  });
+
+  it("HP-2: full variant without copy omits the copy text", async () => {
+    const view = await render(<ScreenHeader title="Asset list" />);
+    expect(view.getByText("Asset list")).toBeTruthy();
+    expect(view.queryByText("Browse your uploads.")).toBeNull();
+  });
+
+  it("HP-3: compact variant with kicker renders only the kicker", async () => {
+    const view = await render(<ScreenHeader kicker="Asset" title="Asset detail" compact />);
+    expect(view.getByText("Asset")).toBeTruthy();
+    expect(view.queryByText("Asset detail")).toBeNull();
+  });
+
+  it("EC-1: compact variant without kicker renders nothing", async () => {
+    const view = await render(<ScreenHeader title="Asset detail" compact />);
+    expect(view.queryByText("Asset detail")).toBeNull();
   });
 });

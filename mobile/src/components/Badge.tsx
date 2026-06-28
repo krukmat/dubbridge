@@ -17,6 +17,22 @@ const TONES: Record<BadgeTone, { bg: string; fg: string }> = {
   danger: { bg: color.dangerSubtle, fg: color.dangerPressed },
   info: { bg: color.infoSubtle, fg: color.infoStrong },
 };
+const SUCCESS_STATUSES = new Set([
+  "grant",
+  "granted",
+  "active",
+  "approved",
+  "finalized",
+  "published",
+]);
+const DANGER_STATUSES = new Set([
+  "revoke",
+  "revoked",
+  "blocked",
+  "rejected",
+  "failed",
+]);
+const INFO_STATUSES = new Set(["pending", "processing", "in_review"]);
 
 /** Resolve a tone, falling back to `neutral` for any unknown value (never throws). */
 function resolveTone(tone: BadgeTone | undefined): { bg: string; fg: string } {
@@ -28,27 +44,11 @@ function resolveTone(tone: BadgeTone | undefined): { bg: string; fg: string } {
  * unrecognized status renders calmly instead of crashing.
  */
 export function statusTone(status: string | null | undefined): BadgeTone {
-  switch (status) {
-    case "grant":
-    case "granted":
-    case "active":
-    case "approved":
-    case "finalized":
-    case "published":
-      return "success";
-    case "revoke":
-    case "revoked":
-    case "blocked":
-    case "rejected":
-    case "failed":
-      return "danger";
-    case "pending":
-    case "processing":
-    case "in_review":
-      return "info";
-    default:
-      return "neutral";
-  }
+  if (status == null) return "neutral";
+  if (SUCCESS_STATUSES.has(status)) return "success";
+  if (DANGER_STATUSES.has(status)) return "danger";
+  if (INFO_STATUSES.has(status)) return "info";
+  return "neutral";
 }
 
 /** Small status pill: subtle background + toned text. */

@@ -29,7 +29,31 @@ export interface FormatTimestampOptions {
   timeZone?: string;
 }
 
+export type StatusLabelVariant = "default" | "consent";
+
 const ELLIPSIS = "…";
+const STATUS_LABELS: Record<string, string> = {
+  finalized: "Ready",
+  in_review: "In review",
+  pending: "Pending",
+  approved: "Approved",
+  rejected: "Rejected",
+  published: "Published",
+  processing: "Processing",
+  failed: "Failed",
+  active: "Active",
+  blocked: "Blocked",
+  grant: "Granted",
+  granted: "Granted",
+  revoke: "Revoked",
+  revoked: "Revoked",
+};
+const CONSENT_STATUS_LABELS: Record<string, string> = {
+  grant: "Active",
+  granted: "Active",
+  revoke: "Inactive",
+  revoked: "Inactive",
+};
 
 /**
  * Return a display-safe identifier.
@@ -59,6 +83,40 @@ export function formatId(id: string | null | undefined, opts: FormatIdOptions = 
   const head = lastBoundary > 0 ? window.slice(0, lastBoundary) : window;
 
   return `${head}${ELLIPSIS}`;
+}
+
+/**
+ * Return a user-facing label for a domain status string.
+ *
+ * Known values use explicit product copy; unknown values degrade to a
+ * humanized underscore-separated label instead of crashing or leaking raw enum
+ * formatting.
+ */
+export function formatStatusLabel(
+  status: string | null | undefined,
+  variant: StatusLabelVariant = "default",
+): string {
+  if (variant === "consent" && (status == null || status === "")) {
+    return "Inactive";
+  }
+
+  if (status == null || status === "") {
+    return "";
+  }
+
+  const value = String(status);
+  const normalized = value.toLowerCase();
+  const labels = variant === "consent" ? CONSENT_STATUS_LABELS : STATUS_LABELS;
+  const known = labels[normalized];
+  if (known) {
+    return known;
+  }
+
+  return normalized
+    .split("_")
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
 }
 
 /**

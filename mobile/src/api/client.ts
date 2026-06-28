@@ -53,60 +53,83 @@ function withBearer(
   };
 }
 
-export function createGatewayClient(config: ClientConfig): GatewayClient {
-  const { gatewayBaseUrl, timeoutMs = 10_000 } = config;
+function mapHttpError(status: number) {
+  if (status === 401) return { ok: false as const, error: { kind: "session_expired" as const } };
+  if (status === 403) return { ok: false as const, error: { kind: "forbidden" as const } };
+  return { ok: false as const, error: { kind: "http" as const, status } };
+}
 
-  async function request<T>(
+function buildJsonHeaders(accessToken: string | null) {
+  return withBearer({ "Content-Type": "application/json" }, accessToken);
+}
+
+function createAbortGuard(timeoutMs: number) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return {
+    signal: controller.signal,
+    clear() {
+      clearTimeout(timer);
+    },
+  };
+}
+
+function mapNetworkError(err: unknown) {
+  const error = err as Error;
+  if (error.name === "AbortError") {
+    return { ok: false as const, error: { kind: "network" as const, message: "timeout" } };
+  }
+  return {
+    ok: false as const,
+    error: { kind: "network" as const, message: error.message ?? "unknown network error" },
+  };
+}
+
+async function mapJsonResponse<T>(res: Response): Promise<GatewayResult<T>> {
+  if (!res.ok) {
+    return mapHttpError(res.status);
+  }
+
+  const data = await parseResponseBody<T>(res);
+  return { ok: true, value: { data, sessionRotation: null } };
+}
+
+function mapUploadStatus<T>(status: number): GatewayResult<T> | null {
+  if (status >= 200 && status < 300) return null;
+  return mapHttpError(status === 413 ? 413 : status);
+}
+
+function createRequest(
+  gatewayBaseUrl: string,
+  timeoutMs: number,
+) {
+  return async function request<T>(
     method: string,
     path: string,
     accessToken: string | null,
     body?: unknown,
   ): Promise<GatewayResult<T>> {
-    const headers = withBearer(
-      {
-        "Content-Type": "application/json",
-      },
-      accessToken,
-    );
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const headers = buildJsonHeaders(accessToken);
+    const guard = createAbortGuard(timeoutMs);
 
     try {
       const res = await fetch(`${gatewayBaseUrl}${path}`, {
         method,
         headers,
         body: body !== undefined ? JSON.stringify(body) : undefined,
-        signal: controller.signal,
+        signal: guard.signal,
       });
-
-      if (res.status === 401) {
-        return { ok: false, error: { kind: "session_expired" } };
-      }
-      if (res.status === 403) {
-        return { ok: false, error: { kind: "forbidden" } };
-      }
-      if (!res.ok) {
-        return { ok: false, error: { kind: "http", status: res.status } };
-      }
-
-      const data = await parseResponseBody<T>(res);
-      return { ok: true, value: { data, sessionRotation: null } };
+      return mapJsonResponse<T>(res);
     } catch (err: unknown) {
-      const error = err as Error;
-      if (error.name === "AbortError") {
-        return { ok: false, error: { kind: "network", message: "timeout" } };
-      }
-      return {
-        ok: false,
-        error: { kind: "network", message: error.message ?? "unknown network error" },
-      };
+      return mapNetworkError(err);
     } finally {
-      clearTimeout(timer);
+      guard.clear();
     }
-  }
+  };
+}
 
-  async function postMultipart<T>(
+function createMultipartPost(gatewayBaseUrl: string) {
+  return async function postMultipart<T>(
     path: string,
     accessToken: string | null,
     upload: MultipartUpload,
@@ -123,30 +146,21 @@ export function createGatewayClient(config: ClientConfig): GatewayClient {
         headers,
         sessionType: FileSystem.FileSystemSessionType.BACKGROUND,
       });
-
-      if (result.status === 401) {
-        return { ok: false, error: { kind: "session_expired" } };
-      }
-      if (result.status === 403) {
-        return { ok: false, error: { kind: "forbidden" } };
-      }
-      if (result.status < 200 || result.status >= 300) {
-        if (result.status === 413) {
-          return { ok: false, error: { kind: "http", status: 413 } };
-        }
-        return { ok: false, error: { kind: "http", status: result.status } };
-      }
+      const statusError = mapUploadStatus<T>(result.status);
+      if (statusError) return statusError;
 
       const data = JSON.parse(result.body) as T;
       return { ok: true, value: { data, sessionRotation: null } };
     } catch (err: unknown) {
-      const error = err as Error;
-      return {
-        ok: false,
-        error: { kind: "network", message: error.message ?? "unknown network error" },
-      };
+      return mapNetworkError(err);
     }
-  }
+  };
+}
+
+export function createGatewayClient(config: ClientConfig): GatewayClient {
+  const { gatewayBaseUrl, timeoutMs = 10_000 } = config;
+  const request = createRequest(gatewayBaseUrl, timeoutMs);
+  const postMultipart = createMultipartPost(gatewayBaseUrl);
 
   return {
     get<T>(path: string, accessToken: string | null) {

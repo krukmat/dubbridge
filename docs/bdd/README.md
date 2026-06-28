@@ -91,6 +91,48 @@ Spec: `docs/bdd/s-127-mobile-review-player.feature`
 | SC-PLAYBACK-3 | Asset detail opens inline playback after an explicit play action | `S-127-T4` | `mobile/__tests__/asset.screens.test.tsx::HP-1: finalized asset shows Play and opens inline playback after an explicit tap`; `mobile/maestro/playback.yaml` | `mobile/maestro/playback.yaml` | HP |
 | SC-PLAYBACK-4 | Asset detail denial or failure leaves the rest of the screen usable | `S-127-T4` | `mobile/__tests__/asset.screens.test.tsx::EC-1: playback denial shows a not-ready state and keeps compliance access usable`; `mobile/__tests__/asset.screens.test.tsx::EC-2: playback failure shows an error state and keeps compliance access usable` | `mobile/maestro/playback.yaml` | EC |
 
+## S-210 — Mobile product-experience refresh
+Spec: `docs/bdd/s-210-mobile-product-experience.feature`
+
+> **Status:** Implemented (2026-06-28). All tasks T0–T9 complete. Evidence column
+> updated from `(planned)` to confirmed executable evidence. Maestro flow edits
+> landed with their UI task (D12); final accordion step added in T9.
+
+| Scenario ID | Description | Task | Executable Evidence | Mobile Flow | HP / EC |
+| --- | --- | --- | --- | --- | --- |
+| SC-DASH-1 | Home dashboard shows live content on load | S-210-T3 | `mobile/__tests__/HomeScreen.test.tsx::HomeScreen > HP-1` (greeting + review count + recent assets + quick-actions) | — (Maestro home flow deferred: X-S-210-1 data not yet real) | HP |
+| SC-DASH-2 | Home dashboard degrades cleanly on error or session expiry | S-210-T3 | `mobile/__tests__/HomeScreen.test.tsx::HomeScreen > EC-1` (fetch error → StateView error); `HomeScreen > EC-2` (session expired → auth.logout) | — | EC |
+| SC-DASH-3 | Home quick-actions reach the correct sections (testIDs invariant) | S-210-T3 | `mobile/__tests__/RootNavigator.test.tsx::HP-1` (home-open-assets, home-open-upload, home-open-review, home-open-organizations); existing Maestro flows | existing Maestro flows (testIDs preserved) | HP |
+| SC-ACTBAR-1 | Primary action is bottom-anchored on Upload / AssetDetail / ReviewDetail | S-210-T2 | `mobile/__tests__/ActionBar.test.tsx::ActionBar > HP-1/HP-2/EC-1`; Upload/AssetDetail/ReviewDetail screen tests (upload-finalize, asset-play-button, review-approve, review-reject preserved) | — | HP |
+| SC-FORM-1 | Incomplete rights form shows a visible validation message | S-210-T6 | `mobile/__tests__/UploadScreen.test.tsx::SC-FORM-1 > HP-1` (all-empty → per-field errors); `SC-FORM-1 > HP-2` (form does not advance); `SC-FORM-1 > EC-1` (error clears on interaction) | — | EC |
+| SC-FORM-2 | Rights form reflects a three-step progress indicator | S-210-T6 | `mobile/__tests__/UploadScreen.test.tsx::SC-FORM-2 > HP-1` (indicator visible on rights step); `SC-FORM-2 > HP-2` (advances to File step) | — | HP |
+| SC-EMPTY-1 | Empty list screens present a primary CTA | S-210-T7 | `mobile/__tests__/asset.screens.test.tsx::SC-EMPTY-1 > HP-1` (empty + CTA visible); `SC-EMPTY-1 > HP-2` (CTA press calls onOpenUpload); `SC-EMPTY-1 > EC-1` (no CTA when onOpenUpload omitted) | — | HP |
+| SC-STATUS-1 | Domain status values render as user-facing labels | S-210-T8 | `mobile/__tests__/format.test.ts::formatStatusLabel > HP-1` (finalized → "Ready"; in_review → "In review"); `HP-2` (consent grant → "Active"); `EC-1` (unknown fallback); badge tone unchanged | — | HP |
+
+### TestID invariants (hard contract — preserved across S-210)
+
+The following testIDs are asserted by existing Maestro flows and Jest suites and were
+preserved verbatim across all S-210 tasks:
+
+`home-screen`, `home-open-assets`, `home-open-upload`, `home-open-review`,
+`home-open-organizations`, `home-sign-out`, `asset-list-screen`,
+`asset-list-empty-state`, `asset-card-{id}`, `asset-detail-screen`,
+`asset-play-button`, `asset-open-compliance`, `upload-screen`, `upload-finalize`,
+`review-inbox-screen`, `review-task-card-{id}`, `review-detail-screen`,
+`review-approve`, `review-reject`.
+
+### Existing scenario assertion deltas (landed — Maestro edits per D12)
+
+| Scenario | Original assertion | S-210 change | Shipped with |
+| --- | --- | --- | --- |
+| SC-DETAIL-1 | `assertVisible: asset-seed-1`, `e2e-user`, `Finalized` | ids behind "Technical details" accordion (D5); status → "Ready" (D8); accordion expanded via `tapOn: asset-tech-details-toggle` before id assertions | T5 (ids/accordion) + T8 (status) + T9 (Maestro tapOn step) |
+| SC-LIST-1 | asserts title + status badge | media placeholder tile added (D4); empty-CTA row added (D7) | T4 (placeholder) + T7 (CTA) |
+| SC-LIST-2 | asserts empty state text | primary CTA visible (D7) | T7 |
+| SC-INGEST-1 | `tapOn: Pick file` → `upload-finalize` | ActionBar repositions buttons; `upload-finalize` testID preserved | T2 |
+| SC-INGEST-2 | asserts error text visible | unaffected by S-210 | — |
+| SC-PLAYBACK-3 / SC-PLAYBACK-4 | `asset-play-button` → inline player | ActionBar repositions Play; `asset-play-button` preserved | T2 |
+| SC-NAV-1 | `home-screen` auth controls root nav | Home gains dashboard content; all `home-open-*` testIDs preserved | T3 |
+
 ## S-200 — Mobile credential login with backend-issued JWT (FenixCRM parity)
 Spec: `docs/bdd/s-200-mobile-auth.feature`
 

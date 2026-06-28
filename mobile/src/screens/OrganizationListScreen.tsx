@@ -1,14 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import {
-  FlatList,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { FlatList, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { createGatewayClient } from "../api/client";
-import { useAuth } from "../auth/AuthProvider";
 import { Badge, statusTone } from "../components/Badge";
 import { Button } from "../components/Button";
 import { Panel } from "../components/Panel";
@@ -16,6 +7,7 @@ import { Screen } from "../components/Screen";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { StateView } from "../components/StateView";
 import { color, fieldStyle, space, type } from "../theme";
+import { useOrganizationList } from "./useOrganizationList";
 
 export type OrgRole = "owner" | "admin" | "editor" | "reviewer" | "viewer";
 
@@ -33,181 +25,47 @@ type Props = {
   onOpenMembers: (organization: OrganizationSummary) => void;
 };
 
-type ViewState =
-  | { kind: "loading" }
-  | { kind: "ready"; organizations: OrganizationSummary[] }
-  | { kind: "error"; message: string };
-
-function errorMessage(kind: "forbidden" | "network" | "http", detail?: string | number) {
-  if (kind === "forbidden") return "You do not have access to organizations.";
-  if (kind === "network") return String(detail ?? "Network request failed.");
-  return `Request failed with status ${detail}.`;
+function OrganizationCreatePanel({ name, createError, creating, onChangeName, onCreate }: { name: string; createError: string | null; creating: boolean; onChangeName: (v: string) => void; onCreate: () => void }) {
+  return (
+    <Panel>
+      <Text style={styles.sectionTitle}>Create organization</Text>
+      <TextInput testID="organization-name-input" accessibilityLabel="Organization name" value={name} onChangeText={onChangeName} placeholder="Organization name" autoCapitalize="words" style={fieldStyle} />
+      {createError ? <Text style={styles.errorText}>{createError}</Text> : null}
+      <Button testID="organization-create" label={creating ? "Creating..." : "Create and open"} onPress={onCreate} loading={creating} disabled={creating} />
+    </Panel>
+  );
 }
 
-export function OrganizationListScreen({
-  gatewayBaseUrl,
-  onOpenProjects,
-  onOpenMembers,
-}: Props) {
-  const auth = useAuth();
-  const [viewState, setViewState] = useState<ViewState>({ kind: "loading" });
-  const [name, setName] = useState("");
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
+function OrganizationListBody({ organizations, onOpenProjects, onOpenMembers }: { organizations: OrganizationSummary[]; onOpenProjects: (o: OrganizationSummary) => void; onOpenMembers: (o: OrganizationSummary) => void }) {
+  return (
+    <FlatList
+      contentContainerStyle={styles.list}
+      data={organizations}
+      keyExtractor={(o) => o.id}
+      renderItem={({ item: org }) => (
+        <Panel testID={`organization-card-${org.id}`}>
+          <Text style={styles.cardTitle}>{org.name}</Text>
+          <Badge label={org.viewer_role} tone={statusTone(org.viewer_role)} />
+          <View style={styles.cardActions}>
+            <Button testID={`organization-projects-${org.id}`} label="Projects" onPress={() => onOpenProjects(org)} size="sm" />
+            <Button testID={`organization-members-${org.id}`} label="Members" onPress={() => onOpenMembers(org)} variant="secondary" size="sm" />
+          </View>
+        </Panel>
+      )}
+    />
+  );
+}
 
-  const loadOrganizations = useCallback(async () => {
-    const client = createGatewayClient({ gatewayBaseUrl });
-    const result = await client.get<OrganizationSummary[]>("/api/orgs", auth.sessionRef);
-
-    if (result.ok) {
-      await auth.onSessionRotation(result.value.sessionRotation);
-      setViewState({ kind: "ready", organizations: result.value.data });
-      return;
-    }
-
-    if (result.error.kind === "session_expired") {
-      await auth.logout();
-      return;
-    }
-
-    setViewState({
-      kind: "error",
-      message: errorMessage(
-        result.error.kind,
-        result.error.kind === "network" ? result.error.message : result.error.kind === "http" ? result.error.status : undefined,
-      ),
-    });
-  }, [auth, gatewayBaseUrl]);
-
-  useEffect(() => {
-    void loadOrganizations();
-  }, [loadOrganizations]);
-
-  const createOrganization = useCallback(async () => {
-    const normalizedName = name.trim();
-    if (!normalizedName) {
-      setCreateError("Organization name is required.");
-      return;
-    }
-
-    setCreating(true);
-    setCreateError(null);
-    const client = createGatewayClient({ gatewayBaseUrl });
-    const result = await client.post<OrganizationSummary>(
-      "/api/orgs",
-      auth.sessionRef,
-      { name: normalizedName },
-    );
-    setCreating(false);
-
-    if (result.ok) {
-      await auth.onSessionRotation(result.value.sessionRotation);
-      setName("");
-      onOpenProjects(result.value.data);
-      return;
-    }
-
-    if (result.error.kind === "session_expired") {
-      await auth.logout();
-      return;
-    }
-
-    setCreateError(
-      errorMessage(
-        result.error.kind,
-        result.error.kind === "network" ? result.error.message : result.error.kind === "http" ? result.error.status : undefined,
-      ),
-    );
-  }, [auth, gatewayBaseUrl, name, onOpenProjects]);
-
-  const onRetry = useCallback(() => {
-    setViewState({ kind: "loading" });
-    void loadOrganizations();
-  }, [loadOrganizations]);
-
+export function OrganizationListScreen({ gatewayBaseUrl, onOpenProjects, onOpenMembers }: Props) {
+  const { viewState, name, setName, createError, creating, createOrganization, onRetry } = useOrganizationList(gatewayBaseUrl, onOpenProjects);
   return (
     <Screen testID="organization-list-screen" edges={["bottom"]}>
-      <ScreenHeader
-        kicker="Workspace"
-        title="Organizations"
-        copy="Choose the organization whose projects and members you want to manage."
-      />
-
-      <Panel>
-        <Text style={styles.sectionTitle}>Create organization</Text>
-        <TextInput
-          testID="organization-name-input"
-          accessibilityLabel="Organization name"
-          value={name}
-          onChangeText={setName}
-          placeholder="Organization name"
-          autoCapitalize="words"
-          style={fieldStyle}
-        />
-        {createError ? <Text style={styles.errorText}>{createError}</Text> : null}
-        <Button
-          testID="organization-create"
-          label={creating ? "Creating..." : "Create and open"}
-          onPress={() => void createOrganization()}
-          loading={creating}
-          disabled={creating}
-        />
-      </Panel>
-
-      {viewState.kind === "loading" ? (
-        <StateView kind="loading" title="Loading organizations..." />
-      ) : null}
-
-      {viewState.kind === "error" ? (
-        <StateView
-          testID="organization"
-          kind="error"
-          title="Could not load organizations"
-          message={viewState.message}
-          onRetry={onRetry}
-        />
-      ) : null}
-
-      {viewState.kind === "ready" && viewState.organizations.length === 0 ? (
-        <StateView
-          testID="organization-list-empty"
-          kind="empty"
-          title="No organizations yet"
-          message="Create your first organization above."
-        />
-      ) : null}
-
-      {viewState.kind === "ready" && viewState.organizations.length > 0 ? (
-        <FlatList
-          contentContainerStyle={styles.list}
-          data={viewState.organizations}
-          keyExtractor={(organization) => organization.id}
-          renderItem={({ item: organization }) => (
-            <Panel testID={`organization-card-${organization.id}`}>
-              <Text style={styles.cardTitle}>{organization.name}</Text>
-              <Badge
-                label={organization.viewer_role}
-                tone={statusTone(organization.viewer_role)}
-              />
-              <View style={styles.cardActions}>
-                <Button
-                  testID={`organization-projects-${organization.id}`}
-                  label="Projects"
-                  onPress={() => onOpenProjects(organization)}
-                  size="sm"
-                />
-                <Button
-                  testID={`organization-members-${organization.id}`}
-                  label="Members"
-                  onPress={() => onOpenMembers(organization)}
-                  variant="secondary"
-                  size="sm"
-                />
-              </View>
-            </Panel>
-          )}
-        />
-      ) : null}
+      <ScreenHeader kicker="Workspace" title="Organizations" copy="Choose the organization whose projects and members you want to manage." />
+      <OrganizationCreatePanel name={name} createError={createError} creating={creating} onChangeName={setName} onCreate={() => void createOrganization()} />
+      {viewState.kind === "loading" ? <StateView kind="loading" title="Loading organizations..." /> : null}
+      {viewState.kind === "error" ? <StateView testID="organization" kind="error" title="Could not load organizations" message={viewState.message} onRetry={onRetry} /> : null}
+      {viewState.kind === "ready" && viewState.organizations.length === 0 ? <StateView testID="organization-list-empty" kind="empty" title="No organizations yet" message="Create your first organization above." /> : null}
+      {viewState.kind === "ready" && viewState.organizations.length > 0 ? <OrganizationListBody organizations={viewState.organizations} onOpenProjects={onOpenProjects} onOpenMembers={onOpenMembers} /> : null}
     </Screen>
   );
 }

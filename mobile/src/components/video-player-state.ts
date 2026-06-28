@@ -63,29 +63,28 @@ export function reduceVideoPlayerState(
     case "source_changed":
       return createVideoPlayerState(event.source);
     case "loading":
-      if (state.kind === "idle") {
-        return state;
-      }
-      return { kind: "loading" };
+      return keepIdleOr(state, { kind: "loading" });
     case "ready":
-      if (state.kind === "idle") {
-        return state;
-      }
-      return { kind: "playing" };
+      return keepIdleOr(state, { kind: "playing" });
     case "error":
-      if (state.kind === "idle") {
-        return state;
-      }
-      return {
-        kind: "error",
-        message: event.message?.trim() || VIDEO_PLAYER_ERROR_OVERLAY.message || "",
-      };
+      return keepIdleOr(state, createErrorState(event.message));
     case "ended":
-      if (state.kind !== "playing") {
-        return state;
-      }
-      return { kind: "end" };
+      return state.kind === "playing" ? { kind: "end" } : state;
   }
+}
+
+function keepIdleOr(
+  state: VideoPlayerState,
+  nextState: VideoPlayerState,
+): VideoPlayerState {
+  return state.kind === "idle" ? state : nextState;
+}
+
+function createErrorState(message?: string): VideoPlayerState {
+  return {
+    kind: "error",
+    message: message?.trim() || VIDEO_PLAYER_ERROR_OVERLAY.message || "",
+  };
 }
 
 export function createVideoPlayerShellSnapshot(

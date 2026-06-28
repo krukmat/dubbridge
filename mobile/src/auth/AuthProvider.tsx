@@ -59,6 +59,12 @@ type AuthProviderProps = {
   children: ReactNode;
 };
 
+type AuthStateControls = {
+  setSession: (session: AuthSession | null) => void;
+  setStatus: (status: AuthStatus) => void;
+  setLoginError: (error: string | null) => void;
+};
+
 function getGatewayClient(): GatewayClientBundle | null {
   const runtimeConfig = readRuntimeConfig();
 
@@ -98,105 +104,108 @@ function toAuthSession(payload: AuthSuccessPayload): AuthSession {
   };
 }
 
+function resetAuthState(controls: AuthStateControls) {
+  controls.setSession(null);
+  controls.setStatus("unauthed");
+  controls.setLoginError(null);
+}
+
+function acceptStoredSession(
+  storedSession: AuthSession | null,
+  controls: AuthStateControls,
+) {
+  if (storedSession === null) {
+    resetAuthState(controls);
+    return;
+  }
+
+  controls.setSession(storedSession);
+  controls.setStatus("authed");
+  controls.setLoginError(null);
+}
+
+async function hydrateStoredSession(
+  controls: AuthStateControls,
+  isMounted: () => boolean,
+) {
+  try {
+    const storedSession = await loadAuthSession();
+    if (!isMounted()) return;
+    acceptStoredSession(storedSession, controls);
+  } catch {
+    await clearAuthSession();
+    if (!isMounted()) return;
+    resetAuthState(controls);
+  }
+}
+
+function useHydratedAuthState(
+  setSession: AuthStateControls["setSession"],
+  setStatus: AuthStateControls["setStatus"],
+  setLoginError: AuthStateControls["setLoginError"],
+) {
+  useEffect(() => {
+    let mounted = true;
+    const isMounted = () => mounted;
+    void hydrateStoredSession({ setSession, setStatus, setLoginError }, isMounted);
+    return () => {
+      mounted = false;
+    };
+  }, [setLoginError, setSession, setStatus]);
+}
+
+async function submitLogin(
+  email: string,
+  password: string,
+  controls: AuthStateControls,
+): Promise<void> {
+  const gateway = getGatewayClient();
+
+  if (gateway === null) {
+    resetAuthState(controls);
+    controls.setLoginError("missing_runtime_config");
+    return;
+  }
+
+  const loginResult = await gateway.client.post<AuthSuccessPayload>("/auth/login", null, {
+    email: email.trim(),
+    password,
+  });
+
+  if (!loginResult.ok || !isAuthSuccessPayload(loginResult.value.data)) {
+    await clearAuthSession();
+    resetAuthState(controls);
+    controls.setLoginError(loginResult.ok ? "login_failed" : loginErrorKind(loginResult.error.kind));
+    return;
+  }
+
+  const nextSession = toAuthSession(loginResult.value.data);
+  await saveAuthSession(nextSession);
+  controls.setSession(nextSession);
+  controls.setStatus("authed");
+  controls.setLoginError(null);
+}
+
+function loginErrorKind(kind: "session_expired" | "forbidden" | "http" | "network") {
+  return kind === "network" ? "network_error" : "login_failed";
+}
+
 export function AuthProvider({
   children,
 }: AuthProviderProps): ReactNode {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [loginError, setLoginError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function hydrateSession(): Promise<void> {
-      try {
-        const storedSession = await loadAuthSession();
-
-        if (!isMounted) {
-          return;
-        }
-
-        if (storedSession === null) {
-          setSession(null);
-          setStatus("unauthed");
-          setLoginError(null);
-          return;
-        }
-
-        setSession(storedSession);
-        setStatus("authed");
-        setLoginError(null);
-      } catch {
-        await clearAuthSession();
-
-        if (!isMounted) {
-          return;
-        }
-
-        setSession(null);
-        setStatus("unauthed");
-        setLoginError(null);
-      }
-    }
-
-    void hydrateSession();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const controls: AuthStateControls = { setSession, setStatus, setLoginError };
+  useHydratedAuthState(setSession, setStatus, setLoginError);
 
   async function logout(): Promise<void> {
-    setSession(null);
-    setStatus("unauthed");
-    setLoginError(null);
+    resetAuthState(controls);
     await clearAuthSession();
   }
 
   async function login(email: string, password: string): Promise<void> {
-    const gateway = getGatewayClient();
-
-    if (gateway === null) {
-      setSession(null);
-      setStatus("unauthed");
-      setLoginError("missing_runtime_config");
-      return;
-    }
-
-    const loginResult = await gateway.client.post<AuthSuccessPayload>(
-      "/auth/login",
-      null,
-      {
-        email: email.trim(),
-        password,
-      },
-    );
-
-    if (!loginResult.ok) {
-      await clearAuthSession();
-      setSession(null);
-      setStatus("unauthed");
-      setLoginError(
-        loginResult.error.kind === "network"
-          ? "network_error"
-          : "login_failed",
-      );
-      return;
-    }
-
-    if (!isAuthSuccessPayload(loginResult.value.data)) {
-      await clearAuthSession();
-      setSession(null);
-      setStatus("unauthed");
-      setLoginError("login_failed");
-      return;
-    }
-
-    const nextSession = toAuthSession(loginResult.value.data);
-    await saveAuthSession(nextSession);
-    setSession(nextSession);
-    setStatus("authed");
-    setLoginError(null);
+    await submitLogin(email, password, controls);
   }
 
   const value: AuthContextValue = {

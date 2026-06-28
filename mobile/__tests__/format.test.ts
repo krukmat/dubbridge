@@ -1,4 +1,4 @@
-import { formatId, formatRelative, formatTimestamp } from "../src/format";
+import { formatId, formatRelative, formatStatusLabel, formatTimestamp } from "../src/format";
 
 describe("formatId", () => {
   it("HP-1: returns the full id unchanged by default", () => {
@@ -74,6 +74,25 @@ describe("formatTimestamp", () => {
     expect(formatTimestamp("2026-01-01T11:00:00Z", { timeZone: "Not/AZone" })).toBe(
       "2026-01-01T11:00:00Z",
     );
+  });
+});
+
+describe("formatStatusLabel", () => {
+  it("HP-3: maps known domain statuses to product labels", () => {
+    expect(formatStatusLabel("finalized")).toBe("Ready");
+    expect(formatStatusLabel("in_review")).toBe("In review");
+    expect(formatStatusLabel("approved")).toBe("Approved");
+  });
+
+  it("supports consent-specific labels without leaking raw enum values", () => {
+    expect(formatStatusLabel("grant", "consent")).toBe("Active");
+    expect(formatStatusLabel("revoke", "consent")).toBe("Inactive");
+  });
+
+  it("EC-3: unknown values degrade to a humanized fallback", () => {
+    expect(formatStatusLabel("needs_manual_check")).toBe("Needs Manual Check");
+    expect(formatStatusLabel("")).toBe("");
+    expect(formatStatusLabel(null)).toBe("");
   });
 });
 

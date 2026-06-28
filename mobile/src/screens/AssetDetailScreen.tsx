@@ -1,10 +1,8 @@
-import { useEffect, useEffectEvent, useState } from "react";
-import { StyleSheet, Text } from "react-native";
+import { useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { createGatewayClient } from "../api/client";
-import { buildManifestUrl, issuePlaybackGrant, resolvePlaybackErrorMessage } from "../api/playback";
-import { useAuth } from "../auth/AuthProvider";
-import { formatId } from "../format";
+import { formatStatusLabel } from "../format";
+import { ActionBar, ACTION_BAR_CONTENT_HEIGHT } from "../components/ActionBar";
 import { Badge, statusTone } from "../components/Badge";
 import { Button } from "../components/Button";
 import { Panel } from "../components/Panel";
@@ -12,7 +10,8 @@ import { PlaybackStateView, type PlaybackViewState } from "../components/Playbac
 import { Screen } from "../components/Screen";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { StateView } from "../components/StateView";
-import { color, type } from "../theme";
+import { color, space, type } from "../theme";
+import { useAssetDetail, type AssetDetailViewState } from "./useAssetDetail";
 import type { AssetSummary } from "./AssetListScreen";
 
 type AssetDetailScreenProps = {
@@ -21,214 +20,81 @@ type AssetDetailScreenProps = {
   onOpenCompliance: () => void;
 };
 
-type AssetDetailViewState =
-  | { kind: "loading" }
-  | { kind: "ready"; asset: AssetSummary }
-  | { kind: "error"; message: string }
-  | { kind: "not_available" };
+type AssetReadyProps = {
+  asset: AssetSummary;
+  playbackState: PlaybackViewState;
+  onLoadPlayback: () => void;
+  onOpenCompliance: () => void;
+};
 
-function formatStatus(status: string): string {
-  return status
-    .split("_")
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join(" ");
+function AssetReadyContent({ asset, playbackState, onLoadPlayback, onOpenCompliance }: AssetReadyProps) {
+  const [techExpanded, setTechExpanded] = useState(false);
+  return (
+    <>
+      <Panel>
+        <Text style={styles.assetTitle}>{asset.title}</Text>
+        <Badge label={formatStatusLabel(asset.status)} tone={statusTone(asset.status)} />
+        <Pressable testID="asset-tech-details-toggle" onPress={() => setTechExpanded((v) => !v)} accessibilityRole="button" accessibilityLabel="Technical details" accessibilityState={{ expanded: techExpanded }}>
+          <Text style={styles.techToggle}>Technical details {techExpanded ? "▲" : "▼"}</Text>
+        </Pressable>
+        {techExpanded ? (
+          <View testID="asset-tech-details" style={styles.techGroup}>
+            <Text style={styles.metaLabel}>Asset ID</Text>
+            <Text style={styles.metaValue} numberOfLines={1} ellipsizeMode="tail">{asset.id}</Text>
+            <Text style={styles.metaLabel}>Uploader ID</Text>
+            <Text style={styles.metaValue} numberOfLines={1} ellipsizeMode="tail">{asset.uploader_id}</Text>
+          </View>
+        ) : null}
+      </Panel>
+      {asset.status === "finalized" ? (
+        <Panel>
+          <Text style={styles.panelTitle}>Playback</Text>
+          <PlaybackStateView state={playbackState} testIdPrefix="asset-playback" testIdPlayer="asset-inline-player" onRetry={onLoadPlayback} />
+        </Panel>
+      ) : null}
+      <Panel>
+        <Text style={styles.panelTitle}>Compliance and consent</Text>
+        <Text style={styles.panelCopy}>Review the immutable audit trail, rights evidence, and voice consent ledger.</Text>
+        <Button testID="asset-open-compliance" label="Open compliance center" onPress={onOpenCompliance} fullWidth />
+      </Panel>
+    </>
+  );
 }
 
-export function AssetDetailScreen({
-  assetId,
-  gatewayBaseUrl,
-  onOpenCompliance,
-}: AssetDetailScreenProps) {
-  const auth = useAuth();
-  const handleLogout = useEffectEvent(async () => {
-    await auth.logout();
-  });
-  const handleSessionRotation = useEffectEvent(async (rotation: string | null) => {
-    await auth.onSessionRotation(rotation);
-  });
-  const [viewState, setViewState] = useState<AssetDetailViewState>({
-    kind: "loading",
-  });
-  const [playbackState, setPlaybackState] = useState<PlaybackViewState>({
-    kind: "idle",
-  });
+function assetScreenPadding(viewState: AssetDetailViewState, actionBarHeight: number): number {
+  return viewState.kind === "ready" && viewState.asset.status === "finalized" ? actionBarHeight : 0;
+}
 
-  useEffect(() => {
-    setPlaybackState({ kind: "idle" });
-  }, [assetId]);
-
-  useEffect(() => {
-    let isActive = true;
-
-    async function loadAssetDetail(): Promise<void> {
-      setViewState({ kind: "loading" });
-
-      const client = createGatewayClient({ gatewayBaseUrl });
-      const result = await client.get<AssetSummary>(
-        `/api/assets/${assetId}`,
-        auth.sessionRef,
-      );
-
-      if (!isActive) {
-        return;
-      }
-
-      if (!result.ok) {
-        if (result.error.kind === "session_expired") {
-          await handleLogout();
-          return;
-        }
-
-        if (result.error.kind === "http" && result.error.status === 404) {
-          setViewState({ kind: "not_available" });
-          return;
-        }
-
-        const message =
-          result.error.kind === "network"
-            ? result.error.message
-            : result.error.kind === "forbidden"
-              ? "You do not have access to this asset."
-              : `Gateway request failed with status ${result.error.status}.`;
-        setViewState({ kind: "error", message });
-        return;
-      }
-
-      await handleSessionRotation(result.value.sessionRotation);
-
-      if (!isActive) {
-        return;
-      }
-
-      setViewState({ kind: "ready", asset: result.value.data });
-    }
-
-    void loadAssetDetail();
-
-    return () => {
-      isActive = false;
-    };
-  }, [assetId, gatewayBaseUrl]);
-
-  async function loadPlayback(asset: AssetSummary): Promise<void> {
-    if (playbackState.kind === "loading") {
-      return;
-    }
-
-    setPlaybackState({ kind: "loading" });
-
-    const client = createGatewayClient({ gatewayBaseUrl });
-    const result = await issuePlaybackGrant(client, auth.sessionRef, asset.id);
-
-    if (!result.ok) {
-      if (result.error.kind === "session_expired") {
-        await handleLogout();
-        return;
-      }
-
-      if (result.error.kind === "http" && (result.error.status === 409 || result.error.status === 422)) {
-        setPlaybackState({ kind: "not_ready" });
-        return;
-      }
-
-      setPlaybackState({ kind: "error", message: resolvePlaybackErrorMessage(result.error) });
-      return;
-    }
-
-    await handleSessionRotation(result.value.sessionRotation);
-    setPlaybackState({
-      kind: "ready",
-      source: buildManifestUrl(gatewayBaseUrl, asset.id, result.value.data.grantId),
-    });
-  }
+export function AssetDetailScreen({ assetId, gatewayBaseUrl, onOpenCompliance }: AssetDetailScreenProps) {
+  const { viewState, playbackState, loadPlayback } = useAssetDetail(assetId, gatewayBaseUrl);
+  const actionBarHeight = ACTION_BAR_CONTENT_HEIGHT + space.md * 2;
+  const isFinalized = viewState.kind === "ready" && viewState.asset.status === "finalized";
 
   return (
-    <Screen testID="asset-detail-screen" scroll edges={["bottom"]}>
-      <ScreenHeader kicker="Asset" title="Asset detail" />
-
-      {viewState.kind === "loading" ? (
-        <StateView kind="loading" title="Loading asset detail…" />
+    <View style={styles.container}>
+      <Screen testID="asset-detail-screen" scroll edges={["bottom"]} extraBottomPadding={assetScreenPadding(viewState, actionBarHeight)}>
+        <ScreenHeader kicker="Asset" title="Asset detail" />
+        {viewState.kind === "loading" ? <StateView kind="loading" title="Loading asset detail…" /> : null}
+        {viewState.kind === "error" ? <StateView kind="error" title="Could not load asset detail" message={viewState.message} /> : null}
+        {viewState.kind === "not_available" ? <StateView kind="empty" title="Asset detail not available yet" message="This asset detail surface is not available on the current backend." /> : null}
+        {viewState.kind === "ready" ? (
+          <AssetReadyContent asset={viewState.asset} playbackState={playbackState} onLoadPlayback={() => void loadPlayback(viewState.asset)} onOpenCompliance={onOpenCompliance} />
+        ) : null}
+      </Screen>
+      {isFinalized && viewState.kind === "ready" ? (
+        <ActionBar>
+          <Button testID="asset-play-button" label="Play" onPress={() => void loadPlayback(viewState.asset)} fullWidth loading={playbackState.kind === "loading"} disabled={playbackState.kind === "loading"} />
+        </ActionBar>
       ) : null}
-
-      {viewState.kind === "error" ? (
-        <StateView
-          kind="error"
-          title="Could not load asset detail"
-          message={viewState.message}
-        />
-      ) : null}
-
-      {viewState.kind === "not_available" ? (
-        <StateView
-          kind="empty"
-          title="Asset detail not available yet"
-          message="This asset detail surface is not available on the current backend."
-        />
-      ) : null}
-
-      {viewState.kind === "ready" ? (
-        <>
-          <Panel>
-            <Text style={styles.assetTitle}>{viewState.asset.title}</Text>
-            <Text style={styles.metaLabel}>Status</Text>
-            <Badge
-              label={formatStatus(viewState.asset.status)}
-              tone={statusTone(viewState.asset.status)}
-            />
-            <Text style={styles.metaLabel}>Asset ID</Text>
-            <Text style={styles.metaValue} numberOfLines={1} ellipsizeMode="tail">
-              {formatId(viewState.asset.id)}
-            </Text>
-            <Text style={styles.metaLabel}>Uploader ID</Text>
-            <Text style={styles.metaValue} numberOfLines={1} ellipsizeMode="tail">
-              {formatId(viewState.asset.uploader_id)}
-            </Text>
-          </Panel>
-
-          {viewState.asset.status === "finalized" ? (
-            <Panel>
-              <Text style={styles.panelTitle}>Playback</Text>
-              <Text style={styles.panelCopy}>
-                Open the original track inline when playback is available.
-              </Text>
-              <Button
-                testID="asset-play-button"
-                label="Play"
-                onPress={() => void loadPlayback(viewState.asset)}
-                fullWidth
-                loading={playbackState.kind === "loading"}
-                disabled={playbackState.kind === "loading"}
-              />
-
-              <PlaybackStateView
-                state={playbackState}
-                testIdPrefix="asset-playback"
-                testIdPlayer="asset-inline-player"
-                onRetry={() => void loadPlayback(viewState.asset)}
-              />
-            </Panel>
-          ) : null}
-
-          <Panel>
-            <Text style={styles.panelTitle}>Compliance and consent</Text>
-            <Text style={styles.panelCopy}>
-              Review the immutable audit trail, rights evidence, and voice consent ledger.
-            </Text>
-            <Button
-              testID="asset-open-compliance"
-              label="Open compliance center"
-              onPress={onOpenCompliance}
-              fullWidth
-            />
-          </Panel>
-        </>
-      ) : null}
-    </Screen>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: color.canvas },
   assetTitle: { ...type.title, color: color.ink900 },
+  techToggle: { ...type.label, color: color.primary, marginTop: space.xs },
+  techGroup: { gap: space.xs, marginTop: space.xs },
   metaLabel: { ...type.label, color: color.ink400 },
   metaValue: { ...type.meta, color: color.ink700 },
   panelTitle: { ...type.heading, color: color.ink900 },

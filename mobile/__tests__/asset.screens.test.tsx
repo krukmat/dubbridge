@@ -132,7 +132,7 @@ describe("asset screens", () => {
       await fireEvent.press(view.getByText("Test Video"));
 
       expect(onOpenAsset).toHaveBeenCalledWith(ASSET);
-      expect(view.getByText("Finalized")).toBeTruthy();
+      expect(view.getByText("Ready")).toBeTruthy();
     });
   });
 
@@ -195,12 +195,12 @@ describe("asset screens", () => {
         `/api/assets/${ASSET.id}`,
         "opaque-session-abc123",
       );
-      expect(view.getByText("Finalized")).toBeTruthy();
+      expect(view.getByText("Ready")).toBeTruthy();
       expect(view.getByText("Compliance and consent")).toBeTruthy();
       expect(view.getByTestId("asset-open-compliance")).toBeTruthy();
     });
 
-    it("HP-2b: long metadata ids use single-line tail ellipsis without dropping the full value", async () => {
+    it("HP-2b: technical details are collapsed by default; expanding reveals ids with tail ellipsis", async () => {
       mockGetAsset({
         id: "asset-seed-super-long-id",
         uploader_id: "uploader-seed-super-long-id",
@@ -212,12 +212,20 @@ describe("asset screens", () => {
         expect(view.getByText("Test Video")).toBeTruthy();
       });
 
+      // Ids are not visible by default
+      expect(view.queryByTestId("asset-tech-details")).toBeNull();
+      expect(view.queryByText("asset-seed-super-long-id")).toBeNull();
+
+      // Expand the accordion
+      await fireEvent.press(view.getByTestId("asset-tech-details-toggle"));
+
       const assetId = view.getByText("asset-seed-super-long-id");
       const uploaderId = view.getByText("uploader-seed-super-long-id");
       expect(assetId.props.numberOfLines).toBe(1);
       expect(assetId.props.ellipsizeMode).toBe("tail");
       expect(uploaderId.props.numberOfLines).toBe(1);
       expect(uploaderId.props.ellipsizeMode).toBe("tail");
+      expect(view.getByTestId("asset-tech-details")).toBeTruthy();
     });
 
     it("HP-1: finalized asset shows Play and opens inline playback after an explicit tap", async () => {
@@ -402,6 +410,76 @@ describe("asset screens", () => {
     });
   });
 
+  // SC-EMPTY-1: empty list with onOpenUpload shows primary CTA
+  describe("SC-EMPTY-1: empty asset list presents a primary CTA", () => {
+    it("HP-1: shows Upload asset CTA when onOpenUpload is provided", async () => {
+      mockClient.get.mockResolvedValueOnce({
+        ok: true,
+        value: { data: [], sessionRotation: null },
+      });
+
+      const onOpenUpload = jest.fn();
+      const view = await render(
+        <AssetListScreen
+          gatewayBaseUrl="http://127.0.0.1:4000"
+          onOpenAsset={jest.fn()}
+          onOpenUpload={onOpenUpload}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(view.getByTestId("asset-list-empty-state")).toBeTruthy();
+      });
+
+      expect(view.getByTestId("asset-list-empty-cta")).toBeTruthy();
+      expect(view.getByText("Upload asset")).toBeTruthy();
+    });
+
+    it("HP-2: pressing the CTA calls onOpenUpload", async () => {
+      mockClient.get.mockResolvedValueOnce({
+        ok: true,
+        value: { data: [], sessionRotation: null },
+      });
+
+      const onOpenUpload = jest.fn();
+      const view = await render(
+        <AssetListScreen
+          gatewayBaseUrl="http://127.0.0.1:4000"
+          onOpenAsset={jest.fn()}
+          onOpenUpload={onOpenUpload}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(view.getByTestId("asset-list-empty-cta")).toBeTruthy();
+      });
+
+      await fireEvent.press(view.getByTestId("asset-list-empty-cta"));
+      expect(onOpenUpload).toHaveBeenCalledTimes(1);
+    });
+
+    it("EC-1: no CTA rendered when onOpenUpload is not provided", async () => {
+      mockClient.get.mockResolvedValueOnce({
+        ok: true,
+        value: { data: [], sessionRotation: null },
+      });
+
+      const view = await render(
+        <AssetListScreen
+          gatewayBaseUrl="http://127.0.0.1:4000"
+          onOpenAsset={jest.fn()}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(view.getByTestId("asset-list-empty-state")).toBeTruthy();
+      });
+
+      expect(view.queryByTestId("asset-list-empty-cta")).toBeNull();
+      expect(view.queryByText("Upload asset")).toBeNull();
+    });
+  });
+
   // EC: network error renders error state with retry affordance
   describe("EC: gateway or network failure renders a clear error state with retry", () => {
     it("shows an error state and retries on tap", async () => {
@@ -515,8 +593,8 @@ describe("asset screens", () => {
 
   async function fillRightsForm(view: Awaited<ReturnType<typeof render>>) {
     await fireEvent.changeText(view.getByTestId("upload-field-owner"), "DubBridge Studios");
-    await fireEvent.changeText(view.getByTestId("upload-field-license-type"), "exclusive");
-    await fireEvent.changeText(view.getByTestId("upload-field-source-type"), "original");
+    await fireEvent.press(view.getByTestId("upload-field-license-type-option-exclusive"));
+    await fireEvent.press(view.getByTestId("upload-field-source-type-option-original"));
     await fireEvent.changeText(view.getByTestId("upload-field-proof-reference"), "contract-123");
   }
 
@@ -718,8 +796,8 @@ describe("asset screens", () => {
 
       // Fill only 3 of 4 fields
       await fireEvent.changeText(view.getByTestId("upload-field-owner"), "DubBridge Studios");
-      await fireEvent.changeText(view.getByTestId("upload-field-license-type"), "exclusive");
-      await fireEvent.changeText(view.getByTestId("upload-field-source-type"), "original");
+      await fireEvent.press(view.getByTestId("upload-field-license-type-option-exclusive"));
+      await fireEvent.press(view.getByTestId("upload-field-source-type-option-original"));
       // upload-field-proof-reference left empty
 
       await fireEvent.press(view.getByTestId("upload-submit-rights"));

@@ -2,6 +2,7 @@ export { Button, type ButtonProps, type ButtonVariant, type ButtonSize } from ".
 export { Screen, type ScreenProps, type ScreenEdge } from "./Screen";
 export { ScreenHeader, type ScreenHeaderProps } from "./ScreenHeader";
 export { Card, type CardProps } from "./Card";
+export { IconBadge, type IconBadgeProps, type IconBadgeTone } from "./IconBadge";
 export { Panel, type PanelProps } from "./Panel";
 export { Badge, statusTone, type BadgeProps, type BadgeTone } from "./Badge";
 export {

@@ -25,6 +25,62 @@ function getLoginErrorCopy(error: string | null): string | null {
   }
 }
 
+function LoginForm({
+  email,
+  password,
+  errorCopy,
+  onChangeEmail,
+  onChangePassword,
+}: {
+  email: string;
+  password: string;
+  errorCopy: string | null;
+  onChangeEmail: (value: string) => void;
+  onChangePassword: (value: string) => void;
+}) {
+  return (
+    <View style={styles.form}>
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Email</Text>
+        <TextInput
+          testID="login-email-input"
+          style={fieldStyle}
+          value={email}
+          onChangeText={onChangeEmail}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="email-address"
+          textContentType="emailAddress"
+          placeholder="you@company.com"
+          placeholderTextColor={color.ink400}
+        />
+      </View>
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Password</Text>
+        <TextInput
+          testID="login-password-input"
+          style={fieldStyle}
+          value={password}
+          onChangeText={onChangePassword}
+          autoCapitalize="none"
+          autoCorrect={false}
+          secureTextEntry
+          textContentType="password"
+          placeholder="Enter your password"
+          placeholderTextColor={color.ink400}
+        />
+      </View>
+
+      {errorCopy ? (
+        <Text testID="login-error-text" style={styles.error}>
+          {errorCopy}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 export function LoginScreen() {
   const auth = useAuth();
   const [email, setEmail] = useState("");
@@ -64,45 +120,13 @@ export function LoginScreen() {
           copy="Use your DubBridge email and password to access your workspace."
         />
 
-        <View style={styles.form}>
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              testID="login-email-input"
-              style={fieldStyle}
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              textContentType="emailAddress"
-              placeholder="you@company.com"
-              placeholderTextColor={color.ink400}
-            />
-          </View>
-
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              testID="login-password-input"
-              style={fieldStyle}
-              value={password}
-              onChangeText={setPassword}
-              autoCapitalize="none"
-              autoCorrect={false}
-              secureTextEntry
-              textContentType="password"
-              placeholder="Enter your password"
-              placeholderTextColor={color.ink400}
-            />
-          </View>
-
-          {errorCopy ? (
-            <Text testID="login-error-text" style={styles.error}>
-              {errorCopy}
-            </Text>
-          ) : null}
-        </View>
+        <LoginForm
+          email={email}
+          password={password}
+          errorCopy={errorCopy}
+          onChangeEmail={setEmail}
+          onChangePassword={setPassword}
+        />
       </View>
 
       <Button

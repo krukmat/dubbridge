@@ -51,6 +51,15 @@ jest.mock("expo-notifications", () => ({
   })),
 }));
 
+jest.mock("../src/api/notifications", () => ({
+  listNotifications: jest.fn().mockResolvedValue({
+    ok: true,
+    value: { data: { notifications: [] }, sessionRotation: null },
+  }),
+  markNotificationsRead: jest.fn().mockResolvedValue({ ok: true, value: { sessionRotation: null } }),
+  registerPushToken: jest.fn().mockResolvedValue({ ok: true, value: { sessionRotation: null } }),
+}));
+
 const mockLoadAuthSession =
   loadAuthSession as jest.MockedFunction<typeof loadAuthSession>;
 const mockSaveAuthSession =
@@ -91,19 +100,20 @@ describe("mobile auth flow integration", () => {
     const mockClient = {
       get: jest
         .fn()
+        // HomeScreen: GET /api/assets (dashboard aggregate)
         .mockResolvedValueOnce({
           ok: true,
-          value: {
-            data: [ASSET_SUMMARY],
-            sessionRotation: null,
-          },
+          value: { data: [ASSET_SUMMARY], sessionRotation: null },
         })
+        // AssetListScreen: GET /api/assets
         .mockResolvedValueOnce({
           ok: true,
-          value: {
-            data: ASSET_SUMMARY,
-            sessionRotation: null,
-          },
+          value: { data: [ASSET_SUMMARY], sessionRotation: null },
+        })
+        // AssetDetailScreen: GET /api/assets/{id}
+        .mockResolvedValueOnce({
+          ok: true,
+          value: { data: ASSET_SUMMARY, sessionRotation: null },
         }),
       post: jest
         .fn()
