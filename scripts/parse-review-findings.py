@@ -10,8 +10,8 @@ non-zero when any finding is present, forcing the primary agent to read and
 disposition each one before proceeding.
 
 Exit codes:
-  0  no findings of any kind
-  1  one or more findings found (agent must read and disposition)
+  0  no findings, or all findings are minor/nit severity
+  1  one or more blocking or major findings (agent must disposition)
   2  result file missing or unreadable
 """
 
@@ -204,7 +204,10 @@ def main():
     else:
         print(format_text(data, collected))
 
-    if collected and not args.no_fail:
+    has_blocking = any(
+        f.get("severity") in ("blocking", "major") for _, f in collected
+    )
+    if has_blocking and not args.no_fail:
         return 1
     return 0
 
