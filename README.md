@@ -65,8 +65,8 @@ The mobile app is the main way to use DubBridge: sign in, bring your content in,
 
 <table align="center">
   <tr>
-    <td align="center"><img src="mobile/artifacts/screenshots/18_asset_detail_playback.png" width="200" alt="Original audio playing"/><br/><sub>Original audio — playing in the app</sub></td>
-    <td align="center"><img src="mobile/artifacts/screenshots/19_review_detail_playback.png" width="200" alt="Dubbed audio playing"/><br/><sub>Dubbed audio — playing in the app</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/playback_asset_detail.png" width="200" alt="Original audio playing"/><br/><sub>Original audio — playing in the app</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/playback_review.png" width="200" alt="Dubbed audio playing"/><br/><sub>Dubbed audio — playing in the app</sub></td>
   </tr>
 </table>
 
