@@ -388,13 +388,21 @@ def _empty_reconciliation():
 
 
 def reconcile(pass_results, changed_paths):
-    """Deterministic D8 reconciliation of ≥2 successful pass results.
+    """Deterministically compile successful pass results into one packet.
 
     Returns an aggregate result dict with a reconciliation block. The top-level
-    findings list contains only consensus findings (≥2 passes exact match).
-    The reconciliation block contains all five classified finding sets.
+    findings list contains exact duplicates seen in multiple passes, while the
+    reconciliation block preserves every classified finding set for developer
+    disposition. A single parseable pass is enough to produce a usable packet.
     """
     import collections
+
+    def _aggregate_status(statuses):
+        if "findings" in statuses:
+            return "findings"
+        if "pass" in statuses:
+            return "pass"
+        return "blocked"
 
     # Tag each finding with its pass index for cross-pass comparisons.
     tagged = []
@@ -404,7 +412,7 @@ def reconcile(pass_results, changed_paths):
 
     if not tagged:
         statuses = {r["status"] for r in pass_results}
-        agg_status = "findings" if "findings" in statuses else "pass"
+        agg_status = _aggregate_status(statuses)
         return {
             "status": agg_status,
             "summary": pass_results[0].get("summary", ""),
@@ -479,7 +487,7 @@ def reconcile(pass_results, changed_paths):
     likely_false_positive = _clean(likely_fp_tagged)
 
     statuses = {r["status"] for r in pass_results}
-    agg_status = "findings" if "findings" in statuses else "pass"
+    agg_status = _aggregate_status(statuses)
 
     return {
         "status": agg_status,
@@ -625,15 +633,14 @@ def main():
 
     succeeded = [r for status, r in pass_results if status == "ok"]
     all_format_warnings = [w for _, r in pass_results if r for w in r.get("format_warnings") or []]
-    if len(succeeded) < 2:
+    if not succeeded:
         print(
-            f"[review] quorum not met ({len(succeeded)}/{args.passes} passed)",
+            f"[review] no usable review passes ({len(succeeded)}/{args.passes} parsed)",
             file=sys.stderr,
         )
         return 3
 
     aggregate = reconcile(succeeded, changed_paths)
-    aggregate["degraded"] = len(succeeded) < args.passes
     aggregate["passes_run"] = args.passes
     aggregate["passes_succeeded"] = len(succeeded)
 
@@ -673,7 +680,6 @@ def main():
         "format_warnings": all_format_warnings or None,
         "passes_run": aggregate["passes_run"],
         "passes_succeeded": aggregate["passes_succeeded"],
-        "degraded": aggregate["degraded"],
         "consensus_count": rec.get("consensus_count", 0),
         "pass_specific_count": rec.get("pass_specific_count", 0),
         "severity_inconsistent_count": rec.get("severity_inconsistent_count", 0),

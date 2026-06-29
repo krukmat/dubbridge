@@ -654,12 +654,16 @@ For development tasks with RRI 0–40, after implementation is complete:
 1. Implementation completes (primary agent or eligible Gemma Developer).
 2. Gemma Reviewer runs N sequential passes (default 3, `--passes N`,
    env `DUBBRIDGE_REVIEW_PASSES`) via `scripts/gemma-code-review.py`.
-   - **≥2 of N passes succeed** → deterministic reconciliation produces an
-     aggregate (exactly 2/N ⇒ `degraded: true`). Findings are classified as
-     `consensus`, `pass-specific`, `severity-inconsistent`,
-     `location-inconsistent`, or `likely-false-positive`.
+   - Each parseable pass contributes review comments to one consolidated
+     developer-review packet.
+   - Duplicate findings are consolidated and source buckets are preserved.
+   - Findings are classified as `consensus`, `pass-specific`,
+     `severity-inconsistent`, `location-inconsistent`, or
+     `likely-false-positive`; these buckets are review metadata, not escalation
+     triggers by themselves.
    - **`--passes 1`** → reproduces the previous single-pass behavior exactly.
-   - **<2 passes succeed or Gemma unavailable** → see Availability below.
+   - **No usable consolidated result, or Gemma unavailable** → see Availability
+     below.
 3. The primary agent runs its Reflection cycle, treating Gemma Reviewer findings
    as one input and recording the disposition in `### Reflection log`.
 
@@ -672,10 +676,13 @@ The review step is **mandatory for all Low/Moderate development tasks**.
 Gemma is the preferred path; the **context-isolated subagent** (D14) is the
 required fallback.
 
-- **Gemma available, quorum met (≥2 passes):** run `make qa-gemma-review`.
-- **Gemma unavailable or quorum fails (<2 passes):** the agent must spawn a
+- **Gemma available and a usable consolidated result is produced:** run
+  `make qa-gemma-review`, read the consolidated developer-review packet, and
+  disposition every finding.
+- **Gemma unavailable, stalls, returns invalid output, returns `BLOCKED`, or no
+  usable consolidated result can be produced:** the agent must spawn a
   context-isolated subagent as the mandatory fallback reviewer. The subagent
-  receives an isolation packet (diff + acceptance criteria + any partial
+  receives an isolation packet (diff + acceptance criteria + any usable partial
   findings) and its output is advisory, exactly as Gemma's. The primary agent
   reconciles and records `disposition_divergence` in the audit log.
 - **Neither path may be skipped.** No additional human approval gate beyond
@@ -697,10 +704,7 @@ trigger gate (`should_adjudicate()`) and the isolation packet builder
 
 | Condition | Detail |
 |---|---|
-| Gemma blocked / quorum failure | `gemma_blocked=True` — mandatory fallback |
-| Consensus blocking or major finding | any `consensus` finding with `severity` in `blocking`, `major` |
-| Band ≥ Med-high | slice band is `Med-high` or `Complex` |
-| Inter-pass disagreement | `severity_inconsistent_count > 0` or `location_inconsistent_count > 0` |
+| Gemma unavailable or unusable | `gemma_blocked=True`, missing aggregate, empty aggregate, `BLOCKED`, invalid output, stall, or no usable consolidated result |
 
 **Model:** the subagent must be spawned at the **Balanced** tier — a capable
 but token-efficient model, not Premium. The adjudicator role is read-only and
@@ -714,8 +718,9 @@ in this guide.
 **Authority:** the adjudicator is advisory — it never closes the task. The
 primary agent reconciles its disposition against the adjudicator's and records
 `disposition_divergence` (`"none"`, `"partial"`, or `"full"`) in the audit log.
-Simulated self-review ("re-read as if reviewing someone else's code") is
-retained **only** when none of the above trigger conditions are present.
+Gemma findings of any severity, inter-pass disagreement, and Med-high/Complex
+band alone stay in the primary agent's normal disposition path when the local
+packet is usable.
 
 ### Scope
 
@@ -731,11 +736,9 @@ Task completion records for Low/Moderate development tasks must include:
 
 - Model: `<resolved DUBBRIDGE_REVIEW_MODEL, else DUBBRIDGE_LOW_RRI_MODEL>`
 - Command: `<exact command, e.g. make qa-gemma-review>`
-- Passes run / succeeded: `<N>/<N>` (e.g. `3/3`, `2/3 degraded`)
-- Quorum: `met | failed`
+- Passes run / usable: `<N>/<M>` (e.g. `3/3`, `3/1`; zero usable passes triggers fallback)
 - Aggregate status: `PASS | FINDINGS | BLOCKED`
 - Consensus findings: `<count>` | Pass-specific: `<count>` | Disagreement: `<count>`
-- Degraded: `true | false`
 - Artifacts: `<path to result.json and per-pass result.passK.json, if persisted>`
 - Isolated adjudicator: `spawned | not triggered` — trigger: `<condition or n/a>`
 - disposition_divergence: `none | partial | full | null`
@@ -779,50 +782,81 @@ code-review replacement, not a patch approver, and not a final RRI authority.
 ## Development task closure checklist
 
 A development task is not done until the closure gates for its band have been
-checked in order. Evaluate the review gate first; do not start the closure
+checked **in order**. Evaluate the review gate first; do not start the closure
 summary with unit coverage certification or owner final verification.
 
-Low/Moderate review gate:
+**This checklist applies to every development task regardless of RRI band.**
+The steps that apply per band are marked below. Skipping any applicable step is
+not permitted — including for Low (0–25) tasks.
 
-- **RRI 0–40 development tasks:** `Gemma Reviewer` is mandatory unless the task
-  is exempt (`docs-only`, `config-only`, `migration-only`, `ADR`, `plan`,
-  `task-ledger`, or `policy-only`).
-- **RRI 0–25 direct primary-agent development tasks:** record whether the review
-  ran through Gemma quorum or the D14 fallback before describing any completion
-  certification.
-- **RRI 0–25 delegated Gemma Developer tasks:** the delegating agent records the
-  mandatory review and reflection in the final report rather than inside the
-  delegated task entry, but the task is still not complete until that review is
-  reconciled.
+### Step 1 — Gemma Reviewer / D14 adjudicator (RRI 0–40, mandatory)
 
-Moderate+ task-entry checklist:
+Applies to: **all development tasks with RRI 0–40** (Low and Moderate bands).
+Exempt only: `docs-only`, `config-only`, `migration-only`, `ADR`, `plan`,
+`task-ledger`, or `policy-only` tasks.
 
 ```
-[ ] 1. Gemma Reviewer / D14 adjudicator
-       - Run `make qa-gemma-review`
-       - If Gemma unavailable OR band ≥ Med-high: spawn D14 context-isolated
-         subagent (mandatory fallback — not optional)
-       - Record `### Gemma Reviewer evidence` block in the task entry
+[ ] 1a. Run `make qa-gemma-review`
+        - Gemma runs N sequential passes (default 3, env DUBBRIDGE_REVIEW_PASSES).
+        - Every parseable pass contributes to one consolidated developer-review
+          packet; there is no quorum gate.
+        - Wrapper classifies findings: consensus | pass-specific |
+          severity-inconsistent | location-inconsistent | likely-false-positive.
+        - One or more parseable passes produce a usable aggregate. Zero parseable
+          passes, invalid output, stall, unavailable model, or `BLOCKED` status
+          routes to D14 fallback.
+        - `make qa-gemma-review` automatically runs `parse-review-findings.py`
+          after writing the result. If findings exist in ANY bucket (findings[],
+          consensus, pass_specific, location_inconsistent, severity_inconsistent,
+          or likely_false_positive), the script exits non-zero and the agent MUST
+          read every finding and record disposition before proceeding to step 1b.
+          Do NOT report "0 findings" without verifying the script exit code.
 
-[ ] 2. Reflection log
-       - Moderate (26–40): 2 passes
+[ ] 1b. Evaluate D14 trigger — spawn context-isolated subagent if ANY of:
+        - Gemma unavailable, stalled, returned invalid output, returned `BLOCKED`,
+          or no usable consolidated result was produced  ← mandatory
+        The D14 subagent must be spawned at the Balanced model tier.
+        Its output is advisory; record disposition_divergence.
+
+[ ] 1c. Record `### Gemma Reviewer evidence` block in the task entry.
+        For RRI 0–25 primary-agent tasks: record in the task entry.
+        For RRI 0–25 delegated Gemma Developer tasks: record in the final report.
+        Neither path may be skipped.
+```
+
+### Step 2 — Reflection log (RRI 26+)
+
+Applies to: **development tasks with RRI 26 or higher** (Moderate, Med-high, Complex).
+Not required for RRI 0–25 tasks; for those, the Reflection cycle is applied to
+Gemma's output during the mandatory Step 1 review and recorded there.
+
+```
+[ ] 2. Record `### Reflection log` block in the task entry.
+       - Moderate (26–40): 2 passes (Draft → Critique → Revise each)
        - Med-high (41–55): 3 passes
        - Complex  (56–70): 4 passes
-       - Record `### Reflection log` block in the task entry
-
-[ ] 3. Unit coverage certification
-       - Table: Case ID | Type | Behavior | Unit test evidence | Result
-       - Every HP-# and EC-# must map to at least one passing test
-       - Record `### Unit coverage certification` block in the task entry
-
-[ ] 4. Owner final verification
-       - Owner, date, statement, exact commands run
-       - Record `### Owner final verification` block in the task entry
+       Gemma Reviewer findings must be treated as one input to the Reflection
+       cycle; record the disposition of each finding in the log.
 ```
 
-Only after the applicable review gate and all required completion blocks are
-checked may the task status be flipped to `[x] Done` and the completion
-reported to the user.
+### Step 3 — Unit coverage certification (all development tasks)
+
+```
+[ ] 3. Record `### Unit coverage certification` block in the task entry.
+       - Table: Case ID | Type | Behavior | Unit test evidence | Result
+       - Every HP-# and EC-# must map to at least one passing test.
+       - `N/A` is not permitted for development-task happy paths or edge cases.
+```
+
+### Step 4 — Owner final verification (all development tasks)
+
+```
+[ ] 4. Record `### Owner final verification` block in the task entry.
+       - Owner, date, statement, exact commands run.
+```
+
+Only after all applicable steps above are checked may the task status be
+flipped to `[x] Done` and the completion reported to the user.
 
 ## Related
 

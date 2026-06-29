@@ -21,9 +21,6 @@ Authority unchanged: spawning the isolated reviewer is an orchestrator-runtime
 action. This module delivers the inspectable, testable scaffolding it runs on.
 """
 
-# Bands that trigger isolated adjudication when reached or exceeded (D14).
-BANDS_MED_HIGH_OR_ABOVE = frozenset({"Med-high", "Complex"})
-
 # Exhaustive allowlist of sections the adjudicator packet may contain.
 # The isolation guarantee is enforced by this set — if a caller injects a key
 # outside it, _assert_packet_isolation() raises before the packet is returned.
@@ -37,49 +34,27 @@ DISPOSITION_DIVERGENCE_VALUES = frozenset({"none", "partial", "full"})
 def should_adjudicate(aggregate, band, *, gemma_blocked=False):
     """Return True when context-isolated adjudication is required (D14).
 
-    Fires when any of the following is true:
-      1. gemma_blocked=True — Gemma was unavailable or quorum failed; the
-         isolated subagent is the mandatory fallback reviewer for all
-         development tasks (replaces the old "absence never blocks" path).
-      2. One or more consensus findings have severity blocking or major.
-      3. The slice band is Med-high or Complex.
-      4. Inter-pass disagreement: severity-inconsistent or location-inconsistent
-         finding counts are non-zero.
-
-    Does not fire for: Low/Moderate band + Gemma available + no consensus
-    blocking/major findings + no inter-pass disagreement (e.g. 3/3 PASS or
-    nit/minor-only findings).
+    D14 is now a fallback for unusable local review output, not an escalation
+    path for the content of a usable Gemma packet. Findings of every severity
+    and every reconciliation bucket are left to the primary developer's
+    disposition once Gemma produces a parseable consolidated result.
 
     Args:
         aggregate:     the reconciled aggregate result dict produced by
-                       gemma-code-review.py (T5). May be None or lack a
-                       reconciliation block when gemma_blocked=True.
+                       gemma-code-review.py. Missing or BLOCKED aggregates are
+                       unusable and trigger fallback; findings content does not.
         band:          the slice RRI band string as defined in CLAUDE.md
-                       ("Low", "Moderate", "Med-high", "Complex").
-        gemma_blocked: True when Gemma was unavailable or quorum failed (<2
-                       passes succeeded). The isolated subagent must then be
-                       spawned as the mandatory fallback reviewer.
+                       ("Low", "Moderate", "Med-high", "Complex"). Kept for API
+                       compatibility; band no longer triggers D14 by itself.
+        gemma_blocked: True when Gemma was unavailable, stalled, returned invalid
+                       output, or otherwise failed to produce a usable
+                       consolidated result.
     """
     if gemma_blocked:
         return True
-
-    rec = (aggregate or {}).get("reconciliation") or {}
-
-    has_consensus_blocking_major = any(
-        f.get("severity") in ("blocking", "major")
-        for f in (rec.get("consensus") or [])
-    )
-
-    band_high_enough = band in BANDS_MED_HIGH_OR_ABOVE
-
-    # severity_inconsistent and location_inconsistent are the classes that
-    # represent genuine cross-pass contradiction; pass_specific alone is noise.
-    has_disagreement = (
-        (rec.get("severity_inconsistent_count") or 0) > 0
-        or (rec.get("location_inconsistent_count") or 0) > 0
-    )
-
-    return has_consensus_blocking_major or band_high_enough or has_disagreement
+    if not aggregate:
+        return True
+    return aggregate.get("status") == "blocked"
 
 
 def build_adjudicator_packet(diff, criteria, reconciled_findings):

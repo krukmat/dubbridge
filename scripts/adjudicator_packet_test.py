@@ -61,13 +61,13 @@ def _diff():
 
 
 # ---------------------------------------------------------------------------
-# should_adjudicate — gemma_blocked mandatory fallback
+# should_adjudicate — unusable Gemma output fallback
 # ---------------------------------------------------------------------------
 
 class TestShouldAdjudicateGemmaBlocked(unittest.TestCase):
     """When gemma_blocked=True the trigger must always fire, regardless of
-    band, findings, or aggregate content. The isolated subagent is the
-    mandatory fallback reviewer when Gemma is unavailable or quorum fails."""
+    band, findings, or aggregate content. The isolated subagent is the fallback
+    reviewer when Gemma cannot produce a usable consolidated packet."""
 
     def test_fires_low_band_no_findings(self):
         self.assertTrue(_mod.should_adjudicate(_empty_aggregate(), "Low", gemma_blocked=True))
@@ -76,7 +76,7 @@ class TestShouldAdjudicateGemmaBlocked(unittest.TestCase):
         self.assertTrue(_mod.should_adjudicate(_empty_aggregate(), "Moderate", gemma_blocked=True))
 
     def test_fires_aggregate_none(self):
-        # Gemma unavailable → no aggregate at all; must still fire.
+        # Gemma unavailable -> no aggregate at all; must still fire.
         self.assertTrue(_mod.should_adjudicate(None, "Low", gemma_blocked=True))
 
     def test_fires_aggregate_empty_dict(self):
@@ -92,9 +92,20 @@ class TestShouldAdjudicateGemmaBlocked(unittest.TestCase):
         # gemma_blocked defaults to False; existing logic unchanged when omitted.
         self.assertFalse(_mod.should_adjudicate(_empty_aggregate(), "Low"))
 
-    def test_quorum_failure_analog_low_band(self):
-        # Quorum failure (<2 passes) → caller passes gemma_blocked=True.
+    def test_no_usable_passes_analog_low_band(self):
+        # No parseable pass output -> caller passes gemma_blocked=True.
         self.assertTrue(_mod.should_adjudicate(_empty_aggregate(), "Low", gemma_blocked=True))
+
+    def test_fires_missing_aggregate_without_explicit_flag(self):
+        self.assertTrue(_mod.should_adjudicate(None, "Low"))
+
+    def test_fires_empty_aggregate_without_explicit_flag(self):
+        self.assertTrue(_mod.should_adjudicate({}, "Moderate"))
+
+    def test_fires_blocked_aggregate(self):
+        agg = _empty_aggregate()
+        agg["status"] = "blocked"
+        self.assertTrue(_mod.should_adjudicate(agg, "Low"))
 
 
 # ---------------------------------------------------------------------------
@@ -151,28 +162,28 @@ class TestShouldAdjudicateNoFire(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# should_adjudicate — fires on consensus blocking/major
+# should_adjudicate — findings stay local when aggregate is usable
 # ---------------------------------------------------------------------------
 
 class TestShouldAdjudicateConsensus(unittest.TestCase):
 
-    def test_fires_consensus_blocking_low_band(self):
+    def test_no_fire_consensus_blocking_low_band(self):
         agg = _empty_aggregate()
         agg["reconciliation"]["consensus"] = [_finding("blocking")]
         agg["reconciliation"]["consensus_count"] = 1
-        self.assertTrue(_mod.should_adjudicate(agg, "Low"))
+        self.assertFalse(_mod.should_adjudicate(agg, "Low"))
 
-    def test_fires_consensus_major_low_band(self):
+    def test_no_fire_consensus_major_low_band(self):
         agg = _empty_aggregate()
         agg["reconciliation"]["consensus"] = [_finding("major")]
         agg["reconciliation"]["consensus_count"] = 1
-        self.assertTrue(_mod.should_adjudicate(agg, "Low"))
+        self.assertFalse(_mod.should_adjudicate(agg, "Low"))
 
-    def test_fires_consensus_major_moderate_band(self):
+    def test_no_fire_consensus_major_moderate_band(self):
         agg = _empty_aggregate()
         agg["reconciliation"]["consensus"] = [_finding("major")]
         agg["reconciliation"]["consensus_count"] = 1
-        self.assertTrue(_mod.should_adjudicate(agg, "Moderate"))
+        self.assertFalse(_mod.should_adjudicate(agg, "Moderate"))
 
     def test_no_fire_consensus_minor_low_band(self):
         agg = _empty_aggregate()
@@ -187,58 +198,58 @@ class TestShouldAdjudicateConsensus(unittest.TestCase):
         self.assertFalse(_mod.should_adjudicate(agg, "Low"))
 
     def test_fires_mixed_consensus_one_blocking(self):
-        # Any consensus blocking/major is sufficient even alongside nit/minor.
+        # Findings of every severity stay in the developer packet.
         agg = _empty_aggregate()
         agg["reconciliation"]["consensus"] = [_finding("nit"), _finding("blocking")]
         agg["reconciliation"]["consensus_count"] = 2
-        self.assertTrue(_mod.should_adjudicate(agg, "Low"))
+        self.assertFalse(_mod.should_adjudicate(agg, "Low"))
 
 
 # ---------------------------------------------------------------------------
-# should_adjudicate — fires on band >= Med-high
+# should_adjudicate — band alone does not fire
 # ---------------------------------------------------------------------------
 
 class TestShouldAdjudicateBand(unittest.TestCase):
 
-    def test_fires_med_high_band_no_findings(self):
-        self.assertTrue(_mod.should_adjudicate(_empty_aggregate(), "Med-high"))
+    def test_no_fire_med_high_band_no_findings(self):
+        self.assertFalse(_mod.should_adjudicate(_empty_aggregate(), "Med-high"))
 
-    def test_fires_complex_band_no_findings(self):
-        self.assertTrue(_mod.should_adjudicate(_empty_aggregate(), "Complex"))
+    def test_no_fire_complex_band_no_findings(self):
+        self.assertFalse(_mod.should_adjudicate(_empty_aggregate(), "Complex"))
 
     def test_no_fire_moderate_band_pass_no_findings(self):
         self.assertFalse(_mod.should_adjudicate(_empty_aggregate(), "Moderate"))
 
-    def test_fires_med_high_no_reconciliation_block(self):
+    def test_no_fire_med_high_no_reconciliation_block(self):
         agg = {"status": "pass", "findings": []}
-        self.assertTrue(_mod.should_adjudicate(agg, "Med-high"))
+        self.assertFalse(_mod.should_adjudicate(agg, "Med-high"))
 
-    def test_fires_complex_no_reconciliation_block(self):
+    def test_no_fire_complex_no_reconciliation_block(self):
         agg = {"status": "pass", "findings": []}
-        self.assertTrue(_mod.should_adjudicate(agg, "Complex"))
+        self.assertFalse(_mod.should_adjudicate(agg, "Complex"))
 
 
 # ---------------------------------------------------------------------------
-# should_adjudicate — fires on inter-pass disagreement
+# should_adjudicate — inter-pass disagreement stays local
 # ---------------------------------------------------------------------------
 
 class TestShouldAdjudicateDisagreement(unittest.TestCase):
 
-    def test_fires_severity_inconsistent_low_band(self):
+    def test_no_fire_severity_inconsistent_low_band(self):
         agg = _empty_aggregate()
         agg["reconciliation"]["severity_inconsistent_count"] = 1
-        self.assertTrue(_mod.should_adjudicate(agg, "Low"))
+        self.assertFalse(_mod.should_adjudicate(agg, "Low"))
 
-    def test_fires_location_inconsistent_low_band(self):
+    def test_no_fire_location_inconsistent_low_band(self):
         agg = _empty_aggregate()
         agg["reconciliation"]["location_inconsistent_count"] = 2
-        self.assertTrue(_mod.should_adjudicate(agg, "Moderate"))
+        self.assertFalse(_mod.should_adjudicate(agg, "Moderate"))
 
-    def test_fires_both_disagreement_types(self):
+    def test_no_fire_both_disagreement_types(self):
         agg = _empty_aggregate()
         agg["reconciliation"]["severity_inconsistent_count"] = 1
         agg["reconciliation"]["location_inconsistent_count"] = 1
-        self.assertTrue(_mod.should_adjudicate(agg, "Low"))
+        self.assertFalse(_mod.should_adjudicate(agg, "Low"))
 
     def test_no_fire_pass_specific_only_low_band(self):
         # pass_specific is single-pass noise, not cross-pass contradiction.

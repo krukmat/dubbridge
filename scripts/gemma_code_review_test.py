@@ -430,9 +430,19 @@ class ReconcileUnit(unittest.TestCase):
         agg = _mod.reconcile(passes, ["scripts/a.py"])
         self.assertEqual(agg["status"], "pass")
 
+    def test_aggregate_status_blocked_when_all_parseable_passes_blocked(self):
+        passes = [_pass_result("blocked"), _pass_result("blocked")]
+        agg = _mod.reconcile(passes, ["scripts/a.py"])
+        self.assertEqual(agg["status"], "blocked")
+
+    def test_aggregate_status_pass_when_blocked_pass_has_usable_peer(self):
+        passes = [_pass_result("blocked"), _pass_result("pass")]
+        agg = _mod.reconcile(passes, ["scripts/a.py"])
+        self.assertEqual(agg["status"], "pass")
+
 
 # ---------------------------------------------------------------------------
-# MultiPassCli — integration tests for the N-pass loop and quorum via CLI
+# MultiPassCli — integration tests for the N-pass loop via CLI
 # ---------------------------------------------------------------------------
 
 class MultiPassCli(unittest.TestCase):
@@ -480,30 +490,40 @@ class MultiPassCli(unittest.TestCase):
 
         return exit_code, aggregate, pass_artifacts
 
-    def test_hp1_three_of_three_pass_exit_zero_no_degraded(self):
+    def test_hp1_three_of_three_pass_exit_zero(self):
         ec, agg, _ = self._run_multi([
             "STATUS: PASS\nSUMMARY: ok",
             "STATUS: PASS\nSUMMARY: ok",
             "STATUS: PASS\nSUMMARY: ok",
         ])
         self.assertEqual(ec, 0)
-        self.assertFalse(agg["degraded"])
+        self.assertNotIn("degraded", agg)
         self.assertEqual(agg["passes_run"], 3)
         self.assertEqual(agg["passes_succeeded"], 3)
 
-    def test_two_of_three_degraded_exit_zero(self):
+    def test_two_of_three_parseable_exit_zero(self):
         ec, agg, _ = self._run_multi([
             "STATUS: PASS\nSUMMARY: ok",
             RuntimeError("simulated failure"),
             "STATUS: PASS\nSUMMARY: ok",
         ])
         self.assertEqual(ec, 0)
-        self.assertTrue(agg["degraded"])
+        self.assertNotIn("degraded", agg)
         self.assertEqual(agg["passes_succeeded"], 2)
 
-    def test_one_of_three_quorum_fails_exit_nonzero_no_aggregate(self):
+    def test_one_of_three_parseable_still_writes_aggregate(self):
         ec, agg, _ = self._run_multi([
             "STATUS: PASS\nSUMMARY: ok",
+            RuntimeError("fail"),
+            RuntimeError("fail"),
+        ])
+        self.assertEqual(ec, 0)
+        self.assertIsNotNone(agg)
+        self.assertEqual(agg["passes_succeeded"], 1)
+
+    def test_zero_of_three_parseable_fails_no_aggregate(self):
+        ec, agg, _ = self._run_multi([
+            RuntimeError("fail"),
             RuntimeError("fail"),
             RuntimeError("fail"),
         ])
@@ -517,7 +537,7 @@ class MultiPassCli(unittest.TestCase):
             "STATUS: PASS\nSUMMARY: ok",
         ])
         self.assertEqual(ec, 0)
-        self.assertTrue(agg["degraded"])
+        self.assertNotIn("degraded", agg)
 
     def test_per_pass_artifacts_written(self):
         _, _, artifacts = self._run_multi([
@@ -626,7 +646,7 @@ class MultiPassCliAudit(unittest.TestCase):
         self.assertEqual(r["outcome"], "PASS")
         self.assertEqual(r["passes_run"], 3)
         self.assertEqual(r["passes_succeeded"], 3)
-        self.assertFalse(r["degraded"])
+        self.assertNotIn("degraded", r)
         self.assertIn("consensus_count", r)
         self.assertIn("pass_specific_count", r)
         self.assertIn("severity_inconsistent_count", r)
@@ -634,7 +654,7 @@ class MultiPassCliAudit(unittest.TestCase):
         self.assertEqual(r["response_tokens"], 23)
         self.assertGreater(r["packet_tokens_est"], 0)
 
-    def test_degraded_run_reflected_in_audit_record(self):
+    def test_partial_parseable_run_reflected_in_audit_record(self):
         records = self._run_audit([
             _mod.gemma_local.StreamChatResult(
                 content="STATUS: PASS\nSUMMARY: ok",
@@ -648,7 +668,7 @@ class MultiPassCliAudit(unittest.TestCase):
         ])
         self.assertEqual(len(records), 1)
         r = records[0]
-        self.assertTrue(r["degraded"])
+        self.assertNotIn("degraded", r)
         self.assertEqual(r["passes_succeeded"], 2)
         self.assertEqual(r["passes_run"], 3)
 
@@ -666,9 +686,9 @@ class MultiPassCliAudit(unittest.TestCase):
         self.assertEqual(len(records), 1)
         self.assertIsNone(records[0]["response_tokens"])
 
-    def test_quorum_failure_emits_no_audit_record(self):
+    def test_zero_parseable_passes_emits_no_audit_record(self):
         records = self._run_audit([
-            "STATUS: PASS\nSUMMARY: ok",
+            RuntimeError("fail"),
             RuntimeError("fail"),
             RuntimeError("fail"),
         ])
