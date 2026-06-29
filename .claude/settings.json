@@ -206,7 +206,11 @@
       "Bash(bash scripts/check-task-unit-coverage.sh)",
       "Bash(python3 -c \"from PIL import Image; print\\('PIL ok'\\)\")",
       "Bash(python3 -)",
-      "Bash(xargs -I{} basename {})"
+      "Bash(xargs -I{} basename {})",
+      "Bash(python3 /Users/matias/dubbridge/scripts/check-primary-label-usage.py)",
+      "Bash(grep -nE '^#{1,3} ' docs/architecture.md)",
+      "Bash(grep -c '\\\\.md$')",
+      "Bash(grep -nE '^#{1,3} ' docs/playbooks/AGENT_WORKFLOW_GUIDE.md)"
     ]
   },
   "hooks": {

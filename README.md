@@ -1,225 +1,53 @@
 # DubBridge
 
-DubBridge is a platform for localizing audiovisual content — taking a video in one language and producing a dubbed, subtitle-ready version in another, with full traceability from intake to publication.
+You know how a show on Netflix can be watched dubbed in your own language? DubBridge brings that to your own videos — it takes something filmed in one language and turns it into a version people can watch in another, with new spoken audio and subtitles.
 
-## What it does
+It's made for creators who want their work seen beyond the language it was filmed in: publish a video, make it watchable for people who speak something else, and share it with their community — all while staying in control of who's allowed to use your content, and with a real person reviewing every version before it goes public.
 
-Content enters the target platform as a direct upload or, once the planned intake slice lands, as an owner-authorized download from a content platform (for example, importing content from an account the owner controls). From there, DubBridge takes it through a governed pipeline:
+DubBridge is still being built. Today you can bring videos in, confirm you have the rights to them, and move them through review and publishing from the mobile app. The automatic dubbing and subtitling itself is the piece we're building now.
 
-1. **Rights verification** — nothing moves forward without a confirmed authorization basis. This is a hard gate, not a best-effort check.
-2. **Media preparation** — the file is analyzed, normalized, and made ready for processing.
-3. **Transcription** — speech is converted to text using AI-based recognition.
-4. **Subtitle generation** — timed subtitles are produced from the transcript.
-5. **Dubbing** — a translated audio track is synthesized and aligned to the original timing.
-6. **Human review** — a person verifies the output before anything is published.
-7. **Publication** — the localized asset is released once every gate has passed.
+## Where things stand
 
-Every step is logged. Every artifact has a traceable origin. Nothing reaches an audience without clearing rights, quality, and review.
+| What it does | Status |
+|------|--------|
+| Bring your videos in | Working today |
+| Confirm you have the rights to use them | Working today |
+| Mobile app for iPhone and Android | Working today |
+| Track consent and keep a compliance record | Working today |
+| A person reviews before anything is published | Working today |
+| Watch videos right inside the app | Working today |
+| Import videos from other platforms you own | Coming |
+| Automatic transcription, dubbing and publishing | In progress |
 
-## Who it is for
+## Mobile app
 
-- **Content owners** who want to expand reach into new languages without losing control of their rights or their brand.
-- **Localization teams** who need a structured workflow instead of a patchwork of tools.
-- **Platforms** that handle user-generated or licensed video and need to offer multilingual outputs at scale.
-
-## How content gets in
-
-DubBridge accepts content these ways:
-
-- **Upload (operational)** — send a file through the API. Authenticated clients submit assets directly.
-- **Platform download (planned, primary intake)** — the content owner authorizes DubBridge to import content from an account they control; DubBridge downloads it on their behalf and ingests it through the same governed pipeline as an uploaded file. Access requires the owner's explicit, scoped authorization.
-- **Live stream recording (planned, deferred sub-case)** — for clients producing live broadcasts, DubBridge can capture an authorized live stream and ingest the result through the same governed pipeline.
-
-All paths converge, once delivered, at the same rights gate. There is no shortcut.
-
-## Design philosophy
-
-The platform is built so that authorization and auditability are structural, not optional. A job cannot proceed past a stage it has not cleared. Artifacts are immutable — once ingested, the original is never modified, only transformed into derived outputs with explicit lineage. Every governance event is recorded.
-
-The processing core is written in Rust. AI workloads (transcription, translation, voice synthesis) run as isolated Python workers behind typed contracts, keeping the ML ecosystem contained and the orchestration layer stable.
-
-## Development setup
-
-Requires Rust (via `rustup`) and Docker.
-
-```
-# Local infrastructure only — this Compose file is never the production deployment
-# descriptor (ADR-026).
-docker compose -f infra/local/docker-compose.yml up -d postgres redis minio
-# Start local app containers only when you explicitly opt into the app profile.
-# Put auth env vars in .env before starting the protected API container.
-docker compose -f infra/local/docker-compose.yml --profile app up api worker-runner
-# Configure the auth env required by your local profile before starting the
-# protected API outside Compose.
-cargo run -p dubbridge-api
-```
-
-Enable the shared Git hook path so local `pre-push` uses the repository hook:
-
-```bash
-git config core.hooksPath .githooks
-```
-
-Local Rust QA commands:
-
-```bash
-make qa-local          # fmt + clippy + test + cargo check
-make qa-deny           # dependency policy / advisories
-make qa-coverage       # 90% coverage gate (existing llvm-cov scope)
-make qa-build-release  # release build verification
-make qa-ci             # full local mirror of the blocking CI baseline
-```
-
-When `Cargo.toml` or `Cargo.lock` changes, install `cargo-deny` locally:
-
-```bash
-cargo install cargo-deny --version 0.18.4 --locked
-```
-
-Infrastructure: PostgreSQL for state, Redis for job coordination, MinIO for object storage.
-Local app-container wiring now lives in the opt-in `app` profile of
-`infra/local/docker-compose.yml`; it targets container DNS (`postgres`, `redis`) and
-keeps auth secrets in a local `.env`.
-
-The default local app profile still uses `storage.backend = local_fs`. To exercise
-the S3-compatible path against local MinIO, start the app profile with:
-
-```bash
-DUBBRIDGE_STORAGE_BACKEND=s3 docker compose -f infra/local/docker-compose.yml --profile app up
-```
-
-The compose file points the Rust containers at `http://minio:9000`, bucket
-`dubbridge-local`, and the local-only MinIO credentials `dubbridge` /
-`dubbridge123`. Keep production object-store credentials in deployment secrets, not
-committed config.
-
-### Object cleanup and reconciliation
-
-Uploads write the object first, then persist the relational pending-ingestion row.
-If the relational write fails, the API attempts immediate cleanup of the just-written
-object and logs any cleanup failure with the ingest token and storage key.
-
-The API also runs periodic storage reconciliation from the same cleanup worker. The
-reconciliation pass lists canonical `ingests/` keys through `StorageAdapter`, compares
-them with `pending_ingestions.storage_key` and `artifact_records.storage_key`, and
-deletes only planner-approved orphan candidates. Referenced objects are retained, and
-malformed or unexpected keys are skipped and logged. Delete failures keep enough
-context for a later run to retry; rerunning reconciliation after successful deletion is
-a no-op for already-repaired state.
-
-### Environments (local vs production)
-
-Local and production are separated by a fail-closed layered configuration model
-governed by ADR-026 and delivered in slice P0
-(`docs/plan/s-030-environment-separation.md`). `crates/config` now requires an explicit
-`DUBBRIDGE_ENV`, loads committed non-secret `config/<env>.toml` profiles, accepts
-secrets only through injected environment variables, and runs a production
-`validate()` that rejects local defaults (localhost datastores, local-fs storage,
-absent auth). The Docker Compose file above is local infrastructure only and is never
-the production deployment descriptor, and the local Rust app containers track
-`rust-toolchain.toml` via `rust:stable`.
-
-### Agent workflow and task complexity (RRI)
-
-All development in this repository follows a mandatory
-`analyze → plan → tasks → approval → implement` workflow governed by
-`docs/playbooks/AGENT_WORKFLOW_GUIDE.md`.
-
-Before implementing any task, agents compute a **Required Reasoning Index (RRI)**
-score that estimates how much reasoning, caution, and verification the task
-requires. The RRI combines cyclomatic complexity, files affected, domain risk,
-test-coverage risk, ambiguity, coupling, security/data impact, and context size
-into a single score with penalties for high-risk combinations.
-
-| RRI band | Label | What it requires |
-|---|---|---|
-| 0–25 | Low | Auto-execute via local Gemma (Ollama); orchestrator reviews + reports |
-| 26–40 | Moderate | Confirm area tests exist |
-| 41–55 | Med-high | Plan + explicit acceptance criteria |
-| 56–70 | Complex | Plan first; human reviews the plan |
-| 71–85 | High | Characterization tests + human reviews the diff |
-| 86–100 | Very high | ADR + risk analysis + decompose first |
-| > 100 | Excessive | Architecture work required before any implementation |
-
-Low-band tasks (RRI 0–25) are delegated to a local Gemma model running through
-Ollama — no cloud call, no approval gate. The orchestrating agent reviews the
-output and reports before marking the task done. Full procedure: `docs/policies/RRI_POLICY.md`.
-
-Background and design rationale: `docs/prompts/medium-article-rri-output.md`.
-
-## Knowledge format (OKF)
-
-Every documentation file in `docs/` carries a YAML frontmatter block that declares its type:
-
-```yaml
----
-type: ADR        # one of 10 closed values
-status: Accepted
----
-```
-
-The closed vocabulary and rules live in [`docs/knowledge/README.md`](docs/knowledge/README.md). The validator runs on every commit:
-
-```mermaid
-graph LR
-    DOCS[docs/**/*.md] -->|parsed by| VAL[check_okf_frontmatter.py]
-    VAL -->|type + status valid?| HOOK[pre-commit hook]
-    VAL -->|included in| CI[CI qa-docs job]
-    HOOK & CI -->|fail-closed| BLOCK[commit / PR blocked]
-    HOOK & CI -->|pass| OK[green ✅]
-```
-
-```bash
-make qa-okf-frontmatter   # run the validator alone
-make qa-docs              # full doc gate (includes OKF)
-```
-
-## Repository layout
-
-```
-apps/api            — HTTP API and health endpoints
-apps/worker-runner  — background job execution
-apps/cli            — operational utilities
-crates/             — shared domain, persistence, storage, jobs, quality, auth, audit
-workers/*-py        — Python AI worker contracts (ASR, translation, TTS)
-infra/              — local infrastructure and database migrations
-docs/               — architecture decisions, pipeline design, and development policy
-```
-
-## Mobile client
-
-The first-party mobile app (React Native + Expo) puts the governed DubBridge
-workflow in your pocket: sign in, bring content in, confirm its rights posture,
-review the output, and publish only after the last human checkpoint has passed.
-
-The app runs on a dark canvas (`#141414`) with a bold red accent — designed to
-foreground video content and read as a media-first product.
+The mobile app is the main way to use DubBridge: sign in, bring your content in, confirm you have the rights to it, review the result, and publish only once every check has passed. (Built with React Native + Expo.)
 
 **Onboarding**
 
 <table align="center">
   <tr>
     <td align="center"><img src="mobile/artifacts/screenshots/01_auth_login.png" width="200" alt="Login"/><br/><sub>Login</sub></td>
-    <td align="center"><img src="mobile/artifacts/screenshots/02_home.png" width="200" alt="Home"/><br/><sub>Home — recent assets and quick actions</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/02_home.png" width="200" alt="Home"/><br/><sub>Home — your recent videos and quick actions</sub></td>
   </tr>
 </table>
 
-**Assets**
+**Your videos**
 
 <table align="center">
   <tr>
-    <td align="center"><img src="mobile/artifacts/screenshots/03_asset_list.png" width="185" alt="Asset library"/><br/><sub>Asset library</sub></td>
-    <td align="center"><img src="mobile/artifacts/screenshots/05_upload.png" width="185" alt="Upload"/><br/><sub>Upload a file</sub></td>
-    <td align="center"><img src="mobile/artifacts/screenshots/04_asset_detail.png" width="185" alt="Asset detail"/><br/><sub>Asset detail</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/03_asset_list.png" width="185" alt="Your video library"/><br/><sub>Your video library</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/05_upload.png" width="185" alt="Upload"/><br/><sub>Upload a video</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/04_asset_detail.png" width="185" alt="Video details"/><br/><sub>Video details</sub></td>
   </tr>
 </table>
 
-**Ingest outcomes**
+**Adding a video**
 
 <table align="center">
   <tr>
-    <td align="center"><img src="mobile/artifacts/screenshots/06_ingest_complete.png" width="200" alt="Ingest complete"/><br/><sub>Ingest complete — rights confirmed</sub></td>
-    <td align="center"><img src="mobile/artifacts/screenshots/07_ingest_no_rights.png" width="200" alt="Ingest blocked"/><br/><sub>Ingest blocked — rights missing</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/06_ingest_complete.png" width="200" alt="Video added"/><br/><sub>Video added — rights confirmed</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/07_ingest_no_rights.png" width="200" alt="Blocked"/><br/><sub>Blocked — rights missing</sub></td>
   </tr>
 </table>
 
@@ -233,12 +61,12 @@ foreground video content and read as a media-first product.
   </tr>
 </table>
 
-**Inline playback**
+**Watching in the app**
 
 <table align="center">
   <tr>
-    <td align="center"><img src="mobile/artifacts/screenshots/18_asset_detail_playback.png" width="200" alt="Asset playback"/><br/><sub>Original track — playing inline on asset detail</sub></td>
-    <td align="center"><img src="mobile/artifacts/screenshots/19_review_detail_playback.png" width="200" alt="Review playback"/><br/><sub>Dubbed track — playing inline on review detail</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/18_asset_detail_playback.png" width="200" alt="Original audio playing"/><br/><sub>Original audio — playing in the app</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/19_review_detail_playback.png" width="200" alt="Dubbed audio playing"/><br/><sub>Dubbed audio — playing in the app</sub></td>
   </tr>
 </table>
 
@@ -248,7 +76,7 @@ foreground video content and read as a media-first product.
   <tr>
     <td align="center"><img src="mobile/artifacts/screenshots/11_compliance_center.png" width="185" alt="Compliance center"/><br/><sub>Compliance center</sub></td>
     <td align="center"><img src="mobile/artifacts/screenshots/12_consent_active.png" width="185" alt="Consent active"/><br/><sub>Consent active</sub></td>
-    <td align="center"><img src="mobile/artifacts/screenshots/13_consent_revoked.png" width="185" alt="Consent revoked"/><br/><sub>Consent revoked — pipeline fail-closed</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/13_consent_revoked.png" width="185" alt="Consent revoked"/><br/><sub>Consent revoked — everything stops</sub></td>
   </tr>
 </table>
 
@@ -263,6 +91,76 @@ foreground video content and read as a media-first product.
   </tr>
 </table>
 
----
+## How it works
 
-*DubBridge is under active development. JWT-protected upload ingestion, the rights ledger, the first-party mobile client (React Native + Expo), the mobile compliance and review workspace, and inline playback on asset detail and review detail are operational. Platform-download intake (primary), live stream recording (deferred sub-case), media preparation, transcription, dubbing, and publication pipeline automation remain planned work.*
+Once a video is in, it moves through a series of steps — each one a checkpoint it has to pass:
+
+1. **Rights check** — nothing moves forward until we've confirmed you're allowed to use the video. No exceptions.
+2. **Preparing the file** — the video is cleaned up and made ready to work with.
+3. **Transcription** — the spoken words are turned into text automatically.
+4. **Subtitles** — that text becomes timed subtitles.
+5. **Dubbing** — a new audio track in the target language is created and matched to the original timing.
+6. **Human review** — a person checks the result before it goes anywhere.
+7. **Publishing** — the finished version is released, once every check has passed.
+
+Every step is recorded, and every version can be traced back to where it came from. Nothing reaches an audience until it has cleared rights, quality, and a human review.
+
+## Who it is for
+
+- **Creators** who want their videos watched in more than the language they were filmed in, and shared with new communities.
+- **Localization teams** who want one clear workflow instead of juggling a dozen tools.
+- **Platforms** that handle a lot of video and need it available in many languages.
+
+## How content gets in
+
+- **Upload** — add your video directly from the app.
+- **Import from another platform (coming)** — connect an account you own on another platform, and DubBridge brings your video over for you.
+- **Live recording (coming)** — for live broadcasts, DubBridge can capture an authorized stream and bring it in.
+
+However a video comes in, it goes through the same rights check first. There is no shortcut.
+
+## Design
+
+The orchestration core is Rust. AI workloads — transcription, translation, voice synthesis — run as isolated Python workers behind typed contracts, keeping the ML layer contained and the orchestration layer stable.
+
+Authorization and auditability are structural, not optional. A job cannot proceed past a stage it has not cleared. Once ingested, originals are never modified — only transformed into derived outputs with explicit lineage.
+
+## Development setup
+
+Requires Rust (via `rustup`) and Docker.
+
+```bash
+# Start local infrastructure
+docker compose -f infra/local/docker-compose.yml up -d postgres redis minio
+
+# Run the API
+DUBBRIDGE_ENV=local cargo run -p dubbridge-api
+```
+
+Install the repository's Git hooks:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Run QA checks before pushing:
+
+```bash
+make qa-local   # format + lint + tests
+make qa-ci      # full CI mirror
+```
+
+For storage backends, environment config, dependency policy, and contributor tooling, see [DEVELOPMENT_REFERENCE.md](DEVELOPMENT_REFERENCE.md).
+
+## Repository layout
+
+```
+apps/api            — HTTP API and health endpoints
+apps/worker-runner  — background job execution
+apps/cli            — operational utilities
+crates/             — shared domain, persistence, storage, jobs, quality, auth, audit
+workers/*-py        — Python AI worker contracts (ASR, translation, TTS)
+infra/              — local infrastructure and database migrations
+docs/               — architecture decisions, pipeline design, and development policy
+mobile/             — React Native + Expo mobile client
+```

@@ -861,6 +861,7 @@ flipped to `[x] Done` and the completion reported to the user.
 ## Related
 
 - `CLAUDE.md`, `AGENTS.md`, `README_AGENT_ORDER.md`
+- `DEVELOPMENT_REFERENCE.md` — developer entry point: architecture, ADR index, roadmap, BDD, setup, and QA gates
 - `docs/policies/HITL_AUTONOMY_POLICY.md`
 - `docs/policies/RRI_POLICY.md` — RRI formula, anchor rubric, bands, and gates
 - `docs/playbooks/LOW_RRI_LOCAL_MODEL_HANDOFF.md` — patch delegation vs. review delegation
