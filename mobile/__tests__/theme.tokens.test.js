@@ -120,12 +120,19 @@ describe("T2 WCAG AA contrast certification", () => {
 
   // ── Edge cases ───────────────────────────────────────────────────────────
 
-  // EC-3: primary on canvas — 3.84:1. Below 4.5:1 for small text but above
-  // 3:1 large-UI threshold (WCAG 1.4.11 non-text / 1.4.3 large text ≥18px bold).
-  // primary (#E50914) is ONLY used for: CTA buttons (≥16px/600 = large), icons,
-  // and the Netflix-red brand stripe. Never for body or meta text on canvas.
-  it("EC-3: primary on canvas meets large-UI threshold 3:1 (CTA/icon use only)", () => {
+  // EC-3a: primary on canvas — 3.84:1. Meets large-UI threshold (3:1, WCAG 1.4.11)
+  // but NOT small-text AA (4.5:1). primary (#E50914) is restricted to: CTA buttons
+  // (≥16px/600 = large text), icons, and the Netflix-red brand stripe. Never for
+  // body, meta, or label text. Use primaryStrong for small-text label contexts.
+  it("EC-3a: primary on canvas meets large-UI threshold 3:1 (CTA/icon use only)", () => {
     expect(contrastRatio(color.primary, color.canvas)).toBeGreaterThanOrEqual(3.0);
+    expect(contrastRatio(color.primary, color.canvas)).toBeLessThan(4.5);
+  });
+
+  // EC-3b: primaryStrong on canvas — must meet full AA 4.5:1 for small text.
+  // Used for kicker labels, eyebrows, and toggles (type.label at 12px bold).
+  it("EC-3b: primaryStrong on canvas meets AA 4.5:1 (small-text label use)", () => {
+    expect(contrastRatio(color.primaryStrong, color.canvas)).toBeGreaterThanOrEqual(4.5);
   });
 
   // EC-4: danger === primary (both #E50914) — T0 decision gate resolved.

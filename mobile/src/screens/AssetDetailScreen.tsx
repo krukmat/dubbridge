@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   assetTitle: { ...type.title, color: color.ink900 },
   mediaHeader: { gap: space.md },
   mediaHeaderCopy: { gap: space.sm },
-  mediaEyebrow: { ...type.label, color: color.primary },
+  mediaEyebrow: { ...type.label, color: color.primaryStrong },
   mediaTitle: { ...type.title, color: color.ink900 },
   mediaBody: { ...type.body, color: color.ink500 },
   mediaFrame: {
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
   },
   mediaFrameLabel: {
     ...type.label,
-    color: color.primary,
+    color: color.primaryStrong,
     alignSelf: "flex-start",
     backgroundColor: color.raised,
     borderRadius: radius.pill,
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     backgroundColor: color.sunken,
   },
   summaryValue: { ...type.body, color: color.ink700 },
-  techToggle: { ...type.label, color: color.primary, marginTop: space.xs },
+  techToggle: { ...type.label, color: color.primaryStrong, marginTop: space.xs },
   techGroup: { gap: space.xs, marginTop: space.xs },
   metaLabel: { ...type.label, color: color.ink400 },
   metaValue: { ...type.meta, color: color.ink700 },

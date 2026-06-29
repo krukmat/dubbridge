@@ -38,7 +38,7 @@ export function ScreenHeader({ kicker, title, copy, compact = false }: ScreenHea
 const styles = StyleSheet.create({
   header: { gap: space.sm },
   compactHeader: { paddingBottom: space.xs },
-  kicker: { ...type.label, color: color.primary },
+  kicker: { ...type.label, color: color.primaryStrong },
   title: { ...type.display, color: color.ink900 },
   copy: { ...type.body, color: color.ink500 },
 });

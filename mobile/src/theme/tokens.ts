@@ -26,11 +26,13 @@ export const color = {
   borderStrong: "#3D3D3D",
 
   // Primary accent — Netflix red (ADR-035).
-  // primaryPressed is lighter than the S-220/T0 target (#B8000B) so it clears
-  // WCAG AA (4.5:1) on primarySubtle (#2A0608). On canvas it reads 5.06:1 (AA).
-  // onPrimary on primaryPressed yields 3.64:1 — large-UI only (button pressed
-  // state is always ≥18px/bold; small text never sits on primaryPressed).
+  // `primary` (#E50914) yields 3.84:1 on canvas — meets large-UI threshold (3:1)
+  // but not small-text (4.5:1). Use only for large UI: buttons, icons, backgrounds.
+  // `primaryStrong` (#FF3333) yields 5.06:1 on canvas — use for small text labels
+  // such as kickers, eyebrows, and toggles (type.label at 12px).
+  // `primaryPressed` (#FF3333) is the interactive pressed state for buttons.
   primary: "#E50914",
+  primaryStrong: "#FF3333",
   primaryPressed: "#FF3333",
   primarySubtle: "#2A0608",
   onPrimary: "#FFFFFF",

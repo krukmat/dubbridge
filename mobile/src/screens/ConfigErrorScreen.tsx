@@ -24,7 +24,7 @@ export function ConfigErrorScreen({ message }: { message: string }) {
 
 const styles = StyleSheet.create({
   centered: { justifyContent: "center" },
-  eyebrow: { ...type.label, color: color.primary },
+  eyebrow: { ...type.label, color: color.primaryStrong },
   title: { ...type.title, color: color.ink900 },
   message: { ...type.body, color: color.ink700 },
   hint: { ...type.meta, color: color.ink400 },

@@ -42,7 +42,7 @@ const stepStyles = StyleSheet.create({
   dotNumInactive: { color: color.ink300 },
   dotCheck: { ...type.label, color: color.onPrimary },
   label: { ...type.label },
-  labelActive: { color: color.primary },
+  labelActive: { color: color.primaryStrong },
   labelInactive: { color: color.ink300 },
   connector: { position: 'absolute', top: 14, left: '50%', right: '-50%', height: 1.5, backgroundColor: color.border, zIndex: -1 },
 });

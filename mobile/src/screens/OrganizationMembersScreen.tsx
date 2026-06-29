@@ -69,5 +69,5 @@ const styles = StyleSheet.create({
   roles: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
   list: { gap: space.sm, paddingBottom: space.xl },
   memberId: { ...type.bodyStrong, color: color.ink900 },
-  memberRole: { ...type.label, color: color.primary },
+  memberRole: { ...type.label, color: color.primaryStrong },
 });
