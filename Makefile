@@ -53,6 +53,7 @@ qa-review-budget:
 # regex production-readiness scan for the mobile surface.
 qa-mobile:
 	cd mobile && npm run typecheck && npm run lint && npm test
+	python3 scripts/check-primary-label-usage.py
 
 # DESIGN.md stays on an explicit opt-in gate for now because the Google CLI and
 # spec are still alpha and should not widen the main CI surface by default.
