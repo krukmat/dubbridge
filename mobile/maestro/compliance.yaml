@@ -32,6 +32,12 @@ tags:
       id: asset-detail-screen
     timeout: 20000
 
+- scrollUntilVisible:
+    element:
+      id: asset-open-compliance
+    direction: DOWN
+    timeout: 5000
+
 - tapOn:
     id: asset-open-compliance
 

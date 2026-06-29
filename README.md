@@ -192,63 +192,76 @@ The first-party mobile app (React Native + Expo) puts the governed DubBridge
 workflow in your pocket: sign in, bring content in, confirm its rights posture,
 review the output, and publish only after the last human checkpoint has passed.
 
-**Sign in and orient the workspace** — Mobile starts with authenticated access and
-lands the user in a workspace that adapts to active projects, so the next action is
-never far away.
+The app runs on a dark canvas (`#141414`) with a bold red accent — designed to
+foreground video content and read as a media-first product.
 
-<p align="center">
-  <img src="mobile/artifacts/screenshots/01_auth_login.png" width="220" alt="DubBridge mobile login screen" />
-  <img src="mobile/artifacts/screenshots/08_home_for_projects.png" width="220" alt="DubBridge mobile home screen with active projects" />
-</p>
+**Onboarding**
 
-**Bring assets into the pipeline** — The asset library and upload flow keep intake
-simple on the surface, but still route every file through the governed ingestion
-path.
+<table align="center">
+  <tr>
+    <td align="center"><img src="mobile/artifacts/screenshots/01_auth_login.png" width="200" alt="Login"/><br/><sub>Login</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/02_home.png" width="200" alt="Home"/><br/><sub>Home — recent assets and quick actions</sub></td>
+  </tr>
+</table>
 
-<p align="center">
-  <img src="mobile/artifacts/screenshots/03_asset_list.png" width="220" alt="DubBridge mobile asset library" />
-  <img src="mobile/artifacts/screenshots/05_upload.png" width="220" alt="DubBridge mobile upload flow" />
-</p>
+**Assets**
 
-**Stop early when rights are not in place, and preview finalized media inline** —
-If the authorization basis is missing, the mobile app surfaces the failure instead
-of letting the asset drift further downstream. When an asset is finalized, the same
-detail view lets the user open inline playback and verify the original track in
-context.
+<table align="center">
+  <tr>
+    <td align="center"><img src="mobile/artifacts/screenshots/03_asset_list.png" width="185" alt="Asset library"/><br/><sub>Asset library</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/05_upload.png" width="185" alt="Upload"/><br/><sub>Upload a file</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/04_asset_detail.png" width="185" alt="Asset detail"/><br/><sub>Asset detail</sub></td>
+  </tr>
+</table>
 
-<p align="center">
-  <img src="mobile/artifacts/screenshots/07_ingest_no_rights.png" width="220" alt="DubBridge mobile ingest stopped because rights are missing" />
-  <img src="mobile/artifacts/screenshots/18_asset_detail_playback.png" width="220" alt="DubBridge mobile asset detail with inline playback" />
-</p>
+**Ingest outcomes**
 
-**Inspect consent and compliance without leaving mobile** — The compliance center
-keeps the audit trail close to the asset. Operators can inspect consent status and
-see immediately when a revocation has pushed the workflow back into a fail-closed
-state.
+<table align="center">
+  <tr>
+    <td align="center"><img src="mobile/artifacts/screenshots/06_ingest_complete.png" width="200" alt="Ingest complete"/><br/><sub>Ingest complete — rights confirmed</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/07_ingest_no_rights.png" width="200" alt="Ingest blocked"/><br/><sub>Ingest blocked — rights missing</sub></td>
+  </tr>
+</table>
 
-<p align="center">
-  <img src="mobile/artifacts/screenshots/11_compliance_center.png" width="220" alt="DubBridge mobile compliance center" />
-  <img src="mobile/artifacts/screenshots/13_consent_revoked.png" width="220" alt="DubBridge mobile consent status after revocation" />
-</p>
+**Projects**
 
-**Review with playback before deciding** — Once localization work is ready, it
-lands in the review inbox. Opening a task now brings playback directly into the
-review workspace so the reviewer can listen before approving or rejecting the
-derived output.
+<table align="center">
+  <tr>
+    <td align="center"><img src="mobile/artifacts/screenshots/08_home_for_projects.png" width="185" alt="Home with projects"/><br/><sub>Home with active projects</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/09_project_list.png" width="185" alt="Project list"/><br/><sub>Project list</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/10_project_detail.png" width="185" alt="Project detail"/><br/><sub>Project detail</sub></td>
+  </tr>
+</table>
 
-<p align="center">
-  <img src="mobile/artifacts/screenshots/14_review_inbox.png" width="220" alt="DubBridge mobile review inbox" />
-  <img src="mobile/artifacts/screenshots/19_review_detail_playback.png" width="220" alt="DubBridge mobile review detail with inline playback" />
-</p>
+**Inline playback**
 
-**Approve, then publish** — Approval and publication remain distinct checkpoints.
-The reviewer clears the work first; only then does the app expose the final publish
-step that makes the localized asset available to its audience.
+<table align="center">
+  <tr>
+    <td align="center"><img src="mobile/artifacts/screenshots/18_asset_detail_playback.png" width="200" alt="Asset playback"/><br/><sub>Original track — playing inline on asset detail</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/19_review_detail_playback.png" width="200" alt="Review playback"/><br/><sub>Dubbed track — playing inline on review detail</sub></td>
+  </tr>
+</table>
 
-<p align="center">
-  <img src="mobile/artifacts/screenshots/16_review_approved.png" width="220" alt="DubBridge mobile review task approved" />
-  <img src="mobile/artifacts/screenshots/17_review_published.png" width="220" alt="DubBridge mobile review task published" />
-</p>
+**Compliance and consent**
+
+<table align="center">
+  <tr>
+    <td align="center"><img src="mobile/artifacts/screenshots/11_compliance_center.png" width="185" alt="Compliance center"/><br/><sub>Compliance center</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/12_consent_active.png" width="185" alt="Consent active"/><br/><sub>Consent active</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/13_consent_revoked.png" width="185" alt="Consent revoked"/><br/><sub>Consent revoked — pipeline fail-closed</sub></td>
+  </tr>
+</table>
+
+**Review workflow**
+
+<table align="center">
+  <tr>
+    <td align="center"><img src="mobile/artifacts/screenshots/14_review_inbox.png" width="170" alt="Review inbox"/><br/><sub>Inbox</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/15_review_detail.png" width="170" alt="Review detail"/><br/><sub>Detail</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/16_review_approved.png" width="170" alt="Approved"/><br/><sub>Approved</sub></td>
+    <td align="center"><img src="mobile/artifacts/screenshots/17_review_published.png" width="170" alt="Published"/><br/><sub>Published</sub></td>
+  </tr>
+</table>
 
 ---
 

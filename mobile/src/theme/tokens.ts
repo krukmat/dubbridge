@@ -1,52 +1,57 @@
 import type { TextStyle, ViewStyle } from "react-native";
 
 /**
- * S-115 design tokens — the single source of visual truth for the mobile app.
+ * S-220 design tokens — dark-canvas (Netflix-style) palette (ADR-035).
  *
- * One restrained "ink + teal" palette (ADR-029 mobile surface). Screens and
- * primitives must consume these tokens rather than hardcoding hex, spacing, or
- * type. See docs/plan/s-115-mobile-ux-foundation.md for the locked spec.
+ * Replaces the S-115 ink+teal palette with a dark canvas and Netflix-red
+ * primary accent. Screens and primitives must consume these tokens rather than
+ * hardcoding hex, spacing, or type.
  */
 
 export const color = {
-  // Ink (text) scale — darkest to lightest.
-  ink900: "#0F1B22",
-  ink700: "#243640",
-  ink500: "#4A5A63",
-  ink400: "#647079",
-  ink300: "#8A949B",
+  // Ink (text) scale — lightest to darkest on dark canvas.
+  ink900: "#F5F5F5",
+  ink700: "#E0E0E0",
+  ink500: "#A8A8A8",
+  ink400: "#737373",
+  ink300: "#4D4D4D",
 
   // Surfaces.
-  canvas: "#F7F8FA",
-  raised: "#FFFFFF",
-  sunken: "#EEF0F4",
+  canvas: "#141414",
+  raised: "#1F1F1F",
+  sunken: "#0A0A0A",
 
   // Borders.
-  border: "#E1E5EC",
-  borderStrong: "#C2CDC8",
+  border: "#2A2A2A",
+  borderStrong: "#3D3D3D",
 
-  // Primary accent (the single brand accent).
-  primary: "#097F67",
-  primaryPressed: "#0A745E",
-  primarySubtle: "#E2EFEB",
-  onPrimary: "#F7FBF9",
+  // Primary accent — Netflix red (ADR-035).
+  // primaryPressed is lighter than the S-220/T0 target (#B8000B) so it clears
+  // WCAG AA (4.5:1) on primarySubtle (#2A0608). On canvas it reads 5.06:1 (AA).
+  // onPrimary on primaryPressed yields 3.64:1 — large-UI only (button pressed
+  // state is always ≥18px/bold; small text never sits on primaryPressed).
+  primary: "#E50914",
+  primaryPressed: "#FF3333",
+  primarySubtle: "#2A0608",
+  onPrimary: "#FFFFFF",
 
   // Semantic — used sparingly (badges, destructive actions, errors).
-  success: "#1A7F5A",
-  successSubtle: "#E3F2EA",
-  warning: "#9A6B12",
-  warningSubtle: "#F6ECD6",
-  danger: "#B3261E",
-  dangerSubtle: "#F7E4E2",
-  dangerPressed: "#8F1E18",
-  info: "#1D5E84",
-  infoSubtle: "#E1ECF3",
+  success: "#2DC76D",
+  successSubtle: "#0D2E1A",
+  warning: "#F5A623",
+  warningSubtle: "#2E1F04",
+  danger: "#E50914",
+  dangerSubtle: "#2A0608",
+  dangerPressed: "#B8000B",
+  info: "#3B9EDB",
+  infoSubtle: "#071622",
 
   // "Strong" semantic foregrounds for text on the matching subtle backgrounds.
-  // Darkened to clear WCAG AA (>=4.5:1) for small badge labels.
-  successStrong: "#0F5C40",
-  warningStrong: "#6E4C0D",
-  infoStrong: "#16486A",
+  // Brightened to clear WCAG AA (>=4.5:1) on dark subtle backgrounds.
+  // infoStrong adjusted from #2A7FB8 (4.21:1) to #4BAEE5 (7.40:1) for AA compliance.
+  successStrong: "#1FA855",
+  warningStrong: "#D4891A",
+  infoStrong: "#4BAEE5",
 } as const;
 
 export const space = {

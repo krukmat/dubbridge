@@ -90,7 +90,8 @@ qa-gemma-review:
 	{ echo "# Gemma Reviewer packet (base: $(GEMMA_REVIEW_BASE))"; echo ""; \
 	  git diff $(GEMMA_REVIEW_BASE); } \
 	| python3 scripts/gemma-code-review.py --out "$(GEMMA_REVIEW_RESULT)" - \
-	&& echo "[gemma-review] result written to $(GEMMA_REVIEW_RESULT)"
+	&& echo "[gemma-review] result written to $(GEMMA_REVIEW_RESULT)"; \
+	python3 scripts/parse-review-findings.py "$(GEMMA_REVIEW_RESULT)"
 
 qa-gemma-push-review:
 	@if [ "$${DUBBRIDGE_SKIP_GEMMA_PUSH_REVIEW:-0}" = "1" ]; then \

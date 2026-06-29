@@ -104,10 +104,20 @@ tags:
 - tapOn:
     id: publish-action
 
-# After publish the panel shows "Published <timestamp>"; match with a wildcard.
+# After publish the ActionBar (publish-action) disappears — wait for that as the
+# completion signal, then scroll to the Publication panel before asserting.
 - extendedWaitUntil:
-    visible:
-      text: "Published.*"
+    notVisible:
+      id: publish-action
     timeout: 20000
+
+- scrollUntilVisible:
+    element:
+      text: "Published.*"
+    direction: DOWN
+    timeout: 8000
+
+- assertVisible:
+    text: "Published.*"
 
 - takeScreenshot: 17_review_published

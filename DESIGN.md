@@ -3,32 +3,32 @@ version: alpha
 name: DubBridge Mobile
 description: Agent-readable design intent for the first-party DubBridge mobile app. Mirrors the shipped React Native token system; does not replace runtime styling in mobile/src/theme/tokens.ts.
 colors:
-  ink900: "#0F1B22"
-  ink700: "#243640"
-  ink500: "#4A5A63"
-  ink400: "#647079"
-  ink300: "#8A949B"
-  canvas: "#F7F8FA"
-  raised: "#FFFFFF"
-  sunken: "#EEF0F4"
-  border: "#E1E5EC"
-  borderStrong: "#C2CDC8"
-  primary: "#097F67"
-  primaryPressed: "#0A745E"
-  primarySubtle: "#E2EFEB"
-  onPrimary: "#F7FBF9"
-  success: "#1A7F5A"
-  successSubtle: "#E3F2EA"
-  successStrong: "#0F5C40"
-  warning: "#9A6B12"
-  warningSubtle: "#F6ECD6"
-  warningStrong: "#6E4C0D"
-  danger: "#B3261E"
-  dangerSubtle: "#F7E4E2"
-  dangerPressed: "#8F1E18"
-  info: "#1D5E84"
-  infoSubtle: "#E1ECF3"
-  infoStrong: "#16486A"
+  ink900: "#F5F5F5"
+  ink700: "#E0E0E0"
+  ink500: "#A8A8A8"
+  ink400: "#737373"
+  ink300: "#4D4D4D"
+  canvas: "#141414"
+  raised: "#1F1F1F"
+  sunken: "#0A0A0A"
+  border: "#2A2A2A"
+  borderStrong: "#3D3D3D"
+  primary: "#E50914"
+  primaryPressed: "#FF3333"
+  primarySubtle: "#2A0608"
+  onPrimary: "#FFFFFF"
+  success: "#2DC76D"
+  successSubtle: "#0D2E1A"
+  successStrong: "#1FA855"
+  warning: "#F5A623"
+  warningSubtle: "#2E1F04"
+  warningStrong: "#D4891A"
+  danger: "#E50914"
+  dangerSubtle: "#2A0608"
+  dangerPressed: "#B8000B"
+  info: "#3B9EDB"
+  infoSubtle: "#071622"
+  infoStrong: "#4BAEE5"
 typography:
   display:
     fontFamily: System
@@ -160,17 +160,20 @@ drift, the shipped tokens win until the docs are synchronized.
 
 ## Colors
 
-The palette is rooted in deep ink neutrals and a single teal accent.
+The palette is rooted in a dark canvas and a single Netflix-red accent (ADR-035).
 
 - **Ink:** `ink900`, `ink700`, `ink500`, `ink400`, and `ink300` provide the full
-  text hierarchy. Use them for title, body, metadata, and disabled text before
-  considering any semantic color.
-- **Surface:** `canvas` is the app background, `raised` is the primary panel/card
-  surface, and `sunken` is the quiet inset/tinted surface for secondary emphasis.
-- **Primary:** `primary` is the only brand/action accent. `primaryPressed`,
-  `primarySubtle`, and `onPrimary` define its interactive states.
+  text hierarchy on dark surfaces. Values are inverted from the light palette —
+  `ink900` is near-white (`#F5F5F5`). Use them for title, body, metadata, and
+  disabled text before considering any semantic color.
+- **Surface:** `canvas` (`#141414`) is the app background, `raised` (`#1F1F1F`)
+  is the primary panel/card surface, and `sunken` (`#0A0A0A`) is the quiet inset
+  surface for secondary emphasis.
+- **Primary:** `primary` (`#E50914`) is the Netflix-red brand/action accent.
+  `primaryPressed`, `primarySubtle`, and `onPrimary` define its interactive states.
 - **Semantic:** `success`, `warning`, `danger`, and `info` are used sparingly for
-  status communication, badges, destructive actions, and error states.
+  status communication, badges, destructive actions, and error states. Values are
+  brightened for legibility on dark backgrounds. WCAG AA certification in T2.
 
 Prefer calm contrast over visual noise. The app should read as operational and
 legible first, branded second.
@@ -255,7 +258,7 @@ this vocabulary.
 Do:
 
 - Use the shipped token values from `mobile/src/theme/tokens.ts`.
-- Keep the "ink + teal" identity intact.
+- Keep the dark-canvas + Netflix-red identity intact (ADR-035).
 - Prefer clear operational copy over engineering-harness language.
 - Use semantic colors for state meaning, not for decoration.
 - Keep primary actions obvious and secondary actions quiet.

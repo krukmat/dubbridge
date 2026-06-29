@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
   mediaFrame: {
     minHeight: 220,
     borderRadius: radius.lg,
-    backgroundColor: color.ink900,
+    backgroundColor: color.sunken,
     padding: space.xl,
     justifyContent: "space-between",
     gap: space.md,

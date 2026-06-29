@@ -1,9 +1,11 @@
 import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react-native";
 import * as DocumentPicker from "expo-document-picker";
+import { StyleSheet } from "react-native";
 
 import { createGatewayClient } from "../src/api/client";
 import type { AuthContextValue } from "../src/auth/AuthProvider";
 import { AssetDetailScreen } from "../src/screens/AssetDetailScreen";
+import { color } from "../src/theme";
 import {
   AssetListScreen,
   type AssetSummary,
@@ -227,6 +229,14 @@ describe("asset screens", () => {
       expect(uploaderId.props.numberOfLines).toBe(1);
       expect(uploaderId.props.ellipsizeMode).toBe("tail");
       expect(view.getByTestId("asset-tech-details")).toBeTruthy();
+    });
+
+    it("EC-T4-1: playback-idle frame uses dark surface token (sunken) not ink900 on dark canvas", async () => {
+      const view = await renderDetail();
+      await waitFor(() => expect(view.getByTestId("asset-playback-idle")).toBeTruthy());
+      const frame = view.getByTestId("asset-playback-idle");
+      const flat = StyleSheet.flatten(frame.props.style);
+      expect(flat.backgroundColor).toBe(color.sunken);
     });
 
     it("HP-1: finalized asset shows Play and opens inline playback after an explicit tap", async () => {

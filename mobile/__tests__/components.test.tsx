@@ -35,6 +35,7 @@ import { Card } from "../src/components/Card";
 import { IconBadge } from "../src/components/IconBadge";
 import { Screen } from "../src/components/Screen";
 import { ScreenHeader } from "../src/components/ScreenHeader";
+import { SelectField } from "../src/components/Select";
 import { StateView } from "../src/components/StateView";
 import { VideoPlayer } from "../src/components/VideoPlayer";
 import { color, space } from "../src/theme";
@@ -216,6 +217,9 @@ describe("VideoPlayer", () => {
     expect(view.getByTestId("player")).toBeTruthy();
     expect(view.getByText("Original track")).toBeTruthy();
     expect(view.getByText("Loading video")).toBeTruthy();
+    expect(StyleSheet.flatten(view.getByTestId("player").props.style).backgroundColor).toBe(
+      color.sunken,
+    );
     expect(StyleSheet.flatten(view.getByText("Loading video").props.style).color).toBe(color.onPrimary);
     expect(
       StyleSheet.flatten(view.getByText("Preparing the player for playback.").props.style).color,
@@ -287,6 +291,28 @@ describe("VideoPlayer", () => {
     expect(
       view.getByText("A playback source is required before the player can start."),
     ).toBeTruthy();
+  });
+});
+
+describe("SelectField", () => {
+  it("EC-5: error copy uses a dark-theme-safe meta foreground instead of the large-UI danger accent", async () => {
+    const view = await render(
+      <SelectField
+        label="Status"
+        value="draft"
+        onChange={() => {}}
+        error="Pick a valid state"
+        errorTestID="select-error"
+        options={[
+          { label: "Draft", value: "draft" },
+          { label: "Ready", value: "ready" },
+        ]}
+      />,
+    );
+
+    expect(StyleSheet.flatten(view.getByTestId("select-error").props.style).color).toBe(
+      color.ink700,
+    );
   });
 });
 

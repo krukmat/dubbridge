@@ -1,6 +1,6 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { color, radius, space, type } from '../theme';
+import { color, radius, space, type } from "../theme";
 
 export type SelectOption = {
   label: string;
@@ -70,7 +70,7 @@ export function SelectField({ label, error, errorTestID, ...selectProps }: Selec
 
 const styles = StyleSheet.create({
   row: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: space.sm,
   },
   pill: {
@@ -105,6 +105,6 @@ const styles = StyleSheet.create({
   },
   errorText: {
     ...type.meta,
-    color: color.danger,
+    color: color.ink700,
   },
 });

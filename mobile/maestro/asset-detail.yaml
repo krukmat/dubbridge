@@ -67,11 +67,18 @@ tags:
 - assertVisible: Demo Reel 2026
 - assertVisible: Ready
 
-# Technical details accordion (D5/T5): ids are hidden by default; expand before asserting
+# Screenshot captures the default media-first state (tech details collapsed)
+- takeScreenshot: 04_asset_detail
+
+# Technical details accordion (D5/T5): scroll to toggle, expand, then assert ids are reachable
+- scrollUntilVisible:
+    element:
+      id: asset-tech-details-toggle
+    direction: DOWN
+    timeout: 5000
+
 - tapOn:
     id: asset-tech-details-toggle
 
 - assertVisible: asset-seed-1
 - assertVisible: e2e-user
-
-- takeScreenshot: 04_asset_detail

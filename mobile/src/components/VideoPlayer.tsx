@@ -137,18 +137,18 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: color.border,
-    backgroundColor: color.ink900,
+    backgroundColor: color.sunken,
     minHeight: 220,
   },
   video: {
     width: "100%",
     aspectRatio: 16 / 9,
-    backgroundColor: color.ink900,
+    backgroundColor: color.sunken,
   },
   overlay: {
     ...StyleSheet.absoluteFill,
     justifyContent: "center",
-    backgroundColor: color.ink900,
+    backgroundColor: color.sunken,
   },
   metaRow: {
     position: "absolute",
