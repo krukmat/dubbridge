@@ -1,6 +1,6 @@
 # DubBridge
 
-You know how a show on Netflix can be watched dubbed in your own language? DubBridge brings that to your own videos — it takes something filmed in one language and turns it into a version people can watch in another, with new spoken audio and subtitles.
+DubBridge takes a video filmed in one language and turns it into a version people can watch in another — with new spoken audio and subtitles, the same way localized shows work on streaming platforms.
 
 It's made for creators who want their work seen beyond the language it was filmed in: publish a video, make it watchable for people who speak something else, and share it with their community — all while staying in control of who's allowed to use your content, and with a real person reviewing every version before it goes public.
 

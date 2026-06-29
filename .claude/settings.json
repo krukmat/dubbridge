@@ -210,7 +210,8 @@
       "Bash(python3 /Users/matias/dubbridge/scripts/check-primary-label-usage.py)",
       "Bash(grep -nE '^#{1,3} ' docs/architecture.md)",
       "Bash(grep -c '\\\\.md$')",
-      "Bash(grep -nE '^#{1,3} ' docs/playbooks/AGENT_WORKFLOW_GUIDE.md)"
+      "Bash(grep -nE '^#{1,3} ' docs/playbooks/AGENT_WORKFLOW_GUIDE.md)",
+      "Bash(GEMMA_REVIEW_BASE=\"origin/main...HEAD\" DUBBRIDGE_SKIP_GEMMA_REVIEW=1 make qa-docs)"
     ]
   },
   "hooks": {
