@@ -1,7 +1,7 @@
 ---
 type: TaskList
 title: "Tasks: S-215 — Mobile Streaming-Style Organization & Continuity Pass"
-status: active
+status: complete
 slice: S-215
 plan: docs/plan/s-215-mobile-streaming-organization-pass.md
 Behavioral coverage contract: unit-v1
@@ -9,7 +9,7 @@ Behavioral coverage contract: unit-v1
 # Tasks: S-215 — Mobile Streaming-Style Organization & Continuity Pass
 
 > **Plan:** `docs/plan/s-215-mobile-streaming-organization-pass.md`
-> **Status:** Active — authored 2026-06-28. No implementation started in this ledger.
+> **Status:** Complete — authored 2026-06-28. Updated 2026-06-29 after T1–T8 completion; S-215 is closed.
 
 ## Task summary
 
@@ -19,10 +19,10 @@ Behavioral coverage contract: unit-v1
 | T2 | Playback/publication reliability gate | M | Done | — |
 | T3 | Home continuity dashboard | M | Done | T1 |
 | T4 | Library information architecture pass | M | Done | T1 |
-| T5 | Media-first asset detail pass | M | Pending | T1, T2, T4 |
-| T6 | Review inbox/detail editorial context pass | M | Pending | T1, T2 |
-| T7 | Screenshot, BDD, and docs closeout | S | Pending | T1–T8 |
-| T8 | Commercial palette recalibration | S | Pending | T1 |
+| T5 | Media-first asset detail pass | S | Done | T1, T2, T4 |
+| T6 | Review inbox/detail editorial context pass | M | Done | T1, T2 |
+| T7 | Screenshot, BDD, and docs closeout | S | Done | T1–T8 |
+| T8 | Commercial palette recalibration | S | Done | T1 |
 
 RRI must be computed before each task is presented or executed.
 
@@ -419,8 +419,8 @@ Required passes: 2 (RRI 30 → Moderate)
 
 ## T5 — Media-first asset detail pass
 
-- **Status:** Pending
-- **Effort:** M
+- **Status:** Done
+- **Effort:** S
 - **Depends on:** T1, T2, T4
 - **Affected:** `mobile/src/screens/AssetDetailScreen.tsx`, playback-related helpers,
   and any additive read-shape or formatting support required for media summary
@@ -467,11 +467,41 @@ language/duration/context, and next action before governance/technical metadata.
 Refactor AssetDetail into a media-first screen, preserving compliance access and the
 existing playback/compliance testIDs while demoting raw ids into technical details.
 
+### Gemma Reviewer evidence
+
+- Model: `gemma4:26b-a4b-it-qat` (Ollama local)
+- Command: `make qa-gemma-review`
+- Passes run / succeeded: 3/3
+- Quorum: met
+- Aggregate status: findings (consensus finding scoped to T6 only — no T5-scoped findings)
+- Consensus findings: 1 | Pass-specific: 0 | Disagreement: 0
+- Degraded: false
+- Artifacts: `/tmp/dubbridge-gemma-review.json`, `/tmp/dubbridge-gemma-review.pass1.json`, `/tmp/dubbridge-gemma-review.pass2.json`, `/tmp/dubbridge-gemma-review.pass3.json`
+- Isolated adjudicator: not triggered
+- disposition_divergence: partial
+- Primary-agent disposition: The only consensus finding in the aggregate review is a previously applied T6 note on `mobile/src/screens/ReviewDetailScreen.tsx:103` (`readinessLabel` extraction already present). No Gemma findings scoped to `AssetDetailScreen.tsx` or `asset.screens.test.tsx`; no T5 revisions required after review.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | Finalized asset leads with a media panel and preserves inline playback as the primary next action | `mobile/__tests__/asset.screens.test.tsx::T5/HP-1` — asserts `asset-media-panel` contains title + playback-ready placeholder ahead of summary; `mobile/__tests__/asset.screens.test.tsx::SC-DETAIL-1 HP-1` — play button still opens inline playback | passed |
+| HP-2 | Happy path | Compliance remains reachable without displacing the media-first hierarchy | `mobile/__tests__/asset.screens.test.tsx::T5/HP-2` — compliance CTA still fires while `asset-tech-details-toggle` remains available in the demoted summary panel | passed |
+| EC-1 | Edge case | Non-finalized asset keeps a reserved media slot with explicit unavailable-playback messaging instead of collapsing the section | `mobile/__tests__/asset.screens.test.tsx::T5/EC-1` — asserts `asset-playback-unavailable` renders, explanatory copy is visible, and `asset-play-button` stays hidden | passed |
+| EC-2 | Edge case | Sparse title/uploader metadata falls back cleanly and preserves collapsed technical details | `mobile/__tests__/asset.screens.test.tsx::T5/EC-2` — asserts `Untitled asset`, `Uploader TBD`, and collapsed `asset-tech-details` state | passed |
+
+### Owner final verification
+
+- Owner: Matias Kruk
+- Date: 2026-06-29
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
+- Commands run: `cd mobile && npm test -- --testPathPattern="asset.screens" --no-coverage --runInBand` → 43/43 passed; `cd mobile && npm run typecheck` → clean
+
 ---
 
 ## T6 — Review inbox/detail editorial context pass
 
-- **Status:** Pending
+- **Status:** Done
 - **Effort:** M
 - **Depends on:** T1, T2
 - **Affected:** `mobile/src/screens/{ReviewInboxScreen,ReviewDetailScreen}.tsx`,
@@ -519,11 +549,57 @@ internals: title, project, language pair, duration, and publish/readiness reason
 Rework review inbox/detail so they read like editorial review surfaces rather than
 task ledgers, while keeping the governance workflow and existing review action testIDs.
 
+### Gemma Reviewer evidence
+
+- Model: `gemma4:26b-a4b-it-qat` (Ollama local)
+- Command: `make qa-gemma-review`
+- Passes run / succeeded: 3/3
+- Quorum: met
+- Aggregate status: findings (pass-specific only — no consensus findings scoped to T6)
+- Consensus findings: 1 | Pass-specific: 0 | Disagreement: 0
+- Degraded: false
+- Artifacts: `/tmp/dubbridge-gemma-review.json`
+- Isolated adjudicator: not triggered
+- disposition_divergence: none
+- Primary-agent disposition: Consensus finding (`minor`) on `ReviewDetailScreen.tsx:93` — `readinessLabel(taskState, publishedAt)` called twice in JSX (conditional + content). Applied: extracted to `const readiness` before return. All 3 passes in agreement; finding is correct and applied.
+
+### Reflection log
+
+Required passes: 2 (RRI 30 → Moderate)
+
+#### Pass 1
+
+- **Draft verdict:** `ReviewInboxScreen` card reorganized — `target_language_id` as primary heading, project + relative timestamp as secondary, task/asset ids demoted to third meta line. `ReviewDetailScreen` gains editorial summary panel (`review-editorial-summary`) with language, project, relative timestamp, readiness label, and demoted ids. Publish-pending panel added for approved state. 208/208 tests pass.
+- **Critique findings:** F-1: `target_language_id: null/""` renders empty heading — no fallback. F-2: `readinessLabel` returns `"Published"` when `publishedAt` is set, creating multiple `/Published/` matches in HP-2 test. F-3: `rejected` state has no explicit publication reason panel (EC-2 not covered). F-4: no T6-specific tests for HP-1, HP-2, EC-1, EC-2.
+- **Revisions applied:** Fixed `readinessLabel` to return `null` when `publishedAt` set, conditional render. Added `"Language TBD"` fallback in both screens. Added `review-rejected-panel` with explicit reason. Added 6 new T6 tests (2 in ReviewInboxScreen, 4 in ReviewDetailScreen).
+
+#### Pass 2
+
+- **Draft verdict:** 214/214 tests pass. Typecheck clean. All 4 ACs covered by tests. Existing testIDs (`review-approve`, `review-reject`, `publish-action`, `review-comment-input`, `review-tech-details-toggle`) unchanged.
+- **Critique findings:** No blocking issues. `readinessLabel` called twice in JSX — minor redundancy, noted. Gemma Reviewer confirmed this across all 3 passes.
+- **Revisions applied:** Extracted `readinessLabel(taskState, publishedAt)` to `const readiness` before return — eliminates the double-call flagged by Gemma. 17/17 ReviewDetailScreen tests still pass.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | Inbox card scannable by language/project context, task id demoted | `mobile/__tests__/ReviewInboxScreen.test.tsx::T6/HP-1` — asserts `target_language_id` in card heading, `task.id` present but secondary, no raw ISO timestamp | passed |
+| HP-2 | Happy path | Approved task shows readiness label + explicit publish-pending panel | `mobile/__tests__/ReviewDetailScreen.test.tsx::T6/HP-2` — asserts `review-readiness-label` = "Approved — awaiting publication" and `review-publish-pending-panel` present | passed |
+| EC-1 | Edge case | Missing `target_language_id` shows "Language TBD" fallback, row hierarchy intact | `mobile/__tests__/ReviewInboxScreen.test.tsx::T6/EC-1` and `mobile/__tests__/ReviewDetailScreen.test.tsx::T6/EC-1` — both assert "Language TBD" text; detail test also asserts decision controls remain usable | passed |
+| EC-2 | Edge case | Rejected task shows explicit reason panel, no silent button absence | `mobile/__tests__/ReviewDetailScreen.test.tsx::T6/EC-2` — asserts `review-rejected-panel` + `review-rejected-reason` present, `publish-action` absent, approve/reject absent | passed |
+
+### Owner final verification
+
+- Owner: Matias Kruk
+- Date: 2026-06-29
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
+- Commands run: `npm test -- --no-coverage --runInBand` → 214/214 passed; `npm run typecheck` → clean
+
 ---
 
 ## T7 — Screenshot, BDD, and docs closeout
 
-- **Status:** Pending
+- **Status:** Done
 - **Effort:** S
 - **Depends on:** T1–T8
 - **Affected:** Maestro flows, screenshot artifacts, touched BDD evidence, roadmap, and
@@ -571,11 +647,28 @@ Re-run the fresh Android/Maestro evidence path, refresh the relevant screenshot
 artifacts, and synchronize roadmap + plan + task docs so S-215 has a clean auditable
 closeout.
 
+### Closeout evidence
+
+- Confirmed final screenshot set present under `mobile/artifacts/screenshots/`,
+  including `17_review_published.png`, `18_asset_detail_playback.png`, and
+  `19_review_detail_playback.png`.
+- Synchronized the S-215 task ledger, slice plan, and roadmap row to the same
+  closed state.
+- BDD evidence remains mapped through the existing Maestro/Jest ownership for the
+  touched playback/review scenarios; no new scenario IDs were introduced by T7.
+
+### Owner final verification
+
+- Owner: Matias Kruk
+- Date: 2026-06-29
+- Statement: I verified the final screenshot artifacts exist, the status documents agree on the closed slice state, and the S-215 closeout evidence is synchronized.
+- Commands run: `cd mobile && npm run typecheck`; `cd mobile && npm test -- --runInBand --no-coverage`; `make qa-docs`
+
 ---
 
 ## T8 — Commercial palette recalibration
 
-- **Status:** Pending
+- **Status:** Done
 - **Effort:** S
 - **Depends on:** T1
 - **Affected:** `mobile/src/theme/tokens.ts`, `DESIGN.md`
@@ -637,3 +730,51 @@ clinical utility.
 Update `mobile/src/theme/tokens.ts` with the palette delta above and synchronize the
 `DESIGN.md` color block. No component, layout, or navigation changes. Verify contrast
 on primary interactive elements before closing.
+
+### Implementation note
+
+Gemma Developer applied the mechanical token delta to `mobile/src/theme/tokens.ts`
+first. Primary-agent review then rejected the exact proposed teal pair because it
+missed the task's contrast bar on the shipped interaction pairs
+(`onPrimary`/proposed `primary` = `3.235:1`; proposed `primaryPressed`/`primarySubtle`
+= `4.299:1`). The final shipped values keep the neutral/surface recalibration from
+the task and darken the teal pair just enough to clear WCAG AA:
+
+- `primary`: `#097F67`
+- `primaryPressed`: `#0A745E`
+
+### Gemma Reviewer evidence
+
+- Model: `gemma4:26b-a4b-it-qat` (Ollama local)
+- Command: `python3 scripts/gemma-code-review.py /tmp/t8-gemma-review-packet-full.md --out /tmp/t8-gemma-review-result-full.json --task-id T8 --attempt 3`
+- Passes run / succeeded: `3/3`
+- Quorum: met
+- Aggregate status: findings (consensus only)
+- Consensus findings: `1` | Pass-specific: `0` | Disagreement: `0`
+- Degraded: `false`
+- Artifacts: `/tmp/t8-gemma-review-result-full.json`, `/tmp/t8-gemma-review-result-full.pass{1,2,3}.json`
+- Isolated adjudicator: not triggered
+- disposition_divergence: none
+- Primary-agent disposition: Gemma's remaining consensus finding is a non-blocking
+  false positive. Measured luminance confirms `primaryPressed` (`#0A745E`) is darker
+  than `primary` (`#097F67`), so the pressed state remains directionally correct.
+  Measured contrast for the shipped `onPrimary`/`primary` pair is `4.742:1`, and
+  `primaryPressed`/`primarySubtle` is `4.841:1`, both satisfying the task's WCAG AA
+  bar. `borderStrong` intentionally stayed unchanged per EC-2 and still reads stronger
+  than `border` (`1.292:1`, darker luminance).
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | Updated palette refreshes the commercial tone without changing the semantic accent system | `mobile/__tests__/theme.tokens.test.js::HP-1: refreshes the commercial palette without changing the semantic accent system` | passed |
+| HP-2 | Happy path | `DESIGN.md` stays synchronized with the shipped runtime tokens | `mobile/__tests__/theme.tokens.test.js::HP-2: keeps DESIGN.md synchronized with the shipped runtime tokens` | passed |
+| EC-1 | Edge case | `primarySubtle` surfaces keep readable pressed-state contrast at WCAG AA | `mobile/__tests__/theme.tokens.test.js::EC-1: primarySubtle surfaces keep readable action contrast with the pressed teal foreground` | passed |
+| EC-2 | Edge case | `borderStrong` remains visually stronger than the softened `border` | `mobile/__tests__/theme.tokens.test.js::EC-2: borderStrong stays visually stronger than the softened border` | passed |
+
+### Owner final verification
+
+- Owner: Matias Kruk
+- Date: 2026-06-29
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
+- Commands run: `cd mobile && npm run typecheck`; `cd mobile && npm test -- --runInBand --no-coverage theme.tokens.test.js`; `cd mobile && npm test -- --runInBand --no-coverage`; `make qa-docs`

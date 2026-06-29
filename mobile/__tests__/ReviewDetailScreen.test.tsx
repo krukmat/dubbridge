@@ -454,4 +454,74 @@ describe("ReviewDetailScreen", () => {
     );
     expect(mockAuth.logout).not.toHaveBeenCalled();
   });
+
+  it("T6/HP-1: editorial summary shows language, project, readiness label, and demoted ids", async () => {
+    await render(
+      <ReviewDetailScreen
+        task={BASE_TASK}
+        gatewayBaseUrl="http://gateway"
+        onBack={jest.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("review-editorial-summary")).toBeTruthy());
+    const summary = screen.getByTestId("review-editorial-summary");
+    const summaryText = JSON.stringify(summary);
+
+    // Language and project are visible in the editorial panel.
+    expect(summaryText).toContain(BASE_TASK.target_language_id);
+    expect(summaryText).toContain(BASE_TASK.project_id);
+    // Readiness label present for pending state.
+    expect(screen.getByTestId("review-readiness-label")).toBeTruthy();
+    expect(screen.getByTestId("review-readiness-label").props.children).toBe("Pending review");
+    // Ids appear in summary (demoted but visible).
+    expect(summaryText).toContain(BASE_TASK.id);
+    expect(summaryText).toContain(BASE_TASK.asset_id);
+  });
+
+  it("T6/HP-2: approved task shows explicit readiness label and publish-pending panel", async () => {
+    await render(
+      <ReviewDetailScreen
+        task={{ ...BASE_TASK, state: "approved" }}
+        gatewayBaseUrl="http://gateway"
+        onBack={jest.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("review-publish-pending-panel")).toBeTruthy());
+    expect(screen.getByTestId("review-readiness-label").props.children).toBe("Approved — awaiting publication");
+    expect(screen.getByTestId("review-publish-pending-reason")).toBeTruthy();
+  });
+
+  it("T6/EC-1: missing target_language_id shows Language TBD fallback in editorial summary", async () => {
+    await render(
+      <ReviewDetailScreen
+        task={{ ...BASE_TASK, target_language_id: "" }}
+        gatewayBaseUrl="http://gateway"
+        onBack={jest.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("review-editorial-summary")).toBeTruthy());
+    expect(screen.getByText("Language TBD")).toBeTruthy();
+    // Decision controls remain usable despite missing metadata.
+    expect(screen.getByTestId("review-approve")).toBeTruthy();
+    expect(screen.getByTestId("review-reject")).toBeTruthy();
+  });
+
+  it("T6/EC-2: rejected task shows explicit reason panel instead of silent button absence", async () => {
+    await render(
+      <ReviewDetailScreen
+        task={{ ...BASE_TASK, state: "rejected" }}
+        gatewayBaseUrl="http://gateway"
+        onBack={jest.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("review-rejected-panel")).toBeTruthy());
+    expect(screen.getByTestId("review-rejected-reason")).toBeTruthy();
+    expect(screen.queryByTestId("publish-action")).toBeNull();
+    expect(screen.queryByTestId("review-approve")).toBeNull();
+    expect(screen.queryByTestId("review-reject")).toBeNull();
+  });
 });

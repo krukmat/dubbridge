@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { formatId, formatStatusLabel, formatTimestamp } from "../format";
+import { formatId, formatRelative, formatStatusLabel, formatTimestamp } from "../format";
 
 import { type ReviewTaskSummary } from "../api/review";
 import { ActionBar, ACTION_BAR_CONTENT_HEIGHT } from "../components/ActionBar";
@@ -74,6 +74,13 @@ function ReviewActionBars({ taskState, publishedAt, isSubmitting, decide, publis
   return null;
 }
 
+function readinessLabel(taskState: TaskState, publishedAt: string | null): string | null {
+  if (publishedAt) return null;
+  if (taskState === "approved") return "Approved — awaiting publication";
+  if (taskState === "rejected") return "Rejected";
+  return "Pending review";
+}
+
 export function ReviewDetailScreen({ task, gatewayBaseUrl, onBack }: ReviewDetailScreenProps) {
   const { taskState, comment, setComment, publishedAt, mutation, decide, publish } =
     useReviewDetailMutations(task, gatewayBaseUrl);
@@ -81,15 +88,27 @@ export function ReviewDetailScreen({ task, gatewayBaseUrl, onBack }: ReviewDetai
   const playbackState = usePlaybackLoader({ assetId: task.asset_id, gatewayBaseUrl, attempt: playbackAttempt });
   const isSubmitting = mutation.kind === "submitting";
   const actionBarHeight = ACTION_BAR_CONTENT_HEIGHT + space.md * 2;
+  const readiness = readinessLabel(taskState, publishedAt);
 
   return (
     <View style={styles.container}>
       <Screen testID="review-detail-screen" scroll extraBottomPadding={actionBarHeight}>
         <ScreenHeader kicker="Review" title="Review task" />
-        <Panel>
-          <View style={styles.row}><Text style={styles.label}>Task ID</Text><Text style={styles.value} numberOfLines={1} ellipsizeMode="tail">{formatId(task.id)}</Text></View>
-          <View style={styles.row}><Text style={styles.label}>Asset</Text><Text style={styles.value} numberOfLines={1} ellipsizeMode="tail">{formatId(task.asset_id)}</Text></View>
-          <View style={styles.row}><Text style={styles.label}>State</Text><Badge label={formatStatusLabel(taskState)} tone={statusTone(taskState)} /></View>
+        <Panel testID="review-editorial-summary">
+          <View style={styles.row}>
+            <Text style={styles.editorialLang} numberOfLines={1}>{formatId(task.target_language_id) || "Language TBD"}</Text>
+            <Badge label={formatStatusLabel(taskState)} tone={statusTone(taskState)} />
+          </View>
+          <Text style={styles.editorialMeta}>
+            Project {formatId(task.project_id)} · {formatRelative(task.updated_at)}
+          </Text>
+          {readiness ? (
+            <Text style={styles.readinessLabel} testID="review-readiness-label">
+              {readiness}
+            </Text>
+          ) : null}
+          <Text style={styles.techIdMeta} numberOfLines={1} ellipsizeMode="tail">{formatId(task.id)}</Text>
+          <Text style={styles.techIdMeta} numberOfLines={1} ellipsizeMode="tail">{formatId(task.asset_id)}</Text>
         </Panel>
         <Panel>
           <Text style={styles.sectionTitle}>Playback</Text>
@@ -103,7 +122,22 @@ export function ReviewDetailScreen({ task, gatewayBaseUrl, onBack }: ReviewDetai
           {mutation.kind === "error" ? <Text style={styles.errorText} accessibilityRole="alert" accessibilityLiveRegion="assertive">{mutation.message}</Text> : null}
         </Panel>
         {taskState === "approved" && publishedAt ? (
-          <Panel><Text style={styles.sectionTitle}>Publication</Text><Text style={styles.body} accessibilityLiveRegion="polite">Published {new Date(publishedAt).toLocaleString()}</Text></Panel>
+          <Panel>
+            <Text style={styles.sectionTitle}>Publication</Text>
+            <Text style={styles.body} accessibilityLiveRegion="polite">Published {formatTimestamp(publishedAt)}</Text>
+          </Panel>
+        ) : null}
+        {taskState === "approved" && !publishedAt ? (
+          <Panel testID="review-publish-pending-panel">
+            <Text style={styles.sectionTitle}>Publication</Text>
+            <Text style={styles.body} testID="review-publish-pending-reason">Ready to publish — use the button below to make this content available.</Text>
+          </Panel>
+        ) : null}
+        {taskState === "rejected" ? (
+          <Panel testID="review-rejected-panel">
+            <Text style={styles.sectionTitle}>Publication</Text>
+            <Text style={styles.body} testID="review-rejected-reason">Not available for publication — this task was rejected.</Text>
+          </Panel>
         ) : null}
         <Button label="Back to inbox" variant="secondary" onPress={onBack} />
       </Screen>
@@ -117,6 +151,10 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   label: { ...type.label, color: color.ink400 },
   value: { ...type.meta, color: color.ink700, flex: 1, flexShrink: 1, textAlign: "right", marginLeft: space.md },
+  editorialLang: { ...type.heading, color: color.ink900, flex: 1 },
+  editorialMeta: { ...type.meta, color: color.ink400, marginTop: space.xs },
+  readinessLabel: { ...type.body, color: color.ink500, marginTop: space.xs },
+  techIdMeta: { ...type.meta, color: color.ink300, marginTop: space.xs },
   sectionTitle: { ...type.heading, color: color.ink900 },
   comparisonStack: { gap: space.md },
   comparisonPanel: { gap: space.xs, padding: space.md, borderRadius: radius.lg, borderWidth: 1, borderColor: color.border, backgroundColor: color.sunken },

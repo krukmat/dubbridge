@@ -1,6 +1,6 @@
 import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 
-import { formatId, formatStatusLabel, formatTimestamp } from "../format";
+import { formatId, formatRelative, formatStatusLabel } from "../format";
 
 import { type ReviewTaskSummary } from "../api/review";
 import { Badge, statusTone } from "../components/Badge";
@@ -22,17 +22,17 @@ function ReviewTaskCard({ task, onPress }: { task: ReviewTaskSummary; onPress: (
     <Card
       testID={`review-task-card-${task.id}`}
       onPress={onPress}
-      accessibilityLabel={`Review task ${task.id}, state ${formatStatusLabel(task.state)}`}
+      accessibilityLabel={`Review task ${task.id}, state ${formatStatusLabel(task.state)}, language ${formatId(task.target_language_id)}`}
       trailing="chevron"
     >
       <View style={styles.cardRow}>
-        <Text style={styles.taskId} numberOfLines={1}>Task {formatId(task.id)}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>{formatId(task.target_language_id) || "Language TBD"}</Text>
         <Badge label={formatStatusLabel(task.state)} tone={statusTone(task.state)} />
       </View>
-      <Text style={styles.meta}>Asset {formatId(task.asset_id)}</Text>
       <Text style={styles.meta}>
-        Project {formatId(task.project_id)} · Updated {formatTimestamp(task.updated_at)}
+        Project {formatId(task.project_id)} · {formatRelative(task.updated_at)}
       </Text>
+      <Text style={styles.taskIdMeta} numberOfLines={1}>Task {formatId(task.id)} · Asset {formatId(task.asset_id)}</Text>
     </Card>
   );
 }
@@ -102,7 +102,8 @@ const styles = StyleSheet.create({
   listContent: { gap: space.md, paddingBottom: space.xl },
   emptyContent: { flexGrow: 1 },
   cardRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: space.sm },
-  taskId: { ...type.heading, color: color.ink900, flex: 1 },
+  cardTitle: { ...type.heading, color: color.ink900, flex: 1 },
   meta: { ...type.meta, color: color.ink400 },
+  taskIdMeta: { ...type.meta, color: color.ink300 },
   notificationMessage: { ...type.meta, color: color.ink500 },
 });

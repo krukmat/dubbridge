@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react-native";
+import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react-native";
 import * as DocumentPicker from "expo-document-picker";
 
 import { createGatewayClient } from "../src/api/client";
@@ -188,7 +188,7 @@ describe("asset screens", () => {
       const view = await renderDetail();
 
       await waitFor(() => {
-        expect(view.getByText("Test Video")).toBeTruthy();
+        expect(view.getByTestId("asset-media-panel")).toBeTruthy();
       });
 
       expect(view.getByTestId("asset-detail-screen")).toBeTruthy();
@@ -196,7 +196,7 @@ describe("asset screens", () => {
         `/api/assets/${ASSET.id}`,
         "opaque-session-abc123",
       );
-      expect(view.getByText("Ready")).toBeTruthy();
+      expect(view.getAllByText("Ready").length).toBeGreaterThan(0);
       expect(view.getByText("Compliance and consent")).toBeTruthy();
       expect(view.getByTestId("asset-open-compliance")).toBeTruthy();
     });
@@ -210,7 +210,7 @@ describe("asset screens", () => {
       const view = await renderDetail();
 
       await waitFor(() => {
-        expect(view.getByText("Test Video")).toBeTruthy();
+        expect(view.getByTestId("asset-summary-panel")).toBeTruthy();
       });
 
       // Ids are not visible by default
@@ -301,7 +301,7 @@ describe("asset screens", () => {
 
       const view = await renderDetail();
 
-      await waitFor(() => expect(view.getByText("Test Video")).toBeTruthy());
+      await waitFor(() => expect(view.getByTestId("asset-playback-unavailable")).toBeTruthy());
       expect(view.queryByTestId("asset-play-button")).toBeNull();
       expect(mockClient.post).not.toHaveBeenCalled();
     });
@@ -478,6 +478,57 @@ describe("asset screens", () => {
 
       expect(view.queryByTestId("asset-list-empty-cta")).toBeNull();
       expect(view.queryByText("Upload asset")).toBeNull();
+    });
+  });
+
+  // T5: Media-first asset detail hierarchy
+  describe("T5: Media-first asset detail hierarchy", () => {
+    const onOpenCompliance = jest.fn();
+
+    beforeEach(() => {
+      onOpenCompliance.mockClear();
+    });
+
+    it('HP-1: status "finalized" renders the title and media placeholder inside the lead media panel', async () => {
+      mockClient.get.mockResolvedValueOnce({ ok: true, value: { data: { ...ASSET }, sessionRotation: null } });
+      const view = await render(<AssetDetailScreen assetId={ASSET.id} gatewayBaseUrl="http://127.0.0.1:4000" onOpenCompliance={onOpenCompliance} />);
+      await waitFor(() => expect(view.getByTestId("asset-media-panel")).toBeTruthy());
+
+      const mediaPanel = view.getByTestId("asset-media-panel");
+      expect(within(mediaPanel).getByText("Original track")).toBeTruthy();
+      expect(within(mediaPanel).getByText("Test Video")).toBeTruthy();
+      expect(within(mediaPanel).getByText("Playback ready")).toBeTruthy();
+      expect(view.getByTestId("asset-summary-panel")).toBeTruthy();
+      expect(view.getByTestId("asset-open-compliance")).toBeTruthy();
+    });
+
+    it('HP-2: finalized asset keeps compliance reachable without displacing the media-first hierarchy', async () => {
+      mockClient.get.mockResolvedValueOnce({ ok: true, value: { data: { ...ASSET }, sessionRotation: null } });
+      const view = await render(<AssetDetailScreen assetId={ASSET.id} gatewayBaseUrl="http://127.0.0.1:4000" onOpenCompliance={onOpenCompliance} />);
+      await waitFor(() => expect(view.getByTestId("asset-open-compliance")).toBeTruthy());
+      fireEvent.press(view.getByTestId("asset-open-compliance"));
+      expect(onOpenCompliance).toHaveBeenCalledTimes(1);
+      expect(view.getByTestId("asset-tech-details-toggle")).toBeTruthy();
+    });
+
+    it('EC-1: pending asset keeps the media slot visible with an unavailable-playback explanation', async () => {
+      mockClient.get.mockResolvedValueOnce({ ok: true, value: { data: { ...ASSET, status: "pending" }, sessionRotation: null } });
+      const view = await render(<AssetDetailScreen assetId={ASSET.id} gatewayBaseUrl="http://127.0.0.1:4000" onOpenCompliance={onOpenCompliance} />);
+      await waitFor(() => expect(view.getByTestId("asset-playback-unavailable")).toBeTruthy());
+      expect(view.getByTestId("asset-playback-unavailable")).toBeTruthy();
+      expect(view.getByText("Playback unavailable")).toBeTruthy();
+      expect(view.queryByTestId("asset-play-button")).toBeNull();
+      expect(view.getByTestId("asset-open-compliance")).toBeTruthy();
+    });
+
+    it('EC-2: sparse title/uploader metadata falls back cleanly and keeps technical details collapsed', async () => {
+      mockClient.get.mockResolvedValueOnce({ ok: true, value: { data: { ...ASSET, title: "   ", uploader_id: "" }, sessionRotation: null } });
+      const view = await render(<AssetDetailScreen assetId={ASSET.id} gatewayBaseUrl="http://127.0.0.1:4000" onOpenCompliance={onOpenCompliance} />);
+      await waitFor(() => expect(view.getAllByText("Untitled asset").length).toBeGreaterThan(0));
+      expect(view.getAllByText("Ready").length).toBeGreaterThan(0);
+      expect(view.getByText("Uploader TBD")).toBeTruthy();
+      expect(view.getByTestId("asset-tech-details-toggle")).toBeTruthy();
+      expect(view.queryByTestId("asset-tech-details")).toBeNull();
     });
   });
 

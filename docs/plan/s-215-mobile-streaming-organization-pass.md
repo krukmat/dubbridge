@@ -1,13 +1,13 @@
 ---
 type: Plan
 title: "Plan: S-215 — Mobile Streaming-Style Organization & Continuity Pass"
-status: active
+status: complete
 slice: S-215
 governed_by: [ADR-029]
 ---
 # Plan: S-215 — Mobile Streaming-Style Organization & Continuity Pass
 
-> **Status:** Active — authored 2026-06-28 from a fresh post-rebuild screenshot audit. Implementation pending approval.
+> **Status:** Complete (2026-06-29). P0 ✅ P1 ✅ P2 ✅ P3 ✅ — T1–T8 all Done.
 > **Roadmap phase:** `S-215`, a non-blocking mobile product follow-up on top of S-210 that focuses on organization, continuity, and media-first wayfinding.
 > **Tasks ledger:** `docs/tasks/s-215-mobile-streaming-organization-pass.md`
 
@@ -41,11 +41,11 @@ Audit source:
 | # | Severity | Finding | Screenshot evidence |
 |---|---|---|---|
 | F1 | 🔴 High | **Home is improved but still not continuity-led.** The dashboard shows recent assets and review count, but there is no "continue reviewing", "resume playback", or "next required action" organization. It still asks the user to choose a section rather than continuing their current workflow. | `02_home` |
-| F2 | 🔴 High | **Library organization is missing.** The asset surface still lacks search, filters, sort, grouping, and a distinction between "empty workspace" and "no results for current view". At scale this becomes a flat catalog with no browsing model. | `03_asset_list` |
+| F2 | 🔴 High | **Library organization is only partially solved.** The asset surface now has search, status filters, and an empty-vs-no-results split, but it still lacks sort/grouping and does not yet behave like a shared browsable collection organized by project/language dimensions. | `03_asset_list` |
 | F3 | 🔴 High | **Asset detail is not media-first yet.** Playback is present but visually secondary; metadata and compliance still carry more visual weight than the actual media object. A streaming-style surface would anchor the page around preview, duration, language, and next action. | `04_asset_detail` |
-| F4 | 🔴 High | **Review surfaces are workflow-first, not editorial-first.** `Task review-task-seed-1`, raw asset ids, and state badges dominate the first read. The reviewer should first understand title, project, language pair, duration, and why this item is in queue. | `14_review_inbox`, `15_review_detail`, `16_review_approved` |
-| F5 | 🔴 High | **Top chrome still clips into the system status area.** Several screen kickers (`ASSETS`, `UPLOAD`, `REVIEW`, `GOVERNANCE`) sit visibly too close to or under the Android status bar, making the surface feel unfinished. | `03_asset_list`, `04_asset_detail`, `05_upload`, `11_compliance_center`, `14_review_inbox` |
-| F6 | 🟡 Medium | **Runtime trust is still shaky on the exact surfaces that should sell the product.** The screenshot suite could approve a review task, but publication never rendered `Published`; separately the review playback panel showed a `401` playback error. These are not the same bug, but together they undercut the media/review story and must gate UX closeout. | `review_publish_failure.png` |
+| F4 | 🔴 High | **Review surfaces are improved but still not fully editorial-first.** The inbox/detail hierarchy now separates readiness and publication states, but the primary user-facing nouns still lean on `target_language_id`, `project_id`, and other technical identifiers rather than human content context. | `14_review_inbox`, `15_review_detail`, `16_review_approved` |
+| F5 | 🔴 High | **Asset detail is still not the strongest media anchor in the product.** The screen now has better action hierarchy, but playback/preview still needs to dominate more clearly than technical metadata and compliance copy. | `04_asset_detail`, `18_asset_detail_playback.png` |
+| F6 | 🟡 Medium | **Palette/commercial confidence is still behind the IA work.** The structure improved faster than the visual tone; the app still reads slightly clinical/utility-first and needs the planned palette recalibration pass to feel more productized without leaving ADR-029 restraint. | refreshed screenshots across `02_home`–`16_review_approved` |
 
 ## Objective
 
@@ -55,8 +55,10 @@ Audit source:
 - Make asset and review detail screens **media-first** while preserving governance
   and audit access.
 - Clarify review context with editorial signals before workflow identifiers.
-- Correct top-chrome safe-area problems and treat playback/publication runtime issues
-  as a pre-closeout gate.
+- Finish the remaining media-first asset-detail work, preserve the review/context
+  gains already landed, and close the slice with refreshed visual evidence.
+- Apply the planned palette recalibration so the improved IA also reads as a more
+  commercially confident product surface.
 
 ## Scope
 
@@ -68,6 +70,7 @@ Audit source:
 - Top-chrome/safe-area corrections on affected mobile screens.
 - Publication/playback runtime stabilization on the reviewed mobile paths.
 - Screenshot baseline refresh and docs sync.
+- Token-level palette recalibration plus synchronized `DESIGN.md` color block.
 
 ### Excluded
 
@@ -141,7 +144,7 @@ foreclose this path:
 | Follow-up | Need | Notes |
 |---|---|---|
 | X-S-215-1 | Asset/review cards need richer read data (`duration_ms`, `source_language`, `target_language`, optional poster/thumbnail key) | Placeholder tiles from S-210 are acceptable interim behavior, but real collection browsing needs these fields. |
-| X-S-215-2 | Review rows need a stable blocking/context summary (`ready for review`, `approved waiting to publish`, `publish failed`, etc.) | Can be derived client-side only if current API shape is sufficient; otherwise record additive read contract. |
+| X-S-215-2 | Review rows need stable human-readable context (`title`, project name, target-language label, blocking summary) instead of falling back to ids as the primary surface noun. | Can be derived client-side only if current API shape is sufficient; otherwise record additive read contract. |
 | X-S-215-3 | Published content requires a community-accessible read contract: channel/collection grouping keyed by project + target language, public asset metadata (title, target language, duration, thumbnail), and a stable public identifier distinct from internal asset UUIDs. | S-215 does not implement this. It is recorded explicitly so it is not silently assumed at closeout. Required before any community/discovery surface can be built on top of the publication state. |
 
 ## Affected components
@@ -153,16 +156,17 @@ foreclose this path:
 | Mobile hooks/api | `mobile/src/hooks/*`, `mobile/src/api/{playback,review}.ts` | dashboard aggregation, filter state, publish/playback flow correctness |
 | Navigation | `mobile/src/navigation/RootNavigator.tsx` | wayfinding affordances only; stack model retained unless explicitly reopened |
 | Backend/runtime if required | `apps/api`, `apps/worker-runner`, `crates/*` on playback/publication path | only if needed to resolve F6 |
+| Theme/docs | `mobile/src/theme/tokens.ts`, `DESIGN.md` | commercial palette recalibration and design-doc sync |
 | Docs | this plan, task ledger, roadmap, screenshot artifacts | status sync and evidence |
 
 ## Phased rollout
 
 | Phase | Theme | Tasks |
 |---|---|---|
-| P0 | Reliability and chrome | T1, T2 |
-| P1 | Continuity and library organization | T3, T4 |
-| P2 | Media-first detail and review context | T5, T6 |
-| P3 | Evidence and closeout | T7 |
+| P0 | Reliability and chrome | T1 ✅, T2 ✅ |
+| P1 | Continuity and library organization | T3 ✅, T4 ✅ |
+| P2 | Media-first detail and review context | T5 ✅, T6 ✅ |
+| P3 | Evidence and finish | T7 ✅, T8 ✅ |
 
 ## Task decomposition
 
@@ -172,9 +176,10 @@ foreclose this path:
 | T2 | Playback/publication reliability gate | M | — |
 | T3 | Home continuity dashboard | M | T1 |
 | T4 | Library information architecture pass | M | T1 |
-| T5 | Media-first asset detail pass | M | T1, T2, T4 |
+| T5 | Media-first asset detail pass | S | T1, T2, T4 |
 | T6 | Review inbox/detail editorial context pass | M | T1, T2 |
-| T7 | Screenshot, BDD, and docs closeout | S | T1–T6 |
+| T7 | Screenshot, BDD, and docs closeout | S | T1–T8 |
+| T8 | Commercial palette recalibration | S | T1 |
 
 RRI must be computed per task before implementation. This plan records the sequence,
 scope, and acceptance intent; it does not pre-authorize execution.
@@ -195,6 +200,7 @@ flowchart TD
   T5 --> T7
   T6 --> T7
   T2 --> T7
+  T8["T8 — commercial palette recalibration"] --> T7
 ```
 
 ## Verification expectations
@@ -205,6 +211,8 @@ flowchart TD
 - refreshed screenshots must show corrected top chrome and updated organization
 - publication path must either render the expected published state or fail with an
   explicit, reviewed product state and synchronized test evidence
+- the final screenshot set must reflect the palette recalibration and the
+  remaining asset-detail hierarchy changes
 - `make qa-docs`
 
 ## Related

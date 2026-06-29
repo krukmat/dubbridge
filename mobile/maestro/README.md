@@ -18,7 +18,7 @@ HS256 JWT bearer token) via the mock gateway.
 | 6 — Organizations and projects | `projects.yaml` | `SC-ORG-1`, `SC-PROJECT-1` | `08_home_for_projects.png`, `09_project_list.png`, `10_project_detail.png` |
 | 7 — Compliance and consent | `compliance.yaml` | `SC-AUDIT-1`, `SC-RIGHTS-1`, `SC-CONSENT-1/2` | `11_compliance_center.png`, `12_consent_active.png`, `13_consent_revoked.png` |
 | 8 — Review and publication | `review.yaml` | `SC-REVIEW-1/2`, `SC-PUBLISH-1/2` | `14_review_inbox.png`, `15_review_detail.png`, `16_review_approved.png`, `17_review_published.png` |
-| 8b — Playback surfaces | `playback.yaml` | `SC-PLAYBACK-1`, `SC-PLAYBACK-3` | `playback_review.png`, `playback_asset_detail.png` |
+| 8b — Playback surfaces | `playback.yaml` | `SC-PLAYBACK-1`, `SC-PLAYBACK-3` | `18_asset_detail_playback.png`, `19_review_detail_playback.png` |
 
 All phases from 2 onwards authenticate via the reusable `e2e-login.yaml` subflow
 using the fixed E2E credentials (`e2e@dubbridge.dev` / `e2etestpass123`). The mock

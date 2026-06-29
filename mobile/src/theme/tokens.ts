@@ -17,17 +17,17 @@ export const color = {
   ink300: "#8A949B",
 
   // Surfaces.
-  canvas: "#F4F7F6",
+  canvas: "#F7F8FA",
   raised: "#FFFFFF",
-  sunken: "#EAF0EE",
+  sunken: "#EEF0F4",
 
   // Borders.
-  border: "#D8E0DD",
+  border: "#E1E5EC",
   borderStrong: "#C2CDC8",
 
   // Primary accent (the single brand accent).
-  primary: "#127C68",
-  primaryPressed: "#0E6353",
+  primary: "#097F67",
+  primaryPressed: "#0A745E",
   primarySubtle: "#E2EFEB",
   onPrimary: "#F7FBF9",
 

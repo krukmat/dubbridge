@@ -503,4 +503,57 @@ describe("ReviewInboxScreen", () => {
     resolveProj1({ ok: true, value: { data: { org_id: "org-001", project_id: "proj-001", tasks: [] }, sessionRotation: null } });
     await waitFor(() => expect(screen.getByText("No tasks assigned")).toBeTruthy());
   });
+
+  it("T6/HP-1: review card shows language as primary heading and demotes task id to secondary meta", async () => {
+    mockClient.get.mockImplementation(async (path: string) => {
+      switch (path) {
+        case "/api/orgs":
+          return { ok: true, value: { data: [{ id: "org-001", name: "Acme", viewer_role: "reviewer" }], sessionRotation: null } };
+        case "/api/orgs/org-001/projects":
+          return { ok: true, value: { data: [{ id: "proj-001", org_id: "org-001", name: "Trailer" }], sessionRotation: null } };
+        case "/api/orgs/org-001/projects/proj-001/review-tasks":
+          return { ok: true, value: { data: { org_id: "org-001", project_id: "proj-001", tasks: [REVIEW_TASK] }, sessionRotation: null } };
+        case "/api/notifications":
+          return { ok: true, value: { data: { notifications: [] }, sessionRotation: null } };
+        default:
+          throw new Error(`Unexpected GET ${path}`);
+      }
+    });
+
+    await render(<ReviewInboxScreen gatewayBaseUrl="http://gateway" onOpenTask={jest.fn()} />);
+    await waitFor(() => expect(screen.getByTestId(`review-task-card-${REVIEW_TASK.id}`)).toBeTruthy());
+
+    const card = screen.getByTestId(`review-task-card-${REVIEW_TASK.id}`);
+    const cardText = JSON.stringify(card);
+
+    // Language appears as the primary heading content.
+    expect(cardText).toContain(REVIEW_TASK.target_language_id);
+    // Task id is present in the card but in the secondary meta text (not the heading).
+    expect(cardText).toContain(REVIEW_TASK.id);
+    // No raw ISO timestamps.
+    expect(cardText).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/);
+  });
+
+  it("T6/EC-1: card with missing target_language_id shows Language TBD fallback", async () => {
+    const TASK_NO_LANG = { ...REVIEW_TASK, id: "task-nolang", target_language_id: "" };
+    mockClient.get.mockImplementation(async (path: string) => {
+      switch (path) {
+        case "/api/orgs":
+          return { ok: true, value: { data: [{ id: "org-001", name: "Acme", viewer_role: "reviewer" }], sessionRotation: null } };
+        case "/api/orgs/org-001/projects":
+          return { ok: true, value: { data: [{ id: "proj-001", org_id: "org-001", name: "Trailer" }], sessionRotation: null } };
+        case "/api/orgs/org-001/projects/proj-001/review-tasks":
+          return { ok: true, value: { data: { org_id: "org-001", project_id: "proj-001", tasks: [TASK_NO_LANG] }, sessionRotation: null } };
+        case "/api/notifications":
+          return { ok: true, value: { data: { notifications: [] }, sessionRotation: null } };
+        default:
+          throw new Error(`Unexpected GET ${path}`);
+      }
+    });
+
+    await render(<ReviewInboxScreen gatewayBaseUrl="http://gateway" onOpenTask={jest.fn()} />);
+    await waitFor(() => expect(screen.getByTestId("review-task-card-task-nolang")).toBeTruthy());
+
+    expect(screen.getByText("Language TBD")).toBeTruthy();
+  });
 });
