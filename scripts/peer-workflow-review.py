@@ -18,8 +18,8 @@ Cross-vendor resolution (RRI 41+ only):
   unknown               -> claude
 
 Exit codes:
-  0   PASS
-  1   FINDINGS (non-blocking) or BLOCKED (only when D14 also unavailable)
+  0   PASS or FINDINGS (findings are advisory; artifact written for agent review)
+  1   BLOCKED (peer and D14 both unavailable, or explicit blocked verdict)
   2   peer invocation error / unable to review (blocked artifact written)
 """
 
@@ -468,7 +468,7 @@ def main() -> int:
         write_artifact(result, artifact)
         verdict = result["verdict"]
         print(f"[peer-review] verdict={verdict.upper()} artifact={artifact}", file=sys.stderr)
-        return 0 if verdict == "pass" else 1
+        return 1 if verdict == "blocked" else 0
 
     # Gemma band (RRI 0-40).
     try:
