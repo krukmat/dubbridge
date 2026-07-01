@@ -226,14 +226,15 @@
       "Bash(python3 scripts/rri.py --C 1 --T 1 --A 1 --X 1 --D 0 --K 1 --P 0 --touches Makefile --touches .githooks/pre-push --touches .github/workflows/ci.yml --json)",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(f'RRI {d[\\\\\"final\\\\\"]} \\({d[\\\\\"band\\\\\"][\\\\\"label\\\\\"]}\\)'\\)\")",
       "Bash(python3 scripts/rri.py --C 2 --T 1 --A 1 --X 2 --D 1 --K 1 --P 1 --json)",
-      "Bash(python3 /Users/matias/dubbridge/scripts/peer-workflow-review.py *)",
+      "Bash(python3 scripts/peer-workflow-review.py *)",
       "Bash(PEER_REVIEW_DRY_RUN=1 PEER_REVIEW_RRI=22 make qa-peer-workflow-review)",
       "Bash(python3 scripts/peer_workflow_review_test.py)",
       "Bash(DUBBRIDGE_SKIP_PEER_REVIEW=1 make qa-peer-workflow-review)",
-      "Bash(PEER_REVIEW_DRY_RUN=1 PEER_REVIEW_RRI=55 PEER_REVIEW_CALLER=codex make qa-peer-workflow-review)"
+      "Bash(PEER_REVIEW_DRY_RUN=1 PEER_REVIEW_RRI=55 PEER_REVIEW_CALLER=codex make qa-peer-workflow-review)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('STATUS:', d.get\\('status','?'\\)\\); [print\\(f\\\\\" [{f['severity']}] {f['path']}:{f.get\\('line','?'\\)} — {f['detail']}\\\\\"\\) for f in d.get\\('findings',[]\\)]\")"
     ],
     "additionalDirectories": [
-      "/Users/matias/dubbridge/docs/knowledge"
+      "docs/knowledge"
     ]
   },
   "hooks": {
