@@ -239,6 +239,15 @@ class CliBehavior(unittest.TestCase):
         payload = json.loads(r.stdout)
         self.assertEqual(payload["model"], "low-model")
 
+    def test_dry_run_falls_back_to_shared_default(self):
+        env = os.environ.copy()
+        env.pop("DUBBRIDGE_REVIEW_MODEL", None)
+        env.pop("DUBBRIDGE_LOW_RRI_MODEL", None)
+        r = self.run_cli("-", "--dry-run", stdin=_packet(), env=env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        payload = json.loads(r.stdout)
+        self.assertEqual(payload["model"], "gemma4:12b-mlx")
+
     def test_empty_packet_exits_1(self):
         r = self.run_cli("-", stdin=" \n")
         self.assertEqual(r.returncode, 1)
@@ -267,7 +276,7 @@ class AuditEmission(unittest.TestCase):
             # audit is added by T6.
             argv = [_SCRIPT, packet_file, "--out", out_path, "--passes", "1"] + (extra_args or [])
             with patch("sys.argv", argv), \
-                 patch.object(_mod.gemma_local, "ensure_model_available"), \
+                 patch.object(_mod.gemma_local, "resolve_model_with_fallback", return_value="model"), \
                  patch.object(_mod.gemma_local, "stream_chat",
                               return_value=stream_response), \
                  patch.object(_mod.gemma_local, "append_audit_log",
@@ -469,7 +478,7 @@ class MultiPassCli(unittest.TestCase):
             argv = ([_SCRIPT, packet_file, "--out", out_path, "--passes", str(n)]
                     + (extra_args or []))
             with patch("sys.argv", argv), \
-                 patch.object(_mod.gemma_local, "ensure_model_available"), \
+                 patch.object(_mod.gemma_local, "resolve_model_with_fallback", return_value="model"), \
                  patch.object(_mod.gemma_local, "stream_chat", side_effect=_mock_stream), \
                  patch.object(_mod.gemma_local, "append_audit_log"):
                 exit_code = _mod.main()
@@ -556,7 +565,7 @@ class MultiPassCli(unittest.TestCase):
                 f.write(_packet())
             argv = [_SCRIPT, packet_file, "--out", out_path, "--passes", "1"]
             with patch("sys.argv", argv), \
-                 patch.object(_mod.gemma_local, "ensure_model_available"), \
+                 patch.object(_mod.gemma_local, "resolve_model_with_fallback", return_value="model"), \
                  patch.object(_mod.gemma_local, "stream_chat",
                               return_value="STATUS: PASS\nSUMMARY: ok"), \
                  patch.object(_mod.gemma_local, "append_audit_log"):
@@ -617,7 +626,7 @@ class MultiPassCliAudit(unittest.TestCase):
             argv = ([_SCRIPT, packet_file, "--out", out_path, "--passes", str(n)]
                     + (extra_args or []))
             with patch("sys.argv", argv), \
-                 patch.object(_mod.gemma_local, "ensure_model_available"), \
+                 patch.object(_mod.gemma_local, "resolve_model_with_fallback", return_value="model"), \
                  patch.object(_mod.gemma_local, "stream_chat", side_effect=_mock_stream), \
                  patch.object(_mod.gemma_local, "append_audit_log",
                               side_effect=lambda r: captured.append(r)):
@@ -711,7 +720,7 @@ class MultiPassCliAudit(unittest.TestCase):
                 f.write(_packet())
             argv = [_SCRIPT, packet_file, "--out", out_path, "--passes", "1"]
             with patch("sys.argv", argv), \
-                 patch.object(_mod.gemma_local, "ensure_model_available"), \
+                 patch.object(_mod.gemma_local, "resolve_model_with_fallback", return_value="model"), \
                  patch.object(_mod.gemma_local, "stream_chat",
                               return_value="STATUS: PASS\nSUMMARY: ok"), \
                  patch.object(_mod.gemma_local, "append_audit_log",

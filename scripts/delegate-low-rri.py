@@ -256,8 +256,9 @@ def get_json(url, timeout):
         raise DelegationIdleTimeout(timeout) from exc
 
 
-def ensure_model_available(host, model, timeout):
-    return gemma_local.ensure_model_available(host, model, timeout)
+def resolve_model(host, model, timeout):
+    fallback = gemma_local.default_fallback_model_for("DUBBRIDGE_LOW_RRI_MODEL")
+    return gemma_local.resolve_model_with_fallback(host, model, timeout, fallback)
 
 
 def build_replacement_payload(model, packet, num_ctx, num_predict, temperature, think):
@@ -872,9 +873,14 @@ def main():
         if not args.before_file:
             raise RuntimeError("--mode before-after requires --before-file")
 
+    if args.dry_run:
+        selected_model = args.model
+    else:
+        selected_model = resolve_model(args.host, args.model, args.idle_timeout)
+
     if args.mode == "before-after":
         payload = build_replacement_payload(
-            args.model,
+            selected_model,
             packet,
             args.num_ctx,
             args.num_predict,
@@ -883,7 +889,7 @@ def main():
         )
     else:
         payload = build_payload(
-            args.model,
+            selected_model,
             packet,
             args.num_ctx,
             args.num_predict,
@@ -899,7 +905,6 @@ def main():
     system_prompt = payload["messages"][0]["content"]
     user_prompt = payload["messages"][1]["content"]
 
-    ensure_model_available(args.host, args.model, args.idle_timeout)
     wall_start = time.monotonic()
     stream_result = stream_chat(
         endpoint(args.host, "/api/chat"),

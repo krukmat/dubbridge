@@ -19,7 +19,8 @@ from typing import Optional
 
 
 DEFAULT_HOST = "http://localhost:11434"
-DEFAULT_MODEL = "gemma4:26b-a4b-it-qat"
+DEFAULT_MODEL = "gemma4:12b-mlx"
+DEFAULT_FALLBACK_MODEL = "gemma4:26b-a4b-it-qat"
 DEFAULT_IDLE_TIMEOUT_SECONDS = 180
 DEFAULT_MAX_WALL_SECONDS = 900
 DEFAULT_NUM_CTX = 40960
@@ -84,14 +85,51 @@ def get_json(url, timeout):
         raise GemmaIdleTimeout(timeout) from exc
 
 
-def ensure_model_available(host, model, timeout):
+def _installed_model_names(host, timeout):
     tags = get_json(endpoint(host, "/api/tags"), timeout)
-    installed = {item.get("name") for item in tags.get("models", [])}
+    return {item.get("name") for item in tags.get("models", [])}
+
+
+def _format_available_models(installed):
+    return ", ".join(sorted(name for name in installed if name)) or "<none>"
+
+
+def ensure_model_available(host, model, timeout):
+    installed = _installed_model_names(host, timeout)
     if model not in installed:
-        available = ", ".join(sorted(name for name in installed if name)) or "<none>"
+        available = _format_available_models(installed)
         raise RuntimeError(
             f"local Ollama model {model!r} is not installed; available: {available}",
         )
+    return model
+
+
+def resolve_model_with_fallback(host, model, timeout, fallback_model=None):
+    installed = _installed_model_names(host, timeout)
+    if model in installed:
+        return model
+    if fallback_model and fallback_model in installed:
+        print(
+            f"[gemma] model {model!r} is not installed; "
+            f"falling back to {fallback_model!r}",
+            file=sys.stderr,
+        )
+        return fallback_model
+    available = _format_available_models(installed)
+    if fallback_model:
+        raise RuntimeError(
+            f"local Ollama model {model!r} is not installed and fallback "
+            f"{fallback_model!r} is not installed; available: {available}",
+        )
+    raise RuntimeError(
+        f"local Ollama model {model!r} is not installed; available: {available}",
+    )
+
+
+def default_fallback_model_for(*override_env_names):
+    if any(os.environ.get(name) for name in override_env_names):
+        return None
+    return DEFAULT_FALLBACK_MODEL
 
 
 def build_chat_payload(

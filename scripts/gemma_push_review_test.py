@@ -74,7 +74,7 @@ def _make_packet(**kwargs):
 def _model_args(**kwargs):
     defaults = dict(
         host="http://localhost:11434",
-        model="gemma4:26b-a4b-it-qat",
+        model="gemma4:12b-mlx",
         num_ctx=32768,
         num_predict=4096,
         temperature=0.1,
@@ -691,7 +691,7 @@ class RunPushAuditOllamaUnavailable(unittest.TestCase):
         packet = _make_packet()
         run = _completed_run()
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(_mod.gemma_local, "ensure_model_available",
+            with patch.object(_mod.gemma_local, "resolve_model_with_fallback",
                               side_effect=RuntimeError("model not installed")):
                 rc = _mod.run_push_audit(packet, run, args, tmp, repo_root=tmp)
             self.assertEqual(rc, 2)
@@ -709,7 +709,7 @@ class RunPushAuditOllamaUnavailable(unittest.TestCase):
         packet = _make_packet()
         run = _completed_run()
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(_mod.gemma_local, "ensure_model_available",
+            with patch.object(_mod.gemma_local, "resolve_model_with_fallback",
                               side_effect=RuntimeError("missing")):
                 with patch.object(_mod.gemma_local, "append_audit_log") as mock_audit:
                     _mod.run_push_audit(packet, run, args, tmp, repo_root=tmp)
@@ -723,7 +723,7 @@ class RunPushAuditTimeout(unittest.TestCase):
         packet = _make_packet()
         run = _completed_run()
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(_mod.gemma_local, "ensure_model_available"):
+            with patch.object(_mod.gemma_local, "resolve_model_with_fallback", return_value="model"):
                 with patch.object(_mod.gemma_local, "stream_chat",
                                   side_effect=_gl.GemmaIdleTimeout(60)):
                     rc = _mod.run_push_audit(packet, run, args, tmp, repo_root=tmp)
@@ -738,7 +738,7 @@ class RunPushAuditTimeout(unittest.TestCase):
         packet = _make_packet()
         run = _completed_run()
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(_mod.gemma_local, "ensure_model_available"):
+            with patch.object(_mod.gemma_local, "resolve_model_with_fallback", return_value="model"):
                 with patch.object(_mod.gemma_local, "stream_chat",
                                   side_effect=_gl.GemmaWallTimeout(900)):
                     rc = _mod.run_push_audit(packet, run, args, tmp, repo_root=tmp)
@@ -754,7 +754,7 @@ class RunPushAuditTimeout(unittest.TestCase):
         packet = _make_packet()
         run = _completed_run()
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(_mod.gemma_local, "ensure_model_available"):
+            with patch.object(_mod.gemma_local, "resolve_model_with_fallback", return_value="model"):
                 with patch.object(_mod.gemma_local, "stream_chat",
                                   side_effect=RuntimeError("response cut by token limit; output may be truncated")):
                     rc = _mod.run_push_audit(packet, run, args, tmp, repo_root=tmp)
@@ -774,7 +774,7 @@ class RunPushAuditParserRejection(unittest.TestCase):
         run = _completed_run()
         patch_resp = "STATUS: FINDINGS\nSUMMARY: x\ndiff --git a/x b/x"
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(_mod.gemma_local, "ensure_model_available"):
+            with patch.object(_mod.gemma_local, "resolve_model_with_fallback", return_value="model"):
                 with patch.object(_mod.gemma_local, "stream_chat", return_value=patch_resp):
                     rc = _mod.run_push_audit(packet, run, args, tmp, repo_root=tmp)
             self.assertEqual(rc, 2)
@@ -815,7 +815,7 @@ class RunPushAuditParserRejection(unittest.TestCase):
             "=== FINDING END ===",
         ])
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(_mod.gemma_local, "ensure_model_available"):
+            with patch.object(_mod.gemma_local, "resolve_model_with_fallback", return_value="model"):
                 with patch.object(_mod.gemma_local, "stream_chat", return_value=invalid_resp):
                     rc = _mod.run_push_audit(packet, run, args, tmp, repo_root=tmp)
             self.assertEqual(rc, 2)
@@ -840,7 +840,7 @@ class RunPushAuditHappyPath(unittest.TestCase):
         run = _completed_run()
         response = _findings_response(path="scripts/example.py", line=1, with_rri_hint=True)
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(_mod.gemma_local, "ensure_model_available"):
+            with patch.object(_mod.gemma_local, "resolve_model_with_fallback", return_value="model"):
                 with patch.object(
                     _mod.gemma_local,
                     "stream_chat",
@@ -881,7 +881,7 @@ class RunPushAuditHappyPath(unittest.TestCase):
         # Finding at a path not in the diff
         response = _findings_response(path="scripts/unrelated.py", line=1)
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(_mod.gemma_local, "ensure_model_available"):
+            with patch.object(_mod.gemma_local, "resolve_model_with_fallback", return_value="model"):
                 with patch.object(_mod.gemma_local, "stream_chat", return_value=response):
                     with patch.object(_mod.gemma_local, "append_audit_log"):
                         rc = _mod.run_push_audit(packet, run, args, tmp, repo_root=tmp)
@@ -898,7 +898,7 @@ class RunPushAuditHappyPath(unittest.TestCase):
         run = _completed_run()
         response = "STATUS: PASS\nSUMMARY: no issues"
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(_mod.gemma_local, "ensure_model_available"):
+            with patch.object(_mod.gemma_local, "resolve_model_with_fallback", return_value="model"):
                 with patch.object(_mod.gemma_local, "stream_chat", return_value=response):
                     with patch.object(_mod.gemma_local, "append_audit_log"):
                         rc = _mod.run_push_audit(packet, run, args, tmp, repo_root=tmp)
@@ -915,7 +915,7 @@ class RunPushAuditHappyPath(unittest.TestCase):
         run = _completed_run()
         response = "STATUS: PASS\nSUMMARY: no issues"
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(_mod.gemma_local, "ensure_model_available"):
+            with patch.object(_mod.gemma_local, "resolve_model_with_fallback", return_value="model"):
                 with patch.object(_mod.gemma_local, "stream_chat", return_value=response):
                     with patch.object(_mod.gemma_local, "append_audit_log") as mock_audit:
                         rc = _mod.run_push_audit(packet, run, args, tmp, repo_root=tmp)
@@ -952,12 +952,21 @@ class EnvNamespace(unittest.TestCase):
             )
         self.assertEqual(model, "fallback-model")
 
-    def test_num_ctx_default_higher_than_code_review(self):
-        # D11: push-reviewer uses 32768 default, code-review uses 16384
-        self.assertGreater(
-            _mod.DEFAULT_NUM_CTX_PUSH_REVIEW,
-            _mod.gemma_local.DEFAULT_NUM_CTX,
-        )
+    def test_fallback_to_shared_default_when_overrides_absent(self):
+        clean = {
+            k: v for k, v in os.environ.items()
+            if k not in ("DUBBRIDGE_PUSH_REVIEW_MODEL", "DUBBRIDGE_LOW_RRI_MODEL")
+        }
+        with patch.dict(os.environ, clean, clear=True):
+            model = os.environ.get(
+                "DUBBRIDGE_PUSH_REVIEW_MODEL",
+                os.environ.get("DUBBRIDGE_LOW_RRI_MODEL", _mod.gemma_local.DEFAULT_MODEL),
+            )
+        self.assertEqual(model, "gemma4:12b-mlx")
+
+    def test_num_ctx_default_is_push_specific(self):
+        # D11: push-reviewer keeps its own CI-log packet baseline.
+        self.assertEqual(_mod.DEFAULT_NUM_CTX_PUSH_REVIEW, 32768)
 
     def test_think_defaults_true_for_push_reviewer(self):
         # Push reviewer defaults think=True (reflexive pass)
@@ -1392,7 +1401,7 @@ class ScoreCandidatesIntegration(unittest.TestCase):
         response = _findings_response(path="scripts/example.py", line=1, with_rri_hint=True)
         rri_out = _rri_json(final=18, label="Low")
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(_mod.gemma_local, "ensure_model_available"):
+            with patch.object(_mod.gemma_local, "resolve_model_with_fallback", return_value="model"):
                 with patch.object(_mod.gemma_local, "stream_chat", return_value=response):
                     with patch.object(_mod.gemma_local, "append_audit_log"):
                         with patch.object(_mod.subprocess, "run") as mock_sub:
@@ -1414,7 +1423,7 @@ class ScoreCandidatesIntegration(unittest.TestCase):
         run = _completed_run()
         response = "STATUS: PASS\nSUMMARY: no issues"
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(_mod.gemma_local, "ensure_model_available"):
+            with patch.object(_mod.gemma_local, "resolve_model_with_fallback", return_value="model"):
                 with patch.object(_mod.gemma_local, "stream_chat", return_value=response):
                     with patch.object(_mod.gemma_local, "append_audit_log"):
                         rc = _mod.run_push_audit(packet, run, args, tmp, repo_root=tmp)
@@ -1643,7 +1652,7 @@ class PushAuditReports(unittest.TestCase):
         response = _findings_response(path="scripts/example.py", line=1, with_rri_hint=True)
         rri_out = _rri_json(final=18, label="Low")
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(_mod.gemma_local, "ensure_model_available"):
+            with patch.object(_mod.gemma_local, "resolve_model_with_fallback", return_value="model"):
                 with patch.object(_mod.gemma_local, "stream_chat", return_value=response):
                     with patch.object(_mod.gemma_local, "append_audit_log"):
                         with patch.object(_mod.subprocess, "run") as mock_sub:

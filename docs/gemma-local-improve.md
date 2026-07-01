@@ -46,6 +46,15 @@ Operational surfaces:
 
 ## Gemma Developer vs. Gemma Reviewer
 
+The shared primary model is `gemma4:12b-mlx` as of 2026-07-01. The previous
+default, `gemma4:26b-a4b-it-qat`, remains the automatic fallback when no explicit
+model override is set and the primary model is not installed locally.
+Role-specific environment variables still take precedence
+(`DUBBRIDGE_REVIEW_MODEL`, `DUBBRIDGE_PUSH_REVIEW_MODEL`, then
+`DUBBRIDGE_LOW_RRI_MODEL` where applicable) and are treated as strict explicit
+choices. The MLX tag requires an Ollama runtime new enough to pull and run
+current Gemma 4 MLX manifests.
+
 | | Gemma Developer | Gemma Reviewer |
 |---|---|---|
 | **Purpose** | Implement a simple code patch | Review code for correctness and safety |

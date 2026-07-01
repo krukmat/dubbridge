@@ -515,8 +515,20 @@ def main():
     if not packet:
         raise RuntimeError("review packet is empty")
 
+    selected_model = args.model
+    if not args.dry_run:
+        selected_model = gemma_local.resolve_model_with_fallback(
+            args.host,
+            args.model,
+            args.idle_timeout,
+            gemma_local.default_fallback_model_for(
+                "DUBBRIDGE_REVIEW_MODEL",
+                "DUBBRIDGE_LOW_RRI_MODEL",
+            ),
+        )
+
     payload = build_review_payload(
-        args.model,
+        selected_model,
         packet,
         args.num_ctx,
         args.num_predict,
@@ -531,8 +543,6 @@ def main():
     system_prompt = payload["messages"][0]["content"]
     user_prompt = payload["messages"][1]["content"]
     changed_paths = changed_paths_from_packet(packet)
-
-    gemma_local.ensure_model_available(args.host, args.model, args.idle_timeout)
 
     if args.passes == 1:
         # Single-pass: exact current behavior (T3) — no reconciliation block.

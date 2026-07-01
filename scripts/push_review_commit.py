@@ -204,16 +204,16 @@ def main():
     # 4. Append row
     append_daily_row(daily_path, row)
 
-    # 5. Stage files
+    # 5. Stage files before branch switch so git checkout doesn't abort on local changes.
     files_to_add = [daily_path]
     if report_dst:
         files_to_add.append(report_dst)
 
+    subprocess.run(["git", "add"] + files_to_add, check=False)
+
     # Detached HEAD: sync to current main tip before committing so the push is fast-forward.
     subprocess.run(["git", "fetch", "origin", "main"], check=True)
     subprocess.run(["git", "checkout", "-B", "_push-review-tmp", "origin/main"], check=True)
-
-    subprocess.run(["git", "add"] + files_to_add, check=False)
 
     r = subprocess.run(["git", "diff", "--cached", "--quiet"], check=False)
     if r.returncode == 0:

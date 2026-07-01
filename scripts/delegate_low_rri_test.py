@@ -648,6 +648,20 @@ class CliBehavior(unittest.TestCase):
         finally:
             os.unlink(fname)
 
+    def test_dry_run_uses_shared_default_model(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write("# test packet\n")
+            fname = f.name
+        env = os.environ.copy()
+        env.pop("DUBBRIDGE_LOW_RRI_MODEL", None)
+        try:
+            r = self.run_cli(fname, "--dry-run", env=env)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            data = json.loads(r.stdout)
+            self.assertEqual(data["model"], "gemma4:12b-mlx")
+        finally:
+            os.unlink(fname)
+
     def test_dry_run_stream_true(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
             f.write("# test packet\n")
@@ -759,7 +773,7 @@ class AuditEmission(unittest.TestCase):
 
             argv = [_SCRIPT, packet_file, "--out", out_path] + (extra_args or [])
             with patch("sys.argv", argv), \
-                 patch.object(_mod, "ensure_model_available"), \
+                 patch.object(_mod, "resolve_model", return_value="model"), \
                  patch.object(_mod, "stream_chat", return_value=stream_response), \
                  patch.object(_mod.gemma_local, "append_audit_log",
                               side_effect=lambda r: captured.append(r)):
@@ -824,7 +838,7 @@ class AuditEmission(unittest.TestCase):
                     "--allow-path", "scripts/"]
             captured = []
             with patch("sys.argv", argv), \
-                 patch.object(_mod, "ensure_model_available"), \
+                 patch.object(_mod, "resolve_model", return_value="model"), \
                  patch.object(_mod, "stream_chat", return_value=response), \
                  patch.object(_mod, "build_diff", return_value=fake_diff), \
                  patch.object(_mod, "validate_file_actions"), \

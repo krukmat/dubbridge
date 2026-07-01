@@ -18,7 +18,8 @@ import gemma_local
 class SharedConfig(unittest.TestCase):
     def test_defaults_are_role_neutral(self):
         self.assertEqual(gemma_local.DEFAULT_HOST, "http://localhost:11434")
-        self.assertEqual(gemma_local.DEFAULT_MODEL, "gemma4:26b-a4b-it-qat")
+        self.assertEqual(gemma_local.DEFAULT_MODEL, "gemma4:12b-mlx")
+        self.assertEqual(gemma_local.DEFAULT_FALLBACK_MODEL, "gemma4:26b-a4b-it-qat")
         self.assertEqual(gemma_local.DEFAULT_TEMPERATURE, 0.1)
         self.assertFalse(gemma_local.DEFAULT_THINK)
 
@@ -93,6 +94,61 @@ class Payload(unittest.TestCase):
     def test_sum_measured_tokens_requires_complete_data(self):
         self.assertEqual(gemma_local.sum_measured_tokens([2, 3]), 5)
         self.assertIsNone(gemma_local.sum_measured_tokens([2, None]))
+
+
+class ModelAvailability(unittest.TestCase):
+    def test_ensure_model_available_accepts_installed_default(self):
+        tags = {"models": [{"name": "gemma4:12b-mlx"}]}
+        with patch.object(gemma_local, "get_json", return_value=tags):
+            gemma_local.ensure_model_available(
+                "http://localhost:11434",
+                gemma_local.DEFAULT_MODEL,
+                1,
+            )
+
+    def test_ensure_model_available_reports_missing_default(self):
+        tags = {"models": [{"name": "gemma4:26b-a4b-it-qat"}]}
+        with patch.object(gemma_local, "get_json", return_value=tags):
+            with self.assertRaises(RuntimeError) as ctx:
+                gemma_local.ensure_model_available(
+                    "http://localhost:11434",
+                    gemma_local.DEFAULT_MODEL,
+                    1,
+                )
+        self.assertIn("gemma4:12b-mlx", str(ctx.exception))
+        self.assertIn("gemma4:26b-a4b-it-qat", str(ctx.exception))
+
+    def test_resolve_model_with_fallback_uses_primary_when_installed(self):
+        tags = {
+            "models": [
+                {"name": "gemma4:12b-mlx"},
+                {"name": "gemma4:26b-a4b-it-qat"},
+            ]
+        }
+        with patch.object(gemma_local, "get_json", return_value=tags):
+            model = gemma_local.resolve_model_with_fallback(
+                "http://localhost:11434",
+                gemma_local.DEFAULT_MODEL,
+                1,
+                gemma_local.DEFAULT_FALLBACK_MODEL,
+            )
+        self.assertEqual(model, "gemma4:12b-mlx")
+
+    def test_resolve_model_with_fallback_uses_current_model_when_primary_absent(self):
+        tags = {"models": [{"name": "gemma4:26b-a4b-it-qat"}]}
+        with patch.object(gemma_local, "get_json", return_value=tags):
+            model = gemma_local.resolve_model_with_fallback(
+                "http://localhost:11434",
+                gemma_local.DEFAULT_MODEL,
+                1,
+                gemma_local.DEFAULT_FALLBACK_MODEL,
+            )
+        self.assertEqual(model, "gemma4:26b-a4b-it-qat")
+
+    def test_default_fallback_model_disabled_by_explicit_override(self):
+        with patch.dict(os.environ, {"DUBBRIDGE_LOW_RRI_MODEL": "custom"}, clear=True):
+            fallback = gemma_local.default_fallback_model_for("DUBBRIDGE_LOW_RRI_MODEL")
+        self.assertIsNone(fallback)
 
 
 class TaggedHelpers(unittest.TestCase):

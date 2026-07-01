@@ -36,7 +36,7 @@ DOCS_ONLY_EXTENSIONS = frozenset({
 DOCS_ONLY_PATH_PREFIXES = ("docs/", "README", "CHANGELOG", "LICENSE", "CONTRIBUTING")
 
 # T1B constants
-DEFAULT_NUM_CTX_PUSH_REVIEW = 32768  # higher than code-review; CI logs included in packet
+DEFAULT_NUM_CTX_PUSH_REVIEW = 32768  # push-review baseline for CI-log packets
 GROUNDING_SLACK = 10  # lines of tolerance around hunk boundaries
 PATCH_LIKE_PATTERNS = (
     "diff --git ",
@@ -117,7 +117,10 @@ def parse_args():
             "DUBBRIDGE_PUSH_REVIEW_NUM_CTX",
             os.environ.get("DUBBRIDGE_LOW_RRI_NUM_CTX", str(DEFAULT_NUM_CTX_PUSH_REVIEW)),
         )),
-        help="Context window size (env DUBBRIDGE_PUSH_REVIEW_NUM_CTX, default 32768).")
+        help=(
+            "Context window size (env DUBBRIDGE_PUSH_REVIEW_NUM_CTX, "
+            f"default {DEFAULT_NUM_CTX_PUSH_REVIEW})."
+        ))
     parser.add_argument("--num-predict", type=int, dest="num_predict",
         default=int(os.environ.get(
             "DUBBRIDGE_PUSH_REVIEW_NUM_PREDICT",
@@ -729,8 +732,28 @@ def run_push_audit(packet, run_info, args, out_dir, repo_root="."):
     after_sha = packet.get("after") or run_info.get("head_sha", "unknown")
     short_sha = _short_sha(after_sha)
 
+    selected_model = args.model
+    if not args.dry_run:
+        try:
+            selected_model = gemma_local.resolve_model_with_fallback(
+                args.host,
+                args.model,
+                args.idle_timeout,
+                gemma_local.default_fallback_model_for(
+                    "DUBBRIDGE_PUSH_REVIEW_MODEL",
+                    "DUBBRIDGE_LOW_RRI_MODEL",
+                ),
+            )
+        except RuntimeError as exc:
+            path = write_blocked("ollama_unavailable", str(exc), run_info, out_dir, after_sha)
+            write_blocked_report(path, _load_json(path), repo_root=repo_root)
+            print(f"[push-audit] blocked (Ollama unavailable): {exc}", file=sys.stderr)
+            print(f"[push-audit] non-Gemma agent should review this push manually", file=sys.stderr)
+            print(f"[push-audit] blocked artifact: {path}", file=sys.stderr)
+            return 2
+
     payload = gemma_local.build_chat_payload(
-        model=args.model,
+        model=selected_model,
         system_prompt=build_push_audit_system_prompt(),
         packet=json.dumps(packet),
         num_ctx=args.num_ctx,
@@ -746,16 +769,6 @@ def run_push_audit(packet, run_info, args, out_dir, repo_root="."):
 
     system_prompt = payload["messages"][0]["content"]
     user_prompt = payload["messages"][1]["content"]
-
-    try:
-        gemma_local.ensure_model_available(args.host, args.model, args.idle_timeout)
-    except RuntimeError as exc:
-        path = write_blocked("ollama_unavailable", str(exc), run_info, out_dir, after_sha)
-        write_blocked_report(path, _load_json(path), repo_root=repo_root)
-        print(f"[push-audit] blocked (Ollama unavailable): {exc}", file=sys.stderr)
-        print(f"[push-audit] non-Gemma agent should review this push manually", file=sys.stderr)
-        print(f"[push-audit] blocked artifact: {path}", file=sys.stderr)
-        return 2
 
     wall_start = time.monotonic()
     try:

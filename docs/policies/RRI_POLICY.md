@@ -207,7 +207,8 @@ The Low band is special: vendor model resolution does not apply. Low-band tasks
 are either handled directly by the primary agent or, for eligible simple code
 patches only, delegated to the local Ollama/Gemma path. When delegation is used,
 use `OLLAMA_HOST` when set, otherwise `http://localhost:11434`. Use
-`DUBBRIDGE_LOW_RRI_MODEL` when set, otherwise `gemma4:26b-a4b-it-qat`.
+`DUBBRIDGE_LOW_RRI_MODEL` when set, otherwise primary `gemma4:12b-mlx`; when that
+primary default is not installed locally, fall back to `gemma4:26b-a4b-it-qat`.
 
 Thinking mode: activate for Balanced→Premium and above when the task requires
 multi-step reasoning that cannot be validated incrementally. Do **not** activate
@@ -274,7 +275,7 @@ The wrapper resolves:
 | Env var | Default | Purpose |
 |---|---|---|
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint |
-| `DUBBRIDGE_LOW_RRI_MODEL` | `gemma4:26b-a4b-it-qat` | Local model |
+| `DUBBRIDGE_LOW_RRI_MODEL` | `gemma4:12b-mlx` primary, `gemma4:26b-a4b-it-qat` fallback | Local model |
 | `DUBBRIDGE_LOW_RRI_IDLE_TIMEOUT_SECONDS` | `60` | Seconds without a token = stall |
 | `DUBBRIDGE_LOW_RRI_MAX_WALL_SECONDS` | `900` | Hard generation cap |
 | `DUBBRIDGE_LOW_RRI_NUM_CTX` | `16384` | Context window for packet + tagged contract |
