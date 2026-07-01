@@ -152,9 +152,9 @@ class TestParsePeerResponse(unittest.TestCase):
         self.assertEqual(result["verdict"], "findings")
         self.assertEqual(len(result["findings"]), 1)
 
-    def test_no_verdict_defaults_pass(self):
+    def test_no_verdict_defaults_blocked(self):
         result = _mod._parse_peer_response("SUMMARY: nothing", "codex", "task")
-        self.assertEqual(result["verdict"], "pass")
+        self.assertEqual(result["verdict"], "blocked")
 
 
 # ---------------------------------------------------------------------------

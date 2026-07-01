@@ -202,7 +202,7 @@ def _build_peer_packet(phase: str, content: str, task_id: str) -> str:
 
 
 def _parse_peer_response(output: str, peer: str, phase: str) -> dict:
-    verdict = "pass"
+    verdict = None
     summary = ""
     findings = []
     for line in output.splitlines():
@@ -215,6 +215,12 @@ def _parse_peer_response(output: str, peer: str, phase: str) -> dict:
             summary = ls[len("SUMMARY:"):].strip()
         elif ls.startswith("FINDING:"):
             findings.append(ls[len("FINDING:"):].strip())
+    if verdict is None:
+        print(
+            f"[peer-review] warning: no VERDICT line found in {peer} response; treating as blocked",
+            file=sys.stderr,
+        )
+        verdict = "blocked"
     return {
         "reviewer": peer,
         "phase": phase,
@@ -222,6 +228,9 @@ def _parse_peer_response(output: str, peer: str, phase: str) -> dict:
         "summary": summary,
         "findings": findings,
     }
+
+
+_PEER_CLI_TIMEOUT = int(os.environ.get("DUBBRIDGE_PEER_CLI_TIMEOUT_SECONDS", "120"))
 
 
 def invoke_peer_cli(peer: str, packet: str) -> tuple[bool, str]:
@@ -232,7 +241,7 @@ def invoke_peer_cli(peer: str, packet: str) -> tuple[bool, str]:
             input=packet,
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=_PEER_CLI_TIMEOUT,
         )
         if result.returncode == 0:
             return True, result.stdout
