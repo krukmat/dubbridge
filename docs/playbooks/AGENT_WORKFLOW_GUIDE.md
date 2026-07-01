@@ -70,6 +70,19 @@ governs: "all agent-facing workflow decisions in the repository"
 
 ## Per-task discipline
 
+- **Phase 1 — Task-analysis review** (before presenting or delegating any task):
+  run an independent reviewer on the task card/plan to confirm readiness. The
+  reviewer is resolved by RRI band:
+  - **RRI 0–40:** Gemma (advisory). Run before building the delegation packet or
+    presenting the task card. Record the phase-1 report line:
+    `Task-analysis review: gemma <artifact path> - <PASS|BLOCKED>`
+  - **RRI 41+:** cross-vendor peer (resolve from caller identity per the
+    `Band-routed peer review` section). Record:
+    `Task-analysis review: <codex|claude|d14> <artifact path> - <PASS|BLOCKED>`
+  A `BLOCKED` verdict stops presentation or delegation until revised, explicitly
+  waived by the user, or reported as blocked. Docs-only, config-only,
+  migration-only, ADR, plan, task-ledger, and policy-only tasks are exempt from
+  phase 1 and record `n/a` with the exemption stated.
 - Present the next task using the `AGENTS.md` presentation contract before executing
   it when approval is required. For RRI 0–25, do not present the full task for
   approval. If the task is an eligible simple code patch, prepare a local
@@ -632,6 +645,63 @@ Agent communication must follow a **Socratic doubt model**:
 - **No hallucination.** Do not infer positions from tone or phrasing. Do not attribute intent, agreement, or correctness to a message that does not state them. If a message is ambiguous, ask — do not deduce.
 - **Challenge your own output.** Before reporting a result, ask whether it could be wrong and whether the source you used is current. The RRI self-scoring error in T1 (estimated ~16/28 by hand; script returned 27) is the canonical example of why this matters.
 
+## Band-routed peer review (two phases)
+
+Every task goes through two independent review checkpoints. The reviewer is
+resolved from the task's RRI band and the review phase:
+
+| Review phase | RRI 0–40 (Low + Moderate) | RRI 41+ (Med-high + Complex) |
+|---|---|---|
+| **Phase 1 — Task-analysis review** (before task-card presentation or delegation) | **Gemma** (advisory) | **Cross-vendor peer**; D14 fallback |
+| **Phase 2 — Code-solution review** (after implementation, before closure) | **Gemma Reviewer** (existing N-pass) | **Cross-vendor peer replaces Gemma**; D14 fallback |
+
+### Cross-vendor resolution (RRI 41+ only)
+
+```
+caller = claude-code     -> reviewer = codex
+caller = codex           -> reviewer = claude
+caller = local-provider  -> reviewer = claude
+caller = remote-provider -> reviewer = claude
+caller = unknown         -> reviewer = claude
+```
+
+### Report line contract
+
+Two lines are required per task, one per phase. Both appear in the task-card (phase 1)
+and the closure report (phase 2). A docs/policy/config-only task records `n/a` with
+the exemption stated for phase 2.
+
+```
+Task-analysis review: <gemma|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
+Code-solution review: <gemma|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
+```
+
+- `<reviewer>` ∈ `gemma | codex | claude | d14`. Use `d14` when the resolved
+  peer CLI was unavailable/unauthenticated and D14 handled the review.
+- `PASS` — the phase may proceed (presentation or closure).
+- `BLOCKED` — non-pass verdict, or peer **and** D14 both unavailable. The caller
+  stops and reports a blocked artifact. Clearing it requires revision, an
+  explicit user waiver, or reporting the task blocked. Never downgrade silently
+  to self-review.
+
+### Interaction with existing gates
+
+- Peer review **does not replace** the HITL human approval gate required by the
+  RRI band. It is a separate, independent check that runs in addition to it.
+- In the RRI 41+ band the cross-vendor peer **replaces Gemma** as the code-solution
+  reviewer (they do not both run). **D14** remains the mandatory fallback.
+- The four existing development-task closure blocks (Step 1 Gemma Reviewer/D14,
+  Step 2 Reflection log, Step 3 coverage cert, Step 4 owner verification) are
+  preserved. In the RRI 41+ band the cross-vendor peer occupies the reviewer
+  slot inside Step 1; D14 remains the Step 1 fallback path.
+
+### Enforcement note
+
+Until `scripts/peer-workflow-review.py` (PPR-2) and the Makefile target (PPR-3)
+are implemented, peer review is a **workflow and reporting contract**: the caller
+must perform the review and record the two report lines. Hook enforcement is not
+active in PPR-1.
+
 ## Gemma Reviewer
 
 **Gemma Reviewer** is a read-only local model role that runs after implementation
@@ -791,11 +861,15 @@ summary with unit coverage certification or owner final verification.
 The steps that apply per band are marked below. Skipping any applicable step is
 not permitted — including for Low (0–25) tasks.
 
-### Step 1 — Gemma Reviewer / D14 adjudicator (RRI 0–40, mandatory)
+### Step 1 — Code-solution review (all development tasks, mandatory)
 
-Applies to: **all development tasks with RRI 0–40** (Low and Moderate bands).
+Applies to: **all development tasks** regardless of RRI band.
 Exempt only: `docs-only`, `config-only`, `migration-only`, `ADR`, `plan`,
 `task-ledger`, or `policy-only` tasks.
+
+**Reviewer is determined by RRI band** (see `Band-routed peer review` above):
+
+#### Step 1-A — RRI 0–40 (Low + Moderate): Gemma Reviewer / D14
 
 ```
 [ ] 1a. Run `make qa-gemma-review`
@@ -824,6 +898,43 @@ Exempt only: `docs-only`, `config-only`, `migration-only`, `ADR`, `plan`,
         For RRI 0–25 primary-agent tasks: record in the task entry.
         For RRI 0–25 delegated Gemma Developer tasks: record in the final report.
         Neither path may be skipped.
+```
+
+#### Step 1-B — RRI 41+ (Med-high + Complex): cross-vendor peer / D14
+
+The cross-vendor peer **replaces Gemma** as the code-solution reviewer for this
+band. Do not run Gemma Reviewer for RRI 41+ tasks; the peer is the mandatory
+path and D14 is the mandatory fallback.
+
+```
+[ ] 1d. Resolve the cross-vendor peer from the caller identity:
+        claude-code → codex | codex → claude | any other → claude
+
+[ ] 1e. Invoke the peer reviewer via `scripts/peer-workflow-review.py --phase code`
+        (once PPR-2 lands). Until then, invoke the peer manually and write the
+        review artifact to `.agent/peer-code-review-<task-id>.json`.
+
+[ ] 1f. Evaluate D14 fallback — spawn context-isolated subagent if:
+        - Peer CLI unavailable, unauthenticated, or returns invalid output.
+        - If D14 is also unavailable: write a blocked-artifact record and stop.
+          Never self-review. Report the task as blocked.
+        The D14 subagent runs at the Balanced model tier; output is advisory.
+
+[ ] 1g. Record `### Peer Reviewer evidence` block in the task entry:
+        - Reviewer: `<codex|claude|d14>`
+        - Command: `<exact command or manual invocation>`
+        - Artifact: `<path to review artifact>`
+        - Verdict: `PASS | BLOCKED`
+        - Findings: `<summary or "none">`
+        - D14 fallback: `triggered | not triggered` — reason: `<condition or n/a>`
+        - disposition_divergence: `none | partial | full | null`
+        - Primary-agent disposition: `<accepted / rejected false positives / repaired>`
+```
+
+Record the phase-2 report line in the closure report:
+
+```
+Code-solution review: <gemma|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
 ```
 
 ### Step 2 — Reflection log (RRI 26+)

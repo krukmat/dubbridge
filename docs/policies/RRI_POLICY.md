@@ -186,15 +186,17 @@ evidence and gates the agent must satisfy before and after that approval.
 Effort, capability, thinking, and gate are each derived **in parallel** from the RRI
 band — never derive one output from another (e.g. do not infer capability from Effort).
 
-| RRI band | Label | Effort | Capability (Codex) | Capability (Claude Code) | Thinking | Gate |
-|---|---|---|---|---|---|---|
-| **0–25** | Low | **S** | Primary agent or Local Gemma via Ollama | Primary agent or Local Gemma via Ollama | Off | **Low-band handling:** do not present the full task for approval; use local Gemma only for eligible simple code patches, otherwise execute directly with the primary agent. |
-| **26–40** | Moderate | **M** | Balanced | Balanced | Off | Confirm tests exist in the affected area. |
-| **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Plan + explicit acceptance criteria required before approval. |
-| **56–70** | Complex | **L** | Premium | Premium | On | Plan first. **Decompose into subtasks before implementation.** Human reviews the plan. |
-| **71–85** | High | **XL** | Premium | Premium | On | Characterization tests + explicit acceptance criteria + human reviews the **diff** (not just the plan). **Decomposition remains mandatory.** |
-| **86–100** | Very high | **XL** | Premium | Premium | On | Do not implement directly. Produce an ADR + risk analysis + decompose into subtasks. |
-| **> 100** | Excessive | **XL** | Premium | Premium | On | Architecture/design work must happen first. Re-scope before any implementation. |
+| RRI band | Label | Effort | Capability (Codex) | Capability (Claude Code) | Thinking | Phase-1 reviewer | Phase-2 reviewer | Gate |
+|---|---|---|---|---|---|---|---|---|
+| **0–25** | Low | **S** | Primary agent or Local Gemma via Ollama | Primary agent or Local Gemma via Ollama | Off | Gemma | Gemma Reviewer | **Low-band handling:** do not present the full task for approval; use local Gemma only for eligible simple code patches, otherwise execute directly with the primary agent. |
+| **26–40** | Moderate | **M** | Balanced | Balanced | Off | Gemma | Gemma Reviewer | Confirm tests exist in the affected area. |
+| **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Cross-vendor peer* | Cross-vendor peer* | Plan + explicit acceptance criteria required before approval. |
+| **56–70** | Complex | **L** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Plan first. **Decompose into subtasks before implementation.** Human reviews the plan. |
+| **71–85** | High | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Characterization tests + explicit acceptance criteria + human reviews the **diff** (not just the plan). **Decomposition remains mandatory.** |
+| **86–100** | Very high | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Do not implement directly. Produce an ADR + risk analysis + decompose into subtasks. |
+| **> 100** | Excessive | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Architecture/design work must happen first. Re-scope before any implementation. |
+
+\* **Cross-vendor peer** (RRI 41+): `claude-code → codex | codex → claude | other → claude`. Unavailable peer CLI falls back to **D14** (Balanced tier); peer + D14 both unavailable → blocked artifact, stop. The cross-vendor peer **replaces** Gemma as the phase-2 code-solution reviewer for this band; D14 remains the mandatory fallback. Phase-1 exemptions (docs/policy/config-only tasks) record `n/a`. Full contract: `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review`.
 
 ### Model tier resolution
 

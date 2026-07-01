@@ -45,9 +45,14 @@ RUST_CHANGED=0
 DEPENDENCY_CHANGED=0
 DOCS_CHANGED=0
 MOBILE_CHANGED=0
+SCRIPTS_CHANGED=0
 
 if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(Cargo\.toml$|Cargo\.lock$|rust-toolchain\.toml$|\.cargo/|build\.rs$|src/|tests/|benches/|examples/|crates/|apps/|deny\.toml$|\.clippy\.toml$|tarpaulin\.toml$|Makefile$|justfile$|\.github/workflows/|\.githooks/)'; then
   RUST_CHANGED=1
+fi
+
+if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^scripts/'; then
+  SCRIPTS_CHANGED=1
 fi
 
 if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(docs/adr/|docs/architecture\.md$|docs/plan/|docs/tasks/|README\.md$|docs/playbooks/|Makefile$|\.github/workflows/|\.githooks/)'; then
@@ -62,11 +67,11 @@ if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^mobile/'; then
   MOBILE_CHANGED=1
 fi
 
-if [ "$RUST_CHANGED" -eq 0 ] && [ "$DOCS_CHANGED" -eq 0 ] && [ "$MOBILE_CHANGED" -eq 0 ]; then
+if [ "$RUST_CHANGED" -eq 0 ] && [ "$DOCS_CHANGED" -eq 0 ] && [ "$MOBILE_CHANGED" -eq 0 ] && [ "$SCRIPTS_CHANGED" -eq 0 ]; then
   if [ -n "$DIFF_RANGE" ]; then
-    echo "pre-push: no Rust-, docs-, or mobile-impacting changes detected in $DIFF_RANGE, skipping QA"
+    echo "pre-push: no Rust-, docs-, mobile-, or scripts-impacting changes detected in $DIFF_RANGE, skipping QA"
   else
-    echo "pre-push: no Rust-, docs-, or mobile-impacting changes detected, skipping QA"
+    echo "pre-push: no Rust-, docs-, mobile-, or scripts-impacting changes detected, skipping QA"
   fi
   exit 0
 fi
@@ -107,5 +112,21 @@ if [ "$RUST_CHANGED" -eq 1 ]; then
     fi
 
     make qa-deny
+  fi
+fi
+
+# Band-routed peer-workflow review (PPR-3).
+# Runs the phase-2 code-solution review when code or scripts change.
+# Set DUBBRIDGE_SKIP_PEER_REVIEW=1 to skip.
+# Set PEER_REVIEW_RRI to the task's actual RRI (defaults to 22 / Low band).
+if [ "${RUST_CHANGED}" -eq 1 ] || [ "${SCRIPTS_CHANGED}" -eq 1 ]; then
+  if [ "${DUBBRIDGE_SKIP_PEER_REVIEW:-0}" != "1" ]; then
+    _peer_rri="${PEER_REVIEW_RRI:-22}"
+    _peer_range="${DIFF_RANGE:-HEAD}"
+    if [ -n "$_peer_range" ]; then
+      echo "pre-push: running peer-workflow review (phase=code rri=${_peer_rri} base=${_peer_range})"
+      PEER_REVIEW_BASE="${_peer_range}" PEER_REVIEW_RRI="${_peer_rri}" \
+        PEER_REVIEW_PHASE="code" make qa-peer-workflow-review
+    fi
   fi
 fi

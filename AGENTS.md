@@ -162,13 +162,35 @@ Low band. Those tasks skip the full approval presentation; use local Gemma
 delegation through Ollama only for eligible simple code patches, and otherwise
 handle them directly as the primary agent while still following the low-band gate.
 
+## Band-routed peer review report lines
+
+Every task card must include a phase-1 line, and every development closure report
+must include a phase-2 line. The reviewer token is resolved by RRI band at report
+time. Docs-only, config-only, migration-only, ADR, plan, task-ledger, and
+policy-only tasks record `n/a` with the exemption stated for phase 2.
+
+```
+Task-analysis review: <gemma|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
+Code-solution review: <gemma|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
+```
+
+- `gemma` — RRI 0–40 (both phases).
+- `codex | claude` — RRI 41+, resolved from caller identity
+  (`claude-code → codex`, `codex → claude`, others → `claude`).
+- `d14` — RRI 41+ where the resolved peer CLI was unavailable and D14 handled the review.
+- `BLOCKED` — non-pass verdict or peer + D14 both unavailable. Stops presentation
+  (phase 1) or closure (phase 2) until revised, user-waived, or reported blocked.
+
+See `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review` for the
+full contract.
+
 ## Development Closure Rule
 
 For development-task closure, do not describe certification, final verification,
 or status flips as the first completion step. First determine whether the task
-must pass the mandatory `Gemma Reviewer` / D14 review gate under
-`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and
-`docs/policies/HITL_AUTONOMY_POLICY.md`, then describe the remaining closure
+must pass the mandatory code-solution review gate (Gemma for RRI 0–40; cross-vendor
+peer for RRI 41+, with D14 fallback) under `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
+and `docs/policies/HITL_AUTONOMY_POLICY.md`, then describe the remaining closure
 blocks in order.
 
 ## Language

@@ -215,7 +215,25 @@
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); [print\\(j['name'], j['conclusion'], [s for s in j.get\\('steps',[]\\) if s.get\\('conclusion'\\) not in \\('success','skipped',None\\)]\\) for j in d['jobs']]\")",
       "Bash(cargo deny *)",
       "Bash(npm test *)",
-      "Bash(cargo update *)"
+      "Bash(cargo update *)",
+      "Bash(python3 -c \"import json,sys; print\\(json.load\\(sys.stdin\\)[0]['databaseId']\\)\")",
+      "Bash(grep -iE '^\\\\- \\\\`?\\(task|adr|plan|policy|playbook|proposal|roadmap|architecture|bdd|summary|audit|handoff\\)' docs/knowledge/README.md)",
+      "Bash(grep -E '\\\\`[a-z]')",
+      "Bash(python3 scripts/rri.py --cc 0 --T 0 --A 1 --X 0 --D 0 --K 0 --P 0 --json)",
+      "Bash(python3 scripts/rri.py --C 0 --T 0 --A 1 --X 0 --D 0 --K 0 --P 0 --json)",
+      "Bash(python3 scripts/rri.py --C 2 --T 2 --A 1 --X 1 --D 0 --K 1 --P 0 --touches scripts/peer-workflow-review.py --json)",
+      "Bash(python3 -m pytest scripts/peer_workflow_review_test.py -v)",
+      "Bash(python3 scripts/rri.py --C 1 --T 1 --A 1 --X 1 --D 0 --K 1 --P 0 --touches Makefile --touches .githooks/pre-push --touches .github/workflows/ci.yml --json)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(f'RRI {d[\\\\\"final\\\\\"]} \\({d[\\\\\"band\\\\\"][\\\\\"label\\\\\"]}\\)'\\)\")",
+      "Bash(python3 scripts/rri.py --C 2 --T 1 --A 1 --X 2 --D 1 --K 1 --P 1 --json)",
+      "Bash(python3 /Users/matias/dubbridge/scripts/peer-workflow-review.py *)",
+      "Bash(PEER_REVIEW_DRY_RUN=1 PEER_REVIEW_RRI=22 make qa-peer-workflow-review)",
+      "Bash(python3 scripts/peer_workflow_review_test.py)",
+      "Bash(DUBBRIDGE_SKIP_PEER_REVIEW=1 make qa-peer-workflow-review)",
+      "Bash(PEER_REVIEW_DRY_RUN=1 PEER_REVIEW_RRI=55 PEER_REVIEW_CALLER=codex make qa-peer-workflow-review)"
+    ],
+    "additionalDirectories": [
+      "/Users/matias/dubbridge/docs/knowledge"
     ]
   },
   "hooks": {

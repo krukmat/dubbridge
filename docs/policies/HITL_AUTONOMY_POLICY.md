@@ -93,6 +93,35 @@ When approval is required (RRI > 25), end the presentation with:
 - Report outcomes faithfully: failing tests, skipped steps, and assumptions must be
   stated plainly.
 
+## Band-routed peer review
+
+Every development task is reviewed by an independent reviewer at two phases.
+The reviewer is determined by the task's RRI band:
+
+- **RRI 0–40 (Low + Moderate):** Gemma (phases 1 and 2). Phase-2 = existing
+  Gemma Reviewer N-pass; phase-1 = advisory Gemma review of the task card.
+- **RRI 41+ (Med-high + Complex):** cross-vendor peer (phases 1 and 2). The
+  peer replaces Gemma as the code-solution reviewer for this band.
+
+**Cross-vendor resolution (RRI 41+ only):**
+`claude-code → codex | codex → claude | local-provider → claude |
+remote-provider → claude | unknown → claude`
+
+**Failure modes (RRI 41+):**
+1. Peer CLI unavailable or unauthenticated → fall back to **D14** (Balanced tier).
+2. Peer + D14 both unavailable → write a blocked-artifact record and stop. Never
+   self-review. Report the task as blocked.
+
+Peer review **does not replace** the human approval gate required by the RRI band
+(HITL). It is a separate, independent check — the human approval gate still fires
+for every RRI 26+ task after the peer review passes.
+
+Phase-1 (task-analysis) exemptions: docs-only, config-only, migration-only, ADR,
+plan, task-ledger, and policy-only tasks record `Task-analysis review: n/a`.
+
+See `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review` for the
+full routing table, report line contract, and enforcement note.
+
 ## Gemma Reviewer availability
 
 The review step is **mandatory** for all Low (0–25) and Moderate (26–40)

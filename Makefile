@@ -1,6 +1,12 @@
-.PHONY: qa-fmt qa-lint qa-test qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-rri qa-ci qa-gemma-review qa-gemma-push-review install-hooks
+.PHONY: qa-fmt qa-lint qa-test qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review install-hooks
 
 COVERAGE_MIN ?= 90
+PEER_REVIEW_RRI      ?= 22
+PEER_REVIEW_PHASE    ?= code
+PEER_REVIEW_CALLER   ?= claude-code
+PEER_REVIEW_TASK_ID  ?=
+PEER_REVIEW_ARTIFACT ?= /tmp/dubbridge-peer-review.json
+PEER_REVIEW_BASE     ?= HEAD
 GEMMA_REVIEW_BASE   ?= HEAD
 GEMMA_REVIEW_RESULT ?= /tmp/dubbridge-gemma-review.json
 COVERAGE_IGNORE_REGEX ?= (apps/(api|cli|worker-runner)/src/(main|cleanup)\.rs|apps/api/src/(dto/ingestion|lib|routes/ingestion|state)\.rs|crates/(db|jobs|observability)/src/lib\.rs|crates/db/src/(artifact_repo|asset_repo|audit_repo|pending_ingestion_repo|rights_repo)\.rs|crates/(audit|ingestion)/src/lib\.rs)
@@ -131,6 +137,21 @@ qa-gemma-push-review:
 	fi; \
 	echo "[gemma-push-review] running $$1"; \
 	"$$@"
+
+# Band-routed two-phase peer-workflow review (PPR-3).
+# Reads git diff from PEER_REVIEW_BASE and routes to Gemma (RRI 0-40) or
+# cross-vendor peer (RRI 41+) per the contract in docs/plan/portable-peer-review-gate.md.
+# Set PEER_REVIEW_DRY_RUN=1 to resolve routing without invoking any model.
+# Set DUBBRIDGE_SKIP_PEER_REVIEW=1 to skip entirely (e.g. in CI without Ollama).
+qa-peer-workflow-review:
+	@if [ "$${DUBBRIDGE_SKIP_PEER_REVIEW:-0}" = "1" ]; then \
+		echo "[peer-review] skipped (DUBBRIDGE_SKIP_PEER_REVIEW=1)"; exit 0; \
+	fi; \
+	args="--phase $(PEER_REVIEW_PHASE) --rri $(PEER_REVIEW_RRI) \
+	      --caller $(PEER_REVIEW_CALLER) --artifact $(PEER_REVIEW_ARTIFACT)"; \
+	if [ -n "$(PEER_REVIEW_TASK_ID)" ]; then args="$$args --task-id $(PEER_REVIEW_TASK_ID)"; fi; \
+	if [ "$${PEER_REVIEW_DRY_RUN:-0}" = "1" ]; then args="$$args --dry-run"; fi; \
+	git diff "$(PEER_REVIEW_BASE)" | python3 scripts/peer-workflow-review.py $$args --content -
 
 install-hooks:
 	cp scripts/hooks/pre-commit .git/hooks/pre-commit

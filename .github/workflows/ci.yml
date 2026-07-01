@@ -159,3 +159,19 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Run release build gate
         run: make qa-build-release
+
+  peer-workflow-review:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run peer-workflow-review unit tests
+        run: python3 scripts/peer_workflow_review_test.py
+      - name: Smoke-test peer-workflow routing (dry-run)
+        env:
+          PEER_REVIEW_DRY_RUN: "1"
+          PEER_REVIEW_RRI: ${{ github.event_name == 'pull_request' && '22' || '22' }}
+          PEER_REVIEW_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || 'HEAD~1' }}
+        run: make qa-peer-workflow-review
