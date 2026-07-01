@@ -81,6 +81,34 @@ function readinessLabel(taskState: TaskState, publishedAt: string | null): strin
   return "Pending review";
 }
 
+function ReviewPublicationSection({ taskState, publishedAt }: { taskState: TaskState; publishedAt: string | null }) {
+  if (taskState === "approved" && publishedAt) {
+    return (
+      <Panel>
+        <Text style={styles.sectionTitle}>Publication</Text>
+        <Text style={styles.body} accessibilityLiveRegion="polite">Published {formatTimestamp(publishedAt)}</Text>
+      </Panel>
+    );
+  }
+  if (taskState === "approved") {
+    return (
+      <Panel testID="review-publish-pending-panel">
+        <Text style={styles.sectionTitle}>Publication</Text>
+        <Text style={styles.body} testID="review-publish-pending-reason">Ready to publish — use the button below to make this content available.</Text>
+      </Panel>
+    );
+  }
+  if (taskState === "rejected") {
+    return (
+      <Panel testID="review-rejected-panel">
+        <Text style={styles.sectionTitle}>Publication</Text>
+        <Text style={styles.body} testID="review-rejected-reason">Not available for publication — this task was rejected.</Text>
+      </Panel>
+    );
+  }
+  return null;
+}
+
 export function ReviewDetailScreen({ task, gatewayBaseUrl, onBack }: ReviewDetailScreenProps) {
   const { taskState, comment, setComment, publishedAt, mutation, decide, publish } =
     useReviewDetailMutations(task, gatewayBaseUrl);
@@ -121,24 +149,7 @@ export function ReviewDetailScreen({ task, gatewayBaseUrl, onBack }: ReviewDetai
           <TextInput testID="review-comment-input" accessibilityLabel="Comment" value={comment} onChangeText={setComment} placeholder="Add a comment…" multiline numberOfLines={3} style={[fieldStyle, styles.commentInput]} />
           {mutation.kind === "error" ? <Text style={styles.errorText} accessibilityRole="alert" accessibilityLiveRegion="assertive">{mutation.message}</Text> : null}
         </Panel>
-        {taskState === "approved" && publishedAt ? (
-          <Panel>
-            <Text style={styles.sectionTitle}>Publication</Text>
-            <Text style={styles.body} accessibilityLiveRegion="polite">Published {formatTimestamp(publishedAt)}</Text>
-          </Panel>
-        ) : null}
-        {taskState === "approved" && !publishedAt ? (
-          <Panel testID="review-publish-pending-panel">
-            <Text style={styles.sectionTitle}>Publication</Text>
-            <Text style={styles.body} testID="review-publish-pending-reason">Ready to publish — use the button below to make this content available.</Text>
-          </Panel>
-        ) : null}
-        {taskState === "rejected" ? (
-          <Panel testID="review-rejected-panel">
-            <Text style={styles.sectionTitle}>Publication</Text>
-            <Text style={styles.body} testID="review-rejected-reason">Not available for publication — this task was rejected.</Text>
-          </Panel>
-        ) : null}
+        <ReviewPublicationSection taskState={taskState} publishedAt={publishedAt} />
         <Button label="Back to inbox" variant="secondary" onPress={onBack} />
       </Screen>
       <ReviewActionBars taskState={taskState} publishedAt={publishedAt} isSubmitting={isSubmitting} decide={decide} publish={publish} />

@@ -237,6 +237,18 @@ function useAssetListState(
   return { viewState, refreshing, onRefresh, onRetry };
 }
 
+function useAssetListFilter(viewState: AssetListViewState) {
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const loadedAssets = viewState.kind === "ready" ? viewState.assets : [];
+  const availableStatuses = [...new Set(loadedAssets.map((a) => a.status))];
+  const filteredAssets = loadedAssets
+    .filter((a) => (query ? a.title.toLowerCase().includes(query.toLowerCase()) : true))
+    .filter((a) => (statusFilter !== "all" ? a.status === statusFilter : true));
+  const isNoResults = loadedAssets.length > 0 && filteredAssets.length === 0;
+  return { query, setQuery, statusFilter, setStatusFilter, filteredAssets, isNoResults, availableStatuses };
+}
+
 export function AssetListScreen({
   gatewayBaseUrl,
   onOpenAsset,
@@ -249,38 +261,17 @@ export function AssetListScreen({
     auth.logout,
     auth.onSessionRotation,
   );
-
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-
-  const loadedAssets = viewState.kind === "ready" ? viewState.assets : [];
-  const availableStatuses = [...new Set(loadedAssets.map((a) => a.status))];
-  const filteredAssets = loadedAssets
-    .filter((a) => (query ? a.title.toLowerCase().includes(query.toLowerCase()) : true))
-    .filter((a) => (statusFilter !== "all" ? a.status === statusFilter : true));
-  const isNoResults = loadedAssets.length > 0 && filteredAssets.length === 0;
-
+  const { query, setQuery, statusFilter, setStatusFilter, filteredAssets, isNoResults, availableStatuses } =
+    useAssetListFilter(viewState);
   return (
     <Screen testID="asset-list-screen">
       <ScreenHeader kicker="Assets" title="Your library" copy="Browse and manage your media." />
-
       {viewState.kind === "loading" ? (
-        <StateView
-          kind="loading"
-          title="Loading assets…"
-          message="Fetching your assets from the gateway."
-        />
+        <StateView kind="loading" title="Loading assets…" message="Fetching your assets from the gateway." />
       ) : null}
-
       {viewState.kind === "error" ? (
-        <StateView
-          kind="error"
-          title="Could not load assets"
-          message={viewState.message}
-          onRetry={onRetry}
-        />
+        <StateView kind="error" title="Could not load assets" message={viewState.message} onRetry={onRetry} />
       ) : null}
-
       {viewState.kind === "empty" ? (
         <StateView
           testID="asset-list-empty-state"
@@ -294,7 +285,6 @@ export function AssetListScreen({
           }
         />
       ) : null}
-
       {viewState.kind === "ready" ? (
         <>
           <LibraryFilterBar
