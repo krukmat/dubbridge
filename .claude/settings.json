@@ -231,7 +231,14 @@
       "Bash(python3 scripts/peer_workflow_review_test.py)",
       "Bash(DUBBRIDGE_SKIP_PEER_REVIEW=1 make qa-peer-workflow-review)",
       "Bash(PEER_REVIEW_DRY_RUN=1 PEER_REVIEW_RRI=55 PEER_REVIEW_CALLER=codex make qa-peer-workflow-review)",
-      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('STATUS:', d.get\\('status','?'\\)\\); [print\\(f\\\\\" [{f['severity']}] {f['path']}:{f.get\\('line','?'\\)} — {f['detail']}\\\\\"\\) for f in d.get\\('findings',[]\\)]\")"
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('STATUS:', d.get\\('status','?'\\)\\); [print\\(f\\\\\" [{f['severity']}] {f['path']}:{f.get\\('line','?'\\)} — {f['detail']}\\\\\"\\) for f in d.get\\('findings',[]\\)]\")",
+      "Bash(python3 scripts/parse-review-findings.py --help)",
+      "Bash(DUBBRIDGE_SKIP_GEMMA_REVIEW=1 make qa-docs)",
+      "Bash(PEER_REVIEW_BASE=\"origin/main...HEAD\" PEER_REVIEW_RRI=\"22\" PEER_REVIEW_PHASE=\"code\" make qa-peer-workflow-review)",
+      "Bash(echo \"peer-review exit: $?\")",
+      "Bash(tee /tmp/push-output.txt)",
+      "Bash(echo \"PUSH_EXIT:$?\")",
+      "Bash(tee /tmp/push-output2.txt)"
     ],
     "additionalDirectories": [
       "docs/knowledge"
