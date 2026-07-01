@@ -238,7 +238,9 @@
       "Bash(echo \"peer-review exit: $?\")",
       "Bash(tee /tmp/push-output.txt)",
       "Bash(echo \"PUSH_EXIT:$?\")",
-      "Bash(tee /tmp/push-output2.txt)"
+      "Bash(tee /tmp/push-output2.txt)",
+      "Bash(DUBBRIDGE_SKIP_GEMMA_REVIEW=1 git push)",
+      "Bash(git commit -m 'chore\\(settings\\): update allowed tools for PPR session *)"
     ],
     "additionalDirectories": [
       "docs/knowledge"
