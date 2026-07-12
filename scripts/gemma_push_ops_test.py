@@ -55,6 +55,15 @@ class PushReviewOpsWiring(unittest.TestCase):
         self.assertIn("blocked/degraded result or operational failure", text)
         self.assertIn("Primary CI remains authoritative.", text)
 
+    def test_workflow_audits_push_and_schedule_but_not_pull_requests(self):
+        text = WORKFLOW.read_text(encoding="utf-8")
+        condition = (
+            "if: github.event.workflow_run.event == 'push' || "
+            "github.event.workflow_run.event == 'schedule'"
+        )
+        self.assertIn(condition, text)
+        self.assertNotIn("github.event.workflow_run.event == 'pull_request'", text)
+
 
 if __name__ == "__main__":
     unittest.main()

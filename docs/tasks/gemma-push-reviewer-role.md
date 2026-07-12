@@ -685,8 +685,9 @@ completes.
 
 - **HP-1:** `make qa-gemma-push-review DUBBRIDGE_PUSH_REVIEW_RUN_ID=<run-id>` -> wrapper
   collects the completed GitHub run evidence and writes artifacts.
-- **HP-2:** Self-hosted `workflow_run` receives a completed `ci` run -> workflow
-  passes run ID, head SHA, branch, conclusion, and URL into the wrapper.
+- **HP-2:** Self-hosted `workflow_run` receives a completed push or scheduled `ci`
+  run -> workflow passes run ID, head SHA, branch, conclusion, and URL into the
+  wrapper.
 
 ### Edge Case Examples
 
@@ -705,7 +706,7 @@ completes.
 - GitHub workflow uses `workflow_run` after the primary pipeline and runs on
   `self-hosted` runner labels.
 - Push review starts automatically from GitHub when the `ci` workflow
-  completes for a push event.
+  completes for a push or scheduled event.
 - No existing CI job becomes dependent on Ollama.
 - Documentation states the workflow is post-pipeline and advisory, while the
   primary CI result remains authoritative.
@@ -731,8 +732,8 @@ evidence.
   run ID, workflow, branch, push range, event path, output dir, collect-only,
   force, and dry-run usage.
 - Added advisory workflow `.github/workflows/push-review.yml` using
-  `workflow_run` after `ci` completes on a self-hosted runner so push review
-  starts automatically from GitHub, with artifact upload and
+  `workflow_run` after push or scheduled `ci` completes on a self-hosted runner
+  so push review starts automatically from GitHub, with artifact upload and
   `continue-on-error: true` so the primary CI result remains authoritative.
 - Added structural tests in `scripts/gemma_push_ops_test.py` to verify the
   target wiring and post-pipeline workflow contract.
@@ -743,8 +744,8 @@ evidence.
   env vars and maps them to the wrapper CLI. Code evidence: `Makefile::qa-gemma-push-review`;
   test evidence
   `scripts/gemma_push_ops_test.py::PushReviewOpsWiring::test_make_target_maps_env_to_cli_flags`.
-- **HP-2:** Self-hosted workflow receives completed `ci` context and
-  forwards run ID, branch, and head SHA into the advisory make target. Code
+- **HP-2:** Self-hosted workflow receives completed push or scheduled `ci`
+  context and forwards run ID, branch, and head SHA into the advisory make target. Code
   evidence: `.github/workflows/push-review.yml`; test evidence
   `scripts/gemma_push_ops_test.py::PushReviewOpsWiring::test_workflow_is_post_pipeline_self_hosted_and_advisory`.
 
@@ -807,7 +808,7 @@ Required passes: 3 (RRI 41 -> Med-high)
 | Case ID | Type | Behavior | Unit test evidence | Result |
 |---|---|---|---|---|
 | HP-1 | Happy path | local make target maps run-id/env inputs into the push-review CLI | `scripts/gemma_push_ops_test.py::PushReviewOpsWiring::test_make_target_maps_env_to_cli_flags` | passed |
-| HP-2 | Happy path | post-pipeline workflow starts automatically after completed `ci` push runs and forwards run context on self-hosted runner | `scripts/gemma_push_ops_test.py::PushReviewOpsWiring::test_workflow_is_post_pipeline_self_hosted_and_advisory` | passed |
+| HP-2 | Happy path | post-pipeline workflow starts automatically after completed push or scheduled `ci` runs and forwards run context on self-hosted runner | `scripts/gemma_push_ops_test.py::PushReviewOpsWiring::test_workflow_is_post_pipeline_self_hosted_and_advisory`, `scripts/gemma_push_ops_test.py::PushReviewOpsWiring::test_workflow_audits_push_and_schedule_but_not_pull_requests` | passed |
 | EC-1 | Edge case | skip env exits cleanly with a skip message | `scripts/gemma_push_ops_test.py::PushReviewOpsWiring::test_make_target_exists_and_is_skippable` | passed |
 | EC-2 | Edge case | workflow stays self-hosted and does not impose GitHub-hosted Ollama dependency | `scripts/gemma_push_ops_test.py::PushReviewOpsWiring::test_workflow_is_post_pipeline_self_hosted_and_advisory` | passed |
 | EC-3 | Edge case | pending/queued pipeline writes pending sentinel and avoids model analysis | `scripts/gemma_push_review_test.py::PendingRun::test_in_progress_returns_sentinel_path`, `scripts/gemma_push_review_test.py::PendingRun::test_queued_status_is_pending` | passed |

@@ -2,7 +2,7 @@ use std::{path::Path, sync::Arc};
 
 use async_trait::async_trait;
 use futures_util::TryStreamExt;
-use object_store::{ObjectStore, aws::AmazonS3Builder, buffered::BufWriter};
+use object_store::{ObjectStore, ObjectStoreExt, aws::AmazonS3Builder, buffered::BufWriter};
 use tokio::io::AsyncWriteExt;
 
 use crate::{adapter::StorageAdapter, config::StorageConfig, error::StorageError};
