@@ -36,6 +36,16 @@ class HP2UnrestrictedCommandsNoLongerRejectedByCheckCommand(unittest.TestCase):
     # class proves check_command itself no longer rejects them (unit level);
     # integration_test.py's RealBoundaryWiredIntoRunner proves a previously
     # denied command actually reaches real subprocess execution end-to-end.
+    #
+    # Security model note (two distinct containment layers, only one of
+    # which is exercised here): command-execution containment is now
+    # minimal — check_command no longer restricts which commands run, so a
+    # permitted command can still read files or make network calls the
+    # process itself can reach. Filesystem-write containment remains the
+    # primary security gate and is unaffected by this class — it lives in
+    # check_write's worktree jail (see EC1PathEscapeAttempts below) and in
+    # the post-run diff-scope validation (T7c-a/b2/b3), neither of which
+    # this task touches.
     def test_previously_unlisted_dev_commands_now_pass(self):
         with tempfile.TemporaryDirectory() as tmp:
             boundary = b.LocalAgentBoundary(tmp)
