@@ -416,6 +416,25 @@ review artifact was produced for this change; closure relies on the full
 test suite (695/695 passing) and manual verification (correct default
 propagated, no stray env override, model uninstalled and unloaded) instead.
 
+**Addendum — pre-push gate:** separately, the `pre-push` git hook's
+`make qa-docs` → `qa-gemma-review` step (triggered because this change edits
+canonical docs) also failed 3/3 passes against `gemma4:26b-a4b-it-qat`
+(the new default) with the same malformed-output symptom this amendment's
+own T7c-b3 review hit — free-form prose instead of the required tagged
+format, not a GPU-contention issue this time (GPU was otherwise idle). A
+full D14 fallback review of the exact commit being pushed was run
+independently (context-isolated subagent, Balanced tier) and returned PASS
+with two non-blocking observations (a test-coverage gap on two exit paths;
+an imprecise claim in the commit message about `.gitignore`'s prior state).
+The user explicitly authorized `DUBBRIDGE_SKIP_GEMMA_REVIEW=1` for this push
+specifically, on the basis of that D14 PASS. This is worth flagging as a
+pattern: `gemma4:26b-a4b-it-qat` (now the sole review model) appears to
+struggle with the tagged-output contract more often than the retired
+`gemma4:12b-mlx` fast lane did in this role — a possible follow-up is
+tightening `scripts/gemma-code-review.py`'s system prompt or grammar
+constraint for this model family, tracked informally here pending a formal
+task.
+
 ## Related
 
 - `docs/plan/adr036-local-first-pilot.md` — Stage 1/Stage 2 pilot plan for §10
