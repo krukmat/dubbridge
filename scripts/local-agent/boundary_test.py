@@ -18,29 +18,47 @@ class HP1InScopePassesThrough(unittest.TestCase):
             boundary.check_write("hello.txt")
             boundary.check_write("nested/dir/file.txt")
 
-    def test_allowlisted_command_passes(self):
+    def test_previously_allowlisted_commands_still_pass(self):
         with tempfile.TemporaryDirectory() as tmp:
             boundary = b.LocalAgentBoundary(tmp)
             boundary.check_command(["cargo", "test", "-p", "domain"])
             boundary.check_command(["npm", "test"])
             boundary.check_command(["make", "qa-fmt"])
-
-    def test_grep_and_python_unittest_pass(self):
-        # added after a real pilot run: the model reasonably wanted to grep
-        # a file before editing it, and to run a card's own
-        # `python3 -m unittest ...` verify_commands directly.
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
             boundary.check_command(["grep", "-n", "foo", "src/lib.rs"])
             boundary.check_command(["python3", "-m", "unittest", "scripts/foo_test.py"])
+            boundary.check_command(["cargo", "metadata", "--format-version", "1"])
 
-    def test_cargo_metadata_passes(self):
-        # added after a real pilot run: the model reasonably wanted to
-        # inspect the workspace/crate structure via `cargo metadata` before
-        # editing Rust code — read-only, no compilation or writes.
+
+class HP2UnrestrictedCommandsNoLongerRejectedByCheckCommand(unittest.TestCase):
+    # T7b-3: these are representative commands that were previously rejected
+    # by check_command's allowlist and caused real T7 aborts — a legitimate
+    # development command being blocked, not an adversarial probe. This
+    # class proves check_command itself no longer rejects them (unit level);
+    # integration_test.py's RealBoundaryWiredIntoRunner proves a previously
+    # denied command actually reaches real subprocess execution end-to-end.
+    def test_previously_unlisted_dev_commands_now_pass(self):
         with tempfile.TemporaryDirectory() as tmp:
             boundary = b.LocalAgentBoundary(tmp)
-            boundary.check_command(["cargo", "metadata", "--format-version", "1"])
+            boundary.check_command(["cargo", "run", "-p", "dubbridge-api"])
+            boundary.check_command(["npm", "run", "screenshots"])
+            boundary.check_command(["python3", "arbitrary_script.py"])
+            boundary.check_command(["sh", "-c", "cargo build && cargo test"])
+            boundary.check_command(["curl", "https://example.com"])
+            boundary.check_command(["python3", "-m", "unittest", "discover", "-s", "."])
+
+    def test_make_non_qa_target_now_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            boundary = b.LocalAgentBoundary(tmp)
+            boundary.check_command(["make", "release"])
+
+    def test_empty_command_still_rejected(self):
+        # the only remaining check_command rejection: an empty argv is not a
+        # command-policy decision, it's a malformed-call guard the runner
+        # itself relies on (see run_local_task.py's tool-call handling).
+        with tempfile.TemporaryDirectory() as tmp:
+            boundary = b.LocalAgentBoundary(tmp)
+            with self.assertRaises(BoundaryViolation):
+                boundary.check_command([])
 
 
 class EC1PathEscapeAttempts(unittest.TestCase):
@@ -101,168 +119,6 @@ class EC1PathEscapeAttempts(unittest.TestCase):
 
                 with self.assertRaises(BoundaryViolation):
                     boundary.check_write("swappable-link")
-
-
-class EC2AllowlistedCommandArgumentEscape(unittest.TestCase):
-    # D14 finding (medium severity): check_command only inspected
-    # argv[0]/argv[1] against fixed prefixes — an allowlisted command's own
-    # arguments (e.g. --manifest-path, -C) were never checked, letting an
-    # otherwise-permitted command act outside the worktree via its flags.
-    def test_cargo_manifest_path_escape_rejected(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            with self.assertRaises(BoundaryViolation):
-                boundary.check_command(["cargo", "build", "--manifest-path", "/etc/passwd"])
-
-    def test_cargo_manifest_path_escape_rejected_with_equals_form(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            with self.assertRaises(BoundaryViolation):
-                boundary.check_command(["cargo", "build", "--manifest-path=/etc/passwd"])
-
-    def test_make_dash_c_escape_rejected(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            with self.assertRaises(BoundaryViolation):
-                boundary.check_command(["make", "qa-fmt", "-C", "/"])
-
-    def test_cargo_manifest_path_within_worktree_still_allowed(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            boundary.check_command(["cargo", "build", "--manifest-path", "Cargo.toml"])
-
-    def test_cargo_metadata_manifest_path_escape_rejected(self):
-        # cargo metadata accepts --manifest-path too (confirmed via
-        # `cargo metadata --help`) — the shared PATH_ACCEPTING_FLAGS check
-        # must cover it the same as cargo build/test.
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            with self.assertRaises(BoundaryViolation):
-                boundary.check_command(["cargo", "metadata", "--manifest-path", "/etc/passwd"])
-
-    # D14 finding (blocking): grep's file operands are bare positional
-    # arguments, not named flags — PATH_ACCEPTING_FLAGS never inspected them,
-    # so any of these passed check_command completely unchecked before the
-    # fix, letting the model read arbitrary files anywhere on disk.
-    def test_grep_absolute_path_escape_rejected(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            with self.assertRaises(BoundaryViolation):
-                boundary.check_command(["grep", "root", "/etc/passwd"])
-
-    def test_grep_recursive_absolute_path_escape_rejected(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            with self.assertRaises(BoundaryViolation):
-                boundary.check_command(["grep", "-r", "foo", "/"])
-
-    def test_grep_pattern_file_flag_escape_rejected(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            with self.assertRaises(BoundaryViolation):
-                boundary.check_command(["grep", "-f", "/etc/passwd", "x"])
-
-    def test_grep_dotdot_escape_rejected(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            with self.assertRaises(BoundaryViolation):
-                boundary.check_command(["grep", "foo", "../../etc/passwd"])
-
-    def test_grep_within_worktree_still_allowed(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            boundary.check_command(["grep", "-n", "foo", "src/lib.rs"])
-            boundary.check_command(["grep", "-r", "foo", "."])
-
-    # D14 finding (major): unittest discover's -s/--start-directory and
-    # -t/--top-level-directory take an arbitrary directory, unconstrained by
-    # the bare 3-token prefix match, letting the model run test discovery
-    # (i.e. execute arbitrary Python modules) rooted outside the worktree.
-    def test_unittest_discover_start_directory_escape_rejected(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            with self.assertRaises(BoundaryViolation):
-                boundary.check_command(
-                    ["python3", "-m", "unittest", "discover", "-s", "/etc", "-p", "*.py"]
-                )
-
-    def test_unittest_discover_top_level_directory_escape_rejected(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            with self.assertRaises(BoundaryViolation):
-                boundary.check_command(
-                    ["python3", "-m", "unittest", "discover", "-t", "/"]
-                )
-
-    def test_unittest_discover_within_worktree_still_allowed(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            boundary.check_command(["python3", "-m", "unittest", "discover", "-s", "."])
-
-
-class EC2DenylistAndUnknownCommands(unittest.TestCase):
-    def test_git_push_rejected(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            with self.assertRaises(BoundaryViolation):
-                boundary.check_command(["git", "push", "origin", "main"])
-
-    def test_git_push_embedded_in_shell_string_rejected(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            with self.assertRaises(BoundaryViolation):
-                boundary.check_command(["sh", "-c", "git push origin main"])
-
-    def test_git_push_with_double_space_or_extra_quoting_still_rejected(self):
-        # regression: a literal-substring check (" git push", "git push ")
-        # is defeated by irregular whitespace or quoting; token-subsequence
-        # matching via shlex must still catch these.
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            with self.assertRaises(BoundaryViolation):
-                boundary.check_command(["sh", "-c", "git  push origin main"])
-            with self.assertRaises(BoundaryViolation):
-                boundary.check_command(["sh", "-c", "'git' 'push' origin"])
-
-    def test_rm_rf_rejected(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            with self.assertRaises(BoundaryViolation):
-                boundary.check_command(["rm", "-rf", "/"])
-
-    def test_docker_rejected(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            with self.assertRaises(BoundaryViolation):
-                boundary.check_command(["docker", "compose", "up"])
-
-    def test_unknown_command_not_on_either_list_rejected_fail_closed(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            with self.assertRaises(BoundaryViolation):
-                boundary.check_command(["curl", "https://example.com"])
-
-    def test_make_non_qa_target_rejected(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            with self.assertRaises(BoundaryViolation):
-                boundary.check_command(["make", "release"])
-
-    def test_python_without_m_unittest_still_rejected(self):
-        # the allowlist entry is specifically ("python3", "-m", "unittest"),
-        # not bare "python3" — arbitrary script execution must stay denied.
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            with self.assertRaises(BoundaryViolation):
-                boundary.check_command(["python3", "arbitrary_script.py"])
-            with self.assertRaises(BoundaryViolation):
-                boundary.check_command(["python3", "-c", "import os; os.system('rm -rf /')"])
-
-    def test_empty_command_rejected(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            boundary = b.LocalAgentBoundary(tmp)
-            with self.assertRaises(BoundaryViolation):
-                boundary.check_command([])
 
 
 class EC3EnvironmentStripping(unittest.TestCase):

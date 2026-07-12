@@ -5,152 +5,28 @@ Implements the `check_write(path)` / `check_command(argv)` interface that
 `run_local_task.py`'s `NullBoundary` stubbed out. Any rejection raises
 `run_local_task.BoundaryViolation` so the runner's existing abort path (added
 in T6a) handles it without change.
+
+T7b-3: containment no longer depends on restricting *which* commands run.
+`check_command` is now a pass-through — arbitrary development commands are
+permitted, with the worktree as `cwd` (T6a) and the stripped environment
+(`env_for_subprocess`, unchanged below) as the actual containment mechanisms.
+This is a narrower guarantee than the old allowlist: a permitted command can
+still read files or make network calls the process itself has access to
+(worktree `cwd` is not a filesystem sandbox, and the stripped env only
+removes credentials from what the command *sees*, it does not stop the
+command from reaching outside the worktree on its own). What post-run
+diff-scope validation (T7c-a/b2/b3) *does* guarantee is on the write side:
+no diff touching a path outside `allowed_paths` is ever copied to the
+primary checkout, regardless of which commands produced it. That write-side
+scope check, not a command allowlist, is what this task relies on — it does
+not claim to contain arbitrary read/network side effects.
 """
 
 import os
-import shlex
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from run_local_task import BoundaryViolation
-
-# Allowlist-first: an argv[0] not in this set is rejected by default, even if
-# it doesn't match anything in the denylist. The denylist exists as explicit,
-# auditable defense-in-depth for the highest-risk commands, not as the
-# primary gate.
-ALLOWED_COMMAND_PREFIXES = (
-    ("cargo", "test"),
-    ("cargo", "build"),
-    ("cargo", "check"),
-    ("cargo", "fmt"),
-    ("cargo", "clippy"),
-    ("npm", "test"),
-    ("npm", "run", "lint"),
-    ("npm", "run", "typecheck"),
-    ("make",),  # qa-* targets checked explicitly below
-    # Read-only inspection/verification commands: confirmed necessary from a
-    # real pilot run — the model reasonably wanted to grep a file before
-    # editing it, and to run a card's own `python3 -m unittest ...`
-    # verify_commands via the agentic loop's own run_command tool, not only
-    # through the operator-controlled test_runner harness.
-    ("grep",),
-    ("python3", "-m", "unittest"),
-    # Read-only workspace inspection: confirmed necessary from a real pilot
-    # run — the model reasonably wanted to inspect the crate/workspace
-    # structure before editing Rust code. Emits no side effects (no
-    # compilation, no filesystem writes). `cargo metadata` does accept
-    # --manifest-path (verified via `cargo metadata --help`), but that's
-    # already covered by the existing shared PATH_ACCEPTING_FLAGS check —
-    # no new escape surface to add here.
-    ("cargo", "metadata"),
-)
-
-DENIED_COMMAND_PREFIXES = (
-    ("git", "push"),
-    ("rm", "-rf"),
-    ("docker",),
-)
-
-
-def _is_make_qa_target(argv):
-    return len(argv) >= 2 and argv[0] == "make" and argv[1].startswith("qa-")
-
-
-def _matches_prefix(argv, prefix):
-    return len(argv) >= len(prefix) and tuple(argv[: len(prefix)]) == prefix
-
-
-def _tokenize_argv_element(element):
-    try:
-        return shlex.split(element)
-    except ValueError:
-        # unbalanced quotes etc.: fail closed by treating the raw string as
-        # a single opaque token rather than raising here — the caller still
-        # rejects on "not on either list" if nothing matches.
-        return [element]
-
-
-def _contains_subsequence(tokens, subsequence):
-    n = len(subsequence)
-    return any(
-        tuple(tokens[i : i + n]) == subsequence for i in range(len(tokens) - n + 1)
-    )
-
-
-def _argv_embeds_denied_subcommand(argv):
-    # A single argv element can embed an entire shell command (e.g.
-    # ["sh", "-c", "git  push origin main"]) that a positional prefix check
-    # on argv[0]/argv[1] would miss entirely. Tokenize every element with
-    # shlex (not a literal substring match, which a double space or extra
-    # quoting would defeat) and look for a denied prefix as a token
-    # subsequence anywhere in the combined token stream.
-    tokens = [tok for element in argv for tok in _tokenize_argv_element(element)]
-    return any(_contains_subsequence(tokens, prefix) for prefix in DENIED_COMMAND_PREFIXES)
-
-
-# D14 finding: check_command only inspected argv[0]/argv[1] against fixed
-# prefixes — an allowlisted command's own arguments (e.g. `cargo build
-# --manifest-path /etc/passwd`, `make qa-fmt -C /`) were never checked, so an
-# allowlisted command could still act outside the worktree via its flags.
-# These are the flag spellings (both "--flag value" and "--flag=value") that
-# accept an arbitrary path for the allowlisted tools in this module. This
-# only covers *named*-flag path arguments — grep's bare positional file
-# operands are a separate gap, closed by `_grep_argv_escapes_worktree` below
-# (a second D14 finding: this list was never a complete accounting of every
-# allowlisted tool's path-accepting surface).
-PATH_ACCEPTING_FLAGS = (
-    "--manifest-path", "-C", "--target-dir", "--prefix",
-    # unittest discover's directory flags — see the second D14 finding below.
-    "-s", "--start-directory", "-t", "--top-level-directory",
-)
-
-
-def _argv_path_flag_escapes_worktree(argv, worktree_root):
-    i = 0
-    while i < len(argv):
-        token = argv[i]
-        flag, _, inline_value = token.partition("=")
-        if flag in PATH_ACCEPTING_FLAGS:
-            value = inline_value if inline_value else (argv[i + 1] if i + 1 < len(argv) else None)
-            if value is not None:
-                candidate = value if os.path.isabs(value) else os.path.join(worktree_root, value)
-                resolved = os.path.realpath(candidate)
-                try:
-                    common = os.path.commonpath([resolved, worktree_root])
-                except ValueError:
-                    return True
-                if common != worktree_root:
-                    return True
-        i += 1
-    return False
-
-
-def _resolves_outside_worktree(value, worktree_root):
-    candidate = value if os.path.isabs(value) else os.path.join(worktree_root, value)
-    resolved = os.path.realpath(candidate)
-    try:
-        common = os.path.commonpath([resolved, worktree_root])
-    except ValueError:
-        return True
-    return common != worktree_root
-
-
-# D14 finding (blocking): grep takes its file operands as bare positional
-# arguments, not named flags — PATH_ACCEPTING_FLAGS (built for cargo/make's
-# "--flag value" vocabulary) never inspects them at all, so `grep pattern
-# /etc/passwd` or `grep -r pattern /` passed check_command completely
-# unchecked, letting the model read any file the process can access. Every
-# bare (non-flag) token after argv[0] is validated against the worktree jail;
-# grep's PATTERN argument is virtually never itself an absolute or
-# ".."-escaping path, so this fails closed on the rare cases it might be
-# without materially restricting real usage.
-def _grep_argv_escapes_worktree(argv, worktree_root):
-    for token in argv[1:]:
-        if token.startswith("-"):
-            continue
-        if _resolves_outside_worktree(token, worktree_root):
-            return True
-    return False
 
 
 class LocalAgentBoundary:
@@ -187,31 +63,11 @@ class LocalAgentBoundary:
         if not argv:
             raise BoundaryViolation("empty command rejected")
 
-        if _argv_embeds_denied_subcommand(argv):
-            raise BoundaryViolation(f"denied command (shell-embedded): {argv!r}")
-
-        for prefix in DENIED_COMMAND_PREFIXES:
-            if _matches_prefix(argv, prefix):
-                raise BoundaryViolation(f"denied command: {argv!r}")
-
-        if _argv_path_flag_escapes_worktree(argv, self._worktree_root):
-            raise BoundaryViolation(f"command path flag escapes worktree: {argv!r}")
-
-        if argv[0] == "grep" and _grep_argv_escapes_worktree(argv, self._worktree_root):
-            raise BoundaryViolation(f"grep argument escapes worktree: {argv!r}")
-
-        if _is_make_qa_target(argv):
-            return None
-
-        for prefix in ALLOWED_COMMAND_PREFIXES:
-            if prefix == ("make",):
-                continue  # only the qa-* form above is allowed for make
-            if _matches_prefix(argv, prefix):
-                return None
-
-        # Fail closed: anything not explicitly recognized as allowed is
-        # rejected, even if it isn't on the denylist either.
-        raise BoundaryViolation(f"command not in allowlist: {argv!r}")
+        # No command-policy gate: any nonempty argv passes. Write-side
+        # containment is the worktree cwd (T6a), the stripped environment
+        # (env_for_subprocess below), and post-run diff-scope validation
+        # (T7c-a/b2/b3) — not a command allowlist. This does not sandbox a
+        # command's own reads or network access; see the module docstring.
 
     def env_for_subprocess(self):
         return stripped_agent_env()
