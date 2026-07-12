@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   advisory-push-review:
-    if: github.event.workflow_run.event == 'push'
+    if: github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'schedule'
     runs-on:
       - self-hosted
       - macOS
