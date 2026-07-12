@@ -2221,6 +2221,53 @@ guide's closed vocabulary `PASS | BLOCKED`, not the raw pass-1 verdict)
 - Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior. Cierre aprobado.
 - Commands run: `cd scripts/local-agent && python3 -m unittest boundary_test run_local_task_test integration_test scope_check_test escalation_packet_test -v` and `cd scripts && python3 -m unittest gemma_local_test -v`
 
+### Pre-push Gemma Reviewer findings (post-commit, canonical-docs gate)
+
+The `pre-push` hook's `make qa-gemma-review` (triggered because the commit
+touches `docs/tasks/`) ran automatically on push and returned `findings`
+(3/3 passes usable) — this is a separate gate from Step 1-B's cross-vendor
+peer review above; it runs at push time, not at task-closure time, so it is
+recorded here rather than reopening the closed task.
+
+- Model note: the log reported `gemma4:12b-mlx` as not installed on this
+  machine (available: `gemma3:27b`, `gemma4:26b-a4b-it-qat`,
+  `nomic-embed-text:latest`, `qwen3.6:35b-a3b`); the ADR-036 binding is
+  `gemma4:26b-a4b-it-qat`, not the `12b-mlx` fast lane the wrapper's
+  unpinned default still resolves to — the same pre-existing default/binding
+  mismatch already disclosed in T6c's completion evidence, not a new gap.
+  The review still produced a usable 3/3-pass aggregate despite the missing
+  tag.
+- Findings: 3 (2 `major`/`consensus` + 1 `pass_specific`, 1 `minor`/`consensus`)
+  1. **`major, consensus`** (`boundary.py:187`) — removing `check_command`'s
+     policy reopens a window for network exfiltration or reads outside the
+     worktree before any write-side validation runs.
+  2. **`major, pass_specific`** (`boundary.py:63`) — same point, different
+     wording (names `curl`, `sh -c` explicitly).
+  3. **`minor, consensus`** (`boundary_test.py:121`) — the security model
+     moved from deny-by-default to execute-all/validate-writes; documentation
+     should distinguish command-execution containment (now minimal) from
+     filesystem-write containment (the primary mechanism post-T7b-3).
+- Disposition: **all 3 accepted as correct, none disputed — and all 3
+  already addressed**, not newly caused by this finding:
+  - Findings 1 and 2 restate, with no new information, Codex's Phase-2
+    finding #1 (recorded above), which was already fixed by rewriting the
+    `boundary.py` module docstring (lines 9–22) to state explicitly that
+    this is a **write-side-only** containment guarantee — it does not claim
+    to sandbox a command's own reads or network access. This is the
+    intentional design tradeoff T7b-3 exists to make, gated on T7b-1
+    (adversarial regression suite) and T7c-b3 (wired, audited scope-check)
+    both being `[x] Done` before this task started, per the task's own
+    dependency gate.
+  - Finding 3 is already satisfied by the same docstring rewrite, which
+    names both containment layers explicitly and states which one is now
+    minimal.
+  - No code change made in response to this gate: no finding identifies a
+    defect in `check_write`, `stripped_agent_env`, the timeout/process-group
+    logic, or a test gap — all of which remain unchanged and fully covered
+    per the Unit coverage certification table above.
+- disposition_divergence: `none` — Gemma's findings agree with, rather than
+  contradict, the already-recorded Codex Phase-2 disposition.
+
 ---
 
 ## T7d — Rerun the 16-card corpus with offline-productivity Qwen runner
