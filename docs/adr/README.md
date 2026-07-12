@@ -43,6 +43,7 @@ Run `make qa-docs` before reporting an ADR change complete.
 | [ADR-033](ADR-033-open-knowledge-format-adoption.md) | Adopt the Open Knowledge Format (OKF) for repository knowledge | Accepted |
 | [ADR-034](ADR-034-gemma-process-audit-and-reviewer-reconciliation.md) | Gemma process audit log and reviewer multi-pass reconciliation contract | Accepted (scope: gemma-audit-and-triple-pass slice) |
 | [ADR-035](ADR-035-mobile-dark-theme-netflix-style.md) | Mobile dark-theme visual identity — Netflix-style dark canvas | Accepted |
+| [ADR-036](ADR-036-local-first-agentic-implementation-band.md) | Local-first agentic implementation band (RRI 26–40) and Apple Silicon local model stack | Accepted (scope: agent workflow / local delegation) |
 
 ## Backfill note
 

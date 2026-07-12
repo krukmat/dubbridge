@@ -18,3 +18,4 @@ __pycache__/
 .agent/
 .claude/*
 logs/gemma-audit/
+logs/local-bench/
