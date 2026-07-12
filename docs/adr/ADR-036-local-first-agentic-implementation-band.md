@@ -127,10 +127,21 @@ to behave like a production execution sandbox.
 - **Isolated disposable git worktree** per task. The model may read, write, and
   run arbitrary development commands inside it. A broken worktree is deleted;
   the primary checkout is never the execution directory.
-- **No command allowlist or command-policy aborts.** Shell composition,
-  repository inspection, dependency tooling, formatters, compilers, and tests
-  are permitted. Productivity is measured against the resulting diff and gates,
-  not against which command vocabulary the model selected.
+- **No command allowlist or command-policy aborts** for the general case.
+  Shell composition, repository inspection, dependency tooling, formatters,
+  compilers, and tests are permitted. Productivity is measured against the
+  resulting diff and gates, not against which command vocabulary the model
+  selected.
+  **Amendment (T7b-3, recorded post-implementation):** a short, fixed
+  denylist (`git push`, `docker`, `rm -rf`) is retained as defense-in-depth
+  for the three highest-severity, hardest-to-undo actions, reintroduced
+  after the pre-push Gemma Reviewer gate flagged unrestricted execution as a
+  major finding. This is materially narrower than the positive allowlist
+  this ADR's §3 already rejects (an ~10-entry "which tools may run" list);
+  it is three specific irreversible/exfiltration-adjacent actions, not a
+  return to allowlist-first policy. See
+  `docs/tasks/adr036-local-first-pilot.md` T7b-3 "Design revision" for the
+  full trail.
 - **Post-run scope enforcement:** after the model finishes, the orchestrator
   compares the worktree diff with the card's `allowed_paths`. Out-of-scope
   changes fail the card and are never applied to the primary checkout.

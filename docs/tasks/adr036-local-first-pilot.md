@@ -2321,6 +2321,62 @@ was restored.
 - `make qa-gemma-review` re-run after this revision — see result recorded
   immediately below, before the push was retried.
 
+### Pre-push Gemma Reviewer, corrected result (root cause: stale shell env var)
+
+The first two `make qa-gemma-review` attempts after this revision still
+returned byte-identical output to the pre-revision runs (referencing a line
+number, `boundary.py:187`, that could not exist in the post-revision
+161-line file) — a red flag that the review was not analyzing the current
+diff. Root cause: this shell session's `DUBBRIDGE_LOW_RRI_MODEL` environment
+variable was set to `gemma4:12b-mlx`, a model retired earlier the same day
+(commit `51adc52`, "retire gemma4:12b-mlx fast lane") and no longer
+installed. `gemma-code-review.py`'s `default_fallback_model_for()` disables
+its fallback entirely whenever `DUBBRIDGE_LOW_RRI_MODEL` is set (by design,
+to let an explicit override win) — so with an uninstalled model and no
+fallback, the packet was never actually reviewed by a working model for
+those two attempts. `~/.zshrc` and `~/.zprofile` already had the correct
+value (`gemma4:26b-a4b-it-qat`); only this already-running shell process
+had the stale value from before those files were fixed.
+
+Re-run with the stale variable unset (`env -u DUBBRIDGE_LOW_RRI_MODEL make
+qa-gemma-review`) produced a genuine analysis of the current diff:
+
+- Verdict: `findings` (4 total: 2 `major` — 1 `consensus`, 1 `pass_specific`
+  — and 2 `minor` — 1 `consensus`, 1 `pass_specific`)
+- Summary (model's own words): *"The task successfully removes the
+  restrictive command allowlist and replaces it with a minimal denylist for
+  high-risk commands (git push, docker, rm -rf)... While this is documented
+  and user-directed, it relies entirely on filesystem write-side validation
+  rather than process containment... The code review and testing coverage
+  are exceptionally thorough."* — the model correctly identified the
+  denylist revision and characterized it as an intentional, documented,
+  user-directed tradeoff, not a defect.
+- Findings 1–3 restate the same architectural point already dispositioned
+  above (write-side containment, not execution sandboxing, is the
+  intentional model) — no new information, no code change.
+- Finding 4 (`pass_specific`, minor, `boundary.py:52`): *"this is a
+  fundamental shift in the security posture... should be highlighted in the
+  high-level ADR/Task documentation."* **Accepted and fixed** — this was a
+  genuine gap: the task ledger documented the shift, but
+  `docs/adr/ADR-036-local-first-agentic-implementation-band.md` §3 (the
+  actual design authority) still read "No command allowlist or
+  command-policy aborts" without qualification. Added an amendment note to
+  ADR-036 §3 recording the 3-entry denylist exception and pointing back to
+  this ledger section, per the workflow guide's ADR change propagation
+  contract. `make qa-docs`'s frontmatter/consistency checks re-run and
+  passed after the ADR edit.
+- disposition_divergence: `none`.
+
+**Lesson for future sessions:** always verify no stale
+`DUBBRIDGE_LOW_RRI_MODEL`/`DUBBRIDGE_REVIEW_MODEL` override is set in the
+active shell before trusting a Gemma Reviewer "no change" result across
+repeated runs — identical output across a real code change is itself a
+signal to check the model resolution path, not just accept the verdict.
+
+---
+
+## T7d — Rerun the 16-card corpus with offline-productivity Qwen runner
+
 - **Status:** [ ] Pending
 - **Effort:** M
 - **RRI:** n/a (operational orchestration; no new code)
