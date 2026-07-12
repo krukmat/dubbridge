@@ -76,9 +76,45 @@ Nothing under `apps/` or `crates/` changes.
   T9 pilot orchestration, T10 policy propagation):** judgment, operations on
   the physical machine, or policy-touching work that HITL policy keeps with
   the primary agent.
+- **Stage 1 corrective loop (T7a–T7e):** preserve the original Qwen run as the
+  immutable baseline; classify its failures; replace command allowlisting with
+  disposable offline-worktree containment and post-run diff scope checks;
+  rerun the same corpus with Qwen; then run Gemma independently as
+  a comparator when the corrected Qwen result remains below promotion gates or
+  the owner requests the comparison. No model switch occurs inside a session.
 - Per-task RRI values in the ledger are **preliminary estimates**; recompute
   with `scripts/rri.py` at presentation time before execution, per the
   workflow guide.
+
+Corrective-loop dependency order:
+
+```text
+T7 baseline ─► T7a classify ─► T7b-1 characterize ─► T7c-a scope util ─► T7c-b1 prompt
+                                                                       └► T7c-b2 wire gate ─► T7c-b3 audit/integration
+                                                                                                       │
+                                                                            T7b-3 remove allowlist ◄───┘
+                                                                                     │
+                                                                                     ▼
+                              T7e Gemma comparator ◄─ T7d corrected Qwen run
+                                        │               │
+                                        └───────┬───────┘
+                                                ▼
+                                               T8
+```
+
+`T7b`/`T7c` are decomposed into six ordered subtasks (`T7b-1`, `T7c-a`, `T7c-b1`,
+`T7c-b2`, `T7c-b3`, `T7b-3`) per `docs/tasks/adr036-local-first-pilot.md` — the
+original single-card `T7b` scored RRI 73 (High), which triggers mandatory
+decomposition under `RRI_POLICY.md` §Decomposition triggers. The decomposition
+also resequences the post-run diff-scope gate (`T7c-a`/`T7c-b2`/`T7c-b3`) ahead
+of the allowlist removal (`T7b-3`), closing a zero-gate window flagged by the
+cross-vendor phase-1 peer review (`.agent/peer-task-review-T7b.json`): the
+allowlist must not be removable before the replacement enforcement gate exists,
+is wired in, and is audited.
+
+T7e is a separate full-corpus comparator, not a continuation of a Qwen
+session. It is required when corrected Qwen misses a promotion gate; otherwise
+the owner may explicitly waive it if T8 does not need a binding comparison.
 
 ## Verification
 

@@ -19,11 +19,11 @@ from typing import Optional
 
 
 DEFAULT_HOST = "http://localhost:11434"
-DEFAULT_MODEL = "gemma4:12b-mlx"
+DEFAULT_MODEL = "gemma4:26b-a4b-it-qat"
 DEFAULT_FALLBACK_MODEL = "gemma4:26b-a4b-it-qat"
 DEFAULT_IDLE_TIMEOUT_SECONDS = 180
 DEFAULT_MAX_WALL_SECONDS = 900
-DEFAULT_NUM_CTX = 40960
+DEFAULT_NUM_CTX = 32768
 DEFAULT_NUM_PREDICT = 4096
 DEFAULT_TEMPERATURE = 0.1
 DEFAULT_THINK = False
@@ -316,12 +316,29 @@ def _redact(value):
     return _SECRET_PATTERN.sub(r'\1=***REDACTED***', value)
 
 
+def _redact_recursive(value):
+    # D14 finding (T6c): the original top-level-only redaction never
+    # recursed into list/dict fields. That was invisible while every caller
+    # only ever put already-redacted prompt strings in the record, but T6c's
+    # "commands" field is a list of argv lists — model-controlled content
+    # that can carry a credential-shaped string straight into the persisted
+    # log unredacted. Every audit-log caller goes through this one function,
+    # so fixing it here covers all roles, not just the new one.
+    if isinstance(value, str):
+        return _redact(value)
+    if isinstance(value, list):
+        return [_redact_recursive(item) for item in value]
+    if isinstance(value, dict):
+        return {k: _redact_recursive(v) for k, v in value.items()}
+    return value
+
+
 def append_audit_log(record, *, now=None):
     ts = now or datetime.datetime.utcnow()
     log_dir = pathlib.Path("logs/gemma-audit")
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / ts.strftime("%Y-%m.jsonl")
-    safe = {k: (_redact(v) if isinstance(v, str) else v) for k, v in record.items()}
+    safe = {k: _redact_recursive(v) for k, v in record.items()}
     with open(log_path, "a", encoding="utf-8") as f:
         f.write(json.dumps(safe, sort_keys=True) + "\n")
 

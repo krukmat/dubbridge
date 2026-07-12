@@ -69,12 +69,14 @@ user explicitly waives, or the task is reported as blocked.
 | PPR-1 | `docs/tasks/peer-review-policy-contract.md` | Define band-routed, two-phase peer-review policy and reporting contract | docs | done |
 | PPR-2 | *(no ledger — RRI 19, Low)* | Implement `scripts/peer-workflow-review.py` + adapters + tests | development | done |
 | PPR-3 | *(no ledger — RRI 22, Low)* | Wire `make qa-peer-workflow-review`, pre-push routing, and CI job | config | done |
+| PPR-4 | `docs/tasks/peer-review-codex-bin-resolution.md` | Make Codex peer-review resolution explicit and executable from Claude Code | development | proposed |
 
 ## Dependencies
 
 ```
 PPR-1 (policy contract) ──> PPR-2 (script implements the contract)
 PPR-2 ──> PPR-3 (wiring requires the script to exist)
+PPR-3 ──> PPR-4 (Codex resolution hardens the implemented routing)
 ```
 
 PPR-1 is self-contained (docs/policy only); PPR-2 and PPR-3 will be authored
@@ -93,9 +95,11 @@ as separate task ledgers once PPR-1 is closed.
 
 ## Risks
 
-- **R1** — Codex CLI not installed locally (`which codex` → not found). The
-  policy defines resolution and the D14/blocked-artifact fallback regardless;
-  PPR-2 implements the availability probe.
+- **R1** — Codex CLI may not be inherited on `PATH` by Claude Code even when the
+  VS Code extension ships a working executable. PPR-4 defines an explicit
+  `CODEX_BIN` resolution path before the `PATH` fallback, validates the selected
+  executable, and preserves the D14/blocked-artifact fallback when invocation
+  cannot run.
 - **R2** — Band boundary at RRI 40/41 must resolve deterministically (inclusive
   `0–40 → Gemma`, `41+ → cross-vendor`), matching the existing Moderate/Med-high
   boundary in `RRI_POLICY.md`.

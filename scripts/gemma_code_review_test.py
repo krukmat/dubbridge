@@ -246,7 +246,7 @@ class CliBehavior(unittest.TestCase):
         r = self.run_cli("-", "--dry-run", stdin=_packet(), env=env)
         self.assertEqual(r.returncode, 0, r.stderr)
         payload = json.loads(r.stdout)
-        self.assertEqual(payload["model"], "gemma4:12b-mlx")
+        self.assertEqual(payload["model"], "gemma4:26b-a4b-it-qat")
 
     def test_empty_packet_exits_1(self):
         r = self.run_cli("-", stdin=" \n")

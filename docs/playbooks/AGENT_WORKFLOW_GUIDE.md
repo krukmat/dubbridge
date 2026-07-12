@@ -262,10 +262,10 @@ Do not collapse these into one undocumented guess.
 
 The **RRI 0–25 Low band** is the exception to vendor model resolution: it uses
 local Gemma delegation through Ollama. Resolve the local model from
-`DUBBRIDGE_LOW_RRI_MODEL`, defaulting to primary `gemma4:12b-mlx` with
-`gemma4:26b-a4b-it-qat` as the automatic fallback when the primary is not
-installed, and the Ollama endpoint from `OLLAMA_HOST`, defaulting to
-`http://localhost:11434`.
+`DUBBRIDGE_LOW_RRI_MODEL`, defaulting to `gemma4:26b-a4b-it-qat` (the former
+`gemma4:12b-mlx` fast lane was retired — ADR-036 Amendment 1 — so there is no
+separate fallback tier), and the Ollama endpoint from `OLLAMA_HOST`,
+defaulting to `http://localhost:11434`.
 
 When preparing a task for presentation or local delegation, the agent must compute
 a complexity score and derive the recommended model tier or local delegation

@@ -116,23 +116,38 @@ code:
 - The Low band (0–25) keeps the existing packet protocol; migrating it to the
   agentic runner is a possible follow-up, not part of this decision.
 
-### 3. Execution boundary for the local implementer (fail-closed)
+### 3. Offline productivity containment for the local implementer
 
-The local agent runs inside an enforcement boundary, not on trust:
+Stage 1 showed that command-level allowlisting dominated the result: normal
+repository inspection (`cat`, `find`, `wc`, direct test invocations, and shell
+composition) terminated otherwise viable sessions. For the local offline pilot,
+the worktree is the disposable containment boundary; the runner does not attempt
+to behave like a production execution sandbox.
 
-- **Isolated git worktree** per task; allowed-path set declared up front;
-  out-of-scope writes are rejected by the wrapper exactly as the packet
-  protocol does today.
-- **No push, no merge, no deploy:** the agent process runs without push
-  credentials; the worktree remote is not writable from the agent environment.
-- **Environment stripped:** only `DUBBRIDGE_ENV=local` bindings; never the
-  production descriptor (ADR-026 alignment); no secrets in the agent's env.
-- **Network limited to the local model endpoint** (`OLLAMA_HOST`); the
-  harness gets no other egress.
-- **Destructive commands denied** (recursive delete, `git push`, migration
-  apply against non-local databases) via wrapper command policy.
-- **Test execution is permitted and expected** (`cargo test`, targeted
-  `make` gates) inside the worktree.
+- **Isolated disposable git worktree** per task. The model may read, write, and
+  run arbitrary development commands inside it. A broken worktree is deleted;
+  the primary checkout is never the execution directory.
+- **No command allowlist or command-policy aborts.** Shell composition,
+  repository inspection, dependency tooling, formatters, compilers, and tests
+  are permitted. Productivity is measured against the resulting diff and gates,
+  not against which command vocabulary the model selected.
+- **Post-run scope enforcement:** after the model finishes, the orchestrator
+  compares the worktree diff with the card's `allowed_paths`. Out-of-scope
+  changes fail the card and are never applied to the primary checkout.
+- **Minimal credential surface:** the subprocess environment remains stripped
+  of repository/operator credentials. This is containment hygiene, not a
+  command restriction, and does not impede normal offline code work.
+- **No publication authority:** benchmark worktrees are ephemeral and are not
+  pushed, merged, deployed, or reused as trusted branches. The orchestrator is
+  the only component that may copy an accepted diff out of the worktree.
+- **Verification remains operator-controlled:** the card's acceptance commands
+  run after implementation and determine success independently of the model's
+  self-assessment.
+
+This is an explicit productivity tradeoff for a local, offline benchmark. It is
+not a claim that arbitrary command execution is appropriate for CI runners,
+shared hosts, production credentials, or remote multi-tenant agents; those
+surfaces require a real OS/container sandbox and a separate ADR amendment.
 
 ### 4. Test-first delegation contract
 
@@ -186,6 +201,14 @@ and a summary of each failed attempt. **The cloud agent starts from the
 packet and does not re-explore the repository from scratch** — repeated
 repository re-ingestion is the dominant avoidable cloud cost driver.
 
+Local-model handoff follows the same attribution rule. Qwen and Gemma never
+co-author one benchmark session. If Qwen exhausts its repair or turn budget,
+its session closes and emits the escalation packet; Gemma may
+then start a new, independently identified session from that packet. The audit
+trail attributes model, time, repairs, tokens, and outcome to each session.
+Gemma-as-implementer results are reported separately from the Qwen baseline and
+from the corrected-Qwen run, and the reviewer pairing flips per §5.
+
 ### 8. Operating modes (cost policy)
 
 | | Economy | Balanced (default) | High-confidence |
@@ -220,18 +243,31 @@ without the dev stack, load/unload cycle cost, 1-hour thermal soak; run a
 15–20-task benchmark drawn from real repo history (Rust API tasks, mobile
 Jest/RN tasks, a CI failure, docs task) through the agentic runner.
 
+If the baseline exposes harness-induced failures, Stage 1 preserves that run
+as immutable evidence, classifies the failures, applies the offline-productivity
+containment defined in §3, and reruns the **same corpus from scratch**. A model
+comparison uses a third independent run against the same corpus; models are not
+swapped mid-session. T8 reports all runs rather than overwriting the baseline.
+
 **Stage 2 — pilot:** 5 real RRI 26–40 tasks with normal HITL approval.
 
 **Promotion gate (band flips to local-first only if all hold):**
 ≥ 75% task success without escalation; ≤ 2 repair attempts average; zero
-scope violations; zero boundary violations (push/secret/path); end-to-end
-wall-clock ≤ 2× the cloud equivalent; measured cloud-token reduction vs the
-recorded baseline.
+accepted out-of-scope diffs; no change escapes an ephemeral benchmark worktree
+without orchestrator acceptance; end-to-end wall-clock ≤ 2× the cloud
+equivalent; measured cloud-token reduction vs the recorded baseline.
+
+The corrected offline run has no command-policy rejection metric. T8 instead
+reports out-of-scope diffs, verification failures, repair/turn exhaustion, and
+wall-clock. Any attempt to apply a diff outside the card's allowed paths fails
+the card; the raw worktree command history remains audit evidence rather than a
+runtime permission gate.
 
 **Rollback triggers (after adoption):** escalation rate > 40% over a rolling
-20-task window, any boundary violation, or sustained swap/thermal degradation
-→ the band reverts to cloud implementation; the stack remains for review
-roles. Reverting is a one-line mode/binding change.
+20-task window, any accepted out-of-scope diff or unintended change outside the
+disposable worktree, or sustained swap/thermal degradation → the band reverts
+to cloud implementation; the stack remains for review roles. Reverting is a
+one-line mode/binding change.
 
 ## Consequences
 
@@ -322,6 +358,63 @@ roles. Reverting is a one-line mode/binding change.
   which roles may write code per band, and is explicitly intended for reuse
   in future projects; ADR-033/ADR-034 set the precedent for indexing durable
   process contracts.
+
+## Amendment 1 (2026-07-12): Retire the `gemma4:12b-mlx` fast lane
+
+**Reason:** During T7c-b3 closure, `gemma4:12b-mlx` was found resident
+alongside `gemma4:26b-a4b-it-qat` on the same unified-memory GPU, causing
+Gemma Reviewer idle-timeouts (180s/pass, 3/3 passes). The fast lane's
+"may stay resident" allowance (§6) directly enabled this double-residency.
+Rather than add resource-contention guards to keep the fast lane viable,
+the fast lane role is retired.
+
+**Changes to §1 (Local model stack):** the "Fast lane" row is retired.
+The model stack is now two roles, not three:
+
+| Role | Model (dubbridge binding) |
+|---|---|
+| **Local implementer** | `Qwen3.6-35B-A3B` (4-bit, 32K operational ctx) |
+| **Local reviewer / challenger / multimodal** | `gemma4:26b-a4b-it-qat` |
+
+**Changes to §6 (Memory-residency rule):** "Only the 12B fast lane may stay
+resident" is retired with no replacement resident model — the sequence is
+strictly implement → unload (`keep_alive 0`) → run heavy verification →
+reload only if a repair attempt is needed, for every role, with **zero**
+models resident between phases. Small-diff/triage review (the fast lane's
+former use case) now uses `gemma4:26b-a4b-it-qat` at reduced `num_predict`,
+accepting the latency cost.
+
+**Binding/code changes required:**
+- `scripts/gemma_local.py`: `DEFAULT_MODEL` → `gemma4:26b-a4b-it-qat`
+- `docs/policies/RRI_POLICY.md` §`DUBBRIDGE_LOW_RRI_MODEL`: primary binding
+  updated; fallback chain collapses (primary == former fallback)
+- `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`: default reference updated
+- Test files asserting `DEFAULT_MODEL == "gemma4:12b-mlx"` updated to the
+  new default (`scripts/gemma_local_test.py`, `scripts/delegate_low_rri_test.py`,
+  `scripts/gemma_push_review_test.py`, `scripts/gemma_code_review_test.py`)
+- `docs/tasks/gemma4-12b-mlx-local-model.md` / `docs/plan/gemma4-12b-mlx-local-model.md`:
+  left as historical record (task/plan already closed); not deleted, marked
+  superseded by this amendment
+- `ollama rm gemma4:12b-mlx` (already done, user-confirmed, prior to this
+  amendment being drafted)
+
+**Consequence accepted:** small-diff/triage review loses its low-latency
+path and now pays the 26B model's higher latency uniformly. This is judged
+acceptable given the reliability problem observed.
+
+**Review-gate disposition:** this amendment's own code change (`scripts/
+gemma_local.py` `DEFAULT_MODEL`/`DEFAULT_NUM_CTX`, plus test files) computed
+RRI 58 / Complex, which routes to the cross-vendor peer (`codex`) per
+`AGENT_WORKFLOW_GUIDE.md` Step 1-B. `codex review` was attempted but its CLI
+invocation failed (flag mismatch on this installed version) and the
+`peer-workflow-review.py` wrapper's own D14 fallback path also errored
+(missing `adjudicator_packet` module — a pre-existing tooling gap, itself
+worth a follow-up task: `docs/tasks/peer-review-codex-bin-resolution.md`
+already tracks the related `codex` binary-resolution issue). The user
+explicitly directed closing this work without a peer/D14 review pass. No
+review artifact was produced for this change; closure relies on the full
+test suite (695/695 passing) and manual verification (correct default
+propagated, no stray env override, model uninstalled and unloaded) instead.
 
 ## Related
 

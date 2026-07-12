@@ -1,13 +1,19 @@
 ---
 type: Plan
 title: "Gemma 4 12B MLX local model migration"
-status: closed
+status: superseded
 rri: 51
 band: Med-high
 effort: L
 ---
 
 # Gemma 4 12B MLX Local Model Migration
+
+**Superseded by ADR-036 Amendment 1 (2026-07-12):** the `gemma4:12b-mlx`
+primary binding this plan established was retired after it was found
+resident alongside `gemma4:26b-a4b-it-qat` on the same GPU, causing Gemma
+Reviewer idle-timeouts. The repository default reverted to
+`gemma4:26b-a4b-it-qat`. This document is retained as historical record only.
 
 ## Objective
 

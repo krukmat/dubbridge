@@ -159,12 +159,13 @@ class TestMainExitCodes(unittest.TestCase):
         self.assertEqual(code, 0)
 
     def test_exit_1_when_top_level_findings(self):
-        data = _result(findings=[_finding(severity="minor")])
+        # 6841b37: only blocking/major findings fail the gate.
+        data = _result(findings=[_finding(severity="major")])
         code, _ = self._run(data)
         self.assertEqual(code, 1)
 
     def test_exit_1_when_reconciliation_findings(self):
-        data = _result(reconciliation={"location_inconsistent": [_finding()]})
+        data = _result(reconciliation={"location_inconsistent": [_finding(severity="major")]})
         code, _ = self._run(data)
         self.assertEqual(code, 1)
 

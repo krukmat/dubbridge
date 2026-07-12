@@ -658,7 +658,7 @@ class CliBehavior(unittest.TestCase):
             r = self.run_cli(fname, "--dry-run", env=env)
             self.assertEqual(r.returncode, 0, r.stderr)
             data = json.loads(r.stdout)
-            self.assertEqual(data["model"], "gemma4:12b-mlx")
+            self.assertEqual(data["model"], "gemma4:26b-a4b-it-qat")
         finally:
             os.unlink(fname)
 

@@ -18,7 +18,7 @@ import gemma_local
 class SharedConfig(unittest.TestCase):
     def test_defaults_are_role_neutral(self):
         self.assertEqual(gemma_local.DEFAULT_HOST, "http://localhost:11434")
-        self.assertEqual(gemma_local.DEFAULT_MODEL, "gemma4:12b-mlx")
+        self.assertEqual(gemma_local.DEFAULT_MODEL, "gemma4:26b-a4b-it-qat")
         self.assertEqual(gemma_local.DEFAULT_FALLBACK_MODEL, "gemma4:26b-a4b-it-qat")
         self.assertEqual(gemma_local.DEFAULT_TEMPERATURE, 0.1)
         self.assertFalse(gemma_local.DEFAULT_THINK)
@@ -98,7 +98,7 @@ class Payload(unittest.TestCase):
 
 class ModelAvailability(unittest.TestCase):
     def test_ensure_model_available_accepts_installed_default(self):
-        tags = {"models": [{"name": "gemma4:12b-mlx"}]}
+        tags = {"models": [{"name": "gemma4:26b-a4b-it-qat"}]}
         with patch.object(gemma_local, "get_json", return_value=tags):
             gemma_local.ensure_model_available(
                 "http://localhost:11434",
@@ -107,7 +107,7 @@ class ModelAvailability(unittest.TestCase):
             )
 
     def test_ensure_model_available_reports_missing_default(self):
-        tags = {"models": [{"name": "gemma4:26b-a4b-it-qat"}]}
+        tags = {"models": [{"name": "qwen3.6:35b-a3b"}]}
         with patch.object(gemma_local, "get_json", return_value=tags):
             with self.assertRaises(RuntimeError) as ctx:
                 gemma_local.ensure_model_available(
@@ -115,16 +115,11 @@ class ModelAvailability(unittest.TestCase):
                     gemma_local.DEFAULT_MODEL,
                     1,
                 )
-        self.assertIn("gemma4:12b-mlx", str(ctx.exception))
         self.assertIn("gemma4:26b-a4b-it-qat", str(ctx.exception))
+        self.assertIn("qwen3.6:35b-a3b", str(ctx.exception))
 
     def test_resolve_model_with_fallback_uses_primary_when_installed(self):
-        tags = {
-            "models": [
-                {"name": "gemma4:12b-mlx"},
-                {"name": "gemma4:26b-a4b-it-qat"},
-            ]
-        }
+        tags = {"models": [{"name": "gemma4:26b-a4b-it-qat"}]}
         with patch.object(gemma_local, "get_json", return_value=tags):
             model = gemma_local.resolve_model_with_fallback(
                 "http://localhost:11434",
@@ -132,14 +127,14 @@ class ModelAvailability(unittest.TestCase):
                 1,
                 gemma_local.DEFAULT_FALLBACK_MODEL,
             )
-        self.assertEqual(model, "gemma4:12b-mlx")
+        self.assertEqual(model, "gemma4:26b-a4b-it-qat")
 
     def test_resolve_model_with_fallback_uses_current_model_when_primary_absent(self):
         tags = {"models": [{"name": "gemma4:26b-a4b-it-qat"}]}
         with patch.object(gemma_local, "get_json", return_value=tags):
             model = gemma_local.resolve_model_with_fallback(
                 "http://localhost:11434",
-                gemma_local.DEFAULT_MODEL,
+                "gemma4:some-missing-tag",
                 1,
                 gemma_local.DEFAULT_FALLBACK_MODEL,
             )
@@ -256,6 +251,34 @@ class AuditLog(unittest.TestCase):
             with open(log_path, encoding="utf-8") as f:
                 line = f.read()
             self.assertNotIn("supersecret", line)
+            self.assertIn("REDACTED", line)
+
+    def test_ec2b_secret_redacted_inside_nested_list_field(self):
+        # D14 finding (T6c): the original redaction only inspected top-level
+        # string values. local-implementer audit records carry "commands" as
+        # a list of argv lists — model-controlled content that could smuggle
+        # a credential-shaped string past a shallow redaction pass.
+        with tempfile.TemporaryDirectory() as tmp:
+            record = {
+                "role": "local-implementer",
+                "commands": [["curl", "-H", "token=supersecrettoken", "https://example.com"]],
+            }
+            log_path = self._run(record, tmp=tmp)
+            with open(log_path, encoding="utf-8") as f:
+                line = f.read()
+            self.assertNotIn("supersecrettoken", line)
+            self.assertIn("REDACTED", line)
+
+    def test_ec2c_secret_redacted_inside_nested_dict_field(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            record = {
+                "role": "local-implementer",
+                "nested": {"inner": "password=hunter2 leaked here"},
+            }
+            log_path = self._run(record, tmp=tmp)
+            with open(log_path, encoding="utf-8") as f:
+                line = f.read()
+            self.assertNotIn("hunter2", line)
             self.assertIn("REDACTED", line)
 
     def test_ec3_two_appends_produce_two_lines(self):

@@ -6,6 +6,7 @@ import importlib.util
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import MagicMock, call, patch
 
 
 SCRIPT = Path(__file__).with_name("check-maintainability.py")
@@ -133,6 +134,64 @@ diff --git a/mobile/src/screens/Example.tsx b/mobile/src/screens/Example.tsx
 
         self.assertEqual([line.path for line in lines], ["mobile/src/screens/Example.tsx", "mobile/src/screens/Example.tsx"])
         self.assertEqual(lines[0].line_no, 10)
+
+    def test_hp3_discover_base_keeps_valid_explicit_commit(self) -> None:
+        with patch.object(
+            checker.subprocess,
+            "run",
+            return_value=MagicMock(returncode=0),
+        ) as mock_run:
+            self.assertEqual(checker.discover_base("valid-base"), "valid-base")
+
+        mock_run.assert_called_once_with(
+            ["git", "cat-file", "-e", "valid-base^{commit}"],
+            check=False,
+            stdout=checker.subprocess.DEVNULL,
+            stderr=checker.subprocess.DEVNULL,
+        )
+
+    def test_ec10_discover_base_skips_github_null_sha(self) -> None:
+        null_sha = "0" * 40
+
+        def verify_candidate(args: list[str], **_kwargs: object) -> MagicMock:
+            return MagicMock(returncode=0 if args[-1] == "origin/main^{commit}" else 1)
+
+        with patch.dict(checker.os.environ, {}, clear=True), patch.object(
+            checker.subprocess,
+            "run",
+            side_effect=verify_candidate,
+        ) as mock_run:
+            self.assertEqual(checker.discover_base(null_sha), "origin/main")
+
+        mock_run.assert_has_calls(
+            [
+                call(
+                    ["git", "cat-file", "-e", f"{null_sha}^{{commit}}"],
+                    check=False,
+                    stdout=checker.subprocess.DEVNULL,
+                    stderr=checker.subprocess.DEVNULL,
+                ),
+                call(
+                    ["git", "cat-file", "-e", "origin/main^{commit}"],
+                    check=False,
+                    stdout=checker.subprocess.DEVNULL,
+                    stderr=checker.subprocess.DEVNULL,
+                ),
+            ]
+        )
+
+    def test_ec11_discover_base_returns_none_without_a_commit(self) -> None:
+        with patch.dict(checker.os.environ, {}, clear=True), patch.object(
+            checker.subprocess,
+            "run",
+            return_value=MagicMock(returncode=1),
+        ) as mock_run:
+            self.assertIsNone(checker.discover_base(None))
+
+        self.assertEqual(
+            [call.args[0][-1] for call in mock_run.call_args_list],
+            ["origin/main^{commit}", "HEAD^{commit}"],
+        )
 
 
 if __name__ == "__main__":

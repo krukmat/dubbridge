@@ -19,3 +19,9 @@ __pycache__/
 .claude/*
 logs/gemma-audit/
 logs/local-bench/
+scripts/local-bench/cards/
+scripts/local-bench/pilot-out/
+scripts/local-bench/pilot-work/
+scripts/local-bench/t7-work-*/
+scripts/local-agent/logs/
+.pytest_cache/

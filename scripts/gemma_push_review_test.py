@@ -74,7 +74,7 @@ def _make_packet(**kwargs):
 def _model_args(**kwargs):
     defaults = dict(
         host="http://localhost:11434",
-        model="gemma4:12b-mlx",
+        model="gemma4:26b-a4b-it-qat",
         num_ctx=32768,
         num_predict=4096,
         temperature=0.1,
@@ -962,7 +962,7 @@ class EnvNamespace(unittest.TestCase):
                 "DUBBRIDGE_PUSH_REVIEW_MODEL",
                 os.environ.get("DUBBRIDGE_LOW_RRI_MODEL", _mod.gemma_local.DEFAULT_MODEL),
             )
-        self.assertEqual(model, "gemma4:12b-mlx")
+        self.assertEqual(model, "gemma4:26b-a4b-it-qat")
 
     def test_num_ctx_default_is_push_specific(self):
         # D11: push-reviewer keeps its own CI-log packet baseline.

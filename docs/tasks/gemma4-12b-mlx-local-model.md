@@ -2,13 +2,16 @@
 type: TaskList
 title: "Tasks: Gemma 4 12B MLX local model migration"
 plan: docs/plan/gemma4-12b-mlx-local-model.md
-status: closed
+status: superseded
 rri: 51
 band: Med-high
 effort: L
 ---
 
 # Tasks: Gemma 4 12B MLX Local Model Migration
+
+**Superseded by ADR-036 Amendment 1 (2026-07-12):** see
+`docs/plan/gemma4-12b-mlx-local-model.md`. Retained as historical record only.
 
 ## T1 - Evaluate and replace the local Gemma default
 
