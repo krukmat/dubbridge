@@ -153,24 +153,26 @@ class RealBoundaryWiredIntoRunner(unittest.TestCase):
                 transcript = json.load(f)
             self.assertEqual(transcript["status"], "boundary_violation")
 
-    def test_previously_denied_command_via_real_boundary_now_reaches_execution(self):
-        # T7b-3: check_command no longer rejects by executable/argument
-        # vocabulary — a command like `git push` (previously on the
-        # denylist) must now reach real execution via run_command, not abort
-        # with boundary_violation. The no-push guarantee for the benchmark
-        # comes from the harness never copying a diff to the primary
-        # checkout (T7c-b2/b3's scope-check gate), not from check_command.
-        # Popen is faked the same way test_run_command_wires_stripped_env_...
-        # fakes it above, so no real `git push` network call is made.
+    def test_previously_allowlist_rejected_command_via_real_boundary_now_reaches_execution(self):
+        # T7b-3: check_command no longer allowlists by executable/argument
+        # vocabulary — a command like `curl` (previously rejected because it
+        # wasn't on ALLOWED_COMMAND_PREFIXES, not because it was denylisted)
+        # must now reach real execution via run_command, not abort with
+        # boundary_violation. `git push` is a different case — see
+        # test_denylisted_command_via_real_boundary_still_aborts below — the
+        # short DENIED_COMMAND_PREFIXES denylist retained as defense-in-depth
+        # still rejects it. Popen is faked the same way
+        # test_run_command_wires_stripped_env_... fakes it above, so no real
+        # network call is made.
         with tempfile.TemporaryDirectory() as tmp:
             worktree = os.path.join(tmp, "worktree")
             _git_init_worktree(worktree)
             card_path = _make_card(tmp)
             out_path = os.path.join(tmp, "transcript.json")
 
-            pushed_argv = ["git", "push", "origin", "main"]
+            curl_argv = ["curl", "https://example.com"]
             responses = [
-                _tool_call("run_command", {"argv": pushed_argv}),
+                _tool_call("run_command", {"argv": curl_argv}),
                 _tool_call("finish", {}),
             ]
             chat = ChatSequencer(responses)
@@ -212,17 +214,44 @@ class RealBoundaryWiredIntoRunner(unittest.TestCase):
             self.assertEqual(len(run_command_events), 1)
             self.assertEqual(run_command_events[0]["result"]["returncode"], 0)
 
-            # Codex peer review finding: prove the exact previously-denied
+            # Codex peer review finding: prove the exact previously-rejected
             # argv actually reached subprocess.Popen with the worktree cwd
             # and the stripped (credential-free) environment, not just that
             # check_command allowed it and the runner reported success.
             self.assertEqual(len(captured_calls), 1)
             call_args, call_kwargs = captured_calls[0]
-            self.assertEqual(call_args[0], pushed_argv)
+            self.assertEqual(call_args[0], curl_argv)
             self.assertEqual(call_kwargs["cwd"], worktree)
             self.assertTrue(call_kwargs.get("start_new_session"))
             self.assertNotIn("HOME", call_kwargs["env"])
             self.assertIn("PATH", call_kwargs["env"])
+
+    def test_denylisted_command_via_real_boundary_still_aborts(self):
+        # Reintroduced denylist (post pre-push Gemma Reviewer finding): the
+        # three highest-severity commands (git push, docker, rm -rf) remain
+        # denylisted even though the broader allowlist is gone. This must
+        # still abort with boundary_violation before run_command executes.
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = os.path.join(tmp, "worktree")
+            os.makedirs(worktree)
+            card_path = _make_card(tmp)
+            out_path = os.path.join(tmp, "transcript.json")
+
+            chat = ChatSequencer([_tool_call("run_command", {"argv": ["git", "push"]})])
+            unused_tests = lambda wt: self.fail("must not run after boundary violation")
+            real_boundary = b.LocalAgentBoundary(worktree)
+
+            exit_code = rlt.main(
+                ["--card", card_path, "--worktree", worktree, "--out", out_path],
+                chat_fn=chat,
+                test_runner=unused_tests,
+                boundary=real_boundary,
+            )
+
+            self.assertNotEqual(exit_code, 0)
+            with open(out_path, encoding="utf-8") as f:
+                transcript = json.load(f)
+            self.assertEqual(transcript["status"], "boundary_violation")
 
 
 class AuditRecordScopeCheckAggregation(unittest.TestCase):

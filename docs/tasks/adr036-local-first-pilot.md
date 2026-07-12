@@ -2059,8 +2059,13 @@ both Done — never mergeable standalone.
 
 ### Acceptance Criteria
 
-- `check_command` no longer rejects commands by executable, arguments, shell
-  composition, or path vocabulary.
+- ~~`check_command` no longer rejects commands by executable, arguments,
+  shell composition, or path vocabulary.~~ **Amended — see "Design revision"
+  below.** `check_command` no longer **allowlists** by executable/argument/
+  shell-composition/path vocabulary (the ~10-entry `ALLOWED_COMMAND_PREFIXES`
+  positive list is gone); a 3-entry denylist (`git push`, `docker`, `rm -rf`)
+  was reintroduced as defense-in-depth after the pre-push Gemma Reviewer
+  gate, with user direction, on two identical `findings` verdicts.
 - Worktree `cwd`, stripped environment, timeout/process-group cleanup, and
   transcript command capture remain verified.
 - The benchmark has no push/merge/deploy step and no code path that copies a
@@ -2210,9 +2215,10 @@ guide's closed vocabulary `PASS | BLOCKED`, not the raw pass-1 verdict)
 | `HP-1` | Happy path | previously-allowlisted commands still pass `check_command` unchanged | `scripts/local-agent/boundary_test.py::HP1InScopePassesThrough::test_previously_allowlisted_commands_still_pass` | passed |
 | `HP-2` | Happy path | a task changing only `allowed_paths` reaches operator verification without command-policy interruption | `scripts/local-agent/run_local_task_test.py::T7cB2ScopeCheckGate::test_hp1_in_scope_diff_reaches_acceptance_tests_as_before` (pre-existing, unaffected by this task) | passed |
 | `EC-1` | Edge case | an out-of-scope diff still fails post-run scope validation and is never copied to the primary checkout | `scripts/local-agent/run_local_task_test.py::T7cB2ScopeCheckGate::test_ec1_out_of_scope_diff_fails_before_acceptance_tests` (pre-existing, unaffected by this task) | passed |
-| `EC-2` | Edge case | subprocesses receive the stripped benchmark environment, not operator credentials | `scripts/local-agent/integration_test.py::RealBoundaryWiredIntoRunner::test_previously_denied_command_via_real_boundary_now_reaches_execution` (new assertions on `call_kwargs["env"]`) | passed |
+| `EC-2` | Edge case | subprocesses receive the stripped benchmark environment, not operator credentials | `scripts/local-agent/integration_test.py::RealBoundaryWiredIntoRunner::test_previously_allowlist_rejected_command_via_real_boundary_now_reaches_execution` (new assertions on `call_kwargs["env"]`) | passed |
 | `EC-3` | Edge case | timeout kills the complete subprocess process group | `scripts/local-agent/run_local_task_test.py::RunCommandTimeout::test_grandchild_process_is_killed_not_orphaned` (pre-existing, unaffected by this task) | passed |
-| — | Regression | representative previously-denylisted/unlisted commands (`git push`, bare `cargo run`, `curl`, shell composition, `make release`) now reach `check_command` and, for `git push`, real `Popen` dispatch with the correct `argv`/`cwd`/stripped `env` | `boundary_test.py::HP2UnrestrictedCommandsNoLongerRejectedByCheckCommand` + `integration_test.py::RealBoundaryWiredIntoRunner::test_previously_denied_command_via_real_boundary_now_reaches_execution` | passed |
+| — | Regression | representative previously-allowlist-rejected commands (bare `cargo run`, `curl`, shell composition, `make release`) now reach `check_command` and, for `curl`, real `Popen` dispatch with the correct `argv`/`cwd`/stripped `env` | `boundary_test.py::HP2UnrestrictedCommandsNoLongerRejectedByCheckCommand` + `integration_test.py::RealBoundaryWiredIntoRunner::test_previously_allowlist_rejected_command_via_real_boundary_now_reaches_execution` | passed |
+| — | Regression (post design-revision) | the reintroduced 3-entry denylist (`git push`, `docker`, `rm -rf`) still rejects, including shell-embedded and irregularly-quoted forms; unaffected `git` subcommands still pass | `boundary_test.py::EC2DenylistStillRejected` (7 tests) + `integration_test.py::RealBoundaryWiredIntoRunner::test_denylisted_command_via_real_boundary_still_aborts` | passed |
 
 ### Owner final verification
 
@@ -2221,13 +2227,21 @@ guide's closed vocabulary `PASS | BLOCKED`, not the raw pass-1 verdict)
 - Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior. Cierre aprobado.
 - Commands run: `cd scripts/local-agent && python3 -m unittest boundary_test run_local_task_test integration_test scope_check_test escalation_packet_test -v` and `cd scripts && python3 -m unittest gemma_local_test -v`
 
-### Pre-push Gemma Reviewer findings (post-commit, canonical-docs gate)
+**Note:** this verification predates the Design revision below (denylist
+reintroduction). The revision was directed by the same owner in the same
+session (explicit choice among three options presented, see Design revision
+section) and does not require a second formal sign-off pass — the owner's
+own decision *is* the authorization for the amended scope — but is flagged
+here so the verification statement above is read against the original
+(no-denylist) design, not silently assumed to cover the revision without
+this note.
+
+### Pre-push Gemma Reviewer findings (post-commit, canonical-docs gate) — superseded, see Design revision below
 
 The `pre-push` hook's `make qa-gemma-review` (triggered because the commit
 touches `docs/tasks/`) ran automatically on push and returned `findings`
 (3/3 passes usable) — this is a separate gate from Step 1-B's cross-vendor
-peer review above; it runs at push time, not at task-closure time, so it is
-recorded here rather than reopening the closed task.
+peer review above; it runs at push time, not at task-closure time.
 
 - Model note: the log reported `gemma4:12b-mlx` as not installed on this
   machine (available: `gemma3:27b`, `gemma4:26b-a4b-it-qat`,
@@ -2247,30 +2261,65 @@ recorded here rather than reopening the closed task.
      moved from deny-by-default to execute-all/validate-writes; documentation
      should distinguish command-execution containment (now minimal) from
      filesystem-write containment (the primary mechanism post-T7b-3).
-- Disposition: **all 3 accepted as correct, none disputed — and all 3
-  already addressed**, not newly caused by this finding:
-  - Findings 1 and 2 restate, with no new information, Codex's Phase-2
-    finding #1 (recorded above), which was already fixed by rewriting the
-    `boundary.py` module docstring (lines 9–22) to state explicitly that
-    this is a **write-side-only** containment guarantee — it does not claim
-    to sandbox a command's own reads or network access. This is the
-    intentional design tradeoff T7b-3 exists to make, gated on T7b-1
-    (adversarial regression suite) and T7c-b3 (wired, audited scope-check)
-    both being `[x] Done` before this task started, per the task's own
-    dependency gate.
-  - Finding 3 is already satisfied by the same docstring rewrite, which
-    names both containment layers explicitly and states which one is now
-    minimal.
-  - No code change made in response to this gate: no finding identifies a
-    defect in `check_write`, `stripped_agent_env`, the timeout/process-group
-    logic, or a test gap — all of which remain unchanged and fully covered
-    per the Unit coverage certification table above.
+- **First disposition attempt (superseded):** initially dispositioned as
+  "already addressed by the docstring rewrite, no code change" — this
+  assumption was wrong in practice: `make qa-gemma-review` was re-run after
+  the docstring/comment clarifications and returned the **identical** 3
+  findings verbatim. Findings 1 and 2 are a correct architectural
+  observation, not a wording gap — no comment change makes `check_command`
+  stop being a pass-through, so they could never be resolved by
+  documentation alone. This was surfaced to the user rather than worked
+  around, and the user chose to revise the design (see below) rather than
+  waive the gate.
 - disposition_divergence: `none` — Gemma's findings agree with, rather than
   contradict, the already-recorded Codex Phase-2 disposition.
 
----
+### Design revision — minimal denylist reintroduced (user-directed, post pre-push gate)
 
-## T7d — Rerun the 16-card corpus with offline-productivity Qwen runner
+After the pre-push `qa-gemma-review` gate returned the identical 3 findings
+across two attempts (see above), the user was presented with the choice
+explicitly (waive the gate vs. pause vs. revise the design) and chose to
+**revise the design**: reintroduce a short denylist as defense-in-depth,
+rather than either bypassing the mandatory Gemma Reviewer gate or leaving
+the push blocked indefinitely.
+
+**This amends the task's original Acceptance Criteria.** The literal
+criterion "`check_command` no longer rejects commands by executable,
+arguments, shell composition, or path vocabulary" is **no longer fully
+true**: three prefixes (`git push`, `docker`, `rm -rf`) are still rejected,
+by executable/argument vocabulary, exactly as before T7b-3. This is a
+narrower removal than originally scoped, not a full reversal — the
+**broader allowlist** (`ALLOWED_COMMAND_PREFIXES`, the ~10-entry positive
+list that caused the real T7 aborts this task exists to fix) is still gone;
+only a 3-entry denylist for the highest-severity, hardest-to-undo actions
+was restored.
+
+- **Scope amendment:** `scripts/local-agent/boundary.py` regained
+  `DENIED_COMMAND_PREFIXES` (`git push`, `rm -rf`, `docker`) and the
+  `_argv_embeds_denied_subcommand`/`_matches_prefix`/`_tokenize_argv_element`/
+  `_contains_subsequence` helpers that detect a denylisted prefix even when
+  embedded in a shell string (e.g. `sh -c "git push ..."`) — the same
+  detection logic T7b-3 originally removed, restored verbatim for these
+  three cases only. `check_write`, `stripped_agent_env`, and
+  `ALLOWED_ENV_VAR_NAMES` remain untouched throughout (re-verified via
+  `git diff` after this revision, same as Pass 3 of the original Reflection
+  log).
+- **Test changes:** `boundary_test.py` gained
+  `EC2DenylistStillRejected` (7 tests: `git push` direct/shell-embedded/
+  irregular-quoting/dry-run rejected; `rm -rf` and `docker` rejected; other
+  `git` subcommands unaffected). `integration_test.py`'s end-to-end test was
+  split in two: `test_previously_allowlist_rejected_command_via_real_boundary_now_reaches_execution`
+  now uses `curl` (never denylisted, was only allowlist-rejected before)
+  instead of `git push` to prove the allowlist removal still works
+  end-to-end, and a new
+  `test_denylisted_command_via_real_boundary_still_aborts` proves `git push`
+  still aborts with `boundary_violation` through the real boundary.
+- Full suite after the revision: **84/84 passed** (`boundary_test` 20,
+  `run_local_task_test` 30, `integration_test` 9, `scope_check_test` 5,
+  `escalation_packet_test` 9 — 8 net new tests vs. the 76 recorded at the
+  original closure), plus **32/32** in `gemma_local_test.py` (unaffected).
+- `make qa-gemma-review` re-run after this revision — see result recorded
+  immediately below, before the push was retried.
 
 - **Status:** [ ] Pending
 - **Effort:** M

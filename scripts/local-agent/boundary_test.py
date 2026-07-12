@@ -39,10 +39,14 @@ class HP2UnrestrictedCommandsNoLongerRejectedByCheckCommand(unittest.TestCase):
     #
     # Security model note (two distinct containment layers, only one of
     # which is exercised here): command-execution containment is now
-    # minimal — check_command no longer restricts which commands run, so a
+    # minimal — check_command no longer allowlists which commands run, so a
     # permitted command can still read files or make network calls the
-    # process itself can reach. Filesystem-write containment remains the
-    # primary security gate and is unaffected by this class — it lives in
+    # process itself can reach. A short denylist (DENIED_COMMAND_PREFIXES)
+    # remains as defense-in-depth for the three highest-severity cases (git
+    # push, docker, rm -rf) — see EC2DenylistStillRejected below — but
+    # everything else, including the commands exercised in this class, is
+    # unrestricted. Filesystem-write containment remains the primary
+    # security gate and is unaffected by this class — it lives in
     # check_write's worktree jail (see EC1PathEscapeAttempts below) and in
     # the post-run diff-scope validation (T7c-a/b2/b3), neither of which
     # this task touches.
@@ -62,13 +66,74 @@ class HP2UnrestrictedCommandsNoLongerRejectedByCheckCommand(unittest.TestCase):
             boundary.check_command(["make", "release"])
 
     def test_empty_command_still_rejected(self):
-        # the only remaining check_command rejection: an empty argv is not a
-        # command-policy decision, it's a malformed-call guard the runner
-        # itself relies on (see run_local_task.py's tool-call handling).
+        # an empty argv is not a command-policy decision, it's a
+        # malformed-call guard the runner itself relies on (see
+        # run_local_task.py's tool-call handling).
         with tempfile.TemporaryDirectory() as tmp:
             boundary = b.LocalAgentBoundary(tmp)
             with self.assertRaises(BoundaryViolation):
                 boundary.check_command([])
+
+
+class EC2DenylistStillRejected(unittest.TestCase):
+    # T7b-3 revision: the full command allowlist is gone, but a short
+    # denylist for the three highest-severity, hardest-to-undo actions is
+    # retained as defense-in-depth (see the module docstring). This is
+    # deliberately narrow — not a return to the old allowlist model — so
+    # these are the only three families of check_command rejection left.
+    def test_git_push_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            boundary = b.LocalAgentBoundary(tmp)
+            with self.assertRaises(BoundaryViolation):
+                boundary.check_command(["git", "push", "origin", "main"])
+
+    def test_git_push_embedded_in_shell_string_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            boundary = b.LocalAgentBoundary(tmp)
+            with self.assertRaises(BoundaryViolation):
+                boundary.check_command(["sh", "-c", "git push origin main"])
+
+    def test_git_push_with_double_space_or_extra_quoting_still_rejected(self):
+        # a literal-substring check would be defeated by irregular
+        # whitespace or quoting; token-subsequence matching via shlex must
+        # still catch these.
+        with tempfile.TemporaryDirectory() as tmp:
+            boundary = b.LocalAgentBoundary(tmp)
+            with self.assertRaises(BoundaryViolation):
+                boundary.check_command(["sh", "-c", "git  push origin main"])
+            with self.assertRaises(BoundaryViolation):
+                boundary.check_command(["sh", "-c", "'git' 'push' origin"])
+
+    def test_rm_rf_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            boundary = b.LocalAgentBoundary(tmp)
+            with self.assertRaises(BoundaryViolation):
+                boundary.check_command(["rm", "-rf", "/"])
+
+    def test_docker_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            boundary = b.LocalAgentBoundary(tmp)
+            with self.assertRaises(BoundaryViolation):
+                boundary.check_command(["docker", "compose", "up"])
+
+    def test_git_push_dry_run_still_rejected(self):
+        # the denylist matches on the "git push" prefix regardless of
+        # trailing flags — a --dry-run push is still denied rather than
+        # trying to special-case it, keeping the gate simple and fail-closed.
+        with tempfile.TemporaryDirectory() as tmp:
+            boundary = b.LocalAgentBoundary(tmp)
+            with self.assertRaises(BoundaryViolation):
+                boundary.check_command(["git", "push", "--dry-run", "origin", "main"])
+
+    def test_other_git_subcommands_still_allowed(self):
+        # only "git push" is denylisted — git status/diff/log/etc. and any
+        # other git subcommand remain unrestricted, same as any other
+        # command not on the three-entry denylist.
+        with tempfile.TemporaryDirectory() as tmp:
+            boundary = b.LocalAgentBoundary(tmp)
+            boundary.check_command(["git", "status"])
+            boundary.check_command(["git", "diff"])
+            boundary.check_command(["git", "log", "--oneline"])
 
 
 class EC1PathEscapeAttempts(unittest.TestCase):
