@@ -223,6 +223,34 @@ allowlist (`cat`, direct Python invocation, `cd`/shell composition, `wc`, or
 baseline outcomes, but ADR-036 no longer uses command vocabulary as the safety
 or promotion boundary for the offline pilot.
 
+## T7 — Real-task evidence lane (`T7f` + `T7k`)
+
+This section is the post-corpus evidence lane. Unlike the retired 16-card
+benchmark, these are single real tasks run from fresh disposable worktrees and
+classified individually as either trustworthy promotion evidence or
+diagnostic-only evidence.
+
+| Trial | Task focus | Raw status | Wall-clock | Classification | Promotion-usable? |
+|---|---|---:|---:|---|---|
+| `T7f` | `scope_check.py` false-positive fix for ignored runner artifacts | success | see task ledger | trustworthy real-task success | Yes |
+| `T7K-01` | Gemma-band `findings -> exit 0` in `peer-workflow-review.py` | success | 258.7s | diagnostic-only: whole-file rewrite, unrelated string churn, no targeted regression test | No |
+| `T7K-02` | D14 fallback import repair in `peer-workflow-review.py` | success | 293.4s | diagnostic-positive: scoped diff, but still unrelated string churn and no dedicated regression test | No |
+| `T7K-03` | stale-import false-negative for runner self-edits | transport_error | 501.9s | diagnostic failure: no diff, token-limit transport collapse after repeated exploration | No |
+
+### Current reading
+
+- The evidence lane is **better than the retired corpus** because each run is
+  a real task with explicit transcripts and, where preserved, the exact
+  worktree diff.
+- It is **not yet strong enough for T8**. Only `T7f` is currently clean enough
+  to cite as trustworthy promotion evidence.
+- `T7K-03` adds an important failure mode: when the task asks the local runner
+  to repair one of its own import/scope semantics, convergence cost rises
+  sharply and transport fragility (`response cut by token limit`) becomes a
+  first-order failure class.
+- Net result after `T7k`: the real-task lane is useful for diagnosis, but it
+  has not yet produced enough clean wins to populate the promotion-gate table.
+
 ## Open questions status (ADR-036)
 
 | # | Question | Status |

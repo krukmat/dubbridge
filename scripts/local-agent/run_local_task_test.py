@@ -15,6 +15,29 @@ import run_local_task as rlt
 gemma_local = rlt.gemma_local
 
 
+_audit_log_patch = None
+
+
+def setUpModule():
+    global _audit_log_patch
+    # T7g: isolate the real logs/gemma-audit/*.jsonl sink for the whole test
+    # module. Dedicated audit-emission tests still override this seam locally
+    # when they need to inspect emitted records.
+    _audit_log_patch = patch.object(
+        gemma_local,
+        "append_audit_log",
+        side_effect=lambda record, **kwargs: None,
+    )
+    _audit_log_patch.start()
+
+
+def tearDownModule():
+    global _audit_log_patch
+    if _audit_log_patch is not None:
+        _audit_log_patch.stop()
+        _audit_log_patch = None
+
+
 def _git(repo, *args):
     return subprocess.run(
         ["git", *args],
@@ -62,13 +85,17 @@ def _write_and_finish(path, content):
     ]
 
 
-def _make_card(tmp_dir):
+def _make_card(tmp_dir, rri=None, band=None):
     card = {
         "task_id": "toy-1",
         "spec": "Write hello.txt containing 'hi'.",
         "acceptance_tests": ["HP-1"],
         "allowed_paths": ["hello.txt"],
     }
+    if rri is not None:
+        card["rri"] = rri
+    if band is not None:
+        card["band"] = band
     path = os.path.join(tmp_dir, "card.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(card, f)
@@ -744,6 +771,40 @@ class ReadFileTool(unittest.TestCase):
             ]
             self.assertEqual(len(malformed_events), 1)
 
+    def test_read_file_directory_is_malformed_not_a_boundary_violation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = os.path.join(tmp, "worktree")
+            _git_init_worktree(worktree)
+            os.makedirs(os.path.join(worktree, "existing-dir"))
+            card_path = _make_card(tmp)
+            out_path = os.path.join(tmp, "transcript.json")
+
+            responses = [
+                _tool_call_native_object("read_file", {"path": "existing-dir"}),
+            ] + _write_and_finish("hello.txt", "hi")
+            chat = ChatSequencer(responses)
+            passing_tests = lambda wt: {"passed": True, "output": "ok"}
+
+            exit_code = rlt.main(
+                ["--card", card_path, "--worktree", worktree, "--out", out_path],
+                chat_fn=chat,
+                test_runner=passing_tests,
+            )
+
+            self.assertEqual(exit_code, 0)
+            with open(out_path, encoding="utf-8") as f:
+                transcript = json.load(f)
+            self.assertEqual(transcript["status"], "success")
+            malformed_events = [
+                e for e in transcript["transcript"] if e.get("event") == "malformed_tool_call"
+            ]
+            self.assertEqual(len(malformed_events), 1)
+            self.assertIn("directory", malformed_events[0]["error"])
+            boundary_events = [
+                e for e in transcript["transcript"] if e.get("event") == "boundary_violation"
+            ]
+            self.assertEqual(boundary_events, [])
+
     def test_read_file_path_escape_is_boundary_violation(self):
         with tempfile.TemporaryDirectory() as tmp:
             worktree = os.path.join(tmp, "worktree")
@@ -919,6 +980,199 @@ class RunCommandTimeout(unittest.TestCase):
                 os.kill(grandchild_pid, 0)  # signal 0: raises iff pid is gone
 
 
+class HP1WellFormedArgvListUnaffected(unittest.TestCase):
+    # T7d-fix: the argv-type validation added ahead of check_command/Popen
+    # must not change behavior for the well-formed case every other
+    # run_command test already relies on. A dedicated test (rather than
+    # only relying on RunCommandExecutesReally, which predates this task)
+    # keeps HP-1 traceable to its own case ID.
+    def test_list_of_str_argv_executes_unchanged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = os.path.join(tmp, "worktree")
+            _git_init_worktree(worktree)
+            card_path = _make_card(tmp)
+            out_path = os.path.join(tmp, "transcript.json")
+
+            responses = [
+                _tool_call("run_command", {"argv": ["echo", "hp1-well-formed"]}),
+            ] + _write_and_finish("hello.txt", "hi")
+            chat = ChatSequencer(responses)
+            passing_tests = lambda wt: {"passed": True, "output": "ok"}
+
+            exit_code = rlt.main(
+                ["--card", card_path, "--worktree", worktree, "--out", out_path],
+                chat_fn=chat,
+                test_runner=passing_tests,
+                boundary=_AllowAnyCommandBoundary(),
+            )
+
+            self.assertEqual(exit_code, 0)
+            with open(out_path, encoding="utf-8") as f:
+                transcript = json.load(f)
+            self.assertEqual(transcript["status"], "success")
+            tool_events = [
+                e["result"] for e in transcript["transcript"]
+                if e.get("event") == "tool_result" and e["result"].get("tool") == "run_command"
+            ]
+            self.assertEqual(len(tool_events), 1)
+            self.assertTrue(tool_events[0]["ok"])
+            self.assertEqual(tool_events[0]["returncode"], 0)
+            self.assertIn("hp1-well-formed", tool_events[0]["stdout"])
+            malformed_events = [
+                e for e in transcript["transcript"] if e.get("event") == "malformed_tool_call"
+            ]
+            self.assertEqual(len(malformed_events), 0)
+
+
+class EC1MalformedArgvType(unittest.TestCase):
+    # T7d-fix: found live during a real qwen3.6:35b-a3b benchmark session
+    # (MC-01) — the model sent argv as a raw string ("cd mobile && npm
+    # install") instead of a list. Before this fix, that string reached
+    # subprocess.Popen unchanged, which treated the whole string as a literal
+    # executable name and raised an uncaught FileNotFoundError, crashing the
+    # entire benchmark batch (see run_stage1_benchmark_test.py's
+    # PerCardIsolation for the batch-level half of this incident).
+    def test_string_argv_is_bounced_as_malformed_not_crashed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = os.path.join(tmp, "worktree")
+            _git_init_worktree(worktree)
+            card_path = _make_card(tmp)
+            out_path = os.path.join(tmp, "transcript.json")
+
+            responses = [
+                _tool_call("run_command", {"argv": "cd mobile && npm install"}),
+            ] + _write_and_finish("hello.txt", "hi")
+            chat = ChatSequencer(responses)
+            passing_tests = lambda wt: {"passed": True, "output": "ok"}
+
+            exit_code = rlt.main(
+                ["--card", card_path, "--worktree", worktree, "--out", out_path],
+                chat_fn=chat,
+                test_runner=passing_tests,
+                boundary=_AllowAnyCommandBoundary(),
+            )
+
+            self.assertEqual(exit_code, 0)
+            with open(out_path, encoding="utf-8") as f:
+                transcript = json.load(f)
+            self.assertEqual(transcript["status"], "success")
+            malformed_events = [
+                e for e in transcript["transcript"] if e.get("event") == "malformed_tool_call"
+            ]
+            self.assertEqual(len(malformed_events), 1)
+            self.assertIn("argv", malformed_events[0]["error"])
+
+    def test_string_argv_repeated_exhausts_malformed_bounce_budget(self):
+        # Proves the string-argv rejection genuinely reaches the same
+        # MAX_MALFORMED_BOUNCES accounting as every other malformed call —
+        # not just that a single occurrence is bounced once (which could pass
+        # even if it bypassed the shared budget entirely).
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = os.path.join(tmp, "worktree")
+            _git_init_worktree(worktree)
+            card_path = _make_card(tmp)
+            out_path = os.path.join(tmp, "transcript.json")
+
+            responses = [
+                _tool_call("run_command", {"argv": "cd mobile && npm install"}),
+            ] * 4
+            chat = ChatSequencer(responses)
+            unused_tests = lambda wt: self.fail("tests must not run on abort path")
+
+            exit_code = rlt.main(
+                ["--card", card_path, "--worktree", worktree, "--out", out_path],
+                chat_fn=chat,
+                test_runner=unused_tests,
+                boundary=_AllowAnyCommandBoundary(),
+            )
+
+            self.assertNotEqual(exit_code, 0)
+            with open(out_path, encoding="utf-8") as f:
+                transcript = json.load(f)
+            self.assertEqual(transcript["status"], "aborted")
+            self.assertEqual(transcript["reason"], "malformed_tool_call_repeated")
+            self.assertEqual(chat.calls, 4)
+
+
+class EC2CommandFailsToStart(unittest.TestCase):
+    # T7d-fix: a well-typed argv (passes the EC-1 type check and
+    # boundary.check_command) can still fail to spawn. Before this fix,
+    # Popen's OSError propagated uncaught and crashed the whole benchmark
+    # batch, exactly like the pre-existing TimeoutExpired bug this same
+    # function already handles below.
+    def test_nonexistent_executable_reports_structured_failure_not_a_crash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = os.path.join(tmp, "worktree")
+            _git_init_worktree(worktree)
+            card_path = _make_card(tmp)
+            out_path = os.path.join(tmp, "transcript.json")
+
+            responses = [
+                _tool_call("run_command", {"argv": ["nonexistent_binary_xyz_t7d"]}),
+            ] + _write_and_finish("hello.txt", "hi")
+            chat = ChatSequencer(responses)
+            passing_tests = lambda wt: {"passed": True, "output": "ok"}
+
+            exit_code = rlt.main(
+                ["--card", card_path, "--worktree", worktree, "--out", out_path],
+                chat_fn=chat,
+                test_runner=passing_tests,
+                boundary=_AllowAnyCommandBoundary(),
+            )
+
+            self.assertEqual(exit_code, 0)
+            with open(out_path, encoding="utf-8") as f:
+                transcript = json.load(f)
+            self.assertEqual(transcript["status"], "success")
+            tool_events = [
+                e["result"] for e in transcript["transcript"]
+                if e.get("event") == "tool_result" and e["result"].get("tool") == "run_command"
+            ]
+            self.assertEqual(len(tool_events), 1)
+            self.assertFalse(tool_events[0]["ok"])
+            self.assertIsNone(tool_events[0]["returncode"])
+            self.assertIn("command failed to start", tool_events[0]["stderr"])
+
+
+class EC2bCommandArgvRejectedByPopen(unittest.TestCase):
+    # A well-typed argv element that Popen itself rejects before ever
+    # spawning (embedded NUL byte -> ValueError, empirically confirmed
+    # against this Python's subprocess module) must be handled the same way
+    # as EC-2's OSError, not left to escape as a different uncaught crash.
+    def test_embedded_null_byte_reports_structured_failure_not_a_crash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = os.path.join(tmp, "worktree")
+            _git_init_worktree(worktree)
+            card_path = _make_card(tmp)
+            out_path = os.path.join(tmp, "transcript.json")
+
+            responses = [
+                _tool_call("run_command", {"argv": ["echo", "a\x00b"]}),
+            ] + _write_and_finish("hello.txt", "hi")
+            chat = ChatSequencer(responses)
+            passing_tests = lambda wt: {"passed": True, "output": "ok"}
+
+            exit_code = rlt.main(
+                ["--card", card_path, "--worktree", worktree, "--out", out_path],
+                chat_fn=chat,
+                test_runner=passing_tests,
+                boundary=_AllowAnyCommandBoundary(),
+            )
+
+            self.assertEqual(exit_code, 0)
+            with open(out_path, encoding="utf-8") as f:
+                transcript = json.load(f)
+            self.assertEqual(transcript["status"], "success")
+            tool_events = [
+                e["result"] for e in transcript["transcript"]
+                if e.get("event") == "tool_result" and e["result"].get("tool") == "run_command"
+            ]
+            self.assertEqual(len(tool_events), 1)
+            self.assertFalse(tool_events[0]["ok"])
+            self.assertIsNone(tool_events[0]["returncode"])
+            self.assertIn("command failed to start", tool_events[0]["stderr"])
+
+
 class RunCommandExecutesReally(unittest.TestCase):
     # D14 finding #3 (major): run_command must actually invoke a subprocess
     # and report its real exit status/output, not fabricate {"ok": True}.
@@ -1022,10 +1276,10 @@ class AuditLogEmission(unittest.TestCase):
     # T6c: append_audit_log must be called for every run_loop exit path, not
     # only the success path — audit visibility must not depend on how the
     # session ended.
-    def _run_and_capture_audit_record(self, tmp, chat, test_runner, boundary=None):
+    def _run_and_capture_audit_record(self, tmp, chat, test_runner, boundary=None, card_kwargs=None):
         worktree = os.path.join(tmp, "worktree")
         _git_init_worktree(worktree)
-        card_path = _make_card(tmp)
+        card_path = _make_card(tmp, **(card_kwargs or {}))
         out_path = os.path.join(tmp, "transcript.json")
 
         captured = {}
@@ -1055,6 +1309,22 @@ class AuditLogEmission(unittest.TestCase):
         self.assertFalse(record["escalated"])
         self.assertEqual(record["attempts"], 1)
         self.assertEqual(record["test_results"], [True])
+        self.assertIsNone(record["rri"])
+        self.assertIsNone(record["band"])
+
+    def test_hp3_card_rri_and_band_are_emitted_when_present(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            chat = ChatSequencer(_write_and_finish("hello.txt", "hi"))
+            passing_tests = lambda wt: {"passed": True, "output": "ok"}
+            record = self._run_and_capture_audit_record(
+                tmp,
+                chat,
+                passing_tests,
+                card_kwargs={"rri": 29, "band": "Moderate"},
+            )
+
+        self.assertEqual(record["rri"], 29)
+        self.assertEqual(record["band"], "Moderate")
 
     def test_ec1_budget_exhausted_still_emits_audit_record(self):
         with tempfile.TemporaryDirectory() as tmp:

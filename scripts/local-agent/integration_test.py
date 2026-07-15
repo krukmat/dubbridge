@@ -18,6 +18,29 @@ import run_local_task as rlt
 import boundary as b
 
 
+_audit_log_patch = None
+
+
+def setUpModule():
+    global _audit_log_patch
+    # T7g: keep every rlt.main() call in this module off the real
+    # logs/gemma-audit/*.jsonl sink unless a test deliberately overrides the
+    # seam to inspect the emitted record.
+    _audit_log_patch = patch.object(
+        rlt.gemma_local,
+        "append_audit_log",
+        side_effect=lambda record, **kwargs: None,
+    )
+    _audit_log_patch.start()
+
+
+def tearDownModule():
+    global _audit_log_patch
+    if _audit_log_patch is not None:
+        _audit_log_patch.stop()
+        _audit_log_patch = None
+
+
 def _git(repo, *args):
     return subprocess.run(
         ["git", *args],

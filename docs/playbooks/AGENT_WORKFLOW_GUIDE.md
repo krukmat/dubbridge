@@ -31,6 +31,14 @@ governs: "all agent-facing workflow decisions in the repository"
      success flow the task must implement or preserve;
    - at least one **edge case example** with a stable `EC-#` ID — a concrete
      boundary, invalid-input, or failure flow the task must handle or reject.
+   - when a task can produce benchmark/evaluation/review evidence, metrics, or
+     a blocker/promotion-state change, the task definition must also name:
+     - **Evidence to emit** — the concrete artifacts expected during execution
+       (for example transcripts, screenshots, audit rows, benchmark outputs,
+       review packets, or report sections);
+     - **Status artifacts affected** — the exact ledgers, plans, reports, ADR
+       indexes, or downstream blocker docs that must be synchronized before the
+       task can be reported complete.
 4. **Gate by RRI** — compute RRI with `scripts/rri.py`. For RRI 0–25, skip the
    full human approval presentation. Use local Gemma delegation through Ollama
    only for eligible simple code patches; otherwise execute directly as the
@@ -62,6 +70,15 @@ governs: "all agent-facing workflow decisions in the repository"
   constraints are discovered during analysis.
 - Skip this requirement for docs-only, config-only, migration-only, or planning
   tasks unless the task's main risk is behavioral correctness.
+- When a task can produce metrics, benchmark outputs, evaluation evidence, or a
+  blocker/promotion-state change, its task definition is not complete unless it
+  also names:
+  - **Evidence to emit** — the concrete artifacts the task is expected to
+    create while it runs; and
+  - **Status artifacts affected** — the exact status-bearing docs that must be
+    updated in the same workflow pass.
+- Treat these as execution-time outputs, not as optional closure notes. If they
+  are known at planning time, they belong in the task definition up front.
 - A task ledger can opt into automated enforcement by declaring
   `Behavioral coverage contract: unit-v1`. For ledgers with that marker, `make
   qa-docs` rejects completed development tasks whose `HP-#` / `EC-#` cases are not
@@ -88,6 +105,11 @@ governs: "all agent-facing workflow decisions in the repository"
   approval. If the task is an eligible simple code patch, prepare a local
   delegation packet for Gemma and report after review and verification; otherwise
   execute directly and report normally.
+- Before implementation starts, derive an explicit execution-time documentation set
+  from the task definition: what evidence/metrics must be emitted and which status
+  artifacts must be synchronized. For tasks that affect benchmarks, reports, audit
+  trails, blockers, or promotion state, that set is part of the task's working
+  surface from the start, not a post-hoc cleanup list.
 - **Pre-task summary for development tasks:** when the task will write or modify
   code, the task presentation must include two explicit sections:
   - **Happy paths considered** — the primary success flows the agent expects to
@@ -109,6 +131,10 @@ governs: "all agent-facing workflow decisions in the repository"
   explicitly asks for them.
 - After each task: verify the relevant tests/checks, update the status docs,
   document deviations or evidence, and state unresolved risks or blockers.
+- When a task's evidence or metrics become available mid-execution, update the
+  named report/ledger artifacts in the same workflow pass instead of deferring
+  them until an end-of-task memory sweep. A task that changes the measured state
+  of the project should update that measured state as part of the task itself.
 - Treat status-document synchronization as part of the task itself, not follow-up
   cleanup. Do not report a task complete while any governing status document still
   shows stale state.
@@ -752,11 +778,15 @@ required fallback.
   `make qa-gemma-review`, read the consolidated developer-review packet, and
   disposition every finding.
 - **Gemma unavailable, stalls, returns invalid output, returns `BLOCKED`, or no
-  usable consolidated result can be produced:** the agent must spawn a
-  context-isolated subagent as the mandatory fallback reviewer. The subagent
-  receives an isolation packet (diff + acceptance criteria + any usable partial
-  findings) and its output is advisory, exactly as Gemma's. The primary agent
-  reconciles and records `disposition_divergence` in the audit log.
+  usable consolidated result can be produced:** the agent must perform **one
+  immediate retry** with the same review packet first. If the retry yields a
+  usable consolidated result, continue on the Gemma path. If the retry fails
+  for the same class of reason or still produces no usable consolidated result,
+  spawn a context-isolated subagent as the mandatory fallback reviewer. The
+  subagent receives an isolation packet (diff + acceptance criteria + any
+  usable partial findings) and its output is advisory, exactly as Gemma's. The
+  primary agent reconciles and records `disposition_divergence` in the audit
+  log.
 - **Neither path may be skipped.** No additional human approval gate beyond
   what the RRI band already requires is opened by using the fallback.
 

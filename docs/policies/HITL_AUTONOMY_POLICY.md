@@ -130,10 +130,13 @@ development tasks. Gemma is the preferred reviewer; the context-isolated subagen
 
 When Ollama is unavailable, the model is absent, Gemma stalls, output is invalid,
 the review result is `BLOCKED`, or no usable consolidated review result can be
-produced, the agent **must** spawn a context-isolated subagent as the mandatory
-fallback reviewer. The subagent receives an isolation packet (diff + acceptance
-criteria + any usable partial findings) and its output is advisory, exactly as
-Gemma's would be. The primary agent reconciles and records
+produced, the agent must perform **one immediate retry** with the same review
+packet first. If the retry succeeds with a usable Gemma result, the Gemma path
+continues normally. If the retry fails for the same class of reason or still
+produces no usable result, the agent **must** spawn a context-isolated subagent
+as the mandatory fallback reviewer. The subagent receives an isolation packet
+(diff + acceptance criteria + any usable partial findings) and its output is
+advisory, exactly as Gemma's would be. The primary agent reconciles and records
 `disposition_divergence` in the audit log.
 
 Gemma unavailability or unusable local review output does not open a human

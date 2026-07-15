@@ -20,8 +20,27 @@ class SharedConfig(unittest.TestCase):
         self.assertEqual(gemma_local.DEFAULT_HOST, "http://localhost:11434")
         self.assertEqual(gemma_local.DEFAULT_MODEL, "gemma4:26b-a4b-it-qat")
         self.assertEqual(gemma_local.DEFAULT_FALLBACK_MODEL, "gemma4:26b-a4b-it-qat")
+        self.assertEqual(gemma_local.DEFAULT_NUM_PREDICT, 4096)
         self.assertEqual(gemma_local.DEFAULT_TEMPERATURE, 0.1)
         self.assertFalse(gemma_local.DEFAULT_THINK)
+
+    def test_resolve_num_predict_raises_default_for_gemma(self):
+        self.assertEqual(
+            gemma_local.resolve_num_predict("gemma4:26b-a4b-it-qat", 4096),
+            8192,
+        )
+
+    def test_resolve_num_predict_keeps_qwen_default_budget(self):
+        self.assertEqual(
+            gemma_local.resolve_num_predict("qwen3.6:35b-a3b", 4096),
+            4096,
+        )
+
+    def test_resolve_num_predict_preserves_explicit_override(self):
+        self.assertEqual(
+            gemma_local.resolve_num_predict("gemma4:26b-a4b-it-qat", 6144),
+            6144,
+        )
 
     def test_bool_from_env_defaults_false(self):
         with patch.dict(os.environ, {}, clear=True):
@@ -56,6 +75,19 @@ class PacketAndResults(unittest.TestCase):
 
 
 class Payload(unittest.TestCase):
+    def test_build_chat_payload_uses_model_aware_default_budget(self):
+        payload = gemma_local.build_chat_payload(
+            model="gemma4:26b-a4b-it-qat",
+            system_prompt="system",
+            packet="packet",
+            num_ctx=8192,
+            num_predict=4096,
+            temperature=0.25,
+            think=True,
+        )
+
+        self.assertEqual(payload["options"]["num_predict"], 8192)
+
     def test_build_chat_payload_sets_generation_options(self):
         payload = gemma_local.build_chat_payload(
             model="m",

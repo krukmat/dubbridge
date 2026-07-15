@@ -9,6 +9,17 @@ Transport (host normalization, streaming chat, model resolution, atomic
 result writing) is reused from `gemma_local.py` rather than duplicated, per
 the plan's design decision to extend the delegate-low-rri.py lineage instead
 of reinventing its transport layer.
+
+KNOWN LIMITATION (T7f): `gemma_local`, `scope_check`, and `boundary` are
+imported once, below, from this script's own directory -- not from the
+disposable worktree a session edits. If a task card's `allowed_paths`
+includes any of those three modules, `run_loop`'s `finish`-time scope_check
+call (and the boundary checks during the session) still run against the
+pre-session, unedited copy of that module, not the model's changes. A
+session whose task is "fix a bug in scope_check.py/boundary.py/gemma_local.py
+itself" can therefore get a misleading in_scope/boundary verdict. Verify such
+a session's diff independently (run its own tests against the worktree copy)
+rather than trusting this runner's own gate for that narrow case.
 """
 
 import argparse
@@ -149,11 +160,13 @@ class NullBoundary:
 
 
 class TaskCard:
-    def __init__(self, task_id, spec, acceptance_tests, allowed_paths):
+    def __init__(self, task_id, spec, acceptance_tests, allowed_paths, rri=None, band=None):
         self.task_id = task_id
         self.spec = spec
         self.acceptance_tests = acceptance_tests
         self.allowed_paths = allowed_paths
+        self.rri = rri
+        self.band = band
 
 
 class ToolCall:
@@ -212,15 +225,34 @@ def _run_command_with_timeout(argv, worktree_dir, boundary):
     # caught. Popen with start_new_session=True puts the whole command in
     # its own process group, so killpg on timeout reaches the entire tree,
     # not just the directly-spawned process.
-    process = subprocess.Popen(
-        argv,
-        cwd=worktree_dir,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        env=boundary.env_for_subprocess(),
-        start_new_session=True,
-    )
+    try:
+        process = subprocess.Popen(
+            argv,
+            cwd=worktree_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=boundary.env_for_subprocess(),
+            start_new_session=True,
+        )
+    except (OSError, ValueError) as exc:
+        # T7d-fix: a well-typed argv (list[str], passed check_command) can
+        # still fail to spawn — OSError covers a nonexistent/non-executable
+        # binary (FileNotFoundError, PermissionError, ...); ValueError covers
+        # an argv element Popen itself rejects before ever spawning (e.g. an
+        # embedded NUL byte). Before this fix, either propagated uncaught and
+        # crashed the whole benchmark batch, exactly like the TimeoutExpired
+        # case below — report it the same way, as a structured failed-command
+        # result, not a crash.
+        return {
+            "tool": "run_command",
+            "argv": argv,
+            "ok": False,
+            "returncode": None,
+            "stdout": "",
+            "stderr": f"command failed to start: {exc}",
+        }
+
     try:
         stdout, stderr = process.communicate(timeout=COMMAND_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
@@ -286,12 +318,23 @@ def apply_tool_call(call, worktree_dir, boundary):
                 content = f.read()
         except FileNotFoundError as exc:
             raise MalformedToolCall(f"read_file: no such file in worktree: {path!r}") from exc
+        except IsADirectoryError as exc:
+            raise MalformedToolCall(f"read_file: path is a directory, not a file: {path!r}") from exc
         except OSError as exc:
             raise BoundaryViolation(f"read rejected: {path!r} ({exc})") from exc
         return {"tool": "read_file", "path": path, "ok": True, "content": content}
 
     if call.name == "run_command":
         argv = require_argument(call, "argv")
+        # T7d-fix: a real qwen3.6:35b-a3b session sent argv as a single raw
+        # string (e.g. "cd mobile && npm install") instead of a list. Popen
+        # would treat the whole string as a literal executable name and raise
+        # an uncaught FileNotFoundError, crashing the entire benchmark batch
+        # (MC-01, see run_stage1_benchmark.py's per-card isolation fix for the
+        # same incident). Reject the wrong type here, before it ever reaches
+        # check_command/Popen, as ordinary malformed model output.
+        if not isinstance(argv, list) or not all(isinstance(item, str) for item in argv):
+            raise MalformedToolCall(f"run_command: argv must be a list of strings, got {argv!r}")
         boundary.check_command(argv)
         return _run_command_with_timeout(argv, worktree_dir, boundary)
 
@@ -521,6 +564,8 @@ def load_card(card_path):
         spec=data["spec"],
         acceptance_tests=data.get("acceptance_tests", []),
         allowed_paths=data.get("allowed_paths", []),
+        rri=data.get("rri"),
+        band=data.get("band"),
     )
 
 
@@ -584,8 +629,8 @@ def build_audit_record(card, result, model, elapsed_s):
         "outcome": result["status"].upper(),
         "model": model,
         "task_id": card.task_id,
-        "rri": None,
-        "band": None,
+        "rri": card.rri,
+        "band": card.band,
         "attempts": len(test_events),
         "commands": [c["argv"] for c in command_events],
         "test_results": [e["result"]["passed"] for e in test_events],

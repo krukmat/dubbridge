@@ -128,6 +128,10 @@ the owner may explicitly waive it if T8 does not need a binding comparison.
 
 - `docs/adr/ADR-036-local-first-agentic-implementation-band.md`
 - `docs/tasks/adr036-local-first-pilot.md` (task ledger)
+- `docs/plan/adr036-quality-metrics.md` — precondition plan for `T8`: repairs
+  the audit trail and the two remaining diagnosed harness defects, and
+  resolves the 16-card corpus's validity problem, before a Stage 1 go/no-go
+  report is attempted
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
 - `docs/policies/HITL_AUTONOMY_POLICY.md`
 - `docs/playbooks/LOW_RRI_LOCAL_MODEL_HANDOFF.md`

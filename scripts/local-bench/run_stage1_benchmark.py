@@ -132,6 +132,10 @@ def _write_temp_card(card, base_dir):
         "acceptance_tests": card["acceptance_tests"],
         "allowed_paths": card["allowed_paths"],
     }
+    if "rri" in card:
+        rlt_card["rri"] = card["rri"]
+    if "band" in card:
+        rlt_card["band"] = card["band"]
     path = os.path.join(base_dir, f"{card['task_id']}.card.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(rlt_card, f)
@@ -159,9 +163,31 @@ def main(argv=None):
     results = []
     for card in cards:
         print(f"[T7] running {card['task_id']} ({card['category']})...", file=sys.stderr)
-        result = run_card(card, args.work_dir, args.out_dir, args.host, args.model, args.keep_worktree)
+        card_start = time.monotonic()
+        try:
+            result = run_card(card, args.work_dir, args.out_dir, args.host, args.model, args.keep_worktree)
+        except Exception as exc:  # noqa: BLE001 - deliberate: isolate one card's
+            # T7d-fix: found live when MC-01's malformed argv crashed
+            # run_local_task.py with an uncaught exception that propagated
+            # straight through run_card() (its own worktree-teardown `finally`
+            # still ran, so no orphaned worktree/branch) and killed this whole
+            # loop, silently discarding every subsequent card's result. This
+            # is deliberately a broad except: it is the last line of defense
+            # against failure modes not already converted into a structured
+            # result by run_local_task.py itself, and must never let one
+            # card's harness-level failure erase the rest of the batch.
+            result = {
+                "task_id": card["task_id"],
+                "category": card["category"],
+                "exit_code": None,
+                "status": "harness_crash",
+                "elapsed_s": round(time.monotonic() - card_start, 1),
+                "error": str(exc),
+            }
+            print(f"[T7] {card['task_id']}: harness_crash ({exc})", file=sys.stderr)
+        else:
+            print(f"[T7] {card['task_id']}: {result['status']} in {result['elapsed_s']}s", file=sys.stderr)
         results.append(result)
-        print(f"[T7] {card['task_id']}: {result['status']} in {result['elapsed_s']}s", file=sys.stderr)
 
     summary_path = os.path.join(args.out_dir, "summary.json")
     with open(summary_path, "w", encoding="utf-8") as f:

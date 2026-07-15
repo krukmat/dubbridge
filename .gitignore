@@ -25,3 +25,5 @@ scripts/local-bench/pilot-work/
 scripts/local-bench/t7-work-*/
 scripts/local-agent/logs/
 .pytest_cache/
+logs/gemma-push-review/
+scripts/local-bench/t7*/

@@ -32,7 +32,7 @@ def parse_args():
     )
     parser.add_argument(
         "--role",
-        choices=["developer", "reviewer", "all"],
+        choices=["developer", "reviewer", "local-implementer", "all"],
         default="all",
         help="Filter records by role (default: all).",
     )

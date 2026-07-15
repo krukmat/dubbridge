@@ -25,6 +25,9 @@ DEFAULT_IDLE_TIMEOUT_SECONDS = 180
 DEFAULT_MAX_WALL_SECONDS = 900
 DEFAULT_NUM_CTX = 32768
 DEFAULT_NUM_PREDICT = 4096
+MODEL_NUM_PREDICT_OVERRIDES = {
+    "gemma4:26b-a4b-it-qat": 8192,
+}
 DEFAULT_TEMPERATURE = 0.1
 DEFAULT_THINK = False
 
@@ -132,6 +135,17 @@ def default_fallback_model_for(*override_env_names):
     return DEFAULT_FALLBACK_MODEL
 
 
+def resolve_num_predict(model, num_predict):
+    """Return the effective generation budget for a specific model.
+
+    Callers that pass a non-default value keep that explicit override. The
+    shared 4096-token default stays unchanged for models without an override.
+    """
+    if num_predict != DEFAULT_NUM_PREDICT:
+        return num_predict
+    return MODEL_NUM_PREDICT_OVERRIDES.get(model, DEFAULT_NUM_PREDICT)
+
+
 def build_chat_payload(
     *,
     model,
@@ -142,6 +156,7 @@ def build_chat_payload(
     temperature,
     think,
 ):
+    effective_num_predict = resolve_num_predict(model, num_predict)
     return {
         "model": model,
         "stream": True,
@@ -149,7 +164,7 @@ def build_chat_payload(
         "keep_alive": "10m",
         "options": {
             "temperature": temperature,
-            "num_predict": num_predict,
+            "num_predict": effective_num_predict,
             "num_ctx": num_ctx,
         },
         "messages": [

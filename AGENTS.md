@@ -15,7 +15,9 @@ this repository. Read them before executing work:
 - `docs/plan/roadmap.md` — the general plan: slice sequence, dependencies, and where
   each slice/task sits.
 
-`CLAUDE.md` (project and the user's global) is authoritative on conflict.
+For workflow topics, `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` is authoritative.
+`CLAUDE.md` (project and the user's global) remains authoritative only for
+topics not overridden there.
 
 ## Task Presentation Rule
 
@@ -57,17 +59,28 @@ Before execution, present:
 9. `Inputs`
 10. `Outputs`
 11. `Acceptance criteria`
-12. `Execution summary`
+12. `Evidence / metrics to emit`
+   - required when the task is expected to produce benchmarks, evaluation data,
+     review artifacts, screenshots, audit records, or reportable measurements
+13. `Status artifacts to sync`
+   - required when the task can change a ledger, report, plan, ADR status, or
+     downstream blocker/promotion state
+14. `Execution summary`
    - short description of what will be done
    - if applicable, list the ordered steps
-13. any task-type-specific pre-task sections required by `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
+15. any task-type-specific pre-task sections required by `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
    - for development tasks, include `Happy paths considered`
    - for development tasks, include `Edge cases considered`
-14. `Pseudocode`, only if it materially clarifies non-trivial logic
-15. `Diagram`
+16. `Pseudocode`, only if it materially clarifies non-trivial logic
+17. `Diagram`
    - required for development tasks
    - for non-development tasks, include only if structure, flow or boundaries are easier to understand visually
-16. explicit statement that execution has not started yet and is waiting for approval, when approval is required
+18. explicit statement that execution has not started yet and is waiting for approval, when approval is required
+
+When the workflow guide requires `Evidence to emit` or `Status artifacts to sync`,
+those items are part of the task's execution contract, not optional closure notes.
+They should make it obvious, before implementation starts, which metrics/reports
+will be updated during the task and which status-bearing docs must be kept in sync.
 
 ## Complexity And Model Guidance
 

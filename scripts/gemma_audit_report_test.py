@@ -73,6 +73,27 @@ def _rev_record(**kwargs):
     return base
 
 
+def _local_impl_record(**kwargs):
+    base = {
+        "ts": "2026-07-15T11:00:00Z",
+        "role": "local-implementer",
+        "outcome": "SUCCESS",
+        "model": "qwen3.6:35b-a3b",
+        "task_id": "T7g",
+        "rri": 29,
+        "band": "Moderate",
+        "attempts": 1,
+        "commands": [["cargo", "test"]],
+        "test_results": [True],
+        "boundary_violations": 0,
+        "scope_check": {"in_scope": True, "offending_paths": []},
+        "escalated": False,
+        "elapsed_s": 3.0,
+    }
+    base.update(kwargs)
+    return base
+
+
 class LoadRecords(unittest.TestCase):
     def test_hp2_empty_directory_returns_no_records(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -98,6 +119,17 @@ class LoadRecords(unittest.TestCase):
             records, _ = _mod.load_records(tmp, "developer", None)
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0]["role"], "developer")
+
+    def test_role_filter_local_implementer_excludes_other_roles(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _write_jsonl(
+                tmp,
+                "2026-07.jsonl",
+                [_dev_record(), _rev_record(), _local_impl_record()],
+            )
+            records, _ = _mod.load_records(tmp, "local-implementer", None)
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["role"], "local-implementer")
 
     def test_since_filter_excludes_older_months(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -323,6 +355,21 @@ class CliBehavior(unittest.TestCase):
         data = json.loads(r.stdout)
         self.assertEqual(data["total_records"], 1)
         self.assertEqual(data["by_role"], {"reviewer": 1})
+
+    def test_role_filter_local_implementer_via_cli(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _write_jsonl(
+                tmp,
+                "2026-07.jsonl",
+                [_dev_record(), _rev_record(), _local_impl_record()],
+            )
+            cmd = [sys.executable, _SCRIPT, "--log-dir", tmp,
+                   "--role", "local-implementer", "--format", "json"]
+            r = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0)
+        data = json.loads(r.stdout)
+        self.assertEqual(data["total_records"], 1)
+        self.assertEqual(data["by_role"], {"local-implementer": 1})
 
 
 if __name__ == "__main__":

@@ -240,7 +240,23 @@
       "Bash(echo \"PUSH_EXIT:$?\")",
       "Bash(tee /tmp/push-output2.txt)",
       "Bash(DUBBRIDGE_SKIP_GEMMA_REVIEW=1 git push)",
-      "Bash(git commit -m 'chore\\(settings\\): update allowed tools for PPR session *)"
+      "Bash(git commit -m 'chore\\(settings\\): update allowed tools for PPR session *)",
+      "Bash(codex exec *)",
+      "Bash(python3 -m unittest boundary_test run_local_task_test integration_test scope_check_test escalation_packet_test -v)",
+      "Bash(python3 -m unittest run_stage1_benchmark_test -v)",
+      "Bash(python3 -m unittest run_local_task_test.EC1MalformedArgvType run_local_task_test.EC2CommandFailsToStart run_local_task_test.EC2bCommandArgvRejectedByPopen -v)",
+      "Bash(nohup python3 scripts/local-bench/run_stage1_benchmark.py --out-dir logs/local-bench/t7d-20260712 --work-dir scripts/local-bench/t7d-work-20260712-part2 --only MC-02 MC-03 MC-04 RC-01 RC-02 RC-03 RC-04 RF-01 RF-02 RF-03)",
+      "Bash(disown)",
+      "Bash(kill -0 56785)",
+      "Bash(ps -p 56785 -o pid,etime,command)",
+      "Bash(git -C /Users/matias/dubbridge worktree list)",
+      "Bash(kill -TERM 56785)",
+      "Bash(ps -p 56785 -o pid,command)",
+      "Bash(git -C /Users/matias/dubbridge branch -D bench/rc-04-1783888808)",
+      "Bash(git -C /Users/matias/dubbridge branch --list \"bench/*\")",
+      "Bash(nohup python3 scripts/local-bench/run_stage1_benchmark.py --out-dir logs/local-bench/t7e-20260712 --work-dir scripts/local-bench/t7e-work-20260712 --model gemma4:26b-a4b-it-qat)",
+      "Bash(ps -p 75371 -o pid,etime,command)",
+      "Bash(kill -0 75371)"
     ],
     "additionalDirectories": [
       "docs/knowledge"
