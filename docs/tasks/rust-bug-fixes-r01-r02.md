@@ -76,8 +76,9 @@ to both functions.
 
 ## T2 — R-02: Use `UnknownStoredValue` in `parse_license_type` / `parse_source_type`
 
-**Status:** pending ⬜
+**Status:** done ✅
 **Effort:** S · **RRI:** 8 · **Band:** Low
+**Commit:** `841a564`
 
 ### Context
 
@@ -159,8 +160,15 @@ _ => Err(DbError::UnknownStoredValue {
 
 ### Execution log
 
-*(to be filled on completion)*
+- Developer patch landed in `841a564` (`fix(db+tooling): R-02 UnknownStoredValue + reviewer think=true default`).
+- Follow-up formatting landed in `9400b79` (`style(db): cargo fmt R-02 wildcard arms`).
+- Verified current file state matches the intended two-arm replacement exactly.
+- Verification rerun on 2026-07-16:
+  - `cargo check -p dubbridge-db`
+  - `cargo test -p dubbridge-db --lib`
 
 ### Arbiter verdict
 
-*(to be filled on completion)*
+- **Developer:** Gemma-produced patch is present in the repo and matches the task contract: both wildcard arms now return `DbError::UnknownStoredValue` with the correct `field` names and `value.to_owned()`.
+- **Scope:** Clean. The requested behavior change is confined to `crates/db/src/pending_ingestion_repo.rs`; no extra code changes were needed for the fix itself beyond the later formatting commit.
+- **Verification:** `cargo check -p dubbridge-db` ✅ · `cargo test -p dubbridge-db --lib` ✅ (`69` tests passed on 2026-07-16).

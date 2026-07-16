@@ -189,7 +189,7 @@ band — never derive one output from another (e.g. do not infer capability from
 | RRI band | Label | Effort | Capability (Codex) | Capability (Claude Code) | Thinking | Phase-1 reviewer | Phase-2 reviewer | Gate |
 |---|---|---|---|---|---|---|---|---|
 | **0–25** | Low | **S** | Primary agent or Local Gemma via Ollama | Primary agent or Local Gemma via Ollama | Off | Gemma | Gemma Reviewer | **Low-band handling:** do not present the full task for approval; use local Gemma only for eligible simple code patches, otherwise execute directly with the primary agent. |
-| **26–40** | Moderate | **M** | Balanced | Balanced | Off | Gemma | Gemma Reviewer | Confirm tests exist in the affected area. |
+| **26–40** | Moderate | **M** | Balanced | Balanced | Off | Gemma | Gemma Reviewer | Confirm tests exist in the affected area. **Implementation route:** local-first via `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL`; primary agent remains orchestrator, cloud implementation is escalation/fallback. |
 | **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Cross-vendor peer* | Cross-vendor peer* | Plan + explicit acceptance criteria required before approval. |
 | **56–70** | Complex | **L** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Plan first. **Decompose into subtasks before implementation.** Human reviews the plan. |
 | **71–85** | High | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Characterization tests + explicit acceptance criteria + human reviews the **diff** (not just the plan). **Decomposition remains mandatory.** |
@@ -213,6 +213,14 @@ use `OLLAMA_HOST` when set, otherwise `http://localhost:11434`. Use
 former `gemma4:12b-mlx` fast lane was retired by ADR-036 Amendment 1 —
 resource contention with the reviewer model — and there is no separate
 fallback tier left to fall back to).
+
+The Moderate band is special for **implementation routing**. Task cards still
+present vendor-model recommendations for Codex and Claude Code because the
+primary agent remains the orchestrator and cloud escalation path, but the
+default implementation route for development tasks scoring **RRI 26–40** is
+the local agentic runner. Resolve the implementer from
+`DUBBRIDGE_LOCAL_AGENT_MODEL`, defaulting to `qwen3.6:35b-a3b`, and the Ollama
+endpoint from `OLLAMA_HOST`, defaulting to `http://localhost:11434`.
 
 Thinking mode: activate for Balanced→Premium and above when the task requires
 multi-step reasoning that cannot be validated incrementally. Do **not** activate
@@ -318,6 +326,39 @@ out-of-scope path, invalid tagged response, unavailable Ollama/model, or a
 post-application RRI above 25 must escalate to the normal human-gated workflow.
 If the delegation times out (exit 124), report it explicitly as `Gemma timeout
 (idle|wall)` in the final task summary.
+
+### Moderate local-first handling
+
+For final **RRI 26–40**, the implementation default is **local-first**:
+
+- the primary agent remains the planner, approver-facing presenter, reviewer,
+  and closer;
+- the code-authoring surface is `scripts/local-agent/run_local_task.py` in a
+  disposable worktree;
+- the implementer resolves from `DUBBRIDGE_LOCAL_AGENT_MODEL` (default
+  `qwen3.6:35b-a3b`);
+- post-run `allowed_paths` scope enforcement is mandatory;
+- the local path has a maximum of **2 repair attempts**, each requiring new
+  evidence;
+- cloud implementation is the escalation/fallback path when the local runner,
+  model binding, repair budget, or scope boundary fails.
+
+The review path is unchanged for this band: phase 1 stays Gemma, phase 2 stays
+Gemma Reviewer / D14 unless ADR-036's model-family contingency is explicitly
+activated and documented for the task.
+
+Bindings used by the operative local-first route:
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint |
+| `DUBBRIDGE_LOCAL_AGENT_MODEL` | `qwen3.6:35b-a3b` | Default local implementer for RRI 26–40 |
+
+**Rollback triggers:** revert Moderate-band implementation to the cloud path if
+the rolling 20-task window shows escalation rate `> 40%`, any accepted
+out-of-scope diff, any unintended change escaping the disposable worktree
+boundary, or sustained swap/thermal degradation attributable to the local
+implementer.
 
 ## Decomposition triggers
 

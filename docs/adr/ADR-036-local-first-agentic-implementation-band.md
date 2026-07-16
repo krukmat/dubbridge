@@ -457,3 +457,19 @@ task.
 - `docs/adr/ADR-034-gemma-process-audit-and-reviewer-reconciliation.md` — audit log and reviewer contract this ADR extends
 - `docs/adr/ADR-026-layered-fail-closed-configuration-and-environment-separation.md` — environment separation the execution boundary aligns with
 - `docs/evaluations/large-file-delegation-2026-06-21.md` — failure evidence motivating the test-first and boundary rules
+
+## Implementation note (2026-07-15 owner override)
+
+The original staged-adoption plan in ADR-036 §10 required Stage 1/Stage 2
+promotion evidence before policy propagation. On **2026-07-15**, the owner
+explicitly overrode that dependency and promoted the policy early:
+
+- `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
+- `docs/policies/RRI_POLICY.md`
+- `docs/policies/HITL_AUTONOMY_POLICY.md`
+
+now treat **RRI 26–40** as a **local-first implementation band** by default.
+This does **not** retroactively claim that the original promotion gates were
+met. It changes the evaluation surface: future evidence is gathered from live
+Moderate-band tasks under the operative policy rather than from a separate
+pilot gate.

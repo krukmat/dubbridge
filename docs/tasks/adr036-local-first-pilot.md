@@ -3353,7 +3353,10 @@ change for a retry.
 
 ## T9 — Stage 2 pilot: 5 real RRI 26–40 tasks (GO gate)
 
-- **Status:** [ ] Pending (blocked on T8 = GO)
+- **Status:** [~] Superseded as a gating mechanism by the 2026-07-15 owner
+  override that made ADR-036 routing operative before T8/T9 completion.
+  Future evidence collection now happens on normal live Moderate-band tasks
+  under the active policy, not through a separate pilot batch.
 - **Effort:** L (aggregate of 5 individually gated tasks)
 - **RRI:** computed per pilot task at presentation time
 - **Executor tier:** per ADR-036 routing (local implementer under full gates)
@@ -3380,7 +3383,7 @@ not pilot failures.
 
 ## T10 — Policy propagation on promotion
 
-- **Status:** [ ] Pending (blocked on T9 results + human approval)
+- **Status:** [x] Done — 2026-07-15 owner override + human approval
 - **Effort:** M
 - **RRI:** n/a (policy/docs task; explicit human approval required)
 - **Executor tier:** primary + human
@@ -3388,16 +3391,17 @@ not pilot failures.
   `docs/policies/RRI_POLICY.md`, `docs/policies/HITL_AUTONOMY_POLICY.md`,
   `docs/playbooks/LOW_RRI_LOCAL_MODEL_HANDOFF.md` (cross-reference),
   `docs/adr/ADR-036-...md` (implementation notes)
-- **Depends on:** T9
+- **Depends on:** human approval of the exact diff. The original T9 dependency
+  was explicitly waived by owner override on 2026-07-15.
 
 ### Goal
 
-Only if the pilot sustains the gates: amend the workflow guide (band table,
-reviewer pairing, residency rule, escalation packet), RRI policy crosswalk,
-and HITL policy (local delegation section) to make the 26–40 local path the
-Balanced-mode default; record rollback triggers (ADR-036 §10) as operative
-policy. This is the single task in the slice that changes agent-facing policy,
-and it requires explicit human approval of the exact diff.
+Amend the workflow guide (band table, reviewer pairing, residency rule,
+escalation packet), RRI policy crosswalk, and HITL policy to make the 26–40
+local path the operative default and record rollback triggers (ADR-036 §10) as
+policy. This was originally gated on pilot promotion, but on 2026-07-15 the
+owner explicitly overrode that dependency so live tasks, not a separate pilot
+batch, become the evaluation surface.
 
 ### Acceptance Criteria
 
@@ -3406,11 +3410,23 @@ and it requires explicit human approval of the exact diff.
   `Accepted`).
 - Rollback trigger wording present in the workflow guide.
 
+### Completion Evidence
+
+- Owner approved the override explicitly on 2026-07-15.
+- Updated:
+  - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
+  - `docs/policies/RRI_POLICY.md`
+  - `docs/policies/HITL_AUTONOMY_POLICY.md`
+  - `docs/adr/ADR-036-local-first-agentic-implementation-band.md`
+  - this ledger + the linked plan note
+- `make qa-docs` passes.
+
 ---
 
 ## T11 — Evaluate deprecating the Low-band packet protocol (gated, not automatic)
 
-- **Status:** [ ] Pending (blocked on T10 = policy propagated; not automatic)
+- **Status:** [x] Done — 2026-07-15 decision: keep `gemma4:26b-a4b-it-qat` for
+  Low-band Developer; no policy or script change approved
 - **Effort:** M
 - **RRI:** computed at presentation time (touches
   `LOW_RRI_LOCAL_MODEL_HANDOFF.md`, `delegate-low-rri.py` call sites if any
@@ -3464,3 +3480,25 @@ never to deprecate as a side effect of T6a-d shipping.
   ADR-036 implementation note recording the follow-on decision and date.
 - If rejected or deferred: record the rationale in this task's completion
   evidence and close it as a decision, not leave it dangling `Pending`.
+
+### Completion Evidence
+
+- Scope narrowed by owner on 2026-07-15 to one question only: whether the
+  **Low-band Developer model binding** should move from `gemma4` to `qwen`.
+- Decision: **No change. Keep `gemma4:26b-a4b-it-qat` for Low-band Developer.**
+- Rationale:
+  - the current Low-band path is built around the packet protocol in
+    `docs/playbooks/LOW_RRI_LOCAL_MODEL_HANDOFF.md` and
+    `scripts/delegate-low-rri.py` (tagged-block output, deterministic
+    apply/build, `full-file` / `before-after` modes, no shell/filesystem
+    authority);
+  - the current `qwen3.6:35b-a3b` evidence in this slice is tied to the
+    **agentic runner** path (`scripts/local-agent/run_local_task.py`), not to
+    the packet protocol used by Low-band delegation;
+  - ADR-036 explicitly preserved the Low band unchanged and names migration of
+    `0–25` to the agentic path as a possible follow-up, not an implicit
+    consequence of Moderate-band promotion.
+- Outcome: no change to `DUBBRIDGE_LOW_RRI_MODEL`, no deprecation of
+  `delegate-low-rri.py`, no policy edits. A future change would require a
+  separate task that validates `qwen` specifically against the Low-band packet
+  contract before any binding change is proposed.

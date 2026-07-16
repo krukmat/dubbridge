@@ -12,19 +12,25 @@ governed_by: [ADR-036]
 
 Execute the staged adoption defined in ADR-036 §10: measure the local model
 stack on the real machine (Stage 1), run a bounded pilot on real Moderate-band
-tasks (Stage 2), and produce a go/no-go decision against the promotion gates —
-without changing any workflow policy until promotion is earned.
+tasks (Stage 2), and produce a go/no-go decision against the promotion gates.
+
+**Historical note (2026-07-15):** this "no policy change until promotion" rule
+was explicitly overridden by the owner. The workflow/policy docs were promoted
+early so live Moderate-band tasks, not a separate pilot batch, become the
+evaluation surface. This plan remains the measurement and implementation trail,
+not a prerequisite to the now-operative routing.
 
 ## Context
 
-ADR-036 (Proposed) decides the policy: a local agentic implementation path for
+ADR-036 (Accepted) decides the policy: a local agentic implementation path for
 RRI 26–40, a role-based local model stack (Qwen3.6-35B-A3B implementer /
 Gemma 4 26B A4B reviewer / Gemma 4 12B fast lane), a fail-closed execution
 boundary, and promotion/rollback gates. This slice is the work that validates
 or refutes the five open questions recorded in the ADR. Nothing in this slice
 modifies `AGENT_WORKFLOW_GUIDE.md`, `RRI_POLICY.md`, or
-`HITL_AUTONOMY_POLICY.md`; policy propagation is a separate gated task (T10)
-that only runs if the promotion gate passes.
+`HITL_AUTONOMY_POLICY.md`; policy propagation was originally a separate gated
+task (T10) that only ran if the promotion gate passed. That dependency was
+superseded by the 2026-07-15 owner override described above.
 
 ## Design decisions
 

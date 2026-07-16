@@ -72,6 +72,37 @@ If penalties are present and the final RRI is still ≤ 25, the low-band handlin
 still applies. When delegation is used, state all active penalties explicitly in
 the delegation packet and final report so the score is transparent.
 
+## Local-first implementation (RRI 26–40)
+
+For the **26–40 Moderate band**, the approval gate is unchanged: the agent must
+present the task and wait for explicit human approval before implementation.
+What changes is the default implementation route.
+
+The default path for development tasks in this band is:
+
+1. Compute RRI with `scripts/rri.py`.
+2. Present the task and obtain explicit approval.
+3. Run the implementation through `scripts/local-agent/run_local_task.py` in a
+   disposable git worktree, resolving the implementer from
+   `DUBBRIDGE_LOCAL_AGENT_MODEL` (default `qwen3.6:35b-a3b`) and the endpoint
+   from `OLLAMA_HOST`.
+4. Keep the primary agent as orchestrator of record: it owns the task card,
+   allowed paths, acceptance tests, reflection passes, closure, and all final
+   judgments about correctness.
+5. Enforce the task's `allowed_paths` after the local run. Any out-of-scope
+   diff fails closed and is never accepted into the primary checkout.
+6. Run the approved verification commands.
+7. If the local run fails the acceptance signal, hits the scope boundary, or
+   the local path is unavailable, the primary agent may run at most **2**
+   evidence-backed local repair attempts.
+8. After the repair budget is exhausted, or if the local runner/model is
+   unavailable, escalate to cloud implementation with the ADR-036 escalation
+   packet rather than continuing with ad hoc local retries.
+
+This routing is operative by owner override dated **2026-07-15**. It was
+adopted ahead of the original ADR-036 promotion gate so that live Moderate-band
+tasks become the evaluation surface.
+
 ## Approval checkpoint wording
 
 When approval is required (RRI > 25), end the presentation with:
