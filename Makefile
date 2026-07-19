@@ -1,4 +1,4 @@
-.PHONY: qa-fmt qa-lint qa-test qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review install-hooks
+.PHONY: qa-fmt qa-lint qa-test qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review show-codex-session-model install-hooks
 
 COVERAGE_MIN ?= 90
 PEER_REVIEW_RRI      ?= 22
@@ -152,6 +152,9 @@ qa-peer-workflow-review:
 	if [ -n "$(PEER_REVIEW_TASK_ID)" ]; then args="$$args --task-id $(PEER_REVIEW_TASK_ID)"; fi; \
 	if [ "$${PEER_REVIEW_DRY_RUN:-0}" = "1" ]; then args="$$args --dry-run"; fi; \
 	git diff "$(PEER_REVIEW_BASE)" | python3 scripts/peer-workflow-review.py $$args --content -
+
+show-codex-session-model:
+	python3 scripts/show-codex-session-model.py
 
 install-hooks:
 	cp scripts/hooks/pre-commit .git/hooks/pre-commit
