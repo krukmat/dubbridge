@@ -1043,6 +1043,16 @@ Gemma's output during the mandatory Step 1 review and recorded there.
 Only after all applicable steps above are checked may the task status be
 flipped to `[x] Done` and the completion reported to the user.
 
+### Step 5 — Context compaction reminder (all tasks, after `[x] Done`)
+
+```
+[ ] 5. In the closure report to the user, append a one-line reminder to run
+       `/compact` (or `/clear` if the task's context is no longer needed).
+       This is advisory text only — no agent or hook can invoke context
+       compaction on its own; only the user (or the harness automatically,
+       near the context limit) can trigger it.
+```
+
 ## Related
 
 - `CLAUDE.md`, `AGENTS.md`, `README_AGENT_ORDER.md`
