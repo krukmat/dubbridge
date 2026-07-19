@@ -21,6 +21,7 @@ Canonical home for repository BDD artifacts: `docs/bdd/`.
 - `s-120-media-preparation.feature`
 - `s-125-hls-playback-delivery.feature`
 - `s-127-mobile-review-player.feature`
+- `s-130-asr-transcription.feature`
 - `s-160-review.feature`
 - `s-200-mobile-auth.feature`
 
@@ -90,6 +91,14 @@ Spec: `docs/bdd/s-127-mobile-review-player.feature`
 | SC-PLAYBACK-2 | Review detail keeps the decision flow usable when playback is unavailable | `S-127-T3` | `mobile/__tests__/ReviewDetailScreen.test.tsx::EC-5: playback denial shows a not-ready empty state and keeps decision controls usable`; `mobile/__tests__/ReviewDetailScreen.test.tsx::EC-6: playback failure shows an error state and keeps decision controls usable` | `mobile/maestro/playback.yaml` | EC |
 | SC-PLAYBACK-3 | Asset detail opens inline playback after an explicit play action | `S-127-T4` | `mobile/__tests__/asset.screens.test.tsx::HP-1: finalized asset shows Play and opens inline playback after an explicit tap`; `mobile/maestro/playback.yaml` | `mobile/maestro/playback.yaml` | HP |
 | SC-PLAYBACK-4 | Asset detail denial or failure leaves the rest of the screen usable | `S-127-T4` | `mobile/__tests__/asset.screens.test.tsx::EC-1: playback denial shows a not-ready state and keeps compliance access usable`; `mobile/__tests__/asset.screens.test.tsx::EC-2: playback failure shows an error state and keeps compliance access usable` | `mobile/maestro/playback.yaml` | EC |
+
+## S-130 — ASR transcription
+Spec: `docs/bdd/s-130-asr-transcription.feature`
+
+| Scenario ID | Description | Task | Executable Evidence | Mobile Flow | HP / EC |
+| --- | --- | --- | --- | --- | --- |
+| S130_HP1 | Prepared asset produces transcript and alignment artifacts and becomes transcription-ready | S-130-T3, S-130-T4 | `apps/worker-runner/src/main.rs::process_transcription_job_marks_ready_when_both_artifacts_stored`; `workers/asr-worker-py/tests/test_worker.py::test_successful_transcription_emits_output_and_exits_0` | — | HP |
+| S130_EC1 | ASR worker failure marks transcription status Failed and persists no derived artifacts | S-130-T3, S-130-T4 | `apps/worker-runner/src/main.rs::process_transcription_job_marks_failed_on_asr_error`; `workers/asr-worker-py/tests/test_worker.py::test_transcription_exception_emits_error_and_exits_1` | — | EC |
 
 ## S-210 — Mobile product-experience refresh
 Spec: `docs/bdd/s-210-mobile-product-experience.feature`

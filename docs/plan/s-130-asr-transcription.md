@@ -1,12 +1,15 @@
 ---
 type: Plan
 title: "Plan: S-130 — ASR Transcription"
-status: active
+status: closed
 slice: S-130
 ---
 # Plan: S-130 — ASR Transcription
 
-> **Status:** Active — authored 2026-06-25. Implementation pending approval.
+> **Status:** Done 2026-07-19. Authored 2026-06-25. T1–T5 are complete; T1/T2 owner
+> sign-off was recorded 2026-07-19 against the already-recorded implementation
+> evidence, and T5 synchronized the canonical BDD + roadmap/task/plan status
+> artifacts under the repository's pre-commit roadmap drift guard.
 > **Roadmap phase:** `S-130` — Processing / ASR (transcription).
 > **Tasks ledger:** `docs/tasks/s-130-asr-transcription.md`.
 
@@ -158,9 +161,9 @@ the schema contract in `output.schema.json`.
 |------|-------|--------|-----------------|------|
 | T1 | Domain types + migration + repository | M | 35 | Moderate |
 | T2 | Job contract + enqueue from preparation-ready | M | 37 | Moderate |
-| T3 | ASR client trait + worker handler + readiness gating | L | 53 | Med-high |
+| T3 | ASR client trait + worker handler + readiness gating | L | 42 | Med-high |
 | T4 | Python ASR worker implementation (`faster-whisper`) | M | 37 | Moderate |
-| T5 | BDD feature file + docs sync | S | — | Low (docs) |
+| T5 | BDD feature file + docs sync | S | — | Done (docs) |
 
 Tasks must run in order: T1 → T2 → T3 → T4 → T5.
 
