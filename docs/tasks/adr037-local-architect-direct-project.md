@@ -67,8 +67,8 @@ T5 + first target milestone ─► T6 Trace downstream outcome and local-stack u
 | T2 Build one-shot tool-free wrapper | `[x] Done 2026-07-20` | 27 Moderate | M | Medium developer | T0 |
 | T3 Select first real work item and freeze packet | `[x] Done 2026-07-20` | 35 Moderate | M | Medium analyst | T0 |
 | T4 Run direct Local Architect analysis | `[x] Done 2026-07-20` | 36 Moderate | M | Medium operator/analyst | T1, T2, T3 |
-| T5 Verify and author actual project decision/plan/tasks | `[~] In progress 2026-07-20` | 53 Med-high | L | primary + peer/human | T4 |
-| T6 Record downstream outcome and stack utility | `[ ] Blocked` | 34 Moderate | M | Medium evaluator | T5 + first target milestone |
+| T5 Verify and author actual project decision/plan/tasks | `[x] Done 2026-07-20` | 53 Med-high | L | primary + peer/human | T4 |
+| T6 Record downstream outcome and stack utility | `[ ] Open — no downstream milestone yet 2026-07-20` | 34 Moderate | M | Medium evaluator | T5 + first target milestone |
 
 T0 records the owner's decision to use the role directly on project work. It does
 not authorize model download, wrapper implementation, model execution, or target
@@ -555,9 +555,18 @@ workflow.
 
 ## T6 - Record downstream outcome and local-stack utility
 
-- **Status:** `[ ] Blocked 2026-07-20` — `T5` is now `Done`; still blocked on
-  the first `S-140` implementation/review milestone (`S-140-T1` has not
-  started — blocked on D1/D2 ratification and its own presentation/approval)
+- **Status:** `[ ] Open — no downstream milestone yet 2026-07-20`. `T5` is
+  `Done`. `S-140-T1` has not started (blocked on D1/D2 ratification and its
+  own presentation/approval), so no S-140 implementation/review evidence
+  exists for `T6` to compare against. Closing `T6` today would mean
+  asserting a downstream-utility verdict without the evidence its own
+  acceptance criteria require — exactly the kind of unsupported claim
+  ADR-037 §9 disables the lane for. `T6` is therefore left explicitly open
+  with no target date rather than force-closed. The rest of the ADR-037
+  direct-project cycle (`T0`-`T5`) is substantively complete: the role was
+  scoped, bound to an exact model, invoked once on real project work, and
+  independently verified before any canonical doc was authored — see the
+  **ADR-037 direct-project cycle summary** below.
 - **Effort:** M
 - **Preliminary RRI:** 34 Moderate; `C0 F2 D3 T2 A1 K2 P1 X4`
 - **Agent grade:** Medium evaluator
@@ -599,3 +608,62 @@ after at least one downstream implementation/review milestone exists.
 ### Status artifacts affected
 
 - `docs/evaluations/adr037-direct-project-report.md`, this task ledger.
+
+---
+
+## ADR-037 direct-project cycle summary (2026-07-20)
+
+`T0`-`T5` are `Done`. `T6` is `Open`, not `Blocked` and not `Done` — it has
+no target date and does not gate any other work; it is a future measurement
+task that will run once `S-140` produces its first implementation/review
+milestone. This section records the cycle's standing against ADR-037 §8
+(operational criteria) and §9 (circuit breaker) as of `T5` closure, so the
+cycle's completeness is auditable without re-deriving it from the task
+sections above.
+
+### §8 operational criteria
+
+| Criterion | Status | Evidence |
+|---|---|---|
+| Exact model identity + packet hash recorded | Met | `T1` digest `a50eda8e...`; `T3` packet SHA-256 `1e69aea9...` |
+| Zero critical invented repository facts | Met | `T4` automatic-failure scan: none found |
+| Zero conflicts with controlling accepted ADRs | Met | ADR-006/018/030 verified present and applied consistently |
+| No claim of implementation/review/approval/production-readiness authority | Met | Not claimed by the `T4` artifact itself |
+| Critical constraints recovered, target ≥90% | **Not measured** | No explicit denominator/percentage was recorded against total critical constraints; only claim counts (5 `SUPPORTED`, 2 `UNKNOWN`) exist |
+| ≥1 material recommendation accepted, or artifact confirms existing design | Met | Multiple recommendations accepted per `T5` reconciliation table |
+| Rejected/partial recommendations recorded with reasons | Met | 3 rows rejected/re-grounded with explicit reasons in `T5` reconciliation |
+| Runtime acceptable (16K ≈ 20 min, ≥6 tok/s decode) | **Partially measured** | `T1` smoke run measured ≈6.6 tok/s, but the real `T4` packet run (3m53s wall-clock) did not re-report tok/s |
+
+Two criteria lack explicit measurement (constraint-recovery percentage,
+real-run throughput). This does not invalidate `T4`/`T5` — the artifact
+passed its automatic-failure scan and independent verification on the merits
+— but it is a traceability gap worth closing if this lane is invoked again.
+
+### §9 circuit breaker
+
+Not triggered. No artifact invented a critical repository fact, ignored a
+controlling ADR, claimed approval/implementation authority, or omitted
+material safety/recovery analysis. One near-miss is worth recording
+honestly: the `T4` advisory's own claims (as adopted into the first draft of
+the canonical `S-140` docs) contained two overclaims — `X-S-160-3` marked
+"unblocked" when only partially so, and a single-parent lineage assumption
+stated as unconditional when an open design branch (D1b) could break it.
+Neither was an invented fact; both were assumptions stated with more
+confidence than the evidence supported. `T5`'s first correction attempt
+fixed the first issue but missed a residual instance of the second, caught
+only by a second independent review round (`.agent/peer-task-review-t5.json`
+round 2). This confirms the ADR's own stated limitation in its "Negative"
+consequence: verification is not a single-pass activity, and using the Local
+Architect does not reduce it to one.
+
+### Why the cycle is closed at T5, not forced through T6
+
+`T6`'s acceptance criteria require an outcome trace linking recommendations
+to *downstream implementation/review evidence* — evidence that does not
+exist while `S-140-T1` has not started. Recording a `T6` verdict now would
+violate the same evidentiary standard `T4`/`T5` were held to. The
+direct-project lane is therefore assessed as **operationally healthy** on
+every measured `§8` criterion, with **no `§9` incident**, and **two
+measurement gaps** noted above — but its downstream-utility question
+remains genuinely open pending real `S-140` implementation, not
+indefinitely deferred by omission.

@@ -334,5 +334,24 @@ evidence: `.agent/peer-task-review-t5.json`.
 **Closure:** `T5` approved by owner 2026-07-20 after a PASS cross-vendor
 phase-1 review (3 rounds; see `.agent/peer-task-review-t5.json`). No
 Gemma Reviewer/D14 code-solution gate applies — `T5`'s deliverable is
-docs-only target planning, not code. `T5` is `[x] Done`. `T6` is unblocked
-pending the first `S-140` implementation/review milestone.
+docs-only target planning, not code. `T5` is `[x] Done`.
+
+## ADR-037 direct-project cycle status (2026-07-20)
+
+`T0`-`T5` are `Done`; the cycle is substantively complete. `T6` (downstream
+outcome/utility trace) is left `Open` rather than forced closed: its
+acceptance criteria require comparing `T4`'s recommendations against real
+`S-140` implementation/review evidence, and none exists yet — `S-140-T1` has
+not started (blocked on Design decisions D1/D2 ratification, then its own
+presentation/approval). Recording a `T6` verdict without that evidence would
+itself be the kind of unsupported claim ADR-037 §9 exists to catch.
+
+Full `§8`/`§9` standing as of `T5` closure — including two measurement gaps
+(constraint-recovery percentage not explicitly tracked; real `T4` run
+throughput not re-reported after the `T1` smoke measurement) and one
+near-miss worth recording honestly (two overclaims in `T4`'s adopted output —
+`X-S-160-3` framing and single-parent lineage — caught only after a second
+independent review round, not the first) — is recorded in the **"ADR-037
+direct-project cycle summary"** section of
+`docs/tasks/adr037-local-architect-direct-project.md`. This file remains
+`status: in-progress` until `T6` closes.
