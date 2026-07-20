@@ -18,6 +18,12 @@ processes authorized media and enforces fail-closed governance (see
 `docs/adr/ADR-008-...md`), so irreversible or outward-facing actions require explicit
 human sign-off.
 
+The Local Architect / Complex Analyst role (ADR-037) produces advisory
+analysis only; it never evaluates, approves, or satisfies any human-approval
+gate on its own behalf or on behalf of the task it informed — see
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Local Architect / Complex Analyst
+(ADR-037)`.
+
 ## Always requires explicit approval
 
 - Starting any implementation task with **RRI > 25**, even if a plan was approved

@@ -897,6 +897,25 @@ qa-docs` rejects completed development sections that omit required `Gemma
 Reviewer evidence` for RRI 0–40 or omit the `Reflection log` required for
 RRI 26+.
 
+## Local Architect / Complex Analyst (ADR-037)
+
+**Local Architect / Complex Analyst** (`qwen3.6:27b-q4_K_M` via Ollama) is a
+bounded, advisory-only role for architecture synthesis and complex causal
+analysis on a real work item, invoked before the primary agent authors the
+target ADR/plan/tasks. It is not an implementer, not a reviewer, not a
+technical judge, and does not replace Gemma Reviewer, the RRI 41+
+cross-vendor peer, D14, or human approval — see ADR-037 §1 for the full
+may/may-not boundary and §3 for the eight invocation triggers (e.g. a likely
+ADR decision, multi-module failure analysis, or a high-RRI problem needing
+decomposition before execution).
+
+Its output is advisory evidence only. The primary agent must independently
+verify every claim against repository evidence before authoring any
+canonical document — the artifact carries no approval authority of its own.
+Full procedure, task cards, and operational evidence:
+`docs/tasks/adr037-local-architect-direct-project.md`;
+`docs/evaluations/adr037-direct-project-report.md`.
+
 ## Push Reviewer
 
 **Gemma Push Reviewer** is a separate post-pipeline audit role. It is not a
