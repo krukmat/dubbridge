@@ -24,8 +24,8 @@ FINDING_START_MARKER = "=== FINDING START ==="
 FINDING_END_MARKER = "=== FINDING END ==="
 PATCH_LIKE_PATTERNS = (
     "diff --git ",
-    "--- ",
-    "+++ ",
+    "--- a/",
+    "+++ b/",
     "@@ ",
     "=== FILE START ===",
     "=== REPLACEMENT START ===",
