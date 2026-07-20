@@ -67,7 +67,7 @@ T5 + first target milestone ─► T6 Trace downstream outcome and local-stack u
 | T2 Build one-shot tool-free wrapper | `[x] Done 2026-07-20` | 27 Moderate | M | Medium developer | T0 |
 | T3 Select first real work item and freeze packet | `[x] Done 2026-07-20` | 35 Moderate | M | Medium analyst | T0 |
 | T4 Run direct Local Architect analysis | `[x] Done 2026-07-20` | 36 Moderate | M | Medium operator/analyst | T1, T2, T3 |
-| T5 Verify and author actual project decision/plan/tasks | `[ ] Ready 2026-07-20` | 50 Med-high | L | primary + peer/human | T4 |
+| T5 Verify and author actual project decision/plan/tasks | `[~] In progress 2026-07-20` | 53 Med-high | L | primary + peer/human | T4 |
 | T6 Record downstream outcome and stack utility | `[ ] Blocked` | 34 Moderate | M | Medium evaluator | T5 + first target milestone |
 
 T0 records the owner's decision to use the role directly on project work. It does
@@ -504,16 +504,18 @@ S-140 ADR/plan/tasks) is now unblocked; `T6` remains blocked on `T5`.
 
 ## T5 - Verify and author the actual project decision, plan, and tasks
 
-- **Status:** `[ ] Blocked`
+- **Status:** `[x] Done 2026-07-20` — reconciliation and canonical docs
+  authored, cross-vendor phase-1 review passed (3 rounds), owner-approved
 - **Effort:** L
 - **Preliminary RRI:** 50 Med-high; `C2 F3 D4 T2 A3 K3 P2 X4 + arch_decision`
+  (recomputed final: 53 Med-high, same band — see report)
 - **Agent grade:** primary + band-routed peer/human
 - **Depends on:** T4
 - **Allowed paths:** target work-item ADR/plan/tasks/report entries selected in T3
-- **Task-analysis review:** pending - RRI 41+ cross-vendor peer/D14 before
-  presentation
-- **Code-solution review:** `n/a` for docs-only target planning unless a later target
-  task includes code
+- **Task-analysis review:** done - RRI 41+ cross-vendor peer (Codex), 3 rounds,
+  final verdict PASS; see `.agent/peer-task-review-t5.json` and report
+- **Code-solution review:** `n/a` for docs-only target planning; no code
+  changed by this task
 
 ### Objective
 
@@ -553,7 +555,9 @@ workflow.
 
 ## T6 - Record downstream outcome and local-stack utility
 
-- **Status:** `[ ] Blocked`
+- **Status:** `[ ] Blocked 2026-07-20` — `T5` is now `Done`; still blocked on
+  the first `S-140` implementation/review milestone (`S-140-T1` has not
+  started — blocked on D1/D2 ratification and its own presentation/approval)
 - **Effort:** M
 - **Preliminary RRI:** 34 Moderate; `C0 F2 D3 T2 A1 K2 P1 X4`
 - **Agent grade:** Medium evaluator

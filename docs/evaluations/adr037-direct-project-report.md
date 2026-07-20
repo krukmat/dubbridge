@@ -221,3 +221,118 @@ generation.
 `T4` is blocked by a wrapper defect in `T2`, not by model identity, packet drift, or
 runtime memory pressure. The exact execution path required by ADR-037 was attempted
 once and preserved as evidence without fallback substitution.
+
+### Resolution and final run (2026-07-20)
+
+The wrapper defect was root-caused to Ollama buffering the entire chain-of-thought
+before returning when `thinking` is not explicitly disabled, which exceeded the
+client timeout on this model/host. Fixed via Option C: `think: false` plus
+thinking-provenance capture fields (`think_disabled`, `thinking_present`,
+`thinking_sha256`) added to `run_analysis.py`, covered by a 10-test unit suite
+(`run_analysis_test.py`). `T4` was re-run against the same frozen `S-140` packet
+and model binding.
+
+| Field | Value |
+|---|---|
+| Output artifact | `.agent/local-architect/adr037/S-140/t4-analysis-artifact.json` (gitignored per `.agent/` convention) |
+| `think_disabled` | `true` |
+| `thinking_present` | `false` |
+| `status` | `ok`, `success: true` |
+| Claims returned | 5 `SUPPORTED`, 2 `UNKNOWN` |
+| Automatic-failure scan | `PASS` — no invented facts; ADR-006/018/030 verified to exist and applied consistently; no false authority claims; fail-closed readiness gating addressed as risk+recommendation; genuine uncertainty correctly labeled `UNKNOWN` |
+
+**Closure:** Code-solution review: n/a (task-analysis output, not code). Task-analysis
+review: `gemma .agent/peer-task-review-t4.json` — `PASS`. `T4` is `Done` (2026-07-20),
+committed as `6343df3`. `T5` is unblocked; `T6` remains blocked on `T5` plus the first
+downstream S-140 milestone.
+
+## T5 - Verify and author the actual project decision, plan, and tasks
+
+`T5` recomputed RRI for the target canonical planning task at `53 Med-high`
+(`python3 scripts/rri.py --C 3 --T 3 --A 3 --X 3 --D 3 --K 2 --P 2 --touches docs/adr
+--touches docs/plan/s-140-subtitle-generation.md --touches
+docs/tasks/s-140-subtitle-generation.md --json`), matching the ledger's preliminary
+`50 Med-high` in the same band, then verified every `T4` claim/recommendation
+against repository evidence before authoring anything canonical.
+
+### Reconciliation table
+
+| T4 item | Disposition | Evidence |
+|---|---|---|
+| S-130 produces TranscriptText/WordAlignment, READY on both | Accepted | `docs/tasks/s-130-asr-transcription.md:28,171,211` |
+| S-140 has no canonical plan/tasks | Accepted | `docs/plan/roadmap.md:134` |
+| S-160 and S-170 "built on fixtures, awaiting S-140/S-150" | **Rejected as stated; corrected** | S-160 is `✅ done 2026-06-13` (`docs/plan/roadmap.md:136`); only sub-item `X-S-160-3` remains gated on S-140/S-150 (`docs/plan/roadmap.md:384`). S-170 (`⬜ no plan yet`) genuinely depends on S-140 (`docs/plan/roadmap.md:137`). |
+| Rust orchestrates; Python isolated to ML workers | Accepted | `CLAUDE.md:58`; precedent `workers/asr-worker-py` |
+| Must feed the existing fail-closed review gate, no bypass | **Accepted, re-grounded as binding, not advisory** | `docs/adr/ADR-030-*.md:104` ("The contract operates ahead of real subtitle/dub producers") already places this obligation on S-140 |
+| UNKNOWN: exact v1 subtitle output format defined? | Confirmed genuinely open | No SRT/VTT/JSON schema found anywhere in repo; recorded as Design decision D2 in the new plan |
+| UNKNOWN: segmentation needs separate ML model vs. reuse word_alignment? | Confirmed genuinely open | No repo evidence either way; recorded as Design decision D1 |
+| Rec: scope = consume Transcript/WordAlignment → canonical artifact → immutable object-store record | Accepted | Matches `docs/adr/ADR-006-*.md:36-39` checksum/storage_key pattern |
+| Rec: Rust orchestrates; Python only if ML segmentation justified | Accepted | Matches `asr-worker-py` contract split |
+| Rec: "SubtitleReady" gate → enqueue S-160 review, no parallel paths | **Accepted, re-grounded** — restated as ADR-030's existing obligation, not a new idea | `docs/adr/ADR-030-*.md:104` |
+| Rec: draft new ADR for S-140 lineage/checksum | **Rejected — no new ADR needed** | ADR-006 already covers lineage/checksum generically; ADR-030 already covers the review-gate obligation; no genuinely new architectural decision exists beyond `ArtifactKind::Subtitle`, which follows an established pattern. Cross-references added to the plan instead. |
+| Rec: task decomposition (artifact def / orchestration / S-160 integration / observability) | Accepted | Consistent with S-130's own task shape and ADR-018 |
+| Open question: is multilingual subtitle generation part of S-140? | **Resolved — was already answered by repo evidence, not actually open** | `docs/plan/roadmap.md:82` pipeline: `S-140 subtitles -> S-150 translation + dubbing` |
+
+### Outputs authored
+
+- `docs/plan/s-140-subtitle-generation.md` (new, `status: proposed`) — canonical
+  plan citing verified evidence, with Design decisions D1 (segmentation source)
+  and D2 (subtitle schema) explicitly flagged as **open, unresolved by repository
+  evidence**, to be ratified by the task approver before `S-140-T1` execution.
+- `docs/tasks/s-140-subtitle-generation.md` (new, `status: proposed`) — task
+  ledger; only `T1` carries full HP/EC/acceptance-criteria detail (still
+  provisional pending D1/D2 ratification); `T2`–`T6` are decomposition
+  placeholders, explicitly not ready for execution.
+- No new ADR was authored — see reconciliation row above.
+
+### Acceptance criteria check
+
+- Canonical target docs cite verified repository evidence, not model authority: met.
+- All adopted claims fact-checked or rewritten: met (see table).
+- Rejected/partial recommendations recorded with reasons: met.
+- Normal RRI, phase-1 review, and human approval gates control downstream work:
+  the canonical `S-140` plan/tasks are `proposed`, not approved — they require
+  their own presentation and cross-vendor peer/D14 review before any `S-140`
+  task begins execution. `T5` authored the docs; `T5` did not grant them
+  approval.
+
+### Task-analysis review for T5 itself
+
+RRI 53 Med-high required an RRI 41+ cross-vendor phase-1 review before `T5`
+could be presented for closure. Codex was invoked directly (binary resolved
+from the VS Code extension bundle, since `scripts/peer-workflow-review.py`'s
+built-in `codex review --stdin` invocation is broken against the current
+Codex CLI — it expects a bare `-` argument, not `--stdin`; not patched in
+this task, worked around by invoking the codex binary manually). Full
+evidence: `.agent/peer-task-review-t5.json`.
+
+- **Round 1 — BLOCKED (2 P2 findings):** the authored `S-140` docs claimed
+  `X-S-160-3` was unblocked via the existing `review_tasks`/ADR-030 gate, but
+  `review_tasks` (`infra/migrations/0014_create_review_tasks.sql`,
+  `crates/domain/src/review.rs`) stores only `(project_id, asset_id,
+  target_language_id)` with no derived-artifact-identity column; and `T1`'s
+  acceptance criteria assumed a single `parent_artifact_id` suffices for
+  subtitle lineage without addressing the open D1b branch (dedicated
+  segmentation worker consuming both `TranscriptText` and `WordAlignment`).
+  Both independently re-verified against the cited schema/code before
+  accepting.
+- **Fix round 1:** corrected the pipeline-diagram/X-S-160-3 framing (now
+  explicitly "remains open," with a new risk-table row and an explanatory
+  paragraph) and made `T1`'s lineage acceptance criterion conditional on
+  D1a/D1b.
+- **Round 2 — BLOCKED (1 P2 finding):** the `X-S-160-3` fix was accepted as
+  correct, but the lineage fix was incomplete — the plan's Objective bullet
+  still described lineage as pointing to "transcript/alignment artifacts"
+  (plural), contradicting the newly-conditional `T1` criteria.
+- **Fix round 2:** corrected the remaining dual-parent phrasing in four more
+  locations (plan Objective bullet, pipeline diagram, ADR-006
+  governing-constraints bullet, tasks `HP-1`), confirmed by grep that no
+  dual-lineage phrasing remained except one accurate non-lineage reference
+  (the `ArtifactKind` precedent citation).
+- **Round 3 — PASS, zero findings.**
+
+**Closure:** `T5` approved by owner 2026-07-20 after a PASS cross-vendor
+phase-1 review (3 rounds; see `.agent/peer-task-review-t5.json`). No
+Gemma Reviewer/D14 code-solution gate applies — `T5`'s deliverable is
+docs-only target planning, not code. `T5` is `[x] Done`. `T6` is unblocked
+pending the first `S-140` implementation/review milestone.
