@@ -108,9 +108,9 @@ task ledger, emit the RRI/decision evidence, then stop before implementation.
 
 ## S-140-T1a: Domain subtitle kind/status types
 
-**Effort:** S (planning RRI 24 — Low; recompute at presentation time)
+**Effort:** S (RRI 21 — Low, recomputed at presentation time)
 **Depends on:** S-140-T0
-**Status:** Not started — blocked on T0
+**Status:** Done — domain types added; T1b unblocked
 
 **Happy paths considered:**
 - HP-1: `ArtifactKind::Subtitle` round-trips through display/parse helpers.
@@ -138,6 +138,29 @@ task ledger, emit the RRI/decision evidence, then stop before implementation.
 **Evidence to emit:** RRI output, unit test names, local implementation artifact
 if delegated.
 
+**Evidence emitted:**
+- RRI: `python3 scripts/rri.py --C 1 --F 0 --D 2 --T 1 --A 0 --K 2 --P 2 --X 0
+  --touches crates/domain/src/artifact.rs --platform rust` → Final RRI 21,
+  Low.
+- Delegated to local Gemma (`gemma4:26b-a4b-it-qat`) via
+  `scripts/delegate-low-rri.py`, `--allow-path crates/domain/src/artifact.rs`.
+  Attempt 1 introduced an unrelated syntax defect (corrupted an existing line
+  in `derived_artifact_new_sets_fields`); caught in orchestrator review before
+  apply, not applied. Attempt 2 (bounded repair cycle) fixed it cleanly; diff
+  validated with `git apply --check` and applied.
+- Unit tests added and passing (`cargo test -p dubbridge-domain --lib
+  artifact`, 18/18 passed): `parse_subtitle` (HP-1),
+  `subtitle_status_display_all_variants` (HP-2). EC-1/EC-2 (unknown-value
+  fail-closed via `UnknownStoredValue`) are DB-layer (`crates/db`) concerns
+  out of this file's scope by the stop condition below; deferred to T1b,
+  which already extends the DB-layer `parse_kind`/check constraints.
+- `cargo fmt -p dubbridge-domain -- --check` clean; `cargo clippy -p
+  dubbridge-domain --all-features -- -D warnings` clean.
+- Gemma Reviewer phase-2 diff review (`scripts/gemma-code-review.py`, 3
+  passes): `status: findings`, 1 minor non-blocking finding (confirmed
+  `snake_case` serde convention is correct, no action needed), 3/3 pass
+  consensus.
+
 **Status artifacts affected:** This ledger.
 
 **Stop condition:** Stop after domain tests pass. Do not create migrations or DB
@@ -147,7 +170,9 @@ repository code.
 `crates/domain/src/artifact.rs`, cover HP/EC with unit tests, and stop before any
 migration or repository work.
 
-**Status: [ ] Not started — blocked on T0**
+**Status: [x] Done 2026-07-21 — Subtitle domain types added via Low-RRI local
+delegation (Gemma), Gemma Reviewer phase-2 passed with 1 non-blocking minor
+finding; T1b unblocked**
 
 ---
 

@@ -27,6 +27,8 @@ pub enum ArtifactKind {
     TranscriptText,
     /// S-130: word-level alignment derived from the source artifact.
     WordAlignment,
+    /// S-140: subtitle file (e.g., VTT/SRT) derived from the source artifact.
+    Subtitle,
 }
 
 impl std::fmt::Display for ArtifactKind {
@@ -40,6 +42,7 @@ impl std::fmt::Display for ArtifactKind {
             Self::HlsSegment => "hls_segment",
             Self::TranscriptText => "transcript_text",
             Self::WordAlignment => "word_alignment",
+            Self::Subtitle => "subtitle",
         };
         write!(f, "{s}")
     }
@@ -59,6 +62,7 @@ pub fn parse_artifact_kind(s: &str) -> ArtifactKind {
         "hls_segment" => ArtifactKind::HlsSegment,
         "transcript_text" => ArtifactKind::TranscriptText,
         "word_alignment" => ArtifactKind::WordAlignment,
+        "subtitle" => ArtifactKind::Subtitle,
         _ => ArtifactKind::OriginalMedia,
     }
 }
@@ -181,6 +185,38 @@ impl std::fmt::Display for TranscriptionStatus {
 pub struct TranscriptionStatusRecord {
     pub asset_id: AssetId,
     pub status: TranscriptionStatus,
+    pub error_detail: Option<String>,
+    pub updated_at: OffsetDateTime,
+}
+
+/// S-140-T1a: Subtitle readiness state for an asset.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SubtitleStatus {
+    Pending,
+    InProgress,
+    Ready,
+    /// Subtitle generation failed. `error_detail` in the persisted row records why.
+    Failed,
+}
+
+impl std::fmt::Display for SubtitleStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::Pending => "pending",
+            Self::InProgress => "in_progress",
+            Self::Ready => "ready",
+            Self::Failed => "failed",
+        };
+        write!(f, "{s}")
+    }
+}
+
+/// S-140-T1a: Persisted subtitle status record for an asset.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubtitleStatusRecord {
+    pub asset_id: AssetId,
+    pub status: SubtitleStatus,
     pub error_detail: Option<String>,
     pub updated_at: OffsetDateTime,
 }
@@ -348,5 +384,20 @@ mod tests {
         assert_eq!(da.parent_artifact_id, parent_id);
         assert_eq!(da.kind, ArtifactKind::ProbeMetadata);
         assert_eq!(da.size_bytes, 512);
+    }
+
+    #[test]
+    fn parse_subtitle() {
+        let kind = parse_artifact_kind("subtitle");
+        assert_eq!(kind, ArtifactKind::Subtitle);
+        assert_eq!(kind.to_string(), "subtitle");
+    }
+
+    #[test]
+    fn subtitle_status_display_all_variants() {
+        assert_eq!(SubtitleStatus::Pending.to_string(), "pending");
+        assert_eq!(SubtitleStatus::InProgress.to_string(), "in_progress");
+        assert_eq!(SubtitleStatus::Ready.to_string(), "ready");
+        assert_eq!(SubtitleStatus::Failed.to_string(), "failed");
     }
 }
