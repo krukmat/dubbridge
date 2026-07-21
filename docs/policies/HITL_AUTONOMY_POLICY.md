@@ -146,16 +146,31 @@ When approval is required (RRI > 25), end the presentation with:
 Every development task is reviewed by an independent reviewer at two phases.
 The reviewer is determined by the task's RRI band:
 
-- **RRI 0–40 (Low + Moderate):** Gemma (phases 1 and 2). Phase-2 = existing
-  Gemma Reviewer N-pass; phase-1 = advisory Gemma review of the task card.
-- **RRI 41+ (Med-high + Complex):** cross-vendor peer (phases 1 and 2). The
-  peer replaces Gemma as the code-solution reviewer for this band.
+- **RRI 0–25 (Low):** Gemma (phases 1 and 2). Phase-2 = existing Gemma
+  Reviewer N-pass; phase-1 = advisory Gemma review of the task card.
+- **RRI 26–55 (Moderate + Med-high):** `qwen3.6:27b-q4_K_M` (phases 1 and 2,
+  owner directive 2026-07-21) — see `docs/policies/RRI_POLICY.md § Local
+  pipeline phase-2 reviewer override`. Replaces Gemma (Moderate) and the
+  cross-vendor peer (Med-high) as the default reviewer for this band,
+  regardless of whether implementation stayed local or escalated to cloud.
+- **RRI 56+ (Complex+):** cross-vendor peer (phases 1 and 2). The peer
+  replaces Gemma as the code-solution reviewer for this band.
 
-**Cross-vendor resolution (RRI 41+ only):**
+**Cross-vendor resolution (RRI 56+ only):**
 `claude-code → codex | codex → claude | local-provider → claude |
 remote-provider → claude | unknown → claude`
 
-**Failure modes (RRI 41+):**
+**Failure modes (RRI 26–55):**
+1. `qwen3.6:27b-q4_K_M` unavailable, stalled, or returns invalid/`BLOCKED`
+   output → fall back to **Gemma** (one immediate retry with the same review
+   packet if Gemma itself is unusable on the first attempt).
+2. `qwen3.6:27b-q4_K_M` + Gemma both unavailable/unusable → fall back to
+   **D14** (Balanced tier).
+3. `qwen3.6:27b-q4_K_M` + Gemma + D14 all unavailable → write a
+   blocked-artifact record and stop. Never self-review. Report the task as
+   blocked.
+
+**Failure modes (RRI 56+):**
 1. Peer CLI unavailable or unauthenticated → fall back to **D14** (Balanced tier).
 2. Peer + D14 both unavailable → write a blocked-artifact record and stop. Never
    self-review. Report the task as blocked.
@@ -172,22 +187,29 @@ full routing table, report line contract, and enforcement note.
 
 ## Gemma Reviewer availability
 
-The review step is **mandatory** for all Low (0–25) and Moderate (26–40)
-development tasks. Gemma is the preferred reviewer; the context-isolated subagent
-(D14, `scripts/adjudicator-packet.py`) is the required fallback.
+The review step is **mandatory** for all Low (0–25) development tasks. Gemma
+is the preferred reviewer; the context-isolated subagent (D14,
+`scripts/adjudicator-packet.py`) is the required fallback. For Moderate and
+Med-high (26–55), the equivalent mandatory review step uses
+`qwen3.6:27b-q4_K_M` in place of Gemma as the primary reviewer — see §
+Band-routed peer review above — with Gemma inserted as the intermediate
+fallback (owner directive 2026-07-21) before D14: `qwen3.6:27b-q4_K_M` → Gemma
+→ D14. The retry-then-escalate discipline described below applies at each
+step of that chain.
 
-When Ollama is unavailable, the model is absent, Gemma stalls, output is invalid,
-the review result is `BLOCKED`, or no usable consolidated review result can be
-produced, the agent must perform **one immediate retry** with the same review
-packet first. If the retry succeeds with a usable Gemma result, the Gemma path
-continues normally. If the retry fails for the same class of reason or still
-produces no usable result, the agent **must** spawn a context-isolated subagent
-as the mandatory fallback reviewer. The subagent receives an isolation packet
-(diff + acceptance criteria + any usable partial findings) and its output is
-advisory, exactly as Gemma's would be. The primary agent reconciles and records
-`disposition_divergence` in the audit log.
+When Ollama is unavailable, the model is absent, the reviewer stalls, output
+is invalid, the review result is `BLOCKED`, or no usable consolidated review
+result can be produced, the agent must perform **one immediate retry** with
+the same review packet first. If the retry succeeds with a usable result, the
+primary path continues normally. If the retry fails for the same class of
+reason or still produces no usable result, the agent **must** spawn a
+context-isolated subagent as the mandatory fallback reviewer. The subagent
+receives an isolation packet (diff + acceptance criteria + any usable partial
+findings) and its output is advisory, exactly as the primary reviewer's would
+be. The primary agent reconciles and records `disposition_divergence` in the
+audit log.
 
-Gemma unavailability or unusable local review output does not open a human
+Reviewer unavailability or unusable local review output does not open a human
 approval gate beyond what the RRI band already requires. The review is never
 skipped.
 

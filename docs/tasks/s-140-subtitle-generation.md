@@ -240,9 +240,9 @@ validate it, and stop before repository code or the artifact-kind check.
 
 ## S-140-T1b-ii: Artifact-kind check extension for subtitle
 
-**Effort:** L (planning RRI 45 — Med-high; recompute at presentation time)
+**Effort:** L (recomputed RRI 55 — Med-high, at implementation time 2026-07-21)
 **Depends on:** S-140-T1a
-**Status:** Not started — blocked on T1a and RRI 41+ gate
+**Status:** Done — migration merged; T1b-i still required before T1c
 
 > Split from the original T1b; see [[S-140-T1b-i]] for the rationale. This
 > half only extends an existing check constraint — no new table — but still
@@ -289,7 +289,90 @@ repository methods. Do not touch the subtitle status table (that is
 `subtitle`, validate it, and stop before repository code or the status table
 migration.
 
-**Status: [ ] Not started — blocked on T1a and RRI 41+ gate**
+### Execution record (2026-07-21)
+
+- **RRI at implementation time:** 55 (Med-high) — recomputed via
+  `scripts/rri.py` with `--touches infra/migrations/0023_extend_artifact_kind_check_subtitle.sql`;
+  anchor-rubric floor (D=4, K=4, P=5; ADR-008/ADR-018) plus `auth_security`
+  +10 penalty, base 45 + 10 = 55.
+- **Implementation route:** local-first per Med-high routing —
+  `scripts/local-agent/run_local_task.py`, implementer `qwen3.6:35b-a3b`
+  (`DUBBRIDGE_LOCAL_AGENT_MODEL` default), disposable git worktree
+  (`local/s-140-t1b-ii` branch). **0 repair attempts used** (succeeded on
+  first draft; 1-attempt Med-high budget was not exhausted).
+- **Verification:** custom `test_runner` applied all 23 migrations in order
+  (0001–0023) against a fresh PostgreSQL 16 instance (`local-postgres-1`
+  container) and confirmed via `pg_get_constraintdef` that the resulting
+  `artifact_kind_check` constraint contains all 6 pre-existing kinds plus
+  `subtitle`, in order, with no other kind added. Scope check: in-scope, no
+  boundary violations, no files touched outside `allowed_paths`.
+- **Code-solution review (phase 2):** `qwen3.6:27b-q4_K_M` via Ollama
+  (`http://localhost:11434`), per the 2026-07-21 owner directive replacing
+  the cross-vendor peer as the default Med-high reviewer (see
+  `docs/policies/RRI_POLICY.md` §Local pipeline phase-2 reviewer override).
+  Phase-1 task-analysis review: **n/a** (migration-only task, exempt per
+  policy). Verdict: **PASS**, no findings — confirmed SQL correctness/lock
+  behavior matches precedent 0020/0022, no structural deviation, all
+  acceptance criteria satisfied. `disposition_divergence: none`.
+
+  **Correction (2026-07-21):** this review was originally run against a D14
+  context-isolated subagent after `which codex`/`codex --version` reported
+  no binary. That conclusion was wrong — `codex` is installed but not on
+  `$PATH` (it ships inside the OpenAI ChatGPT VS Code extension bundle,
+  e.g. `~/.vscode/extensions/openai.chatgpt-*/bin/macos-aarch64/codex`);
+  resolving the binary directly confirms it works
+  (`codex login status` → `Logged in using ChatGPT`). Separately, the owner
+  clarified the same day that Med-high phase-2 review should route to
+  `qwen3.6:27b-q4_K_M`, not the cross-vendor peer, once the local pipeline
+  is in play — see `[[feedback_local_pipeline_roles]]` (memory) and the
+  policy sections cited above. The review was re-run for real against
+  `qwen3.6:27b-q4_K_M` (see verdict above); the original D14 finding (file
+  mode `100755` vs. repo convention `100644`) was independently corroborated
+  and the fix (`chmod 644`) stands unchanged.
+
+### Reflection log
+
+Required passes: 3 (`RRI 55` → `Med-high`)
+
+#### Pass 1
+- **Draft verdict:** Local-model-authored migration; DROP+ADD CONSTRAINT
+  pattern matching precedent 0020/0022, all 6 prior kinds preserved,
+  `subtitle` appended.
+- **Critique findings:** File mode `100755` (executable) deviates from
+  repo's `100644` convention for `.sql` migrations (also flagged
+  independently by phase-2 review).
+- **Revisions applied:** `chmod 644` on the migration file.
+
+#### Pass 2
+- **Draft verdict:** Revised file (644, unchanged content).
+- **Critique findings:** Checked migration-number collision risk — `0022`
+  is HEAD's latest migration, no concurrent branch claims `0023`; numbering
+  is safe.
+- **Revisions applied:** none.
+
+#### Pass 3
+- **Draft verdict:** Same file, final state.
+- **Critique findings:** Verified the literal `'subtitle'` string is an
+  exact match to `ArtifactKind::Subtitle`'s wire format in
+  `crates/domain/src/artifact.rs:45,65` (not a near-miss like `'subtitles'`
+  or `'Subtitle'`); verified EC-1 (rejection of unknown kinds) is
+  structurally guaranteed by the closed `CHECK (kind IN (...))` enumeration
+  form, consistent with every prior migration touching this constraint.
+- **Revisions applied:** none.
+
+### Unit coverage certification
+
+Not applicable — this is a migration-only change (no Rust source touched,
+no new code path to cover). `crates/domain/src/artifact.rs` test coverage
+for `ArtifactKind::Subtitle`/`parse_artifact_kind("subtitle")` was already
+certified under S-140-T1a.
+
+### Owner verification
+
+Pending — reported to owner below; not yet independently re-verified by a
+human.
+
+**Status: [x] Done — 2026-07-21, migration merged to `infra/migrations/0023_extend_artifact_kind_check_subtitle.sql`**
 
 ---
 

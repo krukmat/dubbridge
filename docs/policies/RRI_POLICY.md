@@ -189,14 +189,16 @@ band — never derive one output from another (e.g. do not infer capability from
 | RRI band | Label | Effort | Capability (Codex) | Capability (Claude Code) | Thinking | Phase-1 reviewer | Phase-2 reviewer | Gate |
 |---|---|---|---|---|---|---|---|---|
 | **0–25** | Low | **S** | Primary agent or Local Gemma via Ollama | Primary agent or Local Gemma via Ollama | Off | Gemma | Gemma Reviewer | **Low-band handling:** do not present the full task for approval; use local Gemma only for eligible simple code patches, otherwise execute directly with the primary agent. |
-| **26–40** | Moderate | **M** | Balanced | Balanced | Off | Gemma | Gemma Reviewer | Confirm tests exist in the affected area. **Implementation route:** local-first via `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL`; primary agent remains orchestrator, cloud implementation is escalation/fallback. |
-| **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Cross-vendor peer* | Cross-vendor peer* | Plan + explicit acceptance criteria required before approval. **Implementation route:** local-first via `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL` (1 repair attempt max); cloud implementation is escalation/fallback. Review/approval rigor unchanged — cross-vendor peer review, 3 Reflection passes, and this HITL gate still apply. |
+| **26–40** | Moderate | **M** | Balanced | Balanced | Off | Gemma | `qwen3.6:27b-q4_K_M`† | Confirm tests exist in the affected area. **Implementation route:** local-first via `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL`; primary agent remains orchestrator, cloud implementation is escalation/fallback. |
+| **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | `qwen3.6:27b-q4_K_M`† | `qwen3.6:27b-q4_K_M`† | Plan + explicit acceptance criteria required before approval. **Implementation route:** local-first via `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL` (1 repair attempt max); cloud implementation is escalation/fallback. Review/approval rigor unchanged — 3 Reflection passes and this HITL gate still apply; phase-2 (and phase-1 when it applies) reviewer is `qwen3.6:27b-q4_K_M`, not the cross-vendor peer. |
 | **56–70** | Complex | **L** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Plan first. **Decompose into subtasks before implementation.** Human reviews the plan. |
 | **71–85** | High | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Characterization tests + explicit acceptance criteria + human reviews the **diff** (not just the plan). **Decomposition remains mandatory.** |
 | **86–100** | Very high | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Do not implement directly. Produce an ADR + risk analysis + decompose into subtasks. |
 | **> 100** | Excessive | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Architecture/design work must happen first. Re-scope before any implementation. |
 
-\* **Cross-vendor peer** (RRI 41+): `claude-code → codex | codex → claude | other → claude`. Unavailable peer CLI falls back to **D14** (Balanced tier); peer + D14 both unavailable → blocked artifact, stop. The cross-vendor peer **replaces** Gemma as the phase-2 code-solution reviewer for this band; D14 remains the mandatory fallback. Phase-1 exemptions (docs/policy/config-only tasks) record `n/a`. Full contract: `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review`.
+\* **Cross-vendor peer** (RRI 56+, and RRI 41–55 only if the `qwen3.6:27b-q4_K_M` override below is ever rolled back for this band): `claude-code → codex | codex → claude | other → claude`. Unavailable peer CLI falls back to **D14** (Balanced tier); peer + D14 both unavailable → blocked artifact, stop. Phase-1 exemptions (docs/policy/config-only tasks) record `n/a`. Full contract: `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review`.
+
+† **`qwen3.6:27b-q4_K_M` phase-2 (and phase-1, Med-high only) reviewer** (RRI 26–55, owner directive 2026-07-21): replaces Gemma Reviewer (Moderate) and the cross-vendor peer (Med-high) as the default reviewer for this band, regardless of where implementation happened. Unavailable/stalled/invalid output falls back to **Gemma**, then to **D14**; D14 unavailable → blocked artifact, stop. See § Local pipeline phase-2 reviewer override below for the full contract and ADR-037 scope note.
 
 ### Model tier resolution
 
@@ -352,9 +354,12 @@ For final **RRI 26–40**, the implementation default is **local-first**:
 - cloud implementation is the escalation/fallback path when the local runner,
   model binding, repair budget, or scope boundary fails.
 
-The review path is unchanged for this band: phase 1 stays Gemma, phase 2 stays
-Gemma Reviewer / D14 unless ADR-036's model-family contingency is explicitly
-activated and documented for the task.
+**Phase-2 reviewer override (owner directive, 2026-07-21):** for this band,
+phase 2 defaults to the **Local Architect / Complex Analyst model**
+(`qwen3.6:27b-q4_K_M`), not Gemma Reviewer — see § Local pipeline phase-2
+reviewer override below. Phase 1 stays Gemma. If `qwen3.6:27b-q4_K_M` is
+unavailable, stalled, or returns invalid/`BLOCKED` output, fall back to
+**Gemma**, then to **D14** as the final fallback.
 
 Bindings used by the operative local-first route:
 
@@ -386,19 +391,73 @@ For final **RRI 41–55**, the implementation default is also **local-first**
 - cloud implementation is the escalation/fallback path when the local runner,
   model binding, repair budget, or scope boundary fails.
 
-Unlike Moderate, the review and approval path is **not** relaxed: phase 1 and
-phase 2 stay on the **cross-vendor peer** (replacing Gemma) per the RRI 41+
-band-routed reviewer table, 3 Reflection passes still apply, and the RRI 41+
-human approval gate (plan + explicit acceptance criteria before
+The approval path is **not** relaxed: 3 Reflection passes still apply, and
+the RRI 41+ human approval gate (plan + explicit acceptance criteria before
 implementation) still fires. Only the code-authoring surface moves local; the
 tighter repair budget compensates for the higher-risk anchor-rubric floors
 this band typically carries (e.g. `infra/migrations/**`, ADR-008/ADR-018).
+
+**Phase-2 reviewer override (owner directive, 2026-07-21):** for this band,
+phase 2 defaults to `qwen3.6:27b-q4_K_M`, not the cross-vendor peer — see §
+Local pipeline phase-2 reviewer override below. Phase 1 remains exempt for
+migration-only/config-only/docs-only tasks as before; when phase 1 does
+apply, it also routes to `qwen3.6:27b-q4_K_M` rather than the cross-vendor
+peer. If `qwen3.6:27b-q4_K_M` is unavailable, stalled, or returns
+invalid/`BLOCKED` output, fall back to **Gemma**; if Gemma is also
+unavailable, stalled, or returns invalid/`BLOCKED` output, fall back to
+**D14**; if D14 is also unavailable, write a blocked-artifact record and
+stop — never self-review.
 
 Bindings used by the operative Med-high local-first route are the same as
 Moderate's (see table above); no new environment variable is introduced.
 
 **Rollback triggers:** same triggers as Moderate above, evaluated
 independently per band — revert only the affected band to the cloud path.
+
+### Local pipeline phase-2 reviewer override
+
+Owner directive, 2026-07-21: for **RRI 26–55** (Moderate + Med-high), the
+phase-2 code-solution reviewer defaults to the **Local Architect / Complex
+Analyst model** (`qwen3.6:27b-q4_K_M` via Ollama), replacing Gemma Reviewer
+(Moderate) and the cross-vendor peer (Med-high) as the default path. This
+applies regardless of whether implementation stayed on the local-first
+runner or escalated to cloud implementation — the override governs *who
+reviews*, independently of *who authored the code*.
+
+This is a deliberate, scoped exception to ADR-037's written boundary, which
+otherwise restricts the Local Architect / Complex Analyst role to advisory
+architecture/analysis work and explicitly states it "does not replace Gemma
+Reviewer, the RRI 41+ cross-vendor peer, D14, or human approval" (see
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Local Architect / Complex
+Analyst`). For phase-2 code-solution review specifically, in the 26–55 band
+only, this override supersedes that restriction. ADR-037's boundary is
+otherwise unchanged: the role still may not author the target ADR/plan/task
+document, evaluate its own advisory output as authoritative, or satisfy the
+human-approval gate.
+
+Invocation: send the diff, task acceptance criteria, and any independently-
+verified facts (test/verification output the orchestrator already produced)
+directly to `qwen3.6:27b-q4_K_M` via the Ollama `/api/chat` endpoint
+(`OLLAMA_HOST`, default `http://localhost:11434`). No tagged-block contract
+is required for review output (unlike Gemma Developer) — a structured
+PASS/FINDINGS verdict with findings-by-severity is sufficient, since the
+model is not writing files.
+
+**Fallback (owner directive, 2026-07-21):** if `qwen3.6:27b-q4_K_M` is
+unavailable, stalled, returns invalid output, or returns `BLOCKED`, retry
+once against `qwen3.6:27b-q4_K_M` with the same packet; if that retry also
+fails, fall back to **Gemma** using the same review packet. If Gemma is
+likewise unavailable, stalled, or returns invalid/`BLOCKED` output, fall back
+to **D14** (context-isolated subagent, Balanced tier). If D14 is also
+unavailable, write a blocked-artifact record and stop; never self-review.
+Chain: `qwen3.6:27b-q4_K_M → Gemma → D14`. This override changes the default
+reviewer and inserts an intermediate fallback step; it does not remove D14 as
+the final fallback.
+
+**Evidence recording:** record the `### Peer Reviewer evidence` block (see
+`AGENT_WORKFLOW_GUIDE.md § Step 1 — Code-solution review`) with
+`Reviewer: qwen3.6:27b-q4_K_M` (or `gemma` if the Gemma fallback triggered,
+or `d14` if the D14 fallback triggered), same fields otherwise unchanged.
 
 ## Decomposition triggers
 
@@ -548,20 +607,24 @@ The **Low band (0–25)** distinguishes two separate local model roles:
 | Role | When | Can write files? | Can approve? |
 |---|---|---|---|
 | **Gemma Developer** | Simple code patch delegation | Yes (tagged-block contract) | No |
-| **Gemma Reviewer** | Post-implementation code review for RRI 0–40 development tasks | No | No |
+| **Gemma Reviewer** | Post-implementation code review for RRI 0–25 development tasks | No | No |
 
 A task may use Gemma Developer for its implementation and Gemma Reviewer for its
 code review in separate invocations. Gemma Reviewer must not be used as a
 substitute for the primary agent's final Reflection cycle; it is advisory input
 to that cycle.
 
-The review step is **mandatory for all development tasks**. Gemma is the preferred
-path (N sequential passes, default 3); the context-isolated subagent (D14) is the
-required fallback when Gemma is unavailable or quorum fails. The completion evidence
-block records passes run/succeeded, quorum result, aggregate status,
-consensus/disagreement counts, `degraded` flag, isolated adjudicator status, and
-`disposition_divergence`. See `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma
-Reviewer` for the full trigger, authority boundary, and evidence format.
+The review step is **mandatory for all development tasks**. For RRI 0–25 (Low),
+Gemma is the preferred path (N sequential passes, default 3); the
+context-isolated subagent (D14) is the required fallback when Gemma is
+unavailable or quorum fails. For RRI 26–55 (Moderate + Med-high),
+`qwen3.6:27b-q4_K_M` replaces Gemma as the preferred path (owner directive
+2026-07-21) — see § Local pipeline phase-2 reviewer override — with the same
+D14 fallback. The completion evidence block records passes run/succeeded,
+quorum result, aggregate status, consensus/disagreement counts, `degraded`
+flag, isolated adjudicator status, and `disposition_divergence`. See
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer` for the full
+trigger, authority boundary, and evidence format.
 
 ## Related
 
