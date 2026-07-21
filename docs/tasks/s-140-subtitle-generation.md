@@ -180,7 +180,7 @@ finding; T1b unblocked**
 
 **Effort:** L (planning RRI 52 — Med-high; recompute at presentation time)
 **Depends on:** S-140-T1a
-**Status:** Not started — blocked on T1a and RRI 41+ gate
+**Status:** Done — migration merged; T1c unblocked
 
 > Split from the original T1b ("Subtitle status migration and artifact-kind
 > check extension") into T1b-i and [[S-140-T1b-ii]]. Both halves touch
@@ -234,7 +234,84 @@ methods. Do not touch the artifact-kind check (that is [[S-140-T1b-ii]]).
 **Agent handoff prompt:** Add only the subtitle status table migration,
 validate it, and stop before repository code or the artifact-kind check.
 
-**Status: [ ] Not started — blocked on T1a and RRI 41+ gate**
+### Execution record (2026-07-21)
+
+- **RRI at implementation time:** 52 (Med-high) — recomputed via
+  `scripts/rri.py --C 0 --T 3 --A 0 --X 1 --D 4 --K 4 --P 5 --touches infra/migrations/0024_create_subtitle_status.sql --penalty auth_security --platform dubbridge`;
+  anchor-rubric floor (D=4, K=4, P=5; ADR-008/ADR-018) plus `auth_security`
+  +10 penalty, base 42 + 10 = 52.
+- **Implementation route:** local-first per Med-high routing —
+  `scripts/local-agent/run_local_task.py`, implementer `qwen3.6:35b-a3b`
+  (`DUBBRIDGE_LOCAL_AGENT_MODEL` default), disposable git worktree
+  (`local/s-140-t1b-i` branch). An initial harness attempt exposed an
+  environment issue (`createdb`/`psql` absent on the host), so verification
+  was moved into the existing `local-postgres-1` PostgreSQL 16 container and
+  the local run was repeated against the same worktree. **1 repair attempt
+  used** in the successful rerun (the first test failure required tightening
+  the migration comment so it explicitly states that `0022` had no status
+  constraint).
+- **Verification:** custom `test_runner` applied all 24 migrations in order
+  (0001–0024) against a fresh PostgreSQL 16 database inside
+  `local-postgres-1` and confirmed via `information_schema.columns` and
+  `pg_get_constraintdef` that `asset_subtitle_status` contains the expected
+  columns/defaults, `PRIMARY KEY (asset_id)`, `FOREIGN KEY (asset_id)
+  REFERENCES assets(id)`, and a closed `subtitle_status_check` over
+  `pending`, `in_progress`, `ready`, `failed`. Scope check: in-scope, no
+  boundary violations, no files touched outside `allowed_paths`.
+- **Code-solution review (phase 2):** `qwen3.6:27b-q4_K_M` via Ollama
+  (`http://localhost:11434`), per the 2026-07-21 owner directive replacing
+  the cross-vendor peer as the default Med-high reviewer (see
+  `docs/policies/RRI_POLICY.md` §Local pipeline phase-2 reviewer override).
+  Phase-1 task-analysis review: **n/a** (migration-only task, exempt per
+  policy). Artifact: `.agent/peer-code-review-S-140-T1b-i-qwen.json` with
+  packet `.agent/peer-review-packet-S-140-T1b-i.md`. Verdict: **PASS**, no
+  findings — "Migration satisfies all acceptance criteria with correct
+  schema, constraints, and forward-only scope." Gemma fallback: not
+  triggered. D14 fallback: not triggered. `disposition_divergence: none`.
+
+### Reflection log
+
+Required passes: 3 (`RRI 52` → `Med-high`)
+
+#### Pass 1
+- **Draft verdict:** Local-model-authored migration created
+  `asset_subtitle_status` with the correct table shape and a status check over
+  the four `SubtitleStatus` literals.
+- **Critique findings:** The explanatory SQL comment justified the deviation
+  imprecisely; the verifier required it to state explicitly that
+  `0022_create_transcription.sql` had no status constraint.
+- **Revisions applied:** Tightened the migration comment to name the exact
+  precedent and exact reason for the deviation.
+
+#### Pass 2
+- **Draft verdict:** Revised migration comment matched the task's documented
+  deviation requirement.
+- **Critique findings:** Verified migration numbering and scope discipline:
+  `0024` is the next available migration number after committed `0023`, and
+  the diff remained limited to `infra/migrations/0024_create_subtitle_status.sql`.
+- **Revisions applied:** none.
+
+#### Pass 3
+- **Draft verdict:** Final migration ready for acceptance.
+- **Critique findings:** Re-checked the status literals against
+  `crates/domain/src/artifact.rs` and confirmed the SQL check uses the exact
+  wire forms `pending`, `in_progress`, `ready`, `failed`; re-checked that the
+  table still mirrors `asset_transcription_status` except for the documented
+  status constraint required by EC-2.
+- **Revisions applied:** none.
+
+### Unit coverage certification
+
+Not applicable — this is a migration-only change (no Rust source touched,
+no new code path to cover). `crates/domain/src/artifact.rs` test coverage
+for `SubtitleStatus` display literals was already certified under S-140-T1a.
+
+### Owner verification
+
+Pending — reported to owner below; not yet independently re-verified by a
+human.
+
+**Status: [x] Done — 2026-07-21, migration merged to `infra/migrations/0024_create_subtitle_status.sql`; T1c unblocked**
 
 ---
 
@@ -376,62 +453,341 @@ human.
 
 ---
 
-## S-140-T1c: Subtitle repository and readiness evidence
+## S-140-T1c-i: Subtitle artifact uniqueness constraint migration
 
-**Effort:** M (planning RRI 40 — Moderate; recompute at presentation time)
+> Split from the original T1c 2026-07-21 after phase-1 review (qwen, via
+> `scripts/peer-workflow-review.py`) found that EC-4 (duplicate `Subtitle`
+> artifact insertion must be rejected) cannot be enforced atomically without
+> a DB-level `UNIQUE` constraint — a repository-layer check-then-insert has a
+> TOCTOU race. The existing `artifact_records` table (migrations
+> 0003/0019/0022/0023) has no uniqueness on `(asset_id, kind,
+> parent_artifact_id)`. Bundling the constraint migration into the
+> repository task pushed its RRI to 66 (Complex), the same anti-pattern that
+> caused the original broad T1 to be split into T1a/T1b-i/T1b-ii. Splitting
+> the migration into its own task keeps both halves at Med-high and
+> locally routable. Owner decision 2026-07-21: add the constraint via a new
+> migration rather than accept either a TOCTOU-prone check or a
+> best-effort/non-atomic EC-4.
+>
+> **Implementation route:** same Med-high local-first routing as
+> [[S-140-T1b-i]]/[[S-140-T1b-ii]] —
+> `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL`
+> (default `qwen3.6:35b-a3b`), 1 repair attempt max; `qwen3.6:27b-q4_K_M`
+> phase-2 review and 3 Reflection passes apply.
+
+**Effort:** L (recomputed RRI 52 — Med-high; `python3 scripts/rri.py --C 0
+--T 3 --A 0 --X 1 --D 4 --K 4 --P 5 --touches
+infra/migrations/0025_add_subtitle_artifact_unique_constraint.sql --penalty
+auth_security --platform dubbridge`)
 **Depends on:** S-140-T1b-i, S-140-T1b-ii
-**Status:** Not started — blocked on T1b-i and T1b-ii
+**Status:** Not started — unblocked; T1b complete
+
+**Happy paths considered:**
+- HP-1: Migration adds a partial `UNIQUE` index on
+  `artifact_records(asset_id, parent_artifact_id) WHERE kind = 'subtitle'` so
+  a second `Subtitle` insert for the same asset/parent pair is rejected by
+  Postgres itself, not by application code. The partial-index form is
+  deliberate: it avoids PostgreSQL's multiple-NULLs-are-distinct `UNIQUE`
+  behavior by only ever indexing `subtitle` rows, which structurally always
+  have non-NULL `asset_id`/`parent_artifact_id` (see acceptance criteria).
+
+**Edge cases considered:**
+- EC-1: The constraint does not affect existing rows for other kinds
+  (`TranscriptText`, `WordAlignment`, etc.), which may legitimately share
+  `parent_artifact_id` values with each other under the current schema.
+- EC-2: Applying the migration against the existing seeded/test data (all
+  prior migrations 0001–0024) succeeds without a constraint violation on
+  current rows — guaranteed structurally because no repository code writes
+  `Subtitle` artifact rows until [[S-140-T1c-ii]] (which depends on this
+  task) ships.
+
+**Inputs:** `infra/migrations/0019_create_preparation.sql` (introduces
+`parent_artifact_id`), `infra/migrations/0023_extend_artifact_kind_check_subtitle.sql`,
+`infra/migrations/0024_create_subtitle_status.sql`.
+
+**Outputs:** New migration adding the uniqueness constraint.
+
+**Acceptance criteria:**
+- Migration is forward-only, consistent with repository convention (no down
+  migrations exist); no down-migration/rollback tooling exists anywhere in
+  `infra/migrations/`, and this task does not introduce one.
+- Constraint scope is limited to preventing duplicate `Subtitle` artifacts
+  per `(asset_id, parent_artifact_id)`; it must not restrict other artifact
+  kinds sharing a `parent_artifact_id` (EC-1).
+- No existing data can violate this constraint at migration time. Verified
+  ground truth: this repository has no seed-data mechanism, and `'subtitle'`
+  appears in exactly one prior migration
+  (`0023_extend_artifact_kind_check_subtitle.sql`), which only extends a
+  `CHECK` constraint and inserts no rows. No repository code writes
+  `ArtifactKind::Subtitle` rows until [[S-140-T1c-ii]] (which depends on this
+  task). This is a verified structural guarantee, not an assumption; no
+  pre-migration `COUNT(*)` check is needed, though the migration comment
+  should state this guarantee explicitly for future readers.
+- The constraint targets only non-NULL `(asset_id, parent_artifact_id)`
+  pairs: `asset_id` is `NOT NULL` on `artifact_records` (migration 0003);
+  `parent_artifact_id` is nullable in general, but the
+  `artifact_source_or_derived` `CHECK` (migration 0019) already guarantees
+  `parent_artifact_id IS NOT NULL` whenever a row is derived (not an
+  original) — every `Subtitle` row is derived, so both columns are always
+  set for the rows this constraint targets. The partial-index form (`WHERE
+  kind = 'subtitle'`) sidesteps PostgreSQL's multiple-NULLs-are-distinct
+  `UNIQUE` behavior entirely.
+- Migration applies cleanly on top of the full existing migration chain
+  (0001–0024) with no constraint violation on current data (EC-2), verified
+  against the same `local-postgres-1` container setup used for
+  [[S-140-T1b-i]]/[[S-140-T1b-ii]].
+- Consistent with repository convention: no down-migration/rollback tooling
+  exists anywhere in `infra/migrations/` (forward-only, per T1b-i
+  precedent); this task does not introduce one. If reversal is ever needed,
+  the repository pattern is a new forward migration that drops the
+  constraint, not a down-migration file. The migration's SQL comment must
+  state the exact reversal statement (`DROP INDEX <index_name>`) so a future
+  forward migration can copy it verbatim.
+- Migration numbering verified: `ls infra/migrations/ | sort -V | tail -5`
+  confirms `0024_create_subtitle_status.sql` (S-140-T1b-i) is the current
+  highest migration on this branch; `0025` is the next available number and
+  does not collide with T1b-i/T1b-ii, both already merged.
+- The `CREATE UNIQUE INDEX` statement does not use `IF NOT EXISTS`:
+  idempotency is provided by the `sqlx` migration runner's tracking table
+  (each migration applies exactly once), consistent with every prior
+  migration in `infra/migrations/`, none of which use `IF NOT EXISTS`.
+
+**Files expected to change:**
+- `infra/migrations/0025_add_subtitle_artifact_unique_constraint.sql` (new;
+  verified as the next available number per the numbering check above)
+
+**Evidence to emit:** RRI output, migration test/check command output (SQL
+apply-and-inspect via `sqlx::migrate!`/the custom `test_runner` used for
+T1b-i/T1b-ii against a fresh PostgreSQL 16 `local-postgres-1` container,
+confirmed via `pg_get_indexdef`/`psql \d artifact_records` — not the repo's
+Rust test suite, since no repository code exists yet to run those tests
+against),
+qwen phase-2 review artifact.
+
+**Status artifacts affected:** This ledger.
+
+**Stop condition:** Stop after migration validation. Do not implement
+repository methods that consume the constraint (that is [[S-140-T1c-ii]]).
+
+**Agent handoff prompt:** Add only the subtitle artifact uniqueness
+constraint migration, validate it against the full migration chain, and stop
+before repository code.
+
+### Peer Reviewer evidence
+
+- Reviewer: `qwen3.6:27b-q4_K_M` (phase-1 task-analysis and phase-2
+  code-solution, per Med-high band routing)
+- Phase-1 command: `scripts/peer-workflow-review.py --phase task --rri 52`
+- Phase-1 artifact: `.agent/peer-task-review-S-140-T1c-i.md` /
+  `.agent/peer-task-review-S-140-T1c-i-v4.json` — Verdict: `PASS`
+  (1 INFO finding, no action needed; 4 iterative rounds)
+- Phase-2 command: `scripts/peer-workflow-review.py --phase code --rri 52
+  --caller claude-code`
+- Phase-2 artifact (round 1): `.agent/peer-code-review-S-140-T1c-i.json` —
+  Verdict: `FINDINGS` (1 LOW finding: partial-index predicate should restate
+  the NOT NULL guarantee explicitly rather than relying solely on the
+  `artifact_source_or_derived` CHECK, to stay fail-closed against future
+  schema drift)
+- Disposition: accepted and repaired — added
+  `AND asset_id IS NOT NULL AND parent_artifact_id IS NOT NULL` to the index
+  predicate
+- Phase-2 artifact (round 2, final): `.agent/peer-code-review-S-140-T1c-i-v2.json`
+  — Verdict: `PASS` (1 INFO note on seed-data/deployment-order assumption;
+  already covered by the task card's verified ground truth that no
+  seed-data mechanism exists in this repository)
+- Gemma fallback: not triggered — `qwen3.6:27b-q4_K_M` available throughout
+- D14 fallback: not triggered
+- disposition_divergence: none
+
+### Implementation evidence
+
+- Route: local-first (`scripts/local-agent/run_local_task.py`,
+  `qwen3.6:35b-a3b`), disposable worktree
+  `/private/tmp/dubbridge-s140-t1c-i` (branch `agent/s-140-t1c-i`), 0 repair
+  attempts needed (first draft matched spec; a scope-check "out_of_scope"
+  flag on `0024_create_subtitle_status.sql` was a false positive from the
+  operator pre-seeding that file into the worktree for migration-chain
+  context — diffed byte-identical to the source, confirmed untouched by the
+  model)
+- Output: `infra/migrations/0025_add_subtitle_artifact_unique_constraint.sql`
+- Migration-chain validation: `sqlx::migrate!` (via the existing
+  `user_account::tests` harness pointed at `DUBBRIDGE_DATABASE_URL`) applied
+  cleanly against a fresh, disposable Postgres 16 container (0001–0025); the
+  shared `local-postgres-1` dev database was not touched
+- Index shape verified via `psql \d artifact_records` / `pg_indexes`:
+  `CREATE UNIQUE INDEX artifact_records_subtitle_unique_asset_parent ON
+  artifact_records USING btree (asset_id, parent_artifact_id) WHERE (kind =
+  'subtitle' AND asset_id IS NOT NULL AND parent_artifact_id IS NOT NULL)`
+- EC-1 verified: two `word_alignment` rows sharing the same
+  `parent_artifact_id` insert successfully (index does not restrict other
+  kinds)
+- HP-1 verified: first `Subtitle` row for a given
+  `(asset_id, parent_artifact_id)` inserts successfully
+- Duplicate-rejection verified: a second `Subtitle` row for the same
+  `(asset_id, parent_artifact_id)` fails with `duplicate key value violates
+  unique constraint "artifact_records_subtitle_unique_asset_parent"`
+
+**Status: [x] Done — migration validated and merged into working tree;
+awaiting owner's next-step decision (T1c-ii implementation)**
+
+---
+
+## S-140-T1c-ii: Subtitle repository and readiness evidence
+
+> Split from the original T1c; see [[S-140-T1c-i]] for the rationale. This
+> half is the repository/readiness code and depends on T1c-i's constraint
+> for atomic EC-4 enforcement via `ON CONFLICT`, matching the existing
+> `upsert_transcription_status` idiom in `transcription_repo.rs`.
+>
+> **Exact constraint from T1c-i** (restated here so this card is
+> self-contained): a partial `UNIQUE` index `CREATE UNIQUE INDEX ... ON
+> artifact_records (asset_id, parent_artifact_id) WHERE kind = 'subtitle'`,
+> in `infra/migrations/0025_add_subtitle_artifact_unique_constraint.sql`.
+
+**Effort:** L (recomputed RRI 47 — Med-high; `python3 scripts/rri.py --C 2 --T 3
+--A 1 --X 1 --D 3 --K 3 --P 3 --touches crates/db/src/subtitle_repo.rs
+--touches crates/db/src/lib.rs --touches apps/api/tests/subtitle_repo_test.rs
+--platform rust`)
+**Depends on:** S-140-T1c-i
+**Status:** Not started — blocked on T1c-i
 
 **Happy paths considered:**
 - HP-1: Insert a `Subtitle` derived artifact and list it with correct
   `parent_artifact_id` lineage to `WordAlignment` under D1a.
 - HP-2: Subtitle status transitions Pending -> InProgress -> Ready round-trip
   through the repository.
-- HP-3: `get_subtitle_readiness_evidence` returns `true` once the subtitle
-  artifact exists for the asset.
+- HP-3: `get_subtitle_readiness_evidence` returns `true` only when both the
+  subtitle artifact row exists AND the persisted status is Ready (artifact
+  existence alone is not sufficient).
 
 **Edge cases considered:**
 - EC-1: Failed status persists `error_detail` and remains queryable.
 - EC-2: `get_subtitle_status` returns `None` for an asset with no row.
-- EC-3: Readiness evidence returns `false` when status is Ready but no artifact
-  row exists.
+- EC-3: Readiness evidence returns `false` when no subtitle artifact row
+  exists for the asset, regardless of status.
+- EC-4: Attempting to insert a duplicate `Subtitle` artifact for the same
+  asset/parent (`WordAlignment`) pair returns `DbError::Conflict` (existing
+  variant, `crates/db/src/error.rs`), rejected not silently ignored.
+  Enforced atomically by the `UNIQUE` constraint added in [[S-140-T1c-i]].
+  The SQLSTATE `23505` constraint-violation error from Postgres maps to
+  `DbError::Conflict` using the same pattern as the existing
+  `is_unique_violation(error: &sqlx::Error) -> bool` helper in
+  `crates/db/src/user_account.rs:116-126`, not a repository-layer
+  check-then-insert (which would have a TOCTOU race).
+- EC-5: Inserting a `Subtitle` artifact with a `parent_artifact_id` that does
+  not reference an existing `artifact_records` row returns
+  `DbError::QueryFailed` (the existing general sqlx-error-carrying variant —
+  there is no dedicated foreign-key-violation variant in this codebase
+  today, unlike EC-4's `DbError::Conflict`; the underlying `sqlx::Error`
+  already carries the SQLSTATE `23503` detail for callers who need it). The
+  FK violation is on the existing
+  `parent_artifact_id REFERENCES artifact_records(id)` constraint from
+  migration `0019_create_preparation.sql` — this constraint already exists;
+  no new migration is needed in this task (the new constraint from T1c-i
+  covers EC-4 uniqueness, not this FK).
 
-**Inputs:** `crates/db/src/transcription_repo.rs`,
-`apps/api/tests/transcription_repo_test.rs`, and the ratified D1 lineage rule.
+**Inputs:** `crates/db/src/transcription_repo.rs`, `crates/db/src/artifact_repo.rs`,
+`crates/db/src/error.rs` (`DbError::Conflict` already exists; verify in
+Reflection pass 1), `crates/db/src/user_account.rs` (line 116: existing
+`is_unique_violation` fn checking SQLSTATE `23505` — the exact check-logic
+precedent to mirror for EC-4's error mapping; it is private/module-scoped,
+so `subtitle_repo.rs` duplicates the same check rather than importing it),
+`apps/api/tests/transcription_repo_test.rs`, the ratified D1 lineage rule,
+and the `UNIQUE` constraint from [[S-140-T1c-i]] — **before writing any code
+against it, Reflection pass 1 must verify the actual merged
+`infra/migrations/0025_add_subtitle_artifact_unique_constraint.sql` defines
+exactly the expected index** (via `psql \d artifact_records` or
+`pg_get_indexdef`), not just trust the restated expectation in this card.
 
 **Outputs:** `crates/db/src/subtitle_repo.rs` and module export wiring.
 
 **Acceptance criteria:**
-- Repository API follows the transcription repository pattern.
+- Repository API follows the transcription repository pattern: subtitle
+  status lives in the mutable `asset_subtitle_status` row
+  (`upsert_subtitle_status`, mirroring `upsert_transcription_status`), while
+  the `Subtitle` derived-artifact row is a separate one-shot insert
+  (mirroring `insert_transcript_artifacts`) — HP-2's Pending -> InProgress ->
+  Ready transitions apply only to the status row, never to the artifact row.
 - Derived artifact lineage uses one immediate parent: `WordAlignment` (D1a,
-  ratified).
-- All HP/EC cases above have integration-test coverage.
+  ratified), enforced at the DB layer by the existing `parent_artifact_id`
+  foreign-key constraint from migration `0019_create_preparation.sql`
+  (EC-5) — verified present in Reflection pass 1 via `psql \d
+  artifact_records` against a live migrated database, not assumed from
+  reading the migration file alone.
+- Subtitle artifact insertion sets `storage_key` and `checksum` per ADR-006
+  (immutable derived-artifact row); the artifact row itself is never updated
+  in place after insertion (status transitions happen only in the separate
+  status row, not the artifact row).
+- `get_subtitle_readiness_evidence` is fail-closed per ADR-018: it returns
+  `Result<bool, DbError>` (or an equivalent explicit error-carrying type),
+  any DB query failure propagates as `Err`, and it returns `true` only when
+  both the artifact row exists and status is Ready.
+- Duplicate `Subtitle` artifact insertion for the same asset/parent pair
+  (EC-4) returns `DbError::Conflict`, enforced atomically by the T1c-i
+  `UNIQUE` constraint (no repository-layer check-then-insert race), using
+  the same SQLSTATE `23505` check-logic pattern as
+  `is_unique_violation` in `crates/db/src/user_account.rs:116`. That helper
+  is private/module-scoped (`fn`, no `pub`), so the check is duplicated
+  locally in `subtitle_repo.rs` rather than imported.
+- `subtitle_repo_test.rs` tests are independent of `transcription_repo_test.rs`:
+  each test inserts its own asset/artifact fixture rows (matching the
+  existing per-test `setup_pool`/`insert_asset` pattern already used in
+  `transcription_repo_test.rs`) rather than relying on shared mutable state,
+  so the two test files are safe to run in parallel or in either order.
+- Existing transcription repository tests
+  (`apps/api/tests/transcription_repo_test.rs`) show no regression versus
+  their pre-task baseline — the new subtitle repo/tests must not couple with
+  or regress transcription coverage; a pre-existing unrelated flake
+  (confirmed by reproducing it on the pre-task commit) does not block
+  closure.
+- All HP/EC cases above have integration-test coverage in
+  `apps/api/tests/subtitle_repo_test.rs`.
 
 **Files expected to change:**
 - `crates/db/src/subtitle_repo.rs` (new)
 - `crates/db/src/lib.rs`
 - `apps/api/tests/subtitle_repo_test.rs` (new)
 
+No migration is in scope for this task: `asset_subtitle_status`
+(`infra/migrations/0024_create_subtitle_status.sql`, S-140-T1b-i), the
+artifact-kind check extension
+(`infra/migrations/0023_extend_artifact_kind_check_subtitle.sql`,
+S-140-T1b-ii), and the uniqueness constraint
+(`infra/migrations/0025_add_subtitle_artifact_unique_constraint.sql`,
+S-140-T1c-i) are all merged before this task starts; this task only writes
+repository code that reads/writes those existing tables/constraints.
+
 **Evidence to emit:** RRI output, local-run artifact, exact test commands,
 unit/integration test names.
 
-**Status artifacts affected:** This ledger.
+**Status artifacts affected:** This ledger (`docs/tasks/s-140-subtitle-generation.md`)
+must be synced with the execution record, reflection log, and closure status
+before this task is reported done.
 
-**Stop condition:** Stop after repository tests pass. Do not add storage helpers,
-job queues, or worker-runner hooks.
+**Stop condition:** Stop after `cargo test -p dubbridge-api --test
+subtitle_repo_test` (new) passes with each of HP-1..HP-3 and EC-1..EC-5
+covered by a named test, and `transcription_repo_test.rs` shows no new
+failures versus its pre-task baseline (recorded before implementation
+starts; a single re-run on the pre-task commit is sufficient to classify
+any failure as pre-existing, not a full flake-reproduction study). A full
+workspace regression run is not required for closure of this task. Do not
+add storage helpers, job queues, or worker-runner hooks.
 
 **Agent handoff prompt:** Implement only the subtitle repository/readiness seam
-following the transcription repo pattern, cover HP/EC in integration tests, and
-stop before storage or job work.
+following the transcription repo pattern, rely on the T1c-i `UNIQUE`
+constraint (not a repository-layer check) for EC-4, keep readiness evidence
+fail-closed per ADR-018, cover HP-1..HP-3/EC-1..EC-5 in integration tests,
+execute and document all 3 required Reflection passes (RRI 47, Med-high)
+before closure, and stop before storage or job work.
 
-**Status: [ ] Not started — blocked on T1b**
+**Status: [ ] Not started — blocked on T1c-i**
 
 ---
 
 ## S-140-T1d: Subtitle storage key helper
 
 **Effort:** M (planning RRI 26 — Moderate; recompute at presentation time)
-**Depends on:** S-140-T1c
+**Depends on:** S-140-T1c-ii
 **Status:** Not started — blocked on T1c
 
 **Happy paths considered:**
