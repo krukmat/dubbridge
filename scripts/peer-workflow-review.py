@@ -7,10 +7,11 @@ Implements the review contract defined in docs/plan/portable-peer-review-gate.md
   Phase 2 (--phase code):  code-solution review after implementation, before closure.
 
 Reviewer is resolved from the task's RRI band:
-  RRI 0-40  (Low + Moderate)  -> Gemma (local Ollama)
-  RRI 41+   (Med-high+)       -> cross-vendor peer, with D14 fallback
+  RRI 0-25   (Low)                  -> Gemma (local Ollama)
+  RRI 26-55  (Moderate + Med-high)  -> qwen3.6:27b-q4_K_M, Gemma fallback, D14
+  RRI 56+    (Complex+)             -> cross-vendor peer, with D14 fallback
 
-Cross-vendor resolution (RRI 41+ only):
+Cross-vendor resolution (RRI 56+ only):
   claude-code | claude  -> codex
   codex                 -> claude
   local-provider        -> claude
@@ -31,11 +32,14 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from typing import Optional, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gemma_local
 
-BAND_BOUNDARY = 41  # RRI >= this -> cross-vendor peer
+QWEN_REVIEW_MIN_RRI = 26
+CROSS_VENDOR_MIN_RRI = 56
+DEFAULT_QWEN_REVIEW_MODEL = "qwen3.6:27b-q4_K_M"
 
 CALLER_TO_PEER = {
     "claude-code": "codex",
@@ -67,7 +71,11 @@ def resolve_band(rri: int) -> str:
 
 
 def needs_cross_vendor(rri: int) -> bool:
-    return rri >= BAND_BOUNDARY
+    return rri >= CROSS_VENDOR_MIN_RRI
+
+
+def needs_local_qwen_review(rri: int) -> bool:
+    return QWEN_REVIEW_MIN_RRI <= rri < CROSS_VENDOR_MIN_RRI
 
 
 def resolve_peer(caller: str) -> str:
@@ -122,6 +130,33 @@ def _gemma_system_prompt(phase: str) -> str:
     )
 
 
+def _local_structured_system_prompt(phase: str) -> str:
+    if phase == "task":
+        return (
+            "You are a read-only task-analysis reviewer for DubBridge. "
+            "Review the supplied task card for readiness: completeness of acceptance "
+            "criteria, clarity of scope, missing happy paths or edge cases, and "
+            "consistency with the governing policy references.\n"
+            "Return EXACTLY this shape:\n"
+            "VERDICT: PASS|FINDINGS|BLOCKED\n"
+            "SUMMARY: <one line>\n"
+            "FINDING: <severity>|<path>|<line or n/a>|<detail>|<suggestion>\n"
+            "Use zero or more FINDING lines. No markdown fences. No patches. "
+            "No prose before or after."
+        )
+    return (
+        "You are a read-only code-solution reviewer for DubBridge. "
+        "Review the supplied diff and acceptance criteria for correctness, "
+        "fail-closed behavior, missing tests, and side effects.\n"
+        "Return EXACTLY this shape:\n"
+        "VERDICT: PASS|FINDINGS|BLOCKED\n"
+        "SUMMARY: <one line>\n"
+        "FINDING: <severity>|<path>|<line or n/a>|<detail>|<suggestion>\n"
+        "Use zero or more FINDING lines. No markdown fences. No patches. "
+        "No prose before or after."
+    )
+
+
 def run_gemma_review(packet: str, phase: str, args) -> dict:
     """Invoke local Gemma and return a result dict."""
     model = gemma_local.resolve_model_with_fallback(
@@ -169,6 +204,94 @@ def run_gemma_review(packet: str, phase: str, args) -> dict:
         "findings": findings,
         "model": model,
     }
+
+
+def run_local_structured_review(packet: str, phase: str, args, *, model: str, reviewer: str) -> dict:
+    payload = gemma_local.build_chat_payload(
+        model=model,
+        system_prompt=_local_structured_system_prompt(phase),
+        packet=packet,
+        num_ctx=args.num_ctx,
+        num_predict=args.num_predict,
+        temperature=args.temperature,
+        think=args.think,
+    )
+    stream_result = gemma_local.stream_chat(
+        gemma_local.endpoint(args.host, "/api/chat"),
+        payload,
+        idle_timeout=args.idle_timeout,
+        max_wall=args.max_wall,
+        progress_label=f"peer-review/{phase}/{reviewer}",
+    )
+    content = gemma_local.normalize_tagged_content(
+        gemma_local.stream_result_content(stream_result),
+        reviewer,
+    )
+    result = _parse_peer_response(content, reviewer, phase)
+    result["model"] = model
+    usage = gemma_local.stream_result_usage(stream_result)
+    result["usage"] = {
+        "response_tokens": usage.response_tokens,
+        "prompt_tokens": usage.prompt_tokens,
+        "done_reason": usage.done_reason,
+    }
+    return result
+
+
+def _run_qwen_with_retry(packet: str, phase: str, args, model: str) -> Tuple[Optional[dict], Optional[str]]:
+    last_error = None
+    for _ in range(2):
+        try:
+            result = run_local_structured_review(
+                packet,
+                phase,
+                args,
+                model=model,
+                reviewer=DEFAULT_QWEN_REVIEW_MODEL,
+            )
+        except (gemma_local.GemmaIdleTimeout, gemma_local.GemmaWallTimeout, RuntimeError) as exc:
+            last_error = str(exc)
+            continue
+        if result["verdict"] == "blocked":
+            last_error = "qwen reviewer returned BLOCKED"
+            continue
+        return result, None
+    return None, last_error or "qwen reviewer unavailable"
+
+
+def _run_gemma_fallback(packet: str, phase: str, args) -> Tuple[Optional[dict], Optional[str]]:
+    last_error = None
+    for _ in range(2):
+        try:
+            result = run_gemma_review(packet, phase, args)
+        except (gemma_local.GemmaIdleTimeout, gemma_local.GemmaWallTimeout, RuntimeError) as exc:
+            last_error = str(exc)
+            continue
+        if result["verdict"] == "blocked":
+            last_error = "gemma reviewer returned BLOCKED"
+            continue
+        return result, None
+    return None, last_error or "gemma reviewer unavailable"
+
+
+def run_qwen_band_review(content: str, phase: str, args) -> dict:
+    packet = _build_peer_packet(phase, content, args.task_id)
+    qwen_result, qwen_error = _run_qwen_with_retry(packet, phase, args, args.qwen_model)
+    if qwen_result is not None:
+        return qwen_result
+
+    print(f"[peer-review] qwen fallback triggered: {qwen_error}", file=sys.stderr)
+    gemma_result, gemma_error = _run_gemma_fallback(content, phase, args)
+    if gemma_result is not None:
+        return gemma_result
+
+    print(f"[peer-review] gemma fallback failed: {gemma_error}", file=sys.stderr)
+    d14_result = run_d14_fallback(packet, phase, DEFAULT_QWEN_REVIEW_MODEL)
+    d14_result["summary"] = (
+        f"qwen unavailable/invalid ({qwen_error}); gemma unavailable/invalid ({gemma_error}); "
+        "D14 adjudication required."
+    )
+    return d14_result
 
 
 # ---------------------------------------------------------------------------
@@ -336,7 +459,7 @@ def parse_args():
         "--rri",
         type=int,
         required=True,
-        help="Task RRI score. Determines reviewer band (0-40 -> Gemma, 41+ -> cross-vendor peer).",
+        help="Task RRI score. Determines reviewer band (0-25 -> Gemma, 26-55 -> qwen/Gemma/D14, 56+ -> cross-vendor peer).",
     )
     parser.add_argument(
         "--caller",
@@ -381,6 +504,12 @@ def parse_args():
             "DUBBRIDGE_REVIEW_MODEL",
             os.environ.get("DUBBRIDGE_LOW_RRI_MODEL", gemma_local.DEFAULT_MODEL),
         ),
+        help="Gemma model for the Low-band path and Gemma fallback.",
+    )
+    parser.add_argument(
+        "--qwen-model",
+        default=os.environ.get("DUBBRIDGE_QWEN_REVIEW_MODEL", DEFAULT_QWEN_REVIEW_MODEL),
+        help="Primary Ollama reviewer model for RRI 26-55.",
     )
     parser.add_argument(
         "--idle-timeout",
@@ -430,7 +559,8 @@ def main() -> int:
 
     band = resolve_band(args.rri)
     cross_vendor = needs_cross_vendor(args.rri)
-    peer = resolve_peer(args.caller) if cross_vendor else "gemma"
+    qwen_band = needs_local_qwen_review(args.rri)
+    peer = resolve_peer(args.caller) if cross_vendor else (DEFAULT_QWEN_REVIEW_MODEL if qwen_band else "gemma")
     artifact = args.artifact or default_artifact_path(args.task_id, args.phase)
 
     print(
@@ -470,7 +600,22 @@ def main() -> int:
         print(f"[peer-review] verdict={verdict.upper()} artifact={artifact}", file=sys.stderr)
         return 1 if verdict == "blocked" else 0
 
-    # Gemma band (RRI 0-40).
+    if qwen_band:
+        result = run_qwen_band_review(content, args.phase, args)
+        if result["verdict"] == "d14_required":
+            write_artifact(result, artifact)
+            print(
+                f"[peer-review] D14 required — qwen and Gemma were unusable. "
+                f"Spawn D14 adjudicator with artifact: {artifact}",
+                file=sys.stderr,
+            )
+            return 1
+        write_artifact(result, artifact)
+        verdict = result["verdict"]
+        print(f"[peer-review] verdict={verdict.upper()} artifact={artifact}", file=sys.stderr)
+        return 0 if verdict == "pass" else 1
+
+    # Gemma band (RRI 0-25).
     try:
         result = run_gemma_review(content, args.phase, args)
     except (gemma_local.GemmaIdleTimeout, gemma_local.GemmaWallTimeout, RuntimeError) as exc:

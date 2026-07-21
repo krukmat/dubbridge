@@ -47,8 +47,21 @@ class TestNeedsCrossVendor(unittest.TestCase):
         self.assertFalse(_mod.needs_cross_vendor(0))
 
     def test_cross_vendor_band(self):
-        self.assertTrue(_mod.needs_cross_vendor(41))
+        self.assertFalse(_mod.needs_cross_vendor(55))
+        self.assertTrue(_mod.needs_cross_vendor(56))
         self.assertTrue(_mod.needs_cross_vendor(70))
+
+
+class TestNeedsLocalQwenReview(unittest.TestCase):
+    def test_not_in_low_band(self):
+        self.assertFalse(_mod.needs_local_qwen_review(25))
+
+    def test_qwen_band(self):
+        self.assertTrue(_mod.needs_local_qwen_review(26))
+        self.assertTrue(_mod.needs_local_qwen_review(55))
+
+    def test_not_in_cross_vendor_band(self):
+        self.assertFalse(_mod.needs_local_qwen_review(56))
 
 
 class TestResolvePeer(unittest.TestCase):
@@ -186,6 +199,46 @@ class TestRunCrossVendorReview(unittest.TestCase):
             result = _mod.run_cross_vendor_review("packet", "task", "codex")
         self.assertEqual(result["reviewer"], "codex")
         self.assertEqual(result["verdict"], "pass")
+
+
+class TestRunQwenBandReview(unittest.TestCase):
+    def _args(self):
+        return MagicMock(
+            task_id="S-140-T1c",
+            host="http://localhost:11434",
+            qwen_model="qwen3.6:27b-q4_K_M",
+            model="gemma4:26b-a4b-it-qat",
+            num_ctx=4096,
+            num_predict=128,
+            temperature=0.1,
+            think=False,
+            idle_timeout=60,
+            max_wall=60,
+        )
+
+    def test_returns_qwen_result_when_primary_succeeds(self):
+        qwen_result = {"reviewer": "qwen3.6:27b-q4_K_M", "verdict": "pass", "summary": "ok", "findings": []}
+        with patch.object(_mod, "_run_qwen_with_retry", return_value=(qwen_result, None)), \
+             patch.object(_mod, "_run_gemma_fallback") as gemma_fallback:
+            result = _mod.run_qwen_band_review("packet", "task", self._args())
+        self.assertEqual(result["reviewer"], "qwen3.6:27b-q4_K_M")
+        gemma_fallback.assert_not_called()
+
+    def test_falls_back_to_gemma_after_qwen_failure(self):
+        gemma_result = {"reviewer": "gemma", "verdict": "pass", "summary": "ok", "findings": []}
+        with patch.object(_mod, "_run_qwen_with_retry", return_value=(None, "length")), \
+             patch.object(_mod, "_run_gemma_fallback", return_value=(gemma_result, None)):
+            result = _mod.run_qwen_band_review("packet", "task", self._args())
+        self.assertEqual(result["reviewer"], "gemma")
+
+    def test_returns_d14_signal_when_qwen_and_gemma_fail(self):
+        d14 = {"reviewer": "d14", "verdict": "d14_required", "summary": "stub", "findings": [], "d14_packet": {}}
+        with patch.object(_mod, "_run_qwen_with_retry", return_value=(None, "qwen failed")), \
+             patch.object(_mod, "_run_gemma_fallback", return_value=(None, "gemma failed")), \
+             patch.object(_mod, "run_d14_fallback", return_value=d14):
+            result = _mod.run_qwen_band_review("packet", "task", self._args())
+        self.assertEqual(result["reviewer"], "d14")
+        self.assertEqual(result["verdict"], "d14_required")
 
 
 # ---------------------------------------------------------------------------
