@@ -64,6 +64,17 @@ class TestNeedsLocalQwenReview(unittest.TestCase):
         self.assertFalse(_mod.needs_local_qwen_review(56))
 
 
+class TestReviewExitCode(unittest.TestCase):
+    def test_pass_is_success(self):
+        self.assertEqual(_mod.review_exit_code("pass"), 0)
+
+    def test_findings_is_success(self):
+        self.assertEqual(_mod.review_exit_code("findings"), 0)
+
+    def test_blocked_is_failure(self):
+        self.assertEqual(_mod.review_exit_code("blocked"), 1)
+
+
 class TestResolvePeer(unittest.TestCase):
     def test_claude_code_to_codex(self):
         self.assertEqual(_mod.resolve_peer("claude-code"), "codex")

@@ -78,6 +78,10 @@ def needs_local_qwen_review(rri: int) -> bool:
     return QWEN_REVIEW_MIN_RRI <= rri < CROSS_VENDOR_MIN_RRI
 
 
+def review_exit_code(verdict: str) -> int:
+    return 1 if verdict == "blocked" else 0
+
+
 def resolve_peer(caller: str) -> str:
     return CALLER_TO_PEER.get(caller.lower(), "claude")
 
@@ -598,7 +602,7 @@ def main() -> int:
         write_artifact(result, artifact)
         verdict = result["verdict"]
         print(f"[peer-review] verdict={verdict.upper()} artifact={artifact}", file=sys.stderr)
-        return 1 if verdict == "blocked" else 0
+        return review_exit_code(verdict)
 
     if qwen_band:
         result = run_qwen_band_review(content, args.phase, args)
@@ -613,7 +617,7 @@ def main() -> int:
         write_artifact(result, artifact)
         verdict = result["verdict"]
         print(f"[peer-review] verdict={verdict.upper()} artifact={artifact}", file=sys.stderr)
-        return 0 if verdict == "pass" else 1
+        return review_exit_code(verdict)
 
     # Gemma band (RRI 0-25).
     try:
@@ -626,7 +630,7 @@ def main() -> int:
     write_artifact(result, artifact)
     verdict = result["verdict"]
     print(f"[peer-review] verdict={verdict.upper()} artifact={artifact}", file=sys.stderr)
-    return 0 if verdict == "pass" else 1
+    return review_exit_code(verdict)
 
 
 if __name__ == "__main__":
