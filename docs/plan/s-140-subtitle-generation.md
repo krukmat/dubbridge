@@ -192,7 +192,8 @@ writes `TranscriptionStatus::Ready`.
 |------|-------|--------|-----------------|------|
 | T0 | Ratify D1/D2 and freeze local-handoff sequence | S | 6 | Low |
 | T1a | Domain subtitle kind/status types | S | 24 | Low |
-| T1b | Subtitle status migration and artifact-kind check extension | L | 50 | Med-high |
+| T1b-i | Subtitle status table migration | L | 52 | Med-high |
+| T1b-ii | Artifact-kind check extension for subtitle | L | 45 | Med-high |
 | T1c | Subtitle repository and readiness evidence | M | 40 | Moderate |
 | T1d | Subtitle storage key helper | M | 26 | Moderate |
 | T2a | Subtitle job queue contract | M | 34 | Moderate |
@@ -206,11 +207,18 @@ writes `TranscriptionStatus::Ready`.
 T4 (D1b Python subtitle worker) is removed, not skipped — D1 was ratified as
 D1a on 2026-07-21, so no Python worker task exists in this decomposition.
 
-Tasks must run in order: T0 → T1a → T1b → T1c → T1d → T2a → T2b →
-T3a → T3b → T5a → (T5b only if explicitly scoped) → T6.
+Tasks must run in order: T0 → T1a → (T1b-i, T1b-ii in either order, both
+required) → T1c → T1d → T2a → T2b → T3a → T3b → T5a →
+(T5b only if explicitly scoped) → T6.
 Each task requires its own RRI computation and presentation/approval before
 execution, per repository workflow. The RRI values above are planning scores
 from 2026-07-21 and must be recomputed at task presentation time.
+
+T1b was split into T1b-i and T1b-ii on 2026-07-21: both touch
+`infra/migrations/**`, whose anchor-rubric floor (ADR-008/ADR-018) plus the
+automatic `auth_security` penalty keeps every migration-path task at RRI 41+
+regardless of diff size, so splitting narrows each task's change surface
+without changing either one's band.
 
 ### Coordination-mode adjustment required before implementation
 

@@ -176,36 +176,52 @@ finding; T1b unblocked**
 
 ---
 
-## S-140-T1b: Subtitle status migration and artifact-kind check extension
+## S-140-T1b-i: Subtitle status table migration
 
-**Effort:** L (planning RRI 50 — Med-high; recompute at presentation time)
+**Effort:** L (planning RRI 52 — Med-high; recompute at presentation time)
 **Depends on:** S-140-T1a
 **Status:** Not started — blocked on T1a and RRI 41+ gate
+
+> Split from the original T1b ("Subtitle status migration and artifact-kind
+> check extension") into T1b-i and [[S-140-T1b-ii]]. Both halves touch
+> `infra/migrations/**`, whose anchor-rubric floor (D=4, P=5, K=4;
+> ADR-008/ADR-018) plus the automatic `auth_security` penalty puts every
+> migration-path task at RRI 41+ regardless of diff size — confirmed via
+> `scripts/rri.py` on the minimal-possible check-only change (still 45). The
+> split does not lower either task's band; it narrows each task's own change
+> surface and lets the simpler half (T1b-ii) be approved and merged
+> independently.
+>
+> **Implementation route:** Med-high (41–55) now routes local-first per the
+> 2026-07-21 owner override to `docs/policies/RRI_POLICY.md` §Med-high
+> local-first handling — `scripts/local-agent/run_local_task.py` +
+> `DUBBRIDGE_LOCAL_AGENT_MODEL` (default `qwen3.6:35b-a3b`), 1 repair attempt
+> max before escalating to cloud. Cross-vendor peer review (phases 1 and 2)
+> and 3 Reflection passes still apply unchanged; only the code-authoring
+> surface moved local.
 
 **Happy paths considered:**
 - HP-1: Migration creates `asset_subtitle_status` with one row per asset and
   status/error/update fields mirroring `asset_transcription_status`.
-- HP-2: Migration accepts `Subtitle` in the artifact kind check after T1a
-  introduces the domain kind.
 
 **Edge cases considered:**
 - EC-1: Duplicate subtitle status rows for one asset are rejected by the primary
   key.
 - EC-2: Invalid subtitle status text is rejected by the status check.
 
-**Inputs:** Current migrations for transcription status and artifact-kind checks.
+**Inputs:** Current migration for `asset_transcription_status`.
 
-**Outputs:** New subtitle migration.
+**Outputs:** New subtitle status table migration.
 
 **Acceptance criteria:**
 - Migration is reversible or follows the repository's forward-only migration
   convention if no down migrations exist.
 - Table shape mirrors the transcription status table unless a documented reason
   is added.
-- Artifact kind check includes the new `Subtitle` kind and no unrelated kind.
 
 **Files expected to change:**
-- `infra/migrations/00XX_create_subtitle.sql` (new; exact number chosen at task time)
+- `infra/migrations/00XX_create_subtitle_status.sql` (new; exact number chosen
+  at task time)
 
 **Evidence to emit:** RRI output, migration test/check command output,
 cross-vendor/D14 phase-1 artifact if required.
@@ -213,10 +229,65 @@ cross-vendor/D14 phase-1 artifact if required.
 **Status artifacts affected:** This ledger.
 
 **Stop condition:** Stop after migration validation. Do not implement repository
-methods.
+methods. Do not touch the artifact-kind check (that is [[S-140-T1b-ii]]).
 
-**Agent handoff prompt:** Add only the subtitle status migration and artifact
-kind check extension, validate it, and stop before repository code.
+**Agent handoff prompt:** Add only the subtitle status table migration,
+validate it, and stop before repository code or the artifact-kind check.
+
+**Status: [ ] Not started — blocked on T1a and RRI 41+ gate**
+
+---
+
+## S-140-T1b-ii: Artifact-kind check extension for subtitle
+
+**Effort:** L (planning RRI 45 — Med-high; recompute at presentation time)
+**Depends on:** S-140-T1a
+**Status:** Not started — blocked on T1a and RRI 41+ gate
+
+> Split from the original T1b; see [[S-140-T1b-i]] for the rationale. This
+> half only extends an existing check constraint — no new table — but still
+> touches `infra/migrations/**`, so it carries the same anchor-rubric floor
+> and band. Independent of T1b-i; either may be implemented first, but both
+> must land before [[S-140-T1c]] starts.
+>
+> **Implementation route:** same Med-high local-first routing as [[S-140-T1b-i]]
+> — `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL`
+> (default `qwen3.6:35b-a3b`), 1 repair attempt max; cross-vendor peer review
+> and 3 Reflection passes unchanged.
+
+**Happy paths considered:**
+- HP-1: Migration accepts `Subtitle` in the artifact kind check after T1a
+  introduces the domain kind.
+
+**Edge cases considered:**
+- EC-1: Artifact kind check still rejects values outside the known kind set
+  (no unrelated kind added alongside `subtitle`).
+
+**Inputs:** Current artifact-kind check migration.
+
+**Outputs:** New migration extending the artifact-kind check.
+
+**Acceptance criteria:**
+- Migration is reversible or follows the repository's forward-only migration
+  convention if no down migrations exist.
+- Artifact kind check includes the new `Subtitle` kind and no unrelated kind.
+
+**Files expected to change:**
+- `infra/migrations/00XX_extend_artifact_kind_check.sql` (new; exact number
+  chosen at task time)
+
+**Evidence to emit:** RRI output, migration test/check command output,
+cross-vendor/D14 phase-1 artifact if required.
+
+**Status artifacts affected:** This ledger.
+
+**Stop condition:** Stop after migration validation. Do not implement
+repository methods. Do not touch the subtitle status table (that is
+[[S-140-T1b-i]]).
+
+**Agent handoff prompt:** Add only the artifact-kind check extension for
+`subtitle`, validate it, and stop before repository code or the status table
+migration.
 
 **Status: [ ] Not started — blocked on T1a and RRI 41+ gate**
 
@@ -225,8 +296,8 @@ kind check extension, validate it, and stop before repository code.
 ## S-140-T1c: Subtitle repository and readiness evidence
 
 **Effort:** M (planning RRI 40 — Moderate; recompute at presentation time)
-**Depends on:** S-140-T1b
-**Status:** Not started — blocked on T1b
+**Depends on:** S-140-T1b-i, S-140-T1b-ii
+**Status:** Not started — blocked on T1b-i and T1b-ii
 
 **Happy paths considered:**
 - HP-1: Insert a `Subtitle` derived artifact and list it with correct

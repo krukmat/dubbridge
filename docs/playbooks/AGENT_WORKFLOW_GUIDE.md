@@ -42,14 +42,20 @@ governs: "all agent-facing workflow decisions in the repository"
 4. **Gate by RRI** — compute RRI with `scripts/rri.py`. For RRI 0–25, skip the
    full human approval presentation. Use local Gemma delegation through Ollama
    only for eligible simple code patches; otherwise execute directly as the
-   primary agent. For **RRI 26–40**, show the plan and tasks, wait for explicit
-   approval, then use the **local-first implementation path** by default:
-   `scripts/local-agent/run_local_task.py` in a disposable worktree, resolving
-   the implementer from `DUBBRIDGE_LOCAL_AGENT_MODEL` (default
-   `qwen3.6:35b-a3b`). The primary agent remains the orchestrator of record and
-   cloud implementation is the escalation/fallback path, not the default. For
-   RRI 41+, show the plan and tasks and wait for explicit approval before
-   starting implementation, even if a plan was approved in a prior session.
+   primary agent. For **RRI 26–55** (Moderate + Med-high), show the plan and
+   tasks, wait for explicit approval, then use the **local-first implementation
+   path** by default: `scripts/local-agent/run_local_task.py` in a disposable
+   worktree, resolving the implementer from `DUBBRIDGE_LOCAL_AGENT_MODEL`
+   (default `qwen3.6:35b-a3b`). The primary agent remains the orchestrator of
+   record and cloud implementation is the escalation/fallback path, not the
+   default. Med-high (41–55) uses a tighter repair budget (1 evidence-backed
+   local attempt vs. 2 for Moderate) and keeps cross-vendor peer review, 3
+   Reflection passes, and the human approval gate unchanged — the routing
+   change affects only who authors the code, not who reviews or approves it.
+   For **RRI 56+**, show the plan and tasks and wait for explicit approval
+   before starting implementation, even if a plan was approved in a prior
+   session; implementation stays on the cloud path (Premium tier) and
+   decomposition remains mandatory before implementation.
 5. **Implement** — one task at a time, in the defined order.
 6. **Mark progress** — update the tasks document after each completed task (it is
    the crash-safe progress ledger).
@@ -298,13 +304,21 @@ local Gemma delegation through Ollama. Resolve the local model from
 separate fallback tier), and the Ollama endpoint from `OLLAMA_HOST`,
 defaulting to `http://localhost:11434`.
 
-The **RRI 26–40 Moderate band** is a routing exception for implementation:
-task cards still present Codex/Claude recommendations for the orchestrator and
-escalation environment, but the default code-authoring surface is the local
-agentic runner (`scripts/local-agent/run_local_task.py`) using
-`DUBBRIDGE_LOCAL_AGENT_MODEL` (default `qwen3.6:35b-a3b`) inside a disposable
-worktree. This routing became operative by owner override on 2026-07-15,
-ahead of the original ADR-036 pilot promotion gate.
+The **RRI 26–55 band (Moderate + Med-high)** is a routing exception for
+implementation: task cards still present Codex/Claude recommendations for the
+orchestrator and escalation environment, but the default code-authoring
+surface is the local agentic runner (`scripts/local-agent/run_local_task.py`)
+using `DUBBRIDGE_LOCAL_AGENT_MODEL` (default `qwen3.6:35b-a3b`) inside a
+disposable worktree. This routing became operative by owner override on
+2026-07-15 for Moderate (26–40), ahead of the original ADR-036 pilot
+promotion gate, and was extended to Med-high (41–55) by owner override on
+2026-07-21. The extension changes only the implementation-authoring surface:
+Med-high tasks still require cross-vendor peer review (phases 1 and 2), 3
+Reflection passes, and the RRI 41+ human approval gate exactly as before.
+Med-high uses a tighter local repair budget (1 attempt, not 2) before
+escalating to cloud implementation, reflecting the higher-risk anchor-rubric
+floors this band typically carries (e.g. `infra/migrations/**`,
+ADR-008/ADR-018).
 
 When preparing a task for presentation or local delegation, the agent must compute
 a complexity score and derive the recommended model tier or local delegation
@@ -472,8 +486,8 @@ full task for approval:
 | Codex            | <resolved model or pinned model>                        |
 ```
 
-For development tasks in the **RRI 26–40 Moderate band**, add one more line to
-the same block:
+For development tasks in the **RRI 26–55 band (Moderate + Med-high)**, add one
+more line to the same block:
 
 ```
 | Local implementer | <resolved DUBBRIDGE_LOCAL_AGENT_MODEL> via disposable-worktree runner |
@@ -496,7 +510,7 @@ task file explicitly scopes the task to a single vendor environment.
 
 For RRI 0–25, replace both vendor recommendations with the resolved local Gemma
 model and note that the active agent remains the reviewer/orchestrator.
-For RRI 26–40, keep the Codex/Claude recommendations for orchestration and
+For RRI 26–55, keep the Codex/Claude recommendations for orchestration and
 escalation, and add the local-implementer line above.
 
 Presentation rules:
@@ -648,7 +662,7 @@ knobs such as `--temperature` / `DUBBRIDGE_LOW_RRI_TEMPERATURE` and `--think` /
 it only for a bounded experiment because it can consume the token budget before
 the tagged response is completed.
 
-For **RRI 26–40 local-first implementation**, use
+For **RRI 26–55 local-first implementation** (Moderate + Med-high), use
 `scripts/local-agent/run_local_task.py` in a disposable git worktree. The
 primary agent remains orchestrator of record: it owns the task card,
 `allowed_paths`, verification commands, Reflection passes, closure, and final
@@ -657,16 +671,22 @@ accept/reject judgment. The local implementer resolves from
 development commands inside the disposable worktree, and is constrained by the
 existing narrow denylist (`git push`, `docker`, `rm -rf`), stripped
 credentials, and post-run diff scope enforcement. Use at most **2**
-evidence-backed local repair attempts. If the local runner/model is
-unavailable, the repair budget is exhausted, or the task violates the scope
+evidence-backed local repair attempts for Moderate (26–40) and at most **1**
+for Med-high (41–55) — the tighter budget reflects the higher-risk
+anchor-rubric floors Med-high tasks typically carry. If the local runner/model
+is unavailable, the repair budget is exhausted, or the task violates the scope
 boundary, escalate to cloud implementation with the ADR-036 escalation packet
-instead of continuing locally.
+instead of continuing locally. Med-high tasks still go through cross-vendor
+peer review (phases 1 and 2) and 3 Reflection passes regardless of where the
+code was authored — local-first routing changes only the code-authoring
+surface, not the review or approval controls.
 
 **Rollback triggers for this operative policy:** if the rolling 20-task window
 shows escalation rate `> 40%`, any **accepted** out-of-scope diff, any
 unintended change escaping the disposable worktree boundary, or sustained
 swap/thermal degradation attributable to the local implementer, revert the
-Moderate band to cloud implementation while retaining the local review roles.
+affected band (Moderate and/or Med-high) to cloud implementation while
+retaining the local review roles.
 
 ## Reviewability budget gate
 

@@ -78,13 +78,17 @@ If penalties are present and the final RRI is still ≤ 25, the low-band handlin
 still applies. When delegation is used, state all active penalties explicitly in
 the delegation packet and final report so the score is transparent.
 
-## Local-first implementation (RRI 26–40)
+## Local-first implementation (RRI 26–55)
 
-For the **26–40 Moderate band**, the approval gate is unchanged: the agent must
-present the task and wait for explicit human approval before implementation.
-What changes is the default implementation route.
+For the **26–40 Moderate** and **41–55 Med-high** bands, the approval gate is
+unchanged: the agent must present the task and wait for explicit human
+approval before implementation. What changes is the default implementation
+route. Med-high also keeps its own unchanged controls — cross-vendor peer
+review (phases 1 and 2), 3 Reflection passes, and the "Plan + explicit
+acceptance criteria" gate all still apply; only the code-authoring surface
+moves local.
 
-The default path for development tasks in this band is:
+The default path for development tasks in these bands is:
 
 1. Compute RRI with `scripts/rri.py`.
 2. Present the task and obtain explicit approval.
@@ -100,14 +104,21 @@ The default path for development tasks in this band is:
 6. Run the approved verification commands.
 7. If the local run fails the acceptance signal, hits the scope boundary, or
    the local path is unavailable, the primary agent may run at most **2**
-   evidence-backed local repair attempts.
+   evidence-backed local repair attempts for Moderate (26–40) or at most **1**
+   for Med-high (41–55).
 8. After the repair budget is exhausted, or if the local runner/model is
    unavailable, escalate to cloud implementation with the ADR-036 escalation
    packet rather than continuing with ad hoc local retries.
 
-This routing is operative by owner override dated **2026-07-15**. It was
-adopted ahead of the original ADR-036 promotion gate so that live Moderate-band
-tasks become the evaluation surface.
+This routing is operative by owner override dated **2026-07-15** for the
+Moderate band. It was adopted ahead of the original ADR-036 promotion gate so
+that live Moderate-band tasks become the evaluation surface. It was extended
+to the Med-high band by owner override dated **2026-07-21**, with a tighter
+1-attempt repair budget (vs. 2 for Moderate) reflecting the higher-risk
+anchor-rubric floors Med-high tasks typically carry (e.g.
+`infra/migrations/**`, ADR-008/ADR-018). The Med-high extension does not touch
+the "Band-routed peer review" section below — cross-vendor peer review still
+applies in full.
 
 ## Approval checkpoint wording
 
