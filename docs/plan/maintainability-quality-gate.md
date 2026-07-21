@@ -84,3 +84,6 @@ flowchart LR
 - The gate is available through `make qa-maintainability`, runs in CI, and runs
   from the pre-push hook.
 - Unit coverage for the gate lives in `scripts/check_maintainability_test.py`.
+- `MQG-T2` is complete: base revision discovery now accepts only existing commit
+  objects, so GitHub's all-zero new-branch `before` SHA falls back to a valid
+  local base instead of reaching `git diff`.

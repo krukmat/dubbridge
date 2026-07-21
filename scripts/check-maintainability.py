@@ -110,7 +110,7 @@ def discover_base(explicit_base: str | None) -> str | None:
         if not candidate:
             continue
         result = subprocess.run(
-            ["git", "rev-parse", "--verify", candidate],
+            ["git", "cat-file", "-e", f"{candidate}^{{commit}}"],
             check=False,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
