@@ -649,7 +649,9 @@ awaiting owner's next-step decision (T1c-ii implementation)**
 --touches crates/db/src/lib.rs --touches apps/api/tests/subtitle_repo_test.rs
 --platform rust`)
 **Depends on:** S-140-T1c-i
-**Status:** Not started — blocked on T1c-i
+**Status:** Implementation complete, phase-2 review clean, Reflection passes
+1-3 done. Awaiting owner final verification and commit authorization before
+`[x] Done`.
 
 **Happy paths considered:**
 - HP-1: Insert a `Subtitle` derived artifact and list it with correct
@@ -758,7 +760,71 @@ S-140-T1c-i) are all merged before this task starts; this task only writes
 repository code that reads/writes those existing tables/constraints.
 
 **Evidence to emit:** RRI output, local-run artifact, exact test commands,
-unit/integration test names.
+unit/integration test names, and the disposition of any phase-2 review
+findings that remain open at handoff/closure time.
+
+**Closure evidence (2026-07-21):**
+- RRI 47, Med-high band (`python3 scripts/rri.py --C 2 --T 3 --A 1 --X 1 --D 3
+  --K 3 --P 3 --touches crates/db/src/subtitle_repo.rs --touches
+  crates/db/src/lib.rs --touches apps/api/tests/subtitle_repo_test.rs
+  --platform rust`).
+- Phase-2 review (mandatory gate, `qwen3.6:27b-q4_K_M` via
+  `scripts/peer-workflow-review.py --phase code --rri 47`) run against the
+  complete final diff (tracked + untracked files):
+  `.agent/peer-code-review-S-140-T1c-ii-closure.json`, verdict `findings`,
+  no action-required findings: one MEDIUM ("tests lack cleanup/transactions")
+  re-confirmed as a false positive — every test generates its own
+  `AssetId::new()`/`Uuid::new_v4()` row, matching the already-merged pattern
+  in `transcription_repo_test.rs`/`preparation_repo_test.rs`, verified by
+  grep, not asserted from memory; two LOW notes, one explicitly "no change
+  needed", the other a CI-robustness note on the concurrency test, not a
+  defect. Full 8-round history (v1-v7) and the superseded
+  `-rerun-full.json` LOW finding (missing `Failed`-status readiness test) are
+  documented in `docs/tasks/handoff-s140-t1c-ii-2026-07-21.md`; that finding
+  is closed — the test
+  (`subtitle_readiness_evidence_false_when_artifact_exists_and_status_failed`)
+  is present in `apps/api/tests/subtitle_repo_test.rs:433`.
+- Reflection pass 1 (schema verification against a live migrated database,
+  not the migration files alone): `psql \d artifact_records` confirms
+  `artifact_records_subtitle_unique_asset_parent` UNIQUE btree on
+  `(asset_id, parent_artifact_id) WHERE kind = 'subtitle'` (T1c-i, migration
+  0025); `psql \d asset_subtitle_status` confirms the table (migration 0024)
+  with `PRIMARY KEY (asset_id)` and `subtitle_status_check` CHECK constraint
+  matching `SubtitleStatus`'s four variants.
+- Reflection pass 2 (FK constraint for EC-5): `psql \d artifact_records`
+  confirms `artifact_records_parent_artifact_id_fkey` FOREIGN KEY
+  (`parent_artifact_id`) REFERENCES `artifact_records(id)` (migration 0019,
+  pre-existing).
+- Reflection pass 3 (error-mapping EC-4/EC-5 verified by test, not by
+  inspection alone): `insert_subtitle_artifact_rejects_duplicate_for_same_parent`
+  exercises SQLSTATE 23505 -> `DbError::Conflict`;
+  `insert_subtitle_artifact_rejects_missing_parent` exercises SQLSTATE 23503
+  -> `DbError::QueryFailed`, both green.
+- Test commands run against a disposable `postgres:16` container (port
+  5433, not the shared `local-postgres-1`):
+  - `cargo test -p dubbridge-api --test subtitle_repo_test -- --nocapture`
+    -> 13 passed, 0 failed (HP-1..HP-3, EC-1..EC-5, plus EC-3b/EC-4b
+    supplementary cases).
+  - `cargo test -p dubbridge-api --test transcription_repo_test` -> 8
+    passed, 0 failed (no regression vs. pre-task baseline).
+  - `cargo test -p dubbridge-db subtitle_repo::tests::parse_subtitle_status_unknown_fails_closed -- --exact`
+    -> 1 passed.
+  - `cargo fmt --check -p dubbridge-db -p dubbridge-api` -> clean.
+  - `cargo clippy -p dubbridge-db -p dubbridge-api --tests -- -D warnings`
+    -> clean, 0 warnings.
+- Files pending commit (not yet committed — awaiting explicit owner
+  authorization): `crates/db/src/subtitle_repo.rs` (new),
+  `apps/api/tests/subtitle_repo_test.rs` (new), `crates/db/src/lib.rs`
+  (adds `pub mod subtitle_repo;`). `.githooks/pre-push` is a pre-existing,
+  unrelated modification and must not be included in this commit (see
+  `docs/tasks/handoff-s140-t1c-ii-2026-07-21.md`).
+- Documented tech debt (not a closure blocker, out of scope for T1c-ii):
+  `get_subtitle_readiness_evidence` cannot distinguish per-language
+  readiness when multiple `Subtitle` artifacts exist for one asset, since
+  `asset_subtitle_status` is one row per `asset_id`. Covered by test
+  `subtitle_readiness_evidence_true_with_multiple_artifacts_and_asset_level_ready`,
+  which documents the limitation rather than fixing it; a timestamp-ordering
+  fix was attempted and discarded as flaky (two independent clock sources).
 
 **Status artifacts affected:** This ledger (`docs/tasks/s-140-subtitle-generation.md`)
 must be synced with the execution record, reflection log, and closure status
@@ -780,7 +846,8 @@ fail-closed per ADR-018, cover HP-1..HP-3/EC-1..EC-5 in integration tests,
 execute and document all 3 required Reflection passes (RRI 47, Med-high)
 before closure, and stop before storage or job work.
 
-**Status: [ ] Not started — blocked on T1c-i**
+**Status: [~] Implementation and mandatory review gate complete — awaiting
+owner final verification and explicit commit authorization before `[x] Done`**
 
 ---
 
