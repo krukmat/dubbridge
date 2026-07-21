@@ -34,6 +34,14 @@ import gemma_local
 
 DEFAULT_HOST = gemma_local.DEFAULT_HOST
 DEFAULT_MODEL = gemma_local.DEFAULT_MODEL
+# Stall fallback (distinct from gemma_local.DEFAULT_FALLBACK_MODEL, which is
+# an install-availability fallback and currently resolves to the same Gemma
+# model). This one is for a *responding but non-convergent* primary model —
+# observed live during S-140-T1c-ii, where run_local_task.py's Moderate/
+# Med-high path stalled with qwen3.6:35b-a3b as the *primary* implementer.
+# Here roles are reversed: Gemma is primary for Low-band delegation, so the
+# stall fallback goes to qwen3.6:35b-a3b instead.
+DEFAULT_STALL_FALLBACK_MODEL = "qwen3.6:35b-a3b"
 DEFAULT_IDLE_TIMEOUT_SECONDS = gemma_local.DEFAULT_IDLE_TIMEOUT_SECONDS
 DEFAULT_MAX_WALL_SECONDS = gemma_local.DEFAULT_MAX_WALL_SECONDS
 DEFAULT_NUM_CTX = gemma_local.DEFAULT_NUM_CTX
@@ -72,6 +80,20 @@ def parse_args():
         help=(
             "Local model name; defaults to DUBBRIDGE_LOW_RRI_MODEL or "
             f"{DEFAULT_MODEL}."
+        ),
+    )
+    parser.add_argument(
+        "--stall-fallback-model",
+        dest="stall_fallback_model",
+        default=os.environ.get(
+            "DUBBRIDGE_LOW_RRI_STALL_FALLBACK_MODEL", DEFAULT_STALL_FALLBACK_MODEL
+        ),
+        help=(
+            "Model to retry once against, with a fresh timeout budget, if the "
+            "primary model hits the idle/wall timeout without producing a "
+            "response (a stall, not a missing-model error); defaults to "
+            f"DUBBRIDGE_LOW_RRI_STALL_FALLBACK_MODEL or {DEFAULT_STALL_FALLBACK_MODEL}. "
+            "Set to '' to disable."
         ),
     )
     parser.add_argument(
@@ -906,12 +928,31 @@ def main():
     user_prompt = payload["messages"][1]["content"]
 
     wall_start = time.monotonic()
-    stream_result = stream_chat(
-        endpoint(args.host, "/api/chat"),
-        payload,
-        idle_timeout=args.idle_timeout,
-        max_wall=args.max_wall,
-    )
+    try:
+        stream_result = stream_chat(
+            endpoint(args.host, "/api/chat"),
+            payload,
+            idle_timeout=args.idle_timeout,
+            max_wall=args.max_wall,
+        )
+    except (DelegationIdleTimeout, DelegationWallTimeout) as exc:
+        fallback_model = args.stall_fallback_model
+        if not fallback_model or fallback_model == selected_model:
+            raise
+        print(
+            f"[delegate] {selected_model!r} stalled ({exc}); retrying once "
+            f"against stall fallback {fallback_model!r}",
+            file=sys.stderr,
+        )
+        selected_model = fallback_model
+        payload["model"] = selected_model
+        wall_start = time.monotonic()
+        stream_result = stream_chat(
+            endpoint(args.host, "/api/chat"),
+            payload,
+            idle_timeout=args.idle_timeout,
+            max_wall=args.max_wall,
+        )
     content = gemma_local.stream_result_content(stream_result)
     usage = gemma_local.stream_result_usage(stream_result)
 
@@ -960,6 +1001,7 @@ def main():
     gemma_local.append_audit_log({
         "ts": datetime.datetime.utcnow().isoformat() + "Z",
         "role": "developer",
+        "model": selected_model,
         "outcome": delegation["status"].upper(),
         "done_reason": "policy" if delegation["status"] == "blocked" else "stop",
         "mode": args.mode,

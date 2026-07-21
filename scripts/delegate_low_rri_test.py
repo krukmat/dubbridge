@@ -799,6 +799,7 @@ class AuditEmission(unittest.TestCase):
         self.assertEqual(r["apply_result"], "skipped")
         self.assertEqual(r["response_tokens"], 13)
         self.assertGreater(r["packet_tokens_est"], 0)
+        self.assertEqual(r["model"], "model")
 
     def test_no_patch_emits_skipped_apply_result(self):
         records = self._run("STATUS: NO_PATCH\nSUMMARY: nothing to do")
@@ -848,6 +849,87 @@ class AuditEmission(unittest.TestCase):
         r = captured[0]
         self.assertEqual(r["diff_added"], 2)
         self.assertEqual(r["diff_removed"], 1)
+
+
+class StallFallback(unittest.TestCase):
+    """If the primary model stalls (idle/wall timeout), retry once against
+    --stall-fallback-model with a fresh timeout budget instead of failing
+    outright. Distinct from resolve_model's install-availability fallback:
+    this covers a model that responds on the transport but never converges
+    to a usable reply (observed live during S-140-T1c-ii)."""
+
+    def _run(self, side_effect, extra_args=None):
+        captured = []
+        with tempfile.TemporaryDirectory() as tmp:
+            out_path = os.path.join(tmp, "result.json")
+            packet_file = os.path.join(tmp, "packet.md")
+            with open(packet_file, "w") as f:
+                f.write("# test packet\n")
+
+            argv = [_SCRIPT, packet_file, "--out", out_path] + (extra_args or [])
+            with patch("sys.argv", argv), \
+                 patch.object(_mod, "resolve_model", return_value="model"), \
+                 patch.object(_mod, "stream_chat", side_effect=side_effect), \
+                 patch.object(_mod.gemma_local, "append_audit_log",
+                              side_effect=lambda r: captured.append(r)):
+                _mod.main()
+        return captured
+
+    def test_retries_once_against_stall_fallback_model(self):
+        ok_response = _mod.gemma_local.StreamChatResult(
+            content="STATUS: NO_PATCH\nSUMMARY: ok",
+            usage=_mod.gemma_local.StreamUsage(response_tokens=5),
+        )
+        records = self._run([_mod.DelegationIdleTimeout(60), ok_response])
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["model"], "qwen3.6:35b-a3b")
+        self.assertEqual(records[0]["outcome"], "NO_PATCH")
+
+    def test_wall_timeout_also_triggers_fallback(self):
+        ok_response = "STATUS: NO_PATCH\nSUMMARY: ok"
+        records = self._run([_mod.DelegationWallTimeout(900), ok_response])
+        self.assertEqual(records[0]["model"], "qwen3.6:35b-a3b")
+
+    def test_custom_stall_fallback_model_honoured(self):
+        ok_response = "STATUS: NO_PATCH\nSUMMARY: ok"
+        records = self._run(
+            [_mod.DelegationIdleTimeout(60), ok_response],
+            extra_args=["--stall-fallback-model", "custom-model"],
+        )
+        self.assertEqual(records[0]["model"], "custom-model")
+
+    def test_empty_stall_fallback_model_disables_retry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out_path = os.path.join(tmp, "result.json")
+            packet_file = os.path.join(tmp, "packet.md")
+            with open(packet_file, "w") as f:
+                f.write("# test packet\n")
+            argv = [_SCRIPT, packet_file, "--out", out_path,
+                    "--stall-fallback-model", ""]
+            with patch("sys.argv", argv), \
+                 patch.object(_mod, "resolve_model", return_value="model"), \
+                 patch.object(_mod, "stream_chat",
+                               side_effect=_mod.DelegationIdleTimeout(60)):
+                with self.assertRaises(_mod.DelegationIdleTimeout):
+                    _mod.main()
+
+    def test_fallback_same_as_primary_does_not_retry(self):
+        # selected_model resolves to "model" (mocked); requesting the same
+        # name as the stall fallback must not trigger a second call, so the
+        # original timeout propagates instead of being swallowed by a retry.
+        with tempfile.TemporaryDirectory() as tmp:
+            out_path = os.path.join(tmp, "result.json")
+            packet_file = os.path.join(tmp, "packet.md")
+            with open(packet_file, "w") as f:
+                f.write("# test packet\n")
+            argv = [_SCRIPT, packet_file, "--out", out_path,
+                    "--stall-fallback-model", "model"]
+            with patch("sys.argv", argv), \
+                 patch.object(_mod, "resolve_model", return_value="model"), \
+                 patch.object(_mod, "stream_chat",
+                               side_effect=_mod.DelegationIdleTimeout(60)):
+                with self.assertRaises(_mod.DelegationIdleTimeout):
+                    _mod.main()
 
 
 if __name__ == "__main__":
