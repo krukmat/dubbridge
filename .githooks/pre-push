@@ -4,6 +4,24 @@ set -euo pipefail
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
+ALLOW_BRANCH_CREATE="${ALLOW_BRANCH_CREATE:-0}"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -n "${local_ref:-}" ] || continue
+
+  case "$remote_ref" in
+    refs/heads/main)
+      ;;
+    refs/heads/*)
+      if [ "$ALLOW_BRANCH_CREATE" != "1" ]; then
+        echo "pre-push: push bloqueado; solo se permite publicar main." >&2
+        echo "Usa ALLOW_BRANCH_CREATE=1 solo con autorizacion explicita." >&2
+        exit 1
+      fi
+      ;;
+  esac
+done
+
 CARGO_BIN="${CARGO:-$(command -v cargo 2>/dev/null || true)}"
 if [ -z "$CARGO_BIN" ] && [ -x "$HOME/.cargo/bin/cargo" ]; then
   CARGO_BIN="$HOME/.cargo/bin/cargo"
