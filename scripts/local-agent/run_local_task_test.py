@@ -140,6 +140,90 @@ class HP1ToyCardCompletes(unittest.TestCase):
             self.assertGreater(len(transcript["transcript"]), 0)
 
 
+class CheckpointingPersistsProgressPerTurn(unittest.TestCase):
+    # A session interrupted mid-run (e.g. SIGKILL during a slow local-model
+    # generation) previously left zero trace in --out: gemma_local
+    # .write_result() only ran once, after run_loop returned. These tests
+    # cover the fix: main() now writes an in-progress checkpoint to the same
+    # --out path after every turn that continues the loop, so an interrupted
+    # run still leaves the transcript-so-far on disk.
+    def test_write_result_called_once_per_turn_plus_final_result(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = os.path.join(tmp, "worktree")
+            _git_init_worktree(worktree)
+            card_path = _make_card(tmp)
+            out_path = os.path.join(tmp, "transcript.json")
+
+            chat = ChatSequencer(_write_and_finish("hello.txt", "hi"))
+            passing_tests = lambda wt: {"passed": True, "output": "ok"}
+
+            calls = []
+            real_write_result = gemma_local.write_result
+
+            def spy_write_result(delegation, path):
+                calls.append(delegation)
+                real_write_result(delegation, path)
+
+            with patch.object(gemma_local, "write_result", side_effect=spy_write_result):
+                exit_code = rlt.main(
+                    ["--card", card_path, "--worktree", worktree, "--out", out_path],
+                    chat_fn=chat,
+                    test_runner=passing_tests,
+                )
+
+            self.assertEqual(exit_code, 0)
+            # turn 1 (write_file) checkpoints before continuing; turn 2
+            # (finish, tests pass) returns success directly without another
+            # mid-loop checkpoint -- main()'s own terminal write_result call
+            # is the second and last entry.
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(calls[0]["status"], "in_progress")
+            self.assertEqual(calls[0]["turn"], 1)
+            self.assertEqual(calls[0]["task_id"], "toy-1")
+            self.assertEqual(calls[1]["status"], "success")
+
+    def test_checkpoint_survives_when_loop_is_interrupted_before_finish(self):
+        # Simulates the real incident: the process dies mid-session (here, a
+        # chat_fn that raises on the second call, standing in for a kill
+        # between turns) before run_loop ever returns. Before this fix,
+        # nothing would have been written to --out at all.
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = os.path.join(tmp, "worktree")
+            _git_init_worktree(worktree)
+            card_path = _make_card(tmp)
+            out_path = os.path.join(tmp, "transcript.json")
+
+            def chat_fn(messages):
+                if chat_fn.calls == 0:
+                    chat_fn.calls += 1
+                    return _tool_call("write_file", {"path": "hello.txt", "content": "hi"})
+                raise KeyboardInterrupt("simulated operator interruption")
+
+            chat_fn.calls = 0
+
+            with self.assertRaises(KeyboardInterrupt):
+                rlt.main(
+                    ["--card", card_path, "--worktree", worktree, "--out", out_path],
+                    chat_fn=chat_fn,
+                    test_runner=lambda wt: {"passed": True, "output": "ok"},
+                )
+
+            # the write_file call itself already landed on disk, and the
+            # turn-1 checkpoint captured it in the transcript -- exactly the
+            # evidence the real S-140-T1c-ii incident lacked.
+            with open(os.path.join(worktree, "hello.txt"), encoding="utf-8") as f:
+                self.assertEqual(f.read(), "hi")
+            with open(out_path, encoding="utf-8") as f:
+                checkpoint = json.load(f)
+            self.assertEqual(checkpoint["status"], "in_progress")
+            self.assertEqual(checkpoint["turn"], 1)
+            tool_results = [
+                e["result"] for e in checkpoint["transcript"]
+                if e.get("event") == "tool_result"
+            ]
+            self.assertEqual(tool_results[0]["tool"], "write_file")
+
+
 class SystemPromptIncludesToolContract(unittest.TestCase):
     def test_first_message_prepends_tool_calling_contract_to_card_spec(self):
         # regression: chat_fn used to receive only card.spec as the system
@@ -502,6 +586,91 @@ class DefaultBoundaryIsReal(unittest.TestCase):
                 os.path.exists(os.path.join(tmp, "escape.txt")),
                 "escape write must not have landed outside the worktree",
             )
+
+
+class DefaultTestRunnerIsReal(unittest.TestCase):
+    """main() with no test_runner= override must build a real one from the
+    card's acceptance_tests and run it at finish -- not leave test_runner=None
+    and crash with `TypeError: 'NoneType' object is not callable` the way the
+    CLI path did before the fallback existed. chat_fn and boundary already had
+    `x or build_x(...)` fallbacks; test_runner was the missing one, which made
+    every real `python3 run_local_task.py ...` session die at finish."""
+
+    def _make_card_with_tests(self, tmp_dir, acceptance_tests):
+        card = {
+            "task_id": "toy-1",
+            "spec": "Write hello.txt containing 'hi'.",
+            "acceptance_tests": acceptance_tests,
+            "allowed_paths": ["hello.txt"],
+        }
+        path = os.path.join(tmp_dir, "card.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(card, f)
+        return path
+
+    def test_cli_path_runs_card_acceptance_tests_instead_of_crashing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = os.path.join(tmp, "worktree")
+            _git_init_worktree(worktree)
+            # A real shell command that can only pass if (a) the model's write
+            # actually landed in the worktree and (b) the default test_runner
+            # really shelled out to run it -- not a lambda stand-in.
+            card_path = self._make_card_with_tests(tmp, ["test -f hello.txt"])
+            out_path = os.path.join(tmp, "transcript.json")
+
+            chat = ChatSequencer(_write_and_finish("hello.txt", "hi"))
+
+            # NOTE: no test_runner= passed -- exactly how the CLI invokes main().
+            exit_code = rlt.main(
+                ["--card", card_path, "--worktree", worktree, "--out", out_path],
+                chat_fn=chat,
+            )
+
+            self.assertEqual(exit_code, 0)
+            with open(out_path, encoding="utf-8") as f:
+                transcript = json.load(f)
+            self.assertEqual(transcript["status"], "success")
+            test_events = [
+                e for e in transcript["transcript"] if e.get("event") == "test_result"
+            ]
+            self.assertTrue(
+                test_events, "the default test_runner must have actually run at finish"
+            )
+            self.assertTrue(test_events[0]["result"]["passed"])
+
+    def test_cli_path_default_test_runner_reports_failure_not_crash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = os.path.join(tmp, "worktree")
+            _git_init_worktree(worktree)
+            # A command that always fails: the default runner must surface it as
+            # a normal failed-acceptance result (repair budget -> exhausted),
+            # not a TypeError. finish is retried MAX_REPAIR_ATTEMPTS times, so
+            # the chat script supplies enough finish turns to exhaust the budget.
+            card_path = self._make_card_with_tests(tmp, ["false"])
+            out_path = os.path.join(tmp, "transcript.json")
+
+            responses = _write_and_finish("hello.txt", "hi") + [
+                _tool_call("finish", {}),
+                _tool_call("finish", {}),
+            ]
+            chat = ChatSequencer(responses)
+
+            exit_code = rlt.main(
+                ["--card", card_path, "--worktree", worktree, "--out", out_path],
+                chat_fn=chat,
+            )
+
+            self.assertNotEqual(exit_code, 0)
+            with open(out_path, encoding="utf-8") as f:
+                transcript = json.load(f)
+            self.assertEqual(transcript["status"], "budget_exhausted")
+            test_events = [
+                e for e in transcript["transcript"] if e.get("event") == "test_result"
+            ]
+            self.assertTrue(
+                test_events, "the default test_runner must have actually run"
+            )
+            self.assertFalse(test_events[0]["result"]["passed"])
 
 
 class BoundaryViolationPath(unittest.TestCase):
@@ -1257,6 +1426,33 @@ class BuildLiveChatFn(unittest.TestCase):
                 response = chat_fn([{"role": "system", "content": "spec"}])
 
         self.assertEqual(response, _tool_call("finish", {}))
+
+    def test_progress_label_carries_turn_number_across_calls(self):
+        # Live probes against a real local model showed a single write_file
+        # generation for a several-hundred-line file taking ~3 minutes, with
+        # the token counter resetting to zero every turn -- no way to tell
+        # "turn 4 of 30, still generating" apart from a stall. The label must
+        # advance each call so the live progress line carries that context.
+        fake_stream_result = gemma_local.StreamChatResult(
+            content=json.dumps(_tool_call("finish", {})),
+            usage=gemma_local.StreamUsage(),
+        )
+        captured_labels = []
+
+        def spy_stream_chat(url, payload, idle_timeout, max_wall, progress_label="delegate"):
+            captured_labels.append(progress_label)
+            return fake_stream_result
+
+        with patch.object(gemma_local, "ensure_model_available", return_value="qwen3.6:35b-a3b"):
+            with patch.object(gemma_local, "stream_chat", side_effect=spy_stream_chat):
+                chat_fn = rlt.build_live_chat_fn(
+                    "http://localhost:11434", "qwen3.6:35b-a3b", idle_timeout=5, max_wall=30
+                )
+                chat_fn([{"role": "system", "content": "spec"}])
+                chat_fn([{"role": "system", "content": "spec"}])
+
+        self.assertEqual(captured_labels[0], f"local-agent turn 1/{rlt.MAX_TOTAL_TURNS}")
+        self.assertEqual(captured_labels[1], f"local-agent turn 2/{rlt.MAX_TOTAL_TURNS}")
 
     def test_non_json_model_response_raises_malformed_tool_call(self):
         fake_stream_result = gemma_local.StreamChatResult(

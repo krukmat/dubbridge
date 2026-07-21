@@ -30,6 +30,25 @@ import signal
 import subprocess
 import sys
 
+# When this file is run directly (`python3 run_local_task.py ...`, the real
+# CLI path), Python executes it as module `__main__`. boundary.py separately
+# does `from run_local_task import BoundaryViolation`, which -- absent this
+# line -- makes Python import this same file a *second* time under the name
+# `run_local_task`, producing a second, distinct BoundaryViolation class.
+# run_loop's `except BoundaryViolation` (bound to the __main__ copy) then
+# does not match an instance raised via boundary.py's copy, so every real
+# boundary violation escaped as an uncaught traceback instead of the clean
+# {"status": "boundary_violation"} result the code is designed to return.
+# Confirmed live: a real qwen3.6:35b-a3b session hit exactly this crash on a
+# legitimate out-of-scope write attempt. Registering this module object
+# under its on-disk name before any sibling module can trigger the second
+# import makes both names resolve to the identical module, so both refer to
+# the same class. Tests that `import run_local_task` directly (never as
+# __main__) never exercised this path, which is why 100 passing tests missed
+# it.
+if __name__ == "__main__":
+    sys.modules.setdefault("run_local_task", sys.modules[__name__])
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import gemma_local
 
@@ -348,7 +367,14 @@ def run_acceptance_tests(test_runner, worktree_dir):
     return test_runner(worktree_dir)
 
 
-def run_loop(card, chat_fn, test_runner, worktree_dir, boundary):
+def run_loop(card, chat_fn, test_runner, worktree_dir, boundary, checkpoint_fn=None):
+    """checkpoint_fn(transcript, total_turns), if given, is called after every
+    turn that continues the loop. A session killed between turns (e.g. an
+    operator interrupting a slow local-model generation) previously left no
+    artifact at all -- gemma_local.write_result() only ran once, after this
+    function returned. Checkpointing lets the caller persist the
+    transcript-so-far each turn instead, so an interrupted run still leaves
+    diagnostic evidence and any already-applied worktree diff stays visible."""
     transcript = []
     repair_attempt = 0
     malformed_bounces = 0
@@ -403,6 +429,8 @@ def run_loop(card, chat_fn, test_runner, worktree_dir, boundary):
             messages.append(
                 {"role": "user", "content": f"Malformed tool call: {exc}. Retry."}
             )
+            if checkpoint_fn is not None:
+                checkpoint_fn(transcript, total_turns)
             continue
         transcript.append({"role": "assistant", "raw": response})
         # Structural bug found live (both qwen3.6:35b-a3b and
@@ -438,6 +466,8 @@ def run_loop(card, chat_fn, test_runner, worktree_dir, boundary):
             messages.append(
                 {"role": "user", "content": f"Malformed tool call: {exc}. Retry."}
             )
+            if checkpoint_fn is not None:
+                checkpoint_fn(transcript, total_turns)
             continue
         except BoundaryViolation as exc:
             transcript.append({"event": "boundary_violation", "error": str(exc)})
@@ -452,6 +482,16 @@ def run_loop(card, chat_fn, test_runner, worktree_dir, boundary):
         # against consecutive garbage, not a single earlier hiccup in an
         # otherwise-recovering session.
         malformed_bounces = 0
+        # Printed once the tool call is parsed (not during generation, since
+        # the tool isn't known until the model finishes choosing it) — lets
+        # an operator watching stderr tell "still generating turn 4/30" apart
+        # from "turn 4/30 resolved to write_file, now running acceptance
+        # tests", instead of only ever seeing a per-turn token counter reset
+        # to zero with no sense of overall progress.
+        print(
+            f"[local-agent] turn {total_turns}/{MAX_TOTAL_TURNS} -> {call.name}",
+            file=sys.stderr,
+        )
 
         if call.name == "finish":
             scope_result = scope_check.check_scope(worktree_dir, card.allowed_paths)
@@ -499,6 +539,8 @@ def run_loop(card, chat_fn, test_runner, worktree_dir, boundary):
                     "content": f"Tests failed: {test_result['output']}. Repair attempt {repair_attempt}.",
                 }
             )
+            if checkpoint_fn is not None:
+                checkpoint_fn(transcript, total_turns)
             continue
 
         # read_file / write_file / run_command: report the real tool result
@@ -509,6 +551,8 @@ def run_loop(card, chat_fn, test_runner, worktree_dir, boundary):
         messages.append(
             {"role": "user", "content": f"Tool result: {json.dumps(result)}"}
         )
+        if checkpoint_fn is not None:
+            checkpoint_fn(transcript, total_turns)
         continue
 
 
@@ -528,8 +572,17 @@ def build_live_chat_fn(host, model, idle_timeout, max_wall):
     """
     resolved_model = gemma_local.ensure_model_available(host, model, idle_timeout)
     url = gemma_local.endpoint(host, "/api/chat")
+    # Mutable across calls: each chat_fn(messages) invocation is exactly one
+    # run_loop turn, so counting calls here gives the live token-streaming
+    # progress line a "turn N/MAX_TOTAL_TURNS" label -- without it, a full
+    # write_file generation of a several-hundred-line file (confirmed live:
+    # ~3 minutes at local-model throughput) prints only a token count that
+    # resets to zero every turn, indistinguishable from a stalled process to
+    # an operator watching stderr.
+    turn_counter = {"n": 0}
 
     def chat_fn(messages):
+        turn_counter["n"] += 1
         payload = {
             "model": resolved_model,
             "stream": True,
@@ -539,7 +592,11 @@ def build_live_chat_fn(host, model, idle_timeout, max_wall):
             "messages": messages,
         }
         result = gemma_local.stream_chat(
-            url, payload, idle_timeout, max_wall, progress_label="local-agent"
+            url,
+            payload,
+            idle_timeout,
+            max_wall,
+            progress_label=f"local-agent turn {turn_counter['n']}/{MAX_TOTAL_TURNS}",
         )
         content = gemma_local.stream_result_content(result)
         try:
@@ -609,6 +666,53 @@ def build_default_boundary(worktree_root):
     return boundary.LocalAgentBoundary(worktree_root)
 
 
+def build_default_test_runner(card):
+    """CLI fallback: turn card.acceptance_tests (a list of shell command
+    strings) into the test_runner run_loop calls at finish. Mirrors
+    run_stage1_benchmark.make_test_runner.
+
+    Before this existed, main()'s CLI path left test_runner=None -- unlike
+    chat_fn and boundary, which both have `x or build_x(...)` fallbacks -- so
+    every real `python3 run_local_task.py --card ...` session that reached
+    finish crashed with `TypeError: 'NoneType' object is not callable` inside
+    run_acceptance_tests. The whole local-first delegation channel could never
+    close a task from the CLI; it only ever worked when an injected caller
+    (the unit tests, the benchmark harness) supplied its own test_runner.
+    Injected callers still override this and are unaffected.
+
+    An empty acceptance_tests list means "no acceptance gate": finish passes
+    rather than crashing, so a card with nothing to verify still closes
+    cleanly instead of reintroducing the same NoneType failure by another name.
+    """
+
+    def test_runner(worktree_dir):
+        outputs = []
+        for cmd in card.acceptance_tests:
+            try:
+                completed = subprocess.run(
+                    cmd,
+                    shell=True,
+                    cwd=worktree_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=COMMAND_TIMEOUT_SECONDS,
+                )
+            except subprocess.TimeoutExpired:
+                # A hung acceptance command must surface as a failed test, not
+                # an uncaught exception that would crash the runner at finish --
+                # exactly the failure class this fallback exists to remove.
+                outputs.append(f"$ {cmd}\n[TIMEOUT after {COMMAND_TIMEOUT_SECONDS}s]")
+                return {"passed": False, "output": "\n\n".join(outputs)}
+            outputs.append(
+                f"$ {cmd}\n(exit {completed.returncode})\n{completed.stdout}\n{completed.stderr}"
+            )
+            if completed.returncode != 0:
+                return {"passed": False, "output": "\n\n".join(outputs)}
+        return {"passed": True, "output": "\n\n".join(outputs)}
+
+    return test_runner
+
+
 def build_audit_record(card, result, model, elapsed_s):
     # Derived entirely from the transcript run_loop already produced — no
     # new capture logic, only aggregation, so this stays in lockstep with
@@ -651,9 +755,33 @@ def main(argv=None, chat_fn=None, test_runner=None, boundary=None):
     chat_fn = chat_fn or build_live_chat_fn(
         args.host, args.model, args.idle_timeout, args.max_wall
     )
+    # The missing fallback (chat_fn and boundary above both had theirs): the
+    # CLI never injects test_runner, so without this it stayed None and every
+    # finish crashed with TypeError. See build_default_test_runner's docstring.
+    test_runner = test_runner or build_default_test_runner(card)
+
+    def checkpoint_fn(transcript, turn):
+        # Overwritten by the real terminal write_result() call below once
+        # run_loop returns. If the process is killed mid-session instead
+        # (SIGINT/SIGKILL during a slow local-model turn), this is what's
+        # left on disk -- previously nothing was, since write_result() only
+        # ran once, after run_loop returned; an interrupted run left zero
+        # trace in --out and zero rows in the audit log.
+        gemma_local.write_result(
+            {
+                "status": "in_progress",
+                "task_id": card.task_id,
+                "turn": turn,
+                "max_turns": MAX_TOTAL_TURNS,
+                "transcript": transcript,
+            },
+            args.out,
+        )
 
     session_start = datetime.datetime.now(datetime.timezone.utc)
-    result = run_loop(card, chat_fn, test_runner, args.worktree, boundary)
+    result = run_loop(
+        card, chat_fn, test_runner, args.worktree, boundary, checkpoint_fn=checkpoint_fn
+    )
     elapsed_s = (datetime.datetime.now(datetime.timezone.utc) - session_start).total_seconds()
 
     result["task_id"] = card.task_id
