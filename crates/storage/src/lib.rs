@@ -76,6 +76,10 @@ pub fn alignment_key(asset_id: &str) -> String {
     format!("transcripts/{asset_id}/alignment.json")
 }
 
+pub fn subtitle_key(asset_id: &str) -> String {
+    format!("subtitles/{asset_id}/subtitle.json")
+}
+
 pub fn hls_segment_key(asset_id: &str, filename: &str) -> String {
     let safe = sanitize_filename(match filename.trim() {
         "" => "segment.ts",
@@ -215,6 +219,21 @@ mod tests {
     fn transcript_and_alignment_keys_differ() {
         let id = "asset-456";
         assert_ne!(transcript_key(id), alignment_key(id));
+    }
+
+    // S-140-T1d: subtitle storage key contract
+    #[test]
+    fn subtitle_key_format() {
+        assert_eq!(
+            subtitle_key("asset-123"),
+            "subtitles/asset-123/subtitle.json"
+        );
+    }
+
+    #[test]
+    fn subtitle_and_transcript_keys_differ() {
+        let id = "asset-456";
+        assert_ne!(subtitle_key(id), transcript_key(id));
     }
 
     #[test]

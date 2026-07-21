@@ -649,9 +649,8 @@ awaiting owner's next-step decision (T1c-ii implementation)**
 --touches crates/db/src/lib.rs --touches apps/api/tests/subtitle_repo_test.rs
 --platform rust`)
 **Depends on:** S-140-T1c-i
-**Status:** Implementation complete, phase-2 review clean, Reflection passes
-1-3 done. Awaiting owner final verification and commit authorization before
-`[x] Done`.
+**Status:** Done — implementation complete, phase-2 review clean, Reflection
+passes 1-3 done, committed as `d1cb62f`; T1d unblocked.
 
 **Happy paths considered:**
 - HP-1: Insert a `Subtitle` derived artifact and list it with correct
@@ -812,11 +811,10 @@ findings that remain open at handoff/closure time.
   - `cargo fmt --check -p dubbridge-db -p dubbridge-api` -> clean.
   - `cargo clippy -p dubbridge-db -p dubbridge-api --tests -- -D warnings`
     -> clean, 0 warnings.
-- Files pending commit (not yet committed — awaiting explicit owner
-  authorization): `crates/db/src/subtitle_repo.rs` (new),
-  `apps/api/tests/subtitle_repo_test.rs` (new), `crates/db/src/lib.rs`
-  (adds `pub mod subtitle_repo;`). `.githooks/pre-push` is a pre-existing,
-  unrelated modification and must not be included in this commit (see
+- Files committed as `d1cb62f` (2026-07-21): `crates/db/src/subtitle_repo.rs`
+  (new), `apps/api/tests/subtitle_repo_test.rs` (new), `crates/db/src/lib.rs`
+  (adds `pub mod subtitle_repo;`). `.githooks/pre-push` was a pre-existing,
+  unrelated modification and was excluded from this commit (see
   `docs/tasks/handoff-s140-t1c-ii-2026-07-21.md`).
 - Documented tech debt (not a closure blocker, out of scope for T1c-ii):
   `get_subtitle_readiness_evidence` cannot distinguish per-language
@@ -846,16 +844,17 @@ fail-closed per ADR-018, cover HP-1..HP-3/EC-1..EC-5 in integration tests,
 execute and document all 3 required Reflection passes (RRI 47, Med-high)
 before closure, and stop before storage or job work.
 
-**Status: [~] Implementation and mandatory review gate complete — awaiting
-owner final verification and explicit commit authorization before `[x] Done`**
+**Status: [x] Done — 2026-07-21, committed as `d1cb62f`; T1d unblocked**
 
 ---
 
 ## S-140-T1d: Subtitle storage key helper
 
-**Effort:** M (planning RRI 26 — Moderate; recompute at presentation time)
+**Effort:** M (planning RRI 26 — Moderate) → **recomputed RRI 14, Low**
+(`python3 scripts/rri.py --C 1 --T 1 --A 0 --X 0 --D 1 --K 1 --P 1 --touches
+crates/storage/src/lib.rs --platform rust`)
 **Depends on:** S-140-T1c-ii
-**Status:** Not started — blocked on T1c
+**Status:** Done — 2026-07-21
 
 **Happy paths considered:**
 - HP-1: `subtitle_key(asset_id)` returns the canonical storage-owned subtitle
@@ -877,6 +876,32 @@ owner final verification and explicit commit authorization before `[x] Done`**
 
 **Evidence to emit:** RRI output and exact storage test command.
 
+**Closure evidence (2026-07-21):**
+- RRI 14, Low band — routed to Gemma Developer (`gemma4:26b-a4b-it-qat`) per
+  Low-band policy, via `scripts/delegate-low-rri.py --mode before-after
+  --allow-path crates/storage/src/lib.rs --apply`.
+- Attempt 1 applied but produced an invalid file: Gemma emitted a duplicate,
+  unclosed `#[cfg(test)] mod tests { ... }` block containing literal `...`
+  placeholder text copied from the packet's illustrative example, breaking
+  compilation (`error: this file contains an unclosed delimiter`). Caught by
+  `cargo build -p dubbridge-storage` immediately after apply, before any
+  further step. Repaired directly (not re-delegated): removed the malformed
+  duplicate block, added `subtitle_key` once after `alignment_key` (matching
+  precedent), and added the two required tests
+  (`subtitle_key_format`, `subtitle_and_transcript_keys_differ`) inside the
+  existing single `mod tests` block next to `transcript_and_alignment_keys_differ`.
+- `cargo build -p dubbridge-storage` clean after repair.
+- `cargo test -p dubbridge-storage --lib` → 49/49 passed, including the two
+  new tests.
+- `cargo fmt -p dubbridge-storage -- --check` clean.
+- `cargo clippy -p dubbridge-storage --all-features -- -D warnings` clean.
+- Gemma Reviewer (`scripts/gemma-code-review.py`, 3 passes) against the final
+  repaired diff: `status: findings`, 1 consensus minor note (confirms the
+  implementation matches `transcript_key`/`alignment_key` convention, no
+  action) + 1 pass-specific minor note (no `sanitize_filename` call on
+  `asset_id` — consistent with existing precedent, not a new defect, no
+  action). No blocking/major findings; D14 not triggered.
+
 **Status artifacts affected:** This ledger.
 
 **Stop condition:** Stop after storage helper tests pass. Do not modify DB/jobs.
@@ -884,7 +909,8 @@ owner final verification and explicit commit authorization before `[x] Done`**
 **Agent handoff prompt:** Add only the subtitle storage key helper and focused
 tests, then stop.
 
-**Status: [ ] Not started — blocked on T1c**
+**Status: [x] Done — 2026-07-21, `subtitle_key` added to
+`crates/storage/src/lib.rs` with tests; T2a unblocked**
 
 ---
 
@@ -892,7 +918,7 @@ tests, then stop.
 
 **Effort:** M (planning RRI 34 — Moderate; recompute at presentation time)
 **Depends on:** S-140-T1d
-**Status:** Not started — blocked on T1d
+**Status:** Not started — unblocked, T1d done
 
 **Happy paths considered:**
 - HP-1: A `SubtitleJob` carries the asset/project/target-language context needed
