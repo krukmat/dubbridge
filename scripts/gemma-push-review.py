@@ -36,7 +36,7 @@ DOCS_ONLY_EXTENSIONS = frozenset({
 DOCS_ONLY_PATH_PREFIXES = ("docs/", "README", "CHANGELOG", "LICENSE", "CONTRIBUTING")
 
 # T1B constants
-DEFAULT_NUM_CTX_PUSH_REVIEW = 32768  # push-review baseline for CI-log packets
+DEFAULT_NUM_CTX_PUSH_REVIEW = gemma_local.DEFAULT_NUM_CTX  # matches shared roles (T2b-i)
 GROUNDING_SLACK = 10  # lines of tolerance around hunk boundaries
 PATCH_LIKE_PATTERNS = (
     "diff --git ",

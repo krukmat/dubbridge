@@ -964,9 +964,11 @@ class EnvNamespace(unittest.TestCase):
             )
         self.assertEqual(model, "gemma4:26b-a4b-it-qat")
 
-    def test_num_ctx_default_is_push_specific(self):
-        # D11: push-reviewer keeps its own CI-log packet baseline.
-        self.assertEqual(_mod.DEFAULT_NUM_CTX_PUSH_REVIEW, 32768)
+    def test_num_ctx_default_matches_shared_baseline(self):
+        # D11: push-reviewer inherits the shared gemma_local baseline (T2b-i).
+        self.assertEqual(
+            _mod.DEFAULT_NUM_CTX_PUSH_REVIEW, _mod.gemma_local.DEFAULT_NUM_CTX
+        )
 
     def test_think_defaults_true_for_push_reviewer(self):
         # Push reviewer defaults think=True (reflexive pass)
