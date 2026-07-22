@@ -13,6 +13,15 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
+RESULT_FILES = (
+    "aggregate.json",
+    "audit_skipped.json",
+    "pipeline_pending.json",
+    "pipeline_unavailable.json",
+    "blocked.json",
+    "operational_failure.json",
+)
+
 
 def short_sha(sha):
     return sha[:7] if sha else "unknown"
@@ -22,12 +31,114 @@ def today_utc():
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
-def read_aggregate(out_dir):
-    path = os.path.join(out_dir, "aggregate.json")
-    if not os.path.isfile(path):
-        return None
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
+def read_result(out_dir):
+    for filename in RESULT_FILES:
+        path = os.path.join(out_dir, filename)
+        if not os.path.isfile(path):
+            continue
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    return None
+
+
+def _ci_conclusion(result):
+    if not result:
+        return "?"
+
+    pipeline = result.get("pipeline") or {}
+    if pipeline.get("conclusion"):
+        return pipeline["conclusion"]
+
+    run_info = result.get("run_info") or {}
+    if run_info.get("conclusion"):
+        return run_info["conclusion"]
+
+    run_context = result.get("run_context") or {}
+    if run_context.get("conclusion"):
+        return run_context["conclusion"]
+
+    return "?"
+
+
+def summarize_result(result, report_link):
+    if not result:
+        return {
+            "status": "blocked",
+            "quorum": "?",
+            "passes": "?/?",
+            "routing": "?",
+            "ci_conclusion": "?",
+            "action": report_link,
+        }
+
+    sentinel = result.get("sentinel")
+    if sentinel == "audit_skipped":
+        reason = result.get("reason", "unknown")
+        action = report_link
+        if report_link == "(no report generated)" and reason == "docs_only":
+            action = "(docs-only push; no report generated)"
+        return {
+            "status": "skipped",
+            "quorum": "n/a",
+            "passes": "n/a",
+            "routing": reason,
+            "ci_conclusion": _ci_conclusion(result),
+            "action": action,
+        }
+
+    if sentinel == "pipeline_pending":
+        return {
+            "status": "pending",
+            "quorum": "n/a",
+            "passes": "n/a",
+            "routing": "none",
+            "ci_conclusion": _ci_conclusion(result),
+            "action": report_link if report_link != "(no report generated)" else "(pipeline pending; no report generated)",
+        }
+
+    if sentinel == "pipeline_unavailable":
+        return {
+            "status": "unavailable",
+            "quorum": "n/a",
+            "passes": "n/a",
+            "routing": "none",
+            "ci_conclusion": _ci_conclusion(result),
+            "action": report_link if report_link != "(no report generated)" else "(no completed push run found)",
+        }
+
+    if sentinel == "blocked":
+        return {
+            "status": "blocked",
+            "quorum": "?",
+            "passes": "?/?",
+            "routing": "none",
+            "ci_conclusion": _ci_conclusion(result),
+            "action": report_link,
+        }
+
+    if sentinel == "operational_failure":
+        return {
+            "status": "blocked",
+            "quorum": "?",
+            "passes": "?/?",
+            "routing": "operational_failure",
+            "ci_conclusion": _ci_conclusion(result),
+            "action": report_link if report_link != "(no report generated)" else "(operational failure; no report generated)",
+        }
+
+    audit = result.get("audit") or {}
+    passes_ok = audit.get("passes_succeeded", "?")
+    passes_run = audit.get("passes_run", "?")
+    routings = list({c.get("routing", "?") for c in result.get("candidates", [])})
+    routing = ", ".join(routings) if routings else "none"
+    return {
+        "status": result.get("status", "?"),
+        "quorum": audit.get("quorum", "?"),
+        "passes": f"{passes_ok}/{passes_run}",
+        "routing": routing,
+        "ci_conclusion": _ci_conclusion(result),
+        "action": report_link,
+    }
 
 
 def git_branch():
@@ -180,22 +291,14 @@ def main():
         report_link = "(no report generated)"
         print(f"[push-review-commit] no report found in {out_dir}/reports/", file=sys.stderr)
 
-    # 2. Read aggregate
-    agg = read_aggregate(out_dir)
-    if agg:
-        status = agg.get("status", "?")
-        audit = agg.get("audit") or {}
-        quorum = audit.get("quorum", "?")
-        passes_ok = audit.get("passes_succeeded", "?")
-        passes_run = audit.get("passes_run", "?")
-        passes = f"{passes_ok}/{passes_run}"
-        routings = list({c.get("routing", "?") for c in agg.get("candidates", [])})
-        routing = ", ".join(routings) if routings else "none"
-        ci_conclusion = (agg.get("pipeline") or {}).get("conclusion", "?")
-    else:
-        status = "blocked"; quorum = "?"; passes = "?/?"; routing = "?"; ci_conclusion = "?"
-
-    row = f"| `{run_id} / {sha}` | {ci_conclusion} | {status} ({passes} passes, quorum {quorum}) | {routing} | {report_link} |"
+    # 2. Read normalized push-review result
+    result = read_result(out_dir)
+    summary = summarize_result(result, report_link)
+    row = (
+        f"| `{run_id} / {sha}` | {summary['ci_conclusion']} | "
+        f"{summary['status']} ({summary['passes']} passes, quorum {summary['quorum']}) | "
+        f"{summary['routing']} | {summary['action']} |"
+    )
 
     # 3. Create daily if needed
     if not os.path.isfile(daily_path):
