@@ -1,9 +1,6 @@
 use anyhow::{Context, bail};
 use dubbridge_db::transcription_repo;
-use dubbridge_domain::{
-    artifact::TranscriptionStatus,
-    asset::AssetId,
-};
+use dubbridge_domain::{artifact::TranscriptionStatus, asset::AssetId};
 use dubbridge_jobs::{JobEnvelope, SubtitleJobQueue, TranscriptionJob};
 use dubbridge_providers::{AsrInput, AsrOutput, AsrWorkerClient};
 use dubbridge_storage::{StorageAdapter, alignment_key, transcript_key};
@@ -42,8 +39,7 @@ pub(crate) async fn process_transcription_job(
 ) -> anyhow::Result<()> {
     let asset_id = AssetId(job.asset_id);
 
-    let result =
-        process_transcription_job_inner(pool, storage, client, subtitle_queue, &job).await;
+    let result = process_transcription_job_inner(pool, storage, client, subtitle_queue, &job).await;
     if let Err(error) = result {
         let detail = format!("{error:#}");
         let _ = transcription_repo::upsert_transcription_status(

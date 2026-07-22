@@ -7,7 +7,9 @@ use dubbridge_storage::{LocalFsAdapter, StorageAdapter};
 use tempfile::TempDir;
 use tokio::sync::Mutex;
 
-use crate::preparation_runtime::{HlsPackageOutput, process_preparation_envelope, process_preparation_job};
+use crate::preparation_runtime::{
+    HlsPackageOutput, process_preparation_envelope, process_preparation_job,
+};
 
 use super::support::{
     FakePreparationExecutor, assert_status, insert_asset, insert_source_artifact, setup_pool,
@@ -28,14 +30,9 @@ async fn process_preparation_job_marks_ready_when_probe_and_hls_exist() {
         .put(&source.storage_key, b"source-media-bytes".to_vec())
         .await
         .expect("persist source bytes");
-    preparation_repo::upsert_preparation_status(
-        &pool,
-        asset_id,
-        PreparationStatus::Pending,
-        None,
-    )
-    .await
-    .expect("set pending");
+    preparation_repo::upsert_preparation_status(&pool, asset_id, PreparationStatus::Pending, None)
+        .await
+        .expect("set pending");
 
     let stage_log = Arc::new(Mutex::new(Vec::new()));
     let executor = FakePreparationExecutor {
@@ -87,14 +84,9 @@ async fn process_preparation_job_marks_failed_when_hls_stage_fails() {
         .put(&source.storage_key, b"source-media-bytes".to_vec())
         .await
         .expect("persist source bytes");
-    preparation_repo::upsert_preparation_status(
-        &pool,
-        asset_id,
-        PreparationStatus::Pending,
-        None,
-    )
-    .await
-    .expect("set pending");
+    preparation_repo::upsert_preparation_status(&pool, asset_id, PreparationStatus::Pending, None)
+        .await
+        .expect("set pending");
 
     let executor = FakePreparationExecutor {
         pool: pool.clone(),
@@ -157,14 +149,9 @@ async fn process_preparation_job_does_not_mark_ready_when_hls_output_is_invalid(
         .put(&source.storage_key, b"source-media-bytes".to_vec())
         .await
         .expect("persist source bytes");
-    preparation_repo::upsert_preparation_status(
-        &pool,
-        asset_id,
-        PreparationStatus::Pending,
-        None,
-    )
-    .await
-    .expect("set pending");
+    preparation_repo::upsert_preparation_status(&pool, asset_id, PreparationStatus::Pending, None)
+        .await
+        .expect("set pending");
 
     let executor = FakePreparationExecutor {
         pool: pool.clone(),

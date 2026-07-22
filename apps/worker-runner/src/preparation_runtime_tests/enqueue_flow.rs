@@ -17,7 +17,10 @@ use time::OffsetDateTime;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use crate::{preparation_runtime::process_preparation_job, subtitle_enqueue::prepare_transcription_post_ready};
+use crate::{
+    preparation_runtime::process_preparation_job,
+    subtitle_enqueue::prepare_transcription_post_ready,
+};
 
 use super::support::{
     FakePreparationExecutor, assert_status, insert_asset, insert_source_artifact, setup_pool,
@@ -81,14 +84,9 @@ async fn run_full_preparation(
         .put(&source.storage_key, b"source-media-bytes".to_vec())
         .await
         .expect("persist source bytes");
-    preparation_repo::upsert_preparation_status(
-        pool,
-        asset_id,
-        PreparationStatus::Pending,
-        None,
-    )
-    .await
-    .expect("set pending");
+    preparation_repo::upsert_preparation_status(pool, asset_id, PreparationStatus::Pending, None)
+        .await
+        .expect("set pending");
 
     let executor = FakePreparationExecutor {
         pool: pool.clone(),

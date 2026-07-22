@@ -432,12 +432,22 @@ async fn try_claim_subtitle_pending_allows_only_one_concurrent_winner() {
     let pool_b = pool.clone();
 
     let task_a =
-        tokio::spawn(async move { subtitle_repo::try_claim_subtitle_pending(&pool_a, asset_id).await });
+        tokio::spawn(
+            async move { subtitle_repo::try_claim_subtitle_pending(&pool_a, asset_id).await },
+        );
     let task_b =
-        tokio::spawn(async move { subtitle_repo::try_claim_subtitle_pending(&pool_b, asset_id).await });
+        tokio::spawn(
+            async move { subtitle_repo::try_claim_subtitle_pending(&pool_b, asset_id).await },
+        );
 
-    let result_a = task_a.await.expect("task a did not panic").expect("task a query");
-    let result_b = task_b.await.expect("task b did not panic").expect("task b query");
+    let result_a = task_a
+        .await
+        .expect("task a did not panic")
+        .expect("task a query");
+    let result_b = task_b
+        .await
+        .expect("task b did not panic")
+        .expect("task b query");
 
     let winners = [result_a, result_b]
         .into_iter()

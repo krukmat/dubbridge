@@ -1,18 +1,12 @@
 use anyhow::{Context, bail};
 use dubbridge_db::preparation_repo;
-use dubbridge_domain::{
-    artifact::ArtifactRecord,
-    asset::AssetId,
-};
+use dubbridge_domain::{artifact::ArtifactRecord, asset::AssetId};
 use dubbridge_jobs::PreparationJob;
 use dubbridge_media::validate_hls_outputs;
 use dubbridge_storage::{StorageAdapter, hls_manifest_key, hls_segment_key, probe_metadata_key};
 use sqlx::PgPool;
 
-use crate::{
-    checksum_hex,
-    preparation_runtime::HlsPackageOutput,
-};
+use crate::{checksum_hex, preparation_runtime::HlsPackageOutput};
 
 #[allow(dead_code)]
 pub(crate) async fn load_source_artifact(

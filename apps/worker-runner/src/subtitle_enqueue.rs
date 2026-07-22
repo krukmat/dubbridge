@@ -16,8 +16,7 @@ pub async fn prepare_transcription_post_ready(
     asset_id: AssetId,
     source_artifact_id: uuid::Uuid,
 ) {
-    if let Err(error) = try_enqueue_transcription(pool, queue, asset_id, source_artifact_id).await
-    {
+    if let Err(error) = try_enqueue_transcription(pool, queue, asset_id, source_artifact_id).await {
         record_transcription_failure(pool, asset_id, &error).await;
     }
 }
@@ -184,10 +183,7 @@ mod tests {
         asset_id
     }
 
-    async fn insert_source_artifact_for_test(
-        pool: &PgPool,
-        asset_id: AssetId,
-    ) -> ArtifactRecord {
+    async fn insert_source_artifact_for_test(pool: &PgPool, asset_id: AssetId) -> ArtifactRecord {
         let record = ArtifactRecord::new_original(
             asset_id,
             Uuid::new_v4(),
