@@ -420,6 +420,60 @@ Moderate's (see table above); no new environment variable is introduced.
 **Rollback triggers:** same triggers as Moderate above, evaluated
 independently per band — revert only the affected band to the cloud path.
 
+### Target-file size gate for local-first delegation
+
+Owner directive, 2026-07-22: before building a task card for either local-first
+band (Moderate or Med-high), the orchestrating agent must check the line count
+of every file in the card's `allowed_paths` and every file the local
+implementer will need to read in full to complete the task (not just files it
+edits — a large file it must read for context counts too).
+
+- **Threshold: 500 lines.** If any such file exceeds 500 lines, the task
+  cannot be delegated to the local runner as-is. The orchestrator must either:
+  1. **decompose the task** so each subtask's touched/read files stay under
+     the threshold (the preferred outcome — see the GEG-1a–1e split in
+     `docs/tasks/gemma-evidence-artifact-gate.md` for the pattern: chain
+     small, single-concern subtasks instead of one large one), or
+  2. **refactor the oversized file first**, as its own preceding task, so the
+     dependent work can later be delegated against a smaller module; or
+  3. if neither is practical without expanding scope beyond the task at hand,
+     **escalate the task to cloud implementation** and record why the file
+     could not be split or trimmed.
+- This applies to **product/target code being delegated**, not to the local
+  pipeline's own tooling — `scripts/local-agent/*.py` is covered separately,
+  as ordinary maintainability debt (see immediately below), not as a
+  delegation-eligibility gate.
+- Rationale: a large file inflates the prompt the local implementer must hold
+  in its context window on every turn (system spec + full file reads +
+  tool-call history), which is the same mechanism that made context-size
+  tuning necessary in `run_local_task.py` (`MODEL_CONTEXT_TOKENS`). Keeping
+  target files small keeps local turns fast and keeps the model's attention
+  on the task's actual surface area instead of unrelated code sharing the
+  same file.
+- This gate is deterministic and file-size-based; it does not replace or
+  loosen the existing RRI-band or repair-budget rules above — it is a
+  precondition checked before those rules engage.
+- This is the **delegation-side counterpart** to the existing reviewability
+  budget gate (`make qa-review-budget`, `scripts/check-review-budget.py`,
+  documented in `AGENT_WORKFLOW_GUIDE.md` § "Reviewability budget gate"),
+  which is the review-side gate for how much diff Gemma can evaluate. That
+  gate uses a context-derived line budget with a `D14-OVERRIDE:` escape
+  hatch; option 3 above (escalate to cloud) is this gate's equivalent escape
+  when splitting or refactoring is not practical — record the reason the same
+  way, so both gates stay auditable through the same override convention
+  rather than inventing a second one.
+
+**Tooling maintainability (not a delegation gate, a standing code-health
+rule):** `scripts/local-agent/*.py` and other pipeline/orchestrator scripts
+should not be allowed to grow past ~500 lines without deliberate justification
+either — e.g. `run_local_task.py` (918 lines as of 2026-07-22) is a refactor
+candidate, splitting the tool-call parsing, boundary/scope enforcement, and
+the draft/test/repair loop into separate modules the way `boundary.py` and
+`scope_check.py` already are. `scripts/check-maintainability.py` does not yet
+have a Python profile (`RUST_SOURCE`/`RUST_TEST`/`MOBILE_SOURCE`/`MOBILE_TEST`
+only) — adding one is tracked as follow-up work, not a blocking requirement of
+this policy change.
+
 ### Local pipeline phase-2 reviewer override
 
 Owner directive, 2026-07-21: for **RRI 26–55** (Moderate + Med-high), the

@@ -702,6 +702,22 @@ swap/thermal degradation attributable to the local implementer, revert the
 affected band (Moderate and/or Med-high) to cloud implementation while
 retaining the local review roles.
 
+**Target-file size gate (owner directive, 2026-07-22):** before building a
+task card for RRI 26–55 local-first delegation, check every file in
+`allowed_paths` and every file the local implementer must read in full. If
+any exceeds **500 lines**, do not delegate as-is — decompose the task so each
+subtask's touched/read files stay under the threshold (preferred; see the
+GEG-1a–1e chain in `docs/tasks/gemma-evidence-artifact-gate.md` for the
+pattern), refactor the oversized file first as its own preceding task, or
+escalate to cloud implementation and record why splitting wasn't practical.
+This is the delegation-side counterpart to the reviewability budget gate
+below (that gate bounds what Gemma can *review*; this one bounds what the
+local implementer can *read/author* in one turn) — both exist because a
+large file inflates the per-turn prompt and degrades local-model latency and
+attention the same way. See `docs/policies/RRI_POLICY.md` § "Target-file size
+gate for local-first delegation" for full detail. Full policy owns this
+rule; keep this summary in sync if the policy changes.
+
 ## Reviewability budget gate
 
 Local Gemma roles evaluate a change inside a fixed context window
