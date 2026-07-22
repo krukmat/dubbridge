@@ -219,6 +219,19 @@ from 2026-07-21 and must be recomputed at task presentation time.
 worker-runner change stays reviewable under the local-first workflow instead of
 forcing a single large `main.rs` handoff.
 
+Implementation note 2026-07-22: `S-140-T2b-ii` landed with a larger-than-planned
+surface because the owner directed an aggressive refactor instead of a minimal
+hook. The actual implementation moved transcription runtime logic out of
+`apps/worker-runner/src/main.rs` into
+`apps/worker-runner/src/transcription_runtime.rs`, moved preparation runtime
+and its tests into `apps/worker-runner/src/preparation_runtime.rs`, added
+atomic subtitle-pending claim semantics in `crates/db/src/subtitle_repo.rs`,
+added deterministic asset-to-first-target routing in
+`crates/db/src/workspace_repo.rs`, and reduced `main.rs` to a 44-line startup
+entrypoint. The task closed at **RRI 50 (Med-high)** rather than the
+provisional planning score 34. The decomposition itself remains valid; only
+the realized change surface grew.
+
 Live-pilot note 2026-07-21/22: the Serena-based semantic reruns of `T2b-i`
 (`LASE-T6`) never converged on an edit. That path was removed on 2026-07-22 and
 replaced with a simple read/write/patch local runner; `T2b-i` is re-run through

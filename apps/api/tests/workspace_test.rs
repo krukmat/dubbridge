@@ -11,11 +11,12 @@ use dubbridge_auth::{
 use dubbridge_db::{asset_repo, workspace_repo};
 use dubbridge_domain::{
     asset::Asset,
-    workspace::{OrgMember, OrgRole, Organization, Project},
+    workspace::{OrgMember, OrgRole, Organization, Project, TargetLanguage},
 };
 use dubbridge_storage::LocalFsAdapter;
 use sqlx::PgPool;
 use tempfile::TempDir;
+use time::OffsetDateTime;
 use tower::ServiceExt;
 use uuid::Uuid;
 
@@ -558,6 +559,65 @@ async fn json_body(response: axum::response::Response) -> serde_json::Value {
         .await
         .expect("body");
     serde_json::from_slice(&bytes).expect("json body")
+}
+
+#[tokio::test]
+async fn asset_subtitle_route_returns_first_target_in_c_order() {
+    let Some(ctx) = TestContext::new().await else {
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    let org = insert_org_for_subject(&ctx.pool, "Acme", ctx.admin_id, OrgRole::Owner).await;
+    let project = insert_project_for_org(&ctx.pool, org.id.0, "Localization").await;
+    let asset = insert_asset_for_uploader(&ctx.pool, "Episode 1", ctx.admin_id).await;
+    workspace_repo::link_asset_to_project(&ctx.pool, project.id, asset.id, ctx.admin_id)
+        .await
+        .expect("link asset");
+
+    for target_lang in ["fr", "de"] {
+        workspace_repo::upsert_target_language(
+            &ctx.pool,
+            &TargetLanguage {
+                id: Uuid::new_v4(),
+                project_id: project.id,
+                source_lang: "en".into(),
+                target_lang: target_lang.into(),
+                created_at: OffsetDateTime::now_utc(),
+            },
+        )
+        .await
+        .expect("insert target language");
+    }
+
+    let route = workspace_repo::get_asset_subtitle_route(&ctx.pool, asset.id)
+        .await
+        .expect("load subtitle route")
+        .expect("subtitle route");
+
+    assert_eq!(route.project_id, project.id);
+    assert_eq!(route.target_language, "de");
+}
+
+#[tokio::test]
+async fn asset_subtitle_route_returns_none_without_target_languages() {
+    let Some(ctx) = TestContext::new().await else {
+        eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    let org = insert_org_for_subject(&ctx.pool, "Acme", ctx.admin_id, OrgRole::Owner).await;
+    let project = insert_project_for_org(&ctx.pool, org.id.0, "Localization").await;
+    let asset = insert_asset_for_uploader(&ctx.pool, "Episode 2", ctx.admin_id).await;
+    workspace_repo::link_asset_to_project(&ctx.pool, project.id, asset.id, ctx.admin_id)
+        .await
+        .expect("link asset");
+
+    let route = workspace_repo::get_asset_subtitle_route(&ctx.pool, asset.id)
+        .await
+        .expect("load subtitle route");
+
+    assert!(route.is_none());
 }
 
 async fn migrate_and_reset(pool: &PgPool) {

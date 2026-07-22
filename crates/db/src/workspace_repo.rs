@@ -518,6 +518,18 @@ struct TargetLanguageRow {
     created_at: OffsetDateTime,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
+struct AssetSubtitleRouteRow {
+    project_id: Uuid,
+    target_lang: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AssetSubtitleRoute {
+    pub project_id: ProjectId,
+    pub target_language: String,
+}
+
 /// Return the `source_lang` for the asset's project (from any `target_languages` row),
 /// or `None` if the asset is not linked to a project or the project has no target-language row.
 pub async fn get_source_language_for_asset(
@@ -567,6 +579,34 @@ pub async fn list_target_languages(
             created_at: r.created_at,
         })
         .collect())
+}
+
+/// Return the asset project plus the deterministic first subtitle target for enqueue.
+///
+/// This uses `COLLATE "C"` so cross-environment ordering stays byte-stable.
+pub async fn get_asset_subtitle_route(
+    pool: &PgPool,
+    asset_id: AssetId,
+) -> Result<Option<AssetSubtitleRoute>, DbError> {
+    let row = sqlx::query_as::<_, AssetSubtitleRouteRow>(
+        r#"
+        SELECT pa.project_id, tl.target_lang
+        FROM project_assets pa
+        JOIN target_languages tl ON tl.project_id = pa.project_id
+        WHERE pa.asset_id = $1
+        ORDER BY tl.target_lang COLLATE "C"
+        LIMIT 1
+        "#,
+    )
+    .bind(asset_id.0)
+    .fetch_optional(pool)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    Ok(row.map(|row| AssetSubtitleRoute {
+        project_id: ProjectId(row.project_id),
+        target_language: row.target_lang,
+    }))
 }
 
 // ── Unit tests ────────────────────────────────────────────────────────────────

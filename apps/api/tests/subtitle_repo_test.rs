@@ -345,6 +345,113 @@ async fn failed_subtitle_status_persists_error_detail() {
     );
 }
 
+// HP-2b: first claim initializes Pending atomically when no row exists.
+#[tokio::test]
+async fn try_claim_subtitle_pending_initializes_pending() {
+    let Some(pool) = setup_pool().await else {
+        return;
+    };
+
+    let asset_id = insert_asset(&pool).await;
+
+    let claimed = subtitle_repo::try_claim_subtitle_pending(&pool, asset_id)
+        .await
+        .expect("claim pending");
+
+    assert!(claimed);
+
+    let record = subtitle_repo::get_subtitle_status(&pool, asset_id)
+        .await
+        .expect("get")
+        .expect("subtitle row");
+    assert_eq!(record.status, SubtitleStatus::Pending);
+    assert!(record.error_detail.is_none());
+}
+
+// EC-1b: a second claim while Pending must fail closed and keep a single owner.
+#[tokio::test]
+async fn try_claim_subtitle_pending_returns_false_when_already_pending() {
+    let Some(pool) = setup_pool().await else {
+        return;
+    };
+
+    let asset_id = insert_asset(&pool).await;
+    assert!(
+        subtitle_repo::try_claim_subtitle_pending(&pool, asset_id)
+            .await
+            .expect("first claim")
+    );
+
+    let claimed = subtitle_repo::try_claim_subtitle_pending(&pool, asset_id)
+        .await
+        .expect("second claim");
+
+    assert!(!claimed);
+}
+
+// EC-1c: a failed subtitle can be reclaimed and its stale error detail is cleared.
+#[tokio::test]
+async fn try_claim_subtitle_pending_reclaims_failed_status() {
+    let Some(pool) = setup_pool().await else {
+        return;
+    };
+
+    let asset_id = insert_asset(&pool).await;
+    subtitle_repo::upsert_subtitle_status(
+        &pool,
+        asset_id,
+        SubtitleStatus::Failed,
+        Some("queue unavailable"),
+    )
+    .await
+    .expect("seed failed status");
+
+    let claimed = subtitle_repo::try_claim_subtitle_pending(&pool, asset_id)
+        .await
+        .expect("claim failed row");
+
+    assert!(claimed);
+
+    let record = subtitle_repo::get_subtitle_status(&pool, asset_id)
+        .await
+        .expect("get")
+        .expect("subtitle row");
+    assert_eq!(record.status, SubtitleStatus::Pending);
+    assert!(record.error_detail.is_none());
+}
+
+// EC-1d: concurrent claimers race on the DB row and exactly one wins.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn try_claim_subtitle_pending_allows_only_one_concurrent_winner() {
+    let Some(pool) = setup_pool().await else {
+        return;
+    };
+
+    let asset_id = insert_asset(&pool).await;
+    let pool_a = pool.clone();
+    let pool_b = pool.clone();
+
+    let task_a =
+        tokio::spawn(async move { subtitle_repo::try_claim_subtitle_pending(&pool_a, asset_id).await });
+    let task_b =
+        tokio::spawn(async move { subtitle_repo::try_claim_subtitle_pending(&pool_b, asset_id).await });
+
+    let result_a = task_a.await.expect("task a did not panic").expect("task a query");
+    let result_b = task_b.await.expect("task b did not panic").expect("task b query");
+
+    let winners = [result_a, result_b]
+        .into_iter()
+        .filter(|claimed| *claimed)
+        .count();
+    let losers = [result_a, result_b]
+        .into_iter()
+        .filter(|claimed| !claimed)
+        .count();
+
+    assert_eq!(winners, 1);
+    assert_eq!(losers, 1);
+}
+
 // EC-2: get_subtitle_status returns None for an asset with no row.
 #[tokio::test]
 async fn get_subtitle_status_returns_none_when_not_initialised() {

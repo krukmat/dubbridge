@@ -1103,9 +1103,9 @@ superseded, not re-run**
 
 ## S-140-T2b-ii: Transcription-ready subtitle enqueue hook
 
-**Effort:** M (planning RRI 34 — Moderate; recompute at presentation time)
+**Effort:** L (recomputed RRI 50 — Med-high, at implementation time 2026-07-22)
 **Depends on:** S-140-T2b-i
-**Status:** Not started — unblocked, T2b-i done
+**Status:** Done — subtitle enqueue hook landed; T3a unblocked
 
 **Happy paths considered:**
 - HP-1: After `TranscriptionStatus::Ready` is persisted, exactly one
@@ -1147,7 +1147,88 @@ subtitle job processing or multi-language fan-out.
 the extracted subtitle-enqueue module, test ready/failure behavior, and stop
 before `process_subtitle_job`.
 
-**Status: [ ] Not started — blocked on T2b-i**
+### Execution record (2026-07-22)
+
+- **RRI at implementation time:** 50 (Med-high) — recomputed via
+  `python3 scripts/rri.py --C 3 --T 3 --A 0 --X 1 --D 2 --K 3 --P 2 --touches apps/worker-runner/src/main.rs --touches apps/worker-runner/src/subtitle_enqueue.rs --touches apps/worker-runner/src/transcription_runtime.rs --touches crates/db/src/subtitle_repo.rs --touches crates/db/src/workspace_repo.rs --touches apps/api/tests/subtitle_repo_test.rs --touches apps/api/tests/workspace_test.rs --platform dubbridge`;
+  the aggressive refactor expanded the effective surface from the planning
+  estimate by adding a dedicated transcription runtime module, DB idempotency
+  helpers, deterministic route lookup, and focused integration coverage.
+- **Implementation route:** direct Codex implementation, per the owner-directed
+  override on 2026-07-22 to stop waiting on local-runner validation and to
+  refactor aggressively while completing the task. The change not only wired
+  the post-Ready subtitle enqueue path, but also split transcription runtime
+  logic out of `apps/worker-runner/src/main.rs` into
+  `apps/worker-runner/src/transcription_runtime.rs`, then completed the same
+  treatment for preparation into
+  `apps/worker-runner/src/preparation_runtime.rs`, reducing `main.rs` from
+  1359 lines to 44 lines while keeping the enqueue seam focused in
+  `apps/worker-runner/src/subtitle_enqueue.rs`.
+- **Verification:** `cargo check -p dubbridge-worker-runner` ✅;
+  `cargo test -p dubbridge-api --test subtitle_repo_test -- --nocapture` ✅
+  (17 passed, 0 failed);
+  `cargo test -p dubbridge-api --test workspace_test -- --nocapture` ✅
+  (14 passed, 0 failed);
+  `cargo test -p dubbridge-worker-runner -- --nocapture` ✅
+  (21 passed, 0 failed).
+- **Task-analysis review:** `qwen3.6:27b-q4_K_M`
+  `.agent/peer-task-review-S-140-T2b-ii-v9.json` - PASS.
+- **Code-solution review:** `d14`
+  `.agent/peer-code-review-S-140-T2b-ii.json` - PASS. `qwen3.6:27b-q4_K_M`
+  and Gemma were both unusable in the phase-2 review chain, so the required
+  D14 context-isolated fallback handled the final review and returned no
+  findings.
+
+### Reflection log
+
+Required passes: 3 (`RRI 50` → `Med-high`)
+
+#### Pass 1
+- **Draft verdict:** Wire `SubtitleJob` enqueue after transcription readiness
+  and add fail-closed status handling for queue/route failures.
+- **Critique findings:** Keeping that logic in the already-large `main.rs`
+  would technically pass the task but fail the owner's explicit refactor goal.
+- **Revisions applied:** Moved transcription runtime into
+  `apps/worker-runner/src/transcription_runtime.rs` and cut duplicated T3 tests
+  out of `main.rs`.
+
+#### Pass 2
+- **Draft verdict:** Runtime split is cleaner, but subtitle enqueue still lacks
+  atomic ownership and deterministic route lookup at the DB boundary.
+- **Critique findings:** A check-then-enqueue flow would regress idempotency
+  under retries and duplicate completions.
+- **Revisions applied:** Added
+  `subtitle_repo::try_claim_subtitle_pending` and
+  `workspace_repo::get_asset_subtitle_route`, then covered both with
+  integration tests.
+
+#### Pass 3
+- **Draft verdict:** End-to-end flow is correct and test-backed.
+- **Critique findings:** Worker-runner coverage alone would underspecify the
+  repo/database contract for retries and first-target ordering.
+- **Revisions applied:** Added focused DB/API integration tests for subtitle
+  claim semantics and route ordering to keep the runtime logic simpler and the
+  overall CC lower.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | after `TranscriptionStatus::Ready`, exactly one `SubtitleJob` is enqueued for the deterministic first target language | `apps/worker-runner/src/transcription_runtime.rs::process_transcription_job_enqueues_first_subtitle_target_after_ready`, `apps/worker-runner/src/subtitle_enqueue.rs::prepare_subtitle_post_ready_enqueues_first_target_in_c_order` | passed |
+| EC-1 | Edge case | failed transcription does not enqueue a subtitle job | `apps/worker-runner/src/transcription_runtime.rs::process_transcription_job_marks_failed_on_asr_error` | passed |
+| EC-2 | Edge case | transcription jobs that fail before readiness do not leave a queued subtitle job behind | `apps/worker-runner/src/transcription_runtime.rs::process_transcription_job_marks_failed_on_asr_error` | passed |
+| EC-3 | Edge case | multiple target-language rows still enqueue exactly one job, chosen deterministically | `apps/worker-runner/src/transcription_runtime.rs::process_transcription_job_enqueues_first_subtitle_target_after_ready`, `apps/api/tests/workspace_test.rs::asset_subtitle_route_returns_first_target_in_c_order` | passed |
+
+### Owner final verification
+
+- Owner: `Codex (user-directed direct implementation)`
+- Date: `2026-07-22`
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
+- Commands run: `cargo check -p dubbridge-worker-runner`; `cargo test -p dubbridge-api --test subtitle_repo_test -- --nocapture`; `cargo test -p dubbridge-api --test workspace_test -- --nocapture`; `cargo test -p dubbridge-worker-runner -- --nocapture`
+
+**Status: [x] Done — 2026-07-22, implemented directly with aggressive refactor;
+subtitle enqueue hook delivered, DB idempotency + deterministic routing covered,
+and T3a unblocked**
 
 ---
 
@@ -1155,7 +1236,7 @@ before `process_subtitle_job`.
 
 **Effort:** M (planning RRI 35 — Moderate; recompute at presentation time)
 **Depends on:** S-140-T2b-ii (D1a ratified 2026-07-21)
-**Status:** Not started — blocked on T2b-ii
+**Status:** Not started — unblocked, awaits implementation
 
 **Happy paths considered:**
 - HP-1: Word alignments are grouped into ordered subtitle segments with

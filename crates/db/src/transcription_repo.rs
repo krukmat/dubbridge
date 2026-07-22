@@ -58,6 +58,38 @@ pub async fn upsert_transcription_status(
     Ok(())
 }
 
+/// Atomically claim the `Pending` transcription state for an asset.
+///
+/// Returns `true` if this call transitioned the row to `Pending` (caller should
+/// proceed to enqueue), or `false` if the asset was already
+/// `Pending`/`InProgress`/`Ready` (another caller already claimed it, or it is
+/// already done). This replaces the separate check-then-act pattern
+/// (`get_transcription_status` followed by `upsert_transcription_status`),
+/// which raced under concurrent callers for the same asset.
+pub async fn try_claim_transcription_pending(
+    pool: &PgPool,
+    asset_id: AssetId,
+) -> Result<bool, DbError> {
+    let claimed: Option<Uuid> = sqlx::query_scalar(
+        r#"
+        INSERT INTO asset_transcription_status (asset_id, status, error_detail, updated_at)
+        VALUES ($1, 'pending', NULL, now())
+        ON CONFLICT (asset_id) DO UPDATE
+            SET status       = 'pending',
+                error_detail = NULL,
+                updated_at   = now()
+            WHERE asset_transcription_status.status NOT IN ('pending', 'in_progress', 'ready')
+        RETURNING asset_id
+        "#,
+    )
+    .bind(asset_id.0)
+    .fetch_optional(pool)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    Ok(claimed.is_some())
+}
+
 /// Return the current transcription status for an asset, or `None` if not yet initialised.
 pub async fn get_transcription_status(
     pool: &PgPool,

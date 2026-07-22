@@ -102,6 +102,31 @@ pub async fn get_subtitle_status(
     .transpose()
 }
 
+/// Atomically claim `SubtitleStatus::Pending` for the caller that gets to enqueue.
+///
+/// Returns `true` only when the row was absent or previously `Failed`.
+/// Returns `false` when the asset is already `Pending`, `InProgress`, or `Ready`.
+pub async fn try_claim_subtitle_pending(pool: &PgPool, asset_id: AssetId) -> Result<bool, DbError> {
+    let claimed: Option<Uuid> = sqlx::query_scalar(
+        r#"
+        INSERT INTO asset_subtitle_status (asset_id, status, error_detail, updated_at)
+        VALUES ($1, 'pending', NULL, now())
+        ON CONFLICT (asset_id) DO UPDATE
+            SET status = 'pending',
+                error_detail = NULL,
+                updated_at = now()
+        WHERE asset_subtitle_status.status = 'failed'
+        RETURNING asset_id
+        "#,
+    )
+    .bind(asset_id.0)
+    .fetch_optional(pool)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    Ok(claimed.is_some())
+}
+
 /// Persist a `Subtitle` derived artifact linked to `parent_artifact_id`
 /// (the asset's `WordAlignment` artifact, per D1a).
 ///
