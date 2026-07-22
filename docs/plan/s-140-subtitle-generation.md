@@ -147,6 +147,14 @@ decomposition below. D1b (sentence-aware / reading-speed-aware Python
 worker) remains available as a future follow-up if quality requirements
 change; re-ratify D1 first if that follow-up is ever proposed.
 
+**D1a heuristic constants (RATIFIED 2026-07-22):** max **42 characters per
+line**, max **7 seconds per segment**. Standard broadcast/streaming subtitle
+convention (comparable to Netflix timed-text guidelines); chosen because no
+prior art existed anywhere in this repo and T3a's implementation cannot
+proceed without concrete values. Owner-approved at T3a presentation time.
+Any future change to these values requires re-ratifying this sub-decision,
+not a silent constant edit in `crates/providers`.
+
 ### D2 — Canonical subtitle artifact schema (RATIFIED 2026-07-21)
 
 **Ratified:** the proposed internal JSON schema. No SRT/VTT/internal-JSON
