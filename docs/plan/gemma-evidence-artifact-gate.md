@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: "Gemma/Peer Review Evidence Artifact Gate"
-status: proposed
+status: done
 slice: GEG
 ---
 
