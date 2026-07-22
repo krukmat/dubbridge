@@ -58,7 +58,6 @@ impl PreparationExecutor for SubprocessPreparationExecutor {
     }
 }
 
-#[allow(dead_code)]
 async fn write_source_workspace(source_bytes: &[u8]) -> anyhow::Result<(TempDir, PathBuf)> {
     let workspace = TempDir::new().context("failed to create temporary preparation workspace")?;
     let input_path = workspace.path().join("source-media.bin");
@@ -73,7 +72,6 @@ async fn write_source_workspace(source_bytes: &[u8]) -> anyhow::Result<(TempDir,
     Ok((workspace, input_path))
 }
 
-#[allow(dead_code)]
 async fn run_command(command: &[String]) -> anyhow::Result<std::process::Output> {
     let binary = command
         .first()
@@ -98,7 +96,6 @@ async fn run_command(command: &[String]) -> anyhow::Result<std::process::Output>
     Ok(output)
 }
 
-#[allow(dead_code)]
 async fn read_hls_segments(output_dir: &Path) -> anyhow::Result<Vec<HlsSegmentOutput>> {
     let mut entries = fs::read_dir(output_dir).await.with_context(|| {
         format!(
@@ -145,8 +142,169 @@ async fn read_hls_segments(output_dir: &Path) -> anyhow::Result<Vec<HlsSegmentOu
     Ok(segments)
 }
 
-#[allow(dead_code)]
 fn path_to_string(path: &Path) -> anyhow::Result<&str> {
     path.to_str()
         .ok_or_else(|| anyhow::anyhow!("non-UTF-8 path '{}'", path.display()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn run_command_returns_output_on_success() {
+        let command = vec!["echo".to_string(), "hello".to_string()];
+
+        let output = run_command(&command).await.expect("command should succeed");
+
+        assert!(output.status.success());
+        assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "hello");
+    }
+
+    #[tokio::test]
+    async fn run_command_fails_closed_on_nonzero_exit() {
+        let command = vec!["sh".to_string(), "-c".to_string(), "exit 7".to_string()];
+
+        let result = run_command(&command).await;
+
+        let err = result.expect_err("nonzero exit should be an error");
+        assert!(err.to_string().contains("failed with status"));
+    }
+
+    #[tokio::test]
+    async fn run_command_includes_stderr_in_error_message() {
+        let command = vec![
+            "sh".to_string(),
+            "-c".to_string(),
+            "echo boom 1>&2; exit 1".to_string(),
+        ];
+
+        let err = run_command(&command)
+            .await
+            .expect_err("nonzero exit should be an error");
+
+        assert!(err.to_string().contains("boom"));
+    }
+
+    #[tokio::test]
+    async fn run_command_rejects_empty_command() {
+        let command: Vec<String> = Vec::new();
+
+        let err = run_command(&command)
+            .await
+            .expect_err("empty command should be rejected");
+
+        assert!(err.to_string().contains("empty command"));
+    }
+
+    #[tokio::test]
+    async fn run_command_errors_when_binary_is_missing() {
+        let command = vec!["dubbridge-definitely-not-a-real-binary".to_string()];
+
+        let result = run_command(&command).await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn read_hls_segments_filters_by_extension_and_sorts_by_name() {
+        let workspace = TempDir::new().expect("failed to create temp dir");
+        let dir = workspace.path();
+
+        fs::write(dir.join("segment2.ts"), b"second")
+            .await
+            .expect("write segment2");
+        fs::write(dir.join("segment1.ts"), b"first")
+            .await
+            .expect("write segment1");
+        fs::write(dir.join("manifest.m3u8"), b"not a segment")
+            .await
+            .expect("write manifest");
+
+        let segments = read_hls_segments(dir)
+            .await
+            .expect("reading segments should succeed");
+
+        assert_eq!(segments.len(), 2);
+        assert_eq!(segments[0].file_name, "segment1.ts");
+        assert_eq!(segments[0].bytes, b"first");
+        assert_eq!(segments[1].file_name, "segment2.ts");
+        assert_eq!(segments[1].bytes, b"second");
+    }
+
+    #[tokio::test]
+    async fn read_hls_segments_ignores_subdirectories() {
+        let workspace = TempDir::new().expect("failed to create temp dir");
+        let dir = workspace.path();
+
+        fs::create_dir(dir.join("nested.ts"))
+            .await
+            .expect("create dir with .ts-like name");
+        fs::write(dir.join("segment.ts"), b"payload")
+            .await
+            .expect("write segment");
+
+        let segments = read_hls_segments(dir)
+            .await
+            .expect("reading segments should succeed");
+
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].file_name, "segment.ts");
+    }
+
+    #[tokio::test]
+    async fn read_hls_segments_returns_empty_vec_for_empty_directory() {
+        let workspace = TempDir::new().expect("failed to create temp dir");
+
+        let segments = read_hls_segments(workspace.path())
+            .await
+            .expect("reading segments should succeed");
+
+        assert!(segments.is_empty());
+    }
+
+    #[tokio::test]
+    async fn read_hls_segments_fails_closed_on_missing_directory() {
+        let workspace = TempDir::new().expect("failed to create temp dir");
+        let missing = workspace.path().join("does-not-exist");
+
+        let result = read_hls_segments(&missing).await;
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn path_to_string_returns_str_for_utf8_path() {
+        let path = PathBuf::from("/tmp/some/valid/path.txt");
+
+        let value = path_to_string(&path).expect("valid UTF-8 path should succeed");
+
+        assert_eq!(value, "/tmp/some/valid/path.txt");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn path_to_string_fails_closed_on_non_utf8_path() {
+        use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
+
+        let invalid = OsStr::from_bytes(&[0x66, 0x6f, 0x80, 0x6f]);
+        let path = PathBuf::from(invalid);
+
+        let err = path_to_string(&path).expect_err("non-UTF-8 path should be rejected");
+
+        assert!(err.to_string().contains("non-UTF-8 path"));
+    }
+
+    #[tokio::test]
+    async fn write_source_workspace_writes_bytes_to_temp_file() {
+        let source_bytes = b"source media payload";
+
+        let (workspace, input_path) = write_source_workspace(source_bytes)
+            .await
+            .expect("writing workspace should succeed");
+
+        assert!(input_path.starts_with(workspace.path()));
+        let written = fs::read(&input_path).await.expect("read written file");
+        assert_eq!(written, source_bytes);
+    }
 }
