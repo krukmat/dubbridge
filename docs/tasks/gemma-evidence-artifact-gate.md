@@ -22,6 +22,21 @@ Governing ADR: ADR-034 (audit log stays git-ignored/local; unaffected by this ta
 > subtasks are not independently RRI-scored or independently closed with
 > `[x] Done`; they are marked complete against their own acceptance criteria,
 > and the group closes once GEG-1e passes.
+>
+> **Implementation route (RRI_POLICY.md, owner override 2026-07-21):** RRI
+> 26–55 (Moderate + Med-high) routes to the **local-first implementation
+> path** by default — `scripts/local-agent/run_local_task.py` in a disposable
+> worktree, implementer resolved from `DUBBRIDGE_LOCAL_AGENT_MODEL` (default
+> `qwen3.6:35b-a3b`). This applies per-subtask, not just to the group: each of
+> GEG-1a–1e is Effort S/M and individually eligible, regardless of the
+> group's overall Effort L / RRI 48 classification — Effort does not gate the
+> routing decision, RRI band does. The primary agent (Claude Code, this
+> session) remains orchestrator of record: it authors each subtask's
+> delegation contract, applies the 3 Reflection passes to the local diff, and
+> owns the repair budget (1 evidence-backed local attempt per subtask before
+> escalating to cloud implementation — the Med-high, not Moderate, budget).
+> Cross-vendor peer review, Reflection passes, and the RRI 41+ human approval
+> gate are unchanged by this routing; only who authors the diff changes.
 
 ## Dependency order
 
@@ -40,19 +55,18 @@ flowchart LR
 - **GEG-1a → GEG-1b → GEG-1c → GEG-1d → GEG-1e is a strict chain.** Each
   subtask reads/extends the output of the one before it; none are safely
   parallelizable.
-- **External prerequisite (soft block, not yet resolved):** Option C (the
-  `.githooks/pre-push` fix moving Gemma/peer review out of pre-push into
-  closure + CI) is still uncommitted. GEG-1a edits the same `Makefile` region
-  Option C touched (`qa-gemma-review`, `qa-peer-workflow-review` targets). To
-  avoid merge conflicts or re-deriving a stale diff, **Option C should be
-  committed (or explicitly abandoned) before GEG-1a starts.** This was
-  previously only an implicit assumption in this task's Context/Scope-Out
-  sections — it is now a stated blocking dependency.
+- **External prerequisite — resolved.** Option C (the `.githooks/pre-push`
+  fix moving Gemma/peer review out of pre-push into closure + CI) is
+  committed as of `65f2b1e` (`fix(qa): stop running Gemma/peer review on
+  every push`). GEG-1a edits the same `Makefile` region (`qa-gemma-review`,
+  `qa-peer-workflow-review`, the new `qa-docs-review` target) on top of that
+  commit, so this dependency is no longer blocking.
 - No dependency on S-140 or any other product slice.
 
 ## GEG-1a — Receipt schema + Makefile wiring
 
-- **Status:** Pending — blocked on Option C landing (see Dependency order).
+- **Status:** Pending — unblocked (Option C landed at `65f2b1e`); ready for
+  local-first delegation per the Implementation route note above.
 - **Effort:** S
 - **Objective:** Define the committed receipt schema and wire
   `GEMMA_REVIEW_TASK_ID` into `make qa-gemma-review` (mirroring the existing
@@ -325,5 +339,5 @@ flowchart TD
     E -- "neither present" --> FAIL
 ```
 
-Execution has not started. Approve this task (and, prior to GEG-1a, the
-still-uncommitted Option C pre-push fix) to proceed.
+Execution has not started. Approve this task to proceed. Option C is already
+committed (`65f2b1e`), so GEG-1a has no remaining blocking dependency.
