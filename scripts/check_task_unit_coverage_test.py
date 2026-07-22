@@ -161,13 +161,16 @@ class TaskUnitCoverageEvidenceGate(unittest.TestCase):
         # is not an ancestor of HEAD (lives on an orphan branch instead).
         self.write("orphan-seed.txt", "seed\n")
         self.commit_all()
+        original_branch = self.run_cmd(
+            "git", "rev-parse", "--abbrev-ref", "HEAD"
+        ).stdout.strip()
         self.run_cmd("git", "checkout", "--orphan", "unreachable-branch")
         self.run_cmd("git", "rm", "-rf", ".")
         self.write("orphan-only.txt", "orphan\n")
         self.run_cmd("git", "add", "orphan-only.txt")
         self.run_cmd("git", "commit", "-m", "orphan commit")
         orphan_sha = self.head_sha()
-        self.run_cmd("git", "checkout", "main")
+        self.run_cmd("git", "checkout", original_branch)
 
         self.write_corpus(
             section("T-UNREACHABLE", "- Review artifact: docs/audit/gemma-evidence/T-UNREACHABLE.json")
