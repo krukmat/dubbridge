@@ -197,7 +197,8 @@ writes `TranscriptionStatus::Ready`.
 | T1c | Subtitle repository and readiness evidence | M | 40 | Moderate |
 | T1d | Subtitle storage key helper | M | 26 | Moderate |
 | T2a | Subtitle job queue contract | M | 34 | Moderate |
-| T2b | Transcription-ready enqueue hook | M | 35 | Moderate |
+| T2b-i | Worker-runner extraction seam for subtitle enqueue | M | 36 | Moderate |
+| T2b-ii | Transcription-ready subtitle enqueue hook | M | 34 | Moderate |
 | T3a | D1a Rust segmentation provider | M | 35 | Moderate |
 | T3b | Subtitle worker-runner handler and readiness transitions | L | 47 | Med-high |
 | T5a | ADR-030 review-task enqueue on subtitle readiness | M | 39 | Moderate |
@@ -208,11 +209,21 @@ T4 (D1b Python subtitle worker) is removed, not skipped — D1 was ratified as
 D1a on 2026-07-21, so no Python worker task exists in this decomposition.
 
 Tasks must run in order: T0 → T1a → (T1b-i, T1b-ii in either order, both
-required) → T1c → T1d → T2a → T2b → T3a → T3b → T5a →
+required) → T1c → T1d → T2a → T2b-i → T2b-ii → T3a → T3b → T5a →
 (T5b only if explicitly scoped) → T6.
 Each task requires its own RRI computation and presentation/approval before
 execution, per repository workflow. The RRI values above are planning scores
 from 2026-07-21 and must be recomputed at task presentation time.
+
+`T2b` was split on 2026-07-21 into an extraction seam and a wiring step so the
+worker-runner change stays reviewable under the local-first workflow instead of
+forcing a single large `main.rs` handoff.
+
+Live-pilot note 2026-07-21/22: the Serena-based semantic reruns of `T2b-i`
+(`LASE-T6`) never converged on an edit. That path was removed on 2026-07-22 and
+replaced with a simple read/write/patch local runner; `T2b-i` is re-run through
+it. See `docs/plan/local-agent-simple-editing.md` and the resolution note in
+`docs/tasks/s-140-subtitle-generation.md` § `S-140-T2b-i`.
 
 T1b was split into T1b-i and T1b-ii on 2026-07-21: both touch
 `infra/migrations/**`, whose anchor-rubric floor (ADR-008/ADR-018) plus the

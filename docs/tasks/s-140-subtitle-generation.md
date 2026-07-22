@@ -953,26 +953,173 @@ tests, then stop.
 `crates/jobs/src/lib.rs`, test enqueue/dequeue/empty behavior, and stop before
 worker-runner changes.
 
-**Status: [ ] Not started — blocked on T1d**
+**Execution summary:** RRI recomputed at presentation time: 17 (Low band,
+`--T 2 --A 1 --X 1 --D 1 --K 1 --P 1 --auto-cc --platform rust`, 1 touched
+file). Delegated to local Gemma (`gemma4:26b-a4b-it-qat`) via
+`scripts/delegate-low-rri.py` with `--mode full-file`, packet scoped to
+`crates/jobs/src/lib.rs` only; primary model converged without needing the
+stall fallback. Added `SubtitleJob` (`JOB_TYPE = "subtitle_generation"`),
+`SubtitleJobQueue` trait, `SharedSubtitleJobQueue` alias, and
+`InMemorySubtitleJobQueue`, mirroring `TranscriptionJob`/
+`TranscriptionJobQueue`/`InMemoryTranscriptionJobQueue` exactly (enqueue +
+`queued_jobs()` accessor — no `dequeue` method, consistent with existing
+precedent; the ledger's HP-2/EC-1 wording is satisfied by that same
+enqueue/inspect shape, not a literal FIFO-pop API). Orchestrator review
+performed per `docs/playbooks/LOW_RRI_LOCAL_MODEL_HANDOFF.md`: diff read
+line-by-line (only additive, in the requested location, no existing test or
+struct touched), scope confirmed to the single allowed file,
+`apps/worker-runner` untouched. Verification: `cargo fmt -p dubbridge-jobs
+-- --check` clean, `cargo clippy -p dubbridge-jobs --all-features -- -D
+warnings` clean, `cargo test -p dubbridge-jobs` → 7 passed (4 pre-existing +
+3 new: `subtitle_job_type_constant`, `in_memory_subtitle_queue_records_jobs`,
+`in_memory_subtitle_queue_empty_by_default`), `cargo check --workspace`
+clean. Per RRI Low-band policy, this task does not require the Gemma
+Reviewer/D14 full closure packet gated at RRI 26+; the orchestrator review
+checklist above is the governing closure bar for this band. Not yet
+committed.
+
+**Status: [x] Done — 2026-07-21, `SubtitleJob`/`SubtitleJobQueue`/
+`InMemorySubtitleJobQueue` added to `crates/jobs/src/lib.rs` via Low-RRI
+local delegation; tests pass; not yet committed**
 
 ---
 
-## S-140-T2b: Transcription-ready enqueue hook
+## S-140-T2b-i: Worker-runner extraction seam for subtitle enqueue
 
-**Effort:** M (planning RRI 35 — Moderate; recompute at presentation time)
+**Effort:** M (planning RRI 36 — Moderate; recompute at presentation time)
 **Depends on:** S-140-T2a
-**Status:** Not started — blocked on T2a
+**Status:** Not started — unblocked, T2a done; live pilot currently blocked in
+`LASE-T6` before first model turn
 
 **Happy paths considered:**
-- HP-1: `process_transcription_job` enqueues exactly one `SubtitleJob` after
-  writing `TranscriptionStatus::Ready`.
+- HP-1: The transcription-ready subtitle-enqueue preparation logic is moved out
+  of the large `main.rs` body into a dedicated sibling module.
+- HP-2: Worker-runner transcription behavior stays identical after the
+  extraction; this task enqueues no subtitle jobs yet.
+
+**Edge cases considered:**
+- EC-1: Existing transcription failure paths keep their current no-enqueue
+  behavior.
+- EC-2: The extraction does not start `process_subtitle_job` or any subtitle
+  readiness transition.
+
+**Inputs:** `apps/worker-runner/src/main.rs` transcription processing flow and
+existing worker-runner tests.
+
+**Outputs:** Narrow extraction seam for later subtitle enqueue wiring.
+
+**Acceptance criteria:**
+- A dedicated module/file owns the transcription-ready subtitle-enqueue
+  preparation logic.
+- `apps/worker-runner/src/main.rs` is reduced to a thin call site for that
+  seam.
+- Behavior is unchanged in this task: zero subtitle jobs are enqueued.
+- Existing worker-runner transcription tests still pass.
+
+**Files expected to change:**
+- `apps/worker-runner/src/main.rs`
+- `apps/worker-runner/src/subtitle_enqueue.rs`
+
+**Evidence to emit:** RRI output, local-run artifact, exact worker-runner test
+command.
+
+**Status artifacts affected:** This ledger and the S-140 plan.
+
+**Stop condition:** Stop after extraction/refactor tests pass. Do not wire
+`SubtitleJobQueue` yet.
+
+**Agent handoff prompt:** Extract only the transcription-ready subtitle-enqueue
+seam into `apps/worker-runner/src/subtitle_enqueue.rs`, keep behavior
+identical, and stop before any `SubtitleJobQueue` wiring.
+
+**Pilot note (2026-07-21):** `LASE-T6` reran this approved card through the
+semantic runner, but the attempt failed in preflight before any model edit:
+`.agent/local-runs/s-140-t2b-i/S-140-T2b-i.live.run.json` recorded
+`status=preflight_failed`, `reason=serena_start_failed`, with
+`semantic_preflight.error = "timed out waiting for Serena MCP response"`.
+`apps/worker-runner/src/main.rs` and `apps/worker-runner/src/subtitle_enqueue.rs`
+remain untouched.
+
+**Pilot note (2026-07-22):** Five infra/runner blockers found and fixed
+(see `docs/tasks/local-agent-semantic-editing.md` § `LASE-T6` for full
+detail): the MCP wire-protocol framing, a `scope_check` vs `.serena`
+artifact collision (twice — once from Serena's default data-folder
+location, once from `serena project health-check`'s own stray log file), an
+interactive-prompt hang in `serena project index`, and an uncaught
+`SerenaAdapterError` crash in `run_loop` on a mid-session semantic-tool
+hiccup. All fixes verified live against `.agent/worktrees/s-140-t2b-i-live`
+with the same card and `allowed_paths`. With all five fixed, a full pilot
+run completed (exit 0, no crash): semantic preflight and scope gate both
+passed cleanly, and the model made 16+ real, correct semantic tool calls
+(`read_symbol` against actual `main.rs` functions including
+`process_transcription_job_inner`, `process_transcription_envelope`, `main`)
+proving the symbol-first workflow works end-to-end. The model did not,
+however, converge on an edit: after exploring correctly, it switched to
+manually paging the file via `run_command sed`/`head` for its remaining
+turns, never called `apply_patch`/`write_file`, and hit the 30-turn budget
+(`status=budget_exhausted`, `reason=total_turns_exhausted`) before ever
+calling `finish`. `apps/worker-runner/src/main.rs` and
+`apps/worker-runner/src/subtitle_enqueue.rs` remain untouched; worktree
+diff is empty. No repair attempt was consumed (repair attempts only start
+after a `finish` call). Owner decision needed on next step: retry locally
+(larger turn budget or a seeded repair attempt) vs. escalate to cloud
+implementation per ADR-036.
+
+**Resolution (2026-07-22):** Owner directed a redesign rather than another
+retry. Root cause of the non-convergence was the Serena editing model itself:
+`main.rs` is ~14k tokens against the implementer's 262k-token context, so the
+symbol-server was solving a non-problem, and the read/patch size caps built
+around it prevented the model from reading and editing the file directly. The
+Serena/semantic-tool path was removed and replaced with a simple
+read/write/patch runner (`docs/plan/local-agent-simple-editing.md`).
+
+**Superseded (2026-07-22):** Before the simplified-runner pilot for this card
+was executed, the owner directed the orchestrator to implement this seam
+manually in `.agent/worktrees/s-140-t2b-i-live` instead, to unblock the slice
+without waiting on the new runner's first live validation. That manual
+implementation extracted `apps/worker-runner/src/subtitle_enqueue.rs`
+(`prepare_transcription_post_ready` / `try_enqueue_transcription` /
+`resolve_source_language`, no `SubtitleJob` wiring), and — while implementing
+it — the D14/Gemma Reviewer gate surfaced a genuine check-then-act race
+condition on transcription-status claiming, fixed with a new atomic
+`transcription_repo::try_claim_transcription_pending` (single
+`INSERT ... ON CONFLICT ... WHERE ... RETURNING` statement). Committed as
+`4082d45` on branch `s-140-t2b-i-live`. D14 re-run post-fix: 0
+consensus/false-positive/location-inconsistent findings, 1 non-blocking
+`pass_specific` note (index-monitoring suggestion on the new WHERE clause, no
+fix required). All 88 `dubbridge-db` + `dubbridge-worker-runner` tests pass;
+touched-file coverage 94.12% (`subtitle_enqueue.rs`) / 100%
+(`transcription_repo.rs`), both above the 90% gate. The simplified-runner
+pilot for `T2b-i` specifically is therefore superseded and not needed; the
+runner itself remains valid and available for future cards (see `LASE2-T6`
+in `docs/plan/local-agent-simple-editing.md` for its own validation status).
+
+**Status: [x] Done — 2026-07-22, implemented manually on branch
+`s-140-t2b-i-live` (commit `4082d45`) in
+`.agent/worktrees/s-140-t2b-i-live`; simplified-runner pilot for this card
+superseded, not re-run**
+
+---
+
+## S-140-T2b-ii: Transcription-ready subtitle enqueue hook
+
+**Effort:** M (planning RRI 34 — Moderate; recompute at presentation time)
+**Depends on:** S-140-T2b-i
+**Status:** Not started — unblocked, T2b-i done
+
+**Happy paths considered:**
+- HP-1: After `TranscriptionStatus::Ready` is persisted, exactly one
+  `SubtitleJob` is enqueued for the deterministic first target language.
 
 **Edge cases considered:**
 - EC-1: Failed transcription does not enqueue a subtitle job.
 - EC-2: Transcription jobs that fail before readiness do not leave a queued
   subtitle job behind.
+- EC-3: Multiple target-language rows still enqueue only one job in this task,
+  chosen deterministically with `ORDER BY target_lang LIMIT 1`.
 
-**Inputs:** `apps/worker-runner/src/main.rs` transcription processing flow and
+**Inputs:** `apps/worker-runner/src/main.rs`,
+`apps/worker-runner/src/subtitle_enqueue.rs`, `crates/jobs/src/lib.rs`, and
 S-130 enqueue tests.
 
 **Outputs:** Subtitle enqueue hook from transcription readiness.
@@ -980,32 +1127,35 @@ S-130 enqueue tests.
 **Acceptance criteria:**
 - Enqueue happens only after Ready is persisted.
 - Failure paths do not enqueue.
+- Exactly one `SubtitleJob` is created from the deterministic first target
+  language.
 - Tests preserve the existing S-130 transcription behavior.
 
 **Files expected to change:**
 - `apps/worker-runner/src/main.rs`
+- `apps/worker-runner/src/subtitle_enqueue.rs`
 
 **Evidence to emit:** RRI output, local-run artifact, exact worker-runner test
 command.
 
 **Status artifacts affected:** This ledger.
 
-**Stop condition:** Stop after enqueue-hook tests pass. Do not implement subtitle
-job processing.
+**Stop condition:** Stop after enqueue-hook tests pass. Do not implement
+subtitle job processing or multi-language fan-out.
 
-**Agent handoff prompt:** Add only the transcription-ready subtitle enqueue hook
-in `apps/worker-runner`, test ready/failure behavior, and stop before
-`process_subtitle_job`.
+**Agent handoff prompt:** Wire only the post-Ready single-job enqueue path using
+the extracted subtitle-enqueue module, test ready/failure behavior, and stop
+before `process_subtitle_job`.
 
-**Status: [ ] Not started — blocked on T2a**
+**Status: [ ] Not started — blocked on T2b-i**
 
 ---
 
 ## S-140-T3a: D1a Rust segmentation provider
 
 **Effort:** M (planning RRI 35 — Moderate; recompute at presentation time)
-**Depends on:** S-140-T2b (D1a ratified 2026-07-21)
-**Status:** Not started — blocked on T2b
+**Depends on:** S-140-T2b-ii (D1a ratified 2026-07-21)
+**Status:** Not started — blocked on T2b-ii
 
 **Happy paths considered:**
 - HP-1: Word alignments are grouped into ordered subtitle segments with
@@ -1041,7 +1191,7 @@ worker-runner.
 **Agent handoff prompt:** Implement only the D1a Rust segmentation provider and
 unit tests, then stop before worker-runner integration.
 
-**Status: [ ] Not started — blocked on T2b**
+**Status: [ ] Not started — blocked on T2b-ii**
 
 ---
 
