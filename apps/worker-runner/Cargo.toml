@@ -6,6 +6,8 @@ license.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+serde = { version = "1", features = ["derive"] }
+serde_json.workspace = true
 apalis.workspace = true
 tokio.workspace = true
 tracing.workspace = true

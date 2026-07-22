@@ -9,6 +9,7 @@ mod preparation_runtime;
 #[cfg(test)]
 mod preparation_runtime_tests;
 mod subtitle_enqueue;
+mod subtitle_runtime;
 mod transcription_runtime;
 
 #[tokio::main]

@@ -208,7 +208,8 @@ writes `TranscriptionStatus::Ready`.
 | T2b-i | Worker-runner extraction seam for subtitle enqueue | M | 36 | Moderate |
 | T2b-ii | Transcription-ready subtitle enqueue hook | M | 34 | Moderate |
 | T3a | D1a Rust segmentation provider | M | 35 | Moderate |
-| T3b | Subtitle worker-runner handler and readiness transitions | L | 47 | Med-high |
+| T3b | Subtitle worker-runner handler and readiness transitions | L | 50 | Med-high |
+| T3c | Wire real apalis consumer loop for worker-runner queues | M | TBD | Recompute at presentation |
 | T5a | ADR-030 review-task enqueue on subtitle readiness | M | 39 | Moderate |
 | T5b | Optional derived-artifact identity schema change for review tasks | L | TBD | Recompute if scoped |
 | T6 | BDD feature file + docs sync | S | 6 | Low |
@@ -218,10 +219,14 @@ D1a on 2026-07-21, so no Python worker task exists in this decomposition.
 
 Tasks must run in order: T0 → T1a → (T1b-i, T1b-ii in either order, both
 required) → T1c → T1d → T2a → T2b-i → T2b-ii → T3a → T3b → T5a →
-(T5b only if explicitly scoped) → T6.
+(T5b only if explicitly scoped) → T6. T3c (consumer-loop wiring, filed as
+T3b's EC-4 follow-up) depends only on T3b and may run any time after it,
+including in parallel with T5a/T5b/T6 — it is not on the critical path to
+review-task enqueue or BDD closure.
 Each task requires its own RRI computation and presentation/approval before
 execution, per repository workflow. The RRI values above are planning scores
-from 2026-07-21 and must be recomputed at task presentation time.
+from 2026-07-21 and must be recomputed at task presentation time. T3b's RRI
+was recomputed to 50 at presentation time on 2026-07-22 (see task ledger).
 
 `T2b` was split on 2026-07-21 into an extraction seam and a wiring step so the
 worker-runner change stays reviewable under the local-first workflow instead of

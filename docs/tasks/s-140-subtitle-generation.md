@@ -1447,9 +1447,11 @@ was resolved here.**
 
 ## S-140-T3b: Subtitle worker-runner handler and readiness transitions
 
-**Effort:** L (planning RRI 47 — Med-high; recompute at presentation time)
+**Effort:** L (RRI 50 — Med-high, recomputed 2026-07-22 at presentation time via
+`scripts/rri.py --auto-cc`; C=0 F=2 D=4 T=4 A=1 K=4 P=3 X=3, no penalties)
 **Depends on:** S-140-T3a
-**Status:** Not started — blocked on segmentation implementation and RRI 41+ gate
+**Status:** Not started — approved to start 2026-07-22; scope explicitly
+narrowed per owner decision (see EC-4 disposition below)
 
 **Happy paths considered:**
 - HP-1: `process_subtitle_job` loads upstream alignment, generates subtitle
@@ -1473,6 +1475,17 @@ was resolved here.**
   `process_subtitle_job` without also wiring a real consumer loop leaves the
   worker-runner binary a no-op in production regardless of how well-tested the
   handler function is in isolation.
+  **EC-4 disposition (owner decision, 2026-07-22):** out of scope for T3b.
+  The consumer-loop gap predates T3b (it already applies to
+  `process_preparation_job` and `process_transcription_job`, neither of which
+  is called from `main()` today) and wiring it correctly means standing up
+  the apalis `WorkerBuilder`/`Monitor` for all three queues at once, not just
+  subtitle — a materially different, larger unit of work. T3b implements and
+  tests `process_subtitle_job` only. The consumer-loop wiring for all three
+  handlers is deferred to a new, separately tracked task (RRI to be computed
+  at that task's own presentation time) rather than folded into T3b's
+  acceptance criteria. This is the explicit, documented handoff EC-4 itself
+  requires — the gap is not left implicit.
 
 **Inputs:** Subtitle repo/storage/provider/job contracts from T1/T2/T3a.
 
@@ -1483,14 +1496,13 @@ was resolved here.**
 - Subtitle artifact checksum/key/lineage follow ADR-006.
 - Failure paths record durable observability per ADR-018.
 - All HP/EC cases above have focused tests.
-- `main.rs` runs a real consumer loop that dispatches queued jobs to
-  `process_subtitle_job` in production — not only a handler function reachable
-  from tests. If wiring the full apalis consumer loop is out of scope for this
-  task, the task must say so explicitly and hand off the consumer-loop gap as
-  its own tracked follow-up rather than leaving it implicit (see EC-4).
+- Consumer-loop wiring is explicitly out of scope (see EC-4 disposition); a
+  follow-up task tracking it for all three worker-runner queues must exist in
+  this ledger or the plan before T3b is closed.
 
 **Files expected to change:**
-- `apps/worker-runner/src/main.rs`
+- `apps/worker-runner/src/main.rs` (module registration only, not the
+  consumer-loop gap — see EC-4 disposition)
 - `crates/db/src/subtitle_repo.rs` (only if final API adjustment is required)
 
 **Evidence to emit:** RRI output, cross-vendor/D14 phase-1 artifact, local-run
@@ -1506,7 +1518,192 @@ review tasks.
 artifact persistence, cover success/failure tests, and stop before S-160 review
 enqueue.
 
-**Status: [ ] Not started — blocked on segmentation implementation and RRI 41+ gate**
+**Implementation evidence (2026-07-22):**
+
+- Route: local-first (RRI 50, Med-high band), implementer `qwen3.6:35b-a3b`
+  via `scripts/local-agent/run_local_task.py`, disposable worktree
+  `.agent/worktrees/s-140-t3b` on branch `local/s-140-t3b`.
+- **Attempt 1 discarded.** First task-card spec asked for the handler plus 6
+  tests in a single pass with no size guidance. The run hit
+  `status: budget_exhausted` / `reason: total_turns_exhausted` at 30/30 turns
+  with a 768-line file that did not compile in test mode (`error[E0433]:
+  cannot find type 'DubridgeDomain'` — an invented module alias — in 4
+  places). Diagnosed via `cargo test`, not trusted from the background-task
+  "exit code 0" notification alone (that notification reports the wrapper
+  script's exit code, not task success — same lesson as T3a's `qa-coverage`
+  run). Worktree and branch deleted, task card rewritten: capped to 5 tests
+  (dropped a marginal storage-failure test), split into two explicit steps
+  (handler + 3 core tests, then 2 more), explicit crate-path list to prevent
+  invented type names, corrected the acceptance-test command (worker-runner
+  is a bin-only crate; `--lib` fails with "no library targets found").
+- **Attempt 2** also hit `budget_exhausted` at 30/30 turns, but produced a
+  452-line file that was substantively correct: the non-test logic
+  (`process_subtitle_job_inner` and helpers) needed no changes at all.
+  Remaining compile errors were mechanical: `StorageAdapter`/`JobEnvelope`
+  traits not imported inside `mod tests`, and two calls passed
+  `preparation_repo`'s `DerivedArtifact` value to `artifact_repo::
+  insert_artifact_record` (which expects `&ArtifactRecord`) instead of the
+  correct `preparation_repo::insert_derived_artifact`. Orchestrator applied
+  the 3-line import fix plus a 2-call function-swap directly (mechanical
+  reference corrections, not a design change) and re-verified independently
+  before any review: `cargo test -p dubbridge-worker-runner -- subtitle_runtime`
+  → 5/5 pass; `cargo test -p dubbridge-worker-runner` → 38/38 pass (no
+  regression in `transcription_runtime`/`preparation_runtime`/
+  `subtitle_enqueue` tests); `cargo fmt -p dubbridge-worker-runner -- --check`
+  clean; `cargo clippy -p dubbridge-worker-runner --all-targets
+  --all-features -- -D warnings` clean.
+- **Organization gate:** flagged `apps/worker-runner/src/subtitle_runtime.rs`
+  as a `file_growth` violation (354 meaningful lines vs. the 80-line new-file
+  budget) plus two `lint_suppression` findings on the file's two
+  `#[allow(dead_code)]` attributes. The lint-suppression findings are
+  intentional and match the existing, already-accepted pattern in
+  `transcription_runtime.rs` (both handler functions are exercised only by
+  tests today since T3c's consumer-loop wiring is explicitly out of scope —
+  see EC-4 disposition above). The file-growth violation is accepted as a
+  documented sizing artifact, same disposition as T3a's 201–286 line
+  violation: the code was independently verified correct (tests, fmt,
+  clippy) regardless of diff size, and splitting a single cohesive handler
+  file across multiple local-agent turns/commits was judged lower-value than
+  documenting the overage here. (Note found in passing while investigating
+  the file-growth score: `organization_gate.py`'s new-file detection matches
+  the literal string `"new file mode 100644"` from `git diff` output; a file
+  written with executable permissions — as `subtitle_runtime.rs` was, by the
+  local-agent's file-write path — produces `"new file mode 100755"` instead,
+  silently falling through to the 35-line existing-file budget rather than
+  the 80-line new-file budget. Not fixed here — out of scope for this task —
+  but worth a follow-up since it makes the gate's new-file budget
+  unreliable whenever a generated file inherits execute bits.)
+- **Phase-1 review** (`qwen3.6:27b-q4_K_M`, RRI 50 Med-high primary
+  reviewer): verdict `findings`, 1 HIGH + 1 MEDIUM + 1 LOW, all against the
+  task-card spec text (this ran before the mechanical fixes above). HIGH
+  ("storage_key variable never defined before step 9") was about spec
+  wording only — the implementation used the equivalent inline
+  `subtitle_key(&job.asset_id.to_string())` call at both use sites
+  correctly, so no code defect existed. MEDIUM (helper-copy ambiguity for
+  DerivedArtifact insertion) was exactly the class of issue the orchestrator
+  fix above resolved. LOW (asserting storage-key absence) was already
+  satisfied by the test's `storage.get(&key).await.is_err()` pattern.
+  Artifact: `.agent/peer-task-review-S-140-T3b.json`.
+- **Phase-2 review** (`qwen3.6:27b-q4_K_M`, over the real diff after fixes):
+  verdict `findings`, no HIGH, 1 MEDIUM + 2 LOW. LOW (import placement)
+  fixed directly (moved `use dubbridge_providers::SegmentationProvider;` to
+  the top of the file). MEDIUM (no test forces the `get_subtitle_readiness_
+  evidence` false branch after artifact insertion) is a real, accepted test
+  gap: the branch is fail-closed dead code under normal operation (readiness
+  can only be false immediately after this function's own successful
+  insert if there is a DB-level inconsistency), and the same gap exists
+  unaddressed in `transcription_runtime.rs`'s analogous `ensure_
+  transcription_ready` — not a new gap introduced by this task. LOW
+  (envelope-level job-type mismatch doesn't mark status Failed) is a false
+  positive: that error path returns before any status row is touched (mirrors
+  `process_transcription_envelope`'s identical behavior). Re-verified after
+  the import fix: `cargo test -p dubbridge-worker-runner` → 38/38 pass,
+  fmt/clippy clean. Artifact: `.agent/peer-code-review-S-140-T3b.json`.
+- Final file copied (not git-merged) from
+  `.agent/worktrees/s-140-t3b/apps/worker-runner/src/subtitle_runtime.rs`
+  into `apps/worker-runner/src/subtitle_runtime.rs`, plus the one-line `mod
+  subtitle_runtime;` addition to `main.rs` and the two-line `serde`/
+  `serde_json` dependency addition to `apps/worker-runner/Cargo.toml` —
+  same disposable-worktree copy pattern used for T1c-ii/T2b-i/T2b-ii/T3a.
+
+**Reflection log (Med-high band, 2 passes required):**
+
+1. Spec size and turn-budget interact multiplicatively for local models: a
+   spec that is individually clear can still exceed a fixed 30-turn budget
+   if it asks for too much output in one continuous pass. Splitting a spec
+   into explicit sequential steps ("do A, verify, then do B") did not, by
+   itself, prevent a second `budget_exhausted` outcome — but it did shrink
+   the blast radius of the failure from "invented a nonexistent type" to
+   "two mechanical reference errors," which is a materially cheaper failure
+   mode to recover from as an orchestrator. For RRI 41-55 local-first tasks
+   producing a new file from scratch, budget for the possibility that
+   verification/repair happens outside the local run, not only inside it.
+2. The background-task "exit code 0" notification continues to mean only
+   "the wrapper process exited zero," never "the task succeeded" — this is
+   the second time in this slice (after T3a's `qa-coverage` run) that the
+   notification summary was silently misleading relative to
+   `status: budget_exhausted` inside the actual transcript JSON. Always read
+   the transcript's own `status`/`reason` fields and re-run the acceptance
+   tests directly; never treat the notification as sufficient evidence of
+   completion.
+
+**Status: [x] Done (file-level) — 2026-07-22. Mandatory Gemma Reviewer/D14
+gate: not triggered as a fallback — primary Med-high reviewer
+(`qwen3.6:27b-q4_K_M`) was available and used for both phases; all findings
+across both phases were individually verified (fixed, or confirmed
+false-positive/spec-only/pre-existing-gap with evidence), none dismissed
+without reason. Remaining closure items before this can be treated as fully
+certified: (1) workspace-wide `make qa-coverage` gate was already failing
+before this task (65.88% at T3a's closure, pre-existing debt) and has not
+been re-run after this change — the new `subtitle_runtime.rs` file's own
+coverage was not separately measured; (2) owner final verification still
+pending; (3) not yet committed as of this ledger edit. T5a unblocked. T3c
+(consumer-loop wiring) remains filed and unimplemented, as scoped.**
+
+---
+
+## S-140-T3c: Wire real apalis consumer loop for worker-runner queues
+
+**Effort:** M (RRI TBD — recompute at presentation time)
+**Depends on:** S-140-T3b
+**Status:** Not started — filed 2026-07-22 as the explicit EC-4 follow-up
+carved out of T3b's scope (owner decision); not yet presented for approval
+
+**Why this task exists:** `apps/worker-runner/src/main.rs` currently
+constructs `SubprocessPreparationExecutor` and the job queue handle but binds
+both to `_`-prefixed bindings and never runs an apalis `WorkerBuilder`/
+`Monitor` consumer loop ([apps/worker-runner/src/main.rs:36-40](../../apps/worker-runner/src/main.rs#L36-L40)).
+`process_preparation_job`, `process_transcription_job`, and (after T3b)
+`process_subtitle_job` are exercised only by tests — none is ever called from
+`main()` in production. The worker-runner binary is a no-op today regardless
+of how well-tested each handler is in isolation. T3b's EC-4 explicitly
+required this gap not be left implicit if carved out of that task's scope —
+this entry is that required handoff.
+
+**Happy paths considered:**
+- HP-1: On startup, `main()` builds one apalis `WorkerBuilder`/`Monitor` (or
+  one per queue, per the chosen job-queue topology) that actually polls
+  Redis and dispatches queued envelopes to `process_preparation_job`,
+  `process_transcription_job`, and `process_subtitle_job`.
+- HP-2: The process stays alive and keeps consuming until shutdown signal.
+
+**Edge cases considered:**
+- EC-1: A panic or error in one handler must not crash the consumer loop for
+  the other queues.
+- EC-2: Graceful shutdown (SIGTERM) drains in-flight jobs before exit.
+- EC-3: Worker concurrency respects `config.worker_concurrency` (already
+  loaded and logged, currently unused for this purpose).
+
+**Inputs:** Existing handler functions (`process_preparation_job`,
+`process_transcription_job`, and `process_subtitle_job` once T3b lands),
+`dubbridge_jobs::default_queue()`, `config.worker_concurrency`.
+
+**Outputs:** A production-real apalis consumer loop in `main.rs` covering all
+three worker-runner queues.
+
+**Acceptance criteria:**
+- `main()` runs an actual consumer loop, not a one-shot startup log line.
+- All three existing handlers are reachable from `main()` in production, not
+  only from tests.
+- Failure in one queue's handler does not stop consumption of the others.
+- Shutdown behavior is tested or explicitly documented if untestable in this
+  harness.
+
+**Files expected to change:**
+- `apps/worker-runner/src/main.rs`
+
+**Status artifacts affected:** This ledger; S-140 plan if RRI/decomposition
+changes.
+
+**Stop condition:** Stop once all three handlers are demonstrably wired to a
+real consumer loop with passing tests. Do not change job payload schemas.
+
+**Agent handoff prompt:** Wire a real apalis consumer loop in `main.rs` for
+the preparation, transcription, and subtitle queues only; do not change
+handler logic or payload schemas.
+
+**Status: [ ] Not started — RRI not yet computed; requires its own
+presentation and approval before implementation, per the workflow guide.**
 
 ---
 
