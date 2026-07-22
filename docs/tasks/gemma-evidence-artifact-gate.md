@@ -65,8 +65,14 @@ flowchart LR
 
 ## GEG-1a — Receipt schema + Makefile wiring
 
-- **Status:** Pending — unblocked (Option C landed at `65f2b1e`); ready for
-  local-first delegation per the Implementation route note above.
+- **Status:** Complete against acceptance criteria below (subtask; group
+  does not close until GEG-1e — see Split note). Implemented by primary
+  agent via cloud escalation. Local-first attempt (`qwen3.6:35b-a3b`) was
+  tried first per the Implementation route note above; it aborted after
+  repeating a malformed `apply_patch` anchor (`gift diff` typo) 3 times,
+  exhausting the Med-high 1-attempt repair budget
+  (`reason: malformed_tool_call_repeated`). Escalated to cloud
+  implementation per policy.
 - **Effort:** S
 - **Objective:** Define the committed receipt schema and wire
   `GEMMA_REVIEW_TASK_ID` into `make qa-gemma-review` (mirroring the existing
@@ -110,8 +116,17 @@ flowchart LR
 
 ## GEG-1b — Ledger validator: artifact path
 
-- **Status:** Pending — depends on GEG-1a merged (needs a real receipt to
-  validate against).
+- **Status:** Complete against acceptance criteria below (subtask; group
+  does not close until GEG-1e — see Split note). Verified via a synthetic
+  test corpus (valid artifact → pass; mismatched task_id → fail; unreachable
+  commit_sha → fail; no evidence → fail) plus a clean full-corpus regression
+  (`bash scripts/check-task-unit-coverage.sh` against real `docs/tasks/*.md`).
+  Also fixed two pre-existing bugs surfaced during that verification:
+  `extract_task_id()`'s regex truncated real task IDs like `S-125-T1` to
+  `S-125` and matched nothing for bare IDs like `T1`; replaced with
+  first-whitespace-token extraction. `section_rri_value()` failed to match
+  the repo's actual `**RRI:** N` markdown-bold convention; fixed the sed
+  pattern to tolerate `\*\{0,2\}` around the colon.
 - **Effort:** S
 - **Objective:** Extend `validate_gemma_reviewer_evidence` in
   `scripts/check-task-unit-coverage.sh` so a `Review artifact:` line is
@@ -155,8 +170,12 @@ flowchart LR
 
 ## GEG-1c — Validator: three override branches + overrides ledger
 
-- **Status:** Pending — depends on GEG-1b merged (extends the same
-  conditional the artifact path lives in).
+- **Status:** Complete against acceptance criteria below (subtask; group
+  does not close until GEG-1e — see Split note). Created
+  `docs/audit/gemma-review-overrides.md` (OKF `type: Audit`) as the
+  append-only ledger. Verified all three override types (complete → pass;
+  missing companion field → fail) plus invalid-type and
+  absent-from-ledger failure cases via synthetic corpus tests.
 - **Effort:** M
 - **Objective:** Add the three typed `REVIEW-OVERRIDE:` branches (`urgency`,
   `not-applicable`, `pipeline-failure`) to the validator, each requiring its
@@ -203,8 +222,13 @@ flowchart LR
 
 ## GEG-1d — Policy/guide documentation updates
 
-- **Status:** Pending — depends on GEG-1c merged (docs describe the finished
-  contract, not an in-progress one).
+- **Status:** Complete against acceptance criteria below (subtask; group
+  does not close until GEG-1e — see Split note). Added `### Review evidence
+  gate (artifact-or-override, all bands)` to `RRI_POLICY.md`, `### Review
+  artifact receipt and REVIEW-OVERRIDE lines (GEG-1)` to
+  `AGENT_WORKFLOW_GUIDE.md`, and `## Review evidence override (urgency,
+  human-only)` to `HITL_AUTONOMY_POLICY.md`. `make qa-okf-frontmatter`
+  confirmed passing on all three.
 - **Effort:** S
 - **Objective:** Document the artifact-or-override contract and all three
   override types (with companion fields) in the three governing docs.
@@ -230,7 +254,25 @@ flowchart LR
 
 ## GEG-1e — Cutover + full-corpus regression + tests
 
-- **Status:** Pending — depends on GEG-1a through GEG-1d merged.
+- **Status:** Complete against acceptance criteria below (subtask; group
+  does not close until group-level closure below). Cutover recorded as
+  `REVIEW_EVIDENCE_CUTOVER_DATE="2026-07-22"` with grandfather logic in
+  `section_predates_cutover()`. Full-corpus regression
+  (`bash scripts/check-task-unit-coverage.sh`, real `docs/tasks/*.md`)
+  passes clean; confirmed non-vacuous by directly checking the trigger
+  intersection (files carrying `Behavioral coverage contract: unit-v1`
+  crossed with `[x] Done` + `Type: development` sections) is empty in the
+  live corpus today, so this pass reflects "no matching sections yet," not
+  an unexercised code path — the new branch logic itself is proven by the
+  synthetic test suite below, not by the live corpus. Added
+  `scripts/check_task_unit_coverage_test.py` (14 tests, isolated git-tempdir
+  fixtures following the `check_roadmap_drift_test.py` precedent) covering
+  every branch: valid artifact → pass; mismatched task_id → fail;
+  unreachable commit_sha → fail; no evidence → fail; each override type
+  complete → pass; each missing its companion field → fail; invalid
+  override type → fail; override absent from ledger → fail; pre-cutover
+  grandfather path (legacy check still enforced, new gate not applied).
+  Wired into `make qa-docs` (and standalone `make qa-task-unit-coverage`).
 - **Effort:** M
 - **Objective:** Define the grandfather cutover point, run the new validator
   against the full `docs/tasks/*.md` corpus with no false positives on

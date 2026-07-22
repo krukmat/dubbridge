@@ -974,9 +974,49 @@ Task completion records for Low/Moderate development tasks must include:
 per-pass artifacts). Run the reviewer with `make qa-gemma-review` (local only;
 not required in GitHub-hosted CI until an Ollama-capable runner is available).
 For task ledgers that declare `Behavioral coverage contract: unit-v1`, `make
-qa-docs` rejects completed development sections that omit required `Gemma
-Reviewer evidence` for RRI 0–40 or omit the `Reflection log` required for
-RRI 26+.
+qa-docs` rejects completed development sections that omit the `Reflection
+log` required for RRI 26+, and — per the review evidence gate below — omit
+both a `Review artifact:` line and a `REVIEW-OVERRIDE:` line at **every**
+RRI band, not only 0–40.
+
+### Review artifact receipt and REVIEW-OVERRIDE lines (GEG-1)
+
+Owner directive, 2026-07-22: `make qa-gemma-review` and `make
+qa-peer-workflow-review` write a committed JSON receipt when invoked with
+`GEMMA_REVIEW_TASK_ID=<task_id>`, at
+`docs/audit/gemma-evidence/<task_id>.json`:
+
+```json
+{"task_id": "<task_id>", "commit_sha": "<sha>", "reviewer": "gemma|qwen3.6:27b-q4_K_M|d14", "verdict": "PASS|FINDINGS-ACKED|...", "timestamp": "<ISO 8601>"}
+```
+
+The completed section in the task file must reference it:
+
+```md
+- Review artifact: docs/audit/gemma-evidence/<task_id>.json
+```
+
+`scripts/check-task-unit-coverage.sh` checks the file exists, is valid JSON,
+its `task_id` matches the section, and its `commit_sha` is reachable from
+the reviewed history.
+
+If no review ran (or none is applicable), use a typed override line instead
+of the artifact line — never both, never neither:
+
+```md
+- REVIEW-OVERRIDE: <urgency|pipeline-failure|not-applicable> — <reason>
+- Waiver-by: <human name>            # urgency only
+- Failed-attempt: <evidence>          # pipeline-failure only
+- Scope-note: <why>                   # not-applicable only
+```
+
+Every `REVIEW-OVERRIDE:` line also needs a matching row in the append-only
+ledger `docs/audit/gemma-review-overrides.md` — the validator fails a
+section whose override has no ledger row, even if the companion field is
+present. `urgency` overrides require a human `Waiver-by`; an agent may not
+self-issue one (see `docs/policies/HITL_AUTONOMY_POLICY.md`). Full contract:
+`docs/policies/RRI_POLICY.md § Review evidence gate (artifact-or-override,
+all bands)`.
 
 ## Local Architect / Complex Analyst (ADR-037)
 

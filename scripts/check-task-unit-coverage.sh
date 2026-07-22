@@ -40,7 +40,7 @@ is_completed_development_section() {
 
 section_rri_value() {
   local section="$1"
-  printf '%s\n' "$section" | sed -n 's/.*RRI:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -n1
+  printf '%s\n' "$section" | sed -n 's/.*RRI:\*\{0,2\}[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -n1
 }
 
 find_certification_row() {
@@ -164,6 +164,139 @@ validate_gemma_reviewer_evidence() {
   fi
 }
 
+# GEG-1e cutover: sections closed [x] Done before this date are grandfathered
+# out of validate_review_evidence and keep the legacy RRI<=40-only check
+# above instead. See docs/tasks/gemma-evidence-artifact-gate.md (GEG-1e AC 1).
+REVIEW_EVIDENCE_CUTOVER_DATE="2026-07-22"
+
+section_done_date() {
+  local section="$1"
+  printf '%s\n' "$section" \
+    | sed -n 's/.*-[[:space:]]*Date:[[:space:]]*\([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\).*/\1/p' \
+    | head -n1
+}
+
+section_predates_cutover() {
+  local section="$1"
+  local done_date
+  done_date="$(section_done_date "$section")"
+  [[ -n "$done_date" ]] && [[ "$done_date" < "$REVIEW_EVIDENCE_CUTOVER_DATE" ]]
+}
+
+# Band-agnostic artifact-or-override gate (GEG-1b/1c). Applies to every
+# completed development section at or after the cutover, regardless of RRI.
+# A `Review artifact:` line must resolve to a real, matching, reachable
+# receipt (docs/audit/gemma-evidence/<task_id>.json); a `REVIEW-OVERRIDE:`
+# line must be one of the three typed exceptions with its companion field and
+# a matching row in docs/audit/gemma-review-overrides.md. Absence of both
+# fails the gate — silence is not a pass.
+OVERRIDES_LEDGER="docs/audit/gemma-review-overrides.md"
+
+extract_task_id() {
+  local section_title="$1"
+  printf '%s\n' "$section_title" | awk '{print $1}' | sed 's/:$//'
+}
+
+validate_review_artifact_line() {
+  local task_file="$1"
+  local section_title="$2"
+  local section="$3"
+  local artifact_task_id="$4"
+
+  local receipt_path="docs/audit/gemma-evidence/${artifact_task_id}.json"
+  if [[ ! -f "$receipt_path" ]]; then
+    add_violation "$task_file: $section_title: Review artifact points at missing receipt '$receipt_path'"
+    return
+  fi
+
+  if ! python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$receipt_path" >/dev/null 2>&1; then
+    add_violation "$task_file: $section_title: Review artifact '$receipt_path' is not valid JSON"
+    return
+  fi
+
+  local receipt_task_id
+  local receipt_commit_sha
+  receipt_task_id="$(python3 -c "import json; print(json.load(open('$receipt_path')).get('task_id',''))" 2>/dev/null || true)"
+  receipt_commit_sha="$(python3 -c "import json; print(json.load(open('$receipt_path')).get('commit_sha',''))" 2>/dev/null || true)"
+
+  if [[ "$receipt_task_id" != "$artifact_task_id" ]]; then
+    add_violation "$task_file: $section_title: Review artifact task_id '$receipt_task_id' does not match section '$artifact_task_id'"
+  fi
+
+  if [[ -z "$receipt_commit_sha" ]]; then
+    add_violation "$task_file: $section_title: Review artifact missing commit_sha"
+  elif ! git merge-base --is-ancestor "$receipt_commit_sha" HEAD 2>/dev/null && [[ "$receipt_commit_sha" != "$(git rev-parse HEAD 2>/dev/null)" ]]; then
+    add_violation "$task_file: $section_title: Review artifact commit_sha '$receipt_commit_sha' is not reachable from reviewed history"
+  fi
+}
+
+validate_review_override_line() {
+  local task_file="$1"
+  local section_title="$2"
+  local section="$3"
+  local override_line="$4"
+
+  local override_type
+  override_type="$(printf '%s\n' "$override_line" | sed -nE 's/.*REVIEW-OVERRIDE:[[:space:]]*([A-Za-z-]+)[[:space:]]*—.*/\1/p')"
+
+  case "$override_type" in
+    urgency)
+      if ! printf '%s\n' "$section" | grep -Eq '^[[:space:]]*-?[[:space:]]*Waiver-by:[[:space:]]*[^[:space:]].*'; then
+        add_violation "$task_file: $section_title: REVIEW-OVERRIDE: urgency missing companion Waiver-by: <human name>"
+      fi
+      ;;
+    pipeline-failure)
+      if ! printf '%s\n' "$section" | grep -Eq '^[[:space:]]*-?[[:space:]]*Failed-attempt:[[:space:]]*[^[:space:]].*'; then
+        add_violation "$task_file: $section_title: REVIEW-OVERRIDE: pipeline-failure missing companion Failed-attempt: <evidence>"
+      fi
+      ;;
+    not-applicable)
+      if ! printf '%s\n' "$section" | grep -Eq '^[[:space:]]*-?[[:space:]]*Scope-note:[[:space:]]*[^[:space:]].*'; then
+        add_violation "$task_file: $section_title: REVIEW-OVERRIDE: not-applicable missing companion Scope-note: <why>"
+      fi
+      ;;
+    *)
+      add_violation "$task_file: $section_title: REVIEW-OVERRIDE type '$override_type' is not one of urgency, not-applicable, pipeline-failure"
+      return
+      ;;
+  esac
+
+  local task_id
+  task_id="$(extract_task_id "$section_title")"
+  if [[ -z "$task_id" ]] || [[ ! -f "$OVERRIDES_LEDGER" ]] || ! grep -qF "$task_id" "$OVERRIDES_LEDGER"; then
+    add_violation "$task_file: $section_title: REVIEW-OVERRIDE has no matching row in $OVERRIDES_LEDGER"
+  fi
+}
+
+validate_review_evidence() {
+  local task_file="$1"
+  local section_title="$2"
+  local section="$3"
+
+  local artifact_line
+  artifact_line="$(printf '%s\n' "$section" | grep -E '^[[:space:]]*-?[[:space:]]*Review artifact:' | head -n1 || true)"
+  local override_line
+  override_line="$(printf '%s\n' "$section" | grep -E '^[[:space:]]*-?[[:space:]]*REVIEW-OVERRIDE:' | head -n1 || true)"
+
+  if [[ -n "$artifact_line" ]]; then
+    local artifact_task_id
+    artifact_task_id="$(extract_task_id "$section_title")"
+    if [[ -z "$artifact_task_id" ]]; then
+      add_violation "$task_file: $section_title: cannot derive task_id from section title for Review artifact check"
+      return
+    fi
+    validate_review_artifact_line "$task_file" "$section_title" "$section" "$artifact_task_id"
+    return
+  fi
+
+  if [[ -n "$override_line" ]]; then
+    validate_review_override_line "$task_file" "$section_title" "$section" "$override_line"
+    return
+  fi
+
+  add_violation "$task_file: $section_title: missing Review artifact or REVIEW-OVERRIDE evidence"
+}
+
 validate_reflection_log() {
   local task_file="$1"
   local section_title="$2"
@@ -203,8 +336,14 @@ validate_section() {
 
   if [[ -z "$rri" ]]; then
     add_violation "$task_file: $section_title: completed development section must declare numeric RRI"
-  elif (( rri <= 40 )); then
-    validate_gemma_reviewer_evidence "$task_file" "$section_title" "$section"
+  fi
+
+  if section_predates_cutover "$section"; then
+    if [[ -n "$rri" ]] && (( rri <= 40 )); then
+      validate_gemma_reviewer_evidence "$task_file" "$section_title" "$section"
+    fi
+  else
+    validate_review_evidence "$task_file" "$section_title" "$section"
   fi
 
   if [[ -n "$rri" ]] && (( rri >= 26 )); then

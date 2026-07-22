@@ -519,6 +519,44 @@ the final fallback.
 `Reviewer: qwen3.6:27b-q4_K_M` (or `gemma` if the Gemma fallback triggered,
 or `d14` if the D14 fallback triggered), same fields otherwise unchanged.
 
+### Review evidence gate (artifact-or-override, all bands)
+
+Owner directive, 2026-07-22 (GEG-1): every task-file section that reaches
+`[x] Done` with `Type: development` must carry machine-checkable evidence
+that the mandatory review gate for its band actually ran — a Gemma Reviewer
+pass, a cross-vendor peer review, or D14, per the routing rules above. This
+requirement is **band-agnostic**: it applies at RRI 0-25 (Low), 26-40
+(Moderate), and 41-55 (Med-high) alike, not only to the sub-40 tier the
+original ledger validator checked. `scripts/check-task-unit-coverage.sh`
+enforces it for every section dated on or after the cutover recorded in that
+script (`REVIEW_EVIDENCE_CUTOVER_DATE`); sections predating the cutover are
+grandfathered and keep the pre-GEG-1 behavior.
+
+The section must contain **one** of:
+
+- **`Review artifact: docs/audit/gemma-evidence/<task_id>.json`** — a
+  receipt written by `make qa-gemma-review` or `make qa-peer-workflow-review`
+  when invoked with `GEMMA_REVIEW_TASK_ID=<task_id>` (see `AGENT_WORKFLOW_GUIDE.md`
+  for the line format and receipt schema). The validator checks the receipt
+  exists, is valid JSON, its `task_id` matches the section, and its
+  `commit_sha` is reachable from the reviewed history.
+- **`REVIEW-OVERRIDE: <type> — <reason>`** — a typed, human-auditable
+  exception when no receipt exists. Exactly three types are recognized,
+  each requiring both a companion field in the same section and a matching
+  row in the append-only ledger `docs/audit/gemma-review-overrides.md`:
+  - `urgency` — requires `Waiver-by: <human name>`. Cannot be agent-issued;
+    see `docs/policies/HITL_AUTONOMY_POLICY.md`.
+  - `pipeline-failure` — requires `Failed-attempt: <evidence>` (e.g. the
+    abort reason from a local-agent or reviewer-pipeline run).
+  - `not-applicable` — requires `Scope-note: <why>` (e.g. doc-only or
+    config-only work misfiled under a development section).
+
+A section with neither a valid `Review artifact:` line nor a complete
+`REVIEW-OVERRIDE:` line fails the gate — silence is not a pass. This is the
+delegation-closure counterpart to the target-file-size gate above: that gate
+controls what may be sent to local-first implementation before the fact,
+this one controls what may be marked Done after the fact.
+
 ## Decomposition triggers
 
 Split a task into subtasks before implementing if **any** of the following apply:

@@ -240,6 +240,22 @@ violation.
 See `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Reviewability budget gate` for the
 budget derivation and override mechanics.
 
+## Review evidence override (urgency, human-only)
+
+Owner directive, 2026-07-22 (GEG-1): a completed development section may
+close without a `Review artifact:` receipt only via a typed
+`REVIEW-OVERRIDE:` line (see `docs/policies/RRI_POLICY.md § Review evidence
+gate` and `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Review artifact receipt
+and REVIEW-OVERRIDE lines`). Two of the three override types —
+`pipeline-failure` and `not-applicable` — are ordinary agent-supplied
+evidence, no different in kind from the other autonomous escapes in this
+policy. The third, **`urgency`**, is not: it requires a `Waiver-by: <human
+name>` companion field naming the person who authorized skipping review, and
+an agent **may not self-issue it**. An agent invoking `urgency` without a
+prior, explicit human waiver is out of scope of the autonomy this policy
+grants — treat it the same as any other unauthorized skip of a mandatory
+review gate.
+
 ## Related
 
 - `CLAUDE.md`, `AGENTS.md`, `README_AGENT_ORDER.md`

@@ -9,6 +9,8 @@ PEER_REVIEW_ARTIFACT ?= /tmp/dubbridge-peer-review.json
 PEER_REVIEW_BASE     ?= HEAD
 GEMMA_REVIEW_BASE   ?= HEAD
 GEMMA_REVIEW_RESULT ?= /tmp/dubbridge-gemma-review.json
+GEMMA_REVIEW_TASK_ID ?=
+GEMMA_EVIDENCE_DIR   ?= docs/audit/gemma-evidence
 COVERAGE_IGNORE_REGEX ?= (apps/(api|cli|worker-runner)/src/(main|cleanup)\.rs|apps/api/src/(dto/ingestion|lib|routes/ingestion|state)\.rs|crates/(db|jobs|observability)/src/lib\.rs|crates/db/src/(artifact_repo|asset_repo|audit_repo|pending_ingestion_repo|rights_repo)\.rs|crates/(audit|ingestion)/src/lib\.rs)
 CARGO ?= $(if $(shell command -v cargo 2>/dev/null),$(shell command -v cargo),$(HOME)/.cargo/bin/cargo)
 
@@ -67,11 +69,13 @@ qa-design:
 	npx -y @google/design.md lint DESIGN.md
 
 qa-task-unit-coverage:
+	python3 scripts/check_task_unit_coverage_test.py
 	bash scripts/check-task-unit-coverage.sh
 
 # Deterministic doc gates only (no LLM review). Safe to run on every push.
 qa-docs:
 	bash scripts/check-doc-consistency.sh
+	python3 scripts/check_task_unit_coverage_test.py
 	bash scripts/check-task-unit-coverage.sh
 	bash scripts/check-roadmap-drift.sh
 	python3 scripts/check_okf_frontmatter.py
@@ -103,7 +107,19 @@ qa-gemma-review:
 	  git diff $(GEMMA_REVIEW_BASE); } \
 	| python3 scripts/gemma-code-review.py --out "$(GEMMA_REVIEW_RESULT)" - \
 	&& echo "[gemma-review] result written to $(GEMMA_REVIEW_RESULT)"; \
-	python3 scripts/parse-review-findings.py "$(GEMMA_REVIEW_RESULT)"
+	findings_status=0; \
+	python3 scripts/parse-review-findings.py "$(GEMMA_REVIEW_RESULT)" || findings_status=$$?; \
+	if [ -n "$(GEMMA_REVIEW_TASK_ID)" ]; then \
+		mkdir -p "$(GEMMA_EVIDENCE_DIR)"; \
+		verdict="PASS"; [ "$$findings_status" != "0" ] && verdict="FINDINGS-ACKED"; \
+		commit_sha=$$(git rev-parse HEAD); \
+		timestamp=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
+		printf '{"task_id":"%s","commit_sha":"%s","reviewer":"gemma","verdict":"%s","timestamp":"%s"}\n' \
+			"$(GEMMA_REVIEW_TASK_ID)" "$$commit_sha" "$$verdict" "$$timestamp" \
+			> "$(GEMMA_EVIDENCE_DIR)/$(GEMMA_REVIEW_TASK_ID).json"; \
+		echo "[gemma-review] receipt written to $(GEMMA_EVIDENCE_DIR)/$(GEMMA_REVIEW_TASK_ID).json"; \
+	fi; \
+	exit $$findings_status
 
 qa-gemma-push-review:
 	@if [ "$${DUBBRIDGE_SKIP_GEMMA_PUSH_REVIEW:-0}" = "1" ]; then \
@@ -156,7 +172,20 @@ qa-peer-workflow-review:
 	      --caller $(PEER_REVIEW_CALLER) --artifact $(PEER_REVIEW_ARTIFACT)"; \
 	if [ -n "$(PEER_REVIEW_TASK_ID)" ]; then args="$$args --task-id $(PEER_REVIEW_TASK_ID)"; fi; \
 	if [ "$${PEER_REVIEW_DRY_RUN:-0}" = "1" ]; then args="$$args --dry-run"; fi; \
-	git diff "$(PEER_REVIEW_BASE)" | python3 scripts/peer-workflow-review.py $$args --content -
+	review_status=0; \
+	git diff "$(PEER_REVIEW_BASE)" | python3 scripts/peer-workflow-review.py $$args --content - || review_status=$$?; \
+	if [ -n "$(PEER_REVIEW_TASK_ID)" ] && [ -f "$(PEER_REVIEW_ARTIFACT)" ]; then \
+		mkdir -p "$(GEMMA_EVIDENCE_DIR)"; \
+		verdict=$$(python3 -c "import json,sys; d=json.load(open('$(PEER_REVIEW_ARTIFACT)')); v=d.get('verdict','unknown'); print('PASS' if v == 'pass' else 'FINDINGS-ACKED')" 2>/dev/null || echo "FINDINGS-ACKED"); \
+		reviewer=$$(python3 -c "import json,sys; d=json.load(open('$(PEER_REVIEW_ARTIFACT)')); print(d.get('reviewer') or d.get('model') or 'peer')" 2>/dev/null || echo "peer"); \
+		commit_sha=$$(git rev-parse HEAD); \
+		timestamp=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
+		printf '{"task_id":"%s","commit_sha":"%s","reviewer":"%s","verdict":"%s","timestamp":"%s"}\n' \
+			"$(PEER_REVIEW_TASK_ID)" "$$commit_sha" "$$reviewer" "$$verdict" "$$timestamp" \
+			> "$(GEMMA_EVIDENCE_DIR)/$(PEER_REVIEW_TASK_ID).json"; \
+		echo "[peer-review] receipt written to $(GEMMA_EVIDENCE_DIR)/$(PEER_REVIEW_TASK_ID).json"; \
+	fi; \
+	exit $$review_status
 
 show-codex-session-model:
 	python3 scripts/show-codex-session-model.py
