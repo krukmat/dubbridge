@@ -480,7 +480,8 @@ human.
 infra/migrations/0025_add_subtitle_artifact_unique_constraint.sql --penalty
 auth_security --platform dubbridge`)
 **Depends on:** S-140-T1b-i, S-140-T1b-ii
-**Status:** Not started — unblocked; T1b complete
+**Status:** Done — migration validated and merged; T1c-ii unblocked (see
+closure line below; header was stale)
 
 **Happy paths considered:**
 - HP-1: Migration adds a partial `UNIQUE` index on
@@ -918,7 +919,8 @@ tests, then stop.
 
 **Effort:** M (planning RRI 34 — Moderate; recompute at presentation time)
 **Depends on:** S-140-T1d
-**Status:** Not started — unblocked, T1d done
+**Status:** Done — 2026-07-21, `SubtitleJob`/`SubtitleJobQueue`/
+`InMemorySubtitleJobQueue` added (see closure line below; header was stale)
 
 **Happy paths considered:**
 - HP-1: A `SubtitleJob` carries the asset/project/target-language context needed
@@ -988,8 +990,8 @@ local delegation; tests pass; not yet committed**
 
 **Effort:** M (planning RRI 36 — Moderate; recompute at presentation time)
 **Depends on:** S-140-T2a
-**Status:** Not started — unblocked, T2a done; live pilot currently blocked in
-`LASE-T6` before first model turn
+**Status:** Done — 2026-07-22, implemented manually (see closure line below;
+header was stale)
 
 **Happy paths considered:**
 - HP-1: The transcription-ready subtitle-enqueue preparation logic is moved out
