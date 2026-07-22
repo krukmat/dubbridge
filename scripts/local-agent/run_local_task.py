@@ -83,11 +83,13 @@ COMMAND_TIMEOUT_SECONDS = 120
 # this workspace's largest source files while leaving room for the JSON
 # envelope around it.
 GENERATION_TOKEN_BUDGET = 8192
-# qwen3.6:35b-a3b's own advertised context window (`ollama show`); set
-# explicitly rather than trusting Ollama's server-side default, which is
-# smaller and would silently truncate the model's view of a full-file
-# read_file result on a long session.
-MODEL_CONTEXT_TOKENS = 131072
+# qwen3.6:35b-a3b's advertised context window (`ollama show`) is 131072, but
+# that full size measurably slows generation. Set explicitly to a smaller
+# ceiling rather than trusting Ollama's server-side default (smaller still,
+# and would silently truncate the model's view of a full-file read_file
+# result on a long session) or the full advertised window (slow in practice
+# for this workspace's task sizes).
+MODEL_CONTEXT_TOKENS = 90112
 
 # Prepended to every card's own spec as the system message. The model is not
 # given native tool-calling (see build_live_chat_fn's docstring) — it must be
