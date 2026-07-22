@@ -16,6 +16,8 @@ __pycache__/
 *.pyc
 .codex_tmp/*
 .agent/
+.serena/*
+!.serena/project.yml
 .claude/*
 logs/gemma-audit/
 logs/local-bench/

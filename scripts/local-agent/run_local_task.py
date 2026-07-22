@@ -53,7 +53,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import gemma_local
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import runner_workflow_gate
 import scope_check
+from runner_file_tools import ALLOWED_TOOL_NAMES, RunnerFileTools
 
 MAX_REPAIR_ATTEMPTS = 2
 # Independent of MAX_REPAIR_ATTEMPTS (only counts failed finish->test cycles)
@@ -75,6 +77,17 @@ MAX_MALFORMED_BOUNCES = 3
 DEFAULT_IDLE_TIMEOUT_SECONDS = 180
 DEFAULT_MAX_WALL_SECONDS = 1800
 COMMAND_TIMEOUT_SECONDS = 120
+# Output-token budget per turn. read_file/write_file/apply_patch have no size
+# cap (see runner_file_tools.py), so a turn can legitimately need to emit a
+# large "content"/"replacement" string; 4096 is comfortably above any file in
+# this workspace's largest source files while leaving room for the JSON
+# envelope around it.
+GENERATION_TOKEN_BUDGET = 8192
+# qwen3.6:35b-a3b's own advertised context window (`ollama show`); set
+# explicitly rather than trusting Ollama's server-side default, which is
+# smaller and would silently truncate the model's view of a full-file
+# read_file result on a long session.
+MODEL_CONTEXT_TOKENS = 131072
 
 # Prepended to every card's own spec as the system message. The model is not
 # given native tool-calling (see build_live_chat_fn's docstring) — it must be
@@ -97,16 +110,25 @@ Respond with ONLY that JSON object — no prose before or after it, no markdown 
 code fences.
 
 Available tools:
-- read_file: arguments {"path": "<repo-relative path>"}. Returns the current contents of \
-a file already in the worktree. Use this before write_file when you need to see or edit \
-existing code — you cannot see repo contents any other way.
+- read_file: arguments {"path": "<repo-relative path>"}. Returns the full current \
+contents of an existing file. There is no size limit — read the whole file you need \
+to change.
 - write_file: arguments {"path": "<repo-relative path>", "content": "<full file contents>"}. \
-Writes the complete file content (not a diff/patch) to the given path inside the worktree.
+Creates a new file or overwrites an existing one with exactly the content you supply.
+- apply_patch: arguments {"path": "<repo-relative path>", "anchor": "<exact existing text>", "replacement": "<replacement text>"}. \
+Replaces exactly one occurrence of "anchor" (which must appear exactly once in the file) \
+with "replacement". Use this for a focused edit to a large file instead of rewriting it \
+whole. If the anchor is not unique, read the file and include more surrounding text so it is.
 - run_command: arguments {"argv": ["<program>", "<arg1>", ...]}. Runs a command inside \
 the worktree and returns its real exit code, stdout, and stderr.
 - finish: arguments {}. Signals you believe the task is complete; this triggers the \
 acceptance tests. If they fail, you will see the failure output and get another turn \
 to fix it (bounded number of repair attempts).
+
+Typical workflow: read_file the file(s) named in your task, make your edits with \
+apply_patch (focused changes to large files) or write_file (new files or small full \
+rewrites), run the acceptance command yourself with run_command to check, then call \
+finish.
 
 Call exactly one tool per turn. Only call finish once you believe the acceptance \
 tests described in your task will pass.
@@ -138,7 +160,7 @@ TOOL_CALL_JSON_SCHEMA = {
                         "properties": {
                             "name": {
                                 "type": "string",
-                                "enum": ["read_file", "write_file", "run_command", "finish"],
+                                "enum": list(ALLOWED_TOOL_NAMES),
                             },
                             "arguments": {"type": "object"},
                         },
@@ -205,7 +227,7 @@ def parse_tool_call(raw_message):
     call = tool_calls[0]
     function = call.get("function", {})
     name = function.get("name")
-    if name not in ("write_file", "run_command", "read_file", "finish"):
+    if name not in ALLOWED_TOOL_NAMES:
         raise MalformedToolCall(f"unknown tool name: {name!r}")
     raw_arguments = function.get("arguments", {})
     # Real models (confirmed against qwen3.6:35b-a3b) naturally emit
@@ -303,46 +325,14 @@ def _run_command_with_timeout(argv, worktree_dir, boundary):
     }
 
 
-def apply_tool_call(call, worktree_dir, boundary):
-    if call.name == "write_file":
-        path = require_argument(call, "path")
-        boundary.check_write(path)
-        target = os.path.join(worktree_dir, path)
-        os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
-        # D14 finding: check_write() resolving the path and this open() are
-        # two separate steps — a symlink swapped in the gap between them
-        # would previously be followed unconditionally by open(). O_NOFOLLOW
-        # makes the final path component's open atomic against exactly that
-        # race: if it's a symlink at open() time (original target or
-        # swapped), the kernel rejects it instead of following it.
-        try:
-            fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW)
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(call.arguments.get("content", ""))
-        except OSError as exc:
-            raise BoundaryViolation(f"write rejected at open time: {path!r} ({exc})") from exc
-        return {"tool": "write_file", "path": path, "ok": True}
-
-    if call.name == "read_file":
-        path = require_argument(call, "path")
-        # check_write()'s jail/symlink resolution is the same validation a
-        # read needs (path stays inside the worktree, no traversal, no
-        # symlink escape); its name is write-oriented but the check itself
-        # is intent-agnostic, so reusing it here avoids a near-duplicate
-        # boundary method for what is otherwise identical logic.
-        boundary.check_write(path)
-        target = os.path.join(worktree_dir, path)
-        try:
-            with open(target, "r", encoding="utf-8", errors="replace") as f:
-                content = f.read()
-        except FileNotFoundError as exc:
-            raise MalformedToolCall(f"read_file: no such file in worktree: {path!r}") from exc
-        except IsADirectoryError as exc:
-            raise MalformedToolCall(f"read_file: path is a directory, not a file: {path!r}") from exc
-        except OSError as exc:
-            raise BoundaryViolation(f"read rejected: {path!r} ({exc})") from exc
-        return {"tool": "read_file", "path": path, "ok": True, "content": content}
-
+def apply_tool_call(call, worktree_dir, boundary, file_tools=None):
+    if file_tools is None:
+        file_tools = RunnerFileTools(
+            worktree_dir, boundary, MalformedToolCall, BoundaryViolation
+        )
+    file_result = file_tools.handle(call)
+    if file_result is not None:
+        return file_result
     if call.name == "run_command":
         argv = require_argument(call, "argv")
         # T7d-fix: a real qwen3.6:35b-a3b session sent argv as a single raw
@@ -367,7 +357,16 @@ def run_acceptance_tests(test_runner, worktree_dir):
     return test_runner(worktree_dir)
 
 
-def run_loop(card, chat_fn, test_runner, worktree_dir, boundary, checkpoint_fn=None):
+def run_loop(
+    card,
+    chat_fn,
+    test_runner,
+    worktree_dir,
+    boundary,
+    file_tools,
+    organization_gate_fn,
+    checkpoint_fn=None,
+):
     """checkpoint_fn(transcript, total_turns), if given, is called after every
     turn that continues the loop. A session killed between turns (e.g. an
     operator interrupting a slow local-model generation) previously left no
@@ -448,7 +447,7 @@ def run_loop(card, chat_fn, test_runner, worktree_dir, boundary, checkpoint_fn=N
 
         try:
             call = parse_tool_call(response)
-            result = apply_tool_call(call, worktree_dir, boundary)
+            result = apply_tool_call(call, worktree_dir, boundary, file_tools)
         except MalformedToolCall as exc:
             # covers both parse_tool_call (unparseable response) and
             # apply_tool_call (valid tool name, missing/invalid arguments) —
@@ -522,7 +521,22 @@ def run_loop(card, chat_fn, test_runner, worktree_dir, boundary, checkpoint_fn=N
             transcript.append({"event": "test_result", "result": test_result})
 
             if test_result["passed"]:
-                return {"status": "success", "transcript": transcript}
+                organization_result = organization_gate_fn(worktree_dir)
+                transcript.append(
+                    {"event": "organization_gate", "result": organization_result}
+                )
+                if organization_result.get("status") != "pass":
+                    return {
+                        "status": "organization_violation",
+                        "reason": organization_result.get("status", "organization_violation"),
+                        "organization_gate": organization_result,
+                        "transcript": transcript,
+                    }
+                return {
+                    "status": "success",
+                    "organization_gate": organization_result,
+                    "transcript": transcript,
+                }
 
             if repair_attempt >= MAX_REPAIR_ATTEMPTS:
                 return {
@@ -590,6 +604,19 @@ def build_live_chat_fn(host, model, idle_timeout, max_wall):
             "format": TOOL_CALL_JSON_SCHEMA,
             "keep_alive": "10m",
             "messages": messages,
+            "options": {
+                # Confirmed live (S-140-T2b-i pilot, 2026-07-22): with no
+                # explicit num_predict, Ollama's server-side default cut a
+                # real apply_patch tool call mid-JSON (done_reason="length")
+                # on the turn right after a full-file read_file put ~14k
+                # tokens of context in play — the model still had a large
+                # "replacement" string left to emit. read_file/write_file
+                # have no size cap in this tool contract, so the output
+                # budget must comfortably exceed one full file's worth of
+                # text, not just a short tool-call envelope.
+                "num_predict": GENERATION_TOKEN_BUDGET,
+                "num_ctx": MODEL_CONTEXT_TOKENS,
+            },
         }
         result = gemma_local.stream_chat(
             url,
@@ -723,9 +750,52 @@ def build_audit_record(card, result, model, elapsed_s):
         e["result"] for e in transcript
         if e.get("event") == "tool_result" and e["result"].get("tool") == "run_command"
     ]
+    edit_events = [
+        e["result"] for e in transcript
+        if e.get("event") == "tool_result" and e["result"].get("tool") in ("write_file", "apply_patch")
+    ]
     boundary_violations = [e for e in transcript if e.get("event") == "boundary_violation"]
     scope_check_events = [e for e in transcript if e.get("event") == "scope_check"]
     scope_check_result = scope_check_events[-1] if scope_check_events else None
+    organization_events = [
+        e["result"] for e in transcript
+        if e.get("event") == "organization_gate"
+    ]
+    organization_result = (
+        result.get("organization_gate")
+        or (organization_events[-1] if organization_events else None)
+    )
+    acceptance_results = [e["result"]["passed"] for e in test_events]
+    verification_results = {
+        "acceptance_tests": acceptance_results,
+        "final_acceptance_passed": acceptance_results[-1] if acceptance_results else None,
+        "scope_in_scope": scope_check_result["in_scope"] if scope_check_result else None,
+        "organization_status": (
+            organization_result.get("status") if organization_result else None
+        ),
+    }
+    validation_errors = []
+    if result["status"] == "success":
+        if scope_check_result is None or not scope_check_result["in_scope"]:
+            validation_errors.append("scope_gate_not_passed")
+        if organization_result is None or organization_result.get("status") != "pass":
+            validation_errors.append("organization_gate_not_passed")
+        if verification_results["final_acceptance_passed"] is not True:
+            validation_errors.append("acceptance_tests_not_passed")
+    signed = result["status"] == "success" and not validation_errors
+    signature = {
+        "status": "signed" if signed else "unsigned",
+        "signer": "local-implementer" if signed else None,
+        "reason": (
+            "all_mandatory_gates_passed"
+            if signed
+            else (
+                validation_errors[0]
+                if validation_errors
+                else result["status"]
+            )
+        ),
+    }
 
     return {
         "ts": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -737,28 +807,47 @@ def build_audit_record(card, result, model, elapsed_s):
         "band": card.band,
         "attempts": len(test_events),
         "commands": [c["argv"] for c in command_events],
+        "edit_metrics": [
+            {
+                "tool": e["tool"],
+                "path": e["path"],
+                "line_count": e.get("line_count"),
+                "byte_count": e.get("byte_count"),
+                "anchor_matches": e.get("anchor_matches"),
+            }
+            for e in edit_events
+        ],
         "test_results": [e["result"]["passed"] for e in test_events],
         "boundary_violations": len(boundary_violations),
+        "organization_gate": organization_result,
         "scope_check": {
             "in_scope": scope_check_result["in_scope"],
             "offending_paths": scope_check_result["offending_paths"],
         } if scope_check_result else None,
+        "verification_results": verification_results,
+        "audit_validation": {
+            "valid": not validation_errors,
+            "errors": validation_errors,
+        },
+        "signature": signature,
         "escalated": result["status"] != "success",
         "elapsed_s": round(elapsed_s, 3),
     }
 
 
-def main(argv=None, chat_fn=None, test_runner=None, boundary=None):
+def main(
+    argv=None,
+    chat_fn=None,
+    test_runner=None,
+    boundary=None,
+    organization_gate_fn=None,
+):
     args = parse_args(argv)
     card = load_card(args.card)
     boundary = boundary or build_default_boundary(args.worktree)
-    chat_fn = chat_fn or build_live_chat_fn(
-        args.host, args.model, args.idle_timeout, args.max_wall
+    organization_gate_fn = (
+        organization_gate_fn or runner_workflow_gate.run_organization_gate
     )
-    # The missing fallback (chat_fn and boundary above both had theirs): the
-    # CLI never injects test_runner, so without this it stayed None and every
-    # finish crashed with TypeError. See build_default_test_runner's docstring.
-    test_runner = test_runner or build_default_test_runner(card)
 
     def checkpoint_fn(transcript, turn):
         # Overwritten by the real terminal write_result() call below once
@@ -779,23 +868,46 @@ def main(argv=None, chat_fn=None, test_runner=None, boundary=None):
         )
 
     session_start = datetime.datetime.now(datetime.timezone.utc)
-    result = run_loop(
-        card, chat_fn, test_runner, args.worktree, boundary, checkpoint_fn=checkpoint_fn
+    chat_fn = chat_fn or build_live_chat_fn(
+        args.host, args.model, args.idle_timeout, args.max_wall
     )
+    # The missing fallback (chat_fn and boundary above both had theirs): the
+    # CLI never injects test_runner, so without this it stayed None and every
+    # finish crashed with TypeError. See build_default_test_runner's docstring.
+    test_runner = test_runner or build_default_test_runner(card)
+    file_tools = RunnerFileTools(
+        args.worktree, boundary, MalformedToolCall, BoundaryViolation
+    )
+    try:
+        result = run_loop(
+            card,
+            chat_fn,
+            test_runner,
+            args.worktree,
+            boundary,
+            file_tools,
+            organization_gate_fn,
+            checkpoint_fn=checkpoint_fn,
+        )
+    finally:
+        file_tools.close()
     elapsed_s = (datetime.datetime.now(datetime.timezone.utc) - session_start).total_seconds()
 
     result["task_id"] = card.task_id
     result["finished_at"] = datetime.datetime.now(datetime.timezone.utc).strftime(
         "%Y-%m-%dT%H:%M:%SZ"
     )
+    audit_record = build_audit_record(card, result, args.model, elapsed_s)
+    if result["status"] == "success" and not audit_record["audit_validation"]["valid"]:
+        result["status"] = "audit_invalid"
+        result["reason"] = ";".join(audit_record["audit_validation"]["errors"])
+        audit_record = build_audit_record(card, result, args.model, elapsed_s)
     gemma_local.write_result(result, args.out)
 
     # Emitted for every exit path (success, aborted, budget_exhausted,
     # boundary_violation, transport_error) — audit visibility must not
     # depend on how the session ended.
-    gemma_local.append_audit_log(
-        build_audit_record(card, result, args.model, elapsed_s)
-    )
+    gemma_local.append_audit_log(audit_record)
 
     return 0 if result["status"] == "success" else 1
 

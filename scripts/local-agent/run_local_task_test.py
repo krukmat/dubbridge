@@ -13,6 +13,7 @@ from unittest.mock import patch
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import run_local_task as rlt
 gemma_local = rlt.gemma_local
+runner_workflow_gate = rlt.runner_workflow_gate
 
 
 _audit_log_patch = None
@@ -1472,7 +1473,15 @@ class AuditLogEmission(unittest.TestCase):
     # T6c: append_audit_log must be called for every run_loop exit path, not
     # only the success path — audit visibility must not depend on how the
     # session ended.
-    def _run_and_capture_audit_record(self, tmp, chat, test_runner, boundary=None, card_kwargs=None):
+    def _run_and_capture_audit_record(
+        self,
+        tmp,
+        chat,
+        test_runner,
+        boundary=None,
+        card_kwargs=None,
+        organization_gate_fn=None,
+    ):
         worktree = os.path.join(tmp, "worktree")
         _git_init_worktree(worktree)
         card_path = _make_card(tmp, **(card_kwargs or {}))
@@ -1489,6 +1498,7 @@ class AuditLogEmission(unittest.TestCase):
                 chat_fn=chat,
                 test_runner=test_runner,
                 boundary=boundary,
+                organization_gate_fn=organization_gate_fn,
             )
         return captured.get("record")
 
@@ -1507,6 +1517,8 @@ class AuditLogEmission(unittest.TestCase):
         self.assertEqual(record["test_results"], [True])
         self.assertIsNone(record["rri"])
         self.assertIsNone(record["band"])
+        self.assertEqual(record["signature"]["status"], "signed")
+        self.assertEqual(record["signature"]["signer"], "local-implementer")
 
     def test_hp3_card_rri_and_band_are_emitted_when_present(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1537,6 +1549,7 @@ class AuditLogEmission(unittest.TestCase):
         self.assertEqual(record["outcome"], "BUDGET_EXHAUSTED")
         self.assertTrue(record["escalated"])
         self.assertEqual(record["attempts"], 3)
+        self.assertEqual(record["signature"]["status"], "unsigned")
 
     def test_boundary_violation_still_emits_audit_record(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1563,6 +1576,7 @@ class AuditLogEmission(unittest.TestCase):
         self.assertEqual(record["boundary_violations"], 1)
         # finish (and its scope_check) is never reached on this exit path.
         self.assertIsNone(record["scope_check"])
+        self.assertEqual(record["signature"]["status"], "unsigned")
 
     def test_transport_error_still_emits_audit_record(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1577,6 +1591,7 @@ class AuditLogEmission(unittest.TestCase):
         self.assertTrue(record["escalated"])
         # finish (and its scope_check) is never reached on this exit path.
         self.assertIsNone(record["scope_check"])
+        self.assertEqual(record["signature"]["status"], "unsigned")
 
     def test_commands_executed_are_captured_in_audit_record(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1589,6 +1604,64 @@ class AuditLogEmission(unittest.TestCase):
             record = self._run_and_capture_audit_record(tmp, chat, passing_tests)
 
         self.assertEqual(record["commands"], [["cargo", "test"]])
+
+    def test_ec5_organization_failure_blocks_success_signature_after_tests_pass(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            chat = ChatSequencer(_write_and_finish("hello.txt", "hi"))
+            passing_tests = lambda wt: {"passed": True, "output": "ok"}
+            record = self._run_and_capture_audit_record(
+                tmp,
+                chat,
+                passing_tests,
+                organization_gate_fn=lambda wt: {
+                    "status": "violation",
+                    "violations": [{"path": "hello.txt", "rule": "file_growth"}],
+                },
+            )
+
+        self.assertEqual(record["outcome"], "ORGANIZATION_VIOLATION")
+        self.assertEqual(record["verification_results"]["acceptance_tests"], [True])
+        self.assertEqual(record["organization_gate"]["status"], "violation")
+        self.assertEqual(record["signature"]["status"], "unsigned")
+
+    def test_ec6_scope_tests_and_org_passing_yields_signed_audit(self):
+        # After Serena removal the mandatory success gates are exactly three:
+        # scope in-scope, acceptance tests passing, organization gate passing.
+        # There is no semantic-preflight requirement anymore, so a success
+        # audit carrying all three must validate and be signed.
+        card = rlt.TaskCard("toy-1", "spec", ["HP-1"], ["hello.txt"])
+        result = {
+            "status": "success",
+            "transcript": [
+                {"event": "scope_check", "in_scope": True, "offending_paths": [], "has_diff": True},
+                {"event": "test_result", "result": {"passed": True, "output": "ok"}},
+                {"event": "organization_gate", "result": {"status": "pass"}},
+            ],
+        }
+        record = rlt.build_audit_record(card, result, "qwen3.6:35b-a3b", 0.123)
+
+        self.assertTrue(record["audit_validation"]["valid"])
+        self.assertEqual(record["audit_validation"]["errors"], [])
+        self.assertEqual(record["signature"]["status"], "signed")
+        self.assertEqual(record["signature"]["signer"], "local-implementer")
+
+    def test_scope_failure_invalidates_success_audit(self):
+        # The scope gate is still mandatory: a "success" whose diff escaped
+        # allowed_paths must be downgraded to an unsigned, invalid audit.
+        card = rlt.TaskCard("toy-1", "spec", ["HP-1"], ["hello.txt"])
+        result = {
+            "status": "success",
+            "transcript": [
+                {"event": "scope_check", "in_scope": False, "offending_paths": ["other.txt"], "has_diff": True},
+                {"event": "test_result", "result": {"passed": True, "output": "ok"}},
+                {"event": "organization_gate", "result": {"status": "pass"}},
+            ],
+        }
+        record = rlt.build_audit_record(card, result, "qwen3.6:35b-a3b", 0.123)
+
+        self.assertFalse(record["audit_validation"]["valid"])
+        self.assertIn("scope_gate_not_passed", record["audit_validation"]["errors"])
+        self.assertEqual(record["signature"]["status"], "unsigned")
 
 
 class T7B1RealBoundaryEnvStrippingEndToEnd(unittest.TestCase):

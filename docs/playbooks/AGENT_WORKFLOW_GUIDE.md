@@ -670,7 +670,21 @@ accept/reject judgment. The local implementer resolves from
 `DUBBRIDGE_LOCAL_AGENT_MODEL` (default `qwen3.6:35b-a3b`), may run ordinary
 development commands inside the disposable worktree, and is constrained by the
 existing narrow denylist (`git push`, `docker`, `rm -rf`), stripped
-credentials, and post-run diff scope enforcement. Use at most **2**
+credentials, and post-run diff scope enforcement.
+
+The runner exposes a deliberately simple tool contract — `read_file` (whole
+file, no size cap), `write_file` (create or overwrite), `apply_patch`
+(single-unique-anchor replacement), `run_command`, and `finish`. There is no
+language-server / symbol-server preflight: the local implementer has a large
+context window and reads the file it must change directly. (This replaced an
+earlier Serena/semantic-tool path that never produced a successful edit — see
+`docs/plan/local-agent-simple-editing.md`.)
+
+At finish, success signing is fail-closed: scope, acceptance, and organization
+gates must all pass before the audit may carry the `local-implementer`
+signature. A success audit must record scope result, acceptance/verification
+results, organization result, edit metrics (tool, path, line/byte counts),
+implementer model, and the signature itself. Use at most **2**
 evidence-backed local repair attempts for Moderate (26–40) and at most **1**
 for Med-high (41–55) — the tighter budget reflects the higher-risk
 anchor-rubric floors Med-high tasks typically carry. If the local runner/model

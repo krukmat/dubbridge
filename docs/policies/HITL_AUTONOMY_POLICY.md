@@ -99,14 +99,22 @@ The default path for development tasks in these bands is:
 4. Keep the primary agent as orchestrator of record: it owns the task card,
    allowed paths, acceptance tests, reflection passes, closure, and all final
    judgments about correctness.
-5. Enforce the task's `allowed_paths` after the local run. Any out-of-scope
+5. The runner uses a simple tool contract — `read_file` (whole file),
+   `write_file` (create or overwrite), `apply_patch` (single-unique-anchor
+   replacement), `run_command`, `finish`. There is no language-server preflight;
+   the implementer reads the file it changes directly. (See
+   `docs/plan/local-agent-simple-editing.md` for why the earlier Serena path
+   was removed.)
+6. Enforce the task's `allowed_paths` after the local run. Any out-of-scope
    diff fails closed and is never accepted into the primary checkout.
-6. Run the approved verification commands.
-7. If the local run fails the acceptance signal, hits the scope boundary, or
+7. Run the approved verification commands and the organization gate before
+   issuing a signed success audit. The `local-implementer` signature is valid
+   only when scope, acceptance, and organization gates all pass.
+8. If the local run fails the acceptance signal, hits the scope boundary, or
    the local path is unavailable, the primary agent may run at most **2**
    evidence-backed local repair attempts for Moderate (26–40) or at most **1**
    for Med-high (41–55).
-8. After the repair budget is exhausted, or if the local runner/model is
+9. After the repair budget is exhausted, or if the local runner/model is
    unavailable, escalate to cloud implementation with the ADR-036 escalation
    packet rather than continuing with ad hoc local retries.
 

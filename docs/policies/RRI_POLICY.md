@@ -222,7 +222,11 @@ Code because the primary agent remains the orchestrator and cloud escalation
 path, but the default implementation route for development tasks scoring
 **RRI 26–55** is the local agentic runner. Resolve the implementer from
 `DUBBRIDGE_LOCAL_AGENT_MODEL`, defaulting to `qwen3.6:35b-a3b`, and the Ollama
-endpoint from `OLLAMA_HOST`, defaulting to `http://localhost:11434`.
+endpoint from `OLLAMA_HOST`, defaulting to `http://localhost:11434`. The runner
+uses a simple tool contract (`read_file`/`write_file`/`apply_patch`/
+`run_command`/`finish`) with no language-server preflight — the implementer
+reads the file it changes directly (see
+`docs/plan/local-agent-simple-editing.md`).
 
 Med-high (41–55) extends this routing (owner override, 2026-07-21) without
 relaxing any other control: cross-vendor peer review still replaces Gemma as
@@ -231,7 +235,9 @@ approval gate still fires before implementation starts. The only difference
 from Moderate is a tighter local repair budget — 1 evidence-backed attempt
 instead of 2 — before escalating to cloud implementation, reflecting the
 higher-risk anchor-rubric floors Med-high tasks typically carry (e.g.
-`infra/migrations/**`, ADR-008/ADR-018).
+`infra/migrations/**`, ADR-008/ADR-018). A success audit in this band is
+complete only when scope, acceptance, and organization gates all pass and the
+audit carries the `local-implementer` signature.
 
 Thinking mode: activate for Balanced→Premium and above when the task requires
 multi-step reasoning that cannot be validated incrementally. Do **not** activate
