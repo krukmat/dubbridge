@@ -176,8 +176,8 @@ qa-peer-workflow-review:
 	git diff "$(PEER_REVIEW_BASE)" | python3 scripts/peer-workflow-review.py $$args --content - || review_status=$$?; \
 	if [ -n "$(PEER_REVIEW_TASK_ID)" ] && [ -f "$(PEER_REVIEW_ARTIFACT)" ]; then \
 		mkdir -p "$(GEMMA_EVIDENCE_DIR)"; \
-		verdict=$$(python3 -c "import json,sys; d=json.load(open('$(PEER_REVIEW_ARTIFACT)')); v=d.get('verdict','unknown'); print('PASS' if v == 'pass' else 'FINDINGS-ACKED')" 2>/dev/null || echo "FINDINGS-ACKED"); \
-		reviewer=$$(python3 -c "import json,sys; d=json.load(open('$(PEER_REVIEW_ARTIFACT)')); print(d.get('reviewer') or d.get('model') or 'peer')" 2>/dev/null || echo "peer"); \
+		verdict=$$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); v=d.get('verdict','unknown'); print('PASS' if v == 'pass' else 'FINDINGS-ACKED')" "$(PEER_REVIEW_ARTIFACT)" 2>/dev/null || echo "FINDINGS-ACKED"); \
+		reviewer=$$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('reviewer') or d.get('model') or 'peer')" "$(PEER_REVIEW_ARTIFACT)" 2>/dev/null || echo "peer"); \
 		commit_sha=$$(git rev-parse HEAD); \
 		timestamp=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
 		printf '{"task_id":"%s","commit_sha":"%s","reviewer":"%s","verdict":"%s","timestamp":"%s"}\n' \

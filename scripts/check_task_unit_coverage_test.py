@@ -139,14 +139,43 @@ class TaskUnitCoverageEvidenceGate(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("does not match section", result.stdout)
 
+    def test_invalid_commit_sha_fails(self):
+        self.write_corpus(
+            section("T-INVALIDSHA", "- Review artifact: docs/audit/gemma-evidence/T-INVALIDSHA.json")
+        )
+        self.write_ledger()
+        self.write(
+            "docs/audit/gemma-evidence/T-INVALIDSHA.json",
+            '{"task_id":"T-INVALIDSHA","commit_sha":"0000000000000000000000000000000000dead",'
+            '"reviewer":"gemma","verdict":"PASS","timestamp":"2026-07-22T00:00:00Z"}',
+        )
+        self.commit_all()
+
+        result = self.check_gate()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("is not a valid commit object", result.stdout)
+
     def test_unreachable_commit_sha_fails(self):
+        # A real commit object that exists in the repo's object database but
+        # is not an ancestor of HEAD (lives on an orphan branch instead).
+        self.write("orphan-seed.txt", "seed\n")
+        self.commit_all()
+        self.run_cmd("git", "checkout", "--orphan", "unreachable-branch")
+        self.run_cmd("git", "rm", "-rf", ".")
+        self.write("orphan-only.txt", "orphan\n")
+        self.run_cmd("git", "add", "orphan-only.txt")
+        self.run_cmd("git", "commit", "-m", "orphan commit")
+        orphan_sha = self.head_sha()
+        self.run_cmd("git", "checkout", "main")
+
         self.write_corpus(
             section("T-UNREACHABLE", "- Review artifact: docs/audit/gemma-evidence/T-UNREACHABLE.json")
         )
         self.write_ledger()
         self.write(
             "docs/audit/gemma-evidence/T-UNREACHABLE.json",
-            '{"task_id":"T-UNREACHABLE","commit_sha":"0000000000000000000000000000000000dead",'
+            f'{{"task_id":"T-UNREACHABLE","commit_sha":"{orphan_sha}",'
             '"reviewer":"gemma","verdict":"PASS","timestamp":"2026-07-22T00:00:00Z"}',
         )
         self.commit_all()

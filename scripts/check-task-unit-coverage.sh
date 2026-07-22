@@ -216,8 +216,8 @@ validate_review_artifact_line() {
 
   local receipt_task_id
   local receipt_commit_sha
-  receipt_task_id="$(python3 -c "import json; print(json.load(open('$receipt_path')).get('task_id',''))" 2>/dev/null || true)"
-  receipt_commit_sha="$(python3 -c "import json; print(json.load(open('$receipt_path')).get('commit_sha',''))" 2>/dev/null || true)"
+  receipt_task_id="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('task_id',''))" "$receipt_path" 2>/dev/null || true)"
+  receipt_commit_sha="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('commit_sha',''))" "$receipt_path" 2>/dev/null || true)"
 
   if [[ "$receipt_task_id" != "$artifact_task_id" ]]; then
     add_violation "$task_file: $section_title: Review artifact task_id '$receipt_task_id' does not match section '$artifact_task_id'"
@@ -225,6 +225,8 @@ validate_review_artifact_line() {
 
   if [[ -z "$receipt_commit_sha" ]]; then
     add_violation "$task_file: $section_title: Review artifact missing commit_sha"
+  elif ! git cat-file -e "${receipt_commit_sha}^{commit}" 2>/dev/null; then
+    add_violation "$task_file: $section_title: Review artifact commit_sha '$receipt_commit_sha' is not a valid commit object"
   elif ! git merge-base --is-ancestor "$receipt_commit_sha" HEAD 2>/dev/null && [[ "$receipt_commit_sha" != "$(git rev-parse HEAD 2>/dev/null)" ]]; then
     add_violation "$task_file: $section_title: Review artifact commit_sha '$receipt_commit_sha' is not reachable from reviewed history"
   fi
