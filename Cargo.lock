@@ -911,6 +911,8 @@ dependencies = [
  "dubbridge-observability",
  "dubbridge-providers",
  "dubbridge-storage",
+ "serde",
+ "serde_json",
  "sha2",
  "sqlx",
  "tempfile",
