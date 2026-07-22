@@ -19,7 +19,9 @@ ADRs follow a lightweight MADR-style structure:
 
 Keep this index synchronized with ADR file status changes and related canonical-doc
 updates per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` ("ADR change propagation").
-Run `make qa-docs` before reporting an ADR change complete.
+Run `make qa-docs-review` before reporting an ADR change complete (includes
+the Gemma Reviewer pass; plain `make qa-docs` only runs the deterministic
+doc gates).
 
 | ADR | Title | Status |
 |-----|-------|--------|

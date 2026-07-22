@@ -322,7 +322,8 @@ Run `make qa-local` before committing. `make qa-ci` is the blocking baseline CI 
 | `make qa-test` | `cargo test --workspace --all-features` |
 | `make qa-deny` | dependency advisories and license policy |
 | `make qa-coverage` | 90% line coverage gate (llvm-cov, `--test-threads=1`) |
-| `make qa-docs` | Gemma review + doc consistency + task coverage + roadmap drift + OKF frontmatter |
+| `make qa-docs` | doc consistency + task coverage + roadmap drift + OKF frontmatter (deterministic, no LLM) |
+| `make qa-docs-review` | `qa-docs` + Gemma Reviewer pass (task closure / CI, not pre-push) |
 | `make qa-okf-frontmatter` | OKF frontmatter validator alone |
 | `make qa-roadmap-drift` | ledger ↔ roadmap consistency |
 | `make qa-maintainability` | `python3 scripts/check-maintainability.py` |
@@ -360,7 +361,8 @@ The closed `type` vocabulary and its location rules (authoritative: [`docs/knowl
 
 ```bash
 make qa-okf-frontmatter   # validator alone
-make qa-docs              # full doc gate (includes OKF)
+make qa-docs              # deterministic doc gate (includes OKF; no Gemma)
+make qa-docs-review       # qa-docs + Gemma Reviewer (task closure / CI)
 ```
 
 ---

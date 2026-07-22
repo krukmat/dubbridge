@@ -15,7 +15,8 @@ make qa-fmt            # cargo fmt --check
 make qa-lint           # cargo clippy -D warnings
 make qa-test           # cargo test --workspace --all-features
 make qa-deny           # dependency advisories / policy
-make qa-docs           # Gemma review + doc consistency + task coverage + roadmap drift + OKF frontmatter
+make qa-docs           # doc consistency + task coverage + roadmap drift + OKF frontmatter (deterministic, no LLM)
+make qa-docs-review    # qa-docs + Gemma Reviewer pass (task closure / CI, not pre-push)
 make qa-mobile         # cd mobile && typecheck + lint + Jest
 make qa-roadmap-drift  # script: ledger ↔ roadmap consistency
 make qa-maintainability # python3 scripts/check-maintainability.py

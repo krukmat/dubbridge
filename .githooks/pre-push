@@ -97,11 +97,12 @@ fi
 if [ "$DOCS_CHANGED" -eq 1 ]; then
   if [ -n "$DIFF_RANGE" ]; then
     echo "pre-push: canonical docs changed in $DIFF_RANGE"
-    GEMMA_REVIEW_BASE="$DIFF_RANGE" make qa-docs
   else
     echo "pre-push: canonical docs changed"
-    make qa-docs
   fi
+  # Deterministic doc gates only. Gemma Reviewer runs at task closure
+  # (Phase 2) and in CI, not on every push — see AGENT_WORKFLOW_GUIDE.md.
+  make qa-docs
 fi
 
 if [ "$MOBILE_CHANGED" -eq 1 ]; then
@@ -133,18 +134,7 @@ if [ "$RUST_CHANGED" -eq 1 ]; then
   fi
 fi
 
-# Band-routed peer-workflow review (PPR-3).
-# Runs the phase-2 code-solution review when code or scripts change.
-# Set DUBBRIDGE_SKIP_PEER_REVIEW=1 to skip.
-# Set PEER_REVIEW_RRI to the task's actual RRI (defaults to 22 / Low band).
-if [ "${RUST_CHANGED}" -eq 1 ] || [ "${SCRIPTS_CHANGED}" -eq 1 ]; then
-  if [ "${DUBBRIDGE_SKIP_PEER_REVIEW:-0}" != "1" ]; then
-    _peer_rri="${PEER_REVIEW_RRI:-22}"
-    _peer_range="${DIFF_RANGE:-HEAD}"
-    if [ -n "$_peer_range" ]; then
-      echo "pre-push: running peer-workflow review (phase=code rri=${_peer_rri} base=${_peer_range})"
-      PEER_REVIEW_BASE="${_peer_range}" PEER_REVIEW_RRI="${_peer_rri}" \
-        PEER_REVIEW_PHASE="code" make qa-peer-workflow-review
-    fi
-  fi
-fi
+# Band-routed peer-workflow review (PPR-3) intentionally does NOT run here.
+# Per docs/playbooks/AGENT_WORKFLOW_GUIDE.md, pre-push enforces only fast
+# deterministic gates; Gemma/peer review (Phase 2) runs at task closure and
+# in CI (see `make qa-peer-workflow-review`, `make qa-docs-review`).

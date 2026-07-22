@@ -1,4 +1,4 @@
-.PHONY: qa-fmt qa-lint qa-test qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review show-codex-session-model install-hooks
+.PHONY: qa-fmt qa-lint qa-test qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-docs-review qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review show-codex-session-model install-hooks
 
 COVERAGE_MIN ?= 90
 PEER_REVIEW_RRI      ?= 22
@@ -69,12 +69,17 @@ qa-design:
 qa-task-unit-coverage:
 	bash scripts/check-task-unit-coverage.sh
 
+# Deterministic doc gates only (no LLM review). Safe to run on every push.
 qa-docs:
-	$(MAKE) qa-gemma-review
 	bash scripts/check-doc-consistency.sh
 	bash scripts/check-task-unit-coverage.sh
 	bash scripts/check-roadmap-drift.sh
 	python3 scripts/check_okf_frontmatter.py
+
+# qa-docs plus the Gemma Reviewer LLM pass. Reserved for task closure (Phase 2)
+# and CI, per docs/playbooks/AGENT_WORKFLOW_GUIDE.md — not for pre-push.
+qa-docs-review: qa-docs
+	$(MAKE) qa-gemma-review
 
 qa-okf-frontmatter:
 	python3 scripts/check_okf_frontmatter.py
@@ -83,7 +88,7 @@ qa-rri:
 	python3 scripts/rri_test.py
 	python3 scripts/check_roadmap_drift_test.py
 
-qa-ci: qa-local qa-docs qa-rri qa-deny qa-config-secrets qa-roadmap-drift qa-maintainability qa-review-budget qa-mobile qa-coverage qa-build-release
+qa-ci: qa-local qa-docs-review qa-rri qa-deny qa-config-secrets qa-roadmap-drift qa-maintainability qa-review-budget qa-mobile qa-coverage qa-build-release
 
 qa-gemma-review:
 	@if [ "$${DUBBRIDGE_SKIP_GEMMA_REVIEW:-0}" = "1" ]; then \
@@ -157,7 +162,6 @@ show-codex-session-model:
 	python3 scripts/show-codex-session-model.py
 
 install-hooks:
-	cp scripts/hooks/pre-commit .git/hooks/pre-commit
-	cp scripts/hooks/pre-push .git/hooks/pre-push
-	chmod +x .git/hooks/pre-commit .git/hooks/pre-push
-	@echo "Git hooks installed."
+	git config core.hooksPath .githooks
+	chmod +x .githooks/pre-push
+	@echo "Git hooks installed (core.hooksPath=.githooks)."
