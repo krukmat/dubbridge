@@ -1294,6 +1294,16 @@ unit tests, then stop before worker-runner integration.
   `error_detail`.
 - EC-2: Storage write failure marks status Failed and does not report readiness.
 - EC-3: Invalid segmentation output fails closed before artifact insertion.
+- EC-4: `main.rs` actually consumes the job queue end-to-end in production —
+  not just defines a handler function. As of the T2b-ii-followup closure
+  (2026-07-22), `main()` constructs `SubprocessPreparationExecutor` and the
+  queue handle but binds both to `_`-prefixed bindings and never runs an
+  apalis `WorkerBuilder`/`Monitor` consumer loop; `process_preparation_envelope`
+  and `process_preparation_job` are exercised only by tests, never called from
+  `main()`. T3b must not repeat this pattern for the subtitle handler: adding
+  `process_subtitle_job` without also wiring a real consumer loop leaves the
+  worker-runner binary a no-op in production regardless of how well-tested the
+  handler function is in isolation.
 
 **Inputs:** Subtitle repo/storage/provider/job contracts from T1/T2/T3a.
 
@@ -1304,6 +1314,11 @@ unit tests, then stop before worker-runner integration.
 - Subtitle artifact checksum/key/lineage follow ADR-006.
 - Failure paths record durable observability per ADR-018.
 - All HP/EC cases above have focused tests.
+- `main.rs` runs a real consumer loop that dispatches queued jobs to
+  `process_subtitle_job` in production — not only a handler function reachable
+  from tests. If wiring the full apalis consumer loop is out of scope for this
+  task, the task must say so explicitly and hand off the consumer-loop gap as
+  its own tracked follow-up rather than leaving it implicit (see EC-4).
 
 **Files expected to change:**
 - `apps/worker-runner/src/main.rs`
