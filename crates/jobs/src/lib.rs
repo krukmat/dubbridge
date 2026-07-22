@@ -135,6 +135,55 @@ impl TranscriptionJobQueue for InMemoryTranscriptionJobQueue {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SubtitleJob {
+    pub asset_id: Uuid,
+    pub project_id: Uuid,
+    pub target_language: String,
+}
+
+impl SubtitleJob {
+    pub const JOB_TYPE: &str = "subtitle_generation";
+
+    pub fn new(asset_id: Uuid, project_id: Uuid, target_language: impl Into<String>) -> Self {
+        Self {
+            asset_id,
+            project_id,
+            target_language: target_language.into(),
+        }
+    }
+}
+
+pub type SharedSubtitleJobQueue = Arc<dyn SubtitleJobQueue>;
+
+pub trait SubtitleJobQueue: Send + Sync {
+    fn enqueue(&self, job: SubtitleJob) -> Result<(), QueueError>;
+}
+
+#[derive(Debug, Default)]
+pub struct InMemorySubtitleJobQueue {
+    jobs: Mutex<Vec<SubtitleJob>>,
+}
+
+impl InMemorySubtitleJobQueue {
+    pub fn queued_jobs(&self) -> Vec<SubtitleJob> {
+        self.jobs
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+}
+
+impl SubtitleJobQueue for InMemorySubtitleJobQueue {
+    fn enqueue(&self, job: SubtitleJob) -> Result<(), QueueError> {
+        self.jobs
+            .lock()
+            .map_err(|_| QueueError::Unavailable("subtitle queue lock poisoned".into()))?
+            .push(job);
+        Ok(())
+    }
+}
+
 pub fn default_queue() -> &'static str {
     "dubbridge.default"
 }
@@ -166,6 +215,27 @@ mod tests {
         queue.enqueue(job.clone()).expect("enqueue");
 
         assert_eq!(queue.queued_jobs(), vec![job]);
+    }
+
+    #[test]
+    fn subtitle_job_type_constant() {
+        assert_eq!(SubtitleJob::JOB_TYPE, "subtitle_generation");
+    }
+
+    #[test]
+    fn in_memory_subtitle_queue_records_jobs() {
+        let queue = InMemorySubtitleJobQueue::default();
+        let job = SubtitleJob::new(Uuid::new_v4(), Uuid::new_v4(), "en");
+
+        queue.enqueue(job.clone()).expect("enqueue");
+
+        assert_eq!(queue.queued_jobs(), vec![job]);
+    }
+
+    #[test]
+    fn in_memory_subtitle_queue_empty_by_default() {
+        let queue = InMemorySubtitleJobQueue::default();
+        assert!(queue.queued_jobs().is_empty());
     }
 
     #[test]
