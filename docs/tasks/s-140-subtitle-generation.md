@@ -1755,7 +1755,121 @@ only if the task changes blocker state.
 readiness, prove failed/missing-artifact paths do not enqueue, and stop before
 any schema change.
 
-**Status: [ ] Not started — blocked on T3b**
+**Implementation evidence:**
+- New file `apps/worker-runner/src/review_enqueue.rs`: `prepare_review_post_ready`
+  resolves `(org_id, target_language_id)` via `workspace_repo::get_project` and
+  `workspace_repo::list_target_languages`, builds a `ReviewTask`, and calls
+  `review_repo::insert_review_task` — the existing S-160/ADR-030 path, no
+  parallel state machine. All internal failures (missing project, missing
+  target-language row, DB connection/query errors) are caught, logged via
+  `tracing::warn!`/`tracing::debug!`, and swallowed; the function returns `()`
+  and never propagates an error to its caller, so the subtitle `Ready` status
+  written by T3b always stands regardless of enqueue outcome.
+- Idempotency relies on the DB unique constraint
+  `review_tasks_unique_review_unit UNIQUE (project_id, asset_id,
+  target_language_id)` (`infra/migrations/0014_create_review_tasks.sql`), not
+  check-then-act: a SQLSTATE 23505 from `insert_review_task` is detected
+  (`DbError::QueryFailed(sqlx::Error::Database(_))` with `.code() ==
+  Some("23505")`) and logged as an idempotent duplicate at `debug`, distinct
+  from unexpected failures logged at `warn`.
+- Wired into `apps/worker-runner/src/subtitle_runtime.rs` immediately after
+  the (T3b-fixed) post-Ready readiness-evidence check, and `mod
+  review_enqueue;` added to `main.rs`.
+- **Pre-existing T3b bug found and fixed separately, with owner approval,
+  before T5a resumed:** `process_subtitle_job_inner` called
+  `get_subtitle_readiness_evidence` (which checks `status = 'ready'`) *before*
+  writing `SubtitleStatus::Ready`, so the check always failed against the
+  still-`InProgress` row and every subtitle job errored with "subtitle
+  readiness evidence incomplete after Ready status write." Confirmed
+  pre-existing by testing bare T3b commit `05a797d` before any T5a change.
+  Fixed in `6986a4c` (readiness check moved to after the `Ready` write),
+  merged to `main` (fast-forward) before T5a implementation resumed. Root
+  cause: T3b's own real-DB test suite was never exercised against a live
+  Postgres instance during T3b's closure (the DB-gated test helper silently
+  no-ops when `DUBBRIDGE_DATABASE_URL` is unset), so the ordering bug passed
+  review undetected.
+- Test module in `review_enqueue.rs` (5 tests): enqueue-with-correct-identity,
+  idempotent-on-repeated-call, no-op-when-project-missing,
+  no-op-on-db-connection-failure, no-op-when-target-language-missing. Plus
+  integration-level assertions added to `subtitle_runtime.rs`'s existing
+  success/failure-path tests (exactly 1 `review_tasks` row after success, 0
+  rows after alignment/artifact failure), and `review_tasks` added to the
+  test `TRUNCATE` list.
+- Local-agent (30-turn budget) drafted the core logic and wiring but hit
+  `status: budget_exhausted` before adding dedicated `review_enqueue.rs`
+  tests, and left one test bug: the success-path test passed a random UUID as
+  `project_id` instead of the real project_id from
+  `insert_project_with_targets`, which silently masked enqueue never firing
+  (the new row-count assertion caught this: `left: 0, right: 1`). Completed
+  directly as orchestrator: fixed the test, added the missing unit-test
+  module, and decomposed `prepare_review_post_ready` into the combinator-chain
+  style (`.map_err()`/`.ok_or_else()`/`?`) already used by
+  `subtitle_enqueue.rs`'s `prepare_*_post_ready` functions, to satisfy
+  `clippy.toml`'s cognitive-complexity threshold of 15 (initial draft scored
+  64/15).
+- New-file executable-permission bug (same `organization_gate.py` pattern
+  flagged in passing during T3b's closure) recurred: `review_enqueue.rs` was
+  written `100755` by the local-agent tooling; fixed via `chmod 644` in a
+  separate commit before the code-phase review diff was generated.
+- **Phase-1 review** (`qwen3.6:27b-q4_K_M`, RRI 39 Moderate primary
+  reviewer), two rounds: verdict `findings` both times, against the task-card
+  spec text. Round 1 findings addressed by tightening the spec (explicit
+  error-handling instructions, non-idempotent-DB-failure test requirement,
+  target-language-matching ambiguity clarification, TRUNCATE isolation note
+  for `review_tasks`). Round 2 findings were minor/cosmetic and accepted as
+  written. Artifacts: `.agent/peer-task-review-S-140-T5a.json`,
+  `.agent/peer-task-review-S-140-T5a-v2.json`.
+- **Phase-2 review** (`qwen3.6:27b-q4_K_M`, over the real diff scoped to
+  T5a-only changes via `git diff 6986a4c..HEAD`): verdict `findings`, 1 HIGH +
+  1 MEDIUM + 2 LOW. HIGH was a self-contradicting review comment that, read
+  through, confirms the swallow-and-log design is intentional and correct —
+  not an actionable defect. MEDIUM (missing DB-failure-path test coverage)
+  was real and addressed by adding
+  `prepare_review_post_ready_no_op_on_db_connection_failure`. LOW (SQLSTATE
+  "23505" brittleness) was already mitigated by the existing doc comment
+  naming the constraint explicitly. LOW (verify no missed call sites for the
+  changed `insert_project_with_targets` signature) was checked via `grep` and
+  confirmed a false positive — all call sites already updated. Re-verified
+  after fixes: `cargo test -p dubbridge-worker-runner -- --test-threads=1` →
+  44/44 pass (run against real Postgres,
+  `DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@localhost:5432/dubbridge`),
+  fmt/clippy clean. Artifact: `.agent/peer-code-review-S-140-T5a.json`.
+
+**Reflection log (Moderate band, 2 phases, both required):**
+
+1. A task's own prior "Done" status is not proof its real-DB test path was
+   ever exercised. T3b's readiness-check-ordering bug survived phase-2 review
+   and closure entirely because the DB-gated test helper no-ops silently when
+   `DUBBRIDGE_DATABASE_URL` is unset — closure certification must include
+   evidence the tests actually ran against a live database, not just that
+   `cargo test` exited 0.
+2. `clippy.toml`'s cognitive-complexity threshold (15) is a real, intentional
+   SRP gate, not a false-positive-prone nuisance: the codebase's own
+   established idiom for "multi-step fallible resolution with logging-and-
+   swallow error handling" (`subtitle_enqueue.rs`'s `.map_err()`/
+   `.ok_or_else()`/`?` combinator chains) satisfies it comfortably, while an
+   equivalent `match`-with-inline-logging rewrite of the same logic does not.
+   When a new handler needs this shape, copy the existing idiom first rather
+   than re-deriving a structure and fighting the linter afterward.
+3. Local-agent budget exhaustion at the "core logic done, tests incomplete"
+   boundary is now a 3-for-3 pattern across T3a/T3b/T5a for tasks that ask for
+   a new file plus a full test module in one continuous 30-turn run. Treat
+   "dedicated unit tests for the new module" as a separate, expected-to-be-
+   orchestrator-completed step when budgeting these tasks, not evidence of a
+   spec defect.
+
+**Status: [x] Done (file-level) — 2026-07-23. Mandatory Gemma Reviewer/D14
+gate: not triggered as a fallback — primary Moderate-band reviewer
+(`qwen3.6:27b-q4_K_M`) was available and used for both phases; all findings
+individually verified (fixed, or confirmed false-positive/already-satisfied
+with evidence), none dismissed without reason. Unit coverage: 44/44
+`dubbridge-worker-runner` tests pass against real Postgres, fmt/clippy clean.
+Remaining closure items: (1) workspace-wide `make qa-coverage` gate status not
+re-measured for this change (same pre-existing gap noted at T3b's closure);
+(2) owner final verification still pending; (3) `local/s-140-t5a` branch
+(commits `0f35105`, `8732088`) not yet merged into `main` as of this ledger
+edit — merge requires explicit owner approval per Git Safety Protocol. T6
+remains blocked on this task until the merge lands.**
 
 ---
 
