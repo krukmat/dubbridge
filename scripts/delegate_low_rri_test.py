@@ -5,6 +5,7 @@ Run: python3 scripts/delegate_low_rri_test.py
      python3 -m unittest scripts/delegate_low_rri_test.py
 """
 
+import datetime
 import importlib.util
 import io
 import json
@@ -24,6 +25,9 @@ _SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "delegate-low
 _spec = importlib.util.spec_from_file_location("delegate_low_rri", _SCRIPT)
 _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "local-agent"))
+import handoff_schema as _schema
 
 
 # ---------------------------------------------------------------------------
@@ -930,6 +934,67 @@ class StallFallback(unittest.TestCase):
                                side_effect=_mod.DelegationIdleTimeout(60)):
                 with self.assertRaises(_mod.DelegationIdleTimeout):
                     _mod.main()
+
+
+class BuildAttemptBundle(unittest.TestCase):
+    """T3 (docs/tasks/local-first-cloud-local-handoff.md): adapter mapping a
+    delegate-low-rri.py delegation result onto T1's capsule/attempt-bundle
+    schema."""
+
+    def setUp(self):
+        self.start_ts = datetime.datetime(2026, 7, 23, 8, 0, 0, tzinfo=datetime.timezone.utc)
+        self.end_ts = datetime.datetime(2026, 7, 23, 8, 1, 0, tzinfo=datetime.timezone.utc)
+        self.capsule_hash = "a" * 64
+
+    def test_hp1_patch_result_produces_schema_valid_bundle(self):
+        delegation = {
+            "status": "patch",
+            "summary": "did the thing",
+            "files": [{"path": "scripts/x.py", "action": "create", "contents": "x = 1"}],
+            "test_commands": ["python3 -m unittest scripts/x_test.py"],
+            "risk_notes": [],
+        }
+        bundle = _mod.build_attempt_bundle(
+            delegation, self.capsule_hash, "gemma4:26b-a4b-it-qat", self.start_ts, self.end_ts
+        )
+        self.assertEqual(bundle["outcome"], "success")
+        self.assertEqual(bundle["implementer_id"], "gemma")
+        self.assertEqual(bundle["diff_ref"], [{"path": "scripts/x.py", "action": "create"}])
+        validated = _schema.validate_attempt_bundle(bundle, {self.capsule_hash})
+        self.assertEqual(validated["outcome"], "success")
+
+    def test_ec1_blocked_result_produces_valid_bundle_not_a_crash(self):
+        delegation = {
+            "status": "blocked",
+            "summary": "cannot proceed",
+            "files": [],
+            "test_commands": [],
+            "risk_notes": ["ambiguous scope"],
+        }
+        bundle = _mod.build_attempt_bundle(
+            delegation, self.capsule_hash, "gemma4:26b-a4b-it-qat", self.start_ts, self.end_ts
+        )
+        self.assertEqual(bundle["outcome"], "blocked")
+        self.assertEqual(bundle["diff_ref"], [])
+        validated = _schema.validate_attempt_bundle(bundle, {self.capsule_hash})
+        self.assertEqual(validated["outcome"], "blocked")
+
+    def test_ec1_no_patch_result_produces_valid_bundle(self):
+        delegation = {"status": "no_patch", "summary": "nothing to do", "files": [],
+                       "test_commands": [], "risk_notes": []}
+        bundle = _mod.build_attempt_bundle(
+            delegation, self.capsule_hash, "gemma4:26b-a4b-it-qat", self.start_ts, self.end_ts
+        )
+        self.assertEqual(bundle["outcome"], "success")
+        _schema.validate_attempt_bundle(bundle, {self.capsule_hash})
+
+    def test_missing_capsule_hash_returns_none(self):
+        delegation = {"status": "patch", "summary": "ok", "files": [],
+                       "test_commands": [], "risk_notes": []}
+        bundle = _mod.build_attempt_bundle(
+            delegation, None, "gemma4:26b-a4b-it-qat", self.start_ts, self.end_ts
+        )
+        self.assertIsNone(bundle)
 
 
 if __name__ == "__main__":

@@ -355,3 +355,18 @@ independent review round, not the first) — is recorded in the **"ADR-037
 direct-project cycle summary"** section of
 `docs/tasks/adr037-local-architect-direct-project.md`. This file remains
 `status: in-progress` until `T6` closes.
+
+## Handoff-schema capsule/bundle mapping (2026-07-23)
+
+Not to be confused with the `T5` above (same label, different ledger):
+`docs/tasks/local-first-cloud-local-handoff.md`'s `T5` mapped the frozen
+`S-140` ADR-037 packet and its `T4` analysis artifact onto the T1
+capsule/attempt-bundle schema (`scripts/local-agent/handoff_schema.py`), via
+a new additive module,
+`scripts/local-architect/adr037_handoff_mapping.py`. The mapping surfaced
+**no schema gap**: all `CAPSULE_REQUIRED_FIELDS` were derivable from the
+existing packet with no information loss, and the advisory outcome required
+no change to `handoff_schema.py` — it is expressed via a local
+`"advisory-only"` constant that is deliberately outside `VALID_OUTCOMES`, so
+`validate_attempt_bundle` rejects it if ever passed through the standard
+implementer/reviewer path. ADR-037's authority boundary is unchanged.

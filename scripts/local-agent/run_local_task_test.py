@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Unit tests for run_local_task.py (mocked chat endpoint, no live model)."""
 
+import datetime
 import json
 import os
 import subprocess
@@ -12,6 +13,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import run_local_task as rlt
+import handoff_schema
 gemma_local = rlt.gemma_local
 runner_workflow_gate = rlt.runner_workflow_gate
 
@@ -86,7 +88,7 @@ def _write_and_finish(path, content):
     ]
 
 
-def _make_card(tmp_dir, rri=None, band=None):
+def _make_card(tmp_dir, rri=None, band=None, capsule_hash=None):
     card = {
         "task_id": "toy-1",
         "spec": "Write hello.txt containing 'hi'.",
@@ -97,6 +99,8 @@ def _make_card(tmp_dir, rri=None, band=None):
         card["rri"] = rri
     if band is not None:
         card["band"] = band
+    if capsule_hash is not None:
+        card["capsule_hash"] = capsule_hash
     path = os.path.join(tmp_dir, "card.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(card, f)
@@ -1662,6 +1666,190 @@ class AuditLogEmission(unittest.TestCase):
         self.assertFalse(record["audit_validation"]["valid"])
         self.assertIn("scope_gate_not_passed", record["audit_validation"]["errors"])
         self.assertEqual(record["signature"]["status"], "unsigned")
+
+
+class AttemptBundleEmission(unittest.TestCase):
+    # T2 (docs/tasks/local-first-cloud-local-handoff.md): build_attempt_bundles
+    # is additive alongside build_audit_record above -- these tests exercise it
+    # directly against hand-built transcripts, mirroring AuditLogEmission's
+    # style, plus one end-to-end main() run for HP-1.
+    _CAPSULE_HASH = "a" * 64
+    _SESSION_START = datetime.datetime(2026, 7, 23, tzinfo=datetime.timezone.utc)
+    _SESSION_END = datetime.datetime(2026, 7, 23, 0, 5, tzinfo=datetime.timezone.utc)
+
+    def test_hp1_single_attempt_success_emits_one_bundle(self):
+        card = rlt.TaskCard(
+            "toy-1", "spec", ["HP-1"], ["hello.txt"], capsule_hash=self._CAPSULE_HASH
+        )
+        result = {
+            "status": "success",
+            "transcript": [
+                {
+                    "event": "tool_result",
+                    "result": {"tool": "write_file", "path": "hello.txt"},
+                },
+                {"event": "test_result", "result": {"passed": True, "output": "ok"}},
+            ],
+        }
+
+        bundles = rlt.build_attempt_bundles(card, result, "qwen3.6:35b-a3b", self._SESSION_START, self._SESSION_END)
+
+        self.assertEqual(len(bundles), 1)
+        bundle = handoff_schema.validate_attempt_bundle(
+            bundles[0], known_capsule_hashes={self._CAPSULE_HASH}
+        )
+        self.assertEqual(bundle["outcome"], "success")
+        self.assertEqual(bundle["capsule_hash"], self._CAPSULE_HASH)
+
+    def test_hp2_two_attempt_repair_emits_two_bundles_same_capsule_hash(self):
+        card = rlt.TaskCard(
+            "toy-1", "spec", ["HP-1"], ["hello.txt"], capsule_hash=self._CAPSULE_HASH
+        )
+        result = {
+            "status": "success",
+            "transcript": [
+                {
+                    "event": "tool_result",
+                    "result": {"tool": "write_file", "path": "hello.txt"},
+                },
+                {"event": "test_result", "result": {"passed": False, "output": "fail-1"}},
+                {
+                    "event": "tool_result",
+                    "result": {"tool": "write_file", "path": "hello.txt"},
+                },
+                {"event": "test_result", "result": {"passed": True, "output": "ok"}},
+            ],
+        }
+
+        bundles = rlt.build_attempt_bundles(card, result, "qwen3.6:35b-a3b", self._SESSION_START, self._SESSION_END)
+
+        self.assertEqual(len(bundles), 2)
+        for bundle_data in bundles:
+            handoff_schema.validate_attempt_bundle(
+                bundle_data, known_capsule_hashes={self._CAPSULE_HASH}
+            )
+        self.assertEqual(bundles[0]["outcome"], "repair-needed")
+        self.assertEqual(bundles[1]["outcome"], "success")
+        self.assertEqual(bundles[0]["capsule_hash"], self._CAPSULE_HASH)
+        self.assertEqual(bundles[1]["capsule_hash"], self._CAPSULE_HASH)
+
+    def test_ec1_escalation_emits_escalated_bundle_no_partial_for_aborted_attempt(self):
+        card = rlt.TaskCard(
+            "toy-1", "spec", ["HP-1"], ["hello.txt"], capsule_hash=self._CAPSULE_HASH
+        )
+        result = {
+            "status": "budget_exhausted",
+            "reason": "repair_attempts_exhausted",
+            "attempts": rlt.MAX_REPAIR_ATTEMPTS,
+            "transcript": [
+                {
+                    "event": "tool_result",
+                    "result": {"tool": "write_file", "path": "hello.txt"},
+                },
+                {"event": "test_result", "result": {"passed": False, "output": "fail-1"}},
+                {
+                    "event": "tool_result",
+                    "result": {"tool": "write_file", "path": "hello.txt"},
+                },
+                {"event": "test_result", "result": {"passed": False, "output": "fail-2"}},
+                # trailing turn with no closing test_result: the session was
+                # cut off (budget exhausted) before another finish -> no
+                # bundle should be emitted for this incomplete tail.
+                {
+                    "event": "tool_result",
+                    "result": {"tool": "write_file", "path": "hello.txt"},
+                },
+            ],
+        }
+
+        bundles = rlt.build_attempt_bundles(card, result, "qwen3.6:35b-a3b", self._SESSION_START, self._SESSION_END)
+
+        self.assertEqual(len(bundles), 2)
+        for bundle_data in bundles:
+            handoff_schema.validate_attempt_bundle(
+                bundle_data, known_capsule_hashes={self._CAPSULE_HASH}
+            )
+        self.assertEqual(bundles[0]["outcome"], "repair-needed")
+        self.assertEqual(bundles[1]["outcome"], "escalated")
+
+    def test_no_capsule_hash_on_card_emits_no_bundles(self):
+        # Cards produced before T1/T2 adoption carry no capsule_hash --
+        # emitting a bundle with a fabricated hash would validate
+        # syntactically while being semantically false, so emission is
+        # skipped entirely rather than inventing one.
+        card = rlt.TaskCard("toy-1", "spec", ["HP-1"], ["hello.txt"])
+        result = {
+            "status": "success",
+            "transcript": [
+                {"event": "test_result", "result": {"passed": True, "output": "ok"}},
+            ],
+        }
+
+        bundles = rlt.build_attempt_bundles(card, result, "qwen3.6:35b-a3b", self._SESSION_START, self._SESSION_END)
+
+        self.assertEqual(bundles, [])
+
+    def test_boundary_violation_tail_with_no_test_result_emits_no_bundle_for_it(self):
+        # Qwen27 phase-2 review (T2): a session can end on a non-test_result
+        # terminal event (boundary_violation here; transport_error and
+        # turn_budget_exhausted are the same shape) with zero completed
+        # attempts. build_attempt_bundles must not emit anything for that
+        # incomplete tail, and must not crash walking a transcript with no
+        # test_result events at all.
+        card = rlt.TaskCard(
+            "toy-1", "spec", ["HP-1"], ["hello.txt"], capsule_hash=self._CAPSULE_HASH
+        )
+        result = {
+            "status": "boundary_violation",
+            "reason": "write outside allowed_paths",
+            "transcript": [
+                {
+                    "event": "tool_result",
+                    "result": {"tool": "write_file", "path": "hello.txt"},
+                },
+                {"event": "boundary_violation", "error": "write outside allowed_paths"},
+            ],
+        }
+
+        bundles = rlt.build_attempt_bundles(card, result, "qwen3.6:35b-a3b", self._SESSION_START, self._SESSION_END)
+
+        self.assertEqual(bundles, [])
+
+    def test_hp1_end_to_end_main_emits_bundle_via_append_audit_log(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = os.path.join(tmp, "worktree")
+            _git_init_worktree(worktree)
+            card_path = _make_card(tmp, capsule_hash=self._CAPSULE_HASH)
+            out_path = os.path.join(tmp, "transcript.json")
+
+            chat = ChatSequencer(_write_and_finish("hello.txt", "hi"))
+            passing_tests = lambda wt: {"passed": True, "output": "ok"}
+
+            captured = []
+
+            def fake_append_audit_log(record):
+                captured.append(record)
+
+            with patch.object(gemma_local, "append_audit_log", side_effect=fake_append_audit_log):
+                exit_code = rlt.main(
+                    ["--card", card_path, "--worktree", worktree, "--out", out_path],
+                    chat_fn=chat,
+                    test_runner=passing_tests,
+                )
+
+            self.assertEqual(exit_code, 0)
+            # First append is the ADR-034 audit record, second is the bundle.
+            self.assertEqual(len(captured), 2)
+            # Qwen27 phase-1 review (T2): assert the primary audit-record
+            # append is untouched by the new bundle-emission code, not just
+            # that a second record showed up.
+            self.assertEqual(captured[0]["role"], "local-implementer")
+            self.assertEqual(captured[0]["outcome"], "SUCCESS")
+            self.assertIn("signature", captured[0])
+            bundle = handoff_schema.validate_attempt_bundle(
+                captured[1], known_capsule_hashes={self._CAPSULE_HASH}
+            )
+            self.assertEqual(bundle["outcome"], "success")
 
 
 class T7B1RealBoundaryEnvStrippingEndToEnd(unittest.TestCase):

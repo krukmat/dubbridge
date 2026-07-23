@@ -673,6 +673,48 @@ def write_result(delegation, out_path):
     return gemma_local.write_result(delegation, out_path)
 
 
+# --- T3 (docs/tasks/local-first-cloud-local-handoff.md): attempt-bundle adapter --
+# Additive only: does not change the tagged-block contract Gemma must return or
+# any field already written to the audit log above. Maps an existing delegation
+# result onto T1's capsule/attempt-bundle schema (scripts/local-agent/
+# handoff_schema.py) so the Low-band lane produces the same envelope the
+# Moderate/Med-high lane emits (T2's build_attempt_bundles), without a session
+# transcript to segment -- delegate-low-rri.py is a single one-shot call, so
+# there is exactly one bundle per invocation.
+
+DELEGATION_STATUS_TO_OUTCOME = {
+    "patch": "success",
+    "no_patch": "success",
+    "blocked": "blocked",
+}
+
+
+def build_attempt_bundle(delegation, capsule_hash, model, start_ts, end_ts):
+    """Map a delegate-low-rri.py `delegation` result dict onto one T1 attempt
+    bundle. Returns None when `capsule_hash` is falsy (packet predates T1/T3
+    adoption): a bundle without a real capsule hash cannot pass T1's
+    known_capsule_hashes check, so emitting one would only be discarded
+    downstream -- same convention as T2's build_attempt_bundles.
+    """
+    if not capsule_hash:
+        return None
+    outcome = DELEGATION_STATUS_TO_OUTCOME[delegation["status"]]
+    return {
+        "capsule_hash": capsule_hash,
+        "implementer_id": "gemma",
+        "model_tag": model,
+        "start_ts": start_ts.isoformat().replace("+00:00", "Z"),
+        "end_ts": end_ts.isoformat().replace("+00:00", "Z"),
+        "diff_ref": [
+            {"path": entry["path"], "action": entry["action"]}
+            for entry in delegation.get("files", [])
+        ],
+        "test_results": {"commands": delegation.get("test_commands", [])},
+        "review_verdict": "pending",
+        "outcome": outcome,
+    }
+
+
 # --- Caller-side patch construction (the work the small model can't do) ---------
 # Gemma returns full file contents; the deterministic steps below — scope
 # enforcement, diff construction, and `git apply` — run in the caller, never the

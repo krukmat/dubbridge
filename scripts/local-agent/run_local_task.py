@@ -203,13 +203,23 @@ class NullBoundary:
 
 
 class TaskCard:
-    def __init__(self, task_id, spec, acceptance_tests, allowed_paths, rri=None, band=None):
+    def __init__(
+        self, task_id, spec, acceptance_tests, allowed_paths, rri=None, band=None,
+        capsule_hash=None,
+    ):
         self.task_id = task_id
         self.spec = spec
         self.acceptance_tests = acceptance_tests
         self.allowed_paths = allowed_paths
         self.rri = rri
         self.band = band
+        # T2 (docs/tasks/local-first-cloud-local-handoff.md): the T1 capsule
+        # hash this card was issued against, so bundles emitted for this
+        # session can reference it. None for cards produced before T1/T2
+        # existed -- build_attempt_bundles skips emission when unset rather
+        # than fabricating a hash, since an invented hash would validate
+        # against T1's schema syntactically while being semantically false.
+        self.capsule_hash = capsule_hash
 
 
 class ToolCall:
@@ -652,6 +662,7 @@ def load_card(card_path):
         allowed_paths=data.get("allowed_paths", []),
         rri=data.get("rri"),
         band=data.get("band"),
+        capsule_hash=data.get("capsule_hash"),
     )
 
 
@@ -837,6 +848,91 @@ def build_audit_record(card, result, model, elapsed_s):
     }
 
 
+def build_attempt_bundles(card, result, model, session_start, session_end):
+    """T2 (docs/tasks/local-first-cloud-local-handoff.md): one T1 attempt
+    bundle per repair attempt in this session, read-only over the same
+    transcript build_audit_record already aggregates -- no new capture
+    logic, no change to run_loop's control flow or build_audit_record's
+    output.
+
+    Segmentation: run_loop's transcript is one flat list across the whole
+    session; each attempt ends at its `test_result` event (finish -> tests
+    run -> pass or repair). Splitting on that event boundary turns the flat
+    list into per-attempt slices without touching run_loop itself. A trailing
+    slice with no closing test_result (e.g. the turn budget or a boundary
+    violation cut the session off before finish) has no attempt to report,
+    per EC-1 -- no partial/malformed bundle is emitted for it.
+
+    Timestamps: run_loop's transcript events carry no per-event timestamps,
+    so there is no ground truth for exactly when each attempt started/ended
+    within the session. Qwen27 phase-1 review (T2) flagged an earlier version
+    that called datetime.now() once per attempt *after* run_loop had already
+    returned -- every bundle got a near-identical wall-clock timestamp from
+    bundle-generation time, not from when the attempt actually happened, which
+    is worse than useless for audit purposes. Rather than fabricate false
+    per-attempt precision, every bundle's start_ts/end_ts is bounded by the
+    caller-supplied session_start/session_end (the same window build_audit_record's
+    elapsed_s is computed from) -- honest about the granularity actually
+    available instead of inventing timestamps the data doesn't support.
+
+    Returns [] when the card carries no capsule_hash (session predates T1/T2
+    adoption): a bundle without a real capsule hash cannot pass T1's
+    known_capsule_hashes check, so emitting one would only be discarded
+    downstream.
+    """
+    if not card.capsule_hash:
+        return []
+
+    transcript = result.get("transcript", [])
+    test_event_count = sum(1 for e in transcript if e.get("event") == "test_result")
+    bundles = []
+    segment = []
+    tests_seen = 0
+    for event in transcript:
+        segment.append(event)
+        if event.get("event") != "test_result":
+            continue
+        tests_seen += 1
+        test_result = event["result"]
+        edit_events = [
+            e["result"] for e in segment
+            if e.get("event") == "tool_result" and e["result"].get("tool") in ("write_file", "apply_patch")
+        ]
+        is_last_test_event = tests_seen == test_event_count
+        if test_result["passed"]:
+            outcome = "success"
+        elif is_last_test_event:
+            # Qwen27 phase-1 review (T2): this used to check
+            # `result["status"] == "budget_exhausted"` specifically, so a
+            # failing last attempt under any other terminal status (e.g.
+            # boundary_violation, transport_error, aborted) fell through to
+            # "repair-needed" -- implying another attempt was coming, which
+            # is false once the session has actually ended. Any failing final
+            # attempt is escalated regardless of which terminal status ended
+            # the session; only a non-final failing attempt (more repair
+            # turns follow within the same session) is "repair-needed".
+            outcome = "escalated"
+        else:
+            outcome = "repair-needed"
+        bundles.append(
+            {
+                "capsule_hash": card.capsule_hash,
+                "implementer_id": "qwen35",
+                "model_tag": model,
+                "start_ts": session_start.isoformat().replace("+00:00", "Z"),
+                "end_ts": session_end.isoformat().replace("+00:00", "Z"),
+                "diff_ref": [
+                    {"tool": e["tool"], "path": e["path"]} for e in edit_events
+                ],
+                "test_results": test_result,
+                "review_verdict": "pending",
+                "outcome": outcome,
+            }
+        )
+        segment = []
+    return bundles
+
+
 def main(
     argv=None,
     chat_fn=None,
@@ -893,7 +989,8 @@ def main(
         )
     finally:
         file_tools.close()
-    elapsed_s = (datetime.datetime.now(datetime.timezone.utc) - session_start).total_seconds()
+    session_end = datetime.datetime.now(datetime.timezone.utc)
+    elapsed_s = (session_end - session_start).total_seconds()
 
     result["task_id"] = card.task_id
     result["finished_at"] = datetime.datetime.now(datetime.timezone.utc).strftime(
@@ -910,6 +1007,12 @@ def main(
     # boundary_violation, transport_error) — audit visibility must not
     # depend on how the session ended.
     gemma_local.append_audit_log(audit_record)
+
+    # T2: additive alongside the ADR-034 audit record above -- one T1
+    # attempt bundle per repair attempt, appended to the same audit-log
+    # sink (append_audit_log is generic over the record shape it appends).
+    for bundle in build_attempt_bundles(card, result, args.model, session_start, session_end):
+        gemma_local.append_audit_log(bundle)
 
     return 0 if result["status"] == "success" else 1
 
