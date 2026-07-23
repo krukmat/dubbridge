@@ -227,6 +227,12 @@ Each task requires its own RRI computation and presentation/approval before
 execution, per repository workflow. The RRI values above are planning scores
 from 2026-07-21 and must be recomputed at task presentation time. T3b's RRI
 was recomputed to 50 at presentation time on 2026-07-22 (see task ledger).
+T5a's RRI (39, Moderate) was confirmed at presentation time on 2026-07-22 and
+the task reached `[x] Done (file-level)` on 2026-07-23, including a
+separately-approved fix for a pre-existing T3b readiness-check-ordering bug
+found during T5a verification (see task ledger for both). T5a's branch
+(`local/s-140-t5a`) is implemented and reviewed but not yet merged to `main`
+as of this note; T6 stays blocked until that merge lands.
 
 `T2b` was split on 2026-07-21 into an extraction seam and a wiring step so the
 worker-runner change stays reviewable under the local-first workflow instead of
