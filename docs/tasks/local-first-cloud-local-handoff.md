@@ -2,7 +2,7 @@
 type: TaskList
 title: "Tasks: Local-first / cloud-local handoff contract"
 plan: docs/plan/local-first-cloud-local-handoff.md
-status: active
+status: complete
 slice: local-first-cloud-local-handoff
 governed_by: [ADR-036, ADR-037]
 ---
@@ -774,12 +774,24 @@ this band.
 
 ## T6 — Pilot and metrics
 
-- **Status:** `[ ] Open`
+- **Status:** `[x] Won't-do`
 - **Effort:** M
 - **Preliminary RRI:** ~32 Moderate; `C0 F3 D3 T2 A2 K3 P2 X3`
 - **Scope:** `docs/evaluations/local-first-cloud-local-handoff-pilot.md`
   (new); no product code
 - **Depends on:** T4
+
+### Disposition (2026-07-23)
+
+Owner decision: no formal pilot batch. The capsule → attempt-bundle →
+conciliator-checklist path (T1–T5) is already exercised by every real
+Moderate/Med-high task that goes through the local-agent lane going forward
+(e.g. T4's own execution above is itself an instance of the path it
+validates); the owner prefers to evaluate the checklist's predictive value
+task-by-task, on the marcha, rather than commit to a separate 3–5-task
+evaluation doc and a formal go/no-go artifact. If a disagreement case (T6's
+EC-1) shows up in ordinary use, record it where that task's own closure
+evidence lives rather than in a dedicated pilot doc.
 
 ### Objective
 
@@ -827,12 +839,23 @@ separate task if material.
 
 ## T7 — Policy sync / go-no-go
 
-- **Status:** `[ ] Open`
+- **Status:** `[x] Won't-do`
 - **Effort:** S
 - **Preliminary RRI:** ~28 Moderate; `C0 F2 D2 T1 A1 K2 P2 X2`
 - **Scope:** this plan/ledger; cross-references added to
   `AGENT_WORKFLOW_GUIDE.md` / `RRI_POLICY.md` only if T6 recommends adoption
 - **Depends on:** T6
+
+### Disposition (2026-07-23)
+
+No-go by owner decision, not by evidence: since T6 does not run, there is no
+pilot evidence to justify promoting the capsule/bundle vocabulary or the
+conciliator checklist into `AGENT_WORKFLOW_GUIDE.md` or `RRI_POLICY.md` as a
+referenced convention. Per T7's own acceptance criteria (NO-GO path), this
+plan/ledger stays a standalone artifact — T1–T5's schema, adapters, and
+checklist remain available as opt-in tooling for the primary agent to use at
+its own discretion, but are not cross-referenced from the mandatory workflow
+guides. No edit to `AGENT_WORKFLOW_GUIDE.md` or `RRI_POLICY.md` is made.
 
 ### Objective
 
@@ -879,3 +902,12 @@ band handling in `RRI_POLICY.md`. Its closure requirements are:
    roadmap-tracked product slice, so no roadmap row references it.
 3. No `[x] Done` unit-coverage certification or owner-verification block is
    required or presented for T0, consistent with its docs-only exemption.
+
+## Slice closure (2026-07-23)
+
+T0–T5 are `Done`. T6 and T7 are `Won't-do` by explicit owner decision — see
+each task's Disposition note above; no pilot evidence was generated, so T7's
+outcome is NO-GO by default (standalone artifact, no cross-reference added to
+`AGENT_WORKFLOW_GUIDE.md`/`RRI_POLICY.md`). The schema, adapters, and
+conciliator checklist landed in T1–T5 remain in the repo as opt-in tooling;
+this slice is closed with no further tasks planned.

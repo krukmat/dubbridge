@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: "Plan: Local-first / cloud-local handoff contract"
-status: active
+status: complete
 ---
 
 # Plan: Local-first / cloud-local handoff contract
@@ -226,6 +226,16 @@ T0 (this document contract) ──► T1 (capsule/bundle schema)
 - **T6** (pilot) depends on T4 being usable end-to-end.
 - **T7** is the only task with an approval/go-no-go decision and depends on
   T6's metrics.
+
+**Closure (2026-07-23):** T0–T5 landed (see the task ledger). T6 (pilot) and
+T7 (policy sync / go-no-go) were marked `Won't-do` by explicit owner
+decision: rather than run a separate formal pilot batch, the owner evaluates
+the capsule/bundle/checklist tooling on the marcha as real Moderate/Med-high
+tasks pass through the local-agent lane. Net effect: T1–T5's schema,
+adapters, and conciliator checklist stay in the repo as opt-in tooling, not
+promoted into `AGENT_WORKFLOW_GUIDE.md`/`RRI_POLICY.md` as a referenced
+convention (T7's NO-GO path). This plan is closed; see
+`docs/tasks/local-first-cloud-local-handoff.md` § Slice closure.
 
 ## Related documents
 
