@@ -584,6 +584,37 @@ class BuildAndApplyDiff(unittest.TestCase):
         self.assertIn("+    return 1", result["unified_diff"])
         self.assertIn("-    first()", result["unified_diff"])
 
+    def test_before_after_rejects_oversized_before_block(self):
+        d = self._git_repo()
+        target = os.path.join(d, "a.py")
+        lines = "\n".join(f"line{i} = {i}" for i in range(50))
+        with open(target, "w") as f:
+            f.write(lines + "\n")
+        before = os.path.join(d, "before.txt")
+        with open(before, "w") as f:
+            f.write(lines + "\n")
+
+        with self.assertRaises(RuntimeError) as ctx:
+            _mod.apply_before_after(
+                "a.py", before, "x = 1\n", ["a.py"], d, do_apply=False,
+            )
+        self.assertIn("safety cap", str(ctx.exception))
+
+    def test_before_after_rejects_syntactically_invalid_result(self):
+        d = self._git_repo()
+        target = os.path.join(d, "a.py")
+        with open(target, "w") as f:
+            f.write("def f():\n    return 1\n")
+        before = os.path.join(d, "before.txt")
+        with open(before, "w") as f:
+            f.write("    return 1\n")
+
+        with self.assertRaises(RuntimeError) as ctx:
+            _mod.apply_before_after(
+                "a.py", before, "    return (\n", ["a.py"], d, do_apply=False,
+            )
+        self.assertIn("does not parse", str(ctx.exception))
+
     def test_delete_existing_file(self):
         d = self._git_repo()
         target = os.path.join(d, "a.txt")

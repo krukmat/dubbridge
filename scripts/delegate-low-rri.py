@@ -18,6 +18,7 @@ The agent watches for completion (exit 0 → read result.json) or timeout (124).
 """
 
 import argparse
+import ast
 import datetime
 import fnmatch
 import json
@@ -59,6 +60,7 @@ CONTENT_MARKER = "--- CONTENT ---"
 REPLACEMENT_START_MARKER = "=== REPLACEMENT START ==="
 REPLACEMENT_END_MARKER = "=== REPLACEMENT END ==="
 AFTER_MARKER = "--- AFTER ---"
+MAX_BEFORE_LINES = 40
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -887,6 +889,16 @@ def apply_before_after(target_path, before_file, after_block, allow_paths, repo_
     original_stripped = _strip_trailing(original)
     before_stripped = _strip_trailing(before)
 
+    before_line_count = len(before_stripped.splitlines())
+    if before_line_count > MAX_BEFORE_LINES:
+        raise RuntimeError(
+            f"before-after: BEFORE block is {before_line_count} lines, exceeding "
+            f"the {MAX_BEFORE_LINES}-line safety cap. A large BEFORE span forces "
+            "the model to retype unrelated unchanged lines verbatim inside AFTER, "
+            "which can silently drop or corrupt content. Split this edit into "
+            "smaller, single-anchor before-after calls."
+        )
+
     count = original_stripped.count(before_stripped)
     if count == 0:
         raise RuntimeError(
@@ -905,6 +917,17 @@ def apply_before_after(target_path, before_file, after_block, allow_paths, repo_
     # Preserve trailing newline if the original had one.
     if original.endswith("\n") and not final_contents.endswith("\n"):
         final_contents += "\n"
+
+    if target_path.endswith(".py"):
+        try:
+            ast.parse(final_contents, filename=target_path)
+        except SyntaxError as exc:
+            raise RuntimeError(
+                f"before-after: resulting {target_path} does not parse as valid "
+                f"Python ({exc.__class__.__name__}: {exc}); refusing to apply. "
+                "This usually means AFTER did not faithfully replace BEFORE, or "
+                "BEFORE was mis-scoped."
+            ) from exc
 
     files = [{"path": target_path, "action": "modify", "contents": final_contents}]
     enforce_scope(files, allow_paths)
