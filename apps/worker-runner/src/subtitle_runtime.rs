@@ -91,12 +91,6 @@ async fn process_subtitle_job_inner(
     )
     .await?;
 
-    let ready =
-        dubbridge_db::subtitle_repo::get_subtitle_readiness_evidence(pool, asset_id).await?;
-    if !ready {
-        anyhow::bail!("subtitle readiness evidence incomplete after artifact insertion");
-    }
-
     dubbridge_db::subtitle_repo::upsert_subtitle_status(
         pool,
         asset_id,
@@ -104,6 +98,12 @@ async fn process_subtitle_job_inner(
         None,
     )
     .await?;
+
+    let ready =
+        dubbridge_db::subtitle_repo::get_subtitle_readiness_evidence(pool, asset_id).await?;
+    if !ready {
+        anyhow::bail!("subtitle readiness evidence incomplete after Ready status write");
+    }
 
     Ok(())
 }
