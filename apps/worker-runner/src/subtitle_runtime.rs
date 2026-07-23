@@ -148,7 +148,7 @@ mod tests {
     use std::env;
 
     use super::*;
-    use dubbridge_db::{artifact_repo, preparation_repo, review_repo, subtitle_repo, workspace_repo};
+    use dubbridge_db::{artifact_repo, preparation_repo, subtitle_repo};
     use dubbridge_domain::{
         artifact::{ArtifactKind, ArtifactRecord, DerivedArtifact, SubtitleStatus},
         workspace::{OrgId, Organization, Project, ProjectId, TargetLanguage},
@@ -307,9 +307,9 @@ mod tests {
         subtitle_repo::upsert_subtitle_status(&pool, asset_id, SubtitleStatus::Pending, None)
             .await
             .expect("set pending");
-        insert_project_with_targets(&pool, asset_id, "en", &["es"]).await;
+        let project_id = insert_project_with_targets(&pool, asset_id, "en", &["es"]).await;
 
-        let job = dubbridge_jobs::SubtitleJob::new(asset_id.0, Uuid::new_v4(), "es");
+        let job = dubbridge_jobs::SubtitleJob::new(asset_id.0, project_id.0, "es");
         process_subtitle_job(&pool, &storage, job)
             .await
             .expect("process subtitle job");
@@ -326,13 +326,16 @@ mod tests {
         assert!(ready);
 
         // Verify review_tasks row was enqueued
-        let review_rows: Vec<uuid::Uuid> = sqlx::query_scalar(
-            "SELECT id FROM review_tasks ORDER BY id",
-        )
-        .fetch_all(&pool)
-        .await
-        .expect("get review tasks");
-        assert_eq!(review_rows.len(), 1, "exactly one review_task should be enqueued on success");
+        let review_rows: Vec<uuid::Uuid> =
+            sqlx::query_scalar("SELECT id FROM review_tasks ORDER BY id")
+                .fetch_all(&pool)
+                .await
+                .expect("get review tasks");
+        assert_eq!(
+            review_rows.len(),
+            1,
+            "exactly one review_task should be enqueued on success"
+        );
 
         // Verify stored subtitle deserializes to 1 segment with expected joined text
         let key = dubbridge_storage::subtitle_key(&asset_id.0.to_string());
@@ -379,12 +382,11 @@ mod tests {
         );
 
         // No review_tasks row should have been created
-        let review_rows: Vec<uuid::Uuid> = sqlx::query_scalar(
-            "SELECT id FROM review_tasks ORDER BY id",
-        )
-        .fetch_all(&pool)
-        .await
-        .expect("get review tasks");
+        let review_rows: Vec<uuid::Uuid> =
+            sqlx::query_scalar("SELECT id FROM review_tasks ORDER BY id")
+                .fetch_all(&pool)
+                .await
+                .expect("get review tasks");
         assert!(review_rows.is_empty());
     }
 
@@ -438,12 +440,11 @@ mod tests {
         assert_eq!(status.status, SubtitleStatus::Failed);
 
         // No review_tasks row should have been created
-        let review_rows: Vec<uuid::Uuid> = sqlx::query_scalar(
-            "SELECT id FROM review_tasks ORDER BY id",
-        )
-        .fetch_all(&pool)
-        .await
-        .expect("get review tasks");
+        let review_rows: Vec<uuid::Uuid> =
+            sqlx::query_scalar("SELECT id FROM review_tasks ORDER BY id")
+                .fetch_all(&pool)
+                .await
+                .expect("get review tasks");
         assert!(review_rows.is_empty());
 
         // No Subtitle artifact should have been inserted
@@ -509,12 +510,11 @@ mod tests {
         assert!(err.to_string().contains("missing upstream word alignment"));
 
         // No review_tasks row should have been created
-        let review_rows: Vec<uuid::Uuid> = sqlx::query_scalar(
-            "SELECT id FROM review_tasks ORDER BY id",
-        )
-        .fetch_all(&pool)
-        .await
-        .expect("get review tasks");
+        let review_rows: Vec<uuid::Uuid> =
+            sqlx::query_scalar("SELECT id FROM review_tasks ORDER BY id")
+                .fetch_all(&pool)
+                .await
+                .expect("get review tasks");
         assert!(review_rows.is_empty());
     }
 }
