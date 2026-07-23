@@ -465,12 +465,14 @@ test-module run above.
 
 ## T4 — Cloud conciliator checklist / gate
 
-- **Status:** `[ ] Open`
-- **Effort:** M
+- **Status:** `[x] Done`
+- **Effort:** L
 - **Preliminary RRI:** ~33 Moderate; `C2 F2 D3 T3 A1 K2 P2 X3`
-- **Scope:** new `scripts/local-agent/conciliator_checklist.py` (or similar),
-  test module; references but does not duplicate `scope_check.py`,
-  `organization_gate.py`
+- **Final RRI:** 42 Med-high; `C2 F1 D3 T3 A1 K2 P2 X3` (recomputed at
+  presentation time; higher than the preliminary estimate)
+- **Scope:** `scripts/local-agent/conciliator_checklist.py`,
+  `scripts/local-agent/conciliator_checklist_test.py`; references but does
+  not duplicate `scope_check.py`, `organization_gate.py`
 - **Depends on:** T2, T3, T5
 
 ### Objective
@@ -513,10 +515,165 @@ auto-closer.
 
 ### Reflection strategy
 
-Moderate band, 2 passes: pass 1 on checklist-item correctness against each
-of the six items in the plan; pass 2 on fail-closed behavior (a missing or
-ambiguous input produces an explicit FAIL/UNKNOWN item, never a silent
-PASS).
+Med-high band (RRI 42): both review phases route to Qwen27
+(`qwen3.6:27b-q4_K_M`), per the local-agent lane's Med-high routing.
+
+### Execution summary
+
+**Phase-1 task-analysis review (Qwen27), 4 rounds, converged:** wrote the
+task packet, ran it through `scripts/peer-workflow-review.py --phase task`.
+Round 1 found the UNKNOWN-vs-FAIL aggregation rule undefined and `overall`
+missing from acceptance criteria; round 2 found EC-1 wording still
+ambiguous, no mixed-status test coverage, and item-4 budget precedence
+unclear; round 3 found two real gaps (empty `allowed_paths`/`diff_ref`
+edge case, non-bool `passed` handling); round 4 found one more real gap
+(non-dict `test_results` would crash `.get()`). Each round's real findings
+were folded into the packet before re-review; iteration stopped once
+remaining findings were self-resolving or reviewer re-confirmations, not
+new defects.
+
+**Implementation — Qwen3.5a (`qwen3.6:35b-a3b`) via `run_local_task.py`,**
+disposable worktree `/private/tmp/dubbridge-t4-conciliator` (branch
+`agent/t4-conciliator-checklist`), cut from commit `79bcd08` (T0–T3/T5
+committed first so `handoff_schema.py` and its adapters were visible inside
+the isolated worktree). Ran to `budget_exhausted` at the 30-turn cap, but
+produced a complete, materially correct module: `conciliator_checklist.py`
+(all six items, fail-closed aggregation matching the reviewed spec) +
+`conciliator_checklist_test.py` (40 tests). Evaluation: 38/40 passed; the 2
+failures were confirmed (by direct inspection of `_check_reflection` against
+the approved spec) to be a test-authoring bug, not an implementation bug —
+the implementation correctly treats a known RRI < 26 as PASS for the
+reflection item, but two tests incorrectly asserted UNKNOWN for that case.
+
+**Cross-delegated repair — 5 attempts, all failed:** per the owner's
+2026-07-23 instruction to minimize direct involvement and cross-delegate
+between Gemma and Qwen3.5a on failure, the 2-test fix was sent to: Gemma
+(prose packet) — rewrote the entire file from scratch with a wrong import
+path and a wrong `build_report` call signature, deleting 34 of 40 passing
+tests; Qwen3.5a (same packet) — first attempt truncated by token limit
+(no-op), second attempt (raised `--num-predict`) also rewrote the whole
+file with a different wrong import (`from local_agent...`, missing the
+`scripts.` prefix and using an invalid underscore package name) and
+imported nonexistent helper functions; Gemma again with a restrictive
+`--mode before-after` packet (exact find/replace blocks, explicit
+"surgical two-line edit only" instruction) — produced a syntactically
+broken 8-line file (only the two replacement blocks, no class/import
+wrapper); Qwen27 as a last-resort implementer — returned `status: blocked`,
+misreading its own sandboxed repo-root access as "file not present."
+
+**Escalation:** per `HITL_AUTONOMY_POLICY.md`'s repair-budget/escalation
+conditions (same defect, repeated cross-model failure) and
+`feedback_local_pipeline_roles.md`'s documented exception for exactly this
+case, reported the failure pattern to the owner; owner confirmed (after one
+more failed last-resort attempt) direct application. Applied the two-line
+fix myself: `test_reflection_rri_low_unknown`'s expected status corrected
+from `"UNKNOWN"` to `"PASS"` (matches the spec: RRI known and <26 is a
+valid PASS, not missing context), and `test_ec4_all_unknown_overall_unknown`
+changed `_capsule(rri=10)` to `_capsule()` (EC-4 requires RRI genuinely
+absent, not a known low value). Verified: `python3 -m unittest
+scripts.local-agent.conciliator_checklist_test -v` → `Ran 40 tests ... OK`.
+
+**Phase-2 code review (Qwen27):** verdict `findings`, 8 findings on the
+747-line combined content. Disposition: the four "HIGH" findings on budget
+precedence (`build_report`/`_check_budget`/`_get_band_from_capsule`) were
+each the reviewer talking itself through the logic and concluding "this is
+correct" / "this works" / "by design" in its own text — verified directly
+against the code and the task spec's own "Item 4 precedence rule" (capsule
+fields take precedence over caller-supplied `band`/`rri`, exactly as
+implemented); no action needed. One real MEDIUM (root path `"/"` in
+`allowed_paths` normalizes to an empty string, a theoretical edge case) was
+evaluated and left as-is: this repo's path convention (matching
+`scope_check.py`'s own `_normalise_allowed_path`, which rejects paths
+starting with `/`) never uses `/` as an allowed-path entry, so this is
+unreachable in practice, not a live defect. Two LOW/MEDIUM findings were
+genuine missing-test suggestions (mixed trailing-slash normalization,
+`passed`+`status` key conflict, `rri=26` boundary) — noted but not added,
+since they're coverage nice-to-haves outside the approved acceptance
+criteria (HP-1/EC-1..4), not defects; can be added in a follow-up if T6's
+pilot surfaces a related gap.
+
+**Final evidence:** `scripts/local-agent/conciliator_checklist.py` (364
+lines) + `scripts/local-agent/conciliator_checklist_test.py` (380 lines),
+copied from the worktree into the main tree; `python3 -m unittest
+scripts.local-agent.conciliator_checklist_test -v` → `Ran 40 tests ... OK`
+in both the worktree and the main repo tree. All six checklist items
+(scope, acceptance, review, budget, reflection, status_sync) implemented
+with fail-closed aggregation (FAIL dominates UNKNOWN dominates PASS,
+matching the approved spec). Read-only: no filesystem writes beyond an
+optional caller-requested report path; never closes or approves a task.
+
+### Follow-up round — root-path fail-closed guard (2026-07-23)
+
+The owner asked to fix, rather than leave as a note, the phase-2 review's
+MEDIUM finding above (root path `"/"` normalising to `""`). Initial
+cross-delegation attempts (Gemma, then Qwen3.5a) on `--mode before-after`
+produced byte-identical broken output — a 373-line diff, `NameError: name
+'Any' is not defined`, file truncated to 42 lines — from both models on
+the same call. Per the owner's explicit instruction not to assume model
+fault when two independent models fail identically, this was investigated
+rather than retried: inspecting the actual applied diff's git hunks showed
+the corruption spanned from line 1 to line 364 of the file, proving the
+`--before-file` supplied to the CLI did not match the small span described
+in the accompanying prose packet. `apply_before_after()` in
+`scripts/delegate-low-rri.py` performs a blind literal
+`original.replace(before_block, after_block)` — the model never sees or
+echoes the BEFORE text — so an oversized/mis-scoped before-file silently
+replaces far more of the file than intended, regardless of which model
+supplies the (correctly small) AFTER text. Root cause was a caller-side
+packet-construction defect, not a defect in either model or in the tool's
+existing replace/validate logic.
+
+Long-term fix (out of T4's file scope, landed in
+`scripts/delegate-low-rri.py` and `scripts/delegate_low_rri_test.py`,
+RRI 22 Low via `scripts/rri.py`, delegated to Gemma in 4 small before-after
+calls, all applied clean on the first attempt): `apply_before_after` now
+rejects any BEFORE block over `MAX_BEFORE_LINES` (40) before calling the
+model, and rejects (post-substitution) any `.py` result that fails
+`ast.parse`, both fail-closed with a clear `RuntimeError`. Two regression
+tests added. This is now reusable by any future before-after delegation,
+not just T4.
+
+With the tool hardened, the root-path guard itself was re-delegated as two
+small single-anchor before-after calls (`_normalise_path`,
+`_check_scope`) plus one for the new test — all against
+`scripts/local-agent/conciliator_checklist.py` /
+`conciliator_checklist_test.py`. The first `_check_scope`-adjacent test
+edit was attempted with Gemma; the new `ast.parse` gate caught a
+syntactically broken response and refused to write it (no corruption, no
+manual revert needed); per
+[[feedback_cross_delegate_on_failure]] the same edit was re-sent to
+Qwen3.5a (`qwen3.6:35b-a3b`), which produced a clean result on the first
+try. All other calls succeeded on the first attempt with either model.
+
+`_normalise_path` now raises `ValueError` when a non-empty path normalises
+to an empty string; `_check_scope` catches this per-path, collects
+offending raw paths, and returns a scope `FAIL` naming them — before the
+prior "empty diff_ref → PASS" branch. New test:
+`test_scope_root_path_touched_fails_closed`.
+
+**Follow-up phase-2 review (Qwen27, delta-scoped — Med-high band routing
+still applies):** verdict `findings`, none HIGH. Summary: "The fix
+correctly implements fail-closed behavior for root paths." Three findings,
+all coverage/robustness nice-to-haves, not defects: (1) LOW — test uses
+the same `next(...)` lookup pattern as every other test in this file,
+flagged as slightly fragile; left as-is for consistency with the existing
+suite. (2) MEDIUM — suggests additional test coverage for other inputs
+that also normalise to empty (`"./"`, `"///"`); the guard itself is
+generic (fires on any non-empty path normalising to empty, not a
+root-specific check) so these cases are already covered by the
+implementation, only the test enumeration is incomplete. (3) LOW — the
+FAIL reason string could grow long if many bad paths are present in one
+bundle; a real but minor robustness edge case. Disposition matches the
+precedent set earlier in this same task: noted, not added — coverage
+nice-to-haves outside the approved acceptance criteria, not defects;
+revisit if T6's pilot surfaces a related gap.
+
+**Final evidence (this round):** `python3 -m unittest
+scripts.local-agent.conciliator_checklist_test -v` → `Ran 41 tests ... OK`.
+`python3 -m pytest scripts/delegate_low_rri_test.py -q` → `89 passed`
+(includes the 2 new guard-regression tests). Files remain uncommitted
+pending the owner's commit approval for this round, same as the rest of
+T4/T0–T3/T5's local state.
 
 ---
 
