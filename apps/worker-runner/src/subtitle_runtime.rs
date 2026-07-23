@@ -105,6 +105,14 @@ async fn process_subtitle_job_inner(
         anyhow::bail!("subtitle readiness evidence incomplete after Ready status write");
     }
 
+    crate::review_enqueue::prepare_review_post_ready(
+        pool,
+        asset_id,
+        dubbridge_domain::workspace::ProjectId(job.project_id),
+        &job.target_language,
+    )
+    .await;
+
     Ok(())
 }
 
@@ -140,7 +148,7 @@ mod tests {
     use std::env;
 
     use super::*;
-    use dubbridge_db::{artifact_repo, preparation_repo, subtitle_repo};
+    use dubbridge_db::{artifact_repo, preparation_repo, review_repo, subtitle_repo, workspace_repo};
     use dubbridge_domain::{
         artifact::{ArtifactKind, ArtifactRecord, DerivedArtifact, SubtitleStatus},
         workspace::{OrgId, Organization, Project, ProjectId, TargetLanguage},
@@ -158,7 +166,7 @@ mod tests {
             .await
             .expect("migrations");
         sqlx::query(
-            "TRUNCATE TABLE pending_ingestions, audit_events, artifact_records, rights_records, assets, asset_preparation_status, asset_transcription_status, asset_subtitle_status RESTART IDENTITY CASCADE",
+            "TRUNCATE TABLE pending_ingestions, audit_events, artifact_records, rights_records, assets, asset_preparation_status, asset_transcription_status, asset_subtitle_status, review_tasks RESTART IDENTITY CASCADE",
         )
         .execute(&pool)
         .await
@@ -317,6 +325,15 @@ mod tests {
             .expect("readiness");
         assert!(ready);
 
+        // Verify review_tasks row was enqueued
+        let review_rows: Vec<uuid::Uuid> = sqlx::query_scalar(
+            "SELECT id FROM review_tasks ORDER BY id",
+        )
+        .fetch_all(&pool)
+        .await
+        .expect("get review tasks");
+        assert_eq!(review_rows.len(), 1, "exactly one review_task should be enqueued on success");
+
         // Verify stored subtitle deserializes to 1 segment with expected joined text
         let key = dubbridge_storage::subtitle_key(&asset_id.0.to_string());
         let stored_bytes = storage.get(&key).await.expect("get stored subtitle");
@@ -360,6 +377,15 @@ mod tests {
                 .unwrap_or("")
                 .contains("missing upstream word alignment")
         );
+
+        // No review_tasks row should have been created
+        let review_rows: Vec<uuid::Uuid> = sqlx::query_scalar(
+            "SELECT id FROM review_tasks ORDER BY id",
+        )
+        .fetch_all(&pool)
+        .await
+        .expect("get review tasks");
+        assert!(review_rows.is_empty());
     }
 
     #[tokio::test]
@@ -411,6 +437,15 @@ mod tests {
             .expect("status row");
         assert_eq!(status.status, SubtitleStatus::Failed);
 
+        // No review_tasks row should have been created
+        let review_rows: Vec<uuid::Uuid> = sqlx::query_scalar(
+            "SELECT id FROM review_tasks ORDER BY id",
+        )
+        .fetch_all(&pool)
+        .await
+        .expect("get review tasks");
+        assert!(review_rows.is_empty());
+
         // No Subtitle artifact should have been inserted
         let derived = dubbridge_db::preparation_repo::list_derived_artifacts(&pool, asset_id)
             .await
@@ -448,5 +483,38 @@ mod tests {
         .expect_err("wrong job type must fail the envelope");
 
         assert!(err.to_string().contains("unsupported subtitle job type"));
+    }
+
+    #[tokio::test]
+    async fn process_subtitle_review_tasks_no_row_on_failure() {
+        let Some(pool) = setup_pool().await else {
+            return;
+        };
+
+        let asset_id = insert_asset(&pool).await;
+        insert_source_artifact(&pool, asset_id).await;
+
+        subtitle_repo::upsert_subtitle_status(&pool, asset_id, SubtitleStatus::Pending, None)
+            .await
+            .expect("set pending");
+        // No project/target languages inserted -> missing project case
+
+        let job = dubbridge_jobs::SubtitleJob::new(asset_id.0, Uuid::new_v4(), "es");
+        let storage_workspace = tempfile::TempDir::new().unwrap();
+        let storage = LocalFsAdapter::new(storage_workspace.path());
+        let err = process_subtitle_job(&pool, &storage, job)
+            .await
+            .expect_err("missing alignment must fail the job");
+
+        assert!(err.to_string().contains("missing upstream word alignment"));
+
+        // No review_tasks row should have been created
+        let review_rows: Vec<uuid::Uuid> = sqlx::query_scalar(
+            "SELECT id FROM review_tasks ORDER BY id",
+        )
+        .fetch_all(&pool)
+        .await
+        .expect("get review tasks");
+        assert!(review_rows.is_empty());
     }
 }
