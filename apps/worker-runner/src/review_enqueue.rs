@@ -289,6 +289,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn prepare_review_post_ready_no_op_on_db_connection_failure() {
+        let Some(pool) = setup_pool_for_test().await else {
+            return;
+        };
+
+        let asset_id = insert_asset_for_test(&pool).await;
+        let (project_id, _org_id) = insert_project_with_target(&pool, asset_id, "en", "es").await;
+
+        pool.close().await;
+
+        // The pool is closed, so get_project fails with a connection-level DbError.
+        // prepare_review_post_ready must swallow it, not panic, not enqueue.
+        prepare_review_post_ready(&pool, asset_id, project_id, "es").await;
+    }
+
+    #[tokio::test]
     async fn prepare_review_post_ready_no_op_when_target_language_missing() {
         let Some(pool) = setup_pool_for_test().await else {
             return;
