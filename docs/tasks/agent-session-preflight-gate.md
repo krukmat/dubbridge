@@ -2,7 +2,7 @@
 type: TaskList
 title: "Tasks: Agent Session Preflight Gate"
 plan: docs/plan/agent-session-preflight-gate.md
-status: closed
+status: active
 ---
 # Tasks: Agent Session Preflight Gate
 
@@ -24,7 +24,7 @@ Claude Code sessions load the DubBridge workflow contract before file edits.
 ## Task order
 
 ```
-T0 -> T1 -> T2 -> T3
+T0 -> T1 -> T2 -> T3 -> T4a1 -> T4a2 -> T4a3 -> T4a4 -> T4b1 -> T4b2 -> T4b3 -> T4c1 -> T4c2 -> T4c3
 ```
 
 ## T0 — Plan and task ledger
@@ -231,6 +231,380 @@ ledger with evidence.
 - External hook behavior was tested by executing the configured commands directly;
   no full new-window Claude/Codex restart was performed in this session.
 
+## Active hardening workstreams
+
+| Workstream | Status | Objective |
+|---|---|---|
+| `T4a` | active | Replace the reusable sentinel with session-bound, hash-attested receipts |
+| `T4b` | pending | Wire native loading and fail-closed gates in Claude and Codex |
+| `T4c` | pending | Certify real fresh sessions and document the managed-policy boundary |
+
+`T4a-T4c` remain the reporting umbrellas. Execution now happens through the
+subtasks below.
+
+## T4a1 — Receipt schema and source manifest
+
+- **Status:** [ ] Pending
+- **Type:** development
+- **Effort:** L
+- **RRI:** 47 -> Med-high (recompute before execution if scope changes)
+- **Depends on:** T3
+- **Approval:** waived by the user on 2026-07-26 for this bounded hardening sequence
+
+### Goal
+
+Introduce the v2 receipt shape, provider/session/actor path derivation, and the
+exact native-instruction/document manifest that later gates will verify.
+
+### Acceptance criteria
+
+- `scripts/agent-preflight.py` emits a v2 in-memory receipt payload with the
+  required schema fields and source digests.
+- Codex and Claude produce different derived receipt identities for different
+  provider/session/actor tuples.
+- Legacy sentinel payloads or legacy `--mark` output cannot satisfy the v2 validator.
+
+### Happy path examples
+
+- `HP-1`: valid Claude startup payload -> receipt manifest includes native import
+  source plus governing document hashes.
+- `HP-2`: same repository, different provider/session -> different receipt id.
+
+### Edge case examples
+
+- `EC-1`: unsupported provider or lifecycle event -> fail closed before write.
+- `EC-2`: malformed session/actor payload or path-traversal-like identifier ->
+  fail closed without deriving a filesystem path from raw ids.
+
+### Evidence to emit
+
+- Focused unit tests for schema, manifest hashing, and identity derivation.
+- Updated ledger evidence for the chosen schema version and source list.
+
+### Status artifacts affected
+
+- `docs/plan/agent-session-preflight-gate.md`
+- `docs/tasks/agent-session-preflight-gate.md`
+
+## T4a2 — Atomic publish, invalidation, and file-mode guarantees
+
+- **Status:** [ ] Pending
+- **Type:** development
+- **Effort:** L
+- **RRI:** 52 -> Med-high (recompute before execution if scope changes)
+- **Depends on:** T4a1
+
+### Goal
+
+Publish and invalidate v2 receipts atomically so stale or partial evidence can
+never authorize later prompt/tool gates.
+
+### Acceptance criteria
+
+- Receipt publication uses temp-file write, `fsync`, and `os.replace`.
+- Prior authorizing receipt for the same provider/session/actor is removed or
+  invalidated before a new one is published.
+- Receipt directories/files enforce `0700` / `0600` permissions where supported.
+
+### Happy path examples
+
+- `HP-1`: valid reload for the same provider/session replaces the prior receipt
+  with a fully readable new one.
+- `HP-2`: concurrent publishers for distinct sessions complete without collision
+  or partial JSON.
+
+### Edge case examples
+
+- `EC-1`: interruption before `os.replace` leaves no authorizing final receipt.
+- `EC-2`: permission or open/read error denies authorization instead of falling
+  back to stale state.
+
+### Evidence to emit
+
+- Deterministic atomicity and file-mode unit tests.
+- Failure-injection evidence for interrupted publish cleanup.
+
+### Status artifacts affected
+
+- `docs/tasks/agent-session-preflight-gate.md`
+
+## T4a3 — CLI contract and provider hook adapters
+
+- **Status:** [ ] Pending
+- **Type:** development
+- **Effort:** L
+- **RRI:** 41 -> Med-high (recompute before execution if scope changes)
+- **Depends on:** T4a2
+
+### Goal
+
+Expose the receipt engine through stable `load`, `check`, `hook-load`, and
+`hook-gate` entry points with documented exit behavior and stdout/stderr
+separation.
+
+### Acceptance criteria
+
+- Direct CLI commands and provider hook adapters share the same validation core.
+- Exit codes distinguish success, operational invalidity, and malformed input.
+- Legacy `--mark` may remain for diagnostics but cannot authorize any v2 gate.
+
+### Happy path examples
+
+- `HP-1`: `load` prints agent-facing context, publishes the receipt, and exits `0`.
+- `HP-2`: `hook-gate` translates a valid receipt into the provider's non-blocking response.
+
+### Edge case examples
+
+- `EC-1`: malformed hook JSON exits `2` with diagnostics on stderr only.
+- `EC-2`: invalid or foreign receipt exits `1` and produces the provider's blocking response.
+
+### Evidence to emit
+
+- CLI/unit tests covering exit-code matrix and stdout/stderr separation.
+- Hook-adapter fixture evidence for Claude and Codex payload translation.
+
+### Status artifacts affected
+
+- `docs/tasks/agent-session-preflight-gate.md`
+
+## T4a4 — Deterministic race, replacement, and permission tests
+
+- **Status:** [ ] Pending
+- **Type:** development
+- **Effort:** L
+- **RRI:** 47 -> Med-high (recompute before execution if scope changes)
+- **Depends on:** T4a3
+
+### Goal
+
+Lock the receipt engine with deterministic concurrency, replacement, and denial
+tests before provider wiring begins.
+
+### Acceptance criteria
+
+- Tests cover simultaneous loaders, `check` racing against replacement, and
+  permission/open failures.
+- Accepted outcomes are limited to validated old/new receipt success or a clean
+  denial; partial/stale success is never accepted.
+- T4a closure evidence names the final test commands and any unsupported host-specific checks.
+
+### Happy path examples
+
+- `HP-1`: two simultaneous loaders for different sessions both complete with
+  parseable final receipts.
+
+### Edge case examples
+
+- `EC-1`: `check` during invalidation/replacement never returns success for
+  partial or stale JSON.
+- `EC-2`: denied directory/file access produces a clean authorization failure.
+
+### Evidence to emit
+
+- Barrier-controlled race test results.
+- T4a closure note summarizing atomicity/race coverage.
+
+### Status artifacts affected
+
+- `docs/tasks/agent-session-preflight-gate.md`
+
+## T4b1 — Claude native load and lifecycle wiring
+
+- **Status:** [ ] Pending
+- **Type:** configuration
+- **Effort:** L
+- **RRI:** 47 -> Med-high (recompute before execution if scope changes)
+- **Depends on:** T4a4
+
+### Goal
+
+Wire Claude's native import path and lifecycle hooks to the v2 receipt engine.
+
+### Acceptance criteria
+
+- `CLAUDE.md` imports the authoritative workflow bytes that the receipt records.
+- Claude startup/resume/clear/compact/fork/subagent events map to supported
+  `hook-load` sources.
+- Claude prompt/tool gating uses v2 receipt validation instead of the legacy sentinel.
+
+### Happy path examples
+
+- `HP-1`: fresh Claude startup records native-load evidence and passes gate checks.
+
+### Edge case examples
+
+- `EC-1`: unsupported or missing Claude hook payload fields deny access cleanly.
+
+### Evidence to emit
+
+- Config-parse verification plus hook fixture outputs for each mapped lifecycle.
+
+### Status artifacts affected
+
+- `docs/tasks/agent-session-preflight-gate.md`
+
+## T4b2 — Codex native bundle, document limit, and gate wiring
+
+- **Status:** [ ] Pending
+- **Type:** configuration
+- **Effort:** L
+- **RRI:** 52 -> Med-high (recompute before execution if scope changes)
+- **Depends on:** T4b1
+
+### Goal
+
+Generate and wire the Codex-side native instruction bundle so session and tool
+gates validate the same exact workflow bytes.
+
+### Acceptance criteria
+
+- `AGENTS.override.md` round-trips `AGENTS.md` followed by the authoritative workflow guide.
+- Codex configuration sets a document byte limit above the generated bundle size.
+- Codex session/subagent/prompt/tool gates call the v2 adapters and stop relying
+  on the legacy shared sentinel.
+
+### Happy path examples
+
+- `HP-1`: fresh Codex startup loads the generated bundle and publishes a valid v2 receipt.
+
+### Edge case examples
+
+- `EC-1`: bundle drift or byte-limit underflow fails closed before authorization.
+
+### Evidence to emit
+
+- Bundle-generation verification with exact size/hash output.
+- Config-parse and hook-fixture evidence for session and tool gates.
+
+### Status artifacts affected
+
+- `docs/tasks/agent-session-preflight-gate.md`
+
+## T4b3 — Portable path resolution and duplicate-hook cleanup
+
+- **Status:** [ ] Pending
+- **Type:** configuration
+- **Effort:** M
+- **RRI:** 36 -> Moderate (recompute before execution if scope changes)
+- **Depends on:** T4b2
+
+### Goal
+
+Remove hard-coded checkout assumptions and eliminate competing user-level hooks
+that could race or certify the wrong repository state.
+
+### Acceptance criteria
+
+- All hook/config resolution derives the repository from `cwd` or git root.
+- No active Claude/Codex hook path for this repository depends on an absolute checkout path.
+- Duplicate or stale user-level gates are removed, neutralized, or explicitly reported as blockers.
+
+### Happy path examples
+
+- `HP-1`: opening the repository from a different checkout path still resolves
+  the correct repo root and receipt location.
+
+### Edge case examples
+
+- `EC-1`: a duplicate stale hook is detected and reported instead of silently racing.
+
+### Evidence to emit
+
+- Resolution audit showing live hook sources and final repo-root derivation path.
+
+### Status artifacts affected
+
+- `docs/tasks/agent-session-preflight-gate.md`
+
+## T4c1 — Fresh-session smoke harness
+
+- **Status:** [ ] Pending
+- **Type:** verification
+- **Effort:** M
+- **RRI:** 36 -> Moderate (recompute before execution if scope changes)
+- **Depends on:** T4b3
+
+### Goal
+
+Run real fresh-session startup checks for Claude and Codex instead of relying
+only on direct command invocation.
+
+### Acceptance criteria
+
+- Both CLIs are exercised from a fresh session/window path, not only by replaying hook commands.
+- The smoke output proves a unique tail marker and current workflow SHA from the
+  fully loaded source, not just the compact summary.
+- Any provider that cannot be exercised in-session is recorded as unverified, not certified.
+
+### Evidence to emit
+
+- Per-provider smoke transcripts or screenshots with the tail marker and SHA.
+
+### Status artifacts affected
+
+- `docs/tasks/agent-session-preflight-gate.md`
+
+## T4c2 — Audit coverage report and certification math
+
+- **Status:** [ ] Pending
+- **Type:** docs/config verification
+- **Effort:** M
+- **RRI:** 28 -> Moderate (recompute before execution if scope changes)
+- **Depends on:** T4c1
+
+### Goal
+
+Publish an auditable coverage report that counts opened sessions, certified
+sessions, and missing-evidence sessions without overstating certainty.
+
+### Acceptance criteria
+
+- The audit command/report distinguishes opened sessions from certified sessions.
+- A `100%` claim is refused whenever any session lacks native-load plus receipt evidence.
+- The coverage report names the exact criteria for certification.
+
+### Evidence to emit
+
+- Audit report output with certified/opened counts and refusal behavior.
+
+### Status artifacts affected
+
+- `docs/tasks/agent-session-preflight-gate.md`
+- `docs/plan/agent-session-preflight-gate.md`
+
+## T4c3 — Managed-policy boundary and blocker handoff
+
+- **Status:** [ ] Pending
+- **Type:** docs/policy
+- **Effort:** M
+- **RRI:** 26 -> Moderate (recompute before execution if scope changes)
+- **Depends on:** T4c2
+
+### Goal
+
+Document the difference between repository-level certification and literal
+non-bypassable enforcement, and leave a clean blocker/handoff if the admin
+layer cannot be installed from this repository.
+
+### Acceptance criteria
+
+- Repository/user-hook certification and administrator-managed
+  non-bypassability are reported as separate enforcement levels.
+- Any host-policy step that cannot be completed from repository permissions is
+  recorded as a blocker or handoff, not as completed certification.
+- The final task note includes the exact admin-layer artifacts or commands that
+  must be applied outside the repo.
+
+### Evidence to emit
+
+- Boundary/handoff note with admin-managed requirements and unresolved blockers.
+
+### Status artifacts affected
+
+- `docs/plan/agent-session-preflight-gate.md`
+- `docs/tasks/agent-session-preflight-gate.md`
+
 ## Closure
 
-All tasks in this ledger are complete. No commit has been made.
+T0-T3 are complete. Hardening now proceeds through `T4a1-T4c3`. No commit has
+been made.

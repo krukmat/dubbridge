@@ -1,11 +1,11 @@
 ---
 type: Plan
 title: "Plan: Agent Session Preflight Gate"
-status: closed
+status: active
 ---
 # Plan: Agent Session Preflight Gate
 
-> **Status:** Closed
+> **Status:** Active — hardening reopened 2026-07-26
 > **Tasks ledger:** `docs/tasks/agent-session-preflight-gate.md`
 
 ## Objective
@@ -14,15 +14,19 @@ Reduce workflow misses when Codex or Claude Code starts in a fresh window by
 turning the repository startup contract into a small executable preflight and a
 write-time gate.
 
-The goal is not to replace `AGENT_WORKFLOW_GUIDE.md`; it is to make the first
-session interaction load a compact summary and make file edits fail fast when
-the agent has not acknowledged the workflow requirements.
+The goal is not to replace `AGENT_WORKFLOW_GUIDE.md`; it is to make every
+Codex/Claude session load the current workflow bytes through its native
+instruction mechanism, record session-bound evidence, and fail closed when the
+evidence is absent or stale.
 
 ## Affected files
 
 - `scripts/agent-preflight.py`
 - `scripts/agent_preflight_test.py`
 - `.claude/settings.json`
+- `.codex/config.toml`
+- `AGENTS.override.md`
+- `CLAUDE.md`
 - `.gitignore`
 - `/Users/matias/.codex/config.toml`
 - `docs/plan/agent-session-preflight-gate.md`
@@ -55,20 +59,81 @@ that a later task has valid RRI or approval. It should therefore block only the
 missing-session-preflight case and print the per-task checks the agent must
 perform before editing.
 
+### D5 — Bind evidence to the provider session
+
+Receipts live below `.agent/session-preflight/<provider>/` and are keyed by a
+SHA-256 digest of provider, session id, and actor id. A receipt records the raw
+session id inside ignored runtime state, the repository root, lifecycle event,
+native instruction source, and the SHA-256/byte count of every required source.
+Manual diagnostic commands never create an authorizing receipt.
+
+### D6 — Use native instruction loading for the full document
+
+Claude imports `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` from `CLAUDE.md` and
+records `InstructionsLoaded` evidence. Codex loads a generated
+`AGENTS.override.md` containing `AGENTS.md` followed by the authoritative
+workflow guide; project configuration raises `project_doc_max_bytes` above the
+generated bundle size. Startup hook output remains a compact attestation rather
+than attempting to carry the 68 KiB guide.
+
+### D7 — State the enforcement boundary honestly
+
+Repository and user hooks certify normal trusted sessions. Literal
+non-bypassability requires administrator-managed Codex/Claude policy plus a
+controlled launcher that prevents customization-bypass flags. The audit report
+must distinguish those two levels and may not claim semantic comprehension.
+
+### D8 — Split hardening into closure-sized subtasks
+
+The reopened hardening work should not continue as three large umbrella tasks.
+It is decomposed into receipt core, provider wiring, and certification
+workstreams with closure-sized subtasks so each step can emit evidence, fail
+independently, and hand off cleanly.
+
 ## Module dependencies
 
 ```mermaid
 flowchart LR
-    C["Claude SessionStart / PreToolUse"] --> P["scripts/agent-preflight.py"]
-    X["Codex SessionStart / PreToolUse"] --> P
-    P --> S[".agent/session-preflight.json"]
-    P --> W["workflow summary"]
-    S --> G["write-time gate"]
+    C["Claude native @ import"] --> W["current workflow bytes"]
+    X["Codex AGENTS.override.md"] --> W
+    C --> P["session-bound preflight"]
+    X --> P
+    P --> S["provider/session receipt + hashes"]
+    S --> G["prompt/tool fail-closed gate"]
 ```
+
+## Refined hardening sequence
+
+```mermaid
+flowchart LR
+    T3["T3 baseline verified"] --> A1["T4a1 receipt schema + source manifest"]
+    A1 --> A2["T4a2 atomic publish + invalidation"]
+    A2 --> A3["T4a3 CLI + hook adapters"]
+    A3 --> A4["T4a4 race/permission tests"]
+    A4 --> B1["T4b1 Claude native load wiring"]
+    B1 --> B2["T4b2 Codex native bundle + gates"]
+    B2 --> B3["T4b3 portable pathing + legacy-hook cleanup"]
+    B3 --> C1["T4c1 fresh-session smoke harness"]
+    C1 --> C2["T4c2 audit coverage report"]
+    C2 --> C3["T4c3 admin boundary + blocker handoff"]
+```
+
+### Why this split
+
+- `T4a1-T4a4` isolate receipt correctness from provider configuration churn.
+- `T4b1-T4b3` separate Claude wiring, Codex wiring, and path/duplicate-hook cleanup.
+- `T4c1-T4c3` keep runtime certification, audit math, and admin-boundary reporting distinct.
 
 ## Verification
 
 - `python3 -m unittest scripts/agent_preflight_test.py`
-- `python3 scripts/agent-preflight.py --print-summary`
-- `python3 scripts/agent-preflight.py --check`
+- `python3 scripts/agent-preflight.py verify-bootstrap`
+- `python3 scripts/agent-preflight.py audit`
 - `python3 scripts/check_okf_frontmatter.py docs/plan/agent-session-preflight-gate.md docs/tasks/agent-session-preflight-gate.md`
+
+## Current state
+
+- `T0-T3` remain complete.
+- `T4` is now decomposed into `T4a1-T4c3` in the linked ledger.
+- No hardening subtask below `T3` is closed yet; the next intended start point is
+  `T4a1`, followed by the rest of the receipt-core chain.
