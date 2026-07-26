@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import io
 import json
 import os
 import stat
@@ -421,6 +422,319 @@ class AgentPreflightV2ReceiptPublishTest(unittest.TestCase):
             agent_preflight.publish_v2_receipt(self.root, payload)
 
         self.assertFalse(receipts_dir.exists())
+
+
+class AgentPreflightCliV2CommandsTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        (self.root / "CLAUDE.md").write_text("claude instructions\n", encoding="utf-8")
+        (self.root / "AGENTS.override.md").write_text("codex instructions\n", encoding="utf-8")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _load_args(self, provider="claude", session_id="session-1", actor_id="claude-code"):
+        return [
+            "load",
+            "--repo-root",
+            str(self.root),
+            "--provider",
+            provider,
+            "--session-id",
+            session_id,
+            "--actor-id",
+            actor_id,
+            "--hook-event-name",
+            "startup",
+            "--native-instruction-mechanism",
+            "@import",
+            "--native-instruction-path",
+            "CLAUDE.md",
+        ]
+
+    def test_hp1_load_publishes_receipt_prints_summary_exits_zero(self):
+        result = agent_preflight.main(self._load_args())
+
+        self.assertEqual(result, 0)
+        published = agent_preflight.v2_receipt_path(self.root, "claude", "session-1", "claude-code")
+        self.assertTrue(published.exists())
+
+    def test_ec2_load_missing_required_flag_exits_two(self):
+        args = self._load_args()
+        args.remove("--provider")
+        args.remove("claude")
+
+        with mock.patch.object(sys, "stderr", io.StringIO()) as fake_stderr:
+            result = agent_preflight.main(args)
+
+        self.assertEqual(result, 2)
+        self.assertIn("--provider", fake_stderr.getvalue())
+
+    def test_ec1_load_explicit_empty_session_id_exits_one_not_two(self):
+        args = self._load_args(session_id="")
+
+        with mock.patch.object(sys, "stderr", io.StringIO()) as fake_stderr:
+            result = agent_preflight.main(args)
+
+        self.assertEqual(result, 1)
+        self.assertIn("session_id must not be empty", fake_stderr.getvalue())
+
+    def test_hp1_check_command_ok_after_load(self):
+        agent_preflight.main(self._load_args())
+
+        result = agent_preflight.main(
+            [
+                "check",
+                "--repo-root",
+                str(self.root),
+                "--provider",
+                "claude",
+                "--session-id",
+                "session-1",
+                "--actor-id",
+                "claude-code",
+            ]
+        )
+
+        self.assertEqual(result, 0)
+
+    def test_ec2_check_command_exits_one_for_unpublished_identity(self):
+        with mock.patch.object(sys, "stderr", io.StringIO()) as fake_stderr:
+            result = agent_preflight.main(
+                [
+                    "check",
+                    "--repo-root",
+                    str(self.root),
+                    "--provider",
+                    "claude",
+                    "--session-id",
+                    "never-loaded",
+                    "--actor-id",
+                    "claude-code",
+                ]
+            )
+
+        self.assertEqual(result, 1)
+        self.assertIn("agent preflight failed", fake_stderr.getvalue())
+
+    def test_ec2_check_command_missing_provider_flag_exits_two(self):
+        with mock.patch.object(sys, "stderr", io.StringIO()) as fake_stderr:
+            result = agent_preflight.main(
+                [
+                    "check",
+                    "--repo-root",
+                    str(self.root),
+                    "--session-id",
+                    "session-1",
+                    "--actor-id",
+                    "claude-code",
+                ]
+            )
+
+        self.assertEqual(result, 2)
+        self.assertIn("--provider", fake_stderr.getvalue())
+
+    def test_ec2_hook_load_missing_provider_flag_exits_two(self):
+        with mock.patch.object(sys, "stdin", io.StringIO("{}")), mock.patch.object(
+            sys, "stderr", io.StringIO()
+        ) as fake_stderr:
+            result = agent_preflight.main(["hook-load", "--repo-root", str(self.root)])
+
+        self.assertEqual(result, 2)
+        self.assertIn("--provider", fake_stderr.getvalue())
+
+    def test_ec2_hook_gate_missing_provider_flag_exits_two(self):
+        with mock.patch.object(sys, "stdin", io.StringIO("{}")), mock.patch.object(
+            sys, "stderr", io.StringIO()
+        ) as fake_stderr:
+            result = agent_preflight.main(["hook-gate", "--repo-root", str(self.root)])
+
+        self.assertEqual(result, 2)
+        self.assertIn("--provider", fake_stderr.getvalue())
+
+    def test_legacy_mark_does_not_satisfy_v2_check(self):
+        agent_preflight.main(["--repo-root", str(self.root), "--mark"])
+
+        result = agent_preflight.main(
+            [
+                "check",
+                "--repo-root",
+                str(self.root),
+                "--provider",
+                "claude",
+                "--session-id",
+                "session-1",
+                "--actor-id",
+                "claude-code",
+            ]
+        )
+
+        self.assertEqual(result, 1)
+
+
+class AgentPreflightHookAdapterTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        (self.root / "CLAUDE.md").write_text("claude instructions\n", encoding="utf-8")
+        (self.root / "AGENTS.override.md").write_text("codex instructions\n", encoding="utf-8")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _run_hook_command(self, command, provider, stdin_payload):
+        with mock.patch.object(sys, "stdin", io.StringIO(stdin_payload)), mock.patch.object(
+            sys, "stdout", io.StringIO()
+        ) as fake_stdout, mock.patch.object(sys, "stderr", io.StringIO()) as fake_stderr:
+            result = agent_preflight.main(
+                [command, "--repo-root", str(self.root), "--provider", provider]
+            )
+        return result, fake_stdout.getvalue(), fake_stderr.getvalue()
+
+    def test_hp1_claude_hook_load_publishes_receipt(self):
+        payload = json.dumps(
+            {
+                "session_id": "hook-sess-1",
+                "hook_event_name": "startup",
+                "transcript_path": "/tmp/transcript.json",
+            }
+        )
+
+        result, stdout, stderr = self._run_hook_command("hook-load", "claude", payload)
+
+        self.assertEqual(result, 0)
+        self.assertEqual(stderr, "")
+        self.assertIn("DubBridge agent preflight", stdout)
+        published = agent_preflight.v2_receipt_path(self.root, "claude", "hook-sess-1", "claude-code")
+        self.assertTrue(published.exists())
+
+    def test_hp1_codex_hook_load_publishes_receipt(self):
+        payload = json.dumps({"session_id": "codex-sess-1", "event": "startup"})
+
+        result, stdout, stderr = self._run_hook_command("hook-load", "codex", payload)
+
+        self.assertEqual(result, 0)
+        self.assertEqual(stderr, "")
+        published = agent_preflight.v2_receipt_path(self.root, "codex", "codex-sess-1", "codex-cli")
+        self.assertTrue(published.exists())
+
+    def test_hp2_claude_hook_gate_allows_after_load(self):
+        load_payload = json.dumps({"session_id": "hook-sess-1", "hook_event_name": "startup"})
+        self._run_hook_command("hook-load", "claude", load_payload)
+
+        gate_payload = json.dumps({"session_id": "hook-sess-1", "hook_event_name": "startup"})
+        result, stdout, stderr = self._run_hook_command("hook-gate", "claude", gate_payload)
+
+        self.assertEqual(result, 0)
+        self.assertEqual(stderr, "")
+        response = json.loads(stdout)
+        self.assertEqual(
+            response["hookSpecificOutput"]["permissionDecision"], "allow"
+        )
+        self.assertEqual(response["hookSpecificOutput"]["hookEventName"], "PreToolUse")
+
+    def test_hp2_codex_hook_gate_allows_after_load(self):
+        load_payload = json.dumps({"session_id": "codex-sess-1", "event": "startup"})
+        self._run_hook_command("hook-load", "codex", load_payload)
+
+        gate_payload = json.dumps({"session_id": "codex-sess-1", "event": "startup"})
+        result, stdout, stderr = self._run_hook_command("hook-gate", "codex", gate_payload)
+
+        self.assertEqual(result, 0)
+        self.assertEqual(stderr, "")
+        response = json.loads(stdout)
+        self.assertEqual(response["decision"], "allow")
+
+    def test_ec2_claude_hook_gate_denies_for_unknown_session(self):
+        gate_payload = json.dumps({"session_id": "never-loaded", "hook_event_name": "startup"})
+
+        result, stdout, stderr = self._run_hook_command("hook-gate", "claude", gate_payload)
+
+        self.assertEqual(result, 1)
+        response = json.loads(stdout)
+        self.assertEqual(response["hookSpecificOutput"]["permissionDecision"], "deny")
+
+    def test_ec2_codex_hook_gate_denies_for_unknown_session(self):
+        gate_payload = json.dumps({"session_id": "never-loaded", "event": "startup"})
+
+        result, stdout, stderr = self._run_hook_command("hook-gate", "codex", gate_payload)
+
+        self.assertEqual(result, 1)
+        response = json.loads(stdout)
+        self.assertEqual(response["decision"], "deny")
+
+    def test_ec1_hook_load_malformed_json_exits_two_stderr_only(self):
+        result, stdout, stderr = self._run_hook_command("hook-load", "claude", "not json")
+
+        self.assertEqual(result, 2)
+        self.assertEqual(stdout, "")
+        self.assertIn("malformed hook input", stderr)
+
+    def test_ec1_hook_gate_malformed_json_exits_two_stderr_only(self):
+        result, stdout, stderr = self._run_hook_command("hook-gate", "claude", "not json")
+
+        self.assertEqual(result, 2)
+        self.assertEqual(stdout, "")
+        self.assertIn("malformed hook input", stderr)
+
+    def test_ec1_hook_load_non_object_json_exits_two(self):
+        result, stdout, stderr = self._run_hook_command("hook-load", "claude", "[1, 2, 3]")
+
+        self.assertEqual(result, 2)
+        self.assertEqual(stdout, "")
+
+    def test_ec1_hook_load_missing_session_id_exits_two(self):
+        payload = json.dumps({"hook_event_name": "startup"})
+
+        result, stdout, stderr = self._run_hook_command("hook-load", "claude", payload)
+
+        self.assertEqual(result, 2)
+        self.assertIn("session_id", stderr)
+
+    def test_ec1_hook_load_missing_hook_event_name_exits_two(self):
+        payload = json.dumps({"session_id": "hook-sess-1"})
+
+        result, stdout, stderr = self._run_hook_command("hook-load", "claude", payload)
+
+        self.assertEqual(result, 2)
+        self.assertIn("hook_event_name", stderr)
+
+    def test_ec2_hook_load_missing_native_instruction_file_exits_one(self):
+        (self.root / "CLAUDE.md").unlink()
+        payload = json.dumps({"session_id": "hook-sess-1", "hook_event_name": "startup"})
+
+        result, stdout, stderr = self._run_hook_command("hook-load", "claude", payload)
+
+        self.assertEqual(result, 1)
+        self.assertIn("CLAUDE.md", stderr)
+
+    def test_ec1_hook_load_missing_session_id_field_codex_exits_two(self):
+        payload = json.dumps({"event": "startup"})
+
+        result, stdout, stderr = self._run_hook_command("hook-load", "codex", payload)
+
+        self.assertEqual(result, 2)
+        self.assertIn("session_id", stderr)
+
+    def test_adapt_hook_payload_rejects_unsupported_provider_directly(self):
+        with self.assertRaises(agent_preflight.HookPayloadError):
+            agent_preflight.adapt_hook_payload("other", {"session_id": "x", "event": "startup"})
+
+    def test_ec1_hook_load_missing_event_field_codex_exits_two(self):
+        payload = json.dumps({"session_id": "codex-sess-1"})
+
+        result, stdout, stderr = self._run_hook_command("hook-load", "codex", payload)
+
+        self.assertEqual(result, 2)
+        self.assertIn("event", stderr)
+
+    def test_ec1_hook_load_unsupported_provider_argparse_rejects(self):
+        with mock.patch.object(sys, "stderr", io.StringIO()):
+            with self.assertRaises(SystemExit):
+                agent_preflight.main(
+                    ["hook-load", "--repo-root", str(self.root), "--provider", "other"]
+                )
 
 
 if __name__ == "__main__":

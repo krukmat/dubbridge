@@ -272,6 +272,32 @@ def v2_receipt_path(repo_root: Path, provider: str, session_id: str, actor_id: s
     return v2_receipts_dir(repo_root) / f"{identity}.json"
 
 
+def load_v2_receipt(repo_root: Path, provider: str, session_id: str, actor_id: str) -> Dict[str, Any]:
+    """Load and validate a previously published v2 receipt.
+
+    Raises ReceiptValidationError (a PreflightError subclass) for a missing,
+    unreadable, malformed, or schema-invalid receipt -- callers must treat
+    that as operational invalidity, never as an authorizing receipt.
+    """
+    path = v2_receipt_path(repo_root, provider, session_id, actor_id)
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ReceiptValidationError(f"No published receipt at {path}: {exc}") from exc
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ReceiptValidationError(f"Receipt at {path} is not valid JSON: {exc}") from exc
+    validate_v2_receipt_payload(payload)
+    if payload.get("provider") != provider:
+        raise ReceiptValidationError(
+            f"Receipt at {path} is for provider {payload.get('provider')!r}, expected {provider!r}."
+        )
+    if payload.get("session_id") != session_id or payload.get("actor_id") != actor_id:
+        raise ReceiptValidationError(f"Receipt at {path} does not match session/actor identity.")
+    return payload
+
+
 def _secure_mkdir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
     try:
@@ -338,9 +364,128 @@ def publish_v2_receipt(
     return target_path
 
 
+class HookPayloadError(Exception):
+    """Raised when provider hook JSON cannot be parsed or is missing required fields."""
+
+
+CLAUDE_NATIVE_INSTRUCTION_PATH = "CLAUDE.md"
+CODEX_NATIVE_INSTRUCTION_PATH = "AGENTS.override.md"
+
+
+def _read_hook_stdin(stream: Any) -> Dict[str, Any]:
+    raw = stream.read()
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise HookPayloadError(f"Hook stdin is not valid JSON: {exc}") from exc
+    if not isinstance(data, dict):
+        raise HookPayloadError("Hook stdin must be a JSON object.")
+    return data
+
+
+def adapt_claude_hook_payload(hook_input: Dict[str, Any]) -> Dict[str, Any]:
+    """Translate a Claude Code hook stdin payload into v2 receipt identity fields.
+
+    Claude hook payloads carry `session_id`, `transcript_path`, `cwd`, and
+    `hook_event_name` (e.g. "startup", "resume", "clear", "compact") for
+    SessionStart, per the Claude Code hooks contract.
+    """
+    session_id = hook_input.get("session_id")
+    hook_event_name = hook_input.get("hook_event_name")
+    if not isinstance(session_id, str) or not session_id:
+        raise HookPayloadError("Claude hook payload missing string 'session_id'.")
+    if not isinstance(hook_event_name, str) or not hook_event_name:
+        raise HookPayloadError("Claude hook payload missing string 'hook_event_name'.")
+    return {
+        "provider": "claude",
+        "session_id": session_id,
+        "actor_id": "claude-code",
+        "hook_event_name": hook_event_name,
+        "source": "hook",
+        "transcript_path": hook_input.get("transcript_path", ""),
+        "native_instruction_mechanism": "@import",
+        "native_instruction_path": CLAUDE_NATIVE_INSTRUCTION_PATH,
+    }
+
+
+def adapt_codex_hook_payload(hook_input: Dict[str, Any]) -> Dict[str, Any]:
+    """Translate a Codex hook stdin payload into v2 receipt identity fields.
+
+    Codex hook payloads carry `session_id` and `event` (mapped to the shared
+    lifecycle vocabulary); Codex has no per-actor identity concept, so the
+    actor is pinned to "codex-cli".
+    """
+    session_id = hook_input.get("session_id")
+    event = hook_input.get("event")
+    if not isinstance(session_id, str) or not session_id:
+        raise HookPayloadError("Codex hook payload missing string 'session_id'.")
+    if not isinstance(event, str) or not event:
+        raise HookPayloadError("Codex hook payload missing string 'event'.")
+    return {
+        "provider": "codex",
+        "session_id": session_id,
+        "actor_id": "codex-cli",
+        "hook_event_name": event,
+        "source": "hook",
+        "transcript_path": hook_input.get("transcript_path", ""),
+        "native_instruction_mechanism": "generated-bundle",
+        "native_instruction_path": CODEX_NATIVE_INSTRUCTION_PATH,
+    }
+
+
+HOOK_ADAPTERS = {
+    "claude": adapt_claude_hook_payload,
+    "codex": adapt_codex_hook_payload,
+}
+
+
+def adapt_hook_payload(provider: str, hook_input: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        adapter = HOOK_ADAPTERS[provider]
+    except KeyError:
+        raise HookPayloadError(
+            f"Unsupported hook provider {provider!r}; expected one of {sorted(HOOK_ADAPTERS)}."
+        ) from None
+    return adapter(hook_input)
+
+
+def claude_gate_response(*, allow: bool, reason: str) -> Dict[str, Any]:
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "allow" if allow else "deny",
+            "permissionDecisionReason": reason,
+        }
+    }
+
+
+def codex_gate_response(*, allow: bool, reason: str) -> Dict[str, Any]:
+    return {"decision": "allow" if allow else "deny", "reason": reason}
+
+
+GATE_RESPONSE_BUILDERS = {
+    "claude": claude_gate_response,
+    "codex": codex_gate_response,
+}
+
+
+V2_COMMANDS = ("load", "check", "hook-load", "hook-gate")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Print and validate the DubBridge agent-session workflow preflight."
+    )
+    parser.add_argument(
+        "command",
+        nargs="?",
+        choices=V2_COMMANDS,
+        default=None,
+        help=(
+            "v2 receipt command: 'load' builds+publishes a receipt from explicit "
+            "identity flags; 'check' validates an already-published receipt; "
+            "'hook-load' and 'hook-gate' read a provider hook JSON payload on stdin."
+        ),
     )
     parser.add_argument(
         "--repo-root",
@@ -356,13 +501,23 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--mark",
         action="store_true",
-        help="Write the session preflight sentinel.",
+        help="Write the legacy v1 session preflight sentinel (diagnostics only; "
+        "cannot authorize any v2 gate).",
     )
     parser.add_argument(
         "--check",
         action="store_true",
-        help="Fail unless the session preflight sentinel is present and valid.",
+        help="Fail unless the legacy v1 session preflight sentinel is present and valid.",
     )
+    parser.add_argument("--provider", choices=sorted(V2_VALID_PROVIDERS), default=None)
+    parser.add_argument("--session-id", default=None)
+    parser.add_argument("--actor-id", default=None)
+    parser.add_argument("--hook-event-name", default=None)
+    parser.add_argument("--source", default="cli")
+    parser.add_argument("--transcript-path", default="")
+    parser.add_argument("--native-instruction-mechanism", default=None)
+    parser.add_argument("--native-instruction-path", default=None)
+    parser.add_argument("--document", action="append", default=[], dest="documents")
     return parser
 
 
@@ -372,13 +527,132 @@ def resolve_repo_root(raw: Path | None) -> Path:
     return find_repo_root()
 
 
+def _run_load_command(args: argparse.Namespace, repo_root: Path) -> int:
+    missing = [
+        name
+        for name, value in (
+            ("--provider", args.provider),
+            ("--session-id", args.session_id),
+            ("--actor-id", args.actor_id),
+            ("--hook-event-name", args.hook_event_name),
+            ("--native-instruction-mechanism", args.native_instruction_mechanism),
+            ("--native-instruction-path", args.native_instruction_path),
+        )
+        if value is None
+    ]
+    if missing:
+        print(f"agent preflight malformed input: missing {', '.join(missing)}", file=sys.stderr)
+        return 2
+    try:
+        payload = build_v2_receipt_payload(
+            provider=args.provider,
+            session_id=args.session_id,
+            actor_id=args.actor_id,
+            repo_root=repo_root,
+            hook_event_name=args.hook_event_name,
+            source=args.source,
+            transcript_path=args.transcript_path,
+            native_instruction_mechanism=args.native_instruction_mechanism,
+            native_instruction_path=args.native_instruction_path,
+            document_paths=list(args.documents),
+        )
+        path = publish_v2_receipt(repo_root, payload)
+    except PreflightError as exc:
+        print(f"agent preflight failed: {exc}", file=sys.stderr)
+        return 1
+    sys.stdout.write(preflight_summary())
+    print(f"agent preflight receipt published: {path}")
+    return 0
+
+
+def _run_check_command(args: argparse.Namespace, repo_root: Path) -> int:
+    if args.provider is None or args.session_id is None or args.actor_id is None:
+        print(
+            "agent preflight malformed input: --provider, --session-id, and --actor-id are required",
+            file=sys.stderr,
+        )
+        return 2
+    try:
+        payload = load_v2_receipt(repo_root, args.provider, args.session_id, args.actor_id)
+    except PreflightError as exc:
+        print(f"agent preflight failed: {exc}", file=sys.stderr)
+        return 1
+    print(f"agent preflight receipt ok: {payload.get('loaded_at', 'unknown time')}")
+    return 0
+
+
+def _run_hook_load_command(args: argparse.Namespace, repo_root: Path) -> int:
+    if not args.provider:
+        print("agent preflight malformed input: --provider is required", file=sys.stderr)
+        return 2
+    try:
+        hook_input = _read_hook_stdin(sys.stdin)
+        identity_fields = adapt_hook_payload(args.provider, hook_input)
+    except HookPayloadError as exc:
+        print(f"agent preflight malformed hook input: {exc}", file=sys.stderr)
+        return 2
+    try:
+        payload = build_v2_receipt_payload(
+            repo_root=repo_root,
+            native_instruction_mechanism=identity_fields.pop("native_instruction_mechanism"),
+            native_instruction_path=identity_fields.pop("native_instruction_path"),
+            document_paths=[],
+            **identity_fields,
+        )
+        publish_v2_receipt(repo_root, payload)
+    except PreflightError as exc:
+        print(f"agent preflight failed: {exc}", file=sys.stderr)
+        return 1
+    sys.stdout.write(preflight_summary())
+    return 0
+
+
+def _run_hook_gate_command(args: argparse.Namespace, repo_root: Path) -> int:
+    if not args.provider:
+        print("agent preflight malformed input: --provider is required", file=sys.stderr)
+        return 2
+    try:
+        hook_input = _read_hook_stdin(sys.stdin)
+        identity_fields = adapt_hook_payload(args.provider, hook_input)
+    except HookPayloadError as exc:
+        print(f"agent preflight malformed hook input: {exc}", file=sys.stderr)
+        return 2
+
+    response_builder = GATE_RESPONSE_BUILDERS[args.provider]
+    try:
+        load_v2_receipt(
+            repo_root,
+            identity_fields["provider"],
+            identity_fields["session_id"],
+            identity_fields["actor_id"],
+        )
+    except PreflightError as exc:
+        print(json.dumps(response_builder(allow=False, reason=str(exc))))
+        return 1
+
+    print(json.dumps(response_builder(allow=True, reason="agent preflight receipt valid")))
+    return 0
+
+
+V2_COMMAND_HANDLERS = {
+    "load": _run_load_command,
+    "check": _run_check_command,
+    "hook-load": _run_hook_load_command,
+    "hook-gate": _run_hook_gate_command,
+}
+
+
 def main(argv: List[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    if not (args.print_summary or args.mark or args.check):
-        args.print_summary = True
 
     repo_root = resolve_repo_root(args.repo_root)
+
+    if args.command is not None:
+        return V2_COMMAND_HANDLERS[args.command](args, repo_root)
+
+    if not (args.print_summary or args.mark or args.check):
+        args.print_summary = True
 
     if args.print_summary:
         sys.stdout.write(preflight_summary())

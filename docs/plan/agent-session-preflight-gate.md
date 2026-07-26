@@ -140,5 +140,21 @@ flowchart LR
   no disk publish). Reached via ADR-038 direct-cloud escalation after the
   single bounded local attempt hit `budget_exhausted`; see the ledger's
   closure evidence for the full gate trace and Gemma Reviewer pass.
-- The next intended start point is `T4a2` (atomic publish, invalidation,
-  file-mode guarantees), followed by the rest of the receipt-core chain.
+- `T4a2` is complete: atomic `publish_v2_receipt` (temp-write -> fsync ->
+  `os.replace`, pre-publish invalidation, 0700/0600 permissions) landed.
+  ADR-038 downgraded Qwen27's `GO_LOCAL` to `CLOUD_REQUIRED` (fail-closed
+  authorization boundary, ADR-038 §6); Claude implemented directly. See the
+  ledger's closure evidence.
+- `T4a3` is complete: the v2 receipt engine is now exposed through `load`,
+  `check`, `hook-load`, and `hook-gate` CLI verbs plus Claude/Codex hook
+  adapters, sharing one validation core with T4a1/T4a2, with the exit-code
+  contract (0/1/2) and stdout/stderr separation specified in the ledger.
+  Qwen27 recommended `CLOUD_REQUIRED` (same §6 authorization-boundary
+  exclusion as T4a2, reinforced by an undocumented hook-payload-shape
+  unknown); the primary independently confirmed it, and Claude implemented
+  directly. Legacy `--mark`/`--check` remain diagnostics-only and cannot
+  satisfy any v2 gate. See the ledger's closure evidence for the full gate
+  trace, 3-pass Reflection log, and unit coverage certification (56/56
+  passing, 93% line coverage on the touched file).
+- The next intended start point is `T4a4` (deterministic race, replacement,
+  and permission tests), followed by the rest of the receipt-core chain.

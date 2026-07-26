@@ -569,7 +569,7 @@ verification either way, not automatic trust.
 
 ## T4a3 — CLI contract and provider hook adapters
 
-- **Status:** [ ] Pending
+- **Status:** [x] Done — owner-verified 2026-07-26
 - **Type:** development
 - **Effort:** L
 - **RRI:** 41 -> Med-high (recompute before execution if scope changes)
@@ -601,6 +601,163 @@ separation.
 
 - CLI/unit tests covering exit-code matrix and stdout/stderr separation.
 - Hook-adapter fixture evidence for Claude and Codex payload translation.
+
+### Closure evidence (2026-07-26)
+
+**ADR-038 Med-high gate:** ran end-to-end using a frozen `med-high-refinement-v1`
+packet (`.agent/local-architect/med-high-refinement-v1/T4a3/`). qwen27
+(`qwen3.6:27b-q4_K_M`) refinement recommended **`CLOUD_REQUIRED`**: T4a3
+defines the exit-code contract (`load`/`check`/`hook-load`/`hook-gate`) that
+later hook wiring (T4b1/T4b2) will use to block or allow agent tool calls,
+which the refinement assessed as a fail-closed authorization boundary under
+ADR-038 §6, independently reinforced by a material unknown (undocumented
+Claude/Codex native hook JSON payload shapes). The primary route receipt
+independently confirmed `CLOUD_REQUIRED` for the same reasons plus direct
+precedent: T4a2, the immediately preceding task touching the same file for
+the same receipt-authorization surface, was downgraded to `CLOUD_REQUIRED`
+under the identical exclusion. Per ADR-038 §3 the primary may downgrade but
+never upgrade a Qwen27 `CLOUD_REQUIRED`, so the bounded `qwen3.6:35b-a3b`
+local implementer was never invoked; the primary agent (Claude) implemented
+directly. Gate trace verified via `scripts/local-agent/med_high_gate.py`
+(`{"route": "CLOUD_REQUIRED", "reason": "Qwen27 recommended CLOUD_REQUIRED;
+the primary cannot upgrade this to local."}`).
+
+**Implementation:** added to `scripts/agent-preflight.py`: `load_v2_receipt`
+(reads/validates a published receipt, rejecting missing/malformed/mismatched
+identity as `ReceiptValidationError`); `HookPayloadError` plus
+`adapt_claude_hook_payload`/`adapt_codex_hook_payload` (translate provider
+native hook stdin JSON into v2 receipt identity fields, both fail-closed on
+missing/wrong-typed `session_id`/`hook_event_name`/`event`);
+`claude_gate_response`/`codex_gate_response` (provider-shaped
+allow/deny JSON — Claude's matches the real `hookSpecificOutput`/
+`permissionDecision` shape already wired in `.claude/settings.json`; Codex's
+is a minimal `{"decision", "reason"}` contract this task defines for T4b2 to
+wire against later, since no live Codex hook config exists in this repo yet).
+Added an optional `command` positional (`load`/`check`/`hook-load`/
+`hook-gate`) plus new flags (`--provider`, `--session-id`, `--actor-id`,
+`--hook-event-name`, `--source`, `--transcript-path`,
+`--native-instruction-mechanism`, `--native-instruction-path`, `--document`)
+to `build_parser`, and four handlers (`_run_load_command`,
+`_run_check_command`, `_run_hook_load_command`, `_run_hook_gate_command`)
+dispatched from `main` before the legacy `--print-summary`/`--mark`/`--check`
+fallthrough. Exit-code contract implemented exactly as specified: `0` on
+success; `1` for operational invalidity (missing/invalid/foreign receipt),
+with `hook-gate` also emitting the provider's blocking JSON response body on
+`stdout` for that case (EC-2); `2` for malformed input (bad hook JSON,
+missing required CLI flags), with diagnostics on `stderr` only and no
+`stdout` output (EC-1). Legacy `--mark`/`--check` untouched and verified to
+still operate solely on the v1 sentinel — `check --provider ... --session-id
+... --actor-id ...` (v2) and `--check` (v1, no `command` positional) are
+distinguished by argparse's positional-vs-flag grammar, and a manual repro
+confirmed a fresh `--mark` does not satisfy a v2 `check` for the same
+identity. Manually exercised all four HP/EC cases end-to-end for both
+providers (`claude`, `codex`) against a scratch repo before formalizing as
+unit tests.
+
+**Gemma Reviewer (ADR-036 binding, `gemma4:26b-a4b-it-qat`, 3 passes over the
+evolving diff):** pass 1 `status: findings`, 1 minor finding — `--session-id
+""` (explicitly empty) was misclassified as "missing" (exit 2) rather than
+flowing to `validate_opaque_id`'s "must not be empty" path (exit 1),
+producing a less precise diagnostic. Verified as real and fixed in Reflection
+pass 2 (see log). Pass 2 and pass 3 (post-fix) each returned one further
+minor finding on the same `_run_load_command` missing-flag check, but both
+mischaracterized the existing code (claiming the check doesn't validate
+whether flags were actually provided from the CLI, when `value is None` does
+exactly that for all six mandatory identity fields) — assessed as
+self-contradicted false positives on already-correct code, consistent with
+the T6 precedent for this kind of finding; disposition `reviewed_no_change`.
+
+### Reflection log
+
+Required passes: 3 (RRI 41 -> Med-high)
+
+#### Pass 1
+
+- **Draft verdict:** implemented the four v2 CLI verbs (`load`, `check`,
+  `hook-load`, `hook-gate`), the Claude/Codex hook adapters, and the
+  provider-shaped gate-response builders; manually exercised all HP/EC cases
+  end-to-end for both providers, then formalized 18 new unit tests (31 -> 49
+  total), all passing.
+- **Critique findings:** self-review against the 3 ledger acceptance
+  criteria and 4 HP/EC examples found no gaps. Ran Gemma Reviewer
+  independently (pass 1 of 3) over the real diff.
+- **Revisions applied:** none yet — Gemma's finding triaged for pass 2.
+
+#### Pass 2
+
+- **Draft verdict:** re-read `_run_load_command`'s missing-flag detection
+  against Gemma's pass-1 finding.
+- **Critique findings:** confirmed real — `if not value` treats an
+  explicitly empty `--session-id ""` identically to an omitted flag, so the
+  CLI reports the wrong exit code (2, "missing") instead of surfacing the
+  more precise `validate_opaque_id` rejection (1, "must not be empty").
+  Direct repro confirmed the wrong exit code before fixing.
+- **Revisions applied:** changed the missing-argument checks in both
+  `_run_load_command` and `_run_check_command` from truthiness (`if not
+  value`) to `is None`, so an explicitly empty string now correctly reaches
+  `build_v2_receipt_payload`/`load_v2_receipt` and fails with exit 1 and the
+  precise message. Added `test_ec1_load_explicit_empty_session_id_exits_one_not_two`
+  and re-verified via direct repro (`session_id must not be empty`, exit 1).
+  Ran Gemma Reviewer again (pass 2 of 3) over the updated diff; new finding
+  on the same function was a false positive (see closure evidence above) —
+  no further code change from it.
+
+#### Pass 3
+
+- **Draft verdict:** coverage pass — ran
+  `coverage run --branch --include=scripts/agent-preflight.py` against the
+  full suite.
+- **Critique findings:** 92% line coverage after pass 2's test; several
+  reachable-but-untested branches remained in T4a3's own new code:
+  `adapt_codex_hook_payload`'s missing-`session_id` path, `adapt_hook_payload`'s
+  unsupported-provider `KeyError` path (reachable only via direct call, not
+  through argparse's `choices`-validated `--provider` flag),
+  `_run_check_command`/`_run_hook_load_command`/`_run_hook_gate_command`'s
+  "`--provider` is required" branches (reachable when `--provider` is
+  omitted entirely, since the flag has no `required=True`), and
+  `_run_hook_load_command`'s `except PreflightError` branch (receipt
+  build/publish failing after the hook adapter already succeeded, e.g. a
+  missing `CLAUDE.md`/`AGENTS.override.md`).
+- **Revisions applied:** added 6 tests closing every gap above
+  (`test_ec2_check_command_missing_provider_flag_exits_two`,
+  `test_ec2_hook_load_missing_provider_flag_exits_two`,
+  `test_ec2_hook_gate_missing_provider_flag_exits_two`,
+  `test_ec1_hook_load_missing_session_id_field_codex_exits_two`,
+  `test_adapt_hook_payload_rejects_unsupported_provider_directly`,
+  `test_ec2_hook_load_missing_native_instruction_file_exits_one`). Coverage
+  rose to 93%; all remaining uncovered lines are pre-existing T1/T4a1/T4a2
+  code out of this task's scope (git-fallback `find_repo_root`, legacy v1
+  sentinel JSON-decode-error paths, `load_v2_receipt`'s JSON-decode/provider-
+  mismatch branches, `resolve_repo_root`'s no-override fallback, and the
+  legacy flag fallthrough tail of `main`). Ran Gemma Reviewer a third time
+  (pass 3 of 3) over the final diff — same false-positive category finding
+  as pass 2, disposition `reviewed_no_change`. Final suite: 56/56 passing.
+
+**Unit coverage certification:**
+
+| Suite | Tests | Result |
+|---|---|---|
+| Existing T1/T4a1/T4a2 (`AgentPreflightTest`, `AgentPreflightV2ReceiptTest`, `AgentPreflightV2ReceiptPublishTest`) | 31 | pass, unchanged |
+| New T4a3 CLI-command tests (`AgentPreflightCliV2CommandsTest`) | 8 | pass — HP-1 x2, EC-1 x1, EC-2 x4, legacy-isolation x1 |
+| New T4a3 hook-adapter tests (`AgentPreflightHookAdapterTest`) | 17 | pass — HP-1 x2, HP-2 x2, EC-1 x9, EC-2 x2, direct-adapter x2 |
+| **Total** | **56** | **56/56 pass** |
+
+`coverage run --branch --include=scripts/agent-preflight.py`: 93% line
+overall. All lines added for T4a3 (`load_v2_receipt` through the end of
+`main`'s v2 dispatch) are fully covered except the noted pre-existing-code
+gaps inherited from T1/T4a1/T4a2, which remain out of this task's scope.
+
+**Reflection:** the ADR-038 downgrade was, again, the load-bearing call —
+Qwen27 correctly identified that this task's own subject matter (the
+exit-code contract that will gate future tool calls) is what ADR-038 §6
+excludes, this time reinforced by a second, independent signal (the
+undocumented hook-payload-shape unknown) rather than resting on code
+complexity alone. Gemma Reviewer's pass-1 finding was a genuine, if minor,
+diagnostic-precision bug — worth verifying by repro before fixing, same
+discipline as T4a2's thread-collision finding. Passes 2 and 3 both flagged
+the same already-fixed area with claims that didn't match the code on
+inspection (self-contradicted false positives), which is why they're
+recorded with disposition rather than treated as unresolved.
 
 ### Status artifacts affected
 
