@@ -2106,5 +2106,215 @@ class T7cB2ScopeCheckGate(unittest.TestCase):
             self.assertNotIn("attempts", transcript)
 
 
+class ResolveEffectiveLimitsTest(unittest.TestCase):
+    """ADR-038 T3: band-aware limit resolution, offline / no worktree needed."""
+
+    def test_hp1_med_high_band_string_resolves_tight_limits(self):
+        card = rlt.TaskCard("t", "spec", [], [], band="Med-high")
+        limits = rlt.resolve_effective_limits(card)
+        self.assertEqual(limits.band, "Med-high")
+        self.assertEqual(limits.max_total_turns, 8)
+        self.assertEqual(limits.max_repair_attempts, 0)
+        self.assertEqual(limits.required_model, "qwen3.6:35b-a3b")
+
+    def test_hp1b_med_high_rri_without_band_resolves_tight_limits(self):
+        card = rlt.TaskCard("t", "spec", [], [], rri=47)
+        limits = rlt.resolve_effective_limits(card)
+        self.assertEqual(limits.max_total_turns, 8)
+        self.assertEqual(limits.max_repair_attempts, 0)
+
+    def test_hp2_moderate_band_keeps_original_defaults(self):
+        card = rlt.TaskCard("t", "spec", [], [], band="Moderate", rri=30)
+        limits = rlt.resolve_effective_limits(card)
+        self.assertEqual(limits.max_total_turns, rlt.MAX_TOTAL_TURNS)
+        self.assertEqual(limits.max_repair_attempts, rlt.MAX_REPAIR_ATTEMPTS)
+        self.assertIsNone(limits.required_model)
+
+    def test_hp2b_card_without_band_or_rri_keeps_original_defaults(self):
+        card = rlt.TaskCard("t", "spec", [], [])
+        limits = rlt.resolve_effective_limits(card)
+        self.assertEqual(limits.max_total_turns, rlt.MAX_TOTAL_TURNS)
+        self.assertEqual(limits.max_repair_attempts, rlt.MAX_REPAIR_ATTEMPTS)
+        self.assertIsNone(limits.required_model)
+
+    def test_ec1_rri_just_below_med_high_band_keeps_moderate_defaults(self):
+        card = rlt.TaskCard("t", "spec", [], [], rri=40)
+        limits = rlt.resolve_effective_limits(card)
+        self.assertEqual(limits.max_total_turns, rlt.MAX_TOTAL_TURNS)
+
+    def test_ec1b_rri_above_med_high_band_keeps_moderate_defaults(self):
+        # This gate only tightens Med-high (41-55); RRI 56+ is a decomposition
+        # trigger (T6) handled upstream, not this runner's concern.
+        card = rlt.TaskCard("t", "spec", [], [], rri=56)
+        limits = rlt.resolve_effective_limits(card)
+        self.assertEqual(limits.max_total_turns, rlt.MAX_TOTAL_TURNS)
+
+    def test_ec1c_rri_at_exact_med_high_lower_boundary_is_inclusive(self):
+        card = rlt.TaskCard("t", "spec", [], [], rri=41)
+        limits = rlt.resolve_effective_limits(card)
+        self.assertEqual(limits.max_total_turns, 8)
+        self.assertEqual(limits.max_repair_attempts, 0)
+
+    def test_ec1d_rri_at_exact_med_high_upper_boundary_is_inclusive(self):
+        card = rlt.TaskCard("t", "spec", [], [], rri=55)
+        limits = rlt.resolve_effective_limits(card)
+        self.assertEqual(limits.max_total_turns, 8)
+        self.assertEqual(limits.max_repair_attempts, 0)
+
+
+class MedHighRunnerLimitsIntegrationTest(unittest.TestCase):
+    """ADR-038 T3: the Med-high budget enforced end-to-end through main()/run_loop."""
+
+    def test_hp1_med_high_card_can_succeed_within_eight_turns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = os.path.join(tmp, "worktree")
+            _git_init_worktree(worktree)
+            card_path = _make_card(tmp, rri=47, band="Med-high")
+            out_path = os.path.join(tmp, "transcript.json")
+
+            chat = ChatSequencer(_write_and_finish("hello.txt", "hi"))
+            passing_tests = lambda wt: {"passed": True, "output": "ok"}
+
+            exit_code = rlt.main(
+                [
+                    "--card", card_path, "--worktree", worktree, "--out", out_path,
+                    "--model", "qwen3.6:35b-a3b",
+                ],
+                chat_fn=chat,
+                test_runner=passing_tests,
+            )
+
+            self.assertEqual(exit_code, 0)
+            with open(out_path, encoding="utf-8") as f:
+                transcript = json.load(f)
+            self.assertEqual(transcript["status"], "success")
+
+    def test_ec1_ninth_turn_is_never_invoked_for_a_med_high_card(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = os.path.join(tmp, "worktree")
+            _git_init_worktree(worktree)
+            card_path = _make_card(tmp, rri=47, band="Med-high")
+            out_path = os.path.join(tmp, "transcript.json")
+
+            # 9 read_file calls: a Med-high session must be cut off at turn 8,
+            # so chat_fn's 9th scripted response must never be consumed.
+            chat = ChatSequencer(
+                [_tool_call("read_file", {"path": "hello.txt"})] * 9
+            )
+            unused_tests = lambda wt: self.fail(
+                "acceptance tests must not run when the turn budget is exhausted"
+            )
+            with open(os.path.join(worktree, "hello.txt"), "w", encoding="utf-8") as f:
+                f.write("hi")
+            _git(worktree, "add", "-A")
+            _git(worktree, "commit", "-q", "-m", "seed")
+
+            exit_code = rlt.main(
+                [
+                    "--card", card_path, "--worktree", worktree, "--out", out_path,
+                    "--model", "qwen3.6:35b-a3b",
+                ],
+                chat_fn=chat,
+                test_runner=unused_tests,
+            )
+
+            self.assertNotEqual(exit_code, 0)
+            self.assertEqual(chat.calls, 8)
+            with open(out_path, encoding="utf-8") as f:
+                transcript = json.load(f)
+            self.assertEqual(transcript["status"], "budget_exhausted")
+            self.assertEqual(transcript["reason"], "total_turns_exhausted")
+
+    def test_ec1b_first_failed_acceptance_run_ends_a_med_high_session_without_repair(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = os.path.join(tmp, "worktree")
+            _git_init_worktree(worktree)
+            card_path = _make_card(tmp, rri=47, band="Med-high")
+            out_path = os.path.join(tmp, "transcript.json")
+
+            # Only one finish response scripted: a repair turn (which Moderate
+            # would grant) would raise IndexError on ChatSequencer, proving no
+            # repair message was ever sent for a Med-high card.
+            chat = ChatSequencer(_write_and_finish("hello.txt", "hi"))
+            failing_tests = lambda wt: {"passed": False, "output": "assertion failed"}
+
+            exit_code = rlt.main(
+                [
+                    "--card", card_path, "--worktree", worktree, "--out", out_path,
+                    "--model", "qwen3.6:35b-a3b",
+                ],
+                chat_fn=chat,
+                test_runner=failing_tests,
+            )
+
+            self.assertNotEqual(exit_code, 0)
+            with open(out_path, encoding="utf-8") as f:
+                transcript = json.load(f)
+            self.assertEqual(transcript["status"], "budget_exhausted")
+            self.assertEqual(transcript["reason"], "repair_attempts_exhausted")
+            self.assertEqual(transcript["attempts"], 0)
+
+    def test_ec2_model_substitution_for_med_high_card_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = os.path.join(tmp, "worktree")
+            _git_init_worktree(worktree)
+            card_path = _make_card(tmp, rri=47, band="Med-high")
+            out_path = os.path.join(tmp, "transcript.json")
+
+            unused_chat = lambda messages: self.fail(
+                "chat_fn must never be invoked once model substitution is rejected"
+            )
+            unused_tests = lambda wt: self.fail(
+                "acceptance tests must never run once model substitution is rejected"
+            )
+
+            exit_code = rlt.main(
+                [
+                    "--card", card_path, "--worktree", worktree, "--out", out_path,
+                    "--model", "some-other-model",
+                ],
+                chat_fn=unused_chat,
+                test_runner=unused_tests,
+            )
+
+            self.assertNotEqual(exit_code, 0)
+            with open(out_path, encoding="utf-8") as f:
+                transcript = json.load(f)
+            self.assertEqual(transcript["status"], "model_substitution_rejected")
+
+    def test_moderate_card_retains_thirty_turn_two_repair_behavior(self):
+        # HP-2 regression guard: an explicit Moderate-band card must still get
+        # the original 30-turn/two-repair runner behavior, not the Med-high
+        # budget, proving the two bands stay independently addressable.
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = os.path.join(tmp, "worktree")
+            _git_init_worktree(worktree)
+            card_path = _make_card(tmp, rri=30, band="Moderate")
+            out_path = os.path.join(tmp, "transcript.json")
+
+            chat = ChatSequencer(
+                [
+                    *_write_and_finish("hello.txt", "wrong"),
+                    *_write_and_finish("hello.txt", "hi"),
+                ]
+            )
+            attempt = {"n": 0}
+
+            def test_runner(wt):
+                attempt["n"] += 1
+                return {"passed": attempt["n"] > 1, "output": "retry"}
+
+            exit_code = rlt.main(
+                ["--card", card_path, "--worktree", worktree, "--out", out_path],
+                chat_fn=chat,
+                test_runner=test_runner,
+            )
+
+            self.assertEqual(exit_code, 0)
+            with open(out_path, encoding="utf-8") as f:
+                transcript = json.load(f)
+            self.assertEqual(transcript["status"], "success")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

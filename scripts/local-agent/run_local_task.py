@@ -77,6 +77,18 @@ MAX_MALFORMED_BOUNCES = 3
 DEFAULT_IDLE_TIMEOUT_SECONDS = 180
 DEFAULT_MAX_WALL_SECONDS = 1800
 COMMAND_TIMEOUT_SECONDS = 120
+
+# ADR-038 T3: Med-high (RRI 41-55) forces a materially tighter budget than
+# the Moderate default above -- one session, 8 turns, zero repairs, and the
+# exact qwen3.6:35b-a3b binding -- because ADR-038's whole premise is that an
+# unbounded Med-high local attempt (a real RRI 55 session ran to turn 23
+# without a patch) must fail closed to cloud quickly instead of stalling.
+MED_HIGH_BAND_LABEL = "Med-high"
+MED_HIGH_MAX_TOTAL_TURNS = 8
+MED_HIGH_MAX_REPAIR_ATTEMPTS = 0
+MED_HIGH_REQUIRED_MODEL = "qwen3.6:35b-a3b"
+MED_HIGH_RRI_MIN = 41
+MED_HIGH_RRI_MAX = 55
 # Output-token budget per turn. read_file/write_file/apply_patch have no size
 # cap (see runner_file_tools.py), so a turn can legitimately need to emit a
 # large "content"/"replacement" string; 4096 is comfortably above any file in
@@ -220,6 +232,59 @@ class TaskCard:
         # than fabricating a hash, since an invented hash would validate
         # against T1's schema syntactically while being semantically false.
         self.capsule_hash = capsule_hash
+
+
+class EffectiveLimits:
+    """The turn/repair/model budget this session actually runs under.
+
+    Moderate (or a card carrying no band/RRI at all -- e.g. pre-ADR-038
+    fixtures and every existing test in this file) resolves to the original
+    module-level constants unchanged. Only a card whose band or RRI falls in
+    the Med-high range is tightened, per ADR-038 T3.
+    """
+
+    def __init__(self, band, max_total_turns, max_repair_attempts, required_model):
+        self.band = band
+        self.max_total_turns = max_total_turns
+        self.max_repair_attempts = max_repair_attempts
+        self.required_model = required_model
+
+    def as_dict(self):
+        return {
+            "band": self.band,
+            "max_total_turns": self.max_total_turns,
+            "max_repair_attempts": self.max_repair_attempts,
+            "required_model": self.required_model,
+        }
+
+
+def _is_med_high(card):
+    band = getattr(card, "band", None)
+    if isinstance(band, str) and band:
+        return band == MED_HIGH_BAND_LABEL
+    rri = getattr(card, "rri", None)
+    if isinstance(rri, (int, float)) and not isinstance(rri, bool):
+        return MED_HIGH_RRI_MIN <= int(rri) <= MED_HIGH_RRI_MAX
+    return False
+
+
+def resolve_effective_limits(card):
+    """Band-aware limits (ADR-038 T3). Moderate keeps the original
+    30-turn/two-repair runner behavior exactly; Med-high forces 8 turns,
+    zero repairs, and the exact qwen3.6:35b-a3b binding."""
+    if _is_med_high(card):
+        return EffectiveLimits(
+            band=MED_HIGH_BAND_LABEL,
+            max_total_turns=MED_HIGH_MAX_TOTAL_TURNS,
+            max_repair_attempts=MED_HIGH_MAX_REPAIR_ATTEMPTS,
+            required_model=MED_HIGH_REQUIRED_MODEL,
+        )
+    return EffectiveLimits(
+        band=getattr(card, "band", None),
+        max_total_turns=MAX_TOTAL_TURNS,
+        max_repair_attempts=MAX_REPAIR_ATTEMPTS,
+        required_model=None,
+    )
 
 
 class ToolCall:
@@ -378,6 +443,7 @@ def run_loop(
     file_tools,
     organization_gate_fn,
     checkpoint_fn=None,
+    limits=None,
 ):
     """checkpoint_fn(transcript, total_turns), if given, is called after every
     turn that continues the loop. A session killed between turns (e.g. an
@@ -385,7 +451,15 @@ def run_loop(
     artifact at all -- gemma_local.write_result() only ran once, after this
     function returned. Checkpointing lets the caller persist the
     transcript-so-far each turn instead, so an interrupted run still leaves
-    diagnostic evidence and any already-applied worktree diff stays visible."""
+    diagnostic evidence and any already-applied worktree diff stays visible.
+
+    limits: an EffectiveLimits (ADR-038 T3), or None to use the original
+    module-level MAX_TOTAL_TURNS/MAX_REPAIR_ATTEMPTS unchanged -- every
+    pre-T3 caller (including every existing test in this file) that does not
+    pass `limits` keeps byte-for-byte identical behavior."""
+    limits = limits or resolve_effective_limits(card)
+    max_total_turns = limits.max_total_turns
+    max_repair_attempts = limits.max_repair_attempts
     transcript = []
     repair_attempt = 0
     malformed_bounces = 0
@@ -400,7 +474,7 @@ def run_loop(
 
     while True:
         total_turns += 1
-        if total_turns > MAX_TOTAL_TURNS:
+        if total_turns > max_total_turns:
             transcript.append({"event": "turn_budget_exhausted", "total_turns": total_turns - 1})
             return {
                 "status": "budget_exhausted",
@@ -500,7 +574,7 @@ def run_loop(
         # tests", instead of only ever seeing a per-turn token counter reset
         # to zero with no sense of overall progress.
         print(
-            f"[local-agent] turn {total_turns}/{MAX_TOTAL_TURNS} -> {call.name}",
+            f"[local-agent] turn {total_turns}/{max_total_turns} -> {call.name}",
             file=sys.stderr,
         )
 
@@ -550,7 +624,7 @@ def run_loop(
                     "transcript": transcript,
                 }
 
-            if repair_attempt >= MAX_REPAIR_ATTEMPTS:
+            if repair_attempt >= max_repair_attempts:
                 return {
                     "status": "budget_exhausted",
                     "reason": "repair_attempts_exhausted",
@@ -753,7 +827,7 @@ def build_default_test_runner(card):
     return test_runner
 
 
-def build_audit_record(card, result, model, elapsed_s):
+def build_audit_record(card, result, model, elapsed_s, effective_limits=None):
     # Derived entirely from the transcript run_loop already produced — no
     # new capture logic, only aggregation, so this stays in lockstep with
     # whatever event shapes T6a/T6b already emit instead of duplicating them.
@@ -818,6 +892,7 @@ def build_audit_record(card, result, model, elapsed_s):
         "task_id": card.task_id,
         "rri": card.rri,
         "band": card.band,
+        "effective_limits": effective_limits.as_dict() if effective_limits else None,
         "attempts": len(test_events),
         "commands": [c["argv"] for c in command_events],
         "edit_metrics": [
@@ -946,6 +1021,33 @@ def main(
     organization_gate_fn = (
         organization_gate_fn or runner_workflow_gate.run_organization_gate
     )
+    limits = resolve_effective_limits(card)
+
+    # ADR-038 T3 EC-2: a Med-high card must run under the exact required
+    # model -- no silent substitution. This is a routing-evidence check, not
+    # a capability check: --model defaults to the same qwen3.6:35b-a3b tag,
+    # so this only ever fires when a caller explicitly overrides --model for
+    # a card the gate (T2) already routed to Med-high local implementation.
+    if limits.required_model and args.model != limits.required_model:
+        session_start = datetime.datetime.now(datetime.timezone.utc)
+        result = {
+            "status": "model_substitution_rejected",
+            "reason": (
+                f"Med-high card requires model {limits.required_model!r}, "
+                f"got {args.model!r}."
+            ),
+            "transcript": [],
+            "task_id": card.task_id,
+            "finished_at": datetime.datetime.now(datetime.timezone.utc).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            ),
+        }
+        gemma_local.write_result(result, args.out)
+        audit_record = build_audit_record(
+            card, result, args.model, 0.0, effective_limits=limits
+        )
+        gemma_local.append_audit_log(audit_record)
+        return 1
 
     def checkpoint_fn(transcript, turn):
         # Overwritten by the real terminal write_result() call below once
@@ -959,7 +1061,8 @@ def main(
                 "status": "in_progress",
                 "task_id": card.task_id,
                 "turn": turn,
-                "max_turns": MAX_TOTAL_TURNS,
+                "max_turns": limits.max_total_turns,
+                "effective_limits": limits.as_dict(),
                 "transcript": transcript,
             },
             args.out,
@@ -986,6 +1089,7 @@ def main(
             file_tools,
             organization_gate_fn,
             checkpoint_fn=checkpoint_fn,
+            limits=limits,
         )
     finally:
         file_tools.close()
@@ -996,11 +1100,15 @@ def main(
     result["finished_at"] = datetime.datetime.now(datetime.timezone.utc).strftime(
         "%Y-%m-%dT%H:%M:%SZ"
     )
-    audit_record = build_audit_record(card, result, args.model, elapsed_s)
+    audit_record = build_audit_record(
+        card, result, args.model, elapsed_s, effective_limits=limits
+    )
     if result["status"] == "success" and not audit_record["audit_validation"]["valid"]:
         result["status"] = "audit_invalid"
         result["reason"] = ";".join(audit_record["audit_validation"]["errors"])
-        audit_record = build_audit_record(card, result, args.model, elapsed_s)
+        audit_record = build_audit_record(
+            card, result, args.model, elapsed_s, effective_limits=limits
+        )
     gemma_local.write_result(result, args.out)
 
     # Emitted for every exit path (success, aborted, budget_exhausted,
