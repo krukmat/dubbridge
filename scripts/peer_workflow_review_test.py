@@ -64,6 +64,22 @@ class TestNeedsLocalQwenReview(unittest.TestCase):
         self.assertFalse(_mod.needs_local_qwen_review(56))
 
 
+class TestD14Fallback(unittest.TestCase):
+    def test_hyphenated_helper_is_loaded_and_packet_is_isolated(self):
+        result = _mod.run_d14_fallback("task packet", "task", "qwen")
+
+        self.assertEqual(result["reviewer"], "d14")
+        self.assertEqual(result["verdict"], "d14_required")
+        self.assertEqual(
+            result["d14_packet"],
+            {
+                "diff": "",
+                "criteria": "task packet",
+                "reconciled_findings": [],
+            },
+        )
+
+
 class TestReviewExitCode(unittest.TestCase):
     def test_pass_is_success(self):
         self.assertEqual(_mod.review_exit_code("pass"), 0)

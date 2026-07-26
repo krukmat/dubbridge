@@ -26,6 +26,7 @@ Exit codes:
 
 import argparse
 import datetime
+import importlib.util
 import json
 import os
 import shutil
@@ -379,7 +380,18 @@ def invoke_peer_cli(peer: str, packet: str) -> tuple[bool, str]:
 
 def run_d14_fallback(packet: str, phase: str, peer: str) -> dict:
     """D14: spawn a context-isolated subagent via adjudicator-packet.py logic."""
-    import adjudicator_packet  # lazy: scripts/ is on sys.path at runtime  # noqa: PLC0415
+    # The canonical helper intentionally keeps its historical CLI filename
+    # `adjudicator-packet.py`.  A normal `import adjudicator_packet` therefore
+    # cannot resolve it (hyphens are not valid module-name characters), which
+    # used to crash the final fallback exactly when both local reviewers had
+    # already failed.  Load that concrete file explicitly and fail with a
+    # useful error if the repository layout is broken.
+    helper_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "adjudicator-packet.py")
+    spec = importlib.util.spec_from_file_location("dubbridge_adjudicator_packet", helper_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"unable to load D14 packet helper: {helper_path}")
+    adjudicator_packet = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(adjudicator_packet)
     # Build a minimal isolation packet from the review content.
     ap = adjudicator_packet.build_adjudicator_packet(
         diff=packet if phase == "code" else "",
