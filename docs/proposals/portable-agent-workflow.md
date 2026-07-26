@@ -297,9 +297,10 @@ Recommended dependencies:
 
 ### Required RRI Report Shape
 
-Before implementation, the agent should paste the script's markdown output
-directly into the task presentation or local delegation packet. Do not reformat
-or recompute the score manually.
+Before implementation, store the script's markdown output unchanged in the task
+ledger or a dedicated RRI artifact. The compact approval card links to that
+report and projects only the decision-relevant summary. Low-band delegation
+packets and final reports retain the full output. Do not recompute the score.
 
 The report must include:
 
@@ -406,26 +407,24 @@ This distinction matters: low-risk does not mean "always delegate".
 
 ## Task Presentation Contract
 
-When approval is required, present:
+When approval is required, present a six-block compact projection:
 
-1. Task ID and title.
-2. Status.
-3. Effort.
-4. Complexity.
-5. Recommended model for Codex and Claude Code.
-6. Objective.
-7. Context.
-8. Related documents.
-9. Inputs.
-10. Outputs.
-11. Acceptance criteria.
-12. Execution summary.
-13. Happy paths considered for development tasks.
-14. Edge cases considered for development tasks.
-15. Reflection strategy for RRI 26 or higher development tasks.
-16. Pseudocode only if it clarifies non-trivial logic.
-17. Mermaid diagram for development tasks.
-18. Direct approval checkpoint.
+1. **Decision header:** task identity/status, RRI/band, Effort, approval gate,
+   vendor recommendations, resolved implementation route, penalties, dominant
+   RRI drivers, and a link to the full report.
+2. **Scope and acceptance:** objective, in/out boundaries, primary happy/edge
+   behaviors, evidence, and status artifacts.
+3. **Agent workflow:** actual orchestrator, phase-1 reviewer, approver,
+   implementer, Reflection/verifier, phase-2 reviewer, and closure owner; state
+   the gate and fallback for every phase.
+4. **Diagrams:** one agent-workflow diagram and, for development tasks, one
+   technical-scope diagram. Never exceed two.
+5. **References:** task, plan, and materially governing documents only.
+6. **Approval checkpoint:** direct wording or an explicit bounded user waiver.
+
+Keep the complete task definition, RRI variable table, long case lists, and
+detailed Reflection plan in linked artifacts rather than copying them into the
+approval card.
 
 Use this final line when approval is required:
 
@@ -501,7 +500,8 @@ Portable testing expectations:
 A development task is not done until the applicable gates are checked in this
 order:
 
-1. Gemma Reviewer or D14 adjudicator, if required.
+1. The independent reviewer resolved by the task's RRI band, including its
+   required fallback chain.
 2. Reflection log, if required.
 3. Unit coverage certification.
 4. Owner final verification.

@@ -133,34 +133,28 @@ topics not covered by `AGENT_WORKFLOW_GUIDE.md`.
 When answering about development-task completion or before marking a
 development task done, first determine whether the task is exempt (docs-only,
 config-only, migration-only, planning, ADR, task-ledger, or policy-only) or
-whether the workflow requires the mandatory `Gemma Reviewer` / D14 review gate
+whether the workflow requires the mandatory band-resolved review gate
 before certification or final verification is discussed.
 
 ## Task Presentation Contract
 
 Before executing a task that belongs to a staged plan or task list, present the task first when the workflow or the user requires approval.
 
-Use this structure:
+Use the six-block Compact Approval Task Card v2 from
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and
+`docs/templates/compact-approval-task-card.md`:
 
-1. `Task ID` and `Task title`
-2. `Status`
-3. `Effort`
-4. `Complexity`
-5. `Recommended model`
-   - Codex recommendation
-   - Claude Code recommendation
-6. `Objective`
-7. `Context`
-8. `Related documents`
-9. `Inputs`
-10. `Outputs`
-11. `Acceptance criteria`
-12. `Execution summary`
-13. `Pseudocode` if applicable
-14. `Diagram`
-   - required for development tasks
-   - otherwise include if applicable
-15. explicit approval wait-state when required
+1. Decision header: identity/status, RRI, routing, and approval gate.
+2. Scope and acceptance: objective, in/out boundaries, behaviors, evidence, and
+   status sync.
+3. Agent workflow: actual participant for every phase, including gates and
+   fallbacks.
+4. Diagrams: agent workflow plus technical scope for development tasks.
+5. Material references only.
+6. Approval checkpoint or explicit bounded waiver.
+
+Keep full task and RRI detail in the linked ledger/artifact instead of repeating
+it in the approval card.
 
 ## Complexity And Model Defaults
 
@@ -226,12 +220,12 @@ Skip pseudocode for straightforward document creation, direct shell operations o
 
 ## Diagram Rule
 
-For development tasks, add a compact Mermaid diagram in every task presentation.
-Its purpose is to make the concept, flow, boundary, dependency direction, state
-transition, or ownership split easy to approve before implementation starts.
+Every approval card includes a compact agent-workflow Mermaid diagram. Add a
+second compact technical-scope diagram for development tasks so the concept,
+boundary, dependency direction, or state transition is easy to approve.
 
-For non-development tasks, add a Mermaid diagram only when boundaries, flows or
-architecture are materially easier to evaluate visually.
+For non-development tasks, add no second Mermaid diagram unless boundaries,
+flows, or architecture are materially easier to evaluate visually.
 
 Skip diagrams for simple documentation tasks unless the subject itself is architectural.
 
@@ -245,7 +239,7 @@ When approval is required, end with:
 
 For development-task closure, do not present unit coverage certification,
 owner final verification, or `[x] Done` as the first completion step. First
-state whether the mandatory `Gemma Reviewer` / D14 review gate applies under
+state whether the mandatory band-resolved review gate applies under
 `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and
 `docs/policies/HITL_AUTONOMY_POLICY.md`, then list the remaining closure
 requirements in order.

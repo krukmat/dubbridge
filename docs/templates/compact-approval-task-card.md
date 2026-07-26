@@ -1,0 +1,77 @@
+---
+type: Reference
+title: "Template: Compact Approval Task Card v2"
+---
+
+# Compact Approval Task Card v2
+
+Use this projection for tasks that require approval. Keep full task definition
+and RRI evidence in the linked task ledger or RRI artifact.
+
+## 1. Decision header
+
+`<Task ID> - <title> | <status> | RRI <score> <band> | Effort <S/M/L/XL> | <approval gate>`
+
+| Routing | Resolved value |
+|---|---|
+| Orchestrator | `<agent and recommended model>` |
+| Implementation | `<resolved implementer and route>` |
+| RRI | `<score> -> <band>; gates: <list>; penalties: <none/list>` |
+| Main drivers | `<two or three dominant RRI factors>` |
+| Full evidence | `<task-ledger or RRI-artifact link>` |
+
+## 2. Scope and acceptance
+
+- **Objective:** `<one sentence>`
+- **In scope:** `<allowed paths, modules, or behaviors>`
+- **Out of scope:** `<explicit boundaries>`
+- **Acceptance:**
+  - `<criterion or HP-1>`
+  - `<criterion or EC-1>`
+- **Evidence / status sync:** `<outputs, commands, ledgers, or reports>`
+
+## 3. Agent workflow
+
+| Phase | Responsible | Action, gate, and fallback |
+|---|---|---|
+| Analyze and scope | `<primary orchestrator>` | Compute RRI, freeze scope, and prepare the card |
+| Phase 1 review | `<resolved reviewer>` | Must PASS; fallback `<chain>` |
+| Approval | `<human approver>` | Required for RRI 26+ unless explicitly waived |
+| Implement | `<resolved implementer>` | Work only in scope; fallback `<route>` |
+| Reflect and verify | `<primary orchestrator>` | `<N>` passes; run `<checks>` |
+| Phase 2 review | `<resolved reviewer>` | Must PASS; fallback `<chain>` |
+| Close | `<primary orchestrator>` | Emit evidence and synchronize status artifacts |
+
+For reviewed tasks:
+
+`Task-analysis review: <reviewer> <artifact> - <PASS|BLOCKED>`
+
+For exempt tasks:
+
+`Task-analysis review: n/a - <exemption>`
+
+## 4. Diagrams
+
+Use the agent-workflow diagram for approval cards. Add one compact technical
+scope diagram for development tasks. Do not exceed two diagrams.
+
+```mermaid
+flowchart LR
+  O[Orchestrator] --> R1[Phase 1 review]
+  R1 --> H{Human gate}
+  H --> I[Implementer]
+  I --> V[Reflection and verification]
+  V --> R2[Phase 2 review]
+  R2 --> C[Closure]
+```
+
+## 5. References
+
+`Task: <path> | Plan: <path> | Governing: <material policies/ADRs only>`
+
+## 6. Approval checkpoint
+
+`Execution has not started. Approve this task to proceed.`
+
+Omit the checkpoint only when the RRI band does not require it or the user has
+explicitly waived it for the bounded task. Record the waiver in the card.

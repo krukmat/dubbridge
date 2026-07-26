@@ -34,53 +34,34 @@ not restated verbatim below.
 When answering questions about development-task completion or before marking a
 development task done, the agent must explicitly determine whether the task is
 exempt (docs-only, config-only, migration-only, planning, ADR, task-ledger, or
-policy-only) or whether the workflow requires `Gemma Reviewer` / D14 review
-before citing unit coverage certification or owner final verification.
+policy-only) or whether the workflow requires the band-resolved independent
+review before citing unit coverage certification or owner final verification.
 
 ## Required Task Presentation Format
 
-Before execution, present:
+For RRI 26+ approval presentations, use the six-block **Compact Approval Task
+Card v2** defined by `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and instantiated at
+`docs/templates/compact-approval-task-card.md`:
 
-1. `Task ID` and `Task title`
-2. `Status`
-3. `Effort`
-4. `Complexity`
-5. `Recommended model`
-   - one recommendation for Codex
-   - one recommendation for Claude Code
-6. `Objective`
-7. `Context`
-   - why this task exists
-   - what stage or plan it belongs to
-8. `Related documents`
-   - source task file
-   - linked plan file
-   - any policies, ADRs, prompts or configs that materially govern the task
-9. `Inputs`
-10. `Outputs`
-11. `Acceptance criteria`
-12. `Evidence / metrics to emit`
-   - required when the task is expected to produce benchmarks, evaluation data,
-     review artifacts, screenshots, audit records, or reportable measurements
-13. `Status artifacts to sync`
-   - required when the task can change a ledger, report, plan, ADR status, or
-     downstream blocker/promotion state
-14. `Execution summary`
-   - short description of what will be done
-   - if applicable, list the ordered steps
-15. any task-type-specific pre-task sections required by `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
-   - for development tasks, include `Happy paths considered`
-   - for development tasks, include `Edge cases considered`
-16. `Pseudocode`, only if it materially clarifies non-trivial logic
-17. `Diagram`
-   - required for development tasks
-   - for non-development tasks, include only if structure, flow or boundaries are easier to understand visually
-18. explicit statement that execution has not started yet and is waiting for approval, when approval is required
+1. `Decision header` — task identity/status, RRI/band, Effort, approval gate,
+   Codex/Claude recommendations, resolved implementation route, penalties,
+   dominant RRI drivers, and link to the full RRI evidence.
+2. `Scope and acceptance` — objective, in scope, out of scope, primary `HP-#` /
+   `EC-#` behaviors for development tasks, evidence, and status sync.
+3. `Agent workflow` — the resolved orchestrator, phase-1 reviewer, human gate,
+   implementer, Reflection/verifier, phase-2 reviewer, and closure owner. State
+   each responsibility, gate, and fallback.
+4. `Diagrams` — one agent-workflow diagram; development tasks add one technical
+   scope diagram. Never exceed two diagrams.
+5. `References` — task, plan, and only materially governing documents.
+6. `Approval checkpoint` — required wording or explicit bounded user waiver.
 
-When the workflow guide requires `Evidence to emit` or `Status artifacts to sync`,
-those items are part of the task's execution contract, not optional closure notes.
-They should make it obvious, before implementation starts, which metrics/reports
-will be updated during the task and which status-bearing docs must be kept in sync.
+Do not copy the full task definition or RRI variable table into the approval
+card. Those remain in the linked task ledger/RRI artifact. RRI 0–25 tasks still
+skip the full approval card under the Low-band route.
+
+`Evidence to emit` and `Status artifacts to sync` remain part of the execution
+contract; summarize them in the card and keep their full paths in the task ledger.
 
 ## Complexity And Model Guidance
 
@@ -125,19 +106,19 @@ Do not add pseudocode for trivial file creation, simple edits, or direct command
 
 ## Diagram Rule
 
-For development tasks, always include a compact Mermaid diagram in the task presentation.
-The goal is conceptual clarity before approval: show the relevant flow, boundary,
-dependency direction, state transition, or ownership split even when the system
-architecture itself is unchanged.
+Every approval card includes a compact agent-workflow Mermaid diagram. For
+development tasks, also include a technical-scope diagram showing the relevant
+flow, boundary, dependency direction, state transition, or ownership split.
 
-For non-development tasks, include a diagram only when at least one is true:
+For non-development tasks, add no second diagram unless at least one is true:
 
 - the task changes architecture boundaries
 - the task spans multiple services, crates, workers or repositories
 - the task introduces a pipeline, state machine or dependency flow
-- the task is easier to approve when shown as a compact flow
+- the task is easier to approve when shown as a compact technical flow
 
-Do not add diagrams for simple documentation-only tasks unless the document itself is about architecture.
+Never exceed two diagrams. Simple documentation-only tasks normally use only the
+agent-workflow diagram.
 
 ## Related Documents Rule
 
@@ -183,16 +164,18 @@ time. Docs-only, config-only, migration-only, ADR, plan, task-ledger, and
 policy-only tasks record `n/a` with the exemption stated for phase 2.
 
 ```
-Task-analysis review: <gemma|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
-Code-solution review: <gemma|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
+Task-analysis review: <gemma|qwen3.6:27b-q4_K_M|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
+Code-solution review: <gemma|qwen3.6:27b-q4_K_M|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
 ```
 
-- `gemma` — RRI 0–40 (both phases).
-- `codex | claude` — RRI 41+, resolved from caller identity
+- `gemma` — primary reviewer for RRI 0–25; intermediate fallback for RRI 26–55.
+- `qwen3.6:27b-q4_K_M` — primary reviewer for both phases in RRI 26–55.
+- `codex | claude` — RRI 56+, resolved from caller identity
   (`claude-code → codex`, `codex → claude`, others → `claude`).
-- `d14` — RRI 41+ where the resolved peer CLI was unavailable and D14 handled the review.
-- `BLOCKED` — non-pass verdict or peer + D14 both unavailable. Stops presentation
-  (phase 1) or closure (phase 2) until revised, user-waived, or reported blocked.
+- `d14` — final fallback when the preceding reviewer chain is unusable.
+- `BLOCKED` — non-pass verdict or the band's full reviewer/fallback chain is
+  unavailable. Stops presentation (phase 1) or closure (phase 2) until revised,
+  user-waived, or reported blocked.
 
 See `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review` for the
 full contract.
@@ -201,8 +184,8 @@ full contract.
 
 For development-task closure, do not describe certification, final verification,
 or status flips as the first completion step. First determine whether the task
-must pass the mandatory code-solution review gate (Gemma for RRI 0–40; cross-vendor
-peer for RRI 41+, with D14 fallback) under `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
+must pass the mandatory code-solution review gate resolved by the canonical RRI
+band table under `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
 and `docs/policies/HITL_AUTONOMY_POLICY.md`, then describe the remaining closure
 blocks in order.
 
