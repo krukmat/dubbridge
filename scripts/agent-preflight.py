@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -14,6 +15,19 @@ from typing import Any, Dict, List
 
 SCRIPT_VERSION = 1
 SENTINEL_RELATIVE = Path(".agent") / "session-preflight.json"
+
+RECEIPT_SCHEMA_VERSION = 2
+V2_VALID_PROVIDERS = frozenset({"codex", "claude"})
+V2_VALID_LIFECYCLE_EVENTS = frozenset(
+    {
+        "startup",
+        "resume",
+        "clear",
+        "compact",
+        "fork",
+        "subagent",
+    }
+)
 
 SUMMARY_LINES = [
     "DubBridge agent preflight",
@@ -124,6 +138,126 @@ def check_preflight(repo_root: Path) -> Dict[str, Any]:
             "Run scripts/agent-preflight.py --mark again."
         )
     return data
+
+
+class ReceiptValidationError(PreflightError):
+    """Raised when a v2 receipt payload or its inputs fail validation."""
+
+
+def validate_provider(provider: str) -> None:
+    if provider not in V2_VALID_PROVIDERS:
+        raise ReceiptValidationError(
+            f"Unsupported provider {provider!r}; expected one of {sorted(V2_VALID_PROVIDERS)}."
+        )
+
+
+def validate_lifecycle_event(hook_event_name: str) -> None:
+    if hook_event_name not in V2_VALID_LIFECYCLE_EVENTS:
+        raise ReceiptValidationError(
+            f"Unsupported lifecycle hook_event_name {hook_event_name!r}; "
+            f"expected one of {sorted(V2_VALID_LIFECYCLE_EVENTS)}."
+        )
+
+
+def validate_opaque_id(label: str, value: str) -> None:
+    if not value:
+        raise ReceiptValidationError(f"{label} must not be empty.")
+    if "\x00" in value:
+        raise ReceiptValidationError(f"{label} must not contain a NUL byte.")
+    if "/" in value or "\\" in value:
+        raise ReceiptValidationError(f"{label} must not contain a path separator.")
+    if ".." in value:
+        raise ReceiptValidationError(f"{label} must not contain a '..' segment.")
+
+
+def compute_receipt_identity(provider: str, session_id: str, actor_id: str) -> str:
+    validate_provider(provider)
+    validate_opaque_id("session_id", session_id)
+    validate_opaque_id("actor_id", actor_id)
+    digest_input = "\x00".join([provider, session_id, actor_id]).encode("utf-8")
+    return hashlib.sha256(digest_input).hexdigest()
+
+
+def hash_source_file(repo_root: Path, relative_path: str) -> Dict[str, Any]:
+    full_path = repo_root / relative_path
+    try:
+        data = full_path.read_bytes()
+    except OSError as exc:
+        raise ReceiptValidationError(
+            f"Could not read source file {relative_path!r} under {repo_root}: {exc}"
+        ) from exc
+    return {
+        "path": relative_path,
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "bytes": len(data),
+    }
+
+
+def build_v2_receipt_payload(
+    *,
+    provider: str,
+    session_id: str,
+    actor_id: str,
+    repo_root: Path,
+    hook_event_name: str,
+    source: str,
+    transcript_path: str,
+    native_instruction_mechanism: str,
+    native_instruction_path: str,
+    document_paths: List[str],
+) -> Dict[str, Any]:
+    validate_provider(provider)
+    validate_lifecycle_event(hook_event_name)
+    validate_opaque_id("session_id", session_id)
+    validate_opaque_id("actor_id", actor_id)
+
+    identity = compute_receipt_identity(provider, session_id, actor_id)
+
+    native_instruction = hash_source_file(repo_root, native_instruction_path)
+    native_instruction["mechanism"] = native_instruction_mechanism
+
+    documents = [hash_source_file(repo_root, doc_path) for doc_path in document_paths]
+
+    return {
+        "schema_version": RECEIPT_SCHEMA_VERSION,
+        "provider": provider,
+        "session_id": session_id,
+        "actor_id": actor_id,
+        "receipt_identity": identity,
+        "repo_root": str(repo_root.resolve()),
+        "lifecycle": {
+            "hook_event_name": hook_event_name,
+            "source": source,
+            "transcript_path": transcript_path,
+        },
+        "loaded_at": datetime.now(timezone.utc).isoformat(),
+        "native_instruction": native_instruction,
+        "documents": documents,
+    }
+
+
+def validate_v2_receipt_payload(payload: Dict[str, Any]) -> None:
+    if not isinstance(payload, dict):
+        raise ReceiptValidationError("v2 receipt payload must be a JSON object.")
+    if "version" in payload and "schema_version" not in payload:
+        raise ReceiptValidationError(
+            "Payload looks like a legacy v1 sentinel (has 'version', missing 'schema_version')."
+        )
+    if payload.get("schema_version") != RECEIPT_SCHEMA_VERSION:
+        raise ReceiptValidationError(
+            f"Unsupported receipt schema_version {payload.get('schema_version')!r}; "
+            f"expected {RECEIPT_SCHEMA_VERSION}."
+        )
+    validate_provider(payload.get("provider"))
+    validate_opaque_id("session_id", payload.get("session_id", ""))
+    validate_opaque_id("actor_id", payload.get("actor_id", ""))
+    lifecycle = payload.get("lifecycle")
+    if not isinstance(lifecycle, dict):
+        raise ReceiptValidationError("v2 receipt payload requires a 'lifecycle' object.")
+    validate_lifecycle_event(lifecycle.get("hook_event_name"))
+    for required_key in ("native_instruction", "documents"):
+        if required_key not in payload:
+            raise ReceiptValidationError(f"v2 receipt payload missing {required_key!r}.")
 
 
 def build_parser() -> argparse.ArgumentParser:

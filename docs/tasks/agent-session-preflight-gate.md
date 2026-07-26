@@ -244,7 +244,7 @@ subtasks below.
 
 ## T4a1 — Receipt schema and source manifest
 
-- **Status:** [ ] Pending
+- **Status:** [x] Done
 - **Type:** development
 - **Effort:** L
 - **RRI:** 47 -> Med-high (recompute before execution if scope changes)
@@ -280,6 +280,127 @@ exact native-instruction/document manifest that later gates will verify.
 
 - Focused unit tests for schema, manifest hashing, and identity derivation.
 - Updated ledger evidence for the chosen schema version and source list.
+
+### Closure evidence (2026-07-26)
+
+**ADR-038 Med-high gate:** ran end-to-end. qwen27 (`qwen3.6:27b-q4_K_M`)
+refinement recommended `GO_LOCAL`; primary route receipt agreed `GO_LOCAL`;
+`med_high_gate.py` confirmed the route. The single bounded qwen3.5a
+(`qwen3.6:35b-a3b`) attempt (8 turns / 300s, 0 repair budget) ended
+`status: budget_exhausted` (`total_turns_exhausted`) with no tests written and
+an incorrect guess at the lifecycle event set — verified directly against the
+worktree diff and transcript rather than trusted at face value. Per ADR-038
+§5 this escalated straight to direct cloud implementation (no local retry).
+Also surfaced, but did not fix (out of `allowed_paths`), a latent bug in
+`scripts/local-agent/run_med_high_task.py`: `build_evidence_bundle()` crashes
+with an uncaught `FileNotFoundError` when the local session ends without ever
+producing a diff file, so no escalation bundle is written on this failure
+mode. Follow-up ticket filed and closed:
+`docs/tasks/med-high-escalation-bundle-crash.md` (fixed this and six
+additional related evidence-loss defects found by adversarial peer review;
+see that ledger's own closure evidence for the review disposition, Reflection
+log, and coverage certification). Its own residual scope exception
+(`resolve_rri_table`'s path-vs-text ambiguity) was filed separately as
+`docs/tasks/rri-table-path-text-ambiguity.md`.
+
+**Implementation:** added to `scripts/agent-preflight.py`: `V2_VALID_PROVIDERS`,
+`V2_VALID_LIFECYCLE_EVENTS` (`startup`, `resume`, `clear`, `compact`, `fork`,
+`subagent` — real events per `.claude/settings.json` plus T4b1's planned
+`fork`/`subagent`), `ReceiptValidationError`, `validate_provider`,
+`validate_lifecycle_event`, `validate_opaque_id`, `compute_receipt_identity`,
+`hash_source_file`, `build_v2_receipt_payload`, `validate_v2_receipt_payload`.
+Purely additive; `find_repo_root()`, `preflight_summary()`, and the legacy
+`--mark`/`--check` sentinel path are unchanged.
+
+**Gemma Reviewer (ADR-036 binding, `gemma4:26b-a4b-it-qat`, 3 passes) — initial
+pass (superseded, see re-check below):** `status: findings`, 6 raised
+findings, all independently verified against running code and found to be
+**false positives**: 3 "blocking" claims (plus 2 restatements) that
+`datetime`/`timezone` were unimported — the import is present at line 11 and
+a live `build_v2_receipt_payload()` call was executed with no `NameError`;
+1 "minor" claim that a missing `provider` key causes a `TypeError` — verified
+`validate_provider(None)` correctly raises `ReceiptValidationError` (`None not
+in frozenset(...)` is valid Python). One remaining "minor" suggestion (require
+`documents` non-empty) is a design preference outside the T4a1 spec, not a
+defect. No code changes made in response to this review pass.
+
+This initial pass was later found to have a packet-construction defect: it
+sent `git diff` only, so the pre-existing `datetime`/`timezone` import (line
+11, unchanged by the diff) never appeared in what Gemma read, and it also
+predated the 4 branch-coverage tests added afterwards to close the 84%→88%
+coverage gap. Both are process gaps in how the review packet was built and
+sequenced, not defects in the reviewed code — `scripts/agent-preflight.py`
+itself was byte-identical throughout.
+
+**Gemma Reviewer re-check (2026-07-26, corrected packet, 3 passes):** re-ran
+against the final diff (all 14 `AgentPreflightV2ReceiptTest` cases, no gap)
+with a packet that included the full current content of
+`scripts/agent-preflight.py` alongside the diff, so the line-11
+`datetime`/`timezone` import was no longer hidden from the model. Result:
+`status: findings`, 0 "blocking" findings (the prior 3 false positives did not
+recur — confirms the missing-context theory), 3 "minor" findings remain, all
+independently verified as false: (1)/(2) claims that `importlib.util` is
+imported but unused, and that `hashlib` is imported twice, in
+`scripts/agent_preflight_test.py` — both false; `importlib.util` is used at
+lines 12/16 to dynamically load the module under test, and `hashlib` is
+imported exactly once (line 5). Inspecting the actual request payload sent to
+Ollama (via `--dry-run`) showed why: the corrected packet only embedded the
+full file content for `scripts/agent-preflight.py`, the file responsible for
+the prior pass's false positives — `scripts/agent_preflight_test.py` was still
+sent as diff-only. Its diff hunk boundaries (one hunk near line 2-8, the next
+starting at line 82) skip exactly the lines (12-17) where `importlib.util` is
+used, reproducing the same missing-context failure mode in the one file the
+fix didn't cover. No code changes made in response to either review pass.
+This re-check is superseded in turn by the pass-3 re-check below; retained for
+the audit trail, not as the operative evidence.
+
+**Gemma Reviewer pass 3 (2026-07-26, packet with full content of BOTH changed
+files, 3 passes):** built a corrected packet embedding the complete current
+content of `scripts/agent-preflight.py` (324 lines) *and*
+`scripts/agent_preflight_test.py` (218 lines), followed by the final git diff
+against both — confirmed byte-identical to the diff already reviewed in the
+pass-2 re-check (`diff` against the prior packet's diff section showed no
+difference), so this run isolates the effect of the packet fix alone. Result:
+`status: findings`, 0 blocking, 1 consensus minor finding, 0 pass-specific/
+location-inconsistent/severity-inconsistent findings. The prior false claims
+that `importlib.util` is unused and `hashlib` is double-imported in
+`scripts/agent_preflight_test.py` **did not recur** — confirms the
+missing-context theory a second time, this time for the file the earlier fix
+had missed. The one remaining finding (`os.replace` in `mark_preflight`
+lacking cross-filesystem fallback) cites line 308, which is actually
+`if args.mark:` inside `main()`; the real `os.replace` call is at line 104
+inside `mark_preflight()` (verified directly) — a location error, but the
+substance (mark_preflight uses `os.replace` after `mkdir(parents=True)`) is
+correct. This is pre-existing T1 code explicitly out of scope for T4a1 ("must
+not touch ... the `--mark`/`--check` sentinel logic"), the finding's own
+suggestion says "None required; current implementation satisfies
+requirements," and T1's closure evidence already recorded and accepted this
+same atomic-write tradeoff. No code change made. No further Gemma-packet-
+integrity follow-up task is needed: the fix (embed full current content for
+every changed file, not only the file that produced findings in a prior pass)
+is confirmed effective across both files and is the operative packet-building
+rule for future review passes on this task family.
+
+**Unit coverage certification:**
+
+| Suite | Tests | Result |
+|---|---|---|
+| Existing T1/T2 (`AgentPreflightTest`) | 6 | pass, unchanged |
+| New v2 receipt tests (`AgentPreflightV2ReceiptTest`) | 14 | pass — HP-1, HP-2, EC-1 x2, EC-2 x2, EC-3 x2, EC-4 x2, plus 4 direct `validate_v2_receipt_payload` branch tests |
+| **Total** | **20** | **20/20 pass** |
+
+`coverage run --branch` over `scripts/agent-preflight.py`: 88% line, all
+uncovered lines confined to legacy `find_repo_root()`/CLI `main()` branches
+untouched by T4a1 (git-missing fallback, JSON-decode-error path, `--print-summary`
+default toggle) — the new v2 receipt code (lines ~143-260) is fully exercised.
+
+**Reflection:** the ADR-038 gate did its job — it caught a genuinely
+incomplete local attempt (no new tests, wrong domain knowledge) before it
+could be mistaken for done, and forced escalation without a retry-until-it-
+passes loop. Gemma Reviewer's false positives here are a reminder that
+"findings" status requires verification against the actual running code
+before acting on it, same as the local implementer's output — reviewer
+output isn't automatically ground truth either.
 
 ### Status artifacts affected
 

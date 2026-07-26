@@ -135,5 +135,10 @@ flowchart LR
 
 - `T0-T3` remain complete.
 - `T4` is now decomposed into `T4a1-T4c3` in the linked ledger.
-- No hardening subtask below `T3` is closed yet; the next intended start point is
-  `T4a1`, followed by the rest of the receipt-core chain.
+- `T4a1` is complete: v2 receipt payload/validator, identity derivation, and
+  source-manifest hashing landed in `scripts/agent-preflight.py` (memory-only,
+  no disk publish). Reached via ADR-038 direct-cloud escalation after the
+  single bounded local attempt hit `budget_exhausted`; see the ledger's
+  closure evidence for the full gate trace and Gemma Reviewer pass.
+- The next intended start point is `T4a2` (atomic publish, invalidation,
+  file-mode guarantees), followed by the rest of the receipt-core chain.
