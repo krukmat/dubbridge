@@ -1644,10 +1644,9 @@ pending; (3) not yet committed as of this ledger edit. T5a unblocked. T3c
 
 ## S-140-T3c: Wire real apalis consumer loop for worker-runner queues
 
-**Effort:** M (RRI TBD — recompute at presentation time)
-**Depends on:** S-140-T3b
-**Status:** Not started — filed 2026-07-22 as the explicit EC-4 follow-up
-carved out of T3b's scope (owner decision); not yet presented for approval
+**Status:** Superseded 2026-07-25 by [[S-140-T3c-i]] / [[S-140-T3c-ii]] — see
+split rationale below. This entry is retained for history; do not implement
+from it.
 
 **Why this task exists:** `apps/worker-runner/src/main.rs` currently
 constructs `SubprocessPreparationExecutor` and the job queue handle but binds
@@ -1660,23 +1659,368 @@ of how well-tested each handler is in isolation. T3b's EC-4 explicitly
 required this gap not be left implicit if carved out of that task's scope —
 this entry is that required handoff.
 
+**Split rationale (2026-07-25):** presentation-time investigation found the
+original framing understated scope: `crates/jobs` only has in-memory queue
+implementations (`InMemoryPreparationJobQueue`, `InMemoryTranscriptionJobQueue`,
+`InMemorySubtitleJobQueue`), used solely by tests. No Redis-backed queue
+implementation exists anywhere in the workspace despite `apalis` being a
+declared dependency (`Cargo.toml:40`, `crates/jobs/Cargo.toml:8`,
+`apps/worker-runner/Cargo.toml:11`) — `apalis` is never constructed or called
+anywhere in the codebase today. A real consumer loop cannot poll Redis without
+a real Redis-backed queue to poll. Owner decision 2026-07-25: expand scope to
+include the real backend rather than wire a `Monitor` against a
+still-nonexistent queue, then split into two Med-high halves to keep both
+locally routable — `python3 scripts/rri.py` on the combined scope
+(`crates/jobs/src/lib.rs` + `crates/jobs/Cargo.toml` +
+`apps/worker-runner/src/main.rs` + `apps/worker-runner/Cargo.toml`) scored 56
+(Complex), which requires a human-reviewed plan before implementation and is
+explicitly out of the S-140 local-control band per this plan's own
+coordination-mode section. The split narrows each half back into Med-high
+without changing what ships.
+
+**Topology decision (owner, 2026-07-25):** one apalis `Monitor` process with
+three registered `WorkerBuilder`s (one per queue: preparation, transcription,
+subtitle), each with its own concurrency setting. This is apalis's standard
+multi-queue-in-one-process pattern; it isolates handler failures per queue
+natively (EC-1) and lets `config.worker_concurrency` apply per queue rather
+than globally. Rejected alternative: three separate worker-runner binaries —
+that would change the task from a `main.rs` edit into a deployment/infra
+restructure, a materially larger and differently-scoped unit of work than
+this ledger entry.
+
+---
+
+## S-140-T3c-i: Redis-backed job queue implementation
+
+**Effort:** L (RRI 48 — Med-high; `python3 scripts/rri.py --auto-cc --T 4 --A 2
+--X 3 --D 4 --K 4 --P 2 --touches crates/jobs/src/lib.rs --touches
+crates/jobs/Cargo.toml --platform rust`)
+**Depends on:** S-140-T3b
+**Status:** Not started — split from S-140-T3c 2026-07-25; not yet presented
+for approval
+
+> Split from the original T3c; see [[S-140-T3c]] for the rationale. This half
+> only adds a real Redis-backed implementation of the three existing queue
+> traits (`PreparationJobQueue`, `TranscriptionJobQueue`, `SubtitleJobQueue`);
+> it does not touch `apps/worker-runner` at all. [[S-140-T3c-ii]] depends on
+> this half's output to build the consumer loop.
+>
+> **Implementation route:** Med-high local-first —
+> `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL`
+> (default `qwen3.6:35b-a3b`), 1 repair attempt max; `qwen3.6:27b-q4_K_M`
+> phase-2 review and 3 Reflection passes apply.
+
 **Happy paths considered:**
-- HP-1: On startup, `main()` builds one apalis `WorkerBuilder`/`Monitor` (or
-  one per queue, per the chosen job-queue topology) that actually polls
-  Redis and dispatches queued envelopes to `process_preparation_job`,
-  `process_transcription_job`, and `process_subtitle_job`.
+- HP-1: `RedisPreparationJobQueue::enqueue` (and the transcription/subtitle
+  equivalents) push a serialized `JobEnvelope<T>` onto the apalis-managed
+  Redis storage for that job's `JOB_TYPE`, using `apalis-redis`'s storage
+  type, not a hand-rolled Redis client.
+- HP-2: A job enqueued via the Redis-backed queue is retrievable by an
+  apalis `Monitor`/`WorkerBuilder` pointed at the same Redis connection
+  (verified with a minimal throwaway consumer in the test, not just by
+  inspecting Redis keys directly).
+
+**Edge cases considered:**
+- EC-1: Redis connection failure on enqueue returns `QueueError` (the
+  existing error type in `crates/jobs/src/lib.rs`), not a panic.
+- EC-2: The three queues use distinct apalis storage namespaces/keys so jobs
+  of one type are never dequeued by a worker built for another type.
+
+**Inputs:** `crates/jobs/src/lib.rs` (existing `PreparationJobQueue`,
+`TranscriptionJobQueue`, `SubtitleJobQueue` traits and their in-memory
+implementations to mirror the public shape of), `apalis-redis` crate docs
+(add as a new workspace dependency — confirm exact crate name and version
+compatible with `apalis = "0.7"` already pinned in the root `Cargo.toml`
+before writing code), local Redis instance from
+`infra/local/docker-compose.yml`.
+
+**Outputs:** `RedisPreparationJobQueue`, `RedisTranscriptionJobQueue`,
+`RedisSubtitleJobQueue` (or one generic Redis-backed queue type parameterized
+per job, implementer's discretion) implementing the three existing traits
+against real Redis via `apalis-redis`.
+
+> **Amendment 2026-07-26 (owner-confirmed) — the three queue traits become
+> `async`.** The original acceptance criterion below forbade trait signature
+> changes. That turned out to be unsatisfiable against `apalis-redis` 0.7.4:
+> `apalis::prelude::Storage::push` is `async` and exposes no synchronous API.
+> A sync `fn enqueue` cannot await it — `Handle::block_on` panics when called
+> from inside a Tokio worker thread, and a `tokio::spawn` fire-and-forget
+> would mean enqueue failures never surface as `QueueError`, breaking this
+> same entry's fail-closed criterion and ADR-018's no-fire-and-forget rule.
+> The two criteria were therefore in direct conflict, and fail-closed wins.
+> Resolved by the implementing agent, then explicitly re-confirmed by the
+> owner via task-flow decision during S-140-T3c-ii presentation (see Owner
+> final verification below).
+>
+> All three `enqueue` call sites are already inside `async fn`, so the async
+> route costs exactly three `.await` insertions plus `async fn` on four
+> test-side fake queues. The stop condition is relaxed accordingly: the
+> mechanical call-site updates in `apps/api` and `apps/worker-runner` are in
+> scope for this entry. The consumer loop remains [[S-140-T3c-ii]] and is
+> still out of scope.
+
+**Acceptance criteria:**
+- ~~New Redis-backed queue types implement the existing trait signatures
+  exactly (`PreparationJobQueue`, `TranscriptionJobQueue`, `SubtitleJobQueue`)
+  — no trait signature changes, since [[S-140-T2a]]/worker-runner enqueue
+  call sites already depend on those traits unchanged.~~ **Superseded by the
+  2026-07-26 amendment above.** Replaced by: the three traits become
+  `#[async_trait] async fn enqueue`, the trait set and their return types are
+  otherwise unchanged, and every call site and impl in the workspace is
+  updated in the same change so `cargo check --workspace --all-features
+  --all-targets` stays green.
+- Enqueue failures surface as `QueueError`, not a panic or silent drop.
+- `JobEnvelope<T>` keeps its `Serialize`/`Deserialize` derives; no unrelated
+  public-API surface is removed.
+- Tests run against a real local Redis (`docker compose -f
+  infra/local/docker-compose.yml up -d redis`), not a mock — this task's
+  entire purpose is proving the real backend works.
+- The in-memory queue implementations are untouched and remain available for
+  existing unit tests.
+
+**Files expected to change:**
+- `crates/jobs/src/lib.rs`
+- `crates/jobs/Cargo.toml` (add `apalis-redis` dependency; confirm exact
+  package name before use)
+- Root `Cargo.toml` (`apalis-redis`, `async-trait`, `tokio-test` workspace
+  entries)
+- Per the 2026-07-26 amendment, the mechanical async call-site updates only:
+  `apps/api/src/routes/ingestion.rs`, `apps/api/tests/ingestion_test.rs`,
+  `apps/api/Cargo.toml` (dev-dep `async-trait`),
+  `apps/worker-runner/src/subtitle_enqueue.rs`,
+  `apps/worker-runner/src/transcription_runtime.rs`,
+  `apps/worker-runner/src/preparation_runtime_tests/enqueue_flow.rs`
+
+**Evidence to emit:** RRI output, local-run artifact, exact jobs test command
+(against real Redis), workspace-wide `cargo check --workspace --all-features
+--all-targets`, qwen phase-2 review artifact.
+
+**Status artifacts affected:** This ledger.
+
+**Stop condition:** Stop after the three Redis-backed queue types pass tests
+against a real local Redis instance and the workspace check is green. Per the
+2026-07-26 amendment, `apps/worker-runner` may be touched **only** for the
+mechanical `.await` / `async fn` call-site updates the trait change forces —
+the consumer loop itself is still [[S-140-T3c-ii]] and remains out of scope.
+
+**Agent handoff prompt:** Implement the Redis-backed queue types in
+`crates/jobs/src/lib.rs` using `apalis-redis`, converting the three queue
+traits to `#[async_trait] async fn enqueue`, test against real local Redis,
+propagate the async change mechanically to every existing call site and fake
+queue in the workspace, and stop before any worker-runner consumer-loop
+change.
+
+### Peer Reviewer evidence
+
+- Reviewer: `qwen3.6:27b-q4_K_M`
+- Command: `python3 scripts/gemma-code-review.py
+  .agent/peer-code-review-S-140-T3c-i-r3.packet --model qwen3.6:27b-q4_K_M
+  --task-id S-140-T3c-i --attempt 3 --passes 3 --out
+  .agent/peer-code-review-S-140-T3c-i-r3-qwen.json`
+- Artifact: `.agent/peer-code-review-S-140-T3c-i-r3-qwen.json`
+  (prior rounds: `.agent/peer-code-review-S-140-T3c-i-qwen.json` attempt 1,
+  `.agent/peer-code-review-S-140-T3c-i-r2-qwen.json` attempt 2)
+- Verdict: `PASS` — 3/3 passes succeeded, 0 consensus findings, 0 blocking,
+  0 major. Attempt 2 was `BLOCKED` on two consensus majors; both were verified
+  empirically and repaired in fix round 4 before this attempt.
+- Findings: one pass-specific `nit` (1 of 3 passes) suggesting
+  `REDIS_CONNECT_TIMEOUT` be exported for cross-crate alignment; the same
+  finding concludes "otherwise leave as is". No consensus, not actioned —
+  no other crate establishes Redis connections today, so exporting it would
+  widen the public API with no consumer.
+- Gemma fallback: `not triggered` — reason: per Step 1-B the
+  `qwen3.6:27b-q4_K_M` peer is the reviewer for RRI 41–55 and Gemma is a
+  fallback rather than an additive pass; the peer ran successfully (3/3), so
+  no fallback condition arose.
+- D14 fallback: `not triggered` — reason: peer reviewer available and returned
+  valid output on all three passes.
+- disposition_divergence: `none`
+- Primary-agent disposition: `repaired` (attempts 1–2 findings) then `accepted`
+  (attempt 3 clean); the single attempt-3 nit was rejected as a non-defect.
+
+### Reflection log
+
+Required passes: 3 (`RRI 48` → `Med-high`)
+
+#### Pass 1
+
+- **Draft verdict:** Three Redis-backed queue types compile against
+  `apalis-redis` 0.7.4 and all crate tests pass, but the queues serialize every
+  enqueue behind a process-wide `tokio::sync::Mutex` and the tests only assert
+  `enqueue(..).is_ok()`.
+- **Critique findings:**
+  - The `Mutex` is unnecessary: `RedisStorage<T>: Clone` and its default
+    `ConnectionManager` is a cheap multiplexed handle, so the lock converts a
+    concurrent path into a serial one for no correctness benefit.
+  - HP-2 was not actually covered — asserting `is_ok()` proves nothing landed
+    in Redis.
+  - EC-1's test had match arms that passed silently and could never fail.
+  - Redis tests hardcoded `redis://127.0.0.1:6379` and hard-failed in the
+    Redis-less CI `test` job.
+- **Revisions applied:**
+  - Replaced the `Mutex` with clone-per-push.
+  - Added `redis_enqueued_job_is_retrievable_from_its_namespace`, retrieving
+    through an independently-connected same-namespace `RedisStorage`.
+  - Rewrote the fail-closed test with real assertions.
+  - Gated every Redis test behind `DUBBRIDGE_REDIS_URL`, skipping when unset.
+
+#### Pass 2
+
+- **Draft verdict:** Corrections applied and 13 of 14 tests pass, but the
+  unreachable-server test does not return within 30 seconds.
+- **Critique findings:**
+  - This is a production defect, not a test defect. `apalis_redis::connect`
+    builds a redis-rs `ConnectionManager` whose
+    `ConnectionManagerConfig::DEFAULT_CONNECTION_TIMEOUT` is `None`, so an
+    unreachable or blackholed Redis hangs the caller forever. A worker booting
+    against a dead Redis would never fail closed, violating EC-1 and ADR-018.
+  - Loosening the test timeout would hide the defect rather than fix it.
+  - `fetch_by_id` has no `Ok(None)` path in this version — the namespace
+    isolation assertion was testing an unreachable branch.
+- **Revisions applied:**
+  - Bounded connect in production code with `REDIS_CONNECT_TIMEOUT = 5s`,
+    mapping elapse to `QueueError::Unavailable`.
+  - Changed the cross-namespace assertion to `.is_err()`, which is what
+    isolation actually produces here.
+  - Split the fail-closed test into malformed-URL and unreachable-server cases.
+
+#### Pass 3
+
+- **Draft verdict:** All 14 crate tests, fmt and clippy pass for
+  `dubbridge-jobs`, but the crate's three queue traits were silently changed
+  from sync to async and `JobEnvelope<T>` silently lost its serde derives.
+- **Critique findings:**
+  - `cargo check --workspace --all-features --all-targets` fails:
+    `dubbridge-api` and `dubbridge-worker-runner` no longer compile. Running
+    only the per-crate gates the task card listed is what let this through for
+    three rounds; the workspace check is now part of the gate set.
+  - The ledger's "no trait signature changes" criterion is unsatisfiable
+    against `apalis-redis` 0.7.4 and was in direct conflict with the same
+    entry's fail-closed criterion (see the 2026-07-26 amendment above).
+  - `JobEnvelope<T>` losing `Serialize`/`Deserialize` is an unrequested
+    public-API regression unrelated to the task.
+- **Revisions applied:**
+  - Restored `Serialize, Deserialize` on `JobEnvelope<T>`.
+  - Propagated the async change: `.await` at the three existing call sites,
+    `#[async_trait] async fn` on the four test-side fake queues, and
+    `async-trait` added to `apps/api`'s dev-dependencies (integration tests do
+    not see `[dependencies]`).
+  - Amended the ledger criterion and stop condition with recorded rationale
+    under owner approval.
+  - Added `cargo check --workspace --all-features --all-targets` as a
+    permanent gate for this entry.
+
+### Unit coverage certification
+
+All references are in `crates/jobs/src/lib.rs`. Tests are gated behind
+`DUBBRIDGE_REDIS_URL` and were run against a real local Redis.
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | enqueue pushes onto apalis-managed Redis storage namespaced by the job's `JOB_TYPE`, via `apalis-redis` rather than a hand-rolled client | `crates/jobs/src/lib.rs::redis_preparation_queue_connects_and_enqueues` | passed |
+| HP-1 | Happy path | same, transcription queue | `crates/jobs/src/lib.rs::redis_transcription_queue_connects_and_enqueues` | passed |
+| HP-1 | Happy path | same, subtitle queue | `crates/jobs/src/lib.rs::redis_subtitle_queue_connects_and_enqueues` | passed |
+| HP-2 | Happy path | an enqueued job is retrievable from the same Redis namespace a consumer would poll, with the payload intact | `crates/jobs/src/lib.rs::redis_enqueued_job_is_retrievable_from_its_namespace` | passed |
+| EC-1 | Edge case | an unreachable Redis fails closed as `QueueError::Unavailable` in bounded time, never a hang or panic | `crates/jobs/src/lib.rs::redis_queue_fails_closed_on_unreachable_server` | passed |
+| EC-1 | Edge case | a malformed connection URL fails closed as `QueueError::Unavailable` | `crates/jobs/src/lib.rs::redis_queue_fails_closed_on_malformed_url` | passed |
+| EC-2 | Edge case | the three queues use distinct namespaces, so a job of one type is not retrievable through another type's storage handle | `crates/jobs/src/lib.rs::redis_queues_use_distinct_namespaces` | passed |
+
+**Coverage gate.** `make qa-coverage` passes at **94.46% lines / 92.83%
+functions** workspace-wide (`COVERAGE_MIN = 90`), run with both
+`DUBBRIDGE_DATABASE_URL` and `DUBBRIDGE_REDIS_URL` set so no DB- or
+Redis-gated test silently skips. A first run without `DUBBRIDGE_DATABASE_URL`
+reported 68.35% — that was an environment artifact, not a coverage regression.
+
+**Caveat, recorded deliberately:** `crates/jobs/src/lib.rs` is listed in
+`COVERAGE_IGNORE_REGEX` (`Makefile:14`), a pre-existing exclusion this task did
+not introduce and did not change. The workspace gate therefore does **not**
+measure the file this task modifies. Measured directly instead:
+
+```
+cargo llvm-cov -p dubbridge-jobs --summary-only -- --test-threads=1
+crates/jobs/src/lib.rs   lines 92.41%   regions 92.19%   functions 81.25%
+```
+
+This clears the 90% line bar on its own. The function-level figure is lower
+because the derived and trait-forwarding stubs (`JobEnvelope` derives, the
+`#[async_trait]` shims) are counted as uncovered functions. Whether to remove
+`crates/jobs/src/lib.rs` from `COVERAGE_IGNORE_REGEX` now that it carries real
+logic is a separate decision for the owner, not something this task changed.
+
+### Owner final verification
+
+- Owner: `Matias (owner authorization via task-flow decision, 2026-07-26)`
+- Date: `2026-07-26`
+- Statement: Owner authorized committing this task's implementation and
+  re-confirmed the async-trait amendment above, given in response to an
+  explicit AskUserQuestion prompt raised during S-140-T3c-ii presentation
+  (owner chose "commit T3c-i first" to unblock the dependent task, then
+  explicitly chose "treat as confirmed" when asked whether that extends to
+  filling in this verification block and marking this task Done). This is a
+  task-flow authorization, not a statement that the owner independently
+  re-ran every acceptance test line by line.
+- Commands run: see agent-run verification block below; owner did not run
+  additional commands beyond authorizing this closure.
+
+> Verification commands run by the agent on the implementation worktree
+> `.agent/worktrees/s-140-t3c-i`, all green:
+>
+> ```
+> cargo check --workspace --all-features --all-targets
+> DUBBRIDGE_REDIS_URL=redis://127.0.0.1:6379 cargo test -p dubbridge-jobs   # 14 passed, 0 failed
+> cargo test -p dubbridge-jobs                                             # 14 passed, 0 failed (CI path)
+> DUBBRIDGE_REDIS_URL=redis://127.0.0.1:6379 cargo test --workspace --all-features   # 0 failed
+> cargo fmt --all -- --check
+> cargo clippy -p dubbridge-jobs -p dubbridge-api -p dubbridge-worker-runner --all-features --all-targets -- -D warnings
+> make qa-docs
+> ```
+
+**Status: [x] Done — 2026-07-26, implemented on worktree
+`.agent/worktrees/s-140-t3c-i`, owner authorized commit and closure via
+task-flow decision during S-140-T3c-ii presentation. Phase-2 peer review
+PASS. All acceptance gates green (build, tests, fmt, clippy, qa-docs,
+qa-coverage).**
+
+---
+
+## S-140-T3c-ii: Wire real apalis consumer loop for worker-runner queues
+
+**Effort:** L (RRI 42 — Med-high; `python3 scripts/rri.py --auto-cc --T 3 --A 2
+--X 3 --D 3 --K 4 --P 2 --touches apps/worker-runner/src/main.rs --touches
+apps/worker-runner/Cargo.toml --platform rust`)
+**Depends on:** S-140-T3c-i
+**Status:** Not started — split from S-140-T3c 2026-07-25; not yet presented
+for approval
+
+> Split from the original T3c; see [[S-140-T3c]] for the rationale and the
+> owner-decided topology (one `Monitor`, one `WorkerBuilder` per queue).
+> Depends on [[S-140-T3c-i]]'s Redis-backed queue types — this half only
+> wires the consumer side.
+>
+> **Implementation route:** same Med-high local-first routing as
+> [[S-140-T3c-i]].
+
+**Happy paths considered:**
+- HP-1: On startup, `main()` builds one apalis `Monitor` registering three
+  `WorkerBuilder`s (preparation, transcription, subtitle), each backed by its
+  [[S-140-T3c-i]] Redis queue, dispatching to `process_preparation_job`,
+  `process_transcription_job`, and `process_subtitle_job` respectively.
 - HP-2: The process stays alive and keeps consuming until shutdown signal.
 
 **Edge cases considered:**
-- EC-1: A panic or error in one handler must not crash the consumer loop for
-  the other queues.
-- EC-2: Graceful shutdown (SIGTERM) drains in-flight jobs before exit.
+- EC-1: A panic or error in one queue's handler does not crash consumption of
+  the other two queues (apalis's per-`WorkerBuilder` isolation, verified by
+  test, not assumed from the library's documented behavior alone).
+- EC-2: Graceful shutdown (SIGTERM) drains in-flight jobs before exit, or this
+  is explicitly documented as untestable in this harness with the reason
+  stated.
 - EC-3: Worker concurrency respects `config.worker_concurrency` (already
-  loaded and logged, currently unused for this purpose).
+  loaded and logged, currently unused for this purpose) — applied per queue,
+  consistent with the owner-decided topology.
 
 **Inputs:** Existing handler functions (`process_preparation_job`,
-`process_transcription_job`, and `process_subtitle_job` once T3b lands),
-`dubbridge_jobs::default_queue()`, `config.worker_concurrency`.
+`process_transcription_job`, `process_subtitle_job`), the three
+[[S-140-T3c-i]] Redis-backed queue types, `config.worker_concurrency`.
 
 **Outputs:** A production-real apalis consumer loop in `main.rs` covering all
 three worker-runner queues.
@@ -1691,6 +2035,12 @@ three worker-runner queues.
 
 **Files expected to change:**
 - `apps/worker-runner/src/main.rs`
+- `apps/worker-runner/Cargo.toml` (only if a new direct dependency on
+  `apalis-redis` types is required beyond what `crates/jobs` already
+  re-exports)
+
+**Evidence to emit:** RRI output, local-run artifact, exact worker-runner test
+command, qwen phase-2 review artifact.
 
 **Status artifacts affected:** This ledger; S-140 plan if RRI/decomposition
 changes.
@@ -1698,12 +2048,13 @@ changes.
 **Stop condition:** Stop once all three handlers are demonstrably wired to a
 real consumer loop with passing tests. Do not change job payload schemas.
 
-**Agent handoff prompt:** Wire a real apalis consumer loop in `main.rs` for
-the preparation, transcription, and subtitle queues only; do not change
-handler logic or payload schemas.
+**Agent handoff prompt:** Wire a real apalis `Monitor`/`WorkerBuilder` consumer
+loop in `main.rs` for the preparation, transcription, and subtitle queues
+using the [[S-140-T3c-i]] Redis-backed queues only; do not change handler
+logic or payload schemas.
 
-**Status: [ ] Not started — RRI not yet computed; requires its own
-presentation and approval before implementation, per the workflow guide.**
+**Status: [ ] Not started — RRI 42 computed 2026-07-25; requires presentation
+and approval before implementation.**
 
 ---
 
