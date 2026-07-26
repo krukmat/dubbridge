@@ -233,6 +233,12 @@ impl RedisPreparationJobQueue {
             .map(|parts| parts.task_id)
             .map_err(|e| QueueError::Unavailable(format!("redis enqueue failed: {e}")))
     }
+
+    /// Owned clone of the underlying apalis backend, for attaching this
+    /// queue's namespace to a `WorkerBuilder` as a consumer.
+    pub fn backend(&self) -> apalis_redis::RedisStorage<PreparationJob> {
+        self.storage.clone()
+    }
 }
 
 #[async_trait::async_trait]
@@ -275,6 +281,12 @@ impl RedisTranscriptionJobQueue {
             .map(|parts| parts.task_id)
             .map_err(|e| QueueError::Unavailable(format!("redis enqueue failed: {e}")))
     }
+
+    /// Owned clone of the underlying apalis backend, for attaching this
+    /// queue's namespace to a `WorkerBuilder` as a consumer.
+    pub fn backend(&self) -> apalis_redis::RedisStorage<TranscriptionJob> {
+        self.storage.clone()
+    }
 }
 
 #[async_trait::async_trait]
@@ -316,6 +328,12 @@ impl RedisSubtitleJobQueue {
             .await
             .map(|parts| parts.task_id)
             .map_err(|e| QueueError::Unavailable(format!("redis enqueue failed: {e}")))
+    }
+
+    /// Owned clone of the underlying apalis backend, for attaching this
+    /// queue's namespace to a `WorkerBuilder` as a consumer.
+    pub fn backend(&self) -> apalis_redis::RedisStorage<SubtitleJob> {
+        self.storage.clone()
     }
 }
 
