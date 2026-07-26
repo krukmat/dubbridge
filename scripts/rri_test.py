@@ -130,13 +130,24 @@ class Bands(unittest.TestCase):
 
 
 class Decomposition(unittest.TestCase):
+    def test_final_rri_55_does_not_trigger_by_band_alone(self):
+        scores = {name: 0 for name in rri.VARS}
+        self.assertEqual(rri.detect_triggers(55, 55, scores, {}), [])
+
+    def test_final_rri_56_triggers_decomposition(self):
+        scores = {name: 0 for name in rri.VARS}
+        self.assertEqual(
+            rri.detect_triggers(56, 56, scores, {}),
+            ["RRI >= 56"],
+        )
+
     def test_complex_and_domain_triggers(self):
         r = rri.evaluate(c_score=4, f_override=0, d=3, k=0, p=0, t=0, a=0, x=0)
         self.assertTrue(any("C >= 4 and D >= 3" in t for t in r["triggers"]))
 
     def test_high_rri_triggers(self):
         r = rri.evaluate(c_score=5, f_override=5, d=5, k=5, p=5, t=5, a=5, x=5)
-        self.assertTrue(any("RRI > 70" in t for t in r["triggers"]))
+        self.assertEqual(r["triggers"].count("RRI >= 56"), 1)
 
     def test_no_trigger_low(self):
         r = rri.evaluate(c_score=1, f_override=1, d=1, k=1, p=0, t=2, a=0, x=2)

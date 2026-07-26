@@ -472,8 +472,8 @@ def resolve_band(rri):
 def detect_triggers(rri, base, scores, applied):
     """Return the list of decomposition triggers that fired (RRI_POLICY.md)."""
     triggers = []
-    if rri > 70:
-        triggers.append("RRI > 70")
+    if rri >= 56:
+        triggers.append("RRI >= 56")
     if base > 100:
         triggers.append("base RRI > 100")
     if scores["F"] >= 4 and scores["K"] >= 3:
