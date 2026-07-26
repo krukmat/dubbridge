@@ -18,8 +18,15 @@ from urllib import error, request
 
 ARTIFACT_SCHEMA_VERSION = "adr037-local-architect-artifact-v1"
 PROMPT_VERSION = "adr037-local-architect-prompt-v1"
+DEFAULT_PROFILE = "adr037"
+MED_HIGH_REFINEMENT_PROFILE = "med-high-refinement-v1"
+MED_HIGH_REFINEMENT_PROMPT_VERSION = "med-high-refinement-prompt-v1"
+PROFILE_PROMPT_VERSIONS = {
+    DEFAULT_PROFILE: PROMPT_VERSION,
+    MED_HIGH_REFINEMENT_PROFILE: MED_HIGH_REFINEMENT_PROMPT_VERSION,
+}
 EXPECTED_CLAIM_LABELS = {"SUPPORTED", "INFERRED", "UNKNOWN"}
-REQUIRED_RESPONSE_FIELDS = {
+ADR037_REQUIRED_RESPONSE_FIELDS = {
     "objective": str,
     "current_state": str,
     "constraints": list,
@@ -29,6 +36,19 @@ REQUIRED_RESPONSE_FIELDS = {
     "evidence_gaps": list,
     "claims": list,
 }
+MED_HIGH_REFINEMENT_REQUIRED_RESPONSE_FIELDS = {
+    "route_recommendation": str,
+    "summary": str,
+    "refined_scope": list,
+    "excluded_scope": list,
+    "implementation_steps": list,
+    "acceptance_tests": list,
+    "risks": list,
+    "unknowns": list,
+    "stop_conditions": list,
+    "claims": list,
+}
+MED_HIGH_ROUTE_RECOMMENDATIONS = {"GO_LOCAL", "CLOUD_REQUIRED"}
 
 
 class AnalysisError(RuntimeError):
@@ -52,6 +72,7 @@ class Config:
     temperature: float
     num_predict: int
     overwrite: bool
+    profile: str = DEFAULT_PROFILE
 
 
 def utc_now() -> str:
@@ -62,27 +83,55 @@ def sha256_bytes(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def build_prompt(packet: dict[str, Any]) -> str:
+def build_prompt(packet: dict[str, Any], profile: str = DEFAULT_PROFILE) -> str:
     packet_json = json.dumps(packet, ensure_ascii=True, indent=2, sort_keys=True)
-    return (
-        "You are the DubBridge Local Architect / Complex Analyst. "
-        "You are advisory-only, read-only, and must not claim authority.\n\n"
-        "Return JSON only. Do not use Markdown fences.\n"
-        "Required schema:\n"
-        "{\n"
-        '  "objective": string,\n'
-        '  "current_state": string,\n'
-        '  "constraints": [string],\n'
-        '  "risks": [string],\n'
-        '  "recommendations": [string],\n'
-        '  "open_questions": [string],\n'
-        '  "evidence_gaps": [string],\n'
-        '  "claims": [{"statement": string, "label": "SUPPORTED|INFERRED|UNKNOWN"}]\n'
-        "}\n\n"
-        "Use only facts supported by the packet. Mark uncertainty explicitly.\n\n"
-        "Project packet:\n"
-        f"{packet_json}\n"
-    )
+    if profile == DEFAULT_PROFILE:
+        # Keep the ADR-037 prompt byte-for-byte stable for callers that do not
+        # select a profile explicitly.
+        return (
+            "You are the DubBridge Local Architect / Complex Analyst. "
+            "You are advisory-only, read-only, and must not claim authority.\n\n"
+            "Return JSON only. Do not use Markdown fences.\n"
+            "Required schema:\n"
+            "{\n"
+            '  "objective": string,\n'
+            '  "current_state": string,\n'
+            '  "constraints": [string],\n'
+            '  "risks": [string],\n'
+            '  "recommendations": [string],\n'
+            '  "open_questions": [string],\n'
+            '  "evidence_gaps": [string],\n'
+            '  "claims": [{"statement": string, "label": "SUPPORTED|INFERRED|UNKNOWN"}]\n'
+            "}\n\n"
+            "Use only facts supported by the packet. Mark uncertainty explicitly.\n\n"
+            "Project packet:\n"
+            f"{packet_json}\n"
+        )
+    if profile == MED_HIGH_REFINEMENT_PROFILE:
+        return (
+            "You are the DubBridge Local Architect refining one approved Med-high task. "
+            "You are advisory-only, read-only, tool-free, and must not claim approval or implementation authority.\n\n"
+            "Return JSON only. Do not use Markdown fences.\n"
+            "Required schema:\n"
+            "{\n"
+            '  "route_recommendation": "GO_LOCAL|CLOUD_REQUIRED",\n'
+            '  "summary": string,\n'
+            '  "refined_scope": [string],\n'
+            '  "excluded_scope": [string],\n'
+            '  "implementation_steps": [string],\n'
+            '  "acceptance_tests": [string],\n'
+            '  "risks": [string],\n'
+            '  "unknowns": [string],\n'
+            '  "stop_conditions": [string],\n'
+            '  "claims": [{"statement": string, "label": "SUPPORTED|INFERRED|UNKNOWN"}]\n'
+            "}\n\n"
+            "Choose CLOUD_REQUIRED whenever evidence is incomplete, scope is unbounded, "
+            "acceptance is non-deterministic, or a material unknown prevents a safe bounded implementation. "
+            "Do not expand the approved scope. Use only facts supported by the packet and mark uncertainty explicitly.\n\n"
+            "Approved task packet:\n"
+            f"{packet_json}\n"
+        )
+    raise AnalysisError("invalid_profile", f"Unsupported analysis profile: {profile!r}.")
 
 
 def parse_packet(packet_bytes: bytes) -> dict[str, Any]:
@@ -154,7 +203,9 @@ def strip_json_fence(response_text: str) -> str:
     return trimmed
 
 
-def validate_response_text(response_text: str) -> dict[str, Any]:
+def validate_response_text(
+    response_text: str, profile: str = DEFAULT_PROFILE
+) -> dict[str, Any]:
     candidate = strip_json_fence(response_text)
     try:
         payload = json.loads(candidate)
@@ -162,13 +213,39 @@ def validate_response_text(response_text: str) -> dict[str, Any]:
         raise AnalysisError("invalid_response", f"Model response is not valid JSON: {exc}") from exc
     if not isinstance(payload, dict):
         raise AnalysisError("invalid_response", "Model response root must be a JSON object.")
-    for field, expected_type in REQUIRED_RESPONSE_FIELDS.items():
+    if profile == DEFAULT_PROFILE:
+        required_fields = ADR037_REQUIRED_RESPONSE_FIELDS
+        list_fields = ("constraints", "risks", "recommendations", "open_questions", "evidence_gaps")
+    elif profile == MED_HIGH_REFINEMENT_PROFILE:
+        required_fields = MED_HIGH_REFINEMENT_REQUIRED_RESPONSE_FIELDS
+        list_fields = (
+            "refined_scope",
+            "excluded_scope",
+            "implementation_steps",
+            "acceptance_tests",
+            "risks",
+            "unknowns",
+            "stop_conditions",
+        )
+    else:
+        raise AnalysisError("invalid_profile", f"Unsupported analysis profile: {profile!r}.")
+
+    for field, expected_type in required_fields.items():
         value = payload.get(field)
         if not isinstance(value, expected_type):
             raise AnalysisError("invalid_response", f"Field {field!r} is missing or has the wrong type.")
-    for field in ("constraints", "risks", "recommendations", "open_questions", "evidence_gaps"):
+    for field in list_fields:
         if not all(isinstance(item, str) and item.strip() for item in payload[field]):
             raise AnalysisError("invalid_response", f"Field {field!r} must contain only non-empty strings.")
+    if profile == MED_HIGH_REFINEMENT_PROFILE:
+        route_recommendation = payload["route_recommendation"]
+        if route_recommendation not in MED_HIGH_ROUTE_RECOMMENDATIONS:
+            raise AnalysisError(
+                "invalid_response",
+                f"Route recommendation {route_recommendation!r} is not allowed.",
+            )
+        if not payload["summary"].strip():
+            raise AnalysisError("invalid_response", "Field 'summary' must be a non-empty string.")
     claims = payload["claims"]
     if not claims:
         raise AnalysisError("invalid_response", "Field 'claims' must contain at least one claim label.")
@@ -198,6 +275,7 @@ def write_json_atomic(output_path: Path, payload: dict[str, Any], overwrite: boo
 def artifact_base(config: Config, packet_sha256: str | None = None) -> dict[str, Any]:
     return {
         "schema_version": ARTIFACT_SCHEMA_VERSION,
+        "profile": config.profile,
         "success": False,
         "status": "failed",
         "started_at": utc_now(),
@@ -213,7 +291,8 @@ def artifact_base(config: Config, packet_sha256: str | None = None) -> dict[str,
             "resolved_digest": None,
         },
         "prompt": {
-            "version": PROMPT_VERSION,
+            "profile": config.profile,
+            "version": PROFILE_PROMPT_VERSIONS.get(config.profile),
             "sha256": None,
         },
         "runtime": {
@@ -236,6 +315,13 @@ def run_analysis(
     packet_sha256 = sha256_bytes(packet_bytes)
     artifact = artifact_base(config, packet_sha256=packet_sha256)
 
+    if config.profile not in PROFILE_PROMPT_VERSIONS:
+        raise AnalysisError(
+            "invalid_profile",
+            f"Unsupported analysis profile: {config.profile!r}.",
+            context=artifact,
+        )
+
     if packet_sha256 != config.expected_packet_sha256:
         raise AnalysisError(
             "packet_hash_mismatch",
@@ -257,7 +343,7 @@ def run_analysis(
             context=artifact,
         )
 
-    prompt = build_prompt(packet)
+    prompt = build_prompt(packet, profile=config.profile)
     artifact["prompt"]["sha256"] = sha256_bytes(prompt.encode("utf-8"))
     request_payload = {
         "model": config.model_tag,
@@ -281,7 +367,10 @@ def run_analysis(
     if not isinstance(response_text, str) or not response_text.strip():
         raise AnalysisError("invalid_response", "Ollama generate response is missing the response text.", context=artifact)
 
-    validated = validate_response_text(response_text)
+    try:
+        validated = validate_response_text(response_text, profile=config.profile)
+    except AnalysisError as exc:
+        raise AnalysisError(exc.code, str(exc), context=artifact) from exc
     artifact["success"] = True
     artifact["status"] = "ok"
     artifact["finished_at"] = utc_now()
@@ -334,6 +423,12 @@ def build_failure_artifact(config: Config, exc: AnalysisError) -> dict[str, Any]
 def parse_args() -> Config:
     parser = argparse.ArgumentParser(description="Run one Local Architect analysis with a frozen packet.")
     parser.add_argument("--packet", required=True, help="Path to the immutable JSON packet.")
+    parser.add_argument(
+        "--profile",
+        choices=tuple(PROFILE_PROMPT_VERSIONS),
+        default=DEFAULT_PROFILE,
+        help="Structured analysis profile (default preserves the ADR-037 contract).",
+    )
     parser.add_argument("--expected-packet-sha256", required=True, help="Expected SHA-256 for the packet bytes.")
     parser.add_argument("--output", required=True, help="Artifact path to write atomically.")
     parser.add_argument("--model-tag", default="qwen3.6:27b-q4_K_M", help="Exact Ollama model tag to verify and run.")
@@ -359,6 +454,7 @@ def parse_args() -> Config:
         temperature=args.temperature,
         num_predict=args.num_predict,
         overwrite=args.overwrite,
+        profile=args.profile,
     )
 
 

@@ -308,5 +308,133 @@ class RunAnalysisTest(unittest.TestCase):
         self.assertEqual(self.output_path.read_text(encoding="utf-8"), '{"status":"keep"}\n')
 
 
+def _med_high_response(route_recommendation: str = "GO_LOCAL") -> str:
+    return json.dumps(
+        {
+            "route_recommendation": route_recommendation,
+            "summary": "Bounded refinement of the approved Med-high task.",
+            "refined_scope": ["Implement the validator module."],
+            "excluded_scope": ["Product architecture changes."],
+            "implementation_steps": ["Add module.", "Add tests."],
+            "acceptance_tests": ["python3 scripts/local-agent/med_high_gate_test.py"],
+            "risks": ["Schema drift between profiles."],
+            "unknowns": ["Exact primary attestation format."],
+            "stop_conditions": ["Any acceptance test fails once."],
+            "claims": [{"statement": "Scope matches the approved card.", "label": "SUPPORTED"}],
+        }
+    )
+
+
+class MedHighRefinementProfileTest(unittest.TestCase):
+    """Tests for the med-high-refinement-v1 profile (Task T1)."""
+
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmpdir.cleanup)
+        self.root = Path(self.tmpdir.name)
+        self.packet_path = self.root / "packet.json"
+        self.packet_path.write_bytes(_packet_bytes())
+        self.packet_sha = _MOD.sha256_bytes(self.packet_path.read_bytes())
+        self.output_path = self.root / "artifact.json"
+        self.base_config = _MOD.Config(
+            packet_path=self.packet_path,
+            expected_packet_sha256=self.packet_sha,
+            output_path=self.output_path,
+            model_tag="qwen3.6:27b-q4_K_M",
+            expected_model_digest="a50eda8ed977ab48a12431878896b27ffd5cef552c17af3317d9623b939a7f1e",
+            ollama_url="http://127.0.0.1:11434",
+            timeout_seconds=5.0,
+            temperature=0.0,
+            num_predict=1024,
+            overwrite=False,
+            profile=_MOD.MED_HIGH_REFINEMENT_PROFILE,
+        )
+
+    def test_hp1_default_profile_prompt_and_schema_are_unchanged(self) -> None:
+        # ADR-037 backward compatibility: the default profile must keep using
+        # PROMPT_VERSION and the original required-field set.
+        packet = _MOD.parse_packet(_packet_bytes())
+        prompt = _MOD.build_prompt(packet, profile=_MOD.DEFAULT_PROFILE)
+        self.assertIn('"objective": string', prompt)
+        self.assertNotIn("route_recommendation", prompt)
+        self.assertEqual(
+            _MOD.PROFILE_PROMPT_VERSIONS[_MOD.DEFAULT_PROFILE], _MOD.PROMPT_VERSION
+        )
+
+    def test_hp2_go_local_response_produces_hash_bound_success_artifact(self) -> None:
+        fetcher = FakeFetcher(
+            self.base_config.expected_model_digest,
+            _med_high_response("GO_LOCAL"),
+        )
+
+        artifact = _MOD.run_analysis(self.base_config, fetcher=fetcher)
+        _MOD.write_json_atomic(self.output_path, artifact, overwrite=False)
+        written = json.loads(self.output_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(written["success"])
+        self.assertEqual(written["profile"], _MOD.MED_HIGH_REFINEMENT_PROFILE)
+        self.assertEqual(written["prompt"]["version"], _MOD.MED_HIGH_REFINEMENT_PROMPT_VERSION)
+        self.assertEqual(written["model"]["resolved_digest"], self.base_config.expected_model_digest)
+        self.assertEqual(written["response"]["validated"]["route_recommendation"], "GO_LOCAL")
+        self.assertEqual(written["packet"]["sha256"], self.packet_sha)
+
+    def test_hp2b_cloud_required_response_produces_hash_bound_success_artifact(self) -> None:
+        fetcher = FakeFetcher(
+            self.base_config.expected_model_digest,
+            _med_high_response("CLOUD_REQUIRED"),
+        )
+
+        artifact = _MOD.run_analysis(self.base_config, fetcher=fetcher)
+
+        self.assertTrue(artifact["success"])
+        self.assertEqual(artifact["response"]["validated"]["route_recommendation"], "CLOUD_REQUIRED")
+
+    def test_ec1_invalid_route_recommendation_fails_closed(self) -> None:
+        fetcher = FakeFetcher(
+            self.base_config.expected_model_digest,
+            _med_high_response("MAYBE_LOCAL"),
+        )
+
+        with self.assertRaises(_MOD.AnalysisError) as ctx:
+            _MOD.run_analysis(self.base_config, fetcher=fetcher)
+
+        artifact = _MOD.build_failure_artifact(self.base_config, ctx.exception)
+        _MOD.write_json_atomic(self.output_path, artifact, overwrite=False)
+        written = json.loads(self.output_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(ctx.exception.code, "invalid_response")
+        self.assertEqual(written["error"]["code"], "invalid_response")
+
+    def test_ec1b_missing_med_high_field_fails_closed(self) -> None:
+        payload = json.loads(_med_high_response("GO_LOCAL"))
+        del payload["stop_conditions"]
+        fetcher = FakeFetcher(self.base_config.expected_model_digest, json.dumps(payload))
+
+        with self.assertRaises(_MOD.AnalysisError) as ctx:
+            _MOD.run_analysis(self.base_config, fetcher=fetcher)
+
+        self.assertEqual(ctx.exception.code, "invalid_response")
+
+    def test_ec1c_empty_summary_fails_closed(self) -> None:
+        payload = json.loads(_med_high_response("GO_LOCAL"))
+        payload["summary"] = "   "
+        fetcher = FakeFetcher(self.base_config.expected_model_digest, json.dumps(payload))
+
+        with self.assertRaises(_MOD.AnalysisError) as ctx:
+            _MOD.run_analysis(self.base_config, fetcher=fetcher)
+
+        self.assertEqual(ctx.exception.code, "invalid_response")
+
+    def test_ec2_unsupported_profile_fails_closed_before_any_network_call(self) -> None:
+        fetcher = FakeFetcher(self.base_config.expected_model_digest, "{}")
+        config = _MOD.Config(**{**vars(self.base_config), "profile": "not-a-real-profile"})
+
+        with self.assertRaises(_MOD.AnalysisError) as ctx:
+            _MOD.run_analysis(config, fetcher=fetcher)
+
+        self.assertEqual(ctx.exception.code, "invalid_profile")
+        self.assertFalse(fetcher.calls)
+
+
 if __name__ == "__main__":
     unittest.main()
