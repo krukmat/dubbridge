@@ -35,6 +35,7 @@ import med_high_gate
 
 MED_HIGH_WALL_CLOCK_SECONDS = 300
 MED_HIGH_RUNNER_MODEL = "qwen3.6:35b-a3b"
+POST_KILL_WAIT_SECONDS = 5
 ROUTE_GO_LOCAL = med_high_gate.ROUTE_GO_LOCAL
 ROUTE_CLOUD_REQUIRED = med_high_gate.ROUTE_CLOUD_REQUIRED
 
@@ -49,11 +50,50 @@ class SupervisorResult:
     runner_result: dict[str, Any] | None
     bundle_path: str | None
     elapsed_s: float
+    bundle_write_ok: bool = True
+
+
+@dataclass(frozen=True)
+class BundleWriteResult:
+    path: str
+    write_ok: bool
+    write_error: str | None
 
 
 def _load_json(path: str) -> dict[str, Any]:
     with open(path, encoding="utf-8") as f:
         return json.load(f)
+
+
+def _load_optional_artifact_json(path: str | None) -> tuple[Any | None, str | None]:
+    """Load an optional gate artifact (refinement artifact or primary
+    receipt), never letting an existing-but-unreadable file crash bundle
+    construction (plan Defect B). Existence (os.path.isfile) is not
+    readability -- the correct idiom, mirroring _read_runner_out, is
+    try/except around the read itself. Returns (value, error): error is None
+    on success or on a genuinely absent path; value is None whenever error is
+    not None."""
+    if not path or not os.path.isfile(path):
+        return None, None
+    try:
+        return _load_json(path), None
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        return None, str(exc)
+
+
+class GateInputError(Exception):
+    """A gate artifact (refinement artifact or primary receipt) could not be
+    read or parsed. Distinct from med_high_gate.GateError, which signals a
+    successfully-read artifact that failed gate validation. Caught by
+    supervise() alongside GateError so a corrupt or unreadable gate input
+    surfaces as CLOUD_REQUIRED with a bundle, never an uncaught traceback
+    (plan Defect C, D6)."""
+
+    def __init__(self, artifact_label: str, path: str, error: str):
+        self.artifact_label = artifact_label
+        self.path = path
+        self.error = error
+        super().__init__(f"{artifact_label} unreadable: {path}: {error}")
 
 
 def decide_route(
@@ -62,8 +102,14 @@ def decide_route(
     """Thin wrapper over the T2 gate: pure, offline, fail-closed. Any read or
     validation failure is surfaced as CLOUD_REQUIRED by the caller, never as
     an uncaught exception that could be mistaken for a crash."""
-    refinement_artifact = _load_json(refinement_artifact_path)
-    primary_receipt = _load_json(primary_receipt_path)
+    try:
+        refinement_artifact = _load_json(refinement_artifact_path)
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise GateInputError("refinement artifact", refinement_artifact_path, str(exc)) from exc
+    try:
+        primary_receipt = _load_json(primary_receipt_path)
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise GateInputError("primary receipt", primary_receipt_path, str(exc)) from exc
     return med_high_gate.evaluate_route(
         refinement_artifact=refinement_artifact,
         primary_receipt=primary_receipt,
@@ -136,7 +182,18 @@ def run_supervised_runner(
                 "reason": f"run_local_task.py exceeded the {wall_clock_seconds}s Med-high wall clock; process group kill failed: {exc}",
                 "elapsed_s": time.monotonic() - start,
             }
-        process.wait()
+        try:
+            process.wait(timeout=POST_KILL_WAIT_SECONDS)
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            # D10: the process group has already been sent SIGKILL, so this
+            # wait should return promptly; a hung wait or a wait-time OSError
+            # (e.g. ECHILD if something else already reaped it) must not
+            # prevent supervise() from reaching bundle construction.
+            return {
+                "status": "wall_clock_exceeded",
+                "reason": f"run_local_task.py exceeded the {wall_clock_seconds}s Med-high wall clock; process group killed; post-kill wait failed: {exc}",
+                "elapsed_s": time.monotonic() - start,
+            }
         elapsed_s = time.monotonic() - start
         return {
             "status": "wall_clock_exceeded",
@@ -155,13 +212,51 @@ def run_supervised_runner(
     return {"status": "runner_exited", "elapsed_s": elapsed_s, "returncode": 0}
 
 
-def _read_runner_out(out_path: str) -> dict[str, Any] | None:
+def _read_runner_out(out_path: str) -> tuple[dict[str, Any] | None, str | None]:
+    """Returns (value, failure_reason): value is the parsed runner output on
+    success, or None on either a read failure or a wrong-shaped-but-parsed
+    value. failure_reason is only set for the wrong-shape case, since that is
+    the only one with a meaningful reason to report -- a missing/undecodable
+    file has nothing to shape-check (plan D9: consumed directly by the
+    caller, which renders "MISSING with reason", not routed through
+    escalation_packet.py's ADR-036-specific result.get("reason") convention)."""
     if not os.path.isfile(out_path):
-        return None
+        return None, None
     try:
-        return _load_json(out_path)
-    except (OSError, json.JSONDecodeError):
-        return None
+        parsed = _load_json(out_path)
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return None, None
+    return escalation_packet.validate_json_object_shape(parsed)
+
+
+def _render_gate_artifact_sections(
+    *, refinement_artifact_path: str | None, primary_receipt_path: str | None
+) -> tuple[str, str, str]:
+    """Render the refinement-artifact section, primary-receipt section, and
+    refinement-artifact SHA-256 field, each fail-visible on a read failure
+    rather than raising (plan Defect B/T2). Split out of build_evidence_bundle
+    to keep its own cyclomatic complexity under the radon ceiling."""
+    refinement_artifact, refinement_error = _load_optional_artifact_json(refinement_artifact_path)
+    primary_receipt, receipt_error = _load_optional_artifact_json(primary_receipt_path)
+
+    if refinement_error is not None:
+        refinement_section = f"{escalation_packet.MISSING} (refinement artifact unreadable: {refinement_artifact_path}: {refinement_error})"
+        refinement_sha_field = f"{escalation_packet.MISSING} (not computed: source unreadable)"
+    elif refinement_artifact is not None:
+        refinement_section = json.dumps(refinement_artifact, indent=2, sort_keys=True)
+        refinement_sha_field = med_high_gate.sha256_of(refinement_artifact)
+    else:
+        refinement_section = escalation_packet.MISSING
+        refinement_sha_field = escalation_packet.MISSING
+
+    if receipt_error is not None:
+        receipt_section = f"{escalation_packet.MISSING} (primary receipt unreadable: {primary_receipt_path}: {receipt_error})"
+    elif primary_receipt is not None:
+        receipt_section = json.dumps(primary_receipt, indent=2, sort_keys=True)
+    else:
+        receipt_section = escalation_packet.MISSING
+
+    return refinement_section, receipt_section, refinement_sha_field
 
 
 def build_evidence_bundle(
@@ -170,70 +265,77 @@ def build_evidence_bundle(
     card_path: str,
     runner_out_path: str,
     stop_reason: str,
+    elapsed_s: float = 0.0,
     refinement_artifact_path: str | None = None,
     primary_receipt_path: str | None = None,
     effective_limits: dict[str, Any] | None = None,
     diff_file: str | None = None,
     rri_table: str | None = None,
     card_hash: str | None = None,
-) -> str:
+) -> BundleWriteResult:
     """Assemble the ADR-038 section 5 cloud-escalation bundle.
 
     Reuses escalation_packet.build_packet for the seven ADR-036 sections
     (task spec/RRI, plan, allowed paths, diff, commands, tests, per-attempt
-    summaries) verbatim, then appends the four ADR-038-specific sections the
-    section-5 evidence list requires beyond ADR-036's original scope: the
-    refinement artifact, the primary receipt, the effective limits, and an
-    explicit stop-reason/hash/model-identity/elapsed-time footer. Every
-    missing optional input renders literal "MISSING" text, the same
-    fail-visible convention escalation_packet.py already uses, rather than
-    silently omitting a section cloud continuation might need.
+    summaries) verbatim, then appends the ADR-038-specific sections the
+    section-5 evidence list requires beyond ADR-036's original scope:
+    acceptance tests, the refinement artifact, the primary receipt, the
+    effective limits, and an explicit stop-reason/hash/model-identity/
+    elapsed-time footer. Every missing optional input renders literal
+    "MISSING" text, the same fail-visible convention escalation_packet.py
+    already uses, rather than silently omitting a section cloud continuation
+    might need.
+
+    Writes atomically (temp file + fsync + os.replace) and never raises on a
+    write failure (plan Defect E/D8): the caller inspects the returned
+    BundleWriteResult instead. This is the plan's one deliberate exception
+    besides the task-card read -- a storage-layer failure is reported
+    structurally, not converted into a successful write.
     """
     card = escalation_packet.load_card(card_path)
-    runner_result = _read_runner_out(runner_out_path) or {}
-    diff_text = escalation_packet.read_text_file(diff_file)
+    runner_value, runner_shape_failure_reason = _read_runner_out(runner_out_path)
+    if runner_shape_failure_reason is not None:
+        runner_result = {"status": "transcript_shape_invalid", "reason": runner_shape_failure_reason}
+    else:
+        runner_result = runner_value or {}
+    diff_text, diff_missing = escalation_packet.read_optional_text_file(diff_file, label="diff file")
     rri_table_text = escalation_packet.resolve_rri_table(rri_table)
 
-    base_packet = escalation_packet.build_packet(card, runner_result, diff_text, rri_table_text)
-
-    refinement_artifact = (
-        _load_json(refinement_artifact_path)
-        if refinement_artifact_path and os.path.isfile(refinement_artifact_path)
-        else None
+    base_packet = escalation_packet.build_packet(
+        card, runner_result, diff_text, rri_table_text, diff_missing=diff_missing
     )
-    primary_receipt = (
-        _load_json(primary_receipt_path)
-        if primary_receipt_path and os.path.isfile(primary_receipt_path)
-        else None
+
+    refinement_section, receipt_section, refinement_sha_field = _render_gate_artifact_sections(
+        refinement_artifact_path=refinement_artifact_path,
+        primary_receipt_path=primary_receipt_path,
+    )
+
+    acceptance_tests = card.get("acceptance_tests") or []
+    acceptance_tests_section = (
+        "\n".join(f"- `{t}`" for t in acceptance_tests)
+        if acceptance_tests
+        else escalation_packet.MISSING
     )
 
     extra_sections = [
+        ("8. Acceptance tests", acceptance_tests_section),
+        ("9. Refinement artifact (Qwen27)", refinement_section),
+        ("10. Primary route receipt", receipt_section),
         (
-            "8. Refinement artifact (Qwen27)",
-            json.dumps(refinement_artifact, indent=2, sort_keys=True)
-            if refinement_artifact is not None
-            else escalation_packet.MISSING,
-        ),
-        (
-            "9. Primary route receipt",
-            json.dumps(primary_receipt, indent=2, sort_keys=True)
-            if primary_receipt is not None
-            else escalation_packet.MISSING,
-        ),
-        (
-            "10. Effective limits",
+            "11. Effective limits",
             json.dumps(effective_limits, indent=2, sort_keys=True)
             if effective_limits is not None
             else escalation_packet.MISSING,
         ),
         (
-            "11. Stop reason and hashes",
+            "12. Stop reason and hashes",
             (
                 f"Stop reason: `{stop_reason}`\n\n"
                 f"Card hash: `{card_hash or escalation_packet.MISSING}`\n\n"
-                f"Refinement artifact SHA-256: `{med_high_gate.sha256_of(refinement_artifact) if refinement_artifact is not None else escalation_packet.MISSING}`\n\n"
+                f"Refinement artifact SHA-256: `{refinement_sha_field}`\n\n"
                 f"Runner model: `{runner_result.get('model', escalation_packet.MISSING)}`\n\n"
-                f"Runner status: `{runner_result.get('status', escalation_packet.MISSING)}`"
+                f"Runner status: `{runner_result.get('status', escalation_packet.MISSING)}`\n\n"
+                f"Elapsed: `{elapsed_s}s`"
             ),
         ),
     ]
@@ -243,9 +345,124 @@ def build_evidence_bundle(
         parts.append(f"\n\n## {title}\n\n{body}\n")
     full_packet = "".join(parts)
 
-    with open(bundle_out_path, "w", encoding="utf-8") as f:
-        f.write(full_packet)
-    return bundle_out_path
+    return _write_bundle_atomically(bundle_out_path, full_packet)
+
+
+def _write_bundle_atomically(bundle_out_path: str, content: str) -> BundleWriteResult:
+    """Write via a temp file in the same directory, fsync, then os.replace,
+    so a reader never observes a partially-written bundle (plan D8). Catches
+    both OSError (disk/permission/path failures) and UnicodeEncodeError (an
+    unencodable code point reaching the write stream, the mirror of the
+    UnicodeDecodeError guards on the read side) and never re-raises -- the
+    caller inspects write_ok/write_error instead."""
+    tmp_path = f"{bundle_out_path}.tmp"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, bundle_out_path)
+    except (OSError, UnicodeEncodeError) as exc:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        return BundleWriteResult(path=bundle_out_path, write_ok=False, write_error=str(exc))
+    return BundleWriteResult(path=bundle_out_path, write_ok=True, write_error=None)
+
+
+def _amend_reason_for_write_failure(reason: str, write_result: BundleWriteResult) -> str:
+    """Plan D8 item 4: a write failure is reported by amending the existing
+    reason field, not by adding a new output channel."""
+    if write_result.write_ok:
+        return reason
+    return f"{reason} (bundle write failed: {write_result.write_error})"
+
+
+def _pre_launch_bundle(
+    *,
+    bundle_out_path: str,
+    card_path: str,
+    out_path: str,
+    refinement_artifact_path: str,
+    primary_receipt_path: str,
+    card_hash: str,
+    diff_file: str | None,
+    rri_table: str | None,
+    stop_reason: str,
+    status: str,
+    reason: str,
+) -> SupervisorResult:
+    """Build and emit a bundle for a route decided before any runner launch:
+    a gate rejection, an unreadable gate artifact, or a direct CLOUD_REQUIRED
+    decision. Shared by supervise()'s three pre-launch outcomes so the
+    call/wrap pattern isn't triplicated."""
+    write_result = build_evidence_bundle(
+        bundle_out_path=bundle_out_path,
+        card_path=card_path,
+        runner_out_path=out_path,
+        stop_reason=stop_reason,
+        elapsed_s=0.0,
+        refinement_artifact_path=refinement_artifact_path,
+        primary_receipt_path=primary_receipt_path,
+        card_hash=card_hash,
+        diff_file=diff_file,
+        rri_table=rri_table,
+    )
+    return SupervisorResult(
+        status=status, route=ROUTE_CLOUD_REQUIRED,
+        reason=_amend_reason_for_write_failure(reason, write_result),
+        runner_result=None, bundle_path=write_result.path, elapsed_s=0.0,
+        bundle_write_ok=write_result.write_ok,
+    )
+
+
+def _post_launch_bundle(
+    *,
+    bundle_out_path: str,
+    card_path: str,
+    out_path: str,
+    refinement_artifact_path: str,
+    primary_receipt_path: str,
+    card_hash: str,
+    diff_file: str | None,
+    rri_table: str | None,
+    launch_outcome: dict[str, Any],
+    runner_result: dict[str, Any] | None,
+    elapsed_s: float,
+) -> SupervisorResult:
+    """Build and emit a bundle once the runner has launched and did not
+    succeed (EC-1, EC-2): the stop reason is drawn from the runner's own
+    reported status when it exited cleanly, or from the launch outcome
+    itself (e.g. wall_clock_exceeded, transport_error) otherwise."""
+    stop_reason = launch_outcome["status"]
+    if launch_outcome["status"] == "runner_exited" and runner_result is not None:
+        stop_reason = runner_result.get("status", stop_reason)
+
+    effective_limits = (
+        (runner_result or {}).get("effective_limits")
+        or (runner_result or {}).get("audit_effective_limits")
+    )
+    write_result = build_evidence_bundle(
+        bundle_out_path=bundle_out_path,
+        card_path=card_path,
+        runner_out_path=out_path,
+        stop_reason=stop_reason,
+        elapsed_s=elapsed_s,
+        refinement_artifact_path=refinement_artifact_path,
+        primary_receipt_path=primary_receipt_path,
+        effective_limits=effective_limits,
+        card_hash=card_hash,
+        diff_file=diff_file,
+        rri_table=rri_table,
+    )
+    reason = launch_outcome.get("reason", stop_reason)
+    return SupervisorResult(
+        status=stop_reason, route=ROUTE_GO_LOCAL,
+        reason=_amend_reason_for_write_failure(reason, write_result),
+        runner_result=runner_result, bundle_path=write_result.path, elapsed_s=elapsed_s,
+        bundle_write_ok=write_result.write_ok,
+    )
 
 
 def supervise(
@@ -268,6 +485,13 @@ def supervise(
     to cloud immediately (HP-2) or supervise exactly one bounded Qwen35
     attempt (HP-1) and emit a complete evidence bundle on any non-success
     outcome (EC-1, EC-2)."""
+    bundle_kwargs = dict(
+        bundle_out_path=bundle_out_path, card_path=card_path, out_path=out_path,
+        refinement_artifact_path=refinement_artifact_path,
+        primary_receipt_path=primary_receipt_path, card_hash=card_hash,
+        diff_file=diff_file, rri_table=rri_table,
+    )
+
     try:
         decision = decide_route(
             refinement_artifact_path=refinement_artifact_path,
@@ -276,38 +500,22 @@ def supervise(
             rri=rri,
         )
     except med_high_gate.GateError as exc:
-        bundle_path = build_evidence_bundle(
-            bundle_out_path=bundle_out_path,
-            card_path=card_path,
-            runner_out_path=out_path,
-            stop_reason=f"gate_error:{exc.code}",
-            refinement_artifact_path=refinement_artifact_path,
-            primary_receipt_path=primary_receipt_path,
-            card_hash=card_hash,
-            diff_file=diff_file,
-            rri_table=rri_table,
+        return _pre_launch_bundle(
+            **bundle_kwargs,
+            stop_reason=f"gate_error:{exc.code}", status="gate_rejected", reason=str(exc),
         )
-        return SupervisorResult(
-            status="gate_rejected", route=ROUTE_CLOUD_REQUIRED, reason=str(exc),
-            runner_result=None, bundle_path=bundle_path, elapsed_s=0.0,
+    except GateInputError as exc:
+        return _pre_launch_bundle(
+            **bundle_kwargs,
+            stop_reason=f"gate_input_unreadable:{exc.artifact_label}",
+            status="cloud_required", reason=str(exc),
         )
 
     if decision.route == ROUTE_CLOUD_REQUIRED:
         # HP-2: routes directly to cloud without ever launching Qwen35.
-        bundle_path = build_evidence_bundle(
-            bundle_out_path=bundle_out_path,
-            card_path=card_path,
-            runner_out_path=out_path,
-            stop_reason="cloud_required",
-            refinement_artifact_path=refinement_artifact_path,
-            primary_receipt_path=primary_receipt_path,
-            card_hash=card_hash,
-            diff_file=diff_file,
-            rri_table=rri_table,
-        )
-        return SupervisorResult(
-            status="cloud_required", route=ROUTE_CLOUD_REQUIRED, reason=decision.reason,
-            runner_result=None, bundle_path=bundle_path, elapsed_s=0.0,
+        return _pre_launch_bundle(
+            **bundle_kwargs,
+            stop_reason="cloud_required", status="cloud_required", reason=decision.reason,
         )
 
     launch_outcome = run_supervised_runner(
@@ -317,7 +525,12 @@ def supervise(
         python_executable=python_executable,
     )
     elapsed_s = launch_outcome.get("elapsed_s", 0.0)
-    runner_result = _read_runner_out(out_path)
+    runner_value, runner_shape_failure_reason = _read_runner_out(out_path)
+    runner_result = (
+        {"status": "transcript_shape_invalid", "reason": runner_shape_failure_reason}
+        if runner_shape_failure_reason is not None
+        else runner_value
+    )
 
     if launch_outcome["status"] == "runner_exited" and runner_result is not None and runner_result.get("status") == STATUS_SUCCESS:
         # HP-1: exactly one exact-model runner launched, success recorded
@@ -327,29 +540,9 @@ def supervise(
             runner_result=runner_result, bundle_path=None, elapsed_s=elapsed_s,
         )
 
-    stop_reason = launch_outcome["status"]
-    if launch_outcome["status"] == "runner_exited" and runner_result is not None:
-        stop_reason = runner_result.get("status", stop_reason)
-
-    effective_limits = (
-        (runner_result or {}).get("effective_limits")
-        or (runner_result or {}).get("audit_effective_limits")
-    )
-    bundle_path = build_evidence_bundle(
-        bundle_out_path=bundle_out_path,
-        card_path=card_path,
-        runner_out_path=out_path,
-        stop_reason=stop_reason,
-        refinement_artifact_path=refinement_artifact_path,
-        primary_receipt_path=primary_receipt_path,
-        effective_limits=effective_limits,
-        card_hash=card_hash,
-        diff_file=diff_file,
-        rri_table=rri_table,
-    )
-    return SupervisorResult(
-        status=stop_reason, route=ROUTE_GO_LOCAL, reason=launch_outcome.get("reason", stop_reason),
-        runner_result=runner_result, bundle_path=bundle_path, elapsed_s=elapsed_s,
+    return _post_launch_bundle(
+        **bundle_kwargs,
+        launch_outcome=launch_outcome, runner_result=runner_result, elapsed_s=elapsed_s,
     )
 
 

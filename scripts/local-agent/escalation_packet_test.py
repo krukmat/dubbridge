@@ -62,7 +62,11 @@ REALISTIC_DIFF = (
 REALISTIC_RRI_TABLE = "| Variable | Score |\n|---|---|\n| C | 1 |\n"
 
 
-EXPECTED_GOLDEN = """# Escalation packet: `T99`
+# Captured from the repository state before any task in
+# docs/tasks/med-high-escalation-bundle-crash.md lands (plan D4). T1-T3 prove
+# their changes are byte-identical to this on every currently-working path;
+# never modified by this ticket.
+PRE_TICKET_BUNDLE_WITH_DIFF = """# Escalation packet: `T99`
 
 ## 1. Task spec + RRI table
 
@@ -187,7 +191,7 @@ class GoldenFileFormat(unittest.TestCase):
             with open(out_path, encoding="utf-8") as f:
                 actual = f.read()
 
-            self.assertEqual(actual, EXPECTED_GOLDEN)
+            self.assertEqual(actual, PRE_TICKET_BUNDLE_WITH_DIFF)
 
 
 class HP1AllSectionsPopulated(unittest.TestCase):
@@ -381,6 +385,181 @@ class RriTableAsInlineStringVsFile(unittest.TestCase):
                 content = f.read()
 
             self.assertIn("| Variable | Score |", content)
+
+
+class ReadOptionalTextFileTest(unittest.TestCase):
+    """T1 (plan Defect A/D2/D3): read_optional_text_file must never let a
+    read failure escape, and must distinguish absent/not-found/unreadable."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+
+    def test_hp2_no_path_renders_bare_missing(self):
+        text, missing = escalation_packet.read_optional_text_file(None, label="diff file")
+        self.assertIsNone(text)
+        self.assertEqual(missing, "MISSING")
+
+    def test_ec1_nonexistent_path_names_path_in_missing_text(self):
+        path = os.path.join(self.tmp.name, "does-not-exist.txt")
+        text, missing = escalation_packet.read_optional_text_file(path, label="diff file")
+        self.assertIsNone(text)
+        self.assertEqual(missing, f"MISSING (diff file not found: {path})")
+
+    def test_ec2_unreadable_existing_file_names_error(self):
+        import builtins
+
+        path = os.path.join(self.tmp.name, "unreadable.txt")
+        write_text(path, "content")
+        real_open = builtins.open
+
+        def failing_open(p, *a, **kw):
+            if p == path:
+                raise PermissionError("denied")
+            return real_open(p, *a, **kw)
+
+        builtins.open = failing_open
+        try:
+            text, missing = escalation_packet.read_optional_text_file(path, label="diff file")
+        finally:
+            builtins.open = real_open
+
+        self.assertIsNone(text)
+        self.assertEqual(missing, f"MISSING (diff file unreadable: {path}: denied)")
+
+    def test_ec3_directory_path_renders_not_found_not_uncaught(self):
+        # os.path.isfile() is False for a directory, so this falls into the
+        # not-found branch, not the unreadable branch (plan: "Scope boundary
+        # on resolve_rri_table" -- same os.path.isfile behavior applies here).
+        # It must not raise IsADirectoryError.
+        text, missing = escalation_packet.read_optional_text_file(self.tmp.name, label="diff file")
+        self.assertIsNone(text)
+        self.assertEqual(missing, f"MISSING (diff file not found: {self.tmp.name})")
+
+    def test_hp1_readable_file_returns_content_with_no_missing_text(self):
+        path = os.path.join(self.tmp.name, "diff.txt")
+        write_text(path, "some diff text")
+        text, missing = escalation_packet.read_optional_text_file(path, label="diff file")
+        self.assertEqual(text, "some diff text")
+        self.assertIsNone(missing)
+
+
+class EC4DiffFileNonexistentPathViaCli(unittest.TestCase):
+    def test_ec4_adr036_cli_nonexistent_diff_file_renders_not_found(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            transcript_path = os.path.join(tmp, "transcript.json")
+            card_path = os.path.join(tmp, "card.json")
+            out_path = os.path.join(tmp, "packet.md")
+            missing_diff_path = os.path.join(tmp, "no-such-diff.txt")
+
+            write_json(transcript_path, REALISTIC_TRANSCRIPT)
+            write_json(card_path, REALISTIC_CARD)
+
+            exit_code = escalation_packet.main(
+                [
+                    "--transcript", transcript_path,
+                    "--card", card_path,
+                    "--out", out_path,
+                    "--diff-file", missing_diff_path,
+                ]
+            )
+
+            self.assertEqual(exit_code, 0)
+            with open(out_path, encoding="utf-8") as f:
+                content = f.read()
+
+            self.assertIn(
+                f"## 4. Full diff\n\nMISSING (diff file not found: {missing_diff_path})",
+                content,
+            )
+
+
+class EC6RriTableUnreadableExistingFile(unittest.TestCase):
+    def test_ec6_rri_table_permission_error_renders_unreadable_not_uncaught(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            rri_path = os.path.join(tmp, "rri.md")
+            write_text(rri_path, REALISTIC_RRI_TABLE)
+
+            orig_open = escalation_packet.read_optional_text_file
+
+            def failing_reader(path, *, label):
+                if path == rri_path:
+                    return None, f"MISSING ({label} unreadable: {path}: denied)"
+                return orig_open(path, label=label)
+
+            escalation_packet.read_optional_text_file = failing_reader
+            try:
+                result = escalation_packet.resolve_rri_table(rri_path)
+            finally:
+                escalation_packet.read_optional_text_file = orig_open
+
+            self.assertEqual(result, f"MISSING (RRI table file unreadable: {rri_path}: denied)")
+
+    def test_nonexistent_rri_table_path_still_becomes_literal_text_unchanged(self):
+        # Path-vs-text ambiguity stays out of scope (T5 follow-up): a
+        # nonexistent path is untouched by this task's read-failure fix.
+        result = escalation_packet.resolve_rri_table("not-a-real-path.md")
+        self.assertEqual(result, "not-a-real-path.md")
+
+
+class TranscriptShapeValidationTest(unittest.TestCase):
+    """T4 (plan D9): a transcript that parses but has the wrong shape must
+    not crash build_packet's .get() calls on the ADR-036 CLI path, and the
+    failure reason must actually render (round 6's blocking finding)."""
+
+    def test_ec3_adr036_cli_transcript_list_normalizes_without_crash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            transcript_path = os.path.join(tmp, "transcript.json")
+            card_path = os.path.join(tmp, "card.json")
+            out_path = os.path.join(tmp, "packet.md")
+
+            write_json(transcript_path, ["not", "a", "dict"])
+            write_json(card_path, REALISTIC_CARD)
+
+            exit_code = escalation_packet.main(
+                [
+                    "--transcript", transcript_path,
+                    "--card", card_path,
+                    "--out", out_path,
+                ]
+            )
+
+            self.assertEqual(exit_code, 0)
+            with open(out_path, encoding="utf-8") as f:
+                content = f.read()
+
+            self.assertIn("## 5. Commands executed with output\n\nMISSING", content)
+            self.assertIn("## 6. Test results\n\nMISSING", content)
+            self.assertIn(
+                "- Final status: `transcript_shape_invalid` "
+                "(expected a JSON object, got list).",
+                content,
+            )
+
+    def test_transcript_scalar_also_normalizes_without_crash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            transcript_path = os.path.join(tmp, "transcript.json")
+            card_path = os.path.join(tmp, "card.json")
+            out_path = os.path.join(tmp, "packet.md")
+
+            write_json(transcript_path, "not an object")
+            write_json(card_path, REALISTIC_CARD)
+
+            exit_code = escalation_packet.main(
+                [
+                    "--transcript", transcript_path,
+                    "--card", card_path,
+                    "--out", out_path,
+                ]
+            )
+
+            self.assertEqual(exit_code, 0)
+            with open(out_path, encoding="utf-8") as f:
+                content = f.read()
+
+            self.assertIn(
+                "expected a JSON object, got str", content,
+            )
 
 
 class CliInvocation(unittest.TestCase):

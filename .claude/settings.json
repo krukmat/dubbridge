@@ -256,7 +256,14 @@
       "Bash(git -C /Users/matias/dubbridge branch --list \"bench/*\")",
       "Bash(nohup python3 scripts/local-bench/run_stage1_benchmark.py --out-dir logs/local-bench/t7e-20260712 --work-dir scripts/local-bench/t7e-work-20260712 --model gemma4:26b-a4b-it-qat)",
       "Bash(ps -p 75371 -o pid,etime,command)",
-      "Bash(kill -0 75371)"
+      "Bash(kill -0 75371)",
+      "Bash(nohup ~/.vscode/extensions/openai.chatgpt-26.721.41059-darwin-arm64/bin/macos-aarch64/codex exec -m gpt-5.6-sol -s read-only -C /Users/matias/dubbridge -o /private/tmp/claude-501/-Users-matias-dubbridge/9ce9b6a3-5b8f-46f5-a388-6a776ff4d462/scratchpad/codex_peer_review_r3_result.md -)",
+      "Bash(echo \"launched pid $!\")",
+      "Bash(ps -p 53152 -o pid,stat,etime,command)",
+      "Bash(python3 scripts/rri.py --cc 12 --T 1 --A 0 --X 2 --D 4 --K 3 --P 2 --touches scripts/local-agent/run_med_high_task.py --touches scripts/local-agent/escalation_packet.py --touches scripts/local-agent/run_med_high_task_test.py --touches scripts/local-agent/escalation_packet_test.py --touches docs/plan/med-high-escalation-bundle-crash.md --touches docs/tasks/med-high-escalation-bundle-crash.md --touches docs/tasks/agent-session-preflight-gate.md --touches docs/tasks/rri-table-path-text-ambiguity.md)",
+      "Bash(nohup ~/.vscode/extensions/openai.chatgpt-26.721.41059-darwin-arm64/bin/macos-aarch64/codex exec -m gpt-5.6-sol -s read-only -C /Users/matias/dubbridge -o /private/tmp/claude-501/-Users-matias-dubbridge/9ce9b6a3-5b8f-46f5-a388-6a776ff4d462/scratchpad/codex_peer_review_r4_result.md -)",
+      "Bash(ps -p 55845 -o pid,stat,etime,command)",
+      "Bash(python3 /Users/matias/dubbridge/scripts/rri.py --cc 12 --T 1 --A 0 --X 2 --D 4 --K 3 --P 2 --touches scripts/local-agent/run_med_high_task.py --touches scripts/local-agent/escalation_packet.py --touches scripts/local-agent/run_med_high_task_test.py --touches scripts/local-agent/escalation_packet_test.py --touches docs/plan/med-high-escalation-bundle-crash.md --touches docs/tasks/med-high-escalation-bundle-crash.md --touches docs/tasks/agent-session-preflight-gate.md --touches docs/tasks/rri-table-path-text-ambiguity.md)"
     ],
     "additionalDirectories": [
       "docs/knowledge"
