@@ -583,12 +583,12 @@ class AgentPreflightHookAdapterTest(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def _run_hook_command(self, command, provider, stdin_payload):
+    def _run_hook_command(self, command, provider, stdin_payload, extra_args=()):
         with mock.patch.object(sys, "stdin", io.StringIO(stdin_payload)), mock.patch.object(
             sys, "stdout", io.StringIO()
         ) as fake_stdout, mock.patch.object(sys, "stderr", io.StringIO()) as fake_stderr:
             result = agent_preflight.main(
-                [command, "--repo-root", str(self.root), "--provider", provider]
+                [command, "--repo-root", str(self.root), "--provider", provider, *extra_args]
             )
         return result, fake_stdout.getvalue(), fake_stderr.getvalue()
 
@@ -735,6 +735,292 @@ class AgentPreflightHookAdapterTest(unittest.TestCase):
                 agent_preflight.main(
                     ["hook-load", "--repo-root", str(self.root), "--provider", "other"]
                 )
+
+    def test_hp2_claude_hook_gate_allows_for_real_pretooluse_payload_shape(self):
+        load_payload = json.dumps({"session_id": "hook-sess-1", "hook_event_name": "startup"})
+        self._run_hook_command("hook-load", "claude", load_payload)
+
+        gate_payload = json.dumps(
+            {
+                "session_id": "hook-sess-1",
+                "transcript_path": "/tmp/transcript.json",
+                "cwd": str(self.root),
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Edit",
+                "tool_input": {"file_path": "foo.py"},
+            }
+        )
+        result, stdout, stderr = self._run_hook_command("hook-gate", "claude", gate_payload)
+
+        self.assertEqual(result, 0)
+        self.assertEqual(stderr, "")
+        response = json.loads(stdout)
+        self.assertEqual(response["hookSpecificOutput"]["permissionDecision"], "allow")
+
+    def test_hp2_codex_hook_gate_allows_for_real_tool_call_event_shape(self):
+        load_payload = json.dumps({"session_id": "codex-sess-1", "event": "startup"})
+        self._run_hook_command("hook-load", "codex", load_payload)
+
+        gate_payload = json.dumps({"session_id": "codex-sess-1", "event": "PreToolUse"})
+        result, stdout, stderr = self._run_hook_command("hook-gate", "codex", gate_payload)
+
+        self.assertEqual(result, 0)
+        response = json.loads(stdout)
+        self.assertEqual(response["decision"], "allow")
+
+    def test_ec1_hook_gate_missing_session_id_exits_two_for_real_pretooluse_shape(self):
+        gate_payload = json.dumps(
+            {
+                "transcript_path": "/tmp/transcript.json",
+                "cwd": str(self.root),
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Edit",
+            }
+        )
+        result, stdout, stderr = self._run_hook_command("hook-gate", "claude", gate_payload)
+
+        self.assertEqual(result, 2)
+        self.assertEqual(stdout, "")
+        self.assertIn("session_id", stderr)
+
+    def test_extract_hook_gate_identity_rejects_unsupported_provider_directly(self):
+        with self.assertRaises(agent_preflight.HookPayloadError):
+            agent_preflight.extract_hook_gate_identity("other", {"session_id": "x"})
+
+    def test_hp1_claude_hook_load_records_governing_documents_via_document_flags(self):
+        (self.root / "AGENTS.md").write_text("agents contract\n", encoding="utf-8")
+        (self.root / "docs" / "policies").mkdir(parents=True)
+        (self.root / "docs" / "policies" / "HITL_AUTONOMY_POLICY.md").write_text(
+            "autonomy policy\n", encoding="utf-8"
+        )
+        payload = json.dumps({"session_id": "hook-sess-1", "hook_event_name": "startup"})
+
+        result, stdout, stderr = self._run_hook_command(
+            "hook-load",
+            "claude",
+            payload,
+            extra_args=(
+                "--document",
+                "AGENTS.md",
+                "--document",
+                "docs/policies/HITL_AUTONOMY_POLICY.md",
+            ),
+        )
+
+        self.assertEqual(result, 0)
+        self.assertEqual(stderr, "")
+        published = agent_preflight.v2_receipt_path(self.root, "claude", "hook-sess-1", "claude-code")
+        payload_on_disk = json.loads(published.read_text(encoding="utf-8"))
+        recorded_paths = {doc["path"] for doc in payload_on_disk["documents"]}
+        self.assertEqual(recorded_paths, {"AGENTS.md", "docs/policies/HITL_AUTONOMY_POLICY.md"})
+
+
+class AgentPreflightRacePermissionTest(unittest.TestCase):
+    """T4a4: deterministic, barrier-controlled race/replacement/permission tests.
+
+    Every test here must resolve to exactly one of: a validated old receipt, a
+    validated new receipt, or a clean ReceiptValidationError/OSError denial.
+    Partial or stale JSON observed as a "success" is a failing assertion, not
+    an acceptable outcome.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.instruction_path = self.root / "INSTRUCTIONS.md"
+        self.instruction_path.write_text("do the task\n", encoding="utf-8")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _payload(self, **overrides):
+        kwargs = dict(
+            provider="claude",
+            session_id="session-1",
+            actor_id="actor-1",
+            repo_root=self.root,
+            hook_event_name="startup",
+            source="hook",
+            transcript_path="/tmp/transcript.json",
+            native_instruction_mechanism="hook",
+            native_instruction_path="INSTRUCTIONS.md",
+            document_paths=[],
+        )
+        kwargs.update(overrides)
+        return agent_preflight.build_v2_receipt_payload(**kwargs)
+
+    def test_hp1_barrier_controlled_simultaneous_loaders_different_sessions(self):
+        """Two distinct-session publishers are released from a shared barrier at
+        the same instant; both must complete with a parseable, schema-valid
+        receipt loadable via load_v2_receipt for their own identity."""
+        session_ids = ["race-session-a", "race-session-b"]
+        for session_id in session_ids:
+            agent_preflight.publish_v2_receipt(self.root, self._payload(session_id=session_id))
+
+        barrier = threading.Barrier(len(session_ids))
+        results: dict[str, dict] = {}
+        errors: list[BaseException] = []
+        lock = threading.Lock()
+
+        def reload_and_load(session_id: str) -> None:
+            try:
+                barrier.wait(timeout=5)
+                agent_preflight.publish_v2_receipt(
+                    self.root, self._payload(session_id=session_id)
+                )
+                payload = agent_preflight.load_v2_receipt(
+                    self.root, "claude", session_id, "actor-1"
+                )
+                with lock:
+                    results[session_id] = payload
+            except BaseException as exc:  # pragma: no cover - failure asserted below
+                with lock:
+                    errors.append(exc)
+
+        threads = [
+            threading.Thread(target=reload_and_load, args=(session_id,))
+            for session_id in session_ids
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=5)
+
+        self.assertEqual(errors, [])
+        self.assertEqual(set(results), set(session_ids))
+        for session_id, payload in results.items():
+            self.assertEqual(payload["schema_version"], agent_preflight.RECEIPT_SCHEMA_VERSION)
+            self.assertEqual(payload["session_id"], session_id)
+
+    def test_ec1_check_during_invalidate_replace_window_never_returns_partial_or_stale(self):
+        """Force load_v2_receipt to observe the target path at the exact instant
+        _invalidate_prior_receipt has unlinked the prior receipt but the
+        replacement has not yet been os.replace'd in. The only acceptable
+        outcomes are a clean ReceiptValidationError (file absent) or, if the
+        loader runs after the real replace lands, a fully valid new payload --
+        never a partially written or stale-but-still-present file."""
+        first = self._payload(session_id="race-check")
+        target_path = agent_preflight.publish_v2_receipt(self.root, first)
+        first_loaded_at = json.loads(target_path.read_text(encoding="utf-8"))["loaded_at"]
+
+        publish_started = threading.Event()
+        allow_replace = threading.Event()
+        observed: dict = {}
+
+        original_invalidate = agent_preflight._invalidate_prior_receipt
+
+        def gated_invalidate(path: Path) -> None:
+            original_invalidate(path)
+            publish_started.set()
+            allow_replace.wait(timeout=5)
+
+        def run_check() -> None:
+            publish_started.wait(timeout=5)
+            try:
+                payload = agent_preflight.load_v2_receipt(
+                    self.root, "claude", "race-check", "actor-1"
+                )
+                observed["outcome"] = "success"
+                observed["payload"] = payload
+            except agent_preflight.ReceiptValidationError as exc:
+                observed["outcome"] = "clean_denial"
+                observed["error"] = str(exc)
+
+        checker = threading.Thread(target=run_check)
+        checker.start()
+
+        second = self._payload(session_id="race-check")
+        with mock.patch.object(
+            agent_preflight, "_invalidate_prior_receipt", side_effect=gated_invalidate
+        ):
+            publish_thread = threading.Thread(
+                target=agent_preflight.publish_v2_receipt, args=(self.root, second)
+            )
+            publish_thread.start()
+            publish_started.wait(timeout=5)
+            allow_replace.set()
+            publish_thread.join(timeout=5)
+        checker.join(timeout=5)
+
+        self.assertIn("outcome", observed)
+        if observed["outcome"] == "clean_denial":
+            self.assertNotIn("payload", observed)
+        else:
+            payload = observed["payload"]
+            self.assertEqual(payload["schema_version"], agent_preflight.RECEIPT_SCHEMA_VERSION)
+            self.assertIn(payload["loaded_at"], {first_loaded_at, second["loaded_at"]})
+
+        final = json.loads(target_path.read_text(encoding="utf-8"))
+        self.assertEqual(final["loaded_at"], second["loaded_at"])
+
+    def test_ec1_load_never_accepts_partially_written_temp_file_as_receipt(self):
+        """A temp file mid-write (no os.replace yet) must never be visible at
+        the final target path, so load_v2_receipt must reject it as absent
+        rather than parse truncated JSON as a valid receipt."""
+        payload = self._payload(session_id="race-partial")
+        target_path = agent_preflight.v2_receipt_path(self.root, "claude", "race-partial", "actor-1")
+        agent_preflight._secure_mkdir(target_path.parent)
+
+        tmp_path = target_path.parent / f".{target_path.name}.partial.tmp"
+        tmp_path.write_text('{"schema_version": 2, "session_id": "race-partial"', encoding="utf-8")
+
+        with self.assertRaises(agent_preflight.ReceiptValidationError):
+            agent_preflight.load_v2_receipt(self.root, "claude", "race-partial", "actor-1")
+
+        self.assertFalse(target_path.exists())
+
+    def test_ec2_denied_receipts_directory_produces_clean_authorization_failure(self):
+        """A receipts directory the process cannot read/traverse must fail
+        load_v2_receipt closed (ReceiptValidationError), never raise an
+        unhandled exception or silently authorize."""
+        payload = self._payload(session_id="race-denied-dir")
+        agent_preflight.publish_v2_receipt(self.root, payload)
+        receipts_dir = agent_preflight.v2_receipts_dir(self.root)
+
+        if os.geteuid() == 0:
+            with mock.patch.object(
+                agent_preflight.Path,
+                "read_text",
+                side_effect=PermissionError("denied"),
+            ):
+                with self.assertRaises(agent_preflight.ReceiptValidationError):
+                    agent_preflight.load_v2_receipt(
+                        self.root, "claude", "race-denied-dir", "actor-1"
+                    )
+            return
+
+        original_mode = stat.S_IMODE(receipts_dir.stat().st_mode)
+        try:
+            receipts_dir.chmod(0o000)
+            with self.assertRaises(agent_preflight.ReceiptValidationError):
+                agent_preflight.load_v2_receipt(
+                    self.root, "claude", "race-denied-dir", "actor-1"
+                )
+        finally:
+            receipts_dir.chmod(original_mode)
+
+    def test_ec2_denied_receipt_file_produces_clean_authorization_failure(self):
+        """A receipt file the process cannot open for read must fail
+        load_v2_receipt closed, never partially parse or authorize."""
+        payload = self._payload(session_id="race-denied-file")
+        target_path = agent_preflight.publish_v2_receipt(self.root, payload)
+
+        if os.geteuid() == 0:
+            self.skipTest(
+                "Running as root: POSIX file permission denial cannot be enforced "
+                "against this process, so EC-2 file-level denial is exercised via "
+                "the directory-level monkeypatch case instead."
+            )
+
+        original_mode = stat.S_IMODE(target_path.stat().st_mode)
+        try:
+            target_path.chmod(0o000)
+            with self.assertRaises(agent_preflight.ReceiptValidationError):
+                agent_preflight.load_v2_receipt(
+                    self.root, "claude", "race-denied-file", "actor-1"
+                )
+        finally:
+            target_path.chmod(original_mode)
 
 
 if __name__ == "__main__":

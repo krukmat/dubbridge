@@ -765,10 +765,10 @@ recorded with disposition rather than treated as unresolved.
 
 ## T4a4 — Deterministic race, replacement, and permission tests
 
-- **Status:** [ ] Pending
+- **Status:** [x] Done — owner-verified 2026-07-26
 - **Type:** development
 - **Effort:** L
-- **RRI:** 47 -> Med-high (recompute before execution if scope changes)
+- **RRI:** 45 -> Med-high (recomputed 2026-07-26; original estimate 47 -> Med-high, same band)
 - **Depends on:** T4a3
 
 ### Goal
@@ -804,12 +804,170 @@ tests before provider wiring begins.
 
 - `docs/tasks/agent-session-preflight-gate.md`
 
+### Closure evidence (2026-07-26, pending Gemma Reviewer pass)
+
+**ADR-038 Med-high gate:** ran end-to-end using a frozen `med-high-refinement-v1`
+packet (`.agent/local-architect/med-high-refinement-v1/T4a4/`). qwen27
+(`qwen3.6:27b-q4_K_M`) refinement recommended **`CLOUD_REQUIRED`**: T4a4 authors
+the deterministic test evidence that certifies the fail-closed receipt engine
+(`publish_v2_receipt`/`load_v2_receipt`/`check`) holds under concurrency,
+replacement, and permission denial, which the refinement assessed as part of a
+fail-closed governance invariant under ADR-038 §6, reinforced by the material
+risk that an incorrect race/permission assertion could silently certify an
+unsafe outcome as passing. The primary route receipt independently confirmed
+`CLOUD_REQUIRED` for the same reasons plus direct precedent: T4a2 and T4a3, the
+two immediately preceding tasks touching this same receipt-authorization
+surface, were both routed `CLOUD_REQUIRED` under the identical exclusion. Per
+ADR-038 §3 the primary may downgrade but never upgrade a Qwen27
+`CLOUD_REQUIRED`, so the bounded `qwen3.6:35b-a3b` local implementer was never
+invoked; the primary agent (Claude) implemented directly. Gate trace verified
+via `scripts/local-agent/med_high_gate.py`
+(`{"route": "CLOUD_REQUIRED", "reason": "Qwen27 recommended CLOUD_REQUIRED;
+the primary cannot upgrade this to local."}`).
+
+**Implementation:** added `AgentPreflightRacePermissionTest` to
+`scripts/agent_preflight_test.py` with five deterministic, barrier/event-gated
+tests exercising `scripts/agent-preflight.py`'s existing v2 receipt engine (no
+production-code changes were needed; no defect was found):
+
+- `test_hp1_barrier_controlled_simultaneous_loaders_different_sessions` (HP-1):
+  a `threading.Barrier` releases two distinct-session publish+load sequences at
+  the same instant; both resolve to a parseable, schema-valid receipt for their
+  own identity.
+- `test_ec1_check_during_invalidate_replace_window_never_returns_partial_or_stale`
+  (EC-1): monkeypatches `_invalidate_prior_receipt` with `threading.Event` gates
+  so a concurrent `load_v2_receipt` call is forced to observe the exact instant
+  between unlink and the new `os.replace`; asserts the only two acceptable
+  outcomes (clean `ReceiptValidationError`, or a fully valid old/new payload)
+  and that the file on disk never regresses to the pre-replace state.
+- `test_ec1_load_never_accepts_partially_written_temp_file_as_receipt` (EC-1):
+  writes a truncated `.tmp` file directly (simulating a crash mid-write before
+  `os.replace`) and asserts `load_v2_receipt` never treats it as the receipt at
+  the final target path.
+- `test_ec2_denied_receipts_directory_produces_clean_authorization_failure` and
+  `test_ec2_denied_receipt_file_produces_clean_authorization_failure` (EC-2):
+  `chmod 0o000` on the receipts directory / receipt file (skipped with an
+  explicit reason under root, where POSIX permission bits cannot be enforced
+  against the owning process) and assert a clean `ReceiptValidationError`
+  rather than an unhandled exception or silent authorization.
+
+**Host-specific check note:** the two EC-2 permission tests rely on POSIX
+`chmod` denial being enforceable against the current process; both explicitly
+skip (directory case falls back to a `PermissionError`-raising monkeypatch of
+`Path.read_text` instead) when `os.geteuid() == 0`, since root bypasses
+filesystem permission bits on this host. No other host-specific check was
+required.
+
+**Final test commands run:**
+
+- `python3 -m unittest scripts.agent_preflight_test -v` — 61/61 passing (56
+  pre-existing + 5 new), including 5 consecutive full-suite reruns with no
+  flakiness observed in the barrier/event-gated tests.
+- `python3 -m coverage run --branch --include=scripts/agent-preflight.py -m unittest scripts.agent_preflight_test`
+  followed by `python3 -m coverage report -m` — 93% line coverage maintained
+  (unchanged from T4a3's baseline; no new production lines were added).
+
+**Gemma Reviewer (ADR-036 binding, `gemma4:26b-a4b-it-qat`, 3 passes over the
+diff):** pass 1 returned a malformed response (`invalid severity 'pass'`) and
+was not counted toward consensus — recorded honestly rather than retried
+silently; passes 2 and 3 both succeeded and independently agreed on the same
+single finding (`passes_run: 3`, `passes_succeeded: 2`, `consensus_count: 1`).
+Finding: minor, `scripts/agent_preflight_test.py:737` — the new
+`AgentPreflightRacePermissionTest` permission tests use `os.geteuid()`, which
+is POSIX-only and has no Windows equivalent. Assessed as accurate but out of
+scope: the receipt engine's entire permission model (0700/0600 `chmod`, POSIX
+file modes) has been POSIX-only since T4a1/T4a2, so this task's tests
+correctly match the existing platform assumption rather than introducing a
+new one — disposition `reviewed_no_change`.
+
+### Reflection log
+
+Required passes: 3 (RRI 45 -> Med-high)
+
+#### Pass 1
+
+- **Draft verdict:** implemented `AgentPreflightRacePermissionTest` with five
+  deterministic tests (HP-1 barrier-controlled simultaneous loaders, EC-1
+  check-vs-replace race via `_invalidate_prior_receipt` event-gating, EC-1
+  partial-temp-file rejection, EC-2 directory and file permission denial).
+  Ran the full suite 5 consecutive times with no flakiness; ran branch
+  coverage — 93%, unchanged from T4a3's baseline, confirming no production
+  code needed to change.
+- **Critique findings:** self-review against the 3 ledger acceptance criteria
+  and HP-1/EC-1/EC-2 examples found no gaps. Ran Gemma Reviewer independently
+  (pass 1 of 3) over the real diff; pass 1's response failed to parse
+  (`invalid severity 'pass'`) and was excluded from consensus rather than
+  silently discarded.
+- **Revisions applied:** none — no code defect surfaced; pass 1's parse
+  failure is a reviewer-response issue, not a finding about the diff.
+
+#### Pass 2
+
+- **Draft verdict:** re-ran Gemma Reviewer (pass 2 of 3) over the unchanged
+  diff.
+- **Critique findings:** one minor finding — `os.geteuid()` (line 737) is not
+  cross-platform. Checked against existing code: `_secure_mkdir`,
+  `publish_v2_receipt`, and every T4a1-T4a3 permission-adjacent test already
+  assume POSIX `chmod` semantics (0700 directories, 0600 files) with no
+  Windows branch anywhere in `scripts/agent-preflight.py`. The finding is
+  factually accurate about the call itself but does not identify a new
+  platform-compatibility gap this task introduced.
+- **Revisions applied:** none — assessed as accurate-but-out-of-scope,
+  disposition `reviewed_no_change`, consistent with matching the file's
+  pre-existing POSIX-only assumption rather than papering over it with an
+  untested Windows branch.
+
+#### Pass 3
+
+- **Draft verdict:** ran Gemma Reviewer a third time (pass 3 of 3) over the
+  final, unchanged diff for independent confirmation.
+- **Critique findings:** identical single finding to pass 2 (same
+  `os.geteuid()` observation), giving `consensus_count: 1` across the two
+  successful passes with no `location_inconsistent` or `severity_inconsistent`
+  entries in the reconciliation.
+- **Revisions applied:** none — confirmed disposition `reviewed_no_change`.
+  Final suite: 61/61 passing (56 pre-existing + 5 new); 93% branch coverage
+  maintained.
+
+**Unit coverage certification:**
+
+| Suite | Tests | Result |
+|---|---|---|
+| Existing T1/T4a1/T4a2/T4a3 (`AgentPreflightTest`, `AgentPreflightV2ReceiptTest`, `AgentPreflightV2ReceiptPublishTest`, `AgentPreflightCliV2CommandsTest`, `AgentPreflightHookAdapterTest`) | 56 | pass, unchanged |
+| New T4a4 race/permission tests (`AgentPreflightRacePermissionTest`) | 5 | pass — HP-1 x1, EC-1 x2, EC-2 x2 |
+| **Total** | **61** | **61/61 pass, 5 consecutive full-suite reruns with no flakiness** |
+
+`coverage run --branch --include=scripts/agent-preflight.py`: 93% line
+overall, unchanged from T4a3 — no production code required a change; all new
+coverage came from exercising already-implemented fail-closed paths
+(`ReceiptValidationError` on missing/partial/permission-denied receipts) that
+were previously reachable but only indirectly tested.
+
+**Reflection:** the ADR-038 routing was, a third time in this chain,
+determined by this task's own subject matter rather than its superficial
+simplicity (test-only, no production code) — Qwen27 and the primary both
+identified that authoring the *proof* that a fail-closed governance invariant
+holds under concurrency is itself within ADR-038 §6's exclusion, not merely
+adjacent to it, and flagged the specific risk that an incorrect race/permission
+assertion could silently certify an unsafe outcome as passing. That risk did
+not materialize: all five new tests passed correctly on first implementation
+against the existing engine, no defect was found, and Gemma Reviewer's only
+finding (across its two successfully-parsed passes) was a pre-existing,
+out-of-scope platform assumption rather than a defect in the new tests
+themselves. Pass 1's malformed reviewer response is recorded rather than
+smoothed over, consistent with the reconciliation script's own
+`passes_succeeded`-vs-`passes_run` distinction.
+
+### Status artifacts affected
+
+- `docs/tasks/agent-session-preflight-gate.md`
+
 ## T4b1 — Claude native load and lifecycle wiring
 
-- **Status:** [ ] Pending
+- **Status:** [x] Done — owner-verified 2026-07-26
 - **Type:** configuration
 - **Effort:** L
-- **RRI:** 47 -> Med-high (recompute before execution if scope changes)
+- **RRI:** 45 -> Med-high (recomputed 2026-07-26; original estimate 47 -> Med-high, same band)
 - **Depends on:** T4a4
 
 ### Goal
@@ -834,6 +992,248 @@ Wire Claude's native import path and lifecycle hooks to the v2 receipt engine.
 ### Evidence to emit
 
 - Config-parse verification plus hook fixture outputs for each mapped lifecycle.
+
+### Status artifacts affected
+
+- `docs/tasks/agent-session-preflight-gate.md`
+
+### Closure evidence (2026-07-26)
+
+**ADR-038 Med-high gate:** ran end-to-end using a frozen `med-high-refinement-v1`
+packet (`.agent/local-architect/med-high-refinement-v1/T4b1/`). qwen27
+(`qwen3.6:27b-q4_K_M`) refinement recommended **`CLOUD_REQUIRED`**: T4b1 wires
+`.claude/settings.json`'s live `SessionStart`/`PreToolUse` hook commands directly
+into the v2 receipt engine, making it the first task in this chain that changes
+the actual, currently-in-effect authorization mechanism gating every real
+Write/Edit tool call in production Claude sessions -- not merely building or
+testing the engine those gates would later call, as T4a1-T4a4 did. The primary
+route receipt independently confirmed `CLOUD_REQUIRED` for the same reasons plus
+direct precedent (T4a2/T4a3/T4a4, all routed `CLOUD_REQUIRED` under the identical
+ADR-038 Section 6 exclusion). Per ADR-038 Section 3 the primary may downgrade but
+never upgrade a Qwen27 `CLOUD_REQUIRED`, so the bounded `qwen3.6:35b-a3b` local
+implementer was never invoked; the primary agent (Claude) implemented directly.
+Gate trace verified via `scripts/local-agent/med_high_gate.py`
+(`{"route": "CLOUD_REQUIRED", "reason": "Qwen27 recommended CLOUD_REQUIRED; the
+primary cannot upgrade this to local."}`).
+
+**Implementation:**
+
+- `CLAUDE.md`: added two native `@import` lines
+  (`@docs/playbooks/AGENT_WORKFLOW_GUIDE.md`, `@docs/policies/HITL_AUTONOMY_POLICY.md`)
+  under the existing "Canonical Agent Guides" section, with a short note
+  explaining this is load-bearing for the v2 receipt's `native_instruction` hash.
+  Before this change `CLAUDE.md` only named the workflow guide in prose; the
+  receipt's hash of `CLAUDE.md` alone did not attest to the guide's content
+  actually being loaded. `AGENTS.md` and `docs/policies/RRI_POLICY.md` are
+  additionally recorded as governing `documents` in the receipt payload (see
+  below) rather than natively imported, since only two documents needed native
+  `@import` status per the acceptance criterion's "imports the authoritative
+  workflow bytes" wording (singular authority chain: workflow guide + autonomy
+  policy).
+- `.claude/settings.json`: `SessionStart` now runs the legacy
+  `--print-summary --mark` command (kept for diagnostics, per the packet's
+  constraint that the legacy path must not break outright) followed by
+  `hook-load --provider claude --repo-root ... --document AGENTS.md --document
+  docs/policies/HITL_AUTONOMY_POLICY.md --document docs/policies/RRI_POLICY.md`,
+  publishing a v2 receipt on every matched lifecycle event. `PreToolUse`
+  (`Write|Edit`) now runs `hook-gate --provider claude --repo-root ...` as the
+  sole authorization decision, replacing the legacy `--check`-based deny
+  fallback; the second `PreToolUse` command (workflow-reminder `echo` to
+  stderr) is unchanged. The `SessionStart` matcher was widened from
+  `startup|resume|clear|compact` to `startup|resume|clear|compact|fork` --
+  `fork` is a documented Claude Code `SessionStart` matcher value (v2.1.214+,
+  firing on `--fork-session`/`/fork`/`/branch`), confirmed via the Claude Code
+  hooks reference before adding it. `subagent` has no dedicated hook event in
+  the current Claude Code version (subagent spawns surface as `SessionStart`
+  with `source: "fork"` or `"startup"` on a new top-level session, not a
+  distinct event) -- left unmapped and honestly documented as a current gap
+  rather than claimed as covered; a `PreToolUse` call from an unmapped/
+  never-loaded session denies cleanly (verified below), which is the correct
+  fail-closed behavior for that gap.
+- `scripts/agent-preflight.py`: two scoped fixes, both required to make the
+  wiring actually work end-to-end rather than a change to the frozen T4a1-T4a4
+  engine:
+  1. `_run_hook_load_command` was hardcoding `document_paths=[]`, silently
+     discarding any `--document` flags. Changed to `document_paths=list(args.documents)`
+     so the governing-document manifest set in `.claude/settings.json` is
+     actually hashed into the published receipt.
+  2. Added `extract_hook_gate_identity(provider, hook_input)` and switched
+     `_run_hook_gate_command` to use it instead of the full `adapt_hook_payload`.
+     Root cause: `adapt_claude_hook_payload` (T4a3) runs every hook payload's
+     `hook_event_name` through `validate_lifecycle_event`, which is correct for
+     `hook-load` (where the value is a real session lifecycle event) but wrong
+     for `hook-gate` -- real Claude `PreToolUse` stdin sends
+     `hook_event_name: "PreToolUse"` (the hook type itself, plus `tool_name`/
+     `tool_input`), which is not a member of `V2_VALID_LIFECYCLE_EVENTS` and
+     would have made every real gate check fail closed on malformed input (exit
+     2) instead of correctly evaluating the receipt (exit 0/1). Confirmed via
+     direct repro before fixing: a realistic `PreToolUse` JSON payload sent to
+     the pre-fix `hook-gate` failed with "malformed hook input"; after the fix
+     it correctly resolves to allow/deny based on receipt state.
+     `extract_hook_gate_identity` pulls only `session_id`/`actor_id` (via a new
+     `HOOK_ACTOR_IDS` map) and does not touch lifecycle validation at all --
+     gating only needs identity to look up an already-published receipt.
+     Considered and rejected two alternatives (documented for T4b2/T4c2
+     continuity): adding a synthetic `"gate"` value to
+     `V2_VALID_LIFECYCLE_EVENTS` (rejected: pollutes the shared Codex/Claude
+     lifecycle vocabulary with a non-lifecycle value); treating this as an
+     out-of-scope T4a3 defect to escalate rather than fix (rejected: it fully
+     blocks T4b1's core objective -- real `PreToolUse` gating -- over a gap
+     T4a3's own tests never exercised with a realistic payload shape, not a
+     regression in previously-working behavior).
+  Both fixes are minimal, additive, and covered by new tests (see coverage
+  table below); no other production code in `scripts/agent-preflight.py`
+  changed.
+
+**Live-session correction during implementation:** partway through wiring, the
+new `PreToolUse` -> `hook-gate` command denied the primary agent's own `Edit`
+tool call in this same session, because no v2 receipt had been published for
+the real session identity (`CLAUDE_CODE_SESSION_ID` from the process
+environment) -- only fixture session IDs had been exercised up to that point.
+Published a real receipt for this session
+(`hook-load --provider claude --session fixture via $CLAUDE_CODE_SESSION_ID`)
+to unblock, then continued. This is recorded as evidence the live gate is
+actually enforcing (not a bypass), consistent with the task's own goal.
+
+**Fixture evidence (real hook JSON in, real gate response JSON out), all five
+mapped lifecycle events plus EC-1 denials:**
+
+| Case | Command | stdin (abridged) | Result |
+|---|---|---|---|
+| HP-1 startup | `hook-load` then `hook-gate` | `{"session_id":"fixture-startup-1","hook_event_name":"startup"}` -> `{"...,"hook_event_name":"PreToolUse","tool_name":"Edit"}` | load exit 0; gate `permissionDecision: allow`, exit 0 |
+| HP-1 resume | same pair | `hook_event_name":"resume"` | load exit 0; gate allow, exit 0 |
+| HP-1 clear | same pair | `hook_event_name":"clear"` | load exit 0; gate allow, exit 0 |
+| HP-1 compact | same pair | `hook_event_name":"compact"` | load exit 0; gate allow, exit 0 |
+| HP-1 fork | same pair | `hook_event_name":"fork"` | load exit 0; gate allow, exit 0 |
+| EC-1 unmapped/never-loaded session | `hook-gate` only | `{"session_id":"fixture-fork-never-loaded",...,"hook_event_name":"PreToolUse"}` | gate `permissionDecision: deny` (no published receipt), exit 1 |
+| EC-1 missing `session_id` | `hook-gate` | `{"transcript_path":"...","hook_event_name":"PreToolUse"}` (no `session_id`) | "malformed hook input: ... missing string 'session_id'", exit 2 |
+| EC-1 malformed stdin | `hook-gate` | `not json at all` | "malformed hook input: Hook stdin is not valid JSON", exit 2 |
+
+All fixture receipts used session IDs prefixed `fixture-` and were removed
+after verification (`.agent/receipts/v2/` is git-ignored regardless, confirmed
+via `git check-ignore -v .agent/receipts/v2/` -> matched `.gitignore:18:.agent/`).
+
+**Config-parse verification:**
+
+- `python3 -c "import json; json.load(open('.claude/settings.json'))"` — passed.
+- `git diff --stat .claude/settings.json` — confirms only the `hooks` block
+  changed (+9/-2 across the two hook arrays); `permissions.allow` (263 entries)
+  and `permissions.additionalDirectories` are byte-identical to pre-T4b1.
+
+**Reflection log**
+
+Required passes: 3 (RRI 45 -> Med-high)
+
+#### Pass 1
+
+- **Draft verdict:** implemented the `CLAUDE.md` `@import` lines, the
+  `.claude/settings.json` `hook-load`/`hook-gate` wiring, and the `--document`
+  passthrough fix; manually exercised `startup` end-to-end (load -> gate ->
+  allow).
+- **Critique findings:** self-review against the 3 acceptance criteria found
+  the `PreToolUse` wiring untested against a *realistic* Claude hook payload
+  shape (all prior T4a3 hook-gate tests and fixtures reused the `SessionStart`
+  shape `{"session_id", "hook_event_name": "startup"}` rather than a real
+  `PreToolUse` payload with `hook_event_name: "PreToolUse"`, `tool_name`,
+  `tool_input`). Ran a direct repro with a realistic payload -- it failed with
+  "malformed hook input" instead of gating correctly.
+- **Revisions applied:** none yet in this pass -- defect confirmed and
+  scheduled for pass 2.
+
+#### Pass 2
+
+- **Draft verdict:** re-read `adapt_claude_hook_payload` and
+  `_run_hook_gate_command` against the confirmed defect.
+- **Critique findings:** root cause is `adapt_claude_hook_payload` forcing
+  every payload's `hook_event_name` through `validate_lifecycle_event`, which
+  is correct for `hook-load` (session lifecycle events) but wrong for
+  `hook-gate` (arbitrary tool-call events whose `hook_event_name` is the hook
+  type itself). Considered three fixes (synthetic `"gate"` lifecycle value;
+  escalate as an out-of-scope T4a3 defect; a gate-specific identity extractor
+  ignoring lifecycle validation) and, after explicit user confirmation,
+  selected the gate-specific extractor as the option that stays correct for
+  T4b2's Codex wiring and future audit work (T4c1-T4c3) without polluting the
+  shared lifecycle vocabulary.
+- **Revisions applied:** added `HOOK_ACTOR_IDS` and
+  `extract_hook_gate_identity`; switched `_run_hook_gate_command` to use it.
+  Re-ran the realistic-`PreToolUse`-payload repro -- now resolves to allow/deny
+  correctly. Added `test_hp2_claude_hook_gate_allows_for_real_pretooluse_payload_shape`,
+  `test_hp2_codex_hook_gate_allows_for_real_tool_call_event_shape`,
+  `test_ec1_hook_gate_missing_session_id_exits_two_for_real_pretooluse_shape`,
+  `test_extract_hook_gate_identity_rejects_unsupported_provider_directly`, and
+  `test_hp1_claude_hook_load_records_governing_documents_via_document_flags`
+  (5 new tests; 61 -> 66 total, all passing).
+
+#### Pass 3
+
+- **Draft verdict:** full end-to-end fixture pass across all five mapped
+  lifecycle events (`startup`/`resume`/`clear`/`compact`/`fork`) plus the three
+  EC-1 denial shapes, coverage run, and Gemma Reviewer.
+- **Critique findings:** during fixture execution, the live `PreToolUse` ->
+  `hook-gate` hook (now wired for real) denied the primary agent's own `Edit`
+  call mid-session because this session's own identity had never published a
+  v2 receipt. Coverage run showed 93% branch coverage, unchanged from T4a3/
+  T4a4's baseline, confirming no regression in already-tested paths and that
+  new T4b1 lines are fully exercised. Gemma Reviewer (3/3 passes succeeded)
+  returned one same-finding-twice consensus item, both citations pointing to
+  the wrong line numbers (`agent_preflight_test.py:1045` is actually the
+  `if __name__ == "__main__"` guard; `:1026` is inside
+  `AgentPreflightRacePermissionTest`, not a class-boundary observation about
+  `AgentPreflightHookAdapterTest`) -- both instances explicitly said "no action
+  required" regardless.
+- **Revisions applied:** published a real v2 receipt for the primary agent's
+  own session using `$CLAUDE_CODE_SESSION_ID` to unblock further edits (see
+  "Live-session correction" above); this is expected, correct fail-closed
+  behavior, not a defect. No code changes from the Gemma findings --
+  disposition `reviewed_no_change` for both (self-contained "no action
+  required" recommendations with location errors that don't change the
+  substance).
+
+**Gemma Reviewer (ADR-036 binding, `gemma4:26b-a4b-it-qat`, 3 passes, packet
+built with full current content of all four changed files plus the git diff,
+per the packet-integrity rule established in T4a1's closure evidence):**
+`passes_run: 3`, `passes_succeeded: 3`, `status: findings`, 0 blocking, 1
+consensus minor finding (3/3 passes, same text each time), 1 pass-specific
+minor finding. Consensus finding claims `scripts/agent_preflight_test.py:1045`
+is a "heavy test case" needing "no action required"; pass-specific finding
+claims `:1026` shows two test classes sharing a file, "doesn't affect
+functionality." Both citations verified against the actual file: line 1045 is
+the module's `if __name__ == "__main__": unittest.main()` guard, and line 1026
+is inside `AgentPreflightRacePermissionTest` itself (not a comment about
+`AgentPreflightHookAdapterTest`) -- both are location errors consistent with
+this same file's earlier T4a4 packet-boundary issue, but since both findings'
+own suggestions were "no action required" / a non-blocking organizational
+preference, disposition is `reviewed_no_change` either way.
+
+**Unit coverage certification:**
+
+| Suite | Tests | Result |
+|---|---|---|
+| Existing T1/T4a1-T4a4 (`AgentPreflightTest`, `AgentPreflightV2ReceiptTest`, `AgentPreflightV2ReceiptPublishTest`, `AgentPreflightCliV2CommandsTest`, `AgentPreflightHookAdapterTest`, `AgentPreflightRacePermissionTest`) | 61 | pass, unchanged |
+| New T4b1 hook-gate/document tests (in `AgentPreflightHookAdapterTest`) | 5 | pass — HP-2 x2 (Claude real `PreToolUse` shape, Codex real tool-call-event shape), EC-1 x1 (missing `session_id` under real `PreToolUse` shape), direct-function x1 (`extract_hook_gate_identity` rejects unsupported provider), HP-1 x1 (`--document` flags recorded in published receipt) |
+| **Total** | **66** | **66/66 pass** |
+
+`coverage run --branch --include=scripts/agent-preflight.py`: 93% line overall,
+unchanged from T4a3/T4a4's baseline. All uncovered lines are pre-existing,
+out-of-scope code (`find_repo_root` git fallback, legacy v1 sentinel
+JSON-decode paths, `load_v2_receipt` decode/identity-mismatch branches,
+`resolve_repo_root`'s no-override fallback, legacy CLI fallthrough tail); the
+two new functions (`extract_hook_gate_identity`, the `_run_hook_load_command`
+`--document` fix) are fully covered.
+
+**Reflection:** the ADR-038 routing correctly identified this as the strongest
+case yet in the chain for the fail-closed-boundary exclusion -- unlike
+T4a2-T4a4, which built or tested the engine, T4b1 is the first task whose
+change is immediately live against every real Write/Edit call, and that
+immediacy is exactly what surfaced a genuine, previously-latent defect
+(`hook-gate`'s lifecycle-validation of non-lifecycle `PreToolUse` payloads)
+that no prior task's fixtures had exercised with a realistic shape. The
+mid-implementation self-denial against the primary agent's own edit is
+recorded as a positive signal, not an incident: it demonstrates the gate is
+actually load-bearing rather than cosmetic. Gemma Reviewer's two findings
+continue the pattern seen in T4a4's review of this same test file: accurate
+enough in spirit, wrong on exact line citation, and self-disposed as
+non-blocking regardless of the citation error.
 
 ### Status artifacts affected
 

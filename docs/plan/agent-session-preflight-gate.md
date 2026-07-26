@@ -156,5 +156,34 @@ flowchart LR
   satisfy any v2 gate. See the ledger's closure evidence for the full gate
   trace, 3-pass Reflection log, and unit coverage certification (56/56
   passing, 93% line coverage on the touched file).
-- The next intended start point is `T4a4` (deterministic race, replacement,
-  and permission tests), followed by the rest of the receipt-core chain.
+- `T4a4` is complete: five deterministic tests (`AgentPreflightRacePermissionTest`)
+  lock the v2 receipt engine against concurrent loaders, a check-vs-replace
+  race, and permission denial, with no production-code changes needed. ADR-038
+  again routed `CLOUD_REQUIRED` (same §6 fail-closed-invariant exclusion as
+  T4a2/T4a3); Claude implemented directly. See the ledger's closure evidence
+  for the gate trace, Gemma Reviewer log (one out-of-scope platform finding,
+  disposition `reviewed_no_change`), and unit coverage certification (61/61
+  passing, 93% line coverage).
+- `T4b1` is complete: `.claude/settings.json`'s `SessionStart`/`PreToolUse`
+  hooks now call the v2 `hook-load`/`hook-gate` verbs instead of the legacy
+  sentinel, and `CLAUDE.md` natively `@import`s the workflow guide and
+  autonomy policy so the receipt's `native_instruction` hash attests to real
+  loaded bytes. ADR-038 routed `CLOUD_REQUIRED` (this is the first task in the
+  chain to change the *live* authorization mechanism itself, not just build or
+  test the engine behind it); Claude implemented directly. Implementation
+  surfaced and fixed one genuine defect in the frozen T4a3 engine: `hook-gate`
+  was running real `PreToolUse` payloads (whose `hook_event_name` is the hook
+  type itself, e.g. `"PreToolUse"`) through the same lifecycle-event validator
+  used by `hook-load`, which would have failed closed on every real gate check
+  with a malformed-input error instead of evaluating the receipt. Fixed with a
+  gate-specific identity extractor that does not lifecycle-validate. `fork` was
+  added to the `SessionStart` matcher (a documented Claude Code v2.1.214+
+  value); `subagent` has no dedicated hook event in the current Claude Code
+  version and is left honestly unmapped rather than claimed as covered. See
+  the ledger's closure evidence for the gate trace, fixture evidence across
+  all five mapped lifecycle events plus EC-1 denials, Gemma Reviewer log (two
+  non-blocking, self-disposed findings with line-citation errors), and unit
+  coverage certification (66/66 passing, 93% line coverage).
+- The next intended start point is `T4b2` (Codex native bundle, document
+  limit, and gate wiring), which extends the same hook-wiring pattern to
+  Codex's `AGENTS.override.md` and hook configuration.

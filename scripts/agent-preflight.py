@@ -449,6 +449,33 @@ def adapt_hook_payload(provider: str, hook_input: Dict[str, Any]) -> Dict[str, A
     return adapter(hook_input)
 
 
+HOOK_ACTOR_IDS = {
+    "claude": "claude-code",
+    "codex": "codex-cli",
+}
+
+
+def extract_hook_gate_identity(provider: str, hook_input: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract only the identity fields a gate check needs from hook stdin.
+
+    Gate hooks (e.g. Claude's PreToolUse) fire for arbitrary tool events whose
+    `hook_event_name`/`event` value is the hook type itself (e.g. "PreToolUse"),
+    not a session lifecycle value from V2_VALID_LIFECYCLE_EVENTS. A gate check
+    only needs to know which already-published receipt to look up -- it must
+    not run that value through lifecycle validation the way hook-load does.
+    """
+    try:
+        actor_id = HOOK_ACTOR_IDS[provider]
+    except KeyError:
+        raise HookPayloadError(
+            f"Unsupported hook provider {provider!r}; expected one of {sorted(HOOK_ACTOR_IDS)}."
+        ) from None
+    session_id = hook_input.get("session_id")
+    if not isinstance(session_id, str) or not session_id:
+        raise HookPayloadError(f"{provider.capitalize()} hook payload missing string 'session_id'.")
+    return {"provider": provider, "session_id": session_id, "actor_id": actor_id}
+
+
 def claude_gate_response(*, allow: bool, reason: str) -> Dict[str, Any]:
     return {
         "hookSpecificOutput": {
@@ -596,7 +623,7 @@ def _run_hook_load_command(args: argparse.Namespace, repo_root: Path) -> int:
             repo_root=repo_root,
             native_instruction_mechanism=identity_fields.pop("native_instruction_mechanism"),
             native_instruction_path=identity_fields.pop("native_instruction_path"),
-            document_paths=[],
+            document_paths=list(args.documents),
             **identity_fields,
         )
         publish_v2_receipt(repo_root, payload)
@@ -613,7 +640,7 @@ def _run_hook_gate_command(args: argparse.Namespace, repo_root: Path) -> int:
         return 2
     try:
         hook_input = _read_hook_stdin(sys.stdin)
-        identity_fields = adapt_hook_payload(args.provider, hook_input)
+        identity_fields = extract_hook_gate_identity(args.provider, hook_input)
     except HookPayloadError as exc:
         print(f"agent preflight malformed hook input: {exc}", file=sys.stderr)
         return 2

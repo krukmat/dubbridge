@@ -119,6 +119,17 @@ in this repository. Read them in this order before acting on any task:
 6. `docs/plan/roadmap.md` — the general plan: slice sequence, dependencies, and
    where each slice/task sits. Read it to locate any task before implementing.
 
+The native imports below make Claude Code load the actual bytes of the two
+highest-authority documents above as part of this file, rather than relying on
+a separate manual read step. This is load-bearing for the agent-session
+preflight gate (`docs/tasks/agent-session-preflight-gate.md`, T4b1): the v2
+receipt hashes `CLAUDE.md` as the `native_instruction` source, and these
+imports are what make that hash actually attest to workflow-guide and
+autonomy-policy content having been loaded natively, not just named in prose.
+
+@docs/playbooks/AGENT_WORKFLOW_GUIDE.md
+@docs/policies/HITL_AUTONOMY_POLICY.md
+
 **Precedence rule:**
 `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` is the highest-authority source for
 **all** agent-facing decisions: workflow, process, implementation discipline,
