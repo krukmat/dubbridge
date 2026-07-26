@@ -42,20 +42,29 @@ governs: "all agent-facing workflow decisions in the repository"
 4. **Gate by RRI** — compute RRI with `scripts/rri.py`. For RRI 0–25, skip the
    full human approval presentation. Use local Gemma delegation through Ollama
    only for eligible simple code patches; otherwise execute directly as the
-   primary agent. For **RRI 26–55** (Moderate + Med-high), show the plan and
-   tasks, wait for explicit approval, then use the **local-first implementation
-   path** by default: `scripts/local-agent/run_local_task.py` in a disposable
-   worktree, resolving the implementer from `DUBBRIDGE_LOCAL_AGENT_MODEL`
-   (default `qwen3.6:35b-a3b`). The primary agent remains the orchestrator of
+   primary agent. For **RRI 26–40 Moderate**, show the plan and tasks, wait
+   for explicit approval, then use the **local-first implementation path** by
+   default: `scripts/local-agent/run_local_task.py` in a disposable worktree,
+   resolving the implementer from `DUBBRIDGE_LOCAL_AGENT_MODEL` (default
+   `qwen3.6:35b-a3b`), with at most 2 evidence-backed local repair attempts
+   before escalating to cloud. The primary agent remains the orchestrator of
    record and cloud implementation is the escalation/fallback path, not the
-   default. Med-high (41–55) uses a tighter repair budget (1 evidence-backed
-   local attempt vs. 2 for Moderate) and keeps cross-vendor peer review, 3
-   Reflection passes, and the human approval gate unchanged — the routing
-   change affects only who authors the code, not who reviews or approves it.
-   For **RRI 56+**, show the plan and tasks and wait for explicit approval
-   before starting implementation, even if a plan was approved in a prior
-   session; implementation stays on the cloud path (Premium tier) and
-   decomposition remains mandatory before implementation.
+   default. For **RRI 41–55 Med-high**, show the plan and tasks, wait for
+   explicit approval, then route through the **ADR-038 Architect-refined
+   single-attempt gate**: Qwen27 advisory refinement (`GO_LOCAL` |
+   `CLOUD_REQUIRED`) → primary hash-bound route receipt (may downgrade, never
+   upgrade) → if `GO_LOCAL`, exactly one bounded `qwen3.6:35b-a3b` session
+   (≤8 turns, ≤300 seconds, **0** repair attempts, supervised as its own
+   process group by `scripts/local-agent/run_med_high_task.py`) → otherwise
+   Codex/Claude with the full evidence bundle. Med-high keeps the
+   band-resolved independent review route, 3 Reflection passes, and the human
+   approval gate unchanged — the routing change affects only who authors the
+   code, not who reviews or approves it. See § Local-first and
+   Architect-refined implementation routing (RRI 26–55) below for the full
+   diagram and contract. For **RRI 56+**, show the plan and tasks and wait for
+   explicit approval before starting implementation, even if a plan was
+   approved in a prior session; implementation stays on the cloud path
+   (Premium tier) and decomposition remains mandatory before implementation.
 5. **Implement** — one task at a time, in the defined order.
 6. **Mark progress** — update the tasks document after each completed task (it is
    the crash-safe progress ledger).
@@ -99,14 +108,9 @@ governs: "all agent-facing workflow decisions in the repository"
 ## Per-task discipline
 
 - **Phase 1 — Task-analysis review** (before presenting or delegating any task):
-  run an independent reviewer on the task card/plan to confirm readiness. The
-  reviewer is resolved by RRI band:
-  - **RRI 0–40:** Gemma (advisory). Run before building the delegation packet or
-    presenting the task card. Record the phase-1 report line:
-    `Task-analysis review: gemma <artifact path> - <PASS|BLOCKED>`
-  - **RRI 41+:** cross-vendor peer (resolve from caller identity per the
-    `Band-routed peer review` section). Record:
-    `Task-analysis review: <codex|claude|d14> <artifact path> - <PASS|BLOCKED>`
+  run the reviewer resolved by the canonical `Band-routed peer review` table on
+  the task card/plan. Record the phase-1 report line with the actual reviewer,
+  artifact, and verdict. Do not maintain a second band mapping here.
   A `BLOCKED` verdict stops presentation or delegation until revised, explicitly
   waived by the user, or reported as blocked. Docs-only, config-only,
   migration-only, ADR, plan, task-ledger, and policy-only tasks are exempt from
@@ -121,25 +125,13 @@ governs: "all agent-facing workflow decisions in the repository"
   artifacts must be synchronized. For tasks that affect benchmarks, reports, audit
   trails, blockers, or promotion state, that set is part of the task's working
   surface from the start, not a post-hoc cleanup list.
-- **Pre-task summary for development tasks:** when the task will write or modify
-  code, the task presentation must include two explicit sections:
-  - **Happy paths considered** — the primary success flows the agent expects to
-    implement and verify for the task.
-  - **Edge cases considered** — the boundary and failure conditions the agent
-    expects to handle or verify for the task.
-  - **Reflection strategy** — when the task's RRI is 26 or higher, the task
-    presentation must state the Reflection strategy that will be used, derived
-    from the `Reflection design pattern for development tasks` section below.
-    The presentation must name the required pass count for the task's RRI band
-    and briefly summarize the intended focus of each pass.
-  - **Diagram** — a compact Mermaid diagram that explains the concept to be
-    implemented: the flow, boundary, dependency direction, state transition, or
-    ownership split that the task relies on. The diagram may be minimal, but it is
-    required for development tasks even when the architecture itself is unchanged.
-  These sections are required at task start for development tasks so approval
-  covers not just the objective but also the intended behavioral coverage. Skip
-  them for docs-only, config, migration-only, or planning tasks unless the user
-  explicitly asks for them.
+- **Pre-task summary for development tasks:** the compact card's `Scope and
+  acceptance` block must name the primary `HP-#` and `EC-#` behaviors, and its
+  workflow table must name the required Reflection pass count and pass focuses
+  for RRI 26+. A compact technical-scope Mermaid diagram is mandatory. These
+  items do not require separate prose sections in the approval card; their full
+  definitions remain in the linked task ledger. Skip development-only content
+  for docs-only, config, migration-only, or planning tasks unless requested.
 - After each task: verify the relevant tests/checks, update the status docs,
   document deviations or evidence, and state unresolved risks or blockers.
 - When a task's evidence or metrics become available mid-execution, update the
@@ -304,21 +296,52 @@ local Gemma delegation through Ollama. Resolve the local model from
 separate fallback tier), and the Ollama endpoint from `OLLAMA_HOST`,
 defaulting to `http://localhost:11434`.
 
+### Local-first and Architect-refined implementation routing (RRI 26–55)
+
 The **RRI 26–55 band (Moderate + Med-high)** is a routing exception for
 implementation: task cards still present Codex/Claude recommendations for the
 orchestrator and escalation environment, but the default code-authoring
-surface is the local agentic runner (`scripts/local-agent/run_local_task.py`)
-using `DUBBRIDGE_LOCAL_AGENT_MODEL` (default `qwen3.6:35b-a3b`) inside a
-disposable worktree. This routing became operative by owner override on
-2026-07-15 for Moderate (26–40), ahead of the original ADR-036 pilot
-promotion gate, and was extended to Med-high (41–55) by owner override on
-2026-07-21. The extension changes only the implementation-authoring surface:
-Med-high tasks still require cross-vendor peer review (phases 1 and 2), 3
-Reflection passes, and the RRI 41+ human approval gate exactly as before.
-Med-high uses a tighter local repair budget (1 attempt, not 2) before
-escalating to cloud implementation, reflecting the higher-risk anchor-rubric
-floors this band typically carries (e.g. `infra/migrations/**`,
-ADR-008/ADR-018).
+surface moves local. The two sub-bands now use different routes.
+
+**Moderate (26–40):** the code-authoring surface is the local agentic runner
+(`scripts/local-agent/run_local_task.py`) using `DUBBRIDGE_LOCAL_AGENT_MODEL`
+(default `qwen3.6:35b-a3b`) inside a disposable worktree, with at most 2
+evidence-backed local repair attempts before escalating to cloud. This
+routing became operative by owner override on 2026-07-15, ahead of the
+original ADR-036 pilot promotion gate.
+
+**Med-high (41–55):** ADR-038 (2026-07-26) governs this band. It replaces the
+Moderate-style direct local-first route (and this band's own earlier
+1-repair-attempt variant, adopted 2026-07-21 and now retired) with a
+fail-closed, evidence-bearing gate:
+
+```mermaid
+flowchart LR
+    Card["Approved Med-high card\n(RRI 41-55)"] --> Q27["Qwen27 advisory refinement\nqwen3.6:27b-q4_K_M"]
+    Q27 -->|GO_LOCAL or CLOUD_REQUIRED| Receipt["Primary hash-bound\nroute receipt"]
+    Receipt -->|"downgrade allowed;\nupgrade never allowed"| Gate{"med_high_gate.py\nboth sides GO_LOCAL?"}
+    Gate -->|No: CLOUD_REQUIRED| Cloud["Codex / Claude\n+ full ADR-038 S5 evidence bundle"]
+    Gate -->|Yes: GO_LOCAL| Runner["ONE bounded qwen3.6:35b-a3b session\nsupervised as its own process group\n<=8 turns / <=300s / 0 repairs"]
+    Runner -->|success| Done["Signed local-implementer audit"]
+    Runner -->|timeout, failed acceptance,\nscope/boundary/org violation| Cloud
+```
+
+Implementation surfaces: `scripts/local-architect/run_analysis.py`
+(`med-high-refinement-v1` profile) for the Qwen27 artifact,
+`scripts/local-agent/med_high_gate.py` for the fail-closed route decision,
+`scripts/local-agent/run_local_task.py`'s `resolve_effective_limits()` for
+the tightened 8-turn/0-repair/exact-model budget, and
+`scripts/local-agent/run_med_high_task.py` for the process-group-supervised
+300-second cutoff and automatic evidence-bundle emission on every
+non-success route. There is no repair attempt at this band — a failed
+acceptance run, timeout, or violation routes directly to cloud, never
+retries locally.
+
+Both sub-bands keep the independent reviewer resolved by the canonical band
+table (currently `qwen3.6:27b-q4_K_M`, then Gemma, then D14), 3 Reflection
+passes, and the RRI 26+/41+ human approval gate exactly as before — the
+routing change affects only who authors the code, not who reviews or
+approves it.
 
 When preparing a task for presentation or local delegation, the agent must compute
 a complexity score and derive the recommended model tier or local delegation
@@ -334,8 +357,8 @@ decomposition triggers) lives in `docs/policies/RRI_POLICY.md`.
 **Adoption note:** RRI supersedes the single-axis cyclomatic-complexity scoring
 that previously drove the tier mapping. No ADR is required — RRI is a workflow
 policy, not a runtime architecture decision. `AGENTS.md` and `CLAUDE.md` are
-**not** changed; this guide overrides both "without exception" on complexity
-scoring and model selection, so the adoption is binding from this file alone.
+summaries of this guide and must be synchronized whenever its presentation or
+routing contract changes.
 
 **How Steps 1 and 2 below relate to RRI:**
 - The cyclomatic-complexity formula in Step 1 maps directly to the **`C` variable**
@@ -343,13 +366,14 @@ scoring and model selection, so the adoption is binding from this file alone.
 - The tier mapping in Step 2 is now driven by the **RRI band** (not the raw CC
   label). The tier names (Economy / Balanced / Premium) and thinking-mode rules
   are unchanged; only the input that selects the tier changes.
-- Step 3 is updated to include the RRI score in the task presentation for RRI 26+,
+- Step 3 includes the compact RRI summary in the task presentation for RRI 26+,
   or in the local delegation packet and final report for RRI 0–25.
 
 Before presenting or delegating any task: **run `scripts/rri.py`** — do not compute the RRI by hand.
 The script measures F automatically and maps raw CC to the C score via the policy
-table. Paste its markdown output directly into the task presentation for RRI 26+,
-or into the local delegation packet and final report for RRI 0–25.
+table. Store its full markdown output in the task ledger or a linked RRI artifact.
+For RRI 26+, project the required compact summary into the approval card; for RRI
+0–25, include the full output in the local delegation packet and final report.
 
 ```bash
 # Task-presentation time (before code is written — diff is empty):
@@ -475,28 +499,35 @@ doc updates, or any task where the strategy is fully pre-defined.
 
 ### Step 3 — State it in the task presentation or delegation packet
 
-For RRI 26+, include this block in the task presentation. For RRI 0–25, include it
-in the local Gemma delegation packet and final report instead of presenting the
-full task for approval:
+For RRI 26+, use the **Compact Approval Task Card v2**. It is a projection of the
+linked task ledger and full RRI evidence, not a second task definition. Keep the
+card to no more than six content blocks:
 
-```
-| RRI              | <score> → band <label> → gates: <list>                  |
-| Complexity score | <CC range or decision-weight score> → <cyclomatic/decision-weight label> |
-| Claude Code      | <resolved model or pinned model> — thinking <On / Off>  |
-| Codex            | <resolved model or pinned model>                        |
-```
+1. **Decision header** — task ID/title, status, final RRI/band, Effort, and the
+   approval gate. Include a small routing table with the orchestrator, concrete
+   Codex/Claude recommendations, resolved implementation route, penalties,
+   two or three dominant RRI drivers, and a link to full RRI evidence.
+2. **Scope and acceptance** — one-sentence objective, in-scope paths/behaviors,
+   explicit out-of-scope boundary, the primary acceptance criteria (`HP-#` and
+   `EC-#` for development), evidence to emit, and status artifacts to sync.
+3. **Agent workflow** — a table naming the actual responsible participant for
+   analysis, phase-1 review, human approval, implementation, Reflection/testing,
+   phase-2 review, and closure. Each row states its gate/output and any fallback.
+   Show the route resolved for this task, not every possible band route.
+4. **Diagrams** — one compact agent-workflow Mermaid diagram. Development tasks
+   add one compact technical-scope diagram; never exceed two diagrams.
+5. **References** — task, plan, and only materially governing policies/ADRs.
+6. **Approval checkpoint** — the required HITL wording, or an explicit record of
+   the bounded user waiver.
 
-For development tasks in the **RRI 26–55 band (Moderate + Med-high)**, add one
-more line to the same block:
+The reusable projection lives at
+`docs/templates/compact-approval-task-card.md`. The linked task ledger must still
+contain the full task definition and the unmodified `scripts/rri.py` markdown
+report. The approval card itself shows only the final score, band, gates,
+penalties, dominant drivers, and evidence link.
 
-```
-| Local implementer | <resolved DUBBRIDGE_LOCAL_AGENT_MODEL> via disposable-worktree runner |
-```
-
-Present the full RRI variable table (variable | score | evidence | confidence)
-before this summary block when a human approval presentation is required. For
-RRI 0–25, place the same table in the local delegation packet and final report.
-See `docs/policies/RRI_POLICY.md` for the reporting format.
+For RRI 0–25, do not present a full approval card. Put the full RRI report in the
+local delegation packet and final report as required by the Low-band route.
 
 The recommendation is **not** a competition between vendors. Every presentation
 must provide:
@@ -508,18 +539,22 @@ Both recommendations must be derived from the same computed complexity and the
 same tier-mapping rules in this guide. Do not present only one vendor unless the
 task file explicitly scopes the task to a single vendor environment.
 
-For RRI 0–25, replace both vendor recommendations with the resolved local Gemma
-model and note that the active agent remains the reviewer/orchestrator.
+For RRI 0–25, use the resolved primary-agent or eligible local-Gemma route and
+note that the active agent remains the reviewer/orchestrator.
 For RRI 26–55, keep the Codex/Claude recommendations for orchestration and
-escalation, and add the local-implementer line above.
+escalation, and name the local implementer in the decision-header routing table.
 
-Presentation rules:
+Compact-card rules:
 
 - Always show the computed `Complexity score`, even if the task file already
   declares `Complexity:`.
-- For development tasks, always include a Mermaid diagram in the task presentation.
-  Its purpose is conceptual clarity at approval time, not only architecture-change
-  review; use the smallest diagram that makes the implementation shape obvious.
+- Every approval card includes the agent-workflow diagram. Development tasks also
+  include the smallest technical diagram that makes the implementation boundary
+  obvious.
+- Keep acceptance to the decision-relevant behaviors; link to the full task
+  definition instead of copying its inputs, outputs, context, or long case lists.
+- Keep the workflow table to seven phase rows and make every involved agent/model
+  visible with its responsibility, gate, and fallback.
 - If the task file provides explicit complexity or model guidance, state that it
   is a task-local override when presenting the task.
 - If the presentation uses a resolved model from the current agent environment,
@@ -555,16 +590,13 @@ subtask that proceeds after decomposition.
 
 Task-presentation requirement for development tasks:
 
-- When a development task's RRI is 26 or higher and the task is being presented
-  for approval, the presentation must include a `Reflection strategy` section.
-- That section must be derived from this table and must state:
-  - the task's RRI and band;
-  - the required number of Reflection passes for that band;
-  - a short pass-by-pass plan describing the intended Draft → Critique → Revise
-    focus for each pass.
-- The section should be concrete enough that the approver can see how the agent
-  intends to use Reflection on correctness, fail-closed behavior, side effects,
-  and coverage risk for the specific task being proposed.
+- For RRI 26+, the compact card's `Reflect and verify` workflow row states the
+  RRI/band, required pass count, and a terse ordered focus for the passes (for
+  example `contract -> failure boundaries -> coverage`). A separate Reflection
+  section is not required in the approval card.
+- The workflow row must still make clear that every pass is a complete Draft ->
+  Critique -> Revise loop. Detailed findings and revisions belong in the closure
+  `Reflection log`, not in the approval card.
 
 Each Reflection pass consists of:
 
@@ -690,10 +722,10 @@ for Med-high (41–55) — the tighter budget reflects the higher-risk
 anchor-rubric floors Med-high tasks typically carry. If the local runner/model
 is unavailable, the repair budget is exhausted, or the task violates the scope
 boundary, escalate to cloud implementation with the ADR-036 escalation packet
-instead of continuing locally. Med-high tasks still go through cross-vendor
-peer review (phases 1 and 2) and 3 Reflection passes regardless of where the
-code was authored — local-first routing changes only the code-authoring
-surface, not the review or approval controls.
+instead of continuing locally. Med-high tasks still go through the
+band-resolved independent review route (phases 1 and 2) and 3 Reflection passes
+regardless of where the code was authored — local-first routing changes only
+the code-authoring surface, not the review or approval controls.
 
 **Rollback triggers for this operative policy:** if the rolling 20-task window
 shows escalation rate `> 40%`, any **accepted** out-of-scope diff, any
@@ -783,7 +815,7 @@ resolved from the task's RRI band and the review phase:
 | **Phase 2 — Code-solution review** (after implementation, before closure) | **Gemma Reviewer** (existing N-pass) | `qwen3.6:27b-q4_K_M`† replaces Gemma/peer; Gemma fallback‡; D14 final fallback | **Cross-vendor peer replaces Gemma**; D14 fallback |
 
 † **Owner directive, 2026-07-21** — see `docs/policies/RRI_POLICY.md § Local
-pipeline phase-2 reviewer override`. Applies regardless of whether
+pipeline phase-1/phase-2 reviewer override`. Applies regardless of whether
 implementation stayed local or escalated to cloud.
 
 ‡ **Owner directive, 2026-07-21** — when `qwen3.6:27b-q4_K_M` is unavailable,
@@ -832,7 +864,7 @@ Code-solution review: <gemma|qwen3.6:27b-q4_K_M|codex|claude|d14> <artifact path
 - Peer review **does not replace** the HITL human approval gate required by the
   RRI band. It is a separate, independent check that runs in addition to it.
 - In the RRI 26–55 band, `qwen3.6:27b-q4_K_M` **replaces** Gemma (Moderate)
-  and the cross-vendor peer (Med-high) as the primary code-solution reviewer.
+  and the cross-vendor peer (Med-high) as the primary reviewer for both phases.
   If `qwen3.6:27b-q4_K_M` is unavailable/stalled/invalid, **Gemma** is the
   intermediate fallback (owner directive 2026-07-21) before **D14**, which
   remains the mandatory final fallback: `qwen3.6:27b-q4_K_M → Gemma → D14`.
@@ -853,10 +885,10 @@ active in PPR-1.
 
 ## Gemma Reviewer
 
-**Gemma Reviewer** is a read-only local model role that runs after implementation
-and before the primary agent's final Reflection cycle for Low (0–25) and Moderate
-(26–40) RRI development tasks. It is distinct from **Gemma Developer**, which is
-the patch-delegation path for eligible simple code patches.
+**Gemma Reviewer** is a read-only local model role. It is the primary reviewer
+for Low (0–25) development tasks and the intermediate fallback for RRI 26–55
+when `qwen3.6:27b-q4_K_M` is unusable. It is distinct from **Gemma Developer**,
+which is the patch-delegation path for eligible simple code patches.
 
 ### Authority boundary
 
@@ -870,7 +902,8 @@ the patch-delegation path for eligible simple code patches.
 
 ### When it runs
 
-For development tasks with RRI 0–40, after implementation is complete:
+For Low development tasks, or when the RRI 26–55 reviewer fallback is triggered
+after implementation:
 
 1. Implementation completes (primary agent or eligible Gemma Developer).
 2. Gemma Reviewer runs N sequential passes (default 3, `--passes N`,
@@ -893,9 +926,9 @@ Reflection cycle.
 
 ### Availability
 
-The review step is **mandatory for all Low/Moderate development tasks**.
-Gemma is the preferred path; the **context-isolated subagent** (D14) is the
-required fallback.
+The review step is mandatory. Gemma is the preferred Low-band reviewer and the
+intermediate RRI 26–55 fallback; D14 is the final fallback defined by the
+canonical band table.
 
 - **Gemma available and a usable consolidated result is produced:** run
   `make qa-gemma-review`, read the consolidated developer-review packet, and
@@ -1029,10 +1062,10 @@ may/may-not boundary and §3 for the eight invocation triggers (e.g. a likely
 ADR decision, multi-module failure analysis, or a high-RRI problem needing
 decomposition before execution).
 
-**Scoped exception (owner directive, 2026-07-21):** for RRI 26–55 phase-2
-(and phase-1, Med-high only) code-solution review, this model *does* replace
-Gemma Reviewer and the cross-vendor peer as the default reviewer — see
-`docs/policies/RRI_POLICY.md § Local pipeline phase-2 reviewer override` and
+**Scoped exception (owner directive, 2026-07-21):** for RRI 26–55 non-exempt
+phase-1 task-analysis and phase-2 code-solution review, this model *does*
+replace Gemma Reviewer and the cross-vendor peer as the default reviewer — see
+`docs/policies/RRI_POLICY.md § Local pipeline phase-1/phase-2 reviewer override` and
 `§ Band-routed peer review` above. Outside that narrow review role, the
 ADR-037 boundary is unchanged: it remains advisory-only for architecture/
 analysis synthesis, may not author the target document itself, and does not
@@ -1089,12 +1122,7 @@ Exempt only: `docs-only`, `config-only`, `migration-only`, `ADR`, `plan`,
 
 **Reviewer is determined by RRI band** (see `Band-routed peer review` above):
 
-#### Step 1-A — RRI 0–40 (Low + Moderate): Gemma Reviewer / D14
-
-**Moderate (26–40) override (owner directive, 2026-07-21):** phase 2 defaults
-to `qwen3.6:27b-q4_K_M` instead of Gemma Reviewer — see
-`docs/policies/RRI_POLICY.md § Local pipeline phase-2 reviewer override`.
-Low band (0–25) is unaffected; Gemma Reviewer stays the phase-2 path there.
+#### Step 1-A — RRI 0–25 (Low): Gemma Reviewer / D14
 
 ```
 [ ] 1a. Run `make qa-gemma-review`
@@ -1125,15 +1153,12 @@ Low band (0–25) is unaffected; Gemma Reviewer stays the phase-2 path there.
         Neither path may be skipped.
 ```
 
-#### Step 1-B — RRI 41–55 (Med-high): `qwen3.6:27b-q4_K_M` / D14
+#### Step 1-B — RRI 26–55 (Moderate + Med-high): `qwen3.6:27b-q4_K_M` / Gemma / D14
 
-**Owner directive, 2026-07-21:** for Med-high, phase 2 (and phase 1 when it
-applies — i.e. not exempted as migration-only/config-only/docs-only) defaults
-to the **Local Architect / Complex Analyst model** (`qwen3.6:27b-q4_K_M` via
-Ollama), not the cross-vendor peer. See `docs/policies/RRI_POLICY.md § Local
-pipeline phase-2 reviewer override` for the full contract and the ADR-037
-scope note (a deliberate, scoped exception to ADR-037's written advisory-only
-boundary, limited to phase-2/phase-1 code-solution review in the 26–55 band).
+**Owner directive, 2026-07-21:** phase 2, and non-exempt phase 1, defaults to
+the **Local Architect / Complex Analyst model** (`qwen3.6:27b-q4_K_M` via
+Ollama) throughout RRI 26–55. See `docs/policies/RRI_POLICY.md § Local pipeline
+phase-2 reviewer override` for the full contract and ADR-037 scope note.
 
 ```
 [ ] 1d. Send the diff, task acceptance criteria, and any independently-

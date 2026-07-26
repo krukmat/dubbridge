@@ -189,8 +189,8 @@ band — never derive one output from another (e.g. do not infer capability from
 | RRI band | Label | Effort | Capability (Codex) | Capability (Claude Code) | Thinking | Phase-1 reviewer | Phase-2 reviewer | Gate |
 |---|---|---|---|---|---|---|---|---|
 | **0–25** | Low | **S** | Primary agent or Local Gemma via Ollama | Primary agent or Local Gemma via Ollama | Off | Gemma | Gemma Reviewer | **Low-band handling:** do not present the full task for approval; use local Gemma only for eligible simple code patches, otherwise execute directly with the primary agent. |
-| **26–40** | Moderate | **M** | Balanced | Balanced | Off | Gemma | `qwen3.6:27b-q4_K_M`† | Confirm tests exist in the affected area. **Implementation route:** local-first via `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL`; primary agent remains orchestrator, cloud implementation is escalation/fallback. |
-| **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | `qwen3.6:27b-q4_K_M`† | `qwen3.6:27b-q4_K_M`† | Plan + explicit acceptance criteria required before approval. **Implementation route:** local-first via `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL` (1 repair attempt max); cloud implementation is escalation/fallback. Review/approval rigor unchanged — 3 Reflection passes and this HITL gate still apply; phase-2 (and phase-1 when it applies) reviewer is `qwen3.6:27b-q4_K_M`, not the cross-vendor peer. |
+| **26–40** | Moderate | **M** | Balanced | Balanced | Off | `qwen3.6:27b-q4_K_M`† | `qwen3.6:27b-q4_K_M`† | Confirm tests exist in the affected area. **Implementation route:** local-first via `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL`; primary agent remains orchestrator, cloud implementation is escalation/fallback. |
+| **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | `qwen3.6:27b-q4_K_M`† | `qwen3.6:27b-q4_K_M`† | Plan + explicit acceptance criteria required before approval. **Implementation route (ADR-038):** Qwen27 advisory refinement (GO_LOCAL/CLOUD_REQUIRED) → primary hash-bound route receipt (may downgrade, never upgrade) → if GO_LOCAL, exactly one bounded `qwen3.6:35b-a3b` session (≤8 turns, ≤300s, 0 repairs) → otherwise Codex/Claude with the full evidence bundle. No repair attempt at this band. Review/approval rigor unchanged — 3 Reflection passes and this HITL gate still apply; phase-2 (and phase-1 when it applies) reviewer is `qwen3.6:27b-q4_K_M`, not the cross-vendor peer. |
 | **56–70** | Complex | **L** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Plan first. **Decompose into subtasks before implementation.** Human reviews the plan. |
 | **71–85** | High | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Characterization tests + explicit acceptance criteria + human reviews the **diff** (not just the plan). **Decomposition remains mandatory.** |
 | **86–100** | Very high | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Do not implement directly. Produce an ADR + risk analysis + decompose into subtasks. |
@@ -198,7 +198,7 @@ band — never derive one output from another (e.g. do not infer capability from
 
 \* **Cross-vendor peer** (RRI 56+, and RRI 41–55 only if the `qwen3.6:27b-q4_K_M` override below is ever rolled back for this band): `claude-code → codex | codex → claude | other → claude`. Unavailable peer CLI falls back to **D14** (Balanced tier); peer + D14 both unavailable → blocked artifact, stop. Phase-1 exemptions (docs/policy/config-only tasks) record `n/a`. Full contract: `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review`.
 
-† **`qwen3.6:27b-q4_K_M` phase-2 (and phase-1, Med-high only) reviewer** (RRI 26–55, owner directive 2026-07-21): replaces Gemma Reviewer (Moderate) and the cross-vendor peer (Med-high) as the default reviewer for this band, regardless of where implementation happened. Unavailable/stalled/invalid output falls back to **Gemma**, then to **D14**; D14 unavailable → blocked artifact, stop. See § Local pipeline phase-2 reviewer override below for the full contract and ADR-037 scope note.
+† **`qwen3.6:27b-q4_K_M` phase-1 and phase-2 reviewer** (RRI 26–55, owner directive 2026-07-21): replaces Gemma Reviewer (Moderate) and the cross-vendor peer (Med-high) as the default reviewer for this band, regardless of where implementation happened. Unavailable/stalled/invalid output falls back to **Gemma**, then to **D14**; D14 unavailable → blocked artifact, stop. See § Local pipeline phase-1/phase-2 reviewer override below for the full contract and ADR-037 scope note.
 
 ### Model tier resolution
 
@@ -228,16 +228,15 @@ uses a simple tool contract (`read_file`/`write_file`/`apply_patch`/
 reads the file it changes directly (see
 `docs/plan/local-agent-simple-editing.md`).
 
-Med-high (41–55) extends this routing (owner override, 2026-07-21) without
-relaxing any other control: cross-vendor peer review still replaces Gemma as
-reviewer for this band, 3 Reflection passes still apply, and the RRI 41+ human
-approval gate still fires before implementation starts. The only difference
-from Moderate is a tighter local repair budget — 1 evidence-backed attempt
-instead of 2 — before escalating to cloud implementation, reflecting the
-higher-risk anchor-rubric floors Med-high tasks typically carry (e.g.
-`infra/migrations/**`, ADR-008/ADR-018). A success audit in this band is
-complete only when scope, acceptance, and organization gates all pass and the
-audit carries the `local-implementer` signature.
+Med-high (41–55) does **not** extend Moderate's direct local-first routing.
+ADR-038 (2026-07-26) replaces it with the Qwen27-refined, hash-bound,
+zero-repair single-attempt gate described in § Med-high Architect-refined
+single-attempt handling below, without relaxing any other control: the
+band-resolved independent reviewer remains mandatory, 3 Reflection passes
+still apply, and the RRI 41+ human approval gate still fires before
+implementation starts. A success audit in this band is complete only when
+scope, acceptance, and organization gates all pass and the audit carries the
+`local-implementer` signature.
 
 Thinking mode: activate for Balanced→Premium and above when the task requires
 multi-step reasoning that cannot be validated incrementally. Do **not** activate
@@ -360,10 +359,10 @@ For final **RRI 26–40**, the implementation default is **local-first**:
 - cloud implementation is the escalation/fallback path when the local runner,
   model binding, repair budget, or scope boundary fails.
 
-**Phase-2 reviewer override (owner directive, 2026-07-21):** for this band,
-phase 2 defaults to the **Local Architect / Complex Analyst model**
-(`qwen3.6:27b-q4_K_M`), not Gemma Reviewer — see § Local pipeline phase-2
-reviewer override below. Phase 1 stays Gemma. If `qwen3.6:27b-q4_K_M` is
+**Phase-1/phase-2 reviewer override (owner directive, 2026-07-21):** for this
+band, both non-exempt phase 1 and phase 2 default to the **Local Architect / Complex Analyst model**
+(`qwen3.6:27b-q4_K_M`), not Gemma Reviewer — see § Local pipeline phase-1/phase-2
+reviewer override below. If `qwen3.6:27b-q4_K_M` is
 unavailable, stalled, or returns invalid/`BLOCKED` output, fall back to
 **Gemma**, then to **D14** as the final fallback.
 
@@ -380,32 +379,58 @@ out-of-scope diff, any unintended change escaping the disposable worktree
 boundary, or sustained swap/thermal degradation attributable to the local
 implementer.
 
-### Med-high local-first handling
+### Med-high Architect-refined single-attempt handling
 
-For final **RRI 41–55**, the implementation default is also **local-first**
-(owner override, 2026-07-21, extending the Moderate-band routing above):
+For final **RRI 41–55**, implementation does **not** use Moderate's direct
+local-first route. ADR-038 (2026-07-26) replaces it with a fail-closed,
+evidence-bearing gate:
 
-- the primary agent remains the planner, approver-facing presenter, reviewer,
-  and closer;
-- the code-authoring surface is `scripts/local-agent/run_local_task.py` in a
-  disposable worktree;
-- the implementer resolves from `DUBBRIDGE_LOCAL_AGENT_MODEL` (default
-  `qwen3.6:35b-a3b`) — the same binding used for Moderate;
-- post-run `allowed_paths` scope enforcement is mandatory;
-- the local path has a maximum of **1 repair attempt** (tighter than
-  Moderate's 2), each requiring new evidence;
-- cloud implementation is the escalation/fallback path when the local runner,
-  model binding, repair budget, or scope boundary fails.
+```text
+approved Med-high card
+  -> Qwen27 (qwen3.6:27b-q4_K_M) advisory refinement: GO_LOCAL | CLOUD_REQUIRED
+  -> primary agent hash-bound route receipt (may downgrade GO_LOCAL to cloud;
+     may NEVER upgrade CLOUD_REQUIRED to local)
+  -> if GO_LOCAL: exactly ONE bounded session on qwen3.6:35b-a3b
+       (<=8 turns, <=300 seconds wall clock, 0 repair attempts, exact model
+       binding — no silent substitution)
+  -> otherwise (CLOUD_REQUIRED, timeout, or any failure): Codex or Claude with
+     the full ADR-038 §5 evidence bundle (task capsule, refinement artifact,
+     primary receipt, effective limits, transcript/checkpoint, partial diff,
+     commands/tests run, stop reason, hashes, model identity, elapsed time)
+```
+
+Implementation surfaces:
+
+- `scripts/local-architect/run_analysis.py` (`med-high-refinement-v1` profile)
+  produces the hash-bound Qwen27 refinement artifact.
+- `scripts/local-agent/med_high_gate.py` validates the refinement artifact,
+  the primary receipt, card/capsule hash binding, exact model tag/digest, and
+  the Med-high RRI band, then applies the fail-closed route rules.
+- `scripts/local-agent/run_local_task.py`'s `resolve_effective_limits()`
+  forces 8 turns / 0 repairs / exact `qwen3.6:35b-a3b` binding for any card
+  whose band or RRI falls in 41–55 (Moderate's 30-turn/2-repair defaults are
+  unchanged for cards outside this band).
+- `scripts/local-agent/run_med_high_task.py` supervises that one session as
+  its own OS process group, kills the full group on the 300-second cutoff,
+  and emits the complete evidence bundle (via `escalation_packet.py`) on
+  every non-success route.
+
+There is no repair attempt at this band — zero, not one. A failed acceptance
+run, a timeout, a scope/boundary/organization violation, or a model
+substitution all terminate the session and route to cloud, never retry
+locally. This is tighter than Moderate's 2-repair budget and tighter than
+this band's own previous 1-repair-attempt behavior (retired by ADR-038).
 
 The approval path is **not** relaxed: 3 Reflection passes still apply, and
 the RRI 41+ human approval gate (plan + explicit acceptance criteria before
-implementation) still fires. Only the code-authoring surface moves local; the
-tighter repair budget compensates for the higher-risk anchor-rubric floors
-this band typically carries (e.g. `infra/migrations/**`, ADR-008/ADR-018).
+implementation) still fires. The primary agent remains the planner,
+approver-facing presenter, reviewer, and closer regardless of which route
+Qwen27/the gate select.
 
-**Phase-2 reviewer override (owner directive, 2026-07-21):** for this band,
-phase 2 defaults to `qwen3.6:27b-q4_K_M`, not the cross-vendor peer — see §
-Local pipeline phase-2 reviewer override below. Phase 1 remains exempt for
+**Phase-1/phase-2 reviewer override (owner directive, 2026-07-21, unchanged by
+ADR-038):** for this band, both non-exempt phase 1 and phase 2 default to
+`qwen3.6:27b-q4_K_M`, not the cross-vendor peer — see § Local pipeline
+phase-1/phase-2 reviewer override below. Phase 1 remains exempt for
 migration-only/config-only/docs-only tasks as before; when phase 1 does
 apply, it also routes to `qwen3.6:27b-q4_K_M` rather than the cross-vendor
 peer. If `qwen3.6:27b-q4_K_M` is unavailable, stalled, or returns
@@ -414,11 +439,17 @@ unavailable, stalled, or returns invalid/`BLOCKED` output, fall back to
 **D14**; if D14 is also unavailable, write a blocked-artifact record and
 stop — never self-review.
 
-Bindings used by the operative Med-high local-first route are the same as
-Moderate's (see table above); no new environment variable is introduced.
+Bindings: `OLLAMA_HOST` and `DUBBRIDGE_LOCAL_AGENT_MODEL` are the same
+variables Moderate uses (see table above); ADR-038 introduces no new
+environment variable, only the additional hash-bound artifacts above.
 
-**Rollback triggers:** same triggers as Moderate above, evaluated
-independently per band — revert only the affected band to the cloud path.
+**Rollback triggers:** CLOUD_REQUIRED, timeout, or any gate rejection is not
+a rollback trigger — it is the designed fallback path and fires per task.
+Revert this band's local-attempt step entirely (route every Med-high task
+directly to cloud) if the rolling 20-task window shows a GO_LOCAL success
+rate `< 40%`, any accepted out-of-scope diff, any unintended change escaping
+the disposable worktree boundary, or any confirmed CLOUD_REQUIRED-to-local
+upgrade (a gate defect, not an expected outcome).
 
 ### Target-file size gate for local-first delegation
 
@@ -474,23 +505,24 @@ have a Python profile (`RUST_SOURCE`/`RUST_TEST`/`MOBILE_SOURCE`/`MOBILE_TEST`
 only) — adding one is tracked as follow-up work, not a blocking requirement of
 this policy change.
 
-### Local pipeline phase-2 reviewer override
+### Local pipeline phase-1/phase-2 reviewer override
 
 Owner directive, 2026-07-21: for **RRI 26–55** (Moderate + Med-high), the
-phase-2 code-solution reviewer defaults to the **Local Architect / Complex
-Analyst model** (`qwen3.6:27b-q4_K_M` via Ollama), replacing Gemma Reviewer
-(Moderate) and the cross-vendor peer (Med-high) as the default path. This
-applies regardless of whether implementation stayed on the local-first
-runner or escalated to cloud implementation — the override governs *who
-reviews*, independently of *who authored the code*.
+non-exempt phase-1 task-analysis reviewer and phase-2 code-solution reviewer
+default to the **Local Architect / Complex Analyst model**
+(`qwen3.6:27b-q4_K_M` via Ollama), replacing Gemma Reviewer (Moderate) and the
+cross-vendor peer (Med-high) as the default paths. This applies regardless of
+whether implementation stayed on the local-first runner or escalated to cloud
+implementation — the override governs *who reviews*, independently of *who
+authored the code*.
 
 This is a deliberate, scoped exception to ADR-037's written boundary, which
 otherwise restricts the Local Architect / Complex Analyst role to advisory
-architecture/analysis work and explicitly states it "does not replace Gemma
-Reviewer, the RRI 41+ cross-vendor peer, D14, or human approval" (see
+architecture/analysis work and explicitly states that it does not replace any
+workflow reviewer, D14, or human approval (see
 `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Local Architect / Complex
-Analyst`). For phase-2 code-solution review specifically, in the 26–55 band
-only, this override supersedes that restriction. ADR-037's boundary is
+Analyst`). For phase-1 task-analysis and phase-2 code-solution review in the
+26–55 band only, this override supersedes that restriction. ADR-037's boundary is
 otherwise unchanged: the role still may not author the target ADR/plan/task
 document, evaluate its own advisory output as authoritative, or satisfy the
 human-approval gate.
@@ -580,9 +612,12 @@ started below 56 must still be split after recomputation.
 
 ## Reporting format
 
-Before every implementation, compute the RRI as a table. For RRI 26+, present it
-in the task approval packet. For RRI 0–25, include it in the local delegation
-packet and final report instead of presenting the full task for approval.
+Before every implementation, compute the RRI as a table. Store the full report in
+the task ledger or a dedicated RRI artifact. For RRI 26+, the compact approval
+card links to that report and shows only the final score/band, gates, penalties,
+dominant drivers, and resolved routing. For RRI 0–25, include the full report in
+the local delegation packet and final report instead of presenting an approval
+card.
 
 | Variable | Score | Evidence | Confidence |
 |---|---|---|---|
@@ -693,10 +728,11 @@ directory convention: `**/auth/**`, `**/security/**`, `**/crypto/**` → 4/4/4;
 project's own critical paths should eventually graduate to a dedicated profile like
 `dubbridge` when ADR anchoring is warranted.
 
-### Copy the output into the task presentation
+### Store the output and project the compact summary
 
-Run the script, then paste its markdown output directly into the task presentation
-block. Do not reformat or recompute. The script output **is** the RRI report.
+Run the script, then store its markdown output unchanged in the task ledger or a
+linked RRI artifact. Do not recompute it. The script output **is** the full RRI
+report; the approval card is only its compact decision projection.
 
 ## Gemma Developer vs. Gemma Reviewer
 
@@ -717,7 +753,7 @@ Gemma is the preferred path (N sequential passes, default 3); the
 context-isolated subagent (D14) is the required fallback when Gemma is
 unavailable or quorum fails. For RRI 26–55 (Moderate + Med-high),
 `qwen3.6:27b-q4_K_M` replaces Gemma as the preferred path (owner directive
-2026-07-21) — see § Local pipeline phase-2 reviewer override — with the same
+2026-07-21) — see § Local pipeline phase-1/phase-2 reviewer override — with the same
 D14 fallback. The completion evidence block records passes run/succeeded,
 quorum result, aggregate status, consensus/disagreement counts, `degraded`
 flag, isolated adjudicator status, and `disposition_divergence`. See

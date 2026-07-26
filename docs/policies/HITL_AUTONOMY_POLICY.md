@@ -78,17 +78,17 @@ If penalties are present and the final RRI is still ≤ 25, the low-band handlin
 still applies. When delegation is used, state all active penalties explicitly in
 the delegation packet and final report so the score is transparent.
 
-## Local-first implementation (RRI 26–55)
+## Local-first implementation (RRI 26–40 Moderate)
 
-For the **26–40 Moderate** and **41–55 Med-high** bands, the approval gate is
-unchanged: the agent must present the task and wait for explicit human
-approval before implementation. What changes is the default implementation
-route. Med-high also keeps its own unchanged controls — cross-vendor peer
-review (phases 1 and 2), 3 Reflection passes, and the "Plan + explicit
-acceptance criteria" gate all still apply; only the code-authoring surface
-moves local.
+For the **26–40 Moderate** band, the approval gate is unchanged: the agent
+must present the task and wait for explicit human approval before
+implementation. What changes is the default implementation route.
 
-The default path for development tasks in these bands is:
+The **41–55 Med-high** band does **not** use this direct local-first route —
+see § Med-high Architect-refined single-attempt gate (RRI 41–55) below for
+its own routing.
+
+The default path for Moderate development tasks is:
 
 1. Compute RRI with `scripts/rri.py`.
 2. Present the task and obtain explicit approval.
@@ -112,27 +112,76 @@ The default path for development tasks in these bands is:
    only when scope, acceptance, and organization gates all pass.
 8. If the local run fails the acceptance signal, hits the scope boundary, or
    the local path is unavailable, the primary agent may run at most **2**
-   evidence-backed local repair attempts for Moderate (26–40) or at most **1**
-   for Med-high (41–55).
+   evidence-backed local repair attempts.
 9. After the repair budget is exhausted, or if the local runner/model is
    unavailable, escalate to cloud implementation with the ADR-036 escalation
    packet rather than continuing with ad hoc local retries.
 
-This routing is operative by owner override dated **2026-07-15** for the
-Moderate band. It was adopted ahead of the original ADR-036 promotion gate so
-that live Moderate-band tasks become the evaluation surface. It was extended
-to the Med-high band by owner override dated **2026-07-21**, with a tighter
-1-attempt repair budget (vs. 2 for Moderate) reflecting the higher-risk
-anchor-rubric floors Med-high tasks typically carry (e.g.
-`infra/migrations/**`, ADR-008/ADR-018). The Med-high extension does not touch
-the "Band-routed peer review" section below — cross-vendor peer review still
-applies in full.
+This routing is operative by owner override dated **2026-07-15**. It was
+adopted ahead of the original ADR-036 promotion gate so that live
+Moderate-band tasks become the evaluation surface.
+
+It was extended to the Med-high band by owner override dated **2026-07-21**
+with a tighter 1-attempt repair budget, and subsequently **replaced** for
+Med-high by ADR-038 (2026-07-26) — see § Med-high Architect-refined
+single-attempt gate (RRI 41–55) below. Med-high no longer uses any repair
+attempt at all; the historical 1-attempt figure no longer applies to this
+band.
+
+## Med-high Architect-refined single-attempt gate (RRI 41–55)
+
+ADR-038 (2026-07-26) governs implementation routing for final **RRI 41–55**.
+The approval gate is unchanged: the agent must present the task and wait for
+explicit human approval before implementation. Band-resolved independent
+review (phases 1 and 2), 3 Reflection passes, and the "Plan + explicit
+acceptance criteria" gate all still apply.
+
+The route:
+
+1. Compute RRI with `scripts/rri.py`; confirm it falls in 41–55.
+2. Present the task and obtain explicit approval.
+3. Request a Qwen27 (`qwen3.6:27b-q4_K_M`) advisory refinement via
+   `scripts/local-architect/run_analysis.py`'s `med-high-refinement-v1`
+   profile. It returns `route_recommendation: GO_LOCAL | CLOUD_REQUIRED`
+   bound to the task capsule hash and its own model tag/digest.
+4. The primary agent issues its own hash-bound route receipt, evaluated by
+   `scripts/local-agent/med_high_gate.py`. The primary may **downgrade**
+   GO_LOCAL to cloud; it may **never upgrade** CLOUD_REQUIRED to local — this
+   is enforced structurally (the gate requires both sides to independently
+   say GO_LOCAL), not by trusting either decision alone.
+5. If the gate resolves GO_LOCAL: `scripts/local-agent/run_med_high_task.py`
+   supervises exactly **one** session on the exact `qwen3.6:35b-a3b` binding,
+   as its own OS process group, bounded to **8 turns**, **300 seconds**
+   wall clock, and **0 repair attempts**. No silent model substitution. A
+   timeout kills the full process group (not just the immediate PID) and
+   preserves the last checkpoint and partial diff.
+6. If the gate resolves CLOUD_REQUIRED, or the one local attempt does not
+   reach success (timeout, failing acceptance, scope/boundary/organization
+   violation, or model substitution), escalate to Codex or Claude with the
+   full ADR-038 §5 evidence bundle: task capsule, refinement artifact,
+   primary receipt, effective limits, transcript/checkpoint, partial diff,
+   commands/tests run, stop reason, hashes, model identity, elapsed time.
+7. Run the approved verification commands and the organization gate before
+   issuing a signed success audit, exactly as for Moderate. The
+   `local-implementer` signature is valid only when scope, acceptance, and
+   organization gates all pass.
+
+Hard exclusions from GO_LOCAL regardless of the Qwen27 recommendation:
+auth/security work, rights/consent/governance invariants, schema/migrations/
+release cuts, unresolved ADR decisions, and unbounded scope — see ADR-038 §6.
+
+This gate does not weaken the independent review route defined by the
+"Band-routed peer review" section below.
 
 ## Approval checkpoint wording
 
 When approval is required (RRI > 25), end the presentation with:
 
 `Execution has not started. Approve this task to proceed.`
+
+Use the Compact Approval Task Card v2 from the workflow guide. A user may waive
+this checkpoint only by explicitly authorizing execution without another
+approval for a clearly bounded task; record that waiver in the card or ledger.
 
 ## Permitted without prior approval
 

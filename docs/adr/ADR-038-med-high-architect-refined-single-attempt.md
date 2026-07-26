@@ -1,0 +1,176 @@
+---
+type: ADR
+title: "ADR-038: Architect-refined single local attempt for Med-high tasks"
+status: Accepted
+supersedes: ""
+superseded_by: ""
+---
+
+# ADR-038: Architect-refined Single Local Attempt for Med-high Tasks
+
+- **Status:** Accepted
+- **Date:** 2026-07-26
+- **Deciders:** DubBridge owner and platform-agent workflow maintainers
+- **Scope:** agent workflow and local delegation only; no application-runtime or
+  product-architecture change
+- **Amends:** ADR-036 local implementation routing and ADR-037 Local Architect
+  invocation timing
+- **Owner approval:** the owner accepted the proposed route in the active session
+  with `si, de acuerdo` after reviewing the exact Qwen27 -> primary decision ->
+  Qwen35/cloud workflow and its limits.
+
+## Context
+
+The 2026-07-21 owner override extended the RRI 26-40 local-first route to the
+Med-high band (RRI 41-55). That extension reused the Moderate runner with a
+nominally tighter repair budget, but the executable runner remained global: up
+to 30 model turns, two post-test repairs, and a per-chat wall limit of 1,800
+seconds. A real RRI 55 session reached turn 23 without producing a patch before
+the operator stopped it. This single observation does not by itself satisfy the
+rolling rollback-rate trigger, but it demonstrates that direct Med-high
+local-first authoring can spend substantial time before producing evidence.
+
+ADR-036 originally rejected general local implementation for RRI 41+ because
+ambiguity, blast radius, and verification burden are precisely what raise the
+band. ADR-037 already permits Qwen3.6-27B to decompose a high-RRI problem, but it
+places that role upstream of operative planning. The useful middle ground is a
+bounded routing consultation after a task is approved and before any local code
+authoring, followed by at most one short local implementation session.
+
+The aggregate change scores RRI 93 (Very high) when policy, ADR, runner,
+supervision, tests, and status synchronization are treated as one patch. It must
+therefore be delivered as the subtasks in
+`docs/tasks/med-high-local-refinement.md`, each scoring RRI <= 55.
+
+## Decision
+
+### 1. Preserve Low and Moderate routing
+
+- RRI 0-25 keeps the existing Low-band gate.
+- RRI 26-40 remains local-first when the normal eligibility gates pass.
+- This ADR changes only RRI 41-55 Med-high implementation routing.
+
+### 2. Add one advisory refinement before Med-high implementation
+
+After phase-1 readiness review and human approval, the orchestrator freezes the
+approved task capsule and invokes the ADR-037 Local Architect exactly once with
+`qwen3.6:27b-q4_K_M`. The invocation is tool-free and read-only. Its structured
+`med-high-refinement-v1` artifact must contain:
+
+- the task/capsule hash and exact model tag/digest;
+- `GO_LOCAL` or `CLOUD_REQUIRED`;
+- refined in-scope and out-of-scope boundaries;
+- ordered implementation steps and deterministic acceptance tests;
+- material risks, unknowns, stop conditions, and claim provenance.
+
+The Local Architect recommends a route; it does not approve or implement the
+task. An unavailable, timed-out, malformed, stale, or hash-mismatched artifact
+is equivalent to `CLOUD_REQUIRED`.
+
+### 3. Keep the primary agent as the fail-closed route authority
+
+The primary agent independently verifies the artifact against the approved card,
+governing ADRs, repository evidence, and local eligibility gates. It emits a
+hash-bound route receipt with its identity, timestamp, rationale, and decision.
+
+- The primary may downgrade Qwen27 `GO_LOCAL` to cloud.
+- The primary may never upgrade `CLOUD_REQUIRED` to local.
+- A material scope or acceptance change invalidates the original approval and
+  requires a new capsule, RRI computation, review, and approval.
+- The Local Architect artifact is not silently reused as the official phase-1
+  review artifact. The two roles use separate artifacts/invocations unless a
+  later explicit policy amendment defines a combined schema and authority.
+
+### 4. Define "one local round" precisely
+
+Only `GO_LOCAL` plus a valid primary receipt may start the exact local
+implementer binding `qwen3.6:35b-a3b`. The Med-high budget is:
+
+- one implementation session total;
+- at most 8 model/tool turns;
+- at most 300 seconds total wall time for the supervised session;
+- zero post-acceptance-test repair cycles;
+- no silent model substitution.
+
+The implementer may inspect, edit, and run tests within those limits. Once it
+calls `finish`, a failing acceptance gate ends the session; it does not receive a
+repair turn. Turn, wall, transport, scope, organization, boundary, no-diff, or
+test failure immediately selects the cloud route.
+
+### 5. Preserve evidence during cloud escalation
+
+Every non-successful local route emits a handoff bundle containing the immutable
+task capsule, refinement artifact, primary receipt, effective limits, transcript
+or last checkpoint, partial diff, commands/tests, stop reason, hashes, model
+identity, and elapsed time. Codex or Claude consumes that bundle instead of
+re-exploring the task from scratch.
+
+### 6. Exclude high-confidence surfaces from `GO_LOCAL`
+
+The primary must choose cloud regardless of Qwen27's recommendation for:
+
+- authentication or security boundaries;
+- rights, consent, publication, or other fail-closed governance invariants;
+- schema/data migrations and release cuts;
+- an unresolved ADR-level decision;
+- unbounded cross-module scope, non-deterministic acceptance, critical unknowns,
+  or a target file that fails the local delegation size gate.
+
+### 7. Keep review and approval rigor unchanged
+
+The new refinement is an implementation-routing gate. It does not reduce the
+Med-high human approval requirement, three Reflection passes, phase-2 review,
+owner verification, or status synchronization. Reviewer fallback is not routing
+fallback: failure of the advisory refinement routes implementation to cloud,
+while official reviewer failure follows the review policy's own chain.
+
+## Risk analysis
+
+| Risk | Failure mode | Mitigation |
+|---|---|---|
+| False-positive `GO_LOCAL` | Local model starts an unsuitable task | Primary verification, hard exclusions, hash-bound receipt, short one-shot budget |
+| False-negative `CLOUD_REQUIRED` | A locally solvable task spends cloud capacity | Accepted cost of fail-closed routing; evidence can refine later policy |
+| Stale or tampered artifact | Receipt authorizes a different task | Capsule/artifact SHA-256 binding and model-digest validation |
+| Slow or stuck local session | Repeats the observed 23-turn stall | Supervisor-enforced 8-turn/300-second process-group cutoff |
+| Hidden repair loop | "One round" becomes multiple attempts | Runner budget is one session and zero repairs; tests lock the semantics |
+| Scope drift after approval | Refinement changes what the owner approved | Any material scope/acceptance change requires a new capsule and gate |
+| Same-model authority conflation | Advisory output is treated as review/approval | Separate artifacts and explicit role labels; primary and human retain authority |
+| Lost escalation context | Cloud repeats exploration | Automatic handoff bundle includes all local evidence and hashes |
+
+## Consequences
+
+### Positive
+
+- Med-high tasks receive local architecture/decomposition value without an
+  unbounded local coding attempt.
+- A narrowly viable task can still use local implementation once.
+- Cloud fallback begins with reusable evidence and a refined scope.
+
+### Negative
+
+- The route adds one local analysis invocation before implementation.
+- The primary must verify and attest the recommendation.
+- Some solvable local tasks will intentionally escalate when evidence is
+  incomplete or the five-minute budget is insufficient.
+
+## Alternatives considered
+
+- **Keep direct local-first for all RRI 41-55:** rejected because observed
+  latency and the runner's global budgets do not match the band's risk.
+- **Route every Med-high task directly to cloud:** safe but discards the useful
+  ADR-037 decomposition lane and all bounded local implementation opportunities.
+- **Let Qwen27 implement:** rejected; ADR-037 keeps the dense model advisory and
+  tool-free, and ADR-036 records why it is unsuitable for agentic loops.
+- **Allow one repair after a failed acceptance test:** rejected because it means
+  two implementation attempts, contradicting the owner's one-round constraint.
+
+## Related
+
+- `docs/adr/ADR-036-local-first-agentic-implementation-band.md`
+- `docs/adr/ADR-037-qwen36-27b-local-architect-complex-analyst.md`
+- `docs/plan/med-high-local-refinement.md`
+- `docs/tasks/med-high-local-refinement.md`
+- `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
+- `docs/policies/RRI_POLICY.md`
+- `docs/policies/HITL_AUTONOMY_POLICY.md`
+

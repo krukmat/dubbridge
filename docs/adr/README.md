@@ -47,6 +47,7 @@ doc gates).
 | [ADR-035](ADR-035-mobile-dark-theme-netflix-style.md) | Mobile dark-theme visual identity — Netflix-style dark canvas | Accepted |
 | [ADR-036](ADR-036-local-first-agentic-implementation-band.md) | Local-first agentic implementation band (RRI 26–40) and Apple Silicon local model stack | Accepted (scope: agent workflow / local delegation) |
 | [ADR-037](ADR-037-qwen36-27b-local-architect-complex-analyst.md) | Qwen3.6-27B as Local Architect and Complex Analyst | Accepted (scope: direct project advisory analysis) |
+| [ADR-038](ADR-038-med-high-architect-refined-single-attempt.md) | Architect-refined single local attempt for Med-high tasks | Accepted (amends ADR-036/ADR-037; agent workflow only) |
 
 ## Backfill note
 
