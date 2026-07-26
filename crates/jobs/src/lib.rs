@@ -52,8 +52,9 @@ impl std::fmt::Display for QueueError {
 
 impl std::error::Error for QueueError {}
 
+#[async_trait::async_trait]
 pub trait PreparationJobQueue: Send + Sync {
-    fn enqueue(&self, job: PreparationJob) -> Result<(), QueueError>;
+    async fn enqueue(&self, job: PreparationJob) -> Result<(), QueueError>;
 }
 
 pub type SharedPreparationJobQueue = Arc<dyn PreparationJobQueue>;
@@ -72,8 +73,9 @@ impl InMemoryPreparationJobQueue {
     }
 }
 
+#[async_trait::async_trait]
 impl PreparationJobQueue for InMemoryPreparationJobQueue {
-    fn enqueue(&self, job: PreparationJob) -> Result<(), QueueError> {
+    async fn enqueue(&self, job: PreparationJob) -> Result<(), QueueError> {
         self.jobs
             .lock()
             .map_err(|_| QueueError::Unavailable("queue lock poisoned".into()))?
@@ -81,8 +83,6 @@ impl PreparationJobQueue for InMemoryPreparationJobQueue {
         Ok(())
     }
 }
-
-pub type SharedTranscriptionJobQueue = Arc<dyn TranscriptionJobQueue>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TranscriptionJob {
@@ -107,8 +107,11 @@ impl TranscriptionJob {
     }
 }
 
+pub type SharedTranscriptionJobQueue = Arc<dyn TranscriptionJobQueue>;
+
+#[async_trait::async_trait]
 pub trait TranscriptionJobQueue: Send + Sync {
-    fn enqueue(&self, job: TranscriptionJob) -> Result<(), QueueError>;
+    async fn enqueue(&self, job: TranscriptionJob) -> Result<(), QueueError>;
 }
 
 #[derive(Debug, Default)]
@@ -125,8 +128,9 @@ impl InMemoryTranscriptionJobQueue {
     }
 }
 
+#[async_trait::async_trait]
 impl TranscriptionJobQueue for InMemoryTranscriptionJobQueue {
-    fn enqueue(&self, job: TranscriptionJob) -> Result<(), QueueError> {
+    async fn enqueue(&self, job: TranscriptionJob) -> Result<(), QueueError> {
         self.jobs
             .lock()
             .map_err(|_| QueueError::Unavailable("transcription queue lock poisoned".into()))?
@@ -156,8 +160,9 @@ impl SubtitleJob {
 
 pub type SharedSubtitleJobQueue = Arc<dyn SubtitleJobQueue>;
 
+#[async_trait::async_trait]
 pub trait SubtitleJobQueue: Send + Sync {
-    fn enqueue(&self, job: SubtitleJob) -> Result<(), QueueError>;
+    async fn enqueue(&self, job: SubtitleJob) -> Result<(), QueueError>;
 }
 
 #[derive(Debug, Default)]
@@ -174,13 +179,150 @@ impl InMemorySubtitleJobQueue {
     }
 }
 
+#[async_trait::async_trait]
 impl SubtitleJobQueue for InMemorySubtitleJobQueue {
-    fn enqueue(&self, job: SubtitleJob) -> Result<(), QueueError> {
+    async fn enqueue(&self, job: SubtitleJob) -> Result<(), QueueError> {
         self.jobs
             .lock()
             .map_err(|_| QueueError::Unavailable("subtitle queue lock poisoned".into()))?
             .push(job);
         Ok(())
+    }
+}
+
+// ---- Redis-backed queues ----
+
+/// Upper bound on establishing a Redis connection.
+///
+/// redis-rs's `ConnectionManager` has no default connection timeout, so an
+/// unreachable or blackholed Redis would otherwise hang the caller forever.
+/// Bounding it here keeps the queue fail-closed: an unavailable backend
+/// surfaces as `QueueError::Unavailable` in bounded time.
+const REDIS_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
+pub struct RedisPreparationJobQueue {
+    storage: apalis_redis::RedisStorage<PreparationJob>,
+}
+
+impl RedisPreparationJobQueue {
+    pub async fn connect(redis_url: &str) -> Result<Self, QueueError> {
+        let conn = tokio::time::timeout(REDIS_CONNECT_TIMEOUT, apalis_redis::connect(redis_url))
+            .await
+            .map_err(|_| QueueError::Unavailable("redis connect timed out".to_string()))?
+            .map_err(|e| QueueError::Unavailable(format!("redis connect failed: {e}")))?;
+        let config = apalis_redis::Config::default().set_namespace(PreparationJob::JOB_TYPE);
+        let storage = apalis_redis::RedisStorage::new_with_config(conn, config);
+        Ok(Self { storage })
+    }
+
+    /// Enqueue and return the apalis task id.
+    ///
+    /// The `PreparationJobQueue` trait deliberately returns `()`, so this
+    /// inherent method exists to let tests prove the job is retrievable from
+    /// the same Redis namespace a consumer would poll. The trait method
+    /// delegates here, so both paths exercise the same push.
+    pub async fn enqueue_with_id(
+        &self,
+        job: PreparationJob,
+    ) -> Result<apalis::prelude::TaskId, QueueError> {
+        use apalis::prelude::Storage;
+        let mut storage = self.storage.clone();
+        storage
+            .push(job)
+            .await
+            .map(|parts| parts.task_id)
+            .map_err(|e| QueueError::Unavailable(format!("redis enqueue failed: {e}")))
+    }
+}
+
+#[async_trait::async_trait]
+impl PreparationJobQueue for RedisPreparationJobQueue {
+    async fn enqueue(&self, job: PreparationJob) -> Result<(), QueueError> {
+        self.enqueue_with_id(job).await.map(|_| ())
+    }
+}
+
+pub struct RedisTranscriptionJobQueue {
+    storage: apalis_redis::RedisStorage<TranscriptionJob>,
+}
+
+impl RedisTranscriptionJobQueue {
+    pub async fn connect(redis_url: &str) -> Result<Self, QueueError> {
+        let conn = tokio::time::timeout(REDIS_CONNECT_TIMEOUT, apalis_redis::connect(redis_url))
+            .await
+            .map_err(|_| QueueError::Unavailable("redis connect timed out".to_string()))?
+            .map_err(|e| QueueError::Unavailable(format!("redis connect failed: {e}")))?;
+        let config = apalis_redis::Config::default().set_namespace(TranscriptionJob::JOB_TYPE);
+        let storage = apalis_redis::RedisStorage::new_with_config(conn, config);
+        Ok(Self { storage })
+    }
+
+    /// Enqueue and return the apalis task id.
+    ///
+    /// The `TranscriptionJobQueue` trait deliberately returns `()`, so this
+    /// inherent method exists to let tests prove the job is retrievable from
+    /// the same Redis namespace a consumer would poll. The trait method
+    /// delegates here, so both paths exercise the same push.
+    pub async fn enqueue_with_id(
+        &self,
+        job: TranscriptionJob,
+    ) -> Result<apalis::prelude::TaskId, QueueError> {
+        use apalis::prelude::Storage;
+        let mut storage = self.storage.clone();
+        storage
+            .push(job)
+            .await
+            .map(|parts| parts.task_id)
+            .map_err(|e| QueueError::Unavailable(format!("redis enqueue failed: {e}")))
+    }
+}
+
+#[async_trait::async_trait]
+impl TranscriptionJobQueue for RedisTranscriptionJobQueue {
+    async fn enqueue(&self, job: TranscriptionJob) -> Result<(), QueueError> {
+        self.enqueue_with_id(job).await.map(|_| ())
+    }
+}
+
+pub struct RedisSubtitleJobQueue {
+    storage: apalis_redis::RedisStorage<SubtitleJob>,
+}
+
+impl RedisSubtitleJobQueue {
+    pub async fn connect(redis_url: &str) -> Result<Self, QueueError> {
+        let conn = tokio::time::timeout(REDIS_CONNECT_TIMEOUT, apalis_redis::connect(redis_url))
+            .await
+            .map_err(|_| QueueError::Unavailable("redis connect timed out".to_string()))?
+            .map_err(|e| QueueError::Unavailable(format!("redis connect failed: {e}")))?;
+        let config = apalis_redis::Config::default().set_namespace(SubtitleJob::JOB_TYPE);
+        let storage = apalis_redis::RedisStorage::new_with_config(conn, config);
+        Ok(Self { storage })
+    }
+
+    /// Enqueue and return the apalis task id.
+    ///
+    /// The `SubtitleJobQueue` trait deliberately returns `()`, so this
+    /// inherent method exists to let tests prove the job is retrievable from
+    /// the same Redis namespace a consumer would poll. The trait method
+    /// delegates here, so both paths exercise the same push.
+    pub async fn enqueue_with_id(
+        &self,
+        job: SubtitleJob,
+    ) -> Result<apalis::prelude::TaskId, QueueError> {
+        use apalis::prelude::Storage;
+        let mut storage = self.storage.clone();
+        storage
+            .push(job)
+            .await
+            .map(|parts| parts.task_id)
+            .map_err(|e| QueueError::Unavailable(format!("redis enqueue failed: {e}")))
+    }
+}
+
+#[async_trait::async_trait]
+impl SubtitleJobQueue for RedisSubtitleJobQueue {
+    async fn enqueue(&self, job: SubtitleJob) -> Result<(), QueueError> {
+        self.enqueue_with_id(job).await.map(|_| ())
     }
 }
 
@@ -192,12 +334,16 @@ pub fn default_queue() -> &'static str {
 mod tests {
     use super::*;
 
+    fn redis_url_for_test() -> Option<String> {
+        std::env::var("DUBBRIDGE_REDIS_URL").ok()
+    }
+
     #[test]
     fn in_memory_queue_records_jobs() {
         let queue = InMemoryPreparationJobQueue::default();
         let job = PreparationJob::new(Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
 
-        queue.enqueue(job.clone()).expect("enqueue");
+        tokio_test::block_on(async { queue.enqueue(job.clone()).await.expect("enqueue") });
 
         assert_eq!(queue.queued_jobs(), vec![job]);
     }
@@ -212,7 +358,7 @@ mod tests {
         let queue = InMemoryTranscriptionJobQueue::default();
         let job = TranscriptionJob::new(Uuid::new_v4(), Uuid::new_v4(), "en");
 
-        queue.enqueue(job.clone()).expect("enqueue");
+        tokio_test::block_on(async { queue.enqueue(job.clone()).await.expect("enqueue") });
 
         assert_eq!(queue.queued_jobs(), vec![job]);
     }
@@ -227,7 +373,7 @@ mod tests {
         let queue = InMemorySubtitleJobQueue::default();
         let job = SubtitleJob::new(Uuid::new_v4(), Uuid::new_v4(), "en");
 
-        queue.enqueue(job.clone()).expect("enqueue");
+        tokio_test::block_on(async { queue.enqueue(job.clone()).await.expect("enqueue") });
 
         assert_eq!(queue.queued_jobs(), vec![job]);
     }
@@ -245,5 +391,133 @@ mod tests {
 
         assert_eq!(envelope.job_type, PreparationJob::JOB_TYPE);
         assert_eq!(envelope.payload, payload);
+    }
+
+    #[tokio::test]
+    async fn redis_preparation_queue_connects_and_enqueues() {
+        let Some(url) = redis_url_for_test() else {
+            return;
+        };
+        let queue = RedisPreparationJobQueue::connect(&url)
+            .await
+            .expect("redis connect");
+        let job = PreparationJob::new(Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
+        assert!(queue.enqueue(job).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn redis_transcription_queue_connects_and_enqueues() {
+        let Some(url) = redis_url_for_test() else {
+            return;
+        };
+        let queue = RedisTranscriptionJobQueue::connect(&url)
+            .await
+            .expect("redis connect");
+        let job = TranscriptionJob::new(Uuid::new_v4(), Uuid::new_v4(), "en");
+        assert!(queue.enqueue(job).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn redis_subtitle_queue_connects_and_enqueues() {
+        let Some(url) = redis_url_for_test() else {
+            return;
+        };
+        let queue = RedisSubtitleJobQueue::connect(&url)
+            .await
+            .expect("redis connect");
+        let job = SubtitleJob::new(Uuid::new_v4(), Uuid::new_v4(), "en");
+        assert!(queue.enqueue(job).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn redis_queue_fails_closed_on_malformed_url() {
+        // Deterministic and infra-free: a URL with no redis:// scheme cannot
+        // even be parsed into connection info, so connect must reject it.
+        let result = RedisPreparationJobQueue::connect("not-a-redis-url").await;
+        assert!(
+            matches!(result, Err(QueueError::Unavailable(_))),
+            "expected QueueError::Unavailable for a malformed url"
+        );
+    }
+
+    #[tokio::test]
+    async fn redis_queue_fails_closed_on_unreachable_server() {
+        use std::time::Duration;
+
+        // Port 1 is reserved and never accepts connections. connect must give
+        // up on its own bound rather than hanging, so the outer ceiling here
+        // only exists to fail the test loudly if the bound regresses.
+        let outcome = tokio::time::timeout(
+            REDIS_CONNECT_TIMEOUT + Duration::from_secs(10),
+            RedisPreparationJobQueue::connect("redis://127.0.0.1:1"),
+        )
+        .await
+        .expect("connect to an unreachable server hung past its own timeout");
+
+        assert!(
+            matches!(outcome, Err(QueueError::Unavailable(_))),
+            "expected QueueError::Unavailable for an unreachable server"
+        );
+    }
+
+    #[tokio::test]
+    async fn redis_enqueued_job_is_retrievable_from_its_namespace() {
+        use apalis::prelude::Storage;
+
+        let Some(url) = redis_url_for_test() else {
+            return;
+        };
+
+        let queue = RedisPreparationJobQueue::connect(&url)
+            .await
+            .expect("prep connect");
+        let job = PreparationJob::new(Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
+        let task_id = queue.enqueue_with_id(job.clone()).await.expect("enqueue");
+
+        // Independent connection into the same namespace: this is exactly what
+        // an apalis worker polls, so retrieval here proves the round trip.
+        let conn = apalis_redis::connect(url.as_str())
+            .await
+            .expect("probe connect");
+        let config = apalis_redis::Config::default().set_namespace(PreparationJob::JOB_TYPE);
+        let mut probe: apalis_redis::RedisStorage<PreparationJob> =
+            apalis_redis::RedisStorage::new_with_config(conn, config);
+
+        let fetched = probe.fetch_by_id(&task_id).await.expect("fetch");
+        let fetched = fetched.expect("job present in its own namespace");
+        assert_eq!(fetched.args, job);
+    }
+
+    #[tokio::test]
+    async fn redis_queues_use_distinct_namespaces() {
+        use apalis::prelude::Storage;
+
+        assert_ne!(PreparationJob::JOB_TYPE, SubtitleJob::JOB_TYPE);
+        assert_ne!(PreparationJob::JOB_TYPE, TranscriptionJob::JOB_TYPE);
+        assert_ne!(TranscriptionJob::JOB_TYPE, SubtitleJob::JOB_TYPE);
+
+        let Some(url) = redis_url_for_test() else {
+            return;
+        };
+
+        let prep_queue = RedisPreparationJobQueue::connect(&url)
+            .await
+            .expect("prep connect");
+        let job = PreparationJob::new(Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
+        let task_id = prep_queue.enqueue_with_id(job).await.expect("enqueue");
+
+        // The subtitle namespace must not see the preparation job.
+        let conn = apalis_redis::connect(url.as_str())
+            .await
+            .expect("probe connect");
+        let config = apalis_redis::Config::default().set_namespace(SubtitleJob::JOB_TYPE);
+        let mut other: apalis_redis::RedisStorage<SubtitleJob> =
+            apalis_redis::RedisStorage::new_with_config(conn, config);
+
+        let cross = other.fetch_by_id(&task_id).await;
+        assert!(
+            cross.is_err(),
+            "preparation job leaked into the subtitle namespace"
+        );
     }
 }

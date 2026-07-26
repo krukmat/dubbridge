@@ -38,10 +38,13 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 sqlx = { version = "0.8", default-features = false, features = ["postgres", "runtime-tokio-rustls", "uuid", "time", "macros"] }
 apalis = { version = "0.7" }
+apalis-redis = { version = "0.7.4" }
 # v0.14.1-rc1; pinned to the verified upstream tag commit until 0.14.1 is published.
 object_store = { git = "https://github.com/apache/arrow-rs-object-store.git", rev = "c7316d29face118e7409eead0cda098f38589428", features = ["aws"] }
 uuid = { version = "1.18", features = ["serde", "v4"] }
 time = { version = "0.3", features = ["serde", "macros"] }
+async-trait = "0.1"
+tokio-test = "0.4"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

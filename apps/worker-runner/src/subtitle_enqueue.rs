@@ -75,6 +75,7 @@ async fn try_enqueue_transcription(
             source_artifact_id,
             source_language,
         ))
+        .await
         .map_err(|error| {
             tracing::warn!(asset_id = %asset_id, error = %error, "failed to enqueue TranscriptionJob");
             error.to_string()
@@ -103,6 +104,7 @@ async fn try_enqueue_subtitle(
             route.project_id.0,
             route.target_language,
         ))
+        .await
         .map_err(|error| {
             tracing::warn!(asset_id = %asset_id, error = %error, "failed to enqueue SubtitleJob");
             error.to_string()
@@ -364,8 +366,9 @@ mod tests {
         };
 
         struct FailingSubtitleQueue;
+        #[async_trait::async_trait]
         impl SubtitleJobQueue for FailingSubtitleQueue {
-            fn enqueue(&self, _job: SubtitleJob) -> Result<(), QueueError> {
+            async fn enqueue(&self, _job: SubtitleJob) -> Result<(), QueueError> {
                 Err(QueueError::Unavailable("subtitle queue down".into()))
             }
         }
