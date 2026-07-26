@@ -565,8 +565,9 @@ mod tests {
         };
 
         struct FailingSubtitleQueue;
+        #[async_trait::async_trait]
         impl SubtitleJobQueue for FailingSubtitleQueue {
-            fn enqueue(&self, _job: dubbridge_jobs::SubtitleJob) -> Result<(), QueueError> {
+            async fn enqueue(&self, _job: dubbridge_jobs::SubtitleJob) -> Result<(), QueueError> {
                 Err(QueueError::Unavailable("subtitle queue down".into()))
             }
         }

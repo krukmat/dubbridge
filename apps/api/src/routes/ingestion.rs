@@ -329,7 +329,7 @@ async fn schedule_preparation_job(
 
     let job = dubbridge_jobs::PreparationJob::new(asset_id.0, source_artifact.id, ingest_token);
 
-    if let Err(error) = state.preparation_queue.enqueue(job) {
+    if let Err(error) = state.preparation_queue.enqueue(job).await {
         let detail = format!("preparation enqueue failed: {error}");
         dubbridge_db::preparation_repo::upsert_preparation_status(
             &state.pool,

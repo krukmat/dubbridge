@@ -171,8 +171,9 @@ impl TestContext {
 
 struct FailingPreparationQueue;
 
+#[async_trait::async_trait]
 impl PreparationJobQueue for FailingPreparationQueue {
-    fn enqueue(&self, _job: PreparationJob) -> Result<(), QueueError> {
+    async fn enqueue(&self, _job: PreparationJob) -> Result<(), QueueError> {
         Err(QueueError::Unavailable(
             "intentional preparation queue failure".to_string(),
         ))

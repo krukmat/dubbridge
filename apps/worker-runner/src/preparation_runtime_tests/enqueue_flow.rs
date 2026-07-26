@@ -175,8 +175,9 @@ async fn enqueue_failure_records_transcription_failed_status() {
 
     struct FailingQueue;
 
+    #[async_trait::async_trait]
     impl TranscriptionJobQueue for FailingQueue {
-        fn enqueue(&self, _job: TranscriptionJob) -> Result<(), QueueError> {
+        async fn enqueue(&self, _job: TranscriptionJob) -> Result<(), QueueError> {
             Err(QueueError::Unavailable("queue is down".into()))
         }
     }
