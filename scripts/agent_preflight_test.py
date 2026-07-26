@@ -4,9 +4,15 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import json
+import os
+import stat
+import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 SPEC = importlib.util.spec_from_file_location(
@@ -212,6 +218,209 @@ class AgentPreflightV2ReceiptTest(unittest.TestCase):
             agent_preflight.validate_v2_receipt_payload(payload)
 
         self.assertIn("documents", str(ctx.exception))
+
+
+@unittest.skipIf(sys.platform.startswith("win"), "POSIX permission semantics required")
+class AgentPreflightV2ReceiptPublishTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.instruction_path = self.root / "INSTRUCTIONS.md"
+        self.instruction_path.write_text("do the task\n", encoding="utf-8")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _payload(self, **overrides):
+        kwargs = dict(
+            provider="claude",
+            session_id="session-1",
+            actor_id="actor-1",
+            repo_root=self.root,
+            hook_event_name="startup",
+            source="hook",
+            transcript_path="/tmp/transcript.json",
+            native_instruction_mechanism="hook",
+            native_instruction_path="INSTRUCTIONS.md",
+            document_paths=[],
+        )
+        kwargs.update(overrides)
+        return agent_preflight.build_v2_receipt_payload(**kwargs)
+
+    def test_hp1_valid_reload_atomically_replaces_prior_receipt(self):
+        first = self._payload()
+        path_a = agent_preflight.publish_v2_receipt(self.root, first)
+
+        second = self._payload()
+        path_b = agent_preflight.publish_v2_receipt(self.root, second)
+
+        self.assertEqual(path_a, path_b)
+        entries = list(path_b.parent.iterdir())
+        self.assertEqual(entries, [path_b])
+
+        on_disk = json.loads(path_b.read_text(encoding="utf-8"))
+        self.assertEqual(on_disk["loaded_at"], second["loaded_at"])
+
+    def test_hp1_receipt_dir_and_file_permissions_are_restrictive(self):
+        payload = self._payload()
+        path = agent_preflight.publish_v2_receipt(self.root, payload)
+
+        dir_mode = stat.S_IMODE(path.parent.stat().st_mode)
+        file_mode = stat.S_IMODE(path.stat().st_mode)
+
+        self.assertEqual(dir_mode, 0o700)
+        self.assertEqual(file_mode, 0o600)
+
+    def test_hp2_concurrent_distinct_sessions_do_not_collide(self):
+        errors: list[Exception] = []
+        paths: list[Path] = []
+        lock = threading.Lock()
+
+        def publish(session_id: str) -> None:
+            try:
+                payload = self._payload(session_id=session_id)
+                result = agent_preflight.publish_v2_receipt(self.root, payload)
+                with lock:
+                    paths.append(result)
+            except Exception as exc:  # pragma: no cover - failure path asserted below
+                with lock:
+                    errors.append(exc)
+
+        threads = [
+            threading.Thread(target=publish, args=(f"session-{i}",)) for i in range(5)
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        self.assertEqual(errors, [])
+        self.assertEqual(len(paths), len(set(paths)))
+        for path in paths:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(data["schema_version"], 2)
+
+    def test_hp2_concurrent_same_identity_never_collides_on_temp_name(self):
+        errors: list[Exception] = []
+        lock = threading.Lock()
+
+        def publish() -> None:
+            try:
+                agent_preflight.publish_v2_receipt(self.root, self._payload())
+            except Exception as exc:  # pragma: no cover - failure path asserted below
+                with lock:
+                    errors.append(exc)
+
+        threads = [threading.Thread(target=publish) for _ in range(5)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        self.assertEqual(errors, [])
+        target_path = agent_preflight.v2_receipt_path(self.root, "claude", "session-1", "actor-1")
+        self.assertTrue(target_path.exists())
+        entries = list(target_path.parent.iterdir())
+        self.assertEqual(entries, [target_path])
+
+    def test_ec1_interruption_before_replace_leaves_no_authorizing_receipt(self):
+        payload = self._payload()
+        target_path = agent_preflight.v2_receipt_path(
+            self.root, payload["provider"], payload["session_id"], payload["actor_id"]
+        )
+
+        with mock.patch.object(
+            agent_preflight.os, "replace", side_effect=InterruptedError("boom")
+        ):
+            with self.assertRaises(InterruptedError):
+                agent_preflight.publish_v2_receipt(self.root, payload)
+
+        self.assertFalse(target_path.exists())
+        leftovers = [p for p in target_path.parent.iterdir() if p.name.endswith(".tmp")]
+        self.assertEqual(leftovers, [])
+
+    def test_ec1_interruption_does_not_resurrect_prior_receipt(self):
+        first = self._payload()
+        target_path = agent_preflight.publish_v2_receipt(self.root, first)
+        first_contents = target_path.read_text(encoding="utf-8")
+
+        second = self._payload()
+        with mock.patch.object(
+            agent_preflight.os, "replace", side_effect=InterruptedError("boom")
+        ):
+            with self.assertRaises(InterruptedError):
+                agent_preflight.publish_v2_receipt(self.root, second)
+
+        self.assertFalse(target_path.exists())
+        self.assertNotEqual(first_contents, "")
+
+    def test_ec1_failure_during_temp_write_cleans_up_and_denies_authorization(self):
+        payload = self._payload()
+        target_path = agent_preflight.v2_receipt_path(
+            self.root, payload["provider"], payload["session_id"], payload["actor_id"]
+        )
+
+        with mock.patch.object(
+            agent_preflight.os, "fsync", side_effect=OSError("disk full")
+        ):
+            with self.assertRaises(OSError):
+                agent_preflight.publish_v2_receipt(self.root, payload)
+
+        self.assertFalse(target_path.exists())
+        leftovers = [p for p in target_path.parent.iterdir() if p.name.endswith(".tmp")]
+        self.assertEqual(leftovers, [])
+
+    def test_hp1_invalidate_prior_receipt_tolerates_toctou_race(self):
+        target_path = self.root / "already-gone.json"
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_text("{}", encoding="utf-8")
+
+        original_unlink = Path.unlink
+
+        def flaky_unlink(self_path, *args, **kwargs):
+            if self_path == target_path:
+                original_unlink(self_path, *args, **kwargs)
+                raise FileNotFoundError("already removed")
+            return original_unlink(self_path, *args, **kwargs)
+
+        with mock.patch.object(Path, "unlink", flaky_unlink):
+            agent_preflight._invalidate_prior_receipt(target_path)
+
+        self.assertFalse(target_path.exists())
+
+    def test_hp1_chmod_failure_on_temp_file_does_not_block_publish(self):
+        payload = self._payload()
+
+        with mock.patch.object(agent_preflight.os, "chmod", side_effect=OSError("no chmod")):
+            path = agent_preflight.publish_v2_receipt(self.root, payload)
+
+        self.assertTrue(path.exists())
+        data = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(data["schema_version"], 2)
+
+    def test_ec2_permission_error_denies_authorization_without_fallback(self):
+        payload = self._payload()
+        target_path = agent_preflight.v2_receipt_path(
+            self.root, payload["provider"], payload["session_id"], payload["actor_id"]
+        )
+
+        with mock.patch.object(
+            agent_preflight.os, "open", side_effect=PermissionError("denied")
+        ):
+            with self.assertRaises(PermissionError):
+                agent_preflight.publish_v2_receipt(self.root, payload)
+
+        self.assertFalse(target_path.exists())
+
+    def test_ec2_malformed_payload_rejected_before_touching_disk(self):
+        payload = self._payload()
+        del payload["documents"]
+        receipts_dir = agent_preflight.v2_receipts_dir(self.root)
+
+        with self.assertRaises(agent_preflight.ReceiptValidationError):
+            agent_preflight.publish_v2_receipt(self.root, payload)
+
+        self.assertFalse(receipts_dir.exists())
 
 
 if __name__ == "__main__":

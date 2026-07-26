@@ -8,6 +8,8 @@ import json
 import os
 import subprocess
 import sys
+import threading
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
@@ -17,6 +19,7 @@ SCRIPT_VERSION = 1
 SENTINEL_RELATIVE = Path(".agent") / "session-preflight.json"
 
 RECEIPT_SCHEMA_VERSION = 2
+RECEIPTS_DIR_RELATIVE = Path(".agent") / "receipts" / "v2"
 V2_VALID_PROVIDERS = frozenset({"codex", "claude"})
 V2_VALID_LIFECYCLE_EVENTS = frozenset(
     {
@@ -258,6 +261,81 @@ def validate_v2_receipt_payload(payload: Dict[str, Any]) -> None:
     for required_key in ("native_instruction", "documents"):
         if required_key not in payload:
             raise ReceiptValidationError(f"v2 receipt payload missing {required_key!r}.")
+
+
+def v2_receipts_dir(repo_root: Path) -> Path:
+    return repo_root / RECEIPTS_DIR_RELATIVE
+
+
+def v2_receipt_path(repo_root: Path, provider: str, session_id: str, actor_id: str) -> Path:
+    identity = compute_receipt_identity(provider, session_id, actor_id)
+    return v2_receipts_dir(repo_root) / f"{identity}.json"
+
+
+def _secure_mkdir(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(path, 0o700)
+    except OSError:
+        pass
+
+
+def _invalidate_prior_receipt(target_path: Path) -> None:
+    if not target_path.exists() and not target_path.is_symlink():
+        return
+    try:
+        target_path.unlink()
+    except FileNotFoundError:
+        pass
+
+
+def publish_v2_receipt(
+    repo_root: Path,
+    payload: Dict[str, Any],
+) -> Path:
+    """Atomically publish a v2 receipt, invalidating any prior receipt for the
+    same provider/session/actor identity first. A crash or error at any point
+    before the final `os.replace` leaves no authorizing receipt on disk."""
+    validate_v2_receipt_payload(payload)
+
+    target_path = v2_receipt_path(
+        repo_root, payload["provider"], payload["session_id"], payload["actor_id"]
+    )
+    receipts_dir = target_path.parent
+    _secure_mkdir(receipts_dir)
+
+    _invalidate_prior_receipt(target_path)
+
+    tmp_path = (
+        receipts_dir
+        / f".{target_path.name}.{os.getpid()}.{threading.get_ident()}.{uuid.uuid4().hex}.tmp"
+    )
+    try:
+        fd = os.open(str(tmp_path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(json.dumps(payload, indent=2) + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+        except BaseException:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+            raise
+        try:
+            os.chmod(tmp_path, 0o600)
+        except OSError:
+            pass
+        os.replace(tmp_path, target_path)
+    except BaseException:
+        try:
+            tmp_path.unlink()
+        except FileNotFoundError:
+            pass
+        raise
+
+    return target_path
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -409,7 +409,7 @@ output isn't automatically ground truth either.
 
 ## T4a2 — Atomic publish, invalidation, and file-mode guarantees
 
-- **Status:** [ ] Pending
+- **Status:** [x] Done — owner-verified 2026-07-26
 - **Type:** development
 - **Effort:** L
 - **RRI:** 52 -> Med-high (recompute before execution if scope changes)
@@ -444,6 +444,124 @@ never authorize later prompt/tool gates.
 
 - Deterministic atomicity and file-mode unit tests.
 - Failure-injection evidence for interrupted publish cleanup.
+
+### Closure evidence (2026-07-26)
+
+**ADR-038 Med-high gate:** ran end-to-end. qwen27 (`qwen3.6:27b-q4_K_M`)
+refinement recommended `GO_LOCAL`. The primary route receipt **downgraded to
+`CLOUD_REQUIRED`**: publish/invalidate atomicity for the v2 receipt is the
+mechanism later prompt/tool gates rely on for authorization, which falls
+under ADR-038 §6's explicit exclusion ("authentication or security
+boundaries"; "fail-closed governance invariants") regardless of Qwen27's
+recommendation. Per ADR-038 §3 the primary may downgrade but never upgrade,
+so the bounded `qwen3.6:35b-a3b` local implementer was never invoked; the
+primary agent (Claude) implemented directly.
+
+**Implementation:** added to `scripts/agent-preflight.py`:
+`RECEIPTS_DIR_RELATIVE`, `v2_receipts_dir`, `v2_receipt_path`,
+`_secure_mkdir`, `_invalidate_prior_receipt`, `publish_v2_receipt`. The
+publish path: `validate_v2_receipt_payload` -> derive target path from
+`compute_receipt_identity` -> `_secure_mkdir` (0700, best-effort) ->
+`_invalidate_prior_receipt` (unlink any existing file at the target path) ->
+write to a `os.getpid()` + `threading.get_ident()` + `uuid4().hex`-qualified
+temp file in the same directory via `O_CREAT | O_EXCL, 0o600` -> `fsync` ->
+best-effort `chmod 0600` -> `os.replace` into place. Any exception before
+`os.replace` unlinks the temp file and re-raises; the old receipt (already
+removed) is not restored, matching the task's "stale or partial evidence can
+never authorize" goal (deny-by-default, not fail-safe-to-stale). Purely
+additive; `build_v2_receipt_payload`/`validate_v2_receipt_payload` (T4a1) and
+the legacy `--mark`/`--check` sentinel path are unchanged. Out of scope for
+this task and left untouched: T4a3's CLI contract (no new `--publish`/
+`--invalidate` flags added).
+
+**Gemma Reviewer (ADR-036 binding, `gemma4:26b-a4b-it-qat`, 3 passes):**
+`status: findings`, 0 blocking, 1 consensus minor finding (3/3 passes), 1
+pass-specific minor finding. Consensus finding: `_invalidate_prior_receipt`
+unlinks the target before the new file is durably written, so a concurrent
+reader could briefly see no receipt during a legitimate update; assessed by
+the reviewer as an acceptable, intentional trade-off given the fail-closed
+authorization context — no suggested change. Pass-specific finding: the
+per-PID temp filename could collide across threads sharing a PID within the
+same process. Verified as a real, reproducible race (direct repro:
+`os.open(..., O_EXCL)` raised `FileExistsError` under concurrent
+same-process/same-identity publish). Fixed in Reflection pass 3 below by
+qualifying the temp filename with `threading.get_ident()` and a `uuid4()`
+suffix; re-verified with a 10-thread same-identity repro producing zero
+errors and exactly one final file.
+
+### Reflection log
+
+Required passes: 3 (RRI 52 -> Med-high)
+
+#### Pass 1
+
+- **Draft verdict:** implemented `publish_v2_receipt` with temp-write ->
+  fsync -> `os.replace`, pre-publish invalidation via unlink, and 0700/0600
+  permission enforcement; 27 new/updated unit tests passing, covering HP-1,
+  HP-2 (distinct sessions), EC-1, EC-2.
+- **Critique findings:** none identified in self-review against the 3
+  acceptance criteria and 4 HP/EC examples; all criteria appeared satisfied.
+- **Revisions applied:** none.
+
+#### Pass 2
+
+- **Draft verdict:** same implementation, now checked against Gemma
+  Reviewer's independent 3-pass review of the real diff.
+- **Critique findings:** Gemma raised one 3/3-consensus minor finding
+  (invalidate-then-write ordering creates a brief no-receipt window for
+  concurrent readers) and one 1/3 pass-specific minor finding (per-PID temp
+  filename can collide across threads in the same process for the same
+  identity — confirmed as a real, reproducible bug, not a false positive,
+  via a direct 5-thread same-identity repro that raised `FileExistsError`).
+- **Revisions applied:** none yet — findings triaged in this pass;
+  consensus finding accepted as intentional design (fail-closed over
+  availability); pass-specific finding scheduled for fix in Pass 3.
+
+#### Pass 3
+
+- **Draft verdict:** re-reading the implementation for the flagged
+  same-process/same-identity race and for coverage gaps.
+- **Critique findings:** (1) confirmed temp-filename collision risk is real
+  and worth closing even though HP-2 only requires distinct-session
+  concurrency; (2) coverage run showed 3 uncovered branches in newly added
+  code: the `except BaseException` around the temp-file write/fsync, the
+  `except OSError: pass` around the post-write `chmod`, and the
+  `except FileNotFoundError: pass` TOCTOU guard in
+  `_invalidate_prior_receipt`.
+- **Revisions applied:** qualified the temp filename with
+  `threading.get_ident()` + `uuid.uuid4().hex` (in addition to
+  `os.getpid()`) to eliminate the collision window; added
+  `test_hp2_concurrent_same_identity_never_collides_on_temp_name`,
+  `test_ec1_failure_during_temp_write_cleans_up_and_denies_authorization`,
+  `test_hp1_chmod_failure_on_temp_file_does_not_block_publish`, and
+  `test_hp1_invalidate_prior_receipt_tolerates_toctou_race` to close the
+  coverage gaps and lock in the fix. Re-ran the full suite (31/31 pass) and
+  a manual 10-thread same-identity repro (0 errors, 1 final file).
+
+**Unit coverage certification:**
+
+| Suite | Tests | Result |
+|---|---|---|
+| Existing T1/T4a1 (`AgentPreflightTest`, `AgentPreflightV2ReceiptTest`) | 20 | pass, unchanged |
+| New T4a2 publish/invalidate tests (`AgentPreflightV2ReceiptPublishTest`) | 11 | pass — HP-1 x4, HP-2 x2, EC-1 x2, EC-2 x2, plus 1 malformed-payload guard |
+| **Total** | **31** | **31/31 pass** |
+
+`coverage run --branch --include=scripts/agent-preflight.py`: 91% line
+overall. All lines added for T4a2 (`v2_receipts_dir` through the end of
+`publish_v2_receipt`) are 100% covered; the remaining uncovered lines are
+pre-existing T1/T4a1 code out of scope for this task (`find_repo_root` git
+fallback, `load_sentinel` JSON-decode-error path, CLI `main()` branches).
+
+**Reflection:** the ADR-038 downgrade decision was the load-bearing call in
+this task — Qwen27's `GO_LOCAL` recommendation was reasonable from a pure
+code-complexity standpoint (single-file, well-scoped, deterministic tests),
+but the task's actual subject matter (an authorization-relevant atomic
+publish/invalidate mechanism) is exactly what ADR-038 §6 carves out for
+cloud regardless of the local recommendation. Gemma Reviewer's pass-specific
+finding (thread-collision on temp filenames) was a genuine, reproducible
+defect rather than a false positive this time — verified by direct repro
+before accepting it, consistent with treating reviewer output as needing
+verification either way, not automatic trust.
 
 ### Status artifacts affected
 
