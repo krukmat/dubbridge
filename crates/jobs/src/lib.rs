@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -52,7 +53,7 @@ impl std::fmt::Display for QueueError {
 
 impl std::error::Error for QueueError {}
 
-#[async_trait::async_trait]
+#[async_trait]
 pub trait PreparationJobQueue: Send + Sync {
     async fn enqueue(&self, job: PreparationJob) -> Result<(), QueueError>;
 }
@@ -73,7 +74,7 @@ impl InMemoryPreparationJobQueue {
     }
 }
 
-#[async_trait::async_trait]
+#[async_trait]
 impl PreparationJobQueue for InMemoryPreparationJobQueue {
     async fn enqueue(&self, job: PreparationJob) -> Result<(), QueueError> {
         self.jobs
@@ -109,7 +110,7 @@ impl TranscriptionJob {
 
 pub type SharedTranscriptionJobQueue = Arc<dyn TranscriptionJobQueue>;
 
-#[async_trait::async_trait]
+#[async_trait]
 pub trait TranscriptionJobQueue: Send + Sync {
     async fn enqueue(&self, job: TranscriptionJob) -> Result<(), QueueError>;
 }
@@ -128,7 +129,7 @@ impl InMemoryTranscriptionJobQueue {
     }
 }
 
-#[async_trait::async_trait]
+#[async_trait]
 impl TranscriptionJobQueue for InMemoryTranscriptionJobQueue {
     async fn enqueue(&self, job: TranscriptionJob) -> Result<(), QueueError> {
         self.jobs
@@ -160,7 +161,7 @@ impl SubtitleJob {
 
 pub type SharedSubtitleJobQueue = Arc<dyn SubtitleJobQueue>;
 
-#[async_trait::async_trait]
+#[async_trait]
 pub trait SubtitleJobQueue: Send + Sync {
     async fn enqueue(&self, job: SubtitleJob) -> Result<(), QueueError>;
 }
@@ -179,7 +180,7 @@ impl InMemorySubtitleJobQueue {
     }
 }
 
-#[async_trait::async_trait]
+#[async_trait]
 impl SubtitleJobQueue for InMemorySubtitleJobQueue {
     async fn enqueue(&self, job: SubtitleJob) -> Result<(), QueueError> {
         self.jobs
@@ -200,149 +201,74 @@ impl SubtitleJobQueue for InMemorySubtitleJobQueue {
 /// surfaces as `QueueError::Unavailable` in bounded time.
 const REDIS_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
-pub struct RedisPreparationJobQueue {
-    storage: apalis_redis::RedisStorage<PreparationJob>,
+macro_rules! define_redis_job_queue {
+    ($queue_ty:ident, $job_ty:ty, $queue_trait:ident) => {
+        pub struct $queue_ty {
+            storage: apalis_redis::RedisStorage<$job_ty>,
+        }
+
+        impl $queue_ty {
+            pub async fn connect(redis_url: &str) -> Result<Self, QueueError> {
+                let conn =
+                    tokio::time::timeout(REDIS_CONNECT_TIMEOUT, apalis_redis::connect(redis_url))
+                        .await
+                        .map_err(|_| {
+                            QueueError::Unavailable("redis connect timed out".to_string())
+                        })?
+                        .map_err(|e| {
+                            QueueError::Unavailable(format!("redis connect failed: {e}"))
+                        })?;
+                let config = apalis_redis::Config::default().set_namespace(<$job_ty>::JOB_TYPE);
+                let storage = apalis_redis::RedisStorage::new_with_config(conn, config);
+                Ok(Self { storage })
+            }
+
+            /// Enqueue and return the apalis task id.
+            ///
+            /// The queue trait deliberately returns `()`, so this inherent
+            /// method exists to let tests prove the job is retrievable from the
+            /// same Redis namespace a consumer would poll. The trait method
+            /// delegates here, so both paths exercise the same push.
+            pub async fn enqueue_with_id(
+                &self,
+                job: $job_ty,
+            ) -> Result<apalis::prelude::TaskId, QueueError> {
+                use apalis::prelude::Storage;
+                let mut storage = self.storage.clone();
+                storage
+                    .push(job)
+                    .await
+                    .map(|parts| parts.task_id)
+                    .map_err(|e| QueueError::Unavailable(format!("redis enqueue failed: {e}")))
+            }
+
+            /// Owned clone of the underlying apalis backend, for attaching
+            /// this queue's namespace to a `WorkerBuilder` as a consumer.
+            pub fn backend(&self) -> apalis_redis::RedisStorage<$job_ty> {
+                self.storage.clone()
+            }
+        }
+
+        #[async_trait]
+        impl $queue_trait for $queue_ty {
+            async fn enqueue(&self, job: $job_ty) -> Result<(), QueueError> {
+                self.enqueue_with_id(job).await.map(|_| ())
+            }
+        }
+    };
 }
 
-impl RedisPreparationJobQueue {
-    pub async fn connect(redis_url: &str) -> Result<Self, QueueError> {
-        let conn = tokio::time::timeout(REDIS_CONNECT_TIMEOUT, apalis_redis::connect(redis_url))
-            .await
-            .map_err(|_| QueueError::Unavailable("redis connect timed out".to_string()))?
-            .map_err(|e| QueueError::Unavailable(format!("redis connect failed: {e}")))?;
-        let config = apalis_redis::Config::default().set_namespace(PreparationJob::JOB_TYPE);
-        let storage = apalis_redis::RedisStorage::new_with_config(conn, config);
-        Ok(Self { storage })
-    }
-
-    /// Enqueue and return the apalis task id.
-    ///
-    /// The `PreparationJobQueue` trait deliberately returns `()`, so this
-    /// inherent method exists to let tests prove the job is retrievable from
-    /// the same Redis namespace a consumer would poll. The trait method
-    /// delegates here, so both paths exercise the same push.
-    pub async fn enqueue_with_id(
-        &self,
-        job: PreparationJob,
-    ) -> Result<apalis::prelude::TaskId, QueueError> {
-        use apalis::prelude::Storage;
-        let mut storage = self.storage.clone();
-        storage
-            .push(job)
-            .await
-            .map(|parts| parts.task_id)
-            .map_err(|e| QueueError::Unavailable(format!("redis enqueue failed: {e}")))
-    }
-
-    /// Owned clone of the underlying apalis backend, for attaching this
-    /// queue's namespace to a `WorkerBuilder` as a consumer.
-    pub fn backend(&self) -> apalis_redis::RedisStorage<PreparationJob> {
-        self.storage.clone()
-    }
-}
-
-#[async_trait::async_trait]
-impl PreparationJobQueue for RedisPreparationJobQueue {
-    async fn enqueue(&self, job: PreparationJob) -> Result<(), QueueError> {
-        self.enqueue_with_id(job).await.map(|_| ())
-    }
-}
-
-pub struct RedisTranscriptionJobQueue {
-    storage: apalis_redis::RedisStorage<TranscriptionJob>,
-}
-
-impl RedisTranscriptionJobQueue {
-    pub async fn connect(redis_url: &str) -> Result<Self, QueueError> {
-        let conn = tokio::time::timeout(REDIS_CONNECT_TIMEOUT, apalis_redis::connect(redis_url))
-            .await
-            .map_err(|_| QueueError::Unavailable("redis connect timed out".to_string()))?
-            .map_err(|e| QueueError::Unavailable(format!("redis connect failed: {e}")))?;
-        let config = apalis_redis::Config::default().set_namespace(TranscriptionJob::JOB_TYPE);
-        let storage = apalis_redis::RedisStorage::new_with_config(conn, config);
-        Ok(Self { storage })
-    }
-
-    /// Enqueue and return the apalis task id.
-    ///
-    /// The `TranscriptionJobQueue` trait deliberately returns `()`, so this
-    /// inherent method exists to let tests prove the job is retrievable from
-    /// the same Redis namespace a consumer would poll. The trait method
-    /// delegates here, so both paths exercise the same push.
-    pub async fn enqueue_with_id(
-        &self,
-        job: TranscriptionJob,
-    ) -> Result<apalis::prelude::TaskId, QueueError> {
-        use apalis::prelude::Storage;
-        let mut storage = self.storage.clone();
-        storage
-            .push(job)
-            .await
-            .map(|parts| parts.task_id)
-            .map_err(|e| QueueError::Unavailable(format!("redis enqueue failed: {e}")))
-    }
-
-    /// Owned clone of the underlying apalis backend, for attaching this
-    /// queue's namespace to a `WorkerBuilder` as a consumer.
-    pub fn backend(&self) -> apalis_redis::RedisStorage<TranscriptionJob> {
-        self.storage.clone()
-    }
-}
-
-#[async_trait::async_trait]
-impl TranscriptionJobQueue for RedisTranscriptionJobQueue {
-    async fn enqueue(&self, job: TranscriptionJob) -> Result<(), QueueError> {
-        self.enqueue_with_id(job).await.map(|_| ())
-    }
-}
-
-pub struct RedisSubtitleJobQueue {
-    storage: apalis_redis::RedisStorage<SubtitleJob>,
-}
-
-impl RedisSubtitleJobQueue {
-    pub async fn connect(redis_url: &str) -> Result<Self, QueueError> {
-        let conn = tokio::time::timeout(REDIS_CONNECT_TIMEOUT, apalis_redis::connect(redis_url))
-            .await
-            .map_err(|_| QueueError::Unavailable("redis connect timed out".to_string()))?
-            .map_err(|e| QueueError::Unavailable(format!("redis connect failed: {e}")))?;
-        let config = apalis_redis::Config::default().set_namespace(SubtitleJob::JOB_TYPE);
-        let storage = apalis_redis::RedisStorage::new_with_config(conn, config);
-        Ok(Self { storage })
-    }
-
-    /// Enqueue and return the apalis task id.
-    ///
-    /// The `SubtitleJobQueue` trait deliberately returns `()`, so this
-    /// inherent method exists to let tests prove the job is retrievable from
-    /// the same Redis namespace a consumer would poll. The trait method
-    /// delegates here, so both paths exercise the same push.
-    pub async fn enqueue_with_id(
-        &self,
-        job: SubtitleJob,
-    ) -> Result<apalis::prelude::TaskId, QueueError> {
-        use apalis::prelude::Storage;
-        let mut storage = self.storage.clone();
-        storage
-            .push(job)
-            .await
-            .map(|parts| parts.task_id)
-            .map_err(|e| QueueError::Unavailable(format!("redis enqueue failed: {e}")))
-    }
-
-    /// Owned clone of the underlying apalis backend, for attaching this
-    /// queue's namespace to a `WorkerBuilder` as a consumer.
-    pub fn backend(&self) -> apalis_redis::RedisStorage<SubtitleJob> {
-        self.storage.clone()
-    }
-}
-
-#[async_trait::async_trait]
-impl SubtitleJobQueue for RedisSubtitleJobQueue {
-    async fn enqueue(&self, job: SubtitleJob) -> Result<(), QueueError> {
-        self.enqueue_with_id(job).await.map(|_| ())
-    }
-}
+define_redis_job_queue!(
+    RedisPreparationJobQueue,
+    PreparationJob,
+    PreparationJobQueue
+);
+define_redis_job_queue!(
+    RedisTranscriptionJobQueue,
+    TranscriptionJob,
+    TranscriptionJobQueue
+);
+define_redis_job_queue!(RedisSubtitleJobQueue, SubtitleJob, SubtitleJobQueue);
 
 pub fn default_queue() -> &'static str {
     "dubbridge.default"
