@@ -209,7 +209,10 @@ writes `TranscriptionStatus::Ready`.
 | T2b-ii | Transcription-ready subtitle enqueue hook | M | 34 | Moderate |
 | T3a | D1a Rust segmentation provider | M | 35 | Moderate |
 | T3b | Subtitle worker-runner handler and readiness transitions | L | 50 | Med-high |
-| T3c | Wire real apalis consumer loop for worker-runner queues | M | TBD | Recompute at presentation |
+| T3c-i | Redis-backed job queue implementation | L | 48 | Med-high |
+| T3c-ii | Wire real apalis consumer loop for worker-runner queues | L | 42 | Med-high |
+| T3c-iii | Redis queue integration tests must not self-skip in CI (deferred) | S | TBD | Recompute at presentation |
+| T3c-iv | Resolve apalis-redis future-incompatibility before edition 2024 (deferred) | TBD | TBD | Recompute at presentation |
 | T5a | ADR-030 review-task enqueue on subtitle readiness | M | 39 | Moderate |
 | T5b | Optional derived-artifact identity schema change for review tasks | L | TBD | Recompute if scoped |
 | T6 | BDD feature file + docs sync | S | 6 | Low |
@@ -219,10 +222,35 @@ D1a on 2026-07-21, so no Python worker task exists in this decomposition.
 
 Tasks must run in order: T0 → T1a → (T1b-i, T1b-ii in either order, both
 required) → T1c → T1d → T2a → T2b-i → T2b-ii → T3a → T3b → T5a →
-(T5b only if explicitly scoped) → T6. T3c (consumer-loop wiring, filed as
-T3b's EC-4 follow-up) depends only on T3b and may run any time after it,
-including in parallel with T5a/T5b/T6 — it is not on the critical path to
-review-task enqueue or BDD closure.
+(T5b only if explicitly scoped) → T6. T3c-i → T3c-ii (consumer-loop wiring,
+filed as T3b's EC-4 follow-up, split 2026-07-25 — see task ledger) depend
+only on T3b and may run any time after it, including in parallel with
+T5a/T5b/T6 — neither is on the critical path to review-task enqueue or BDD
+closure.
+
+T3c was split into T3c-i/T3c-ii on 2026-07-25: presentation-time RRI on the
+combined scope (Redis-backed queue implementation + consumer-loop wiring)
+scored 56 (Complex), which requires a human-reviewed plan and is out of the
+S-140 local-control band. The split narrows each half back to Med-high
+(48 and 42) without changing what ships. T3c-i also expanded scope versus the
+original filing: `crates/jobs` was found to have only in-memory queue
+implementations with no Redis backend anywhere in the workspace despite
+`apalis` being a declared dependency, so a real consumer loop had nothing
+real to consume from — T3c-i adds that backend before T3c-ii wires the
+consumer loop against it.
+
+T3c-iii and T3c-iv were filed on 2026-07-26 as T3c-i follow-ups and are
+deferred to a later phase: neither blocks S-140 closure and neither is on the
+critical path. T3c-iii covers a gate gap — the four Redis integration tests
+delivered by T3c-i self-skip to green when `DUBBRIDGE_REDIS_URL` is unset, and
+nothing in the test path sets it, so a regression in the Redis backend would
+pass CI undetected (the backend itself was verified working on 2026-07-26 by
+re-running those tests against a real Redis). T3c-iv tracks the
+`apalis-redis v0.7.4` never-type-fallback future-incompatibility, which is
+warning-only today but becomes a compile error under edition 2024; the only
+newer releases are 1.0 prereleases, making it a breaking upgrade rather than a
+version bump. See the task ledger for both.
+
 Each task requires its own RRI computation and presentation/approval before
 execution, per repository workflow. The RRI values above are planning scores
 from 2026-07-21 and must be recomputed at task presentation time. T3b's RRI

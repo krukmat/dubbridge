@@ -671,9 +671,9 @@ revisit if T6's pilot surfaces a related gap.
 **Final evidence (this round):** `python3 -m unittest
 scripts.local-agent.conciliator_checklist_test -v` → `Ran 41 tests ... OK`.
 `python3 -m pytest scripts/delegate_low_rri_test.py -q` → `89 passed`
-(includes the 2 new guard-regression tests). Files remain uncommitted
-pending the owner's commit approval for this round, same as the rest of
-T4/T0–T3/T5's local state.
+(includes the 2 new guard-regression tests). Committed 2026-07-23 as
+`765b67a` (feat: checklist + root-path guard) and `2468786` (fix:
+`conciliator_checklist{,_test}.py` permissions corrected to `100644`).
 
 ---
 

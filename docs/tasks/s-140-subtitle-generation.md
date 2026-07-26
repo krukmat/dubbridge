@@ -2058,6 +2058,150 @@ and approval before implementation.**
 
 ---
 
+## S-140-T3c-iii: Redis queue integration tests must not self-skip in CI
+
+**Effort:** S (RRI TBD — recompute at presentation; scope not yet fixed)
+**Depends on:** S-140-T3c-i
+**Status:** Deferred to a later phase — filed 2026-07-26 as a [[S-140-T3c-i]]
+follow-up. Not on the S-140 critical path and not a blocker for S-140 closure.
+
+**Why this task exists:** [[S-140-T3c-i]] shipped the Redis-backed queues with
+four integration tests that only run when `DUBBRIDGE_REDIS_URL` is set —
+`redis_url_for_test()` returns `None` otherwise and each test early-returns
+green ([crates/jobs/src/lib.rs:355-357](../../crates/jobs/src/lib.rs#L355-L357)).
+Nothing in the test path sets that variable: it appears only in
+[infra/local/docker-compose.yml:57](../../infra/local/docker-compose.yml#L57)
+and `:93` as runtime service env, never in the `Makefile`, CI workflows, or
+test scripts. Consequence: `make qa-local` and CI both report green while
+`redis_transcription_queue_connects_and_enqueues`,
+`redis_subtitle_queue_connects_and_enqueues`,
+`redis_preparation_queue_connects_and_enqueues`, and
+`redis_enqueued_job_is_retrievable_from_its_namespace` never contact Redis. A
+regression in the T3c-i backend would pass every gate undetected.
+
+**Verification that produced this filing (2026-07-26):** `make qa-local` → exit
+0 with `DUBBRIDGE_REDIS_URL` unset (those four tests skipped silently).
+Re-run as `DUBBRIDGE_REDIS_URL=redis://127.0.0.1:6379 cargo test -p
+dubbridge-jobs --all-features` against the local `redis:7` container → `14
+passed; 0 failed`, and `redis-cli --scan` then showed the three apalis
+namespaces (`media_preparation:{data,active,signal}`,
+`asr_transcription:{…}`, `subtitle_generation:{…}`, `DBSIZE 9`). The backend
+itself is sound; only the gate coverage is missing.
+
+**Happy paths considered:**
+- HP-1: CI provisions a Redis service and exports `DUBBRIDGE_REDIS_URL`, so the
+  four integration tests execute for real on every run.
+- HP-2: A developer without local Redis still gets a clear, non-green signal
+  (explicit skip report or documented opt-out) rather than a silent pass.
+
+**Edge cases considered:**
+- EC-1: Skipping must be observable. If an opt-out is kept for local
+  ergonomics, the test must announce the skip rather than return `ok`, so a
+  green run is never mistaken for Redis coverage.
+- EC-2: Test isolation against a shared Redis — namespaces must not collide
+  with a developer's running local stack, or the run must use a dedicated
+  database index / key prefix.
+- EC-3: Decide explicitly whether these tests are required (fail closed when
+  Redis is absent in CI) or advisory; a required gate that can be silently
+  disabled by an unset env var is the defect being fixed, so re-introducing it
+  in another form is out of bounds.
+
+**Inputs:** `redis_url_for_test()` and the four Redis tests in
+`crates/jobs/src/lib.rs`; the CI workflow definition; `Makefile` QA targets;
+`infra/local/docker-compose.yml` as the existing local Redis source.
+
+**Outputs:** Redis-backed queue behavior actually exercised by an automated
+gate, with skip semantics that cannot be mistaken for a pass.
+
+**Acceptance criteria:**
+- A CI run with a broken Redis backend fails, demonstrated by a deliberate
+  temporary break or an equivalent test proving the gate bites.
+- No test reports `ok` for a Redis assertion it did not execute.
+- The chosen policy (required vs advisory) is written down in this ledger.
+
+**Files expected to change:** `crates/jobs/src/lib.rs`, CI workflow, possibly
+`Makefile`.
+
+**Evidence to emit:** RRI output, the exact test command, CI run showing the
+tests executing (not skipping), and proof the gate fails on a broken backend.
+
+**Status artifacts affected:** This ledger; S-140 plan if the follow-up is
+pulled into a numbered phase.
+
+**Stop condition:** Stop once the Redis tests demonstrably run in CI and a
+broken backend fails the gate. Do not change queue behavior or payload
+schemas — this is a test/CI coverage task only.
+
+**Agent handoff prompt:** Make the `crates/jobs` Redis integration tests
+execute in CI against a real Redis instead of self-skipping on an unset
+`DUBBRIDGE_REDIS_URL`, and prove the gate fails when the backend is broken. Do
+not modify queue or job-payload behavior.
+
+**Status: [ ] Deferred — later phase; requires RRI computation, presentation,
+and approval before implementation.**
+
+---
+
+## S-140-T3c-iv: Resolve apalis-redis future-incompatibility before edition 2024
+
+**Effort:** TBD (RRI TBD — recompute at presentation; scope not yet fixed)
+**Depends on:** S-140-T3c-i, S-140-T3c-ii
+**Status:** Deferred to a later phase — filed 2026-07-26 as a [[S-140-T3c-i]]
+follow-up. Warning-only today; not a blocker for S-140 closure.
+
+**Why this task exists:** `cargo check --workspace --all-targets
+--all-features` emits a future-incompatibility report for `apalis-redis
+v0.7.4`, the transitive backend [[S-140-T3c-i]] now depends on.
+`push_request` in that crate's `src/storage.rs:715` relies on never-type
+fallback being `()`; the report states that in edition 2024 the requirement
+`!: FromRedisValue` will fail. This is a warning today and does not affect the
+current build, but it becomes a hard error on a future Rust or edition bump,
+at which point the entire worker-runner consumer path stops compiling.
+
+**Constraint discovered at filing time:** the only newer `apalis-redis`
+releases are pre-1.0 prereleases (`1.0.0-alpha.1` through `1.0.0-rc.8`). An
+upgrade is therefore a breaking-API change across the surfaces T3c-i and
+T3c-ii own, not a version bump — which is precisely why this is filed as a
+later-phase task rather than folded into either.
+
+**Options to weigh at presentation (not pre-decided here):**
+- Upgrade to an `apalis-redis` 1.0 release once one is stable, absorbing the
+  API break in `crates/jobs` and `apps/worker-runner`.
+- Pin and document, tracking the upstream issue, and re-evaluate when the
+  toolchain actually forces edition 2024.
+- `[patch]` the dependency locally — highest maintenance cost; listed for
+  completeness, not recommended without a concrete forcing event.
+
+**Acceptance criteria:**
+- `cargo report future-incompatibilities` is clean for `apalis-redis`, or the
+  decision to defer is recorded here with the specific trigger that would
+  reopen it.
+- Worker-runner queue behavior is unchanged, proven by the existing
+  `crates/jobs` and worker-runner tests.
+
+**Files expected to change:** `Cargo.toml`, `crates/jobs/Cargo.toml`,
+`apps/worker-runner/Cargo.toml`, `Cargo.lock`, and any call sites broken by an
+API change.
+
+**Evidence to emit:** RRI output, `cargo report future-incompatibilities`
+before/after, and the full `crates/jobs` + worker-runner test runs.
+
+**Status artifacts affected:** This ledger; S-140 plan if pulled into a
+numbered phase.
+
+**Stop condition:** Stop once the future-incompat warning is resolved or the
+deferral is recorded with an explicit reopen trigger. Do not change queue
+semantics while upgrading.
+
+**Agent handoff prompt:** Evaluate and resolve the `apalis-redis v0.7.4`
+never-type-fallback future-incompatibility ahead of edition 2024, preserving
+existing queue behavior and test coverage.
+
+**Status: [ ] Deferred — later phase; requires RRI computation, presentation,
+and approval before implementation.**
+
+---
+
 > **S-140-T4 removed 2026-07-21:** the D1b Python subtitle worker task was
 > removed, not skipped, after T0 ratified D1a. Its own stop condition required
 > exactly this: "If D1a ... is ratified instead, this task is removed from the
