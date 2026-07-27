@@ -207,7 +207,37 @@ flowchart LR
   events plus EC-1 denials, peer review (qwen3.6:27b-q4_K_M, 0 blocking
   findings), and unit coverage certification (69/69 passing, 93% line
   coverage).
-- The next intended start point is `T4b3` (portable path resolution and
-  duplicate-hook cleanup), which removes the hard-coded
-  `/Users/matias/.codex/config.toml` absolute-path assumption and audits
-  for competing user-level hooks.
+- `T4b3` is complete: `scripts/agent-preflight.py`'s repo-root resolution
+  was already portable; the hard-coding lived only in the two hook wrapper
+  configs. `.claude/settings.json` now uses `$CLAUDE_PROJECT_DIR` (the
+  documented Claude Code hook env var) instead of a literal checkout path
+  in all three hook commands. `/Users/matias/.codex/config.toml` now
+  derives the script path and `--repo-root` from a single
+  `git rev-parse --show-toplevel` capture per hook body, and its
+  multi-project selection guard compares a protocol-normalized
+  `git remote get-url origin` value instead of an absolute path, so any
+  clone/worktree of this repository matches regardless of checkout
+  location. No duplicate or stale user-level Claude/Codex hook was found
+  for this repository (global `~/.claude/settings.json` has empty hooks;
+  no ancestor-directory settings file has any). RRI 36 (Moderate) would
+  normally route to the local-first disposable-worktree implementer, but
+  was downgraded to direct primary-agent implementation because
+  `/Users/matias/.codex/config.toml` lives outside this repository and
+  outside any worktree the local runner's scope-check can ever see. Peer
+  review (`qwen3.6:27b-q4_K_M`) went 3 rounds (HIGH: guard still
+  hard-coded absolute path -> fixed with git-remote comparison; MEDIUM:
+  SSH/HTTPS URL aliasing -> fixed with protocol normalization; final round
+  PASS, 0 findings). Self-verification (executing the exact TOML-parsed
+  command strings against real worktree/unrelated-repo fixtures, not just
+  diff review) independently caught and fixed a `$#`-inside-double-quotes
+  shell-expansion bug that would have silently disabled the Codex guard.
+  Editing the Codex hook bodies invalidates their `trusted_hash` entries
+  (same mechanism T4b2 documented); the next real Codex session against
+  this config will require one-time interactive re-trust. See the
+  ledger's closure evidence for the full task-analysis and code-solution
+  review trace, 2-pass Reflection log, and manual HP-1/EC-1 evidence.
+- The next intended start point is `T4c1` (fresh-session smoke harness),
+  which runs real fresh-session startup checks for Claude and Codex
+  instead of relying only on direct command invocation -- including,
+  incidentally, the first live confirmation that a real Codex session
+  re-trusts the hooks T4b3 just modified.

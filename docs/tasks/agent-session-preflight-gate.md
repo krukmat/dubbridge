@@ -1581,7 +1581,7 @@ end-to-end, not silently assumed away or fixed with unearned confidence.
 
 ## T4b3 — Portable path resolution and duplicate-hook cleanup
 
-- **Status:** [ ] Pending
+- **Status:** [x] Done
 - **Type:** configuration
 - **Effort:** M
 - **RRI:** 36 -> Moderate (recompute before execution if scope changes)
@@ -1614,6 +1614,206 @@ that could race or certify the wrong repository state.
 ### Status artifacts affected
 
 - `docs/tasks/agent-session-preflight-gate.md`
+
+### Implementation summary
+
+`scripts/agent-preflight.py`'s `find_repo_root()`/`resolve_repo_root()` were
+already portable (git-root derivation with a cwd fallback); the hard-coding
+lived entirely in the two hook wrapper configs. Fixed both:
+
+- `.claude/settings.json`: replaced the literal `/Users/matias/dubbridge` in
+  all three hook `command` strings (`SessionStart` x2, `PreToolUse`
+  `hook-gate` x1) with `$CLAUDE_PROJECT_DIR`, the officially documented
+  Claude Code hook environment variable (confirmed against
+  `https://code.claude.com/docs/en/hooks-guide.md` via a `claude-code-guide`
+  subagent lookup, not assumed from memory).
+- `/Users/matias/.codex/config.toml`: the script path and `--repo-root`
+  value are now derived once per hook body from
+  `root="$(git rev-parse --show-toplevel 2>/dev/null)"` and reused, instead
+  of three separate hard-coded literals. The multi-project selection guard
+  (this `config.toml` is shared across 4 unrelated projects) was kept, but
+  changed from a literal absolute-path comparison to a
+  protocol-normalized `git remote get-url origin` comparison
+  (`krukmat/dubbridge`, stripping `https://github.com/`, `git@github.com:`,
+  `ssh://git@github.com/`, and a trailing `.git`), so any clone or worktree
+  of this repository matches regardless of checkout path or remote
+  protocol, while unrelated repositories still do not match.
+
+**Routing:** RRI 36 (Moderate) would normally route to
+`scripts/local-agent/run_local_task.py`'s disposable-worktree local-first
+path. Downgraded to direct primary-agent implementation because part of
+the required scope, `/Users/matias/.codex/config.toml`, lives outside this
+repository and outside any worktree the local runner's scope-check
+(`scope_check.check_scope`, which runs `git diff`/`git ls-files` inside
+`worktree_dir`) can ever see or bound — the file is structurally
+unreachable by that tool, not merely risky. User confirmed (in-session)
+implementing both files directly rather than splitting the task across a
+local-delegated part and a direct part.
+
+**Bug found and fixed during self-verification (not from either review
+pass):** the first attempt at the git-remote normalization used
+`sed -e "s#\.git$##"` inside the TOML command's double-quoted `sed`
+argument. Under `sh -c`, `$#` inside double quotes is the shell's special
+"positional parameter count" expansion (`0`), not a literal `$` before a
+regex end-anchor. This silently corrupted the `sed` expression, made
+`remote` resolve to an empty string, and would have silently disabled the
+Codex hook path entirely (never matching even the real repository) --
+caught only by executing the exact TOML-parsed command string with `sh -x`
+against real fixtures rather than relying on visual diff review. Fixed by
+escaping to `\$` so the shell forwards a literal `$` to `sed`.
+
+**Known side effect (expected, documented, not a defect):** editing the
+Codex hook command bodies invalidates their `hooks.state.*.trusted_hash`
+entries (same mechanism T4b2 already found and documented). The next real
+Codex session against this `config.toml` will require one-time interactive
+re-trust. The stale hashes were left untouched in the file for Codex to
+detect and refresh itself, per its own trust model -- overwriting them
+manually would falsely claim a trust decision this agent cannot make on
+Codex's behalf.
+
+### Task-analysis review
+
+- Reviewer: `qwen3.6:27b-q4_K_M`
+- Command: `python3 scripts/peer-workflow-review.py --phase task --rri 36 --caller claude-code --content <analysis packet> --task-id agent-session-preflight-T4b3 --artifact .agent/peer-task-review-T4b3.json`
+- Artifact: `.agent/peer-task-review-T4b3.json`
+- Verdict: `findings` (1 MEDIUM, 2 LOW) -- treated as PASS per band contract (non-blocking)
+- Findings and disposition:
+  - MEDIUM (shell-expansion support in Claude Code hooks unverified) ->
+    resolved before implementation via `claude-code-guide` subagent lookup
+    against official docs; used the confirmed `$CLAUDE_PROJECT_DIR`
+    pattern.
+  - LOW (missing explicit verification step for the Codex config fix) ->
+    added as the HP-1/EC-1 manual-execution verification performed below.
+  - LOW (cwd-fallback risk if `--repo-root` were removed) -> resolved by
+    design: `--repo-root` was kept and made dynamic, never removed, so the
+    script's cwd-fallback path is never exercised by either hook.
+
+Task-analysis review: qwen3.6:27b-q4_K_M `.agent/peer-task-review-T4b3.json` - PASS
+
+### Reflection log
+
+Required passes: 2 (`36` -> `Moderate`)
+
+#### Pass 1 — path portability
+
+- **Draft verdict:** both hook configs replace the literal checkout path
+  with dynamic resolution (`$CLAUDE_PROJECT_DIR` for Claude,
+  `$(git rev-parse --show-toplevel)` captured once for Codex).
+- **Critique findings:**
+  - The first HP-1 simulation attempt gave a false negative because the
+    subshell's `cwd` was never actually changed, only `$CLAUDE_PROJECT_DIR`
+    was set -- risk of certifying the fix without real evidence had this
+    gone unnoticed.
+  - The Codex multi-project guard still compares against a fixed
+    identifier by design (see below) -- worth stating explicitly so it
+    doesn't read as an oversight.
+  - Did not initially verify the `git rev-parse` failure path (no git /
+    detached from any repo); confirmed the existing `2>/dev/null` fallback
+    makes `root=""`, the guard never matches, and the hook body is a safe
+    no-op.
+- **Revisions applied:** none to the code; corrected the verification
+  method (used `cd` into the simulated checkout, not just an env var) and
+  re-ran HP-1 before accepting it as passing.
+
+#### Pass 2 — duplicate-hook safety
+
+- **Draft verdict:** confirmed both before and after the fix that no
+  duplicate/stale hook exists: global `~/.claude/settings.json` has empty
+  `hooks`; no other real `settings.json` exists in the repo tree outside
+  inert disposable-worktree copies; Codex `hooks.state` has exactly the
+  two expected entries for this `config.toml`.
+- **Critique findings:**
+  - Had not checked ancestor directories of the repo (`/Users/matias`,
+    `/Users`) for a `settings.json` Claude Code might discover via upward
+    search -- a real gap in the duplicate-hook sweep.
+  - Changing the Codex hook bodies invalidates `trusted_hash` -- an
+    expected side effect that needed to be stated explicitly as a closure
+    consequence rather than left implicit.
+- **Revisions applied:** checked `/Users/matias/.claude/settings.json` and
+  `/Users/.claude/settings.json` (absent) explicitly; confirmed the only
+  ancestor hit is the already-reviewed empty-hooks global settings file.
+
+### Peer Reviewer evidence
+
+- Reviewer: `qwen3.6:27b-q4_K_M`
+- Command: `python3 scripts/peer-workflow-review.py --phase code --rri 36 --caller claude-code --content <diff packet> --task-id agent-session-preflight-T4b3 --artifact .agent/peer-code-review-T4b3.json`
+- Artifact: `.agent/peer-code-review-T4b3.json` (final, v3 round)
+- Verdict: `PASS` (0 findings on the final round)
+- Findings and disposition across all rounds:
+  - Round 1: HIGH -- Codex guard still hard-coded the absolute checkout
+    path (`.claude/settings.json` only had its script invocation made
+    dynamic, not `.codex/config.toml`'s guard). **Accepted and fixed**:
+    replaced the literal path comparison with a `git remote get-url
+    origin` comparison.
+  - Round 2: MEDIUM -- the raw-remote-URL guard breaks on SSH vs HTTPS
+    aliasing. **Accepted and fixed**: normalized the remote URL (strip
+    known protocol/host prefixes and trailing `.git`) before comparing.
+    MEDIUM -- possible spoofing via local remote manipulation. **Reviewed,
+    no code change**: the described attacker already needs local write
+    access to `.git/config`, at which point `~/.codex/config.toml` itself
+    is directly editable -- this guard does not introduce a new attack
+    surface. LOW -- no automated tests for the guard. **Reviewed, no code
+    change**: this is a shell one-liner embedded in a user-level TOML
+    config outside the repository, not code the repo's test suite can
+    cover; verified manually instead (see HP-1/EC-1 evidence below), which
+    is also how round-2's own review-triggered bug (the `$#` shell
+    expansion defect) was actually caught.
+  - Round 3 (final): PASS, 0 findings.
+- Gemma fallback: not triggered -- `qwen3.6:27b-q4_K_M` responded normally
+  on all three rounds.
+- D14 fallback: not triggered.
+- disposition_divergence: none
+- Primary-agent disposition: 1 HIGH + 1 MEDIUM fixed; 1 MEDIUM + 1 LOW
+  reviewed and dispositioned with no code change (rationale above).
+
+Code-solution review: qwen3.6:27b-q4_K_M `.agent/peer-code-review-T4b3.json` - PASS
+
+### Unit coverage certification
+
+This is a `configuration` task changing shell logic embedded in two hook
+config files (one inside the repo, one in shared user-level Codex config
+outside the repo and outside git version control) -- there is no Python/Rust
+unit under either repo's test suite that can import and assert on TOML/JSON
+hook `command` strings. Both `HP-1` and `EC-1` were instead certified via
+direct execution of the exact, post-edit command strings (extracted via
+`tomli`/`json` parsing, not retyped) against real repository and
+non-repository fixtures.
+
+| Case ID | Type | Behavior | Evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | opening the repo from a different checkout path still resolves the correct repo root and receipt location (Claude side, `$CLAUDE_PROJECT_DIR`) | manual: `cd /tmp/dubbridge-t4b3-hp1-sim && python3 "$CLAUDE_PROJECT_DIR/scripts/agent-preflight.py" --print-summary --mark` and the `hook-load` v2 variant -- both the legacy sentinel and the v2 receipt were written under the simulated checkout, not `/Users/matias/dubbridge` | passed |
+| HP-1 | Happy path | opening the repo from a different checkout path still resolves the correct repo root (Codex side, git-remote guard) | manual: executed the exact TOML-parsed `PreToolUse` command via `subprocess.run` with `cwd=` a freshly created worktree at a different path than the real repo -- guard matched via normalized remote, execution reached `agent-preflight.py`'s hook payload validation | passed |
+| EC-1 | Edge case | a duplicate stale hook is detected (or confirmed absent) instead of silently racing | manual audit: global `~/.claude/settings.json` hooks empty; no other real `settings.json` in the repo tree; no ancestor-directory `settings.json` with hooks; Codex `hooks.state` has exactly the two expected entries | passed |
+| EC-1 | Edge case | the Codex multi-project guard must not match an unrelated repository (regression check on the HP-1 fix) | manual: executed the exact TOML-parsed command from a freshly initialized unrelated git repo with no `origin` remote -- exit 0, no output, `agent-preflight.py` never invoked | passed |
+
+Additional evidence: `python3 -c "import tomli; tomli.load(open('/Users/matias/.codex/config.toml','rb'))"` confirmed valid TOML after every edit round; all 4 `[projects."..."]` `trust_level` entries unaffected.
+
+### Owner final verification
+
+- Owner: Claude (primary agent, this session)
+- Date: 2026-07-27
+- Statement: I verified HP-1 and EC-1 by executing the exact post-edit hook
+  command strings (extracted via `tomli`/`json`, not retyped) against real
+  git fixtures -- a fresh worktree at a different path for the positive
+  case, an unrelated repository with no matching remote for the negative
+  case -- rather than relying on static diff review alone. I confirmed no
+  duplicate or stale user-level Claude/Codex hook exists for this
+  repository, both before and after the change. I verified `/Users/matias/.codex/config.toml`
+  remains valid TOML and that all four projects' `trust_level` entries are
+  unaffected. I disposed all peer-review findings across three review
+  rounds, fixing the HIGH and both accepted MEDIUMs, and independently
+  caught and fixed a shell-expansion bug (`$#` inside double quotes) that
+  the reviewer itself did not catch, by executing rather than only reading
+  the generated command.
+- Commands run:
+  - `python3 scripts/rri.py --touches .claude/settings.json --touches /Users/matias/.codex/config.toml --touches scripts/agent-preflight.py --touches scripts/agent_preflight_test.py --cc 2 --D 4 --K 2 --P 2 --T 2 --A 1 --X 2`
+  - `python3 scripts/peer-workflow-review.py --phase task ...` (3 total invocations across the session: 1 task-analysis, 3 code-solution rounds)
+  - `python3 -c "import tomli; tomli.load(open('/Users/matias/.codex/config.toml','rb'))"` (after every edit round)
+  - Manual `sh -x -c "<extracted command>"` and `subprocess.run(['sh','-c', cmd], cwd=..., input=...)` fixture executions for HP-1/EC-1 on both hook configs
+  - `git worktree add --detach /tmp/dubbridge-t4b3-hp1-sim HEAD` / `git worktree add --detach /tmp/dubbridge-t4b3-hp1-v2 HEAD` and `git worktree remove ... --force` (cleanup) for isolated checkout-path simulation
+- Result: all commands passed; both hook configs now resolve the
+  repository dynamically; no duplicate/stale hook found; peer review
+  reached a clean PASS after 3 rounds with all findings dispositioned.
 
 ## T4c1 — Fresh-session smoke harness
 

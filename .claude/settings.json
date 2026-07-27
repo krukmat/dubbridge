@@ -276,11 +276,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 /Users/matias/dubbridge/scripts/agent-preflight.py --print-summary --mark"
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/agent-preflight.py\" --print-summary --mark"
           },
           {
             "type": "command",
-            "command": "python3 /Users/matias/dubbridge/scripts/agent-preflight.py hook-load --provider claude --repo-root /Users/matias/dubbridge --document AGENTS.md --document docs/policies/HITL_AUTONOMY_POLICY.md --document docs/policies/RRI_POLICY.md >/dev/null 2>&1 || true"
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/agent-preflight.py\" hook-load --provider claude --repo-root \"$CLAUDE_PROJECT_DIR\" --document AGENTS.md --document docs/policies/HITL_AUTONOMY_POLICY.md --document docs/policies/RRI_POLICY.md >/dev/null 2>&1 || true"
           }
         ]
       }
@@ -291,7 +291,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 /Users/matias/dubbridge/scripts/agent-preflight.py hook-gate --provider claude --repo-root /Users/matias/dubbridge"
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/agent-preflight.py\" hook-gate --provider claude --repo-root \"$CLAUDE_PROJECT_DIR\""
           },
           {
             "type": "command",
