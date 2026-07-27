@@ -184,6 +184,30 @@ flowchart LR
   all five mapped lifecycle events plus EC-1 denials, Gemma Reviewer log (two
   non-blocking, self-disposed findings with line-citation errors), and unit
   coverage certification (66/66 passing, 93% line coverage).
-- The next intended start point is `T4b2` (Codex native bundle, document
-  limit, and gate wiring), which extends the same hook-wiring pattern to
-  Codex's `AGENTS.override.md` and hook configuration.
+- `T4b2` is complete: `AGENTS.override.md` (79,101 bytes, byte-exact
+  concatenation of `AGENTS.md` + `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`)
+  now exists, `/Users/matias/.codex/config.toml`'s `SessionStart`/
+  `PreToolUse` hooks call the v2 `hook-load`/`hook-gate` verbs instead of
+  the legacy sentinel (mirroring T4b1's Claude wiring), and
+  `project_doc_max_bytes = 131072` covers the bundle with headroom. ADR-038
+  routed `CLOUD_REQUIRED` (same live-authorization-boundary exclusion as
+  T4a2-T4b1, reinforced by the shared-config and new-artifact risk
+  factors); Claude implemented directly. Implementation surfaced and fixed
+  a second instance of the T4b1-class defect: `adapt_codex_hook_payload`
+  and `codex_gate_response` (T4a3) assumed a wrong Codex hook payload/
+  response shape (`event`/`{"decision","reason"}`), corrected via static
+  inspection of the installed Codex CLI binary to the real
+  `hook_event_name`/`hookSpecificOutput` shape (field-identical to
+  Claude's). Two Codex-specific limitations were found and documented
+  rather than fixed: Codex's own project-doc loader truncates silently on
+  overflow instead of failing closed, and changing a hook's command body
+  invalidates its `trusted_hash`, requiring one-time interactive re-trust
+  on next real Codex session start. See the ledger's closure evidence for
+  the full gate trace, fixture evidence across all four mapped lifecycle
+  events plus EC-1 denials, peer review (qwen3.6:27b-q4_K_M, 0 blocking
+  findings), and unit coverage certification (69/69 passing, 93% line
+  coverage).
+- The next intended start point is `T4b3` (portable path resolution and
+  duplicate-hook cleanup), which removes the hard-coded
+  `/Users/matias/.codex/config.toml` absolute-path assumption and audits
+  for competing user-level hooks.

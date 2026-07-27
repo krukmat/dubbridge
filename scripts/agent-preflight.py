@@ -411,21 +411,24 @@ def adapt_claude_hook_payload(hook_input: Dict[str, Any]) -> Dict[str, Any]:
 def adapt_codex_hook_payload(hook_input: Dict[str, Any]) -> Dict[str, Any]:
     """Translate a Codex hook stdin payload into v2 receipt identity fields.
 
-    Codex hook payloads carry `session_id` and `event` (mapped to the shared
-    lifecycle vocabulary); Codex has no per-actor identity concept, so the
-    actor is pinned to "codex-cli".
+    Codex hook payloads carry `session_id` and `hook_event_name` -- the same
+    field name Claude uses, confirmed against the installed Codex CLI binary
+    (codex-cli 0.146.0-alpha.3.1: serde struct dump shows `session_id`,
+    `transcript_path`, `hook_event_name`, `cwd`, `tool_name`, `tool_input`
+    grouped as one hook-input struct). Codex has no per-actor identity
+    concept, so the actor is pinned to "codex-cli".
     """
     session_id = hook_input.get("session_id")
-    event = hook_input.get("event")
+    hook_event_name = hook_input.get("hook_event_name")
     if not isinstance(session_id, str) or not session_id:
         raise HookPayloadError("Codex hook payload missing string 'session_id'.")
-    if not isinstance(event, str) or not event:
-        raise HookPayloadError("Codex hook payload missing string 'event'.")
+    if not isinstance(hook_event_name, str) or not hook_event_name:
+        raise HookPayloadError("Codex hook payload missing string 'hook_event_name'.")
     return {
         "provider": "codex",
         "session_id": session_id,
         "actor_id": "codex-cli",
-        "hook_event_name": event,
+        "hook_event_name": hook_event_name,
         "source": "hook",
         "transcript_path": hook_input.get("transcript_path", ""),
         "native_instruction_mechanism": "generated-bundle",
@@ -487,7 +490,22 @@ def claude_gate_response(*, allow: bool, reason: str) -> Dict[str, Any]:
 
 
 def codex_gate_response(*, allow: bool, reason: str) -> Dict[str, Any]:
-    return {"decision": "allow" if allow else "deny", "reason": reason}
+    """Build the Codex PreToolUse response shape.
+
+    Confirmed against the installed Codex CLI binary (codex-cli
+    0.146.0-alpha.3.1): the serde struct dump groups `hookEventName`,
+    `permissionDecision`, `permissionDecisionReason`, `additionalContext`
+    together as one `PreToolUsePermissionDecisionWire`-shaped struct --
+    field-for-field the same shape Claude uses (`claude_gate_response`
+    above), not a distinct `{"decision", "reason"}` contract.
+    """
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "allow" if allow else "deny",
+            "permissionDecisionReason": reason,
+        }
+    }
 
 
 GATE_RESPONSE_BUILDERS = {
