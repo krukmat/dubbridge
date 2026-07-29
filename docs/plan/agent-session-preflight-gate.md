@@ -276,3 +276,42 @@ flowchart LR
   already fail-closed by a downstream validator. See the ledger's closure
   evidence for the full gate trace, live fixture evidence table, 3-pass
   Reflection log, peer review disposition, and unit coverage certification.
+- `T4c1b` and `T4c1c` closed the second Codex gap. `T4c1b` captured the raw
+  stdin the installed Codex CLI actually sends to the `SessionStart` hook and
+  isolated the "failed for a reason not diagnosable" cause above to an exact
+  field-mapping defect: `hook_event_name` carries the hook *type*
+  (`"SessionStart"`), while the lifecycle value lives in `source` -- the same
+  defect class `T4c1` fixed for Claude, left unfixed on the Codex side. Its
+  origin is traceable to `T4b2` reading a serde struct dump (which shows
+  field *names*, not *values*) and inferring the wrong semantics, then
+  recording that inference as "confirmed against the installed binary".
+  `T4c1c` fixed `adapt_codex_hook_payload` to read `source`, corrected every
+  unit test that had been certifying the false contract, and added a
+  live-captured-payload test (79 passing, 93% branch coverage; both peer
+  review phases PASS).
+- **The dual-provider objective is now met end-to-end (2026-07-29).**
+  `T4c1b` proved the two Codex causes were independent: a no-bypass `codex
+  exec` run produced no `hook: SessionStart` line at all, confirming the hook
+  was silently skipped because the `hooks.state` `trusted_hash` entries had
+  drifted from the current hook bodies. It also disproved the assumption that
+  a bypass run re-trusts them as a side effect (the hashes were byte-identical
+  before and after). Clearing drift required one interactive `codex` session
+  in a real TTY -- an action no agent can perform -- which the owner
+  performed. With drift cleared and `T4c1c` applied, a no-bypass `codex exec`
+  session reported `hook: SessionStart Completed` and auto-published the
+  first genuine Codex v2 receipt (`lifecycle.hook_event_name: "startup"`,
+  non-empty `transcript_path`); a follow-up resume run updated it to
+  `"resume"`. Both providers now publish real receipts from real sessions.
+- **Operational caveat that survives.** A drifted hook fails *silently* --
+  no `hook:` line, no receipt, no error -- and only a human in an interactive
+  TTY can re-trust it. Editing either hook command body in
+  `~/.codex/config.toml` re-triggers this. Any future task touching those
+  bodies must budget for that manual step and must not assume the hook still
+  runs.
+- Codex persists **no** hook events in its session rollout log; a failing hook
+  surfaces only as an ephemeral stderr line. `T4c1c` therefore added an opt-in
+  raw-stdin capture (`DUBBRIDGE_PREFLIGHT_DEBUG_STDIN`, inert when unset) so
+  the next provider payload-shape mismatch is a one-command diagnosis rather
+  than a two-task investigation.
+- The next intended start point is `T4c2` (audit coverage report and
+  certification math).

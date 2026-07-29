@@ -374,6 +374,12 @@ CODEX_NATIVE_INSTRUCTION_PATH = "AGENTS.override.md"
 
 def _read_hook_stdin(stream: Any) -> Dict[str, Any]:
     raw = stream.read()
+    debug_path = os.environ.get("DUBBRIDGE_PREFLIGHT_DEBUG_STDIN")
+    if debug_path:
+        try:
+            Path(debug_path).write_text(raw, encoding="utf-8")
+        except OSError:
+            pass
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as exc:
@@ -422,24 +428,43 @@ def adapt_claude_hook_payload(hook_input: Dict[str, Any]) -> Dict[str, Any]:
 def adapt_codex_hook_payload(hook_input: Dict[str, Any]) -> Dict[str, Any]:
     """Translate a Codex hook stdin payload into v2 receipt identity fields.
 
-    Codex hook payloads carry `session_id` and `hook_event_name` -- the same
-    field name Claude uses, confirmed against the installed Codex CLI binary
-    (codex-cli 0.146.0-alpha.3.1: serde struct dump shows `session_id`,
-    `transcript_path`, `hook_event_name`, `cwd`, `tool_name`, `tool_input`
-    grouped as one hook-input struct). Codex has no per-actor identity
+    Codex hook payloads carry the same field *names* Claude uses, and the same
+    semantics: `hook_event_name` is the hook *type* (always the literal
+    "SessionStart" for this hook) and the lifecycle sub-event ("startup",
+    "resume", "clear", "compact", "fork") is carried in the separate `source`
+    field. Confirmed against a live-captured payload from codex-cli
+    0.146.0-alpha.3.1:
+    `{"session_id":"019fa419-...","transcript_path":"...","cwd":"...",
+      "hook_event_name":"SessionStart","model":"gpt-5.6-sol",
+      "permission_mode":"bypassPermissions","source":"startup"}`.
+
+    T4b2 read a serde struct dump from the binary and correctly concluded that
+    the field is named `hook_event_name` (not `event`, as T4a3 assumed), but a
+    struct dump shows field *names*, not *values* -- it inferred that this
+    field also holds the lifecycle value, which it does not. That half-correct
+    inference is why every genuine Codex session failed `hook-load` with
+    "Unsupported lifecycle hook_event_name 'SessionStart'" while emitting only
+    an undiagnosable `hook: SessionStart Failed` (Codex persists no hook events
+    in its rollout log).
+
+    `source` is required rather than falling back to `hook_event_name`: this is
+    a fail-closed governance path, and silently accepting the wrong field is
+    precisely the failure mode being fixed. Codex has no per-actor identity
     concept, so the actor is pinned to "codex-cli".
     """
     session_id = hook_input.get("session_id")
-    hook_event_name = hook_input.get("hook_event_name")
+    lifecycle_event = hook_input.get("source")
     if not isinstance(session_id, str) or not session_id:
         raise HookPayloadError("Codex hook payload missing string 'session_id'.")
-    if not isinstance(hook_event_name, str) or not hook_event_name:
-        raise HookPayloadError("Codex hook payload missing string 'hook_event_name'.")
+    if not isinstance(lifecycle_event, str) or not lifecycle_event:
+        raise HookPayloadError("Codex hook payload missing string 'source'.")
     return {
         "provider": "codex",
         "session_id": session_id,
         "actor_id": "codex-cli",
-        "hook_event_name": hook_event_name,
+        # The receipt schema's `hook_event_name` field holds the lifecycle
+        # value, not the hook type -- map the payload's `source` into it.
+        "hook_event_name": lifecycle_event,
         "source": "hook",
         "transcript_path": hook_input.get("transcript_path", ""),
         "native_instruction_mechanism": "generated-bundle",

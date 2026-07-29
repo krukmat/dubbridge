@@ -639,7 +639,9 @@ class AgentPreflightHookAdapterTest(unittest.TestCase):
         self.assertEqual(receipt["lifecycle"]["hook_event_name"], "startup")
 
     def test_hp1_codex_hook_load_publishes_receipt(self):
-        payload = json.dumps({"session_id": "codex-sess-1", "hook_event_name": "startup"})
+        payload = json.dumps(
+            {"session_id": "codex-sess-1", "hook_event_name": "SessionStart", "source": "startup"}
+        )
 
         result, stdout, stderr = self._run_hook_command("hook-load", "codex", payload)
 
@@ -647,6 +649,39 @@ class AgentPreflightHookAdapterTest(unittest.TestCase):
         self.assertEqual(stderr, "")
         published = agent_preflight.v2_receipt_path(self.root, "codex", "codex-sess-1", "codex-cli")
         self.assertTrue(published.exists())
+        receipt = json.loads(published.read_text(encoding="utf-8"))
+        self.assertEqual(receipt["lifecycle"]["hook_event_name"], "startup")
+
+    def test_hp1_codex_hook_load_publishes_receipt_for_live_captured_payload(self):
+        # T4c1c: byte-for-byte the real SessionStart payload captured from a
+        # genuine fresh `codex exec` session (codex-cli 0.146.0-alpha.3.1) via
+        # the DUBBRIDGE_PREFLIGHT_DEBUG_STDIN capture hook (session_id/
+        # transcript_path redacted to fixture values; every key and the shape
+        # are exactly what Codex sent). Ground truth the fixture-only test
+        # above was previously blind to: `hook_event_name` is the hook type
+        # "SessionStart", and the lifecycle value lives in `source`.
+        payload = json.dumps(
+            {
+                "session_id": "fixture-codex-live-captured",
+                "transcript_path": "/tmp/fixture-codex-rollout.jsonl",
+                "cwd": str(self.root),
+                "hook_event_name": "SessionStart",
+                "model": "gpt-5.6-sol",
+                "permission_mode": "bypassPermissions",
+                "source": "startup",
+            }
+        )
+
+        result, stdout, stderr = self._run_hook_command("hook-load", "codex", payload)
+
+        self.assertEqual(result, 0)
+        self.assertEqual(stderr, "")
+        published = agent_preflight.v2_receipt_path(
+            self.root, "codex", "fixture-codex-live-captured", "codex-cli"
+        )
+        self.assertTrue(published.exists())
+        receipt = json.loads(published.read_text(encoding="utf-8"))
+        self.assertEqual(receipt["lifecycle"]["hook_event_name"], "startup")
 
     def test_hp2_claude_hook_gate_allows_after_load(self):
         load_payload = json.dumps(
@@ -666,10 +701,18 @@ class AgentPreflightHookAdapterTest(unittest.TestCase):
         self.assertEqual(response["hookSpecificOutput"]["hookEventName"], "PreToolUse")
 
     def test_hp2_codex_hook_gate_allows_after_load(self):
-        load_payload = json.dumps({"session_id": "codex-sess-1", "hook_event_name": "startup"})
+        load_payload = json.dumps(
+            {"session_id": "codex-sess-1", "hook_event_name": "SessionStart", "source": "startup"}
+        )
         self._run_hook_command("hook-load", "codex", load_payload)
 
-        gate_payload = json.dumps({"session_id": "codex-sess-1", "hook_event_name": "startup"})
+        gate_payload = json.dumps(
+            {
+                "session_id": "codex-sess-1",
+                "hook_event_name": "PreToolUse",
+                "tool_name": "apply_patch",
+            }
+        )
         result, stdout, stderr = self._run_hook_command("hook-gate", "codex", gate_payload)
 
         self.assertEqual(result, 0)
@@ -687,7 +730,9 @@ class AgentPreflightHookAdapterTest(unittest.TestCase):
         self.assertEqual(response["hookSpecificOutput"]["permissionDecision"], "deny")
 
     def test_ec2_codex_hook_gate_denies_for_unknown_session(self):
-        gate_payload = json.dumps({"session_id": "never-loaded", "hook_event_name": "startup"})
+        gate_payload = json.dumps(
+            {"session_id": "never-loaded", "hook_event_name": "PreToolUse", "tool_name": "apply_patch"}
+        )
 
         result, stdout, stderr = self._run_hook_command("hook-gate", "codex", gate_payload)
 
@@ -716,7 +761,7 @@ class AgentPreflightHookAdapterTest(unittest.TestCase):
         self.assertEqual(stdout, "")
 
     def test_ec1_hook_load_missing_session_id_exits_two(self):
-        payload = json.dumps({"hook_event_name": "startup"})
+        payload = json.dumps({"hook_event_name": "SessionStart", "source": "startup"})
 
         result, stdout, stderr = self._run_hook_command("hook-load", "claude", payload)
 
@@ -743,7 +788,7 @@ class AgentPreflightHookAdapterTest(unittest.TestCase):
         self.assertIn("CLAUDE.md", stderr)
 
     def test_ec1_hook_load_missing_session_id_field_codex_exits_two(self):
-        payload = json.dumps({"hook_event_name": "startup"})
+        payload = json.dumps({"hook_event_name": "SessionStart", "source": "startup"})
 
         result, stdout, stderr = self._run_hook_command("hook-load", "codex", payload)
 
@@ -755,6 +800,108 @@ class AgentPreflightHookAdapterTest(unittest.TestCase):
             agent_preflight.adapt_hook_payload(
                 "other", {"session_id": "x", "hook_event_name": "startup"}
             )
+
+    def test_ec1_hook_load_missing_source_field_codex_exits_two(self):
+        # T4c1c: a payload carrying only the hook type and no `source` is
+        # exactly the shape that must fail closed -- it is indistinguishable
+        # from the pre-fix assumption that `hook_event_name` held the
+        # lifecycle value.
+        payload = json.dumps({"session_id": "codex-sess-1", "hook_event_name": "SessionStart"})
+
+        result, stdout, stderr = self._run_hook_command("hook-load", "codex", payload)
+
+        self.assertEqual(result, 2)
+        self.assertIn("source", stderr)
+
+    def test_ec1_hook_load_unsupported_lifecycle_event_codex_exits_one(self):
+        # Peer review (T4c1 phase-2): Codex's hook-load path had no direct
+        # test of the fail-closed downstream lifecycle check, unlike the new
+        # Claude tests added by this task. adapt_codex_hook_payload accepts
+        # any string and defers validation to build_v2_receipt_payload's
+        # validate_lifecycle_event -- confirm that still denies cleanly.
+        payload = json.dumps(
+            {
+                "session_id": "codex-sess-1",
+                "hook_event_name": "SessionStart",
+                "source": "not_a_real_event",
+            }
+        )
+
+        result, stdout, stderr = self._run_hook_command("hook-load", "codex", payload)
+
+        self.assertEqual(result, 1)
+        self.assertIn("not_a_real_event", stderr)
+
+    def test_ec1_hook_load_unsupported_provider_argparse_rejects(self):
+        with mock.patch.object(sys, "stderr", io.StringIO()):
+            with self.assertRaises(SystemExit):
+                agent_preflight.main(
+                    ["hook-load", "--repo-root", str(self.root), "--provider", "other"]
+                )
+
+    def test_hp2_claude_hook_gate_allows_for_real_pretooluse_payload_shape(self):
+        load_payload = json.dumps(
+            {"session_id": "hook-sess-1", "hook_event_name": "SessionStart", "source": "startup"}
+        )
+        self._run_hook_command("hook-load", "claude", load_payload)
+
+        gate_payload = json.dumps(
+            {
+                "session_id": "hook-sess-1",
+                "transcript_path": "/tmp/transcript.json",
+                "cwd": str(self.root),
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Edit",
+                "tool_input": {"file_path": "foo.py"},
+            }
+        )
+        result, stdout, stderr = self._run_hook_command("hook-gate", "claude", gate_payload)
+
+        self.assertEqual(result, 0)
+        self.assertEqual(stderr, "")
+        response = json.loads(stdout)
+        self.assertEqual(response["hookSpecificOutput"]["permissionDecision"], "allow")
+
+    def test_hp2_codex_hook_gate_allows_for_real_tool_call_event_shape(self):
+        load_payload = json.dumps(
+            {"session_id": "codex-sess-1", "hook_event_name": "SessionStart", "source": "startup"}
+        )
+        self._run_hook_command("hook-load", "codex", load_payload)
+
+        gate_payload = json.dumps(
+            {
+                "session_id": "codex-sess-1",
+                "transcript_path": "/tmp/transcript.json",
+                "cwd": str(self.root),
+                "hook_event_name": "PreToolUse",
+                "tool_name": "apply_patch",
+                "tool_input": {"path": "foo.py"},
+            }
+        )
+        result, stdout, stderr = self._run_hook_command("hook-gate", "codex", gate_payload)
+
+        self.assertEqual(result, 0)
+        response = json.loads(stdout)
+        self.assertEqual(response["hookSpecificOutput"]["permissionDecision"], "allow")
+
+    def test_ec1_hook_gate_missing_session_id_exits_two_for_real_pretooluse_shape(self):
+        gate_payload = json.dumps(
+            {
+                "transcript_path": "/tmp/transcript.json",
+                "cwd": str(self.root),
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Edit",
+            }
+        )
+        result, stdout, stderr = self._run_hook_command("hook-gate", "claude", gate_payload)
+
+        self.assertEqual(result, 2)
+        self.assertEqual(stdout, "")
+        self.assertIn("session_id", stderr)
+
+    def test_extract_hook_gate_identity_rejects_unsupported_provider_directly(self):
+        with self.assertRaises(agent_preflight.HookPayloadError):
+            agent_preflight.extract_hook_gate_identity("other", {"session_id": "x"})
 
     def test_adapt_claude_hook_payload_reads_source_for_real_sessionstart_shape(self):
         # T4c1: real Claude Code SessionStart payloads always carry
@@ -802,98 +949,62 @@ class AgentPreflightHookAdapterTest(unittest.TestCase):
             )
         self.assertIn("source", str(ctx.exception))
 
-    def test_ec1_hook_load_missing_hook_event_name_field_codex_exits_two(self):
-        payload = json.dumps({"session_id": "codex-sess-1"})
-
-        result, stdout, stderr = self._run_hook_command("hook-load", "codex", payload)
-
-        self.assertEqual(result, 2)
-        self.assertIn("hook_event_name", stderr)
-
-    def test_ec1_hook_load_unsupported_provider_argparse_rejects(self):
-        with mock.patch.object(sys, "stderr", io.StringIO()):
-            with self.assertRaises(SystemExit):
-                agent_preflight.main(
-                    ["hook-load", "--repo-root", str(self.root), "--provider", "other"]
-                )
-
-    def test_hp2_claude_hook_gate_allows_for_real_pretooluse_payload_shape(self):
-        load_payload = json.dumps(
-            {"session_id": "hook-sess-1", "hook_event_name": "SessionStart", "source": "startup"}
-        )
-        self._run_hook_command("hook-load", "claude", load_payload)
-
-        gate_payload = json.dumps(
-            {
-                "session_id": "hook-sess-1",
-                "transcript_path": "/tmp/transcript.json",
-                "cwd": str(self.root),
-                "hook_event_name": "PreToolUse",
-                "tool_name": "Edit",
-                "tool_input": {"file_path": "foo.py"},
-            }
-        )
-        result, stdout, stderr = self._run_hook_command("hook-gate", "claude", gate_payload)
-
-        self.assertEqual(result, 0)
-        self.assertEqual(stderr, "")
-        response = json.loads(stdout)
-        self.assertEqual(response["hookSpecificOutput"]["permissionDecision"], "allow")
-
-    def test_hp2_codex_hook_gate_allows_for_real_tool_call_event_shape(self):
-        load_payload = json.dumps({"session_id": "codex-sess-1", "hook_event_name": "startup"})
-        self._run_hook_command("hook-load", "codex", load_payload)
-
-        gate_payload = json.dumps(
-            {
-                "session_id": "codex-sess-1",
-                "transcript_path": "/tmp/transcript.json",
-                "cwd": str(self.root),
-                "hook_event_name": "PreToolUse",
-                "tool_name": "apply_patch",
-                "tool_input": {"path": "foo.py"},
-            }
-        )
-        result, stdout, stderr = self._run_hook_command("hook-gate", "codex", gate_payload)
-
-        self.assertEqual(result, 0)
-        response = json.loads(stdout)
-        self.assertEqual(response["hookSpecificOutput"]["permissionDecision"], "allow")
-
-    def test_ec1_hook_gate_missing_session_id_exits_two_for_real_pretooluse_shape(self):
-        gate_payload = json.dumps(
-            {
-                "transcript_path": "/tmp/transcript.json",
-                "cwd": str(self.root),
-                "hook_event_name": "PreToolUse",
-                "tool_name": "Edit",
-            }
-        )
-        result, stdout, stderr = self._run_hook_command("hook-gate", "claude", gate_payload)
-
-        self.assertEqual(result, 2)
-        self.assertEqual(stdout, "")
-        self.assertIn("session_id", stderr)
-
-    def test_extract_hook_gate_identity_rejects_unsupported_provider_directly(self):
-        with self.assertRaises(agent_preflight.HookPayloadError):
-            agent_preflight.extract_hook_gate_identity("other", {"session_id": "x"})
-
-    def test_adapt_codex_hook_payload_reads_hook_event_name_directly(self):
+    def test_adapt_codex_hook_payload_reads_source_as_lifecycle_directly(self):
         fields = agent_preflight.adapt_codex_hook_payload(
-            {"session_id": "codex-sess-1", "hook_event_name": "startup"}
+            {"session_id": "codex-sess-1", "hook_event_name": "SessionStart", "source": "startup"}
         )
         self.assertEqual(fields["provider"], "codex")
         self.assertEqual(fields["session_id"], "codex-sess-1")
         self.assertEqual(fields["actor_id"], "codex-cli")
+        # The hook TYPE ("SessionStart") must never leak into the receipt's
+        # lifecycle field -- `source` is the lifecycle value.
         self.assertEqual(fields["hook_event_name"], "startup")
         self.assertEqual(fields["native_instruction_mechanism"], "generated-bundle")
         self.assertEqual(fields["native_instruction_path"], "AGENTS.override.md")
 
-    def test_adapt_codex_hook_payload_rejects_missing_hook_event_name_directly(self):
+    def test_adapt_codex_hook_payload_rejects_missing_source_directly(self):
         with self.assertRaises(agent_preflight.HookPayloadError) as ctx:
-            agent_preflight.adapt_codex_hook_payload({"session_id": "codex-sess-1"})
-        self.assertIn("hook_event_name", str(ctx.exception))
+            agent_preflight.adapt_codex_hook_payload(
+                {"session_id": "codex-sess-1", "hook_event_name": "SessionStart"}
+            )
+        self.assertIn("source", str(ctx.exception))
+
+    def test_read_hook_stdin_captures_raw_payload_when_debug_env_set(self):
+        # T4c1c: the only way to diagnose a provider payload-shape mismatch is
+        # to capture the raw stdin -- Codex persists no hook events in its
+        # rollout log, which is why this defect survived two tasks. Opt-in via
+        # env var; inert otherwise.
+        capture = Path(self.tmp.name) / "captured-stdin.json"
+        raw = '{"session_id": "s1", "hook_event_name": "SessionStart", "source": "startup"}'
+        with mock.patch.dict(
+            os.environ, {"DUBBRIDGE_PREFLIGHT_DEBUG_STDIN": str(capture)}, clear=False
+        ):
+            data = agent_preflight._read_hook_stdin(io.StringIO(raw))
+
+        self.assertEqual(data["source"], "startup")
+        self.assertEqual(capture.read_text(encoding="utf-8"), raw)
+
+    def test_read_hook_stdin_debug_capture_failure_never_breaks_parsing(self):
+        # The capture is diagnostic only: an unwritable path must not turn a
+        # valid payload into a hook failure. The fail-closed governance path
+        # must never depend on debug I/O succeeding.
+        unwritable = Path(self.tmp.name) / "no-such-dir" / "capture.json"
+        raw = '{"session_id": "s1", "hook_event_name": "SessionStart", "source": "startup"}'
+        with mock.patch.dict(
+            os.environ, {"DUBBRIDGE_PREFLIGHT_DEBUG_STDIN": str(unwritable)}, clear=False
+        ):
+            data = agent_preflight._read_hook_stdin(io.StringIO(raw))
+
+        self.assertEqual(data["source"], "startup")
+        self.assertFalse(unwritable.exists())
+
+    def test_read_hook_stdin_does_not_capture_when_debug_env_unset(self):
+        capture = Path(self.tmp.name) / "must-not-exist.json"
+        env = {k: v for k, v in os.environ.items() if k != "DUBBRIDGE_PREFLIGHT_DEBUG_STDIN"}
+        with mock.patch.dict(os.environ, env, clear=True):
+            agent_preflight._read_hook_stdin(io.StringIO('{"session_id": "s1"}'))
+
+        self.assertFalse(capture.exists())
 
     def test_codex_gate_response_matches_claude_shaped_hook_specific_output(self):
         allow_response = agent_preflight.codex_gate_response(allow=True, reason="ok")
