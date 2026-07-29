@@ -236,8 +236,43 @@ flowchart LR
   this config will require one-time interactive re-trust. See the
   ledger's closure evidence for the full task-analysis and code-solution
   review trace, 2-pass Reflection log, and manual HP-1/EC-1 evidence.
-- The next intended start point is `T4c1` (fresh-session smoke harness),
-  which runs real fresh-session startup checks for Claude and Codex
-  instead of relying only on direct command invocation -- including,
-  incidentally, the first live confirmation that a real Codex session
-  re-trusts the hooks T4b3 just modified.
+- `T4c1` is complete: fresh-session smoke harness, plus a real defect found
+  and fixed during its own pre-implementation analysis. Opening a genuine
+  fresh Claude Code session and capturing its real `SessionStart` payload
+  proved `adapt_claude_hook_payload` (T4a3) had been silently broken for
+  every real Claude session since T4b1 shipped: it validated
+  `hook_event_name` as the lifecycle event, but real payloads always set
+  `hook_event_name` to the literal hook type `"SessionStart"` -- the
+  lifecycle sub-event is in the separate `source` field. `hook-load` failed
+  silently (`|| true` in `.claude/settings.json`), so no v2 receipt had ever
+  been published by a genuine Claude session, only by fixtures and manual
+  CLI invocation. This recomputed the task from RRI 36 (Moderate,
+  verification-only) to RRI 44 (Med-high, development) by owner decision to
+  fix in-scope rather than file separately; ADR-038's Qwen27 refinement and
+  primary receipt both independently confirmed `CLOUD_REQUIRED`, consistent
+  with every other task in this chain that touched this file. The fix (read
+  `source` instead of `hook_event_name`) was verified three ways: unit
+  tests (75/75 passing, 93% coverage, unchanged baseline), a replay of the
+  actual live-captured payload against a scratch checkout (receipt
+  published correctly), and a genuinely fresh Claude Code session with no
+  manual intervention (the real hook fired on its own and auto-published a
+  receipt for that exact new session identity). Codex's fresh-session path
+  was attempted twice with a real `codex exec` session -- unlike T4b2's
+  assumption, the installed Codex CLI is ChatGPT-authenticated (no
+  per-call API credits at stake), so a live attempt was feasible and made,
+  but confirmed T4b3's own prediction: the hook-command edits since T4b2/
+  T4b3 invalidated `hooks.state`'s persisted `trusted_hash`, and `codex
+  exec` has no TTY to interactively re-trust, so the hook was silently
+  skipped. A second attempt with one bounded, user-authorized use of
+  `--dangerously-bypass-hook-trust` got the hook to fire, but it then
+  failed for a reason not diagnosable from the session rollout log or a
+  manual reproduction of the identical command -- a second, distinct Codex
+  gap. Both are honestly recorded as EC-2 unverified, not certified, per
+  the task's own acceptance criterion. Peer review (`qwen3.6:27b-q4_K_M`)
+  returned 5 findings (2 HIGH, 1 MEDIUM, 2 LOW); 2 were accepted and fixed
+  (added a Codex negative-lifecycle test for coverage parity with the new
+  Claude tests; added a clarifying comment), 3 were verified as either
+  confirmations of existing correctness or pre-existing/out-of-scope design
+  already fail-closed by a downstream validator. See the ledger's closure
+  evidence for the full gate trace, live fixture evidence table, 3-pass
+  Reflection log, peer review disposition, and unit coverage certification.

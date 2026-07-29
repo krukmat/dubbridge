@@ -386,21 +386,32 @@ def _read_hook_stdin(stream: Any) -> Dict[str, Any]:
 def adapt_claude_hook_payload(hook_input: Dict[str, Any]) -> Dict[str, Any]:
     """Translate a Claude Code hook stdin payload into v2 receipt identity fields.
 
-    Claude hook payloads carry `session_id`, `transcript_path`, `cwd`, and
-    `hook_event_name` (e.g. "startup", "resume", "clear", "compact") for
-    SessionStart, per the Claude Code hooks contract.
+    Claude `SessionStart` hook payloads carry `session_id`, `transcript_path`,
+    `cwd`, `hook_event_name`, and `source`, per the Claude Code hooks
+    contract. `hook_event_name` is the hook *type* and is always the literal
+    string "SessionStart" -- it is never a lifecycle value. The lifecycle
+    sub-event ("startup", "resume", "clear", "compact", "fork") is carried in
+    the separate `source` field, confirmed against a live-captured payload:
+    `{"session_id":"...","hook_event_name":"SessionStart","source":"startup"}`.
+    This mirrors T4b1's `extract_hook_gate_identity` finding for `PreToolUse`
+    (`hook_event_name` there is likewise the hook type, not a lifecycle
+    value) -- `hook-load`'s job is different (it must validate and record a
+    real lifecycle event), so the fix here is to read the correct field,
+    not to skip lifecycle validation the way the gate path does.
     """
     session_id = hook_input.get("session_id")
-    hook_event_name = hook_input.get("hook_event_name")
+    lifecycle_event = hook_input.get("source")
     if not isinstance(session_id, str) or not session_id:
         raise HookPayloadError("Claude hook payload missing string 'session_id'.")
-    if not isinstance(hook_event_name, str) or not hook_event_name:
-        raise HookPayloadError("Claude hook payload missing string 'hook_event_name'.")
+    if not isinstance(lifecycle_event, str) or not lifecycle_event:
+        raise HookPayloadError("Claude hook payload missing string 'source'.")
     return {
         "provider": "claude",
         "session_id": session_id,
+        # The receipt schema's `hook_event_name` field holds the lifecycle
+        # value, not the hook type -- map the payload's `source` into it.
+        "hook_event_name": lifecycle_event,
         "actor_id": "claude-code",
-        "hook_event_name": hook_event_name,
         "source": "hook",
         "transcript_path": hook_input.get("transcript_path", ""),
         "native_instruction_mechanism": "@import",

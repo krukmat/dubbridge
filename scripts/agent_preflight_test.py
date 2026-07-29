@@ -596,7 +596,8 @@ class AgentPreflightHookAdapterTest(unittest.TestCase):
         payload = json.dumps(
             {
                 "session_id": "hook-sess-1",
-                "hook_event_name": "startup",
+                "hook_event_name": "SessionStart",
+                "source": "startup",
                 "transcript_path": "/tmp/transcript.json",
             }
         )
@@ -609,6 +610,34 @@ class AgentPreflightHookAdapterTest(unittest.TestCase):
         published = agent_preflight.v2_receipt_path(self.root, "claude", "hook-sess-1", "claude-code")
         self.assertTrue(published.exists())
 
+    def test_hp1_claude_hook_load_publishes_receipt_for_live_captured_payload(self):
+        # T4c1: byte-for-byte the real SessionStart payload captured from a
+        # genuine fresh Claude Code session via a temporary, user-authorized
+        # diagnostic hook (session_id/transcript_path redacted to fixture
+        # values; hook_event_name/source/cwd keys and shape are exactly what
+        # Claude Code sent). This is the ground truth the fixture-only tests
+        # above were previously blind to.
+        payload = json.dumps(
+            {
+                "session_id": "fixture-live-captured-session",
+                "transcript_path": "/tmp/fixture-transcript.jsonl",
+                "cwd": str(self.root),
+                "hook_event_name": "SessionStart",
+                "source": "startup",
+            }
+        )
+
+        result, stdout, stderr = self._run_hook_command("hook-load", "claude", payload)
+
+        self.assertEqual(result, 0)
+        self.assertEqual(stderr, "")
+        published = agent_preflight.v2_receipt_path(
+            self.root, "claude", "fixture-live-captured-session", "claude-code"
+        )
+        self.assertTrue(published.exists())
+        receipt = json.loads(published.read_text(encoding="utf-8"))
+        self.assertEqual(receipt["lifecycle"]["hook_event_name"], "startup")
+
     def test_hp1_codex_hook_load_publishes_receipt(self):
         payload = json.dumps({"session_id": "codex-sess-1", "hook_event_name": "startup"})
 
@@ -620,10 +649,12 @@ class AgentPreflightHookAdapterTest(unittest.TestCase):
         self.assertTrue(published.exists())
 
     def test_hp2_claude_hook_gate_allows_after_load(self):
-        load_payload = json.dumps({"session_id": "hook-sess-1", "hook_event_name": "startup"})
+        load_payload = json.dumps(
+            {"session_id": "hook-sess-1", "hook_event_name": "SessionStart", "source": "startup"}
+        )
         self._run_hook_command("hook-load", "claude", load_payload)
 
-        gate_payload = json.dumps({"session_id": "hook-sess-1", "hook_event_name": "startup"})
+        gate_payload = json.dumps({"session_id": "hook-sess-1", "hook_event_name": "PreToolUse"})
         result, stdout, stderr = self._run_hook_command("hook-gate", "claude", gate_payload)
 
         self.assertEqual(result, 0)
@@ -647,7 +678,7 @@ class AgentPreflightHookAdapterTest(unittest.TestCase):
         self.assertEqual(response["hookSpecificOutput"]["permissionDecision"], "allow")
 
     def test_ec2_claude_hook_gate_denies_for_unknown_session(self):
-        gate_payload = json.dumps({"session_id": "never-loaded", "hook_event_name": "startup"})
+        gate_payload = json.dumps({"session_id": "never-loaded", "hook_event_name": "PreToolUse"})
 
         result, stdout, stderr = self._run_hook_command("hook-gate", "claude", gate_payload)
 
@@ -692,17 +723,19 @@ class AgentPreflightHookAdapterTest(unittest.TestCase):
         self.assertEqual(result, 2)
         self.assertIn("session_id", stderr)
 
-    def test_ec1_hook_load_missing_hook_event_name_exits_two(self):
-        payload = json.dumps({"session_id": "hook-sess-1"})
+    def test_ec1_hook_load_missing_source_field_exits_two(self):
+        payload = json.dumps({"session_id": "hook-sess-1", "hook_event_name": "SessionStart"})
 
         result, stdout, stderr = self._run_hook_command("hook-load", "claude", payload)
 
         self.assertEqual(result, 2)
-        self.assertIn("hook_event_name", stderr)
+        self.assertIn("source", stderr)
 
     def test_ec2_hook_load_missing_native_instruction_file_exits_one(self):
         (self.root / "CLAUDE.md").unlink()
-        payload = json.dumps({"session_id": "hook-sess-1", "hook_event_name": "startup"})
+        payload = json.dumps(
+            {"session_id": "hook-sess-1", "hook_event_name": "SessionStart", "source": "startup"}
+        )
 
         result, stdout, stderr = self._run_hook_command("hook-load", "claude", payload)
 
@@ -723,6 +756,52 @@ class AgentPreflightHookAdapterTest(unittest.TestCase):
                 "other", {"session_id": "x", "hook_event_name": "startup"}
             )
 
+    def test_adapt_claude_hook_payload_reads_source_for_real_sessionstart_shape(self):
+        # T4c1: real Claude Code SessionStart payloads always carry
+        # hook_event_name == "SessionStart" (the hook type) and put the
+        # lifecycle sub-event in `source` -- confirmed against a live-captured
+        # payload. The adapter must read `source`, not `hook_event_name`.
+        fields = agent_preflight.adapt_claude_hook_payload(
+            {
+                "session_id": "claude-sess-1",
+                "hook_event_name": "SessionStart",
+                "source": "startup",
+                "transcript_path": "/tmp/transcript.json",
+            }
+        )
+        self.assertEqual(fields["provider"], "claude")
+        self.assertEqual(fields["session_id"], "claude-sess-1")
+        self.assertEqual(fields["actor_id"], "claude-code")
+        self.assertEqual(fields["hook_event_name"], "startup")
+        self.assertEqual(fields["native_instruction_mechanism"], "@import")
+        self.assertEqual(fields["native_instruction_path"], "CLAUDE.md")
+
+    def test_adapt_claude_hook_payload_accepts_every_mapped_lifecycle_source(self):
+        for lifecycle_value in ("startup", "resume", "clear", "compact", "fork"):
+            with self.subTest(source=lifecycle_value):
+                fields = agent_preflight.adapt_claude_hook_payload(
+                    {
+                        "session_id": "claude-sess-1",
+                        "hook_event_name": "SessionStart",
+                        "source": lifecycle_value,
+                    }
+                )
+                self.assertEqual(fields["hook_event_name"], lifecycle_value)
+
+    def test_adapt_claude_hook_payload_rejects_missing_source_directly(self):
+        with self.assertRaises(agent_preflight.HookPayloadError) as ctx:
+            agent_preflight.adapt_claude_hook_payload(
+                {"session_id": "claude-sess-1", "hook_event_name": "SessionStart"}
+            )
+        self.assertIn("source", str(ctx.exception))
+
+    def test_adapt_claude_hook_payload_rejects_empty_string_source_directly(self):
+        with self.assertRaises(agent_preflight.HookPayloadError) as ctx:
+            agent_preflight.adapt_claude_hook_payload(
+                {"session_id": "claude-sess-1", "hook_event_name": "SessionStart", "source": ""}
+            )
+        self.assertIn("source", str(ctx.exception))
+
     def test_ec1_hook_load_missing_hook_event_name_field_codex_exits_two(self):
         payload = json.dumps({"session_id": "codex-sess-1"})
 
@@ -739,7 +818,9 @@ class AgentPreflightHookAdapterTest(unittest.TestCase):
                 )
 
     def test_hp2_claude_hook_gate_allows_for_real_pretooluse_payload_shape(self):
-        load_payload = json.dumps({"session_id": "hook-sess-1", "hook_event_name": "startup"})
+        load_payload = json.dumps(
+            {"session_id": "hook-sess-1", "hook_event_name": "SessionStart", "source": "startup"}
+        )
         self._run_hook_command("hook-load", "claude", load_payload)
 
         gate_payload = json.dumps(
@@ -837,7 +918,9 @@ class AgentPreflightHookAdapterTest(unittest.TestCase):
         (self.root / "docs" / "policies" / "HITL_AUTONOMY_POLICY.md").write_text(
             "autonomy policy\n", encoding="utf-8"
         )
-        payload = json.dumps({"session_id": "hook-sess-1", "hook_event_name": "startup"})
+        payload = json.dumps(
+            {"session_id": "hook-sess-1", "hook_event_name": "SessionStart", "source": "startup"}
+        )
 
         result, stdout, stderr = self._run_hook_command(
             "hook-load",
