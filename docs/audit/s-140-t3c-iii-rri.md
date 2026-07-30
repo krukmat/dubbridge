@@ -1,3 +1,10 @@
+---
+type: Audit
+title: "RRI evidence: S-140-T3c-iii Redis queue integration tests"
+status: proposed
+slice: s-140-subtitle-generation
+---
+
 ## S-140-T3c-iii — Presentation-time RRI
 
 ```bash
