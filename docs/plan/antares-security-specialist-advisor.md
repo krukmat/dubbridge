@@ -473,7 +473,19 @@ is now cancelled outright, because Antares does not propose RRI inputs.
   rule. The primary agent implemented `scripts/antares/tool_call_parser.py`
   and `scripts/antares/terminal_state.py` directly against the same approved
   card; `qwen3.6:27b-q4_K_M` code-solution review returned `PASS` with no
-  findings. `T2b` is now open, depending on `T2a`.
+  findings.
+- T2b completed on 2026-07-30 at execution RRI 50 (Med-high). By explicit
+  user instruction, this session routes all Med-high implementations
+  directly to cloud (Claude Code) until further notice, bypassing the
+  ADR-038 Qwen27-refinement/local-attempt gate for this and any subsequent
+  Med-high task in the session; band-routed review, 3 Reflection passes, and
+  the human approval gate ran unchanged. The primary agent implemented
+  `scripts/antares/command_policy.py` and
+  `scripts/antares/path_containment.py` directly, extending
+  `scripts/antares/terminal_state.py` with six new T2b terminal-state kinds;
+  `qwen3.6:27b-q4_K_M` code-solution review returned `PASS` with no findings
+  (one retry was needed after a first-attempt Ollama timeout). `T2c` is now
+  open, depending on `T2b`.
 - A defect in `scripts/local-architect/run_analysis.py` (missing `num_ctx`,
   causing schema-heavy `med-high-refinement-v1` responses to truncate) was
   found and fixed while executing T2a (RRI 22, Low band). This affects any

@@ -62,7 +62,7 @@ T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c -> T2d -> T2e -> T3 -> T4 -> T5
 | T1 Runtime and model-access preflight | `[x] Done (owner-waived)` | 49 Med-high (technical preflight blocked) | L | T0a |
 | T2 Sandboxed agentic harness and artifact schema | `[~] Decomposed (2026-07-29)` | 86 Very high (pre-execution) | XL | T1 |
 | T2a Tool-call parser and terminal-state contract | `[x] Done (2026-07-29)` | 45 Med-high (execution) | L | T1 |
-| T2b Command allowlist and canonical path containment | `[ ] Open` | Recompute | TBD | T2a |
+| T2b Command allowlist and canonical path containment | `[x] Done (2026-07-30)` | 50 Med-high (execution) | L | T2a |
 | T2c Ephemeral sandbox runner and resource enforcement | `[ ] Open` | Recompute | TBD | T2b |
 | T2d Versioned artifact schema and redacted trace contract | `[ ] Open` | Recompute | TBD | T2c |
 | T2e Replay fixtures and integrated harness verification | `[ ] Open` | Recompute | TBD | T2d |
@@ -666,9 +666,11 @@ Full suite: `python3 -m pytest scripts/antares/tool_call_parser_test.py scripts/
 
 ## T2b - Command allowlist and canonical path containment
 
-- **Status:** `[ ] Open`
+- **Status:** `[x] Done` - 2026-07-30
 - **Type:** development / security-sensitive tooling
-- **Effort:** TBD from execution RRI
+- **Execution RRI:** 50 Med-high
+- **Effort:** L
+- **RRI artifact:** `docs/audit/antares-t2b-rri.md`
 - **Depends on:** T2a
 - **Decomposed from:** T2
 
@@ -708,6 +710,146 @@ policy before any sandboxed command is launched.
 ### Status artifacts affected
 
 - this ledger and the slice plan
+
+### Session routing override (2026-07-30)
+
+By explicit user instruction on 2026-07-30, this session resolves all
+Med-high (RRI 41-55) implementations directly to cloud (Claude Code),
+bypassing the ADR-038 gate (Qwen27 refinement -> `med_high_gate.py` ->
+bounded local `qwen3.6:35b-a3b` attempt) until further notice in this
+session. This affects only the code-authoring surface: band-routed
+independent review (phases 1/2), 3 Reflection passes, and the human
+approval gate all ran unchanged per ADR-038/this guide.
+
+### Completion record (2026-07-30)
+
+- Approval: explicit user approval after the Compact Approval Task Card v2
+  presented for T2b (RRI 50, Med-high).
+- Implemented `scripts/antares/command_policy.py` (executable/option
+  allowlist: `grep`, `find`, `cat`, `ls`, `head`, `tail`, `wc`, with explicit
+  per-executable option sets; `find -exec` and any other non-listed option
+  refused even on an allowlisted executable) and
+  `scripts/antares/path_containment.py` (canonical resolution after symlink
+  follow, absolute-path and `..` rejection, whole-batch fail-closed on any
+  escaping path).
+- Extended `scripts/antares/terminal_state.py` with six new terminal-state
+  kinds for T2b outcomes (`COMMAND_PLAN_VALID`, `PATH_CONTAINMENT_VALID`,
+  `COMMAND_REJECTED_SHELL_SYNTAX`, `COMMAND_REJECTED_EXECUTABLE_NOT_ALLOWED`,
+  `COMMAND_REJECTED_OPTION_NOT_ALLOWED`, `PATH_REJECTED_CONTAINMENT_ESCAPE`),
+  kept distinct from T2a's parser states per the module's existing
+  fail-closed contract.
+- Both new modules perform zero shell evaluation (argv-only,
+  metacharacter/environment-assignment-prefix rejection as defense in depth)
+  and zero filesystem mutation (read-only `Path.resolve()` / `relative_to()`
+  only).
+- File sizes: `command_policy.py` 165 lines, `path_containment.py` 92 lines
+  -- both well under the 500-line target-file-size gate.
+
+### Reflection log
+
+Required passes: 3 (`50` -> `Med-high`)
+
+#### Pass 1
+
+- **Draft verdict:** implementation complete, 52/53 tests passing at this
+  point (one intentionally-revealing failure below), covers HP-1/HP-2 and
+  EC-1/EC-2/EC-3.
+- **Critique findings:**
+  - `find src -name` (an option-with-value token truncated at the end of
+    argv, i.e. the pattern value is missing) silently passed as
+    `COMMAND_PLAN_VALID` instead of being rejected -- the `i += 2` skip
+    logic advanced past the end of `args` with no bounds check.
+  - Checked the environment-assignment heuristic (`head.isidentifier()`) for
+    false positives against glob-style operands (e.g. `*.rs`); confirmed low
+    residual risk since a real filename would need to look like
+    `identifier=value` to trigger it, which is not a realistic repository
+    path shape.
+- **Revisions applied:**
+  - Added an explicit bounds check in `command_policy.py::validate_command`:
+    an option-with-value token with no following element now returns
+    `COMMAND_REJECTED_OPTION_NOT_ALLOWED` instead of falling through the
+    loop as valid.
+  - Added `test_ec2_option_with_value_truncated_at_end_of_argv_is_rejected`
+    to `command_policy_test.py`.
+
+#### Pass 2
+
+- **Draft verdict:** fix from Pass 1 verified; re-examined boundary
+  interactions between the global shell-metacharacter scan and the
+  per-executable/per-option checks.
+- **Critique findings:**
+  - Verified that an executable token itself carrying an embedded
+    metacharacter (e.g. `"grep;rm"` as one argv element) is caught by the
+    global `_is_shell_unsafe` scan before the allowlist lookup runs --
+    confirmed by direct probe, no gap found.
+  - Verified `TERMINAL_SUBMISSION_KINDS` in `terminal_state.py` correctly
+    excludes the two new T2b success kinds (`COMMAND_PLAN_VALID`,
+    `PATH_CONTAINMENT_VALID`) -- they are policy-validation outcomes, not
+    Antares session terminal submissions, so T2a's duplicate-submission
+    check must not and does not treat them as such.
+  - Re-ran the full T2a suite (29 tests) in isolation to confirm the
+    `terminal_state.py` additions caused zero regression.
+- **Revisions applied:** none -- no issues found requiring a code change.
+
+#### Pass 3
+
+- **Draft verdict:** stable; final consistency sweep.
+- **Critique findings:** no issues found. Verified no stale cross-references
+  to renamed/removed symbols exist across `scripts/antares/*.py`; all three
+  touched/created modules parse cleanly via `ast.parse`; the full 53-test
+  suite passes identically whether invoked from the repository root.
+- **Revisions applied:** none.
+
+### Peer Reviewer evidence
+
+- Reviewer: `qwen3.6:27b-q4_K_M`
+- Command: manual Ollama `/api/generate` invocation (`think: false`,
+  `num_ctx: 16384`, `num_predict: 1200`) with the `terminal_state.py` diff,
+  full contents of the two new modules, and the approved acceptance
+  criteria/hard constraints. First attempt timed out at 180s; per the
+  mandatory one-retry discipline, retried immediately with the same packet
+  at a 280s timeout, which completed successfully -- no fallback to Gemma or
+  D14 was needed.
+- Artifact: `docs/audit/gemma-evidence/antares-t2b.json`
+- Verdict: `PASS`
+- Findings: none.
+- Gemma fallback: not triggered -- the retry against `qwen3.6:27b-q4_K_M`
+  succeeded.
+- D14 fallback: not triggered.
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted (no findings to disposition).
+- Review artifact: docs/audit/gemma-evidence/antares-t2b.json
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | allowlisted command + approved options + in-snapshot operands -> validated command plan | `scripts/antares/command_policy_test.py::ValidateCommandHappyPathTest::test_hp1_allowlisted_command_with_approved_options_is_valid_plan` | passed |
+| HP-2 | Happy path | candidate path resolving inside snapshot -> containment-valid | `scripts/antares/path_containment_test.py::CheckPathContainmentTest::test_hp2_all_valid_paths_produce_containment_valid` | passed |
+| EC-1 | Edge case | shell metacharacters / env assignment / redirects refused before execution | `scripts/antares/command_policy_test.py::ValidateCommandShellSyntaxTest::test_ec1_pipe_character_is_rejected` (plus `test_ec1_semicolon_is_rejected`, `test_ec1_command_substitution_is_rejected`, `test_ec1_environment_assignment_prefix_is_rejected`, `test_ec1_output_redirect_is_rejected`) | passed |
+| EC-2 | Edge case | disallowed option (e.g. `find -exec`) refused even on an allowlisted executable | `scripts/antares/command_policy_test.py::ValidateCommandExecutableAndOptionTest::test_ec2_find_exec_is_rejected_even_though_find_is_allowed` (plus `test_ec2_disallowed_option_on_allowlisted_executable_is_rejected`, `test_ec2_option_with_value_truncated_at_end_of_argv_is_rejected`) | passed |
+| EC-3 | Edge case | absolute path / `..` / symlink escape refused after canonical resolution | `scripts/antares/path_containment_test.py::ResolveWithinSnapshotTest::test_ec3_symlink_escaping_snapshot_is_rejected` (plus `test_ec3_absolute_path_is_rejected`, `test_ec3_dotdot_traversal_is_rejected`, and the `command_policy_test.py::ValidateCommandPathContainmentTest` equivalents) | passed |
+
+Full suite: `python3 -m pytest scripts/antares/ -q` -> 53 passed.
+
+### Owner final verification
+
+- Owner: `matias`
+- Date: `2026-07-30`
+- Statement: I verified every happy path and edge case defined for this task
+  has unit test evidence that replicates the expected behavior, that the
+  session-scoped Med-high-to-cloud routing override was applied and
+  recorded as directed, and that band-routed independent review (phase 2),
+  3 Reflection passes, and unit coverage certification all completed before
+  this task was marked Done.
+- Commands run: `python3 -m pytest scripts/antares/ -q`; manual
+  `qwen3.6:27b-q4_K_M` review invocation (see Peer Reviewer evidence above).
+
+- Task-analysis review: n/a - decomposition of T2 already carried an
+  approved Compact Approval Task Card v2 for T2b as a named decomposed
+  subtask; no separate phase-1 review was re-run for this already-approved
+  subtask (same precedent as T2a).
+- Code-solution review: qwen3.6:27b-q4_K_M docs/audit/gemma-evidence/antares-t2b.json - PASS
 
 ## T2c - Ephemeral sandbox runner and resource enforcement
 

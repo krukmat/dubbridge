@@ -1,9 +1,10 @@
-"""Fail-closed terminal-state contract for Antares tool-call parsing (T2a).
+"""Fail-closed terminal-state contract for Antares tool-call parsing (T2a)
+and command/path policy validation (T2b).
 
-Every outcome the parser can produce is one of these explicit, machine-
-distinguishable states. No two failure modes collapse into a single generic
-"error" bucket: downstream policy (T2b), sandbox (T2c), and artifact (T2d)
-layers need to tell them apart.
+Every outcome the parser or policy layer can produce is one of these
+explicit, machine-distinguishable states. No two failure modes collapse into
+a single generic "error" bucket: downstream policy (T2b), sandbox (T2c), and
+artifact (T2d) layers need to tell them apart.
 """
 
 from __future__ import annotations
@@ -31,6 +32,17 @@ class TerminalStateKind(Enum):
     MALFORMED_SUBMIT_PAYLOAD = "malformed_submit_payload"
     DUPLICATE_TERMINAL_SUBMISSION = "duplicate_terminal_submission"
 
+    # T2b: command-policy and path-containment outcomes. Kept distinct from
+    # the T2a parser states above -- a caller must be able to tell "the
+    # tool-call JSON was malformed" apart from "the JSON parsed fine but the
+    # requested command/path violates the execution policy".
+    COMMAND_PLAN_VALID = "command_plan_valid"
+    PATH_CONTAINMENT_VALID = "path_containment_valid"
+    COMMAND_REJECTED_SHELL_SYNTAX = "command_rejected_shell_syntax"
+    COMMAND_REJECTED_EXECUTABLE_NOT_ALLOWED = "command_rejected_executable_not_allowed"
+    COMMAND_REJECTED_OPTION_NOT_ALLOWED = "command_rejected_option_not_allowed"
+    PATH_REJECTED_CONTAINMENT_ESCAPE = "path_rejected_containment_escape"
+
 
 # Kinds produced by a successful, well-formed tool call.
 SUCCESS_KINDS = frozenset(
@@ -38,6 +50,8 @@ SUCCESS_KINDS = frozenset(
         TerminalStateKind.PARSED_TERMINAL_CALL,
         TerminalStateKind.SUBMITTED_VULNERABLE_FILES,
         TerminalStateKind.SUBMITTED_NO_VULNERABILITY_FOUND,
+        TerminalStateKind.COMMAND_PLAN_VALID,
+        TerminalStateKind.PATH_CONTAINMENT_VALID,
     }
 )
 
@@ -53,10 +67,13 @@ TERMINAL_SUBMISSION_KINDS = frozenset(
 
 @dataclass(frozen=True)
 class TerminalState:
-    """One parsed outcome.
+    """One parsed or policy-validated outcome.
 
-    `argv` is populated only for PARSED_TERMINAL_CALL. `candidates` is
-    populated only for SUBMITTED_VULNERABLE_FILES. `detail` carries a
+    `argv` is populated for PARSED_TERMINAL_CALL (T2a, as submitted) and for
+    COMMAND_PLAN_VALID (T2b, the validated/normalized command plan).
+    `candidates` is populated for SUBMITTED_VULNERABLE_FILES (T2a, as
+    submitted) and for PATH_CONTAINMENT_VALID (T2b, the subset of candidate
+    paths that resolved inside the snapshot). `detail` carries a
     human-readable reason for any non-success kind; it is diagnostic only
     and must never be parsed by callers to distinguish states -- use `kind`.
     """
