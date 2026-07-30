@@ -544,6 +544,39 @@ is now cancelled outright, because Antares does not propose RRI inputs.
   status is `[x] Done (owner-waived, 2026-07-30)`, distinct from a genuine
   owner-verified closure. `T2d` (versioned artifact schema and redacted trace
   contract) is now unblocked, depending on `T2c-2`.
+- `T2d` was scored at `RRI 50 -> Med-high`. Qwen27 refinement returned
+  `GO_LOCAL`; the primary agent downgraded to `CLOUD_REQUIRED` under the
+  ADR-038 §6 hard exclusion (the schema mechanically enforces Antares'
+  mandatory-human-disposition governance contract, a fail-closed governance
+  invariant) and implemented directly. Phase-1 task-analysis review
+  (`qwen3.6:27b-q4_K_M`) returned `BLOCKED` on first pass (6 findings: 2
+  BLOCKING, 2 MAJOR, 2 MINOR — missing concrete trace-reference shape, missing
+  disposition field semantics, no per-category payload partition, abstract
+  HP/EC statements, no empty-candidates rule, no schema-version audit trail);
+  the task definition was substantively redesigned (not cosmetically patched)
+  to close each gap, and a second review pass returned `PASS`. Three
+  Reflection passes during implementation found and fixed a weak
+  `content_hash` format check, missing fork/cycle/single-artifact chain test
+  coverage, and a chain-validation gap where individually malformed artifacts
+  could report a false-clean head. Phase-2 code-solution review
+  (`qwen3.6:27b-q4_K_M`) needed two retries: the first two attempts each
+  timed out at 700s with decode stuck around 4.4-4.7 tokens/second (the
+  model's `thinking` capability was enabled by default and never disabled);
+  adding `"think": false` to the request cut decode to ~29 tokens/second (a
+  ~6x change) and the review completed in 206.6s with a natural `PASS`
+  verdict (7 `NONE` findings, 1 `MINOR` on `_validate_storage_uri`'s
+  tilde-path handling — independently verified as already covered by the
+  existing allowlist check and closed with a new regression test rather than
+  left implicit). Separately, before closure the primary agent discovered
+  this checkout (`core.bare = true`) had already absorbed T2d's uncommitted
+  files into two unrelated `S-140` commits (`da8e06a`, `844e847d`) made by a
+  concurrent session sharing the same working directory; the owner reviewed
+  the finding and chose to leave the existing commits as-is rather than
+  rewrite shared history — see the "Commit-provenance note" in the T2d task
+  entry. Owner (Matias Kruk) explicitly waived personal test-by-test final
+  verification (`AskUserQuestion`, 2026-07-30); status is `[x] Done
+  (owner-waived, 2026-07-30)`. `T2e` (replay fixtures and integrated harness
+  verification) is now unblocked, depending on `T2d`.
 - No roadmap update is required until T5 retains a production operating mode.
 
 ## Related documents

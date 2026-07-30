@@ -66,7 +66,7 @@ T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c (decomposed: T2c-1 -> T2c-2) -> T2d 
 | T2c Ephemeral sandbox runner and resource enforcement | `[~] Decomposed (2026-07-30)` | 56 Complex (pre-decomposition) | L | T2b |
 | T2c-1 Sandbox process execution and isolation | `[x] Done (2026-07-30)` | 49 Med-high (planning) | L | T2b |
 | T2c-2 Resource budget, wall-timeout, teardown | `[x] Done (owner-waived, 2026-07-30)` | 53 Med-high (execution) | L | T2c-1 |
-| T2d Versioned artifact schema and redacted trace contract | `[ ] Open` | Recompute | TBD | T2c-2 |
+| T2d Versioned artifact schema and redacted trace contract | `[x] Done (owner-waived, 2026-07-30)` | 50 (Med-high) | S/M-equivalent | T2c-2 |
 | T2e Replay fixtures and integrated harness verification | `[ ] Open` | Recompute | TBD | T2d |
 | T3 CWE watchlist and context-complete packet construction | `[ ] Open` | Recompute | TBD | T2e |
 | T4 Ground-truth calibration and observe-only workflow pilot | `[ ] Open` | Recompute | TBD | T2e, T3 |
@@ -1391,48 +1391,388 @@ remain passing, unaffected by the `terminal_state.py` addition.
 
 ## T2d - Versioned artifact schema and redacted trace contract
 
-- **Status:** `[ ] Open`
+- **Status:** `[x] Done (owner-waived, 2026-07-30)`
 - **Type:** development / security-sensitive tooling
-- **Effort:** TBD from execution RRI
+- **Effort:** Moderate/Med-high band (RRI 50) — see `docs/audit/antares-t2d-rri.md`
 - **Depends on:** T2c-2
 - **Decomposed from:** T2
 
 ### Objective
 
-Normalize every success, negative, degraded, refused, and skipped result into a
-versioned artifact with provenance, terminal-state semantics, and a redacted
-trace-reference contract.
+Normalize every one of the 20 `TerminalStateKind` values (`scripts/antares/terminal_state.py`)
+into a versioned artifact with provenance, terminal-state semantics, a concrete
+redacted trace-reference contract, and mandatory human-disposition fields.
+
+### Redacted trace-reference contract (resolves qwen27/Gemma Phase-1 BLOCKING finding)
+
+- Raw `stdout`/`stderr`/`detail`/prompt/source-excerpt content is **never**
+  written into the committed artifact. Instead the artifact stores a
+  `trace_ref` object:
+  ```json
+  {
+    "trace_ref": {
+      "content_hash": "sha256:<hex>",
+      "storage_uri": "file://<local-fs-path-outside-docs/>",
+      "byte_length": 12345,
+      "redaction_version": 1
+    }
+  }
+  ```
+- `storage_uri` must resolve outside any path `make qa-docs` or `git` tracks
+  (e.g. under a gitignored `var/antares-traces/` root); the schema validator
+  rejects any `storage_uri` that resolves inside a tracked path.
+- `content_hash` is SHA-256 over the raw (pre-redaction) trace bytes, so a
+  human reviewer with access to the raw store can verify the committed
+  artifact matches a specific trace without the trace itself being committed.
+- `redaction_version` is a small integer identifying which redaction ruleset
+  produced the reference, so future rule changes don't silently reinterpret
+  old artifacts.
+- Terminal states with no trace content (e.g. `MALFORMED_TOOL_CALL`) set
+  `trace_ref: null` rather than omitting the field.
+- **Validator scope boundary:** the schema validator checks shape and
+  consistency only (field presence, enum membership, the category-conditional
+  required fields below, the EC-2/EC-4 rejection rules). It does **not**
+  perform I/O to confirm `content_hash` matches the bytes at `storage_uri` —
+  that would require reading the raw (non-committed) store at validation
+  time, which the validator has no access to by design. The hash-integrity
+  guarantee is instead a property of the **writer**: the writer function
+  (part of this task's "Evidence to emit") computes `content_hash` directly
+  from the raw bytes at artifact-creation time, before writing either the
+  raw trace or the `trace_ref`. A validation fixture asserts the writer's
+  round-trip (write raw bytes -> compute hash -> read back via
+  `storage_uri` -> hash matches), which is a writer-module test, not a
+  schema-validator test.
+
+### Per-category payload shape (resolves qwen27 MAJOR finding, Focus 2)
+
+The common base fields below apply to all 20 kinds. Each category then adds
+its own required fields; the validator enforces category-conditional
+requirements (e.g. `SUBMITTED_VULNERABLE_FILES` without `candidates` is
+rejected regardless of the fact that `candidates` is merely "present" on the
+struct).
+
+**Common base (all 20 kinds):** `schema_version`, `kind`, `finding_id`,
+`artifact_id`, `supersedes` (nullable), `provenance`, `trace_ref` (nullable),
+`disposition`.
+
+| Category | Kinds | Category-specific required fields | `trace_ref` |
+|---|---|---|---|
+| T2a parser (7) | `PARSED_TERMINAL_CALL`, `SUBMITTED_VULNERABLE_FILES`, `SUBMITTED_NO_VULNERABILITY_FOUND`, `MALFORMED_TOOL_CALL`, `UNSUPPORTED_TOOL_NAME`, `MALFORMED_SUBMIT_PAYLOAD`, `DUPLICATE_TERMINAL_SUBMISSION` | `argv` on `PARSED_TERMINAL_CALL`; `candidates` (non-empty, EC-4) on `SUBMITTED_VULNERABLE_FILES`; `detail` on all rejection kinds | always `null` (no subprocess trace exists at parse time) |
+| T2b policy (6) | `COMMAND_PLAN_VALID`, `PATH_CONTAINMENT_VALID`, `COMMAND_REJECTED_SHELL_SYNTAX`, `COMMAND_REJECTED_EXECUTABLE_NOT_ALLOWED`, `COMMAND_REJECTED_OPTION_NOT_ALLOWED`, `PATH_REJECTED_CONTAINMENT_ESCAPE` | `argv` on `COMMAND_PLAN_VALID`; `candidates` on `PATH_CONTAINMENT_VALID`; `detail` on all rejection kinds | always `null` (still pre-execution) |
+| T2c-1 execution (3) | `SANDBOX_EXECUTION_COMPLETE`, `SANDBOX_RUNTIME_UNAVAILABLE`, `SANDBOX_COMMAND_TIMED_OUT` | `argv`, `exit_code` (nullable only for `SANDBOX_RUNTIME_UNAVAILABLE`), `elapsed_seconds` | non-null on `SANDBOX_EXECUTION_COMPLETE`/`SANDBOX_COMMAND_TIMED_OUT` (stdout/stderr exist); `null` on `SANDBOX_RUNTIME_UNAVAILABLE` (nothing ran) |
+| T2c-2 budget (4) | `SANDBOX_OUTPUT_CAP_EXCEEDED`, `SANDBOX_WALL_BUDGET_EXCEEDED`, `SANDBOX_BUDGET_EXHAUSTED`, `SANDBOX_TEARDOWN_UNCONFIRMED` | `elapsed_seconds`; `budget: {limit, consumed, unit}`; `teardown_grace_seconds` additionally required on `SANDBOX_TEARDOWN_UNCONFIRMED` | non-null (a command ran before the budget/teardown condition fired) |
+
+### Mandatory human-disposition fields (resolves qwen27/Gemma Phase-1 BLOCKING finding)
+
+Every artifact instance carries a `disposition` object, required (not
+optional) on every terminal state, including non-finding states:
+
+```json
+{
+  "disposition": {
+    "state": "needs-human-review",
+    "reviewer": null,
+    "reviewed_at": null,
+    "note": null
+  }
+}
+```
+
+- `state` is one of the enum values: `needs-human-review` (default at
+  creation), `accepted-now`, `accepted-follow-up`, `rejected`. This mirrors
+  the four dispositions already named in `AGENT_WORKFLOW_GUIDE.md`'s Antares
+  authority-boundary section.
+- `state` starts at `needs-human-review` for every terminal state at
+  creation time — including negative (`SUBMITTED_NO_VULNERABILITY_FOUND`) and
+  degraded/rejected states — so nothing is ever created pre-closed (EC-3).
+  Moving to any other `state` requires `reviewer` and `reviewed_at` to be
+  non-null in the same write (schema validator enforces this pairing).
+- The artifact schema is append-only per ADR-006 (immutable artifacts): a
+  disposition change is written as a new versioned artifact revision with a
+  `supersedes: <artifact_id>` back-reference, never an in-place mutation of
+  a committed file.
+- **Stable identity across revisions (resolves qwen27 MINOR finding, Focus 5
+  — "provenance audit trail for asynchronous human disposition updates"):**
+  `artifact_id` changes on every revision (it identifies one immutable
+  file); `finding_id` is generated once at creation (e.g. a UUID) and copied
+  unchanged into every subsequent revision in that finding's supersede
+  chain. A consumer resolving "the current disposition of finding X" walks
+  the chain by `finding_id` and takes the revision no other committed
+  artifact names in its `supersedes` field (the chain head). Without a
+  stable `finding_id`, a consumer has no non-ambiguous way to ask "what is
+  the latest disposition for this specific finding" across an append-only
+  revision history — this was the concrete gap the finding flagged, not
+  addressed by `supersedes` alone.
+- Backwards-compatibility guarantee: out of scope for this task by design —
+  `schema_version` starts at `1` and this task ships only one version;
+  compatibility across versions is deferred to the future migration task
+  that EC-5's `schema_version` field anticipates. This is a scope boundary,
+  not an unaddressed gap.
 
 ### Happy paths considered
 
-- **HP-1:** `vulnerable_files` records validated candidate paths, provenance, and
-  an external trace reference without leaking source excerpts into committed docs.
-- **HP-2:** `no_vulnerability_found` records an explicit negative result with the
-  same provenance and audit fields as a positive result.
+- **HP-1:** `vulnerable_files` records validated candidate paths, provenance,
+  and a `trace_ref` per the contract above, without the raw stdout/stderr or
+  source excerpts appearing anywhere in the committed artifact.
+- **HP-2:** `no_vulnerability_found` records an explicit negative result with
+  the same provenance, `trace_ref`, and `disposition` fields as a positive
+  result — disposition starts at `needs-human-review`, not auto-closed.
 
 ### Edge cases considered
 
-- **EC-1:** degraded states such as `budget_exhausted`, `command_timeout`, or
-  `output_limit` remain durable and distinguishable.
-- **EC-2:** raw traces remain outside committed paths and the artifact records the
-  redaction/retention contract instead of embedding sensitive content.
-- **EC-3:** undisposed findings remain operationally open instead of appearing
-  closed by omission.
+- **EC-1:** degraded states (`SANDBOX_BUDGET_EXHAUSTED`, `SANDBOX_COMMAND_TIMED_OUT`,
+  `SANDBOX_OUTPUT_CAP_EXCEEDED`) serialize to a distinct `kind` value each
+  (no collapsing into one generic "degraded" bucket) and carry
+  `disposition.state = needs-human-review` at creation.
+- **EC-2:** a validation fixture asserts that no committed fixture or example
+  file contains a raw trace body; only `trace_ref` objects with hashes/URIs
+  are present. The schema validator rejects any artifact instance where a
+  trace-bearing field (`stdout`/`stderr`/`detail`) is non-empty alongside a
+  populated `trace_ref`.
+- **EC-3:** an artifact with `disposition.state = needs-human-review` is
+  distinguishable from a closed one by state alone (never by field absence);
+  a fixture asserts a needs-human-review artifact remains valid against the
+  schema (open findings are not schema violations).
+- **EC-4 (new, from Phase-1 review):** `SUBMITTED_VULNERABLE_FILES` with an
+  empty `candidates` tuple is rejected by the schema validator as malformed
+  (a positive finding kind must carry at least one candidate path).
+- **EC-5 (new, from Phase-1 review):** a `schema_version` field is present on
+  every artifact; the validator rejects an artifact whose `schema_version` it
+  does not recognize, rather than attempting best-effort parsing. Migration
+  between versions is out of scope for this task (single version, `1`, at
+  first release) but the field's presence is required now so a future
+  migration task has something to key off.
+- **EC-6 (new, this pass):** a disposition-update fixture writes an initial
+  revision (`finding_id = F`, `artifact_id = A1`, `supersedes = null`), then
+  a second revision (`finding_id = F`, `artifact_id = A2`,
+  `supersedes = A1`). The fixture asserts: (a) both revisions share the same
+  `finding_id`; (b) resolving "current disposition of `F`" returns `A2`, not
+  `A1`; (c) a malformed revision that changes `finding_id` mid-chain, or
+  that sets `supersedes` to a non-existent `artifact_id`, is rejected by the
+  validator.
 
 ### Acceptance criteria
 
-- The schema is versioned and covers every terminal state named by the plan.
-- Provenance includes model/runtime/harness versions plus packet/snapshot hashes.
-- Human disposition fields are mandatory in the durable contract.
-- Committed summaries exclude prompts, source excerpts, credentials, and secrets.
+- The schema is versioned (`schema_version` field, starting at `1`) and
+  covers every one of the 20 `TerminalStateKind` values with a distinct,
+  non-collapsed `kind` string and the category-specific required fields in
+  the payload-shape table above.
+- Provenance includes model/runtime/harness versions plus packet/snapshot
+  hashes (existing requirement, unchanged).
+- `disposition` (per the four-state enum above) and `trace_ref` (per the
+  contract above) are both mandatory, non-optional fields on every artifact
+  instance, including negative and degraded/rejected states.
+- `finding_id` is stable across a supersede chain; `artifact_id` is unique
+  per revision; the validator rejects a chain break (EC-6).
+- Committed summaries, fixtures, and examples exclude prompts, source
+  excerpts, credentials, and secrets; validated by EC-2's fixture assertion.
+- A malformed `SUBMITTED_VULNERABLE_FILES` (empty `candidates`) is rejected
+  at validation time (EC-4).
 
 ### Evidence to emit
 
-- Schema module, validation fixtures, and one redacted example per terminal state.
+- Schema module (`scripts/antares/artifact_schema.py` or similar), a
+  writer function (computes `content_hash` from raw bytes at creation time),
+  a validator function (shape/consistency only, no I/O — see validator
+  scope boundary above), validation fixtures (EC-2, EC-4, EC-6, plus the
+  writer hash round-trip fixture), and one redacted example artifact per
+  each of the 20 `TerminalStateKind` values.
 
 ### Status artifacts affected
 
 - this ledger and the slice plan
+
+### Implementation note (ADR-038 routing)
+
+RRI = 50 (Med-high, 41-55) — `docs/audit/antares-t2d-rri.md`. Qwen27
+(`qwen3.6:27b-q4_K_M`, `scripts/local-architect/run_analysis.py`
+`med-high-refinement-v1` profile) returned `route_recommendation: GO_LOCAL`.
+The primary agent issued its own hash-bound route receipt and **downgraded**
+to `CLOUD_REQUIRED`, invoking the ADR-038 §6 hard exclusion: this schema
+mechanically enforces the mandatory-human-disposition governance contract for
+Antares (an advisory-only security tool), which is a fail-closed governance
+invariant. `scripts/local-agent/med_high_gate.py` confirms
+`{"route": "CLOUD_REQUIRED", "reason": "Primary receipt downgraded GO_LOCAL to
+cloud."}`. Implemented directly by the primary (cloud) agent, per ADR-038 §5.
+
+### Peer Reviewer evidence
+
+- Reviewer: `qwen3.6:27b-q4_K_M`
+- Phase 1 command: Ollama `/api/chat`, `docs/audit/gemma-evidence/antares-t2d-phase1.json`
+- Phase 2 command: Ollama `/api/chat` with `"think": false` (see note below on
+  why), `docs/audit/gemma-evidence/antares-t2d-phase2.json`
+- Phase 1 verdict: `BLOCKED` (pass 1, 6 findings: 2 BLOCKING, 2 MAJOR, 2 MINOR)
+  → task definition revised (redacted trace-reference contract, per-category
+  payload shape, mandatory human-disposition fields, stable
+  `finding_id`/`artifact_id` identity, validator scope boundary, concrete
+  EC-4/5/6) → re-reviewed (pass 2) → `PASS`, all 6 pass-1 findings
+  independently confirmed resolved against the revised text, plus one new
+  MINOR accepted-follow-up (supersede-chain retention/tombstone policy, out
+  of scope for T2d).
+- Phase 2 verdict: `PASS`. 8 findings returned, 7 `NONE` + 1 `MINOR`
+  (`_validate_storage_uri` has no explicit `~`-style absolute-path rejection).
+  Independently verified: `~`-prefixed URIs are already rejected via the
+  `ALLOWED_TRACE_STORAGE_PREFIX` allowlist check (`storage_uri_outside_allowed_root`),
+  confirming the reviewer's own hedge ("though the repo-relative check likely
+  covers this") was correct. Closed with an explicit regression test
+  (`test_storage_uri_tilde_path_is_rejected`) rather than left implicit.
+- Operational note: the first two Phase-2 attempts (default request, no
+  `think` parameter) each timed out at 700s wall-clock with decode stuck at
+  ~4.4-4.7 tokens/second (`n_decoded` reaching 1853 and 2633 respectively
+  before the client `curl` hit `--max-time` and the in-progress generation
+  was discarded — `stream: false` means no partial output is recoverable on
+  timeout). `ollama show qwen3.6:27b-q4_K_M` confirmed the model has a
+  `thinking` capability that was never disabled in those requests. Adding
+  `"think": false` to the third attempt cut decode to ~29 tokens/second (a
+  ~6x change) and the model completed in 206.6s with `done_reason: "stop"`
+  (natural completion, not truncation) — strong evidence the earlier
+  timeouts were consumed by invisible reasoning tokens rather than the
+  requested 8-finding response itself.
+- Gemma fallback: not triggered (both phases resolved directly against
+  `qwen3.6:27b-q4_K_M`).
+- D14 fallback: not triggered.
+- disposition_divergence: `none`.
+- Primary-agent disposition: accepted all 7 phase-2 `NONE` findings as
+  confirming correctness; the 1 `MINOR` finding was independently verified
+  (not just accepted on the model's word) and closed with a new regression
+  test. Phase-1's 6 original findings were resolved via genuine task-definition
+  redesign (not cosmetic reclassification) prior to the passing re-review.
+
+```
+Task-analysis review: qwen3.6:27b-q4_K_M docs/audit/gemma-evidence/antares-t2d-phase1.json - PASS
+Code-solution review: qwen3.6:27b-q4_K_M docs/audit/gemma-evidence/antares-t2d-phase2.json - PASS
+```
+
+### Reflection log
+
+Required passes: 3 (`50` → `Med-high`)
+
+#### Pass 1
+
+- **Draft verdict:** initial `artifact_schema.py` validated `content_hash`
+  by checking only the `"sha256:"` prefix, not that the remaining 64
+  characters were valid lowercase hex.
+- **Critique findings:** a malformed hash (e.g. `sha256:not-actually-hex`)
+  would pass validation, silently breaking the writer's hash-integrity
+  guarantee described in the redacted trace-reference contract.
+- **Revisions applied:** added `_is_valid_sha256_hex()` (prefix + exact
+  64-char lowercase-hex check) and wired it into `_validate_trace_ref_field`;
+  added `test_malformed_content_hash_is_rejected`.
+
+#### Pass 2
+
+- **Draft verdict:** `validate_supersede_chain` correctly resolved linear
+  chains, but had no test coverage for a forked chain (two artifacts naming
+  the same `supersedes` target) or the single-artifact baseline case.
+- **Critique findings:** an unproven fork/cycle path is exactly the kind of
+  gap a schema meant to protect an append-only audit trail (ADR-006) cannot
+  afford to leave unverified — EC-6 explicitly names "rejects a chain break."
+- **Revisions applied:** added `test_ec6_rejects_forked_chain_with_two_heads`
+  and `test_ec6_single_artifact_chain_resolves_to_itself`; also added
+  `test_ec6_rejects_dangling_supersedes` for the third EC-6 sub-case
+  (non-existent `supersedes` target).
+
+#### Pass 3
+
+- **Draft verdict:** `validate_supersede_chain` computed chain-relational
+  properties (head resolution, `finding_id` consistency) without first
+  calling `validate_artifact()` on each element.
+- **Critique findings:** a chain composed of individually schema-invalid
+  artifacts (e.g. one with an unrecognized `schema_version`) could report a
+  clean, resolvable head — the chain-level check and the artifact-level
+  check were independent, so passing one didn't imply the other.
+- **Revisions applied:** `validate_supersede_chain` now validates every
+  element via `validate_artifact()` before computing chain properties;
+  added `test_ec6_chain_rejects_an_individually_malformed_artifact` as proof.
+
+Gemma/qwen27 Phase-1 findings were dispositioned by task-definition revision
+(not code changes, since Phase 1 precedes implementation) — see the pass-2
+resolution detail in `docs/audit/gemma-evidence/antares-t2d-phase1.json`.
+Phase-2's single MINOR finding is dispositioned above under Peer Reviewer
+evidence, not as a fourth Reflection pass (it arrived after all 3 required
+passes were already complete, per the closure-checklist ordering).
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | `SUBMITTED_VULNERABLE_FILES` carries `trace_ref`, provenance, and no raw stdout/stderr/source excerpt in the committed artifact | `scripts/antares/artifact_schema_test.py::HappyPathTest::test_hp1_vulnerable_files_carries_trace_ref_and_no_raw_content` | passed |
+| HP-2 | Happy path | `SUBMITTED_NO_VULNERABILITY_FOUND` records an explicit negative result with the same provenance/`trace_ref`/`disposition` shape, not auto-closed | `scripts/antares/artifact_schema_test.py::HappyPathTest::test_hp2_no_vulnerability_found_matches_positive_result_shape` | passed |
+| EC-1 | Edge case | degraded kinds serialize to distinct `kind` values and start `needs-human-review` | `scripts/antares/artifact_schema_test.py::EdgeCaseTest::test_ec1_degraded_states_are_distinct_and_start_needs_human_review` | passed |
+| EC-2 | Edge case | validator rejects a populated `trace_ref` alongside non-empty raw stdout/stderr | `scripts/antares/artifact_schema_test.py::EdgeCaseTest::test_ec2_rejects_raw_trace_alongside_populated_trace_ref` | passed |
+| EC-2 | Edge case | no committed example carries raw trace content | `scripts/antares/artifact_schema_test.py::ExampleArtifactsTest::test_examples_never_carry_raw_trace_content`, `CommittedExampleFixtureTest::test_committed_examples_contain_no_raw_trace_fields_and_validate` | passed |
+| EC-3 | Edge case | a `needs-human-review` artifact is schema-valid (open findings are not violations) | `scripts/antares/artifact_schema_test.py::EdgeCaseTest::test_ec3_needs_human_review_is_schema_valid_not_a_violation` | passed |
+| EC-3 | Edge case | moving off `needs-human-review` without `reviewer`+`reviewed_at` is rejected | `scripts/antares/artifact_schema_test.py::EdgeCaseTest::test_ec3_disposition_missing_reviewer_on_non_open_state_is_rejected` | passed |
+| EC-4 | Edge case | `SUBMITTED_VULNERABLE_FILES` with empty `candidates` is rejected | `scripts/antares/artifact_schema_test.py::EdgeCaseTest::test_ec4_empty_candidates_with_submitted_vulnerable_files_is_rejected` | passed |
+| EC-5 | Edge case | an unrecognized `schema_version` is hard-rejected, not best-effort parsed | `scripts/antares/artifact_schema_test.py::EdgeCaseTest::test_ec5_unrecognized_schema_version_is_rejected` | passed |
+| EC-6 | Edge case | two revisions sharing `finding_id` resolve to the latest (`supersedes`-referenced) revision | `scripts/antares/artifact_schema_test.py::EdgeCaseTest::test_ec6_chain_shares_finding_id_and_resolves_to_latest_revision` | passed |
+| EC-6 | Edge case | a `finding_id` change mid-chain is rejected | `scripts/antares/artifact_schema_test.py::EdgeCaseTest::test_ec6_rejects_finding_id_change_mid_chain` | passed |
+| EC-6 | Edge case | a `supersedes` reference to a non-existent `artifact_id` is rejected | `scripts/antares/artifact_schema_test.py::EdgeCaseTest::test_ec6_rejects_dangling_supersedes` | passed |
+| EC-6 | Edge case | a forked chain (two artifacts naming the same `supersedes` target) is rejected | `scripts/antares/artifact_schema_test.py::EdgeCaseTest::test_ec6_rejects_forked_chain_with_two_heads` | passed |
+| EC-6 | Edge case | a single-artifact chain resolves to itself | `scripts/antares/artifact_schema_test.py::EdgeCaseTest::test_ec6_single_artifact_chain_resolves_to_itself` | passed |
+| EC-6 | Edge case | a chain containing an individually schema-invalid artifact is rejected before chain properties are computed | `scripts/antares/artifact_schema_test.py::EdgeCaseTest::test_ec6_chain_rejects_an_individually_malformed_artifact` | passed |
+
+Supporting (non-`HP`/`EC`-tagged, but load-bearing for the acceptance criteria):
+`test_writer_hash_roundtrip` and `test_writer_roundtrip_fails_if_bytes_are_tampered`
+(writer/validator scope-boundary guarantee — content-hash integrity is the
+writer's responsibility, proven by round-trip, not the validator's, per the
+explicit scope-boundary decision); `CategoryFieldTest::test_all_20_kinds_are_covered_and_partitioned`
+(category partition completeness, the assertion-based self-check quoted in
+the implementation); `test_t2c1_runtime_unavailable_forbids_trace_ref` and
+`test_t2c1_execution_complete_requires_trace_ref` (category-conditional
+`trace_ref` nullability from the payload-shape table);
+`test_t2c2_teardown_unconfirmed_requires_grace_seconds`; `test_malformed_content_hash_is_rejected`;
+`test_storage_uri_outside_allowed_root_is_rejected` and
+`test_storage_uri_tilde_path_is_rejected` (phase-2 MINOR finding closure);
+`ExampleArtifactsTest` and `CommittedExampleFixtureTest` (all 20 committed
+example artifacts generate, serialize, round-trip, and validate — the "one
+redacted example artifact per kind" evidence-to-emit requirement).
+
+Full suite: 28/28 passed (`python3 -m unittest scripts.antares.artifact_schema_test -v`).
+
+### Owner final verification
+
+- **Status: WAIVED (not a genuine verification).** Presented two questions via
+  `AskUserQuestion` (2026-07-30): (1) how to handle the commit-provenance
+  finding below, (2) how to close owner verification. For (2), the owner
+  selected "Waiver explícito (como en T2c-2)" — an explicit, documented
+  waiver of personal test-by-test review, not a statement that the owner
+  independently verified each `HP-#`/`EC-#` case's unit test evidence
+  genuinely covers the claimed behavior. Recorded per
+  `docs/policies/HITL_AUTONOMY_POLICY.md`'s waiver provision, mirroring the
+  T2c-2 precedent above.
+- Owner: `Matias Kruk`
+- Date: `2026-07-30`
+- Waiver selection (verbatim option label): "Waiver explícito (como en
+  T2c-2)" — Autorizás cerrar sin revisión manual caso-por-caso.
+- Agent-run commands (owner did not independently run or review these before
+  waiving): `python3 -m unittest scripts.antares.artifact_schema_test -v`
+  (28/28 passed).
+
+### Commit-provenance note (owner-reviewed, 2026-07-30)
+
+Before closure, `git rev-parse HEAD` (this checkout has `core.bare = true`,
+so `git status`/`git add`/`git diff` fail here with "must be run in a work
+tree," but ref resolution works) showed this task's implementation files
+(`scripts/antares/artifact_schema.py`, `artifact_schema_test.py`, all 20
+`examples/*.json`, and `docs/audit/antares-t2d-rri.md`) were **already
+committed** — under commits `da8e06a` ("S-140: add review-task subtitle
+artifact identity", 17:02:46) and `844e847d` ("Docs: fix antares audit
+frontmatter type", 17:05:34) — before this task's own closure record existed
+and without the primary agent ever running `git commit` this session. Byte
+comparison (`git show HEAD:<path>` vs. on-disk) confirmed the committed
+content was identical to the in-progress, not-yet-reviewed working copy.
+Root cause: both commits share the owner's own git identity and touch
+unrelated `S-140` files in the same commit, indicating a concurrent session
+in this same shared checkout ran a broad `git add` that swept in T2d's
+uncommitted files as a side effect — not a repo hook (`.githooks/` has only
+`pre-push`) and not a background daemon. Presented to the owner via
+`AskUserQuestion`; selected disposition: **"Dejarlo así"** — leave the
+existing commits as-is rather than rewrite shared history, since the content
+is correct and another session may still be active. This note exists so a
+future reader of `da8e06a`/`844e847d` understands why T2d's files appear
+there under unrelated messages, predating T2d's own Phase-2 review and
+Reflection log.
 
 ## T2e - Replay fixtures and integrated harness verification
 

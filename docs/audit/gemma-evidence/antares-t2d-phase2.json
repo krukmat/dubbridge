@@ -1,0 +1,20 @@
+{
+  "task_id": "antares-t2d-phase2",
+  "commit_sha": "844e847d4b6ca51b31f80589363151a24664618d",
+  "reviewer": "qwen3.6:27b-q4_K_M",
+  "request_params": {"think": false},
+  "verdict": "PASS",
+  "timestamp": "2026-07-30T15:26:46.771889Z",
+  "raw_model_response_sha256_note": "see /private/tmp scratchpad t2d_phase2_review_response_v2.json for the raw Ollama response object (done_reason=stop, prompt_eval_count=6852, eval_count=399)",
+  "findings_verbatim": "**Verdict: PASS**\n\n1. **NONE**: `validate_artifact` strictly enforces EC-5 (schema version), EC-4 (empty candidates rejection), and mandatory fields (finding_id/artifact_id) without fail-open gaps.\n2. **NONE**: The static assertions on T2A/T2B/T2C1/T2C2 partitions guarantee complete coverage of all 20 `TerminalStateKind` values with no silent fall-throughs.\n3. **NONE**: EC-2 is enforced by `_validate_trace_ref_field`, which rejects artifacts containing both a populated `trace_ref` and non-empty raw traces, preventing redaction bypasses in committed state.\n4. **NONE**: `validate_supersede_chain` correctly identifies chain heads by comparing `artifact_id` against the set of all `supersedes` targets, accurately rejecting forks, cycles, and dangling references per EC-6.\n5. **MINOR**: `_validate_storage_uri` rejects URIs starting with `/` after stripping `file://`, but does not explicitly reject absolute paths that start with other special characters (e.g., `~`) though the repo-relative check likely covers this; low risk given gitignore context.\n6. **NONE**: The writer/validator separation is correctly implemented; I/O-bound hash verification is excluded from the validator scope as per the explicit boundary definition, tested separately by round-trip tests.\n7. **NONE**: Disposition state transitions (EC-3) are validated atomically in `_validate_disposition`, ensuring `reviewer`/`reviewed_at` cannot be set on `NEEDS_HUMAN_REVIEW` nor omitted when moving to other states.\n8. **NONE**: Category-specific field requirements (e.g., `argv` for parser/policy, `budget` for T2c-2) are correctly isolated in `_validate_category_fields`, matching the 20-kind schema definition.",
+  "findings_disposition": [
+    {
+      "id": 5,
+      "severity": "MINOR",
+      "summary": "_validate_storage_uri has no explicit rejection of non-'/' absolute-path styles such as '~'",
+      "disposition": "verified-not-exploitable + closed with test",
+      "verification": "Independently ran _validate_storage_uri against 'file://~/evil' and 'file://~root/x': both are rejected with code storage_uri_outside_allowed_root, because the allowlist-prefix check (relative.startswith(ALLOWED_TRACE_STORAGE_PREFIX) at artifact_schema.py:217) is a superset guard that also blocks any path not literally starting with 'var/antares-traces/', independent of the '/'-prefix check at line 212. This confirms the reviewer's own hedge ('though the repo-relative check likely covers this') was correct.",
+      "action": "Added scripts/antares/artifact_schema_test.py::CategoryFieldTest::test_storage_uri_tilde_path_is_rejected to lock this in as an explicit regression test rather than leaving it as an implicit consequence of the allowlist check. Full suite re-run: 28/28 passing."
+    }
+  ]
+}

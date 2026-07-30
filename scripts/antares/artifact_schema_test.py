@@ -381,6 +381,22 @@ class CategoryFieldTest(unittest.TestCase):
             validate_artifact(artifact)
         self.assertEqual(ctx.exception.code, "storage_uri_outside_allowed_root")
 
+    def test_storage_uri_tilde_path_is_rejected(self) -> None:
+        artifact = Artifact(
+            schema_version=SCHEMA_VERSION,
+            kind=TerminalStateKind.SANDBOX_EXECUTION_COMPLETE,
+            finding_id="f15",
+            artifact_id="f15-r1",
+            provenance=_provenance(),
+            argv=("cmd",),
+            exit_code=0,
+            elapsed_seconds=1.0,
+            trace_ref=TraceRef(content_hash="sha256:" + "e" * 64, storage_uri="file://~/evil.trace", byte_length=1),
+        )
+        with self.assertRaises(ArtifactSchemaError) as ctx:
+            validate_artifact(artifact)
+        self.assertEqual(ctx.exception.code, "storage_uri_outside_allowed_root")
+
 
 class ExampleArtifactsTest(unittest.TestCase):
     def test_all_20_examples_are_generated_and_schema_valid(self) -> None:
