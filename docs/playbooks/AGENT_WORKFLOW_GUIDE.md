@@ -770,6 +770,19 @@ tunes the fixed prompt/contract overhead the derivation reserves. Only code path
 Gemma actually receives are counted; docs, config, and markdown are excluded,
 mirroring the `qa-gemma-review` packet filter.
 
+`REVIEW_PATHS` (empty by default — no behavior change) is a shared, opt-in
+Makefile variable that scopes the diff itself, applied identically by
+`qa-gemma-review`, `qa-peer-workflow-review`, and `qa-review-budget`. Unlike
+the line-count budget above, this addresses a different failure mode: a
+`git diff`-based gate with no pathspec reviews the *entire working tree*, not
+just the task at hand. If another task's uncommitted changes coexist in the
+same checkout, the packet mixes both tasks' diffs — a reviewer's findings can
+then land entirely on the unrelated task's files while the actual reviewed
+change goes unchecked (or vice versa), with nothing in the gate itself
+surfacing the mismatch. Set `REVIEW_PATHS` to the task's own touched paths
+before invoking any of these three targets whenever the working tree holds
+more than one task's uncommitted work.
+
 **Non-Gemma agents are responsible for staying inside this budget.** When a
 change is too large, the delivering agent must split it into smaller delegation
 units. If the change is genuinely irreducible (mechanical rename, atomic

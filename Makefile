@@ -11,6 +11,7 @@ GEMMA_REVIEW_BASE   ?= HEAD
 GEMMA_REVIEW_RESULT ?= /tmp/dubbridge-gemma-review.json
 GEMMA_REVIEW_TASK_ID ?=
 GEMMA_EVIDENCE_DIR   ?= docs/audit/gemma-evidence
+REVIEW_PATHS         ?=
 COVERAGE_IGNORE_REGEX ?= (apps/(api|cli|worker-runner)/src/(main|cleanup)\.rs|apps/api/src/(dto/ingestion|lib|routes/ingestion|state)\.rs|crates/(db|jobs|observability)/src/lib\.rs|crates/db/src/(artifact_repo|asset_repo|audit_repo|pending_ingestion_repo|rights_repo)\.rs|crates/(audit|ingestion)/src/lib\.rs)
 CARGO ?= $(if $(shell command -v cargo 2>/dev/null),$(shell command -v cargo),$(HOME)/.cargo/bin/cargo)
 
@@ -54,7 +55,7 @@ qa-maintainability:
 # `D14-OVERRIDE: <reason>` line in the commit body routes the change to a
 # non-Gemma (D14) reviewer instead.
 qa-review-budget:
-	python3 scripts/check-review-budget.py
+	python3 scripts/check-review-budget.py $(if $(REVIEW_PATHS),--files $(REVIEW_PATHS))
 
 # Mobile production-readiness + correctness: strict types, AST lint (no any /
 # console / debugger / ts-suppression), and the Jest suite. Replaces the former
@@ -98,13 +99,13 @@ qa-gemma-review:
 	@if [ "$${DUBBRIDGE_SKIP_GEMMA_REVIEW:-0}" = "1" ]; then \
 		echo "[gemma-review] skipped (DUBBRIDGE_SKIP_GEMMA_REVIEW=1)"; exit 0; \
 	fi; \
-	code_changes=$$(git diff --name-only $(GEMMA_REVIEW_BASE) 2>/dev/null \
+	code_changes=$$(git diff --name-only $(GEMMA_REVIEW_BASE) -- $(REVIEW_PATHS) 2>/dev/null \
 		| grep -vE '^(docs/|[^/]+\.md$$)' || true); \
 	if [ -z "$$code_changes" ]; then \
 		echo "[gemma-review] no code changes vs $(GEMMA_REVIEW_BASE); skipped"; exit 0; \
 	fi; \
 	{ echo "# Gemma Reviewer packet (base: $(GEMMA_REVIEW_BASE))"; echo ""; \
-	  git diff $(GEMMA_REVIEW_BASE); } \
+	  git diff $(GEMMA_REVIEW_BASE) -- $(REVIEW_PATHS); } \
 	| python3 scripts/gemma-code-review.py --out "$(GEMMA_REVIEW_RESULT)" - \
 	&& echo "[gemma-review] result written to $(GEMMA_REVIEW_RESULT)"; \
 	findings_status=0; \
@@ -173,7 +174,7 @@ qa-peer-workflow-review:
 	if [ -n "$(PEER_REVIEW_TASK_ID)" ]; then set -- "$$@" --task-id "$(PEER_REVIEW_TASK_ID)"; fi; \
 	if [ "$${PEER_REVIEW_DRY_RUN:-0}" = "1" ]; then set -- "$$@" --dry-run; fi; \
 	review_status=0; \
-	git diff "$(PEER_REVIEW_BASE)" | python3 scripts/peer-workflow-review.py "$$@" --content - || review_status=$$?; \
+	git diff "$(PEER_REVIEW_BASE)" -- $(REVIEW_PATHS) | python3 scripts/peer-workflow-review.py "$$@" --content - || review_status=$$?; \
 	if [ -n "$(PEER_REVIEW_TASK_ID)" ] && [ -f "$(PEER_REVIEW_ARTIFACT)" ]; then \
 		mkdir -p "$(GEMMA_EVIDENCE_DIR)"; \
 		verdict=$$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); v=d.get('verdict','unknown'); print('PASS' if v == 'pass' else 'FINDINGS-ACKED')" "$(PEER_REVIEW_ARTIFACT)" 2>/dev/null || echo "FINDINGS-ACKED"); \
