@@ -50,7 +50,7 @@ than escalating by default.
 ## Task order
 
 ```text
-T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c -> T2d -> T2e -> T3 -> T4 -> T5
+T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c (decomposed: T2c-1 -> T2c-2) -> T2d -> T2e -> T3 -> T4 -> T5
 ```
 
 ## Task summary
@@ -63,8 +63,10 @@ T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c -> T2d -> T2e -> T3 -> T4 -> T5
 | T2 Sandboxed agentic harness and artifact schema | `[~] Decomposed (2026-07-29)` | 86 Very high (pre-execution) | XL | T1 |
 | T2a Tool-call parser and terminal-state contract | `[x] Done (2026-07-29)` | 45 Med-high (execution) | L | T1 |
 | T2b Command allowlist and canonical path containment | `[x] Done (2026-07-30)` | 50 Med-high (execution) | L | T2a |
-| T2c Ephemeral sandbox runner and resource enforcement | `[ ] Open` | Recompute | TBD | T2b |
-| T2d Versioned artifact schema and redacted trace contract | `[ ] Open` | Recompute | TBD | T2c |
+| T2c Ephemeral sandbox runner and resource enforcement | `[~] Decomposed (2026-07-30)` | 56 Complex (pre-decomposition) | L | T2b |
+| T2c-1 Sandbox process execution and isolation | `[ ] Open` | 49 Med-high (planning) | L | T2b |
+| T2c-2 Resource budget, wall-timeout, teardown | `[ ] Open` | 51 Med-high (planning) | L | T2c-1 |
+| T2d Versioned artifact schema and redacted trace contract | `[ ] Open` | Recompute | TBD | T2c-2 |
 | T2e Replay fixtures and integrated harness verification | `[ ] Open` | Recompute | TBD | T2d |
 | T3 CWE watchlist and context-complete packet construction | `[ ] Open` | Recompute | TBD | T2e |
 | T4 Ground-truth calibration and observe-only workflow pilot | `[ ] Open` | Recompute | TBD | T2e, T3 |
@@ -853,11 +855,13 @@ Full suite: `python3 -m pytest scripts/antares/ -q` -> 53 passed.
 
 ## T2c - Ephemeral sandbox runner and resource enforcement
 
-- **Status:** `[ ] Open`
+- **Status:** `[~] Decomposed` - 2026-07-30
 - **Type:** development / security-sensitive tooling
-- **Effort:** TBD from execution RRI
+- **Pre-decomposition RRI:** 56 Complex (mandatory decomposition gate, RRI >= 56)
+- **RRI artifact:** `docs/audit/antares-t2c-rri.md`
 - **Depends on:** T2b
 - **Decomposed from:** T2
+- **Decomposed into:** T2c-1, T2c-2
 
 ### Objective
 
@@ -865,10 +869,110 @@ Run already-validated argv commands in an ephemeral, default-deny sandbox with
 network isolation, read-only mounts, dropped privileges, bounded resources, and
 reliable teardown.
 
+### Decomposition rationale
+
+Presentation-time RRI scored 56 (Complex band), one point past the Med-high
+ceiling, driven primarily by `D=4` (this task spans a genuine OS-level process
+isolation boundary, not pure validation) and `P=4` (a defect here is a sandbox
+escape or resource-exhaustion class failure, per
+`docs/policies/RRI_POLICY.md` § Decomposition triggers, "Final RRI >= 56" is an
+unconditional hard gate). Split into T2c-1 (process execution and isolation) and
+T2c-2 (resource budget, wall-timeout, teardown), each independently scoring in
+the Med-high band (49 and 51) with `A=1`, per the split target. Full rationale
+and both subtask RRI computations: `docs/audit/antares-t2c-rri.md`.
+
+### Status artifacts affected
+
+- this ledger and the slice plan
+
+## T2c-1 - Sandbox process execution and isolation
+
+- **Status:** `[ ] Open`
+- **Type:** development / security-sensitive tooling
+- **Effort:** L (RRI 49 Med-high, planning estimate — recompute before implementation)
+- **RRI artifact:** `docs/audit/antares-t2c-rri.md` § T2c-1
+- **Depends on:** T2b
+- **Decomposed from:** T2c
+
+### Objective
+
+Spawn an already-validated `COMMAND_PLAN_VALID` argv inside an isolated
+subprocess — network disabled, read-only mounts, dropped privileges, credentials
+stripped — and return captured output with measured timing.
+
+### Scope boundary with T2c-2
+
+T2c-1 owns the single-process lifecycle: launching, isolating, timing out, and
+killing one command's subprocess. T2c-2 owns aggregate session accounting: the
+15-command wall budget, hard CPU/RAM/PID/output-size caps, and teardown
+verification across the whole run. Concretely:
+
+- T2c-1 captures stdout/stderr as produced until the process terminates (by
+  completion or by its own per-command timeout); it does not impose an output
+  *size* cap — that is a T2c-2 resource cap, layered on top in the next
+  subtask. "Bounded" in T2c-1's context means bounded by process termination,
+  not by a byte-size ceiling.
+- T2c-1 is responsible for killing the specific subprocess instance when its
+  own per-command timeout fires. T2c-2 is responsible for the aggregate
+  command counter, the wall-clock budget across all commands, and confirming
+  teardown actually completed after every exit path (including ones T2c-1
+  triggered).
+
 ### Happy paths considered
 
 - **HP-1:** a validated read-only command completes inside the sandbox and returns
-  bounded stdout/stderr plus measured timing.
+  captured stdout/stderr plus measured timing.
+
+### Edge cases considered
+
+- **EC-2:** runtime unavailability or sandbox bootstrap failure produces
+  `runtime_unavailable` without falling back to unsandboxed execution.
+
+### Acceptance criteria
+
+- The runner uses network-disabled, credential-stripped, read-only execution with
+  dropped privileges for every invocation.
+- Per-command timeout is enforced; a command that exceeds it is killed by
+  T2c-1 itself, not left running for a later layer to notice.
+- No success path exists outside the sandbox boundary — a subprocess launched
+  without isolation active is never treated as a valid result.
+- Measured timing and captured stdout/stderr are emitted per invocation.
+
+### Evidence to emit
+
+- Sandbox runner module (`scripts/antares/sandbox_runner.py`), isolation
+  fixtures, and bootstrap-failure/timeout tests.
+
+### Status artifacts affected
+
+- this ledger and the slice plan
+
+### Task-analysis review (phase 1)
+
+- Review artifact: `docs/audit/gemma-evidence/antares-t2c-1-phase1.json`
+- Verdict: `PASS` — 2 MINOR findings (T2c-1/T2c-2 boundary wording for
+  per-command-kill responsibility, and "bounded" output meaning), both
+  folded into the Objective/Scope-boundary/Acceptance-criteria text above.
+  No BLOCKING or MAJOR findings.
+
+`Task-analysis review: qwen3.6:27b-q4_K_M docs/audit/gemma-evidence/antares-t2c-1-phase1.json - PASS`
+
+## T2c-2 - Resource budget, wall-timeout, and teardown enforcement
+
+- **Status:** `[ ] Open`
+- **Type:** development / security-sensitive tooling
+- **Effort:** L (RRI 51 Med-high, planning estimate — recompute before implementation)
+- **RRI artifact:** `docs/audit/antares-t2c-rri.md` § T2c-2
+- **Depends on:** T2c-1
+- **Decomposed from:** T2c
+
+### Objective
+
+Enforce CPU/RAM/PID/output resource caps and the 15-command wall-time budget on
+top of T2c-1's runner, and guarantee teardown under every termination path.
+
+### Happy paths considered
+
 - **HP-2:** a multi-command run stops cleanly after a successful terminal
   submission within the 15-call budget.
 
@@ -876,23 +980,20 @@ reliable teardown.
 
 - **EC-1:** per-command timeout, wall-time exhaustion, or output-limit breach
   produces a distinct degraded terminal state.
-- **EC-2:** runtime unavailability or sandbox bootstrap failure produces
-  `runtime_unavailable` without falling back to unsandboxed execution.
 - **EC-3:** teardown runs even after timeout or sandbox violation.
 
 ### Acceptance criteria
 
-- The runner uses network-disabled, credential-stripped, read-only execution with
-  dropped privileges and teardown after each run.
-- Per-command timeout, wall timeout, CPU/RAM/PID/output caps, and the 15-command
-  budget are enforced deterministically.
-- No success path exists outside the sandbox boundary.
-- Measured timing/resource fields needed by later artifacts are emitted.
+- CPU, RAM, PID, and output caps are enforced deterministically per command.
+- Wall timeout and the 15-command budget produce explicit degraded termination
+  states, never a silent stop.
+- Teardown executes on every exit path (success, timeout, violation, exhaustion) —
+  verified, not assumed.
 
 ### Evidence to emit
 
-- Sandbox runner module, isolation fixtures, timeout/output-limit tests, and
-- teardown verification evidence.
+- Budget/teardown module (`scripts/antares/sandbox_budget.py`), resource-cap
+  fixtures, and teardown-verification tests covering every termination path.
 
 ### Status artifacts affected
 
@@ -903,7 +1004,7 @@ reliable teardown.
 - **Status:** `[ ] Open`
 - **Type:** development / security-sensitive tooling
 - **Effort:** TBD from execution RRI
-- **Depends on:** T2c
+- **Depends on:** T2c-2
 - **Decomposed from:** T2
 
 ### Objective

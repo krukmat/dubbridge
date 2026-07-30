@@ -486,6 +486,14 @@ is now cancelled outright, because Antares does not propose RRI inputs.
   `qwen3.6:27b-q4_K_M` code-solution review returned `PASS` with no findings
   (one retry was needed after a first-attempt Ollama timeout). `T2c` is now
   open, depending on `T2b`.
+- T2c was scored at presentation time on 2026-07-30 at `RRI 56 -> Complex`,
+  triggering the unconditional `RRI >= 56` decomposition gate before any
+  implementation could be approved. It was split into `T2c-1` (sandbox
+  process execution and isolation, RRI 49 Med-high) and `T2c-2` (resource
+  budget, wall-timeout, and teardown enforcement, RRI 51 Med-high), each
+  within the split target of `RRI <= 55` and `A <= 1`. Full rationale and
+  both subtask computations: `docs/audit/antares-t2c-rri.md`. `T2d`'s
+  dependency was updated from `T2c` to `T2c-2` accordingly.
 - A defect in `scripts/local-architect/run_analysis.py` (missing `num_ctx`,
   causing schema-heavy `med-high-refinement-v1` responses to truncate) was
   found and fixed while executing T2a (RRI 22, Low band). This affects any
