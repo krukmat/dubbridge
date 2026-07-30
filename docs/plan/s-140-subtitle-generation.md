@@ -11,9 +11,10 @@ slice: S-140
 > `docs/evaluations/adr037-direct-project-report.md`). T0/T1a/T1b-i/T1b-ii/T1c/
 > T1d/T2a/T2b-i/T2b-ii/T3a/T3b/T3c-i/T3c-ii/T5a/T6 are complete and
 > synchronized. `T3c-ii` closed on 2026-07-30 via owner-waived phase-2 review;
-> `T3c-iii` and `T3c-iv` are deferred later-phase non-blockers, and `T5b`
-> remains optional/unscoped. The roadmap row remains `in progress` until this
-> synchronized closeout is committed, which is what the drift gate expects.
+> `T3c-iii` also closed on 2026-07-30 (RRI 39 Moderate) with explicit Redis CI
+> gating + review evidence synchronized; `T3c-iv` remains the only deferred
+> later-phase non-blocker, and `T5b` remains optional/unscoped. The roadmap row
+> remains `in progress` because `T3c-iv` and `X-S-160-3` are still open.
 > **Roadmap phase:** `S-140` — Processing / Subtitle generation.
 > **Tasks ledger:** `docs/tasks/s-140-subtitle-generation.md`.
 
@@ -214,7 +215,7 @@ writes `TranscriptionStatus::Ready`.
 | T3b | Subtitle worker-runner handler and readiness transitions | L | 50 | Med-high |
 | T3c-i | Redis-backed job queue implementation | L | 48 | Med-high |
 | T3c-ii | Wire real apalis consumer loop for worker-runner queues | L | 42 | Med-high |
-| T3c-iii | Redis queue integration tests must not self-skip in CI (deferred) | S | TBD | Recompute at presentation |
+| T3c-iii | Redis queue integration tests must not self-skip in CI | M | 39 | Moderate |
 | T3c-iv | Resolve apalis-redis future-incompatibility before edition 2024 (deferred) | TBD | TBD | Recompute at presentation |
 | T5a | ADR-030 review-task enqueue on subtitle readiness | M | 39 | Moderate |
 | T5b | Optional derived-artifact identity schema change for review tasks | L | TBD | Recompute if scoped |
@@ -242,17 +243,17 @@ implementations with no Redis backend anywhere in the workspace despite
 real to consume from — T3c-i adds that backend before T3c-ii wires the
 consumer loop against it.
 
-T3c-iii and T3c-iv were filed on 2026-07-26 as T3c-i follow-ups and are
-deferred to a later phase: neither blocks S-140 closure and neither is on the
-critical path. T3c-iii covers a gate gap — the four Redis integration tests
-delivered by T3c-i self-skip to green when `DUBBRIDGE_REDIS_URL` is unset, and
-nothing in the test path sets it, so a regression in the Redis backend would
-pass CI undetected (the backend itself was verified working on 2026-07-26 by
-re-running those tests against a real Redis). T3c-iv tracks the
-`apalis-redis v0.7.4` never-type-fallback future-incompatibility, which is
-warning-only today but becomes a compile error under edition 2024; the only
-newer releases are 1.0 prereleases, making it a breaking upgrade rather than a
-version bump. See the task ledger for both.
+T3c-iii and T3c-iv were filed on 2026-07-26 as T3c-i follow-ups. `T3c-iii`
+closed on 2026-07-30 with presentation-time RRI 39 (Moderate): the Redis test
+path now provisions Redis in CI, exports `DUBBRIDGE_REDIS_URL` against isolated
+DB `15`, runs `make qa-test-redis`, and marks the five Redis-backed tests as
+explicit `#[ignore]` gates locally so a default green run cannot be mistaken for
+real Redis coverage. Verification included both a broken-backend failure path and
+an explicit positive run against a real local Redis. `T3c-iv` remains deferred:
+it tracks the `apalis-redis v0.7.4` never-type-fallback future-incompatibility,
+which is warning-only today but becomes a compile error under edition 2024; the
+only newer releases are 1.0 prereleases, making it a breaking upgrade rather
+than a version bump. See the task ledger for both.
 
 Each task requires its own RRI computation and presentation/approval before
 execution, per repository workflow. The RRI values above are planning scores

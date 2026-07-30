@@ -278,8 +278,14 @@ pub fn default_queue() -> &'static str {
 mod tests {
     use super::*;
 
-    fn redis_url_for_test() -> Option<String> {
-        std::env::var("DUBBRIDGE_REDIS_URL").ok()
+    fn redis_url_for_test_from_env(redis_url: Option<String>) -> String {
+        redis_url.expect(
+            "DUBBRIDGE_REDIS_URL must be set when running ignored Redis integration tests",
+        )
+    }
+
+    fn redis_url_for_test() -> String {
+        redis_url_for_test_from_env(std::env::var("DUBBRIDGE_REDIS_URL").ok())
     }
 
     #[test]
@@ -337,11 +343,34 @@ mod tests {
         assert_eq!(envelope.payload, payload);
     }
 
-    #[tokio::test]
-    async fn redis_preparation_queue_connects_and_enqueues() {
-        let Some(url) = redis_url_for_test() else {
-            return;
+    #[test]
+    fn redis_url_for_test_accepts_explicit_value() {
+        let url = "redis://127.0.0.1:6379/15".to_string();
+        assert_eq!(redis_url_for_test_from_env(Some(url.clone())), url);
+    }
+
+    #[test]
+    fn redis_url_for_test_requires_explicit_env_for_ignored_tests() {
+        let panic = std::panic::catch_unwind(|| redis_url_for_test_from_env(None))
+            .expect_err("missing redis url should panic");
+        let message = if let Some(message) = panic.downcast_ref::<&str>() {
+            *message
+        } else if let Some(message) = panic.downcast_ref::<String>() {
+            message.as_str()
+        } else {
+            panic!("unexpected panic payload type");
         };
+
+        assert_eq!(
+            message,
+            "DUBBRIDGE_REDIS_URL must be set when running ignored Redis integration tests"
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DUBBRIDGE_REDIS_URL; run explicitly via qa-test-redis"]
+    async fn redis_preparation_queue_connects_and_enqueues() {
+        let url = redis_url_for_test();
         let queue = RedisPreparationJobQueue::connect(&url)
             .await
             .expect("redis connect");
@@ -350,10 +379,9 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires DUBBRIDGE_REDIS_URL; run explicitly via qa-test-redis"]
     async fn redis_transcription_queue_connects_and_enqueues() {
-        let Some(url) = redis_url_for_test() else {
-            return;
-        };
+        let url = redis_url_for_test();
         let queue = RedisTranscriptionJobQueue::connect(&url)
             .await
             .expect("redis connect");
@@ -362,10 +390,9 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires DUBBRIDGE_REDIS_URL; run explicitly via qa-test-redis"]
     async fn redis_subtitle_queue_connects_and_enqueues() {
-        let Some(url) = redis_url_for_test() else {
-            return;
-        };
+        let url = redis_url_for_test();
         let queue = RedisSubtitleJobQueue::connect(&url)
             .await
             .expect("redis connect");
@@ -405,12 +432,11 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires DUBBRIDGE_REDIS_URL; run explicitly via qa-test-redis"]
     async fn redis_enqueued_job_is_retrievable_from_its_namespace() {
         use apalis::prelude::Storage;
 
-        let Some(url) = redis_url_for_test() else {
-            return;
-        };
+        let url = redis_url_for_test();
 
         let queue = RedisPreparationJobQueue::connect(&url)
             .await
@@ -433,6 +459,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires DUBBRIDGE_REDIS_URL; run explicitly via qa-test-redis"]
     async fn redis_queues_use_distinct_namespaces() {
         use apalis::prelude::Storage;
 
@@ -440,9 +467,7 @@ mod tests {
         assert_ne!(PreparationJob::JOB_TYPE, TranscriptionJob::JOB_TYPE);
         assert_ne!(TranscriptionJob::JOB_TYPE, SubtitleJob::JOB_TYPE);
 
-        let Some(url) = redis_url_for_test() else {
-            return;
-        };
+        let url = redis_url_for_test();
 
         let prep_queue = RedisPreparationJobQueue::connect(&url)
             .await

@@ -52,6 +52,18 @@ jobs:
   test:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DUBBRIDGE_REDIS_URL: redis://127.0.0.1:6379/15
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -60,6 +72,19 @@ jobs:
         run: cargo fetch --locked
       - name: Run workspace tests
         run: make qa-test
+      - name: Probe Redis test service
+        run: |
+          python3 - <<'PY'
+          import socket
+          conn = socket.create_connection(("127.0.0.1", 6379), timeout=5)
+          conn.sendall(b"*1\r\n$4\r\nPING\r\n")
+          reply = conn.recv(16)
+          conn.close()
+          if not reply.startswith(b"+PONG"):
+              raise SystemExit(f"unexpected redis reply: {reply!r}")
+          PY
+      - name: Run Redis integration tests
+        run: make qa-test-redis
 
   cargo-check:
     if: github.event_name != 'schedule'

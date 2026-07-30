@@ -1,4 +1,4 @@
-.PHONY: qa-fmt qa-lint qa-test qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-docs-review qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review show-codex-session-model install-hooks
+.PHONY: qa-fmt qa-lint qa-test qa-test-redis qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-docs-review qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review show-codex-session-model install-hooks
 
 COVERAGE_MIN ?= 90
 PEER_REVIEW_RRI      ?= 22
@@ -23,6 +23,13 @@ qa-lint:
 
 qa-test:
 	$(CARGO) test --workspace --all-features
+
+qa-test-redis:
+	@if [ -z "$${DUBBRIDGE_REDIS_URL:-}" ]; then \
+		echo "DUBBRIDGE_REDIS_URL must be set for qa-test-redis (for example redis://127.0.0.1:6379/15)"; \
+		exit 1; \
+	fi
+	$(CARGO) test -p dubbridge-jobs --all-features redis_ -- --ignored --test-threads=1
 
 qa-check:
 	$(CARGO) check --workspace --all-targets --all-features
