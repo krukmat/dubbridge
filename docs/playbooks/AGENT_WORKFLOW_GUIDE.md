@@ -1091,6 +1091,54 @@ authoring any canonical document. Full procedure, task cards, and
 operational evidence: `docs/tasks/adr037-local-architect-direct-project.md`;
 `docs/evaluations/adr037-direct-project-report.md`.
 
+## Antares Security-Specialist Advisor
+
+The **Antares Security-Specialist Advisor workflow** is a bounded, read-only,
+advisory-only security aid. The primary agent or human security specialist owns
+the security judgment; Antares is only a CWE-directed repository-level
+vulnerability-localization sub-tool inside that workflow.
+
+Antares requires a justified **CWE identifier plus its generic category
+description** and an existing repository snapshot. Its output is limited to a
+ranked list of candidate source files and the terminal exploration trace. It does
+not choose the CWE, threat-model the task, explain why a candidate is vulnerable,
+recommend tests or remediation, or produce an RRI proposal.
+
+When the active slice explicitly enables the role, the primary security advisor
+may invoke it at three optional touchpoints:
+
+- refinement, against the existing baseline snapshot after the advisor or human
+  has documented a task-relevant CWE hypothesis;
+- post-implementation analysis, against the candidate snapshot as supplemental
+  triage that is separate from the reviewer-of-record verdict and closure gate;
+- post-CI observation, against the exact completed revision.
+
+If no justified CWE exists, the touchpoint is skipped and the reason is recorded;
+Antares must never invent a generic sweep merely to satisfy workflow ceremony.
+
+### Authority boundary
+
+- Antares may emit ranked candidate files and exploration evidence only. The
+  primary agent or human specialist independently verifies repository claims and
+  owns threat surfaces, security rationale, tests, remediation, and follow-up.
+- Antares-1B's reported File F1 `0.209` is a macro-average of task-level benchmark
+  scores and signals substantial localization uncertainty; it is not a verdict or
+  a per-output correctness probability.
+- Antares may not compute the canonical RRI, approve or block a task, satisfy
+  the HITL approval gate, replace the band-routed reviewer of record, merge,
+  close, or autonomously remediate a change.
+- Every material Antares candidate requires a durable human disposition recorded
+  by the primary agent or named owner (`accepted-now`, `accepted-follow-up`,
+  `rejected`, or `needs-human-security-review`).
+- The primary agent must independently verify any repository claim cited from
+  Antares output before propagating it into a canonical plan, task, policy, or
+  closure record.
+- Production workflow touchpoints remain disabled until the runtime preflight,
+  sandboxed harness, ground-truth calibration, and observe-only pilot in
+  `docs/tasks/antares-security-specialist-advisor.md` are completed and the owner
+  records a promote or narrow decision. Approved evaluation tasks may invoke the
+  sandboxed pilot; planning this role alone does not activate it.
+
 ## Push Reviewer
 
 **Gemma Push Reviewer** is a separate post-pipeline audit role. It is not a

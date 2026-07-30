@@ -71,6 +71,7 @@ class Config:
     timeout_seconds: float
     temperature: float
     num_predict: int
+    num_ctx: int
     overwrite: bool
     profile: str = DEFAULT_PROFILE
 
@@ -128,6 +129,9 @@ def build_prompt(packet: dict[str, Any], profile: str = DEFAULT_PROFILE) -> str:
             "Choose CLOUD_REQUIRED whenever evidence is incomplete, scope is unbounded, "
             "acceptance is non-deterministic, or a material unknown prevents a safe bounded implementation. "
             "Do not expand the approved scope. Use only facts supported by the packet and mark uncertainty explicitly.\n\n"
+            "Keep the response compact so it fits the available generation budget: at most 6 items per "
+            "array field, at most 2 sentences per item, and at most 4 claims. Do not pad with restated "
+            "packet content.\n\n"
             "Approved task packet:\n"
             f"{packet_json}\n"
         )
@@ -300,6 +304,7 @@ def artifact_base(config: Config, packet_sha256: str | None = None) -> dict[str,
             "timeout_seconds": config.timeout_seconds,
             "temperature": config.temperature,
             "num_predict": config.num_predict,
+            "num_ctx": config.num_ctx,
         },
         "generation": None,
         "response": None,
@@ -357,6 +362,7 @@ def run_analysis(
         "options": {
             "temperature": config.temperature,
             "num_predict": config.num_predict,
+            "num_ctx": config.num_ctx,
         },
     }
     try:
@@ -441,6 +447,13 @@ def parse_args() -> Config:
     parser.add_argument("--timeout-seconds", type=float, default=120.0, help="Per-request timeout in seconds.")
     parser.add_argument("--temperature", type=float, default=0.0, help="Generation temperature.")
     parser.add_argument("--num-predict", type=int, default=4096, help="Maximum tokens to generate.")
+    parser.add_argument(
+        "--num-ctx",
+        type=int,
+        default=8192,
+        help="Ollama context window size (prompt + response share this budget; "
+        "Ollama's own default of 2048-4096 truncates schema-heavy responses).",
+    )
     parser.add_argument("--overwrite", action="store_true", help="Allow replacing an existing artifact.")
     args = parser.parse_args()
     return Config(
@@ -453,6 +466,7 @@ def parse_args() -> Config:
         timeout_seconds=args.timeout_seconds,
         temperature=args.temperature,
         num_predict=args.num_predict,
+        num_ctx=args.num_ctx,
         overwrite=args.overwrite,
         profile=args.profile,
     )

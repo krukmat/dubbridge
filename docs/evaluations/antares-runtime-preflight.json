@@ -1,0 +1,88 @@
+{
+  "status": "BLOCKED",
+  "blocked_reason": "local_runtime_unproven; mps_unstable; cpu_latency_over_threshold",
+  "model_id": "fdtn-ai/antares-1b",
+  "model_revision": "10417eb35641b32e7141157db19c76eb545193b6",
+  "quantization": "none",
+  "model_digest": "6ba4155a50cd0cede3e10285b0d84b460dcc3caa0175a424e14d3bb606fda675",
+  "license": "Apache-2.0",
+  "runtime": "transformers+torch",
+  "runtime_version": "transformers 5.14.1; torch 2.13.0; accelerate 1.14.0",
+  "endpoint": "local in-process python runtime",
+  "host_arch": "arm64",
+  "host_cpu": "Apple M5",
+  "host_ram_bytes": 34359738368,
+  "artifact_digest_verified": true,
+  "cold_start_ms": null,
+  "peak_rss_bytes": null,
+  "swap_growth_bytes": null,
+  "command_latencies_ms": [
+    39,
+    0,
+    21,
+    25,
+    0,
+    24,
+    29,
+    1
+  ],
+  "total_latency_ms": 1431222,
+  "terminal_result": null,
+  "owner_waiver": {
+    "granted": true,
+    "date": "2026-07-29",
+    "statement": "Owner explicitly accepted T1 as sufficient to proceed despite the blocked technical preflight."
+  },
+  "representative_packet": {
+    "snapshot_ref": "HEAD (2026-07-29)",
+    "scope_paths": [
+      "apps/",
+      "crates/"
+    ],
+    "cwe_id": "CWE-20",
+    "cwe_description": "Improper Input Validation",
+    "purpose": "runtime-only fixture; not a production watchlist decision",
+    "executed": true
+  },
+  "probes": {
+    "hf_env": {
+      "HF_TOKEN": "unset",
+      "HUGGINGFACE_HUB_TOKEN": "unset",
+      "HUGGING_FACE_HUB_TOKEN": "unset"
+    },
+    "gated_repo_probe": {
+      "url": "https://huggingface.co/fdtn-ai/antares-1b/resolve/main/config.json",
+      "http_status": 401,
+      "x_error_code": "GatedRepo",
+      "note": "Initial unauthenticated probe before owner-cleared access"
+    },
+    "python_packages": {
+      "huggingface_hub": true,
+      "transformers": true,
+      "vllm": false,
+      "sglang": false
+    },
+    "docker": {
+      "daemon_available": true,
+      "server_context": "colima",
+      "server_arch": "aarch64",
+      "server_memory": "5.772GiB",
+      "model_runner_available": false
+    },
+    "ollama": {
+      "endpoint_env": "127.0.0.1:11434",
+      "reachable": true,
+      "antares_available": false
+    },
+    "authenticated_access": {
+      "hf_whoami_user": "krukmat",
+      "download_dry_run": "passed"
+    },
+    "runtime_findings": {
+      "mps_status": "unstable",
+      "cpu_status": "functional_but_over_total_latency_threshold"
+    }
+  },
+  "task_id": "T1",
+  "date_utc": "2026-07-29T12:43:10Z"
+}

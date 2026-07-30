@@ -81,6 +81,7 @@ class RunAnalysisTest(unittest.TestCase):
             timeout_seconds=5.0,
             temperature=0.0,
             num_predict=1024,
+            num_ctx=8192,
             overwrite=False,
         )
 
@@ -169,6 +170,30 @@ class RunAnalysisTest(unittest.TestCase):
         self.assertTrue(artifact["generation"]["think_disabled"])
         self.assertFalse(artifact["generation"]["thinking_present"])
         self.assertIsNone(artifact["generation"]["thinking_sha256"])
+
+    def test_hp1d_sends_num_ctx_and_records_it_in_runtime_provenance(self) -> None:
+        fetcher = FakeFetcher(
+            self.base_config.expected_model_digest,
+            json.dumps(
+                {
+                    "objective": "Assess the next planning slice.",
+                    "current_state": "state",
+                    "constraints": ["one"],
+                    "risks": ["two"],
+                    "recommendations": ["three"],
+                    "open_questions": ["four"],
+                    "evidence_gaps": ["five"],
+                    "claims": [{"statement": "A supported claim.", "label": "SUPPORTED"}],
+                }
+            ),
+        )
+
+        config = _MOD.Config(**{**vars(self.base_config), "num_ctx": 8192})
+        artifact = _MOD.run_analysis(config, fetcher=fetcher)
+
+        generate_call = next(c for c in fetcher.calls if c[0].endswith("/api/generate"))
+        self.assertEqual(generate_call[1]["options"]["num_ctx"], 8192)
+        self.assertEqual(artifact["runtime"]["num_ctx"], 8192)
 
     def test_hp2_fetch_json_sends_get_without_body_for_tags_endpoint(self) -> None:
         captured: dict[str, object] = {}
@@ -346,6 +371,7 @@ class MedHighRefinementProfileTest(unittest.TestCase):
             timeout_seconds=5.0,
             temperature=0.0,
             num_predict=1024,
+            num_ctx=8192,
             overwrite=False,
             profile=_MOD.MED_HIGH_REFINEMENT_PROFILE,
         )

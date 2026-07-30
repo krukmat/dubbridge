@@ -24,6 +24,16 @@ gate on its own behalf or on behalf of the task it informed — see
 `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Local Architect / Complex Analyst
 (ADR-037)`.
 
+The Antares Security-Specialist Advisor workflow is likewise advisory-only. The
+primary agent or human security specialist owns the CWE hypothesis, threat model,
+security rationale, tests, remediation, and final disposition. Antares only
+localizes candidate files for an externally supplied CWE against an existing
+snapshot and returns its exploration trace. It never computes the canonical RRI,
+satisfies the human-approval gate, replaces the band-routed review chain, blocks
+CI or closure, or closes work on its own authority. Every material candidate
+requires a durable human disposition, and absence or failure of Antares never
+grants or withholds approval.
+
 ## Always requires explicit approval
 
 - Starting any implementation task with **RRI > 25**, even if a plan was approved
