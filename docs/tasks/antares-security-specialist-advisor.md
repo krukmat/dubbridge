@@ -2143,11 +2143,12 @@ Code-solution review: qwen3.6:27b-q4_K_M docs/audit/gemma-evidence/antares-t2e-p
 
 ## T2e - Replay fixtures and integrated harness verification
 
-- **Status:** `[ ] Open`
+- **Status:** `[x] Done (owner-waived, 2026-07-30)`
 - **Type:** development / security-sensitive tooling
-- **Effort:** TBD from execution RRI
-- **Preliminary RRI:** 44 Med-high (planning estimate, not authority — recompute
-  at presentation time per `docs/policies/RRI_POLICY.md`)
+- **Effort:** L (RRI 55, Med-high 41-55) — `docs/audit/antares-t2e-rri.md`
+- **Preliminary RRI:** 44 Med-high (planning estimate, superseded at
+  presentation time by the execution-time computation of 55 in
+  `docs/audit/antares-t2e-rri.md`, per `docs/policies/RRI_POLICY.md`)
 - **Depends on:** T2e-pre
 - **Decomposed from:** T2
 
@@ -2273,6 +2274,213 @@ an additional code-acceptance criterion and not new administrative scope.
 ### Status artifacts affected
 
 - this ledger and the slice plan
+
+### Implementation note (ADR-038 routing)
+
+RRI = 55 (Med-high, 41-55, top edge) — `docs/audit/antares-t2e-rri.md`. Qwen27
+(`qwen3.6:27b-q4_K_M`, `scripts/local-architect/run_analysis.py`
+`med-high-refinement-v1` profile, first attempt timed out at 180s per
+documented precedent in T2d's ledger entry, succeeded on retry at
+`--timeout-seconds 420`) returned `route_recommendation: GO_LOCAL`. The
+primary agent issued its own hash-bound route receipt and **downgraded** to
+`CLOUD_REQUIRED`, for three reasons: (1) K=4/5 coupling — this is the first
+subtask wiring all four already fail-closed T2 layers together, analytically
+adjacent to ADR-038 §6's security-boundary/governance-invariant exclusions
+even though T2e defines no new policy of its own; (2) the per-file
+target-file-size gate is satisfied (all 14 read-only files are under 500
+lines, max `sandbox_budget.py` at 313) but that gate does not bound the
+*aggregate* read burden — composing the harness correctly requires reading
+all 14 files as one coherent whole, **2389 lines total** (`wc -l` verified:
+`artifact_trace_writer.py`=84, `path_containment.py`=92,
+`artifact_serialization.py`=106, `sandbox_session_budget.py`=108,
+`sandbox_resource_limits.py`=118, `terminal_state.py`=126,
+`artifact_examples.py`=134, `command_policy.py`=165,
+`tool_call_parser.py`=169, `sandbox_process_io.py`=177,
+`artifact_schema.py`=251, `artifact_validators.py`=255,
+`sandbox_runner.py`=291, `sandbox_budget.py`=313), plus authoring two new
+files with no prior `TerminalState`-to-`Artifact` converter to reuse; (3) T2a
+— a materially simpler single-file (169-line) parser task — already
+exhausted its full 8-turn local budget on `run_command` reconnaissance alone
+without ever reaching `write_file` or `finish`. Given T2e's substantially
+larger aggregate burden, a local attempt was judged very likely to repeat
+that failure mode before an inevitable cloud escalation.
+`scripts/local-agent/med_high_gate.py` confirms `{"route": "CLOUD_REQUIRED",
+"reason": "Primary receipt downgraded GO_LOCAL to cloud."}`. Implemented
+directly by the primary (cloud) agent, per ADR-038 §5.
+
+Reason (2) — the quantified aggregate-line-count figure — was added to the
+primary receipt's rationale after the user explicitly asked whether file
+size/line count had been factored into the routing decision; the initial
+receipt referenced "7+ modules" only qualitatively. The per-file gate check
+(reason 2's first half) had already been performed before the initial
+downgrade decision; the aggregate figure had not been computed or cited
+until asked. `scripts/local-agent/med_high_gate.py` was re-run against the
+corrected receipt and reconfirmed the same `CLOUD_REQUIRED` route.
+
+### Reflection log
+
+Required passes: 3 (`RRI 55` → `Med-high`)
+
+#### Pass 1
+
+- **Draft verdict:** initial `harness.py`/`harness_test.py`/`replay_fixtures.py`
+  composing the four T2 layers, passing the HP-1/HP-2/EC-1..4 fixtures plus
+  the `_canonical_kind` fix for the cross-module `TerminalStateKind` landmine
+  documented in the module docstring.
+- **Critique findings:** `SANDBOX_TEARDOWN_UNCONFIRMED` (the case where
+  `_verify_teardown` returns `False` after a real FIFO-timeout kill) had no
+  test exercising it — a fail-closed teardown-grace path was implemented but
+  unverified.
+- **Revisions applied:** added
+  `SupplementalTeardownUnconfirmedTest::test_unconfirmed_teardown_carries_grace_seconds_and_validates`,
+  patching `_verify_teardown` to return `False` against a real FIFO-timeout
+  kill and asserting the resulting artifact still validates.
+
+#### Pass 2
+
+- **Draft verdict:** re-ran the full `scripts/antares/` suite together
+  (not just `harness_test.py` in isolation) to check for cross-file
+  interaction effects before treating Pass 1's fix as final.
+- **Critique findings:** combining `harness_test.py` with the full
+  `scripts/antares/` suite broke `sandbox_budget_test.py`'s own internal
+  self-check assertion. Root-caused empirically (baseline suite is 112/112
+  clean *without* `harness_test.py`): `harness.py`'s eager import of
+  `sandbox_budget.py` at module load time interacted with
+  `sandbox_budget_test.py`'s own pre-existing raw (non-cache-checked) reload
+  of the same file, with an intervening file's unconditional
+  `terminal_state.py` reload in between, producing a `TerminalStateKind`
+  generation mismatch inside `sandbox_budget_test.py`'s own assertion — a
+  genuine, previously-latent collection-order fragility, not something this
+  task introduced by design but one its eager import triggered. Also
+  verified this fix does not weaken the `_canonical_kind` correctness
+  guarantee: that boundary re-resolves `TerminalStateKind` by `.value`
+  string at the point of use regardless of *when* `sandbox_budget.py` (or
+  any sibling module) happens to load, so deferring the load changes
+  nothing about which generation is canonicalized against.
+- **Revisions applied:** made `sandbox_budget.py`'s load fully lazy inside
+  `harness.py` — deferred to first real `dispatch_tool_call`/
+  `HarnessSession()` construction via a `_sandbox_budget_mod()` accessor,
+  PEP 562 module-level `__getattr__`, and a `_default_session_budget()`
+  factory with a locally-mirrored `_DEFAULT_OUTPUT_CAP_BYTES` constant.
+  Zero changes to any existing file (all 14 layer files stayed read-only,
+  per the approved scope); `sandbox_budget_test.py` itself was deliberately
+  left untouched as an equally valid but out-of-scope alternative fix.
+
+#### Pass 3
+
+- **Draft verdict:** ran `coverage.py` with
+  `--include="*/scripts/antares/harness.py,*/scripts/antares/replay_fixtures.py"`
+  against `harness_test.py` to measure actual line coverage rather than
+  assume the HP/EC fixtures implied full coverage.
+- **Critique findings:** measured coverage exposed 4 further real gaps: (1)
+  `SANDBOX_RUNTIME_UNAVAILABLE` and its `argv` backfill from
+  `command_state.argv` were untested; (2) the `session_budget=None` defensive
+  `ValueError` guard in the T2C2-state converter was untested; (3) a
+  `submit_vulnerable_files` candidate path-traversal branch was untested,
+  distinct from the terminal-command-operand path-traversal case EC-3 already
+  covers; (4) module `__getattr__`'s `AttributeError` fallback for an
+  unrecognized attribute name was untested.
+- **Revisions applied:** added
+  `SupplementalSandboxRuntimeUnavailableTest::test_no_network_isolation_is_runtime_unavailable_with_backfilled_argv`,
+  `SupplementalConverterDirectContractTest::test_t2c2_state_without_session_budget_raises`,
+  `SupplementalSubmitCandidatePathTraversalTest::test_escaping_candidate_is_rejected_not_silently_narrowed`,
+  and
+  `SupplementalConverterDirectContractTest::test_unrecognized_module_attribute_raises_attribute_error`.
+  Final measured coverage: 99% on `harness.py` (single remaining miss is an
+  unreachable defensive `RuntimeError` branch, untested in every sibling
+  layer file for the same reason) and 100% on `replay_fixtures.py`. Full
+  suite: `python3 -m pytest scripts/antares/ -q` → 134 passed (112
+  pre-existing + 22 new).
+
+### Peer Reviewer evidence
+
+- Reviewer: `qwen3.6:27b-q4_K_M`
+- Command: manual Ollama `/api/chat` invocation (no `scripts/peer-workflow-review.py`
+  yet — PPR-2 not landed), two attempts. First attempt (`num_predict=2048`)
+  ran 393.2s and was truncated mid-analysis (`done_reason` absent from a
+  completed stop, output spent its whole budget re-deriving and walking back
+  a tentative "blocking" claim about the duplicate-submission bookkeeping
+  without ever stating a final verdict) — judged "no usable consolidated
+  result" per policy. Performed the one permitted immediate retry with a
+  trimmed packet (`harness.py` + `replay_fixtures.py` in full,
+  `harness_test.py` as a compact test-name summary instead of full source),
+  a larger `num_predict=3072`/`num_ctx=20480`, and a strict
+  verdict-first response-format instruction. Retry completed cleanly in
+  103.7s (`done_reason: stop`) with `VERDICT: FINDINGS` and 3 concrete,
+  severity-tagged findings.
+- Artifact: `docs/audit/gemma-evidence/antares-t2e-phase2.json`
+- Verdict: `FINDINGS-ACKED` → `PASS` (post-disposition)
+- Findings: 3 — HIGH (`harness.py:138`, duplicate-submission check using
+  `.value` string equality instead of `_canonical_kind`), MEDIUM
+  (`harness.py:142`, `check_path_containment(parsed.candidates, ...)`
+  assumed non-empty/well-formed candidates), LOW (`harness.py:163`,
+  argv-backfill assumed non-empty `command_state.argv`). All 3 verified
+  against already-read, read-only upstream source
+  (`tool_call_parser.py`, `command_policy.py`) and **rejected as false
+  positives**: (1) `TerminalStateKind.value` is a plain `str`, identical
+  across every class generation since every generation compiles the same
+  `terminal_state.py` source text — this is the exact mechanism the module
+  docstring's "Canonical-kind landmine" section documents as safe without
+  `_canonical_kind`; only `Artifact(kind=...)` construction and category
+  dispatch need it. (2) `tool_call_parser.py`'s
+  `_parse_submit_vulnerable_files` (lines 87-106) rejects a missing,
+  non-list, empty, or non-string-list `candidates` field as
+  `MALFORMED_SUBMIT_PAYLOAD`/`MALFORMED_TOOL_CALL` before ever returning
+  `SUBMITTED_VULNERABLE_FILES`, so a `TerminalState` of that kind is
+  structurally guaranteed non-empty. (3) `command_policy.py`'s
+  `validate_command` rejects an empty `argv` immediately
+  (`if not argv: return _rejected_shell_syntax("")`) before any success
+  path, so `COMMAND_PLAN_VALID` is structurally guaranteed non-empty argv;
+  per the "don't add validation for scenarios that can't happen" operating
+  principle, no defensive guard was added. No code change made in response
+  to this review.
+- Gemma fallback: not triggered — `qwen3.6:27b-q4_K_M` was available and the
+  retry produced a usable consolidated result.
+- D14 fallback: not triggered — same reason.
+- disposition_divergence: `null` (no adjudicator ran; nothing to diverge from)
+- Primary-agent disposition: all 3 findings rejected as false positives with
+  cited evidence; no repair made.
+
+Code-solution review: qwen3.6:27b-q4_K_M docs/audit/gemma-evidence/antares-t2e-phase2.json - PASS
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | valid packet replays deterministically to `submit_vulnerable_files` with canonical validated candidates | `scripts/antares/harness_test.py::HappyPathTest::test_hp1_terminal_then_submit_vulnerable_files_replays_deterministically` | passed |
+| HP-2 | Happy path | valid packet replays deterministically to `submit_no_vulnerability_found`, unambiguous | `scripts/antares/harness_test.py::HappyPathTest::test_hp2_terminal_then_submit_no_vulnerability_found_is_unambiguous` | passed |
+| EC-1 | Edge case | command over configured budget refused before starting; partial trace preserved | `scripts/antares/harness_test.py::EdgeCase1BudgetExhaustionTest::test_ec1_command_over_configured_budget_is_refused_before_starting` | passed |
+| EC-2 | Edge case | parser/policy/sandbox/artifact failures stay distinct, each its own existing `TerminalStateKind` | `scripts/antares/harness_test.py::EdgeCase2DistinctLayerFailuresTest::test_ec2_malformed_json_is_t2a_kind`, `::test_ec2_unsupported_tool_is_t2a_kind`, `::test_ec2_disallowed_executable_is_t2b_kind`, `::test_ec2_sandbox_success_is_t2c1_kind_distinct_from_policy_kinds` | passed |
+| EC-3 | Edge case | sandbox-escape fixtures (path traversal, disallowed executable/option, shell metacharacter) fail closed | `scripts/antares/harness_test.py::EdgeCase3SandboxEscapeFixturesTest::test_ec3_shell_metacharacter_fails_closed`, `::test_ec3_disallowed_executable_fails_closed`, `::test_ec3_disallowed_option_fails_closed`, `::test_ec3_path_traversal_fails_closed` | passed |
+| EC-4 | Edge case | policy-approved hanging/flooding command resolves to a bounded timeout/cap/wall-budget state, never an unbounded hang | `scripts/antares/harness_test.py::EdgeCase4PoisonedPayloadBoundedTest::test_ec4_hanging_command_resolves_to_bounded_timeout_not_a_hang`, `::test_ec4_wall_budget_cuts_off_a_hanging_command_distinctly`, `::test_ec4_output_flood_resolves_to_bounded_cap_not_unbounded_capture` | passed |
+
+Supplemental coverage (beyond the HP/EC contract, found during Reflection):
+`SupplementalTeardownUnconfirmedTest`, `SupplementalDuplicateSubmissionTest`,
+`SupplementalCanonicalKindLandmineTest`,
+`SupplementalSubmitCandidatePathTraversalTest`,
+`SupplementalConverterDirectContractTest` (×2),
+`SupplementalSandboxRuntimeUnavailableTest`, `ReplaySessionTest` — all in
+`scripts/antares/harness_test.py`, all passing.
+
+### Owner final verification
+
+- Owner: Matias Kruk
+- Date: 2026-07-30
+- Statement: **EXPLICIT WAIVER** (not a line-by-line review-and-confirm).
+  Presented via `AskUserQuestion` with the full closure summary — 3 new
+  files (`harness.py` 418L, `harness_test.py` 406L, `replay_fixtures.py`
+  76L), `python3 -m pytest scripts/antares/ -q` → 134/134 passed, 99% line
+  coverage on `harness.py` (100% on `replay_fixtures.py`), 3 Reflection
+  passes (Med-high) with documented real findings and fixes, and Phase 2
+  peer review (`qwen3.6:27b-q4_K_M`) with 3 findings independently verified
+  against read-only upstream source and rejected as false positives with
+  cited evidence. The owner chose "Waiver explícito" over personally
+  re-deriving each `HP-#`/`EC-#`-to-test mapping, authorizing closure on
+  the presented evidence. Precedent: T2c-1/T2c-2 explicit-waiver pattern in
+  this same ledger.
+- Commands run: `python3 -m pytest scripts/antares/ -q` (134 passed,
+  re-confirmed by the primary agent immediately before the waiver request,
+  independent of the earlier 134-pass run recorded during implementation).
 
 ## T3 - CWE watchlist and context-complete packet construction
 

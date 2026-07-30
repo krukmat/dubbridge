@@ -577,6 +577,42 @@ is now cancelled outright, because Antares does not propose RRI inputs.
   verification (`AskUserQuestion`, 2026-07-30); status is `[x] Done
   (owner-waived, 2026-07-30)`. `T2e` (replay fixtures and integrated harness
   verification) is now unblocked, depending on `T2d`.
+- `T2e` was scored at `RRI 55 -> Med-high` (top edge of the band). Qwen27
+  refinement returned `GO_LOCAL`; the primary agent downgraded to
+  `CLOUD_REQUIRED` for three reasons: K=4/5 coupling as the first subtask
+  wiring all four already fail-closed T2 layers together, an aggregate
+  14-file/2389-line read burden the per-file 500-line gate does not bound
+  even though every individual file passes it, and `T2a`'s own precedent of
+  exhausting its full local budget on reconnaissance alone on a materially
+  smaller single-file task. `scripts/local-agent/med_high_gate.py` confirmed
+  `CLOUD_REQUIRED`; the primary (cloud) agent implemented
+  `scripts/antares/harness.py`, `scripts/antares/harness_test.py`, and
+  `scripts/antares/replay_fixtures.py` directly, composing
+  `tool_call_parser.py`/`terminal_state.py`, `command_policy.py`/
+  `path_containment.py`, `sandbox_runner.py`/`sandbox_budget.py`, and
+  `artifact_schema.py` into one deterministic harness entrypoint, read-only
+  on all 14 existing layer files. Three Reflection passes found and fixed a
+  real cross-module `TerminalStateKind` class-identity bug (the
+  "canonical-kind landmine": several T2a-T2c1 modules unconditionally
+  re-execute `terminal_state.py` without a `sys.modules` cache check,
+  producing a fresh non-`==`-comparable enum generation each time — solved
+  with a `_canonical_kind()` re-resolution boundary), a genuine
+  collection-order test-fragility interaction with `sandbox_budget_test.py`
+  (solved by making `harness.py`'s `sandbox_budget.py` import lazy via PEP
+  562 `__getattr__`, with zero changes to any existing file), and 5 real
+  test-coverage gaps found via measured `coverage.py` output. Final: 134/134
+  tests passing (112 pre-existing + 22 new), 99% line coverage on
+  `harness.py` (100% on `replay_fixtures.py`). Phase-2 code-solution review
+  (`qwen3.6:27b-q4_K_M`) needed one retry (first attempt truncated at 393.2s
+  without reaching a stated verdict) and returned `FINDINGS` (1 HIGH, 1
+  MEDIUM, 1 LOW); all 3 were independently verified against already-read
+  read-only upstream source and rejected as false positives grounded in
+  those files' own structural validation guarantees, with no code change
+  needed: `docs/audit/gemma-evidence/antares-t2e-phase2.json`. Owner (Matias
+  Kruk) explicitly waived personal test-by-test final verification
+  (`AskUserQuestion`, 2026-07-30); status is `[x] Done (owner-waived,
+  2026-07-30)`. `T3` (CWE watchlist and context-complete packet
+  construction) and `T4` are now unblocked, depending on `T2e`.
 - No roadmap update is required until T5 retains a production operating mode.
 
 ## Related documents
