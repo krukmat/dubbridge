@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+import uuid
 from pathlib import Path
 
 
@@ -62,6 +63,10 @@ class TaskUnitCoverageEvidenceGate(unittest.TestCase):
         (self.root / "docs" / "tasks").mkdir(parents=True)
         (self.root / "docs" / "audit" / "gemma-evidence").mkdir(parents=True)
         (self.root / "apps" / "api" / "tests").mkdir(parents=True)
+        (self.root / ".gitignore").write_text(
+            "scripts/check-task-unit-coverage.sh\n",
+            encoding="utf-8",
+        )
         (self.root / "apps" / "api" / "tests" / "foo_test.rs").write_text(
             "#[test]\nfn test_case() {}\n", encoding="utf-8"
         )
@@ -164,7 +169,8 @@ class TaskUnitCoverageEvidenceGate(unittest.TestCase):
         original_branch = self.run_cmd(
             "git", "rev-parse", "--abbrev-ref", "HEAD"
         ).stdout.strip()
-        self.run_cmd("git", "checkout", "--orphan", "unreachable-branch")
+        unreachable_branch = f"unreachable-branch-{uuid.uuid4().hex[:8]}"
+        self.run_cmd("git", "checkout", "--orphan", unreachable_branch)
         self.run_cmd("git", "rm", "-rf", ".")
         self.write("orphan-only.txt", "orphan\n")
         self.run_cmd("git", "add", "orphan-only.txt")
@@ -186,7 +192,10 @@ class TaskUnitCoverageEvidenceGate(unittest.TestCase):
         result = self.check_gate()
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("is not reachable from reviewed history", result.stdout)
+        self.assertIn(
+            "is not reachable from reviewed history",
+            result.stdout + result.stderr,
+        )
 
     def test_no_evidence_at_all_fails(self):
         self.write_corpus(section("T-NOEVID", ""))
