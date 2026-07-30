@@ -290,6 +290,7 @@ async fn worker_failure_does_not_stop_sibling_workers() {
     assert_eq!(failures.load(Ordering::SeqCst), 1);
 }
 
+#[allow(clippy::too_many_lines)]
 #[tokio::test]
 async fn redis_monitor_wires_preparation_transcription_and_subtitle_workers() {
     let Some(database_url) = env::var("DUBBRIDGE_DATABASE_URL").ok() else {
@@ -340,8 +341,7 @@ async fn redis_monitor_wires_preparation_transcription_and_subtitle_workers() {
         worker_concurrency: 2,
         pool: pool.clone(),
         storage: shared_storage,
-        preparation_executor: Arc::new(FakePreparationExecutor::default())
-            as SharedPreparationExecutor,
+        preparation_executor: Arc::new(FakePreparationExecutor) as SharedPreparationExecutor,
         asr_client: Arc::new(StubAsrWorkerClient::ok(asr_output)) as SharedAsrWorkerClient,
         preparation_backend: preparation_backend.clone(),
         transcription_backend: transcription_backend.clone(),
