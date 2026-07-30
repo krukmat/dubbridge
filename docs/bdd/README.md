@@ -22,6 +22,7 @@ Canonical home for repository BDD artifacts: `docs/bdd/`.
 - `s-125-hls-playback-delivery.feature`
 - `s-127-mobile-review-player.feature`
 - `s-130-asr-transcription.feature`
+- `s-140-subtitle-generation.feature`
 - `s-160-review.feature`
 - `s-200-mobile-auth.feature`
 
@@ -99,6 +100,16 @@ Spec: `docs/bdd/s-130-asr-transcription.feature`
 | --- | --- | --- | --- | --- | --- |
 | S130_HP1 | Prepared asset produces transcript and alignment artifacts and becomes transcription-ready | S-130-T3, S-130-T4 | `apps/worker-runner/src/main.rs::process_transcription_job_marks_ready_when_both_artifacts_stored`; `workers/asr-worker-py/tests/test_worker.py::test_successful_transcription_emits_output_and_exits_0` | — | HP |
 | S130_EC1 | ASR worker failure marks transcription status Failed and persists no derived artifacts | S-130-T3, S-130-T4 | `apps/worker-runner/src/main.rs::process_transcription_job_marks_failed_on_asr_error`; `workers/asr-worker-py/tests/test_worker.py::test_transcription_exception_emits_error_and_exits_1` | — | EC |
+
+## S-140 — Subtitle generation
+Spec: `docs/bdd/s-140-subtitle-generation.feature`
+
+| Scenario ID | Description | Task | Executable Evidence | Mobile Flow | HP / EC |
+| --- | --- | --- | --- | --- | --- |
+| S140_HP1 | Ready transcription enqueues exactly one subtitle job for the deterministic first target language | S-140-T2b-ii | `apps/worker-runner/src/transcription_runtime.rs::process_transcription_job_enqueues_first_subtitle_target_after_ready`; `apps/worker-runner/src/subtitle_enqueue.rs::prepare_subtitle_post_ready_enqueues_first_target_in_c_order`; `apps/api/tests/workspace_test.rs::asset_subtitle_route_returns_first_target_in_c_order` | — | HP |
+| S140_HP2 | Successful subtitle processing persists one subtitle artifact, marks readiness, and enqueues one review task | S-140-T3b, S-140-T5a | `apps/worker-runner/src/subtitle_runtime.rs::process_subtitle_job_marks_ready_and_stores_artifact_on_success`; `apps/worker-runner/src/review_enqueue.rs::prepare_review_post_ready_enqueues_review_task_with_expected_identity` | — | HP |
+| S140_EC1 | Missing alignment fails closed without persisting subtitle output or creating review work | S-140-T3b, S-140-T5a | `apps/worker-runner/src/subtitle_runtime.rs::process_subtitle_job_fails_when_alignment_missing`; `apps/worker-runner/src/subtitle_runtime.rs::process_subtitle_review_tasks_no_row_on_failure` | — | EC |
+| S140_EC2 | Invalid segmentation output fails closed without persisting subtitle output or creating review work | S-140-T3b, S-140-T5a | `apps/worker-runner/src/subtitle_runtime.rs::process_subtitle_job_fails_closed_on_invalid_segmentation_output` | — | EC |
 
 ## S-210 — Mobile product-experience refresh
 Spec: `docs/bdd/s-210-mobile-product-experience.feature`

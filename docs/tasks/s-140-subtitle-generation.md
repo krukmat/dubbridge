@@ -1,28 +1,29 @@
 ---
 type: TaskList
 title: "S-140 Subtitle Generation"
-status: proposed
+status: active
 slice: S-140
 plan: docs/plan/s-140-subtitle-generation.md
 Behavioral coverage contract: unit-v1
 ---
 # S-140 Subtitle Generation
 
-> **Status:** Proposed 2026-07-20. Authored via ADR-037 T5 (Local Architect
+> **Status:** Active 2026-07-30. Authored via ADR-037 T5 (Local Architect
 > advisory verified against repository evidence — see
 > `docs/evaluations/adr037-direct-project-report.md` reconciliation section).
 > T0 ratified Design decisions D1 (segmentation source → D1a) and D2 (subtitle
 > schema → the proposed internal JSON schema) on 2026-07-21 — see
-> `docs/plan/s-140-subtitle-generation.md`. No task below has started
-> execution. Each development task still requires its own RRI computation and
-> presentation/approval — this ledger does not inherit ADR-037 T5's approval.
-> Owner coordination-mode adjustment 2026-07-21: S-140 implementation must not
-> start from the former broad provisional task cards. The primary agent's role
-> is limited to Med-high/Complex coordination for this goal: recompute/present
-> RRI, route peer/D14 review, decide whether to decompose again, assemble any
-> allowed handoff packet, enforce scope, and close status artifacts. Low and
-> Moderate cards are local-owned under their normal local routes. High+ cards
-> must be decomposed or escalated under the RRI policy before execution.
+> `docs/plan/s-140-subtitle-generation.md`. T0/T1a/T1b-i/T1b-ii/T1c/T1d/T2a/
+> T2b-i/T2b-ii/T3a/T3b/T3c-i/T3c-ii/T5a/T6 are complete. `T3c-ii` closed on
+> 2026-07-30 via owner-waived phase-2 review after qwen rounds `r1`-`r6`;
+> `T3c-iii` and `T3c-iv` remain deferred later-phase non-blockers, and `T5b`
+> remains optional/unscoped. Any future work on those follow-ups still requires
+> its own fresh RRI computation and presentation/approval. The roadmap row
+> stays `in progress` in this uncommitted working tree because the drift gate
+> only allows a `✅ done` slice row once its synchronized plan/task evidence
+> files are committed. Owner coordination-mode adjustment 2026-07-21 remains in
+> force: the primary agent coordinates Med-high/Complex work, while Low and
+> Moderate cards stay on their normal local/direct routes.
 > **Plan:** `docs/plan/s-140-subtitle-generation.md`.
 > **Behavioral coverage contract:** unit-v1.
 
@@ -1989,16 +1990,17 @@ qa-coverage).**
 --X 3 --D 3 --K 4 --P 2 --touches apps/worker-runner/src/main.rs --touches
 apps/worker-runner/Cargo.toml --platform rust`)
 **Depends on:** S-140-T3c-i
-**Status:** Not started — split from S-140-T3c 2026-07-25; not yet presented
-for approval
+**Status:** Done (owner-waived phase-2 review) — 2026-07-30
 
 > Split from the original T3c; see [[S-140-T3c]] for the rationale and the
 > owner-decided topology (one `Monitor`, one `WorkerBuilder` per queue).
 > Depends on [[S-140-T3c-i]]'s Redis-backed queue types — this half only
 > wires the consumer side.
 >
-> **Implementation route:** same Med-high local-first routing as
-> [[S-140-T3c-i]].
+> **Implementation route:** same Med-high routing band as [[S-140-T3c-i]], but
+> the ADR-038 local-architect refinement timed out and resolved
+> `CLOUD_REQUIRED`, so the implementation completed directly in the primary
+> checkout with the recorded evidence bundle.
 
 **Happy paths considered:**
 - HP-1: On startup, `main()` builds one apalis `Monitor` registering three
@@ -2014,9 +2016,9 @@ for approval
 - EC-2: Graceful shutdown (SIGTERM) drains in-flight jobs before exit, or this
   is explicitly documented as untestable in this harness with the reason
   stated.
-- EC-3: Worker concurrency respects `config.worker_concurrency` (already
-  loaded and logged, currently unused for this purpose) — applied per queue,
-  consistent with the owner-decided topology.
+- EC-3: Worker bootstrap fails closed if the ASR subprocess command cannot
+  resolve a valid script path via explicit override, executable ancestry, or
+  repo-relative discovery.
 
 **Inputs:** Existing handler functions (`process_preparation_job`,
 `process_transcription_job`, `process_subtitle_job`), the three
@@ -2053,8 +2055,169 @@ loop in `main.rs` for the preparation, transcription, and subtitle queues
 using the [[S-140-T3c-i]] Redis-backed queues only; do not change handler
 logic or payload schemas.
 
-**Status: [ ] Not started — RRI 42 computed 2026-07-25; requires presentation
-and approval before implementation.**
+Task-analysis review: qwen3.6:27b-q4_K_M `.agent/peer-task-review-S-140-T3c-ii-phase1-v10.json` - PASS
+Code-solution review: qwen3.6:27b-q4_K_M `.agent/peer-code-review-S-140-T3c-ii-r6.json` - BLOCKED
+
+User waiver: explicit owner instruction on 2026-07-30 to close the phase-2
+review here, accept the residual reviewer concern around the manifest-relative
+ASR fallback, and continue with downstream work.
+
+### Peer Reviewer evidence
+
+- Reviewer: `qwen3.6:27b-q4_K_M`
+- Phase-1 artifact: `.agent/peer-task-review-S-140-T3c-ii-phase1-v10.json`
+  — Verdict: `findings` (2 LOW), treated as PASS after the card tightened the
+  concurrency/dependency acceptance wording before implementation.
+- Phase-2 command: `python3 scripts/peer-workflow-review.py --phase code --rri 42 --caller codex --content /tmp/s140-t3c-ii-r6.diff --task-id S-140-T3c-ii --artifact .agent/peer-code-review-S-140-T3c-ii-r6.json`
+- Phase-2 artifacts: `.agent/peer-code-review-S-140-T3c-ii.json`,
+  `.agent/peer-code-review-S-140-T3c-ii-r2.json`,
+  `.agent/peer-code-review-S-140-T3c-ii-r3.json`,
+  `.agent/peer-code-review-S-140-T3c-ii-r4.json`,
+  `.agent/peer-code-review-S-140-T3c-ii-r5.json`,
+  `.agent/peer-code-review-S-140-T3c-ii-r6.json`
+- Verdict: `FINDINGS` on the final round (`r6`: 1 HIGH, 1 MEDIUM, 2 LOW,
+  1 INFO). Closure remains owner-waived because the final rerun did not return
+  `PASS`.
+- Findings: the residual HIGH questions the manifest-relative ASR fallback in
+  `resolve_asr_worker_path`; lower-severity notes cover ancestor-search cost,
+  default-`python3` validation, shutdown-time retry semantics, and whether the
+  `apalis` `limit` feature earns its keep.
+- Gemma fallback: `not triggered` — reason: `qwen3.6:27b-q4_K_M` stayed
+  available and returned valid review artifacts throughout.
+- D14 fallback: `not triggered` — reason: no reviewer-availability failure
+  occurred.
+- disposition_divergence: `none`
+- Primary-agent disposition: rounds `r1`-`r5` were accepted and repaired
+  (storage deref fix, ASR override path support, executable-ancestor discovery,
+  fail-closed path validation, empty-python rejection). Round `r6` stopped
+  under owner waiver; no further code change was requested after the user's
+  2026-07-30 instruction to close the review here.
+- Review artifact: `docs/audit/gemma-evidence/S-140-T3c-ii.json`
+
+### Happy paths covered
+
+- HP-1: `main()` now builds one real `Monitor` with three queue-specific
+  workers and routes them into the production handlers.
+  Code evidence:
+  `apps/worker-runner/src/main.rs::WorkerRuntime::build_monitor`,
+  `apps/worker-runner/src/main.rs::WorkerRuntime::register_preparation_worker`,
+  `apps/worker-runner/src/main.rs::WorkerRuntime::register_transcription_worker`,
+  `apps/worker-runner/src/main.rs::WorkerRuntime::register_subtitle_worker`,
+  `apps/worker-runner/src/runner_topology_tests.rs::redis_monitor_wires_preparation_transcription_and_subtitle_workers`.
+- HP-2: the worker-runner stays alive until an explicit shutdown signal resolves,
+  instead of logging once and exiting immediately.
+  Code evidence:
+  `apps/worker-runner/src/main.rs::WorkerRuntime::run_with_signal`,
+  `apps/worker-runner/src/main.rs::shutdown_signal`,
+  `apps/worker-runner/src/main.rs::wait_for_shutdown_signal`,
+  `apps/worker-runner/src/runner_topology_tests.rs::shutdown_waiter_resolves_for_ctrl_c_and_sigterm`,
+  `apps/worker-runner/src/runner_topology_tests.rs::worker_shutdown_does_not_start_new_jobs_after_signal`.
+- Concurrency application: every queue registration now applies
+  `.concurrency(self.worker_concurrency)` directly in the production wiring.
+  Code evidence:
+  `apps/worker-runner/src/main.rs::WorkerRuntime::register_preparation_worker`,
+  `apps/worker-runner/src/main.rs::WorkerRuntime::register_transcription_worker`,
+  `apps/worker-runner/src/main.rs::WorkerRuntime::register_subtitle_worker`.
+
+### Edge cases covered
+
+- EC-1: one worker failing does not stop sibling workers from continuing to
+  consume their queues.
+  Code evidence:
+  `apps/worker-runner/src/main.rs::run_monitor_with_signal`,
+  `apps/worker-runner/src/runner_topology_tests.rs::worker_failure_does_not_stop_sibling_workers`.
+- EC-2: shutdown is real and fail-closed rather than an untested placeholder;
+  once shutdown starts, no new job begins.
+  Code evidence:
+  `apps/worker-runner/src/main.rs::shutdown_signal`,
+  `apps/worker-runner/src/main.rs::guard_worker_shutdown`,
+  `apps/worker-runner/src/runner_topology_tests.rs::shutdown_waiter_resolves_for_ctrl_c_and_sigterm`,
+  `apps/worker-runner/src/runner_topology_tests.rs::worker_shutdown_does_not_start_new_jobs_after_signal`.
+- EC-3: ASR worker command resolution fails closed when the override is bad or
+  no valid script can be found, while still accepting explicit override and
+  executable-ancestor discovery.
+  Code evidence:
+  `apps/worker-runner/src/main.rs::resolve_asr_worker_path`,
+  `apps/worker-runner/src/main.rs::validate_asr_worker_path`,
+  `apps/worker-runner/src/runner_topology_tests.rs::asr_worker_path_uses_override_when_present`,
+  `apps/worker-runner/src/runner_topology_tests.rs::asr_worker_path_can_be_found_from_current_exe_ancestors`,
+  `apps/worker-runner/src/runner_topology_tests.rs::asr_worker_path_defaults_to_repo_relative_script`,
+  `apps/worker-runner/src/runner_topology_tests.rs::asr_worker_path_fails_closed_when_script_is_missing`.
+
+### Reflection log
+
+Required passes: 3 (`RRI 42` → `Med-high`)
+
+#### Pass 1
+
+- **Draft verdict:** Real apalis worker wiring, shutdown signal handling, and
+  topology tests landed; `cargo test -p dubbridge-worker-runner` was green.
+- **Critique findings:**
+  - The first phase-2 review rounds surfaced a correctness bug in the storage
+    dereference path inside the worker closures.
+  - ASR subprocess startup still relied on an implicit script path with no
+    explicit override contract.
+- **Revisions applied:**
+  - Repaired the worker storage dereference path in `main.rs`.
+  - Routed ASR startup through `asr_worker_command()` and added explicit
+    `DUBBRIDGE_ASR_WORKER_PATH` handling.
+
+#### Pass 2
+
+- **Draft verdict:** Worker runtime and topology tests still passed, but the
+  review pipeline found the ASR path resolution remained too optimistic about
+  repo layout and environment quality.
+- **Critique findings:**
+  - Auto-discovery needed to search from the current executable as well as the
+    manifest directory.
+  - The fallback path and empty Python override both needed fail-closed
+    validation.
+- **Revisions applied:**
+  - Added executable-ancestor search plus manifest-dir search before fallback.
+  - Added `validate_asr_worker_path(...)` and empty-env rejection in
+    `resolve_asr_worker_python()`.
+  - Added dedicated ASR path tests for override, ancestry, repo-relative
+    discovery, and missing-script failure.
+
+#### Pass 3
+
+- **Draft verdict:** `cargo fmt`, `cargo test -p dubbridge-worker-runner`, and
+  `cargo clippy -p dubbridge-worker-runner -- -D warnings` were green after the
+  ASR hardening pass.
+- **Critique findings:**
+  - Final qwen round `r6` still reported a residual HIGH on the
+    manifest-relative ASR fallback assumption, plus one MEDIUM / two LOW / one
+    INFO follow-up note.
+- **Revisions applied:** none. On 2026-07-30 the owner explicitly instructed
+  the agent to close the review here and continue, so this task records the
+  residual `r6` concern as owner-waived rather than reopening another repair
+  cycle.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | startup wires one real monitor covering preparation, transcription, and subtitle queues end-to-end | `apps/worker-runner/src/runner_topology_tests.rs::redis_monitor_wires_preparation_transcription_and_subtitle_workers` | passed |
+| HP-2 | Happy path | worker-runner stays alive until a real shutdown signal resolves | `apps/worker-runner/src/runner_topology_tests.rs::shutdown_waiter_resolves_for_ctrl_c_and_sigterm` | passed |
+| EC-1 | Edge case | failure in one queue does not stop sibling workers | `apps/worker-runner/src/runner_topology_tests.rs::worker_failure_does_not_stop_sibling_workers` | passed |
+| EC-2 | Edge case | shutdown prevents new jobs from starting once termination begins | `apps/worker-runner/src/runner_topology_tests.rs::worker_shutdown_does_not_start_new_jobs_after_signal` | passed |
+| EC-3 | Edge case | ASR worker path accepts explicit override when valid | `apps/worker-runner/src/runner_topology_tests.rs::asr_worker_path_uses_override_when_present` | passed |
+| EC-3 | Edge case | ASR worker path is discoverable from executable ancestry / repo-relative layout and fails closed when missing | `apps/worker-runner/src/runner_topology_tests.rs::asr_worker_path_can_be_found_from_current_exe_ancestors`, `apps/worker-runner/src/runner_topology_tests.rs::asr_worker_path_defaults_to_repo_relative_script`, `apps/worker-runner/src/runner_topology_tests.rs::asr_worker_path_fails_closed_when_script_is_missing` | passed |
+
+### Owner final verification
+
+- Owner: `Matias (owner waiver + closure authorization)`
+- Date: `2026-07-30`
+- Statement: I authorized closing `S-140-T3c-ii` after the final qwen
+  code-solution review still returned findings, accepting the residual ASR-path
+  concern as a known owner-waived risk while the agent verified the mapped
+  happy-path and edge-case tests below.
+- Commands run: `cargo fmt --all --check`; `cargo test -p dubbridge-worker-runner`; `cargo clippy -p dubbridge-worker-runner -- -D warnings`; `make qa-docs`
+
+**Status: [x] Done (owner-waived phase-2 review) — 2026-07-30. The real apalis
+consumer loop is wired in production, worker-runner tests are green, and the
+final qwen review artifact is recorded with an explicit owner waiver instead of
+another repair round.**
 
 ---
 
@@ -2366,6 +2529,10 @@ re-measured for this change (same pre-existing gap noted at T3b's closure);
 edit — merge requires explicit owner approval per Git Safety Protocol. T6
 remains blocked on this task until the merge lands.**
 
+> 2026-07-30 sync note: item (3) is now resolved by merge commit `620d675`, and
+> T6 is no longer blocked on branch state. The remaining historical note is
+> preserved above because it was accurate at T5a's own closeout time.
+
 ---
 
 ## S-140-T5b: Optional derived-artifact identity schema change for review tasks
@@ -2397,7 +2564,7 @@ placeholder.
 
 **Effort:** S (planning RRI 6 — Low; recompute at presentation time)
 **Depends on:** S-140-T5a, and S-140-T5b if T5b is explicitly scoped
-**Status:** Not started — blocked on T5a and any scoped T5b
+**Status:** Done — 2026-07-30
 
 Mirrors S-130-T5: `docs/bdd/s-140-subtitle-generation.feature`, roadmap
 status sync (`docs/plan/roadmap.md:134`), plan/task ledger closure.
@@ -2422,4 +2589,55 @@ the feature is indexed there.
 **Stop condition:** Stop after docs checks pass and status artifacts are synced.
 Do not start S-150 or S-170 planning.
 
-**Status: [ ] Not started — blocked on T5a and any scoped T5b**
+**Outputs:**
+- `docs/bdd/s-140-subtitle-generation.feature`: canonical subtitle-generation
+  feature covering transcription-ready enqueue, successful subtitle persistence
+  + review-task enqueue, and fail-closed missing-alignment / invalid-segmentation
+  cases.
+- `docs/bdd/README.md`: S-140 canonical spec list + scenario/evidence mapping.
+- `docs/plan/roadmap.md`: stale "T5a not merged / T6 blocked" wording removed;
+  S-140 row synchronized to the current task state; X-S-160-3 clarified as
+  partially addressed but still open pending artifact-identity schema work.
+- `docs/plan/s-140-subtitle-generation.md`: status lifted from proposed to
+  active and stale T5a branch-block note removed.
+- `docs/tasks/s-140-subtitle-generation.md`: T6 closed and top-level slice
+  status synchronized to the current state.
+
+**Agent handoff prompt:** Author the canonical BDD feature for S-140, sync the
+BDD index plus roadmap/plan/ledger status language to the actual current state,
+and verify `make qa-docs` passes without starting S-150 or S-170.
+
+Task-analysis review: n/a — docs-only task (phase-1 exempt).
+Code-solution review: n/a — docs-only task (phase-2 exempt).
+
+### Completion record
+
+- Authored `docs/bdd/s-140-subtitle-generation.feature` with OKF frontmatter and
+  four delivered scenarios: deterministic subtitle enqueue from ready
+  transcription, successful subtitle persistence + review-task enqueue,
+  missing-alignment fail-closed behavior, and invalid-segmentation fail-closed
+  behavior.
+- Updated `docs/bdd/README.md` so S-140 now appears in the canonical spec list
+  and maps each scenario to executable repository evidence.
+- Synchronized `docs/plan/roadmap.md`, `docs/plan/s-140-subtitle-generation.md`,
+  and this ledger to remove stale pre-merge wording around `T5a`, reflect that
+  T6 is complete, and describe the remaining `X-S-160-3` gap accurately:
+  review tasks now originate from real subtitle readiness, but still lack
+  derived-artifact identity/version in schema.
+- Left `T3c-iii`/`T3c-iv` deferred and `T5b` optional, but the later `T3c-ii`
+  closure means these are now follow-ups rather than blockers for the slice.
+- `make qa-docs` is the required verification gate for this task and was run
+  after the sync pass.
+
+### Owner final verification
+
+- Owner: Matias Kruk
+- Date: 2026-07-30
+- Statement: I verified the canonical S-140 BDD and status documents now match
+  the real delivered subtitle-generation scope, remove the stale T5a branch
+  blocker, and keep the remaining X-S-160-3 artifact-identity gap explicit.
+- Commands run: `make qa-docs`
+
+**Status: [x] Done — 2026-07-30. T6 authored the canonical BDD feature,
+synchronized roadmap/plan/ledger state to the actual merged S-140 history, and
+left only deferred/non-scoped follow-ups outside the slice closeout.**

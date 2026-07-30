@@ -1,16 +1,19 @@
 ---
 type: Plan
 title: "Plan: S-140 — Subtitle Generation"
-status: proposed
+status: active
 slice: S-140
 ---
 # Plan: S-140 — Subtitle Generation
 
-> **Status:** Proposed 2026-07-20. Authored via ADR-037 T5 (Local Architect
-> advisory verified against repository evidence; see reconciliation in
-> `docs/evaluations/adr037-direct-project-report.md`). Not yet approved —
-> requires cross-vendor peer/D14 review per RRI 53 (Med-high) before task
-> execution begins.
+> **Status:** Active 2026-07-30. Authored 2026-07-20 via ADR-037 T5 (Local
+> Architect advisory verified against repository evidence; see reconciliation in
+> `docs/evaluations/adr037-direct-project-report.md`). T0/T1a/T1b-i/T1b-ii/T1c/
+> T1d/T2a/T2b-i/T2b-ii/T3a/T3b/T3c-i/T3c-ii/T5a/T6 are complete and
+> synchronized. `T3c-ii` closed on 2026-07-30 via owner-waived phase-2 review;
+> `T3c-iii` and `T3c-iv` are deferred later-phase non-blockers, and `T5b`
+> remains optional/unscoped. The roadmap row remains `in progress` until this
+> synchronized closeout is committed, which is what the drift gate expects.
 > **Roadmap phase:** `S-140` — Processing / Subtitle generation.
 > **Tasks ledger:** `docs/tasks/s-140-subtitle-generation.md`.
 
@@ -259,8 +262,7 @@ T5a's RRI (39, Moderate) was confirmed at presentation time on 2026-07-22 and
 the task reached `[x] Done (file-level)` on 2026-07-23, including a
 separately-approved fix for a pre-existing T3b readiness-check-ordering bug
 found during T5a verification (see task ledger for both). T5a's branch
-(`local/s-140-t5a`) is implemented and reviewed but not yet merged to `main`
-as of this note; T6 stays blocked until that merge lands.
+(`local/s-140-t5a`) has since merged to `main` via `620d675`, unblocking T6.
 
 `T2b` was split on 2026-07-21 into an extraction seam and a wiring step so the
 worker-runner change stays reviewable under the local-first workflow instead of

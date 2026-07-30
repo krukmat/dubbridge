@@ -8,7 +8,7 @@ license.workspace = true
 anyhow.workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json.workspace = true
-apalis.workspace = true
+apalis = { workspace = true, features = ["limit"] }
 tokio.workspace = true
 tracing.workspace = true
 sqlx.workspace = true
