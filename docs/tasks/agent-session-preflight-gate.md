@@ -2554,10 +2554,12 @@ trusted normally, so this reflects real production behavior.
 
 ## T4c2 — Audit coverage report and certification math
 
-- **Status:** [ ] Pending
-- **Type:** docs/config verification
-- **Effort:** M
-- **RRI:** 28 -> Moderate (recompute before execution if scope changes)
+- **Status:** [x] Done — owner-verified 2026-07-29
+- **Type:** development
+- **Effort:** L
+- **RRI:** 43 -> Med-high (recomputed 2026-07-29 at presentation time via
+  `scripts/rri.py`; ledger's prior 28/Moderate placeholder was stale and is
+  superseded — see closure evidence)
 - **Depends on:** T4c1
 
 ### Goal
@@ -2571,6 +2573,16 @@ sessions, and missing-evidence sessions without overstating certainty.
 - A `100%` claim is refused whenever any session lacks native-load plus receipt evidence.
 - The coverage report names the exact criteria for certification.
 
+### Happy path examples
+
+- `HP-1`: audit report distinguishes opened sessions from certified sessions
+  with named counts.
+
+### Edge case examples
+
+- `EC-1`: any session missing native-load or receipt evidence blocks a `100%`
+  claim; the report states the exact unmet criterion instead.
+
 ### Evidence to emit
 
 - Audit report output with certified/opened counts and refusal behavior.
@@ -2580,12 +2592,291 @@ sessions, and missing-evidence sessions without overstating certainty.
 - `docs/tasks/agent-session-preflight-gate.md`
 - `docs/plan/agent-session-preflight-gate.md`
 
+### Closure evidence (2026-07-29)
+
+**Design resolution (human decision, pre-implementation):** the ledger's task
+definition did not specify where "opened session" evidence comes from. The
+user was asked and chose the receipts-only design over a
+transcripts+receipts alternative: "opened" = any session with at least one
+v2 receipt file under `.agent/receipts/v2/` (valid or not); "certified" = the
+subset that passes `validate_v2_receipt_payload` plus a fresh re-hash of
+every recorded governing document against the current repository state.
+This does not detect a session that opened and never wrote any receipt at
+all (a silently-broken hook, the exact failure mode T4c1/T4c1b/T4c1c found
+and fixed) — that limitation is stated in the audit command's own output
+(`AUDIT_KNOWN_LIMITATION`), not only in this closure record, per the user's
+explicit constraint that the report itself must not overstate certainty.
+
+**RRI recompute:** the ledger's placeholder (28, Moderate) predates this
+task's actual scope and was explicitly marked "recompute before execution if
+scope changes." Recomputed at presentation time via `scripts/rri.py --touches
+scripts/agent-preflight.py --touches scripts/agent_preflight_test.py --touches
+docs/tasks/agent-session-preflight-gate.md --touches
+docs/plan/agent-session-preflight-gate.md --cc 14 --D 3 --K 2 --P 2 --T 2 --A 2
+--X 2`: **RRI 43, Med-high (41-55)**. D=3 reflects that this task authors the
+certification math over the same fail-closed receipt-authorization invariant
+that T4a2-T4c1c all independently routed `CLOUD_REQUIRED`, consistent with the
+T4a4 precedent (test-only code routed `CLOUD_REQUIRED` for certifying the same
+invariant) applying with at least equal force to production code whose entire
+purpose is a certainty claim about that invariant. User approved the task at
+this recomputed RRI/band.
+
+**ADR-038 Med-high gate:** ran end-to-end using a frozen `med-high-refinement-v1`
+packet (`.agent/local-architect/med-high-refinement-v1/T4c2/`). qwen27
+(`qwen3.6:27b-q4_K_M`) refinement recommended **`CLOUD_REQUIRED`**: authoring
+a report that asserts certainty about a fail-closed governance invariant is
+excluded under ADR-038 Section 6 regardless of the implementing code's
+read-only nature, reinforced by the direct T4a4 precedent and by the risk
+that a false "fully certified" claim would misrepresent the state of the
+invariant to a human reader. The primary route receipt independently
+confirmed `CLOUD_REQUIRED` for the same reasons, plus an additional factor:
+the 11 receipt files on disk at this revision are real, mixed-provenance
+data (genuine T4c1/T4c1b/T4c1c sessions plus leftover manual/fixture
+entries from earlier closed tasks), not a clean fixture set, and at least
+one governing document
+(`docs/playbooks/AGENT_WORKFLOW_GUIDE.md`) had uncommitted working-tree
+edits at this revision — a correctness risk for any naive hash-reverification
+implementation, best handled with full repository context rather than a
+bounded 8-turn local session. Per ADR-038 Section 3 the primary may
+downgrade but never upgrade a Qwen27 `CLOUD_REQUIRED`, so the bounded
+`qwen3.6:35b-a3b` local implementer was never invoked; the primary agent
+(Claude) implemented directly. Gate trace verified via
+`scripts/local-agent/med_high_gate.py`
+(`{"route": "CLOUD_REQUIRED", "reason": "Qwen27 recommended CLOUD_REQUIRED;
+the primary cannot upgrade this to local."}`).
+
+**Implementation:** added to `scripts/agent-preflight.py`:
+`_reverify_document_hashes` (re-hashes a receipt's recorded
+`native_instruction`/`documents` entries against the current repository
+state and returns human-readable mismatches; fails closed on a malformed
+entry shape, a non-dict/non-list field, or a source file that no longer
+matches or no longer exists — never silently skips it); `audit_v2_receipts`
+(enumerates `.agent/receipts/v2/*.json` — confirmed flat, non-nested layout
+by reading `v2_receipt_path` directly rather than assuming, resolving one of
+the packet's two flagged unknowns — and classifies each as `certified` or
+`opened_not_certified`, read-only throughout); `format_audit_report` (human
+-readable report; refuses any full-certification claim unless
+`opened_count > 0` and every session is certified, and always prints
+`AUDIT_KNOWN_LIMITATION`); `AUDIT_KNOWN_LIMITATION` constant; `_run_audit_command`
+plus a new `audit` verb registered in `V2_COMMANDS`/`V2_COMMAND_HANDLERS`. Purely
+additive; no change to `build_v2_receipt_payload`, `publish_v2_receipt`,
+`load_v2_receipt`, or either hook adapter (T4a1-T4b2, frozen). Ran against
+the real `.agent/receipts/v2/` directory (11 files, mixed provenance): report
+correctly refused a full-certification claim (10/11 not certified — every
+receipt except one predates an uncommitted edit to
+`docs/policies/HITL_AUTONOMY_POLICY.md` also present in this working tree,
+correctly detected as a stale document hash), exit code 1 — real fail-closed
+behavior on real, imperfect data, not a clean fixture.
+
+**Gemma-packet-integrity note:** not applicable to this task's review path
+(RRI 43 routes to `qwen3.6:27b-q4_K_M`, not Gemma), but the same discipline
+was applied: the phase-2 review packet was the full `git diff` of both
+changed files.
+
+**Peer Reviewer (`qwen3.6:27b-q4_K_M`, phase 2, `scripts/peer-workflow-review.py
+--phase code --rri 43`):** `status: findings`, 3 findings (1 HIGH, 1 MEDIUM, 1
+LOW). All three independently verified against running code, not accepted at
+face value:
+
+- HIGH (claimed a malformed `native_instruction` short-circuits document-hash
+  verification): **false positive**, verified by direct execution —
+  constructed a payload with a malformed `native_instruction` and a document
+  with a deliberately stale hash, and `_reverify_document_hashes` returned
+  mismatches for *both* (`malformed native_instruction (not an object): ...`
+  and the stale-document mismatch), proving the `documents` loop is never
+  skipped. `_reverify_document_hashes`'s `native_instruction` and `documents`
+  blocks run unconditionally in sequence; there is no `return`/`continue`
+  between them.
+- MEDIUM (missing test for a receipt file deleted between `glob()` and
+  `read_text()`): the underlying code path (`except OSError` around the
+  receipt-file read) is already 100% branch-covered by
+  `test_ec1_unreadable_receipt_file_is_opened_not_certified_not_crashed`
+  (triggers the identical `OSError` via `chmod(0o000)` rather than a delete
+  race) — confirmed via `coverage report -m`, which shows no gap in that
+  range. A second test for a different trigger of the same already-covered
+  branch would be redundant.
+- LOW (claimed `hash_source_file` could raise an uncaught non-`ReceiptValidationError`
+  exception): **false positive**, verified by reading `hash_source_file`
+  directly — it catches `OSError` internally and always re-raises
+  `ReceiptValidationError`; there is no path where a raw exception escapes to
+  `_reverify_document_hashes`'s `except ReceiptValidationError`.
+
+Disposition: `reviewed_no_change` for all three findings (2 false positives,
+1 already-covered-by-existing-test). No code changes made in response to this
+review pass.
+
+### Reflection log
+
+Required passes: 3 (RRI 43 -> Med-high)
+
+#### Pass 1
+
+- **Draft verdict:** implemented `audit_v2_receipts`/`format_audit_report`/
+  `_reverify_document_hashes`/`_run_audit_command`, ran against the real
+  `.agent/receipts/v2/` directory (11 real, mixed-provenance files) and
+  confirmed correct fail-closed refusal; 9 new unit tests passing on first
+  pass.
+- **Critique findings:** self-review against the 3 ledger acceptance
+  criteria and HP-1/EC-1 found the tests only exercised the "happy" shapes
+  the code was written to handle (stale hash, malformed JSON) but not the
+  defensive `isinstance` branches added for a receipt file with a malformed
+  `native_instruction`/`documents` shape (not a dict/list, or a list entry
+  that isn't a dict) — those branches were reachable (a hand-corrupted or
+  partially-written receipt file) but untested, and one test itself had a
+  logic bug (`session-good` in the mixed-certification test reused
+  `GOVERNING.md` as its own native instruction, so changing `GOVERNING.md`
+  later in the test made it stale too, defeating the test's own premise of
+  a stable "certified" control case).
+- **Revisions applied:** none yet — gaps identified and scheduled for pass 2.
+
+#### Pass 2
+
+- **Draft verdict:** closed the gaps found in pass 1.
+- **Critique findings:** confirmed via `coverage run --branch`: 4 reachable
+  branches in the new code were untested (`native_instruction` not a dict,
+  `documents` not a list, a `documents` list entry not a dict, a schema
+  -invalid receipt reaching `_reverify_document_hashes`). Running the fixed
+  `test_ec1_mixed_certified_and_not_certified_is_never_fully_certified` first
+  surfaced the test's own bug (asserted `certified_count == 1` but got `0`,
+  because the "good" session's native instruction pointed at the same file
+  the test later mutated to make the other session stale).
+- **Revisions applied:** fixed the test bug (gave the "certified" control
+  session its own stable `STABLE.md` native instruction, independent of the
+  file being changed to create the stale case). Added 6 tests closing the 4
+  branch gaps plus 2 more found while writing them
+  (`test_ec1_native_instruction_not_a_dict_is_reported_not_crashed`,
+  `test_ec1_documents_not_a_list_is_reported_not_crashed`,
+  `test_ec1_document_entry_missing_path_or_sha256_is_malformed_not_crashed`,
+  `test_ec1_missing_native_instruction_source_file_is_reported`,
+  `test_ec1_document_list_entry_not_an_object_is_reported_not_crashed`,
+  `test_ec1_schema_invalid_receipt_is_opened_not_certified`). Two of these
+  tests themselves had assertion bugs (checking `reasons[0]` for text that
+  was actually at a different index; one leftover duplicate assertion line
+  from a bad edit) — both caught by re-running the suite and reading the
+  actual failure output rather than assuming the first green run was
+  correct, then fixed. In the process, found and fixed one genuine
+  **production-code** gap, not just a test gap: `_reverify_document_hashes`
+  originally silently skipped a non-dict `native_instruction`/`documents`/
+  document-list-entry instead of reporting it as a malformed-shape mismatch,
+  which would have let a hand-corrupted receipt with a bad
+  `native_instruction` but otherwise-matching document hashes be
+  misclassified as `certified` — verified by a failing test before the fix,
+  passing after. Also added a `chmod(0o000)`-based unreadable-receipt-file
+  test (skipped under root, mirroring T4a4's precedent for the same
+  host-specific limitation) and a wrong-`schema_version` test.
+- Coverage rose from 91% to 95% (30 statements/branches -> 19 remaining,
+  all pre-existing out-of-scope legacy code per the established T4a3/T4a4/
+  T4b1 pattern: `find_repo_root` git fallback, `load_v2_receipt` decode/
+  mismatch branches, the legacy CLI fallthrough tail).
+
+#### Pass 3
+
+- **Draft verdict:** ran the peer reviewer (`qwen3.6:27b-q4_K_M`, phase 2)
+  over the final diff.
+- **Critique findings:** 3 findings (1 HIGH, 1 MEDIUM, 1 LOW), all verified
+  against running code per the closure evidence above: the HIGH
+  short-circuit claim was disproven by direct execution (both mismatches
+  fire together); the MEDIUM test-gap suggestion targets a branch already
+  100% covered by an existing test via a different trigger; the LOW
+  uncaught-exception claim was disproven by reading `hash_source_file`,
+  which never lets a raw exception escape. Also applied one
+  non-reviewer-sourced simplification during self-critique:
+  `_run_audit_command`'s exit-code check
+  (`audit["opened_count"] > 0 and audit["fully_certified"]`) was redundant
+  with `fully_certified`'s own definition, which already requires
+  `opened_count > 0`.
+- **Revisions applied:** simplified `_run_audit_command` to
+  `return 0 if audit["fully_certified"] else 1`; re-ran the full suite
+  (93/93 pass, unchanged) to confirm the simplification changed no
+  observable behavior. No changes made in response to the three peer
+  findings (disposition `reviewed_no_change` for all three, per the
+  verification evidence above).
+
+**Unit coverage certification:**
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | audit report distinguishes opened sessions from certified sessions with named counts | `scripts/agent_preflight_test.py::AgentPreflightAuditTest.test_hp1_all_receipts_valid_and_unchanged_is_fully_certified` | passed |
+| EC-1 | Edge case | any session missing native-load or receipt evidence blocks a 100% claim; exact unmet criterion is named | `scripts/agent_preflight_test.py::AgentPreflightAuditTest.test_ec1_stale_document_hash_is_never_counted_as_certified`, `::test_ec1_mixed_certified_and_not_certified_is_never_fully_certified` | passed |
+
+Additional defensive-path tests beyond the two ledger cases (all passing):
+`test_hp1_empty_receipts_dir_refuses_with_zero_opened`,
+`test_ec1_malformed_json_receipt_is_opened_not_certified_never_crashes`,
+`test_ec1_native_instruction_not_a_dict_is_reported_not_crashed`,
+`test_ec1_documents_not_a_list_is_reported_not_crashed`,
+`test_ec1_document_entry_missing_path_or_sha256_is_malformed_not_crashed`,
+`test_ec1_document_list_entry_not_an_object_is_reported_not_crashed`,
+`test_ec1_schema_invalid_receipt_is_opened_not_certified`,
+`test_ec1_unreadable_receipt_file_is_opened_not_certified_not_crashed`,
+`test_ec1_missing_native_instruction_source_file_is_reported`,
+`test_audit_is_read_only_and_never_modifies_receipt_files`,
+`test_known_limitation_note_is_present_in_every_report`.
+
+| Suite | Tests | Result |
+|---|---|---|
+| Existing T1/T4a1-T4c1c (`AgentPreflightTest`, `AgentPreflightV2ReceiptTest`, `AgentPreflightV2ReceiptPublishTest`, `AgentPreflightCliV2CommandsTest`, `AgentPreflightHookAdapterTest`, `AgentPreflightRacePermissionTest`) | 79 | pass, unchanged |
+| New T4c2 audit tests (`AgentPreflightAuditTest`) | 14 | pass — HP-1 x2, EC-1 x10, read-only x1, known-limitation x1 |
+| **Total** | **93** | **93/93 pass** |
+
+`coverage run --branch --include=scripts/agent-preflight.py`: 95% line/branch
+overall (up from T4c1c's 93% baseline). All new T4c2 code
+(`_reverify_document_hashes`, `audit_v2_receipts`, `format_audit_report`,
+`_run_audit_command`) is fully covered; all remaining uncovered lines are
+pre-existing, out-of-scope legacy code (`find_repo_root` git fallback,
+`load_v2_receipt` decode/mismatch branches, legacy CLI fallthrough tail).
+
+### Peer Reviewer evidence
+
+- Reviewer: `qwen3.6:27b-q4_K_M`
+- Command: `python3 scripts/peer-workflow-review.py --phase code --rri 43 --caller claude-code --content /tmp/t4c2.diff --task-id agent-session-preflight-T4c2 --artifact .agent/peer-code-review-T4c2.json`
+- Artifact: `.agent/peer-code-review-T4c2.json`
+- Verdict: `findings` (3: 1 HIGH, 1 MEDIUM, 1 LOW)
+- Findings: HIGH short-circuit claim (false positive, disproven by direct
+  execution), MEDIUM missing-test suggestion (branch already covered via a
+  different trigger), LOW uncaught-exception claim (false positive,
+  disproven by reading `hash_source_file`)
+- Gemma fallback: not triggered — `qwen3.6:27b-q4_K_M` responded normally
+- D14 fallback: not triggered
+- disposition_divergence: none
+- Primary-agent disposition: all three findings verified against running
+  code and rejected as either false positives or already-covered; no code
+  changes required in response to the review pass (one unrelated
+  simplification was applied during the same Reflection pass, independent
+  of the review findings)
+
+Code-solution review: qwen3.6:27b-q4_K_M .agent/peer-code-review-T4c2.json - PASS
+
+### Owner final verification
+
+- Owner: Claude (primary agent, direct implementation per ADR-038 `CLOUD_REQUIRED`)
+- Date: 2026-07-29
+- Statement: I verified every happy path and edge case defined for this task
+  has unit test evidence that replicates the expected behavior, including
+  running the audit command against the real, imperfect `.agent/receipts/v2/`
+  directory (not only clean fixtures) and confirming the fail-closed refusal
+  behavior on real stale-document data.
+- Commands run:
+  - `python3 -m py_compile scripts/agent-preflight.py scripts/agent_preflight_test.py`
+  - `python3 -m unittest scripts.agent_preflight_test -v`
+  - `python3 -m coverage run --branch --include=scripts/agent-preflight.py -m unittest scripts.agent_preflight_test`
+  - `python3 -m coverage report -m`
+  - `python3 scripts/agent-preflight.py audit`
+  - `python3 scripts/check_okf_frontmatter.py docs/plan/agent-session-preflight-gate.md docs/tasks/agent-session-preflight-gate.md`
+  - `python3 scripts/local-architect/run_analysis.py --packet .agent/local-architect/med-high-refinement-v1/T4c2/packet.json --profile med-high-refinement-v1 --expected-packet-sha256 22dd8a44b4f03525ae2f601772b48249b7d9f3d49533021477c22abb5f62c116 --output .agent/local-architect/med-high-refinement-v1/T4c2/refinement-artifact.json --model-tag qwen3.6:27b-q4_K_M --expected-model-digest a50eda8ed977ab48a12431878896b27ffd5cef552c17af3317d9623b939a7f1e --timeout-seconds 300`
+  - `python3 scripts/local-agent/med_high_gate.py --refinement-artifact .agent/local-architect/med-high-refinement-v1/T4c2/refinement-artifact.json --primary-receipt .agent/local-architect/med-high-refinement-v1/T4c2/primary-route-receipt.json --card-hash 22dd8a44b4f03525ae2f601772b48249b7d9f3d49533021477c22abb5f62c116 --rri 43`
+  - `python3 scripts/peer-workflow-review.py --phase code --rri 43 --caller claude-code --content /tmp/t4c2.diff --task-id agent-session-preflight-T4c2 --artifact .agent/peer-code-review-T4c2.json`
+- Result: all commands passed; 93/93 tests pass; 95% branch coverage; ADR-038
+  gate resolved `CLOUD_REQUIRED` and was honored; peer review returned 3
+  findings, all verified and dispositioned `reviewed_no_change` with
+  evidence.
+
 ## T4c3 — Managed-policy boundary and blocker handoff
 
-- **Status:** [ ] Pending
+- **Status:** [x] Done
 - **Type:** docs/policy
-- **Effort:** M
-- **RRI:** 26 -> Moderate (recompute before execution if scope changes)
+- **Effort:** S
+- **RRI:** 8 -> Low (recomputed at presentation time from the ledger's stale
+  `26 -> Moderate` placeholder; see closure)
 - **Depends on:** T4c2
 
 ### Goal
@@ -2612,7 +2903,40 @@ layer cannot be installed from this repository.
 - `docs/plan/agent-session-preflight-gate.md`
 - `docs/tasks/agent-session-preflight-gate.md`
 
+### Closure
+
+- RRI recomputed at presentation time: `python3 scripts/rri.py --touches
+  docs/plan/agent-session-preflight-gate.md --touches
+  docs/tasks/agent-session-preflight-gate.md --C 0 --D 0 --K 0 --P 1 --T 0
+  --A 1 --X 1` -> `8 -> Low`, correcting the ledger's stale `26 -> Moderate`
+  placeholder. Low band: no approval card, no Reflection cycle;
+  docs/policy type exempts Phase-1 task-analysis review (`n/a`). Implemented
+  directly by the primary agent (not Gemma-delegated: interpretive/
+  structural documentation work stays with the primary agent per
+  `docs/policies/HITL_AUTONOMY_POLICY.md § Local delegation (RRI 0-25)`).
+- Task-analysis review: n/a — docs/policy task, Phase-1 exempt.
+- Code-solution review: n/a — no code changed; docs-only task exempt from
+  Step 1 of the development closure checklist.
+- The boundary/handoff note was added to
+  `docs/plan/agent-session-preflight-gate.md` (closure narrative, after the
+  T4c2 entry). It separates repository-level certification (`hook-gate`
+  fail-closed exit behavior in `scripts/agent-preflight.py:855`, the
+  git-tracked `.claude/settings.json` `PreToolUse` wiring, and the `T4c2`
+  audit re-hash) from administrator-managed non-bypassability, and records
+  the unresolved blocker: `~/.codex/config.toml` is a user-home file this
+  repository cannot deploy or monitor, `.claude/settings.json` is still a
+  locally-editable client setting, and `T4c1b` already proved a drifted
+  Codex hook fails silently with no agent-executable recovery. No admin/
+  fleet-level control (device-management policy, managed-settings
+  deployment) exists or is installed by this plan; that remains an explicit
+  handoff to whoever owns host/fleet policy for the machines running these
+  agents.
+- Evidence emitted: this closure entry plus the plan-file boundary/handoff
+  note (both files listed under "Status artifacts affected" above are
+  updated in this same pass).
+
 ## Closure
 
-T0-T3 are complete. Hardening now proceeds through `T4a1-T4c3`. No commit has
-been made.
+T0-T3 are complete. `T4a1-T4c3` are complete; this concludes the planned
+hardening sequence for the agent-session preflight gate. No commit has been
+made.

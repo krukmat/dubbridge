@@ -313,5 +313,81 @@ flowchart LR
   raw-stdin capture (`DUBBRIDGE_PREFLIGHT_DEBUG_STDIN`, inert when unset) so
   the next provider payload-shape mismatch is a one-command diagnosis rather
   than a two-task investigation.
-- The next intended start point is `T4c2` (audit coverage report and
-  certification math).
+- `T4c2` is complete: `scripts/agent-preflight.py audit` enumerates
+  `.agent/receipts/v2/*.json` (confirmed flat layout) and classifies each
+  session as `certified` or `opened_not_certified`, re-hashing every recorded
+  governing document against the current repository state and refusing any
+  full-certification claim unless every opened session is certified. The
+  user resolved an open design question before approval: "opened" is
+  defined as receipts-only (any session with >=1 receipt file, valid or
+  not), explicitly accepting that a session whose hook silently produced
+  zero receipts is invisible to this audit — that limitation is printed in
+  the command's own output, not only recorded here. RRI recomputed at
+  presentation time from the ledger's stale 28/Moderate placeholder to
+  43/Med-high (this task authors certification math over the same
+  fail-closed invariant T4a2-T4c1c all routed `CLOUD_REQUIRED`, applying the
+  T4a4 precedent with equal or greater force since this is production, not
+  test, code). ADR-038 routed `CLOUD_REQUIRED`; Claude implemented directly.
+  Run against the real, mixed-provenance `.agent/receipts/v2/` directory (11
+  files): correctly refused full certification (10/11 stale, tracking an
+  uncommitted edit to `docs/policies/HITL_AUTONOMY_POLICY.md` present in the
+  working tree at the time), exit code 1 — fail-closed behavior verified on
+  real data, not only clean fixtures. Peer review (`qwen3.6:27b-q4_K_M`)
+  returned 3 findings, all independently verified against running code and
+  rejected (2 false positives disproven by direct execution/source reading,
+  1 redundant with an already-covered test branch). One Reflection-driven
+  fix landed in the implementation itself (not from the peer review): a
+  malformed `native_instruction`/`documents` shape was originally silently
+  skipped instead of reported as a certification gap. See the ledger's
+  closure evidence for the full gate trace, 3-pass Reflection log, peer
+  review disposition, and unit coverage certification (93/93 passing, 95%
+  branch coverage).
+- The next intended start point is `T4c3` (managed-policy boundary and
+  blocker handoff).
+- **`T4c3` is complete.** RRI recomputed at presentation time from the
+  ledger's stale `26/Moderate` placeholder to `8/Low` (docs/policy note, no
+  code touched, D/K floor 0 on `docs/**`); implemented directly by the
+  primary agent per the Low-band route (no approval card, no Reflection
+  cycle, Phase-1 review `n/a`). The note documents two separate enforcement
+  levels that this plan's hardening work (`T4a1-T4c2`) established:
+  1. **Repository-level certification** (what is actually shipped and
+     verified): `scripts/agent-preflight.py hook-gate` returns
+     `allow: false` / exit 1 when no valid v2 receipt exists for the
+     session (`_run_hook_gate_command`, `scripts/agent-preflight.py:855`),
+     and `scripts/agent-preflight.py audit` re-hashes every recorded
+     governing document and refuses full certification if any opened
+     session is uncertified (`T4c2`). `.claude/settings.json` is
+     git-tracked and wires this gate as a `PreToolUse` hook for Claude
+     Code; `T4c1`/`T4c1b`/`T4c1c` proved both providers now publish real
+     v2 receipts from real sessions.
+  2. **Administrator-managed non-bypassability** (what the repository
+     cannot install or guarantee): the gate response is a cooperative
+     signal the provider's own client chooses to honor, not an
+     OS-enforced control — an operator can edit or delete the hook
+     definition on their own machine and the repository has no
+     mechanism to prevent or detect that in real time. Concretely:
+     - Codex's hook wiring lives in `~/.codex/config.toml`, a **user-home
+       file outside this repository's tracked tree** — this repo can
+       ship the hook *command* text as a reference, but cannot deploy it
+       into a developer's home directory, and has no CI signal if an
+       operator's copy drifts or is removed.
+     - `T4c1b` already demonstrated this empirically: a drifted Codex
+       hook (stale `trusted_hash` in `hooks.state`) fails **silently** —
+       no `hook:` line, no receipt, no error — and only a human in an
+       interactive TTY can re-trust it; no agent action can clear that
+       drift.
+     - `.claude/settings.json`, though git-tracked, is still a local
+       settings file the operator's Claude Code client reads from their
+       own checkout; nothing in this repository prevents a local edit,
+       override, or permission-mode change that skips the hook.
+  - **Blocker/handoff recorded, not closed as certification:** making the
+    gate literally non-bypassable requires host- or organization-level
+    controls outside repository permissions — for example, a
+    device-management policy pinning `~/.codex/config.toml` and
+    `.claude/settings.json` read-only, or a fleet-level Claude Code
+    managed-settings deployment. No such control is installed by this
+    plan, and none can be installed from repository scope. This remains
+    an open handoff to whoever owns host/fleet policy for the
+    machines running these agents; `T4a1-T4c2`'s repository-level
+    certification stands on its own but must not be read as literal
+    non-bypassable enforcement.

@@ -1261,5 +1261,255 @@ class AgentPreflightRacePermissionTest(unittest.TestCase):
             target_path.chmod(original_mode)
 
 
+class AgentPreflightAuditTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.doc_path = self.root / "GOVERNING.md"
+        self.doc_path.write_text("governing content v1\n", encoding="utf-8")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _publish(self, session_id: str, *, document_paths=None):
+        payload = agent_preflight.build_v2_receipt_payload(
+            provider="claude",
+            session_id=session_id,
+            actor_id="actor-1",
+            repo_root=self.root,
+            hook_event_name="startup",
+            source="hook",
+            transcript_path="/tmp/transcript.json",
+            native_instruction_mechanism="hook",
+            native_instruction_path="GOVERNING.md",
+            document_paths=list(document_paths or []),
+        )
+        return agent_preflight.publish_v2_receipt(self.root, payload)
+
+    def test_hp1_empty_receipts_dir_refuses_with_zero_opened(self):
+        audit = agent_preflight.audit_v2_receipts(self.root)
+
+        self.assertEqual(audit["opened_count"], 0)
+        self.assertEqual(audit["certified_count"], 0)
+        self.assertFalse(audit["fully_certified"])
+
+        report = agent_preflight.format_audit_report(audit)
+        self.assertIn("REFUSED", report)
+        self.assertIn("0 sessions with any receipt evidence", report)
+
+    def test_hp1_all_receipts_valid_and_unchanged_is_fully_certified(self):
+        self._publish("session-a")
+        self._publish("session-b")
+
+        audit = agent_preflight.audit_v2_receipts(self.root)
+
+        self.assertEqual(audit["opened_count"], 2)
+        self.assertEqual(audit["certified_count"], 2)
+        self.assertEqual(audit["not_certified_count"], 0)
+        self.assertTrue(audit["fully_certified"])
+
+        report = agent_preflight.format_audit_report(audit)
+        self.assertIn("CERTIFIED", report)
+        self.assertNotIn("REFUSED", report)
+
+        exit_code = agent_preflight.main(["--repo-root", str(self.root), "audit"])
+        self.assertEqual(exit_code, 0)
+
+    def test_ec1_stale_document_hash_is_never_counted_as_certified(self):
+        self._publish("session-stale", document_paths=["GOVERNING.md"])
+
+        self.doc_path.write_text("governing content v2 -- changed after publish\n", encoding="utf-8")
+
+        audit = agent_preflight.audit_v2_receipts(self.root)
+
+        self.assertEqual(audit["opened_count"], 1)
+        self.assertEqual(audit["certified_count"], 0)
+        self.assertFalse(audit["fully_certified"])
+        self.assertEqual(audit["sessions"][0]["status"], "opened_not_certified")
+        self.assertIn("stale document hash", audit["sessions"][0]["reasons"][0])
+
+        report = agent_preflight.format_audit_report(audit)
+        self.assertIn("REFUSED", report)
+        self.assertIn("stale document hash", report)
+
+        exit_code = agent_preflight.main(["--repo-root", str(self.root), "audit"])
+        self.assertEqual(exit_code, 1)
+
+    def test_ec1_malformed_json_receipt_is_opened_not_certified_never_crashes(self):
+        receipts_dir = agent_preflight.v2_receipts_dir(self.root)
+        receipts_dir.mkdir(parents=True, exist_ok=True)
+        (receipts_dir / "not-json.json").write_text("{not valid json", encoding="utf-8")
+
+        audit = agent_preflight.audit_v2_receipts(self.root)
+
+        self.assertEqual(audit["opened_count"], 1)
+        self.assertEqual(audit["certified_count"], 0)
+        self.assertFalse(audit["fully_certified"])
+
+    def _valid_schema_payload_with(self, **overrides):
+        base = {
+            "schema_version": agent_preflight.RECEIPT_SCHEMA_VERSION,
+            "provider": "claude",
+            "session_id": "session-x",
+            "actor_id": "actor-x",
+            "receipt_identity": "irrelevant-for-audit",
+            "repo_root": str(self.root.resolve()),
+            "lifecycle": {"hook_event_name": "startup", "source": "hook", "transcript_path": ""},
+            "loaded_at": "2026-07-29T00:00:00+00:00",
+            "native_instruction": {"path": "GOVERNING.md", "sha256": "deadbeef", "bytes": 0},
+            "documents": [],
+        }
+        base.update(overrides)
+        return base
+
+    def test_ec1_native_instruction_not_a_dict_is_reported_not_crashed(self):
+        receipts_dir = agent_preflight.v2_receipts_dir(self.root)
+        receipts_dir.mkdir(parents=True, exist_ok=True)
+        payload = self._valid_schema_payload_with(native_instruction="not-a-dict")
+        (receipts_dir / "corrupt-native.json").write_text(json.dumps(payload), encoding="utf-8")
+
+        audit = agent_preflight.audit_v2_receipts(self.root)
+
+        self.assertEqual(audit["certified_count"], 0)
+        self.assertFalse(audit["fully_certified"])
+
+    def test_ec1_documents_not_a_list_is_reported_not_crashed(self):
+        receipts_dir = agent_preflight.v2_receipts_dir(self.root)
+        receipts_dir.mkdir(parents=True, exist_ok=True)
+        payload = self._valid_schema_payload_with(documents="not-a-list")
+        (receipts_dir / "corrupt-documents.json").write_text(json.dumps(payload), encoding="utf-8")
+
+        audit = agent_preflight.audit_v2_receipts(self.root)
+
+        self.assertEqual(audit["certified_count"], 0)
+        self.assertFalse(audit["fully_certified"])
+
+    def test_ec1_document_entry_missing_path_or_sha256_is_malformed_not_crashed(self):
+        receipts_dir = agent_preflight.v2_receipts_dir(self.root)
+        receipts_dir.mkdir(parents=True, exist_ok=True)
+        real_native = agent_preflight.hash_source_file(self.root, "GOVERNING.md")
+        payload = self._valid_schema_payload_with(
+            native_instruction=real_native,
+            documents=[{"path": "GOVERNING.md"}],
+        )
+        (receipts_dir / "corrupt-doc-entry.json").write_text(json.dumps(payload), encoding="utf-8")
+
+        audit = agent_preflight.audit_v2_receipts(self.root)
+
+        self.assertEqual(audit["certified_count"], 0)
+        self.assertTrue(
+            any("malformed source entry" in reason for reason in audit["sessions"][0]["reasons"])
+        )
+
+    def test_ec1_document_list_entry_not_an_object_is_reported_not_crashed(self):
+        receipts_dir = agent_preflight.v2_receipts_dir(self.root)
+        receipts_dir.mkdir(parents=True, exist_ok=True)
+        real_native = agent_preflight.hash_source_file(self.root, "GOVERNING.md")
+        payload = self._valid_schema_payload_with(
+            native_instruction=real_native,
+            documents=["not-an-object"],
+        )
+        (receipts_dir / "corrupt-doc-list-entry.json").write_text(json.dumps(payload), encoding="utf-8")
+
+        audit = agent_preflight.audit_v2_receipts(self.root)
+
+        self.assertEqual(audit["certified_count"], 0)
+        self.assertTrue(
+            any(
+                "malformed document entry" in reason
+                for reason in audit["sessions"][0]["reasons"]
+            )
+        )
+
+    def test_ec1_schema_invalid_receipt_is_opened_not_certified(self):
+        receipts_dir = agent_preflight.v2_receipts_dir(self.root)
+        receipts_dir.mkdir(parents=True, exist_ok=True)
+        payload = self._valid_schema_payload_with(schema_version=1)
+        (receipts_dir / "wrong-schema.json").write_text(json.dumps(payload), encoding="utf-8")
+
+        audit = agent_preflight.audit_v2_receipts(self.root)
+
+        self.assertEqual(audit["opened_count"], 1)
+        self.assertEqual(audit["certified_count"], 0)
+        self.assertIn("schema validation failed", audit["sessions"][0]["reasons"][0])
+
+    @unittest.skipIf(os.geteuid() == 0, "root bypasses POSIX permission bits")
+    def test_ec1_unreadable_receipt_file_is_opened_not_certified_not_crashed(self):
+        receipts_dir = agent_preflight.v2_receipts_dir(self.root)
+        receipts_dir.mkdir(parents=True, exist_ok=True)
+        payload = self._valid_schema_payload_with()
+        target = receipts_dir / "unreadable.json"
+        target.write_text(json.dumps(payload), encoding="utf-8")
+        original_mode = stat.S_IMODE(target.stat().st_mode)
+        try:
+            target.chmod(0o000)
+            audit = agent_preflight.audit_v2_receipts(self.root)
+        finally:
+            target.chmod(original_mode)
+
+        self.assertEqual(audit["opened_count"], 1)
+        self.assertEqual(audit["certified_count"], 0)
+        self.assertIn("could not read receipt file", audit["sessions"][0]["reasons"][0])
+
+    def test_ec1_missing_native_instruction_source_file_is_reported(self):
+        receipts_dir = agent_preflight.v2_receipts_dir(self.root)
+        receipts_dir.mkdir(parents=True, exist_ok=True)
+        payload = self._valid_schema_payload_with(
+            native_instruction={"path": "DOES-NOT-EXIST.md", "sha256": "deadbeef", "bytes": 0},
+        )
+        (receipts_dir / "missing-source.json").write_text(json.dumps(payload), encoding="utf-8")
+
+        audit = agent_preflight.audit_v2_receipts(self.root)
+
+        self.assertEqual(audit["certified_count"], 0)
+        self.assertIn("Could not read source file", audit["sessions"][0]["reasons"][0])
+
+    def test_ec1_mixed_certified_and_not_certified_is_never_fully_certified(self):
+        stable_doc = self.root / "STABLE.md"
+        stable_doc.write_text("never changes\n", encoding="utf-8")
+        good_payload = agent_preflight.build_v2_receipt_payload(
+            provider="claude",
+            session_id="session-good",
+            actor_id="actor-1",
+            repo_root=self.root,
+            hook_event_name="startup",
+            source="hook",
+            transcript_path="/tmp/transcript.json",
+            native_instruction_mechanism="hook",
+            native_instruction_path="STABLE.md",
+            document_paths=[],
+        )
+        agent_preflight.publish_v2_receipt(self.root, good_payload)
+
+        self._publish("session-going-stale", document_paths=["GOVERNING.md"])
+        self.doc_path.write_text("changed\n", encoding="utf-8")
+
+        audit = agent_preflight.audit_v2_receipts(self.root)
+
+        self.assertEqual(audit["opened_count"], 2)
+        self.assertEqual(audit["certified_count"], 1)
+        self.assertEqual(audit["not_certified_count"], 1)
+        self.assertFalse(audit["fully_certified"])
+
+        exit_code = agent_preflight.main(["--repo-root", str(self.root), "audit"])
+        self.assertEqual(exit_code, 1)
+
+    def test_audit_is_read_only_and_never_modifies_receipt_files(self):
+        path = self._publish("session-readonly")
+        before = path.read_text(encoding="utf-8")
+
+        agent_preflight.audit_v2_receipts(self.root)
+
+        after = path.read_text(encoding="utf-8")
+        self.assertEqual(before, after)
+
+    def test_known_limitation_note_is_present_in_every_report(self):
+        audit = agent_preflight.audit_v2_receipts(self.root)
+        report = agent_preflight.format_audit_report(audit)
+
+        self.assertIn("Known limitation", report)
+        self.assertIn("invisible to this report", report)
+
+
 if __name__ == "__main__":
     unittest.main()

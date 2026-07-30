@@ -298,6 +298,159 @@ def load_v2_receipt(repo_root: Path, provider: str, session_id: str, actor_id: s
     return payload
 
 
+def _reverify_document_hashes(repo_root: Path, payload: Dict[str, Any]) -> List[str]:
+    """Return a list of human-readable mismatches between a receipt's recorded
+    native-instruction/document hashes and the current repository state.
+
+    Empty list means every recorded hash still matches the file on disk now.
+    A recorded source file that no longer exists, or whose content changed
+    since the receipt was published, is reported as a mismatch -- it is
+    never silently ignored."""
+    mismatches: List[str] = []
+    entries = []
+    native_instruction = payload.get("native_instruction")
+    if isinstance(native_instruction, dict):
+        entries.append(native_instruction)
+    else:
+        mismatches.append(f"malformed native_instruction (not an object): {native_instruction!r}")
+    documents = payload.get("documents")
+    if isinstance(documents, list):
+        for doc in documents:
+            if isinstance(doc, dict):
+                entries.append(doc)
+            else:
+                mismatches.append(f"malformed document entry (not an object): {doc!r}")
+    else:
+        mismatches.append(f"malformed documents (not an array): {documents!r}")
+
+    for entry in entries:
+        relative_path = entry.get("path")
+        recorded_sha256 = entry.get("sha256")
+        if not relative_path or not recorded_sha256:
+            mismatches.append(f"malformed source entry: {entry!r}")
+            continue
+        try:
+            current = hash_source_file(repo_root, relative_path)
+        except ReceiptValidationError as exc:
+            mismatches.append(f"{relative_path}: {exc}")
+            continue
+        if current["sha256"] != recorded_sha256:
+            mismatches.append(
+                f"{relative_path}: recorded sha256 {recorded_sha256} no longer "
+                f"matches current sha256 {current['sha256']}"
+            )
+    return mismatches
+
+
+def audit_v2_receipts(repo_root: Path) -> Dict[str, Any]:
+    """Classify every receipt file under RECEIPTS_DIR_RELATIVE as certified or
+    opened-but-not-certified, and refuse to imply full certification whenever
+    any receipt is not certified. Read-only: never writes, repairs, or deletes
+    a receipt file.
+
+    'Opened' is defined as: at least one receipt file present for that
+    identity. See AUDIT_KNOWN_LIMITATION for what this does and does not see.
+    """
+    receipts_dir = v2_receipts_dir(repo_root)
+    sessions: List[Dict[str, Any]] = []
+
+    if receipts_dir.is_dir():
+        receipt_files = sorted(receipts_dir.glob("*.json"))
+    else:
+        receipt_files = []
+
+    for receipt_path in receipt_files:
+        entry: Dict[str, Any] = {
+            "receipt_identity": receipt_path.stem,
+            "receipt_path": str(receipt_path),
+        }
+        try:
+            raw = receipt_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            entry["status"] = "opened_not_certified"
+            entry["reasons"] = [f"could not read receipt file: {exc}"]
+            sessions.append(entry)
+            continue
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            entry["status"] = "opened_not_certified"
+            entry["reasons"] = [f"receipt is not valid JSON: {exc}"]
+            sessions.append(entry)
+            continue
+
+        entry["provider"] = payload.get("provider") if isinstance(payload, dict) else None
+        entry["session_id"] = payload.get("session_id") if isinstance(payload, dict) else None
+
+        try:
+            validate_v2_receipt_payload(payload)
+        except ReceiptValidationError as exc:
+            entry["status"] = "opened_not_certified"
+            entry["reasons"] = [f"schema validation failed: {exc}"]
+            sessions.append(entry)
+            continue
+
+        mismatches = _reverify_document_hashes(repo_root, payload)
+        if mismatches:
+            entry["status"] = "opened_not_certified"
+            entry["reasons"] = [f"stale document hash: {m}" for m in mismatches]
+            sessions.append(entry)
+            continue
+
+        entry["status"] = "certified"
+        entry["reasons"] = []
+        sessions.append(entry)
+
+    opened_count = len(sessions)
+    certified_count = sum(1 for s in sessions if s["status"] == "certified")
+    not_certified_count = opened_count - certified_count
+    fully_certified = opened_count > 0 and not_certified_count == 0
+
+    return {
+        "receipts_dir": str(receipts_dir),
+        "opened_count": opened_count,
+        "certified_count": certified_count,
+        "not_certified_count": not_certified_count,
+        "fully_certified": fully_certified,
+        "sessions": sessions,
+        "known_limitation": AUDIT_KNOWN_LIMITATION,
+    }
+
+
+def format_audit_report(audit: Dict[str, Any]) -> str:
+    lines = [
+        "DubBridge agent preflight — v2 receipt audit",
+        "",
+        f"Receipts directory: {audit['receipts_dir']}",
+        f"Opened sessions (receipt present):    {audit['opened_count']}",
+        f"Certified sessions:                   {audit['certified_count']}",
+        f"Opened but NOT certified:              {audit['not_certified_count']}",
+        "",
+    ]
+    if audit["opened_count"] == 0:
+        lines.append("REFUSED: 0 sessions with any receipt evidence — cannot claim any certification.")
+    elif audit["fully_certified"]:
+        lines.append(
+            f"CERTIFIED: all {audit['certified_count']}/{audit['opened_count']} opened sessions "
+            "are fully certified (schema-valid, document hashes match current repository state)."
+        )
+    else:
+        lines.append(
+            f"REFUSED: {audit['not_certified_count']}/{audit['opened_count']} opened sessions "
+            "are NOT certified — cannot claim full certification."
+        )
+        for session in audit["sessions"]:
+            if session["status"] != "certified":
+                lines.append(
+                    f"  - {session['receipt_identity']} "
+                    f"(provider={session.get('provider')!r}, session_id={session.get('session_id')!r}): "
+                    + "; ".join(session["reasons"])
+                )
+    lines.append("")
+    lines.append(f"Known limitation: {audit['known_limitation']}")
+    return "\n".join(lines) + "\n"
+
+
 def _secure_mkdir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
     try:
@@ -550,7 +703,16 @@ GATE_RESPONSE_BUILDERS = {
 }
 
 
-V2_COMMANDS = ("load", "check", "hook-load", "hook-gate")
+V2_COMMANDS = ("load", "check", "hook-load", "hook-gate", "audit")
+
+AUDIT_KNOWN_LIMITATION = (
+    "This audit counts only sessions that produced at least one v2 receipt "
+    "file. A session whose hook silently failed to publish any receipt at "
+    "all (e.g. a hook-command/payload-shape mismatch, as found and fixed in "
+    "T4c1/T4c1b/T4c1c) is invisible to this report and is not counted as "
+    "'opened'. This is a known, accepted limitation of a receipts-only "
+    "audit, not an oversight."
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -565,7 +727,9 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "v2 receipt command: 'load' builds+publishes a receipt from explicit "
             "identity flags; 'check' validates an already-published receipt; "
-            "'hook-load' and 'hook-gate' read a provider hook JSON payload on stdin."
+            "'hook-load' and 'hook-gate' read a provider hook JSON payload on stdin; "
+            "'audit' reports certified/opened/not-certified counts across all "
+            "published receipts, refusing a full-certification claim if any gap exists."
         ),
     )
     parser.add_argument(
@@ -715,11 +879,18 @@ def _run_hook_gate_command(args: argparse.Namespace, repo_root: Path) -> int:
     return 0
 
 
+def _run_audit_command(args: argparse.Namespace, repo_root: Path) -> int:
+    audit = audit_v2_receipts(repo_root)
+    sys.stdout.write(format_audit_report(audit))
+    return 0 if audit["fully_certified"] else 1
+
+
 V2_COMMAND_HANDLERS = {
     "load": _run_load_command,
     "check": _run_check_command,
     "hook-load": _run_hook_load_command,
     "hook-gate": _run_hook_gate_command,
+    "audit": _run_audit_command,
 }
 
 
