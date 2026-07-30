@@ -43,6 +43,31 @@ class TerminalStateKind(Enum):
     COMMAND_REJECTED_OPTION_NOT_ALLOWED = "command_rejected_option_not_allowed"
     PATH_REJECTED_CONTAINMENT_ESCAPE = "path_rejected_containment_escape"
 
+    # T2c-1: sandboxed subprocess execution outcomes. Kept distinct from the
+    # T2b policy-validation states above -- COMMAND_PLAN_VALID means "this
+    # argv is authorized to run"; the states below describe what actually
+    # happened when it did.
+    SANDBOX_EXECUTION_COMPLETE = "sandbox_execution_complete"
+    SANDBOX_RUNTIME_UNAVAILABLE = "sandbox_runtime_unavailable"
+    SANDBOX_COMMAND_TIMED_OUT = "sandbox_command_timed_out"
+
+    # T2c-2: aggregate session-accounting outcomes layered on top of T2c-1's
+    # single-process states above. Kept distinct from SANDBOX_COMMAND_TIMED_OUT
+    # (a per-command result) and from each other -- a caller must be able to
+    # tell "this one command wrote too much output" apart from "the whole
+    # session ran out of wall-clock budget" apart from "the 15-command counter
+    # was already exhausted before this command could start".
+    SANDBOX_OUTPUT_CAP_EXCEEDED = "sandbox_output_cap_exceeded"
+    SANDBOX_WALL_BUDGET_EXCEEDED = "sandbox_wall_budget_exceeded"
+    SANDBOX_BUDGET_EXHAUSTED = "sandbox_budget_exhausted"
+    # A kill was issued but active post-kill verification could not confirm
+    # the process group actually exited within its bounded grace period.
+    # Kept distinct from the other T2c-2 kinds above (all of which imply
+    # "killed and confirmed gone") -- collapsing an unconfirmed kill into a
+    # normal timeout/cap-exceeded result would silently discard the one
+    # signal that teardown, not just the command, may have failed.
+    SANDBOX_TEARDOWN_UNCONFIRMED = "sandbox_teardown_unconfirmed"
+
 
 # Kinds produced by a successful, well-formed tool call.
 SUCCESS_KINDS = frozenset(
@@ -52,6 +77,7 @@ SUCCESS_KINDS = frozenset(
         TerminalStateKind.SUBMITTED_NO_VULNERABILITY_FOUND,
         TerminalStateKind.COMMAND_PLAN_VALID,
         TerminalStateKind.PATH_CONTAINMENT_VALID,
+        TerminalStateKind.SANDBOX_EXECUTION_COMPLETE,
     }
 )
 
@@ -76,12 +102,20 @@ class TerminalState:
     paths that resolved inside the snapshot). `detail` carries a
     human-readable reason for any non-success kind; it is diagnostic only
     and must never be parsed by callers to distinguish states -- use `kind`.
+    `stdout`/`stderr`/`elapsed_seconds`/`exit_code` are populated for T2c-1's
+    SANDBOX_EXECUTION_COMPLETE and SANDBOX_COMMAND_TIMED_OUT -- captured as
+    produced until process termination, with no size cap applied at this
+    layer (output-size limits are a T2c-2 resource-budget concern).
     """
 
     kind: TerminalStateKind
     argv: tuple[str, ...] = field(default_factory=tuple)
     candidates: tuple[str, ...] = field(default_factory=tuple)
     detail: str = ""
+    stdout: str = ""
+    stderr: str = ""
+    elapsed_seconds: float = 0.0
+    exit_code: int | None = None
 
     @property
     def is_success(self) -> bool:

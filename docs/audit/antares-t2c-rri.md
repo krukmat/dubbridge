@@ -100,6 +100,30 @@ Scope: CPU/RAM/PID caps, output-limit breach detection, wall-timeout across the
 15-command budget, and guaranteed teardown on timeout, sandbox violation, or
 early process exit. Depends on T2c-1's runner existing. Covers HP-2, EC-1, EC-3.
 
+#### T2c-2 — Presentation-time recomputation (2026-07-30, post-T2c-1)
+
+```bash
+python3 scripts/rri.py \
+  --touches scripts/antares/sandbox_budget.py \
+  --touches scripts/antares/sandbox_runner.py \
+  --touches scripts/antares/terminal_state.py \
+  --auto-cc \
+  --D 3 --K 3 --P 3 \
+  --T 1 --A 1 --X 2 \
+  --penalty no_verification
+```
+
+**Final RRI: 53 -> band Med-high (41-55) -> Effort L. Codex Balanced->Premium.
+Claude Balanced->Premium. thinking On**
+
+F rose from 1 to 2 (now touches T2c-1's real `sandbox_runner.py` and
+`terminal_state.py` in addition to the new `sandbox_budget.py`, vs. the
+single-file planning estimate). D/K/P/T/A/X judgments unchanged from the
+planning estimate — T2c-1's actual implementation shape (Protocol-based
+isolation, `TerminalState` dataclass fields for stdout/stderr/elapsed/exit_code)
+did not introduce new coupling or domain risk beyond what was anticipated.
+53 stays within Med-high; decomposition not triggered.
+
 Both subtasks stay within Med-high (41-55): band-routed review (phases 1/2, per
 the session's cloud-routing override for this session), 3 Reflection passes, and
 the human approval gate apply to each independently. Neither reaches the

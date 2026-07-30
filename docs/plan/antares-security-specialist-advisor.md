@@ -494,10 +494,56 @@ is now cancelled outright, because Antares does not propose RRI inputs.
   within the split target of `RRI <= 55` and `A <= 1`. Full rationale and
   both subtask computations: `docs/audit/antares-t2c-rri.md`. `T2d`'s
   dependency was updated from `T2c` to `T2c-2` accordingly.
+- `T2c-1` was implemented under the session-scoped cloud-routing override
+  (Med-high implementations routed directly to Claude Code cloud rather than
+  the ADR-038 local-first gate). Phase-1 task-analysis review
+  (`qwen3.6:27b-q4_K_M`) passed with two MINOR findings folded into the task
+  text before implementation. During Reflection, network isolation was
+  upgraded from a stripped-environment assumption to a real, empirically
+  verified `sandbox-exec` deny-network profile on macOS (fails closed to
+  `SANDBOX_RUNTIME_UNAVAILABLE` on any platform without a proven mechanism),
+  and a timeout process-group-kill defect (a grandchild forked under the
+  isolation wrapper could survive a timeout) was found and fixed with a live
+  test proving no descendant survives. Phase-2 code-solution review needed
+  the Gemma fallback (`qwen3.6:27b-q4_K_M` timed out, then returned an empty
+  response on the mandatory retry) and passed with no findings:
+  `docs/audit/gemma-evidence/antares-t2c-1-phase2.json`. Owner (Matias Kruk)
+  recorded final verification 2026-07-30; status is `[x] Done`. `T2c-2`
+  (resource budget, wall-timeout, teardown) is the next open task, depending
+  on `T2c-1`.
 - A defect in `scripts/local-architect/run_analysis.py` (missing `num_ctx`,
   causing schema-heavy `med-high-refinement-v1` responses to truncate) was
   found and fixed while executing T2a (RRI 22, Low band). This affects any
   future Med-high task using the ADR-038 refinement profile, not only T2a.
+- `T2c-2` (resource budget, wall-timeout, teardown) was implemented under the
+  same session-scoped cloud-routing override as `T2c-1`. During Reflection,
+  empirical testing on the macOS/Darwin implementation host surfaced two
+  platform-specific defects, both pre-existing platform limitations rather
+  than composition bugs: `RLIMIT_AS` cannot be set at all on Darwin, and
+  `RLIMIT_NPROC` there is scoped to the entire UID system-wide rather than the
+  sandboxed command's own process tree, so no cap value is both a real
+  per-command bound and compatible with an ordinary shell pipeline. Per owner
+  decision (two options presented; Option 1 selected), `_resource_limits_available()`
+  now unconditionally fails the whole session closed to
+  `SANDBOX_RUNTIME_UNAVAILABLE` on Darwin rather than enforce a partial/fake
+  cap set. A `PermissionError` gap in `_verify_teardown`'s stale-pgid handling
+  was also found and fixed. Phase-2 code-solution review needed a session-scoped
+  routing substitution: `qwen3.6:27b-q4_K_M` timed out twice against a
+  contended local Ollama instance (another process was independently confirmed
+  consuming it), so per explicit one-session owner override the review was
+  routed to an isolated cloud subagent instead of local Gemma, preserving the
+  D14 context-isolation contract. That review returned `FINDINGS` (2 BLOCKING,
+  3 MAJOR, 3 MINOR — a discarded teardown-verification result, an unbounded
+  blocking read reachable when a grandchild process outlives its parent, an
+  unguarded kill-fallback exception path, a fragile float-comparison outcome
+  discriminator, and weaker test coverage/assertions on several of the above).
+  All 8 were independently verified against the code before being fixed, and a
+  re-review of the same isolated agent against the fixed code returned `PASS`.
+  Owner (Matias Kruk) explicitly waived personal test-by-test final
+  verification rather than performing it (`AskUserQuestion`, 2026-07-30);
+  status is `[x] Done (owner-waived, 2026-07-30)`, distinct from a genuine
+  owner-verified closure. `T2d` (versioned artifact schema and redacted trace
+  contract) is now unblocked, depending on `T2c-2`.
 - No roadmap update is required until T5 retains a production operating mode.
 
 ## Related documents

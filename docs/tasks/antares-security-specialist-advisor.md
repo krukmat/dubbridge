@@ -64,8 +64,8 @@ T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c (decomposed: T2c-1 -> T2c-2) -> T2d 
 | T2a Tool-call parser and terminal-state contract | `[x] Done (2026-07-29)` | 45 Med-high (execution) | L | T1 |
 | T2b Command allowlist and canonical path containment | `[x] Done (2026-07-30)` | 50 Med-high (execution) | L | T2a |
 | T2c Ephemeral sandbox runner and resource enforcement | `[~] Decomposed (2026-07-30)` | 56 Complex (pre-decomposition) | L | T2b |
-| T2c-1 Sandbox process execution and isolation | `[ ] Open` | 49 Med-high (planning) | L | T2b |
-| T2c-2 Resource budget, wall-timeout, teardown | `[ ] Open` | 51 Med-high (planning) | L | T2c-1 |
+| T2c-1 Sandbox process execution and isolation | `[x] Done (2026-07-30)` | 49 Med-high (planning) | L | T2b |
+| T2c-2 Resource budget, wall-timeout, teardown | `[x] Done (owner-waived, 2026-07-30)` | 53 Med-high (execution) | L | T2c-1 |
 | T2d Versioned artifact schema and redacted trace contract | `[ ] Open` | Recompute | TBD | T2c-2 |
 | T2e Replay fixtures and integrated harness verification | `[ ] Open` | Recompute | TBD | T2d |
 | T3 CWE watchlist and context-complete packet construction | `[ ] Open` | Recompute | TBD | T2e |
@@ -887,7 +887,7 @@ and both subtask RRI computations: `docs/audit/antares-t2c-rri.md`.
 
 ## T2c-1 - Sandbox process execution and isolation
 
-- **Status:** `[ ] Open`
+- **Status:** `[x] Done` - 2026-07-30
 - **Type:** development / security-sensitive tooling
 - **Effort:** L (RRI 49 Med-high, planning estimate — recompute before implementation)
 - **RRI artifact:** `docs/audit/antares-t2c-rri.md` § T2c-1
@@ -957,19 +957,161 @@ verification across the whole run. Concretely:
 
 `Task-analysis review: qwen3.6:27b-q4_K_M docs/audit/gemma-evidence/antares-t2c-1-phase1.json - PASS`
 
+### Peer Reviewer evidence
+
+- Reviewer: `gemma` (fallback)
+- Command: manual Ollama `/api/generate` request against `gemma4:26b-a4b-it-qat`
+  with the full diff, task acceptance criteria, and independently-verified test
+  results (64/64 passing, empirical sandbox-exec network-block verification)
+- Artifact: `docs/audit/gemma-evidence/antares-t2c-1-phase2.json`
+- Verdict: `PASS`
+- Findings: none — HP-1/EC-2 confirmed satisfied, fail-closed network-isolation
+  boundary confirmed enforced (no unisolated success path), no resource-leak or
+  security concern raised, scope boundary with T2c-2 confirmed respected
+- Gemma fallback: `triggered` — reason: `qwen3.6:27b-q4_K_M` first attempt timed
+  out at the socket level (280s) against the ~600-line review packet; the
+  mandatory immediate retry against the same packet completed but returned an
+  empty `response` (`done_reason: length`, all 2048 tokens consumed by
+  thinking with no content emitted) — an unusable result under the "invalid
+  output" fallback trigger. First Gemma attempt itself truncated mid-finding
+  (`done_reason: length`) but returned a legible `PASS` verdict plus complete
+  HP-1/EC-2 findings before the cutoff; a second Gemma call with a larger
+  token budget and an explicit conciseness instruction returned a complete,
+  non-truncated response (`done_reason: stop`) answering all four review
+  questions, used as the final result.
+- D14 fallback: `not triggered` — reason: Gemma produced a usable consolidated
+  result on the second call
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted — no findings to disposition; verdict
+  confirmed consistent with the Reflection log below (both Reflection-pass
+  fixes were already in place at review time)
+
+`Code-solution review: gemma docs/audit/gemma-evidence/antares-t2c-1-phase2.json - PASS`
+
+### Reflection log
+
+Required passes: 3 (`49` → `Med-high`)
+
+#### Pass 1
+
+- **Draft verdict:** initial `run_sandboxed` used a stripped environment and a
+  no-op-unless-root privilege drop, but never actually disabled network access
+  at the OS level — the credential-stripped environment does not stop an
+  allowlisted binary from making a network call.
+- **Critique findings:**
+  - The "network-disabled ... for every invocation" acceptance criterion was
+    not met: no mechanism in the draft actually blocked network syscalls, so
+    every `SANDBOX_EXECUTION_COMPLETE` success path was returned without a
+    verified isolation guarantee.
+- **Revisions applied:**
+  - Introduced an injectable `NetworkIsolation` strategy; added
+    `MacosSandboxExecIsolation` (real `sandbox-exec` deny-network profile) and
+    `UnavailableNetworkIsolation` (fails every run closed to
+    `SANDBOX_RUNTIME_UNAVAILABLE` rather than running unisolated).
+  - Empirically verified with a live `curl` call under the profile (exit 6,
+    `http_code 000`) that the network block is real, not just unit-tested
+    against a mock.
+
+#### Pass 2
+
+- **Draft verdict:** network isolation was now real, but two resource-hygiene
+  gaps remained: the macOS sandbox profile temp file was never cleaned up, and
+  a timeout only killed the `sandbox-exec` wrapper PID — a grandchild process
+  it forked could survive as an orphan.
+- **Critique findings:**
+  - `MacosSandboxExecIsolation.wrap` wrote a `/tmp/antares-sandbox-*.sb` file
+    per invocation with no corresponding cleanup — a per-session resource leak
+    that will compound once T2c-2's 15-command budget starts calling this
+    repeatedly.
+  - `process.kill()` in the timeout path only signals the immediate PID.
+    Under the real macOS wrapper, that PID is `sandbox-exec`, not the actual
+    command — a forked grandchild could keep running after the reported
+    timeout, which is exactly the "teardown leaves a process running" failure
+    class the RRI evidence names as the P=4 driver for this task.
+- **Revisions applied:**
+  - Added `cleanup()` to the `NetworkIsolation` protocol and
+    `MacosSandboxExecIsolation`; `run_sandboxed` now calls it on every exit
+    path (success, timeout, bootstrap failure).
+  - Switched to `start_new_session=True` plus `os.killpg` on timeout so the
+    kill reaches the whole process group, with a `process.kill()` fallback if
+    the group kill itself fails.
+  - Added a live test (`test_timeout_kills_grandchild_process_spawned_under_the_wrapper`)
+    that spawns `sleep 5` under the real `sandbox-exec` wrapper and confirms
+    via `pgrep` that nothing survives the timeout kill.
+
+#### Pass 3
+
+- **Draft verdict:** functionally complete and re-verified (64/64 tests
+  passing); reviewed acceptance criteria, HP-1/EC-2 coverage, and the module
+  docstring for accuracy.
+- **Critique findings:**
+  - The module docstring stated "dropped privileges" as an unqualified
+    guarantee, but the implementation is a documented no-op when the host
+    process is not running as root (the common case in dev/CI) — the
+    docstring overstated what the code actually enforces in that case.
+- **Revisions applied:**
+  - Reworded the module docstring to state the privilege-drop behavior
+    precisely (enforced only when the host runs as root; a documented no-op
+    otherwise), matching what `_drop_privileges`'s own docstring already said.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | validated command completes in sandbox, captured stdout/stderr + timing | `scripts/antares/sandbox_runner_test.py::RunSandboxedHappyPathTest::test_hp1_validated_command_completes_with_captured_output_and_timing` | passed |
+| HP-1 | Happy path | non-zero exit / stderr also captured correctly | `scripts/antares/sandbox_runner_test.py::RunSandboxedHappyPathTest::test_hp1_captures_stderr_and_nonzero_exit_code` | passed |
+| EC-2 | Edge case | missing snapshot root fails closed to runtime_unavailable | `scripts/antares/sandbox_runner_test.py::RunSandboxedRuntimeUnavailableTest::test_ec2_missing_snapshot_root_is_runtime_unavailable` | passed |
+| EC-2 | Edge case | no network isolation available never falls through to an unisolated success | `scripts/antares/sandbox_runner_test.py::RunSandboxedRuntimeUnavailableTest::test_ec2_unavailable_network_isolation_is_runtime_unavailable_not_unisolated_run` | passed |
+| EC-2 | Edge case | subprocess bootstrap failure (missing executable) fails closed | `scripts/antares/sandbox_runner_test.py::RunSandboxedRuntimeUnavailableTest::test_ec2_bootstrap_failure_from_nonexistent_executable_is_runtime_unavailable` | passed |
+
+Supporting evidence beyond the approved HP/EC cases (per-command timeout kill,
+real network-block verification, resource cleanup — all Reflection-pass fixes):
+
+| Behavior | Unit test evidence | Result |
+|---|---|---|
+| per-command timeout kills the subprocess | `scripts/antares/sandbox_runner_test.py::RunSandboxedTimeoutTest::test_timeout_kills_subprocess_and_returns_timed_out_state` | passed |
+| macOS sandbox-exec profile actually blocks network (live syscall test) | `scripts/antares/sandbox_runner_test.py::MacosSandboxExecIsolationTest::test_macos_isolation_actually_blocks_network_when_available` | passed |
+| timeout kill reaches a grandchild forked under the wrapper, not just the wrapper PID | `scripts/antares/sandbox_runner_test.py::MacosSandboxExecIsolationTest::test_timeout_kills_grandchild_process_spawned_under_the_wrapper` | passed |
+| sandbox profile temp file is cleaned up after `wrap()`/after a full run | `scripts/antares/sandbox_runner_test.py::MacosSandboxExecIsolationTest::test_cleanup_removes_the_profile_file_written_by_wrap`, `::test_run_sandboxed_cleans_up_profile_file_after_completion` | passed |
+
+Full suite: `python3 -m pytest scripts/antares/ -q` -> 64 passed.
+
+### Owner final verification
+
+- Owner: `Matias Kruk`
+- Date: `2026-07-30`
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior, including the empirically-verified network-isolation and process-group-kill guarantees added during Reflection.
+- Commands run: `python3 -m pytest scripts/antares/ -q` (64 passed),
+  `python3 -m pytest scripts/antares/sandbox_runner_test.py -v`,
+  `python3 -m py_compile scripts/antares/sandbox_runner.py
+  scripts/antares/sandbox_runner_test.py scripts/antares/terminal_state.py`,
+  `make qa-fmt`
+
 ## T2c-2 - Resource budget, wall-timeout, and teardown enforcement
 
-- **Status:** `[ ] Open`
+- **Status:** `[x] Done (owner-waived, 2026-07-30)` — implementation,
+  Reflection log, and phase-2 review complete. Owner final verification was
+  explicitly waived rather than performed as a personal test-by-test check —
+  see that section below for the verbatim waiver record.
 - **Type:** development / security-sensitive tooling
-- **Effort:** L (RRI 51 Med-high, planning estimate — recompute before implementation)
+- **Effort:** L (RRI 53 Med-high, presentation-time recomputation — `docs/audit/antares-t2c-rri.md` § T2c-2 addendum, 2026-07-30)
 - **RRI artifact:** `docs/audit/antares-t2c-rri.md` § T2c-2
-- **Depends on:** T2c-1
+- **Depends on:** T2c-1 (`[x] Done`, 2026-07-30)
 - **Decomposed from:** T2c
 
 ### Objective
 
 Enforce CPU/RAM/PID/output resource caps and the 15-command wall-time budget on
 top of T2c-1's runner, and guarantee teardown under every termination path.
+
+### Scope boundary with T2c-1
+
+T2c-1 owns single-process lifecycle (launch, isolate, per-command timeout, kill
+on that timeout). T2c-2 owns aggregate session accounting: the 15-command
+counter, wall-clock budget across the whole run, per-command CPU/RAM/PID/output
+caps, and confirming (not assuming) teardown after every T2c-1 exit path
+(`SANDBOX_EXECUTION_COMPLETE`, `SANDBOX_RUNTIME_UNAVAILABLE`,
+`SANDBOX_COMMAND_TIMED_OUT`).
 
 ### Happy paths considered
 
@@ -985,10 +1127,34 @@ top of T2c-1's runner, and guarantee teardown under every termination path.
 ### Acceptance criteria
 
 - CPU, RAM, PID, and output caps are enforced deterministically per command.
+- **Output cap uses streaming/polling with early-abort, not post-hoc
+  truncation.** Phase-1 review (Gemma, `docs/audit/gemma-evidence/antares-t2c-2-phase1.json`)
+  flagged post-hoc truncation as insufficient: `process.communicate()` buffers
+  unboundedly before returning, so a process that writes arbitrarily large
+  output can OOM the supervisor before any cap is checked — converting an
+  exhaustion attempt into a host-level DoS. The runner must read
+  stdout/stderr incrementally (polling or a reader thread) and kill the
+  process once the byte cap is exceeded, not after `communicate()` returns.
+- Resource limits (CPU/RAM/PID via `RLIMIT_CPU`/`RLIMIT_AS`/`RLIMIT_NPROC`)
+  compose with T2c-1's `_drop_privileges` into a single `preexec_fn` — Python's
+  `Popen` accepts only one. Ordering matters: setting limits must happen
+  before privilege drop where the limit itself requires privilege to raise,
+  and must not silently no-op after privileges are already dropped.
 - Wall timeout and the 15-command budget produce explicit degraded termination
-  states, never a silent stop.
+  states, never a silent stop. Budget exhaustion is a pre-flight guard (checked
+  before starting a command); per-command timeout is a runtime result of an
+  already-started command — the two are sequential checks, not competing
+  outcomes, and must remain distinguishable in the reported terminal state
+  (e.g. command #15 timing out reports `SANDBOX_COMMAND_TIMED_OUT`, not budget
+  exhaustion; a 16th command is refused before it starts).
 - Teardown executes on every exit path (success, timeout, violation, exhaustion) —
-  verified, not assumed.
+  verified with an active post-kill check (e.g. confirm no process from the
+  killed group remains after a short grace period), not assumed from the kill
+  call succeeding. The verification step itself must not use an unbounded
+  read (do not reintroduce the output-cap problem inside teardown logic).
+- If POSIX resource-limit primitives are unavailable on the host platform, the
+  runner fails closed to `SANDBOX_RUNTIME_UNAVAILABLE` rather than running
+  without enforced caps — consistent with T2c-1's network-isolation precedent.
 
 ### Evidence to emit
 
@@ -998,6 +1164,230 @@ top of T2c-1's runner, and guarantee teardown under every termination path.
 ### Status artifacts affected
 
 - this ledger and the slice plan
+
+### Peer Reviewer evidence (phase 1 — task-analysis review)
+
+- Reviewer: `gemma` (fallback — see below)
+- Command: manual Ollama `/api/chat` invocation, packet at
+  `/private/tmp/claude-501/-Users-matias-dubbridge/5a356528-f43c-46c4-ba10-cbfd75ef2044/scratchpad/t2c2-phase1-packet.txt`
+- Artifact: `docs/audit/gemma-evidence/antares-t2c-2-phase1.json`
+- Verdict: `PASS` (with architectural guidance, folded into acceptance criteria above)
+- Findings: scope decomposition confirmed clean; output-cap mechanism must be
+  decided now (streaming, not post-hoc); `preexec_fn` composition and
+  post-kill teardown verification flagged as concrete implementation risks;
+  command #15 budget-vs-timeout sequencing clarified; platform fail-closed
+  assumption confirmed sound
+- qwen3.6:27b-q4_K_M attempts: 2 (first: socket timeout at 280s, no response;
+  retry: `done_reason: length`, empty `content` after 2048 tokens consumed
+  entirely by internal `thinking` — both unusable per policy)
+- Gemma fallback: `triggered` — reason: qwen unavailable after mandatory
+  immediate retry (empty content both attempts)
+- D14 fallback: `not triggered` — reason: Gemma fallback produced a usable,
+  complete (`done_reason: stop`) result on first call
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted all findings; incorporated into
+  acceptance criteria (output-cap mechanism, preexec_fn composition note,
+  teardown verification requirement, command #15 sequencing) before
+  presentation
+
+```
+Task-analysis review: gemma docs/audit/gemma-evidence/antares-t2c-2-phase1.json - PASS
+```
+
+### Reflection log
+
+Required passes: 3 (`53` → `Med-high`)
+
+#### Pass 1 (resource-limit composition)
+
+- **Draft verdict:** `_compose_preexec` composes `RLIMIT_CPU`/`RLIMIT_AS`/`RLIMIT_NPROC`
+  with `_drop_privileges` into one `preexec_fn`, limits-before-privilege-drop, per
+  acceptance criteria. `_resource_limits_available()` initially excluded only
+  `RLIMIT_AS` on Darwin.
+- **Critique findings:** empirical testing surfaced two real platform bugs, not
+  design flaws: (1) `RLIMIT_NPROC` on Darwin/BSD is scoped to the entire UID
+  system-wide, not the sandboxed command's own process tree, so the module
+  default (16) made trivial multi-process pipelines (`yes | head`) fail with
+  `fork: Resource temporarily unavailable`; (2) `_verify_teardown` only caught
+  `ProcessLookupError` around the post-kill existence probe, but macOS can raise
+  `PermissionError` for a stale/reused pgid, causing test errors.
+- **Revisions applied:** extended `_resource_limits_available()`'s Darwin
+  exclusion to cover `RLIMIT_NPROC` as well as `RLIMIT_AS` (owner-approved,
+  Option 1 of two presented) — no cap value is simultaneously a real per-command
+  bound and compatible with an ordinary shell pipeline on this platform, so the
+  whole session fails closed there rather than enforce a partial/fake cap.
+  Updated the `_preexec_without_darwin_unenforceable_rlimits` test double
+  (renamed from `_preexec_without_rlimit_as`) to match. Widened
+  `_verify_teardown`'s exception handling to `(ProcessLookupError,
+  PermissionError)` in both the polling loop and the final check.
+
+#### Pass 2 (output-cap safety)
+
+- **Draft verdict:** `_read_capped` never calls `process.communicate()`; the
+  main read loop polls via `selectors` with a bounded chunk size and checks the
+  byte total after every chunk, satisfying the phase-1 review's core
+  requirement.
+- **Critique findings:** re-running the suite surfaced a genuine resource leak
+  (unclosed stdout/stderr pipe fds and un-reaped zombies on the
+  kill/cap-exceeded exit path — `ResourceWarning` and `subprocess still
+  running` warnings under test). The isolated phase-2 reviewer additionally
+  found the "drain remaining output after the process exits" branch used a raw
+  blocking `os.read` in a `while True` loop despite a comment claiming it was
+  non-blocking — a grandchild still holding a pipe's write end open (e.g. `yes`
+  outliving `sh` in `yes | head`) could hang it indefinitely, reintroducing the
+  exact unbounded-read failure class this module exists to prevent.
+- **Revisions applied:** added `_close_process_pipes()` and `process.wait()`
+  calls on both exit paths to reap zombies and release fds. Replaced the
+  drain-on-exit loop's raw `os.read` with the same `selectors`-based,
+  time-bounded pattern (0.1s deadline, 0.02s per-select timeout) used by the
+  main read loop.
+
+#### Pass 3 (teardown verification)
+
+- **Draft verdict:** `_kill_process_group` → `_verify_teardown` → `process.wait()`
+  ordering on the kill path is deliberate: the kernel will not recycle
+  `process.pid` until the zombie is reaped, so verifying before reaping avoids a
+  TOCTOU where a recycled pid could resolve to an unrelated process.
+- **Critique findings:** the isolated phase-2 reviewer found `_verify_teardown`'s
+  boolean return value was computed but discarded at both call sites — a kill
+  that could not be confirmed within its grace period was silently reported as
+  a plain `SANDBOX_OUTPUT_CAP_EXCEEDED`/`SANDBOX_COMMAND_TIMED_OUT`, indistinguishable
+  from a clean kill, defeating the "actively verified" acceptance criterion.
+  Separately, `_kill_process_group`'s `process.kill()` fallback was unguarded
+  and could itself raise `ProcessLookupError` on the same already-exited race
+  `_verify_teardown` already treats as success, risking an unhandled exception
+  out of `run_budgeted`. A third finding: the wall-budget-vs-command-timeout
+  discriminator (`effective_timeout < command_timeout_seconds`) was a
+  post-hoc float comparison rather than a decision made once at the point of
+  computation, fragile at exact equality.
+- **Revisions applied:** added `TerminalStateKind.SANDBOX_TEARDOWN_UNCONFIRMED`
+  and wired the kill path to return it when `_verify_teardown` is `False`,
+  before the cap/timeout branches. Wrapped `_kill_process_group`'s
+  `process.kill()` fallback in its own `try/except` for the same exception
+  family. Replaced the float comparison with a `wall_budget_is_binding`
+  boolean computed once from `remaining_wall_seconds() <= command_timeout_seconds`
+  at the same point `effective_timeout` is derived, so exact equality correctly
+  attributes to the wall budget. The clean-exit path's own
+  `_verify_teardown(process)` call after `process.wait()` was deliberately left
+  unwired to a distinct outcome — the process has already exited on its own at
+  that point (no kill was issued), so there is nothing for verification to
+  meaningfully fail; this was confirmed as an intentional scope boundary, not
+  an oversight, by both the primary agent's own analysis and the phase-2
+  reviewer's independent re-check.
+
+### Peer Reviewer evidence (phase 2 — code-solution review)
+
+- Reviewer: `d14` (context-isolated cloud subagent; general-purpose, isolated
+  from the orchestrator's development transcript — fed only the diff/files and
+  acceptance criteria, per the D14 isolation-packet contract)
+- Session-scoped routing note: `qwen3.6:27b-q4_K_M` was attempted first per the
+  canonical 26–55 band chain. Two consecutive attempts against the same
+  packet both failed with a socket timeout (600s, then 900s with a bounded
+  `num_predict`) — Ollama was independently confirmed to be under contention
+  from another concurrent local process at the time (`llama-server` actively
+  consuming CPU). Per explicit owner instruction for this session only
+  ("dado que hay otro proceso usando los modelos locales... prioriza derivar a
+  cloud los reviews... define agentes enfocados en la tarea a realizar
+  aislados del orquestador"), the fallback for this task was redirected from
+  the local Gemma step to an isolated cloud subagent instead, preserving the
+  D14 isolation contract (context-isolated, advisory-only, diff + criteria
+  only, no development transcript). This is a one-session routing
+  substitution, not a change to the standing band-routed reviewer policy.
+- Command: `Agent` tool invocation, `subagent_type: general-purpose`,
+  isolation packet at
+  `/private/tmp/claude-501/-Users-matias-dubbridge/5a356528-f43c-46c4-ba10-cbfd75ef2044/scratchpad/t2c2-sandbox_budget.py`,
+  `t2c2-sandbox_budget_test.py`, `t2c2-terminal_state.diff`
+- Artifact: agent transcript (`ae34b3ac176c56d67`), two calls — initial review
+  and post-fix re-review
+- Verdict: initial `FINDINGS` (2 BLOCKING, 3 MAJOR, 3 MINOR) → **`PASS`** after
+  all 8 findings were fixed and re-verified independently by the same isolated
+  agent against the post-fix files
+- Findings (initial pass): (1) BLOCKING — `_verify_teardown`'s return value
+  discarded, unconfirmed kills unreported; (2) BLOCKING — no test coverage for
+  that failure branch; (3) MAJOR — blocking `os.read` in the drain-on-exit
+  loop could hang on a surviving grandchild; (4) MAJOR — `_kill_process_group`
+  fallback could raise past the caller; (5) MAJOR — fragile float-comparison
+  timeout/wall-budget discriminator; (6) MINOR — under-commented redundant
+  teardown check; (7) MINOR — weak CPU-limit test assertion (elapsed time only,
+  no outcome-kind check); (8) MINOR — no test for the kill-fallback exception
+  path
+- qwen3.6:27b-q4_K_M attempts: 2 (both: socket timeout, no response — packet
+  size against a contended local model, consistent with the phase-1 review's
+  prior experience with this model on large packets)
+- Gemma fallback: `not triggered` — reason: session-scoped owner override
+  redirected the fallback path to an isolated cloud subagent instead of local
+  Gemma, specifically because Ollama was independently confirmed contended by
+  another process
+- D14 fallback: `triggered` — reason: `qwen3.6:27b-q4_K_M` unavailable after
+  the mandatory immediate retry; routed to the context-isolated subagent per
+  the standing D14 fallback contract, substituting a cloud isolated agent for
+  the usual local Balanced-tier subagent for this session only
+- disposition_divergence: `none` — every finding was independently reproduced
+  and verified against the actual code by the primary agent before a fix was
+  applied (see Reflection log above), not merely accepted on the reviewer's
+  assertion; the reviewer's post-fix re-check independently confirmed all 8 as
+  FIXED with no new findings
+- Primary-agent disposition: accepted all 8 findings; all fixed and covered by
+  new/tightened unit tests; one informational observation from the re-review
+  (clean-exit path's own unwired `_verify_teardown` call) evaluated and
+  confirmed as an intentional scope boundary, not a defect
+
+```
+Code-solution review: d14 (isolated cloud subagent ae34b3ac176c56d67) - PASS
+```
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-2 | Happy path | command within budget completes, counter increments | `scripts/antares/sandbox_budget_test.py::RunBudgetedHappyPathTest::test_hp2_command_within_budget_completes_and_increments_counter` | passed |
+| HP-2 | Happy path | a full 15-command run stops cleanly within budget | `scripts/antares/sandbox_budget_test.py::RunBudgetedHappyPathTest::test_hp2_a_full_multi_command_run_stops_cleanly_within_budget` | passed |
+| EC-1 | Edge case | 16th command refused before starting (pre-flight) | `scripts/antares/sandbox_budget_test.py::RunBudgetedCommandBudgetTest::test_ec1_sixteenth_command_is_refused_before_starting` | passed |
+| EC-1 | Edge case | command #15 timing out reports timeout, not exhaustion | `scripts/antares/sandbox_budget_test.py::RunBudgetedCommandBudgetTest::test_ec1_command_number_fifteen_timing_out_reports_timeout_not_exhaustion` | passed |
+| EC-1 | Edge case | wall budget already exhausted refuses before starting | `scripts/antares/sandbox_budget_test.py::RunBudgetedWallBudgetTest::test_ec1_wall_budget_already_exhausted_is_refused_before_starting` | passed |
+| EC-1 | Edge case | wall budget exhausted mid-command is distinct from command timeout (incl. exact-equality discriminator fix) | `scripts/antares/sandbox_budget_test.py::RunBudgetedWallBudgetTest::test_ec1_wall_budget_exhausted_mid_command_is_distinct_from_command_timeout` | passed |
+| EC-1 | Edge case | output cap breach aborts early, not after buffering full output | `scripts/antares/sandbox_budget_test.py::RunBudgetedOutputCapTest::test_ec1_output_cap_breach_aborts_early_not_after_communicate` | passed |
+| EC-1 | Edge case | resource limits unavailable fails closed (generic) | `scripts/antares/sandbox_budget_test.py::RunBudgetedRuntimeUnavailableTest::test_ec1_resource_limits_unavailable_fails_closed` | passed |
+| EC-1 | Edge case | Darwin host fails closed end-to-end, unpatched | `scripts/antares/sandbox_budget_test.py::RunBudgetedDarwinFailClosedTest::test_ec1_darwin_host_fails_closed_without_any_patching` | passed |
+| EC-3 | Edge case | teardown confirmed after timeout kill | `scripts/antares/sandbox_budget_test.py::RunBudgetedTeardownTest::test_ec3_teardown_confirmed_after_timeout_kill` | passed |
+| EC-3 | Edge case | teardown confirmed after output-cap kill | `scripts/antares/sandbox_budget_test.py::RunBudgetedTeardownTest::test_ec3_teardown_confirmed_after_output_cap_kill` | passed |
+| EC-3 | Edge case | unconfirmed teardown is its own distinct, observable outcome | `scripts/antares/sandbox_budget_test.py::RunBudgetedTeardownTest::test_ec3_unconfirmed_teardown_is_its_own_distinct_outcome` | passed |
+| EC-3 | Edge case | kill-fallback race (already-exited process) does not raise | `scripts/antares/sandbox_budget_test.py::KillProcessGroupTest::test_fallback_kill_swallows_already_exited_race_instead_of_raising` | passed |
+
+Supporting (non-`HP`/`EC`-tagged, but load-bearing for the acceptance criteria):
+`ResourceLimitsAvailabilityTest` (Darwin/non-Darwin fail-closed detection),
+`SessionBudgetUnitTest` (preflight/remaining-seconds arithmetic),
+`ComposedPreexecTest::test_cpu_rlimit_actually_terminates_a_cpu_bound_loop`
+(empirical proof of `RLIMIT_CPU` enforcement via signal-killed exit code, not
+just elapsed time), `RunBudgetedOutputCapTest::test_hp2_output_within_cap_is_captured_completely`.
+
+Full suite: 19/19 passed (`python3 -m unittest scripts.antares.sandbox_budget_test`,
+also clean under `-W error::ResourceWarning`, confirming no fd/zombie leaks).
+T2c-1's own 19 tests (`sandbox_runner_test.py`, `terminal_state_test.py`)
+remain passing, unaffected by the `terminal_state.py` addition.
+
+### Owner final verification
+
+- **Status: WAIVED (not a genuine verification).** Asked explicitly whether
+  the owner had personally run or reviewed the verification commands before
+  authorizing closure (`AskUserQuestion`, 2026-07-30). The owner's answer was
+  "Autorizo cerrar sin verificación manual explícita" — an explicit,
+  documented waiver of personal test-by-test review, not a statement that the
+  owner verified each `HP-#`/`EC-#` case's unit test evidence genuinely
+  covers the claimed behavior. Recorded per
+  `docs/policies/HITL_AUTONOMY_POLICY.md`'s waiver provision: "A user may
+  waive this checkpoint only by explicitly authorizing execution without
+  another approval for a clearly bounded task; record that waiver."
+- Owner: `Matias Kruk`
+- Date: `2026-07-30`
+- Waiver statement (verbatim): "Autorizo cerrar sin verificación manual
+  explícita."
+- Agent-run commands (owner did not independently run or review these before
+  waiving): `python3 -m unittest scripts.antares.sandbox_budget_test -v`;
+  `python3 -W error::ResourceWarning -m unittest
+  scripts.antares.sandbox_budget_test -v` (confirms no fd/zombie leaks);
+  `python3 -m unittest scripts.antares.sandbox_runner_test
+  scripts.antares.terminal_state_test` (confirms T2c-1 unaffected).
 
 ## T2d - Versioned artifact schema and redacted trace contract
 
