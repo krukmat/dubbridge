@@ -279,9 +279,8 @@ mod tests {
     use super::*;
 
     fn redis_url_for_test_from_env(redis_url: Option<String>) -> String {
-        redis_url.expect(
-            "DUBBRIDGE_REDIS_URL must be set when running ignored Redis integration tests",
-        )
+        redis_url
+            .expect("DUBBRIDGE_REDIS_URL must be set when running ignored Redis integration tests")
     }
 
     fn redis_url_for_test() -> String {
