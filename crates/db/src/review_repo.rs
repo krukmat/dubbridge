@@ -27,6 +27,7 @@ struct ReviewTaskRowDb {
     project_id: Uuid,
     asset_id: Uuid,
     target_language_id: Uuid,
+    subtitle_artifact_id: Option<Uuid>,
     assignee_subject_id: Option<Uuid>,
     created_at: OffsetDateTime,
     updated_at: OffsetDateTime,
@@ -73,6 +74,7 @@ fn task_from_db(r: ReviewTaskRowDb) -> ReviewTask {
         project_id: ProjectId(r.project_id),
         asset_id: AssetId(r.asset_id),
         target_language_id: r.target_language_id,
+        subtitle_artifact_id: r.subtitle_artifact_id,
         assignee_subject_id: r.assignee_subject_id,
         created_at: r.created_at,
         updated_at: r.updated_at,
@@ -106,9 +108,9 @@ pub async fn insert_review_task(pool: &PgPool, task: &ReviewTask) -> Result<(), 
         r#"
         INSERT INTO review_tasks (
             id, org_id, project_id, asset_id, target_language_id,
-            assignee_subject_id, created_at, updated_at, assigned_at
+            subtitle_artifact_id, assignee_subject_id, created_at, updated_at, assigned_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         "#,
     )
     .bind(task.id.0)
@@ -116,6 +118,7 @@ pub async fn insert_review_task(pool: &PgPool, task: &ReviewTask) -> Result<(), 
     .bind(task.project_id.0)
     .bind(task.asset_id.0)
     .bind(task.target_language_id)
+    .bind(task.subtitle_artifact_id)
     .bind(task.assignee_subject_id)
     .bind(task.created_at)
     .bind(task.updated_at)
@@ -134,6 +137,7 @@ pub async fn get_review_task(
     let row = sqlx::query_as::<_, ReviewTaskRowDb>(
         r#"
         SELECT id, org_id, project_id, asset_id, target_language_id,
+               subtitle_artifact_id,
                assignee_subject_id, created_at, updated_at, assigned_at
         FROM review_tasks
         WHERE id = $1
@@ -228,6 +232,7 @@ pub async fn list_review_tasks_for_scope(
         sqlx::query_as::<_, ReviewTaskRowDb>(
             r#"
             SELECT id, org_id, project_id, asset_id, target_language_id,
+                   subtitle_artifact_id,
                    assignee_subject_id, created_at, updated_at, assigned_at
             FROM review_tasks
             WHERE org_id = $1 AND project_id = $2 AND assignee_subject_id = $3
@@ -244,6 +249,7 @@ pub async fn list_review_tasks_for_scope(
         sqlx::query_as::<_, ReviewTaskRowDb>(
             r#"
             SELECT id, org_id, project_id, asset_id, target_language_id,
+                   subtitle_artifact_id,
                    assignee_subject_id, created_at, updated_at, assigned_at
             FROM review_tasks
             WHERE org_id = $1 AND project_id = $2

@@ -150,6 +150,8 @@ pub struct ReviewTask {
     pub project_id: ProjectId,
     pub asset_id: AssetId,
     pub target_language_id: Uuid,
+    /// Optional until later wiring persists the exact derived subtitle artifact identity.
+    pub subtitle_artifact_id: Option<Uuid>,
     pub assignee_subject_id: Option<Uuid>,
     pub created_at: OffsetDateTime,
     pub updated_at: OffsetDateTime,
@@ -196,6 +198,21 @@ mod tests {
 
     fn actor() -> Uuid {
         Uuid::new_v4()
+    }
+
+    fn review_task() -> ReviewTask {
+        ReviewTask {
+            id: ReviewTaskId::new(),
+            org_id: OrgId::new(),
+            project_id: ProjectId::new(),
+            asset_id: AssetId::new(),
+            target_language_id: Uuid::new_v4(),
+            subtitle_artifact_id: None,
+            assignee_subject_id: None,
+            created_at: OffsetDateTime::now_utc(),
+            updated_at: OffsetDateTime::now_utc(),
+            assigned_at: None,
+        }
     }
 
     fn approved_row(task_id: ReviewTaskId) -> ReviewDecisionRow {
@@ -256,6 +273,20 @@ mod tests {
         let state = derive_review_state(&[approved, rejected]);
         assert_eq!(state, ReviewTaskState::Rejected);
         assert!(!state.is_publishable());
+    }
+
+    #[test]
+    fn hp3_review_task_carries_optional_subtitle_artifact_id() {
+        let artifact_id = Uuid::new_v4();
+        let mut task = review_task();
+        task.subtitle_artifact_id = Some(artifact_id);
+        assert_eq!(task.subtitle_artifact_id, Some(artifact_id));
+    }
+
+    #[test]
+    fn ec3_review_task_allows_missing_subtitle_artifact_id() {
+        let task = review_task();
+        assert_eq!(task.subtitle_artifact_id, None);
     }
 
     // EC-3: unknown persisted publication state fails closed

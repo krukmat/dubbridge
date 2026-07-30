@@ -9,12 +9,13 @@ slice: S-140
 > **Status:** Active 2026-07-30. Authored 2026-07-20 via ADR-037 T5 (Local
 > Architect advisory verified against repository evidence; see reconciliation in
 > `docs/evaluations/adr037-direct-project-report.md`). T0/T1a/T1b-i/T1b-ii/T1c/
-> T1d/T2a/T2b-i/T2b-ii/T3a/T3b/T3c-i/T3c-ii/T5a/T6 are complete and
+> T1d/T2a/T2b-i/T2b-ii/T3a/T3b/T3c-i/T3c-ii/T5a/T5b-a/T6 are complete and
 > synchronized. `T3c-ii` closed on 2026-07-30 via owner-waived phase-2 review;
 > `T3c-iii` also closed on 2026-07-30 (RRI 39 Moderate) with explicit Redis CI
 > gating + review evidence synchronized; `T3c-iv` remains the only deferred
-> later-phase non-blocker, and `T5b` remains optional/unscoped. The roadmap row
-> remains `in progress` because `T3c-iv` and `X-S-160-3` are still open.
+> later-phase non-blocker, and only the post-`T5b-a` remainder of `T5b` stays
+> optional/unscoped. The roadmap row remains `in progress` because `T3c-iv` and
+> `X-S-160-3` are still open.
 > **Roadmap phase:** `S-140` — Processing / Subtitle generation.
 > **Tasks ledger:** `docs/tasks/s-140-subtitle-generation.md`.
 
@@ -44,15 +45,15 @@ design ("The contract operates ahead of real subtitle/dub producers",
 `docs/adr/ADR-030-review-decision-ledger-and-fail-closed-publication-gate.md:104`).
 Only the narrow sub-item X-S-160-3 and the full S-170 slice depend on S-140.
 **X-S-160-3 is not fully closed by S-140 as scoped below**: `review_tasks`
-(`infra/migrations/0014_create_review_tasks.sql`,
-`crates/domain/src/review.rs`) stores only `(project_id, asset_id,
-target_language_id)` — it has no column for derived-artifact identity or
-version. S-140-T5a enqueuing a review task on `SubtitleStatus::Ready` gives
-X-S-160-3 a real subtitle artifact to point *at*, but the review task itself
-still cannot carry that artifact's identity without a schema change. Closing
-X-S-160-3 requires that schema change as an explicit, separately-scoped
-follow-up (S-160 or S-140-T5b, to be decided at T5a/T5b presentation) — it is
-not a side effect of T5a as currently decomposed.
+now has a nullable `subtitle_artifact_id` foreign-key column
+(`infra/migrations/0026_add_review_tasks_subtitle_artifact_id.sql`,
+`crates/domain/src/review.rs`), so the gate can carry derived-artifact
+identity. What remains open is the downstream repo/enqueue ownership wiring and
+any explicit artifact-version semantics. S-140-T5a enqueuing a review task on
+`SubtitleStatus::Ready` gives X-S-160-3 a real subtitle artifact to point *at*;
+`S-140-T5b-a` gives that row a place to store the identity; closing X-S-160-3
+still requires the later follow-up that decides and wires the remaining
+non-schema behavior.
 
 ## Objective
 
@@ -351,4 +352,4 @@ S-130 TranscriptionStatus::Ready → [T2 enqueue] → SubtitleJob
 | Multilingual subtitles | **Not a risk** — explicitly out of scope, owned by S-150 per roadmap pipeline |
 | S-160/S-170 dependency framing | S-160 is done; only X-S-160-3 and full S-170 depend on S-140 — do not reintroduce the corrected "S-160 blocked" framing in task text |
 | ADR-030 compliance | Must reuse the existing gate; any new/parallel review path is a fail-closed violation, not a design option |
-| X-S-160-3 closure requires a `review_tasks` schema change | `review_tasks` has no artifact-identity column today (`infra/migrations/0014_create_review_tasks.sql`); T5 must decide and scope that change explicitly, not assume the existing gate already carries derived-artifact identity |
+| X-S-160-3 closure requires follow-up beyond the `T5b-a` schema change | `review_tasks` now has nullable `subtitle_artifact_id` identity storage (`infra/migrations/0026_add_review_tasks_subtitle_artifact_id.sql`), but closure still needs downstream ownership wiring and any explicit version semantics; do not assume the column alone closes the gap |

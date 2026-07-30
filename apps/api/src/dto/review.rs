@@ -81,6 +81,7 @@ mod tests {
             project_id: ProjectId::new(),
             asset_id: AssetId::new(),
             target_language_id: Uuid::new_v4(),
+            subtitle_artifact_id: None,
             assignee_subject_id: Some(Uuid::new_v4()),
             created_at: OffsetDateTime::now_utc(),
             updated_at: OffsetDateTime::now_utc(),

@@ -31,6 +31,7 @@ pub async fn prepare_review_post_ready(
         project_id,
         asset_id,
         target_language_id,
+        subtitle_artifact_id: None,
         assignee_subject_id: None,
         created_at: OffsetDateTime::now_utc(),
         updated_at: OffsetDateTime::now_utc(),

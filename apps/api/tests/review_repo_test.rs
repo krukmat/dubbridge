@@ -136,6 +136,7 @@ fn new_task(scope: &ReviewScope, asset_id: AssetId, assignee_subject_id: Uuid) -
         project_id: scope.project_id,
         asset_id,
         target_language_id: scope.target_language_id,
+        subtitle_artifact_id: None,
         assignee_subject_id: Some(assignee_subject_id),
         created_at: now,
         updated_at: now,
@@ -265,6 +266,86 @@ async fn approve_decision_round_trips_to_approved_state() {
 }
 
 #[tokio::test]
+async fn review_task_round_trips_optional_subtitle_artifact_id() {
+    let Some(pool) = setup_pool().await else {
+        eprintln!("skipping: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    let scope = insert_review_scope(&pool).await;
+    let mut task = new_task(&scope, scope.asset_id, scope.reviewer_subject_id);
+    let subtitle_artifact_id = Uuid::new_v4();
+
+    sqlx::query(
+        "INSERT INTO artifact_records (id, asset_id, kind, ingest_token, storage_key, content_type, size_bytes, checksum) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+    )
+    .bind(subtitle_artifact_id)
+    .bind(scope.asset_id.0)
+    .bind("subtitle")
+    .bind(Uuid::new_v4())
+    .bind("subtitles/test.vtt")
+    .bind("text/vtt")
+    .bind(32_i64)
+    .bind("deadbeef")
+    .execute(&pool)
+    .await
+    .expect("insert subtitle artifact");
+
+    task.subtitle_artifact_id = Some(subtitle_artifact_id);
+    review_repo::insert_review_task(&pool, &task)
+        .await
+        .expect("insert review task");
+
+    let fetched = review_repo::get_review_task(&pool, task.id)
+        .await
+        .expect("get review task")
+        .expect("stored task");
+
+    assert_eq!(fetched.subtitle_artifact_id, Some(subtitle_artifact_id));
+}
+
+#[tokio::test]
+async fn legacy_review_task_rows_keep_null_subtitle_artifact_id() {
+    let Some(pool) = setup_pool().await else {
+        eprintln!("skipping: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    let scope = insert_review_scope(&pool).await;
+    let task = new_task(&scope, scope.asset_id, scope.reviewer_subject_id);
+
+    review_repo::insert_review_task(&pool, &task)
+        .await
+        .expect("insert review task");
+
+    let fetched = review_repo::get_review_task(&pool, task.id)
+        .await
+        .expect("get review task")
+        .expect("stored task");
+
+    assert_eq!(fetched.subtitle_artifact_id, None);
+}
+
+#[tokio::test]
+async fn review_task_rejects_unknown_subtitle_artifact_id() {
+    let Some(pool) = setup_pool().await else {
+        eprintln!("skipping: DUBBRIDGE_DATABASE_URL not set");
+        return;
+    };
+
+    let scope = insert_review_scope(&pool).await;
+    let mut task = new_task(&scope, scope.asset_id, scope.reviewer_subject_id);
+    task.subtitle_artifact_id = Some(Uuid::new_v4());
+
+    let err = review_repo::insert_review_task(&pool, &task)
+        .await
+        .expect_err("foreign-key violation expected");
+
+    assert!(matches!(err, dubbridge_db::error::DbError::QueryFailed(_)));
+    assert!(err.to_string().contains("subtitle_artifact_id"));
+}
+
+#[tokio::test]
 async fn scoped_queue_filters_out_other_projects_and_assignees() {
     let Some(pool) = setup_pool().await else {
         eprintln!("skipping: DUBBRIDGE_DATABASE_URL not set");
@@ -284,6 +365,7 @@ async fn scoped_queue_filters_out_other_projects_and_assignees() {
         project_id: scope.other_project_id,
         asset_id: scope.other_asset_id,
         target_language_id: Uuid::new_v4(),
+        subtitle_artifact_id: None,
         assignee_subject_id: Some(scope.reviewer_subject_id),
         created_at: other_now,
         updated_at: other_now,

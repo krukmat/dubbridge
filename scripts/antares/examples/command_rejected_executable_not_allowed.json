@@ -1,0 +1,28 @@
+{
+  "argv": [],
+  "artifact_id": "example-command_rejected_executable_not_allowed-r1",
+  "budget": null,
+  "candidates": [],
+  "detail": "example rejection detail for command_rejected_executable_not_allowed",
+  "disposition": {
+    "note": null,
+    "reviewed_at": null,
+    "reviewer": null,
+    "state": "needs-human-review"
+  },
+  "elapsed_seconds": null,
+  "exit_code": null,
+  "finding_id": "example-command_rejected_executable_not_allowed",
+  "kind": "command_rejected_executable_not_allowed",
+  "provenance": {
+    "harness_version": "antares-harness@example",
+    "model_version": "fdtn-ai/antares-1b@example",
+    "packet_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "runtime_version": "scripts/antares@example",
+    "snapshot_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "schema_version": 1,
+  "supersedes": null,
+  "teardown_grace_seconds": null,
+  "trace_ref": null
+}

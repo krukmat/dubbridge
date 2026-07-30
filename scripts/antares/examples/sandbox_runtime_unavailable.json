@@ -1,0 +1,30 @@
+{
+  "argv": [
+    "run-candidate-check"
+  ],
+  "artifact_id": "example-sandbox_runtime_unavailable-r1",
+  "budget": null,
+  "candidates": [],
+  "detail": "example: sandbox runtime unavailable",
+  "disposition": {
+    "note": null,
+    "reviewed_at": null,
+    "reviewer": null,
+    "state": "needs-human-review"
+  },
+  "elapsed_seconds": 1.5,
+  "exit_code": null,
+  "finding_id": "example-sandbox_runtime_unavailable",
+  "kind": "sandbox_runtime_unavailable",
+  "provenance": {
+    "harness_version": "antares-harness@example",
+    "model_version": "fdtn-ai/antares-1b@example",
+    "packet_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "runtime_version": "scripts/antares@example",
+    "snapshot_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "schema_version": 1,
+  "supersedes": null,
+  "teardown_grace_seconds": null,
+  "trace_ref": null
+}

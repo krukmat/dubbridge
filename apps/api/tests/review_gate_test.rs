@@ -105,6 +105,7 @@ async fn insert_review_task(pool: &PgPool, scope: &ReviewScope) -> ReviewTaskId 
         project_id: scope.project_id,
         asset_id: scope.asset_id,
         target_language_id: scope.target_language_id,
+        subtitle_artifact_id: None,
         assignee_subject_id: Some(scope.reviewer_subject_id),
         created_at: now,
         updated_at: now,

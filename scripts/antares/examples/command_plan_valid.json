@@ -1,0 +1,33 @@
+{
+  "argv": [
+    "grep",
+    "-n",
+    "pattern",
+    "file.py"
+  ],
+  "artifact_id": "example-command_plan_valid-r1",
+  "budget": null,
+  "candidates": [],
+  "detail": "",
+  "disposition": {
+    "note": null,
+    "reviewed_at": null,
+    "reviewer": null,
+    "state": "needs-human-review"
+  },
+  "elapsed_seconds": null,
+  "exit_code": null,
+  "finding_id": "example-command_plan_valid",
+  "kind": "command_plan_valid",
+  "provenance": {
+    "harness_version": "antares-harness@example",
+    "model_version": "fdtn-ai/antares-1b@example",
+    "packet_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "runtime_version": "scripts/antares@example",
+    "snapshot_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "schema_version": 1,
+  "supersedes": null,
+  "teardown_grace_seconds": null,
+  "trace_ref": null
+}

@@ -1,0 +1,37 @@
+{
+  "argv": [],
+  "artifact_id": "example-sandbox_output_cap_exceeded-r1",
+  "budget": {
+    "consumed": 100.0,
+    "limit": 100.0,
+    "unit": "bytes"
+  },
+  "candidates": [],
+  "detail": "",
+  "disposition": {
+    "note": null,
+    "reviewed_at": null,
+    "reviewer": null,
+    "state": "needs-human-review"
+  },
+  "elapsed_seconds": 42.0,
+  "exit_code": null,
+  "finding_id": "example-sandbox_output_cap_exceeded",
+  "kind": "sandbox_output_cap_exceeded",
+  "provenance": {
+    "harness_version": "antares-harness@example",
+    "model_version": "fdtn-ai/antares-1b@example",
+    "packet_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "runtime_version": "scripts/antares@example",
+    "snapshot_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "schema_version": 1,
+  "supersedes": null,
+  "teardown_grace_seconds": null,
+  "trace_ref": {
+    "byte_length": 128,
+    "content_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "redaction_version": 1,
+    "storage_uri": "file://var/antares-traces/sandbox_output_cap_exceeded.trace"
+  }
+}

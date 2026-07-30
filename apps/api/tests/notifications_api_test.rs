@@ -598,6 +598,7 @@ async fn insert_review_fixture(pool: &PgPool, subject_id: Uuid) -> ReviewFixture
         project_id: project.id,
         asset_id: asset.id,
         target_language_id: target_language.id,
+        subtitle_artifact_id: None,
         assignee_subject_id: Some(subject_id),
         created_at: now,
         updated_at: now,
