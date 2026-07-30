@@ -63,6 +63,29 @@ skip the full approval card under the Low-band route.
 `Evidence to emit` and `Status artifacts to sync` remain part of the execution
 contract; summarize them in the card and keep their full paths in the task ledger.
 
+## Live per-task todo list (Claude Code and Codex)
+
+Block 3 (`Agent workflow`) is a frozen snapshot taken at presentation time.
+Every orchestrator — Claude Code and Codex alike — must additionally keep a
+**live, per-task todo/checklist** that mirrors block 3's rows and stays
+current as the task actually moves through phases: seed it before
+implementation starts, keep normally one entry `in_progress` at a time, flip
+an entry to `completed` only once that phase's own gate has passed, and keep
+a `BLOCKED` or escalated entry visible (never silently dropped) until it is
+resolved, user-waived, or reported blocked. If a phase reroutes mid-task
+(local implementer escalates to cloud, a reviewer falls back down its chain),
+update that entry's named responsible agent/model to the actual participant.
+
+Use whichever native mechanism the orchestrator has — Claude Code's
+`TodoWrite` tool, Codex's own plan/task tracking — as long as it renders an
+equivalent visible list naming the resolved responsible agent per phase, not
+a generic role label. This list is a transparency/tracking artifact, not an
+approval or review gate: an entry marked `completed` still requires that
+phase's own evidence to exist. RRI 0–25 and docs/config/migration/ADR/plan/
+task-ledger/policy-only tasks use the reduced phase set defined in
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Live per-task phase todo list`,
+which is authoritative for the full contract.
+
 ## Complexity And Model Guidance
 
 **When RRI has been computed**, the `Complexity` field in the task presentation must

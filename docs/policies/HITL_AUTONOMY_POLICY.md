@@ -199,6 +199,12 @@ approval for a clearly bounded task; record that waiver in the card or ledger.
 - Drafting plans, task lists, ADRs, and proposals (no code execution).
 - Non-destructive fixes to documentation and configuration when explicitly
   authorized to "fix inconsistencies".
+- Creating and updating the live per-task todo list required by
+  `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Live per-task phase todo list`.
+  This list is a transparency/tracking artifact only — it never substitutes
+  for the HITL approval checkpoint, the band-routed review chain, or any
+  other closure gate in this policy; marking an entry `completed` does not
+  by itself certify that the corresponding gate passed.
 
 ## Safety rules
 

@@ -159,7 +159,10 @@ Use the six-block Compact Approval Task Card v2 from
 2. Scope and acceptance: objective, in/out boundaries, behaviors, evidence, and
    status sync.
 3. Agent workflow: actual participant for every phase, including gates and
-   fallbacks.
+   fallbacks. This block also seeds a **live, per-task todo list** that must be
+   kept current phase-by-phase during execution, not just shown once at
+   presentation — see `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Live per-task
+   phase todo list`.
 4. Diagrams: agent workflow plus technical scope for development tasks.
 5. Material references only.
 6. Approval checkpoint or explicit bounded waiver.

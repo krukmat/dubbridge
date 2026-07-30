@@ -197,6 +197,61 @@ Required completion format for development tasks:
 - Commands run: `<exact test commands>`
 ```
 
+## Live per-task phase todo list
+
+Every orchestrator (Claude Code, Codex, or any other primary agent acting as
+orchestrator of record) must keep a **live, per-task todo/checklist** that
+mirrors the Compact Approval Task Card's `Agent workflow` block (block 3) and
+stays current as the task actually moves through phases. Block 3 is a frozen
+snapshot taken at presentation time; this checklist is the running tracker
+during execution — it is not satisfied by showing the card once and moving on.
+
+**Mechanism (tool-agnostic).** Use whichever native checklist/plan mechanism
+the orchestrator has — Claude Code uses its `TodoWrite` tool; Codex uses its
+own plan/task-tracking mechanism. Both must render an equivalent visible list:
+one entry per applicable phase, each entry naming the **resolved responsible
+agent/model** for that phase (not a generic role label such as "reviewer"),
+and a status of `pending`, `in_progress`, `blocked`, or `completed`.
+
+**Phase set by band:**
+
+- **RRI 26+ (Moderate through Complex+):** one entry per row of the approval
+  card's `Agent workflow` table — Analyze/scope, Phase 1 review, Approval,
+  Implement, Reflect and verify, Phase 2 review, Close.
+- **RRI 0–25 (Low):** a reduced list matching the phases that actually apply —
+  e.g. Analyze, Gemma/D14 review, Implement (primary agent or Gemma
+  Developer), Close.
+- **Docs-only, config-only, migration-only, ADR, plan, task-ledger, or
+  policy-only tasks:** a minimal list (1–3 entries) is sufficient; a
+  genuinely single-step task may skip the list entirely, matching the
+  existing phase-1-review and Reflection exemptions for this task class.
+
+**Update discipline:**
+
+- Seed the list before implementation starts — immediately after the task is
+  presented and approved (RRI 26+), or immediately before direct execution
+  (RRI 0–25).
+- Normally exactly one phase entry is `in_progress` at a time.
+- Flip an entry to `completed` only when that phase's own gate has actually
+  passed (for example, do not mark "Phase 1 review" `completed` before the
+  reviewer's verdict is `PASS`).
+- A `BLOCKED` review verdict, a failed acceptance run, or an escalation keeps
+  the corresponding entry `blocked` — never silently `completed` or dropped —
+  until it is resolved, explicitly user-waived, or reported blocked.
+- When a task reroutes mid-flight (a local implementer fails and escalates to
+  cloud, a Med-high gate resolves `CLOUD_REQUIRED`, a reviewer falls back down
+  its chain), update the affected entry's responsible agent/model to the
+  actual resolved participant. Do not leave a pre-escalation name in place.
+
+**Authority boundary.** The live todo list is a transparency and tracking
+artifact, not a new approval or review gate. It does not replace the HITL
+approval checkpoint, the band-routed review chain, the Reflection log, or any
+other closure gate defined elsewhere in this guide. An entry marked
+`completed` still requires that phase's own evidence (review artifact,
+Reflection log, unit coverage certification, owner verification, etc.) — the
+checklist records that the step happened, it does not certify that it
+happened correctly.
+
 ## ADR change propagation
 
 An ADR change that occurs outside a task ledger (e.g. a replan, a hotfix, or a

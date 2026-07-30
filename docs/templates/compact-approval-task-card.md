@@ -42,6 +42,12 @@ and RRI evidence in the linked task ledger or RRI artifact.
 | Phase 2 review | `<resolved reviewer>` | Must PASS; fallback `<chain>` |
 | Close | `<primary orchestrator>` | Emit evidence and synchronize status artifacts |
 
+This table seeds a **live per-task todo list** (Claude Code `TodoWrite` /
+Codex's own plan tracking) that the orchestrator keeps updated
+phase-by-phase during execution — it is not satisfied by this static
+snapshot alone. See `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Live per-task
+phase todo list`.
+
 For reviewed tasks:
 
 `Task-analysis review: <reviewer> <artifact> - <PASS|BLOCKED>`
