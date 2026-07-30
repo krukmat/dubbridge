@@ -9,58 +9,125 @@ Scope boundary (see docs/tasks/antares-security-specialist-advisor.md § T2c-2):
 T2c-1 owns single-process lifecycle (launch, isolate, per-command timeout,
 kill on that timeout). T2c-2 owns session-level policy layered around calls
 to that primitive -- it does not re-implement process isolation.
+
+This module is the Facade for T2c-2 (T2e-pre decomposition, pure refactor,
+zero intended behavior change): `run_budgeted` composes
+`sandbox_resource_limits.py` (RLIMIT/Darwin detection + composed preexec_fn),
+`sandbox_session_budget.py` (command/wall-clock accounting), and
+`sandbox_process_io.py` (process supervision, teardown verification, capped
+incremental read). Every name those modules define that `run_budgeted` or an
+existing test depends on is re-exported here as a bare module-level name --
+see docs/tasks/antares-security-specialist-advisor.md § T2e-pre EC-1/EC-2 for
+why this must be bare-name re-export, not qualified submodule access:
+`sandbox_budget_test.py` patches several of these names directly on this
+module object (`unittest.mock.patch.object(_MODULE, "_verify_teardown", ...)`
+and similar), and Python resolves a bare name inside a function body against
+its *defining module's* globals at call time -- `run_budgeted` must therefore
+keep calling these as bare names resolved from this module's own namespace,
+not as `sandbox_process_io._verify_teardown(...)` qualified access, or the
+test's patches would silently stop taking effect.
 """
 
 from __future__ import annotations
 
 import importlib.util
-import os
-import platform
-import resource
-import selectors
-import signal
+import os  # re-export only: sandbox_budget_test.py patches _MODULE.os.killpg
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
-_TERMINAL_STATE_SCRIPT = Path(__file__).with_name("terminal_state.py")
-_TERMINAL_STATE_SPEC = importlib.util.spec_from_file_location(
-    "antares_terminal_state", _TERMINAL_STATE_SCRIPT
-)
-if _TERMINAL_STATE_SPEC is None or _TERMINAL_STATE_SPEC.loader is None:
-    raise RuntimeError(f"Unable to load script spec for {_TERMINAL_STATE_SCRIPT}")
-_TERMINAL_STATE_MOD = importlib.util.module_from_spec(_TERMINAL_STATE_SPEC)
-sys.modules[_TERMINAL_STATE_SPEC.name] = _TERMINAL_STATE_MOD
-_TERMINAL_STATE_SPEC.loader.exec_module(_TERMINAL_STATE_MOD)
 
+def _load_sibling_module(module_name: str, filename: str):
+    """Load `filename` as `module_name`, reusing an already-loaded copy from
+    `sys.modules` if one exists.
+
+    Required once a single concern is split across sibling files that must
+    share one class identity for Enum/dataclass types defined elsewhere
+    (e.g. `TerminalStateKind`): `importlib.util.module_from_spec` +
+    `exec_module` always re-executes a file from scratch and does not
+    consult `sys.modules` on its own, so two independent loads of the same
+    file produce two distinct, non-`==`-comparable class objects. See
+    docs/tasks/antares-security-specialist-advisor.md § T2e-pre EC-4.
+    """
+    if module_name in sys.modules:
+        return sys.modules[module_name]
+    script = Path(__file__).with_name(filename)
+    spec = importlib.util.spec_from_file_location(module_name, script)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Unable to load script spec for {script}")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_TERMINAL_STATE_MOD = _load_sibling_module("antares_terminal_state", "terminal_state.py")
 TerminalState = _TERMINAL_STATE_MOD.TerminalState
 TerminalStateKind = _TERMINAL_STATE_MOD.TerminalStateKind
 
-_SANDBOX_RUNNER_SCRIPT = Path(__file__).with_name("sandbox_runner.py")
-_SANDBOX_RUNNER_SPEC = importlib.util.spec_from_file_location(
-    "antares_sandbox_runner", _SANDBOX_RUNNER_SCRIPT
+# sandbox_session_budget.py must load (and thus resolve its own
+# "antares_terminal_state" sys.modules lookup) BEFORE anything below loads
+# sandbox_runner.py. sandbox_runner.py is an existing, unmodified file that
+# unconditionally re-loads terminal_state.py without checking sys.modules
+# first, silently overwriting the shared "antares_terminal_state" entry --
+# harmless for this module's own TerminalState/TerminalStateKind names
+# (already captured above by the time that happens), but it would otherwise
+# race sandbox_session_budget.py's own check-first lookup into inheriting a
+# *different* TerminalStateKind class object than this module's, breaking
+# every `result.kind == TerminalStateKind.X` comparison in
+# sandbox_budget_test.py even though both sides print identically. See
+# docs/tasks/antares-security-specialist-advisor.md § T2e-pre EC-4.
+_SANDBOX_SESSION_BUDGET_MOD = _load_sibling_module(
+    "antares_sandbox_session_budget", "sandbox_session_budget.py"
 )
-if _SANDBOX_RUNNER_SPEC is None or _SANDBOX_RUNNER_SPEC.loader is None:
-    raise RuntimeError(f"Unable to load script spec for {_SANDBOX_RUNNER_SCRIPT}")
-_SANDBOX_RUNNER_MOD = importlib.util.module_from_spec(_SANDBOX_RUNNER_SPEC)
-sys.modules[_SANDBOX_RUNNER_SPEC.name] = _SANDBOX_RUNNER_MOD
-_SANDBOX_RUNNER_SPEC.loader.exec_module(_SANDBOX_RUNNER_MOD)
+DEFAULT_COMMAND_BUDGET = _SANDBOX_SESSION_BUDGET_MOD.DEFAULT_COMMAND_BUDGET
+DEFAULT_WALL_BUDGET_SECONDS = _SANDBOX_SESSION_BUDGET_MOD.DEFAULT_WALL_BUDGET_SECONDS
+SessionBudget = _SANDBOX_SESSION_BUDGET_MOD.SessionBudget
 
+_SANDBOX_RUNNER_MOD = _load_sibling_module("antares_sandbox_runner", "sandbox_runner.py")
 resolve_network_isolation = _SANDBOX_RUNNER_MOD.resolve_network_isolation
 _stripped_environment = _SANDBOX_RUNNER_MOD._stripped_environment
 _drop_privileges = _SANDBOX_RUNNER_MOD._drop_privileges
 _cleanup_isolation = _SANDBOX_RUNNER_MOD._cleanup_isolation
 NetworkIsolation = _SANDBOX_RUNNER_MOD.NetworkIsolation
 
-# Session-wide command budget (HP-2, EC-1).
-DEFAULT_COMMAND_BUDGET = 15
+_SANDBOX_RESOURCE_LIMITS_MOD = _load_sibling_module(
+    "antares_sandbox_resource_limits", "sandbox_resource_limits.py"
+)
+_resource_limits_available = _SANDBOX_RESOURCE_LIMITS_MOD._resource_limits_available
+_compose_preexec = _SANDBOX_RESOURCE_LIMITS_MOD._compose_preexec
 
-# Session-wide wall-clock budget across the whole run, independent of any
-# single command's own timeout.
-DEFAULT_WALL_BUDGET_SECONDS = 120.0
+# Self-check, not just documentation (mirrors the existing T2A_KINDS-style
+# partition asserts in artifact_schema.py): the comment above explains why
+# loading sandbox_session_budget.py before sandbox_runner.py is required,
+# but a comment alone does not stop a future edit from silently reordering
+# these loads and reintroducing the multi-copy TerminalStateKind bug this
+# module and sandbox_session_budget.py must never hit. Fail loudly and
+# immediately at import time instead of relying on a human reading the
+# comment or noticing a downstream test failure days later. Deliberately
+# `if ... raise` rather than `assert`: this check must still run under
+# `python -O`/`PYTHONOPTIMIZE`, which strips bare `assert` statements.
+if TerminalState is not _SANDBOX_SESSION_BUDGET_MOD.TerminalState:
+    raise RuntimeError(
+        "sandbox_budget and sandbox_session_budget resolved different "
+        "TerminalState class objects -- the load-order invariant documented "
+        "above (session_budget must load before sandbox_runner) was violated."
+    )
+if TerminalStateKind is not _SANDBOX_SESSION_BUDGET_MOD.TerminalStateKind:
+    raise RuntimeError(
+        "sandbox_budget and sandbox_session_budget resolved different "
+        "TerminalStateKind class objects -- the load-order invariant "
+        "documented above (session_budget must load before sandbox_runner) "
+        "was violated."
+    )
+
+_SANDBOX_PROCESS_IO_MOD = _load_sibling_module("antares_sandbox_process_io", "sandbox_process_io.py")
+_kill_process_group = _SANDBOX_PROCESS_IO_MOD._kill_process_group
+_verify_teardown = _SANDBOX_PROCESS_IO_MOD._verify_teardown
+_close_process_pipes = _SANDBOX_PROCESS_IO_MOD._close_process_pipes
+_read_capped = _SANDBOX_PROCESS_IO_MOD._read_capped
+_TEARDOWN_GRACE_SECONDS = _SANDBOX_PROCESS_IO_MOD._TEARDOWN_GRACE_SECONDS
 
 # Per-command resource caps enforced via POSIX RLIMITs in the child.
 DEFAULT_CPU_SECONDS = 10
@@ -70,300 +137,6 @@ DEFAULT_MAX_PROCESSES = 16
 # Per-command combined stdout+stderr byte cap, enforced by incremental
 # polling -- never by buffering the full output and checking after the fact.
 DEFAULT_OUTPUT_CAP_BYTES = 1 * 1024 * 1024
-
-# How long teardown verification waits, after sending the kill signal, before
-# concluding the process group is actually gone. Bounded so verification
-# itself can never hang or block the caller indefinitely.
-_TEARDOWN_GRACE_SECONDS = 1.0
-_TEARDOWN_POLL_INTERVAL_SECONDS = 0.05
-
-_READ_CHUNK_BYTES = 4096
-
-
-def _resource_limits_available() -> bool:
-    """Whether the POSIX RLIMIT primitives this module needs actually work.
-
-    Mirrors T2c-1's network-isolation fail-closed precedent: if the platform
-    cannot enforce every resource cap this module promises, refuse to run
-    rather than execute with a silently unenforced cap.
-
-    Darwin is unconditionally excluded. Two independent RLIMITs are
-    unenforceable there for the sandbox's purposes, confirmed empirically
-    during T2c-2 implementation:
-
-    - `RLIMIT_AS` (address-space / RAM ceiling): not reliably settable at
-      all -- `setrlimit(RLIMIT_AS, ...)` fails even in the parent process on
-      current macOS, not just inside a `preexec_fn`.
-    - `RLIMIT_NPROC` (process-count ceiling): settable, but scoped to the
-      *entire UID* system-wide on BSD-derived kernels, not to the sandboxed
-      command's own process tree. A cap tight enough to matter (e.g. 16)
-      breaks trivial multi-process pipelines outright, because the real
-      user account already runs far more than that system-wide; a cap loose
-      enough not to break normal usage (e.g. 2048) does not bound anything
-      the sandboxed command could actually do, since the account's ambient
-      process count already approaches that range on a live desktop. There
-      is no value that is both a real per-command bound and compatible with
-      an ordinary shell pipeline on this platform.
-
-    Claiming "resource limits enforced" while a promised cap is either
-    unsettable or accidental is exactly the silent-degradation failure mode
-    T2c-1 already rejected for network isolation, so the whole session fails
-    closed on Darwin instead of enforcing a partial or fake set of caps.
-    """
-    if platform.system() == "Darwin":
-        return False
-    return (
-        os.name == "posix"
-        and hasattr(resource, "RLIMIT_CPU")
-        and hasattr(resource, "RLIMIT_AS")
-        and hasattr(resource, "RLIMIT_NPROC")
-    )
-
-
-def _compose_preexec(
-    cpu_seconds: int,
-    address_space_bytes: int,
-    max_processes: int,
-) -> Callable[[], None]:
-    """Build the single `preexec_fn` passed to `Popen`.
-
-    `subprocess.Popen` accepts exactly one `preexec_fn`; T2c-1's
-    `_drop_privileges` and T2c-2's RLIMIT calls must therefore be composed
-    into one function rather than passed separately. Ordering matters:
-    `setrlimit` runs first, while the child may still hold whatever
-    privileges the host process started with, so a limit that requires
-    elevated privilege to raise (it never needs privilege to *lower*) is not
-    silently rejected by having already dropped to an unprivileged uid.
-    Privilege drop runs second and is irreversible for the remaining process
-    lifetime, which is the correct order for a security boundary: tighten
-    resource limits, then relinquish the privilege that could otherwise
-    loosen them again.
-    """
-    drop_privileges = _drop_privileges()
-
-    def _preexec() -> None:  # pragma: no cover - runs only inside the child
-        resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds))
-        resource.setrlimit(
-            resource.RLIMIT_AS, (address_space_bytes, address_space_bytes)
-        )
-        resource.setrlimit(resource.RLIMIT_NPROC, (max_processes, max_processes))
-        drop_privileges()
-
-    return _preexec
-
-
-@dataclass
-class SessionBudget:
-    """Mutable aggregate accounting for one sandbox session.
-
-    Tracks the command counter and wall-clock deadline that a single
-    `run_sandboxed` call has no visibility into. One instance is scoped to
-    exactly one session (one `terminal` tool-call sequence); it is not
-    reused across sessions.
-    """
-
-    command_budget: int = DEFAULT_COMMAND_BUDGET
-    wall_budget_seconds: float = DEFAULT_WALL_BUDGET_SECONDS
-    _commands_started: int = 0
-    _session_started: float | None = None
-
-    def _ensure_started(self) -> None:
-        if self._session_started is None:
-            self._session_started = time.monotonic()
-
-    def elapsed_seconds(self) -> float:
-        self._ensure_started()
-        assert self._session_started is not None
-        return time.monotonic() - self._session_started
-
-    def remaining_wall_seconds(self) -> float:
-        return max(0.0, self.wall_budget_seconds - self.elapsed_seconds())
-
-    def check_preflight(self) -> TerminalState | None:
-        """Guard evaluated before starting a command.
-
-        Returns a degraded `TerminalState` if the command must not start at
-        all, or `None` if the caller may proceed. This is deliberately a
-        pre-flight guard, not a runtime result: the 16th command is refused
-        before it is ever launched, distinct from a command that started and
-        then ran out of its own per-command timeout.
-        """
-        self._ensure_started()
-        if self._commands_started >= self.command_budget:
-            return TerminalState(
-                kind=TerminalStateKind.SANDBOX_BUDGET_EXHAUSTED,
-                detail=(
-                    f"Session command budget of {self.command_budget} already "
-                    "reached; refusing to start another command."
-                ),
-            )
-        if self.remaining_wall_seconds() <= 0:
-            return TerminalState(
-                kind=TerminalStateKind.SANDBOX_WALL_BUDGET_EXCEEDED,
-                detail=(
-                    f"Session wall-clock budget of {self.wall_budget_seconds}s "
-                    "already exhausted; refusing to start another command."
-                ),
-            )
-        return None
-
-    def record_command_started(self) -> None:
-        self._commands_started += 1
-
-
-def _kill_process_group(process: "subprocess.Popen[bytes]") -> None:
-    try:
-        os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-    except (ProcessLookupError, PermissionError, OSError):
-        # The group-kill can fail because the process already exited between
-        # this call and the caller's last check (TOCTOU) -- process.kill()
-        # can then raise the same "already gone" family of errors for the
-        # same reason. That is success for this function's purpose (the
-        # process is not running), not a caller-visible crash, so it is
-        # caught here exactly as _verify_teardown treats the identical race.
-        try:
-            process.kill()
-        except (ProcessLookupError, PermissionError, OSError):
-            pass
-
-
-def _verify_teardown(process: "subprocess.Popen[bytes]") -> bool:
-    """Actively confirm the process group is gone after a kill signal.
-
-    Polls with `os.killpg(pgid, 0)` (signal 0: existence check, sends
-    nothing) for up to `_TEARDOWN_GRACE_SECONDS` rather than trusting that
-    the kill syscall succeeding means the process has actually exited --
-    SIGKILL delivery is not synchronous with process reclamation. Bounded by
-    a fixed grace period and a cheap existence probe so verification itself
-    cannot hang or reintroduce an unbounded read (the same failure class the
-    output cap exists to prevent).
-    """
-    try:
-        pgid = os.getpgid(process.pid)
-    except ProcessLookupError:
-        return True
-
-    # A stale/reused pgid can make the existence probe raise PermissionError
-    # instead of ProcessLookupError on macOS (e.g. the pgid was reassigned to
-    # a process owned by another user) -- both mean "we can no longer confirm
-    # this is our process group", which is the same as gone for this check.
-    deadline = time.monotonic() + _TEARDOWN_GRACE_SECONDS
-    while time.monotonic() < deadline:
-        try:
-            os.killpg(pgid, 0)
-        except (ProcessLookupError, PermissionError):
-            return True
-        time.sleep(_TEARDOWN_POLL_INTERVAL_SECONDS)
-    # One last probe after the loop exits: the `while` condition is checked
-    # before each poll, so a process that dies in the gap between the final
-    # loop iteration's probe and the deadline being crossed would otherwise
-    # never get a check performed exactly at expiry. Not reachable in the
-    # common case (the loop's own probes already cover it), but cheap enough
-    # to keep as the deciding check rather than trust the loop's last result.
-    try:
-        os.killpg(pgid, 0)
-    except (ProcessLookupError, PermissionError):
-        return True
-    return False
-
-
-def _close_process_pipes(process: "subprocess.Popen[bytes]") -> None:
-    """Close the stdout/stderr pipe fds `Popen` opened for `process`.
-
-    `_read_capped` reads via `os.read` on the raw fds directly rather than
-    through `Popen.communicate()`, so nothing else closes these handles.
-    Safe to call after any exit path (`process.stdout`/`stderr` are `None`
-    only if the caller didn't request pipes, which this module always does).
-    """
-    if process.stdout is not None:
-        process.stdout.close()
-    if process.stderr is not None:
-        process.stderr.close()
-
-
-def _read_capped(
-    process: "subprocess.Popen[bytes]",
-    output_cap_bytes: int,
-    timeout_seconds: float,
-) -> tuple[bytes, bytes, bool, bool]:
-    """Read stdout/stderr incrementally, aborting early on cap or timeout.
-
-    Returns `(stdout, stderr, cap_exceeded, timed_out)`. Never calls
-    `process.communicate()`: that call buffers the full stream in memory
-    before returning, so a process that writes unbounded output would OOM
-    the supervisor before any cap check could fire -- this is the exact
-    host-level DoS the phase-1 review flagged. Reads are polled with
-    `selectors` so a fixed-size chunk is pulled per iteration and the byte
-    total is checked after every chunk, not after the process exits.
-    """
-    assert process.stdout is not None
-    assert process.stderr is not None
-
-    stdout_chunks: list[bytes] = []
-    stderr_chunks: list[bytes] = []
-    total_bytes = 0
-    cap_exceeded = False
-    timed_out = False
-
-    sel = selectors.DefaultSelector()
-    sel.register(process.stdout, selectors.EVENT_READ, "stdout")
-    sel.register(process.stderr, selectors.EVENT_READ, "stderr")
-    open_streams = 2
-    deadline = time.monotonic() + timeout_seconds
-
-    try:
-        while open_streams > 0:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                timed_out = True
-                break
-            for key, _ in sel.select(timeout=min(remaining, 0.1)):
-                chunk = os.read(key.fileobj.fileno(), _READ_CHUNK_BYTES)
-                if not chunk:
-                    sel.unregister(key.fileobj)
-                    open_streams -= 1
-                    continue
-                total_bytes += len(chunk)
-                if key.data == "stdout":
-                    stdout_chunks.append(chunk)
-                else:
-                    stderr_chunks.append(chunk)
-                if total_bytes > output_cap_bytes:
-                    cap_exceeded = True
-                    break
-            if cap_exceeded:
-                break
-            if process.poll() is not None and open_streams > 0:
-                # The direct child has exited, but a grandchild it spawned
-                # (e.g. `yes` in `yes | head`) can still hold a pipe's write
-                # end open, so a plain blocking os.read here can hang
-                # forever waiting for data that will never come -- exactly
-                # the unbounded-read failure mode this whole function exists
-                # to prevent. Drain with the same selector-timeout pattern as
-                # the main loop instead of assuming EOF is imminent.
-                drain_deadline = time.monotonic() + 0.1
-                while open_streams > 0 and time.monotonic() < drain_deadline:
-                    for key, _ in sel.select(timeout=0.02):
-                        chunk = os.read(key.fileobj.fileno(), _READ_CHUNK_BYTES)
-                        if not chunk:
-                            sel.unregister(key.fileobj)
-                            open_streams -= 1
-                            continue
-                        total_bytes += len(chunk)
-                        if key.data == "stdout":
-                            stdout_chunks.append(chunk)
-                        else:
-                            stderr_chunks.append(chunk)
-                        if total_bytes > output_cap_bytes:
-                            cap_exceeded = True
-                            break
-                    if cap_exceeded:
-                        break
-                break
-    finally:
-        sel.close()
-
-    return b"".join(stdout_chunks), b"".join(stderr_chunks), cap_exceeded, timed_out
 
 
 def run_budgeted(

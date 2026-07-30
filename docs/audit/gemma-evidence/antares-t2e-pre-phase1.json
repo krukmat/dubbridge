@@ -1,0 +1,62 @@
+{
+  "task_id": "antares-t2e-pre-phase1",
+  "commit_sha": "06d9f8f43375b441c879c99b1cfa37f7f4f735c7",
+  "reviewer": "qwen3.6:27b-q4_K_M",
+  "verdict": "PASS",
+  "timestamp": "2026-07-30T18:12:16Z",
+  "pass_history": [
+    {
+      "pass": 1,
+      "verdict": "FINDINGS",
+      "findings_count": {
+        "BLOCKING": 0,
+        "MAJOR": 1,
+        "MINOR": 3
+      },
+      "findings": [
+        {
+          "id": 1,
+          "severity": "MAJOR",
+          "summary": "EC-1's bare-name-import requirement was scoped only to the 4 explicitly-mocked symbols; it must generalize to every name run_budgeted calls that moves into a new submodule (e.g. _close_process_pipes, _read_capped), or a qualified-access regression on an unmocked-today name would silently stop being patchable in future tests without failing loudly now",
+          "primary_agent_verification": "independently confirmed via grep on scripts/antares/sandbox_budget.py (run_budgeted body, lines 369-540) and sandbox_budget_test.py: run_budgeted calls _read_capped and _close_process_pipes in addition to the 4 EC-1-named functions; also found an additional undocumented dependency, _drop_privileges (line 54, re-exported from sandbox_runner.py/T2c-1), accessed directly by the test at line 64 as _MODULE._drop_privileges() -- this one requires no change since it stays in the core file under the proposed split, but EC-1 didn't say so explicitly",
+          "disposition": "accepted, EC-1 rewritten to state the general rule plus the _drop_privileges no-op case explicitly"
+        },
+        {
+          "id": 2,
+          "severity": "MINOR",
+          "summary": "ambiguity between \"zero modifications\" to test assertions and \"import wiring may be touched\" -- risked the implementer changing which file/entrypoint the test loads via importlib",
+          "primary_agent_verification": "valid drafting gap, no repo evidence needed to confirm the ambiguity itself",
+          "disposition": "accepted, acceptance criteria now require both test files keep loading their target via spec_from_file_location pointed at the existing core file name, not a new __init__.py/package entrypoint"
+        },
+        {
+          "id": 3,
+          "severity": "MINOR",
+          "summary": "no explicit requirement to verify absence of circular imports across the 9-way split",
+          "primary_agent_verification": "valid general risk for a 9-file split with cross-file dataclass/constant dependencies; no existing test currently exercises this because the split doesn't exist yet",
+          "disposition": "accepted, added as EC-4 plus a matching acceptance-criteria line requiring verification by executing tests, not inspection alone"
+        },
+        {
+          "id": 4,
+          "severity": "MINOR",
+          "summary": "\"Evidence to emit\" only required a wc -l table, not test-pass output, even though acceptance hinges on the two test files passing",
+          "primary_agent_verification": "confirmed by re-reading the then-current Evidence to emit section, which listed only the 9 files and a wc -l table",
+          "disposition": "accepted, evidence section now requires full test output (pass/fail count) for both test files"
+        }
+      ]
+    },
+    {
+      "pass": 2,
+      "verdict": "PASS",
+      "note": "all 4 pass-1 findings independently confirmed RESOLVED against the pass-1 revision. One new MINOR finding raised, self-qualified by the reviewer as conditional on the decomposition table being 'missing from the deliverable' -- it was not: the pass-2 prompt deliberately omitted the (unchanged) decomposition-table section to keep the diff focused on the revised EC/acceptance/evidence text, per the prompt's own '(edge cases and acceptance criteria only, unchanged sections omitted)' framing.",
+      "new_findings": [
+        {
+          "id": 5,
+          "severity": "MINOR (self-qualified by reviewer as MAJOR/BLOCKED only if the table is absent from the actual deliverable)",
+          "summary": "reviewer could not see the sandbox_budget.py 4-file decomposition table in the pass-2 excerpt and flagged a possible missing-table risk",
+          "primary_agent_verification": "rejected as a false positive: docs/tasks/antares-security-specialist-advisor.md lines 1865-1873 (### Proposed decomposition) contain the full, unchanged 4-file sandbox_budget.py table (core/sandbox_resource_limits.py/sandbox_session_budget.py/sandbox_process_io.py) and the full 5-file artifact_schema.py table directly above it -- both were intentionally left out of the pass-2 prompt because pass 1 raised no finding against them and they were unchanged; same class of finding as T2e phase-1 pass-2 finding #7 (docs/audit/gemma-evidence/antares-t2e-phase1.json), caused by excerpting the prompt rather than a real gap in the ledger",
+          "disposition": "rejected as false positive (incomplete reviewer context from the deliberately-scoped pass-2 prompt, not a real task gap); no ledger change needed, closed via this evidence record's citation"
+        }
+      ]
+    }
+  ]
+}

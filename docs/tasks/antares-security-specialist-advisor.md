@@ -67,7 +67,8 @@ T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c (decomposed: T2c-1 -> T2c-2) -> T2d 
 | T2c-1 Sandbox process execution and isolation | `[x] Done (2026-07-30)` | 49 Med-high (planning) | L | T2b |
 | T2c-2 Resource budget, wall-timeout, teardown | `[x] Done (owner-waived, 2026-07-30)` | 53 Med-high (execution) | L | T2c-1 |
 | T2d Versioned artifact schema and redacted trace contract | `[x] Done (owner-waived, 2026-07-30)` | 50 (Med-high) | S/M-equivalent | T2c-2 |
-| T2e Replay fixtures and integrated harness verification | `[ ] Open` | Recompute | TBD | T2d |
+| T2e-pre Decompose oversized T2c-2/T2d modules for local-first delegation eligibility | `[ ] Open` | 52 Med-high | L | T2c-2, T2d |
+| T2e Replay fixtures and integrated harness verification | `[ ] Open` | 44 Med-high (preliminary) | L | T2e-pre |
 | T3 CWE watchlist and context-complete packet construction | `[ ] Open` | Recompute | TBD | T2e |
 | T4 Ground-truth calibration and observe-only workflow pilot | `[ ] Open` | Recompute | TBD | T2e, T3 |
 | T5 Promote, narrow, or retire on evidence | `[ ] Open` | Recompute | TBD | T4 |
@@ -1774,19 +1775,438 @@ future reader of `da8e06a`/`844e847d` understands why T2d's files appear
 there under unrelated messages, predating T2d's own Phase-2 review and
 Reflection log.
 
+## T2e-pre - Decompose oversized T2c-2/T2d modules for local-first delegation eligibility
+
+- **Status:** `[x] Done`
+- **Type:** development / pure refactor (no intended behavior change)
+- **Effort:** L
+- **RRI:** 52 Med-high (`python3 scripts/rri.py --touches scripts/antares/artifact_schema.py
+  --touches scripts/antares/artifact_validators.py --touches
+  scripts/antares/artifact_trace_writer.py --touches
+  scripts/antares/artifact_examples.py --touches
+  scripts/antares/artifact_serialization.py --touches
+  scripts/antares/sandbox_budget.py --touches
+  scripts/antares/sandbox_process_io.py --touches
+  scripts/antares/sandbox_resource_limits.py --touches
+  scripts/antares/sandbox_session_budget.py --C 1 --D 3 --K 3 --P 4 --T 1 --A 1
+  --X 3 --penalty refactor_and_behavior`; base 44 + refactor_and_behavior
+  penalty +8 = 52)
+- **Depends on:** T2c-2, T2d
+- **Blocks:** T2e (resolves T2e's Delegation-routing note as decompose-first,
+  not escalate — owner directive, 2026-07-30)
+- **Decomposition-trigger note:** `scripts/rri.py`'s own output flags this task
+  under `docs/policies/RRI_POLICY.md § Decomposition triggers`: "The +8 penalty
+  is active (refactor + behavior change combined) — always separate refactor
+  from functional change into distinct tasks/commits." That rule is satisfied
+  by construction here: this task is refactor-only (zero intended behavior
+  change) and is kept as its own task, strictly preceding T2e's functional
+  harness-building work. It does not require this refactor to be split further
+  into per-file subtasks; the two modules are decomposed together because both
+  block the same downstream gate and share the same acceptance shape
+  (existing tests pass unchanged).
+
+### Implementation routing (resolved — owner override, one-off exception)
+
+**Resolved by explicit owner override, Matias Kruk, 2026-07-30: `CLOUD_REQUIRED`.**
+`sandbox_budget.py` implements the sandbox's process-isolation / RLIMIT /
+teardown-verification security boundary; the owner judged that even a
+zero-behavior-change refactor of this module should go to cloud
+implementation rather than the local `qwen3.6:35b-a3b` session, given the
+task's own reason for existing is to *reduce* the line count that would
+otherwise be read/authored in one local-model turn — undermining that goal by
+routing a security-adjacent split through the local model was the owner's
+stated concern.
+
+Procedurally this differs from T2d's downgrade (`docs/tasks/
+antares-security-specialist-advisor.md` § T2d Implementation note): there, the
+primary agent ran the Qwen27 advisory step first (`route_recommendation:
+GO_LOCAL`) and then exercised its own downgrade authority. Here the owner
+decided the route directly, before Qwen27 was invoked, so the Qwen27
+advisory-refinement step is skipped as a formality that cannot change the
+outcome — the primary/owner may always downgrade toward cloud per ADR-038 §4
+("may downgrade, never upgrade"), and an explicit owner instruction is at
+least as authoritative as the primary agent's own downgrade judgment.
+
+**Scope of the exception:** this resolves routing for **T2e-pre only**. It is
+not a change to `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`'s or
+`docs/policies/HITL_AUTONOMY_POLICY.md`'s general Med-high ADR-038 routing
+contract, and does not set a precedent that security-adjacent Med-high tasks
+route to cloud by default — each task's routing is still resolved
+independently at its own gate.
+
+`scripts/local-agent/med_high_gate.py` result (recorded for audit parity with
+the T2c-2/T2d precedent format): `{"route": "CLOUD_REQUIRED", "reason":
+"Owner override, 2026-07-30 — one-off exception scoped to T2e-pre; security-
+adjacent refactor target (sandbox_budget.py) routed to cloud ahead of the
+Qwen27/local gate rather than through it."}`. Implementation proceeds with the
+primary (cloud) agent, per ADR-038 §5, once this task itself is approved below.
+
+### Objective
+
+Split `artifact_schema.py` (574 lines) and `sandbox_budget.py` (540 lines) —
+both already over the 500-line target-file-size gate for RRI 26-55
+local-first delegation (`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Target-file
+size gate) — into smaller single-responsibility modules using concrete design
+patterns, with **zero intended behavior change**, so T2e's implementer can
+read every file it touches in full and stay under the gate.
+
+### Phase 1 — Task-analysis review
+
+- Reviewer: `qwen3.6:27b-q4_K_M`
+- Command: Ollama `/api/chat`, `"think": false`
+- Artifact: `docs/audit/gemma-evidence/antares-t2e-pre-phase1.json`
+- Pass 1: `FINDINGS` (1 MAJOR, 3 MINOR). The MAJOR finding (EC-1's bare-name
+  requirement scoped only to the 4 mocked symbols, not every name
+  `run_budgeted` calls into a new submodule) was independently confirmed via
+  grep against `scripts/antares/sandbox_budget.py` — which also surfaced an
+  additional dependency the finding didn't name, `_drop_privileges` (a T2c-1
+  re-export accessed directly by the test), requiring no change since it
+  stays in the core file but needed stating explicitly. All 3 MINOR findings
+  (test-entrypoint ambiguity, missing circular-import check, evidence section
+  omitting test-pass output) were accepted as legitimate drafting gaps.
+- Pass 2: `PASS`. All 4 pass-1 findings independently reconfirmed resolved
+  against the revised text. One new MINOR finding, self-qualified by the
+  reviewer as conditional on the decomposition table being absent from the
+  deliverable — **rejected as a false positive**: the table is present
+  unchanged at `### Proposed decomposition` above; the pass-2 prompt
+  deliberately excerpted only the changed sections, which is the likely
+  cause. Same class of issue as T2e phase-1 pass-2 finding #7
+  (`docs/audit/gemma-evidence/antares-t2e-phase1.json`).
+- Gemma fallback: not triggered. D14 fallback: not triggered.
+- disposition_divergence: `none`.
+
+```
+Task-analysis review: qwen3.6:27b-q4_K_M docs/audit/gemma-evidence/antares-t2e-pre-phase1.json - PASS
+```
+
+### Proposed decomposition (verified against current file contents)
+
+`artifact_schema.py` (574 lines) →
+
+| New file | Contents | Pattern |
+|---|---|---|
+| `artifact_schema.py` (core, ~200 lines) | imports, constants, `ValidationError`, `DispositionState`, `T2A_KINDS`..`T2C2_KINDS` partition sets + self-check asserts, dataclasses (`Provenance`, `TraceRef`, `Disposition`, `Budget`, `Artifact`), `_category_of` | — |
+| `artifact_validators.py` (~180 lines) | `_validate_storage_uri`, `_is_valid_sha256_hex`, `_validate_trace_ref_field`, `_validate_disposition`, `_validate_category_fields`, `validate_artifact`, `validate_supersede_chain` | Strategy: `_validate_category_fields`'s if/elif chain becomes a dispatch table keyed by category string |
+| `artifact_trace_writer.py` (~40 lines) | `compute_content_hash`, `write_raw_trace`, `verify_trace_ref_roundtrip` | formalizes a boundary the module's own docstrings already name 3 times ("a writer-module concern instead") |
+| `artifact_serialization.py` (~55 lines) | `artifact_to_dict`, `artifact_from_dict` | Data Mapper |
+| `artifact_examples.py` (~80 lines) | `_example_provenance`, `_example_trace_ref`, `generate_example_artifacts` | fixture/example generation, not core schema |
+
+`sandbox_budget.py` (540 lines) →
+
+| New file | Contents | Pattern |
+|---|---|---|
+| `sandbox_budget.py` (core, ~200 lines) | imports, constants, `run_budgeted` | Facade composing the modules below |
+| `sandbox_resource_limits.py` (~70 lines) | `_resource_limits_available`, `_compose_preexec` | RLIMIT/Darwin-detection concern isolated from orchestration |
+| `sandbox_session_budget.py` (~60 lines) | `SessionBudget` dataclass | pure accounting, no process I/O |
+| `sandbox_process_io.py` (~150 lines) | `_kill_process_group`, `_verify_teardown`, `_close_process_pipes`, `_read_capped` | process supervision/teardown/incremental-read concern |
+
+### Happy paths considered
+
+- **HP-1:** every existing assertion in `artifact_schema_test.py` and
+  `sandbox_budget_test.py` passes **unmodified** against the decomposed
+  modules — proving zero behavior change from the split alone.
+- **HP-2:** every file in `scripts/antares/` measures under 500 lines via
+  `wc -l` after the split (verifies the gate this task exists to satisfy).
+
+### Edge cases considered
+
+- **EC-1:** `sandbox_budget_test.py` calls
+  `unittest.mock.patch.object(_MODULE, "_resource_limits_available", ...)`,
+  `unittest.mock.patch.object(_MODULE, "_compose_preexec", ...)`, and
+  `unittest.mock.patch.object(_MODULE, "_verify_teardown", return_value=False)`
+  (lines 86, 90, 279) plus direct `_MODULE._kill_process_group(...)` (line
+  308) and `_MODULE._resource_limits_available = lambda: False` (line 336)
+  calls, where `_MODULE` is `sandbox_budget.py` loaded by
+  `importlib.util.spec_from_file_location`. Python resolves a bare name inside
+  a function against its *defining module's* globals at call time, so
+  `run_budgeted` must keep calling these as **bare names** after `from
+  sandbox_process_io import _verify_teardown, _kill_process_group,
+  _close_process_pipes, _read_capped` / `from sandbox_resource_limits import
+  _compose_preexec, _resource_limits_available` re-export-style imports into
+  `sandbox_budget.py`'s own namespace — not as
+  `sandbox_process_io._verify_teardown(...)` qualified access. The latter
+  would make `patch.object(_MODULE, "_verify_teardown", ...)` silently patch
+  an attribute `run_budgeted` never reads, defeating
+  `test_teardown_unconfirmed_surfaces_as_its_own_kind` (the existing test
+  guarding `SANDBOX_TEARDOWN_UNCONFIRMED`) without a loud failure in every
+  case. **This requirement is not limited to the four names above** — it
+  applies to *every* name `run_budgeted` calls that moves into a new
+  submodule, including `_close_process_pipes` and `_read_capped` (both move
+  to `sandbox_process_io.py` per the table above but are not directly mocked
+  today, only called; a qualified-access regression on either would not fail
+  loudly, it would just silently stop being patchable in a future test). One
+  existing dependency needs no change at all: `_drop_privileges` (line 54,
+  `_drop_privileges = _SANDBOX_RUNNER_MOD._drop_privileges`, a T2c-1
+  re-export) is accessed directly as `_MODULE._drop_privileges()` by the test
+  (line 64) and by `run_budgeted` itself — it stays in the core
+  `sandbox_budget.py` file under this decomposition (it is not one of the
+  functions moved to any of the three new `sandbox_*` files), so the same
+  bare-name guarantee holds trivially and requires no re-export work.
+- **EC-2:** `artifact_schema_test.py` and `sandbox_budget_test.py` both pull
+  every public symbol off the loaded module object (e.g. `_MOD.artifact_from_dict`,
+  `_MODULE.SessionBudget`) rather than importing named symbols directly —
+  confirmed via grep, zero `mock.patch` calls in `artifact_schema_test.py` and
+  the four `_MODULE`-attribute patches above in `sandbox_budget_test.py`. Every
+  name currently resolvable on the top-level module object must remain
+  resolvable there after the split (via re-export imports at the top of each
+  core file), or the existing test files would need modification — which
+  would violate HP-1.
+- **EC-3:** no other module in `scripts/antares/` imports from
+  `artifact_schema.py` or `sandbox_budget.py` besides their own test files
+  (confirmed via repo-wide grep) — so this task's blast radius is contained to
+  the two modules and their two test files; a future finding of a third
+  consumer during implementation would be a genuine scope surprise requiring
+  re-verification of this claim, not a silent assumption to keep carrying
+  forward.
+- **EC-4:** the 5-way `artifact_schema.py` split introduces cross-file
+  dependencies that did not exist before (e.g. `artifact_serialization.py`
+  needs the dataclasses defined in core `artifact_schema.py`;
+  `artifact_validators.py` needs constants/helpers from core). The
+  implementer must verify no circular import exists among the 5 new
+  `artifact_*` files or the 4 new `sandbox_*` files before closing the task —
+  a cycle is a silent blocker that will not show up in the `wc -l` gate and
+  must be caught by actually importing each module, not just by inspection.
+
+### Acceptance criteria
+
+- `artifact_schema.py` and `sandbox_budget.py`, and every new file each is
+  split into, measure under 500 lines.
+- Every existing test in `artifact_schema_test.py` and `sandbox_budget_test.py`
+  passes with **zero modifications** to either test file's assertions (import
+  wiring inside the test file's own `importlib` bootstrap may be touched only
+  if a new file must be loaded the same way; the assertions themselves must
+  not change). Both test files must keep loading their target via
+  `importlib.util.spec_from_file_location` pointed at `sandbox_budget.py` /
+  `artifact_schema.py` specifically (the core file each test already names) —
+  not a new `__init__.py` or package entrypoint — so every symbol remains
+  reachable as `_MODULE.<name>` exactly as today.
+- No behavior change: `make qa-test` (or the equivalent scoped `cargo`/`python`
+  unittest invocation for `scripts/antares/`) is green before and after, and a
+  diff of `wc -l` and public-symbol names on the top-level module objects
+  shows the same public surface, just relocated.
+- No circular imports among the new files (EC-4): each new module imports
+  cleanly on its own, verified by executing every existing test file, not by
+  inspection alone.
+
+### Evidence to emit
+
+- The 9 files listed in the decomposition table above.
+- A short before/after `wc -l` table per file in the closure record.
+- The full test output (pass/fail count, not just exit code) for
+  `artifact_schema_test.py` and `sandbox_budget_test.py` after the split, as
+  direct evidence for HP-1 and EC-1/EC-2, not only the `wc -l` proof for HP-2.
+
+### Status artifacts affected
+
+- this ledger (this section plus T2e's Delegation-routing note, updated to
+  point at this task's outcome instead of leaving the choice open)
+- `docs/plan/antares-security-specialist-advisor.md` if T2e's dependency
+  changes materially affect the phase narrative
+
+### Implementation note (git state)
+
+The repository's git config unexpectedly showed `core.bare=true` plus a
+fresh `AUTO_MERGE`/`COMMIT_EDITMSG` (unrelated to this task, not created by
+this session) partway through implementation, making `git status`/`git diff`
+fail. Per explicit owner instruction, this was treated as out-of-band and
+ignored for the remainder of this task: implementation, review, and
+verification below use only file reads/writes and `python3`/`pytest`
+commands, no `git` commands. The Phase-2 review packet's description of the
+change was therefore built manually from the actual old/new file contents
+already read during implementation, not from `git diff`.
+
+### Reflection log
+
+Required passes: 3 (`52` → Med-high)
+
+#### Pass 1
+
+- **Draft verdict:** initial 9-file split written per the decomposition
+  table (Strategy dispatch table in `artifact_validators.py`, Data Mapper in
+  `artifact_serialization.py`, Facade in `sandbox_budget.py`), each file
+  using the pre-existing `importlib.util.spec_from_file_location` loading
+  convention for cross-file dependencies.
+- **Critique findings:**
+  - A correctness risk was identified and empirically proven *before*
+    writing any production code: independently re-loading the same source
+    file via `spec_from_file_location`/`module_from_spec`/`exec_module`
+    produces distinct, non-`==`-comparable Enum class objects (confirmed
+    with a 6-line standalone repro). Splitting `SessionBudget` (which
+    constructs `TerminalState(kind=TerminalStateKind.X, ...)` values that
+    flow back through `run_budgeted` to the test file) into its own file
+    risked exactly this: two different `TerminalStateKind` copies that
+    print identically but fail `==`.
+  - After adding a "check `sys.modules` before re-loading" guard to every
+    new file, two concrete test failures still occurred
+    (`test_ec1_sixteenth_command_is_refused_before_starting`,
+    `test_ec1_wall_budget_already_exhausted_is_refused_before_starting`) —
+    root-caused to `sandbox_runner.py` (existing, unmodified, out of this
+    task's scope) unconditionally re-loading `terminal_state.py` without
+    any `sys.modules` check, clobbering the shared registry entry between
+    core's own load and `sandbox_session_budget.py`'s load.
+- **Revisions applied:** added the check-first `_load_sibling_module`
+  helper to every new/rewritten file (also breaks the core↔validators
+  circular-load path for the `artifact_schema.py` family); reordered core
+  `sandbox_budget.py`'s load sequence so `sandbox_session_budget.py` (and
+  transitively `terminal_state.py`) resolves before anything loads
+  `sandbox_runner.py`. Re-verified empirically (`sb.TerminalStateKind is
+  ssb.TerminalStateKind` → `True`) and via the full suite (111 passed).
+
+#### Pass 2
+
+- **Draft verdict:** full suite green (111/111) after the Pass-1 fix;
+  re-read every new file line-by-line as an independent reviewer.
+- **Critique findings:** `artifact_validators.py::_validate_disposition`
+  looked up `_ARTIFACT_SCHEMA_MOD.DispositionState` freshly on every call
+  instead of once at module level, inconsistent with every other
+  cross-module reference in the same file and a needless per-call
+  attribute lookup.
+- **Revisions applied:** moved `DispositionState =
+  _ARTIFACT_SCHEMA_MOD.DispositionState` to module level alongside the
+  other re-exports; removed the in-function lookup. Full suite re-confirmed
+  green (111/111).
+
+#### Pass 3
+
+- **Draft verdict:** ran the Phase-2 code-solution review
+  (`qwen3.6:27b-q4_K_M`) against the Pass-2 state; re-ran after applying its
+  accepted findings.
+- **Critique findings (from Phase-2 review, independently verified before
+  acceptance):**
+  - MAJOR (accepted): the load-order dependency relied on a comment, not a
+    structural guarantee, and could silently regress if reordered later.
+  - MAJOR (accepted, mitigated — full fix out of scope): mixing the new
+    check-first loader with legacy always-re-execute loaders
+    (`sandbox_runner.py`, out of scope) makes identity depend on load
+    history in general; the *specific* risk is closed by the fix below.
+  - MINOR (verified, no change needed): confirmed via direct read that
+    `terminal_state.py`'s only top-level statements are two
+    `frozenset(...)` definitions — no side effects, safe to re-execute.
+  - MINOR (accepted, out of scope): dynamic `importlib` loading is the
+    pre-existing convention for every file in `scripts/antares/`, not
+    something this task introduced; not fixed here.
+  - New finding on the fix itself (accepted): the identity checks initially
+    used bare `assert`, stripped under `python -O`/`PYTHONOPTIMIZE`.
+- **Revisions applied:** added explicit `if TerminalState is not
+  _SANDBOX_SESSION_BUDGET_MOD.TerminalState: raise RuntimeError(...)` guards
+  (and the `TerminalStateKind` equivalent) in `sandbox_budget.py`, mirroring
+  the existing `T2A_KINDS`-style self-check-assert precedent already present
+  in `artifact_schema.py`, but using `if/raise` instead of bare `assert` so
+  the check cannot be optimized away. Verified the guard actually fires
+  under a deliberately-reordered throwaway copy, both with and without
+  `python -O` (confirmed no repo toolchain currently sets `-O`/
+  `PYTHONOPTIMIZE`, via grep of `Makefile`/`.github/workflows/*.yml`). Added
+  `t2e_pre_decomposition_test.py` for HP-2's line-count claim (was
+  previously evidenced only by a `wc -l` command, not a unit test). Full
+  suite green (112/112, including the new test).
+
+### Peer Reviewer evidence
+
+- Reviewer: `qwen3.6:27b-q4_K_M`
+- Command: Ollama `/api/chat`, `"think": false`
+- Artifact: `docs/audit/gemma-evidence/antares-t2e-pre-phase2.json`
+- Verdict: `PASS` (pass 1 `FINDINGS` 2 MAJOR/2 MINOR → pass 2 `FINDINGS` 1
+  new MAJOR-as-raised, all 4 original findings resolved/accepted → pass 3
+  primary-agent-certified `PASS` after independently reproducing the fix
+  under `python -O`)
+- Findings: see Reflection log above; every finding accepted, mitigated, or
+  independently verified as a non-issue; no finding rejected as a false
+  positive in this review.
+- Gemma fallback: not triggered. D14 fallback: not triggered.
+- disposition_divergence: `none`.
+
+```
+Code-solution review: qwen3.6:27b-q4_K_M docs/audit/gemma-evidence/antares-t2e-pre-phase2.json - PASS
+```
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | every existing `artifact_schema_test.py`/`sandbox_budget_test.py` assertion passes unmodified against the decomposed modules | `scripts/antares/artifact_schema_test.py` (28 tests) + `scripts/antares/sandbox_budget_test.py` (19 tests), full run: `python3 -m pytest scripts/antares/artifact_schema_test.py scripts/antares/sandbox_budget_test.py -v` | passed (47/47) |
+| HP-2 | Happy path | every file in `scripts/antares/` measures under 500 lines after the split | `scripts/antares/t2e_pre_decomposition_test.py::DecomposedFileSizeTest::test_hp2_every_decomposed_file_stays_under_500_lines` | passed |
+| EC-1 | Edge case | `run_budgeted` calls every function moved into a new submodule (not just the 4 originally-mocked ones) as a bare name resolved from `sandbox_budget`'s own namespace, so `mock.patch.object`/direct attribute reassignment on `_MODULE` still take effect | `scripts/antares/sandbox_budget_test.py::RunBudgetedRuntimeUnavailableTest::test_ec1_resource_limits_unavailable_fails_closed`, `::RunBudgetedTeardownTest::test_ec3_unconfirmed_teardown_is_its_own_distinct_outcome`, `::KillProcessGroupTest::test_fallback_kill_swallows_already_exited_race_instead_of_raising` | passed |
+| EC-2 | Edge case | every symbol previously resolvable on the top-level module object (`_MOD.<name>`/`_MODULE.<name>`) remains resolvable there after the split, via re-export | full suite (every test in both `_test.py` files reads at least one `_MOD.<name>`/`_MODULE.<name>` attribute) — `python3 -m pytest scripts/antares/artifact_schema_test.py scripts/antares/sandbox_budget_test.py -v` | passed (47/47) |
+| EC-3 | Edge case | no third-party consumer outside the two test files depends on `artifact_schema.py`/`sandbox_budget.py` | repo-wide grep (`grep -rln "artifact_schema\.py\|sandbox_budget\.py" --include="*.py" scripts/`) confirms only the split's own files and their test files; the one substring hit outside `scripts/antares/` (`scripts/gemma_push_review_test.py::test_failure_artifact_schema`/`test_blocked_artifact_schema`) is a test-method-name false positive, unrelated to the actual file | confirmed, no unit test applicable (structural/grep-based claim) |
+| EC-4 | Edge case | no circular imports among the 9 new files; the multi-copy `TerminalStateKind`/`TerminalState` identity risk from splitting a shared-Enum-consuming concern across sibling files is closed | `scripts/antares/sandbox_budget.py`'s own `if TerminalState is not ... raise RuntimeError(...)` guard (exercised implicitly by every `sandbox_budget_test.py` test that reaches `run_budgeted`'s `SANDBOX_BUDGET_EXHAUSTED`/`SANDBOX_WALL_BUDGET_EXCEEDED` paths, e.g. `RunBudgetedCommandBudgetTest::test_ec1_sixteenth_command_is_refused_before_starting`, `RunBudgetedWallBudgetTest::test_ec1_wall_budget_already_exhausted_is_refused_before_starting`); full suite `python3 -m pytest scripts/antares/ -q` | passed (112/112) |
+
+### Owner final verification
+
+- Owner: `Matias Kruk`
+- Date: `2026-07-30`
+- Statement: reviewed the Unit coverage certification table, Reflection log,
+  and Peer Reviewer artifact (`docs/audit/gemma-evidence/antares-t2e-pre-phase2.json`)
+  for this task and confirmed the work is acceptable ("si esta ok").
+- Commands run: `python3 -m pytest scripts/antares/ -q` — 112/112 passed.
+
+**Status: `[x] Done`.**
+
 ## T2e - Replay fixtures and integrated harness verification
 
 - **Status:** `[ ] Open`
 - **Type:** development / security-sensitive tooling
 - **Effort:** TBD from execution RRI
-- **Depends on:** T2d
+- **Preliminary RRI:** 44 Med-high (planning estimate, not authority — recompute
+  at presentation time per `docs/policies/RRI_POLICY.md`)
+- **Depends on:** T2e-pre
 - **Decomposed from:** T2
 
 ### Objective
 
 Assemble the parser, policy, sandbox, and artifact layers into one deterministic
 harness surface with replay fixtures and regression tests for every approved
-happy path and edge case.
+happy path and edge case. This is the first T2 subtask that composes all four
+prior layers (`tool_call_parser.py`/`terminal_state.py`,
+`command_policy.py`/`path_containment.py`, `sandbox_runner.py`/
+`sandbox_budget.py`, `artifact_schema.py`) at once; it adds no new terminal-state
+kinds and defines no new encoding — it proves the existing, already-tested
+per-layer contracts keep their failure boundaries when wired together.
+
+### Phase 1 — Task-analysis review
+
+- Reviewer: `qwen3.6:27b-q4_K_M`
+- Command: Ollama `/api/chat`, `"think": false`
+- Artifact: `docs/audit/gemma-evidence/antares-t2e-phase1.json`
+- Pass 1: `BLOCKED` (2 BLOCKING, 2 MAJOR, 1 MINOR). Two findings (the >500-line
+  delegation-constraint gap and the missing composed-layer poisoned-payload
+  edge case) were independently confirmed against the repo and accepted as-is.
+  Three findings (deterministic-replay definition, EC-2 encoding mechanism,
+  entrypoint interface type) were downgraded from BLOCKING/MAJOR to MINOR on
+  independent verification — the model was not given `sandbox_runner_test.py`
+  or `terminal_state.py` in pass 1, and both files already establish the
+  conventions the findings claimed were missing.
+- Pass 2: `BLOCKED`. All 5 pass-1 findings independently reconfirmed resolved
+  against the revised text. 2 new findings raised: (6) a phrasing issue that
+  conflated the standard ADR-038 routing step with a new code-acceptance
+  criterion — accepted and reworded; (7) a claim that
+  `submit_vulnerable_files`/`submit_no_vulnerability_found` were undefined —
+  **rejected as a false positive**: `terminal_state.py` lines 28-29 define
+  both as `TerminalStateKind` members from T2a, already validated end-to-end
+  by T2d's `test_hp1_vulnerable_files_carries_trace_ref_and_no_raw_content` /
+  `test_hp2_no_vulnerability_found_matches_positive_result_shape`; the pass-2
+  prompt omitted the enum body, which is the likely cause. Closed with an
+  inline citation in the task text rather than a code change (none was
+  needed).
+- Pass 3: `PASS`. Both pass-2 findings independently reconfirmed resolved, no
+  new findings.
+- Gemma fallback: not triggered. D14 fallback: not triggered.
+- disposition_divergence: `none` (every finding's disposition here matches the
+  final accepted/rejected state recorded in the artifact).
+
+```
+Task-analysis review: qwen3.6:27b-q4_K_M docs/audit/gemma-evidence/antares-t2e-phase1.json - PASS
+```
+
+### Delegation-routing note (resolved)
+
+`artifact_schema.py` (574 lines) and `sandbox_budget.py` (540 lines) already
+exceeded the 500-line target-file-size gate for RRI 26-55 local-first
+delegation (`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Target-file size gate).
+**Resolved by owner directive, 2026-07-30: option (b), decompose-first via
+design patterns** rather than escalate directly to cloud — see **T2e-pre**,
+now a hard dependency of this task. T2e's implementer reads the
+decomposed, sub-500-line modules T2e-pre produces, not the original
+oversized files.
 
 ### Happy paths considered
 
@@ -1799,24 +2219,56 @@ happy path and edge case.
 ### Edge cases considered
 
 - **EC-1:** command-budget exhaustion preserves the partial trace and records
-  `budget_exhausted`.
-- **EC-2:** parser, policy, sandbox, and artifact failures remain distinct in the
-  integrated harness output.
+  `budget_exhausted` (concrete target: `sandbox_budget.py`'s
+  `DEFAULT_COMMAND_BUDGET = 15` check against `_commands_started`).
+- **EC-2:** parser, policy, sandbox, and artifact failures remain distinct in
+  the integrated harness output, encoded as the already-defined, already
+  fully-partitioned `TerminalStateKind` enum (`terminal_state.py`) — T2e proves
+  each layer's real failure is wired through to its own existing kind
+  end-to-end; it does not define a new distinction mechanism.
 - **EC-3:** sandbox-escape regression fixtures fail closed across replays.
+- **EC-4:** a structurally valid but semantically poisoned payload from an
+  upstream layer (e.g., a policy-approved command whose execution triggers
+  pathological subprocess behavior) still resolves to a bounded
+  budget/timeout-enforced terminal state through the composed harness, never
+  an unbounded hang — proving T2c-2's wall-timeout/budget guarantee holds when
+  triggered by composed-layer input, not only by `sandbox_runner_test.py`'s
+  direct unit fixtures.
 
 ### Acceptance criteria
 
 - Deterministic replay exists for every T2 HP/EC behavior carried into the
-  decomposed subtasks.
+  decomposed subtasks. "Deterministic" follows the convention already
+  established in `sandbox_runner_test.py`: structural/semantic fields (`kind`,
+  `exit_code`, `candidates`, `provenance`, `trace_ref`, disposition shape) are
+  byte-identical across replays of the same fixture input; wall-clock-derived
+  fields (`elapsed_seconds`, timestamps) are bounded/range-checked, not
+  byte-compared.
 - The integrated harness emits only versioned artifact output and externalized
   redacted trace references.
 - Regression tests prove that parser, policy, containment, sandbox, and artifact
   layers keep their failure boundaries when composed.
+- `submit_vulnerable_files` and `submit_no_vulnerability_found` are not new
+  targets this task invents: both are existing `TerminalStateKind` members
+  (`terminal_state.py` lines 28-29,
+  `SUBMITTED_VULNERABLE_FILES`/`SUBMITTED_NO_VULNERABILITY_FOUND`) already
+  produced by the T2a parser and already validated end-to-end by T2d's
+  `test_hp1_vulnerable_files_carries_trace_ref_and_no_raw_content` /
+  `test_hp2_no_vulnerability_found_matches_positive_result_shape`. HP-1/HP-2
+  here replay the same two outcomes through the composed harness, not through
+  a single layer in isolation.
+
+The delegation-routing note above (escalate vs. decompose-first for the
+>500-line modules) is a **routing prerequisite resolved through the standard
+ADR-038 gate this task already goes through as a Med-high task** — it is not
+an additional code-acceptance criterion and not new administrative scope.
 
 ### Evidence to emit
 
-- Integrated harness entrypoint, replay corpus, and regression tests for all T2
-  happy-path and edge-case behaviors.
+- Integrated harness entrypoint — a plain importable Python module (e.g.
+  `harness.py` with a replay-driving function), consistent with every T2a-T2d
+  module's convention of no CLI wrapper — plus a replay corpus and regression
+  tests for all T2 happy-path and edge-case behaviors.
 
 ### Status artifacts affected
 
