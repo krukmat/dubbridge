@@ -1,30 +1,27 @@
 ---
 type: TaskList
 title: "S-140 Subtitle Generation"
-status: active
+status: done
 slice: S-140
 plan: docs/plan/s-140-subtitle-generation.md
 Behavioral coverage contract: unit-v1
 ---
 # S-140 Subtitle Generation
 
-> **Status:** Active 2026-07-30. Authored via ADR-037 T5 (Local Architect
+> **Status:** Done 2026-07-30. Authored via ADR-037 T5 (Local Architect
 > advisory verified against repository evidence — see
 > `docs/evaluations/adr037-direct-project-report.md` reconciliation section).
 > T0 ratified Design decisions D1 (segmentation source → D1a) and D2 (subtitle
 > schema → the proposed internal JSON schema) on 2026-07-21 — see
 > `docs/plan/s-140-subtitle-generation.md`. T0/T1a/T1b-i/T1b-ii/T1c/T1d/T2a/
-> T2b-i/T2b-ii/T3a/T3b/T3c-i/T3c-ii/T5a/T6 are complete. `T3c-ii` closed on
-> 2026-07-30 via owner-waived phase-2 review after qwen rounds `r1`-`r6`;
-> `T5b-a` closed on 2026-07-30 as the scoped review-task artifact-identity
-> schema contract. `T3c-iii` and `T3c-iv` remain deferred later-phase
-> non-blockers, and only the post-`T5b-a` remainder of `T5b` remains
-> optional/unscoped. Any future work on those follow-ups still requires its own
-> fresh RRI computation and presentation/approval. The roadmap row
-> stays `in progress` in this uncommitted working tree because the drift gate
-> only allows a `✅ done` slice row once its synchronized plan/task evidence
-> files are committed. Owner coordination-mode adjustment 2026-07-21 remains in
-> force: the primary agent coordinates Med-high/Complex work, while Low and
+> T2b-i/T2b-ii/T3a/T3b/T3c-i/T3c-ii/T3c-iii/T5a/T5b-a/T6 are complete.
+> `T3c-ii` closed on 2026-07-30 via owner-waived phase-2 review after qwen
+> rounds `r1`-`r6`; `T5b-a` closed on 2026-07-30 as the scoped review-task
+> artifact-identity schema contract. `T3c-iv` and the post-`T5b-a` remainder of
+> `T5b` / `X-S-160-3` are explicitly deferred beyond slice closeout. Any future
+> work on those follow-ups still requires its own fresh RRI computation and
+> presentation/approval. Owner coordination-mode adjustment 2026-07-21 remains
+> in force: the primary agent coordinates Med-high/Complex work, while Low and
 > Moderate cards stay on their normal local/direct routes.
 > **Plan:** `docs/plan/s-140-subtitle-generation.md`.
 > **Behavioral coverage contract:** unit-v1.
@@ -1699,8 +1696,9 @@ this ledger entry.
 --X 3 --D 4 --K 4 --P 2 --touches crates/jobs/src/lib.rs --touches
 crates/jobs/Cargo.toml --platform rust`)
 **Depends on:** S-140-T3b
-**Status:** Not started — split from S-140-T3c 2026-07-25; not yet presented
-for approval
+**Status:** [x] Done — 2026-07-26. Split from S-140-T3c 2026-07-25 and closed
+with Redis-backed queue implementation, review evidence, Reflection log,
+coverage certification, and owner-authorized verification recorded below
 
 > Split from the original T3c; see [[S-140-T3c]] for the rationale. This half
 > only adds a real Redis-backed implementation of the three existing queue
@@ -2425,8 +2423,9 @@ Required passes: 2 (`RRI 39` → `Moderate`)
 
 **Effort:** TBD (RRI TBD — recompute at presentation; scope not yet fixed)
 **Depends on:** S-140-T3c-i, S-140-T3c-ii
-**Status:** Deferred to a later phase — filed 2026-07-26 as a [[S-140-T3c-i]]
-follow-up. Warning-only today; not a blocker for S-140 closure.
+**Status:** Deferred beyond S-140 closeout — filed 2026-07-26 as a
+[[S-140-T3c-i]] follow-up. Warning-only today; not a blocker for S-140
+closure.
 
 **Why this task exists:** `cargo check --workspace --all-targets
 --all-features` emits a future-incompatibility report for `apalis-redis
@@ -2776,7 +2775,8 @@ Required passes: 3 (`RRI 55` → `Med-high`)
 
 **Effort:** L (RRI TBD — recompute only if the remaining follow-up is scoped)
 **Depends on:** S-140-T5a, `S-140-T5b-a`, and explicit owner decision to carry the remaining artifact-identity/version follow-up beyond the delivered schema contract
-**Status:** Not started — optional remainder; not authorized by `S-140-T5b-a`
+**Status:** Deferred beyond S-140 closeout — optional remainder; not
+authorized by `S-140-T5b-a`
 
 This task exists only to prevent accidental scope creep after `T5b-a`. The S-140 plan records
 that X-S-160-3 cannot fully close unless review tasks can carry a derived-artifact
@@ -2784,7 +2784,8 @@ identity/version. `T5b-a` delivered the nullable schema/domain identity field;
 if the owner decides to close the remaining gap here, this task must be
 expanded into a new full development card covering the downstream wiring/version
 semantics with fresh HP/EC, RRI output, phase-1 review, and approval before
-implementation.
+implementation. S-140 itself now closes without this remainder; any future work
+must be re-scoped explicitly under the slice that owns it.
 
 **Files expected to change if scoped:**
 - `infra/migrations/00XX_update_review_tasks_artifact_identity.sql` (new)
@@ -2794,7 +2795,8 @@ implementation.
 **Stop condition:** Stop after scoping/presentation. Do not implement from this
 placeholder.
 
-**Status: [ ] Not started — optional and unscoped**
+**Status:** Archived placeholder for future re-scoping; not part of S-140 done
+criteria.
 
 ---
 
@@ -2862,8 +2864,9 @@ Code-solution review: n/a — docs-only task (phase-2 exempt).
   T6 is complete, and describe the remaining `X-S-160-3` gap accurately:
   review tasks now originate from real subtitle readiness, but still lack
   derived-artifact identity/version in schema.
-- Left `T3c-iii`/`T3c-iv` deferred and `T5b` optional, but the later `T3c-ii`
-  closure means these are now follow-ups rather than blockers for the slice.
+- Left `T3c-iv` deferred and `T5b` as an optional placeholder; after the later
+  `T3c-ii` and `T5b-a` closeout these are tracked as out-of-slice follow-ups
+  rather than blockers for the slice.
 - `make qa-docs` is the required verification gate for this task and was run
   after the sync pass.
 
@@ -2878,4 +2881,5 @@ Code-solution review: n/a — docs-only task (phase-2 exempt).
 
 **Status: [x] Done — 2026-07-30. T6 authored the canonical BDD feature,
 synchronized roadmap/plan/ledger state to the actual merged S-140 history, and
-left only deferred/non-scoped follow-ups outside the slice closeout.**
+left only deferred/non-scoped follow-ups outside the slice closeout, allowing
+S-140 itself to close as delivered.**
