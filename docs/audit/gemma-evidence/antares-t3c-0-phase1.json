@@ -1,0 +1,18 @@
+{
+  "findings": [
+    "HIGH|2. Scope and acceptance|EC-1|The requirement states `__seed__` is reserved so no real repository path may collide, but does not specify behavior if a file named `__seed__` actually exists in the snapshot (e.g., should it be skipped, renamed, or cause an error?). This creates ambiguity for implementation and testing.|Add explicit acceptance criterion: \"If a file named `__seed__` exists in the snapshot, it must be excluded from processing or handled via a specific conflict resolution strategy defined in HP-1.\"",
+    "MEDIUM|2. Scope and acceptance|HP-1|The sorting rule specifies `sorted()` over POSIX path strings but does not explicitly state how relative vs absolute paths are normalized before sorting, which could lead to non-deterministic ordering if inputs vary.|Clarify that all paths must be normalized to snapshot-relative POSIX format before sorting to ensure deterministic output.",
+    "LOW|2. Scope and acceptance|HP-4|The integrity test requirement is vague (\"deterministic integrity test or QA step\"). It should specify that the test must fail if any fixture file's SHA-256 does not match the manifest.|Specify that the unit test must explicitly compare computed SHA-256 of each fixture against the manifest and raise an assertion error on mismatch."
+  ],
+  "model": "qwen3.6:27b-q4_K_M",
+  "phase": "task",
+  "reviewer": "qwen3.6:27b-q4_K_M",
+  "summary": "Task card is well-structured but contains ambiguous acceptance criteria regarding path collision handling and missing explicit test coverage for the reserved sentinel path constraint.",
+  "ts": "2026-08-02T20:24:37.149753Z",
+  "usage": {
+    "done_reason": "stop",
+    "prompt_tokens": 1871,
+    "response_tokens": 318
+  },
+  "verdict": "findings"
+}

@@ -50,7 +50,7 @@ than escalating by default.
 ## Task order
 
 ```text
-T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c (decomposed: T2c-1 -> T2c-2) -> T2d -> T2e-pre -> T2e -> T3 (decomposed: T3a -> T3b, T3c -> T3d) -> T4 -> T5
+T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c (decomposed: T2c-1 -> T2c-2) -> T2d -> T2e-pre -> T2e -> T3 (decomposed: T3a -> T3b, T3c -> T3c-0 -> T3c-1 -> T3c-2 -> T3d) -> T4 -> T5
 ```
 
 ## Task summary
@@ -72,8 +72,11 @@ T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c (decomposed: T2c-1 -> T2c-2) -> T2d 
 | T3 CWE watchlist and context-complete packet construction | `[~] Decomposed (2026-08-01)` | 78 High (pre-execution) | XL | T2e |
 | T3a Versioned CWE watchlist | `[x] Done (owner-verified, 2026-08-02)` | 37 Moderate (execution) | M | T2e |
 | T3b Packet schema and hard security-exclusion guarantees | `[x] Done (owner-verified, 2026-08-02)` | 27 Moderate (execution) | M | T3a |
-| T3c Deterministic context-closure algorithm | `[ ] Open` | Recompute | TBD | T3a |
-| T3d Integrate T3a+T3b+T3c behind touchpoint packet construction | `[ ] Open` | Recompute | TBD | T3b, T3c |
+| T3c Deterministic context-closure algorithm | `[~] Decomposed (2026-08-02)` | 80 High (pre-execution) | XL | T3b |
+| T3c-0 Characterization corpus and omission-reason contract | `[x] Done (owner-waived, 2026-08-02)` | 39 Moderate | M | T3b |
+| T3c-1 Deterministic dependency and manifest closure | `[ ] Open` | Recompute | TBD | T3c-0 |
+| T3c-2 Governing security-boundary closure | `[ ] Open` | Recompute | TBD | T3c-1 |
+| T3d Integrate T3a+T3b+T3c-2 behind touchpoint packet construction | `[ ] Open` | Recompute | TBD | T3b, T3c-2 |
 | T4 Ground-truth calibration and observe-only workflow pilot | `[ ] Open` | Recompute | TBD | T2e, T3 |
 | T5 Promote, narrow, or retire on evidence | `[ ] Open` | Recompute | TBD | T4 |
 
@@ -2582,6 +2585,265 @@ scoring or implementation proceeds.
 
 `T4` continues to depend on `T3` as a whole; its dependency resolves once all
 `T3a`-`T3d` subtasks are `[x] Done`.
+
+## T3c - Deterministic context-closure algorithm
+
+- **Status:** `[~] Decomposed` - 2026-08-02
+- **Type:** development / repository-analysis policy
+- **Pre-execution RRI:** 80 High
+- **Effort:** XL
+- **RRI artifact:** `docs/audit/antares-t3c-rri.md`
+- **Depends on:** T3b (`[x] Done`, 2026-08-02)
+- **Decomposed from:** T3
+
+### Objective
+
+Resolve the deterministic repository-context closure beyond changed files
+without leaving the packet layer to guess imports, manifests, or governing
+security boundaries.
+
+### Decomposition record (2026-08-02)
+
+Independent analysis after T3b completion measured **RRI 80 -> High** for
+T3c as a single implementation unit, which keeps it above the
+`docs/policies/RRI_POLICY.md` decomposition threshold and also triggers the
+`T >= 4 and P >= 4` split rule. Full evidence:
+`docs/audit/antares-t3c-rri.md`.
+
+The task therefore remains non-implementable as one unit and is decomposed as:
+
+- `T3c-0` - freeze the characterization corpus and omission-reason contract
+  that the later closure algorithm must satisfy.
+- `T3c-1` - implement deterministic dependency and manifest closure from
+  in-snapshot changed paths.
+- `T3c-2` - implement deterministic governing security-boundary closure over
+  the `T3c-1` result.
+
+Split target: each child must recompute to **RRI <= 55** with `A` in `{0, 1}`
+before implementation may start. Any child that still scores above 55 must be
+split again before execution.
+
+Known preconditions surfaced by the phase-1 review of the parent split:
+
+- `T3b` currently enforces a closed omission-reason vocabulary in
+  `scripts/antares/packet_schema.py`, so derived-context-specific omission
+  reasons must be frozen and introduced deliberately before `T3c-1` or
+  `T3c-2` can emit them.
+- The closure lane needs a frozen characterization corpus before algorithmic
+  implementation, because the High-band gate here requires characterization
+  tests, explicit acceptance criteria, and later human diff review.
+
+## T3c-0 - Characterization corpus and omission-reason contract
+
+- **Status:** `[x] Done (owner-waived, 2026-08-02)`
+- **Type:** development / schema precondition / characterization
+- **Execution RRI:** 39 Moderate
+- **Effort:** M
+- **RRI artifact:** `docs/audit/antares-t3c-0-rri.md`
+- **Depends on:** T3b (`[x] Done`, 2026-08-02)
+- **Decomposed from:** T3c
+
+### Objective
+
+Freeze the characterization corpus and the packet-level omission-reason
+contract that `T3c-1` and `T3c-2` must satisfy before any repository closure
+logic is written.
+
+### Happy paths considered
+
+- **HP-1:** a frozen mixed Rust + Python fixture corpus records canonical seed
+  paths, expected deterministic ordering, and expected omission/exclusion
+  outcomes for later closure tests. "Frozen" here means committed fixture
+  files plus a committed manifest that records the source snapshot identity and
+  per-fixture SHA-256 digests, so tests can detect drift by exact content hash.
+  Ordering is defined as Python `sorted()` over canonical snapshot-relative
+  POSIX path strings, case-sensitive, locale-independent, with no case
+  folding and no locale normalization.
+- **HP-2:** the packet schema accepts the derived-context omission reasons
+  needed by `T3c-1` and `T3c-2`, and deterministic serialization remains
+  stable when those reasons appear in the omitted-path list. The existing
+  `path_outside_snapshot` token remains T3b-owned and is intentionally reused
+  rather than renamed. Each omission reason is the exact `OmittedPath.reason`
+  string serialized in the packet schema.
+- **HP-3:** packet-schema validation fails closed for any unrecognized or
+  misspelled derived-context omission reason by raising
+  `PacketValidationError`.
+
+### Edge cases considered
+
+- **EC-1:** an empty changed-path set yields **zero** derived-context entries
+  plus exactly one sentinel omission record (`path="__seed__"`,
+  `reason="context_closure_no_seed"`). This empty-seed output therefore
+  contains exactly **one** omission record total, plus zero other
+  omission/exclusion/include records and zero derived-context entries; it
+  never widens into a whole-repository scan. `__seed__` is reserved for this
+  sentinel use and must never be accepted as a real repository path.
+- **EC-2:** when canonicalization is attempted through
+  `resolve_within_snapshot()`, any candidate path that falls outside the
+  snapshot via symlink or traversal is a **soft omission, not an
+  exception**: it records exactly one `OmittedPath` entry with
+  `reason="path_outside_snapshot"` and follows the same absolute-path
+  reporting rule already enforced by `T3b`.
+- **EC-3:** unsupported file type, missing governing-boundary mapping, and
+  expansion-limit cutoff each map to explicit derived-context omission reasons
+  accepted by the packet schema rather than being improvised later. For
+  `T3c-0`, the expansion-limit case freezes the token and representative
+  omission rows only, validated through synthetic fixture/test rows rather
+  than real traversal; traversal logic that can actually reach the limit
+  remains deferred to `T3c-1`/`T3c-2`.
+
+### Acceptance criteria
+
+- The task defines the exact derived-context omission reason tokens that later
+  `T3c-1`/`T3c-2` may emit, and adds them to the closed packet-schema
+  contract in `scripts/antares/packet_schema.py`. Tests also prove schema
+  validation rejects any omission reason outside that frozen vocabulary with
+  `PacketValidationError`.
+- The task defines the deterministic ordering key for future closure results
+  as Python `sorted()` on canonical snapshot-relative POSIX path strings,
+  case-sensitive and locale-independent, with no case folding and no locale
+  normalization, and the characterization fixtures assert that order
+  explicitly.
+- The task freezes at least one mixed Rust + Python fixture corpus and records
+  the fixture source snapshot identity plus per-fixture SHA-256 digests in a
+  committed manifest so later closure tests do not depend on ambient
+  repository state.
+- The task adds an integrity verification test or deterministic QA step that
+  proves the committed manifest SHA-256 digests still match the fixture files
+  at merge time.
+- The task states the empty-seed contract explicitly and tests it.
+- The task adds a negative test proving `__seed__` is reserved for the empty
+  seed sentinel and cannot collide with a real repository path, including the
+  case where a snapshot contains a real file literally named `__seed__`.
+- The task fixes the empty-seed contract to one sentinel omission record with
+  `path="__seed__"` and `reason="context_closure_no_seed"`, plus zero derived
+  include entries.
+- The task preserves `T3b`'s containment/reporting rule: out-of-snapshot
+  omissions may record an absolute canonicalized path, while in-snapshot
+  derived omissions remain canonical snapshot-relative paths.
+- The expansion-limit omission contract is verified in isolation through
+  synthetic packet/fixture rows that carry
+  `context_closure_expansion_limit_reached`; no traversal mock is allowed to
+  smuggle in `T3c-1`/`T3c-2` logic here.
+- The task updates every existing packet-schema or characterization test that
+  directly asserts omission-reason vocabulary, or records that no such update
+  was needed because the prior assertions remain unchanged.
+- This task does **not** implement dependency traversal, manifest discovery,
+  or governing-boundary closure itself; it freezes the contract and
+  characterization surface those tasks must satisfy. Any expansion-limit
+  example in this task is fixture-level contract evidence only, not closure
+  execution logic.
+
+### Evidence to emit
+
+- `docs/audit/antares-t3c-0-rri.md`
+- one or more frozen fixture files for closure characterization
+- packet-schema contract/tests covering the new derived-context omission
+  reasons
+- characterization tests covering deterministic ordering, mixed-language
+  seeds, empty seeds, and out-of-snapshot derived-path omissions
+
+### Status artifacts affected
+
+- this ledger
+- `docs/plan/antares-security-specialist-advisor.md`
+
+### Implementation route
+
+Local-first route attempted per RRI 39 Moderate routing
+(`scripts/local-agent/run_local_task.py`, `DUBBRIDGE_LOCAL_AGENT_MODEL=
+qwen3.6:35b-a3b`, disposable worktree `.agent/worktrees/antares-t3c-0`). The
+local runner stalled without producing an accept-ready patch; the partial run
+receipt was preserved at `.agent/antares-t3c-0-local-run.json`, the stalled
+session was terminated, and the primary agent completed the approved scope in
+the primary checkout while keeping the touched-file set inside the task card
+boundary.
+
+### Reflection log
+
+Required passes: 2 (`39` -> `Moderate`)
+
+#### Pass 1 (contract freeze)
+
+- **Draft verdict:** the packet-schema vocabulary, sentinel omission helpers,
+  mixed Rust/Python fixture corpus, manifest digests, and characterization
+  tests were implemented; the first full verification run passed 22/22 tests.
+- **Critique findings:**
+  - the reserved `__seed__` sentinel needed to be rejected both during packet
+    build and packet validation so a real repository path could not collide
+    with the empty-seed contract;
+  - the seed-order helper needed explicit negative coverage for reserved-name
+    collisions, blank sentinel detail, and non-canonical relative paths.
+- **Revisions applied:**
+  - added fail-closed `__seed__` rejection during `build_packet()` and
+    `validate_packet()`;
+  - added collision, blank-detail, and non-canonical-path tests around the new
+    context-closure helper surface.
+
+#### Pass 2 (review disposition)
+
+- **Draft verdict:** rerun `qwen3.6:27b-q4_K_M` phase-2 review remained in
+  `FINDINGS`; one robustness gap around invalid seed-order inputs was real and
+  repaired, while the remaining high-severity finding was a contract dispute
+  over whether `__seed__` may ever be accepted as a real repository path.
+- **Critique findings:**
+  - `deterministic_context_closure_seed_order()` should fail cleanly on invalid
+    entries instead of surfacing a Python type mismatch;
+  - the reviewer's remaining objection conflicts with the approved EC-1 text,
+    which explicitly states that `__seed__` is reserved and "must never be
+    accepted as a real repository path."
+- **Revisions applied:**
+  - hardened `deterministic_context_closure_seed_order()` against non-string /
+    non-canonical entries and added direct regression coverage;
+  - retained the global `__seed__` reservation as-written in the approved task
+    contract and carried the unresolved review disagreement into an explicit
+    owner waiver.
+
+### Peer Reviewer evidence
+
+- Reviewer: `qwen3.6:27b-q4_K_M`
+- Command: `git diff -- scripts/antares/packet_schema.py scripts/antares/packet_schema_test.py scripts/antares/context_closure_characterization_test.py scripts/antares/testdata/context_closure_characterization | python3 scripts/peer-workflow-review.py --phase code --rri 39 --caller codex --task-id antares-t3c-0-phase2 --content - --artifact docs/audit/gemma-evidence/antares-t3c-0-phase2.json`
+- Artifact: `docs/audit/gemma-evidence/antares-t3c-0-phase2.json`
+- Verdict: `BLOCKED`
+- Findings: after multiple reruns and one repair cycle, the remaining finding
+  set centered on a contract disagreement: the reviewer recommended allowing a
+  real file named `__seed__`, while the approved task text reserves `__seed__`
+  globally for the empty-seed sentinel. Lower-severity comments were helper/API
+  ergonomics and test-shape preferences, not a reproduced functional failure.
+- Gemma fallback: `not triggered` — reason: qwen returned usable structured
+  verdicts on every rerun
+- D14 fallback: `not triggered` — reason: the user chose an explicit waiver
+  after the refreshed qwen artifact still reflected a contract disagreement
+- disposition_divergence: `partial`
+- Primary-agent disposition: repaired the actionable invalid-input handling,
+  retained the approved reserved-`__seed__` contract, and closed the remaining
+  review disagreement by explicit owner waiver on 2026-08-02
+- Review artifact: `docs/audit/gemma-evidence/antares-t3c-0-phase2.json`
+
+Task-analysis review: `qwen3.6:27b-q4_K_M` `docs/audit/gemma-evidence/antares-t3c-0-phase1.json` - BLOCKED
+Code-solution review: `qwen3.6:27b-q4_K_M` `docs/audit/gemma-evidence/antares-t3c-0-phase2.json` - BLOCKED
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | frozen mixed Rust + Python fixture corpus records canonical seed paths, deterministic ordering, and exact fixture digests | `scripts/antares/context_closure_characterization_test.py::HappyPathTest::test_hp1_manifest_hashes_match_fixture_files_exactly`, `scripts/antares/context_closure_characterization_test.py::HappyPathTest::test_hp2_manifest_seed_order_is_sorted_over_canonical_snapshot_relative_posix_paths` | passed |
+| HP-2 | Happy path | packet schema accepts the derived-context omission reasons and serialization stays stable when they appear in omitted-path rows | `scripts/antares/packet_schema_test.py::HappyPathTest::test_hp3_derived_context_omission_reasons_validate_and_serialize`, `scripts/antares/context_closure_characterization_test.py::HappyPathTest::test_hp3_representative_omission_rows_validate_under_the_packet_schema` | passed |
+| HP-3 | Happy path | packet validation fails closed for any unrecognized or misspelled derived-context omission reason | `scripts/antares/packet_schema_test.py::EdgeCaseTest::test_ec5_unknown_derived_context_omission_reason_is_rejected` | passed |
+| EC-1 | Edge case | empty changed-path set yields exactly one `__seed__` sentinel omission and `__seed__` can never collide with a real repository path | `scripts/antares/context_closure_characterization_test.py::EdgeCaseTest::test_ec1_empty_seed_contract_is_exactly_one_reserved_sentinel_omission`, `scripts/antares/packet_schema_test.py::EdgeCaseTest::test_ec6_real_seed_file_is_rejected_and_cannot_collide_with_sentinel`, `scripts/antares/packet_schema_test.py::EdgeCaseTest::test_ec10_reserved_seed_name_is_rejected_even_when_file_is_missing` | passed |
+| EC-2 | Edge case | out-of-snapshot canonicalization is a soft omission / `None`, not an exception | `scripts/antares/packet_schema_test.py::EdgeCaseTest::test_ec2_out_of_snapshot_path_is_excluded_and_reported`, `scripts/antares/context_closure_characterization_test.py::EdgeCaseTest::test_ec3_outside_snapshot_seed_is_soft_omission_not_exception` | passed |
+| EC-3 | Edge case | unsupported type, missing governing boundary, and expansion-limit cutoff each map to explicit derived-context omission reasons accepted by the schema | `scripts/antares/packet_schema_test.py::HappyPathTest::test_hp3_derived_context_omission_reasons_validate_and_serialize`, `scripts/antares/context_closure_characterization_test.py::HappyPathTest::test_hp3_representative_omission_rows_validate_under_the_packet_schema` | passed |
+
+### Owner final verification
+
+- Owner: `Matias Kruk`
+- Date: `2026-08-02`
+- Statement: **EXPLICIT WAIVER** (not a line-by-line re-review). Confirmed
+  in-session by the user message `waiver. no demos mas vueltas`, 2026-08-02,
+  after presenting the refreshed phase-2 artifact, the 23/23 passing
+  task-local tests, and the remaining contract disagreement over the reserved
+  `__seed__` sentinel.
+- Commands run: `python3 -m unittest scripts/antares/packet_schema_test.py scripts/antares/context_closure_characterization_test.py -v`; `make qa-docs`
 
 ## T3a - Versioned CWE watchlist
 

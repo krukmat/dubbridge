@@ -33,6 +33,16 @@ _GENERATED_TOP_LEVEL_DIRS = frozenset(
 )
 _GENERATED_SUFFIXES = frozenset({".pyc", ".pyo"})
 _GENERATED_FILENAMES = frozenset({".coverage"})
+CONTEXT_CLOSURE_NO_SEED_PATH = "__seed__"
+CONTEXT_CLOSURE_NO_SEED_REASON = "context_closure_no_seed"
+CONTEXT_CLOSURE_OMISSION_REASONS = frozenset(
+    {
+        CONTEXT_CLOSURE_NO_SEED_REASON,
+        "context_closure_unsupported_file_type",
+        "context_closure_missing_governing_boundary",
+        "context_closure_expansion_limit_reached",
+    }
+)
 _OMISSION_REASONS = frozenset(
     {
         "path_outside_snapshot",
@@ -42,6 +52,7 @@ _OMISSION_REASONS = frozenset(
         "security_excluded_production_config",
         "size_budget_fragment_omitted_remainder",
         "size_budget_omitted",
+        *CONTEXT_CLOSURE_OMISSION_REASONS,
     }
 )
 
@@ -190,7 +201,7 @@ def build_packet(
                 seen_paths.add(recorded_path)
             continue
 
-        canonical_rel = resolved.relative_to(root).as_posix()
+        canonical_rel = validate_context_closure_seed_path(resolved.relative_to(root).as_posix())
         if canonical_rel in seen_paths:
             continue
         seen_paths.add(canonical_rel)
@@ -250,6 +261,10 @@ def validate_packet(packet: Packet) -> None:
     seen_included: set[str] = set()
     for included in packet.included:
         _validate_relative_path(included.path)
+        if included.path == CONTEXT_CLOSURE_NO_SEED_PATH:
+            raise PacketValidationError(
+                "__seed__ is reserved for the empty-seed sentinel and cannot be included."
+            )
         if included.path in seen_included:
             raise PacketValidationError(f"duplicate included path {included.path!r}.")
         seen_included.add(included.path)
@@ -295,6 +310,15 @@ def validate_packet(packet: Packet) -> None:
                 )
         else:
             _validate_relative_path(omitted.path)
+        if omitted.reason == CONTEXT_CLOSURE_NO_SEED_REASON:
+            if omitted.path != CONTEXT_CLOSURE_NO_SEED_PATH:
+                raise PacketValidationError(
+                    "context_closure_no_seed omissions must use the reserved __seed__ path."
+                )
+        elif omitted.path == CONTEXT_CLOSURE_NO_SEED_PATH:
+            raise PacketValidationError(
+                "__seed__ is reserved for the context_closure_no_seed sentinel omission."
+            )
         identity = (omitted.path, omitted.reason)
         if identity in seen_omitted:
             raise PacketValidationError(f"duplicate omission record for {identity!r}.")
@@ -450,6 +474,57 @@ def _validate_relative_path(path_text: str) -> None:
     path = PurePosixPath(path_text)
     if not path_text or path.is_absolute() or ".." in path.parts:
         raise PacketValidationError(f"path {path_text!r} is not a canonical relative packet path.")
+
+
+def build_context_closure_no_seed_omission(detail: str | None = None) -> OmittedPath:
+    normalized_detail = (
+        detail.strip()
+        if detail is not None
+        else "No changed paths were provided; context closure must not widen into repository scan."
+    )
+    if not normalized_detail:
+        raise PacketValidationError("context_closure_no_seed detail must be non-empty.")
+    return OmittedPath(
+        path=CONTEXT_CLOSURE_NO_SEED_PATH,
+        reason=CONTEXT_CLOSURE_NO_SEED_REASON,
+        detail=normalized_detail,
+    )
+
+
+def validate_context_closure_seed_path(path_text: str) -> str:
+    _validate_relative_path(path_text)
+    if path_text == CONTEXT_CLOSURE_NO_SEED_PATH:
+        raise PacketValidationError(
+            "__seed__ is reserved for the empty-seed sentinel; use "
+            "build_context_closure_no_seed_omission() instead of passing it as a real path."
+        )
+    return path_text
+
+
+def canonicalize_context_closure_seed_path(raw_path: str, snapshot_root: Path) -> str | None:
+    candidate = PurePosixPath(raw_path)
+    if not raw_path.strip() or candidate.is_absolute() or ".." in candidate.parts:
+        return None
+    resolved_root = snapshot_root.resolve()
+    resolved = (resolved_root / Path(raw_path)).resolve()
+    try:
+        canonical_rel = resolved.relative_to(resolved_root).as_posix()
+    except ValueError:
+        return None
+    return validate_context_closure_seed_path(canonical_rel)
+
+
+def deterministic_context_closure_seed_order(
+    paths: tuple[str | None, ...] | list[str | None],
+) -> tuple[str, ...]:
+    canonical_paths: list[str] = []
+    for path_text in paths:
+        if not isinstance(path_text, str):
+            raise PacketValidationError(
+                "context closure seed order received an invalid or non-canonical path."
+            )
+        canonical_paths.append(validate_context_closure_seed_path(path_text))
+    return tuple(sorted(canonical_paths))
 
 
 def _canonical_record_path(raw_path: str, snapshot_root: Path) -> str:

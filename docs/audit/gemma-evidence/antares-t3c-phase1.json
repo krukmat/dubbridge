@@ -1,0 +1,20 @@
+{
+  "reviewer": "claude",
+  "model": "claude-opus-5",
+  "phase": "task",
+  "verdict": "findings",
+  "summary": "Decomposition route and High-band gating are correctly derived from the RRI evidence, but the card's omission/exclusion behaviors contradict T3b's closed reason vocabulary, the ledger has no T3c section to project from, and the closure has no bounded-expansion or ordering contract.",
+  "findings": [
+    "BLOCKING|scripts/antares/packet_schema.py|36-46|EC-3/EC-4 require omission reasons that do not exist in T3b's closed _OMISSION_REASONS set; T3c cannot emit unsupported-file or no-mapping reasons without a T3b amendment.|Add a T3b-amendment/precondition item and name exact reason tokens.",
+    "MAJOR|docs/tasks/antares-security-specialist-advisor.md|75|There is no ## T3c section in the ledger; the card is not a projection of a durable task definition.|Author the T3c or T3c-0/T3c-1/T3c-2 ledger sections before approval.",
+    "MAJOR|task-card:T3c|Scope and acceptance|No acceptance criterion bounds closure expansion; T3b size budget is out of scope, so overflow has no deterministic truncation contract.|Add bounded-expansion criteria and an edge case for deterministic truncation/omission.",
+    "MAJOR|task-card:T3c|Scope and acceptance|The authoritative source for governing security-boundary mapping is undefined.|Name the source of truth and format before scoring child tasks.",
+    "MAJOR|task-card:T3c|Scope and acceptance|Stable ordering/canonical dedup are asserted but not defined.|Define byte-wise canonical ordering and dedup identity; pin fixtures by commit SHA.",
+    "MEDIUM|task-card:T3c|EC-2/EC-4|Derived-path symlink/.. escape handling and absolute-vs-relative omission recording rules are unspecified.|Require reuse of resolve_within_snapshot and preserve the T3b recording split.",
+    "MEDIUM|task-card:T3c|Diagrams|Approval card is missing the required Mermaid workflow and technical-scope diagrams.|Add both diagrams.",
+    "MINOR|task-card:T3c|Happy paths|No mixed-language happy path exercises merged ordering determinism.|Add HP-3 for a Rust+Python seed set.",
+    "MINOR|task-card:T3c|Approval checkpoint|Closing line should retain the mandated wording verbatim.|Keep 'Execution has not started. Approve this task to proceed.' verbatim.",
+    "MINOR|task-card:T3c|Decision header|Concrete model IDs were author-attested, not reviewer-verified.|Re-verify model IDs when each child card is presented."
+  ],
+  "ts": "2026-08-02T15:00:46.087619Z"
+}

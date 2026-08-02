@@ -1,0 +1,54 @@
+{
+  "source_snapshot_id": "antares-t3c-0-fixture@2026-08-02",
+  "canonical_seed_order": [
+    "python/checks.py",
+    "python/pkg/__init__.py",
+    "rust/src/lib.rs",
+    "rust/src/main.rs"
+  ],
+  "fixture_files": [
+    {
+      "path": "python/checks.py",
+      "sha256": "sha256:715bd84e88f9749da6e26fabce154fbd79542a9588f78329a5d218f93372f03d"
+    },
+    {
+      "path": "python/pkg/__init__.py",
+      "sha256": "sha256:2a69c79f663fab30e6c781841c311f2cfaa62d84b2192734b7faf27fe6b4a667"
+    },
+    {
+      "path": "rust/src/lib.rs",
+      "sha256": "sha256:21766b9d481ff16aa8a8a26b6e360ab95d801e58bb2ef1ce20b6d814f890ffec"
+    },
+    {
+      "path": "rust/src/main.rs",
+      "sha256": "sha256:f0ee1f86b8c8e3f8b036aa42e03c4e96cab7aae226d83cfcc9ef6affb51984db"
+    }
+  ],
+  "representative_omissions": [
+    {
+      "path": "__seed__",
+      "reason": "context_closure_no_seed",
+      "detail": "No changed paths were provided; context closure must not widen into repository scan."
+    },
+    {
+      "path": "/snapshot/outside/escape.rs",
+      "reason": "path_outside_snapshot",
+      "detail": "Representative soft omission row for a canonicalized path that resolves outside the snapshot."
+    },
+    {
+      "path": "docs/spec.yaml",
+      "reason": "context_closure_unsupported_file_type",
+      "detail": "Representative contract row for a seed whose file type is intentionally unsupported."
+    },
+    {
+      "path": "src/security/mod.rs",
+      "reason": "context_closure_missing_governing_boundary",
+      "detail": "Representative contract row for a seed lacking a governing-boundary mapping."
+    },
+    {
+      "path": "src/deep/module.rs",
+      "reason": "context_closure_expansion_limit_reached",
+      "detail": "Representative synthetic omission row for deterministic expansion-limit coverage."
+    }
+  ]
+}

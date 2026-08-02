@@ -1,0 +1,20 @@
+{
+  "findings": [
+    "HIGH|scripts/antares/packet_schema.py|204|The call to `validate_context_closure_seed_path` inside `build_packet` will raise a `PacketValidationError` if the resolved path happens to be named `__seed__`. This prevents legitimate files named `__seed__` from being included in the packet, which is an unintended side effect of reserving the name only for the sentinel omission. The validation should likely only reject the sentinel when it appears as an *omission* or when explicitly passed as a seed argument, not when discovered during file traversal unless the intent is to globally ban this filename.",
+    "MEDIUM|scripts/antares/packet_schema.py|485|The function `canonicalize_context_closure_seed_path` returns `None` for invalid paths (absolute, containing `..`, or outside root). However, `deterministic_context_closure_seed_order` iterates over inputs and calls `validate_context_closure_seed_path` directly on the input strings without first canonicalizing them. If a caller passes a non-canonical path like `./src/main.rs` to `deterministic_context_closure_seed_order`, it will fail validation because `_validate_relative_path` likely expects strict POSIX relative paths without leading `./`. The function name implies it handles raw paths, but the implementation assumes pre-canonicalized inputs.",
+    "MEDIUM|scripts/antares/packet_schema_test.py|135|The test `test_hp4_seed_paths_canonicalize_and_sort_deterministically` relies on `canonicalize_context_closure_seed_path` to clean up paths before sorting. However, there is no test verifying that `deterministic_context_closure_seed_order` fails or behaves correctly when given non-canonical inputs directly (e.g., with leading `./`). The current test only checks the happy path where inputs are pre-cleaned.",
+    "LOW|scripts/antares/packet_schema_test.py|285|The test `test_ec6_real_seed_file_is_rejected_and_cannot_collide_with_sentinel` creates a file named `__seed__` in the snapshot root. This is a side effect that modifies the file system. While `addCleanup` is used, if the test suite runs in parallel or if other tests depend on the snapshot root being clean, this could cause flakiness. It is better to mock the file existence or use a temporary directory specific to this test rather than modifying the shared `snapshot_root`.",
+    "LOW|scripts/antares/packet_schema.py|478|The function `build_context_closure_no_seed_omission` raises `PacketValidationError` if the detail is empty after stripping. This is correct behavior, but the error message \"context_closure_no_seed detail must be non-empty\" is slightly misleading if the user passes `None`, as the default detail is used. The check should ideally distinguish between an explicitly passed empty string and a missing detail that falls back to the default."
+  ],
+  "model": "qwen3.6:27b-q4_K_M",
+  "phase": "code",
+  "reviewer": "qwen3.6:27b-q4_K_M",
+  "summary": "The diff introduces a reserved sentinel path `__seed__` for context closure handling but contains logic errors in validation, missing tests for new helper functions, and potential side effects from file system interactions in tests.",
+  "ts": "2026-08-02T20:59:34.584311Z",
+  "usage": {
+    "done_reason": "stop",
+    "prompt_tokens": 3545,
+    "response_tokens": 672
+  },
+  "verdict": "findings"
+}

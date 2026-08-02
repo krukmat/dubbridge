@@ -641,9 +641,24 @@ is now cancelled outright, because Antares does not propose RRI inputs.
   (`docs/audit/gemma-evidence/antares-t3b-phase2.json`). Owner final
   verification was confirmed in-session on 2026-08-02, so the ledger status is
   now `[x] Done (owner-verified, 2026-08-02)`.
-- `T3c` and `T3d` remain open and still require their own pre-execution RRI
-  and approval before implementation. `T4` stays blocked until all of
-  `T3a`-`T3d` are `[x] Done`.
+- `T3c` no longer remains executable as one unit: after T3b completion it
+  was re-scored at `RRI 80 -> High` and decomposed on 2026-08-02 into
+  `T3c-0` (characterization corpus + omission-reason contract), `T3c-1`
+  (dependency/manifest closure), and `T3c-2` (governing security-boundary
+  closure). Each child must be re-scored and approved individually before
+  implementation.
+- `T3c-0` is now `[x] Done (owner-waived, 2026-08-02)`: the frozen mixed
+  Rust/Python characterization corpus, omission-reason vocabulary, and
+  reserved `__seed__` sentinel contract landed together with task-local
+  verification (`23/23` tests passed). The refreshed phase-2 qwen artifact
+  remained in `FINDINGS` because it recommended allowing a real file named
+  `__seed__`; the approved task text explicitly forbids that, so closure used
+  an explicit owner waiver rather than changing the contract mid-task.
+- `T3c-1` is now the next executable `T3c` child; it still requires a fresh
+  RRI score, phase-1 review, and approval presentation before implementation.
+- `T3d` remains open and now depends on `T3b` plus `T3c-2`. `T4` stays
+  blocked until all of `T3a`, `T3b`, `T3c-0`, `T3c-1`, `T3c-2`, and `T3d`
+  are `[x] Done`.
 - No roadmap update is required until T5 retains a production operating mode.
 
 ## Related documents
