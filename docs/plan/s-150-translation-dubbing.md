@@ -8,13 +8,15 @@ slice: S-150
 
 > **Status:** Planned 2026-08-02. S-150-T0 opened this plan and ratified the
 > localization-unit, artifact-lineage, immutability, and review-version
-> boundaries. S-150-T1a and S-150-T1b are now complete, so the slice has both
-> the product-code domain types and the matching migration layer for per-target
-> translation/dubbing readiness plus the full S-150 artifact-kind set. The
-> plan-review conditions recorded for this slice remain in force, especially the
-> durable S-140/S-150 route discriminator, deterministic initial
-> generation-request identity, migration parity, review cutover, and deferred
-> voice-consent hardening boundary.
+> boundaries. S-150-T1a, S-150-T1b, S-150-T1c-i, and S-150-T1c-ii are now
+> complete, so the slice has the product-code domain types, the migration layer
+> for per-target translation/dubbing readiness and exact current-generation
+> pointer/claim storage, plus the fail-closed translation/dubbing repository
+> implementations that consume that schema. `S-150-T2` is now the next
+> executable child. The plan-review conditions recorded for this slice remain in
+> force, especially the durable S-140/S-150 route discriminator, deterministic
+> initial generation-request identity, migration parity, review cutover, and
+> deferred voice-consent hardening boundary.
 > **Roadmap phase:** `S-150` — Translation + dubbing (TTS / voice cloning).
 > **Tasks ledger:** `docs/tasks/s-150-translation-dubbing.md`.
 
@@ -165,8 +167,10 @@ opaque `generation_request_id`; every redelivery of that same causal request mus
 carry it unchanged. An explicit regeneration must create a new request ID. The exact
 source artifact ID is stored with the generation claim and a reused request ID with
 different source or operation data fails closed instead of aliasing another
-generation. T1c owns the atomic claim/uniqueness rule; T2 and the decomposed T5 job
-contracts own propagation of the request ID.
+generation. The decomposed T1c pair owns this boundary in two halves: T1c-i adds the
+claim/current-pointer schema and atomic uniqueness storage, while T1c-ii consumes it
+through fail-closed repository methods. T2 and the decomposed T5 job contracts own
+propagation of the request ID.
 
 The initial translation request is the one bounded exception to caller-minted
 identity because the current S-140 post-ready seam has no request ID. After the
@@ -285,8 +289,10 @@ no inference from project age, row presence, or feature timing is allowed.
 | T0 | Open plan + ledger; ratify artifact boundaries | planning | 23 / S | Done 2026-08-01 |
 | T1a | Domain artifact kinds and localization status types | development | 23 / S | Recompute before execution |
 | T1b | Per-target status and artifact-kind migration | migration | 52 / L | Done 2026-08-02; verified on fresh PostgreSQL 16 |
-| T1c | Translation/dubbing repositories and immutable generation pointers | development | 47 / L | Med-high; split if exact scope grows |
-| T2 | Translation fan-out job contract and S-140 handoff | development | 50 / L | Med-high; replaces first-target-only seam |
+| T1c | Translation/dubbing repositories and immutable generation pointers | development parent | 56 / L | Decomposed 2026-08-02 after exact rerun over repo paths plus schema-gap review |
+| T1c-i | Generation-claim and exact-pointer schema migration | migration | 52 / L | Done 2026-08-02; verified on fresh PostgreSQL 16; cloud-required by owner request |
+| T1c-ii | Translation/dubbing repositories and readiness evidence | development | 47 / L | Done 2026-08-02; repositories, strict artifact helpers, and readiness evidence verified with cloud-review fallback PASS |
+| T2 | Translation fan-out job contract and S-140 handoff | development | 50 / L | Med-high; next executable child, replaces first-target-only seam |
 | T3a | Translation provider/subprocess contract | development | 42 / L | Med-high |
 | T3b | Functional translation worker | development | 44 / L | Med-high |
 | T3c | Translation runtime persistence and readiness | development | 53 / L | Med-high |
@@ -297,16 +303,20 @@ no inference from project age, row presence, or feature timing is allowed.
 | T8 | Future voice-consent hardening and evidence lifecycle | future ADR/planning parent | 71 / XL | Non-blocking backlog; decompose and approve when activated |
 
 All provisional values were produced by `scripts/rri.py` over the expected path
-sets on 2026-08-01. They are routing evidence, not permission to execute: every task
-must be rerun against its exact paths and current coverage. T5 and T6 are parent
-requirements, not executable handoff cards; their child tasks must be created by T4
-and the T6 decomposition gate respectively. T8 is a non-blocking future parent and
-must be decomposed only when its governance program is activated.
+sets on 2026-08-01, except the T1c rerun/decomposition update recorded on
+2026-08-02. The exact rerun of the original T1c repo surface returned `RRI 56`
+(`Complex`) and the phase-1 review packet confirmed the current `0027` migration
+does not yet provide the D1/D5 generation-claim storage or the exact current
+source/output pointers the repository task requires. They are routing evidence, not
+permission to execute: every task must be rerun against its exact paths and current
+coverage. T1c, T5, and T6 are parent requirements, not executable handoff cards;
+their child tasks must be created before coding begins. T8 is a non-blocking future
+parent and must be decomposed only when its governance program is activated.
 
-Sequence: `T0 -> T1a -> T1b -> T1c -> T2 -> T3a -> T3b -> T3c -> T4 ->
-decomposed T5 children -> decomposed T6 children -> T7`. T8 is deliberately last
-and is not part of the S-150 delivery critical path; it is a future governance
-follow-up coordinated with `X-S-110-2`, `X-S-110-3`, X20, and S-180.
+Sequence: `T0 -> T1a -> T1b -> T1c-i -> T1c-ii -> T2 -> T3a -> T3b -> T3c -> T4
+-> decomposed T5 children -> decomposed T6 children -> T7`. T8 is deliberately
+last and is not part of the S-150 delivery critical path; it is a future
+governance follow-up coordinated with `X-S-110-2`, `X-S-110-3`, X20, and S-180.
 
 ## Technical flow
 

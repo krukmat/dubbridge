@@ -8,10 +8,16 @@ Behavioral coverage contract: unit-v1
 ---
 # S-150 Translation and Dubbing
 
-> **Status:** Planned 2026-08-02. S-150-T0, S-150-T1a, and S-150-T1b are
+> **Status:** Planned 2026-08-02. S-150-T0, S-150-T1a, S-150-T1b, and
+> S-150-T1c-i are
 > complete; the slice now has ratified artifact boundaries, product-code domain
 > kinds/status types, and the matching per-target migration layer for
-> translation/dubbing status storage plus the full S-150 artifact-kind set. The
+> translation/dubbing status storage, exact current-generation pointer/claim
+> storage, plus the full S-150 artifact-kind set. The
+> exact rerun of the original `S-150-T1c` on 2026-08-02 returned `RRI 56` and
+> exposed a schema gap against D1/D5, so `T1c` is now decomposed into `T1c-i`
+> (generation-claim/current-pointer schema, now complete) and `T1c-ii`
+> (repositories, next executable child). The
 > plan-review conditions recorded for this slice remain in force, especially the
 > durable S-140/S-150 route marker, deterministic initial generation-request
 > derivation, and deferred ADR-028 ownership seam for TTS. Tasks T5, T6, and
@@ -351,10 +357,20 @@ Artifact: `docs/audit/s-150-t1b-rri.md`
 
 ## S-150-T1c: Translation/dubbing repositories and immutable generation pointers
 
-**Type:** development
-**Effort:** L (provisional RRI 47 — Med-high; recompute and split if necessary)
+> Exact rerun on 2026-08-02 over the original repository surface
+> (`crates/db/src/translation_repo.rs`, `crates/db/src/dubbing_repo.rs`,
+> `crates/db/src/artifact_repo.rs`, `crates/db/src/lib.rs`) returned `RRI 56`
+> (`Complex`) and the phase-1 review packet confirmed the current
+> `0027_create_translation_dubbing_status_and_extend_artifact_kind_check.sql`
+> schema stops short of D1/D5: it has no generation-claim storage and no exact
+> current source/output pointers on the localization status rows. This parent is
+> therefore decomposed into `S-150-T1c-i` and `S-150-T1c-ii`. Do not implement
+> the parent directly.
+
+**Type:** development parent (not executable as written)
+**Effort:** L (rerun RRI 56 — Complex)
 **Depends on:** S-150-T1b
-**Status:** [ ] Planned
+**Status:** [ ] Decomposed 2026-08-02 into S-150-T1c-i + S-150-T1c-ii
 
 **Happy paths considered:**
 
@@ -377,15 +393,199 @@ Artifact: `docs/audit/s-150-t1b-rri.md`
 - **EC-6:** An explicit regeneration cannot claim the deterministic request ID
   reserved for the initial translation of its source subtitle.
 
-**Acceptance criteria:** Implement fail-closed repositories for per-target state,
-generation claims, exact artifact pointers, and readiness evidence. Enforce one
-atomic generation claim per `(operation, localization unit, generation_request_id)`
-and persist its exact source artifact; reject explicit-regeneration use of the
-reserved initial ID; cover every case with unit/integration tests.
+**Acceptance criteria:** Close this parent only through `S-150-T1c-i` and
+`S-150-T1c-ii`. The first child must add the exact current-pointer/generation-claim
+schema needed by D1/D5; the second must implement the fail-closed repositories and
+readiness evidence over that schema, including the HP/EC cases above.
+
+**Evidence to emit:** Exact RRI rerun, phase-1 review artifact, and the full
+child-task-specific review/Reflection/coverage/verification evidence.
+
+**Status artifacts affected:** This ledger, `docs/plan/s-150-translation-dubbing.md`,
+and `docs/plan/roadmap.md`.
+
+**Agent handoff prompt:** Do not implement this parent. Execute only the approved
+child task and stop at its boundary.
+
+**Stop condition:** Parent cannot be marked Done; start with `S-150-T1c-i`, then
+stop before `T2`.
+
+- Task-analysis review: `d14` `.agent/peer-task-review-s-150-t1c.json` - `BLOCKED`
+
+---
+
+## S-150-T1c-i: Generation-claim and exact-pointer schema migration
+
+**Type:** migration-only
+**Effort:** L (recomputed RRI 52 — Med-high)
+**Depends on:** S-150-T1b
+**Status:** [x] Done 2026-08-02
+
+**Behavioral examples:**
+
+- **HP-1:** `asset_translation_status` can persist one localization unit's exact
+  current subtitle source artifact, translated-subtitle output artifact, and the
+  current `generation_request_id`.
+- **HP-2:** `asset_dubbing_status` can persist one localization unit's exact
+  translated-subtitle source artifact plus its current manifest/final-audio
+  artifacts and `generation_request_id`.
+- **EC-1:** A duplicate generation claim for the same
+  `(operation, project_id, asset_id, target_language_id, generation_request_id)`
+  is rejected by PostgreSQL.
+- **EC-2:** Pointer/claim columns remain nullable until a generation is actually
+  claimed or promoted current; the migration does not invent a backfill.
+- **EC-3:** Pointer or claim rows cannot reference a missing `artifact_records.id`.
+
+**Acceptance criteria:** Add one new forward-only migration after `0027` that
+extends `asset_translation_status` and `asset_dubbing_status` with exact current
+artifact pointers and `current_generation_request_id`, and adds a normalized
+generation-claim table that stores `operation`, the exact localization unit, the
+claimed `generation_request_id`, and its exact `source_artifact_id`. Keep the
+schema provider-neutral, preserve the existing localization-unit primary keys, and
+validate the full migration chain against a fresh PostgreSQL database. This task
+introduces storage/constraints only; it does not add repository code.
+
+**Files expected to change:** One new next-numbered file under `infra/migrations/`
+after exact decomposition.
+
+**Evidence to emit:** Exact RRI report, phase-1/phase-2 exemption lines for
+migration-only work, schema inspection, and fresh-Postgres verification output.
+
+**Status artifacts affected:** This ledger, `docs/plan/s-150-translation-dubbing.md`,
+and migration inventory references if the final task creates them.
+
+**Agent handoff prompt:** Add only the generation-claim/current-pointer migration
+and live-Postgres verification; stop before repository code.
+
+**Stop condition:** Stop after migration verification. Do not start `S-150-T1c-ii`.
+
+### RRI evidence
+
+Artifact: `docs/audit/s-150-t1c-i-rri.md`
+
+- Final RRI: `52`
+- Band: `Med-high (41-55)`
+- Effort: `L`
+- Decomposition: `not triggered`
+
+- Task-analysis review: `n/a` - migration-only exemption
+
+### Closure note
+
+- Added [infra/migrations/0028_add_localization_generation_claims_and_exact_pointers.sql](/Users/matias/dubbridge/infra/migrations/0028_add_localization_generation_claims_and_exact_pointers.sql:1)
+  to extend both localization status tables with exact current-generation pointer
+  columns and to add the normalized `localization_generation_claims` table.
+- Kept all new current-pointer columns nullable, so pre-existing and newly inserted
+  rows can remain unclaimed/current-less without backfill until a generation is
+  actually promoted.
+- Added fail-closed checks so a current generation always carries a source
+  artifact, and a current dubbed-audio pointer cannot exist without a current
+  manifest pointer.
+- Executed on the user-requested cloud path: `CLOUD_REQUIRED` for this task's
+  implementation route; the ADR-038 local authoring path was intentionally not
+  used.
+
+### Migration verification
+
+- Fresh database: `s150_t1c_i_verify` on PostgreSQL 16 inside `local-postgres-1`
+- Migration apply: all migrations `0001` through `0028` applied in order with
+  `psql -v ON_ERROR_STOP=1`
+- Schema inspection:
+  - `information_schema.columns` confirmed nullable `current_*` pointer columns on
+    `asset_translation_status` and `asset_dubbing_status`, plus the full
+    `localization_generation_claims` table shape
+  - `pg_get_constraintdef` confirmed:
+    - status-table FKs from current pointers to `artifact_records(id)` with
+      `ON DELETE RESTRICT`
+    - fail-closed current-pointer checks on both status tables
+    - primary-key uniqueness on
+      `(operation, project_id, asset_id, target_language_id, generation_request_id)`
+      for `localization_generation_claims`
+    - claim-table FKs to `project_assets`, `target_languages`, and
+      `artifact_records`
+- Behavioral verification:
+  - `HP-1`: inserting a translation status row without any new pointer columns left
+    all `current_*` fields `NULL`; updating that row with
+    `current_generation_request_id`, exact subtitle source, and exact
+    translated-subtitle output succeeded
+  - `HP-2`: inserting a dubbing status row without any new pointer columns left all
+    `current_*` fields `NULL`; updating that row with exact translated-subtitle
+    source plus exact manifest/final-audio pointers succeeded
+  - `EC-1`: inserting a second `localization_generation_claims` row for the same
+    `(operation, project_id, asset_id, target_language_id, generation_request_id)`
+    failed with `localization_generation_claims_pk`
+  - `EC-2`: the initial inserts into both status tables succeeded with every new
+    pointer/claim column omitted, proving the migration introduced no backfill
+    requirement
+  - `EC-3`: updating `asset_translation_status.current_source_artifact_id` to a
+    missing UUID failed with
+    `asset_translation_status_current_source_artifact_fk`
+  - Additional fail-closed check: setting `current_dubbed_audio_artifact_id`
+    without `current_manifest_artifact_id` failed with
+    `asset_dubbing_status_current_pointer_check`
+
+- Code-solution review: `n/a` - migration-only exemption
+
+### Owner final verification
+
+- Owner: `Codex agent`
+- Date: 2026-08-02
+- Statement: I verified the migration on a fresh PostgreSQL database and confirmed the task's happy paths and edge cases through schema inspection plus passing/failing row checks.
+- Commands run: `docker-compose -f infra/local/docker-compose.yml up -d postgres`; `docker-compose -f infra/local/docker-compose.yml exec -T postgres psql -U dubbridge -d postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS s150_t1c_i_verify;"`; `docker-compose -f infra/local/docker-compose.yml exec -T postgres psql -U dubbridge -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE s150_t1c_i_verify;"`; `for f in infra/migrations/*.sql; do docker-compose -f infra/local/docker-compose.yml exec -T postgres psql -U dubbridge -d s150_t1c_i_verify -v ON_ERROR_STOP=1 < "$f"; done`; schema inspection queries against `s150_t1c_i_verify`; behavioral `INSERT`/`UPDATE` verification and expected-failure checks against `s150_t1c_i_verify`
+
+---
+
+## S-150-T1c-ii: Translation/dubbing repositories and readiness evidence
+
+> This child consumes the schema introduced by `S-150-T1c-i`. No migration is in
+> scope here.
+
+**Type:** development
+**Effort:** L (recomputed RRI 47 — Med-high)
+**Depends on:** S-150-T1c-i
+**Status:** [x] Done 2026-08-02
+- **RRI:** 47 -> Med-high (41-55)
+
+**Happy paths considered:**
+
+- **HP-1:** A translation claim for one localization unit persists its exact
+  source `Subtitle`, transitions the unit state, and promotes the exact
+  `TranslatedSubtitle` artifact/current generation only when readiness evidence is
+  complete.
+- **HP-2:** A dubbing claim for one localization unit persists its exact source
+  `TranslatedSubtitle`, transitions the unit state, and promotes the exact
+  `DubbingManifest`/`DubbedAudio` artifacts only when readiness evidence is
+  complete.
+- **HP-3:** Re-delivery with the same `(operation, localization unit,
+  generation_request_id)` resolves the same persisted claim instead of creating a
+  second mutable generation.
+
+**Edge cases considered:**
+
+- **EC-1:** A pointer to an artifact belonging to another asset or wrong kind is
+  rejected.
+- **EC-2:** Partial artifact sets cannot transition translation or dubbing to
+  Ready.
+- **EC-3:** A stale generation cannot overwrite the current generation's pointers.
+- **EC-4:** An unknown stored artifact kind fails closed at the repository's strict
+  decode boundary even though the legacy domain parser remains lenient.
+- **EC-5:** Reusing a `generation_request_id` with different operation/source facts
+  fails closed instead of aliasing another generation.
+- **EC-6:** An explicit regeneration cannot claim the deterministic request ID
+  reserved for the initial translation of its source subtitle.
+
+**Acceptance criteria:** Implement fail-closed translation/dubbing repositories for
+per-target state, generation claims, exact artifact pointers, and readiness
+evidence over the ratified `T1c-i` schema. Enforce one atomic generation claim per
+`(operation, localization unit, generation_request_id)`, persist and re-read its
+exact source artifact, reject explicit-regeneration use of the reserved initial ID,
+and cover every HP/EC case with unit/integration tests. This task must not add or
+change migrations.
 
 **Files expected to change:** `crates/db/src/translation_repo.rs`,
 `crates/db/src/dubbing_repo.rs`, `crates/db/src/artifact_repo.rs`,
-`crates/db/src/lib.rs`, and scoped tests.
+`crates/db/src/lib.rs`, and scoped repository tests (expected under
+`apps/api/tests/` unless implementation proves a narrower in-crate test surface).
 
 **Evidence to emit:** Exact RRI, reviewer artifact, Reflection log, unit coverage
 certification, Postgres test output, and owner verification.
@@ -393,9 +593,128 @@ certification, Postgres test output, and owner verification.
 **Status artifacts affected:** This ledger.
 
 **Agent handoff prompt:** Implement only localization repositories and readiness
-evidence for the ratified schema; stop before queues and workers.
+evidence for the `T1c-i` schema; stop before queues and workers.
 
 **Stop condition:** Stop after repository tests and closure gates. Do not start T2.
+
+### RRI evidence
+
+Artifact: `docs/audit/s-150-t1c-ii-rri.md`
+
+- Final RRI: `47`
+- Band: `Med-high (41-55)`
+- Effort: `L`
+- Decomposition: `not triggered`
+
+Task-analysis review: `claude` `.agent/peer-task-review-S-150-T1c-ii-cloud.json` - `PASS`
+
+### Closure note
+
+- Added [crates/db/src/translation_repo.rs](/Users/matias/dubbridge/crates/db/src/translation_repo.rs:1)
+  and [crates/db/src/dubbing_repo.rs](/Users/matias/dubbridge/crates/db/src/dubbing_repo.rs:1)
+  to own fail-closed generation claims, exact current pointers, and readiness
+  evidence for the `0028` localization schema.
+- Extended [crates/db/src/artifact_repo.rs](/Users/matias/dubbridge/crates/db/src/artifact_repo.rs:1)
+  with strict S-150 artifact-kind decoding plus generic derived-artifact
+  insert/lookup helpers, and exported the new repositories from
+  [crates/db/src/lib.rs](/Users/matias/dubbridge/crates/db/src/lib.rs:1).
+- Added [apps/api/tests/localization_repo_test.rs](/Users/matias/dubbridge/apps/api/tests/localization_repo_test.rs:1)
+  to cover claim idempotency, exact ready promotion, partial-readiness negatives,
+  stale-generation protection, reused-request fail-closed behavior, reserved
+  initial-request rejection, and EC-1 promotion failures for wrong-kind,
+  wrong-parent, and other-asset artifacts.
+- Executed on the user-directed CLOUD authoring/review route; the primary
+  `claude` phase-2 review stalled repeatedly, so the documented isolated `d14`
+  fallback reviewer was used and returned `PASS` after the added EC-1 coverage.
+
+### Peer Reviewer evidence
+
+- Reviewer: `d14`
+- Command: `multi_agent_v1.spawn_agent` with model override `gpt-5.4` for an
+  isolated read-only review over the current workspace files after the primary
+  `claude` cloud reviewer stalled
+- Artifact: `docs/audit/gemma-evidence/S-150-T1c-ii.json`
+- Verdict: `PASS`
+- Findings: initial isolated review returned 2 LOW findings about missing EC-1
+  promotion-failure coverage in `promote_translation_ready` and
+  `promote_dubbing_ready`; both were accepted and repaired by adding
+  wrong-kind/wrong-parent/other-asset promotion tests before the rerun PASS
+- Gemma fallback: `not triggered` — reason: `user-directed CLOUD override kept the review path off the local qwen/gemma chain`
+- D14 fallback: `triggered` — reason: `primary claude cloud review stalled repeatedly with no usable output`
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted the LOW coverage findings, added the
+  missing EC-1 promotion-failure tests, reran `cargo test` / `cargo clippy`,
+  and obtained a rerun `PASS`
+- Review artifact: `docs/audit/gemma-evidence/S-150-T1c-ii.json`
+
+Code-solution review: `d14` `docs/audit/gemma-evidence/S-150-T1c-ii.json` - `PASS`
+
+### Reflection log
+
+Required passes: 3 (`47` -> `Med-high`)
+
+#### Pass 1
+
+- **Draft verdict:** Translation/dubbing repositories, strict artifact helpers,
+  and baseline integration coverage were implemented end-to-end over `0028`.
+- **Critique findings:**
+  - The first integration-test cut did not yet prove EC-1 at the promotion APIs
+    (`promote_translation_ready` / `promote_dubbing_ready`) for wrong-kind,
+    wrong-parent, and other-asset artifacts.
+  - The test helper carried one stray unused SQL query line that should be
+    removed before static-gate validation.
+- **Revisions applied:**
+  - Removed the stray unused query in `insert_scope`.
+  - Added promotion-failure coverage for translation and dubbing EC-1 paths.
+
+#### Pass 2
+
+- **Draft verdict:** Coverage now exercised both claim-time and promotion-time
+  fail-closed boundaries across translation and dubbing.
+- **Critique findings:**
+  - The added coverage pushed two integration tests over the repo's clippy
+    `too_many_lines` budget.
+  - The updated coverage still needed a clean rerun through `cargo clippy` and
+    the neighboring subtitle/transcription repository tests.
+- **Revisions applied:**
+  - Extracted `claim_dubbing_generation`, `insert_dubbing_outputs`, and
+    `assert_dubbing_promote_error` helpers in the integration test file.
+  - Reran `cargo test -p dubbridge-db`,
+    `cargo test -p dubbridge-api --test subtitle_repo_test --test transcription_repo_test --test localization_repo_test`,
+    and `cargo clippy -p dubbridge-db -p dubbridge-api --tests -- -D warnings`.
+
+#### Pass 3
+
+- **Draft verdict:** Runtime tests and static gates were green on the updated
+  repo/test surface.
+- **Critique findings:**
+  - The primary `claude` phase-2 review stalled, so closure still required an
+    explicit fallback review artifact.
+  - The first isolated fallback review reported only the two LOW EC-1 coverage
+    gaps already addressed above; the rerun found no further issues.
+- **Revisions applied:** none after the coverage expansion and test refactor;
+  recorded the final fallback `PASS` artifact.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | A translation claim persists its exact `Subtitle` source, transitions the localization unit to `InProgress`, and promotes the exact `TranslatedSubtitle` only when readiness evidence is complete | `apps/api/tests/localization_repo_test.rs::translation_claim_and_promote_ready_persists_exact_current_artifacts` | passed |
+| HP-2 | Happy path | A dubbing claim persists its exact `TranslatedSubtitle` source, transitions the localization unit to `InProgress`, and promotes the exact `DubbingManifest`/`DubbedAudio` pair only when readiness evidence is complete | `apps/api/tests/localization_repo_test.rs::dubbing_claim_and_promote_ready_persists_exact_manifest_and_audio` | passed |
+| HP-3 | Happy path | Re-delivery with the same `(operation, localization unit, generation_request_id)` resolves the same persisted claim instead of creating a second mutable generation | `apps/api/tests/localization_repo_test.rs::translation_redelivery_same_request_reuses_existing_claim`; `apps/api/tests/localization_repo_test.rs::dubbing_redelivery_same_request_reuses_existing_claim` | passed |
+| EC-1 | Edge case | A pointer to an artifact belonging to another asset or wrong kind is rejected, both at claim time and at ready-promotion time | `apps/api/tests/localization_repo_test.rs::translation_claim_rejects_wrong_kind_and_other_asset`; `apps/api/tests/localization_repo_test.rs::translation_promote_ready_rejects_wrong_kind_wrong_parent_and_other_asset_outputs`; `apps/api/tests/localization_repo_test.rs::dubbing_claim_rejects_wrong_kind_and_other_asset`; `apps/api/tests/localization_repo_test.rs::dubbing_promote_ready_rejects_wrong_kind_wrong_parent_and_other_asset_outputs` | passed |
+| EC-2 | Edge case | Partial artifact sets cannot transition translation or dubbing to `Ready` | `apps/api/tests/localization_repo_test.rs::translation_claim_and_promote_ready_persists_exact_current_artifacts`; `apps/api/tests/localization_repo_test.rs::dubbing_claim_and_promote_ready_persists_exact_manifest_and_audio` | passed |
+| EC-3 | Edge case | A stale generation cannot overwrite the current generation's pointers | `apps/api/tests/localization_repo_test.rs::translation_stale_generation_cannot_overwrite_new_current_output`; `apps/api/tests/localization_repo_test.rs::dubbing_stale_generation_cannot_overwrite_new_current_outputs` | passed |
+| EC-4 | Edge case | Unknown stored artifact kinds fail closed at the strict repository decode boundary | `crates/db/src/artifact_repo.rs::parse_kind_unknown_value_fails_closed` | passed |
+| EC-5 | Edge case | Reusing a `generation_request_id` with different source facts fails closed instead of aliasing another generation | `apps/api/tests/localization_repo_test.rs::translation_reused_request_id_with_different_source_conflicts`; `apps/api/tests/localization_repo_test.rs::dubbing_reused_request_id_with_different_source_conflicts` | passed |
+| EC-6 | Edge case | An explicit regeneration cannot claim the deterministic request ID reserved for the initial translation of its source subtitle | `apps/api/tests/localization_repo_test.rs::translation_explicit_regeneration_cannot_use_reserved_initial_request_id`; `crates/db/src/translation_repo.rs::tests::explicit_regeneration_cannot_use_reserved_initial_request_id` | passed |
+
+### Owner final verification
+
+- Owner: `Codex agent`
+- Date: 2026-08-02
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
+- Commands run: `cargo fmt --all`; `cargo test -p dubbridge-db`; `cargo test -p dubbridge-api --test subtitle_repo_test --test transcription_repo_test --test localization_repo_test`; `cargo clippy -p dubbridge-db -p dubbridge-api --tests -- -D warnings`
 
 ---
 
@@ -403,7 +722,7 @@ evidence for the ratified schema; stop before queues and workers.
 
 **Type:** development
 **Effort:** L (provisional RRI 50 — Med-high; recompute before presentation)
-**Depends on:** S-150-T1c
+**Depends on:** S-150-T1c-ii
 **Status:** [ ] Planned
 
 **Happy paths considered:**

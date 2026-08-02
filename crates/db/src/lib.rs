@@ -4,6 +4,7 @@ pub mod artifact_repo;
 pub mod asset_repo;
 pub mod audit_repo;
 pub mod consent_repo;
+pub mod dubbing_repo;
 pub mod error;
 pub mod notification_repo;
 pub mod pending_ingestion_repo;
@@ -13,6 +14,7 @@ pub mod review_repo;
 pub mod rights_repo;
 pub mod subtitle_repo;
 pub mod transcription_repo;
+pub mod translation_repo;
 pub mod user_account;
 pub mod workspace_repo;
 
