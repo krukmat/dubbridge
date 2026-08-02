@@ -10,5 +10,8 @@ time.workspace = true
 uuid.workspace = true
 thiserror = "2.0"
 
+[dev-dependencies]
+serde_json.workspace = true
+
 [lints]
 workspace = true

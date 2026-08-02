@@ -2,10 +2,20 @@
 // S3-T1: added RecordedStreamMedia variant and parse_artifact_kind() (F3 fix)
 // S-120-T2: added derived artifact kinds, DerivedArtifact, and PreparationStatus
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::asset::AssetId;
+use crate::workspace::ProjectId;
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum ArtifactError {
+    #[error("unknown translation status: {0}")]
+    UnknownTranslationStatus(String),
+    #[error("unknown dubbing status: {0}")]
+    UnknownDubbingStatus(String),
+}
 
 /// Artifact kind — S1 tracks upload artifacts; S3 adds recorded stream media;
 /// S-120 adds preparation-derived kinds (probe metadata, HLS manifest/segment).
@@ -29,6 +39,14 @@ pub enum ArtifactKind {
     WordAlignment,
     /// S-140: subtitle file (e.g., VTT/SRT) derived from the source artifact.
     Subtitle,
+    /// S-150: translated subtitle JSON derived from a subtitle artifact.
+    TranslatedSubtitle,
+    /// S-150: one synthesized dubbing segment derived from a translated subtitle.
+    DubbedAudioSegment,
+    /// S-150: ordered segment-manifest boundary for merged dubbing output.
+    DubbingManifest,
+    /// S-150: merged dubbed audio derived from one dubbing manifest.
+    DubbedAudio,
 }
 
 impl std::fmt::Display for ArtifactKind {
@@ -43,6 +61,10 @@ impl std::fmt::Display for ArtifactKind {
             Self::TranscriptText => "transcript_text",
             Self::WordAlignment => "word_alignment",
             Self::Subtitle => "subtitle",
+            Self::TranslatedSubtitle => "translated_subtitle",
+            Self::DubbedAudioSegment => "dubbed_audio_segment",
+            Self::DubbingManifest => "dubbing_manifest",
+            Self::DubbedAudio => "dubbed_audio",
         };
         write!(f, "{s}")
     }
@@ -63,6 +85,10 @@ pub fn parse_artifact_kind(s: &str) -> ArtifactKind {
         "transcript_text" => ArtifactKind::TranscriptText,
         "word_alignment" => ArtifactKind::WordAlignment,
         "subtitle" => ArtifactKind::Subtitle,
+        "translated_subtitle" => ArtifactKind::TranslatedSubtitle,
+        "dubbed_audio_segment" => ArtifactKind::DubbedAudioSegment,
+        "dubbing_manifest" => ArtifactKind::DubbingManifest,
+        "dubbed_audio" => ArtifactKind::DubbedAudio,
         _ => ArtifactKind::OriginalMedia,
     }
 }
@@ -221,6 +247,140 @@ pub struct SubtitleStatusRecord {
     pub updated_at: OffsetDateTime,
 }
 
+/// S-150-T1a: Translation readiness state for one localization unit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TranslationStatus {
+    Pending,
+    InProgress,
+    Ready,
+    /// Translation failed. `error_detail` in the persisted row records why.
+    Failed,
+}
+
+impl std::fmt::Display for TranslationStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::Pending => "pending",
+            Self::InProgress => "in_progress",
+            Self::Ready => "ready",
+            Self::Failed => "failed",
+        };
+        write!(f, "{s}")
+    }
+}
+
+impl FromStr for TranslationStatus {
+    type Err = ArtifactError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "pending" => Ok(Self::Pending),
+            "in_progress" => Ok(Self::InProgress),
+            "ready" => Ok(Self::Ready),
+            "failed" => Ok(Self::Failed),
+            other => Err(ArtifactError::UnknownTranslationStatus(other.to_string())),
+        }
+    }
+}
+
+/// S-150-T1a: Persisted translation status row for one localization unit.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TranslationStatusRecord {
+    pub project_id: ProjectId,
+    pub asset_id: AssetId,
+    pub target_language_id: Uuid,
+    pub status: TranslationStatus,
+    pub error_detail: Option<String>,
+    pub updated_at: OffsetDateTime,
+}
+
+impl TranslationStatusRecord {
+    pub fn new(
+        project_id: ProjectId,
+        asset_id: AssetId,
+        target_language_id: Uuid,
+        status: TranslationStatus,
+        error_detail: Option<String>,
+    ) -> Self {
+        Self {
+            project_id,
+            asset_id,
+            target_language_id,
+            status,
+            error_detail,
+            updated_at: OffsetDateTime::now_utc(),
+        }
+    }
+}
+
+/// S-150-T1a: Dubbing readiness state for one localization unit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DubbingStatus {
+    Pending,
+    InProgress,
+    Ready,
+    /// Dubbing failed. `error_detail` in the persisted row records why.
+    Failed,
+}
+
+impl std::fmt::Display for DubbingStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::Pending => "pending",
+            Self::InProgress => "in_progress",
+            Self::Ready => "ready",
+            Self::Failed => "failed",
+        };
+        write!(f, "{s}")
+    }
+}
+
+impl FromStr for DubbingStatus {
+    type Err = ArtifactError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "pending" => Ok(Self::Pending),
+            "in_progress" => Ok(Self::InProgress),
+            "ready" => Ok(Self::Ready),
+            "failed" => Ok(Self::Failed),
+            other => Err(ArtifactError::UnknownDubbingStatus(other.to_string())),
+        }
+    }
+}
+
+/// S-150-T1a: Persisted dubbing status row for one localization unit.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DubbingStatusRecord {
+    pub project_id: ProjectId,
+    pub asset_id: AssetId,
+    pub target_language_id: Uuid,
+    pub status: DubbingStatus,
+    pub error_detail: Option<String>,
+    pub updated_at: OffsetDateTime,
+}
+
+impl DubbingStatusRecord {
+    pub fn new(
+        project_id: ProjectId,
+        asset_id: AssetId,
+        target_language_id: Uuid,
+        status: DubbingStatus,
+        error_detail: Option<String>,
+    ) -> Self {
+        Self {
+            project_id,
+            asset_id,
+            target_language_id,
+            status,
+            error_detail,
+            updated_at: OffsetDateTime::now_utc(),
+        }
+    }
+}
+
 impl ArtifactRecord {
     pub fn new_original(
         asset_id: AssetId,
@@ -247,6 +407,7 @@ impl ArtifactRecord {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     // S3-T1: F3 acceptance criteria — parse_artifact_kind round-trips
     #[test]
@@ -393,11 +554,181 @@ mod tests {
         assert_eq!(kind.to_string(), "subtitle");
     }
 
+    // S-150-T1a: translated/dubbed artifact kinds
+    #[test]
+    fn parse_translated_subtitle() {
+        assert_eq!(
+            parse_artifact_kind("translated_subtitle"),
+            ArtifactKind::TranslatedSubtitle
+        );
+    }
+
+    #[test]
+    fn parse_dubbed_audio_segment() {
+        assert_eq!(
+            parse_artifact_kind("dubbed_audio_segment"),
+            ArtifactKind::DubbedAudioSegment
+        );
+    }
+
+    #[test]
+    fn parse_dubbing_manifest() {
+        assert_eq!(
+            parse_artifact_kind("dubbing_manifest"),
+            ArtifactKind::DubbingManifest
+        );
+    }
+
+    #[test]
+    fn parse_dubbed_audio() {
+        assert_eq!(
+            parse_artifact_kind("dubbed_audio"),
+            ArtifactKind::DubbedAudio
+        );
+    }
+
+    #[test]
+    fn artifact_kind_display_translation_variants() {
+        assert_eq!(
+            ArtifactKind::TranslatedSubtitle.to_string(),
+            "translated_subtitle"
+        );
+        assert_eq!(
+            ArtifactKind::DubbedAudioSegment.to_string(),
+            "dubbed_audio_segment"
+        );
+        assert_eq!(
+            ArtifactKind::DubbingManifest.to_string(),
+            "dubbing_manifest"
+        );
+        assert_eq!(ArtifactKind::DubbedAudio.to_string(), "dubbed_audio");
+    }
+
     #[test]
     fn subtitle_status_display_all_variants() {
         assert_eq!(SubtitleStatus::Pending.to_string(), "pending");
         assert_eq!(SubtitleStatus::InProgress.to_string(), "in_progress");
         assert_eq!(SubtitleStatus::Ready.to_string(), "ready");
         assert_eq!(SubtitleStatus::Failed.to_string(), "failed");
+    }
+
+    #[test]
+    fn translation_status_display_all_variants() {
+        assert_eq!(TranslationStatus::Pending.to_string(), "pending");
+        assert_eq!(TranslationStatus::InProgress.to_string(), "in_progress");
+        assert_eq!(TranslationStatus::Ready.to_string(), "ready");
+        assert_eq!(TranslationStatus::Failed.to_string(), "failed");
+    }
+
+    #[test]
+    fn dubbing_status_display_all_variants() {
+        assert_eq!(DubbingStatus::Pending.to_string(), "pending");
+        assert_eq!(DubbingStatus::InProgress.to_string(), "in_progress");
+        assert_eq!(DubbingStatus::Ready.to_string(), "ready");
+        assert_eq!(DubbingStatus::Failed.to_string(), "failed");
+    }
+
+    #[test]
+    fn translation_status_parse_known_variants_succeeds() {
+        assert_eq!(
+            TranslationStatus::from_str("pending").unwrap(),
+            TranslationStatus::Pending
+        );
+        assert_eq!(
+            TranslationStatus::from_str("in_progress").unwrap(),
+            TranslationStatus::InProgress
+        );
+        assert_eq!(
+            TranslationStatus::from_str("ready").unwrap(),
+            TranslationStatus::Ready
+        );
+        assert_eq!(
+            TranslationStatus::from_str("failed").unwrap(),
+            TranslationStatus::Failed
+        );
+    }
+
+    #[test]
+    fn dubbing_status_parse_known_variants_succeeds() {
+        assert_eq!(
+            DubbingStatus::from_str("pending").unwrap(),
+            DubbingStatus::Pending
+        );
+        assert_eq!(
+            DubbingStatus::from_str("in_progress").unwrap(),
+            DubbingStatus::InProgress
+        );
+        assert_eq!(
+            DubbingStatus::from_str("ready").unwrap(),
+            DubbingStatus::Ready
+        );
+        assert_eq!(
+            DubbingStatus::from_str("failed").unwrap(),
+            DubbingStatus::Failed
+        );
+    }
+
+    #[test]
+    fn translation_status_unknown_value_fails_closed() {
+        let err = TranslationStatus::from_str("queued").unwrap_err();
+        assert!(matches!(err, ArtifactError::UnknownTranslationStatus(_)));
+    }
+
+    #[test]
+    fn dubbing_status_unknown_value_fails_closed() {
+        let err = DubbingStatus::from_str("queued").unwrap_err();
+        assert!(matches!(err, ArtifactError::UnknownDubbingStatus(_)));
+    }
+
+    #[test]
+    fn translation_status_record_new_carries_localization_unit_identity() {
+        let project_id = ProjectId::new();
+        let asset_id = AssetId::new();
+        let target_language_id = Uuid::new_v4();
+        let record = TranslationStatusRecord::new(
+            project_id,
+            asset_id,
+            target_language_id,
+            TranslationStatus::Pending,
+            None,
+        );
+        assert_eq!(record.project_id, project_id);
+        assert_eq!(record.asset_id, asset_id);
+        assert_eq!(record.target_language_id, target_language_id);
+    }
+
+    #[test]
+    fn dubbing_status_record_new_carries_localization_unit_identity() {
+        let project_id = ProjectId::new();
+        let asset_id = AssetId::new();
+        let target_language_id = Uuid::new_v4();
+        let record = DubbingStatusRecord::new(
+            project_id,
+            asset_id,
+            target_language_id,
+            DubbingStatus::Pending,
+            None,
+        );
+        assert_eq!(record.project_id, project_id);
+        assert_eq!(record.asset_id, asset_id);
+        assert_eq!(record.target_language_id, target_language_id);
+    }
+
+    #[test]
+    fn translation_status_record_missing_identity_fields_fail_to_deserialize() {
+        let full = json!({
+            "project_id": Uuid::new_v4(),
+            "asset_id": Uuid::new_v4(),
+            "target_language_id": Uuid::new_v4(),
+            "status": "pending",
+            "error_detail": null,
+            "updated_at": OffsetDateTime::now_utc(),
+        });
+        for missing in ["project_id", "asset_id", "target_language_id"] {
+            let mut payload = full.clone();
+            payload.as_object_mut().unwrap().remove(missing);
+            let err = serde_json::from_value::<TranslationStatusRecord>(payload).unwrap_err();
+            assert!(err.to_string().contains(missing));
+        }
     }
 }
