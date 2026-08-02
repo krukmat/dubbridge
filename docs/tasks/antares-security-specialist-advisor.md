@@ -2484,9 +2484,10 @@ Supplemental coverage (beyond the HP/EC contract, found during Reflection):
 
 ## T3 - CWE watchlist and context-complete packet construction
 
-- **Status:** `[ ] Open`
+- **Status:** `[~] Decomposed` - 2026-08-01
 - **Type:** development / security policy
-- **Effort:** TBD from execution RRI
+- **Original pre-execution RRI:** 78 High
+- **RRI artifact:** `docs/audit/antares-t3-rri.md`
 - **Depends on:** T2e
 
 ### Objective
@@ -2531,6 +2532,205 @@ retaining the repository context required to localize beyond changed files.
 ### Status artifacts affected
 
 - this ledger and the slice plan
+
+### Decomposition record (2026-08-01)
+
+Pre-execution scoring measured **RRI 78 -> High**, which triggers the
+mandatory decomposition gate under `docs/policies/RRI_POLICY.md` (RRI >= 56
+is an unconditional split trigger; this task also independently exceeds the
+RRI > 70 trigger). Dominant drivers: the `arch_decision` penalty (this task
+originates a new watchlist schema, packet schema, and context-closure/
+partition algorithm not pinned down anywhere else) and the `no_verification`
+penalty (no diff exists yet), combined with P=4 (credential/production-config
+exclusion is a data-visibility-risk boundary) and X=4 (requires holding the
+Rust workspace's crate graph plus Python/doc structure simultaneously).
+Full evidence: `docs/audit/antares-t3-rri.md`.
+
+Proposed replacement subtasks (mirroring the T2 -> T2a..T2e precedent):
+
+- `T3a` isolates the versioned CWE watchlist itself — schema, owner/
+  justification fields per entry, CWE-732 exclusion — with no dependency on
+  repository traversal or packet construction. Narrowest scope, lowest
+  expected RRI.
+- `T3b` isolates the packet schema and its hard security-exclusion
+  guarantees (credentials, `.env`, `config/production.toml`, out-of-snapshot
+  paths) plus the size-budget fail-closed/deterministic-partition logic,
+  operating over an explicit, already-given file list. Defines the packet
+  data contract before the closure algorithm exists.
+- `T3c` isolates the deterministic context-closure algorithm itself: given a
+  set of changed paths, resolve the import/dependency, manifest, and
+  governing security-boundary context beyond those files. Expected to be the
+  highest-complexity subtask — the genuinely novel repo-structure-aware
+  algorithm — and a candidate for further splitting if its own pre-execution
+  RRI still lands above 55.
+- `T3d` integrates `T3a` + `T3b` + `T3c` behind the touchpoint-facing packet
+  construction entrypoints (refinement/review packet, post-CI watchlist
+  entry), with fixtures covering HP-1, HP-2, EC-1, EC-2, EC-3, mirroring
+  T2e's integration role for the T2 layers.
+
+Each subtask must recompute its own pre-execution RRI from its narrower
+scope, aiming for RRI <= 55 with A in {0, 1} per the split target in
+`docs/policies/RRI_POLICY.md § Decomposition triggers`, and must be
+individually presented for approval before implementation. This
+decomposition proposal itself is a planning artifact (no code execution) and
+is being presented to the user for explicit review before any subtask RRI
+scoring or implementation proceeds.
+
+`T4` continues to depend on `T3` as a whole; its dependency resolves once all
+`T3a`-`T3d` subtasks are `[x] Done`.
+
+## T3a - Versioned CWE watchlist
+
+- **Status:** `[x] Done (owner-verified, 2026-08-02)`
+- **Type:** development / security policy
+- **Execution RRI:** 37 Moderate
+- **Effort:** M
+- **RRI artifact:** `docs/audit/antares-t3a-rri.md`
+- **Depends on:** T2e
+
+### Objective
+
+Provide the versioned CWE watchlist that is the sole source of justified CWE
+hypotheses for downstream packet construction — Antares never invents its own
+input.
+
+### Happy paths considered
+
+- **HP-1:** a well-formed watchlist entry (CWE id, generic description,
+  repository boundary, owner, justification) validates and is retrievable by
+  CWE id.
+- **HP-2:** loading the watchlist returns a stable, deterministically ordered
+  set of entries, version-stamped for downstream consumption.
+
+### Edge cases considered
+
+- **EC-1:** CWE-732 is absent from the initial watchlist by construction, and
+  a test asserts its absence with the documented weak-class reason.
+- **EC-2:** an entry missing `owner`, `justification`, or `repository
+  boundary` fails validation instead of silently being included.
+- **EC-3:** a duplicate CWE id across entries is rejected rather than
+  silently shadowing the earlier entry.
+
+### Acceptance criteria
+
+- CWE sources for the watchlist are limited to a human/primary-advisor
+  hypothesis or a justified repository entry; nothing here lets a caller
+  synthesize an unjustified CWE.
+- Every entry names its repository boundary and owner.
+- CWE-732 is excluded from the initial watchlist with the reason recorded.
+- The watchlist is versioned and its load order is deterministic and
+  fixture-testable.
+
+### Evidence to emit
+
+- `scripts/antares/cwe_watchlist.py` (schema + versioned entries + loader/
+  validator) and `scripts/antares/cwe_watchlist_test.py`.
+
+### Status artifacts affected
+
+- this ledger
+
+### Implementation route
+
+Local-first route attempted per RRI 37 Moderate routing
+(`scripts/local-agent/run_local_task.py`, `DUBBRIDGE_LOCAL_AGENT_MODEL=
+qwen3.6:35b-a3b`, disposable worktree `.agent/worktrees/antares-t3a` on
+branch `local/antares-t3a`). Both evidence-backed local attempts failed at
+the transport level: attempt 1 (default 180s idle timeout) and repair
+attempt 1/2 (300s idle timeout, 480s max wall) both returned
+`transport_error` / "Gemma idle timeout after Ns without a token", and a
+direct `curl` probe of `qwen3.6:35b-a3b` outside the runner independently
+confirmed HTTP 000 / curl exit 28 (no response at the transport level).
+`ollama /api/ps` showed only `gemma4:26b-a4b-it-qat` resident throughout;
+`qwen3.6:35b-a3b` and `qwen3.6:27b-q4_K_M` never entered the loaded-model
+list despite being present in `/api/tags`. Repair budget (2 evidence-backed
+attempts, Moderate band) exhausted; escalated to cloud implementation
+(Claude, orchestrating agent) per `docs/policies/HITL_AUTONOMY_POLICY.md §
+Local-first implementation (RRI 26-40 Moderate)` step 9.
+
+### Reflection log
+
+Required passes: 2 (`37` -> `Moderate`)
+
+#### Pass 1 (contract)
+
+- **Draft verdict:** `cwe_watchlist.py` implements `CweWatchlistEntry`,
+  `CweWatchlist`, `validate_entry`, `load_watchlist`; all seed entries pass
+  validation; CWE-732 excluded with a documented reason; 7/7 tests pass.
+- **Critique findings:**
+  - Construction-time validation + duplicate rejection in
+    `CweWatchlist.__init__` means no partially-built or bypassable watchlist
+    state is reachable — matches "nothing lets a caller synthesize an
+    unjustified CWE."
+  - `get()` returning `None` on a missing id (vs. raising) is an
+    acceptance-criteria-compliant choice ("your choice, but document and
+    test it") but was not documented on the method itself.
+- **Revisions applied:** added a one-line docstring to `CweWatchlist.get()`
+  stating the None-on-not-found contract.
+
+#### Pass 2 (edge cases)
+
+- **Draft verdict:** re-verified EC-1/EC-2/EC-3 coverage and seed-data
+  self-consistency after the pass-1 revision.
+- **Critique findings:**
+  - EC-2 test coverage spans all three card-named fields (owner,
+    justification, repository_boundary) individually; `cwe_id`/`description`
+    are validated too but not separately tested — broader than required, not
+    a gap.
+  - Whitespace-only field values (e.g. `owner=" "`) are correctly rejected by
+    `.strip()` in `validate_entry`, a direct consequence of logic already
+    exercised by the empty-string tests, not an untested new branch.
+  - EC-3's duplicate test constructs a `CweWatchlist` directly (not via
+    `load_watchlist()`), matching the card's explicit allowance.
+  - Seed data (`CWE-89`, `CWE-306`, `CWE-22`) is pairwise-distinct and
+    CWE-732-free; every test importing `load_watchlist()` succeeding is
+    itself proof the seed entries pass validation, since `__init__`
+    validates unconditionally.
+- **Revisions applied:** none — no further gaps found.
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma` (`qwen3.6:27b-q4_K_M` unavailable for the full session —
+  see Task-analysis review below and Implementation route above for the
+  transport-level evidence)
+- Command: manual `curl` to `http://localhost:11434/api/chat` with
+  `gemma4:26b-a4b-it-qat`
+- Artifact: `docs/audit/gemma-evidence/antares-t3a-phase2.json`
+- Verdict: `PASS`
+- Findings: none
+- Gemma fallback: `triggered` — reason: `qwen3.6:27b-q4_K_M` unreachable at
+  transport level (curl exit 28 / HTTP 000) across Phase 1 review and both
+  local-implementer attempts in this session; went directly to Gemma for
+  Phase 2 given the established unavailability class rather than repeating a
+  redundant multi-minute timeout
+- D14 fallback: `not triggered` — reason: Gemma responded cleanly
+  (`done_reason=stop`)
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted (PASS, no findings to disposition)
+
+Task-analysis review: `gemma` `docs/audit/gemma-evidence/antares-t3a-phase1.json` - PASS
+Code-solution review: `gemma` `docs/audit/gemma-evidence/antares-t3a-phase2.json` - PASS
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | well-formed entry validates and is retrievable by cwe_id | `scripts/antares/cwe_watchlist_test.py::HappyPathTest::test_hp1_well_formed_entry_validates_and_is_retrievable_by_id` | passed |
+| HP-2 | Happy path | load is deterministic and version-stamped | `scripts/antares/cwe_watchlist_test.py::HappyPathTest::test_hp2_load_is_deterministic_and_version_stamped` | passed |
+| EC-1 | Edge case | CWE-732 absent from watchlist by construction | `scripts/antares/cwe_watchlist_test.py::EdgeCaseTest::test_ec1_cwe_732_is_absent_by_construction` | passed |
+| EC-2 | Edge case | entry missing owner/justification/repository_boundary fails validation | `scripts/antares/cwe_watchlist_test.py::EdgeCaseTest::test_ec2_entry_missing_owner_fails_validation`, `test_ec2_entry_missing_justification_fails_validation`, `test_ec2_entry_missing_repository_boundary_fails_validation` | passed |
+| EC-3 | Edge case | duplicate cwe_id rejected, not silently shadowed | `scripts/antares/cwe_watchlist_test.py::EdgeCaseTest::test_ec3_duplicate_cwe_id_is_rejected_not_silently_shadowed` | passed |
+
+### Owner final verification
+
+- Owner: `Matias Kruk`
+- Date: `2026-08-02`
+- Statement: I verified every happy path and edge case defined for this task
+  has unit test evidence that replicates the expected behavior (confirmed via
+  `AskUserQuestion`, 2026-08-02).
+- Commands run: `python3 -m unittest scripts.antares.cwe_watchlist_test -v`
+  (7/7 passed, run from repository root against the primary checkout copy of
+  `scripts/antares/cwe_watchlist.py` and `cwe_watchlist_test.py`)
 
 ## T4 - Ground-truth calibration and observe-only workflow pilot
 

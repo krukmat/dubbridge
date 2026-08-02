@@ -613,6 +613,26 @@ is now cancelled outright, because Antares does not propose RRI inputs.
   (`AskUserQuestion`, 2026-07-30); status is `[x] Done (owner-waived,
   2026-07-30)`. `T3` (CWE watchlist and context-complete packet
   construction) and `T4` are now unblocked, depending on `T2e`.
+- `T3` pre-execution RRI scored 78 (High), which triggers the mandatory
+  decomposition gate; it was decomposed 2026-08-01 into `T3a`-`T3d` per the
+  decomposition record in `docs/tasks/antares-security-specialist-advisor.md`
+  § T3. `T3`'s own status is `[~] Decomposed`; `T4` now depends on all of
+  `T3a`-`T3d` reaching `[x] Done`, not on `T3` directly.
+- `T3a` (versioned CWE watchlist) scored RRI 37 (Moderate) and was approved.
+  Task-analysis review PASS via Gemma (`qwen3.6:27b-q4_K_M` unreachable at
+  the transport level for the full session — confirmed independently via
+  direct `curl` probes and `ollama /api/ps` showing it never loaded).
+  Local-first implementation (`qwen3.6:35b-a3b`) exhausted its 2-attempt
+  repair budget with the same transport-level unavailability and escalated
+  to cloud implementation. 7/7 unit tests pass; Phase-2 code-solution review
+  PASS via Gemma, no findings:
+  `docs/audit/gemma-evidence/antares-t3a-phase1.json`,
+  `docs/audit/gemma-evidence/antares-t3a-phase2.json`. Owner (Matias Kruk)
+  explicitly certified the `### Owner final verification` block
+  (`AskUserQuestion`, 2026-08-02); status is
+  `[x] Done (owner-verified, 2026-08-02)`. `T3b`, `T3c`, `T3d` remain
+  unscored and individually require their own pre-execution RRI and approval
+  before implementation; `T4` stays blocked until all four are `[x] Done`.
 - No roadmap update is required until T5 retains a production operating mode.
 
 ## Related documents

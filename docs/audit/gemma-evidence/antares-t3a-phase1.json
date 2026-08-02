@@ -1,0 +1,8 @@
+{
+  "task_id": "antares-t3a-phase1",
+  "reviewer": "gemma",
+  "verdict": "PASS",
+  "timestamp": "2026-08-02T08:00:00Z",
+  "note": "qwen3.6:27b-q4_K_M unavailable: two attempts (initial 180s, retry 570s) both timed out with curl exit 28 / HTTP_CODE 000 -- ollama /api/ps confirmed the model never entered the loaded-model list, so this was not a slow-inference case but a load/availability failure. Per the qwen3.6:27b-q4_K_M -> Gemma -> D14 fallback chain, one retry against qwen3.6:27b-q4_K_M was performed first (per policy) before falling back to Gemma (gemma4:26b-a4b-it-qat), which was already resident and responded cleanly (done_reason=stop).",
+  "findings": []
+}
