@@ -50,7 +50,7 @@ than escalating by default.
 ## Task order
 
 ```text
-T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c (decomposed: T2c-1 -> T2c-2) -> T2d -> T2e -> T3 -> T4 -> T5
+T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c (decomposed: T2c-1 -> T2c-2) -> T2d -> T2e-pre -> T2e -> T3 (decomposed: T3a -> T3b, T3c -> T3d) -> T4 -> T5
 ```
 
 ## Task summary
@@ -67,9 +67,13 @@ T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c (decomposed: T2c-1 -> T2c-2) -> T2d 
 | T2c-1 Sandbox process execution and isolation | `[x] Done (2026-07-30)` | 49 Med-high (planning) | L | T2b |
 | T2c-2 Resource budget, wall-timeout, teardown | `[x] Done (owner-waived, 2026-07-30)` | 53 Med-high (execution) | L | T2c-1 |
 | T2d Versioned artifact schema and redacted trace contract | `[x] Done (owner-waived, 2026-07-30)` | 50 (Med-high) | S/M-equivalent | T2c-2 |
-| T2e-pre Decompose oversized T2c-2/T2d modules for local-first delegation eligibility | `[ ] Open` | 52 Med-high | L | T2c-2, T2d |
-| T2e Replay fixtures and integrated harness verification | `[ ] Open` | 44 Med-high (preliminary) | L | T2e-pre |
-| T3 CWE watchlist and context-complete packet construction | `[ ] Open` | Recompute | TBD | T2e |
+| T2e-pre Decompose oversized T2c-2/T2d modules for local-first delegation eligibility | `[x] Done` | 52 Med-high | L | T2c-2, T2d |
+| T2e Replay fixtures and integrated harness verification | `[x] Done (owner-waived, 2026-07-30)` | 55 Med-high (execution) | L | T2e-pre |
+| T3 CWE watchlist and context-complete packet construction | `[~] Decomposed (2026-08-01)` | 78 High (pre-execution) | XL | T2e |
+| T3a Versioned CWE watchlist | `[x] Done (owner-verified, 2026-08-02)` | 37 Moderate (execution) | M | T2e |
+| T3b Packet schema and hard security-exclusion guarantees | `[ ] Open` | 42 Med-high (preliminary) | L | T3a |
+| T3c Deterministic context-closure algorithm | `[ ] Open` | Recompute | TBD | T3a |
+| T3d Integrate T3a+T3b+T3c behind touchpoint packet construction | `[ ] Open` | Recompute | TBD | T3b, T3c |
 | T4 Ground-truth calibration and observe-only workflow pilot | `[ ] Open` | Recompute | TBD | T2e, T3 |
 | T5 Promote, narrow, or retire on evidence | `[ ] Open` | Recompute | TBD | T4 |
 
@@ -2732,7 +2736,110 @@ Code-solution review: `gemma` `docs/audit/gemma-evidence/antares-t3a-phase2.json
   (7/7 passed, run from repository root against the primary checkout copy of
   `scripts/antares/cwe_watchlist.py` and `cwe_watchlist_test.py`)
 
-## T4 - Ground-truth calibration and observe-only workflow pilot
+## T3b - Packet schema and hard security-exclusion guarantees
+
+- **Status:** `[ ] Open`
+- **Type:** development / security policy
+- **Preliminary RRI:** 42 Med-high — `docs/audit/antares-t3b-rri.md`
+- **Effort:** L
+- **Depends on:** T3a
+- **Decomposed from:** T3
+
+### Objective
+
+Define the packet data contract — schema, hard security-exclusion guarantees,
+and size-budget fail-closed/deterministic-partition logic — over an explicit,
+already-given file list, before the repository context-closure algorithm
+(T3c) exists to populate it.
+
+### Happy paths considered
+
+- **HP-1:** given a justified CWE (from the T3a watchlist), a generic
+  description, a baseline/candidate snapshot identity, and an explicit list
+  of in-scope paths, the packet schema validates and serializes
+  deterministically.
+- **HP-2:** a packet within the configured size budget is accepted as-is,
+  with its included paths recorded explicitly.
+
+### Edge cases considered
+
+- **EC-1:** an explicit path list containing credentials, `.env` files,
+  `config/production.toml`, or generated output is rejected from packet
+  inclusion, and the exclusion is reported rather than silently dropped.
+- **EC-2:** a path that resolves outside the declared snapshot root (via
+  symlink or `..` traversal) is excluded and reported, reusing
+  `scripts/antares/path_containment.py` (T2b) for canonical-path containment
+  rather than re-implementing traversal checks.
+- **EC-3:** resolved packet content exceeds the configured size budget, so
+  construction either fails closed or applies a documented deterministic
+  partition; it never silently drops paths without recording the omission,
+  and a partitioned fragment of a file is distinguishable from a separate
+  whole file in the `included` list (no fragment/whole-file identity
+  collision going into `T3c`).
+- **EC-4:** two distinct on-disk spellings of the same path (e.g. `./file`,
+  `file`, `dir/../file`) are canonicalized to one form before inclusion,
+  exclusion, or size-budget accounting, so a caller cannot bypass duplicate
+  detection or the security-exclusion check with an alternate spelling.
+
+### Acceptance criteria
+
+- Packet schema carries: CWE id + generic description (sourced only from a
+  `T3a` watchlist entry or an explicit caller-supplied hypothesis, never
+  invented), baseline/candidate snapshot identity, and an explicit
+  included/omitted path list.
+- Credentials, `.env` files, `config/production.toml`, and out-of-snapshot
+  paths are excluded unconditionally, before any size-budget logic runs —
+  exclusion order matters: a large file must not be able to push a sensitive
+  path out of the size budget via truncation before the exclusion check
+  would have caught it.
+- All paths in the `included` and `omitted` lists are stored in canonicalized
+  form (matching `path_containment.py`'s canonicalization), so redundant or
+  obfuscated spellings of the same path cannot desync the audit trail.
+- Size-budget enforcement is deterministic and fixture-testable: the same
+  oversized input always produces the same partition or the same fail-closed
+  result.
+- A partitioned/truncated fragment of a file carries explicit metadata
+  distinguishing it from a separate whole file, so downstream (`T3c`)
+  identity logic cannot conflate the two.
+- Every omission (security exclusion or size-budget partition) is recorded on
+  the packet, not just dropped silently.
+- This task does not implement the repository context-closure algorithm
+  (import/dependency/manifest/security-boundary resolution beyond the
+  explicit path list) — that is `T3c`.
+
+### Evidence to emit
+
+- `scripts/antares/packet_schema.py` (schema + exclusion guarantees +
+  size-budget partition logic) and `scripts/antares/packet_schema_test.py`.
+
+### Status artifacts affected
+
+- this ledger
+
+### Task-analysis review
+
+- Reviewer: `gemma` (`qwen3.6:27b-q4_K_M` unreachable at transport level —
+  curl exit 28 / HTTP 000 on two consecutive attempts, matching T3a's
+  established unavailability class in this session; `ollama /api/ps` showed
+  only `gemma4:26b-a4b-it-qat` resident)
+- Command: manual `curl` to `http://localhost:11434/api/chat` with
+  `gemma4:26b-a4b-it-qat`
+- Artifact: `docs/audit/gemma-evidence/antares-t3b-phase1.json`
+- Verdict: `PASS`
+- Findings: 2 MINOR — (1) path canonicalization not explicitly mandated for
+  `included`/`omitted` lists; (2) no truncation/fragment-identity metadata
+  defined for EC-3 partial partitioning. Both folded into EC-3 (revised),
+  EC-4 (new), and the acceptance criteria above before presentation.
+- Gemma fallback: `triggered` — reason: `qwen3.6:27b-q4_K_M` unreachable at
+  transport level on retry, same failure class documented in T3a
+- D14 fallback: `not triggered` — reason: Gemma responded cleanly
+  (`done_reason=stop`)
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted both findings, revised task card
+
+Task-analysis review: `gemma` `docs/audit/gemma-evidence/antares-t3b-phase1.json` - PASS
+
+
 
 - **Status:** `[ ] Open`
 - **Type:** development / CI / evaluation
