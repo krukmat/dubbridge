@@ -71,7 +71,7 @@ T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c (decomposed: T2c-1 -> T2c-2) -> T2d 
 | T2e Replay fixtures and integrated harness verification | `[x] Done (owner-waived, 2026-07-30)` | 55 Med-high (execution) | L | T2e-pre |
 | T3 CWE watchlist and context-complete packet construction | `[~] Decomposed (2026-08-01)` | 78 High (pre-execution) | XL | T2e |
 | T3a Versioned CWE watchlist | `[x] Done (owner-verified, 2026-08-02)` | 37 Moderate (execution) | M | T2e |
-| T3b Packet schema and hard security-exclusion guarantees | `[ ] Open` | 42 Med-high (preliminary) | L | T3a |
+| T3b Packet schema and hard security-exclusion guarantees | `[x] Done (owner-verified, 2026-08-02)` | 27 Moderate (execution) | M | T3a |
 | T3c Deterministic context-closure algorithm | `[ ] Open` | Recompute | TBD | T3a |
 | T3d Integrate T3a+T3b+T3c behind touchpoint packet construction | `[ ] Open` | Recompute | TBD | T3b, T3c |
 | T4 Ground-truth calibration and observe-only workflow pilot | `[ ] Open` | Recompute | TBD | T2e, T3 |
@@ -2738,10 +2738,11 @@ Code-solution review: `gemma` `docs/audit/gemma-evidence/antares-t3a-phase2.json
 
 ## T3b - Packet schema and hard security-exclusion guarantees
 
-- **Status:** `[ ] Open`
+- **Status:** `[x] Done (owner-verified, 2026-08-02)`
 - **Type:** development / security policy
-- **Preliminary RRI:** 42 Med-high — `docs/audit/antares-t3b-rri.md`
-- **Effort:** L
+- **Execution RRI:** 27 Moderate
+- **Effort:** M
+- **RRI artifact:** `docs/audit/antares-t3b-rri.md`
 - **Depends on:** T3a
 - **Decomposed from:** T3
 
@@ -2814,7 +2815,7 @@ already-given file list, before the repository context-closure algorithm
 
 ### Status artifacts affected
 
-- this ledger
+- this ledger and the slice plan
 
 ### Task-analysis review
 
@@ -2838,6 +2839,215 @@ already-given file list, before the repository context-closure algorithm
 - Primary-agent disposition: accepted both findings, revised task card
 
 Task-analysis review: `gemma` `docs/audit/gemma-evidence/antares-t3b-phase1.json` - PASS
+
+### Compact Approval Task Card v2 (recorded 2026-08-02)
+
+#### Decision header
+
+- Task: `T3b - Packet schema and hard security-exclusion guarantees`
+- Presentation RRI/band: `42 Med-high` (`docs/audit/antares-t3b-rri.md`,
+  pre-implementation); execution RRI after verification: `27 Moderate`
+  (same artifact, post-implementation section).
+- Approval gate: explicit in-session user approval on `2026-08-02`
+  ("trabajar sobre T3b... dalo por aprobado... prosigue con el desarrollo").
+- Routing summary: phase-1 review `gemma` PASS (fallback because
+  `qwen3.6:27b-q4_K_M` was transport-unreachable during presentation);
+  implementation stayed on the primary/cloud path because ADR-038's Qwen27
+  advisory-refinement prerequisite was unavailable when routing was checked;
+  phase-2 code-solution review later resolved directly on
+  `qwen3.6:27b-q4_K_M` with final `PASS`.
+- Dominant presentation-time drivers: `P=3` (secret-exposure failure mode if
+  exclusions fail), `D=2` (security-exclusion contract, not plain data
+  plumbing), `no_verification` penalty (+15).
+
+#### Scope and acceptance
+
+- Objective: define the packet schema, provenance binding, hard exclusion
+  rules, and deterministic size-budget behavior over an already-explicit path
+  list.
+- In scope: watchlist/explicit CWE provenance binding, canonicalized
+  included/omitted lists, credential/`.env`/`config/production.toml`/
+  generated-output exclusions, out-of-snapshot rejection, fail-closed vs.
+  deterministic-partition size-budget policies.
+- Out of scope: repository context closure/import/dependency/manifest/security
+  boundary discovery (`T3c`), touchpoint integration (`T3d`), and Antares
+  execution itself.
+- Primary behaviors: `HP-1`, `HP-2`, `EC-1`, `EC-2`, `EC-3`, `EC-4` exactly
+  as recorded above.
+- Evidence to emit: `scripts/antares/packet_schema.py`,
+  `scripts/antares/packet_schema_test.py`.
+- Status sync: this ledger + `docs/plan/antares-security-specialist-advisor.md`.
+
+#### Agent workflow
+
+| Phase | Responsible | Gate / output | Fallback |
+|---|---|---|---|
+| Analyze | primary agent | read T3/T3a/T3b context, RRI artifact, containment/watchlist helpers | stop and report if governing docs contradicted |
+| Phase-1 review | `gemma` | `docs/audit/gemma-evidence/antares-t3b-phase1.json` -> `PASS` | `qwen3.6:27b-q4_K_M` was unavailable at presentation time; D14 not needed |
+| Human gate | owner/user | explicit approval granted in-session on `2026-08-02` | none needed; approval recorded here |
+| Implement | primary agent (cloud path) | `packet_schema.py` + tests | ADR-038 local-first path unavailable because Qwen27 refinement probe failed |
+| Reflect and verify | primary agent | 3 Draft -> Critique -> Revise passes (approved Med-high band) + unit tests | revise until green |
+| Phase-2 review | `qwen3.6:27b-q4_K_M` | `docs/audit/gemma-evidence/antares-t3b-phase2.json` -> final `PASS` | Gemma then D14 if qwen unusable; not needed |
+| Close | owner | owner final verification or explicit waiver still required before `[x] Done` | task remains implemented/pending until owner acts |
+
+#### Diagrams
+
+```mermaid
+flowchart LR
+    A[Phase-1 PASS] --> B[User approval]
+    B --> C[Cloud implementation]
+    C --> D[3 reflection passes + tests]
+    D --> E[Phase-2 qwen review PASS]
+    E --> F[Owner verification pending]
+```
+
+```mermaid
+flowchart LR
+    I[explicit raw paths] --> C[canonicalize + dedupe]
+    C --> X[hard exclusions first]
+    X --> B[size-budget policy]
+    B --> P[packet included/omitted lists]
+    P --> T[T3d consumer later]
+```
+
+#### References
+
+- `docs/tasks/antares-security-specialist-advisor.md`
+- `docs/plan/antares-security-specialist-advisor.md`
+- `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
+- `docs/policies/HITL_AUTONOMY_POLICY.md`
+- `docs/audit/antares-t3b-rri.md`
+
+#### Approval checkpoint
+
+- Approval was explicitly granted in-session by the owner/user on
+  `2026-08-02`; execution proceeded on that recorded approval.
+
+### Implementation route
+
+The approved presentation band was `42 Med-high`, so ADR-038's routing rules
+still governed start-of-task execution. At implementation start,
+`qwen3.6:27b-q4_K_M` timed out on a minimal `/api/chat` probe (`curl
+--max-time 45` -> exit 28 / HTTP 000), while `qwen3.6:35b-a3b` responded
+normally. Because ADR-038's Qwen27 advisory-refinement prerequisite was
+unavailable at that moment, the local-first gate could not be completed and
+code authoring stayed on the primary/cloud path. Phase-2 review later
+resolved directly on `qwen3.6:27b-q4_K_M` after the model recovered.
+
+### Completion record (2026-08-02)
+
+- Implemented `scripts/antares/packet_schema.py` (499 lines): watchlist or
+  explicit CWE provenance binding, canonical path recording, hard security
+  exclusions, deterministic ordering, fail-closed and
+  deterministic-partition budget policies, packet validation, and
+  deterministic JSON serialization.
+- Implemented `scripts/antares/packet_schema_test.py` (208 lines): 8 fixture
+  tests covering both happy paths, every named edge case, and the explicit
+  "exclude before budget" regression.
+- Reused `scripts/antares/path_containment.py` for canonical
+  in-snapshot/out-of-snapshot resolution instead of re-implementing
+  traversal/symlink escape checks.
+- Security-exclusion coverage now treats any canonical path ending in
+  `config/production.toml` as excluded, not only the repository-root copy.
+- Final packet order is canonical by path, so the serialized JSON is stable
+  even when callers provide the same logical file set in a different order.
+- Validation stays shape/consistency-only; watchlist provenance is enforced by
+  the builder that constructs watchlist-backed hypotheses.
+
+### Reflection log
+
+Required passes: 3 (`42` -> `Med-high`, approved presentation band)
+
+#### Pass 1
+
+- **Draft verdict:** initial packet builder/test suite implemented all named
+  T3b behaviors; `python3 -m unittest scripts.antares.packet_schema_test -v`
+  passed 7/7.
+- **Critique findings:**
+  - size-budget accounting initially compared against raw file bytes rather
+    than the serialized packet payload bytes;
+  - fragment-prefix sizing used a linear shrink loop that was correct but not
+    a good long-term fit for precise budget enforcement.
+- **Revisions applied:**
+  - changed budget accounting to use the serialized entry byte length;
+  - replaced the linear fragment shrink with a bounded binary search for the
+    largest serializable prefix within budget.
+
+#### Pass 2
+
+- **Draft verdict:** first useful phase-2 qwen review returned real findings
+  against the full code packet; all were independently confirmed.
+- **Critique findings:**
+  - `config/production.toml` exclusion should apply to any canonical path
+    ending with that suffix, not only the repository-root instance;
+  - `validate_packet()` should remain shape/consistency-only rather than
+    re-checking watchlist provenance from outside the packet.
+- **Revisions applied:**
+  - widened the production-config exclusion to suffix-based matching on the
+    canonical path;
+  - removed the external watchlist re-check from `validate_packet()`, keeping
+    provenance enforcement in `hypothesis_from_watchlist()` / `build_packet()`;
+  - extended EC-1 coverage with a nested `config/production.toml` fixture.
+
+#### Pass 3
+
+- **Draft verdict:** retry review on qwen surfaced two remaining contract
+  gaps after the pass-2 fixes.
+- **Critique findings:**
+  - final packet ordering should be canonical so serialization does not depend
+    on input permutation;
+  - the "hard exclusion happens before budget enforcement" guarantee was true
+    in code but needed an explicit regression test.
+- **Revisions applied:**
+  - sorted `staged_includes`, `included`, and `omitted` by canonical path
+    before packet finalization;
+  - added `test_hp1_watchlist_hypothesis_validates_and_serializes_deterministically`
+    coverage across reordered inputs and
+    `test_ec3_security_exclusion_runs_before_size_budget`.
+
+### Peer Reviewer evidence
+
+- Reviewer: `qwen3.6:27b-q4_K_M`
+- Command: manual Ollama `/api/chat` invocation with `"think": false`
+- Artifact: `docs/audit/gemma-evidence/antares-t3b-phase2.json`
+- Verdict: `PASS`
+- Findings: one caller-side packet-construction `BLOCKED` (empty diff for new
+  untracked files) was discarded before code review began; two subsequent full
+  qwen review cycles returned 5 substantive findings total, all independently
+  verified and repaired; final targeted re-review returned `PASS` with no
+  findings.
+- Gemma fallback: `not triggered` — qwen produced usable verdicts after retry.
+- D14 fallback: `not triggered`
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted and fixed all 5 substantive findings;
+  retained the initial empty-diff review result only as caller-side process
+  evidence, not as a code-quality verdict.
+- Review artifact: `docs/audit/gemma-evidence/antares-t3b-phase2.json`
+
+Task-analysis review: `gemma` `docs/audit/gemma-evidence/antares-t3b-phase1.json` - PASS
+Code-solution review: `qwen3.6:27b-q4_K_M` `docs/audit/gemma-evidence/antares-t3b-phase2.json` - PASS
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | watchlist-backed packet validates and serializes deterministically, independent of equivalent input permutation | `scripts/antares/packet_schema_test.py::HappyPathTest::test_hp1_watchlist_hypothesis_validates_and_serializes_deterministically` | passed |
+| HP-2 | Happy path | packet within budget is accepted as-is with explicit included path recording | `scripts/antares/packet_schema_test.py::HappyPathTest::test_hp2_within_budget_packet_is_accepted_as_is` | passed |
+| EC-1 | Edge case | credentials, `.env`, `config/production.toml`, and generated output are excluded and recorded | `scripts/antares/packet_schema_test.py::EdgeCaseTest::test_ec1_sensitive_and_generated_paths_are_excluded_and_recorded` | passed |
+| EC-2 | Edge case | out-of-snapshot symlink escape is excluded and reported | `scripts/antares/packet_schema_test.py::EdgeCaseTest::test_ec2_out_of_snapshot_path_is_excluded_and_reported` | passed |
+| EC-3 | Edge case | oversize packet either fails closed or records a deterministic fragment/remainder, and hard exclusions run before budget enforcement | `scripts/antares/packet_schema_test.py::EdgeCaseTest::test_ec3_fail_closed_budget_rejects_oversize_packet`, `scripts/antares/packet_schema_test.py::EdgeCaseTest::test_ec3_partition_budget_records_fragment_and_remainder`, `scripts/antares/packet_schema_test.py::EdgeCaseTest::test_ec3_security_exclusion_runs_before_size_budget` | passed |
+| EC-4 | Edge case | alternate spellings of the same on-disk path canonicalize to one included path | `scripts/antares/packet_schema_test.py::EdgeCaseTest::test_ec4_alternate_spellings_canonicalize_to_one_path` | passed |
+
+### Owner final verification
+
+- Owner: `Matias Kruk`
+- Date: `2026-08-02`
+- Statement: I verified every happy path and edge case defined for this task
+  has unit test evidence that replicates the expected behavior (confirmed
+  in-session by the user message `verificacion ok`, 2026-08-02).
+- Commands run: `python3 -m unittest scripts.antares.packet_schema_test -v`;
+  `python3 -m unittest scripts.antares.cwe_watchlist_test scripts.antares.path_containment_test -v`;
+  `make qa-docs`
 
 
 

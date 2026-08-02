@@ -630,9 +630,20 @@ is now cancelled outright, because Antares does not propose RRI inputs.
   `docs/audit/gemma-evidence/antares-t3a-phase2.json`. Owner (Matias Kruk)
   explicitly certified the `### Owner final verification` block
   (`AskUserQuestion`, 2026-08-02); status is
-  `[x] Done (owner-verified, 2026-08-02)`. `T3b`, `T3c`, `T3d` remain
-  unscored and individually require their own pre-execution RRI and approval
-  before implementation; `T4` stays blocked until all four are `[x] Done`.
+  `[x] Done (owner-verified, 2026-08-02)`.
+- `T3b` was explicitly approved in-session on 2026-08-02 and implemented the
+  same day. Execution RRI recomputed to 27 (Moderate) after verification
+  evidence landed (`docs/audit/antares-t3b-rri.md`), but the task kept its
+  approved pre-execution Med-high discipline for reflection/review. The
+  implementation added `packet_schema.py` + `packet_schema_test.py`, 8/8
+  task-local unit tests pass, and Phase-2 code-solution review finished PASS
+  directly on `qwen3.6:27b-q4_K_M`
+  (`docs/audit/gemma-evidence/antares-t3b-phase2.json`). Owner final
+  verification was confirmed in-session on 2026-08-02, so the ledger status is
+  now `[x] Done (owner-verified, 2026-08-02)`.
+- `T3c` and `T3d` remain open and still require their own pre-execution RRI
+  and approval before implementation. `T4` stays blocked until all of
+  `T3a`-`T3d` are `[x] Done`.
 - No roadmap update is required until T5 retains a production operating mode.
 
 ## Related documents

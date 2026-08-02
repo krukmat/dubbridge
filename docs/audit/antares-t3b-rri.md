@@ -64,3 +64,30 @@ python3 scripts/rri.py \
   release cut), but its security-exclusion guarantees are exactly the kind
   of judgment call the Qwen27 advisory refinement step should weigh
   explicitly before recommending `GO_LOCAL` vs `CLOUD_REQUIRED`.
+
+## Post-implementation computation (2026-08-02, execution)
+
+```bash
+python3 scripts/rri.py \
+  --touches scripts/antares/packet_schema.py \
+  --touches scripts/antares/packet_schema_test.py \
+  --auto-cc \
+  --D 2 --K 1 --P 3 \
+  --T 1 --A 1 --X 1
+```
+
+| Variable | Score | Evidence | Confidence |
+|---|---|---|---|
+| C cyclomatic | 1 | auto-cc fallback (score=0): no local .rs files in --touches; clippy skipped | Low |
+| F files | 1 | `--touches` -> 2 files | High |
+| D domain | 2 | agent-supplied — unchanged from presentation; the task still defines a security-exclusion packet contract rather than a plain data-holder | High |
+| T coverage | 1 | agent-supplied — 8 packet-schema fixture tests now exist, covering HP-1/HP-2/EC-1..EC-4 | High |
+| A ambiguity | 1 | agent-supplied — scope stayed narrow; no repository context-closure logic was added | High |
+| K coupling | 1 | agent-supplied — still limited to `cwe_watchlist.py` provenance and `path_containment.py` canonicalization reuse | High |
+| P impact | 3 | agent-supplied — unchanged; a defect could still leak sensitive material into a model packet even though this task does not own the secrets system itself | High |
+| X context | 1 | agent-supplied — one module + tests + existing containment/watchlist helpers | High |
+
+**Base value:** 100 x (weighted / 5) = 27
+**Penalties applied:** none
+**Final RRI: 27 -> band Moderate (26-40) -> Effort M. Codex Balanced. Claude Balanced. thinking Off**
+**Execution note:** the task was still executed under its already-approved pre-execution Med-high presentation (`42`, driven by the `no_verification` penalty), so the stronger approval/review discipline remained in force even though the delivered implementation lands lower after verification evidence exists.
