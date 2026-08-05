@@ -228,28 +228,44 @@ flowchart TB
   (`Improper Authentication`, `src/issuer.rs`). This is ad hoc validation,
   not T1's required fixed R4/R5 representative fixture.
 
-## Element 3 — `scripts/antares/*` reconciliation (tracked, governed — not started)
+## Element 3 — `scripts/antares/*` reconciliation (route decided 2026-08-05; implementation pending Subtask B)
 
-Scope for a future task card, not implemented by this plan:
+**Decision (Subtask A, `docs/audit/antares-t4-element3-rri.md` § Subtask A,
+RRI 26 Moderate, approved 2026-08-05): retire the harness's live-invocation
+role; adopt `antares tool query --stdin` / `antares tool sweep --stdin` as
+direct CLI subprocess calls; retain T2a–T2e as the synthetic-fixture/
+replay-test path only.**
 
-- Change `harness.py`'s invocation model from "consume a live model
-  tool-call stream directly" to "invoke `antares tool query --stdin` /
-  `antares tool sweep --stdin` as a subprocess and consume its JSON
-  result." This is an architecture-level change to security-relevant code.
-- Decide the resulting scope of `tool_call_parser.py` /
-  `terminal_state.py`: likely narrows to serving the existing
-  replay-fixture/synthetic-test path (`replay_fixtures.py`,
-  `harness_test.py`) rather than any live-invocation code path, since
-  Cisco's CLI now owns real wire-format parsing end to end. Do not delete
-  either module silently — this is a scope decision that belongs in the
-  task card, not an implicit side effect.
-- This will need `scripts/rri.py` scoring, a `docs/tasks/*` entry (or an
-  amendment to the existing antares task ledger), and explicit human
-  approval before implementation per its resulting band — almost
-  certainly Med-high or higher given it is a cross-file architecture
-  decision on security-relevant parsing code (arch_decision penalty is
-  likely to apply, per the T3c-1 precedent in
-  `docs/audit/antares-t3c-1-rri.md`).
+Justification, grounded in evidence rather than the prior either/or framing:
+
+- Phase B (`docs/evaluations/antares-phase-b-comparison.md`) empirically
+  confirmed `harness.py::dispatch_tool_call` rejects real Antares
+  wire-format output (3/3 real-shaped inputs -> `MALFORMED_TOOL_CALL`); no
+  translation layer exists anywhere in `scripts/antares/*`.
+- T2a's own 2026-07-29 closure record already documented the same gap: the
+  translation layer it assigned to T2c was never built (T2c split into
+  T2c-1 subprocess lifecycle and T2c-2 resource budgets, neither of which
+  does wire-format translation).
+- `antares tool query --stdin` is already proven working end-to-end via
+  direct CLI invocation (T1 R4/R5,
+  `docs/evaluations/antares-runtime-preflight.md`), so no new subprocess
+  plumbing needs to be built inside the harness — the CLI already is that
+  layer. Building a second one duplicates functionality the CLI provides
+  natively, with no evidence motivating the duplication.
+- `tool_call_parser.py` / `terminal_state.py` are **not deleted**: they
+  keep serving `replay_fixtures.py` / `harness_test.py` as the synthetic
+  fixture/replay-test path, unchanged, per the disposition already
+  recorded for T2a–T2e.
+
+**Implementation (Subtask B) is a separate, not-yet-scored task.** Its RRI in
+`docs/audit/antares-t4-element3-rri.md` § Subtask B (48, provisional) was an
+upper-bound placeholder computed against the *other* branch of this decision
+(adopting a translation layer) and does not apply to the retire-and-narrow
+route actually decided here. Subtask B must be rescored against this route's
+actual diff — likely smaller, since it replaces `dispatch_tool_call`'s
+internal-schema consumption with direct CLI subprocess calls rather than
+adding new parsing logic — and presented on its own for approval before any
+code in `scripts/antares/*.py` is touched.
 
 ## What's needed beyond the two elements
 
@@ -337,10 +353,10 @@ flowchart TB
     end
 
     subgraph invoke["Invocation track (unresolved)"]
-        T2["T2a-T2e [x] Done\nunvalidated vs live output"]
-        DEC{"Decision:\nown harness + translation layer\nOR Element 3 / Cisco CLI"}
+        T2["T2a-T2e [x] Done\nretained as test-only path"]
+        DEC["Decision: RESOLVED 2026-08-05\nadopt Cisco CLI, retire harness\nlive-invocation role"]
         T2 --> DEC
-        E3["Element 3\nscripts/antares reconciliation\nRRI + card + approval"]
+        E3["Element 3 / Subtask B\nimplement retire-and-narrow route\n(rescore + approval pending)"]
         DEC --> E3
     end
 
@@ -371,7 +387,7 @@ Two things the graph makes explicit that neither plan stated alone:
 | A | Elements 1 + 2 | Zero governance cost (personal tooling, outside the repo); closes the only hard-blocked prerequisite with no progress; produces the first live model contact in the slice's history | none — no approval required |
 | B | Comparative experiment: same fixture through the existing harness and through `antares tool query --stdin` | Converts the Element 3 decision from speculation into measurement. The existing harness needs a translation layer first, which is itself the measurement of what adopting the CLI would save | none — read-only evaluation, artifacts only |
 | C | T3c-1 -> T3c-2 -> T3d | Invocation-independent; already scored, phase-1 reviewed, and handoff-ready. Runs in parallel with A/B without colliding | explicit approval per task (T3c-1 is RRI 55 Med-high) |
-| D | Element 3 (or an explicit decision to keep the own-harness path plus a translation-layer task) | Only defensible with Phase B evidence in hand. Its task card must decide explicitly what happens to the five completed T2 subtasks — narrow to test-only, retire, or retain as the invocation path | RRI + task card + approval; likely 56+ therefore decomposition |
+| D | Element 3 — **decision resolved 2026-08-05** (Subtask A: adopt CLI, retire harness live-invocation role, T2a-T2e narrowed to test-only); **implementation (Subtask B) pending rescore + approval** | Decomposed under the RRI 58 Complex pre-decomposition gate (`docs/audit/antares-t4-element3-rri.md`); Subtask A closed the architecture decision, Subtask B implements it, Subtask C syncs T2a-T2e disposition docs | Subtask A: RRI 26 approved. Subtask B: rescore + its own approval required before implementation. Subtask C: RRI 18, separately gated |
 | E | T4 pilot, then T5 | Unblocked only once A, C, and D have all landed | existing slice gates |
 
 **Recommended ordering:** A before C, even though C is more execution-ready.
@@ -388,9 +404,9 @@ momentum matters more than sequencing cleanliness.
 
 | Decision | Resolved by | Currently blocked on |
 |---|---|---|
-| Does the existing T2 harness work against real Antares output? | Phase B, after a translation layer is written or the gap is confirmed fatal | Elements 1 + 2 |
-| Adopt Cisco's CLI (Element 3) or keep the own-harness path? | Phase D task card, citing Phase B evidence | Phase B |
-| Do `tool_call_parser.py` / `terminal_state.py` narrow to test-only scope, retire, or stay? | Phase D task card's own Reflection and review — not decided by this plan | Phase D |
+| Does the existing T2 harness work against real Antares output? | **Resolved 2026-08-05 — No.** `docs/evaluations/antares-phase-b-comparison.md`: three real-wire-format inputs (`name`/`arguments`, tag-wrapped) were rejected as `MALFORMED_TOOL_CALL` by the unmodified harness; the internal `tool`/`payload` schema it does accept is validated only against its own synthetic fixtures. No translation layer exists anywhere in `scripts/antares/*`. | — closed |
+| Adopt Cisco's CLI (Element 3) or keep the own-harness path? | **Resolved 2026-08-05 — adopt the CLI.** Subtask A (RRI 26 Moderate, approved), `docs/audit/antares-t4-element3-rri.md` § Subtask A; decision text in § "Element 3" above. | — closed; Subtask B (implementation) is separately gated |
+| Do `tool_call_parser.py` / `terminal_state.py` narrow to test-only scope, retire, or stay? | **Resolved 2026-08-05 — narrow to test-only.** Both modules keep serving `replay_fixtures.py` / `harness_test.py` unchanged; no live-invocation role. Same Subtask A decision. | — closed |
 | Is local `antares-1b` fast enough on this host for routine use? | T1 R5 metrics (cold start, latency, peak RSS, swap growth) | Elements 1 + 2 |
 
 ### Approval boundary
@@ -402,8 +418,12 @@ momentum matters more than sequencing cleanliness.
 - **T3c-1 and successors (Phase C):** explicit human approval per task, per
   their RRI bands. T3c-1's card and phase-1 evidence are already prepared —
   `docs/tasks/handoff-antares-t3c-1-2026-08-03.md`.
-- **Element 3 (Phase D):** `scripts/rri.py` scoring, a task ledger entry, and
-  explicit approval before any implementation.
+- **Element 3 (Phase D):** decomposed under RRI 58 Complex
+  (`docs/audit/antares-t4-element3-rri.md`). Subtask A (route decision, RRI
+  26) approved and closed 2026-08-05. Subtask B (implementation) requires
+  its own rescore against the resolved route and its own explicit approval
+  before any `scripts/antares/*.py` change. Subtask C (T2a-T2e disposition
+  doc sync, RRI 18) separately gated.
 
 ## Open decisions
 
