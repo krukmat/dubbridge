@@ -165,6 +165,35 @@ def _validate_t2c2_fields(artifact: Artifact) -> None:
         )
 
 
+def _validate_t2cli_fields(artifact: Artifact) -> None:
+    """Element 3 Subtask B: antares-cli subprocess dispatch outcomes.
+
+    No argv/candidates come from a parsed tool call here (this path bypasses
+    the T2a parser entirely) -- candidates, when present, come from the
+    CLI's own findings array. CLI_EXECUTION_COMPLETE and CLI_EXECUTION_FAILED
+    ran a real subprocess and so require a trace_ref (stdout/stderr
+    captured, same redaction discipline as t2c1_execution); CLI_BINARY_UNAVAILABLE
+    fails closed before any subprocess spawns, so -- like SANDBOX_RUNTIME_UNAVAILABLE
+    -- it must not carry one. CLI_OUTPUT_MALFORMED did run the CLI (exit 0,
+    unparseable stdout), so it requires a trace_ref like the other two
+    post-execution kinds.
+    """
+    kind = artifact.kind
+    if kind is TerminalStateKind.CLI_BINARY_UNAVAILABLE:
+        if artifact.trace_ref is not None:
+            raise ValidationError(
+                "unexpected_trace_ref",
+                "CLI_BINARY_UNAVAILABLE must not carry a trace_ref (nothing ran).",
+            )
+        if not artifact.detail:
+            raise ValidationError("missing_detail", "CLI_BINARY_UNAVAILABLE requires non-empty detail.")
+        return
+    if artifact.trace_ref is None:
+        raise ValidationError("missing_trace_ref", f"{kind} requires a trace_ref.")
+    if kind is not TerminalStateKind.CLI_EXECUTION_COMPLETE and not artifact.detail:
+        raise ValidationError("missing_detail", f"{kind} is a rejection kind and requires non-empty detail.")
+
+
 # Strategy: dispatch table keyed by the same category strings `_category_of`
 # returns, replacing the original if/elif chain. t2a_parser and t2b_policy
 # share one strategy, exactly as the original if/elif's combined branch did.
@@ -173,6 +202,7 @@ _CATEGORY_VALIDATORS: dict[str, Callable[[Artifact], None]] = {
     "t2b_policy": _validate_t2a_t2b_fields,
     "t2c1_execution": _validate_t2c1_fields,
     "t2c2_budget": _validate_t2c2_fields,
+    "t2cli_execution": _validate_t2cli_fields,
 }
 
 

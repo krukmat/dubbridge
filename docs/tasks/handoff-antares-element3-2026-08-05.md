@@ -1,31 +1,36 @@
 ---
 type: TaskList
-status: in_progress
+status: done
 ---
 
 # Handoff: Antares Element 3 — `scripts/antares/*` reconciliation
 
-**Decomposed; Subtasks A and C closed 2026-08-05.** RRI 58 (Complex)
+**Complete 2026-08-05 — all three subtasks closed.** RRI 58 (Complex)
 triggered mandatory decomposition — see
 `docs/audit/antares-t4-element3-rri.md` for the full pre-decomposition
 score, T2a–T2e disposition, and the 3-way split (Subtask A route decision /
-Subtask B implementation / Subtask C disposition doc sync). Subtask A (RRI
-26 Moderate) is approved and closed: the plan's Element 3 section and
-decision-points table in `docs/plan/antares-local-runtime-adoption.md` now
-record the resolved route — adopt `antares tool query --stdin`/`sweep
---stdin` as direct CLI subprocess calls, retire the harness's
-live-invocation role, retain T2a–T2e as the synthetic-fixture/replay-test
-path only. Subtask C (RRI 18 Low) is approved and closed: T2a and T2e's
-rows in `docs/tasks/antares-security-specialist-advisor.md` now carry the
-same narrowed-disposition note inline, and T2e gained a full disposition
-subsection cross-referencing T2a's existing correction and this handoff's
-resolved route.
+Subtask B implementation / Subtask C disposition doc sync).
 
-Remaining work under this handoff: **Subtask B** (implement the resolved
-route — requires its own rescore against the actual diff and its own
-approval; the RRI 48 figure in the audit artifact was an explicit
-placeholder for the *other* branch of the decision and does not apply). Not
-started; no code in `scripts/antares/*.py` has been touched.
+- **Subtask A** (RRI 26 Moderate) approved and closed: the plan's Element 3
+  section and decision-points table in
+  `docs/plan/antares-local-runtime-adoption.md` record the resolved route —
+  adopt `antares tool query --stdin`/`sweep --stdin` as direct CLI
+  subprocess calls, retire the harness's live-invocation role, retain
+  T2a–T2e as the synthetic-fixture/replay-test path only.
+- **Subtask B** (RRI 50 Med-high, after a mid-implementation scope
+  correction from an initial RRI 43) approved and closed: implemented
+  `dispatch_via_cli`/`cli_terminal_state_to_artifact` in
+  `scripts/antares/harness.py`, plus 4 additive `TerminalStateKind` members
+  and a new `T2CLI_KINDS` category. Full closure record, Reflection log,
+  and unit coverage certification: `docs/audit/antares-t4-element3-rri.md`
+  § "Subtask B — closure record".
+- **Subtask C** (RRI 18 Low) approved and closed: T2a and T2e's rows in
+  `docs/tasks/antares-security-specialist-advisor.md` carry the
+  narrowed-disposition note inline, and T2e gained a full disposition
+  subsection cross-referencing T2a's existing correction and Subtask A's
+  resolved route.
+
+No further work is outstanding under this handoff.
 
 Original framing preserved below for provenance.
 

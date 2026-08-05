@@ -1,17 +1,26 @@
 """Composed T2 replay harness (T2e): parser -> policy/containment -> sandbox
--> artifact, in one deterministic entrypoint.
+-> artifact, in one deterministic entrypoint. Also hosts the direct
+antares-cli subprocess dispatch path (Element 3 Subtask B, see the bottom of
+this module) that is now the actual live-invocation entrypoint.
 
-Drives one raw tool-call JSON message through `tool_call_parser.parse_tool_call`
+Two independent entrypoints live in this module. `dispatch_tool_call` (and
+`process_tool_call`/`replay_session`, which wrap it) drives one raw
+internal-schema tool-call JSON message through `tool_call_parser.parse_tool_call`
 (T2a), then -- for a `terminal` request -- `command_policy.validate_command`
 (T2b) and `sandbox_budget.run_budgeted` (composed T2c-1/T2c-2), stopping at the
 first non-success `TerminalState`; for a submission, validates any candidate
 paths via `path_containment.check_path_containment` (T2b) and checks for a
 duplicate terminal submission via `tool_call_parser.check_duplicate_submission`.
-Every reached `TerminalState` -- success or rejection, from any layer -- is
-then converted into a schema-valid `Artifact` (T2d). This module performs no
-command execution or path resolution of its own; it only sequences the
-existing, already fail-closed layers and normalizes their output. It never
-mutates `snapshot_root` (ADR-006).
+Per the resolved Subtask A decision
+(docs/plan/antares-local-runtime-adoption.md § Element 3), this path is
+**retained only as the synthetic-fixture/replay-test path** -- it serves
+`replay_fixtures.py`/`harness_test.py` and is not live-invoked. `dispatch_via_cli`
+(bottom of this module) is the actual live-invocation entrypoint: it invokes
+the official `antares-cli` as a direct subprocess, bypassing the internal
+schema entirely. Every reached `TerminalState` from either path -- success or
+rejection -- is converted into a schema-valid `Artifact` (T2d). This module
+performs no command execution or path resolution of its own beyond the CLI
+subprocess call itself; it never mutates `snapshot_root` (ADR-006).
 
 Canonical-kind landmine (the central design problem this module exists to
 solve): `tool_call_parser.py`, `command_policy.py`, `path_containment.py`, and
@@ -44,7 +53,10 @@ from __future__ import annotations
 import dataclasses
 import importlib.util
 import json
+import shutil
+import subprocess
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -152,6 +164,11 @@ _DEFAULT_OUTPUT_CAP_BYTES = 1024 * 1024
 
 _ARTIFACT_SCHEMA_MOD = _load_sibling_module("antares_artifact_schema", "artifact_schema.py")
 TerminalStateKind = _ARTIFACT_SCHEMA_MOD.TerminalStateKind  # the canonical generation
+# TerminalState (the dataclass, not TerminalStateKind) is not re-exported by
+# artifact_schema.py -- loaded directly here via the same cache-checking
+# loader, which reuses artifact_schema.py's already-cached
+# "antares_terminal_state" module entry rather than re-executing the file.
+TerminalState = _load_sibling_module("antares_terminal_state", "terminal_state.py").TerminalState
 SCHEMA_VERSION = _ARTIFACT_SCHEMA_MOD.SCHEMA_VERSION
 Provenance = _ARTIFACT_SCHEMA_MOD.Provenance
 Disposition = _ARTIFACT_SCHEMA_MOD.Disposition
@@ -416,3 +433,220 @@ def replay_session(
             )
         )
     return tuple(artifacts)
+
+
+# --- Element 3 Subtask B: direct antares-cli subprocess dispatch path ---
+#
+# `dispatch_via_cli` and `terminal_state.py`'s new CLI_* kinds are the
+# harness's live-invocation entrypoint, per the resolved Subtask A decision
+# (docs/plan/antares-local-runtime-adoption.md § Element 3): invoke the
+# official `antares-cli` (Cisco reference implementation, already proven
+# end-to-end in T1 R4/R5 -- docs/evaluations/antares-runtime-preflight.md)
+# as a direct subprocess, rather than parsing raw model tool-call JSON
+# through the internal {"tool":..., "payload":...} schema `dispatch_tool_call`
+# above consumes. `dispatch_tool_call`/`process_tool_call`/`replay_session`
+# are unchanged and continue to serve `replay_fixtures.py`/`harness_test.py`
+# as the retained synthetic-fixture/replay-test path (Subtask C's
+# disposition) -- this is an additional entrypoint, not a replacement.
+#
+# Output schema (confirmed by reading the antares-cli reference
+# implementation's `core/service.py::WorkflowResult.to_dict`/`to_json`,
+# `output/finding.py::Finding.to_dict`, at
+# `.antares-runtime/antares-cli-reference/` -- personal/untracked host
+# state per the plan's Design decision #5, read for schema only, not
+# depended on at test time): `{"summary": {"total_findings": int, ...},
+# "findings": [{"title": str, "file_path": str, "cwe_ids": [str],
+# "likelihood_of_exploit": str, "submission_rank": int|omitted}, ...],
+# "metadata": {...}}`. Exit code 2 signals `has_operational_failures`
+# (partial/degraded run, still valid JSON) -- distinguished from a crash
+# (non-zero exit with no parseable JSON) by attempting the JSON parse
+# regardless of exit code first.
+
+CLI_QUERY_SUBCOMMAND = ("tool", "query", "--stdin")
+CLI_SWEEP_SUBCOMMAND = ("tool", "sweep", "--stdin")
+DEFAULT_CLI_BINARY = "antares"
+DEFAULT_CLI_TIMEOUT_SECONDS = 300.0
+
+
+def _cli_binary_path(binary: str) -> str | None:
+    """EC-2: resolve `binary` on PATH without spawning anything. Returns
+    `None` if it is missing or not executable -- the caller must fail
+    closed on `None` before any `subprocess.Popen` call."""
+    return shutil.which(binary)
+
+
+def dispatch_via_cli(
+    request: dict[str, Any],
+    *,
+    snapshot_root: Path,
+    binary: str = DEFAULT_CLI_BINARY,
+    subcommand: tuple[str, ...] = CLI_QUERY_SUBCOMMAND,
+    timeout_seconds: float = DEFAULT_CLI_TIMEOUT_SECONDS,
+) -> Any:
+    """Invoke `antares-cli` as a direct, argv-only subprocess and return a
+    `TerminalState` (this module's own canonical `TerminalStateKind`
+    generation -- no `_canonical_kind` reconciliation needed, since this
+    path never touches `tool_call_parser.py`'s or any other sibling's
+    generation).
+
+    `request` is the CLI's own stdin JSON contract (`target`, `cwe_ids`,
+    etc. -- see `.antares-runtime/antares-cli-reference/src/antares_cli/commands/tool.py`);
+    the caller builds it, this function does not construct or validate its
+    shape beyond passing it through as `stdin` bytes.
+
+    HP-1: a successful run (exit 0 or 2, valid JSON) maps to
+    CLI_EXECUTION_COMPLETE with `candidates` populated from the findings
+    array's `file_path` values (empty tuple for a genuine
+    no-vulnerability-found result -- distinguished from a crash by the kind
+    itself, not by an empty `candidates` tuple, which is also valid for
+    HP-1). EC-1: a non-zero exit whose stdout does not parse as JSON, or a
+    timeout, is CLI_EXECUTION_FAILED. EC-1 (malformed variant): valid JSON
+    that is missing the required top-level keys is CLI_OUTPUT_MALFORMED --
+    kept distinct from CLI_EXECUTION_FAILED because the subprocess itself
+    ran and exited in a way the CLI considers non-crashing; only the
+    contract this harness expects was not met. EC-2: `binary` is not found
+    on PATH -> CLI_BINARY_UNAVAILABLE, no subprocess spawned. EC-3: argv is
+    `[binary, *subcommand]` only -- no shell, no string interpolation of
+    `request` (it is passed as stdin bytes, never argv).
+    """
+    resolved_binary = _cli_binary_path(binary)
+    if resolved_binary is None:
+        return TerminalState(
+            kind=TerminalStateKind.CLI_BINARY_UNAVAILABLE,
+            detail=f"CLI binary {binary!r} was not found on PATH; no subprocess was started.",
+        )
+
+    argv = (resolved_binary, *subcommand)
+    stdin_text = json.dumps(request)
+
+    try:
+        process = subprocess.Popen(
+            list(argv),
+            cwd=str(snapshot_root),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            shell=False,
+        )
+    except OSError as exc:
+        return TerminalState(
+            kind=TerminalStateKind.CLI_EXECUTION_FAILED,
+            argv=argv,
+            detail=f"Failed to start the antares-cli subprocess: {exc}",
+        )
+
+    started = time.monotonic()
+    try:
+        stdout, stderr = process.communicate(input=stdin_text, timeout=timeout_seconds)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        stdout, stderr = process.communicate()
+        return TerminalState(
+            kind=TerminalStateKind.CLI_EXECUTION_FAILED,
+            argv=argv,
+            stdout=stdout,
+            stderr=stderr,
+            elapsed_seconds=time.monotonic() - started,
+            detail=f"antares-cli exceeded the {timeout_seconds}s timeout and was killed.",
+        )
+    elapsed = time.monotonic() - started
+
+    exit_code = process.returncode
+    # Exit 0 (completed) and exit 2 (has_operational_failures, still valid
+    # JSON per tool.py) both attempt the JSON parse; any other exit code, or
+    # a parse failure on 0/2, is a hard failure -- never a malformed-output
+    # result, since a non-{0,2} exit means the CLI itself does not claim to
+    # have produced its normal report shape.
+    if exit_code not in (0, 2):
+        return TerminalState(
+            kind=TerminalStateKind.CLI_EXECUTION_FAILED,
+            argv=argv,
+            stdout=stdout,
+            stderr=stderr,
+            exit_code=exit_code,
+            elapsed_seconds=elapsed,
+            detail=f"antares-cli exited {exit_code}.",
+        )
+
+    try:
+        parsed = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        return TerminalState(
+            kind=TerminalStateKind.CLI_OUTPUT_MALFORMED,
+            argv=argv,
+            stdout=stdout,
+            stderr=stderr,
+            exit_code=exit_code,
+            elapsed_seconds=elapsed,
+            detail=f"antares-cli stdout was not valid JSON: {exc}",
+        )
+
+    if (
+        not isinstance(parsed, dict)
+        or "findings" not in parsed
+        or not isinstance(parsed.get("findings"), list)
+    ):
+        return TerminalState(
+            kind=TerminalStateKind.CLI_OUTPUT_MALFORMED,
+            argv=argv,
+            stdout=stdout,
+            stderr=stderr,
+            exit_code=exit_code,
+            elapsed_seconds=elapsed,
+            detail="antares-cli JSON output is missing a 'findings' list.",
+        )
+
+    candidates = tuple(
+        finding["file_path"]
+        for finding in parsed["findings"]
+        if isinstance(finding, dict) and isinstance(finding.get("file_path"), str)
+    )
+    return TerminalState(
+        kind=TerminalStateKind.CLI_EXECUTION_COMPLETE,
+        argv=argv,
+        candidates=candidates,
+        stdout=stdout,
+        stderr=stderr,
+        exit_code=exit_code,
+        elapsed_seconds=elapsed,
+    )
+
+
+def cli_terminal_state_to_artifact(
+    state: Any,
+    *,
+    finding_id: str,
+    artifact_id: str,
+    provenance: Provenance,
+    trace_storage_root: Path,
+    supersedes: str | None = None,
+) -> Artifact:
+    """Convert a `dispatch_via_cli` `TerminalState` into a schema-valid
+    `Artifact`. Separate from `terminal_state_to_artifact` above (which only
+    handles the T2a-T2c2 internal-schema categories) because the CLI
+    category's field requirements are simpler -- no `SessionBudget`, no
+    `output_cap_bytes` -- and mixing the two dispatch tables would obscure
+    which categories each converter actually supports.
+    """
+    canonical_kind = _canonical_kind(state.kind)
+    kwargs: dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "kind": canonical_kind,
+        "finding_id": finding_id,
+        "artifact_id": artifact_id,
+        "provenance": provenance,
+        "supersedes": supersedes,
+        "detail": state.detail,
+        "argv": state.argv,
+        "candidates": state.candidates,
+    }
+    if canonical_kind.value != "cli_binary_unavailable":
+        kwargs["exit_code"] = (
+            state.exit_code if state.exit_code is not None else _EXIT_CODE_UNAVAILABLE_SENTINEL
+        )
+        kwargs["elapsed_seconds"] = state.elapsed_seconds
+        kwargs["trace_ref"] = write_raw_trace(_encode_trace(state), trace_storage_root, artifact_id)
+    artifact = Artifact(**kwargs)
+    validate_artifact(artifact)
+    return artifact

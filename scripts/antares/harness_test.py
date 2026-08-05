@@ -63,6 +63,8 @@ process_tool_call = _MODULE.process_tool_call
 dispatch_tool_call = _MODULE.dispatch_tool_call
 replay_session = _MODULE.replay_session
 validate_artifact = _MODULE.validate_artifact
+dispatch_via_cli = _MODULE.dispatch_via_cli
+cli_terminal_state_to_artifact = _MODULE.cli_terminal_state_to_artifact
 
 
 class _AllowAllIsolation:
@@ -400,6 +402,153 @@ class ReplaySessionTest(HarnessTestBase):
         self.assertEqual(artifacts[1].kind, TerminalStateKind.SUBMITTED_VULNERABLE_FILES)
         for artifact in artifacts:
             validate_artifact(artifact)
+
+
+class _FakeCliProcess:
+    """Stub for subprocess.Popen -- Element 3 Subtask B's task card requires
+    testing against a stub, never the real antares-cli binary."""
+
+    def __init__(self, stdout: str, stderr: str = "", returncode: int = 0, raises_timeout: bool = False):
+        self._stdout = stdout
+        self._stderr = stderr
+        self.returncode = returncode
+        self._raises_timeout = raises_timeout
+        self._timed_out_once = False
+        self.killed = False
+
+    def communicate(self, input: str | None = None, timeout: float | None = None):
+        if self._raises_timeout and not self._timed_out_once:
+            self._timed_out_once = True
+            import subprocess as _subprocess
+
+            raise _subprocess.TimeoutExpired(cmd="antares", timeout=timeout or 0)
+        return self._stdout, self._stderr
+
+    def kill(self) -> None:
+        self.killed = True
+
+
+class DispatchViaCliTest(HarnessTestBase):
+    """HP-1/EC-1/EC-2/EC-3 for Element 3 Subtask B's antares-cli subprocess
+    dispatch path. All subprocess interaction is stubbed via
+    unittest.mock.patch on harness.subprocess.Popen -- per the approved task
+    card, these tests must never invoke the real antares-cli binary."""
+
+    def _patched_which(self, resolved: str | None):
+        return unittest.mock.patch.object(_MODULE.shutil, "which", return_value=resolved)
+
+    def _patched_popen(self, fake_process: "_FakeCliProcess"):
+        return unittest.mock.patch.object(_MODULE.subprocess, "Popen", return_value=fake_process)
+
+    def test_hp1_valid_query_maps_findings_to_candidates(self) -> None:
+        stdout = (
+            '{"summary": {"total_findings": 1}, '
+            '"findings": [{"title": "Improper Authentication", '
+            '"file_path": "src/issuer.rs", "cwe_ids": ["CWE-287"], '
+            '"likelihood_of_exploit": "High"}], "metadata": {}}'
+        )
+        with self._patched_which("/usr/local/bin/antares"), self._patched_popen(
+            _FakeCliProcess(stdout=stdout, returncode=0)
+        ):
+            state = dispatch_via_cli({"target": ".", "cwe_ids": ["CWE-287"]}, snapshot_root=self.snapshot_root)
+        self.assertEqual(state.kind, TerminalStateKind.CLI_EXECUTION_COMPLETE)
+        self.assertEqual(state.candidates, ("src/issuer.rs",))
+        self.assertEqual(state.argv, ("/usr/local/bin/antares", "tool", "query", "--stdin"))
+        artifact = cli_terminal_state_to_artifact(
+            state,
+            finding_id="f1",
+            artifact_id="f1-r1",
+            provenance=_provenance(),
+            trace_storage_root=self.trace_storage_root,
+        )
+        validate_artifact(artifact)
+        self.assertEqual(artifact.disposition.state, DispositionState.NEEDS_HUMAN_REVIEW)
+
+    def test_hp1_no_vulnerability_found_maps_to_empty_candidates(self) -> None:
+        stdout = '{"summary": {"total_findings": 0}, "findings": [], "metadata": {}}'
+        with self._patched_which("/usr/local/bin/antares"), self._patched_popen(
+            _FakeCliProcess(stdout=stdout, returncode=0)
+        ):
+            state = dispatch_via_cli({"target": ".", "cwe_ids": ["CWE-20"]}, snapshot_root=self.snapshot_root)
+        self.assertEqual(state.kind, TerminalStateKind.CLI_EXECUTION_COMPLETE)
+        self.assertEqual(state.candidates, ())
+
+    def test_hp1_operational_failure_exit_2_still_completes(self) -> None:
+        # tool.py raises typer.Exit(code=2) on has_operational_failures while
+        # still printing valid WorkflowResult JSON first.
+        stdout = '{"summary": {"total_findings": 0}, "findings": [], "metadata": {}, "warnings": ["x"]}'
+        with self._patched_which("/usr/local/bin/antares"), self._patched_popen(
+            _FakeCliProcess(stdout=stdout, returncode=2)
+        ):
+            state = dispatch_via_cli({"target": ".", "cwe_ids": ["CWE-20"]}, snapshot_root=self.snapshot_root)
+        self.assertEqual(state.kind, TerminalStateKind.CLI_EXECUTION_COMPLETE)
+        self.assertEqual(state.exit_code, 2)
+
+    def test_ec1_nonzero_exit_without_valid_json_is_execution_failed(self) -> None:
+        with self._patched_which("/usr/local/bin/antares"), self._patched_popen(
+            _FakeCliProcess(stdout="", stderr="fatal: model unavailable", returncode=1)
+        ):
+            state = dispatch_via_cli({"target": ".", "cwe_ids": ["CWE-20"]}, snapshot_root=self.snapshot_root)
+        self.assertEqual(state.kind, TerminalStateKind.CLI_EXECUTION_FAILED)
+        self.assertEqual(state.exit_code, 1)
+
+    def test_ec1_timeout_is_execution_failed_and_kills_process(self) -> None:
+        fake = _FakeCliProcess(stdout="", stderr="", raises_timeout=True)
+        with self._patched_which("/usr/local/bin/antares"), self._patched_popen(fake):
+            state = dispatch_via_cli(
+                {"target": ".", "cwe_ids": ["CWE-20"]},
+                snapshot_root=self.snapshot_root,
+                timeout_seconds=0.01,
+            )
+        self.assertEqual(state.kind, TerminalStateKind.CLI_EXECUTION_FAILED)
+        self.assertTrue(fake.killed)
+
+    def test_ec1_malformed_json_stdout_is_output_malformed(self) -> None:
+        with self._patched_which("/usr/local/bin/antares"), self._patched_popen(
+            _FakeCliProcess(stdout="not json{{{", returncode=0)
+        ):
+            state = dispatch_via_cli({"target": ".", "cwe_ids": ["CWE-20"]}, snapshot_root=self.snapshot_root)
+        self.assertEqual(state.kind, TerminalStateKind.CLI_OUTPUT_MALFORMED)
+
+    def test_ec1_valid_json_missing_findings_key_is_output_malformed(self) -> None:
+        with self._patched_which("/usr/local/bin/antares"), self._patched_popen(
+            _FakeCliProcess(stdout='{"summary": {}}', returncode=0)
+        ):
+            state = dispatch_via_cli({"target": ".", "cwe_ids": ["CWE-20"]}, snapshot_root=self.snapshot_root)
+        self.assertEqual(state.kind, TerminalStateKind.CLI_OUTPUT_MALFORMED)
+
+    def test_ec2_missing_binary_fails_closed_before_any_subprocess(self) -> None:
+        with self._patched_which(None), unittest.mock.patch.object(_MODULE.subprocess, "Popen") as popen:
+            state = dispatch_via_cli({"target": ".", "cwe_ids": ["CWE-20"]}, snapshot_root=self.snapshot_root)
+        self.assertEqual(state.kind, TerminalStateKind.CLI_BINARY_UNAVAILABLE)
+        popen.assert_not_called()
+        artifact = cli_terminal_state_to_artifact(
+            state,
+            finding_id="f1",
+            artifact_id="f1-r1",
+            provenance=_provenance(),
+            trace_storage_root=self.trace_storage_root,
+        )
+        validate_artifact(artifact)
+        self.assertIsNone(artifact.trace_ref)
+
+    def test_ec3_argv_is_binary_and_subcommand_only_no_shell(self) -> None:
+        stdout = '{"summary": {"total_findings": 0}, "findings": [], "metadata": {}}'
+        with self._patched_which("/usr/local/bin/antares"), self._patched_popen(
+            _FakeCliProcess(stdout=stdout, returncode=0)
+        ) as popen:
+            dispatch_via_cli(
+                {"target": "/some/../path", "cwe_ids": ["CWE-20; rm -rf /"]},
+                snapshot_root=self.snapshot_root,
+            )
+        call_kwargs = popen.call_args.kwargs
+        call_args = popen.call_args.args[0]
+        self.assertEqual(call_args, ["/usr/local/bin/antares", "tool", "query", "--stdin"])
+        self.assertFalse(call_kwargs.get("shell", False))
+        # The caller-supplied target/cwe_ids never appear in argv -- they are
+        # only ever passed as stdin bytes via `communicate(input=...)`.
+        for token in call_args:
+            self.assertNotIn("rm -rf", token)
 
 
 if __name__ == "__main__":

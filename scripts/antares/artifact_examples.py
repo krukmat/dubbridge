@@ -126,6 +126,17 @@ def generate_example_artifacts() -> dict[Any, Artifact]:
             kwargs["trace_ref"] = _example_trace_ref(kind)
             if kind is TerminalStateKind.SANDBOX_TEARDOWN_UNCONFIRMED:
                 kwargs["teardown_grace_seconds"] = 5.0
+        elif category == "t2cli_execution":
+            kwargs["argv"] = ("antares", "tool", "query", "--stdin")
+            if kind is TerminalStateKind.CLI_BINARY_UNAVAILABLE:
+                kwargs["detail"] = "example: antares-cli binary not found on PATH"
+            else:
+                kwargs["exit_code"] = 0 if kind is TerminalStateKind.CLI_EXECUTION_COMPLETE else 1
+                kwargs["trace_ref"] = _example_trace_ref(kind)
+                if kind is TerminalStateKind.CLI_EXECUTION_COMPLETE:
+                    kwargs["candidates"] = ("src/example.py",)
+                else:
+                    kwargs["detail"] = f"example rejection detail for {kind.value}"
 
         artifact = Artifact(**kwargs)
         validate_artifact(artifact)

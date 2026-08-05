@@ -128,15 +128,41 @@ T2C2_KINDS = frozenset(
         TerminalStateKind.SANDBOX_TEARDOWN_UNCONFIRMED,
     }
 )
+# Element 3 Subtask B: outcomes of the direct antares-cli subprocess dispatch
+# path (harness.py's dispatch_via_cli), kept as its own category rather than
+# folded into T2C1_KINDS -- T2C1 describes the sandboxed *internal-schema*
+# command execution surface (sandbox_runner.py's argv-only subprocess model
+# operating on parser/policy-validated commands); this category describes
+# CLI-subprocess execution of the external antares-cli binary itself, a
+# different execution surface with different provenance/mapping needs
+# (no argv/candidates from a parsed tool call -- the CLI's own JSON findings
+# array is the source of `candidates`).
+T2CLI_KINDS = frozenset(
+    {
+        TerminalStateKind.CLI_EXECUTION_COMPLETE,
+        TerminalStateKind.CLI_BINARY_UNAVAILABLE,
+        TerminalStateKind.CLI_EXECUTION_FAILED,
+        TerminalStateKind.CLI_OUTPUT_MALFORMED,
+    }
+)
 
-# Self-check, not just documentation: the four category sets must exactly
-# partition all 20 TerminalStateKind values with no gap and no overlap.
+# Self-check, not just documentation: the five category sets must exactly
+# partition all 24 TerminalStateKind values with no gap and no overlap.
+_ALL_CATEGORY_SETS = (T2A_KINDS, T2B_KINDS, T2C1_KINDS, T2C2_KINDS, T2CLI_KINDS)
 assert len(T2A_KINDS) == 7
 assert len(T2B_KINDS) == 6
 assert len(T2C1_KINDS) == 3
 assert len(T2C2_KINDS) == 4
-assert T2A_KINDS | T2B_KINDS | T2C1_KINDS | T2C2_KINDS == frozenset(TerminalStateKind)
-assert not (T2A_KINDS & T2B_KINDS & T2C1_KINDS & T2C2_KINDS)
+assert len(T2CLI_KINDS) == 4
+assert frozenset().union(*_ALL_CATEGORY_SETS) == frozenset(TerminalStateKind)
+# Pairwise disjointness, not just "no value common to all five" -- the
+# original 4-set check (`not (A & B & C & D)`) only ruled out a value shared
+# by every category simultaneously, which would not catch two categories
+# overlapping on a single value while the rest stayed clean. The sum check
+# below is the direct proof: if every pair were disjoint, summing each
+# category's own count must equal the union's count exactly; any pairwise
+# overlap would make the sum strictly greater.
+assert sum(len(s) for s in _ALL_CATEGORY_SETS) == len(frozenset(TerminalStateKind))
 
 
 @dataclass(frozen=True)
@@ -231,6 +257,8 @@ def _category_of(kind: Any) -> str:
         return "t2c1_execution"
     if kind in T2C2_KINDS:
         return "t2c2_budget"
+    if kind in T2CLI_KINDS:
+        return "t2cli_execution"
     raise ValidationError("unknown_kind_category", f"{kind!r} is not mapped to any category.")
 
 

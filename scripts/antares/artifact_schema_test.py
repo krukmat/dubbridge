@@ -292,10 +292,14 @@ class EdgeCaseTest(unittest.TestCase):
 
 
 class CategoryFieldTest(unittest.TestCase):
-    def test_all_20_kinds_are_covered_and_partitioned(self) -> None:
-        self.assertEqual(len(list(TerminalStateKind)), 20)
+    def test_all_24_kinds_are_covered_and_partitioned(self) -> None:
+        self.assertEqual(len(list(TerminalStateKind)), 24)
         self.assertEqual(
-            _MOD.T2A_KINDS | _MOD.T2B_KINDS | _MOD.T2C1_KINDS | _MOD.T2C2_KINDS,
+            _MOD.T2A_KINDS
+            | _MOD.T2B_KINDS
+            | _MOD.T2C1_KINDS
+            | _MOD.T2C2_KINDS
+            | _MOD.T2CLI_KINDS,
             frozenset(TerminalStateKind),
         )
 
@@ -399,9 +403,9 @@ class CategoryFieldTest(unittest.TestCase):
 
 
 class ExampleArtifactsTest(unittest.TestCase):
-    def test_all_20_examples_are_generated_and_schema_valid(self) -> None:
+    def test_all_24_examples_are_generated_and_schema_valid(self) -> None:
         examples = generate_example_artifacts()
-        self.assertEqual(len(examples), 20)
+        self.assertEqual(len(examples), len(list(TerminalStateKind)))
         for kind, artifact in examples.items():
             self.assertEqual(artifact.kind, kind)
             validate_artifact(artifact)  # must not raise
@@ -432,9 +436,9 @@ class CommittedExampleFixtureTest(unittest.TestCase):
 
     def test_committed_examples_directory_has_one_file_per_kind(self) -> None:
         files = sorted(self.EXAMPLES_DIR.glob("*.json"))
-        self.assertEqual(len(files), 20)
         kinds_from_files = {f.stem for f in files}
         kinds_from_enum = {kind.value for kind in TerminalStateKind}
+        self.assertEqual(len(files), len(kinds_from_enum))
         self.assertEqual(kinds_from_files, kinds_from_enum)
 
     def test_committed_examples_contain_no_raw_trace_fields_and_validate(self) -> None:

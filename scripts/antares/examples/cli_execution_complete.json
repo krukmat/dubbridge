@@ -1,0 +1,40 @@
+{
+  "argv": [
+    "antares",
+    "tool",
+    "query",
+    "--stdin"
+  ],
+  "artifact_id": "example-cli_execution_complete-r1",
+  "budget": null,
+  "candidates": [
+    "src/example.py"
+  ],
+  "detail": "",
+  "disposition": {
+    "note": null,
+    "reviewed_at": null,
+    "reviewer": null,
+    "state": "needs-human-review"
+  },
+  "elapsed_seconds": null,
+  "exit_code": 0,
+  "finding_id": "example-cli_execution_complete",
+  "kind": "cli_execution_complete",
+  "provenance": {
+    "harness_version": "antares-harness@example",
+    "model_version": "fdtn-ai/antares-1b@example",
+    "packet_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "runtime_version": "scripts/antares@example",
+    "snapshot_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "schema_version": 1,
+  "supersedes": null,
+  "teardown_grace_seconds": null,
+  "trace_ref": {
+    "byte_length": 128,
+    "content_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "redaction_version": 1,
+    "storage_uri": "file://var/antares-traces/cli_execution_complete.trace"
+  }
+}

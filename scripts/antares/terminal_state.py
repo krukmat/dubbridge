@@ -68,6 +68,20 @@ class TerminalStateKind(Enum):
     # signal that teardown, not just the command, may have failed.
     SANDBOX_TEARDOWN_UNCONFIRMED = "sandbox_teardown_unconfirmed"
 
+    # Element 3 Subtask B: outcomes of the direct antares-cli subprocess
+    # dispatch path in harness.py (antares tool query/sweep --stdin),
+    # distinct from every T2a-T2c2 kind above -- those describe outcomes of
+    # the internal-schema tool-call pipeline, which this path does not use.
+    # Kept as four separate kinds, mirroring the T2c-1/T2c-2 discipline of
+    # never folding distinct failure modes into one generic bucket: a caller
+    # must be able to tell "the CLI is not installed" apart from "the CLI
+    # ran and failed" apart from "the CLI ran, exited 0, but its stdout
+    # could not be parsed".
+    CLI_EXECUTION_COMPLETE = "cli_execution_complete"
+    CLI_BINARY_UNAVAILABLE = "cli_binary_unavailable"
+    CLI_EXECUTION_FAILED = "cli_execution_failed"
+    CLI_OUTPUT_MALFORMED = "cli_output_malformed"
+
 
 # Kinds produced by a successful, well-formed tool call.
 SUCCESS_KINDS = frozenset(
@@ -78,6 +92,7 @@ SUCCESS_KINDS = frozenset(
         TerminalStateKind.COMMAND_PLAN_VALID,
         TerminalStateKind.PATH_CONTAINMENT_VALID,
         TerminalStateKind.SANDBOX_EXECUTION_COMPLETE,
+        TerminalStateKind.CLI_EXECUTION_COMPLETE,
     }
 )
 

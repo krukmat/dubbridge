@@ -1,0 +1,33 @@
+{
+  "argv": [
+    "antares",
+    "tool",
+    "query",
+    "--stdin"
+  ],
+  "artifact_id": "example-cli_binary_unavailable-r1",
+  "budget": null,
+  "candidates": [],
+  "detail": "example: antares-cli binary not found on PATH",
+  "disposition": {
+    "note": null,
+    "reviewed_at": null,
+    "reviewer": null,
+    "state": "needs-human-review"
+  },
+  "elapsed_seconds": null,
+  "exit_code": null,
+  "finding_id": "example-cli_binary_unavailable",
+  "kind": "cli_binary_unavailable",
+  "provenance": {
+    "harness_version": "antares-harness@example",
+    "model_version": "fdtn-ai/antares-1b@example",
+    "packet_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "runtime_version": "scripts/antares@example",
+    "snapshot_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "schema_version": 1,
+  "supersedes": null,
+  "teardown_grace_seconds": null,
+  "trace_ref": null
+}
