@@ -434,6 +434,7 @@ is now cancelled outright, because Antares does not propose RRI inputs.
 | Raw traces leak source or secrets into Git | `logs/antares/` ignored, traces redacted and retention-bounded, summaries sanitized |
 | Advisory-driven runs misread as reachability analysis | Source A deferred; caveat recorded in the artifact when adopted |
 | Capability over-claim in repository docs | T0a corrects the existing charter text before any implementation |
+| **T2 harness never exercised against live model output** | Recorded in § Status synchronization; resolved either by a translation layer or by `docs/plan/antares-local-runtime-adoption.md` Element 3, decided on measured evidence before T4 |
 
 ## Gap-to-control matrix
 
@@ -654,16 +655,45 @@ is now cancelled outright, because Antares does not propose RRI inputs.
   remained in `FINDINGS` because it recommended allowing a real file named
   `__seed__`; the approved task text explicitly forbids that, so closure used
   an explicit owner waiver rather than changing the contract mid-task.
-- `T3c-1` is now the next executable `T3c` child; it still requires a fresh
-  RRI score, phase-1 review, and approval presentation before implementation.
+- `T3c-1` is now the next executable `T3c` child: its fresh presentation-time
+  RRI is 55 (Med-high, Effort L), phase-1 task analysis is PASS via the D14
+  final fallback, and it is ready for the approval presentation. Implementation
+  has not started.
 - `T3d` remains open and now depends on `T3b` plus `T3c-2`. `T4` stays
   blocked until all of `T3a`, `T3b`, `T3c-0`, `T3c-1`, `T3c-2`, and `T3d`
   are `[x] Done`.
+- **Wire-format translation gap (recorded 2026-08-05).** Direct inspection of
+  `scripts/antares/*.py` confirms no module translates real Antares output
+  (`<tool_call>` tags carrying `name`/`arguments`) into the internal
+  `{"tool": ..., "payload": ...}` schema the harness consumes. `T2a` assigned
+  that layer to `T2c`; `T2c-1` (subprocess lifecycle/isolation) and `T2c-2`
+  (aggregate budgets/teardown) neither scoped nor implemented it, and
+  `replay_fixtures.py` builds the internal schema directly, so the whole
+  `T2a`-`T2e` stack was validated against the assumed schema and never against
+  live model output. `T2a`'s Reflection Pass 2 had resolved the discrepancy by
+  reasoning that the observed `name`/`arguments` shape was a generic local-runner
+  envelope rather than Antares' own protocol; Cisco's reference implementation
+  falsifies that reasoning. This does not reopen any completed task, but it
+  means the `T2` invocation path carries an unvalidated assumption that either a
+  translation layer or `docs/plan/antares-local-runtime-adoption.md` Element 3
+  must resolve before `T4` can run.
+- **Cross-plan orchestration.** Execution sequencing across this slice and the
+  local-runtime track is reconciled in
+  `docs/plan/antares-local-runtime-adoption.md` § Orchestration and cross-plan
+  dependencies. That section is authoritative for the ordering question; this
+  plan's phase list remains authoritative for the slice's own scope and gates.
+  Two consequences it records: `T4` has two unmet prerequisites (an unproven
+  runtime *and* an unresolved invocation path), and the `T3c`/`T3d` packet work
+  is invocation-independent and therefore unaffected by the Element 3 decision.
 - No roadmap update is required until T5 retains a production operating mode.
 
 ## Related documents
 
 - `docs/tasks/antares-security-specialist-advisor.md`
+- `docs/plan/antares-local-runtime-adoption.md` — local runtime path found
+  during T1 recovery (official `antares-cli` + local inference shim);
+  falsifies the T2a wire-format docstring assumption and scopes the
+  tracked follow-on for `scripts/antares/*`
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
 - `docs/policies/HITL_AUTONOMY_POLICY.md`
 - `docs/plan/gemma-push-reviewer-role.md`

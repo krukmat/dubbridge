@@ -44,6 +44,80 @@
     "purpose": "runtime-only fixture; not a production watchlist decision",
     "executed": true
   },
+  "r4_r5_ollama_run_2026_08_05": {
+    "status": "PASS",
+    "blocked_reason": null,
+    "model_id": "antares-1b",
+    "model_revision": "de41e7f0168c",
+    "quantization": "gguf-bf16",
+    "model_digest": "sha256-e1ad82cffb9f6656bd26b575f0a07e34d9868bce3783644a61c51e5fd58fceb0",
+    "license": "Apache-2.0",
+    "runtime": "ollama",
+    "runtime_version": "ollama (antares-1b:latest, 3.7GB GGUF import)",
+    "endpoint": "127.0.0.1:11434",
+    "host_arch": "arm64",
+    "host_cpu": "Apple M5",
+    "host_ram_bytes": 34359738368,
+    "artifact_digest_verified": true,
+    "cold_start_ms": 34089,
+    "peak_rss_bytes": 7298629632,
+    "swap_growth_bytes": 0,
+    "command_latencies_ms": null,
+    "command_latencies_note": "CLI does not emit per-tool-call latencies; 10s per-command timeout is enforced internally by antares-cli and both invocations completed with exit 0 / incomplete_reason null, supporting but not directly measuring threshold compliance. See docs/evaluations/antares-runtime-preflight.md R4/R5 section for the full caveat.",
+    "total_latency_ms": 123619,
+    "terminal_result": "vulnerable_files",
+    "representative_packet": {
+      "snapshot_ref": "HEAD 7a1684ca330ba3581f8361392a0bd62e9ea8d7ea (2026-08-05)",
+      "scope_paths": [
+        "apps/",
+        "crates/"
+      ],
+      "cwe_id": "CWE-20",
+      "cwe_description": "Improper Input Validation",
+      "purpose": "runtime-only fixture; not a production watchlist decision",
+      "executed": true,
+      "execution_note": "Two separate antares tool query --stdin invocations (target=apps, target=crates) combined into one evidence record; CLI accepts a single target directory per call. See md record for full deviation log."
+    },
+    "invocations": [
+      {
+        "target": "apps",
+        "exit_code": 0,
+        "incomplete_reason": null,
+        "tool_call_count": 15,
+        "failed_tool_calls": 3,
+        "duration_seconds": 33.62062712502666,
+        "wrapper_latency_ms": 34089,
+        "findings": [
+          {
+            "title": "Improper Input Validation",
+            "file_path": "api/src/ingestion_service.rs",
+            "cwe_ids": ["CWE-20"],
+            "submission_rank": 1,
+            "likelihood_of_exploit": "High"
+          }
+        ]
+      },
+      {
+        "target": "crates",
+        "exit_code": 0,
+        "incomplete_reason": null,
+        "tool_call_count": 13,
+        "failed_tool_calls": 3,
+        "duration_seconds": 89.08636650000699,
+        "wrapper_latency_ms": 89520,
+        "findings": [
+          {
+            "title": "Improper Input Validation",
+            "file_path": "config/src/lib.rs",
+            "cwe_ids": ["CWE-20"],
+            "submission_rank": 1,
+            "likelihood_of_exploit": "High"
+          }
+        ]
+      }
+    ],
+    "date_utc": "2026-08-05T22:17:00Z"
+  },
   "probes": {
     "hf_env": {
       "HF_TOKEN": "unset",

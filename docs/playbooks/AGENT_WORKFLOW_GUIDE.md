@@ -15,6 +15,47 @@ governs: "all agent-facing workflow decisions in the repository"
 
 ## Mandatory workflow before implementing
 
+0. **Local-stack precheck** — before starting any new development task
+   (RRI 0–70+), verify the local Ollama stack is healthy and the models the
+   task's band will actually invoke respond correctly under production
+   generation parameters (`think=false` where applicable, the repo's default
+   `num_predict`/`num_ctx` from `gemma_local.py`). A silent `done_reason:
+   "length"` with empty `content` (thinking-mode exhausting the token budget
+   before any visible output) is a known failure mode — catching it here
+   avoids discovering it mid-review, where it forces an avoidable fallback
+   (Gemma → D14, or `qwen3.6:27b-q4_K_M` → Gemma → D14) and burns a review
+   hop that a healthy stack would not have needed.
+   - Confirm the server process is up and listening:
+     `pgrep -fl ollama` and `lsof -iTCP:11434 -sTCP:LISTEN`. Restart
+     (`kill <pid>`; the macOS app relaunches it) only if the process is
+     absent, wedged, or the port is not listening — do not restart a
+     healthy server on every task.
+   - Warm and re-test each model this task's band will use (at minimum the
+     phase-1/phase-2 reviewer chain: `qwen3.6:27b-q4_K_M` → Gemma; add
+     `qwen3.6:35b-a3b` for RRI 26–55 local-first/ADR-038 routes) with a
+     review-style prompt at production `num_predict`/`num_ctx`, e.g.:
+     ```bash
+     curl -s http://127.0.0.1:11434/api/chat -d '{
+       "model": "<model>",
+       "messages": [{"role": "user", "content": "You are a code reviewer. Reply with ONLY a JSON object: {\"verdict\": \"PASS\", \"findings\": []}"}],
+       "stream": false,
+       "think": false,
+       "options": {"num_predict": 4096, "num_ctx": 131072}
+     }' -m 180
+     ```
+     Confirm `done_reason: "stop"` with non-empty `content`. A `"length"`
+     result with empty content on a small ping (e.g. `num_predict: 16`) is
+     usually just an undersized budget, not the real failure — retry at the
+     production `num_predict` before concluding the model is unhealthy.
+   - This precheck is informational infrastructure verification, not a
+     review gate: it does not replace, skip, or pre-decide the Band-routed
+     peer review outcome for this task, and a healthy precheck does not
+     retroactively change a prior phase's recorded result (e.g. a historical
+     D14 fallback stays as recorded even if a later precheck shows the
+     primary chain healthy again).
+   - Applies to all development tasks. Skip for docs-only, config-only,
+     migration-only, ADR, plan, task-ledger, or policy-only tasks, which
+     never invoke the local pipeline.
 1. **Analyze** — read context, dependencies, and affected files.
    - For **mobile UI / presentation tasks** under `mobile/`, also read the root
      `DESIGN.md` before planning or implementation. `DESIGN.md` governs visual

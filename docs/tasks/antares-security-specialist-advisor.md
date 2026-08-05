@@ -74,7 +74,7 @@ T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c (decomposed: T2c-1 -> T2c-2) -> T2d 
 | T3b Packet schema and hard security-exclusion guarantees | `[x] Done (owner-verified, 2026-08-02)` | 27 Moderate (execution) | M | T3a |
 | T3c Deterministic context-closure algorithm | `[~] Decomposed (2026-08-02)` | 80 High (pre-execution) | XL | T3b |
 | T3c-0 Characterization corpus and omission-reason contract | `[x] Done (owner-waived, 2026-08-02)` | 39 Moderate | M | T3b |
-| T3c-1 Deterministic dependency and manifest closure | `[ ] Open` | Recompute | TBD | T3c-0 |
+| T3c-1 Deterministic dependency and manifest closure | `[ ] Open` | 55 Med-high | L | T3c-0 |
 | T3c-2 Governing security-boundary closure | `[ ] Open` | Recompute | TBD | T3c-1 |
 | T3d Integrate T3a+T3b+T3c-2 behind touchpoint packet construction | `[ ] Open` | Recompute | TBD | T3b, T3c-2 |
 | T4 Ground-truth calibration and observe-only workflow pilot | `[ ] Open` | Recompute | TBD | T2e, T3 |
@@ -291,6 +291,10 @@ macOS ARM64 environment before investing in the harness or CI integration.
 
 - this ledger
 - `docs/plan/antares-security-specialist-advisor.md`
+- `docs/plan/antares-local-runtime-adoption.md` — the runtime path proposed to
+  close R4/R5 (see T1 recovery progress note below); sync its "Open
+  decisions" and "What's needed beyond the two elements" sections when R4/R5
+  actually close.
 
 ### Execution record (2026-07-29)
 
@@ -362,6 +366,197 @@ The external access gate in R1 is not agent-solvable: the agent cannot accept
 terms or manufacture an authorized Hugging Face credential. Once R1 is cleared,
 R2–R5 are the agent's execution responsibility and T2 remains prohibited until
 the regenerated T1 evidence has `status: PASS`.
+
+### T1 recovery progress note (2026-08-05)
+
+`docs/plan/antares-local-runtime-adoption.md` documents a runtime path found
+during a later session's attempt to advance this recovery plan: adopting
+Cisco's own official `antares-cli` reference implementation (bundled inside
+the gated model repository) against a small local inference shim, instead of
+hand-building a wire-format parser against an unobserved model output shape.
+
+Progress against the R1-R5 table above, made outside this ledger's original
+2026-07-29 execution record:
+
+- R1: resolved in that session using a user-supplied, since-superseded
+  Hugging Face token. **That token is exposed in that session's conversation
+  history and must be treated as compromised regardless of later
+  revocation** — see the linked plan's Background section.
+- R2: resolved — a disposable Python 3.12 venv confirmed Apple Silicon MPS
+  availability (`torch.backends.mps.is_available() -> True`).
+- R3: substantially advanced — the pinned revision
+  (`10417eb35641b32e7141157db19c76eb545193b6`) was downloaded and a SHA-256
+  manifest of the top-level artifact files was generated; no externally
+  published second-source digest has been cross-checked yet.
+- R4/R5: not started. The linked plan's Element 1 (local inference shim,
+  personal/untracked) and Element 2 (official `antares-cli` install +
+  profile, personal/untracked) are the intended path to closing them, but
+  neither element has been implemented yet.
+
+This note does not change T1's recorded execution result or `status:
+BLOCKED (owner-waived)` above; it records where the recovery attempt stands
+and points to the plan that would close R4/R5 if pursued. Implementing
+Elements 1-2 is personal, ungoverned tooling per that plan and needs no task
+card; only the downstream `scripts/antares/*` reconciliation (that plan's
+Element 3) is tracked and would need its own RRI, task card, and approval.
+
+### T1 task revision (2026-08-05): Ollama/GGUF runtime proposal — approved 2026-08-05
+
+**Approval.** Approved by the user/owner on 2026-08-05 following presentation
+of the Compact Approval Task Card v2 for `T1-REVISION`. Ollama-served GGUF
+`antares-1b` is now an authorized T1 runtime provenance, alongside (not
+replacing) the R2 Transformers+PyTorch route. `docs/plan/antares-local-runtime-adoption.md`
+Design decisions #2 and #4 and its Element 1/Element 2 sections were updated
+in the same pass to reflect the implemented Ollama-backed state. This does
+not change T1's recorded `status: BLOCKED (owner-waived)` or its original
+2026-07-29 execution record — R4/R5 (the fixed representative fixture run)
+remain not started and are the next step this revision unblocks.
+
+**Trigger.** The R1-R5 table above and the prose immediately following it
+forbid substituting Ollama for the R2-authorized Transformers+PyTorch route
+"without an explicit task revision with new provenance and RRI." A later
+session in this recovery attempt built and validated an Ollama-backed path
+before locating that clause. This subsection is that revision.
+
+**RRI:**
+
+```
+python3 scripts/rri.py --touches docs/tasks/antares-security-specialist-advisor.md \
+  --touches docs/plan/antares-local-runtime-adoption.md \
+  --C 0 --D 3 --K 2 --P 1 --T 1 --A 0 --X 1 --penalty arch_decision
+```
+
+Final RRI: **34 → band Moderate (26-40)**. Effort M. Codex/Claude Balanced
+tier, thinking off. Decomposition not triggered. Penalty applied:
+`arch_decision` (+12) — this revision changes the authorized inference
+runtime, an architecture decision, not just an implementation detail.
+Dominant drivers: D=3 (touches a governance-boundary clause and the plan's
+own Design decision #4, which explicitly reasoned about avoiding this exact
+substitution), K=2 (couples the ledger and the satellite plan), P=1.
+
+**Proposed new provenance (replaces the R2 Transformers+PyTorch-only route
+for T1 closure purposes, does not delete it as a documented alternative):**
+
+- Source checkpoint: same as R3 — `fdtn-ai/antares-1b`, pinned revision
+  `10417eb35641b32e7141157db19c76eb545193b6`, SHA-256 manifest already on
+  disk per R3.
+- Conversion: `convert_hf_to_gguf.py` from a shallow clone of
+  `ggml-org/llama.cpp` (upstream PR #13550, "Granite Four"). Verified by
+  direct source read of `conversion/granite.py`: `GraniteMoeHybridForCausalLM`
+  is explicitly registered (`GraniteHybridModel(Mamba2Model, GraniteMoeModel)`,
+  `MODEL_ARCH.GRANITE_HYBRID`). Because every one of antares-1b's 40 layers
+  is typed `"attention"` in `layer_types` (zero real Mamba/SSM layers), the
+  same source shows the converter falls back to plain `GRANITE_MOE`/`GRANITE`
+  at conversion time — this is a standard, already-supported architecture
+  path, not a novel one. Conversion ran end-to-end: 3.67GB bf16 GGUF, 363
+  tensors.
+- Serving: `ollama create antares-1b -f Modelfile` (`FROM ./antares-1b.gguf`)
+  → `antares-1b:latest`, confirmed via `ollama list`. Ollama exposes a native
+  OpenAI-compatible `POST /v1/completions` SSE endpoint matching
+  `antares_cli`'s `RemoteInferenceBackend` wire contract exactly — no custom
+  shim code required (the previously-built `server.py` FastAPI shim was
+  deleted).
+- Client: official `antares-cli` (Apache-2.0, Cisco reference implementation)
+  installed via `uv tool install .`, configured through a new
+  `~/.antares/profiles.toml` profile `antares-local`
+  (`backend = "remote"`, `endpoint = "http://127.0.0.1:11434/v1/completions"`).
+  This profile and the Ollama model are personal/untracked host state, same
+  boundary as the plan's Design decision #5.
+
+**Validation evidence (ad hoc, not the R4/R5 fixed fixture):**
+`antares tool query --stdin` against `/Users/matias/dubbridge/crates/auth`
+with `CWE-287` completed in ~11.8s, 0 generation errors, 5 tool calls (2
+failed and retried within budget), and returned a genuine finding
+(`Improper Authentication`, `src/issuer.rs`, `CWE-287`, submission rank 1).
+Full JSON: `/tmp/antares-query-result.json` (not committed — host-local
+scratch path). This proves the pipeline end-to-end against real repository
+code; it does not satisfy T1's R4/R5 acceptance criteria, which require the
+specific fixed `HEAD` / `apps/`+`crates/` / `CWE-20` fixture with recorded
+cold-start, latency, peak-RSS, and swap-growth thresholds.
+
+**What approval would change:**
+1. `docs/plan/antares-local-runtime-adoption.md` Design decision #2 (shim
+   rationale) — superseded, needs rewrite to describe the Ollama path instead.
+2. Design decision #4 (governance-boundary claim) — currently states the
+   plan avoids triggering this exact clause by staying on Transformers+PyTorch;
+   that claim is now false and must be replaced with a pointer to this
+   revision as the clause's satisfaction, not its avoidance.
+3. Element 1/Element 2 sections — update to the actual implemented state
+   (no shim server; profile name `antares-local`, not `local-antares`;
+   endpoint port `11434`, not `8000`).
+4. R4/R5 may then be closed by running the fixed representative fixture
+   through the Ollama-backed pipeline instead of remaining blocked on gated
+   Transformers+PyTorch access.
+
+**Approval checkpoint.** This is an RRI 34 (Moderate) architecture-decision
+revision. Per `docs/policies/HITL_AUTONOMY_POLICY.md` and
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md`, it requires explicit human approval
+before any of the four changes above are made. It is docs-only (no code), so
+phase-1/phase-2 peer review and Reflection passes do not apply; the human
+approval gate does.
+
+Execution has not started. Approve this task to proceed.
+
+### T1 R4/R5 execution record — Ollama runtime (2026-08-05)
+
+**Trigger.** The T1 task revision above was approved 2026-08-05, authorizing
+the Ollama-served GGUF `antares-1b` as a T1 runtime provenance. This record
+closes the R4/R5 gap the original 2026-07-29 execution left open (fixed
+representative fixture not executed under any proven runtime).
+
+**Result:** `PASS`. Full evidence:
+`docs/evaluations/antares-runtime-preflight.md` (§ "R4/R5 execution record —
+Ollama runtime (2026-08-05)") and
+`docs/evaluations/antares-runtime-preflight.json`
+(`r4_r5_ollama_run_2026_08_05` key).
+
+**Fixture as executed.** The fixed packet (`HEAD` snapshot, `apps/`+`crates/`
+tree, `CWE-20`) was run as two separate `antares tool query --stdin`
+invocations — one per tracked root — because the CLI's stdin contract accepts
+only a single `target` directory per call (confirmed by reading
+`.antares-runtime/antares-cli-reference/src/antares_cli/commands/tool.py`),
+not a multi-path scope list. This is a self-directed interpretation of "one
+repository-snapshot run" adapted to a CLI constraint the original spec did
+not anticipate; it has not been separately re-confirmed with the owner and is
+flagged here for visibility.
+
+**Threshold results:**
+
+| Threshold | Required | Observed | Result |
+|---|---|---|---|
+| Cold start | `<= 300s` | ~34s | PASS |
+| Per-command latency | `<= 10s` each | not directly measured; CLI enforces a 10s internal timeout and both runs exited `0`/`incomplete_reason: null` | PASS by inference, not direct measurement |
+| Total latency | `<= 900s` | 123,619 ms (~123.6s) | PASS |
+| Peak RSS | `<= 24 GiB` | ~6.80 GiB | PASS |
+| Swap growth | `<= 1 GiB` | 0 (net decrease) | PASS |
+
+Both invocations terminated as `vulnerable_files` with genuine findings
+(`api/src/ingestion_service.rs` and `config/src/lib.rs`, both `CWE-20`, High
+likelihood) — a valid terminal result per R4/R5's acceptance criteria (either
+`vulnerable_files` or `no_vulnerability_found` with exit 0 satisfies it).
+
+**Caveat.** The `antares-cli` tool does not emit per-tool-call latencies in
+its JSON output, only aggregate `duration_seconds`. The per-command `<=10s`
+threshold is therefore supported indirectly (internal CLI enforcement + clean
+exit) rather than directly measured and certified per call. This is recorded
+as a transparency gap in the evidence files, not treated as a threshold
+failure.
+
+**Disposition.** T1's original `status: BLOCKED (owner-waived)` and its
+2026-07-29 execution record are unchanged — that record stands as the
+technical result under the Transformers+PyTorch route. This section records
+the separate, later-authorized Ollama route's fixture execution as a
+technical `PASS`, closing R4/R5.
+
+**Status artifacts synced in this pass:**
+- `docs/evaluations/antares-runtime-preflight.md` — new dated section added.
+- `docs/evaluations/antares-runtime-preflight.json` — new
+  `r4_r5_ollama_run_2026_08_05` key added.
+
+**Still open (not part of this record):** `docs/plan/antares-local-runtime-adoption.md`'s
+"Open decisions" / "What's needed beyond the two elements" sections still
+need to be synced to reflect R4/R5's closure, per the task's own "Status
+artifacts affected" note above.
 
 ## T2 - Sandboxed agentic harness and artifact schema
 
@@ -673,6 +868,44 @@ Full suite: `python3 -m pytest scripts/antares/tool_call_parser_test.py scripts/
   approved Compact Approval Task Card v2 for T2a; no separate phase-1 review
   was re-run for this already-approved subtask.
 - Code-solution review: qwen3.6:27b-q4_K_M docs/audit/gemma-evidence/antares-t2a.json - PASS
+
+### Post-hoc correction notice (2026-08-05)
+
+T2a's status stays `[x] Done`; its acceptance criteria and unit evidence are
+unchanged. This notice records that one piece of its Reflection reasoning has
+since been falsified by external evidence, so no later reader treats it as
+settled.
+
+Reflection Pass 1 flagged that the internal schema
+(`{"tool": ..., "payload": ...}`) was an assumption rather than an observed
+Antares wire format, and that the bounded local-session transcript showed a
+different shape (`{"function": {"name": ..., "arguments": ...}}`). Pass 2
+resolved the discrepancy by reasoning that the observed shape was the generic
+local-runner function-calling envelope, not Antares' own text-embedded
+`<tool_call>` protocol.
+
+Cisco's official `antares-cli` reference implementation — shipped inside the
+gated model repository and read in full on 2026-08-05 — shows that Antares'
+real protocol reads `args`/`arguments` for the argument object and
+`tool`/`name` for the tool name, inside `<tool_call>` tags
+(`agent/streaming.py`, `agent/model_adapter.py`). The `payload` key was never
+correct.
+
+Two related facts, verified the same day:
+
+- The translation layer this task's own docstring assigned to T2c does not
+  exist anywhere in `scripts/antares/`. T2c was decomposed into T2c-1
+  (subprocess lifecycle and isolation) and T2c-2 (aggregate budgets and
+  teardown); neither scoped it.
+- `scripts/antares/replay_fixtures.py::_msg()` constructs the internal schema
+  directly, so T2e's composed-harness tests — and every test downstream of
+  them — exercised the assumption, not live model output.
+
+Resolution is deferred to an explicit decision, not patched here: either a
+translation layer is written, or the invocation path is replaced per
+`docs/plan/antares-local-runtime-adoption.md` Element 3. See that plan's
+§ Orchestration and cross-plan dependencies for the sequencing and the
+evidence required to choose. T4 must not run until it is resolved.
 
 ## T2b - Command allowlist and canonical path containment
 
@@ -2844,6 +3077,174 @@ Code-solution review: `qwen3.6:27b-q4_K_M` `docs/audit/gemma-evidence/antares-t3
   task-local tests, and the remaining contract disagreement over the reserved
   `__seed__` sentinel.
 - Commands run: `python3 -m unittest scripts/antares/packet_schema_test.py scripts/antares/context_closure_characterization_test.py -v`; `make qa-docs`
+
+## T3c-1 - Deterministic dependency and manifest closure
+
+- **Status:** `[ ] Open`
+- **Type:** development / repository-analysis policy
+- **Pre-execution RRI:** 55 Med-high
+- **Effort:** L
+- **RRI artifact:** `docs/audit/antares-t3c-1-rri.md`
+- **Depends on:** T3c-0 (`[x] Done`, owner-waived 2026-08-02)
+- **Decomposed from:** T3c
+
+### Objective
+
+Given an explicit snapshot root and canonical changed paths, compute a deterministic,
+deduplicated closure of direct local Rust/Python source dependencies and relevant
+local manifests. The result must be bounded, reproducible, and canonical
+snapshot-relative POSIX paths. This task does not resolve governing security
+boundaries (T3c-2) or integrate packet construction (T3d). The root is caller-
+supplied and is never inferred from the current working directory, a manifest, or
+an import.
+
+### Scope and boundaries
+
+- Allowed implementation/test surface: `scripts/antares/context_closure.py`,
+  `scripts/antares/context_closure_test.py`, and the dedicated fixture tree
+  `scripts/antares/testdata/context_closure_dependency_manifest/**`.
+- Status synchronization may update this ledger, the slice plan, and the RRI
+  artifact only. The frozen T3c-0 corpus and `packet_schema.py` are read-only.
+- Resolution is local to the declared snapshot. No ambient repository scan,
+  package cache/index, Cargo/pip resolution, subprocess, or network access is
+  permitted.
+
+### Happy paths considered
+
+- **HP-1:** Rust source seeds follow only explicit local `mod name;` edges. An
+  entrypoint (`lib.rs`, `main.rs`, explicit manifest path, or conventional
+  `src/bin/<name>.rs`/`src/bin/<name>/main.rs`) maps from its containing directory;
+  other `foo.rs`/`foo/mod.rs` files map from sibling directory `foo/`, trying
+  `<parent>/<name>.rs` then `<parent>/<name>/mod.rs`. Ancestor manifests are
+  context-only for source seeds. A package `Cargo.toml` seed or path-dependency
+  target manifest additionally follows direct local `[dependencies]` path entries
+  and selected entrypoints. Rust `use` statements never create filesystem edges.
+- **HP-2:** Python imports use fixed local mapping: `a.b.c` checks
+  `<root>/a/b/c.py`, then `<root>/a/b/c/__init__.py`; `from a.b import x`
+  resolves only `a.b`; `from . import name` resolves each named module, while
+  `from .sub import x` resolves only `.sub`; relative levels ascend from the
+  importing package under the exact snapshot root. Absolute imports are local only
+  for an existing top-level module/package with `__init__.py`; plain directories,
+  stdlib, and third-party imports are external.
+- **HP-3:** Equivalent seed permutations produce byte-for-byte equivalent output;
+  duplicate paths are emitted once, changed seeds remain identifiable, and all
+  canonical snapshot-relative POSIX paths are sorted with Python `sorted()`.
+
+### Edge cases considered
+
+- **EC-1:** Empty seeds return zero derived entries plus exactly the frozen
+  `path="__seed__"`, `reason="context_closure_no_seed"` omission and never scan
+  the repository.
+- **EC-2:** An unsupported seed/dependency file type produces the frozen
+  `context_closure_unsupported_file_type` omission. A non-allowlisted file is not
+  classified as a manifest; EC-2 applies only when that file is encountered as a
+  candidate path.
+- **EC-3:** A configured expansion limit counts only canonical source paths popped
+  from the sorted pending queue, including changed seeds. Manifests and candidate
+  canonicalization cost zero. On exhaustion, stop before the next pop and emit one
+  omission for the lexicographically first pending source. Manifest ancestor walks
+  and path-dependency entrypoint discovery happen immediately when candidates are
+  accepted, before source-budget consumption.
+- **EC-4:** A candidate that escapes the snapshot produces the existing absolute
+  path `path_outside_snapshot` soft omission.
+- **EC-5:** A missing/ambiguous local edge, missing non-empty seed, malformed
+  allowlisted manifest, or invalid manifest encoding raises the typed
+  `ContextClosureResolutionError` with canonical seed/reference details. No result,
+  partial closure, or fabricated omission is returned. Local means an explicit
+  relative Python import, Rust `mod`, Rust path dependency, or already-classified
+  in-snapshot target; unclassified external imports are ignored. T3d must catch
+  this exact terminal result and emit degraded/failed construction without a
+  partial packet; the frozen T3c-0 omission vocabulary is unchanged.
+- **EC-6:** Circular Rust/Python graphs use a visited canonical-path set, expand
+  each path at most once, and remain deterministic. Every encountered edge is
+  resolved before a visited back-edge is ignored; an unresolved local edge still
+  triggers EC-5.
+- **EC-7:** Manifest discovery walks from each containing directory to the
+  snapshot root, inclusive, and allowlists only `Cargo.toml`, `Cargo.lock`,
+  `pyproject.toml`, `setup.py`, `setup.cfg`, or the case-sensitive basename
+  regex `^requirements(?:-[A-Za-z0-9_.-]+)?\\.txt$`. No siblings/descendants are
+  included. All matching manifests are context entries once and sorted. Only the
+  nearest ancestor package `Cargo.toml` follows direct `[dependencies]` path
+  entries; dev/build/target/workspace forms are context-only. Targets must
+  directly contain a package `Cargo.toml` (no upward search). Entrypoints are
+  explicit `[lib].path` or `src/lib.rs`; explicit `[[bin]]` paths are followed,
+  while omitted bin paths require a name and use `src/bin/<name>.rs` then
+  `src/bin/<name>/main.rs`, with both/neither an EC-5. Without explicit bins,
+  `src/main.rs` and conventional `src/bin/*` roots are selected only when
+  `autobins` is not `false`; `autobins=false` disables both. Explicit bins exclude
+  automatic bins. Examples, tests, and benches are not entrypoints. Selected
+  entrypoints are enqueued only for a package manifest seed or path-dependency
+  target manifest, not for an ordinary Rust source seed. Workspace-only/empty
+  Cargo manifests and lockfiles are context-only no-ops.
+- **EC-8:** Path identity/order is canonical snapshot-relative POSIX, case-
+  sensitive, locale-independent, with no case folding or normalization; symlink
+  escapes remain `path_outside_snapshot` omissions.
+- **EC-9:** Python relative imports are always local. If the source has no
+  ancestor package directory with an `__init__.py`, or the relative walk leaves
+  the snapshot root or ascends above the topmost package ancestor, EC-5 applies.
+  Missing targets or both `.py` and `__init__.py` candidates existing also trigger
+  EC-5. Absolute imports are local only under the fixed top-level rule; unresolved
+  standard-library or third-party imports are external and are not failures.
+- **EC-10:** `Cargo.toml`, `Cargo.lock`, and `pyproject.toml` use strict TOML
+  parsing; `setup.cfg` uses strict INI parsing; `requirements*.txt` is UTF-8
+  decoded as opaque lines; `setup.py` is UTF-8 decoded only and never executed.
+  NUL, decoding, and parser errors are EC-5. Manifest contents never trigger
+  package or network resolution.
+
+### Acceptance criteria
+
+- Implement the closure only in the allowed module/test surface and dedicated
+  dependency/manifest fixture tree; do not modify `packet_schema.py` or the frozen
+  T3c-0 characterization corpus.
+- Add unit/characterization tests covering every HP/EC case above, including seed
+  permutation equivalence, cycles, module precedence, Python `from` semantics,
+  Cargo entrypoints/path dependencies, manifest allowlist/format failures, and
+  the exact EC-5 no-partial-output contract.
+- Preserve the exact T3c-0 omission literals and the T3b containment/reporting
+  rule. Do not introduce a new omission reason for EC-5.
+- Prove local-only behavior by replacing the network primitive with a failing
+  sentinel and verifying that closure never invokes it.
+- Keep traversal bounded and deterministic, with no ambient whole-repository scan,
+  package-cache lookup, network access, or governing-boundary resolution.
+
+### Evidence to emit
+
+- Task-local unit/characterization test output for all HP/EC cases.
+- Dedicated Rust/Python dependency and manifest fixtures, including a valid empty
+  manifest, malformed allowlisted manifest, cycle, missing local edge, and an
+  unallowlisted candidate file.
+- `docs/audit/antares-t3c-1-rri.md` and phase-1/phase-2 review artifacts.
+- Reflection log, unit coverage certification, and owner final verification at
+  closure.
+
+### Status artifacts affected
+
+- This task ledger.
+- `docs/plan/antares-security-specialist-advisor.md`.
+- `docs/audit/antares-t3c-1-rri.md`.
+- Any downstream T3c-2/T3d blocker text that names T3c-1 state.
+
+### Implementation route
+
+RRI 55 is Med-high. After explicit approval, apply ADR-038: Qwen27 advisory
+refinement (`GO_LOCAL`/`CLOUD_REQUIRED`) followed by a hash-bound route receipt.
+Only `GO_LOCAL` permits one `qwen3.6:35b-a3b` session (maximum 8 turns, 300
+seconds, zero repairs) under `run_med_high_task.py`; otherwise escalate to
+Codex/Claude with the complete evidence bundle. The primary agent owns scope,
+verification, Reflection, review disposition, and status synchronization.
+
+### Task-analysis review (phase 1)
+
+- Reviewer: `d14` (final fallback after the qwen3.6:27b-q4_K_M and Gemma
+  responses were unusable after bounded retries).
+- Review artifact: `.agent/peer-task-review-antares-t3c-1-phase1-d14.json`
+- Verdict: `PASS` — the task contract is bounded, deterministic, fail-closed for
+  local resolution errors, and ready for presentation; the advisory workspace
+  manifest concern is resolved by the nearest-package-manifest rule above.
+
+Task-analysis review: d14 .agent/peer-task-review-antares-t3c-1-phase1-d14.json - PASS
+
+Execution remains unauthorized until the user gives explicit approval.
 
 ## T3a - Versioned CWE watchlist
 

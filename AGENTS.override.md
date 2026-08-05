@@ -63,6 +63,29 @@ skip the full approval card under the Low-band route.
 `Evidence to emit` and `Status artifacts to sync` remain part of the execution
 contract; summarize them in the card and keep their full paths in the task ledger.
 
+## Live per-task todo list (Claude Code and Codex)
+
+Block 3 (`Agent workflow`) is a frozen snapshot taken at presentation time.
+Every orchestrator — Claude Code and Codex alike — must additionally keep a
+**live, per-task todo/checklist** that mirrors block 3's rows and stays
+current as the task actually moves through phases: seed it before
+implementation starts, keep normally one entry `in_progress` at a time, flip
+an entry to `completed` only once that phase's own gate has passed, and keep
+a `BLOCKED` or escalated entry visible (never silently dropped) until it is
+resolved, user-waived, or reported blocked. If a phase reroutes mid-task
+(local implementer escalates to cloud, a reviewer falls back down its chain),
+update that entry's named responsible agent/model to the actual participant.
+
+Use whichever native mechanism the orchestrator has — Claude Code's
+`TodoWrite` tool, Codex's own plan/task tracking — as long as it renders an
+equivalent visible list naming the resolved responsible agent per phase, not
+a generic role label. This list is a transparency/tracking artifact, not an
+approval or review gate: an entry marked `completed` still requires that
+phase's own evidence to exist. RRI 0–25 and docs/config/migration/ADR/plan/
+task-ledger/policy-only tasks use the reduced phase set defined in
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Live per-task phase todo list`,
+which is authoritative for the full contract.
+
 ## Complexity And Model Guidance
 
 **When RRI has been computed**, the `Complexity` field in the task presentation must
@@ -211,6 +234,47 @@ governs: "all agent-facing workflow decisions in the repository"
 
 ## Mandatory workflow before implementing
 
+0. **Local-stack precheck** — before starting any new development task
+   (RRI 0–70+), verify the local Ollama stack is healthy and the models the
+   task's band will actually invoke respond correctly under production
+   generation parameters (`think=false` where applicable, the repo's default
+   `num_predict`/`num_ctx` from `gemma_local.py`). A silent `done_reason:
+   "length"` with empty `content` (thinking-mode exhausting the token budget
+   before any visible output) is a known failure mode — catching it here
+   avoids discovering it mid-review, where it forces an avoidable fallback
+   (Gemma → D14, or `qwen3.6:27b-q4_K_M` → Gemma → D14) and burns a review
+   hop that a healthy stack would not have needed.
+   - Confirm the server process is up and listening:
+     `pgrep -fl ollama` and `lsof -iTCP:11434 -sTCP:LISTEN`. Restart
+     (`kill <pid>`; the macOS app relaunches it) only if the process is
+     absent, wedged, or the port is not listening — do not restart a
+     healthy server on every task.
+   - Warm and re-test each model this task's band will use (at minimum the
+     phase-1/phase-2 reviewer chain: `qwen3.6:27b-q4_K_M` → Gemma; add
+     `qwen3.6:35b-a3b` for RRI 26–55 local-first/ADR-038 routes) with a
+     review-style prompt at production `num_predict`/`num_ctx`, e.g.:
+     ```bash
+     curl -s http://127.0.0.1:11434/api/chat -d '{
+       "model": "<model>",
+       "messages": [{"role": "user", "content": "You are a code reviewer. Reply with ONLY a JSON object: {\"verdict\": \"PASS\", \"findings\": []}"}],
+       "stream": false,
+       "think": false,
+       "options": {"num_predict": 4096, "num_ctx": 131072}
+     }' -m 180
+     ```
+     Confirm `done_reason: "stop"` with non-empty `content`. A `"length"`
+     result with empty content on a small ping (e.g. `num_predict: 16`) is
+     usually just an undersized budget, not the real failure — retry at the
+     production `num_predict` before concluding the model is unhealthy.
+   - This precheck is informational infrastructure verification, not a
+     review gate: it does not replace, skip, or pre-decide the Band-routed
+     peer review outcome for this task, and a healthy precheck does not
+     retroactively change a prior phase's recorded result (e.g. a historical
+     D14 fallback stays as recorded even if a later precheck shows the
+     primary chain healthy again).
+   - Applies to all development tasks. Skip for docs-only, config-only,
+     migration-only, ADR, plan, task-ledger, or policy-only tasks, which
+     never invoke the local pipeline.
 1. **Analyze** — read context, dependencies, and affected files.
    - For **mobile UI / presentation tasks** under `mobile/`, also read the root
      `DESIGN.md` before planning or implementation. `DESIGN.md` governs visual
@@ -392,6 +456,61 @@ Required completion format for development tasks:
 - Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
 - Commands run: `<exact test commands>`
 ```
+
+## Live per-task phase todo list
+
+Every orchestrator (Claude Code, Codex, or any other primary agent acting as
+orchestrator of record) must keep a **live, per-task todo/checklist** that
+mirrors the Compact Approval Task Card's `Agent workflow` block (block 3) and
+stays current as the task actually moves through phases. Block 3 is a frozen
+snapshot taken at presentation time; this checklist is the running tracker
+during execution — it is not satisfied by showing the card once and moving on.
+
+**Mechanism (tool-agnostic).** Use whichever native checklist/plan mechanism
+the orchestrator has — Claude Code uses its `TodoWrite` tool; Codex uses its
+own plan/task-tracking mechanism. Both must render an equivalent visible list:
+one entry per applicable phase, each entry naming the **resolved responsible
+agent/model** for that phase (not a generic role label such as "reviewer"),
+and a status of `pending`, `in_progress`, `blocked`, or `completed`.
+
+**Phase set by band:**
+
+- **RRI 26+ (Moderate through Complex+):** one entry per row of the approval
+  card's `Agent workflow` table — Analyze/scope, Phase 1 review, Approval,
+  Implement, Reflect and verify, Phase 2 review, Close.
+- **RRI 0–25 (Low):** a reduced list matching the phases that actually apply —
+  e.g. Analyze, Gemma/D14 review, Implement (primary agent or Gemma
+  Developer), Close.
+- **Docs-only, config-only, migration-only, ADR, plan, task-ledger, or
+  policy-only tasks:** a minimal list (1–3 entries) is sufficient; a
+  genuinely single-step task may skip the list entirely, matching the
+  existing phase-1-review and Reflection exemptions for this task class.
+
+**Update discipline:**
+
+- Seed the list before implementation starts — immediately after the task is
+  presented and approved (RRI 26+), or immediately before direct execution
+  (RRI 0–25).
+- Normally exactly one phase entry is `in_progress` at a time.
+- Flip an entry to `completed` only when that phase's own gate has actually
+  passed (for example, do not mark "Phase 1 review" `completed` before the
+  reviewer's verdict is `PASS`).
+- A `BLOCKED` review verdict, a failed acceptance run, or an escalation keeps
+  the corresponding entry `blocked` — never silently `completed` or dropped —
+  until it is resolved, explicitly user-waived, or reported blocked.
+- When a task reroutes mid-flight (a local implementer fails and escalates to
+  cloud, a Med-high gate resolves `CLOUD_REQUIRED`, a reviewer falls back down
+  its chain), update the affected entry's responsible agent/model to the
+  actual resolved participant. Do not leave a pre-escalation name in place.
+
+**Authority boundary.** The live todo list is a transparency and tracking
+artifact, not a new approval or review gate. It does not replace the HITL
+approval checkpoint, the band-routed review chain, the Reflection log, or any
+other closure gate defined elsewhere in this guide. An entry marked
+`completed` still requires that phase's own evidence (review artifact,
+Reflection log, unit coverage certification, owner verification, etc.) — the
+checklist records that the step happened, it does not certify that it
+happened correctly.
 
 ## ADR change propagation
 
@@ -966,6 +1085,19 @@ tunes the fixed prompt/contract overhead the derivation reserves. Only code path
 Gemma actually receives are counted; docs, config, and markdown are excluded,
 mirroring the `qa-gemma-review` packet filter.
 
+`REVIEW_PATHS` (empty by default — no behavior change) is a shared, opt-in
+Makefile variable that scopes the diff itself, applied identically by
+`qa-gemma-review`, `qa-peer-workflow-review`, and `qa-review-budget`. Unlike
+the line-count budget above, this addresses a different failure mode: a
+`git diff`-based gate with no pathspec reviews the *entire working tree*, not
+just the task at hand. If another task's uncommitted changes coexist in the
+same checkout, the packet mixes both tasks' diffs — a reviewer's findings can
+then land entirely on the unrelated task's files while the actual reviewed
+change goes unchecked (or vice versa), with nothing in the gate itself
+surfacing the mismatch. Set `REVIEW_PATHS` to the task's own touched paths
+before invoking any of these three targets whenever the working tree holds
+more than one task's uncommitted work.
+
 **Non-Gemma agents are responsible for staying inside this budget.** When a
 change is too large, the delivering agent must split it into smaller delegation
 units. If the change is genuinely irreducible (mechanical rename, atomic
@@ -1273,6 +1405,54 @@ independently verify every claim against repository evidence before
 authoring any canonical document. Full procedure, task cards, and
 operational evidence: `docs/tasks/adr037-local-architect-direct-project.md`;
 `docs/evaluations/adr037-direct-project-report.md`.
+
+## Antares Security-Specialist Advisor
+
+The **Antares Security-Specialist Advisor workflow** is a bounded, read-only,
+advisory-only security aid. The primary agent or human security specialist owns
+the security judgment; Antares is only a CWE-directed repository-level
+vulnerability-localization sub-tool inside that workflow.
+
+Antares requires a justified **CWE identifier plus its generic category
+description** and an existing repository snapshot. Its output is limited to a
+ranked list of candidate source files and the terminal exploration trace. It does
+not choose the CWE, threat-model the task, explain why a candidate is vulnerable,
+recommend tests or remediation, or produce an RRI proposal.
+
+When the active slice explicitly enables the role, the primary security advisor
+may invoke it at three optional touchpoints:
+
+- refinement, against the existing baseline snapshot after the advisor or human
+  has documented a task-relevant CWE hypothesis;
+- post-implementation analysis, against the candidate snapshot as supplemental
+  triage that is separate from the reviewer-of-record verdict and closure gate;
+- post-CI observation, against the exact completed revision.
+
+If no justified CWE exists, the touchpoint is skipped and the reason is recorded;
+Antares must never invent a generic sweep merely to satisfy workflow ceremony.
+
+### Authority boundary
+
+- Antares may emit ranked candidate files and exploration evidence only. The
+  primary agent or human specialist independently verifies repository claims and
+  owns threat surfaces, security rationale, tests, remediation, and follow-up.
+- Antares-1B's reported File F1 `0.209` is a macro-average of task-level benchmark
+  scores and signals substantial localization uncertainty; it is not a verdict or
+  a per-output correctness probability.
+- Antares may not compute the canonical RRI, approve or block a task, satisfy
+  the HITL approval gate, replace the band-routed reviewer of record, merge,
+  close, or autonomously remediate a change.
+- Every material Antares candidate requires a durable human disposition recorded
+  by the primary agent or named owner (`accepted-now`, `accepted-follow-up`,
+  `rejected`, or `needs-human-security-review`).
+- The primary agent must independently verify any repository claim cited from
+  Antares output before propagating it into a canonical plan, task, policy, or
+  closure record.
+- Production workflow touchpoints remain disabled until the runtime preflight,
+  sandboxed harness, ground-truth calibration, and observe-only pilot in
+  `docs/tasks/antares-security-specialist-advisor.md` are completed and the owner
+  records a promote or narrow decision. Approved evaluation tasks may invoke the
+  sandboxed pilot; planning this role alone does not activate it.
 
 ## Push Reviewer
 

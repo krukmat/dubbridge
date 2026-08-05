@@ -18,6 +18,7 @@ __pycache__/
 .agent/
 .serena/*
 !.serena/project.yml
+.antares-runtime/
 .claude/*
 logs/gemma-audit/
 logs/local-bench/
