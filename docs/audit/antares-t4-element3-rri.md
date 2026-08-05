@@ -199,6 +199,41 @@ Independent of Subtask A/B — can run in parallel or first.
 - Scope check: no `scripts/antares/*.py` file touched — confirmed by `git diff --stat` showing only `docs/plan/antares-local-runtime-adoption.md`.
 - Result: **Subtask A closed.** Subtask B remains blocked on its own rescore + approval; Subtask C remains blocked on its own approval.
 
+## Subtask C — closure record
+
+- Approved by user 2026-08-05 ("aprobado").
+- Task-analysis review: `n/a - docs-only/task-ledger-only exemption` (RRI 18
+  Low, docs-only disposition-sync work; exempt per
+  `docs/policies/HITL_AUTONOMY_POLICY.md` and
+  `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Band-routed peer review phase-1
+  exemptions).
+- Implementation: primary agent (Claude Code), direct authorship — per
+  `docs/policies/HITL_AUTONOMY_POLICY.md` § "Local delegation (RRI 0-25)":
+  "Docs, plans, task ledgers, ADRs, policies, workflow scripts, and other
+  structure-heavy or interpretation-heavy work must stay with the primary
+  agent even when the RRI is Low." Not delegated to Gemma.
+- Change: `docs/tasks/antares-security-specialist-advisor.md` — added a
+  "Disposition note (2026-08-05)" subsection under T2e stating the harness
+  validates internal-schema composition only, not live Antares wire-format
+  compatibility, cross-referencing T2a's existing 2026-08-05 post-hoc
+  correction notice and this artifact's own "T2a–T2e disposition" /
+  "Subtask A" sections; updated the task-summary table rows for T2a and T2e
+  with an inline pointer to the same disposition.
+- `replay_fixtures.py` / `harness_test.py` docstrings: inspected, not
+  changed — `replay_fixtures.py`'s docstring is already schema-neutral (no
+  live-invocation claim); `harness_test.py` has no module docstring to
+  correct. Per this Subtask's own scope ("touched only if their module
+  docstrings need the same clarification"), no code change was required.
+- Code-solution review: `n/a - docs-only/task-ledger-only exemption` (same
+  basis as task-analysis review above).
+- `make qa-okf-frontmatter` and `make qa-docs`: both passed post-change.
+- Scope check: `git diff --stat` confirmed only
+  `docs/tasks/antares-security-specialist-advisor.md` changed (34
+  insertions, 2 deletions) — no `scripts/antares/*.py` file touched.
+- Result: **Subtask C closed.** All three Element 3 subtasks are now
+  either closed (A, C) or explicitly blocked pending their own gate
+  (B — rescore + approval against the resolved diff).
+
 ## Split-target check
 
 Per `docs/policies/RRI_POLICY.md` § Decomposition triggers: "divide until

@@ -61,14 +61,14 @@ T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c (decomposed: T2c-1 -> T2c-2) -> T2d 
 | T0a Correct charter and close design gaps | `[x] Done` | 47 Med-high (execution) | L | T0 |
 | T1 Runtime and model-access preflight | `[x] Done (owner-waived)` | 49 Med-high (technical preflight blocked) | L | T0a |
 | T2 Sandboxed agentic harness and artifact schema | `[~] Decomposed (2026-07-29)` | 86 Very high (pre-execution) | XL | T1 |
-| T2a Tool-call parser and terminal-state contract | `[x] Done (2026-07-29)` | 45 Med-high (execution) | L | T1 |
+| T2a Tool-call parser and terminal-state contract — **retained, narrowed to synthetic-fixture/replay path only; not live-invocation, see § T2a post-hoc correction notice** | `[x] Done (2026-07-29)` | 45 Med-high (execution) | L | T1 |
 | T2b Command allowlist and canonical path containment | `[x] Done (2026-07-30)` | 50 Med-high (execution) | L | T2a |
 | T2c Ephemeral sandbox runner and resource enforcement | `[~] Decomposed (2026-07-30)` | 56 Complex (pre-decomposition) | L | T2b |
 | T2c-1 Sandbox process execution and isolation | `[x] Done (2026-07-30)` | 49 Med-high (planning) | L | T2b |
 | T2c-2 Resource budget, wall-timeout, teardown | `[x] Done (owner-waived, 2026-07-30)` | 53 Med-high (execution) | L | T2c-1 |
 | T2d Versioned artifact schema and redacted trace contract | `[x] Done (owner-waived, 2026-07-30)` | 50 (Med-high) | S/M-equivalent | T2c-2 |
 | T2e-pre Decompose oversized T2c-2/T2d modules for local-first delegation eligibility | `[x] Done` | 52 Med-high | L | T2c-2, T2d |
-| T2e Replay fixtures and integrated harness verification | `[x] Done (owner-waived, 2026-07-30)` | 55 Med-high (execution) | L | T2e-pre |
+| T2e Replay fixtures and integrated harness verification — **synthetic-fixture/replay path only; not live-invocation validation, see § T2e disposition note** | `[x] Done (owner-waived, 2026-07-30)` | 55 Med-high (execution) | L | T2e-pre |
 | T3 CWE watchlist and context-complete packet construction | `[~] Decomposed (2026-08-01)` | 78 High (pre-execution) | XL | T2e |
 | T3a Versioned CWE watchlist | `[x] Done (owner-verified, 2026-08-02)` | 37 Moderate (execution) | M | T2e |
 | T3b Packet schema and hard security-exclusion guarantees | `[x] Done (owner-verified, 2026-08-02)` | 27 Moderate (execution) | M | T3a |
@@ -2402,6 +2402,38 @@ prior layers (`tool_call_parser.py`/`terminal_state.py`,
 `sandbox_budget.py`, `artifact_schema.py`) at once; it adds no new terminal-state
 kinds and defines no new encoding — it proves the existing, already-tested
 per-layer contracts keep their failure boundaries when wired together.
+
+### Disposition note (2026-08-05): scope is the synthetic-fixture/replay path, not live invocation
+
+**T2e's "integrated harness verification" validates internal-schema
+composition, not live Antares wire-format compatibility.** This section
+exists so a later reader does not infer the latter from the task title.
+
+- `harness.py`'s `dispatch_tool_call` and `tool_call_parser.py`'s
+  `parse_tool_call` consume the internal `{"tool": ..., "payload": {...}}`
+  schema (see T2a's own 2026-08-05 post-hoc correction notice above), not
+  Antares' real `<tool_call>`-embedded `args`/`tool` protocol confirmed by
+  reading Cisco's official `antares-cli` reference implementation
+  (`agent/streaming.py`, `agent/model_adapter.py`).
+- `replay_fixtures.py::_msg()` constructs that same internal schema
+  directly, so every HP/EC case in this task's Reflection log and unit
+  suite — and T2b–T2d's, transitively, since T2e composes them — exercised
+  the assumed schema, never a live or recorded Antares model transcript.
+  T1 never reached live inference (see T1's execution record above), so no
+  such transcript existed at any point during T2's implementation.
+- This does not change T2e's `[x] Done` status or invalidate its acceptance
+  criteria, which were about composition and failure-boundary preservation
+  across the four T2 layers — a claim the unit suite still supports. It
+  narrows what "integrated harness verification" can be read to mean.
+- **Resolved disposition (Subtask A of Element 3, approved 2026-08-05):**
+  `docs/plan/antares-local-runtime-adoption.md` § "Element 3" retires the
+  harness's live-invocation role outright and adopts
+  `antares tool query --stdin` / `antares tool sweep --stdin` as direct CLI
+  subprocess calls instead of building a translation layer for this schema.
+  `harness.py`, `tool_call_parser.py`, and `terminal_state.py` are retained,
+  unmodified, as the synthetic-fixture/replay-test path only — see
+  `docs/audit/antares-t4-element3-rri.md` § "T2a–T2e disposition" and
+  § "Subtask C" for the full evidence and scope of this correction.
 
 ### Phase 1 — Task-analysis review
 
