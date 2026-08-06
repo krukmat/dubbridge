@@ -1,0 +1,48 @@
+{
+  "task_id": "T4-ground-truth-calibration-pilot",
+  "reviewer": "qwen3.6:27b-q4_K_M",
+  "phase": "code-solution",
+  "verdict_raw": "FINDINGS",
+  "findings_raw_count": 5,
+  "disposition": [
+    {
+      "finding": "calibration.py raises CalibrationError on invalid input",
+      "severity_raw": "BLOCKING",
+      "disposition": "rejected-false-positive",
+      "reason": "Reviewer conflated EC-1 (Antares runtime/invocation failure, which must degrade) with caller-input contract validation (empty case list, malformed case), which this codebase always fail-closes via a raised typed error (see ContextClosureResolutionError, WatchlistValidationError, ValidationError in artifact_schema.py -- same pattern throughout scripts/antares/). calibration.py is never invoked from the live post-CI/pilot path (post_ci_summary.py does not import it); it is the offline calibration-corpus tool. No CI-blocking path exists through this module."
+    },
+    {
+      "finding": "disposition_ledger.py raises LedgerError on validation/state conflicts",
+      "severity_raw": "BLOCKING",
+      "disposition": "rejected-false-positive",
+      "reason": "Same fail-closed pattern as above, applied to ledger contract violations (duplicate entry, re-opening a disposition). These are programming-contract errors, not Antares runtime failures -- EC-1 governs the latter only. Verified post_ci_summary.py's entry_id construction (f\"{touchpoint}:{cwe_id}:{snapshot_id}:{index}\") makes duplicate_entry_id unreachable within its own call pattern."
+    },
+    {
+      "finding": "pilot.py raises PilotError for unwatchlisted CWE / empty triage_owner",
+      "severity_raw": "BLOCKING",
+      "disposition": "partially-accepted-repaired",
+      "reason": "cwe_not_on_watchlist is unreachable from post_ci_summary.py's own call site (cwe_id always sourced from load_watchlist().entries -- verified by reading build_summary's source). However, empty triage_owner IS reachable via a misconfigured --triage-owner CLI flag and was a real gap: main() had no try/except around build_summary, so this caller-input error would have propagated as a nonzero exit and could fail the CI step despite if: always(). Fixed: wrapped main()'s body in try/except, writing a degraded summary and always returning 0. Added test_ec1_empty_triage_owner_degrades_instead_of_crashing_the_job (post_ci_summary_test.py) proving exit 0 and a degraded=true artifact. Verified manually via direct CLI invocation."
+    },
+    {
+      "finding": "push-review.yml missing graceful degradation wrapper (needs || true)",
+      "severity_raw": "MAJOR",
+      "disposition": "accepted-repaired-differently",
+      "reason": "The concrete risk this pointed at (an uncaught exception in post_ci_summary.py reaching a nonzero exit) is real and is the same root cause as the PilotError finding above. Fixed at the Python level (try/except in main(), always returns 0) rather than with a shell-level `|| true`, which is the correct fix location and avoids masking a real script crash from CI logs the way `|| true` would. No YAML change was needed once main() itself guarantees exit 0."
+    },
+    {
+      "finding": "pilot_test.py coverage incomplete (diff was truncated)",
+      "severity_raw": "MINOR",
+      "disposition": "rejected-false-positive",
+      "reason": "Artifact of sending a truncated diff (45000-char cap) to the reviewer, not a real gap. Verified independently via `coverage run`: pilot.py is at 100% line coverage (58/58 statements) after the Reflection-pass additions, including EC-1 (dispatch exception, missing-kind attribute, cli_binary_unavailable) and EC-2 (unwatchlisted CWE, empty skip reason)."
+    }
+  ],
+  "regressions_found_and_fixed": 1,
+  "recheck_after_fix": {
+    "reviewer": "qwen3.6:27b-q4_K_M",
+    "scope": "scripts/antares/post_ci_summary.py (fixed main())",
+    "verdict": "PASS",
+    "findings": []
+  },
+  "final_verdict": "PASS",
+  "timestamp": "2026-08-06T19:47:17Z"
+}

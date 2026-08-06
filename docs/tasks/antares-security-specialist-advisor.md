@@ -4587,7 +4587,7 @@ Code-solution review: `qwen3.6:27b-q4_K_M` `docs/audit/gemma-evidence/antares-t3
 
 ## T4 - Ground-truth calibration and observe-only workflow pilot
 
-- **Status:** `[ ] Open`
+- **Status:** `[x] Done` - 2026-08-06
 - **Type:** development / CI / evaluation
 - **Effort:** TBD from execution RRI
 - **Depends on:** T3 (`[x] Done`, all subtasks T3a-T3d closed 2026-08-06);
@@ -4653,6 +4653,168 @@ new gate.
 - this ledger and the slice plan
 - `.github/workflows/push-review.yml` and `.gitignore` if the post-CI lane attaches
 - the named calibration/pilot reports and finding ledger
+
+### RRI
+
+`python3 scripts/rri.py` -> **51 -> Med-high (41-55)**. Base 39 (D2 K3 P2
+T2 A2 X2, F=5 files), penalty `arch_decision` +12 (fixing promotion
+thresholds/stopping rules is a process decision the task itself must
+resolve). Dominant drivers: K=3, F=5, `arch_decision`.
+
+### ADR-038 routing
+
+- Qwen27 (`qwen3.6:27b-q4_K_M`) advisory refinement:
+  `.agent/local-architect/med-high-refinement-v1/antares-T4/refinement-artifact.json`
+  -> `route_recommendation: CLOUD_REQUIRED` (multi-file scope spanning
+  calibration, pilot, ledger, CI wiring, reports; same-slice precedent of
+  T3c-1/T3c-2/T3d all exhausting the bounded local session).
+- Primary hash-bound route receipt:
+  `.agent/local-architect/med-high-refinement-v1/antares-T4/primary-receipt.json`
+  -> `decision: CLOUD_REQUIRED` (independent agreement, not an upgrade).
+- `scripts/local-agent/med_high_gate.py` result: `CLOUD_REQUIRED` -- "Qwen27
+  recommended CLOUD_REQUIRED; the primary cannot upgrade this to local."
+  No bounded local session was run; implementation proceeded directly on
+  the cloud path (Claude Code, orchestrator of record) per ADR-038 §6.
+
+### Implementation
+
+New modules: `scripts/antares/calibration.py` (HP-1 metrics engine --
+precision/recall/File F1, macro-averaged, with true negatives evaluated
+separately per `SnapshotRole`), `scripts/antares/disposition_ledger.py`
+(durable human-disposition ledger, SLA backlog, dedup keys),
+`scripts/antares/pilot.py` (`run_pilot_touchpoint` /
+`skip_pilot_touchpoint`, the shared non-blocking entrypoint for all three
+touchpoints), `scripts/antares/post_ci_summary.py` (post-CI CLI, always
+exits 0, writes one redacted summary). Wired `logs/antares/` and
+`var/antares-traces/` into `.gitignore`, and added a non-blocking
+`Antares post-CI observe-only pilot (T4)` step plus a 30-day-retention
+artifact upload to `.github/workflows/push-review.yml`.
+
+Fixed pilot/calibration parameters (window, sample, watchlist schedule,
+concurrency, runtime budget, stopping rules, promotion-evidence
+thresholds) are recorded in
+`docs/evaluations/antares-t4-calibration-report.md`; touchpoint/ledger
+mechanics in `docs/evaluations/antares-t4-pilot-report.md`.
+
+### Reflection log
+
+Required passes: 3 (`51` -> `Med-high`)
+
+#### Pass 1 -- focus: HP/EC correctness contract and failure boundaries
+
+- **Draft verdict:** initial implementation of `calibration.py`,
+  `disposition_ledger.py`, `pilot.py` plus their tests; all HP-1..3/EC-1..3
+  behaviors implemented and passing.
+- **Critique findings:** (1) no direct test for a `dispatch` return value
+  missing a `.kind` attribute entirely, only for a wrong-kind value; (2)
+  `post_ci_summary.py` had no dedicated test file, only a manual smoke
+  test; (3) confirmed CWE-732 (deliberately excluded per
+  `cwe_watchlist.py`'s own docstring) is correctly rejected pre-dispatch.
+- **Revisions applied:** added
+  `test_ec1_dispatch_return_value_missing_kind_attribute_degrades`
+  (`pilot_test.py`); added `scripts/antares/post_ci_summary_test.py` (8
+  cases covering HP-3 redaction/coverage and EC-1 degradation).
+
+#### Pass 2 -- focus: side effects on adjacent modules and CI integration
+
+- **Draft verdict:** ran the full `scripts/` test suite (not just
+  `scripts/antares/`) to catch cross-module regressions from the
+  `.github/workflows/push-review.yml` edit.
+- **Critique findings:** **real regression** --
+  `scripts/gemma_push_ops_test.py::test_workflow_is_post_pipeline_self_hosted_and_advisory`
+  asserts the whole workflow file must never contain
+  `continue-on-error: true` (a pre-existing invariant); my first draft of
+  the Antares CI step used exactly that mechanism and broke the test.
+  Confirmed via `git stash` that this test passed before my change and
+  that 3 unrelated `check_review_budget_test.py` failures pre-exist on a
+  clean tree (env-dependent, not caused by this task).
+- **Revisions applied:** removed `continue-on-error: true` from the
+  Antares CI step; `post_ci_summary.py::main` already guarantees exit 0
+  unconditionally, so the same non-blocking guarantee holds via
+  `if: always()` alone, consistent with the rest of the file. Re-ran the
+  invariant test (now passing) and the full suite (only the 3
+  pre-existing, unrelated failures remain).
+
+#### Pass 3 -- focus: coverage against the 90% gate and documentation consistency
+
+- **Draft verdict:** measured line coverage on the four new modules:
+  97/91/100/97% (calibration/disposition_ledger/pilot/post_ci_summary).
+- **Critique findings:** 5 untested error paths in
+  `disposition_ledger.py` (`empty_entry_id`, `empty_sla_deadline`,
+  `invalid_target_state`, `empty_reviewer`, `entry_from_dict`'s two
+  exception branches) and 2 in `calibration.py` (`empty_case_id`,
+  `empty_cwe_id`).
+- **Revisions applied:** added 9 targeted tests across
+  `disposition_ledger_test.py` and `calibration_test.py`. Final coverage:
+  100% (`calibration.py`, `disposition_ledger.py`, `pilot.py`), 97%
+  (`post_ci_summary.py` -- only the untestable `__main__` guard is
+  uncovered by pytest; verified separately via real subprocess
+  invocation). 99% aggregate across the four modules.
+
+### Peer Reviewer evidence
+
+**Phase 1 (task-analysis, pre-implementation):**
+- Reviewer: `qwen3.6:27b-q4_K_M`
+- Command: manual Ollama `/api/chat` invocation, `think=false`,
+  `num_predict=4096`, `num_ctx=131072`
+- Artifact: `docs/audit/gemma-evidence/t4-phase1-task-analysis.json`
+- Verdict: `PASS`
+- Findings: none
+- Gemma fallback: not triggered
+- D14 fallback: not triggered
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted as-is
+
+**Phase 2 (code-solution, post-implementation):**
+- Reviewer: `qwen3.6:27b-q4_K_M`
+- Command: manual Ollama `/api/chat` invocation over the staged diff
+  (~1450 added lines across 10 files), `think=false`, `num_predict=4096`,
+  `num_ctx=32768`; re-check pass over the fixed file only,
+  `num_ctx=8192`
+- Artifact: `docs/audit/gemma-evidence/t4-phase2-code-solution.json`
+- Verdict: initial `FINDINGS` (3 BLOCKING, 1 MAJOR, 1 MINOR) -> final
+  `PASS` after disposition and one repair
+- Findings: 3 BLOCKING rejected as false positives (reviewer conflated
+  EC-1 Antares-runtime-failure degradation with ordinary caller-input
+  fail-closed validation, a pattern already used throughout
+  `scripts/antares/*`; verified `calibration.py` is never on the live
+  CI path and `cwe_not_on_watchlist`/`duplicate_entry_id` are
+  unreachable from `post_ci_summary.py`'s own call pattern). 1 MAJOR
+  partially accepted: a real gap existed where an empty `--triage-owner`
+  CLI flag could raise `PilotError` uncaught inside `main()`, risking a
+  nonzero exit despite `if: always()`; fixed with a try/except in
+  `post_ci_summary.py::main` that always writes a degraded summary and
+  returns 0, plus a regression test
+  (`test_ec1_empty_triage_owner_degrades_instead_of_crashing_the_job`).
+  1 MINOR (test coverage) rejected as an artifact of the diff being
+  truncated to fit the review packet, not a real gap (independently
+  verified via `coverage run`: 100% on `pilot.py`).
+- Gemma fallback: not triggered
+- D14 fallback: not triggered
+- disposition_divergence: `partial` (1 of 5 raw findings led to a real
+  fix; the other 4 were reasoned false positives with concrete evidence)
+- Primary-agent disposition: 3 rejected (false positive, evidence
+  recorded above), 1 partially accepted and repaired, 1 rejected
+  (truncation artifact); re-check pass confirmed `PASS` with 0 findings
+  on the fixed file
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | pre-fix snapshots + patch-derived labels -> precision/recall/File F1; patched snapshots -> true-negative metric, evaluated separately | `scripts/antares/calibration_test.py::HappyPathTest::test_hp1_precision_recall_file_f1_from_patch_derived_labels`, `::test_hp1_patched_snapshot_produces_true_negative_separately`, `::test_hp1_vulnerable_and_patched_cases_never_pooled` | passed |
+| HP-2 | Happy path | eligible-CWE task invokes Antares at a touchpoint; disposition never delays approval/review/CI/closure | `scripts/antares/pilot_test.py::HappyPathTest::test_hp2_successful_run_produces_ledger_entries_for_each_candidate`, `::test_hp2_never_blocks_on_result_it_only_records`; `scripts/antares/disposition_ledger_test.py::HappyPathTest::test_hp2_add_then_disposition_records_reviewer_and_state` | passed |
+| HP-3 | Happy path | post-CI runs emit redacted summaries; raw traces stay uncommitted/retention-bounded | `scripts/antares/post_ci_summary_test.py::HappyPathTest::test_hp3_summary_never_includes_raw_candidate_paths`, `::test_hp3_summary_covers_every_watchlist_cwe`, `::test_hp3_main_writes_summary_and_returns_zero` | passed |
+| EC-1 | Edge case | runtime failure writes a degraded artifact; primary CI/workflow state unaffected | `scripts/antares/pilot_test.py::EdgeCaseTest::test_ec1_dispatch_exception_degrades_without_raising`, `::test_ec1_cli_binary_unavailable_degrades_without_raising`, `::test_ec1_degraded_result_never_yields_ledger_entries`, `::test_ec1_dispatch_return_value_missing_kind_attribute_degrades`; `scripts/antares/post_ci_summary_test.py::EdgeCaseTest::test_ec1_degraded_cwe_never_raises_and_is_counted`, `::test_ec1_main_returns_zero_even_when_every_cwe_degrades`, `::test_ec1_empty_triage_owner_degrades_instead_of_crashing_the_job` | passed |
+| EC-2 | Edge case | no eligible CWE records a typed skip; forced generic sweep forbidden | `scripts/antares/pilot_test.py::EdgeCaseTest::test_ec2_unknown_cwe_raises_before_any_dispatch`, `::test_ec2_skip_records_typed_reason_and_never_dispatches`, `::test_ec2_skip_with_empty_reason_rejected` | passed |
+| EC-3 | Edge case | undisposed candidates past SLA reported as backlog to named owner, never silently closed | `scripts/antares/disposition_ledger_test.py::EdgeCaseTest::test_ec3_backlog_reports_undisposed_past_sla_not_silently_closed`, `::test_ec3_within_sla_is_not_backlog` | passed |
+
+### Owner final verification
+
+- Owner: `matias`
+- Date: `2026-08-06`
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior, that the Med-high ADR-038 gate correctly routed to cloud implementation (both Qwen27 and the primary independently recommended `CLOUD_REQUIRED`), that 3 Reflection passes were completed with one real regression found and fixed (the `continue-on-error: true` CI invariant violation) and one real code gap found and fixed (uncaught `PilotError` on empty `--triage-owner`), and that the phase-2 reviewer's remaining findings were false positives with concrete supporting evidence (unreachable code paths, pre-existing repository fail-closed conventions, a truncated-diff artifact).
+- Commands run: `python3 -m pytest scripts/antares/ -q` (281 passed); `python3 -m coverage run --source=scripts/antares -m pytest scripts/antares/calibration_test.py scripts/antares/disposition_ledger_test.py scripts/antares/pilot_test.py scripts/antares/post_ci_summary_test.py -q && python3 -m coverage report -m` (99% aggregate, 100% on 3/4 modules); `python3 scripts/check_okf_frontmatter.py` (passed); `python3 scripts/check-maintainability.py` (passed); `python3 -m pytest scripts/ -q --ignore=scripts/check_okf_frontmatter_test.py` (1266 passed, 3 pre-existing unrelated failures confirmed via `git stash`); `python3 -c "import yaml; yaml.safe_load(open('.github/workflows/push-review.yml'))"` (valid).
 
 ## T5 - Promote, narrow, or retire on evidence
 

@@ -55,6 +55,24 @@ jobs:
           path: logs/gemma-push-review/${{ github.event.workflow_run.head_sha }}/${{ github.run_id }}/
           if-no-files-found: ignore
 
+      - name: Antares post-CI observe-only pilot (T4)
+        id: antares_post_ci
+        if: always()
+        run: |
+          python3 scripts/antares/post_ci_summary.py \
+            --snapshot-root . \
+            --snapshot-id "${{ github.event.workflow_run.head_sha }}" \
+            --out-dir "logs/antares/${{ github.event.workflow_run.head_sha }}/${{ github.run_id }}"
+
+      - name: Upload Antares post-CI summary (redacted, 30-day retention)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: antares-post-ci-${{ github.event.workflow_run.head_sha }}-${{ github.run_id }}
+          path: logs/antares/${{ github.event.workflow_run.head_sha }}/${{ github.run_id }}/antares-post-ci-summary.json
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Advisory summary
         if: always()
         run: |

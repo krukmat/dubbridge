@@ -31,3 +31,5 @@ scripts/local-agent/logs/
 logs/gemma-push-review/
 scripts/local-bench/t7*/
 .claude/settings.json
+logs/antares/
+var/antares-traces/
