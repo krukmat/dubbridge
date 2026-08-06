@@ -1,0 +1,15 @@
+{
+  "description": "EC-4: paths contributed by multiple governing boundaries, or already present in the T3c-1 closure result, are emitted once in canonical order.",
+  "governing_map_overrides": {
+    "crates/db/": ["docs/architecture.md", "crates/db/Cargo.toml"],
+    "crates/storage/": ["docs/architecture.md", "crates/storage/Cargo.toml"]
+  },
+  "boundary_roots": ["crates/db/", "crates/storage/"],
+  "t3c1_closure_paths": ["crates/db/src/lib.rs", "crates/storage/src/lib.rs"],
+  "expected_included": [
+    "crates/db/Cargo.toml",
+    "crates/storage/Cargo.toml",
+    "docs/architecture.md"
+  ],
+  "expected_omitted": []
+}

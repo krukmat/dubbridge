@@ -665,10 +665,25 @@ is now cancelled outright, because Antares does not propose RRI inputs.
   tests pass (45/45 including the unaffected T3c-0 corpus), 91% line
   coverage. Full closure record: `docs/tasks/antares-security-specialist-advisor.md`
   § T3c-1.
-- `T3d` remains open and now depends on `T3b` plus `T3c-2`. `T4` stays
-  blocked until all of `T3a`, `T3b`, `T3c-0`, `T3c-1`, `T3c-2`, and `T3d`
-  are `[x] Done`. With `T3c-1` now done, `T3c-2` is the next executable
-  `T3c` child.
+- `T3c-2` is `[x] Done (owner-verified, 2026-08-06)`: approved at RRI 49
+  Med-high, ADR-038 routed `GO_LOCAL` (Qwen27 advisory refinement and the
+  primary hash-bound receipt agreed), but the bounded `qwen3.6:35b-a3b`
+  session hit the defined `budget_exhausted` terminal state (8/8 turns, no
+  `finish` call, zero files written) — a correctly-triggered, non-repairable
+  outcome at this band, escalating to cloud per the ADR-038 §5 evidence
+  bundle. Implemented by the primary agent (`governing_boundary_map.py`,
+  `governing_boundary_closure.py`, fixture tree), phase-2 review by
+  `qwen3.6:27b-q4_K_M` returned one minor finding that was rejected as a
+  reproducibly-false positive
+  (`docs/audit/gemma-evidence/antares-t3c-2-phase2.json`), 14/14 task-local
+  tests pass (226 passed / 37 subtests across the full `scripts/antares/`
+  suite with no regressions). Full closure record:
+  `docs/tasks/antares-security-specialist-advisor.md` § T3c-2.
+- `T3d` remains open and now depends only on `T3b` (already done) plus
+  `T3c-2` (now done) — both prerequisites are satisfied. `T4` stays blocked
+  until `T3a`, `T3b`, `T3c-0`, `T3c-1`, `T3c-2`, and `T3d` are all
+  `[x] Done`. With `T3c-2` now done, `T3d` is the next executable task in
+  this slice.
 - **Wire-format translation gap (recorded 2026-08-05).** Direct inspection of
   `scripts/antares/*.py` confirms no module translates real Antares output
   (`<tool_call>` tags carrying `name`/`arguments`) into the internal

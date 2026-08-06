@@ -1,0 +1,14 @@
+{
+  "description": "EC-2: overlapping boundary roots resolve by longest canonical prefix match.",
+  "governing_map_overrides": {
+    "crates/": ["docs/architecture.md"],
+    "crates/db/": ["crates/db/Cargo.toml", "docs/adr/ADR-008-rights-ledger-fail-closed-precondition.md"]
+  },
+  "boundary_roots": ["crates/", "crates/db/"],
+  "t3c1_closure_paths": ["crates/db/src/lib.rs"],
+  "expected_included": [
+    "crates/db/Cargo.toml",
+    "docs/adr/ADR-008-rights-ledger-fail-closed-precondition.md"
+  ],
+  "expected_omitted": []
+}

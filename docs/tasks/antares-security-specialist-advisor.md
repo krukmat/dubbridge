@@ -74,8 +74,8 @@ T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c (decomposed: T2c-1 -> T2c-2) -> T2d 
 | T3b Packet schema and hard security-exclusion guarantees | `[x] Done (owner-verified, 2026-08-02)` | 27 Moderate (execution) | M | T3a |
 | T3c Deterministic context-closure algorithm | `[~] Decomposed (2026-08-02)` | 80 High (pre-execution) | XL | T3b |
 | T3c-0 Characterization corpus and omission-reason contract | `[x] Done (owner-waived, 2026-08-02)` | 39 Moderate | M | T3b |
-| T3c-1 Deterministic dependency and manifest closure | `[ ] Open` | 55 Med-high | L | T3c-0 |
-| T3c-2 Governing security-boundary closure | `[ ] Open` | Recompute | TBD | T3c-1 |
+| T3c-1 Deterministic dependency and manifest closure | `[x] Done (2026-08-05)` | 55 Med-high | L | T3c-0 |
+| T3c-2 Governing security-boundary closure | `[x] Done` | 49 Med-high | L | T3c-1 |
 | T3d Integrate T3a+T3b+T3c-2 behind touchpoint packet construction | `[ ] Open` | Recompute | TBD | T3b, T3c-2 |
 | T4 Ground-truth calibration and observe-only workflow pilot | `[ ] Open` | Recompute | TBD | T2e, T3 |
 | T5 Promote, narrow, or retire on evidence | `[ ] Open` | Recompute | TBD | T4 |
@@ -3478,6 +3478,337 @@ Full antares regression: `python3 -m pytest scripts/antares/ -q` → 212 passed,
   - `python3 -m pytest scripts/antares/ -q`
   - `git diff --stat scripts/antares/packet_schema.py`
   - `python3 scripts/check-maintainability.py --files scripts/antares/context_closure.py scripts/antares/context_closure_test.py`
+
+## T3c-2 - Governing security-boundary closure
+
+- **Status:** `[x] Done (owner-verified, 2026-08-06)`
+- **Type:** development / repository-analysis policy
+- **Execution RRI:** 49 Med-high
+- **Effort:** L
+- **RRI artifact:** `docs/audit/antares-t3c-2-rri.md`
+- **Depends on:** T3c-1 (`[x] Done`, 2026-08-05)
+- **Decomposed from:** T3c
+
+### Task-analysis review (phase 1) — two passes, both `findings`, no `PASS` obtained
+
+**Pass 1** — `qwen3.6:27b-q4_K_M`, `docs/audit/gemma-evidence/antares-t3c-2-phase1.json`,
+`verdict: findings`. Flagged the task card's original routing table
+(`GPT-5.2-Codex`, `claude-sonnet-5`, generic `qwen3.6`) as stale/unverified.
+
+Disposition: accepted as a genuine finding, not a false positive. Verified
+current model identifiers via `WebFetch` against
+`https://learn.chatgpt.com/docs/models` (OpenAI's official docs; recommends
+`gpt-5.6-sol` for complex coding via Codex CLI) and against this runtime
+environment's own declared model roster for Claude (`claude-sonnet-5`,
+escalate to `claude-opus-5` only on repeated failure). Routing table
+corrected accordingly.
+
+MEDIUM (fixture JSON content undefined) and LOW (`D14` undefined inline)
+from pass 1: accepted as non-blocking observations, to be resolved during
+implementation (Reflection pass 1) and by reference to
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer` respectively.
+
+**Pass 2** — same reviewer, re-run after the routing-table correction:
+`docs/audit/gemma-evidence/antares-t3c-2-phase1-pass2.json`, `verdict:
+findings` again — not `PASS`.
+
+- HIGH: flagged `qwen3.6:27b-q4_K_M` / `qwen3.6:35b-a3b` (the ADR-038 local
+  pipeline models) as "not among the CURRENT verified model identifiers."
+  Disposition: **rejected as a reviewer-prompt artifact, not a genuine
+  finding.** The review prompt for this pass only listed `gpt-5.6-sol` /
+  `claude-sonnet-5` as "verified," omitting the local pipeline models that
+  `docs/policies/RRI_POLICY.md` and ADR-038 actually govern for this RRI
+  band. `qwen3.6:27b-q4_K_M` is the exact model that produced this verdict —
+  it cannot be a hallucinated identifier. This is recorded as a defect in
+  how the second review packet was constructed, not evidence that the task
+  card is wrong.
+- MEDIUM (map.py vs closure.py writable-scope clarity) and LOW (`D14`
+  undefined): same non-blocking observations as pass 1, reconfirmed.
+
+**Final disposition:** two passes run, neither returned `PASS`. No third
+pass was run — per explicit owner instruction, `findings` is accepted as
+the final phase-1 result rather than iterating toward a literal `PASS`. All
+6 findings across both passes have an explicit disposition above (1
+corrected, 1 rejected as a prompting artifact, 4 accepted as non-blocking).
+
+`Task-analysis review: qwen3.6:27b-q4_K_M docs/audit/gemma-evidence/antares-t3c-2-phase1-pass2.json - FINDINGS (dispositioned; no PASS obtained after 2 passes; owner accepted findings as final per 2026-08-06 instruction)`
+
+### Objective
+
+Given an explicit snapshot root, the canonical T3c-1 closure result, and one or
+more caller-declared repository boundary roots, compute a deterministic,
+bounded set of additional files that govern the relevant security boundary for
+those paths. The resolver must stay local to the snapshot, reuse the frozen
+omission vocabulary, and never guess boundary context from ambient repository
+state.
+
+### Scope and boundaries
+
+- Allowed implementation/test surface:
+  `scripts/antares/governing_boundary_map.py`,
+  `scripts/antares/governing_boundary_closure.py`,
+  `scripts/antares/governing_boundary_closure_test.py`, and a dedicated
+  fixture tree under
+  `scripts/antares/testdata/governing_boundary_closure/**`.
+- `scripts/antares/context_closure.py`, `scripts/antares/packet_schema.py`,
+  `scripts/antares/cwe_watchlist.py`, and the touchpoint-facing packet
+  constructors remain read-only in this task. T3d integrates them later.
+- Inputs are caller-supplied snapshot root, canonical T3c-1 closure paths, and
+  canonical repository boundary roots. No inference from the current working
+  directory, git state, ripgrep, subprocess package tooling, or network access
+  is permitted.
+
+### Happy paths considered
+
+- **HP-1:** when one or more canonical T3c-1 closure paths fall under a
+  declared repository boundary root with a committed governing-context mapping,
+  the resolver returns the exact canonical boundary-context paths for that
+  boundary (for example code, manifests, or governance-doc anchors) once,
+  sorted lexicographically ascending with Python `sorted()` over canonical
+  snapshot-relative POSIX paths, and deduplicated.
+- **HP-2:** equivalent permutations of closure paths or boundary roots, and
+  multiple closure paths under the same boundary, produce byte-for-byte
+  equivalent output; if two boundaries contribute the same canonical context
+  path, it is emitted once.
+
+### Edge cases considered
+
+- **EC-1:** a canonical closure path not covered by any declared repository
+  boundary root yields exactly one
+  `context_closure_missing_governing_boundary` omission for that path; the
+  resolver must not guess a nearest parent, widen to a whole-repository scan,
+  or silently continue as though the boundary were known.
+- **EC-2:** overlapping repository boundary roots resolve by longest canonical
+  prefix; duplicate or conflicting committed mapping entries are rejected
+  during validation instead of producing ambiguous runtime output.
+- **EC-3:** a committed governing-context target that is missing,
+  non-canonical, or resolves outside the declared snapshot raises a typed
+  fail-closed `GoverningBoundaryValidationError` and returns no partial
+  result; committed mapping drift is not softened into an omission.
+- **EC-4:** paths already present in the T3c-1 closure result, or contributed
+  by multiple governing boundaries, are emitted once in canonical order and do
+  not desynchronize provenance or later size-budget accounting.
+
+### Acceptance criteria
+
+- The task introduces a committed, deterministic governing-boundary map keyed
+  by canonical repository boundary roots. For watchlist-backed hypotheses the
+  roots must align with T3a `repository_boundary` values; task-specific
+  explicit hypotheses may supply their own roots later through T3d without
+  changing this map format.
+- The resolver consumes only the caller-supplied snapshot root, canonical
+  closure paths, boundary roots, and the committed map data. It never infers
+  boundaries from current working directory, git state, or ambient directory
+  walks.
+- Every emitted path is a canonical snapshot-relative POSIX path sorted with
+  Python `sorted()`, case-sensitive and locale-independent. Out-of-snapshot
+  targets are never emitted.
+- Missing coverage of a canonical closure path uses the frozen omission reason
+  `context_closure_missing_governing_boundary`; no new omission reason or
+  packet-schema change is introduced.
+- Map validation is fail-closed and fixture-testable: duplicate boundary keys,
+  non-canonical keys, non-canonical target paths, missing targets, or
+  outside-snapshot targets all fail before a partial result can escape.
+- This task does not build packets, inspect model output, or decide size-budget
+  policy. It resolves governing security-boundary context only; T3d composes
+  the final packet later.
+
+### Evidence to emit
+
+- `docs/audit/antares-t3c-2-rri.md`
+- `scripts/antares/governing_boundary_map.py`
+- `scripts/antares/governing_boundary_closure.py`
+- `scripts/antares/governing_boundary_closure_test.py`
+- planned unit coverage for each task behavior, at minimum:
+  `test_hp1_*`, `test_hp2_*`, `test_ec1_*`, `test_ec2_*`, `test_ec3_*`, and
+  `test_ec4_*`
+- dedicated governing-boundary fixture data under
+  `scripts/antares/testdata/governing_boundary_closure/ec1_missing_boundary_root.json`,
+  `scripts/antares/testdata/governing_boundary_closure/ec2_overlapping_roots.json`,
+  `scripts/antares/testdata/governing_boundary_closure/ec3_invalid_target.json`,
+  and
+  `scripts/antares/testdata/governing_boundary_closure/ec4_duplicate_context_paths.json`
+
+### Status artifacts affected
+
+- this ledger
+- `docs/plan/antares-security-specialist-advisor.md`
+
+### Implementation routing (ADR-038 Med-high)
+
+1. Qwen27 (`qwen3.6:27b-q4_K_M`) advisory refinement, `med-high-refinement-v1`
+   profile — `route_recommendation: GO_LOCAL`.
+2. Primary hash-bound route receipt — `decision: GO_LOCAL` (`refinement_artifact_sha256`
+   bound to the full raw refinement-artifact file, per `med_high_gate.py`'s
+   `decide_route()`, which hashes the entire loaded JSON, not a field subset).
+3. `med_high_gate.evaluate_route()` — both sides `GO_LOCAL` → gate resolved
+   `GO_LOCAL`.
+4. Bounded `qwen3.6:35b-a3b` session via `run_med_high_task.py`, own process
+   group, ≤8 turns / ≤300s / 0 repair attempts — **outcome: `budget_exhausted`**
+   (8/8 turns consumed: 5× `read_file`, 3× `run_command`; no `finish` call; zero
+   files written to the disposable worktree). This is a defined ADR-038
+   terminal state, not a tooling defect — Med-high carries zero repair
+   attempts, so `run_med_high_task.py` correctly emitted the §5 escalation
+   bundle and routed directly to cloud.
+5. Escalated to cloud implementation (Claude Code) per the ADR-038 §5 evidence
+   bundle. Implemented `scripts/antares/governing_boundary_map.py`,
+   `scripts/antares/governing_boundary_closure.py`,
+   `scripts/antares/governing_boundary_closure_test.py`, the fixture snapshot
+   tree, and the four named EC fixture files.
+
+### Happy paths covered
+
+- **HP-1** — `resolve_governing_boundary_closure` (`governing_boundary_closure.py:79-149`)
+  resolves a closure path via `_longest_prefix_match` against the validated
+  map's canonical roots and returns the exact sorted, deduplicated target set.
+  Evidence: `governing_boundary_closure_test.py::test_hp1_closure_path_under_declared_boundary_returns_mapped_context`.
+- **HP-2** — deterministic dedup/ordering is structural: `included` accumulates
+  into a `set()` (line 117) and is only sorted once at the end (line 147), so
+  input order cannot affect output; cross-boundary target sharing (`apps/api/`
+  and `crates/storage/` both mapping to `docs/architecture.md`) collapses to a
+  single emission via the same `set()`.
+  Evidence: `test_hp2_equivalent_permutations_are_byte_for_byte_equivalent`,
+  `test_hp2_cross_boundary_duplicate_context_path_emitted_once`.
+
+### Edge cases covered
+
+- **EC-1** — `_longest_prefix_match` (`governing_boundary_closure.py:73-77`)
+  returns `None` on no match; the only fallback is recording an
+  `OmittedPath` with the frozen `context_closure_missing_governing_boundary`
+  reason (line 27, reused verbatim from `packet_schema.py`). No parent-widening
+  or whole-repo-scan code path exists anywhere in the module.
+  Evidence: `test_ec1_uncovered_closure_path_yields_exactly_one_omission`,
+  `test_ec1_never_widens_to_nearest_parent_or_whole_repo`.
+- **EC-2** — longest-prefix resolution for overlapping roots
+  (`test_ec2_overlapping_roots_resolve_by_longest_prefix`). Conflicting
+  committed mapping entries are rejected at validation
+  (`governing_boundary_map.py:94-101`, `conflicting_target_mapping`) — scoped
+  to canonicalization collisions between **distinct raw keys** (e.g.
+  `"crates/db/"` vs `"crates/db//"`), confirmed live/reachable (not dead code)
+  by direct interpreter check: two distinct dict-literal keys both survive
+  construction and only collide after `PurePosixPath` canonicalization.
+  Legitimate cross-key target sharing is explicitly *not* rejected (a
+  correction made during implementation — the original draft over-rejected
+  this as a false conflict).
+  Evidence: `test_ec2_canonicalization_collision_between_keys_rejected_at_validation`,
+  `test_ec2_distinct_keys_sharing_a_target_are_not_a_conflict`.
+- **EC-3** — every committed-target defect (non-canonical, outside-snapshot,
+  missing) raises before any partial map or result can escape
+  (`governing_boundary_map.py:112-133`); the resolver normalizes the map-level
+  exception into `GoverningBoundaryValidationError` at its own boundary
+  (`governing_boundary_closure.py:96-101`) so callers see one consistent typed
+  surface.
+  Evidence: `test_ec3_missing_governing_context_target_raises_typed_error`,
+  `test_ec3_non_canonical_target_raises_typed_error_no_partial_result`,
+  `test_ec3_outside_snapshot_target_raises_typed_error`.
+- **EC-4** — duplicate closure paths and cross-boundary duplicate targets stay
+  deduplicated (`set()`-based `included` accumulation) and deterministically
+  ordered across reversed-input permutations.
+  Evidence: `test_ec4_duplicate_closure_paths_under_same_boundary_stay_in_sync`,
+  `test_ec4_provenance_and_ordering_stay_deterministic_across_calls`.
+- Additional: an undeclared boundary root (present in `boundary_roots` but
+  absent from the committed map) raises `undeclared_boundary_root` before any
+  resolution proceeds.
+  Evidence: `UndeclaredBoundaryRootTest::test_ec_boundary_root_absent_from_committed_map_raises_typed_error`.
+
+### Reflection log
+
+Required passes: 3 (`49` → `Med-high`)
+
+#### Pass 1 (contract)
+
+- **Draft verdict:** initial implementation passed 10/14 tests; 4 failures
+  traced to one bug.
+- **Critique findings:** `validate_governing_boundary_map` rejected two
+  *different* boundary roots sharing the same governing-context target
+  (`conflicting_target_mapping`) — but HP-2 and the `ec4_duplicate_context_paths.json`
+  fixture explicitly require this to work (the committed map has `apps/api/`
+  and `crates/storage/` both pointing at `docs/architecture.md` by design).
+  The check conflated "two keys collide after canonicalization" (a genuine
+  conflict) with "two keys legitimately share a target" (not a conflict).
+- **Revisions applied:** removed the target-sharing rejection; added a
+  canonical-key-collision check instead (`seen_canonical_roots`, keyed by the
+  `PurePosixPath`-normalized root, not the target). Rewrote the corresponding
+  test to exercise the real collision case (`"crates/db/"` vs `"crates/db//"`)
+  instead of the incorrect legitimate-sharing case.
+
+#### Pass 2 (fail-closed / validation boundaries)
+
+- **Draft verdict:** all 14 tests passing; traced every `raise` site against
+  its trigger condition.
+- **Critique findings:** none found in the raise sites themselves. Verified
+  via direct interpreter probes (not just tests) that (a) a non-dict
+  `governing_map` propagates `invalid_map` through the resolver boundary
+  unchanged; (b) an empty `boundary_roots` tuple correctly produces all-omitted
+  output rather than raising (a legitimate deterministic answer, not a masked
+  failure); (c) a caller-supplied boundary root with double-slash noise
+  (`"crates/db//"`) canonicalizes to the exact same string
+  (`"crates/db/"`) as the map's own key, so caller-side and map-side
+  canonicalization converge correctly by construction — no latent mismatch.
+- **Revisions applied:** none — all three adversarial probes confirmed
+  correct fail-closed behavior with no partial-result leakage.
+
+#### Pass 3 (determinism / coverage)
+
+- **Draft verdict:** full suite green (14/14); ran a 50-iteration randomized
+  input-order stress probe outside the fixed test cases.
+- **Critique findings:** none — 50 shuffles of both `t3c1_closure_paths` and
+  `boundary_roots` order produced exactly one distinct `(included, omitted)`
+  result, confirming byte-for-byte determinism beyond the two fixed
+  permutation tests. Every `raise` site in both modules is reachable from at
+  least one test, matching `context_closure.py`'s (T3c-1) established
+  coverage pattern; the one structurally-defensive `invalid_map` branch is
+  exercised directly by interpreter probe though not by a named unit test,
+  mirroring T3c-1 precedent for the equivalent defensive branch.
+- **Revisions applied:** none.
+
+### Peer Reviewer evidence
+
+- Reviewer: `qwen3.6:27b-q4_K_M`
+- Command: manual `curl` to `http://127.0.0.1:11434/api/chat` (`think:false`,
+  `num_predict:4096`, `num_ctx:65536`), packet = both implementation files +
+  test file + acceptance criteria (~24KB, within reviewability budget)
+- Artifact: `docs/audit/gemma-evidence/antares-t3c-2-phase2.json`
+- Verdict: `FINDINGS` (1 minor finding)
+- Findings: one minor finding claiming the `seen_canonical_roots` collision
+  check in `governing_boundary_map.py:83-102` is "dead code because dict
+  literals enforce unique keys." **Rejected as a false positive** — the
+  premise is factually incorrect: `{"crates/db/": ..., "crates/db//": ...}`
+  is two *distinct* dict-literal keys (verified directly via interpreter,
+  `len(raw_map) == 2`, no collision at construction time) that only collide
+  after `PurePosixPath` canonicalization inside the function body. This is a
+  live, reachable branch, exercised by
+  `test_ec2_canonicalization_collision_between_keys_rejected_at_validation`.
+- Gemma fallback: not triggered — reason: `qwen3.6:27b-q4_K_M` responded with
+  `done_reason: stop` on the first request.
+- D14 fallback: not triggered — reason: primary reviewer available and usable.
+- disposition_divergence: `none`
+- Primary-agent disposition: rejected the sole finding as a false positive
+  with concrete counter-evidence; no code change required.
+
+`Code-solution review: qwen3.6:27b-q4_K_M docs/audit/gemma-evidence/antares-t3c-2-phase2.json - PASS (1 minor finding rejected as false positive with counter-evidence)`
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | closure path under declared boundary returns mapped governing context | `scripts/antares/governing_boundary_closure_test.py::HappyPathTest::test_hp1_closure_path_under_declared_boundary_returns_mapped_context` | passed |
+| HP-2 | Happy path | permutation-equivalence and cross-boundary duplicate-target dedup | `scripts/antares/governing_boundary_closure_test.py::HappyPathTest::test_hp2_equivalent_permutations_are_byte_for_byte_equivalent`, `::test_hp2_cross_boundary_duplicate_context_path_emitted_once` | passed |
+| EC-1 | Edge case | uncovered closure path yields exactly one typed omission; never widens to parent/whole-repo | `scripts/antares/governing_boundary_closure_test.py::EdgeCaseTest::test_ec1_uncovered_closure_path_yields_exactly_one_omission`, `::test_ec1_never_widens_to_nearest_parent_or_whole_repo` | passed |
+| EC-2 | Edge case | overlapping roots resolve by longest prefix; conflicting map entries rejected at validation; legitimate target sharing is not rejected | `scripts/antares/governing_boundary_closure_test.py::EdgeCaseTest::test_ec2_overlapping_roots_resolve_by_longest_prefix`, `::test_ec2_canonicalization_collision_between_keys_rejected_at_validation`, `::test_ec2_distinct_keys_sharing_a_target_are_not_a_conflict` | passed |
+| EC-3 | Edge case | missing/non-canonical/outside-snapshot governing-context target raises typed error, no partial result | `scripts/antares/governing_boundary_closure_test.py::EdgeCaseTest::test_ec3_missing_governing_context_target_raises_typed_error`, `::test_ec3_non_canonical_target_raises_typed_error_no_partial_result`, `::test_ec3_outside_snapshot_target_raises_typed_error` | passed |
+| EC-4 | Edge case | duplicate closure paths / cross-boundary duplicate targets stay deduplicated and deterministically ordered | `scripts/antares/governing_boundary_closure_test.py::EdgeCaseTest::test_ec4_duplicate_closure_paths_under_same_boundary_stay_in_sync`, `::test_ec4_provenance_and_ordering_stay_deterministic_across_calls` | passed |
+| EC-5 (additional) | Edge case | boundary root absent from committed map raises typed `undeclared_boundary_root` error | `scripts/antares/governing_boundary_closure_test.py::UndeclaredBoundaryRootTest::test_ec_boundary_root_absent_from_committed_map_raises_typed_error` | passed |
+
+Full suite: `python3.11 -m pytest scripts/antares/governing_boundary_closure_test.py -v` → 14 passed.
+Regression check: `python3.11 -m pytest scripts/antares/ -v` → 226 passed, 37 subtests passed (no regressions against T3c-1 or any other antares module).
+
+### Owner final verification
+
+- Owner: `Matias Kruk`
+- Date: `2026-08-06`
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior, that the ADR-038 Med-high routing was followed exactly as specified (including the correctly-terminal `budget_exhausted` local outcome and the resulting cloud escalation), and that the phase-2 reviewer's sole finding was correctly dispositioned as a false positive with reproducible counter-evidence rather than silently dropped.
+- Commands run: `python3.11 -m pytest scripts/antares/governing_boundary_closure_test.py -v`, `python3.11 -m pytest scripts/antares/ -v`
 
 ## T3a - Versioned CWE watchlist
 

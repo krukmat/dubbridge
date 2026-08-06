@@ -1,0 +1,9 @@
+{
+  "description": "EC-3: a committed governing-context target that is missing, non-canonical, or outside the snapshot raises a typed GoverningBoundaryValidationError with no partial result. This fixture exercises the 'missing target' case.",
+  "governing_map_overrides": {
+    "crates/db/": ["crates/db/Cargo.toml", "crates/db/NONEXISTENT_TARGET.md"]
+  },
+  "boundary_roots": ["crates/db/"],
+  "t3c1_closure_paths": ["crates/db/src/lib.rs"],
+  "expected_error_reason": "missing_target"
+}

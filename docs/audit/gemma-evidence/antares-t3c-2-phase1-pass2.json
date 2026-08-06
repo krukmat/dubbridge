@@ -1,0 +1,22 @@
+{
+  "findings": [
+    "HIGH|Routing table, Agent workflow|n/a|The routing table lists 'Qwen27 refinement' and 'qwen3.6:35b-a3b' sessions, which are not among the CURRENT verified model identifiers (gpt-5.6-sol, claude-sonnet-5). Referencing unverified or hallucinated models violates the system prompt's instruction to use only verified IDs.|Restrict routing to the verified model list.",
+    "MEDIUM|Scope section|scripts/antares/governing_boundary_map.py|The objective states computing a set governed by 'caller-declared repository boundary roots' and implies a mapping process, yet the scope lists governing_boundary_map.py but no corresponding *_closure_*.py file is explicitly named as writable for the core logic if it differs from governing_boundary_closure.py. If governing_boundary_closure.py is the sole implementation target, ensure the map.py file is truly read-only or correctly identified. If map.py requires updates to define the 'mapping', it must be in the writable scope.|Clarify writable/read-only status of governing_boundary_map.py vs governing_boundary_closure.py.",
+    "LOW|Agent workflow|Phase1 review, Phase2 review|The fallback chain specifies 'Gemma then D14'. D14 is not defined in the context of available models and likely refers to a specific internal identifier or hallucination. Clarify if D14 is a valid tool/model identifier in this repository context or remove it to rely on the verified set.|Define D14 inline or link to its definition."
+  ],
+  "model": "qwen3.6:27b-q4_K_M",
+  "phase": "task",
+  "reviewer": "qwen3.6:27b-q4_K_M",
+  "summary": "The task card contains inconsistent routing logic referencing non-existent models ('Qwen27', 'qwen3.6') that contradict the provided verified model list. Additionally, the scope lacks a specific implementation file for the core 'governing_boundary_map' logic implied by the objective, creating a gap between the stated goal and the writable codebase.",
+  "ts": "2026-08-06T18:09:24.141326Z",
+  "usage": {
+    "done_reason": "stop",
+    "prompt_tokens": 827,
+    "response_tokens": 387
+  },
+  "verdict": "findings",
+  "pass": 2,
+  "commit_sha": "ab9f8da81b78b96fb458081249337b0c9d2f722c",
+  "task_id": "antares-t3c-2",
+  "note": "Second phase-1 pass, run after correcting the model routing table (gpt-5.6-sol / claude-sonnet-5) flagged by pass 1. The HIGH finding in this pass is a reviewer-side artifact of the review prompt's own instruction, which listed only gpt-5.6-sol/claude-sonnet-5 as 'verified' and omitted the local pipeline models (qwen3.6:27b-q4_K_M, qwen3.6:35b-a3b) that ADR-038/RRI_POLICY.md actually govern for this RRI band -- qwen3.6:27b-q4_K_M is the very model that produced this verdict, so it cannot be hallucinated. Disposition recorded in the task ledger, not resolved by a third pass."
+}

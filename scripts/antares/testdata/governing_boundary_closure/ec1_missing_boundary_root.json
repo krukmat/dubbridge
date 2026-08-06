@@ -1,0 +1,12 @@
+{
+  "description": "EC-1: a T3c-1 closure path not covered by any declared boundary root yields exactly one context_closure_missing_governing_boundary omission.",
+  "boundary_roots": ["crates/db/"],
+  "t3c1_closure_paths": ["apps/api/src/main.rs"],
+  "expected_included": [],
+  "expected_omitted": [
+    {
+      "path": "apps/api/src/main.rs",
+      "reason": "context_closure_missing_governing_boundary"
+    }
+  ]
+}
