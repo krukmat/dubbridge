@@ -386,9 +386,10 @@ Two things the graph makes explicit that neither plan stated alone:
 2. **The packet track is invocation-independent.** Computing a deterministic
    dependency/manifest closure over a snapshot is required whether Antares is
    driven by our own harness or by `antares tool query --stdin`. T3c-1,
-   T3c-2 (**done 2026-08-06**), and T3d therefore survive the Element 3
-   decision intact and are not at risk from it. `packet_schema.py` and
-   `cwe_watchlist.py` likewise.
+   T3c-2, and T3d (**all done 2026-08-06** — T3 fully closed, all of
+   T3a-T3d `[x] Done`) therefore survived the Element 3 decision intact and
+   were not at risk from it. `packet_schema.py` and `cwe_watchlist.py`
+   likewise.
 
 ### Proposed sequence
 
@@ -396,7 +397,7 @@ Two things the graph makes explicit that neither plan stated alone:
 |---|---|---|---|
 | A | Elements 1 + 2 | Zero governance cost (personal tooling, outside the repo); closes the only hard-blocked prerequisite with no progress; produces the first live model contact in the slice's history | none — no approval required |
 | B | Comparative experiment: same fixture through the existing harness and through `antares tool query --stdin` | Converts the Element 3 decision from speculation into measurement. The existing harness needs a translation layer first, which is itself the measurement of what adopting the CLI would save | none — read-only evaluation, artifacts only |
-| C | T3c-1 (**done 2026-08-05**) -> T3c-2 (**done 2026-08-06**) -> T3d | Invocation-independent; already scored, phase-1 reviewed, and handoff-ready. Runs in parallel with A/B without colliding | explicit approval per task (T3c-1 was RRI 55 Med-high, approved and closed; T3c-2 was RRI 49 Med-high, approved and closed; T3d next) |
+| C | T3c-1 (**done 2026-08-05**) -> T3c-2 (**done 2026-08-06**) -> T3d (**done 2026-08-06**) — **Phase C complete, T3 fully closed** | Invocation-independent; already scored, phase-1 reviewed, and handoff-ready. Ran in parallel with A/B without colliding | explicit approval per task, all granted and closed (T3c-1 RRI 55 Med-high; T3c-2 RRI 49 Med-high; T3d RRI 51 Med-high, owner-verified 2026-08-06) |
 | D | Element 3 — **complete 2026-08-05** (Subtask A: adopt CLI, retire harness live-invocation role, T2a-T2e narrowed to test-only; Subtask B: `dispatch_via_cli` implemented in `harness.py`; Subtask C: T2a-T2e disposition docs synced) | Decomposed under the RRI 58 Complex pre-decomposition gate (`docs/audit/antares-t4-element3-rri.md`); Subtask A closed the architecture decision, Subtask B implemented it, Subtask C synced T2a-T2e disposition docs | none — all three subtasks closed |
 | E | T4 pilot, then T5 | Unblocked only once A, C, and D have all landed | existing slice gates |
 
@@ -425,12 +426,17 @@ momentum matters more than sequencing cleanliness.
   tooling outside this repository, nothing tracked, no governed path touched.
 - **Phase B:** no approval required. Read-only comparative evaluation that
   emits artifacts; it changes no tracked code.
-- **T3c-1 and successors (Phase C):** explicit human approval per task, per
-  their RRI bands. T3c-1 was approved 2026-08-05 ("aprobado") and is
-  `[x] Done`. T3c-2 was approved 2026-08-06 ("aprobado") and is now
+- **T3c-1 and successors (Phase C) — complete:** explicit human approval per
+  task, per their RRI bands, all granted. T3c-1 approved 2026-08-05
+  ("aprobado"), `[x] Done`. T3c-2 approved 2026-08-06 ("aprobado"),
   `[x] Done` (RRI 49 Med-high; ADR-038 routed `GO_LOCAL`, the bounded local
-  session hit `budget_exhausted`, escalated to and implemented by cloud);
-  T3d is the next task requiring its own presentation and approval.
+  session hit `budget_exhausted`, escalated to and implemented by cloud). T3d
+  approved 2026-08-06 ("aprobado"), `[x] Done (owner-verified, 2026-08-06)`
+  (RRI 51 Med-high; ADR-038 routed `GO_LOCAL`, the bounded local session
+  again hit `budget_exhausted`, escalated to and implemented by cloud;
+  phase-2 review `PASS`, 0 findings). This closes Phase C's task chain and
+  T3 as a whole (all of T3a-T3d `[x] Done`); T4's dependency on T3 is now
+  resolved, leaving T4 gated only on T1's separate runtime prerequisites.
 - **Element 3 (Phase D) — complete 2026-08-05:** decomposed under RRI 58
   Complex (`docs/audit/antares-t4-element3-rri.md`). Subtask A (route
   decision, RRI 26) approved and closed. Subtask B (implementation, RRI 50

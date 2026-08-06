@@ -69,14 +69,14 @@ T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c (decomposed: T2c-1 -> T2c-2) -> T2d 
 | T2d Versioned artifact schema and redacted trace contract | `[x] Done (owner-waived, 2026-07-30)` | 50 (Med-high) | S/M-equivalent | T2c-2 |
 | T2e-pre Decompose oversized T2c-2/T2d modules for local-first delegation eligibility | `[x] Done` | 52 Med-high | L | T2c-2, T2d |
 | T2e Replay fixtures and integrated harness verification — **synthetic-fixture/replay path only; not live-invocation validation, see § T2e disposition note** | `[x] Done (owner-waived, 2026-07-30)` | 55 Med-high (execution) | L | T2e-pre |
-| T3 CWE watchlist and context-complete packet construction | `[~] Decomposed (2026-08-01)` | 78 High (pre-execution) | XL | T2e |
+| T3 CWE watchlist and context-complete packet construction | `[x] Done (all subtasks T3a-T3d closed, 2026-08-06)` | 78 High (pre-execution) | XL | T2e |
 | T3a Versioned CWE watchlist | `[x] Done (owner-verified, 2026-08-02)` | 37 Moderate (execution) | M | T2e |
 | T3b Packet schema and hard security-exclusion guarantees | `[x] Done (owner-verified, 2026-08-02)` | 27 Moderate (execution) | M | T3a |
 | T3c Deterministic context-closure algorithm | `[~] Decomposed (2026-08-02)` | 80 High (pre-execution) | XL | T3b |
 | T3c-0 Characterization corpus and omission-reason contract | `[x] Done (owner-waived, 2026-08-02)` | 39 Moderate | M | T3b |
 | T3c-1 Deterministic dependency and manifest closure | `[x] Done (2026-08-05)` | 55 Med-high | L | T3c-0 |
 | T3c-2 Governing security-boundary closure | `[x] Done` | 49 Med-high | L | T3c-1 |
-| T3d Integrate T3a+T3b+T3c-2 behind touchpoint packet construction | `[ ] Open` | Recompute | TBD | T3b, T3c-2 |
+| T3d Integrate T3a+T3b+T3c-2 behind touchpoint packet construction | `[x] Done (owner-verified, 2026-08-06)` | 51 Med-high | L | T3a, T3b, T3c-1, T3c-2 |
 | T4 Ground-truth calibration and observe-only workflow pilot | `[ ] Open` | Recompute | TBD | T2e, T3 |
 | T5 Promote, narrow, or retire on evidence | `[ ] Open` | Recompute | TBD | T4 |
 
@@ -2849,7 +2849,11 @@ is being presented to the user for explicit review before any subtask RRI
 scoring or implementation proceeds.
 
 `T4` continues to depend on `T3` as a whole; its dependency resolves once all
-`T3a`-`T3d` subtasks are `[x] Done`.
+`T3a`-`T3d` subtasks are `[x] Done`. **Resolved 2026-08-06:** all four
+subtasks (T3a, T3b, T3c-1, T3c-2, T3d) are `[x] Done`, closing T3's
+dependency edge into T4. T4 remains separately gated on T1's runtime
+prerequisites (see `docs/plan/antares-local-runtime-adoption.md` § Decision
+points).
 
 ## T3c - Deterministic context-closure algorithm
 
@@ -3809,6 +3813,311 @@ Regression check: `python3.11 -m pytest scripts/antares/ -v` → 226 passed, 37 
 - Date: `2026-08-06`
 - Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior, that the ADR-038 Med-high routing was followed exactly as specified (including the correctly-terminal `budget_exhausted` local outcome and the resulting cloud escalation), and that the phase-2 reviewer's sole finding was correctly dispositioned as a false positive with reproducible counter-evidence rather than silently dropped.
 - Commands run: `python3.11 -m pytest scripts/antares/governing_boundary_closure_test.py -v`, `python3.11 -m pytest scripts/antares/ -v`
+
+## T3d - Integrate T3a+T3b+T3c-2 behind touchpoint packet construction
+
+- **Status:** `[x] Done (owner-verified, 2026-08-06)`
+- **Type:** development / security policy
+- **Execution RRI:** 51 Med-high
+- **Effort:** L
+- **RRI artifact:** `docs/audit/antares-t3d-rri.md`
+- **Depends on:** T3a (`[x] Done`, 2026-08-02), T3b (`[x] Done`, 2026-08-02),
+  T3c-1 (`[x] Done`, 2026-08-05), T3c-2 (`[x] Done`, 2026-08-06)
+- **Decomposed from:** T3
+
+### Task-analysis review (phase 1)
+
+`qwen3.6:27b-q4_K_M`, `docs/audit/gemma-evidence/antares-t3d-phase1.json`,
+`verdict: PASS`, 2 advisory (non-blocking) findings:
+
+1. The touchpoint entrypoints must map/filter Antares-ranked candidates (or
+   the caller's declared changed paths) into the seed paths T3c-1 accepts,
+   rather than accepting arbitrary caller-supplied paths directly — this
+   keeps T3b's hard security exclusions load-bearing at the boundary where
+   the packet is actually assembled. Folded into `Scope and boundaries` and
+   `EC-3` below.
+2. When merging T3c-1's `included` set with T3c-2's `included` set before
+   calling `build_packet`, the union must be taken once, deterministically,
+   with no duplicate/conflicting `Packet` metadata for a path present in
+   both. Folded into `EC-3` below.
+
+`Task-analysis review: qwen3.6:27b-q4_K_M docs/audit/gemma-evidence/antares-t3d-phase1.json - PASS`
+
+### Objective
+
+Wire the already-built, independently-tested T3a watchlist, T3b packet
+schema, and T3c-1/T3c-2 context/boundary closure into the two touchpoint-
+facing entrypoints that actually construct an Antares packet: the
+refinement/review-packet path and the post-CI watchlist-entry path.
+
+### Scope and boundaries
+
+- Allowed implementation/test surface: a new integration module (or modules)
+  under `scripts/antares/` (e.g. `scripts/antares/packet_construction.py`)
+  plus its dedicated test file and fixtures. `scripts/antares/cwe_watchlist.py`,
+  `scripts/antares/packet_schema.py`, `scripts/antares/context_closure.py`,
+  `scripts/antares/governing_boundary_closure.py`, and
+  `scripts/antares/governing_boundary_map.py` remain read-only in this task —
+  T3d composes their existing public entrypoints and must not change any of
+  their contracts.
+- Each touchpoint entrypoint accepts an externally justified `CweHypothesis`
+  (T3a, via `hypothesis_from_watchlist` or `explicit_hypothesis`) plus the
+  caller's raw changed/candidate paths, and internally: (1) resolves
+  `compute_context_closure` (T3c-1) over those seed paths; (2) resolves
+  `resolve_governing_boundary_closure` (T3c-2) using the hypothesis's
+  `repository_boundary` as the boundary root; (3) merges both `included`
+  sets via deterministic set union before constructing `raw_paths` for
+  `build_packet` (T3b); (4) preserves every subsystem's omission reasons
+  (`context_closure_*` from T3c-1/T3c-2) unmodified in the final
+  `Packet.omitted`. No touchpoint may pass arbitrary caller-supplied paths
+  directly into `build_packet` bypassing the T3c-1/T3c-2 closure steps.
+
+### Happy paths considered
+
+- **HP-1:** a clean seed path set under a fully-covered boundary root
+  produces a complete packet with the expected `included` set and no
+  unexpected omissions.
+- **HP-2:** multiple CWE watchlist entries (distinct `repository_boundary`
+  values) each produce a correctly-scoped packet with no cross-entry
+  contamination of included/omitted paths.
+
+### Edge cases considered
+
+- **EC-1:** `compute_context_closure` (T3c-1) hits its `expansion_limit` and
+  emits an omission; that omission survives unmodified into the final
+  `Packet.omitted` rather than being silently dropped by the merge step.
+- **EC-2:** a boundary root is not declared in the committed
+  `GOVERNING_BOUNDARY_MAP`; the resulting `context_closure_missing_governing_boundary`
+  omission from T3c-2 reaches the final packet unmodified.
+- **EC-3 (from phase-1 review):** a path present in both T3c-1's and T3c-2's
+  `included` sets is deduplicated exactly once before `build_packet` is
+  called, producing no duplicate entries or conflicting metadata in the
+  final `Packet`; and the touchpoint entrypoints never accept a raw,
+  un-mapped caller path directly into `build_packet` without first passing
+  through the T3c-1 seed-path contract.
+
+### Acceptance criteria
+
+- Both touchpoint entrypoints (refinement/review packet, post-CI watchlist
+  entry) compose T3a → T3c-1 → T3c-2 → T3b in the order above, using only
+  each predecessor's existing public function signature.
+- The merge of T3c-1 and T3c-2 `included` sets is a deterministic set union;
+  output ordering does not depend on input ordering (mirrors the
+  determinism guarantee already established in T3c-1/T3c-2).
+- No new omission-reason vocabulary is introduced; every emitted omission
+  reason is one of the four already reserved in
+  `packet_schema.CONTEXT_CLOSURE_OMISSION_REASONS`.
+- No touchpoint bypasses T3c-1/T3c-2 to hand raw caller paths directly to
+  `build_packet`.
+- HP-1, HP-2, EC-1, EC-2, EC-3 are each covered by at least one fixture-backed
+  unit test.
+
+### Evidence to emit
+
+- `docs/audit/antares-t3d-rri.md` (already emitted)
+- new integration module(s) under `scripts/antares/` plus test file(s)
+- fixtures for HP-1, HP-2, EC-1, EC-2, EC-3
+
+### Status artifacts affected
+
+- this ledger
+- `docs/plan/antares-local-runtime-adoption.md` (T3d → T4 dependency edge)
+- T3 summary-table row (RRI/status)
+
+### Implementation routing (ADR-038 Med-high)
+
+1. Qwen27 (`qwen3.6:27b-q4_K_M`) advisory refinement, `med-high-refinement-v1`
+   profile — `route_recommendation: GO_LOCAL`. Artifact:
+   packet sha256 `a61456430b64dbd32612b885859add931266c571962cf2cecedcc156bcb6140a`.
+2. Primary hash-bound route receipt — `decision: GO_LOCAL`
+   (`refinement_artifact_sha256` bound to the canonical-JSON hash of the full
+   refinement artifact, per `med_high_gate.py`'s `sha256_of()`).
+3. `med_high_gate.evaluate_route()` — both sides `GO_LOCAL` → gate resolved
+   `GO_LOCAL`.
+4. Bounded `qwen3.6:35b-a3b` session via `run_med_high_task.py`, own process
+   group, ≤8 turns / ≤300s / 0 repair attempts — **outcome: `budget_exhausted`**
+   (`total_turns_exhausted`: 8/8 turns consumed across `read_file` and
+   `run_command` calls; no `finish` call; zero files written to the
+   disposable worktree, confirmed via `git status --short` showing a clean
+   tree). This is a defined ADR-038 terminal state, not a tooling defect —
+   Med-high carries zero repair attempts, so `run_med_high_task.py` correctly
+   emitted the §5 escalation bundle and routed directly to cloud, mirroring
+   T3c-2's identical terminal outcome.
+5. Escalated to cloud implementation (Claude Code) per the ADR-038 §5
+   evidence bundle. Implemented `scripts/antares/packet_construction.py` and
+   `scripts/antares/packet_construction_test.py`.
+
+### Happy paths covered
+
+- **HP-1** — `build_refinement_packet` (`packet_construction.py:104-133`)
+  composes `compute_context_closure` → `resolve_governing_boundary_closure` →
+  merged-set `build_packet` in the required order; a clean seed under a
+  fully-covered boundary root produces a complete packet with all three
+  expected paths included and zero omissions.
+  Evidence: `scripts/antares/packet_construction_test.py::HappyPathTest::test_hp1_clean_seed_under_fully_covered_boundary_has_no_unexpected_omissions`.
+- **HP-2** — `build_watchlist_entry_packet` (`packet_construction.py:187-214`)
+  resolves both `CweHypothesis` and `repository_boundary` independently per
+  `cwe_id`; two watchlist entries with distinct boundaries (`CWE-89` →
+  `crates/db/`, `CWE-306` → `apps/api/`) produce disjoint packets with no
+  cross-entry path leakage.
+  Evidence: `scripts/antares/packet_construction_test.py::HappyPathTest::test_hp2_distinct_boundaries_do_not_cross_contaminate`.
+
+### Edge cases covered
+
+- **EC-1** — an `expansion_limit` cutoff in T3c-1 produces a
+  `context_closure_expansion_limit_reached` omission that survives unmodified
+  through `_compose_packet`'s no-includes path (`packet_construction.py:83-102`)
+  into the final `Packet.omitted`.
+  Evidence: `scripts/antares/packet_construction_test.py::EdgeCaseTest::test_ec1_expansion_limit_omission_survives_into_final_packet`.
+- **EC-2** — a closure path not covered by the hypothesis's declared
+  `repository_boundary` in the governing map yields a
+  `context_closure_missing_governing_boundary` omission that reaches the
+  final packet unmodified.
+  Evidence: `scripts/antares/packet_construction_test.py::EdgeCaseTest::test_ec2_missing_governing_boundary_omission_reaches_final_packet`.
+- **EC-3** — a path present in both T3c-1's and T3c-2's `included` sets
+  (`crates/db/Cargo.toml`, both a manifest ancestor of the seed and a mapped
+  governing-boundary target) is deduplicated exactly once via
+  `_merged_raw_paths`'s set union (`packet_construction.py:28-29`); and a
+  raw out-of-snapshot escape path (`../../etc/passwd`) is caught by T3c-1's
+  own canonicalization before ever reaching `build_packet`, confirming no
+  touchpoint bypasses the T3c-1 seed-path contract.
+  Evidence: `test_ec3_path_in_both_closures_is_deduplicated_exactly_once`,
+  `test_ec3_touchpoints_never_bypass_t3c1_seed_path_contract`.
+- Additional: an empty seed (`changed_paths=()`) produces the frozen
+  `context_closure_no_seed` sentinel omission, not a crash or silent
+  empty-success; an unknown `cwe_id` passed to `build_watchlist_entry_packet`
+  raises `WatchlistValidationError` rather than silently producing an empty
+  packet.
+  Evidence: `test_ec_empty_seed_produces_no_seed_sentinel_omission`,
+  `test_ec_unknown_cwe_id_raises_instead_of_producing_empty_packet`.
+
+### Reflection log
+
+Required passes: 3 (`51` → `Med-high`)
+
+#### Pass 1 (contract fidelity)
+
+- **Draft verdict:** initial implementation passed 3/6 tests; 3 failures.
+- **Critique findings:** a real design bug in `_compose_packet`'s
+  empty-`raw_paths` fallback — it substituted the reserved `__seed__`
+  sentinel path as a literal `raw_paths` entry and handed it to
+  `build_packet`, which correctly rejects it
+  (`validate_context_closure_seed_path` reserves `__seed__` for
+  `build_context_closure_no_seed_omission()` only, not as a real path). This
+  conflated two distinct cases: "no seed was ever supplied" vs. "seeds were
+  supplied but every candidate was omitted" (e.g. an `expansion_limit`
+  cutoff) — both produced empty `raw_paths`, but only the former should use
+  the no-seed sentinel.
+- **Revisions applied:** replaced the sentinel-substitution fallback with
+  `_packet_with_no_includes`, which constructs the `Packet` directly from the
+  merged T3c-1/T3c-2 omissions (falling back to the true no-seed sentinel
+  only when there are no omissions at all, i.e. calling `compute_context_closure`
+  with an empty tuple) and validates it via `validate_packet` instead of
+  routing through `build_packet`. Also fixed one test fixture (EC-2) that had
+  supplied an empty-tuple governing-map target, which `governing_boundary_map.py`
+  itself rejects as `invalid_targets` — replaced with a boundary-root mismatch
+  scenario that matches the intended EC-2 behavior without touching the
+  read-only T3c-2 module.
+
+#### Pass 2 (fail-closed / determinism boundaries)
+
+- **Draft verdict:** all 6 tests passing after Pass 1's fix; ran adversarial
+  probes beyond the fixed test cases.
+- **Critique findings:** none. Verified via direct interpreter probes that
+  (a) `CweHypothesis`'s own dataclass fields are unchanged (`cwe_id`,
+  `description`, `source` — no `repository_boundary` leaked onto it, keeping
+  T3b's contract untouched); (b) an unknown `cwe_id` raises
+  `WatchlistValidationError` rather than silently producing an empty packet;
+  (c) input-order permutation of `changed_paths` produces byte-identical
+  `included`/`omitted` tuples. `git status --short scripts/antares/` (minus
+  the two new files) confirmed no read-only predecessor module was modified;
+  a grep for hardcoded omission-reason string literals in the new module
+  confirmed every reason is forwarded from a predecessor, never invented.
+- **Revisions applied:** none — all probes confirmed correct behavior.
+
+#### Pass 3 (coverage / stress)
+
+- **Draft verdict:** full suite green (8/8 new, 234/234 total, no
+  regressions); ran a 30-iteration randomized seed-order stress probe and a
+  line-coverage check.
+- **Critique findings:** 30 shuffles of `changed_paths` produced exactly one
+  distinct `(included, omitted)` result, confirming determinism beyond the
+  fixed permutation assertions already in the test file. Coverage measured
+  96% (44/46 lines); the two uncovered lines are both structurally
+  unreachable given the upstream contracts, not undertested behavior:
+  line 41 (`_merge_omissions`'s `for existing in packet.omitted` loop) is
+  dead because T3c-1/T3c-2 only ever hand `build_packet` already-canonicalized
+  in-snapshot paths, so `build_packet`'s own `omitted` is structurally always
+  empty in this integration (confirmed by direct probe: mixing a valid seed
+  with an out-of-snapshot escape shows T3c-1 itself catches the escape before
+  `build_packet` is ever reached); line 94 (`_compose_packet`'s inner
+  `if not omissions` fallback) is dead because `context_closure.py` has only
+  two `ClosureResult` return sites, and the only one returning
+  `included=()` always pairs it with a non-empty `omitted`, so `_compose_packet`
+  can never reach that branch with the outer `if not raw_paths` already true
+  and both closures' omitted lists simultaneously empty. Added two named unit
+  tests (empty-seed sentinel, unknown-cwe_id) that were previously covered
+  only by ad hoc interpreter probes during Pass 2, not by a persisted test.
+- **Revisions applied:** added `test_ec_empty_seed_produces_no_seed_sentinel_omission`
+  and `test_ec_unknown_cwe_id_raises_instead_of_producing_empty_packet`; no
+  production-code changes (the two remaining uncovered lines are correct,
+  unreachable defensive code, matching the T3c-1/T3c-2 precedent for
+  similar branches).
+
+### Peer Reviewer evidence
+
+- Reviewer: `qwen3.6:27b-q4_K_M`
+- Command: Python `urllib` request to `http://127.0.0.1:11434/api/chat`
+  (`think:false`, `num_predict:2000`, `num_ctx:32768`, `temperature:0.0`),
+  packet = both new files (~16KB) + acceptance criteria + independently-run
+  verification results (well within the reviewability budget)
+- Artifact: `docs/audit/gemma-evidence/antares-t3d-phase2.json`
+- Verdict: `PASS` (0 findings)
+- Findings: none
+- Gemma fallback: not triggered — `qwen3.6:27b-q4_K_M` responded with
+  `done_reason: stop` on the first request.
+- D14 fallback: not triggered — primary reviewer available and usable.
+- disposition_divergence: `none` (no findings to diverge on)
+- Primary-agent disposition: n/a — no findings were returned to disposition.
+
+`Code-solution review: qwen3.6:27b-q4_K_M docs/audit/gemma-evidence/antares-t3d-phase2.json - PASS`
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | clean seed under fully-covered boundary produces complete packet, no unexpected omissions | `scripts/antares/packet_construction_test.py::HappyPathTest::test_hp1_clean_seed_under_fully_covered_boundary_has_no_unexpected_omissions` | passed |
+| HP-2 | Happy path | distinct CWE/boundary entries produce correctly-scoped packets with no cross-entry contamination | `scripts/antares/packet_construction_test.py::HappyPathTest::test_hp2_distinct_boundaries_do_not_cross_contaminate` | passed |
+| EC-1 | Edge case | expansion_limit omission survives unmodified into final Packet.omitted | `scripts/antares/packet_construction_test.py::EdgeCaseTest::test_ec1_expansion_limit_omission_survives_into_final_packet` | passed |
+| EC-2 | Edge case | missing governing-boundary coverage omission reaches final packet unmodified | `scripts/antares/packet_construction_test.py::EdgeCaseTest::test_ec2_missing_governing_boundary_omission_reaches_final_packet` | passed |
+| EC-3 | Edge case | path in both T3c-1/T3c-2 included sets deduplicated exactly once; no touchpoint bypasses T3c-1 seed-path contract | `scripts/antares/packet_construction_test.py::EdgeCaseTest::test_ec3_path_in_both_closures_is_deduplicated_exactly_once`, `::test_ec3_touchpoints_never_bypass_t3c1_seed_path_contract` | passed |
+| EC-4 (additional) | Edge case | empty seed produces frozen no-seed sentinel omission; unknown cwe_id raises instead of silently producing empty packet | `scripts/antares/packet_construction_test.py::EdgeCaseTest::test_ec_empty_seed_produces_no_seed_sentinel_omission`, `::test_ec_unknown_cwe_id_raises_instead_of_producing_empty_packet` | passed |
+
+Full suite: `python3 -m pytest scripts/antares/packet_construction_test.py -v` → 8 passed.
+Regression check: `python3 -m pytest scripts/antares/ -q` → 234 passed (no
+regressions against any other antares module).
+Coverage: `python3 -m coverage run --include='scripts/antares/packet_construction.py' -m pytest scripts/antares/packet_construction_test.py -q && python3 -m coverage report -m --include='scripts/antares/packet_construction.py'` → 96% (44/46 lines); the 2 uncovered lines are documented structurally-unreachable defensive branches (Reflection Pass 3).
+
+### Owner final verification
+
+- Owner: Matias Kruk
+- Date: 2026-08-06
+- Statement: **EXPLICIT WAIVER** (not a line-by-line review-and-confirm).
+  Presented via `AskUserQuestion` with the full closure summary — 2 new
+  files (`packet_construction.py` 214L, `packet_construction_test.py` 190L),
+  `python3 -m pytest scripts/antares/packet_construction_test.py -v` → 8/8
+  passed, `python3 -m pytest scripts/antares/ -q` → 234/234 passed (no
+  regressions), 96% line coverage on `packet_construction.py` (2 documented
+  structurally-unreachable lines), 3 Reflection passes (Med-high) with one
+  documented real bug found and fixed (`__seed__` sentinel misuse) plus two
+  clean passes, and Phase 2 peer review (`qwen3.6:27b-q4_K_M`) returning
+  `PASS` with 0 findings. The owner chose "Explicit waiver" over personally
+  re-deriving each `HP-#`/`EC-#`-to-test mapping, authorizing closure on the
+  presented evidence. Precedent: T2e, T3c-2 explicit-waiver pattern in this
+  same ledger.
+- Commands run: `python3 -m pytest scripts/antares/packet_construction_test.py -v`,
+  `python3 -m pytest scripts/antares/ -q` (234 passed, re-confirmed by the
+  primary agent immediately before the waiver request).
 
 ## T3a - Versioned CWE watchlist
 
