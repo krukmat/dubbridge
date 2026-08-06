@@ -1,0 +1,5 @@
+[package]
+name = "explicit_lib_pkg"
+
+[lib]
+path = "custom_src/entry.rs"

@@ -1,7 +1,7 @@
 ---
 type: Audit
 title: "RRI evidence: T3c-1 - Deterministic dependency and manifest closure"
-status: proposed
+status: closed
 task: docs/tasks/antares-security-specialist-advisor.md#t3c-1---deterministic-dependency-and-manifest-closure
 date: 2026-08-03
 ---
@@ -55,3 +55,13 @@ Interpretation: the task remains in the Med-high band and requires the full
 RRI 26–55 review, Reflection, and HITL approval gates. The ambiguity score is
 zero because the revised task definition fixes the terminal error contract,
 empty-manifest behavior, and manifest classification boundary before execution.
+
+## Closure (2026-08-05)
+
+Task closed `[x] Done`. ADR-038 gate resolved `CLOUD_REQUIRED` (both Qwen27
+advisory refinement and the primary hash-bound receipt independently
+recommended cloud, citing this same day's Element 3 Subtask B local-session
+failure as directly comparable counter-evidence). Implemented by the primary
+agent (Claude Code, cloud) per ADR-038 §4/§6. Full closure record, Reflection
+log, and unit coverage certification: `docs/tasks/antares-security-specialist-advisor.md`
+§ T3c-1.

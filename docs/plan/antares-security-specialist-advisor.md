@@ -655,13 +655,20 @@ is now cancelled outright, because Antares does not propose RRI inputs.
   remained in `FINDINGS` because it recommended allowing a real file named
   `__seed__`; the approved task text explicitly forbids that, so closure used
   an explicit owner waiver rather than changing the contract mid-task.
-- `T3c-1` is now the next executable `T3c` child: its fresh presentation-time
-  RRI is 55 (Med-high, Effort L), phase-1 task analysis is PASS via the D14
-  final fallback, and it is ready for the approval presentation. Implementation
-  has not started.
+- `T3c-1` is `[x] Done` (2026-08-05): approved at RRI 55 Med-high, ADR-038
+  routed to `CLOUD_REQUIRED` (both Qwen27 advisory refinement and the
+  primary hash-bound receipt independently recommended cloud, citing the
+  same day's Element 3 Subtask B local-session failure as directly
+  comparable counter-evidence), implemented by the primary agent,
+  phase-2 review PASS on `qwen3.6:27b-q4_K_M` with 0 findings
+  (`docs/audit/gemma-evidence/antares-t3c-1-phase2.json`), 39/39 task-local
+  tests pass (45/45 including the unaffected T3c-0 corpus), 91% line
+  coverage. Full closure record: `docs/tasks/antares-security-specialist-advisor.md`
+  § T3c-1.
 - `T3d` remains open and now depends on `T3b` plus `T3c-2`. `T4` stays
   blocked until all of `T3a`, `T3b`, `T3c-0`, `T3c-1`, `T3c-2`, and `T3d`
-  are `[x] Done`.
+  are `[x] Done`. With `T3c-1` now done, `T3c-2` is the next executable
+  `T3c` child.
 - **Wire-format translation gap (recorded 2026-08-05).** Direct inspection of
   `scripts/antares/*.py` confirms no module translates real Antares output
   (`<tool_call>` tags carrying `name`/`arguments`) into the internal

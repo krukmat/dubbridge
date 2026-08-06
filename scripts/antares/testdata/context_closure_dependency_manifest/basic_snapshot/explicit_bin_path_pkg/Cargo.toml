@@ -1,0 +1,6 @@
+[package]
+name = "explicit_bin_path_pkg"
+
+[[bin]]
+name = "mytool"
+path = "tools/mytool/main.rs"

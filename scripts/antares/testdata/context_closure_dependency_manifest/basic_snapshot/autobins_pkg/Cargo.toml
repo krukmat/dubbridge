@@ -1,0 +1,3 @@
+[package]
+name = "autobins_pkg"
+autobins = false

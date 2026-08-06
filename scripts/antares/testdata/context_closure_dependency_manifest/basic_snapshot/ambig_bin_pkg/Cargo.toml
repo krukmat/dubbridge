@@ -1,0 +1,5 @@
+[package]
+name = "ambig_bin_pkg"
+
+[[bin]]
+name = "tool"

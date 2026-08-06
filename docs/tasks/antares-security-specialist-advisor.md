@@ -3112,7 +3112,7 @@ Code-solution review: `qwen3.6:27b-q4_K_M` `docs/audit/gemma-evidence/antares-t3
 
 ## T3c-1 - Deterministic dependency and manifest closure
 
-- **Status:** `[ ] Open`
+- **Status:** `[x] Done`
 - **Type:** development / repository-analysis policy
 - **Pre-execution RRI:** 55 Med-high
 - **Effort:** L
@@ -3276,7 +3276,208 @@ verification, Reflection, review disposition, and status synchronization.
 
 Task-analysis review: d14 .agent/peer-task-review-antares-t3c-1-phase1-d14.json - PASS
 
-Execution remains unauthorized until the user gives explicit approval.
+### Approval and routing record
+
+- Approved by user 2026-08-05 ("aprobado").
+- ADR-038 routing: Qwen27 (`qwen3.6:27b-q4_K_M`) advisory refinement
+  (`med-high-refinement-v1` profile,
+  `.agent/local-architect/med-high-refinement-v1/T3c-1/refinement-artifact.json`)
+  returned `route_recommendation: CLOUD_REQUIRED`, citing this same day's
+  Element 3 Subtask B local-session failure (10 turns of pure `read_file`
+  reconnaissance, never reaching `write_file`/`finish`) as directly
+  comparable counter-evidence for a similarly large, net-new-authorship
+  specification (3 HP + 10 EC cases in one module).
+- Primary hash-bound route receipt
+  (`.agent/local-architect/med-high-refinement-v1/T3c-1/primary-receipt.json`):
+  independently evaluated against ADR-038 §6 and concurred with
+  `CLOUD_REQUIRED` — not a hard-exclusion case, but the volume/novelty of
+  the specification against an 8-turn/300-second unsupervised budget, with
+  a same-day local failure on a comparably-sized task, made cloud escalation
+  the sound judgment.
+- `med_high_gate.py` result: `CLOUD_REQUIRED` ("Qwen27 recommended
+  CLOUD_REQUIRED; the primary cannot upgrade this to local.").
+- Implementation route taken: primary agent (Claude Code, cloud), per
+  ADR-038 §4/§6. Not attempted locally first — the gate structurally
+  forecloses local implementation whenever Qwen27 recommends
+  `CLOUD_REQUIRED`, regardless of the primary's own receipt.
+
+### Implementation
+
+- `scripts/antares/context_closure.py` (new, 624 lines): Rust `mod`-only
+  edge resolution with Cargo-resolution-order file/dir precedence; Cargo
+  entrypoint discovery (`[lib]`, explicit `[[bin]]` with/without path,
+  `autobins` file- and directory-form discovery, `autobins = false`);
+  direct local `[dependencies]` path-dependency resolution to the nearest
+  package `Cargo.toml`; Python absolute-import resolution gated on a local
+  top-level package (`<top>/__init__.py`) then resolved over the full
+  dotted path; Python relative-import resolution via package-ancestor-chain
+  ascent; manifest ancestor discovery/allowlisting
+  (`Cargo.toml`/`Cargo.lock`/`pyproject.toml`/`setup.py`/`setup.cfg`/
+  `requirements*.txt`) with strict TOML/INI parsing and UTF-8-only
+  `setup.py` handling (never executed); a lexical `..`/`.`
+  path-normalization helper so Cargo path-dependency and entrypoint targets
+  stay canonical; the typed fail-closed `ContextClosureResolutionError`;
+  and `compute_context_closure` as the single entry point, reusing
+  `packet_schema.py`'s `OmittedPath`, `CONTEXT_CLOSURE_NO_SEED_REASON`,
+  `build_context_closure_no_seed_omission`,
+  `canonicalize_context_closure_seed_path`, and
+  `deterministic_context_closure_seed_order` verbatim with no new omission
+  reason introduced.
+- `scripts/antares/context_closure_test.py` (new, 301 lines): 39 tests
+  covering every HP-1..3 and EC-1..10 case plus the required network-primitive
+  sentinel.
+- `scripts/antares/testdata/context_closure_dependency_manifest/basic_snapshot/**`
+  (new, dedicated fixture tree): Rust `mod`/Cargo-entrypoint/path-dependency
+  fixtures, Python absolute/relative-import fixtures (including an
+  ambiguous-module collision and a plain-directory-external case), manifest
+  fixtures for every allowlisted basename plus a workspace-only and an
+  empty `Cargo.toml`, a symlink escaping the snapshot, a cycle (with and
+  without a coexisting unresolved edge), a malformed `Cargo.toml`/`setup.cfg`,
+  an invalid-UTF-8 Rust source file, and a `setup.py` that raises if executed.
+- `scripts/antares/packet_schema.py` and the frozen T3c-0
+  `context_closure_characterization` corpus: **not modified** — confirmed via
+  `git diff --stat scripts/antares/packet_schema.py` (empty) and the
+  pre-existing `context_closure_characterization_test.py` suite passing
+  unchanged (6/6).
+- Two bugs found and fixed during Reflection: (1) Cargo path-dependency and
+  entrypoint target paths were not lexically normalized, so a
+  `path = "../dep_target"` style dependency produced a non-canonical
+  `pathdep_pkg/../dep_target/...` path instead of `dep_target/...` — fixed
+  with a `_normalize_posix` helper (violated EC-8's canonical-identity
+  requirement). (2) absolute Python imports only resolved the top-level
+  segment of a dotted path (e.g. `import top_pkg.mod_y` incorrectly stopped
+  at `top_pkg/__init__.py` instead of resolving `top_pkg/mod_y.py`) — fixed
+  by gating locality on the top-level segment per HP-2/EC-9, then resolving
+  the full dotted path, raising `unresolved_absolute_import` (a real local
+  edge that fails to resolve) rather than silently treating it as external.
+
+### Reflection log
+
+Required passes: 3 (`55` → `Med-high`)
+
+#### Pass 1 — Contract
+
+- **Draft verdict:** Core module implements Rust mod resolution, Cargo
+  entrypoint/path-dependency rules, Python import resolution (absolute +
+  relative), manifest ancestor discovery/parsing, cycle handling, expansion
+  limits, and the fail-closed exception. Manual smoke tests confirmed
+  HP-1/HP-2/HP-3 and most EC cases behave per spec.
+- **Critique findings:** (1) Cargo path-dependency/entrypoint paths were
+  not lexically normalized, producing non-canonical `../`-containing paths.
+  (2) EC-9's "both `.py` and `__init__.py` candidates existing also trigger
+  EC-5" was implemented for relative imports but not yet smoke-tested for
+  absolute imports. (3) `_cargo_entrypoints` tracked an `explicit_bin_names`
+  set that was computed but never read — dead code. (4) No test yet for a
+  workspace-only Cargo manifest (only true-empty was tested).
+- **Revisions applied:** added `_normalize_posix` and applied it to every
+  Cargo path join that could carry a manifest-supplied relative path;
+  removed the dead `explicit_bin_names` tracking; added workspace-only and
+  absolute-import-ambiguity smoke tests before finalizing fixtures.
+
+#### Pass 2 — Failure/containment boundaries
+
+- **Draft verdict:** All EC-5 typed-error paths, EC-3 expansion limit, EC-4
+  containment escape, and the network sentinel implemented and passing
+  (36/36 at this point, including the frozen T3c-0 suite unaffected).
+- **Critique findings:** (1) two `ContextClosureResolutionError` raises
+  inside `_process_source` used a fabricated reason string
+  (`"_expansion_limit_internal"`/`"_unreachable"`) for branches that are
+  actually unreachable by construction given the caller's own gating — a
+  fabricated typed error for an impossible branch is unnecessary complexity
+  and slightly misleading. (2) `_manifest_ancestors` silently swallowed
+  `OSError` from `iterdir()` and returned an empty entry list, which
+  contradicts this task's own fail-closed philosophy ("no fabricated
+  omission, no partial result") by treating an unreadable directory as "no
+  manifests here." (3) No test yet directly proved EC-8's symlink-escape
+  clause (only plain `../` containment was tested).
+- **Revisions applied:** replaced the two fabricated-reason raises with
+  real `assert`/`AssertionError` invariant checks; removed the `except
+  OSError: entries = []` swallow so a genuinely unreadable ancestor
+  directory now propagates instead of being silently treated as absent;
+  added an explicit symlink-escape test using a real symlink fixture.
+
+#### Pass 3 — Deterministic coverage
+
+- **Draft verdict:** 37 tests passing; dead/unreachable branches replaced
+  with real assertions; symlink escape covered.
+- **Critique findings:** (1) EC-6's specific claim ("every encountered edge
+  is resolved before a visited back-edge is ignored") had no test proving
+  an unresolved edge still surfaces despite a coexisting cycle — the
+  existing cycle test only proved the happy-path result was complete. (2)
+  Coverage had not actually been measured — case-count is not the same as
+  the workflow guide's 90% line-coverage gate. (3) Found one dead function,
+  `_rust_entrypoint_dir_for_source`, written early in the draft and never
+  called by any code path. (4) One unreachable defensive branch in
+  `_resolve_import_from` (`level == 0` with `module is None`, which `ast`
+  guarantees cannot occur) still used a fabricated early-return instead of
+  an explicit invariant comment.
+- **Revisions applied:** added a cycle-plus-unresolved-edge test proving
+  EC-6's ordering claim; ran `coverage` and iterated fixtures/tests up to
+  91% (360 statements, 32 missed — remaining misses are unreachable-by-
+  construction internal invariants or rare manifest-shape branch
+  combinations); deleted the dead `_rust_entrypoint_dir_for_source`
+  function; documented the `ast`-guaranteed invariant with an `assert`
+  instead of a defensive early return.
+
+### Peer Reviewer evidence
+
+- Reviewer: `qwen3.6:27b-q4_K_M`
+- Command: manual invocation via Ollama `/api/chat` (`num_ctx=32768`,
+  `num_predict=4096`, `temperature=0.0`, `think=false`), packet built from
+  the full diff plus acceptance criteria and independently-verified test/
+  coverage facts.
+- Artifact: `docs/audit/gemma-evidence/antares-t3c-1-phase2.json`
+- Verdict: `PASS` — 0 findings (`done_reason: "stop"`, clean completion, no
+  truncation).
+- Findings: none.
+- Gemma fallback: not triggered — qwen27 responded successfully on the
+  first attempt.
+- D14 fallback: not triggered.
+- disposition_divergence: `none`.
+- Primary-agent disposition: accepted (no findings to disposition).
+
+Code-solution review: qwen3.6:27b-q4_K_M docs/audit/gemma-evidence/antares-t3c-1-phase2.json - PASS
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | Rust mod/Cargo closure deterministic; use creates no edges | `scripts/antares/context_closure_test.py::HappyPathTest::test_hp1_rust_mod_closure_and_cargo_manifest_are_deterministic`, `::test_hp1_rust_use_statements_do_not_create_file_edges`, `::test_hp1_cargo_path_dependency_closure_is_canonical` | passed |
+| HP-2 | Happy path | Python relative/absolute import closure follows fixed mapping; external imports ignored | `scripts/antares/context_closure_test.py::HappyPathTest::test_hp2_python_relative_import_closure_follows_fixed_mapping`, `::test_hp2_python_absolute_import_resolves_full_dotted_path`, `::test_hp2_external_stdlib_and_plain_directory_imports_are_ignored` | passed |
+| HP-3 | Happy path | Seed permutations byte-equivalent; duplicates removed | `scripts/antares/context_closure_test.py::HappyPathTest::test_hp3_seed_permutations_produce_byte_for_byte_equivalent_output`, `::test_hp3_duplicate_paths_are_emitted_once_and_sorted`, `::test_hp3_cycle_resolves_each_edge_once_and_remains_deterministic` | passed |
+| EC-1 | Edge case | Empty seeds -> frozen no-seed omission only | `scripts/antares/context_closure_test.py::EdgeCaseTest::test_ec1_empty_seeds_produce_exactly_the_frozen_no_seed_omission` | passed |
+| EC-2 | Edge case | Unsupported file type -> frozen omission | `scripts/antares/context_closure_test.py::EdgeCaseTest::test_ec2_unsupported_file_type_produces_frozen_omission` | passed |
+| EC-3 | Edge case | Expansion limit stops before next pending source | `scripts/antares/context_closure_test.py::EdgeCaseTest::test_ec3_expansion_limit_stops_before_next_pending_source` | passed |
+| EC-4 | Edge case | Containment escape -> soft omission with absolute path | `scripts/antares/context_closure_test.py::EdgeCaseTest::test_ec4_containment_escape_is_a_soft_omission_with_absolute_path` | passed |
+| EC-5 | Edge case | Unresolved/missing/malformed/ambiguous -> typed error, no partial result | `scripts/antares/context_closure_test.py::EdgeCaseTest::test_ec5_missing_seed_raises_typed_error_with_no_partial_result`, `::test_ec5_unresolved_rust_mod_raises_typed_error`, `::test_ec5_unresolved_relative_import_without_package_ancestor_raises`, `::test_ec5_unresolved_absolute_import_under_local_package_raises`, `::test_ec5_malformed_manifest_raises_typed_error`, `::test_ec5_ambiguous_python_module_raises_typed_error` | passed |
+| EC-6 | Edge case | Cycles resolve each edge before ignoring visited back-edges | `scripts/antares/context_closure_test.py::EdgeCaseTest::test_ec6_cycle_expands_each_edge_at_most_once`, `::test_ec6_unresolved_edge_still_raises_despite_a_coexisting_cycle` | passed |
+| EC-7 | Edge case | Manifest ancestor/allowlist/Cargo entrypoint/path-dependency rules | `scripts/antares/context_closure_test.py::EdgeCaseTest::test_ec7_manifest_ancestor_discovery_finds_all_allowlisted_manifests`, `::test_ec7_workspace_only_cargo_manifest_is_context_only`, `::test_ec7_empty_cargo_manifest_is_a_context_only_no_op`, `::test_ec7_autobins_false_excludes_automatic_bin_discovery`, `::test_ec7_ambiguous_explicit_bin_without_path_raises`, `::test_ec7_explicit_bin_with_path_is_followed_verbatim`, `::test_ec7_explicit_lib_path_is_followed_instead_of_default`, `::test_ec7_cargo_lock_is_a_context_only_no_op`, `::test_ec7_autobins_discovers_directory_form_bin_entrypoints` | passed |
+| EC-8 | Edge case | Canonical POSIX, case-sensitive; symlink escape is soft omission | `scripts/antares/context_closure_test.py::EdgeCaseTest::test_ec8_canonicalization_is_snapshot_relative_posix_and_case_sensitive`, `::test_ec8_symlink_escape_is_a_soft_omission_not_an_exception` | passed |
+| EC-9 | Edge case | Relative imports always local, fail closed; external absolute ignored | `scripts/antares/context_closure_test.py::EdgeCaseTest::test_ec9_python_relative_import_always_local_and_fails_closed`, `::test_ec9_plain_directory_absolute_import_is_external_not_a_failure`, `::test_ec9_python_from_relative_import_multiple_names_resolves_each` | passed |
+| EC-10 | Edge case | Strict/opaque manifest parsing; setup.py never executed; no network | `scripts/antares/context_closure_test.py::EdgeCaseTest::test_ec10_invalid_encoding_source_raises_typed_error`, `::test_ec10_malformed_setup_cfg_raises_typed_error`, `::test_ec10_setup_py_is_utf8_decoded_only_and_never_executed`, `::test_network_primitive_sentinel_proves_local_only_behavior` | passed |
+
+Test run: `python3 -m pytest scripts/antares/context_closure_test.py scripts/antares/context_closure_characterization_test.py -v` → 45 passed, 0 failed.
+Coverage: `python3 -m coverage run --source=scripts.antares.context_closure -m pytest scripts/antares/context_closure_test.py -q && python3 -m coverage report` → 91% (360 statements, 32 missed; remaining misses are unreachable-by-construction internal invariants or rare manifest-shape branch combinations).
+Full antares regression: `python3 -m pytest scripts/antares/ -q` → 212 passed, 0 failed (confirms `packet_schema.py` and every other antares module unaffected).
+
+### Owner final verification
+
+- Owner: Claude Code (cloud escalation implementer, per ADR-038 §4 routing;
+  no local-implementer signature applies since the gate resolved
+  `CLOUD_REQUIRED`)
+- Date: 2026-08-05
+- Statement: I verified every happy path and edge case defined for this
+  task has unit test evidence that replicates the expected behavior,
+  confirmed `scripts/antares/packet_schema.py` and the frozen T3c-0 corpus
+  were not modified, confirmed the full antares test suite (212 tests)
+  passes with no regressions, and confirmed line coverage of the new
+  module is 91%, above the 90% gate.
+- Commands run:
+  - `python3 -m pytest scripts/antares/context_closure_test.py scripts/antares/context_closure_characterization_test.py -v`
+  - `python3 -m coverage run --source=scripts.antares.context_closure -m pytest scripts/antares/context_closure_test.py -q && python3 -m coverage report`
+  - `python3 -m pytest scripts/antares/ -q`
+  - `git diff --stat scripts/antares/packet_schema.py`
+  - `python3 scripts/check-maintainability.py --files scripts/antares/context_closure.py scripts/antares/context_closure_test.py`
 
 ## T3a - Versioned CWE watchlist
 
