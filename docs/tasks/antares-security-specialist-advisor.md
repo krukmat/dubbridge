@@ -77,7 +77,7 @@ T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c (decomposed: T2c-1 -> T2c-2) -> T2d 
 | T3c-1 Deterministic dependency and manifest closure | `[x] Done (2026-08-05)` | 55 Med-high | L | T3c-0 |
 | T3c-2 Governing security-boundary closure | `[x] Done` | 49 Med-high | L | T3c-1 |
 | T3d Integrate T3a+T3b+T3c-2 behind touchpoint packet construction | `[x] Done (owner-verified, 2026-08-06)` | 51 Med-high | L | T3a, T3b, T3c-1, T3c-2 |
-| T4 Ground-truth calibration and observe-only workflow pilot | `[ ] Open` | Recompute | TBD | T2e, T3 |
+| T4 Ground-truth calibration and observe-only workflow pilot | `[ ] Open` | Recompute | TBD | T3, T1 (R4/R5), Element 3 decision — all resolved 2026-08-06 |
 | T5 Promote, narrow, or retire on evidence | `[ ] Open` | Recompute | TBD | T4 |
 
 ## T0 - Define role charter and authority boundary
@@ -4585,12 +4585,19 @@ Code-solution review: `qwen3.6:27b-q4_K_M` `docs/audit/gemma-evidence/antares-t3
   `python3 -m unittest scripts.antares.cwe_watchlist_test scripts.antares.path_containment_test -v`;
   `make qa-docs`
 
-
+## T4 - Ground-truth calibration and observe-only workflow pilot
 
 - **Status:** `[ ] Open`
 - **Type:** development / CI / evaluation
 - **Effort:** TBD from execution RRI
-- **Depends on:** T2e, T3
+- **Depends on:** T3 (`[x] Done`, all subtasks T3a-T3d closed 2026-08-06);
+  T1 R4/R5 runtime prerequisites (`PASS`, 2026-08-05,
+  `docs/tasks/antares-security-specialist-advisor.md` § "T1 R4/R5 execution
+  record"); Element 3 invocation-path decision (resolved and implemented
+  2026-08-05, `docs/plan/antares-local-runtime-adoption.md` § Element 3).
+  All three prerequisites are closed as of 2026-08-06; the prior `T2e, T3`
+  dependency listing predates the Element 3 / T1 R4-R5 closures and is
+  corrected here to name the actual gating set.
 
 ### Objective
 
