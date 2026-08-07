@@ -1920,6 +1920,107 @@ class T7B1RealBoundaryEnvStrippingEndToEnd(unittest.TestCase):
             )
 
 
+class SystemPromptTurnBudgetInterpolation(unittest.TestCase):
+    """TB1: the rendered system prompt must state the session's actual turn
+    budget and the cwd/relative-path rule -- both facts the runner already
+    computes but previously never surfaced to the model (see
+    docs/plan/med-high-turn-budget-blind-prompt.md). Incident T2a burned all
+    8 Med-high turns on run_command reconnaissance, including calls against
+    a hallucinated absolute host path, without ever reaching write_file or
+    finish."""
+
+    def _rendered_system_message(self, tmp, *, rri=None, band=None):
+        worktree = os.path.join(tmp, "worktree")
+        _git_init_worktree(worktree)
+        card_path = _make_card(tmp, rri=rri, band=band)
+        out_path = os.path.join(tmp, "transcript.json")
+
+        captured = {}
+        chat = ChatSequencer(_write_and_finish("hello.txt", "hi"))
+
+        def chat_fn(messages):
+            captured["messages"] = messages
+            return chat(messages)
+
+        passing_tests = lambda wt: {"passed": True, "output": "ok"}
+
+        rlt.main(
+            ["--card", card_path, "--worktree", worktree, "--out", out_path],
+            chat_fn=chat_fn,
+            test_runner=passing_tests,
+        )
+        return captured["messages"][0]["content"]
+
+    def test_hp1_moderate_band_prompt_states_thirty_turns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            content = self._rendered_system_message(tmp, band="Moderate", rri=30)
+        self.assertIn("30 turns", content)
+
+    def test_hp2_med_high_band_prompt_states_eight_turns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            content = self._rendered_system_message(tmp, band="Med-high", rri=47)
+        self.assertIn("8 turns", content)
+        self.assertNotIn("30 turns", content)
+
+    def test_hp3_prompt_states_cwd_rule_with_negative_example(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            content = self._rendered_system_message(tmp, band="Moderate", rri=30)
+        self.assertIn("resolved relative to the worktree root", content)
+        self.assertIn("/home/", content)
+        self.assertIn("/Users/", content)
+
+    def test_ec1_card_without_band_or_rri_falls_back_to_thirty_turns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            content = self._rendered_system_message(tmp)
+        self.assertIn("30 turns", content)
+        self.assertNotIn("{MAX_TOTAL_TURNS}", content)
+
+    def test_ec2_existing_tool_contract_text_is_unchanged(self):
+        # The two additive facts must not disturb the already-tuned
+        # tool-calling contract text asserted elsewhere
+        # (SystemPromptIncludesToolContract, SystemPromptCopyTest).
+        prompt = rlt.TOOL_CALLING_SYSTEM_PROMPT
+        self.assertIn('{"tool_calls": [{"function"', prompt)
+        self.assertIn("Call exactly one tool per turn.", prompt)
+        self.assertIn("disposable", prompt)
+        self.assertIn("no fixed command allowlist", prompt)
+
+    def test_ec3_task_spec_containing_the_word_turns_does_not_break_render(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = os.path.join(tmp, "worktree")
+            _git_init_worktree(worktree)
+            card = {
+                "task_id": "toy-turns",
+                "spec": "Finish this in a reasonable number of turns, please.",
+                "acceptance_tests": ["HP-1"],
+                "allowed_paths": ["hello.txt"],
+                "band": "Med-high",
+                "rri": 47,
+            }
+            card_path = os.path.join(tmp, "card.json")
+            with open(card_path, "w", encoding="utf-8") as f:
+                json.dump(card, f)
+            out_path = os.path.join(tmp, "transcript.json")
+
+            captured = {}
+            chat = ChatSequencer(_write_and_finish("hello.txt", "hi"))
+
+            def chat_fn(messages):
+                captured["messages"] = messages
+                return chat(messages)
+
+            passing_tests = lambda wt: {"passed": True, "output": "ok"}
+
+            rlt.main(
+                ["--card", card_path, "--worktree", worktree, "--out", out_path],
+                chat_fn=chat_fn,
+                test_runner=passing_tests,
+            )
+        content = captured["messages"][0]["content"]
+        self.assertIn("8 turns total", content)
+        self.assertIn("reasonable number of turns", content)
+
+
 class SystemPromptCopyTest(unittest.TestCase):
     """T7c-b1: the prompt must not imply a fixed command allowlist."""
 

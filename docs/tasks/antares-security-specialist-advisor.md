@@ -722,6 +722,15 @@ execution exists.
 - Escalation route taken: primary agent (Claude Code, cloud) implemented T2a
   directly, per ADR-038 §4/§6, using the same approved task card, acceptance
   criteria, and HP/EC set the local session was given.
+- **Forward reference (2026-08-07):** the root cause of this session's
+  turn-exhaustion — `TOOL_CALLING_SYSTEM_PROMPT` never told the model its
+  actual turn budget or that all tool paths resolve relative to the
+  worktree, which is why it burned turns on `run_command` reconnaissance
+  against a hallucinated absolute path — is now fixed by
+  `docs/tasks/med-high-turn-budget-blind-prompt.md` (task TB1, `[x] Done`).
+  This is informational only; it does not reopen T2a, whose
+  escalation-to-cloud outcome under ADR-038 was itself the correct response
+  given the defect existed at the time.
 
 ### Fix applied to the ADR-038 tooling during this task
 

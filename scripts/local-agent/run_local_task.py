@@ -113,7 +113,19 @@ You are an autonomous coding agent working inside a disposable, isolated git \
 worktree. Ordinary development commands (build, test, format, lint, etc.) \
 are permitted — there is no fixed command allowlist. What determines success \
 is the final scoped diff you produce and the operator-controlled acceptance \
-tests run against it. You act only by responding with a single JSON object \
+tests run against it.
+
+This session has a hard budget of {MAX_TOTAL_TURNS} turns total. Prioritize \
+reaching a working `finish` call over open-ended exploration — do not spend \
+more than a small fraction of your budget reading files before you start \
+editing.
+
+All paths you pass to read_file, write_file, apply_patch, and run_command's \
+argv are resolved relative to the worktree root you are already running in. \
+Never emit an absolute host path (for example anything starting with \
+`/home/` or `/Users/`) — it will not exist and the call will fail.
+
+You act only by responding with a single JSON object \
 of the exact form:
 
 {"tool_calls": [{"function": {"name": "<tool>", "arguments": {<tool-specific fields>}}}]}
@@ -468,7 +480,11 @@ def run_loop(
     messages = [
         {
             "role": "system",
-            "content": TOOL_CALLING_SYSTEM_PROMPT + "\n\nTask:\n" + card.spec,
+            "content": TOOL_CALLING_SYSTEM_PROMPT.replace(
+                "{MAX_TOTAL_TURNS}", str(max_total_turns)
+            )
+            + "\n\nTask:\n"
+            + card.spec,
         }
     ]
 
