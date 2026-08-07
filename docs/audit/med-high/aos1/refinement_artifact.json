@@ -1,0 +1,116 @@
+{
+  "error": null,
+  "finished_at": "2026-08-07T10:45:55.130958Z",
+  "generation": {
+    "created_at": "2026-08-07T10:45:55.109275Z",
+    "done": true,
+    "eval_count": 953,
+    "eval_duration": 138989607000,
+    "load_duration": 220671584,
+    "prompt_eval_count": 1193,
+    "prompt_eval_duration": 255218000,
+    "think_disabled": true,
+    "thinking_present": false,
+    "thinking_sha256": null,
+    "total_duration": 139491852125
+  },
+  "model": {
+    "expected_digest": "a50eda8ed977ab48a12431878896b27ffd5cef552c17af3317d9623b939a7f1e",
+    "resolved_digest": "a50eda8ed977ab48a12431878896b27ffd5cef552c17af3317d9623b939a7f1e",
+    "tag": "qwen3.6:27b-q4_K_M"
+  },
+  "packet": {
+    "expected_sha256": "c9c06859ce300640d3441c6e6a3becb4c44db063a253c3d9e2b15c5e57df3ad0",
+    "path": "/private/tmp/claude-501/-Users-matias-dubbridge/f30961ea-1126-487a-8dbd-91041ae81771/scratchpad/aos1_card_packet.json",
+    "sha256": "c9c06859ce300640d3441c6e6a3becb4c44db063a253c3d9e2b15c5e57df3ad0"
+  },
+  "profile": "med-high-refinement-v1",
+  "prompt": {
+    "profile": "med-high-refinement-v1",
+    "sha256": "f064576f82b657b94e70773099fac1ea6a64e7f2b46bdb6434096d9c9c80b865",
+    "version": "med-high-refinement-prompt-v1"
+  },
+  "response": {
+    "raw_text_sha256": "1fd45349dd549ab20134bee05f6e15e2e064e2b7739731bbefbb123146ec98ce",
+    "validated": {
+      "acceptance_tests": [
+        "scripts/generate-agents-override.py exists, is deterministic, and implements HP-1/HP-3 and EC-2.",
+        "scripts/check-doc-consistency.sh drift-check reuses generator output and implements EC-1/EC-3.",
+        "AGENTS.override.md delta contains only HITL_AUTONOMY_POLICY.md addition; no unrelated reformatting.",
+        "make qa-docs passes after regeneration without new Makefile targets.",
+        "Generator exits non-zero if any source file is missing or empty.",
+        "Drift check fails closed with fix command when AGENTS.override.md is missing or drifted."
+      ],
+      "claims": [
+        {
+          "label": "SUPPORTED",
+          "statement": "Concatenation order is fixed as AGENTS.md, AGENT_WORKFLOW_GUIDE.md, HITL_AUTONOMY_POLICY.md."
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "No separator should be inserted between concatenated files."
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Drift check must invoke Python generator via subprocess, not import logic."
+        },
+        {
+          "label": "INFERRED",
+          "statement": "Existing make qa-docs target will accept the new drift-check function without modification."
+        }
+      ],
+      "excluded_scope": [
+        "Modifying content of AGENTS.md, AGENT_WORKFLOW_GUIDE.md, or HITL_AUTONOMY_POLICY.md.",
+        "Adding new Makefile targets or modifying existing Makefile logic beyond invocation.",
+        "Implementing automatic regeneration hooks (pre-commit/pre-push).",
+        "Extending generator to handle dynamic file lists or additional sources.",
+        "Re-implementing concatenation logic in shell; must reuse Python generator output."
+      ],
+      "implementation_steps": [
+        "Write generate-agents-override.py to read three fixed paths, check existence/length, and write concatenated content to AGENTS.override.md.",
+        "Update check-doc-consistency.sh to define a function that runs the Python script, captures stdout/stderr, and compares output against existing file.",
+        "Ensure shell function exits non-zero with specific error message on drift or missing target.",
+        "Run generator once to produce updated AGENTS.override.md including HITL policy section.",
+        "Execute make qa-docs to verify integration and acceptance criteria.",
+        "Validate idempotency by running generator twice and confirming byte-identical output."
+      ],
+      "refined_scope": [
+        "Create scripts/generate-agents-override.py to concatenate three specific source files without separators.",
+        "Add drift-check function to scripts/check-doc-consistency.sh that invokes the Python generator via subprocess.",
+        "Regenerate AGENTS.override.md once to include HITL_AUTONOMY_POLICY.md content.",
+        "Ensure generator exits non-zero if any source file is missing or empty (EC-2).",
+        "Ensure drift check fails closed with fix command if output differs or target missing (EC-1, EC-3).",
+        "Verify make qa-docs passes using existing target without adding new ones."
+      ],
+      "risks": [
+        "Subprocess invocation in shell may fail due to environment path issues; must use absolute or relative paths correctly.",
+        "Byte-level comparison might fail if line endings differ between source files and generated output.",
+        "Shell function integration with existing qa-docs target might conflict if not properly scoped."
+      ],
+      "route_recommendation": "GO_LOCAL",
+      "stop_conditions": [
+        "make qa-docs fails after implementation.",
+        "Generator produces non-deterministic output or modifies source files.",
+        "New Makefile targets are added or existing ones modified beyond invocation.",
+        "Drift check re-implements concatenation logic instead of invoking generator."
+      ],
+      "summary": "Implement deterministic Python generator and shell drift-check for AGENTS.override.md concatenation. Scope is bounded by fixed file list and explicit exclusion of Makefile changes.",
+      "unknowns": [
+        "Exact current content of AGENTS.override.md to verify delta isolation.",
+        "Current implementation details of make qa-docs target to ensure compatibility.",
+        "Specific error message format required for 'fails closed' behavior in EC-1/EC-3."
+      ]
+    }
+  },
+  "runtime": {
+    "num_ctx": 32768,
+    "num_predict": 4096,
+    "ollama_url": "http://127.0.0.1:11434",
+    "temperature": 0.0,
+    "timeout_seconds": 240.0
+  },
+  "schema_version": "adr037-local-architect-artifact-v1",
+  "started_at": "2026-08-07T10:43:35.598365Z",
+  "status": "ok",
+  "success": true
+}

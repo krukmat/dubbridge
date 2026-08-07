@@ -63,6 +63,35 @@ index_row_data() {
   printf '%s|%s\n' "$target" "$status"
 }
 
+check_agents_override_drift() {
+  if [[ ! -f AGENTS.override.md ]]; then
+    add_violation "AGENTS.override.md: file does not exist - regenerate with 'python3 scripts/generate-agents-override.py --write'"
+    return
+  fi
+
+  local expected_file
+  expected_file="$(mktemp)"
+  local generator_stderr
+  if ! python3 scripts/generate-agents-override.py > "$expected_file" 2>/tmp/agents-override-drift-check-stderr; then
+    generator_stderr="$(cat /tmp/agents-override-drift-check-stderr)"
+    rm -f "$expected_file" /tmp/agents-override-drift-check-stderr
+    add_violation "AGENTS.override.md: generator failed - $generator_stderr"
+    return
+  fi
+  rm -f /tmp/agents-override-drift-check-stderr
+
+  # Byte-exact comparison via cmp: AGENTS.override.md is a hashed
+  # native-instruction attestation source (Codex), so a string comparison
+  # via bash `$()` command substitution is not safe here -- it silently
+  # strips trailing newlines from both sides, which would hide a real
+  # byte-level drift at end-of-file.
+  if ! cmp -s "$expected_file" AGENTS.override.md; then
+    add_violation "AGENTS.override.md: content is stale relative to its sources - regenerate with 'python3 scripts/generate-agents-override.py --write'"
+  fi
+
+  rm -f "$expected_file"
+}
+
 check_status_parity_and_completeness() {
   local file
   for file in docs/adr/ADR-*.md; do
@@ -223,6 +252,7 @@ EOF
 check_status_parity_and_completeness
 check_dangling_refs
 check_superseded_successors
+check_agents_override_drift
 
 if [[ -n "$violations" ]]; then
   printf 'Documentation consistency check failed:\n'

@@ -1,0 +1,8 @@
+{
+  "card_hash": "c9c06859ce300640d3441c6e6a3becb4c44db063a253c3d9e2b15c5e57df3ad0",
+  "decision": "GO_LOCAL",
+  "primary_id": "claude-code-sonnet-5",
+  "rationale": "Task AOS1 is bounded, deterministic doc-tooling with no auth/security, rights/consent/governance-invariant, schema/migration, or unresolved-ADR surface (ADR-038 s.6 hard exclusions do not apply). Scope is a 3-file read + concatenation generator and a shell drift-check function reusing existing check-doc-consistency.sh dispatch pattern; acceptance criteria and HP/EC cases are explicit and testable. Qwen27 also recommends GO_LOCAL. Primary concurs and does not downgrade.",
+  "refinement_artifact_sha256": "9554b26d157b7cd4e3a0db55b1d904dd64e2bced12251e3d8f458d5b5195d3b0",
+  "timestamp": "2026-08-07T10:46:19.460970Z"
+}
