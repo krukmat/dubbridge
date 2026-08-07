@@ -281,6 +281,16 @@ governs: "all agent-facing workflow decisions in the repository"
      intent and component-usage expectations for the mobile surface. It does not
      replace task files, runtime tokens in `mobile/src/theme/tokens.ts`, or the
      workflow authority of this guide.
+   - **Antares refinement touchpoint** — for any RRI 26+ development task that
+     carries a task-relevant CWE hypothesis already on the T3a watchlist
+     (`scripts/antares/cwe_watchlist.py`), invoke Antares against the existing
+     baseline snapshot before implementation starts (see § Antares
+     Security-Specialist Advisor below). If no such CWE hypothesis exists,
+     record a typed skip instead — never invoke Antares as a generic sweep.
+     Does not apply to docs-only, config-only, migration-only, ADR, plan,
+     task-ledger, or policy-only tasks. This step is strictly advisory: it
+     never gates or delays approval, the band-routed reviewer, or RRI
+     computation.
 2. **Plan** — create `docs/plan/<plan-name>.md` with: objective, affected files,
    design decisions, and module dependencies.
 3. **Tasks** — create `docs/tasks/<tasks-name>.md` with: an ordered task list,
@@ -1419,17 +1429,29 @@ ranked list of candidate source files and the terminal exploration trace. It doe
 not choose the CWE, threat-model the task, explain why a candidate is vulnerable,
 recommend tests or remediation, or produce an RRI proposal.
 
-When the active slice explicitly enables the role, the primary security advisor
-may invoke it at three optional touchpoints:
+As of the T5 promote decision (`docs/tasks/antares-security-specialist-advisor.md`
+§ T5 Decision record, 2026-08-06), the role is active for every RRI 26+ task that
+carries a task-relevant CWE hypothesis already on the T3a watchlist
+(`scripts/antares/cwe_watchlist.py`) — this is the same eligibility rule T4 fixed
+for its own pilot sample, not an undeclared per-slice flag. The primary security
+advisor invokes it at three touchpoints under that condition:
 
-- refinement, against the existing baseline snapshot after the advisor or human
-  has documented a task-relevant CWE hypothesis;
-- post-implementation analysis, against the candidate snapshot as supplemental
-  triage that is separate from the reviewer-of-record verdict and closure gate;
-- post-CI observation, against the exact completed revision.
+- **refinement** — a mandatory step inside § "Mandatory workflow before
+  implementing" (step 1, Analyze) for any eligible task, against the existing
+  baseline snapshot, after the advisor or human has documented the CWE
+  hypothesis;
+- **post-implementation** — a mandatory step inside § "Development task closure
+  checklist" for any eligible task, against the candidate snapshot, as
+  supplemental triage separate from the reviewer-of-record verdict and closure
+  gate;
+- **post-CI** — already wired as CI automation: `.github/workflows/push-review.yml`'s
+  "Antares post-CI observe-only pilot (T4)" step, against the exact completed
+  revision.
 
-If no justified CWE exists, the touchpoint is skipped and the reason is recorded;
-Antares must never invent a generic sweep merely to satisfy workflow ceremony.
+If no justified CWE exists for a task, the touchpoint is skipped and the reason
+is recorded; Antares must never invent a generic sweep merely to satisfy
+workflow ceremony. Docs-only, config-only, migration-only, ADR, plan,
+task-ledger, and policy-only tasks are exempt from all three touchpoints.
 
 ### Authority boundary
 
@@ -1448,11 +1470,16 @@ Antares must never invent a generic sweep merely to satisfy workflow ceremony.
 - The primary agent must independently verify any repository claim cited from
   Antares output before propagating it into a canonical plan, task, policy, or
   closure record.
-- Production workflow touchpoints remain disabled until the runtime preflight,
-  sandboxed harness, ground-truth calibration, and observe-only pilot in
-  `docs/tasks/antares-security-specialist-advisor.md` are completed and the owner
-  records a promote or narrow decision. Approved evaluation tasks may invoke the
-  sandboxed pilot; planning this role alone does not activate it.
+- **Production workflow touchpoints are active** as of the T5 promote decision
+  (`docs/tasks/antares-security-specialist-advisor.md` § T5 Decision record,
+  2026-08-06). This promotion was recorded **without** a completed calibration
+  run against the fixed thresholds (File F1 >= 0.30 macro-averaged per
+  watchlisted CWE, true-negative rate >= 0.70) or a completed 30-day pilot
+  window — the T5 decision record states that gap explicitly as an
+  owner-directed deviation, not as evidence the thresholds were met. A future
+  calibration or pilot result that contradicts those thresholds is grounds to
+  revisit this decision (narrow or retire); it is not a standing blocker on the
+  promotion already in effect.
 
 ## Push Reviewer
 
@@ -1489,6 +1516,28 @@ summary with unit coverage certification or owner final verification.
 **This checklist applies to every development task regardless of RRI band.**
 The steps that apply per band are marked below. Skipping any applicable step is
 not permitted — including for Low (0–25) tasks.
+
+### Pre-closure — Antares post-implementation touchpoint (conditional)
+
+Runs before Step 1 below, not as a replacement or renumbering of it. Applies to:
+any RRI 26+ development task that carries a task-relevant CWE hypothesis already
+on the T3a watchlist (`scripts/antares/cwe_watchlist.py`) — the same eligibility
+rule as the refinement touchpoint in § "Mandatory workflow before implementing".
+Exempt: docs-only, config-only, migration-only, ADR, plan, task-ledger, or
+policy-only tasks, and any RRI 0–25 task with no eligible CWE hypothesis.
+
+Invoke Antares against the candidate (post-implementation) snapshot as
+supplemental triage. Record every candidate in the disposition ledger
+(`scripts/antares/disposition_ledger.py`) and disposition each one
+(`accepted-now`, `accepted-follow-up`, `rejected`, or
+`needs-human-security-review`) per § Antares Security-Specialist Advisor
+§ Authority boundary below. If no eligible CWE hypothesis exists, record a
+typed skip instead of invoking Antares.
+
+This step is strictly advisory: it never blocks, delays, or substitutes for
+Step 1's code-solution review, never satisfies the band-routed reviewer or the
+HITL approval gate, and its absence, failure, or a degraded Antares run never
+blocks closure — record the degraded result and proceed.
 
 ### Step 1 — Code-solution review (all development tasks, mandatory)
 

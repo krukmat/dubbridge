@@ -50,7 +50,7 @@ than escalating by default.
 ## Task order
 
 ```text
-T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c (decomposed: T2c-1 -> T2c-2) -> T2d -> T2e-pre -> T2e -> T3 (decomposed: T3a -> T3b, T3c -> T3c-0 -> T3c-1 -> T3c-2 -> T3d) -> T4 -> T5
+T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c (decomposed: T2c-1 -> T2c-2) -> T2d -> T2e-pre -> T2e -> T3 (decomposed: T3a -> T3b, T3c -> T3c-0 -> T3c-1 -> T3c-2 -> T3d) -> T4 -> T5 -> T6
 ```
 
 ## Task summary
@@ -77,8 +77,9 @@ T0 (done) -> T0a -> T1 -> T2a -> T2b -> T2c (decomposed: T2c-1 -> T2c-2) -> T2d 
 | T3c-1 Deterministic dependency and manifest closure | `[x] Done (2026-08-05)` | 55 Med-high | L | T3c-0 |
 | T3c-2 Governing security-boundary closure | `[x] Done` | 49 Med-high | L | T3c-1 |
 | T3d Integrate T3a+T3b+T3c-2 behind touchpoint packet construction | `[x] Done (owner-verified, 2026-08-06)` | 51 Med-high | L | T3a, T3b, T3c-1, T3c-2 |
-| T4 Ground-truth calibration and observe-only workflow pilot | `[ ] Open` | Recompute | TBD | T3, T1 (R4/R5), Element 3 decision — all resolved 2026-08-06 |
-| T5 Promote, narrow, or retire on evidence | `[ ] Open` | Recompute | TBD | T4 |
+| T4 Ground-truth calibration and observe-only workflow pilot | `[x] Done` (2026-08-06) | 51 Med-high | TBD | T3, T1 (R4/R5), Element 3 decision — all resolved 2026-08-06 |
+| T5 Promote, narrow, or retire on evidence | `[x] Done` (2026-08-06, owner-directed promote, no calibration/pilot evidence — see § Decision record) | 11 Low | S | T4 |
+| T6 Wire the T5 promote decision into the operative workflow guides | `[x] Done` (2026-08-06) | 41 Med-high | L | T5 |
 
 ## T0 - Define role charter and authority boundary
 
@@ -4818,10 +4819,10 @@ Required passes: 3 (`51` -> `Med-high`)
 
 ## T5 - Promote, narrow, or retire on evidence
 
-- **Status:** `[ ] Open`
+- **Status:** `[x] Done` - 2026-08-06
 - **Type:** docs / workflow decision
-- **Effort:** TBD from execution RRI
-- **Depends on:** T4
+- **Effort:** S (RRI 11 -> Low, `python3 scripts/rri.py --touches docs/tasks/antares-security-specialist-advisor.md --cc 1 --D 1 --K 1 --P 1 --T 0 --A 1 --X 1`)
+- **Depends on:** T4 (`[x] Done`, 2026-08-06)
 
 ### Objective
 
@@ -4845,6 +4846,277 @@ Make an explicit operating decision from calibration and pilot evidence.
 
 - this ledger and the slice plan
 - workflow/policy docs and roadmap only if the lane is retained
+
+### Decision record (2026-08-06)
+
+**Decision: PROMOTE — retain the Antares Security-Specialist Advisor role at its
+current advisory-only, three-touchpoint scope, unconditionally, effective
+immediately.**
+
+**Owner directive:** the owner reviewed the calibration-evidence gap named below
+and explicitly chose to promote now rather than wait for a live calibration run
+or the 30-day pilot window. This decision is recorded as owner override, not as
+an agent recommendation — the agent's recommendation, offered and declined, was
+to either promote conditionally on the fixed thresholds or run the calibration
+and pilot window first.
+
+**Deviation from the T5 acceptance criterion "the decision cites repository
+calibration and operational evidence separately" — stated explicitly, not
+silently:**
+
+- **Calibration evidence: none exists.** `docs/evaluations/antares-t4-calibration-report.md`
+  fixes the methodology and promotion thresholds (File F1 >= 0.30 macro-averaged
+  per watchlisted CWE with >= 3 cases, true-negative rate >= 0.70) but no
+  calibration run against the corpus has ever executed. There is no
+  `CalibrationReport` artifact to cite.
+- **Operational/pilot evidence: none exists.** `docs/evaluations/antares-t4-pilot-report.md`
+  § "Live pilot run results" states plainly: "Not yet populated -- this task
+  implements the pilot mechanism and fixes its operating parameters; it does not
+  itself constitute the 30-day pilot window." No touchpoint has been invoked as
+  part of that window; the disposition ledger holds no live entries.
+- **What evidence this decision actually rests on:** the single real,
+  end-to-end `antares-cli` invocation performed earlier in this session
+  (`remote` backend, `antares-1b` model via local Ollama, scoped to
+  `crates/storage`, `request_id: 954ee6fdf328d1fc`) — exit 0, empty stderr,
+  valid JSON, one genuine model-produced finding (CWE-22 path traversal
+  candidate in `src/local.rs`, `submission_rank: 1`, `likelihood_of_exploit:
+  "High"`). This is a single anecdotal run outside the fixed calibration
+  corpus and outside the fixed 30-day pilot window; it demonstrates the
+  pipeline is mechanically functional, not that it meets the File F1 or
+  true-negative thresholds T4 fixed for a promotion decision.
+- This is recorded as a deviation, not reframed as compliance: the acceptance
+  criterion is not satisfied by this record. The gap is intentional and
+  owner-authorized.
+
+**Retention parameters fixed by this decision** (per the T5 "if retained"
+acceptance criterion):
+
+| Parameter | Value | Source |
+|---|---|---|
+| Eligible touchpoints | Refinement, post-implementation, post-CI (all three named in T4) | `docs/evaluations/antares-t4-pilot-report.md` § Touchpoints |
+| CWE sources | The versioned T3a watchlist, `scripts/antares/cwe_watchlist.py`, `WATCHLIST_VERSION = "2026-08-02.1"`; re-evaluated once per pilot window per T4's fixed schedule | `docs/evaluations/antares-t4-calibration-report.md` § Pilot operating parameters |
+| Schedule | Unchanged from T4: 30 calendar days per pilot window, starting from first live touchpoint invocation after this decision | `docs/evaluations/antares-t4-calibration-report.md` |
+| Owner | `matias` (same owner who authorized this decision and closed T4's owner verification) | this record |
+| SLA | 72 hours per candidate, `created_at` to disposition (`disposition_ledger._DEFAULT_SLA_HOURS`), unchanged from T4 | `docs/evaluations/antares-t4-calibration-report.md` |
+| Retention | `logs/antares/` and `var/antares-traces/` stay Git-ignored; redacted post-CI summaries retained 30 days as GitHub Actions artifacts, unchanged from T4 | `.gitignore`; `.github/workflows/push-review.yml` |
+| Resource budget | One Antares invocation in flight per touchpoint call, 300s timeout per invocation (`harness.DEFAULT_CLI_TIMEOUT_SECONDS`), unchanged from T4 | `docs/evaluations/antares-t4-calibration-report.md` |
+
+**Stopping rules carried forward unchanged from T4** (not re-decided here):
+disposition backlog > 20 undisposed entries past SLA, or `degraded_count` > 50%
+of touchpoint invocations in any 7-day rolling window.
+
+**Authority boundary — unchanged by this decision:** Antares remains
+advisory-only. It does not become RRI authority, reviewer of record, autonomous
+remediator, or closure gate. This decision promotes continued *use* of the
+existing bounded touchpoints; it grants no new capability and does not revisit
+any item in § "Cancelled capability assumptions" below.
+
+**Follow-up implication:** because no calibration run or pilot window has
+executed, this promotion carries a live, unquantified risk that the role's
+localization quality or operational value falls below the thresholds T4 already
+fixed. No task currently tracks retroactively validating this decision once
+real calibration/pilot data exists; that gap is noted here for visibility but is
+out of scope for this task to resolve.
+
+### Task-analysis review (phase 1)
+
+RRI 11 -> Low band, docs-only workflow decision (no code touched). Exempt from
+phase-1 peer review per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Per-task
+discipline ("Docs-only, config-only, migration-only, ADR, plan, task-ledger, and
+policy-only tasks are exempt from phase 1"). Recorded as `n/a` with this
+exemption stated.
+
+Task-analysis review: n/a (docs-only workflow decision, RRI 11 Low)
+Code-solution review: n/a (no code produced by this task)
+
+## T6 - Wire the T5 promote decision into the operative workflow guides
+
+- **Status:** `[ ] Open`
+- **Type:** docs / workflow-guide consistency
+- **Effort:** L (RRI 41 -> Med-high; see § RRI below)
+- **Depends on:** T5 (`[x] Done`, 2026-08-06)
+
+### Objective
+
+T5 recorded an owner-directed **promote** decision for the Antares role, but the
+canonical workflow guides that agents actually consult during task execution were
+not updated in the same pass. Close that gap: make the promote decision
+load-bearing in the documents an agent reads while doing normal work, not only in
+the task ledger that recorded the decision.
+
+### Problem statement (from post-T5 review)
+
+Four concrete gaps, found by re-reading `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
+§ Antares Security-Specialist Advisor and `docs/policies/HITL_AUTONOMY_POLICY.md`
+against the T5 decision record immediately after T5 closed:
+
+1. `docs/playbooks/AGENT_WORKFLOW_GUIDE.md:1232-1236` still states *"Production
+   workflow touchpoints remain disabled until [...] the owner records a promote
+   or narrow decision"* with no update reflecting that this condition was met on
+   2026-08-06. An agent reading only this file (the highest-authority
+   agent-facing source per `CLAUDE.md`) has no way to know the gate opened.
+2. Touchpoint activation is gated on *"When the active slice explicitly enables
+   the role"* (`AGENT_WORKFLOW_GUIDE.md:1203`), but no slice, plan, or roadmap
+   entry in the repository declares this for any slice other than the one that
+   built the role itself. `docs/plan/roadmap.md`, `AGENTS.md`, and
+   `docs/policies/RRI_POLICY.md` contain zero references to Antares (confirmed
+   by repository-wide grep). There is no determinable answer to "is Antares
+   enabled for the slice I'm working on right now."
+3. The three touchpoints (refinement, post-implementation, post-CI) exist only
+   as prose in the dedicated Antares section — they are not steps in
+   `AGENT_WORKFLOW_GUIDE.md` § "Mandatory workflow before implementing" or § the
+   "Development task closure checklist" that agents actually execute
+   step-by-step. Only post-CI has a real invocation point, because it was wired
+   into `.github/workflows/push-review.yml` as code. Refinement and
+   post-implementation depend on an agent independently remembering to open an
+   isolated section of the document.
+4. `docs/policies/HITL_AUTONOMY_POLICY.md` was not checked for the same
+   "disabled" language or an equivalent activation gap.
+
+### Happy paths considered
+
+- **HP-1:** an agent executing the "Mandatory workflow before implementing"
+  checklist on an RRI 26+ task with a task-relevant CWE hypothesis reaches an
+  explicit step instructing it to invoke (or record a typed skip for) the
+  Antares refinement touchpoint, without opening a separate document section to
+  discover this.
+- **HP-2:** the same agent, at task closure, reaches an explicit step in the
+  "Development task closure checklist" for the post-implementation touchpoint,
+  under the same condition.
+- **HP-3:** a reader of `AGENT_WORKFLOW_GUIDE.md` alone (no other document) can
+  correctly state, without inference, that the Antares role is currently
+  promoted/active as of 2026-08-06, and can cite the T5 decision record as the
+  authority for that fact.
+
+### Edge cases considered
+
+- **EC-1:** a task with no task-relevant CWE hypothesis on the T3a watchlist
+  reaches the same workflow step and records a typed skip (per the existing
+  EC-2 contract in T4/`pilot.py`) rather than silently omitting the touchpoint
+  or inventing a generic sweep.
+- **EC-2:** a docs-only, config-only, migration-only, ADR, plan, task-ledger, or
+  policy-only task — which is exempt from RRI 26+ development-task machinery —
+  is not made to carry the new touchpoint steps, consistent with every other
+  exemption already stated in the workflow guide.
+- **EC-3:** the updated language must not imply Antares gains any new authority
+  (RRI computation, review-gate satisfaction, autonomous remediation, closure
+  authority) — the authority boundary section is carried forward unchanged, and
+  this task's diff must not touch it except to fix cross-references.
+
+### Acceptance criteria
+
+- `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Antares Security-Specialist Advisor
+  no longer states the touchpoints "remain disabled"; it states the current
+  activation status and cites `docs/tasks/antares-security-specialist-advisor.md`
+  § T5 Decision record as the authority.
+- The activation condition ("active slice explicitly enables the role") is
+  replaced with a concrete, checkable rule that does not depend on an
+  undeclared per-slice flag — e.g., activation follows directly from the T5
+  promote decision for any RRI 26+ task with a CWE hypothesis already on the
+  T3a watchlist, matching the eligibility rule T4 already fixed for the pilot
+  sample.
+- Refinement and post-implementation touchpoints appear as explicit, numbered
+  steps inside § "Mandatory workflow before implementing" and § the
+  "Development task closure checklist" respectively — conditioned on the same
+  eligibility rule — not only inside the standalone Antares section.
+- `docs/policies/HITL_AUTONOMY_POLICY.md` is checked for the same gap and
+  updated if it also states or implies the touchpoints are inactive.
+- The authority boundary subsection is otherwise unchanged: no edit grants
+  Antares RRI authority, review-gate authority, autonomous remediation, or
+  closure authority.
+- `make qa-docs` passes after the change.
+
+### Evidence to emit
+
+- The diff itself (workflow-guide and policy-doc edits) is the primary
+  evidence; no code or test artifacts apply to this task.
+
+### Status artifacts affected
+
+- `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` (primary)
+- `docs/policies/HITL_AUTONOMY_POLICY.md` (checked; edited if the gap exists)
+- `docs/tasks/antares-security-specialist-advisor.md` (this ledger, on closure)
+- `docs/plan/antares-local-runtime-adoption.md` (if the plan's own phase table
+  references activation status)
+
+### RRI
+
+`python3 scripts/rri.py --touches docs/playbooks/AGENT_WORKFLOW_GUIDE.md --touches docs/policies/HITL_AUTONOMY_POLICY.md --touches docs/tasks/antares-security-specialist-advisor.md --touches docs/plan/antares-local-runtime-adoption.md --cc 1 --D 2 --K 3 --P 2 --T 0 --A 2 --X 2 --penalty arch_decision`
+-> **41 -> Med-high (41-55)**. Base 29 (D2 K3 P2 T0 A2 X2, F=4 files), penalty
+`arch_decision` +12 (this task changes how and when a workflow role actually
+activates across every future task, not just documentation wording — a process
+decision the task itself must resolve, same reasoning class as T4's penalty).
+Dominant drivers: K=3 (coupling — the edited sections are read by every future
+RRI 26+ task), `arch_decision`.
+
+This task is **not** a development task (no code touched): the ADR-038
+local-first implementation routing does not apply (there is no code-authoring
+surface to route). The RRI 26+ human-approval gate still applies per
+`docs/policies/HITL_AUTONOMY_POLICY.md` (approval is required by RRI band
+regardless of task type). Phase-1/phase-2 peer review and the Reflection cycle
+are exempt as docs-only work, consistent with T4/T5 and every other docs-only
+task in this ledger.
+
+### Implementation record (2026-08-06)
+
+- `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`:
+  - § "Mandatory workflow before implementing", step 1 (Analyze) — added an
+    **Antares refinement touchpoint** sub-bullet naming the eligibility rule
+    (RRI 26+, task-relevant CWE on the T3a watchlist) and the exemptions.
+  - § "Antares Security-Specialist Advisor" — replaced the *"When the active
+    slice explicitly enables the role"* paragraph with the concrete eligibility
+    rule and explicit cross-references to where each touchpoint is now wired
+    (refinement -> step 1 Analyze; post-implementation -> new closure-checklist
+    subsection; post-CI -> the existing `push-review.yml` step). Replaced the
+    *"Production workflow touchpoints remain disabled..."* authority-boundary
+    bullet with an **active-as-of-2026-08-06** statement that explicitly names
+    the T5 deviation (no calibration/pilot evidence) as the basis, not as
+    evidence the fixed thresholds were met.
+  - § "Development task closure checklist" — inserted a new **"Pre-closure —
+    Antares post-implementation touchpoint (conditional)"** subsection
+    immediately before Step 1, deliberately **not** renumbering Steps 1–5
+    (cited by number elsewhere, e.g.
+    `docs/tasks/agent-session-preflight-gate.md:2919` — "Step 1 of the
+    development closure checklist"). The new subsection is explicitly framed
+    as advisory-only and never blocking on Step 1 or closure.
+- `docs/policies/HITL_AUTONOMY_POLICY.md` — checked (acceptance criterion);
+  **no edit needed**. Its Antares paragraph (lines 27–35) states only the
+  authority boundary (advisory-only, no RRI/approval/review/closure authority)
+  and never claimed the touchpoints were disabled, so there was no gap to fix
+  there — confirmed by direct re-read, not assumed.
+- `docs/plan/antares-local-runtime-adoption.md` — checked; no additional edit
+  needed beyond what T5's closure already made (§ Phase E row and the T5
+  Mermaid node were already updated when T5 closed).
+- **`AGENTS.override.md` — added to scope during implementation, beyond the
+  four files named in this task's approved card.** This file is Codex's
+  hash-attested native-instruction bundle
+  (`scripts/agent-preflight.py:525`, `CODEX_NATIVE_INSTRUCTION_PATH =
+  "AGENTS.override.md"`) and was found, while implementing this task, to
+  contain a byte-for-byte duplicate of the exact stale
+  `AGENT_WORKFLOW_GUIDE.md` § Antares text this task fixes (confirmed via
+  direct read of both files before editing). Leaving it unedited would have
+  left Codex sessions reading "remains disabled" while Claude Code sessions
+  read "active" — directly defeating this task's own HP-3 ("a reader of
+  [the workflow guide] alone... can correctly state... the role is currently
+  promoted") for one of the two agent environments `CLAUDE.md` names as
+  required to "follow the same task-presentation contract." All three edits
+  applied to `AGENT_WORKFLOW_GUIDE.md` were mirrored verbatim into
+  `AGENTS.override.md` at the identical surrounding text. This is recorded
+  here as a disclosed scope addition, not a silent one; no other file was
+  added or touched beyond these five.
+- `make qa-docs` passed after all edits (doc-consistency, task-unit-coverage
+  ×2, roadmap-drift, OKF frontmatter).
+- Repository-wide grep confirmed zero remaining occurrences of "remain
+  disabled" or "active slice explicitly enables" outside this task's own
+  Problem-statement quotation of the pre-fix text.
+
+### Status
+
+`[x] Done` — 2026-08-06
+
+Task-analysis review: n/a (docs-only workflow-guide edit, exempt per phase-1
+docs-only exemption)
+Code-solution review: n/a (no code produced by this task)
 
 ## Cancelled capability assumptions
 
