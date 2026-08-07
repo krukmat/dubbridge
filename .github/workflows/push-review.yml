@@ -58,6 +58,7 @@ jobs:
       - name: Antares post-CI observe-only pilot (T4)
         id: antares_post_ci
         if: always()
+        continue-on-error: true
         run: |
           python3 scripts/antares/post_ci_summary.py \
             --snapshot-root . \
