@@ -4931,7 +4931,7 @@ Code-solution review: n/a (no code produced by this task)
 
 ## T6 - Wire the T5 promote decision into the operative workflow guides
 
-- **Status:** `[ ] Open`
+- **Status:** `[x] Done` — 2026-08-06
 - **Type:** docs / workflow-guide consistency
 - **Effort:** L (RRI 41 -> Med-high; see § RRI below)
 - **Depends on:** T5 (`[x] Done`, 2026-08-06)
