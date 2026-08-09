@@ -240,22 +240,30 @@ The reviewer is determined by the task's RRI band:
 - **RRI 56+ (Complex+):** cross-vendor peer (phases 1 and 2). The peer
   replaces Gemma as the code-solution reviewer for this band.
 
-**Cross-vendor resolution (RRI 56+ only):**
+**Cross-vendor primary-review resolution (RRI 56+ only):**
 `claude-code → codex | codex → claude | local-provider → claude |
 remote-provider → claude | unknown → claude`
+
+**D14 provider resolution (all bands):** when D14 is triggered, first use a
+responsive reviewer from a provider different from the primary orchestrator's
+provider. Same-provider D14 is allowed only after that cross-provider attempt
+is unavailable, unauthenticated, stalled, or invalid/`BLOCKED`; record it as a
+degraded fallback with the failed cross-provider evidence.
 
 **Failure modes (RRI 26–55):**
 1. `qwen3.6:27b-q4_K_M` unavailable, stalled, or returns invalid/`BLOCKED`
    output → fall back to **Gemma** (one immediate retry with the same review
    packet if Gemma itself is unusable on the first attempt).
 2. `qwen3.6:27b-q4_K_M` + Gemma both unavailable/unusable → fall back to
-   **D14** (Balanced tier).
+   **D14** (Balanced tier, cross-provider first; same-provider only as a
+   recorded degraded final fallback).
 3. `qwen3.6:27b-q4_K_M` + Gemma + D14 all unavailable → write a
    blocked-artifact record and stop. Never self-review. Report the task as
    blocked.
 
 **Failure modes (RRI 56+):**
-1. Peer CLI unavailable or unauthenticated → fall back to **D14** (Balanced tier).
+1. Peer CLI unavailable or unauthenticated → fall back to **D14** (Balanced tier,
+   cross-provider first; same-provider only as a recorded degraded final fallback).
 2. Peer + D14 both unavailable → write a blocked-artifact record and stop. Never
    self-review. Report the task as blocked.
 
@@ -287,7 +295,9 @@ result can be produced, the agent must perform **one immediate retry** with
 the same review packet first. If the retry succeeds with a usable result, the
 primary path continues normally. If the retry fails for the same class of
 reason or still produces no usable result, the agent **must** spawn a
-context-isolated subagent as the mandatory fallback reviewer. The subagent
+context-isolated subagent as the mandatory fallback reviewer. D14 must first
+be cross-provider; same-provider D14 is permitted only after a failed,
+evidenced cross-provider attempt and is recorded as degraded. The subagent
 receives an isolation packet (diff + acceptance criteria + any usable partial
 findings) and its output is advisory, exactly as the primary reviewer's would
 be. The primary agent reconciles and records `disposition_divergence` in the

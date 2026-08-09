@@ -51,6 +51,7 @@ if __name__ == "__main__":
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import gemma_local
+import fallback_selection
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import runner_workflow_gate
@@ -785,6 +786,7 @@ def parse_args(argv=None):
         default=DEFAULT_MAX_WALL_SECONDS,
         help="Maximum wall-clock seconds for a single chat turn.",
     )
+    fallback_selection.add_cli_arguments(parser)
     return parser.parse_args(argv)
 
 
@@ -1024,6 +1026,90 @@ def build_attempt_bundles(card, result, model, session_start, session_end):
     return bundles
 
 
+_MODERATE_TERMINAL_RESULTS = {
+    ("budget_exhausted", "repair_attempts_exhausted"),
+    ("budget_exhausted", "total_turns_exhausted"),
+    ("transport_error", None),
+    ("boundary_violation", None),
+    ("out_of_scope", None),
+}
+
+
+def _is_moderate_card(card):
+    rri = getattr(card, "rri", None)
+    return isinstance(rri, int) and not isinstance(rri, bool) and 26 <= rri <= 40
+
+
+def _terminal_result_is_eligible(card, result):
+    if not _is_moderate_card(card):
+        return False
+    status = result.get("status")
+    reason = result.get("reason")
+    return (status, reason) in _MODERATE_TERMINAL_RESULTS or (status, None) in _MODERATE_TERMINAL_RESULTS
+
+
+def build_terminal_attempt_packet(card, result, model, effective_limits):
+    """Build the one canonical packet for an eligible Moderate terminal exit.
+
+    This intentionally does not reuse the older per-test attempt bundle: a
+    boundary, transport, scope, or turn-budget exit can have no test result at
+    all, but still needs identical selection evidence before cloud handoff.
+    """
+    if not _terminal_result_is_eligible(card, result):
+        raise ValueError("terminal attempt packet requires an eligible Moderate terminal result")
+
+    transcript = result.get("transcript", [])
+    test_results = [event["result"] for event in transcript if event.get("event") == "test_result"]
+    turn_budget_events = [event for event in transcript if event.get("event") == "turn_budget_exhausted"]
+    total_turns_used = (
+        turn_budget_events[-1].get("total_turns")
+        if turn_budget_events
+        else sum(1 for event in transcript if event.get("role") == "assistant")
+    )
+    repair_attempts_used = result.get("attempts")
+    if repair_attempts_used is None:
+        repair_attempts_used = max(0, len(test_results) - 1)
+
+    return {
+        "task_id": card.task_id,
+        "phase": "implementation",
+        "terminal_status": result["status"],
+        "terminal_reason": result.get("reason"),
+        "trigger": result.get("reason") or result["status"],
+        "trigger_kind": fallback_selection.TRIGGER_OPERATIONAL,
+        "rri": card.rri,
+        "implementer_model": model,
+        "effective_limits": effective_limits.as_dict(),
+        "counters_used": {
+            "total_turns": total_turns_used,
+            "repair_attempts": repair_attempts_used,
+            "test_attempts": len(test_results),
+        },
+        "terminal_transcript": transcript,
+        "final_test_result": test_results[-1] if test_results else None,
+    }
+
+
+def build_moderate_fallback_checkpoint(args, card, result, model, effective_limits):
+    """Return the shared selection checkpoint only for a terminal Moderate exit."""
+    if not _terminal_result_is_eligible(card, result):
+        return None
+    packet = build_terminal_attempt_packet(card, result, model, effective_limits)
+    checkpoint = fallback_selection.build_checkpoint_from_args(
+        args,
+        task_id=card.task_id,
+        phase="implementation",
+        trigger=packet["trigger"],
+        role=fallback_selection.ROLE_CLOUD_IMPLEMENTER,
+        rri=card.rri,
+        packet=packet,
+        trigger_kind=fallback_selection.TRIGGER_OPERATIONAL,
+    )
+    if checkpoint["status"] == fallback_selection.AUTHORIZED_STATUS:
+        fallback_selection.validate_authorized_checkpoint(checkpoint, packet)
+    return checkpoint
+
+
 def main(
     argv=None,
     chat_fn=None,
@@ -1125,6 +1211,33 @@ def main(
         audit_record = build_audit_record(
             card, result, args.model, elapsed_s, effective_limits=limits
         )
+
+    fallback_exit_code = None
+    try:
+        checkpoint = build_moderate_fallback_checkpoint(
+            args, card, result, args.model, limits
+        )
+        if checkpoint is not None:
+            terminal_packet = build_terminal_attempt_packet(
+                card, result, args.model, limits
+            )
+            selection_artifact = (
+                args.fallback_selection_artifact
+                or fallback_selection.default_checkpoint_path(args.out)
+            )
+            fallback_selection.write_checkpoint(checkpoint, selection_artifact)
+            result["terminal_attempt_packet"] = terminal_packet
+            result["fallback_selection_artifact"] = selection_artifact
+            result["fallback_selection"] = checkpoint
+            fallback_exit_code = (
+                fallback_selection.HUMAN_SELECTION_EXIT_CODE
+                if checkpoint["status"] == fallback_selection.AWAITING_STATUS
+                else 1
+            )
+    except fallback_selection.FallbackSelectionError as exc:
+        result["fallback_selection_error"] = str(exc)
+        fallback_exit_code = 2
+
     gemma_local.write_result(result, args.out)
 
     # Emitted for every exit path (success, aborted, budget_exhausted,
@@ -1138,6 +1251,8 @@ def main(
     for bundle in build_attempt_bundles(card, result, args.model, session_start, session_end):
         gemma_local.append_audit_log(bundle)
 
+    if fallback_exit_code is not None:
+        return fallback_exit_code
     return 0 if result["status"] == "success" else 1
 
 
