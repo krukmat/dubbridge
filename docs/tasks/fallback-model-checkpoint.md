@@ -38,7 +38,7 @@ effort: XL
 | FMC-2 | Gate D14 reviewer fallback in phases 1 and 2 | 46 / L | Done | FMC-1 |
 | FMC-3 | Gate Low-band Gemma-to-cloud implementation fallback | 49 / L | Done | FMC-1 |
 | FMC-4 | Gate Moderate local-runner cloud fallback | 44 / L | Done | FMC-1 |
-| FMC-5 | Gate Med-high `CLOUD_REQUIRED` and failed-attempt fallback | 50 / L | Pending | FMC-1 |
+| FMC-5 | Gate Med-high `CLOUD_REQUIRED` and failed-attempt fallback | 50 / L | Done | FMC-1 |
 | FMC-6a | Synchronize authoritative workflow/policy/template docs | docs/policy-only | Pending | FMC-2..FMC-5 |
 | FMC-6b | Synchronize agent summaries and generated override | docs/config-only | Pending | FMC-6a |
 
@@ -606,25 +606,142 @@ Required passes: 3 (`44` -> `Med-high`)
 
 ## FMC-5 — Med-high implementation fallback checkpoint
 
+**Status:** [x] Done
 **Effort:** L. **RRI:** 50 (Med-high). **Allowed paths:**
 `scripts/local-agent/run_med_high_task.py`,
 `scripts/local-agent/run_med_high_task_test.py`.
 
 - **HP-1:** operational-only failure recommends Terra/high and can consume a valid
-  preauthorization receipt.
+  preauthorization receipt. Operational-only means the exact Qwen35 supervisor
+  process cannot be launched or its local binding is unavailable, without evidence
+  of a task acceptance, scope, organization, boundary, or risk failure. The
+  checkpoint is `role=cloud-implementer`, `mode=preauthorized`, and accepts only
+  a complete `fallback-selection-v1` selection whose receipt validates against
+  the canonical packet for that exact handoff bundle.
 - **HP-2:** hard exclusion, `CLOUD_REQUIRED`, or acceptance/scope/organization
-  failure recommends Sol/high.
-- **EC-1:** missing selection pauses before cloud consumption of the ADR-038 bundle.
-- **EC-2:** receipt packet hash covers the exact handoff evidence bundle.
+  failure recommends Sol/high. A timeout, nonzero runner exit, malformed runner
+  transcript, or a failed local acceptance/scope/organization/boundary gate is a
+  capability-or-risk takeover and follows this row.
+- **EC-1:** missing selection in `human-select` mode writes
+  `awaiting_fallback_selection`, preserves the ADR-038 handoff bundle, returns the
+  dedicated pause exit code `3`, and pauses before any cloud consumption. A partial
+  `preauthorized` selection fails closed with `verdict=blocked`, a stable
+  field-specific integrity/selection error, exit code `2`, no receipt, and no cloud
+  instruction.
+- **EC-2:** the canonical fallback packet includes the exact emitted handoff bundle
+  (or its byte-for-byte SHA-256 plus immutable artifact location); mutating that
+  bundle after selection makes receipt validation fail. The supervisor writes a
+  `verdict=blocked` checkpoint artifact with a stable `bundle_receipt_mismatch`
+  summary, returns exit code `2`, retains the unmodified bundle for diagnosis, and
+  emits no cloud instruction. The tests must prove this state transition,
+  telemetry, and absence of a cloud instruction.
 
 **Acceptance criteria:** every non-success Med-high route emits the checkpoint;
-GO_LOCAL success remains unchanged; no model is invoked by the supervisor.
+GO_LOCAL success remains unchanged and emits neither bundle checkpoint nor receipt.
+`human-select` and `preauthorized` use the shared contract's explicit modes: the
+former awaits a complete human selection, the latter requires model, effort, and
+selector before authorization. Recommendations are pure static resolver metadata
+from the task-frozen matrix, never an inference or a model invocation; the
+supervisor only returns the selected model/effort after validating the matching
+receipt. Focused tests cover each takeover class, pause exit, no-invocation
+boundary, and tampered-bundle rejection.
+
+### FMC-5 RRI evidence
+
+- Full evidence: `.agent/fmc-5-rri.md`.
+- Recomputed RRI: `50` -> `Med-high` -> Effort `L`.
+- Antares refinement: typed skip — no task-relevant T3a-watchlisted CWE
+  hypothesis is present for this agent-workflow change.
 
 **Handoff prompt:** `FMC-5 — Gate all ADR-038 cloud routes with the shared contract.
 Stop after focused tests pass.`
 
-Task-analysis review: pending
-Code-solution review: pending
+Task-analysis review: gemma .agent/peer-task-review-fmc-5-r3.json - PASS
+Code-solution review: d14 .agent/peer-code-review-fmc-5.json - PASS
+
+### Peer Reviewer evidence
+
+- Reviewer: `d14` (same-provider degraded adjudicator)
+- Command: `python3 scripts/peer-workflow-review.py --phase code --rri 50
+  --caller codex --task-id FMC-5 --artifact .agent/peer-code-review-fmc-5.json
+  --max-wall 60 --idle-timeout 30 --no-think`, followed by a context-isolated
+  D14 review of only the final diff summary and FMC-5 acceptance criteria.
+- Artifact: `.agent/peer-code-review-fmc-5.json`
+- Verdict: `PASS`
+- Findings: none
+- Gemma fallback: triggered — Qwen27 retried through the band route but idled
+  for 30 seconds without a token; Gemma also idled for 30 seconds without a
+  token and returned no usable verdict.
+- D14 fallback: triggered — the Qwen27 and Gemma review chain was unusable.
+- D14 provider route: `same-provider-degraded` — the required cross-provider
+  `claude -p --bare --model claude-sonnet-5 --effort medium` attempt was
+  unauthenticated (`Not logged in`), so a context-isolated Codex D14 reviewer
+  was used.
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted the context-isolated D14 PASS; no
+  post-review revision was needed.
+- Review artifact: `docs/audit/gemma-evidence/FMC-5.json`
+
+Antares post-implementation: typed skip — FMC-5 carries no task-relevant
+T3a-watchlisted CWE hypothesis, so a generic security sweep was not justified.
+
+### Reflection log
+
+Required passes: 3 (`50` -> `Med-high`)
+
+#### Pass 1
+
+- **Draft verdict:** Every supervisor non-success now carries a checkpoint bound
+  to the emitted ADR-038 bundle's absolute path and byte SHA-256.
+- **Critique findings:** A direct `CLOUD_REQUIRED` path and a runner launch
+  failure require different recommendation metadata without invoking either
+  model.
+- **Revisions applied:** Classified only `transport_error` as operational-only;
+  all other non-success routes use the static capability-risk recommendation.
+
+#### Pass 2
+
+- **Draft verdict:** The shared selection modes produce awaiting and authorized
+  artifacts while the supervisor exposes an instruction only after validation.
+- **Critique findings:** The bundle could change after a receipt is created and
+  before a consumer uses it.
+- **Revisions applied:** Re-read the bundle after receipt creation and convert a
+  digest mismatch into receipt-free `bundle_receipt_mismatch` blocking state.
+
+#### Pass 3
+
+- **Draft verdict:** Focused tests cover successful local execution, operational
+  and capability-risk paths, pause/blocked exits, and bundle tampering.
+- **Critique findings:** Context-isolated D14 review found no remaining issue
+  after the Qwen27 and Gemma reviewer chain was unusable.
+- **Revisions applied:** None; the focused suite passed 50 tests with 97% line
+  coverage for the changed supervisor.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | Operational startup failure authorizes Terra/high against the exact bundle | `scripts/local-agent/run_med_high_task_test.py::SuperviseIntegrationTest::test_hp1_operational_start_failure_authorizes_terra_against_bundle` | passed |
+| HP-2 | Happy path | `CLOUD_REQUIRED` authorizes Sol/high without launching or invoking a model | `scripts/local-agent/run_med_high_task_test.py::SuperviseIntegrationTest::test_hp2_cloud_required_authorizes_sol_without_model_invocation` | passed |
+| EC-1 | Edge case | Missing selection pauses with exit 3; incomplete preauthorization blocks with exit 2 | `scripts/local-agent/run_med_high_task_test.py::SuperviseIntegrationTest::test_ec1_human_selection_pause_preserves_bundle_without_instruction`; `scripts/local-agent/run_med_high_task_test.py::MainCliTest::test_ec1_cli_partial_preauthorization_blocks` | passed |
+| EC-2 | Edge case | Mutated bundle invalidates the receipt, blocks with `bundle_receipt_mismatch`, and emits no instruction | `scripts/local-agent/run_med_high_task_test.py::SuperviseIntegrationTest::test_ec2_bundle_mutation_after_receipt_is_blocked` | passed |
+
+### Owner final verification
+
+- Owner: `Codex` (orchestrator of record under approved FMC-5 scope)
+- Date: `2026-08-09`
+- Statement: I verified every happy path and edge case defined for this task has
+  unit test evidence that replicates the expected behavior.
+- Commands run: `python3 scripts/local-agent/run_med_high_task_test.py`;
+  `cd scripts/local-agent && COVERAGE_FILE=/tmp/dubbridge-fmc5.coverage python3
+  -m coverage run --source=run_med_high_task run_med_high_task_test.py`;
+  `cd scripts/local-agent && COVERAGE_FILE=/tmp/dubbridge-fmc5.coverage python3
+  -m coverage report -m --include='*/run_med_high_task.py'`;
+  `python3 -m py_compile scripts/local-agent/run_med_high_task.py
+  scripts/local-agent/run_med_high_task_test.py`;
+  `git diff --check -- scripts/local-agent/run_med_high_task.py
+  scripts/local-agent/run_med_high_task_test.py docs/tasks/fallback-model-checkpoint.md
+  docs/audit/gemma-evidence/FMC-5.json`.
 
 ## FMC-6a/FMC-6b — Documentation and summary propagation
 
