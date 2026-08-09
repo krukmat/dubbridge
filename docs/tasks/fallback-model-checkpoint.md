@@ -19,6 +19,10 @@ effort: XL
   commit and push remain out of scope.
 - **Aggregate RRI:** 89 (Very high), direct implementation prohibited.
 - **Aggregate penalties:** `arch_decision` (+12), `many_files` (+8).
+- **Owner implementation-route directive (2026-08-09):** FMC-4 and every
+  remaining development task in this plan are cloud-primary until the plan is
+  complete. This is a routing override only: runtime checkpoint behavior and all
+  review, HITL, and evidence gates remain unchanged.
 - **Decomposition:** FMC-1 through FMC-5 are development tasks at RRI 44-50;
   FMC-6a/FMC-6b are documentation/policy propagation tasks.
 - **Evidence to emit:** `.agent/fallback-selection-*.json`, focused unit-test
@@ -33,7 +37,7 @@ effort: XL
 | FMC-1 | Implement shared checkpoint and receipt contract | 44 / L | Done | ADR-039 |
 | FMC-2 | Gate D14 reviewer fallback in phases 1 and 2 | 46 / L | Done | FMC-1 |
 | FMC-3 | Gate Low-band Gemma-to-cloud implementation fallback | 49 / L | Done | FMC-1 |
-| FMC-4 | Gate Moderate local-runner cloud fallback | 46 / L | Pending | FMC-1 |
+| FMC-4 | Gate Moderate local-runner cloud fallback | 44 / L | Done | FMC-1 |
 | FMC-5 | Gate Med-high `CLOUD_REQUIRED` and failed-attempt fallback | 50 / L | Pending | FMC-1 |
 | FMC-6a | Synchronize authoritative workflow/policy/template docs | docs/policy-only | Pending | FMC-2..FMC-5 |
 | FMC-6b | Synchronize agent summaries and generated override | docs/config-only | Pending | FMC-6a |
@@ -446,22 +450,159 @@ Required passes: 3 (`49` -> `Med-high`)
 
 ## FMC-4 — Moderate implementation fallback checkpoint
 
-**Effort:** L. **RRI:** 46 (Med-high). **Allowed paths:**
+**Status:** [x] Done
+**Effort:** L. **RRI:** 44 (Med-high). **Allowed paths:**
 `scripts/local-agent/run_local_task.py`, `scripts/local-agent/run_local_task_test.py`.
 
-- **HP-1:** terminal Moderate local failure with complete preauthorization emits a
-  Terra/medium cloud-implementer receipt bound to the attempt evidence.
-- **EC-1:** terminal failure without selection pauses with an awaiting artifact.
-- **EC-2:** successful local implementation emits no fallback authorization.
+- **Routing boundary:** the delivery task is Med-high because of its implementation
+  risk, but it changes only the runner behavior for a *Moderate task card*
+  (`26 <= card.rri <= 40`). FMC-5 exclusively owns Med-high/ADR-038 routes.
+- **HP-1:** a terminal Moderate local failure with a complete preauthorization emits
+  a `cloud-implementer` receipt recommending `gpt-5.6-terra` at `medium`, bound to
+  the canonical terminal-attempt packet.
+- **EC-1:** a terminal Moderate local failure without a complete selection writes an
+  `awaiting_fallback_selection` checkpoint and pauses before any cloud execution.
+- **EC-2:** a successful local implementation emits no fallback checkpoint,
+  authorization, or cloud-model invocation.
+- **EC-3:** an intermediate `repair-needed` result emits neither checkpoint nor
+  receipt; the existing Moderate repair budget and audit semantics remain intact.
 
-**Acceptance criteria:** repair and audit semantics remain unchanged; selection is
-added only after a terminal non-success result.
+**Acceptance criteria:** selection is added only after an eligible terminal
+Moderate non-success result: `budget_exhausted/repair_attempts_exhausted`,
+`budget_exhausted/total_turns_exhausted`, `transport_error`,
+`boundary_violation`, or `out_of_scope`. A repair-needed result is not terminal;
+nor are `success` and malformed-tool recovery that stays inside the running
+session. The implementation must construct one canonical `terminal_attempt_packet`
+for every eligible terminal result, whether or not that session contains a
+`test_result` event. Its hash input contains the task ID, `phase=implementation`,
+terminal status and reason, trigger and trigger kind, card RRI, implementer model,
+effective turn and repair limits plus counters used, the full terminal transcript,
+and the existing final test-result bundle when one exists (otherwise an explicit
+`null`). The SHA-256 of this packet—not a test-result-only attempt bundle—binds the
+emitted checkpoint or receipt. An incomplete `human-select` selection remains
+awaiting; a complete `preauthorized` selection produces the receipt. The runner
+must only emit this shared-contract artifact; it must not start a cloud model.
+
+**Verification:** add focused unit tests in
+`scripts/local-agent/run_local_task_test.py` for HP-1, EC-1, EC-2, and EC-3,
+including the receipt/checkpoint hash binding for both a terminal final-test
+failure and a terminal path without `test_result` (boundary, transport, scope, or
+turn budget). Prove that repair-budget exhaustion and total-turn exhaustion stay
+distinct, and that the existing repair/audit flow is unchanged before the terminal
+result.
+
+**Evidence to emit:** canonical terminal-attempt packet, awaiting checkpoint or
+authorized receipt, focused test output, and phase-1/phase-2 review artifacts.
+
+**Status artifacts affected:** this ledger and the runner audit evidence.
+
+**Resolved implementation route:** owner-directed `CLOUD_PRIMARY`. Codex starts
+with `gpt-5.6-terra` at `high`; evidence of capability/risk not covered by the
+approved task routes to `gpt-5.6-sol` at `high`. No Qwen35 local implementation
+attempt is permitted for this task.
+
+### FMC-4 RRI evidence
+
+Command:
+`python3 scripts/rri.py --C 2 --touches scripts/local-agent/run_local_task.py --touches scripts/local-agent/run_local_task_test.py --D 4 --K 4 --P 3 --T 1 --A 0 --X 3 --platform dubbridge`
+
+| Variable | Score | Evidence | Confidence |
+|---|---:|---|---|
+| C cyclomatic | 2 | material runner branches are in the 11–20 CC range | High |
+| F files | 1 | two allowed paths | High |
+| D domain | 4 | runner escalation and authorization contract | High |
+| T coverage | 1 | focused unit-test surface exists and requires cases | High |
+| A ambiguity | 0 | terminal states, packet contract, and runtime-band boundary are explicit | High |
+| K coupling | 4 | runner, shared checkpoint, and attempt-evidence contract | High |
+| P impact | 3 | internal implementation-routing/audit behavior | High |
+| X context | 3 | runner, tests, task, plan, and ADR-039 | High |
+
+Final RRI: `44` -> `Med-high` -> Effort `L`; no penalties; decomposition not
+triggered. Antares refinement: typed skip — no task-relevant T3a-watchlisted CWE
+hypothesis exists for this workflow change.
 
 **Handoff prompt:** `FMC-4 — Gate terminal Moderate runner escalation with the shared
 contract. Stop after focused tests pass.`
 
-Task-analysis review: pending
-Code-solution review: pending
+Task-analysis review history: d14 .agent/peer-task-review-fmc-4-r3-cloud-route.json - BLOCKED (resolved by canonical terminal-attempt packet contract)
+Task-analysis review: d14 .agent/peer-task-review-fmc-4-r4-terminal-packet.json - PASS
+Code-solution review: gemma .agent/peer-code-review-fmc-4.json - PASS
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma` (`gemma4:26b-a4b-it-qat`)
+- Command: direct Ollama `/api/chat`, `think=false`, `num_predict=1024`,
+  `num_ctx=32768`, reviewing the FMC-4 acceptance criteria and scoped diff.
+- Artifact: `.agent/peer-code-review-fmc-4.json`
+- Verdict: `PASS`
+- Findings: none
+- Gemma fallback: triggered — Qwen27 did not produce a usable review artifact
+  after its bounded review attempts and was stopped.
+- D14 fallback: not triggered — Gemma returned a usable PASS verdict; therefore
+  no D14 provider route was required.
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted PASS; no revision was required after review.
+- Review artifact: `docs/audit/gemma-evidence/FMC-4.json`
+
+Antares post-implementation: typed skip — no task-relevant T3a-watchlisted CWE
+hypothesis exists for this workflow change.
+
+### Reflection log
+
+Required passes: 3 (`44` -> `Med-high`)
+
+#### Pass 1
+
+- **Draft verdict:** Terminal Moderate exits now produce one packet that includes
+  status, reason, limits, counters, full transcript, and final test result/null.
+- **Critique findings:** The result artifact also needed the canonical packet so a
+  later operator can reproduce the checkpoint hash without reconstructing it.
+- **Revisions applied:** Persisted `terminal_attempt_packet` alongside the shared
+  checkpoint and its artifact path before writing the final result.
+
+#### Pass 2
+
+- **Draft verdict:** Eligible terminal classification is limited to the five
+  specified Moderate exit families.
+- **Critique findings:** Repair-budget and total-turn exhaustion must remain
+  distinguishable even when both have `budget_exhausted` status.
+- **Revisions applied:** Added separate reason assertions and hash-distinct packet
+  coverage for `repair_attempts_exhausted` and `total_turns_exhausted`.
+
+#### Pass 3
+
+- **Draft verdict:** Focused and full runner tests preserve success and
+  repair-needed behavior while exercising receipt, awaiting, and no-test-result
+  terminal paths.
+- **Critique findings:** Independent review found no remaining issue.
+- **Revisions applied:** None; `87` runner tests passed and changed-file coverage
+  was `93%`.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | Terminal Moderate failure with preauthorization emits a Terra/medium cloud-implementer receipt bound to the canonical packet | `scripts/local-agent/run_local_task_test.py::ModerateTerminalFallbackSelection::test_hp1_preauthorized_terminal_test_failure_emits_receipt_bound_to_packet` | passed |
+| EC-1 | Edge case | Terminal Moderate failure without selection writes an awaiting checkpoint and pauses before cloud execution | `scripts/local-agent/run_local_task_test.py::ModerateTerminalFallbackSelection::test_main_persists_awaiting_checkpoint_for_terminal_boundary_without_test_result` | passed |
+| EC-2 | Edge case | Successful local implementation emits no checkpoint or receipt | `scripts/local-agent/run_local_task_test.py::ModerateTerminalFallbackSelection::test_ec2_success_and_ec3_repair_needed_do_not_create_terminal_checkpoint` | passed |
+| EC-3 | Edge case | Repair-needed behavior emits no checkpoint and retains the existing repair flow | `scripts/local-agent/run_local_task_test.py::ModerateTerminalFallbackSelection::test_ec2_success_and_ec3_repair_needed_do_not_create_terminal_checkpoint`; `scripts/local-agent/run_local_task_test.py::HP2RepairThenSuccess::test_exactly_two_repair_turns_then_success` | passed |
+
+### Owner final verification
+
+- Owner: `Codex` (orchestrator of record under owner approval)
+- Date: `2026-08-09`
+- Statement: I verified every happy path and edge case defined for this task has
+  unit test evidence that replicates the expected behavior.
+- Commands run: `python3 scripts/local-agent/run_local_task_test.py`;
+  `cd scripts/local-agent && COVERAGE_FILE=/tmp/dubbridge-fmc4.coverage python3
+  -m coverage run --source=run_local_task run_local_task_test.py`;
+  `cd scripts/local-agent && COVERAGE_FILE=/tmp/dubbridge-fmc4.coverage python3
+  -m coverage report -m --include='*/run_local_task.py'`;
+  `python3 -m py_compile scripts/local-agent/run_local_task.py
+  scripts/local-agent/run_local_task_test.py`;
+  `git diff --check -- scripts/local-agent/run_local_task.py
+  scripts/local-agent/run_local_task_test.py docs/tasks/fallback-model-checkpoint.md
+  docs/audit/gemma-evidence/FMC-4.json`.
 
 ## FMC-5 — Med-high implementation fallback checkpoint
 

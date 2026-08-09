@@ -1852,6 +1852,136 @@ class AttemptBundleEmission(unittest.TestCase):
             self.assertEqual(bundle["outcome"], "success")
 
 
+class ModerateTerminalFallbackSelection(unittest.TestCase):
+    _CAPSULE_HASH = "b" * 64
+    _SESSION_START = datetime.datetime(2026, 8, 9, tzinfo=datetime.timezone.utc)
+    _SESSION_END = datetime.datetime(2026, 8, 9, 0, 5, tzinfo=datetime.timezone.utc)
+
+    def _terminal_result(self, status, reason, transcript):
+        return {
+            "status": status,
+            "reason": reason,
+            "transcript": transcript,
+        }
+
+    def test_hp1_preauthorized_terminal_test_failure_emits_receipt_bound_to_packet(self):
+        card = rlt.TaskCard(
+            "FMC-4", "spec", ["HP-1"], ["hello.txt"], rri=30, band="Moderate",
+            capsule_hash=self._CAPSULE_HASH,
+        )
+        result = self._terminal_result(
+            "budget_exhausted",
+            "repair_attempts_exhausted",
+            [{"event": "test_result", "result": {"passed": False, "output": "fail"}}],
+        )
+        args = rlt.parse_args([
+            "--card", "card.json", "--worktree", ".", "--out", "result.json",
+            "--fallback-mode", "preauthorized", "--fallback-model", "gpt-5.6-terra",
+            "--fallback-reasoning-effort", "medium", "--fallback-selected-by", "matias",
+        ])
+        limits = rlt.resolve_effective_limits(card)
+
+        packet = rlt.build_terminal_attempt_packet(card, result, "qwen3.6:35b-a3b", limits)
+        checkpoint = rlt.build_moderate_fallback_checkpoint(args, card, result, "qwen3.6:35b-a3b", limits)
+
+        self.assertEqual(checkpoint["status"], "fallback_authorized")
+        self.assertEqual(checkpoint["role"], "cloud-implementer")
+        self.assertEqual(checkpoint["recommended_model"], "gpt-5.6-terra")
+        self.assertEqual(checkpoint["packet_sha256"], rlt.fallback_selection.packet_sha256(packet))
+        rlt.fallback_selection.validate_authorized_checkpoint(checkpoint, packet)
+
+    def test_ec1_terminal_without_selection_is_awaiting_and_boundary_packet_has_null_test_result(self):
+        card = rlt.TaskCard("FMC-4", "spec", ["HP-1"], ["hello.txt"], rri=30, band="Moderate")
+        result = self._terminal_result(
+            "boundary_violation", "write outside allowed_paths",
+            [{"event": "boundary_violation", "error": "write outside allowed_paths"}],
+        )
+        args = rlt.parse_args(["--card", "card.json", "--worktree", ".", "--out", "result.json"])
+        limits = rlt.resolve_effective_limits(card)
+
+        packet = rlt.build_terminal_attempt_packet(card, result, "qwen3.6:35b-a3b", limits)
+        checkpoint = rlt.build_moderate_fallback_checkpoint(args, card, result, "qwen3.6:35b-a3b", limits)
+
+        self.assertIsNone(packet["final_test_result"])
+        self.assertEqual(packet["terminal_status"], "boundary_violation")
+        self.assertEqual(checkpoint["status"], "awaiting_fallback_selection")
+        self.assertEqual(checkpoint["packet_sha256"], rlt.fallback_selection.packet_sha256(packet))
+
+    def test_ec2_success_and_ec3_repair_needed_do_not_create_terminal_checkpoint(self):
+        card = rlt.TaskCard("FMC-4", "spec", ["HP-1"], ["hello.txt"], rri=30, band="Moderate")
+        limits = rlt.resolve_effective_limits(card)
+        args = rlt.parse_args(["--card", "card.json", "--worktree", ".", "--out", "result.json"])
+        success = {"status": "success", "transcript": []}
+        repair_needed = {
+            "status": "budget_exhausted", "reason": "repair_needed", "transcript": [],
+        }
+
+        self.assertIsNone(rlt.build_moderate_fallback_checkpoint(args, card, success, "qwen", limits))
+        self.assertIsNone(rlt.build_moderate_fallback_checkpoint(args, card, repair_needed, "qwen", limits))
+
+    def test_repair_and_total_turn_exhaustion_have_distinct_terminal_packets(self):
+        card = rlt.TaskCard("FMC-4", "spec", ["HP-1"], ["hello.txt"], rri=30, band="Moderate")
+        limits = rlt.resolve_effective_limits(card)
+        repair_packet = rlt.build_terminal_attempt_packet(
+            card,
+            self._terminal_result("budget_exhausted", "repair_attempts_exhausted", []),
+            "qwen", limits,
+        )
+        turn_packet = rlt.build_terminal_attempt_packet(
+            card,
+            self._terminal_result("budget_exhausted", "total_turns_exhausted", []),
+            "qwen", limits,
+        )
+
+        self.assertEqual(repair_packet["terminal_reason"], "repair_attempts_exhausted")
+        self.assertEqual(turn_packet["terminal_reason"], "total_turns_exhausted")
+        self.assertNotEqual(
+            rlt.fallback_selection.packet_sha256(repair_packet),
+            rlt.fallback_selection.packet_sha256(turn_packet),
+        )
+
+    def test_main_persists_awaiting_checkpoint_for_terminal_boundary_without_test_result(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            worktree = os.path.join(tmp, "worktree")
+            _git_init_worktree(worktree)
+            card_path = _make_card(tmp, rri=30, band="Moderate")
+            out_path = os.path.join(tmp, "result.json")
+            selection_path = os.path.join(tmp, "selection.json")
+
+            class DenyAllBoundary:
+                def check_write(self, path):
+                    raise rlt.BoundaryViolation("outside allowed_paths")
+
+                def check_command(self, argv):
+                    return None
+
+                def env_for_subprocess(self):
+                    return None
+
+            exit_code = rlt.main(
+                [
+                    "--card", card_path, "--worktree", worktree, "--out", out_path,
+                    "--fallback-selection-artifact", selection_path,
+                ],
+                chat_fn=ChatSequencer(_write_and_finish("hello.txt", "bad")),
+                test_runner=lambda wt: self.fail("boundary result must not run tests"),
+                boundary=DenyAllBoundary(),
+            )
+
+            self.assertEqual(exit_code, rlt.fallback_selection.HUMAN_SELECTION_EXIT_CODE)
+            with open(out_path, encoding="utf-8") as stream:
+                result = json.load(stream)
+            with open(selection_path, encoding="utf-8") as stream:
+                checkpoint = json.load(stream)
+            self.assertEqual(result["terminal_attempt_packet"]["final_test_result"], None)
+            self.assertEqual(result["fallback_selection_artifact"], selection_path)
+            self.assertEqual(checkpoint["status"], "awaiting_fallback_selection")
+            self.assertEqual(
+                checkpoint["packet_sha256"],
+                rlt.fallback_selection.packet_sha256(result["terminal_attempt_packet"]),
+            )
+
+
 class T7B1RealBoundaryEnvStrippingEndToEnd(unittest.TestCase):
     # T7b-1 (ADR-036 corrective loop): boundary_test.py's EC3EnvironmentStripping
     # tests already prove stripped_agent_env() is correct in isolation, and one

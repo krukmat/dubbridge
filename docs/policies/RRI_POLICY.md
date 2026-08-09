@@ -196,9 +196,9 @@ band — never derive one output from another (e.g. do not infer capability from
 | **86–100** | Very high | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Do not implement directly. Produce an ADR + risk analysis + decompose into subtasks. |
 | **> 100** | Excessive | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Architecture/design work must happen first. Re-scope before any implementation. |
 
-\* **Cross-vendor peer** (RRI 56+, and RRI 41–55 only if the `qwen3.6:27b-q4_K_M` override below is ever rolled back for this band): `claude-code → codex | codex → claude | other → claude`. Unavailable peer CLI falls back to **D14** (Balanced tier); peer + D14 both unavailable → blocked artifact, stop. Phase-1 exemptions (docs/policy/config-only tasks) record `n/a`. Full contract: `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review`.
+\* **Cross-vendor peer** (RRI 56+, and RRI 41–55 only if the `qwen3.6:27b-q4_K_M` override below is ever rolled back for this band): `claude-code → codex | codex → claude | other → claude`. Unavailable peer CLI falls back to **D14** (Balanced tier); D14 first uses a responsive provider different from the primary orchestrator, and may use the same provider only after that cross-provider attempt is unusable and is recorded as degraded. Peer + D14 both unavailable → blocked artifact, stop. Phase-1 exemptions (docs/policy/config-only tasks) record `n/a`. Full contract: `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review`.
 
-† **`qwen3.6:27b-q4_K_M` phase-1 and phase-2 reviewer** (RRI 26–55, owner directive 2026-07-21): replaces Gemma Reviewer (Moderate) and the cross-vendor peer (Med-high) as the default reviewer for this band, regardless of where implementation happened. Unavailable/stalled/invalid output falls back to **Gemma**, then to **D14**; D14 unavailable → blocked artifact, stop. See § Local pipeline phase-1/phase-2 reviewer override below for the full contract and ADR-037 scope note.
+† **`qwen3.6:27b-q4_K_M` phase-1 and phase-2 reviewer** (RRI 26–55, owner directive 2026-07-21): replaces Gemma Reviewer (Moderate) and the cross-vendor peer (Med-high) as the default reviewer for this band, regardless of where implementation happened. Unavailable/stalled/invalid output falls back to **Gemma**, then to **D14**; D14 must first be cross-provider and may be same-provider only as a recorded degraded fallback after that cross-provider attempt is unusable. D14 unavailable → blocked artifact, stop. See § Local pipeline phase-1/phase-2 reviewer override below for the full contract and ADR-037 scope note.
 
 ### Model tier resolution
 
@@ -565,7 +565,9 @@ unavailable, stalled, returns invalid output, or returns `BLOCKED`, retry
 once against `qwen3.6:27b-q4_K_M` with the same packet; if that retry also
 fails, fall back to **Gemma** using the same review packet. If Gemma is
 likewise unavailable, stalled, or returns invalid/`BLOCKED` output, fall back
-to **D14** (context-isolated subagent, Balanced tier). If D14 is also
+to **D14** (context-isolated subagent, Balanced tier). D14 first uses a
+responsive cross-provider reviewer; same-provider use is allowed only after
+that attempt is unusable and must be recorded as degraded. If D14 is also
 unavailable, write a blocked-artifact record and stop; never self-review.
 Chain: `qwen3.6:27b-q4_K_M → Gemma → D14`. This override changes the default
 reviewer and inserts an intermediate fallback step; it does not remove D14 as

@@ -216,6 +216,11 @@ Code-solution review: <gemma|qwen3.6:27b-q4_K_M|codex|claude|d14> <artifact path
 See `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review` for the
 full contract.
 
+For every band, D14 must first use a responsive provider different from the
+primary orchestrator's provider. Same-provider D14 is allowed only as a
+recorded degraded fallback after the cross-provider attempt is unusable; see
+the authoritative guide's `Context-isolated adjudicator (D14)` section.
+
 ## Development Closure Rule
 
 For development-task closure, do not describe certification, final verification,
@@ -1272,7 +1277,7 @@ stalled, or returns invalid/`BLOCKED` output, fall back to **Gemma** (one
 retry with the same packet if Gemma itself is unusable) before escalating to
 D14. Chain: `qwen3.6:27b-q4_K_M → Gemma → D14`.
 
-### Cross-vendor resolution (RRI 56+ only)
+### Cross-vendor peer and D14 provider resolution
 
 ```
 caller = claude-code     -> reviewer = codex
@@ -1281,6 +1286,15 @@ caller = local-provider  -> reviewer = claude
 caller = remote-provider -> reviewer = claude
 caller = unknown         -> reviewer = claude
 ```
+
+The mapping above is the **primary reviewer** route for RRI 56+ only. It does
+not limit D14. Whenever D14 is triggered in any RRI band, it MUST first use a
+responsive reviewer from a provider different from the primary orchestrator's
+provider. A same-provider D14 is permitted only as the final degraded fallback
+after the cross-provider D14 is unavailable, unauthenticated, stalled, or
+returns invalid/`BLOCKED` output. Record the cross-provider attempt and, when
+used, the same-provider fallback reason in the review artifact. Context
+isolation is required in both cases.
 
 ### Report line contract
 
@@ -1403,8 +1417,11 @@ work are exempt from this review requirement.
 When the D14 trigger fires, the disposition of findings is adjudicated by a
 fresh subagent or fresh session — fed **only** the final diff, the acceptance
 criteria, and the reconciled findings — never the development transcript or
-chain-of-thought. The `scripts/adjudicator-packet.py` module implements the
-trigger gate (`should_adjudicate()`) and the isolation packet builder
+chain-of-thought. D14 first uses a responsive cross-provider reviewer; a
+same-provider session is permitted only after that cross-provider attempt is
+unusable and must be recorded as a degraded fallback. The
+`scripts/adjudicator-packet.py` module implements the trigger gate
+(`should_adjudicate()`) and the isolation packet builder
 (`build_adjudicator_packet()`).
 
 **Trigger conditions (any one fires):**
@@ -1414,12 +1431,15 @@ trigger gate (`should_adjudicate()`) and the isolation packet builder
 | Gemma unavailable or unusable | `gemma_blocked=True`, missing aggregate, empty aggregate, `BLOCKED`, invalid output, stall, or no usable consolidated result |
 
 **Model:** the subagent must be spawned at the **Balanced** tier — a capable
-but token-efficient model, not Premium. The adjudicator role is read-only and
-analytical (diff + criteria + findings), not generative or synthesis-heavy;
-a Premium model is wasteful and must not be used unless the primary agent
-explicitly overrides with a documented reason recorded in the audit log.
-Resolve the concrete Balanced-tier model from the active environment per
-`docs/policies/RRI_POLICY.md` §Model tier resolution; do not pin a model ID
+but token-efficient model, not Premium. Prefer a responsive model from a
+provider other than the primary orchestrator's provider in every band. Only
+after that provider is demonstrably unusable may D14 use a same-provider
+Balanced model, with the reason recorded in the artifact. The adjudicator role
+is read-only and analytical (diff + criteria + findings), not generative or
+synthesis-heavy; a Premium model is wasteful and must not be used unless the
+primary agent explicitly overrides with a documented reason recorded in the
+audit log. Resolve the concrete Balanced-tier model from the active environment
+per `docs/policies/RRI_POLICY.md` §Model tier resolution; do not pin a model ID
 in this guide.
 
 **Authority:** the adjudicator is advisory — it never closes the task. The
@@ -1448,6 +1468,7 @@ Task completion records for Low/Moderate development tasks must include:
 - Consensus findings: `<count>` | Pass-specific: `<count>` | Disagreement: `<count>`
 - Artifacts: `<path to result.json and per-pass result.passK.json, if persisted>`
 - Isolated adjudicator: `spawned | not triggered` — trigger: `<condition or n/a>`
+- D14 provider route: `cross-provider | same-provider-degraded | n/a` — reason: `<provider and failed cross-provider attempt, or n/a>`
 - disposition_divergence: `none | partial | full | null`
 - Primary-agent disposition: `<accepted findings / rejected false positives / repaired>`
 ```
@@ -1680,7 +1701,9 @@ Exempt only: `docs-only`, `config-only`, `migration-only`, `ADR`, `plan`,
 [ ] 1b. Evaluate D14 trigger — spawn context-isolated subagent if ANY of:
         - Gemma unavailable, stalled, returned invalid output, returned `BLOCKED`,
           or no usable consolidated result was produced  ← mandatory
-        The D14 subagent must be spawned at the Balanced model tier.
+        The D14 subagent must be spawned at the Balanced model tier, using a
+        responsive cross-provider first; same-provider is a recorded degraded
+        fallback only after that attempt is unusable.
         Its output is advisory; record disposition_divergence.
 
 [ ] 1c. Record `### Gemma Reviewer evidence` block in the task entry.
@@ -1715,7 +1738,9 @@ phase-2 reviewer override` for the full contract and ADR-037 scope note.
           also unavailable, stalled, or returns invalid/`BLOCKED` output.
         - If D14 is also unavailable: write a blocked-artifact record and stop.
           Never self-review. Report the task as blocked.
-        The D14 subagent runs at the Balanced model tier; output is advisory.
+        The D14 subagent runs at the Balanced model tier, cross-provider first;
+        same-provider is a recorded degraded fallback only after that attempt
+        is unusable. Output is advisory.
 
 [ ] 1g. Record `### Peer Reviewer evidence` block in the task entry:
         - Reviewer: `<qwen3.6:27b-q4_K_M|gemma|d14>`
@@ -1725,6 +1750,7 @@ phase-2 reviewer override` for the full contract and ADR-037 scope note.
         - Findings: `<summary or "none">`
         - Gemma fallback: `triggered | not triggered` — reason: `<condition or n/a>`
         - D14 fallback: `triggered | not triggered` — reason: `<condition or n/a>`
+        - D14 provider route: `cross-provider | same-provider-degraded | n/a` — reason: `<provider and failed cross-provider attempt, or n/a>`
         - disposition_divergence: `none | partial | full | null`
         - Primary-agent disposition: `<accepted / rejected false positives / repaired>`
 ```
@@ -1748,7 +1774,9 @@ path and D14 is the mandatory fallback.
         - Peer CLI unavailable, unauthenticated, or returns invalid output.
         - If D14 is also unavailable: write a blocked-artifact record and stop.
           Never self-review. Report the task as blocked.
-        The D14 subagent runs at the Balanced model tier; output is advisory.
+        The D14 subagent runs at the Balanced model tier, cross-provider first;
+        same-provider is a recorded degraded fallback only after that attempt
+        is unusable. Output is advisory.
 
 [ ] 1g. Record `### Peer Reviewer evidence` block in the task entry:
         - Reviewer: `<codex|claude|d14>`
@@ -1757,6 +1785,7 @@ path and D14 is the mandatory fallback.
         - Verdict: `PASS | BLOCKED`
         - Findings: `<summary or "none">`
         - D14 fallback: `triggered | not triggered` — reason: `<condition or n/a>`
+        - D14 provider route: `cross-provider | same-provider-degraded | n/a` — reason: `<provider and failed cross-provider attempt, or n/a>`
         - disposition_divergence: `none | partial | full | null`
         - Primary-agent disposition: `<accepted / rejected false positives / repaired>`
 ```
@@ -2061,22 +2090,30 @@ The reviewer is determined by the task's RRI band:
 - **RRI 56+ (Complex+):** cross-vendor peer (phases 1 and 2). The peer
   replaces Gemma as the code-solution reviewer for this band.
 
-**Cross-vendor resolution (RRI 56+ only):**
+**Cross-vendor primary-review resolution (RRI 56+ only):**
 `claude-code → codex | codex → claude | local-provider → claude |
 remote-provider → claude | unknown → claude`
+
+**D14 provider resolution (all bands):** when D14 is triggered, first use a
+responsive reviewer from a provider different from the primary orchestrator's
+provider. Same-provider D14 is allowed only after that cross-provider attempt
+is unavailable, unauthenticated, stalled, or invalid/`BLOCKED`; record it as a
+degraded fallback with the failed cross-provider evidence.
 
 **Failure modes (RRI 26–55):**
 1. `qwen3.6:27b-q4_K_M` unavailable, stalled, or returns invalid/`BLOCKED`
    output → fall back to **Gemma** (one immediate retry with the same review
    packet if Gemma itself is unusable on the first attempt).
 2. `qwen3.6:27b-q4_K_M` + Gemma both unavailable/unusable → fall back to
-   **D14** (Balanced tier).
+   **D14** (Balanced tier, cross-provider first; same-provider only as a
+   recorded degraded final fallback).
 3. `qwen3.6:27b-q4_K_M` + Gemma + D14 all unavailable → write a
    blocked-artifact record and stop. Never self-review. Report the task as
    blocked.
 
 **Failure modes (RRI 56+):**
-1. Peer CLI unavailable or unauthenticated → fall back to **D14** (Balanced tier).
+1. Peer CLI unavailable or unauthenticated → fall back to **D14** (Balanced tier,
+   cross-provider first; same-provider only as a recorded degraded final fallback).
 2. Peer + D14 both unavailable → write a blocked-artifact record and stop. Never
    self-review. Report the task as blocked.
 
@@ -2108,7 +2145,9 @@ result can be produced, the agent must perform **one immediate retry** with
 the same review packet first. If the retry succeeds with a usable result, the
 primary path continues normally. If the retry fails for the same class of
 reason or still produces no usable result, the agent **must** spawn a
-context-isolated subagent as the mandatory fallback reviewer. The subagent
+context-isolated subagent as the mandatory fallback reviewer. D14 must first
+be cross-provider; same-provider D14 is permitted only after a failed,
+evidenced cross-provider attempt and is recorded as degraded. The subagent
 receives an isolation packet (diff + acceptance criteria + any usable partial
 findings) and its output is advisory, exactly as the primary reviewer's would
 be. The primary agent reconciles and records `disposition_divergence` in the
