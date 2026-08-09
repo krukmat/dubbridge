@@ -20,6 +20,7 @@ runner process, not cooperative behavior requested of it.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import signal
@@ -28,6 +29,9 @@ import sys
 import time
 from dataclasses import dataclass
 from typing import Any
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import fallback_selection
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import escalation_packet
@@ -51,6 +55,9 @@ class SupervisorResult:
     bundle_path: str | None
     elapsed_s: float
     bundle_write_ok: bool = True
+    fallback_selection_artifact: str | None = None
+    fallback_selection: dict[str, Any] | None = None
+    cloud_instruction: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -379,6 +386,150 @@ def _amend_reason_for_write_failure(reason: str, write_result: BundleWriteResult
     return f"{reason} (bundle write failed: {write_result.write_error})"
 
 
+def _trigger_kind_for_result(result: SupervisorResult) -> str:
+    """Classify a Med-high takeover without inferring from mutable policy.
+
+    A failed runner launch is the sole operational-only supervisor outcome.
+    Gate rejections, direct CLOUD_REQUIRED decisions, and every launched
+    runner failure have already established a capability or risk boundary.
+    """
+    if result.status == "transport_error":
+        return fallback_selection.TRIGGER_OPERATIONAL
+    return fallback_selection.TRIGGER_CAPABILITY_RISK
+
+
+def build_fallback_packet(
+    *, card_path: str, rri: int, result: SupervisorResult
+) -> dict[str, Any]:
+    """Bind a selection receipt to the exact bytes of the emitted bundle."""
+    if not result.bundle_write_ok or not result.bundle_path:
+        raise fallback_selection.FallbackSelectionError("bundle: unavailable")
+    try:
+        with open(result.bundle_path, "rb") as stream:
+            bundle_bytes = stream.read()
+    except OSError as exc:
+        raise fallback_selection.FallbackSelectionError(
+            f"bundle: unreadable ({exc})"
+        ) from exc
+
+    card = escalation_packet.load_card(card_path)
+    task_id = card.get("task_id")
+    if not isinstance(task_id, str) or not task_id.strip():
+        raise fallback_selection.FallbackSelectionError("task_id: missing from card")
+    trigger_kind = _trigger_kind_for_result(result)
+    return {
+        "task_id": task_id,
+        "phase": "implementation",
+        "terminal_status": result.status,
+        "terminal_route": result.route,
+        "terminal_reason": result.reason,
+        "trigger": result.status,
+        "trigger_kind": trigger_kind,
+        "rri": rri,
+        "handoff_bundle": {
+            "artifact_path": os.path.abspath(result.bundle_path),
+            "sha256": hashlib.sha256(bundle_bytes).hexdigest(),
+        },
+    }
+
+
+def _blocked_checkpoint(
+    *, task_id: str, rri: int, result: SupervisorResult, summary: str
+) -> dict[str, Any]:
+    """Return a receipt-free, fail-closed artifact with a stable summary."""
+    return {
+        "schema_version": fallback_selection.SCHEMA_VERSION,
+        "task_id": task_id,
+        "phase": "implementation",
+        "status": "blocked",
+        "verdict": "blocked",
+        "summary": summary,
+        "trigger": result.status,
+        "trigger_kind": _trigger_kind_for_result(result),
+        "role": fallback_selection.ROLE_CLOUD_IMPLEMENTER,
+        "rri": rri,
+    }
+
+
+def _attach_fallback_selection(
+    *,
+    card_path: str,
+    rri: int,
+    result: SupervisorResult,
+    fallback_mode: str,
+    fallback_model: str | None,
+    fallback_reasoning_effort: str | None,
+    fallback_selected_by: str | None,
+    fallback_selection_artifact: str | None,
+) -> SupervisorResult:
+    """Gate one non-success handoff behind a hash-bound selection receipt.
+
+    This never invokes a cloud model.  It writes an awaiting, authorized, or
+    blocked checkpoint artifact and exposes a cloud instruction only after the
+    receipt validates against a freshly-read copy of the bundle bytes.
+    """
+    card = escalation_packet.load_card(card_path)
+    task_id = card.get("task_id") if isinstance(card.get("task_id"), str) else "unknown"
+    artifact_path = (
+        fallback_selection_artifact
+        or fallback_selection.default_checkpoint_path(result.bundle_path or "fallback")
+    )
+    try:
+        packet = build_fallback_packet(card_path=card_path, rri=rri, result=result)
+        checkpoint = fallback_selection.build_checkpoint(
+            task_id=packet["task_id"],
+            phase="implementation",
+            trigger=packet["trigger"],
+            role=fallback_selection.ROLE_CLOUD_IMPLEMENTER,
+            rri=rri,
+            packet=packet,
+            trigger_kind=packet["trigger_kind"],
+            selection_mode=fallback_mode,
+            selected_model=fallback_model,
+            selected_reasoning_effort=fallback_reasoning_effort,
+            selected_by=fallback_selected_by,
+        )
+        if checkpoint["status"] == fallback_selection.AUTHORIZED_STATUS:
+            # Re-read the bundle after receipt creation. A concurrent mutation
+            # cannot be authorized by the earlier byte digest.
+            current_packet = build_fallback_packet(
+                card_path=card_path, rri=rri, result=result
+            )
+            try:
+                fallback_selection.validate_authorized_checkpoint(
+                    checkpoint, current_packet
+                )
+            except fallback_selection.FallbackSelectionError:
+                checkpoint = _blocked_checkpoint(
+                    task_id=packet["task_id"], rri=rri, result=result,
+                    summary="bundle_receipt_mismatch",
+                )
+        fallback_selection.write_checkpoint(checkpoint, artifact_path)
+    except (fallback_selection.FallbackSelectionError, OSError) as exc:
+        checkpoint = _blocked_checkpoint(
+            task_id=task_id, rri=rri, result=result, summary=str(exc)
+        )
+        try:
+            fallback_selection.write_checkpoint(checkpoint, artifact_path)
+        except OSError:
+            artifact_path = None
+
+    cloud_instruction = None
+    if checkpoint["status"] == fallback_selection.AUTHORIZED_STATUS:
+        cloud_instruction = {
+            "model": checkpoint["selected_model"],
+            "reasoning_effort": checkpoint["selected_reasoning_effort"],
+        }
+    return SupervisorResult(
+        status=result.status, route=result.route, reason=result.reason,
+        runner_result=result.runner_result, bundle_path=result.bundle_path,
+        elapsed_s=result.elapsed_s, bundle_write_ok=result.bundle_write_ok,
+        fallback_selection_artifact=artifact_path,
+        fallback_selection=checkpoint,
+        cloud_instruction=cloud_instruction,
+    )
+
+
 def _pre_launch_bundle(
     *,
     bundle_out_path: str,
@@ -480,6 +631,11 @@ def supervise(
     python_executable=None,
     diff_file: str | None = None,
     rri_table: str | None = None,
+    fallback_mode: str = fallback_selection.MODE_HUMAN_SELECT,
+    fallback_model: str | None = None,
+    fallback_reasoning_effort: str | None = None,
+    fallback_selected_by: str | None = None,
+    fallback_selection_artifact: str | None = None,
 ) -> SupervisorResult:
     """The single entry point: decide route (T2 gate), then either hand off
     to cloud immediately (HP-2) or supervise exactly one bounded Qwen35
@@ -500,49 +656,68 @@ def supervise(
             rri=rri,
         )
     except med_high_gate.GateError as exc:
-        return _pre_launch_bundle(
+        result = _pre_launch_bundle(
             **bundle_kwargs,
             stop_reason=f"gate_error:{exc.code}", status="gate_rejected", reason=str(exc),
         )
     except GateInputError as exc:
-        return _pre_launch_bundle(
+        result = _pre_launch_bundle(
             **bundle_kwargs,
             stop_reason=f"gate_input_unreadable:{exc.artifact_label}",
             status="cloud_required", reason=str(exc),
         )
+    else:
+        result = None
 
-    if decision.route == ROUTE_CLOUD_REQUIRED:
+    if result is None and decision.route == ROUTE_CLOUD_REQUIRED:
         # HP-2: routes directly to cloud without ever launching Qwen35.
-        return _pre_launch_bundle(
+        result = _pre_launch_bundle(
             **bundle_kwargs,
             stop_reason="cloud_required", status="cloud_required", reason=decision.reason,
         )
 
-    launch_outcome = run_supervised_runner(
-        card_path=card_path, worktree=worktree, out_path=out_path,
-        model=MED_HIGH_RUNNER_MODEL,
-        wall_clock_seconds=wall_clock_seconds, popen_fn=popen_fn,
-        python_executable=python_executable,
-    )
-    elapsed_s = launch_outcome.get("elapsed_s", 0.0)
-    runner_value, runner_shape_failure_reason = _read_runner_out(out_path)
-    runner_result = (
-        {"status": "transcript_shape_invalid", "reason": runner_shape_failure_reason}
-        if runner_shape_failure_reason is not None
-        else runner_value
-    )
-
-    if launch_outcome["status"] == "runner_exited" and runner_result is not None and runner_result.get("status") == STATUS_SUCCESS:
-        # HP-1: exactly one exact-model runner launched, success recorded
-        # without escalation -- no bundle is built on this path.
-        return SupervisorResult(
-            status=STATUS_SUCCESS, route=ROUTE_GO_LOCAL, reason="Med-high session succeeded within budget.",
-            runner_result=runner_result, bundle_path=None, elapsed_s=elapsed_s,
+    if result is None:
+        launch_outcome = run_supervised_runner(
+            card_path=card_path, worktree=worktree, out_path=out_path,
+            model=MED_HIGH_RUNNER_MODEL,
+            wall_clock_seconds=wall_clock_seconds, popen_fn=popen_fn,
+            python_executable=python_executable,
+        )
+        elapsed_s = launch_outcome.get("elapsed_s", 0.0)
+        runner_value, runner_shape_failure_reason = _read_runner_out(out_path)
+        runner_result = (
+            {"status": "transcript_shape_invalid", "reason": runner_shape_failure_reason}
+            if runner_shape_failure_reason is not None
+            else runner_value
         )
 
-    return _post_launch_bundle(
-        **bundle_kwargs,
-        launch_outcome=launch_outcome, runner_result=runner_result, elapsed_s=elapsed_s,
+        if (
+            launch_outcome["status"] == "runner_exited"
+            and runner_result is not None
+            and runner_result.get("status") == STATUS_SUCCESS
+        ):
+            # HP-1: exactly one exact-model runner launched, success recorded
+            # without escalation -- no bundle or fallback checkpoint is built.
+            result = SupervisorResult(
+                status=STATUS_SUCCESS, route=ROUTE_GO_LOCAL,
+                reason="Med-high session succeeded within budget.",
+                runner_result=runner_result, bundle_path=None, elapsed_s=elapsed_s,
+            )
+        else:
+            result = _post_launch_bundle(
+                **bundle_kwargs,
+                launch_outcome=launch_outcome, runner_result=runner_result,
+                elapsed_s=elapsed_s,
+            )
+
+    if result.status == STATUS_SUCCESS:
+        return result
+    return _attach_fallback_selection(
+        card_path=card_path, rri=rri, result=result,
+        fallback_mode=fallback_mode, fallback_model=fallback_model,
+        fallback_reasoning_effort=fallback_reasoning_effort,
+        fallback_selected_by=fallback_selected_by,
+        fallback_selection_artifact=fallback_selection_artifact,
     )
 
 
@@ -563,6 +738,7 @@ def parse_args(argv=None):
     parser.add_argument("--wall-clock-seconds", type=int, default=MED_HIGH_WALL_CLOCK_SECONDS)
     parser.add_argument("--diff-file", default=None)
     parser.add_argument("--rri-table", default=None)
+    fallback_selection.add_cli_arguments(parser)
     return parser.parse_args(argv)
 
 
@@ -580,6 +756,11 @@ def main(argv=None) -> int:
         wall_clock_seconds=args.wall_clock_seconds,
         diff_file=args.diff_file,
         rri_table=args.rri_table,
+        fallback_mode=args.fallback_mode,
+        fallback_model=args.fallback_model,
+        fallback_reasoning_effort=args.fallback_reasoning_effort,
+        fallback_selected_by=args.fallback_selected_by,
+        fallback_selection_artifact=args.fallback_selection_artifact,
     )
     print(json.dumps({
         "status": result.status,
@@ -587,8 +768,17 @@ def main(argv=None) -> int:
         "reason": result.reason,
         "bundle_path": result.bundle_path,
         "elapsed_s": result.elapsed_s,
+        "fallback_selection_artifact": result.fallback_selection_artifact,
+        "fallback_selection": result.fallback_selection,
+        "cloud_instruction": result.cloud_instruction,
     }))
-    return 0 if result.status == STATUS_SUCCESS else 1
+    if result.status == STATUS_SUCCESS:
+        return 0
+    if result.fallback_selection is None or result.fallback_selection["status"] == "blocked":
+        return 2
+    if result.fallback_selection["status"] == fallback_selection.AWAITING_STATUS:
+        return fallback_selection.HUMAN_SELECTION_EXIT_CODE
+    return 1
 
 
 if __name__ == "__main__":

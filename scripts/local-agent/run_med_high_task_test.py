@@ -954,6 +954,38 @@ class SuperviseIntegrationTest(unittest.TestCase):
         self.assertEqual(result.route, med_high_gate.ROUTE_GO_LOCAL)
         self.assertIsNone(result.bundle_path)
         self.assertFalse(os.path.isfile(bundle_path))
+        self.assertIsNone(result.fallback_selection)
+        self.assertIsNone(result.cloud_instruction)
+
+    def test_hp1_operational_start_failure_authorizes_terra_against_bundle(self):
+        card_path = _card(self.tmp.name)
+        out_path = os.path.join(self.tmp.name, "out.json")
+        bundle_path = os.path.join(self.tmp.name, "bundle.md")
+        selection_path = os.path.join(self.tmp.name, "selection.json")
+        r_path, p_path = self._write_gate_inputs("GO_LOCAL", "GO_LOCAL")
+
+        result = _MOD.supervise(
+            card_path=card_path, worktree=self.tmp.name, out_path=out_path,
+            bundle_out_path=bundle_path, refinement_artifact_path=r_path,
+            primary_receipt_path=p_path, card_hash=CARD_HASH, rri=50,
+            popen_fn=lambda *a, **kw: (_ for _ in ()).throw(OSError("offline")),
+            fallback_mode="preauthorized", fallback_model="gpt-5.6-terra",
+            fallback_reasoning_effort="high", fallback_selected_by="owner",
+            fallback_selection_artifact=selection_path,
+        )
+
+        self.assertEqual(result.status, "transport_error")
+        self.assertEqual(result.fallback_selection["status"], "fallback_authorized")
+        self.assertEqual(result.fallback_selection["recommended_model"], "gpt-5.6-terra")
+        self.assertEqual(result.fallback_selection["recommended_reasoning_effort"], "high")
+        self.assertEqual(result.cloud_instruction, {
+            "model": "gpt-5.6-terra", "reasoning_effort": "high",
+        })
+        with open(selection_path, encoding="utf-8") as stream:
+            checkpoint = json.load(stream)
+        self.assertEqual(checkpoint["packet_sha256"], _MOD.fallback_selection.packet_sha256(
+            _MOD.build_fallback_packet(card_path=card_path, rri=50, result=result)
+        ))
 
     def test_hp2_cloud_required_routes_without_launching_runner(self):
         card_path = _card(self.tmp.name)
@@ -974,6 +1006,77 @@ class SuperviseIntegrationTest(unittest.TestCase):
         self.assertEqual(result.status, "cloud_required")
         self.assertEqual(result.route, med_high_gate.ROUTE_CLOUD_REQUIRED)
         self.assertTrue(os.path.isfile(bundle_path))
+
+    def test_hp2_cloud_required_authorizes_sol_without_model_invocation(self):
+        card_path = _card(self.tmp.name)
+        out_path = os.path.join(self.tmp.name, "out.json")
+        bundle_path = os.path.join(self.tmp.name, "bundle.md")
+        r_path, p_path = self._write_gate_inputs("CLOUD_REQUIRED", "GO_LOCAL")
+
+        result = _MOD.supervise(
+            card_path=card_path, worktree=self.tmp.name, out_path=out_path,
+            bundle_out_path=bundle_path, refinement_artifact_path=r_path,
+            primary_receipt_path=p_path, card_hash=CARD_HASH, rri=50,
+            popen_fn=lambda *a, **kw: self.fail("must not launch"),
+            fallback_mode="preauthorized", fallback_model="gpt-5.6-sol",
+            fallback_reasoning_effort="high", fallback_selected_by="owner",
+        )
+
+        self.assertEqual(result.fallback_selection["trigger_kind"], "capability-risk")
+        self.assertEqual(result.fallback_selection["recommended_model"], "gpt-5.6-sol")
+        self.assertEqual(result.cloud_instruction, {
+            "model": "gpt-5.6-sol", "reasoning_effort": "high",
+        })
+
+    def test_ec1_human_selection_pause_preserves_bundle_without_instruction(self):
+        card_path = _card(self.tmp.name)
+        out_path = os.path.join(self.tmp.name, "out.json")
+        bundle_path = os.path.join(self.tmp.name, "bundle.md")
+        r_path, p_path = self._write_gate_inputs("CLOUD_REQUIRED", "GO_LOCAL")
+
+        result = _MOD.supervise(
+            card_path=card_path, worktree=self.tmp.name, out_path=out_path,
+            bundle_out_path=bundle_path, refinement_artifact_path=r_path,
+            primary_receipt_path=p_path, card_hash=CARD_HASH, rri=50,
+            popen_fn=lambda *a, **kw: self.fail("must not launch"),
+        )
+
+        self.assertTrue(os.path.isfile(bundle_path))
+        self.assertEqual(result.fallback_selection["status"], "awaiting_fallback_selection")
+        self.assertNotIn("authorization_receipt", result.fallback_selection)
+        self.assertIsNone(result.cloud_instruction)
+        self.assertTrue(os.path.isfile(result.fallback_selection_artifact))
+
+    def test_ec2_bundle_mutation_after_receipt_is_blocked(self):
+        card_path = _card(self.tmp.name)
+        out_path = os.path.join(self.tmp.name, "out.json")
+        bundle_path = os.path.join(self.tmp.name, "bundle.md")
+        r_path, p_path = self._write_gate_inputs("CLOUD_REQUIRED", "GO_LOCAL")
+        real_build_checkpoint = _MOD.fallback_selection.build_checkpoint
+
+        def mutate_after_receipt(**kwargs):
+            checkpoint = real_build_checkpoint(**kwargs)
+            with open(bundle_path, "a", encoding="utf-8") as stream:
+                stream.write("\nmutated after authorization\n")
+            return checkpoint
+
+        _MOD.fallback_selection.build_checkpoint = mutate_after_receipt
+        try:
+            result = _MOD.supervise(
+                card_path=card_path, worktree=self.tmp.name, out_path=out_path,
+                bundle_out_path=bundle_path, refinement_artifact_path=r_path,
+                primary_receipt_path=p_path, card_hash=CARD_HASH, rri=50,
+                popen_fn=lambda *a, **kw: self.fail("must not launch"),
+                fallback_mode="preauthorized", fallback_model="gpt-5.6-sol",
+                fallback_reasoning_effort="high", fallback_selected_by="owner",
+            )
+        finally:
+            _MOD.fallback_selection.build_checkpoint = real_build_checkpoint
+
+        self.assertEqual(result.fallback_selection["status"], "blocked")
+        self.assertEqual(result.fallback_selection["summary"], "bundle_receipt_mismatch")
+        self.assertNotIn("authorization_receipt", result.fallback_selection)
+        self.assertIsNone(result.cloud_instruction)
 
     def test_ec1_timeout_emits_bundle_with_wall_clock_exceeded_reason(self):
         import subprocess as _subprocess
@@ -1288,7 +1391,7 @@ class MainCliTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
 
-    def test_hp2_cli_cloud_required_exits_nonzero(self):
+    def test_ec1_cli_cloud_required_without_selection_pauses(self):
         card_path = _card(self.tmp.name)
         out_path = os.path.join(self.tmp.name, "out.json")
         bundle_path = os.path.join(self.tmp.name, "bundle.md")
@@ -1310,8 +1413,40 @@ class MainCliTest(unittest.TestCase):
             "--rri", "50",
         ])
 
-        self.assertEqual(exit_code, 1)
+        self.assertEqual(exit_code, _MOD.fallback_selection.HUMAN_SELECTION_EXIT_CODE)
         self.assertTrue(os.path.isfile(bundle_path))
+
+    def test_ec1_cli_partial_preauthorization_blocks(self):
+        card_path = _card(self.tmp.name)
+        out_path = os.path.join(self.tmp.name, "out.json")
+        bundle_path = os.path.join(self.tmp.name, "bundle.md")
+        refinement = _refinement_artifact("CLOUD_REQUIRED")
+        receipt = _primary_receipt(refinement, "GO_LOCAL")
+        r_path = os.path.join(self.tmp.name, "refinement.json")
+        p_path = os.path.join(self.tmp.name, "receipt.json")
+        _write_json(r_path, refinement)
+        _write_json(p_path, receipt)
+
+        exit_code = _MOD.main([
+            "--card", card_path,
+            "--worktree", self.tmp.name,
+            "--out", out_path,
+            "--bundle-out", bundle_path,
+            "--refinement-artifact", r_path,
+            "--primary-receipt", p_path,
+            "--card-hash", CARD_HASH,
+            "--rri", "50",
+            "--fallback-mode", "preauthorized",
+            "--fallback-model", "gpt-5.6-sol",
+        ])
+
+        self.assertEqual(exit_code, 2)
+        selection_path = _MOD.fallback_selection.default_checkpoint_path(bundle_path)
+        with open(selection_path, encoding="utf-8") as stream:
+            checkpoint = json.load(stream)
+        self.assertEqual(checkpoint["status"], "blocked")
+        self.assertIn("selected_reasoning_effort", checkpoint["summary"])
+        self.assertNotIn("authorization_receipt", checkpoint)
 
 
 if __name__ == "__main__":
