@@ -168,3 +168,17 @@ fn asset_from_row_unknown_status_fails_closed() {
     };
     assert!(asset_from_row(row).is_err());
 }
+
+#[test]
+fn workspace_repo_stays_under_local_delegation_read_gate() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/workspace_repo.rs");
+    let line_count = std::fs::read_to_string(&path)
+        .expect("read workspace_repo.rs")
+        .lines()
+        .count();
+    assert!(
+        line_count < 500,
+        "workspace_repo.rs has {line_count} lines; must stay under the 500-line \
+         local-delegation read gate (S-150-T2a EC-1)"
+    );
+}

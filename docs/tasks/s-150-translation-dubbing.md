@@ -718,11 +718,224 @@ Required passes: 3 (`47` -> `Med-high`)
 
 ---
 
+## S-150-T2a: Extract oversized seams before T2 fan-out
+
+**Type:** development
+**Effort:** M (RRI 26 — Moderate)
+**Depends on:** S-150-T1c-ii
+**Status:** [x] Done
+
+**Objective:** Extract the two code seams S-150-T2 needs — the post-ready branch
+point in `subtitle_runtime.rs` and the target-language lookup in
+`workspace_repo.rs` — into focused modules under the 500-line local-delegation
+read gate, with zero behavior change.
+
+**Happy paths considered:**
+
+- **HP-1:** Existing subtitle-ready flow behaves identically after extraction
+  (all current tests in `subtitle_runtime.rs` and `workspace_repo.rs` pass
+  unchanged).
+
+**Edge cases considered:**
+
+- **EC-1:** Both target files (post-extraction, the modules T2 will read/edit)
+  are under 500 lines.
+
+**Acceptance criteria:** Extract the post-ready dispatch call inside
+`process_subtitle_job_inner` (`apps/worker-runner/src/subtitle_runtime.rs`,
+lines 44–117) into its own small module/function so T2's future
+`post_ready_route` branch has a narrow, self-contained edit surface. Move
+`list_target_languages` (`crates/db/src/workspace_repo.rs`, lines 555–582) into
+a new focused module (e.g. `crates/db/src/target_language_repo.rs`), re-exported
+from `crates/db/src/lib.rs`. No `post_ready_route` field, no UUIDv5 derivation,
+no fan-out logic, no queue/job changes — pure mechanical extraction.
+
+**Files expected to change:** `apps/worker-runner/src/subtitle_runtime.rs`,
+`crates/db/src/workspace_repo.rs`, new `crates/db/src/target_language_repo.rs`,
+`crates/db/src/lib.rs` (module export).
+
+**Files actually changed (scope expanded during Reflection Pass 2 — see
+Reflection log):**
+
+- `apps/worker-runner/src/subtitle_runtime.rs` (520 → 132 lines)
+- `apps/worker-runner/src/subtitle_alignment.rs` (new, 22 lines) — `RawAlignmentFile`,
+  `RawWord`, `raw_words_to_provider` moved verbatim
+- `apps/worker-runner/src/subtitle_runtime_tests.rs` (new, 373 lines) — all 6
+  tests moved out of `subtitle_runtime.rs`
+- `apps/worker-runner/src/main.rs` — added `mod subtitle_alignment;`,
+  `#[cfg(test)] mod subtitle_runtime_tests;`
+- `crates/db/src/workspace_repo.rs` (777 → 451 lines)
+- `crates/db/src/target_language_repo.rs` (new, grew 44 → 164 lines) — full
+  "Target languages" section moved (`list_target_languages`,
+  `upsert_target_language`, `upsert_target_language_tx`,
+  `delete_target_languages_for_project_tx`, `AssetSubtitleRouteRow`,
+  `AssetSubtitleRoute`, `get_source_language_for_asset`,
+  `get_asset_subtitle_route`, `TargetLanguageRow`)
+- `crates/db/src/workspace_repo_tests.rs` (new, 170 lines) — all 11 tests
+  moved out of `workspace_repo.rs`; several previously-private items
+  (`require_org_role`, `OrgRow`, `org_from_row`, `MemberRow`, `member_from_row`,
+  `ProjectRow`, `project_from_row`, `AssetRow`, `parse_asset_status`,
+  `asset_from_row`) made `pub(crate)` to support the split
+- `crates/db/src/lib.rs` — added `pub mod target_language_repo;`,
+  `#[cfg(test)] mod workspace_repo_tests;`
+- Call-site updates (outside the originally-approved scope):
+  `apps/worker-runner/src/review_enqueue.rs`,
+  `apps/worker-runner/src/subtitle_enqueue.rs`,
+  `apps/worker-runner/src/runner_topology_tests.rs`,
+  `apps/worker-runner/src/transcription_runtime.rs`,
+  `apps/worker-runner/src/preparation_runtime_tests/enqueue_flow.rs`,
+  `apps/api/src/workspace_service.rs`, `apps/api/tests/workspace_test.rs`
+
+Scope expansion was authorized by the user after Reflection Pass 2 found the
+originally-approved minimal extraction insufficient (EC-1 not met — see
+Reflection log below).
+
+**Evidence to emit:** RRI report, phase-1/phase-2 review artifacts, Reflection
+log (2 passes), unit coverage certification, owner verification.
+
+**Status artifacts affected:** This ledger's S-150-T2 `Files expected to
+change` note (paths change post-extraction).
+
+**Agent handoff prompt:** Extract the named seams verbatim into focused
+modules; preserve behavior exactly; do not touch job/queue types or branching
+logic. Stop after extraction compiles and existing tests pass.
+
+**Stop condition:** Stop once both target files are under 500 lines and all
+existing tests pass. Do not start any T2 fan-out logic.
+
+**RRI:** 26 → Moderate (26–40); gates: confirm tests exist in affected area;
+penalties: none. `python3 scripts/rri.py --touches
+apps/worker-runner/src/subtitle_runtime.rs --touches
+crates/db/src/workspace_repo.rs --cc 2 --D 1 --K 1 --P 1 --T 0 --A 0 --X 1
+--platform dubbridge`
+
+**Task-analysis review:** `gemma docs/audit/gemma-evidence/S-150-T2.json - BLOCKED→resolved`
+(3 findings disposed: 1 HIGH rejected as false positive with compile-level
+evidence, 1 MEDIUM accepted and resolved via this T2a/T2 decomposition, 1 LOW
+accepted and resolved by direct inspection)
+
+**Approval:** User approved via Compact Approval Task Card v2, 2026-08-09.
+
+### Reflection log
+
+Required passes: 2 (`26` → `Moderate`)
+
+#### Pass 1
+
+- **Draft verdict:** Local implementer (`qwen3.6:35b-a3b`, disposable worktree
+  `local/s-150-t2a`) produced a minimal extraction before the run was
+  interrupted (session-level kill of the orchestrator process, not the Ollama
+  daemon): `dispatch_post_ready` wrapper added in `subtitle_runtime.rs`
+  (call-site extracted, nothing removed); `list_target_languages` +
+  `TargetLanguageRow` moved out of `workspace_repo.rs` into a new
+  `target_language_repo.rs`. Compiles; existing tests pass.
+- **Critique findings:** Contract/behavior check only — did not yet verify
+  EC-1 (file-size gate) with `wc -l`. Logical correctness against HP-1
+  confirmed by passing tests.
+- **Revisions applied:** none (contract pass; no defects found against
+  HP-1).
+
+#### Pass 2
+
+- **Draft verdict:** Ran `wc -l` on both target files as part of the coverage
+  focus. Result: `subtitle_runtime.rs` = 529 lines (grew from 520 — the
+  wrapper added code without removing any), `workspace_repo.rs` = 739 lines
+  (down from 777, but still far above the 500-line gate). **EC-1 not
+  satisfied.**
+- **Critique findings:** The approved minimal-extraction scope
+  (`dispatch_post_ready` wrapper + `list_target_languages` only) does not
+  achieve the task's own acceptance criterion. Both target files remain
+  above the 500-line local-delegation read gate that this task exists to
+  clear for S-150-T2.
+- **Revisions applied:** Reported the gap to the user rather than declaring
+  success from passing tests alone. User authorized (via AskUserQuestion)
+  expanding T2a's scope now rather than deferring to a separate T2a-ii task,
+  then authorized (via a second AskUserQuestion) proceeding with the full
+  "Target languages" section move despite it touching more call-site files
+  than the originally-approved card. Implemented directly by the primary
+  agent (not re-invoking the local runner — this is a scope expansion
+  authorized by the user, not a local-agent repair attempt within the
+  Moderate-band 2-attempt budget):
+  - Moved `RawAlignmentFile`/`RawWord`/`raw_words_to_provider` to new
+    `subtitle_alignment.rs`; moved all 6 `subtitle_runtime.rs` tests to new
+    `subtitle_runtime_tests.rs`. Result: `subtitle_runtime.rs` → 132 lines.
+  - Moved the remaining "Target languages" functions/structs
+    (`upsert_target_language`, `upsert_target_language_tx`,
+    `delete_target_languages_for_project_tx`, `AssetSubtitleRouteRow`,
+    `AssetSubtitleRoute`, `get_source_language_for_asset`,
+    `get_asset_subtitle_route`) to `target_language_repo.rs`; moved all 11
+    `workspace_repo.rs` tests to new `workspace_repo_tests.rs` (required
+    marking several previously-private items `pub(crate)`). Result:
+    `workspace_repo.rs` → 451 lines.
+  - Updated all 7 affected call-site files; confirmed via repo-wide grep
+    that zero unmigrated `workspace_repo::{upsert_target_language,
+    delete_target_languages_for_project_tx, upsert_target_language_tx,
+    get_source_language_for_asset, get_asset_subtitle_route,
+    list_target_languages}` references remain.
+  - Re-verified: `cargo check --all-targets`, `cargo fmt --check`, `cargo
+    clippy --all-targets -- -D warnings` all clean (only a pre-existing
+    unrelated `apalis-redis` future-incompatibility warning). Full test
+    suites re-run against a live Postgres backend (`--test-threads=1`, no
+    mocks): `dubbridge-db` 77/77, `dubbridge-worker-runner` 52/52,
+    `dubbridge-api` full crate (~22 binaries) all "0 failed". EC-1 now
+    satisfied: both target files under 500 lines (132, 451).
+
+Review artifact: docs/audit/gemma-evidence/S-150-T2a.json
+
+### Peer Reviewer evidence
+
+- Reviewer: `qwen3.6:27b-q4_K_M`
+- Command: manual Ollama `/api/chat` invocation (`OLLAMA_HOST=http://127.0.0.1:11434`),
+  `think: false`, `num_predict: 8192`, `num_ctx: 131072`
+- Artifact: `docs/audit/gemma-evidence/S-150-T2a.json`
+- Verdict: `PASS`
+- Findings: none
+- Gemma fallback: not triggered — reason: `qwen3.6:27b-q4_K_M` healthy
+  (precheck `done_reason: stop`, non-empty content) and returned a usable
+  parseable verdict on first send after one transport-level timeout retry
+  (initial 300s curl timed out on the ~66K-character packet; retried at
+  540s and completed with `done_reason: stop`)
+- D14 fallback: not triggered — reason: n/a
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted PASS verdict. Independently
+  cross-checked the reviewer's four requested focus areas against the
+  primary agent's own evidence before accepting: (1) pure-extraction claim —
+  confirmed via `git diff` showing deletions in the two target files
+  reappearing verbatim in the four new files, no signature/logic changes;
+  (2) missed call sites — confirmed via repo-wide grep (zero unmigrated
+  references, see Reflection log Pass 2); (3) visibility changes — the
+  `pub(crate)` grants on `workspace_repo.rs` items were reviewed individually
+  during implementation, scoped to exactly what `workspace_repo_tests.rs`
+  needs, nothing broader; (4) test coverage — all 17 moved tests (6 + 11)
+  accounted for in the new `_tests.rs` files and passing.
+
+**Task-analysis review:** `qwen3.6:27b-q4_K_M — n/a (user override: Gemma-first,
+Codex after 2 failed attempts — not exercised; phase-1 resolved via the
+`gemma` line recorded above)`
+**Code-solution review:** `qwen3.6:27b-q4_K_M docs/audit/gemma-evidence/S-150-T2a-phase2.json - PASS`
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | Existing subtitle-ready flow, alignment parsing, and org/member/project/asset row mapping behave identically after extraction | `apps/worker-runner/src/subtitle_runtime_tests.rs::process_subtitle_job_marks_ready_and_stores_artifact_on_success`, `alignment_seconds_to_ms_conversion_is_correct`; `crates/db/src/workspace_repo_tests.rs::org_from_row_maps_fields_correctly`, `member_from_row_maps_known_role`, `project_from_row_maps_fields_correctly`, `asset_from_row_maps_known_status` | passed |
+| EC-1 | Edge case | Both target files under 500 lines post-extraction | `apps/worker-runner/src/subtitle_runtime_tests.rs::subtitle_runtime_stays_under_local_delegation_read_gate`, `crates/db/src/workspace_repo_tests.rs::workspace_repo_stays_under_local_delegation_read_gate` (each reads its target file via `CARGO_MANIFEST_DIR` and asserts `line_count < 500`) | passed |
+| EC-1 (regression) | Edge case | Failure-path behavior unchanged after extraction (fails closed on invalid input) | `apps/worker-runner/src/subtitle_runtime_tests.rs::process_subtitle_job_fails_when_alignment_missing`, `process_subtitle_job_fails_closed_on_invalid_segmentation_output`, `process_subtitle_envelope_rejects_wrong_job_type`; `crates/db/src/workspace_repo_tests.rs::require_org_role_unknown_value_fails_closed`, `parse_asset_status_unknown_value_fails_closed`, `member_from_row_unknown_role_fails_closed`, `asset_from_row_unknown_status_fails_closed` | passed |
+
+### Owner final verification
+
+- Owner: `Matias Kruk`
+- Date: 2026-08-09
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior. I confirm the extraction is a pure mechanical move with zero behavior change, verified independently by the primary agent's compile/lint/test cycle and by the qwen3.6:27b-q4_K_M phase-2 reviewer.
+- Commands run: `cargo check --all-targets`; `cargo fmt --all -- --check`; `cargo clippy --all-targets -- -D warnings`; `DUBBRIDGE_DATABASE_URL="postgres://dubbridge:dubbridge@localhost:5432/dubbridge" cargo test -p dubbridge-db -- --test-threads=1`; `DUBBRIDGE_DATABASE_URL="postgres://dubbridge:dubbridge@localhost:5432/dubbridge" cargo test -p dubbridge-worker-runner -- --test-threads=1`; `DUBBRIDGE_DATABASE_URL="postgres://dubbridge:dubbridge@localhost:5432/dubbridge" cargo test -p dubbridge-api -- --test-threads=1`; `git merge --ff-only local/s-150-t2a`
+
+---
+
 ## S-150-T2: Translation fan-out job contract and S-140 handoff
 
 **Type:** development
 **Effort:** L (provisional RRI 50 — Med-high; recompute before presentation)
-**Depends on:** S-150-T1c-ii
+**Depends on:** S-150-T2a
 **Status:** [ ] Planned
 
 **Happy paths considered:**
@@ -775,12 +988,13 @@ subtitle-only compatibility path or create an S-150 review row before T6.
 
 **Files expected to change:** workspace UUID feature configuration if UUIDv5 is not
 already enabled, `crates/jobs`, scoped `apps/worker-runner` enqueue/runtime
-modules/tests, `crates/db/src/subtitle_repo.rs` for exact replay resolution, and
-only the minimum S-140 seam required. Because `subtitle_runtime.rs` and
-`workspace_repo.rs` currently exceed the 500-line local-read gate, the exact T2
-presentation must either split/extract the required seams into focused files first
-or route implementation to cloud with the required evidence; it must not delegate
-those files as-is to the local implementer.
+modules/tests (post-T2a: the extracted post-ready dispatch seam in
+`subtitle_runtime.rs`), `crates/db/src/target_language_repo.rs` (extracted by
+T2a from `workspace_repo.rs`), `crates/db/src/subtitle_repo.rs` for exact
+replay resolution, and only the minimum S-140 seam required. T2a extracts the
+seams this task touches out from under the 500-line local-read gate; confirm
+both target files are still under the gate at T2 presentation time before
+delegating locally.
 
 **Evidence to emit:** Exact RRI, route receipt, phase reviews, Reflection log, unit
 coverage certification, and Redis/in-memory queue evidence.

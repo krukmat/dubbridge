@@ -371,3 +371,17 @@ async fn process_subtitle_review_tasks_no_row_on_failure() {
             .expect("get review tasks");
     assert!(review_rows.is_empty());
 }
+
+#[test]
+fn subtitle_runtime_stays_under_local_delegation_read_gate() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/subtitle_runtime.rs");
+    let line_count = std::fs::read_to_string(&path)
+        .expect("read subtitle_runtime.rs")
+        .lines()
+        .count();
+    assert!(
+        line_count < 500,
+        "subtitle_runtime.rs has {line_count} lines; must stay under the 500-line \
+         local-delegation read gate (S-150-T2a EC-1)"
+    );
+}
