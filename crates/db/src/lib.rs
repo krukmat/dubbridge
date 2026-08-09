@@ -13,10 +13,13 @@ pub mod preparation_repo;
 pub mod review_repo;
 pub mod rights_repo;
 pub mod subtitle_repo;
+pub mod target_language_repo;
 pub mod transcription_repo;
 pub mod translation_repo;
 pub mod user_account;
 pub mod workspace_repo;
+#[cfg(test)]
+mod workspace_repo_tests;
 
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;

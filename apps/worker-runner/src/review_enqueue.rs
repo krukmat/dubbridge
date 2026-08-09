@@ -1,5 +1,5 @@
 use dubbridge_db::error::DbError;
-use dubbridge_db::{review_repo, workspace_repo};
+use dubbridge_db::{review_repo, target_language_repo, workspace_repo};
 use dubbridge_domain::asset::AssetId;
 use dubbridge_domain::review::{ReviewTask, ReviewTaskId};
 use dubbridge_domain::workspace::{OrgId, ProjectId};
@@ -87,7 +87,7 @@ async fn resolve_target_language_id(
     project_id: ProjectId,
     target_language: &str,
 ) -> Result<Uuid, ()> {
-    let rows = workspace_repo::list_target_languages(pool, project_id)
+    let rows = target_language_repo::list_target_languages(pool, project_id)
         .await
         .map_err(|error| {
             tracing::warn!(
@@ -215,7 +215,7 @@ mod tests {
         .await
         .expect("link asset to project");
 
-        workspace_repo::upsert_target_language(
+        target_language_repo::upsert_target_language(
             pool,
             &TargetLanguage {
                 id: Uuid::new_v4(),

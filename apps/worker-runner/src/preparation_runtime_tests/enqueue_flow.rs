@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use dubbridge_db::{preparation_repo, transcription_repo, workspace_repo};
+use dubbridge_db::{preparation_repo, target_language_repo, transcription_repo, workspace_repo};
 use dubbridge_domain::{
     artifact::{ArtifactRecord, PreparationStatus, TranscriptionStatus},
     asset::AssetId,
@@ -67,7 +67,7 @@ async fn insert_project_with_target_language(pool: &PgPool, asset_id: AssetId, s
         target_lang: "es".into(),
         created_at: OffsetDateTime::now_utc(),
     };
-    workspace_repo::upsert_target_language(pool, &tl)
+    target_language_repo::upsert_target_language(pool, &tl)
         .await
         .expect("insert target language");
 }

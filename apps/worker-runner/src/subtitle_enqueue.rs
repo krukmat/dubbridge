@@ -1,4 +1,4 @@
-use dubbridge_db::{subtitle_repo, transcription_repo, workspace_repo};
+use dubbridge_db::{subtitle_repo, target_language_repo, transcription_repo};
 use dubbridge_domain::{
     artifact::{SubtitleStatus, TranscriptionStatus},
     asset::AssetId,
@@ -112,7 +112,7 @@ async fn try_enqueue_subtitle(
 }
 
 async fn resolve_source_language(pool: &PgPool, asset_id: AssetId) -> Result<String, String> {
-    let result = workspace_repo::get_source_language_for_asset(pool, asset_id)
+    let result = target_language_repo::get_source_language_for_asset(pool, asset_id)
         .await
         .map_err(|error| {
             tracing::warn!(asset_id = %asset_id, error = %error, "failed to resolve source language");
@@ -128,8 +128,8 @@ async fn resolve_source_language(pool: &PgPool, asset_id: AssetId) -> Result<Str
 async fn resolve_subtitle_route(
     pool: &PgPool,
     asset_id: AssetId,
-) -> Result<workspace_repo::AssetSubtitleRoute, String> {
-    let route = workspace_repo::get_asset_subtitle_route(pool, asset_id)
+) -> Result<target_language_repo::AssetSubtitleRoute, String> {
+    let route = target_language_repo::get_asset_subtitle_route(pool, asset_id)
         .await
         .map_err(|error| {
             tracing::warn!(asset_id = %asset_id, error = %error, "failed to resolve subtitle route");
@@ -239,7 +239,7 @@ mod tests {
         .expect("link asset to project");
 
         for target_lang in target_langs {
-            workspace_repo::upsert_target_language(
+            target_language_repo::upsert_target_language(
                 pool,
                 &TargetLanguage {
                     id: Uuid::new_v4(),

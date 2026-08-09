@@ -31,8 +31,11 @@ mod preparation_runtime_tests;
 mod review_enqueue;
 #[cfg(test)]
 mod runner_topology_tests;
+mod subtitle_alignment;
 mod subtitle_enqueue;
 mod subtitle_runtime;
+#[cfg(test)]
+mod subtitle_runtime_tests;
 mod transcription_runtime;
 
 const ASR_WORKER_RELATIVE_PATH: &str = "workers/asr-worker-py/main.py";

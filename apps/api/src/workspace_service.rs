@@ -212,7 +212,10 @@ impl WorkspaceService for PgWorkspaceService {
         &self,
         project_id: ProjectId,
     ) -> Result<Vec<TargetLanguage>, WorkspaceServiceError> {
-        Ok(dubbridge_db::workspace_repo::list_target_languages(&self.pool, project_id).await?)
+        Ok(
+            dubbridge_db::target_language_repo::list_target_languages(&self.pool, project_id)
+                .await?,
+        )
     }
 
     async fn replace_target_languages(
@@ -224,14 +227,19 @@ impl WorkspaceService for PgWorkspaceService {
         let mut tx = self.pool.begin().await.map_err(|error| {
             WorkspaceServiceError::Db(dubbridge_db::error::DbError::QueryFailed(error))
         })?;
-        dubbridge_db::workspace_repo::delete_target_languages_for_project_tx(&mut tx, project_id)
-            .await?;
+        dubbridge_db::target_language_repo::delete_target_languages_for_project_tx(
+            &mut tx, project_id,
+        )
+        .await?;
 
         let mut created = Vec::with_capacity(target_languages.len());
         for target_lang in target_languages {
             let target_language = TargetLanguage::new(project_id, source_lang.clone(), target_lang);
-            dubbridge_db::workspace_repo::upsert_target_language_tx(&mut tx, &target_language)
-                .await?;
+            dubbridge_db::target_language_repo::upsert_target_language_tx(
+                &mut tx,
+                &target_language,
+            )
+            .await?;
             created.push(target_language);
         }
 

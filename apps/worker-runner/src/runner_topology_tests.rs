@@ -14,7 +14,8 @@ use apalis::prelude::{
 };
 use async_trait::async_trait;
 use dubbridge_db::{
-    artifact_repo, preparation_repo, subtitle_repo, transcription_repo, workspace_repo,
+    artifact_repo, preparation_repo, subtitle_repo, target_language_repo, transcription_repo,
+    workspace_repo,
 };
 use dubbridge_domain::{
     artifact::{
@@ -540,7 +541,7 @@ async fn insert_project_with_targets(
     .expect("link asset to project");
 
     for target_lang in target_langs {
-        workspace_repo::upsert_target_language(
+        target_language_repo::upsert_target_language(
             pool,
             &TargetLanguage {
                 id: Uuid::new_v4(),

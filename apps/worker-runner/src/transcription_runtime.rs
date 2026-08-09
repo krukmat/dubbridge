@@ -264,7 +264,7 @@ mod tests {
     use std::env;
 
     use super::*;
-    use dubbridge_db::{artifact_repo, subtitle_repo, workspace_repo};
+    use dubbridge_db::{artifact_repo, subtitle_repo, target_language_repo, workspace_repo};
     use dubbridge_domain::{
         artifact::{ArtifactKind, ArtifactRecord, SubtitleStatus},
         workspace::{OrgId, Organization, Project, ProjectId, TargetLanguage},
@@ -357,7 +357,7 @@ mod tests {
         .expect("link asset to project");
 
         for target_lang in target_langs {
-            workspace_repo::upsert_target_language(
+            target_language_repo::upsert_target_language(
                 pool,
                 &TargetLanguage {
                     id: Uuid::new_v4(),

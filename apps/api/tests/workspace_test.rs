@@ -8,7 +8,7 @@ use dubbridge_api::{build_app, state::AppState};
 use dubbridge_auth::{
     AuthenticatedPrincipal, SharedTokenVerifier, TokenVerificationError, TokenVerifier,
 };
-use dubbridge_db::{asset_repo, workspace_repo};
+use dubbridge_db::{asset_repo, target_language_repo, workspace_repo};
 use dubbridge_domain::{
     asset::Asset,
     workspace::{OrgMember, OrgRole, Organization, Project, TargetLanguage},
@@ -576,7 +576,7 @@ async fn asset_subtitle_route_returns_first_target_in_c_order() {
         .expect("link asset");
 
     for target_lang in ["fr", "de"] {
-        workspace_repo::upsert_target_language(
+        target_language_repo::upsert_target_language(
             &ctx.pool,
             &TargetLanguage {
                 id: Uuid::new_v4(),
@@ -590,7 +590,7 @@ async fn asset_subtitle_route_returns_first_target_in_c_order() {
         .expect("insert target language");
     }
 
-    let route = workspace_repo::get_asset_subtitle_route(&ctx.pool, asset.id)
+    let route = target_language_repo::get_asset_subtitle_route(&ctx.pool, asset.id)
         .await
         .expect("load subtitle route")
         .expect("subtitle route");
@@ -613,7 +613,7 @@ async fn asset_subtitle_route_returns_none_without_target_languages() {
         .await
         .expect("link asset");
 
-    let route = workspace_repo::get_asset_subtitle_route(&ctx.pool, asset.id)
+    let route = target_language_repo::get_asset_subtitle_route(&ctx.pool, asset.id)
         .await
         .expect("load subtitle route");
 

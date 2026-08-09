@@ -5,14 +5,14 @@ use uuid::Uuid;
 
 use dubbridge_domain::asset::{Asset, AssetId, IngestionStatus};
 use dubbridge_domain::workspace::{
-    OrgId, OrgMember, OrgRole, Organization, Project, ProjectId, TargetLanguage, parse_org_role,
+    OrgId, OrgMember, OrgRole, Organization, Project, ProjectId, parse_org_role,
 };
 
 use crate::error::DbError;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn require_org_role(s: &str) -> Result<OrgRole, DbError> {
+pub(crate) fn require_org_role(s: &str) -> Result<OrgRole, DbError> {
     parse_org_role(s).ok_or_else(|| DbError::UnknownStoredValue {
         field: "org_members.role",
         value: s.to_owned(),
@@ -60,11 +60,11 @@ pub async fn insert_org_tx(
 
 #[cfg(test)]
 #[derive(sqlx::FromRow)]
-struct OrgRow {
-    id: Uuid,
-    name: String,
-    created_at: OffsetDateTime,
-    updated_at: OffsetDateTime,
+pub(crate) struct OrgRow {
+    pub(crate) id: Uuid,
+    pub(crate) name: String,
+    pub(crate) created_at: OffsetDateTime,
+    pub(crate) updated_at: OffsetDateTime,
 }
 
 #[derive(sqlx::FromRow)]
@@ -77,7 +77,7 @@ struct OrgMembershipRow {
 }
 
 #[cfg(test)]
-fn org_from_row(r: OrgRow) -> Organization {
+pub(crate) fn org_from_row(r: OrgRow) -> Organization {
     Organization {
         id: OrgId(r.id),
         name: r.name,
@@ -163,14 +163,14 @@ pub async fn add_org_member_tx(
 }
 
 #[derive(sqlx::FromRow)]
-struct MemberRow {
-    org_id: Uuid,
-    subject_id: Uuid,
-    role: String,
-    joined_at: OffsetDateTime,
+pub(crate) struct MemberRow {
+    pub(crate) org_id: Uuid,
+    pub(crate) subject_id: Uuid,
+    pub(crate) role: String,
+    pub(crate) joined_at: OffsetDateTime,
 }
 
-fn member_from_row(r: MemberRow) -> Result<OrgMember, DbError> {
+pub(crate) fn member_from_row(r: MemberRow) -> Result<OrgMember, DbError> {
     Ok(OrgMember {
         org_id: OrgId(r.org_id),
         subject_id: r.subject_id,
@@ -260,15 +260,15 @@ pub async fn insert_project_tx(
 }
 
 #[derive(sqlx::FromRow)]
-struct ProjectRow {
-    id: Uuid,
-    org_id: Uuid,
-    name: String,
-    created_at: OffsetDateTime,
-    updated_at: OffsetDateTime,
+pub(crate) struct ProjectRow {
+    pub(crate) id: Uuid,
+    pub(crate) org_id: Uuid,
+    pub(crate) name: String,
+    pub(crate) created_at: OffsetDateTime,
+    pub(crate) updated_at: OffsetDateTime,
 }
 
-fn project_from_row(r: ProjectRow) -> Project {
+pub(crate) fn project_from_row(r: ProjectRow) -> Project {
     Project {
         id: ProjectId(r.id),
         org_id: OrgId(r.org_id),
@@ -394,16 +394,16 @@ pub async fn unlink_asset_from_project(
 }
 
 #[derive(sqlx::FromRow)]
-struct AssetRow {
-    id: Uuid,
-    title: String,
-    uploader_id: Uuid,
-    status: String,
-    created_at: OffsetDateTime,
-    updated_at: OffsetDateTime,
+pub(crate) struct AssetRow {
+    pub(crate) id: Uuid,
+    pub(crate) title: String,
+    pub(crate) uploader_id: Uuid,
+    pub(crate) status: String,
+    pub(crate) created_at: OffsetDateTime,
+    pub(crate) updated_at: OffsetDateTime,
 }
 
-fn parse_asset_status(s: &str) -> Result<IngestionStatus, DbError> {
+pub(crate) fn parse_asset_status(s: &str) -> Result<IngestionStatus, DbError> {
     match s {
         "pending" => Ok(IngestionStatus::Pending),
         "finalized" => Ok(IngestionStatus::Finalized),
@@ -416,7 +416,7 @@ fn parse_asset_status(s: &str) -> Result<IngestionStatus, DbError> {
     }
 }
 
-fn asset_from_row(r: AssetRow) -> Result<Asset, DbError> {
+pub(crate) fn asset_from_row(r: AssetRow) -> Result<Asset, DbError> {
     Ok(Asset {
         id: AssetId(r.id),
         title: r.title,
@@ -448,330 +448,4 @@ pub async fn list_assets_for_project(
     .map_err(DbError::QueryFailed)?;
 
     rows.into_iter().map(asset_from_row).collect()
-}
-
-// ── Target languages ──────────────────────────────────────────────────────────
-
-/// Inserts a target language for a project. If the (project_id, target_lang) pair
-/// already exists, updates source_lang to allow corrections.
-pub async fn upsert_target_language(pool: &PgPool, tl: &TargetLanguage) -> Result<(), DbError> {
-    sqlx::query(
-        r#"
-        INSERT INTO target_languages (id, project_id, source_lang, target_lang, created_at)
-        VALUES ($1, $2, $3, $4, $5)
-        ON CONFLICT (project_id, target_lang)
-        DO UPDATE SET source_lang = EXCLUDED.source_lang
-        "#,
-    )
-    .bind(tl.id)
-    .bind(tl.project_id.0)
-    .bind(&tl.source_lang)
-    .bind(&tl.target_lang)
-    .bind(tl.created_at)
-    .execute(pool)
-    .await
-    .map_err(DbError::QueryFailed)?;
-    Ok(())
-}
-
-pub async fn upsert_target_language_tx(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    tl: &TargetLanguage,
-) -> Result<(), DbError> {
-    sqlx::query(
-        r#"
-        INSERT INTO target_languages (id, project_id, source_lang, target_lang, created_at)
-        VALUES ($1, $2, $3, $4, $5)
-        ON CONFLICT (project_id, target_lang)
-        DO UPDATE SET source_lang = EXCLUDED.source_lang
-        "#,
-    )
-    .bind(tl.id)
-    .bind(tl.project_id.0)
-    .bind(&tl.source_lang)
-    .bind(&tl.target_lang)
-    .bind(tl.created_at)
-    .execute(&mut **tx)
-    .await
-    .map_err(DbError::QueryFailed)?;
-    Ok(())
-}
-
-pub async fn delete_target_languages_for_project_tx(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    project_id: ProjectId,
-) -> Result<(), DbError> {
-    sqlx::query("DELETE FROM target_languages WHERE project_id = $1")
-        .bind(project_id.0)
-        .execute(&mut **tx)
-        .await
-        .map_err(DbError::QueryFailed)?;
-    Ok(())
-}
-
-#[derive(sqlx::FromRow)]
-struct TargetLanguageRow {
-    id: Uuid,
-    project_id: Uuid,
-    source_lang: String,
-    target_lang: String,
-    created_at: OffsetDateTime,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
-struct AssetSubtitleRouteRow {
-    project_id: Uuid,
-    target_lang: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AssetSubtitleRoute {
-    pub project_id: ProjectId,
-    pub target_language: String,
-}
-
-/// Return the `source_lang` for the asset's project (from any `target_languages` row),
-/// or `None` if the asset is not linked to a project or the project has no target-language row.
-pub async fn get_source_language_for_asset(
-    pool: &PgPool,
-    asset_id: AssetId,
-) -> Result<Option<String>, DbError> {
-    let lang: Option<String> = sqlx::query_scalar(
-        r#"
-        SELECT tl.source_lang
-        FROM target_languages tl
-        JOIN project_assets pa ON pa.project_id = tl.project_id
-        WHERE pa.asset_id = $1
-        LIMIT 1
-        "#,
-    )
-    .bind(asset_id.0)
-    .fetch_optional(pool)
-    .await
-    .map_err(DbError::QueryFailed)?;
-    Ok(lang)
-}
-
-pub async fn list_target_languages(
-    pool: &PgPool,
-    project_id: ProjectId,
-) -> Result<Vec<TargetLanguage>, DbError> {
-    let rows = sqlx::query_as::<_, TargetLanguageRow>(
-        r#"
-        SELECT id, project_id, source_lang, target_lang, created_at
-        FROM target_languages
-        WHERE project_id = $1
-        ORDER BY target_lang
-        "#,
-    )
-    .bind(project_id.0)
-    .fetch_all(pool)
-    .await
-    .map_err(DbError::QueryFailed)?;
-
-    Ok(rows
-        .into_iter()
-        .map(|r| TargetLanguage {
-            id: r.id,
-            project_id: ProjectId(r.project_id),
-            source_lang: r.source_lang,
-            target_lang: r.target_lang,
-            created_at: r.created_at,
-        })
-        .collect())
-}
-
-/// Return the asset project plus the deterministic first subtitle target for enqueue.
-///
-/// This uses `COLLATE "C"` so cross-environment ordering stays byte-stable.
-pub async fn get_asset_subtitle_route(
-    pool: &PgPool,
-    asset_id: AssetId,
-) -> Result<Option<AssetSubtitleRoute>, DbError> {
-    let row = sqlx::query_as::<_, AssetSubtitleRouteRow>(
-        r#"
-        SELECT pa.project_id, tl.target_lang
-        FROM project_assets pa
-        JOIN target_languages tl ON tl.project_id = pa.project_id
-        WHERE pa.asset_id = $1
-        ORDER BY tl.target_lang COLLATE "C"
-        LIMIT 1
-        "#,
-    )
-    .bind(asset_id.0)
-    .fetch_optional(pool)
-    .await
-    .map_err(DbError::QueryFailed)?;
-
-    Ok(row.map(|row| AssetSubtitleRoute {
-        project_id: ProjectId(row.project_id),
-        target_language: row.target_lang,
-    }))
-}
-
-// ── Unit tests ────────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn require_org_role_known_variants_succeed() {
-        assert!(matches!(require_org_role("owner"), Ok(OrgRole::Owner)));
-        assert!(matches!(require_org_role("admin"), Ok(OrgRole::Admin)));
-        assert!(matches!(require_org_role("editor"), Ok(OrgRole::Editor)));
-        assert!(matches!(
-            require_org_role("reviewer"),
-            Ok(OrgRole::Reviewer)
-        ));
-        assert!(matches!(require_org_role("viewer"), Ok(OrgRole::Viewer)));
-    }
-
-    #[test]
-    fn require_org_role_unknown_value_fails_closed() {
-        let err = require_org_role("superuser").unwrap_err();
-        assert!(matches!(
-            err,
-            DbError::UnknownStoredValue {
-                field: "org_members.role",
-                ..
-            }
-        ));
-        assert!(err.to_string().contains("superuser"));
-    }
-
-    #[test]
-    fn require_org_role_empty_string_fails_closed() {
-        assert!(require_org_role("").is_err());
-    }
-
-    #[test]
-    fn parse_asset_status_known_variants_succeed() {
-        assert!(matches!(
-            parse_asset_status("pending"),
-            Ok(IngestionStatus::Pending)
-        ));
-        assert!(matches!(
-            parse_asset_status("finalized"),
-            Ok(IngestionStatus::Finalized)
-        ));
-    }
-
-    #[test]
-    fn parse_asset_status_unknown_value_fails_closed() {
-        let err = parse_asset_status("processing").unwrap_err();
-        assert!(matches!(
-            err,
-            DbError::UnknownStoredValue {
-                field: "assets.status",
-                ..
-            }
-        ));
-    }
-
-    #[test]
-    fn parse_asset_status_all_known_variants_succeed() {
-        assert!(matches!(
-            parse_asset_status("rejected_missing_rights"),
-            Ok(IngestionStatus::RejectedMissingRights)
-        ));
-        assert!(matches!(
-            parse_asset_status("rejected_missing_uploader_context"),
-            Ok(IngestionStatus::RejectedMissingUploaderContext)
-        ));
-    }
-
-    #[test]
-    fn org_from_row_maps_fields_correctly() {
-        let id = Uuid::new_v4();
-        let now = OffsetDateTime::now_utc();
-        let row = OrgRow {
-            id,
-            name: "Test Org".to_string(),
-            created_at: now,
-            updated_at: now,
-        };
-        let org = org_from_row(row);
-        assert_eq!(org.id.0, id);
-        assert_eq!(org.name, "Test Org");
-    }
-
-    #[test]
-    fn member_from_row_maps_known_role() {
-        let org_id = Uuid::new_v4();
-        let subject_id = Uuid::new_v4();
-        let now = OffsetDateTime::now_utc();
-        let row = MemberRow {
-            org_id,
-            subject_id,
-            role: "admin".to_string(),
-            joined_at: now,
-        };
-        let member = member_from_row(row).unwrap();
-        assert_eq!(member.org_id.0, org_id);
-        assert_eq!(member.subject_id, subject_id);
-        assert_eq!(member.role, OrgRole::Admin);
-    }
-
-    #[test]
-    fn member_from_row_unknown_role_fails_closed() {
-        let row = MemberRow {
-            org_id: Uuid::new_v4(),
-            subject_id: Uuid::new_v4(),
-            role: "superuser".to_string(),
-            joined_at: OffsetDateTime::now_utc(),
-        };
-        assert!(member_from_row(row).is_err());
-    }
-
-    #[test]
-    fn project_from_row_maps_fields_correctly() {
-        let id = Uuid::new_v4();
-        let org_id = Uuid::new_v4();
-        let now = OffsetDateTime::now_utc();
-        let row = ProjectRow {
-            id,
-            org_id,
-            name: "My Project".to_string(),
-            created_at: now,
-            updated_at: now,
-        };
-        let project = project_from_row(row);
-        assert_eq!(project.id.0, id);
-        assert_eq!(project.org_id.0, org_id);
-        assert_eq!(project.name, "My Project");
-    }
-
-    #[test]
-    fn asset_from_row_maps_known_status() {
-        let id = Uuid::new_v4();
-        let uploader = Uuid::new_v4();
-        let now = OffsetDateTime::now_utc();
-        let row = AssetRow {
-            id,
-            title: "Demo Reel".to_string(),
-            uploader_id: uploader,
-            status: "finalized".to_string(),
-            created_at: now,
-            updated_at: now,
-        };
-        let asset = asset_from_row(row).unwrap();
-        assert_eq!(asset.id.0, id);
-        assert_eq!(asset.title, "Demo Reel");
-        assert_eq!(asset.uploader_id, uploader);
-        assert_eq!(asset.status, IngestionStatus::Finalized);
-    }
-
-    #[test]
-    fn asset_from_row_unknown_status_fails_closed() {
-        let row = AssetRow {
-            id: Uuid::new_v4(),
-            title: "X".to_string(),
-            uploader_id: Uuid::new_v4(),
-            status: "corrupted".to_string(),
-            created_at: OffsetDateTime::now_utc(),
-            updated_at: OffsetDateTime::now_utc(),
-        };
-        assert!(asset_from_row(row).is_err());
-    }
 }
