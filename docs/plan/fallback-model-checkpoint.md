@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: "Plan: Human-selected fallback model checkpoint"
-status: active
+status: done
 slice: FMC
 ---
 
@@ -62,6 +62,15 @@ flowchart TD
 - Run `make qa-docs`, `git diff --check`, and the focused Python test suites.
 - Run the band-resolved phase-2 reviewer for every development subtask before
   closure; docs/ADR/policy subtasks remain exempt where the workflow says so.
+
+## Delivery status
+
+- FMC-1 through FMC-5 are complete.
+- FMC-6a completed on 2026-08-09: authoritative workflow, policy, Low-handoff,
+  and approval-template propagation now records ADR-039's packet-bound fallback
+  selection contract.
+- FMC-6b completed on 2026-08-09: `AGENTS.md` and `CLAUDE.md` now summarize the
+  checkpoint, and `AGENTS.override.md` was regenerated from its sources.
 
 ## Non-goals
 

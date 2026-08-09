@@ -226,6 +226,27 @@ from Terra to Sol. The task card records the local route and the conditional
 cloud trigger/model separately. The workflow guide owns the full decision rule
 and current official-source links.
 
+### Human-selected fallback checkpoint
+
+ADR-039 adds a fail-closed selection checkpoint after a terminal local failure
+and before a D14 reviewer or cloud implementer is invoked. The responsible script
+emits a `fallback-selection-v1` artifact bound to the exact fallback packet by
+SHA-256; it does not invoke a model itself.
+
+- `human-select` is the interactive default. Without a complete model,
+  reasoning-effort, and selector choice, the artifact is
+  `awaiting_fallback_selection` and the process stops without authorizing the
+  fallback.
+- `preauthorized` is an automation mode only when those three fields were frozen
+  in the approved task card or preflight; a missing field fails closed.
+- An authorized receipt is valid only for its packet digest. The orchestrator must
+  revalidate it immediately before invoking exactly the selected model/effort; a
+  missing, stale, or role-mismatched receipt remains blocked.
+- The checkpoint does not alter RRI, the existing HITL gate, reviewer
+  independence, repair budgets, or scope controls. D14 remains a read-only
+  Balanced-tier adjudicator; in the current Codex projection its recommendation
+  is `gpt-5.6-terra` at `medium`.
+
 The Low band is special: vendor model resolution does not apply to its normal
 primary-agent/local path. Resolve a cloud model only when an eligible Gemma patch
 attempt exhausts the bounded escalation path; use the Low row above and preserve

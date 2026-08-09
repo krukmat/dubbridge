@@ -129,6 +129,19 @@ a pin here):
 
 If a task file already defines explicit complexity or model guidance, that task-local guidance overrides this file.
 
+## Human-selected fallback checkpoint
+
+Before any terminal local fallback can invoke D14 or a cloud implementer, emit the
+ADR-039 `fallback-selection-v1` artifact bound to the exact fallback packet.
+`human-select` is the default: without a complete human model, reasoning-effort,
+and selector choice, stop as `awaiting_fallback_selection`. `preauthorized` is
+allowed only when those exact fields were frozen in the approved task card or
+preflight; validate the receipt against the current packet, then use exactly its
+selected model and effort. This bounded checkpoint neither waives HITL nor changes
+RRI, reviewer independence, D14's read-only Balanced role, repair budgets, or task
+scope. See ADR-039 and `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` for the full
+protocol.
+
 ## Pseudocode Rule
 
 Include pseudocode only when at least one is true:
@@ -1006,6 +1019,31 @@ Compact-card rules:
   - a task-local explicit pin documented in the task file.
 - Add a one-line rationale if the mapping is non-obvious (e.g., a Medium CC task
   escalated to High because of a Very High external-dependency count).
+
+### Human-selected fallback checkpoint (ADR-039)
+
+Before a terminal local-review or local-implementation failure can invoke D14 or
+a cloud implementer, the responsible script must emit a
+`fallback-selection-v1` artifact bound by SHA-256 to the exact fallback packet.
+The artifact authorizes a later invocation; it never invokes a model itself.
+
+- `human-select` is the interactive default. If model, reasoning effort, or
+  selector is absent, emit `awaiting_fallback_selection`, stop, and do not invoke
+  the fallback.
+- `preauthorized` is valid only when model, effort, and selector were frozen in
+  the approved card or preflight. Missing fields fail closed.
+- Before resuming, the orchestrator validates the receipt against the current
+  packet and invokes exactly the selected model and effort. A missing, stale,
+  role-mismatched, or digest-mismatched receipt remains blocked.
+- Preserve role and gate boundaries: D14 is still a read-only, context-isolated
+  Balanced-tier adjudicator; cloud implementation is separately selected. Neither
+  selection changes RRI, HITL approval, reviewer independence, repair budgets, or
+  scope/organization gates.
+
+The approval card records the selection mode and artifact/resume condition when
+a fallback is possible. The Low handoff packet records the same requirement for
+Gemma-to-cloud escalation. See ADR-039 for the schema and frozen recommendation
+matrix.
 
 ## Reflection design pattern for development tasks
 
@@ -2053,6 +2091,28 @@ When approval is required (RRI > 25), end the presentation with:
 Use the Compact Approval Task Card v2 from the workflow guide. A user may waive
 this checkpoint only by explicitly authorizing execution without another
 approval for a clearly bounded task; record that waiver in the card or ledger.
+
+## Fallback model-selection checkpoint
+
+ADR-039 adds a bounded authorization checkpoint only when a terminal local review
+or implementation route needs D14 or a cloud implementer. It is not a replacement
+for the task's HITL approval and it never broadens the approved scope.
+
+1. The responsible script emits a `fallback-selection-v1` artifact, bound by
+   SHA-256 to the exact fallback packet, before invoking any fallback model.
+2. `human-select` is the interactive default. A missing model, reasoning effort,
+   or human selector returns `awaiting_fallback_selection`; the process stops and
+   must not invoke D14 or a cloud implementer.
+3. `preauthorized` is allowed only when all three selection fields were frozen in
+   the approved task card or preflight. Any incomplete preauthorization fails
+   closed.
+4. The orchestrator must validate the authorized receipt and packet digest, then
+   invoke exactly its selected model and effort. A stale, missing, mismatched, or
+   role-confused receipt stays blocked.
+
+D14 remains a read-only, context-isolated Balanced-tier reviewer. Selecting it
+does not authorize cloud implementation; selecting a cloud implementer does not
+waive independent review, RRI gates, repair limits, or scope checks.
 
 ## Permitted without prior approval
 
