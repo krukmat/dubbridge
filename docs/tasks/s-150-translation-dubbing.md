@@ -912,7 +912,7 @@ Review artifact: docs/audit/gemma-evidence/S-150-T2a.json
 **Task-analysis review:** `qwen3.6:27b-q4_K_M — n/a (user override: Gemma-first,
 Codex after 2 failed attempts — not exercised; phase-1 resolved via the
 `gemma` line recorded above)`
-**Code-solution review:** `qwen3.6:27b-q4_K_M docs/audit/gemma-evidence/S-150-T2a-phase2.json - PASS`
+**Code-solution review:** `qwen3.6:27b-q4_K_M docs/audit/gemma-evidence/S-150-T2a.json - PASS`
 
 ### Unit coverage certification
 
