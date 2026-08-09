@@ -155,7 +155,8 @@ Use the six-block Compact Approval Task Card v2 from
 `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and
 `docs/templates/compact-approval-task-card.md`:
 
-1. Decision header: identity/status, RRI, routing, and approval gate.
+1. Decision header: identity/status, RRI, primary route, cloud-takeover
+   trigger/model, and approval gate.
 2. Scope and acceptance: objective, in/out boundaries, behaviors, evidence, and
    status sync.
 3. Agent workflow: actual participant for every phase, including gates and
@@ -188,17 +189,32 @@ The Effort → Complexity mapping is a **fallback** used only when no RRI is ava
 - `Effort: M` -> `Complexity: Medium`
 - `Effort: L` -> `Complexity: High`
 
-Default model recommendations:
+Current Codex cloud-takeover defaults (re-verify against official vendor guidance
+at task-presentation time):
 
-- Codex: `GPT-5.2-Codex`
-- Claude Code: `Claude Sonnet 4`
+- RRI 0–25 bounded Low-band cloud escalation: `gpt-5.6-luna` at `low`;
+  `gpt-5.6-terra` at `low` if Luna is unavailable.
+- RRI 26–40 local-first fallback: `gpt-5.6-terra` at `medium`.
+- RRI 41–55: operational-only fallback uses `gpt-5.6-terra` at `high`;
+  capability/risk takeover uses `gpt-5.6-sol` at `high`.
+- RRI 56+: cloud-primary uses `gpt-5.6-sol`, with effort resolved by the
+  canonical workflow table; RRI 86+ remains analysis/decomposition only.
+
+Claude Code model resolution remains provider-current and follows the canonical
+workflow guide. Task-local model pins override these defaults until explicitly
+updated.
 
 For RRI 0–25 Low-band tasks, follow the repository workflow guide instead of
 these defaults: use local Gemma through Ollama only for eligible simple code
 patches; otherwise handle the task directly and report as the orchestrator of
 record.
 
-Escalate Claude Code to `Claude Opus 4.1` only for heavy synthesis, long-context comparison, or repeated failure under Sonnet 4.
+Claude Code capability resolution (Balanced `claude-sonnet-5` / Premium
+`claude-opus-5`) is not pinned here — resolve it from the dated
+"Current Claude Code capability resolution" table in
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md`, re-verified at task-presentation
+time, not from this summary. Escalate to Opus only for heavy synthesis,
+long-context comparison, or repeated failure under Sonnet.
 
 If the task file defines explicit complexity or model guidance, follow the task file.
 

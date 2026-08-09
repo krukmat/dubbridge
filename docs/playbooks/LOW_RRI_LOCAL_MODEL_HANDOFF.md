@@ -64,7 +64,11 @@ Poor-fit tasks:
 6. Review the semantic result in the actual files.
 7. Run the required verification commands.
 8. If the result is weak or structurally risky, retry with a smaller scope.
-9. If the repair cycle fails, escalate instead of forcing a larger retry.
+9. If the repair cycle fails, escalate instead of forcing a larger retry. When
+   Codex becomes the executor after the governing Low-band escalation gate, use
+   the current Economy resolution from the workflow guide: `gpt-5.6-luna` at
+   `low`, or `gpt-5.6-terra` at `low` if Luna is unavailable in the active
+   environment.
 
 ## Packet-writing rules
 
@@ -192,7 +196,9 @@ Before accepting the result, verify all of the following:
   - the specific synchronization rule that was previously wrong.
 - Use at most the bounded repair cycle allowed by the governing policy.
 - After a failed repair cycle, escalate instead of substituting a larger manual
-  rewrite under the guise of local delegation.
+  rewrite under the guise of local delegation. Record the actual Codex model in
+  the final report; model selection does not waive or replace the Low-band
+  escalation gate.
 
 ## Anti-patterns
 

@@ -17,6 +17,7 @@ import tempfile
 import time
 import unittest
 from unittest.mock import MagicMock, patch
+from urllib.error import URLError
 
 # ---------------------------------------------------------------------------
 # Import the script as a module (hyphen in filename requires importlib).
@@ -965,6 +966,171 @@ class StallFallback(unittest.TestCase):
                                side_effect=_mod.DelegationIdleTimeout(60)):
                 with self.assertRaises(_mod.DelegationIdleTimeout):
                     _mod.main()
+
+
+class TerminalCloudFallbackSelection(unittest.TestCase):
+    """FMC-3: terminal Low implementation escalation is checkpointed."""
+
+    def _run(
+            self, *, response=None, resolve_side_effect=None,
+            stream_side_effect=None, extra_args=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            packet_file = os.path.join(tmp, "packet.md")
+            result_path = os.path.join(tmp, "result.json")
+            selection_path = os.path.join(tmp, "selection.json")
+            with open(packet_file, "w") as f:
+                f.write("# terminal Low task\n")
+            argv = [
+                _SCRIPT, packet_file, "--out", result_path,
+                "--fallback-selection-artifact", selection_path,
+                "--task-id", "FMC-3", "--attempt", "2", "--rri", "25",
+                "--terminal-cloud-escalation",
+            ] + (extra_args or [])
+            stream_patch = (
+                patch.object(_mod, "stream_chat", side_effect=stream_side_effect)
+                if stream_side_effect is not None
+                else patch.object(_mod, "stream_chat", return_value=response)
+            )
+            with patch("sys.argv", argv), \
+                 patch.object(_mod, "resolve_model", side_effect=resolve_side_effect
+                              if resolve_side_effect is not None else (lambda *_: "gemma")), \
+                 stream_patch, \
+                 patch.object(_mod.gemma_local, "append_audit_log"):
+                exit_code = _mod.main()
+            selection = None
+            if os.path.exists(selection_path):
+                with open(selection_path) as f:
+                    selection = json.load(f)
+            result = None
+            if os.path.exists(result_path):
+                with open(result_path) as f:
+                    result = json.load(f)
+            return exit_code, selection, result
+
+    def test_hp1_terminal_blocked_preauthorization_emits_luna_receipt(self):
+        exit_code, selection, result = self._run(
+            response="STATUS: BLOCKED\nSUMMARY: local repair exhausted",
+            extra_args=[
+                "--fallback-mode", "preauthorized",
+                "--fallback-model", "gpt-5.6-luna",
+                "--fallback-reasoning-effort", "low",
+                "--fallback-selected-by", "owner",
+            ],
+        )
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(selection["status"], "fallback_authorized")
+        self.assertEqual(selection["role"], "cloud-implementer")
+        self.assertEqual(selection["selected_model"], "gpt-5.6-luna")
+        self.assertEqual(selection["selected_reasoning_effort"], "low")
+        self.assertIn("authorization_receipt", selection)
+
+    def test_hp1_explicit_human_model_override_is_preserved(self):
+        exit_code, selection, _ = self._run(
+            response="STATUS: BLOCKED\nSUMMARY: local repair exhausted",
+            extra_args=[
+                "--fallback-mode", "preauthorized",
+                "--fallback-model", "human-approved-model",
+                "--fallback-reasoning-effort", "medium",
+                "--fallback-selected-by", "owner",
+            ],
+        )
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(selection["selected_model"], "human-approved-model")
+        self.assertEqual(selection["selected_reasoning_effort"], "medium")
+
+    def test_ec1_terminal_unavailable_model_awaits_selection_and_exits_3(self):
+        exit_code, selection, result = self._run(
+            resolve_side_effect=URLError("offline"),
+        )
+        self.assertEqual(exit_code, 3)
+        self.assertIsNone(result)
+        self.assertEqual(selection["status"], "awaiting_fallback_selection")
+        self.assertNotIn("authorization_receipt", selection)
+        self.assertEqual(selection["recommended_model"], "gpt-5.6-luna")
+        self.assertEqual(selection["recommended_reasoning_effort"], "low")
+
+    def test_terminal_request_failure_emits_authorized_receipt(self):
+        exit_code, selection, _ = self._run(
+            stream_side_effect=URLError("offline"),
+            extra_args=[
+                "--fallback-mode", "preauthorized",
+                "--fallback-model", "gpt-5.6-luna",
+                "--fallback-reasoning-effort", "low",
+                "--fallback-selected-by", "owner",
+            ],
+        )
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(selection["status"], "fallback_authorized")
+
+    def test_terminal_timeout_after_stall_retry_awaits_selection(self):
+        exit_code, selection, _ = self._run(
+            stream_side_effect=[
+                _mod.DelegationIdleTimeout(60),
+                _mod.DelegationWallTimeout(900),
+            ],
+        )
+        self.assertEqual(exit_code, 3)
+        self.assertEqual(selection["status"], "awaiting_fallback_selection")
+        self.assertIn("stall fallback timed out", selection["trigger"])
+
+    def test_terminal_timeout_without_stall_retry_awaits_selection(self):
+        exit_code, selection, _ = self._run(
+            stream_side_effect=_mod.DelegationIdleTimeout(60),
+            extra_args=["--stall-fallback-model", ""],
+        )
+        self.assertEqual(exit_code, 3)
+        self.assertEqual(selection["status"], "awaiting_fallback_selection")
+
+    def test_terminal_path_requires_rri_and_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            packet_file = os.path.join(tmp, "packet.md")
+            with open(packet_file, "w") as f:
+                f.write("# terminal Low task\n")
+            with patch("sys.argv", [
+                    _SCRIPT, packet_file, "--terminal-cloud-escalation",
+                ]), patch.object(_mod, "resolve_model", side_effect=URLError("offline")):
+                self.assertEqual(_mod.main(), 2)
+
+    def test_terminal_path_rejects_non_low_rri(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            packet_file = os.path.join(tmp, "packet.md")
+            with open(packet_file, "w") as f:
+                f.write("# terminal Low task\n")
+            with patch("sys.argv", [
+                    _SCRIPT, packet_file, "--terminal-cloud-escalation", "--rri", "26",
+                ]), patch.object(_mod, "resolve_model", side_effect=URLError("offline")):
+                self.assertEqual(_mod.main(), 2)
+
+    def test_nonterminal_blocked_preserves_existing_success_exit_and_no_checkpoint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            packet_file = os.path.join(tmp, "packet.md")
+            result_path = os.path.join(tmp, "result.json")
+            with open(packet_file, "w") as f:
+                f.write("# ordinary Low task\n")
+            with patch("sys.argv", [_SCRIPT, packet_file, "--out", result_path]), \
+                 patch.object(_mod, "resolve_model", return_value="gemma"), \
+                 patch.object(_mod, "stream_chat", return_value="STATUS: BLOCKED\nSUMMARY: retry me"), \
+                 patch.object(_mod.gemma_local, "append_audit_log"):
+                self.assertEqual(_mod.main(), 0)
+            self.assertFalse(os.path.exists(result_path.replace(".json", ".fallback-selection.json")))
+
+    def test_nonterminal_unavailable_model_preserves_transport_error(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md") as packet:
+            packet.write("# ordinary Low task\n")
+            packet.flush()
+            with patch("sys.argv", [_SCRIPT, packet.name]), \
+                 patch.object(_mod, "resolve_model", side_effect=URLError("offline")):
+                with self.assertRaises(URLError):
+                    _mod.main()
+
+    def test_incomplete_preauthorization_fails_closed(self):
+        exit_code, selection, _ = self._run(
+            resolve_side_effect=URLError("offline"),
+            extra_args=["--fallback-mode", "preauthorized"],
+        )
+        self.assertEqual(exit_code, 2)
+        self.assertIsNone(selection)
 
 
 class BuildAttemptBundle(unittest.TestCase):

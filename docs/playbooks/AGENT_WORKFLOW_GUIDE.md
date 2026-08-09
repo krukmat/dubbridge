@@ -98,16 +98,18 @@ governs: "all agent-facing workflow decisions in the repository"
    default: `scripts/local-agent/run_local_task.py` in a disposable worktree,
    resolving the implementer from `DUBBRIDGE_LOCAL_AGENT_MODEL` (default
    `qwen3.6:35b-a3b`), with at most 2 evidence-backed local repair attempts
-   before escalating to cloud. The primary agent remains the orchestrator of
-   record and cloud implementation is the escalation/fallback path, not the
-   default. For **RRI 41–55 Med-high**, show the plan and tasks, wait for
+   before escalating to the cloud-takeover model resolved in Step 2. The primary
+   agent remains the orchestrator of record and cloud implementation is the
+   escalation/fallback path, not the default. For **RRI 41–55 Med-high**, show
+   the plan and tasks, wait for
    explicit approval, then route through the **ADR-038 Architect-refined
    single-attempt gate**: Qwen27 advisory refinement (`GO_LOCAL` |
    `CLOUD_REQUIRED`) → primary hash-bound route receipt (may downgrade, never
    upgrade) → if `GO_LOCAL`, exactly one bounded `qwen3.6:35b-a3b` session
    (≤8 turns, ≤300 seconds, **0** repair attempts, supervised as its own
-   process group by `scripts/local-agent/run_med_high_task.py`) → otherwise
-   Codex/Claude with the full evidence bundle. Med-high keeps the
+   process group by `scripts/local-agent/run_med_high_task.py`) → otherwise the
+   concrete Codex/Claude cloud-takeover model from Step 2 with the full evidence
+   bundle. Med-high keeps the
    band-resolved independent review route, 3 Reflection passes, and the human
    approval gate unchanged — the routing change affects only who authors the
    code, not who reviews or approves it. See § Local-first and
@@ -426,7 +428,7 @@ flowchart LR
     Card["Approved Med-high card\n(RRI 41-55)"] --> Q27["Qwen27 advisory refinement\nqwen3.6:27b-q4_K_M"]
     Q27 -->|GO_LOCAL or CLOUD_REQUIRED| Receipt["Primary hash-bound\nroute receipt"]
     Receipt -->|"downgrade allowed;\nupgrade never allowed"| Gate{"med_high_gate.py\nboth sides GO_LOCAL?"}
-    Gate -->|No: CLOUD_REQUIRED| Cloud["Codex / Claude\n+ full ADR-038 S5 evidence bundle"]
+    Gate -->|No: CLOUD_REQUIRED| Cloud["Resolved Codex / Claude takeover model\n+ full ADR-038 S5 evidence bundle"]
     Gate -->|Yes: GO_LOCAL| Runner["ONE bounded qwen3.6:35b-a3b session\nsupervised as its own process group\n<=8 turns / <=300s / 0 repairs"]
     Runner -->|success| Done["Signed local-implementer audit"]
     Runner -->|timeout, failed acceptance,\nscope/boundary/org violation| Cloud
@@ -565,9 +567,10 @@ Mapping (now driven by RRI band — see the canonical crosswalk in
 
 Agent-specific resolution rules:
 
-- For RRI 0–25, use the local Ollama/Gemma delegation protocol in
-  `docs/policies/RRI_POLICY.md § Low RRI local delegation`; do not resolve to a
-  cloud vendor model. For the step-by-step handoff discipline for local-model
+- For normal RRI 0–25 handling, use the primary-agent or local Ollama/Gemma
+  protocol in `docs/policies/RRI_POLICY.md § Low RRI local delegation`; a cloud
+  vendor model recommendation is unnecessary unless that bounded local path
+  actually escalates. For the step-by-step handoff discipline for local-model
   work, see `docs/playbooks/LOW_RRI_LOCAL_MODEL_HANDOFF.md`.
 - Resolve each capability label to the best currently available model in the
   active agent environment.
@@ -596,6 +599,99 @@ Agent-specific resolution rules:
 - Do not silently replace a task-local pinned model with a newer one. Either use
   the pinned model or update the task metadata explicitly.
 
+#### Current Codex cloud-takeover resolution
+
+The table below is the current OpenAI/Codex resolution baseline, verified against
+official OpenAI documentation on 2026-08-09. It is a presentation-time default,
+not a permanent model pin: re-check the official guidance whenever preparing a
+new task card, and preserve any explicit task-local pin until an approved
+documentation change replaces it.
+
+| RRI / capability | Local-first position | When cloud takes control | Codex model to present | Starting reasoning effort |
+|---|---|---|---|---|
+| **0–25 / Low** | Primary-agent direct by default; Gemma only for an eligible simple patch | Gemma is unavailable/unusable or its bounded repair fails and the Low-band escalation gate is followed | `gpt-5.6-luna`; use `gpt-5.6-terra` at `low` only when Luna is unavailable in the active environment | `low` |
+| **26–40 / Balanced** | `qwen3.6:35b-a3b` local-first, up to 2 evidence-backed repairs | Local runner/model is unavailable, scope enforcement fails, or the repair budget is exhausted | `gpt-5.6-terra` | `medium` |
+| **41–55 / Balanced -> Premium** | ADR-038 gate, then at most one bounded local attempt | Operational-only fallback with no new risk or ambiguity | `gpt-5.6-terra` | `high` |
+| **41–55 / Balanced -> Premium** | ADR-038 gate, then at most one bounded local attempt | `CLOUD_REQUIRED` because of a hard exclusion, ambiguity, coupling/risk, or a local acceptance/scope/organization failure | `gpt-5.6-sol` | `high` |
+| **56–70 / Premium** | Cloud is the primary route after mandatory decomposition | Approved decomposed subtask proceeds on Codex | `gpt-5.6-sol` | `high`; use `xhigh` only when eval evidence shows a gain |
+| **71–85 / Premium** | Cloud is the primary route after mandatory decomposition | Approved subtask proceeds on Codex with human diff review | `gpt-5.6-sol` | `xhigh`; compare `max` only for the hardest quality-first case |
+| **86–100 / Premium** | No direct implementation | Cloud performs ADR/risk analysis and decomposition only | `gpt-5.6-sol` | `max` |
+| **>100 / Premium** | No direct implementation before re-scope | Cloud performs architecture/design and re-scoping only | `gpt-5.6-sol` | `max` |
+
+Classify the takeover cause before choosing the model:
+
+- **Operational-only fallback** means the local service, model binding, process,
+  or machine is unavailable, without evidence that the approved task itself is
+  more ambiguous, coupled, risky, or difficult than scored. Do not spend Premium
+  capacity merely because Ollama is down.
+- **Capability/risk takeover** means cloud won before local execution because of
+  an ADR-038 hard exclusion or `CLOUD_REQUIRED`, or the local attempt produced
+  evidence of an acceptance, scope, organization, ambiguity, or reasoning gap.
+  Use the Premium resolution and carry the full escalation evidence.
+- In Moderate, two capability-related local failures are evidence that the
+  original RRI or task decomposition may be incomplete. Re-run `scripts/rri.py`
+  and re-apply the resulting gate before promoting from Terra to Sol; an
+  infrastructure-only failure does not change the RRI.
+
+The approval card must show the local route and the cloud takeover separately.
+For a conditional Med-high route, write both branches, for example:
+`operational-only -> gpt-5.6-terra/high; capability-or-risk ->
+gpt-5.6-sol/high`. If cloud is already the winning route, name the concrete cloud
+model as the implementer instead of leaving `Codex` as an unresolved provider.
+
+Current official basis:
+
+- OpenAI describes `gpt-5.6-sol` as the flagship for complex coding and
+  `gpt-5.6-terra` as the intelligence/cost balance; `gpt-5.6-luna` is the
+  cost-sensitive option: <https://developers.openai.com/api/docs/models>.
+- Codex guidance positions Sol for complex/open-ended work, Terra as the everyday
+  workhorse, and Luna for clear/repeatable work; it also recommends the lowest
+  reasoning effort that meets the quality bar:
+  <https://learn.chatgpt.com/docs/models>.
+- `gpt-5.5` and `gpt-5.4` remain task-local compatibility choices, not new
+  defaults. OpenAI classifies GPT-5.5 as previous-generation; GPT-5.4 and
+  GPT-5.4 mini retire from Codex with ChatGPT sign-in on 2026-08-31, while API-key
+  usage is unaffected. Do not silently rewrite historical task pins.
+
+#### Current Claude Code capability resolution
+
+The table below is the current Anthropic resolution baseline, verified against
+the active Claude Code runtime's model roster on 2026-08-09. Like the Codex
+table above, it is a presentation-time default, not a permanent pin: re-check
+current guidance whenever preparing a new task card, and preserve any
+explicit task-local pin until an approved documentation change replaces it.
+This table is the canonical source `docs/policies/RRI_POLICY.md § Model tier
+resolution` points to for the `Capability (Claude Code)` column; `CLAUDE.md`
+and `AGENTS.md` must not carry their own copy of the concrete model names —
+they summarize this table and link to it, so the fact lives in exactly one
+place.
+
+| RRI band | Capability | Claude model to present | Thinking | Escalation within band |
+|---|---|---|---|---|
+| **0–25 / Low** | n/a — primary agent direct or local Gemma | Whichever model is already running the session; no Claude-cloud resolution needed | Off | n/a |
+| **26–40 / Balanced** | Balanced | `claude-sonnet-5` | Off | none — stays on Sonnet 5 |
+| **41–55 / Balanced → Premium** | Balanced → Premium | `claude-sonnet-5`; escalate to `claude-opus-5` only if the bounded attempt stalls or repeatedly fails | On | Sonnet 5 → Opus 5 on stall/failure |
+| **56–70 / Premium** | Premium | `claude-opus-5` | On | n/a |
+| **71–85 / Premium** | Premium | `claude-opus-5` | On | n/a |
+| **86–100 / Premium** | Premium (analysis/decomposition only) | `claude-opus-5` | On | n/a |
+| **>100 / Premium** | Premium (re-scope only) | `claude-opus-5` | On | n/a |
+
+Escalation guidance: escalate to `claude-opus-5` only when the task is
+long-context heavy, synthesis-heavy, or repeatedly stalls under
+`claude-sonnet-5`. If a task is primarily code editing, repo navigation,
+shell execution, or deterministic implementation work, keep `claude-sonnet-5`
+as the default — do not escalate to Opus merely because Codex escalated to
+`gpt-5.6-sol` in the same row; the two vendor resolutions are independent.
+
+Current official basis: the active Claude Code runtime environment reports
+the current lineup as the Claude 5 family (`claude-opus-5`, `claude-sonnet-5`,
+`claude-fable-5`) plus `claude-haiku-4-5-20251001`. If the active runtime's
+model roster is unavailable or the recommendation is more than roughly two
+months old, re-verify against official Anthropic documentation
+(<https://docs.anthropic.com>) before presenting a concrete model ID. Do not
+silently replace a task-local pinned model with a newer one — see the Codex
+rule above, which applies identically here.
+
 **Thinking mode** for the selected balanced/premium reasoning model:
 activate when the task requires multi-step reasoning that cannot be validated
 incrementally — e.g., architecture trade-offs with more than two interacting
@@ -611,8 +707,9 @@ card to no more than six content blocks:
 
 1. **Decision header** — task ID/title, status, final RRI/band, Effort, and the
    approval gate. Include a small routing table with the orchestrator, concrete
-   Codex/Claude recommendations, resolved implementation route, penalties,
-   two or three dominant RRI drivers, and a link to full RRI evidence.
+   Codex/Claude recommendations, resolved primary implementation route, the
+   cloud-takeover trigger and model, penalties, two or three dominant RRI
+   drivers, and a link to full RRI evidence.
 2. **Scope and acceptance** — one-sentence objective, in-scope paths/behaviors,
    explicit out-of-scope boundary, the primary acceptance criteria (`HP-#` and
    `EC-#` for development), evidence to emit, and status artifacts to sync.
@@ -648,7 +745,8 @@ task file explicitly scopes the task to a single vendor environment.
 For RRI 0–25, use the resolved primary-agent or eligible local-Gemma route and
 note that the active agent remains the reviewer/orchestrator.
 For RRI 26–55, keep the Codex/Claude recommendations for orchestration and
-escalation, and name the local implementer in the decision-header routing table.
+escalation, and name both the local implementer and the conditional cloud
+takeover model/trigger in the decision-header routing table.
 
 Compact-card rules:
 
@@ -823,11 +921,11 @@ gates must all pass before the audit may carry the `local-implementer`
 signature. A success audit must record scope result, acceptance/verification
 results, organization result, edit metrics (tool, path, line/byte counts),
 implementer model, and the signature itself. Use at most **2**
-evidence-backed local repair attempts for Moderate (26–40) and at most **1**
-for Med-high (41–55) — the tighter budget reflects the higher-risk
-anchor-rubric floors Med-high tasks typically carry. If the local runner/model
-is unavailable, the repair budget is exhausted, or the task violates the scope
-boundary, escalate to cloud implementation with the ADR-036 escalation packet
+evidence-backed local repair attempts for Moderate (26–40). Med-high (41–55)
+uses the ADR-038 single-attempt route with **0** repair attempts. If the local
+runner/model is unavailable, the applicable repair budget is exhausted, or the
+task violates the scope boundary, escalate with the relevant ADR-036/ADR-038
+evidence packet to the concrete cloud-takeover model recorded in the task card
 instead of continuing locally. Med-high tasks still go through the
 band-resolved independent review route (phases 1 and 2) and 3 Reflection passes
 regardless of where the code was authored — local-first routing changes only

@@ -189,8 +189,8 @@ band — never derive one output from another (e.g. do not infer capability from
 | RRI band | Label | Effort | Capability (Codex) | Capability (Claude Code) | Thinking | Phase-1 reviewer | Phase-2 reviewer | Gate |
 |---|---|---|---|---|---|---|---|---|
 | **0–25** | Low | **S** | Primary agent or Local Gemma via Ollama | Primary agent or Local Gemma via Ollama | Off | Gemma | Gemma Reviewer | **Low-band handling:** do not present the full task for approval; use local Gemma only for eligible simple code patches, otherwise execute directly with the primary agent. |
-| **26–40** | Moderate | **M** | Balanced | Balanced | Off | `qwen3.6:27b-q4_K_M`† | `qwen3.6:27b-q4_K_M`† | Confirm tests exist in the affected area. **Implementation route:** local-first via `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL`; primary agent remains orchestrator, cloud implementation is escalation/fallback. |
-| **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | `qwen3.6:27b-q4_K_M`† | `qwen3.6:27b-q4_K_M`† | Plan + explicit acceptance criteria required before approval. **Implementation route (ADR-038):** Qwen27 advisory refinement (GO_LOCAL/CLOUD_REQUIRED) → primary hash-bound route receipt (may downgrade, never upgrade) → if GO_LOCAL, exactly one bounded `qwen3.6:35b-a3b` session (≤8 turns, ≤300s, 0 repairs) → otherwise Codex/Claude with the full evidence bundle. No repair attempt at this band. Review/approval rigor unchanged — 3 Reflection passes and this HITL gate still apply; phase-2 (and phase-1 when it applies) reviewer is `qwen3.6:27b-q4_K_M`, not the cross-vendor peer. |
+| **26–40** | Moderate | **M** | Balanced | Balanced | Off | `qwen3.6:27b-q4_K_M`† | `qwen3.6:27b-q4_K_M`† | Confirm tests exist in the affected area. **Implementation route:** local-first via `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL`; primary agent remains orchestrator, cloud implementation is escalation/fallback using the concrete takeover model in the task card. |
+| **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | `qwen3.6:27b-q4_K_M`† | `qwen3.6:27b-q4_K_M`† | Plan + explicit acceptance criteria required before approval. **Implementation route (ADR-038):** Qwen27 advisory refinement (GO_LOCAL/CLOUD_REQUIRED) → primary hash-bound route receipt (may downgrade, never upgrade) → if GO_LOCAL, exactly one bounded `qwen3.6:35b-a3b` session (≤8 turns, ≤300s, 0 repairs) → otherwise the concrete cloud-takeover model recorded in the task card with the full evidence bundle. No repair attempt at this band. Review/approval rigor unchanged — 3 Reflection passes and this HITL gate still apply; phase-2 (and phase-1 when it applies) reviewer is `qwen3.6:27b-q4_K_M`, not the cross-vendor peer. |
 | **56–70** | Complex | **L** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Plan first. **Decompose into subtasks before implementation.** Human reviews the plan. |
 | **71–85** | High | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Characterization tests + explicit acceptance criteria + human reviews the **diff** (not just the plan). **Decomposition remains mandatory.** |
 | **86–100** | Very high | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Do not implement directly. Produce an ADR + risk analysis + decompose into subtasks. |
@@ -207,10 +207,32 @@ IDs per the resolution table in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` (Model
 tier resolution). Resolve against official vendor documentation at
 task-presentation time — do not rely on stale memory for "latest" or "best".
 
-The Low band is special: vendor model resolution does not apply. Low-band tasks
-are either handled directly by the primary agent or, for eligible simple code
-patches only, delegated to the local Ollama/Gemma path. When delegation is used,
-use `OLLAMA_HOST` when set, otherwise `http://localhost:11434`. Use
+For Codex, the current cloud-takeover projection is:
+
+| RRI band | Cloud position | Codex resolution to present |
+|---|---|---|
+| **0–25** | Only after the optional Gemma patch path exhausts its bounded escalation path | `gpt-5.6-luna` at `low`; `gpt-5.6-terra` at `low` if Luna is unavailable |
+| **26–40** | Local-first fallback | `gpt-5.6-terra` at `medium` |
+| **41–55** | Cloud may win at the ADR-038 gate or become the one-attempt fallback | Operational-only fallback: `gpt-5.6-terra` at `high`; capability/risk takeover: `gpt-5.6-sol` at `high` |
+| **56–70** | Cloud-primary after decomposition | `gpt-5.6-sol` at `high` |
+| **71–85** | Cloud-primary after decomposition | `gpt-5.6-sol` at `xhigh` |
+| **86+** | Analysis/decomposition/re-scope only; no direct implementation | `gpt-5.6-sol` at `max` |
+
+This projection does not change the RRI band or the HITL gate. An Ollama outage
+is an operational fallback and does not by itself justify Premium. Evidence of
+ambiguity, coupling, risk, acceptance failure, or scope/organization failure is a
+capability/risk takeover; in Moderate, re-run `scripts/rri.py` before promoting
+from Terra to Sol. The task card records the local route and the conditional
+cloud trigger/model separately. The workflow guide owns the full decision rule
+and current official-source links.
+
+The Low band is special: vendor model resolution does not apply to its normal
+primary-agent/local path. Resolve a cloud model only when an eligible Gemma patch
+attempt exhausts the bounded escalation path; use the Low row above and preserve
+the governing gate. Low-band tasks are otherwise handled directly by the primary
+agent or, for eligible simple code patches only, delegated to the local
+Ollama/Gemma path. When delegation is used, use `OLLAMA_HOST` when set, otherwise
+`http://localhost:11434`. Use
 `DUBBRIDGE_LOW_RRI_MODEL` when set, otherwise `gemma4:26b-a4b-it-qat` (the
 former `gemma4:12b-mlx` fast lane was retired by ADR-036 Amendment 1 —
 resource contention with the reviewer model — and there is no separate
@@ -219,7 +241,9 @@ fallback tier left to fall back to).
 The Moderate and Med-high bands are special for **implementation routing**.
 Task cards still present vendor-model recommendations for Codex and Claude
 Code because the primary agent remains the orchestrator and cloud escalation
-path, but the default implementation route for development tasks scoring
+path. The card must name both the local implementer and the cloud-takeover
+trigger/model; `Codex` or `Claude` alone is not a resolved implementation value.
+The default implementation route for development tasks scoring
 **RRI 26–55** is the local agentic runner. Resolve the implementer from
 `DUBBRIDGE_LOCAL_AGENT_MODEL`, defaulting to `qwen3.6:35b-a3b`, and the Ollama
 endpoint from `OLLAMA_HOST`, defaulting to `http://localhost:11434`. The runner
@@ -357,7 +381,8 @@ For final **RRI 26–40**, the implementation default is **local-first**:
 - the local path has a maximum of **2 repair attempts**, each requiring new
   evidence;
 - cloud implementation is the escalation/fallback path when the local runner,
-  model binding, repair budget, or scope boundary fails.
+  model binding, repair budget, or scope boundary fails; the task card must
+  already record the concrete takeover trigger/model from the workflow table.
 
 **Phase-1/phase-2 reviewer override (owner directive, 2026-07-21):** for this
 band, both non-exempt phase 1 and phase 2 default to the **Local Architect / Complex Analyst model**

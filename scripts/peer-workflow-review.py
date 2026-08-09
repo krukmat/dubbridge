@@ -20,8 +20,9 @@ Cross-vendor resolution (RRI 56+ only):
 
 Exit codes:
   0   PASS or FINDINGS (findings are advisory; artifact written for agent review)
-  1   BLOCKED (peer and D14 both unavailable, or explicit blocked verdict)
+  1   BLOCKED verdict or authorized D14 handoff
   2   peer invocation error / unable to review (blocked artifact written)
+  3   D14 fallback paused for human model selection
 """
 
 import argparse
@@ -36,6 +37,7 @@ import tempfile
 from typing import Optional, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import fallback_selection
 import gemma_local
 
 QWEN_REVIEW_MIN_RRI = 26
@@ -457,6 +459,83 @@ def write_blocked_artifact(reason: str, phase: str, path: str, peer: str) -> Non
     )
 
 
+def _validate_d14_packet(packet: object) -> None:
+    if not isinstance(packet, dict):
+        raise fallback_selection.FallbackSelectionError(
+            "d14_packet: must be a JSON object"
+        )
+    expected_types = {
+        "diff": str,
+        "criteria": str,
+        "reconciled_findings": list,
+    }
+    for field, expected_type in expected_types.items():
+        if not isinstance(packet.get(field), expected_type):
+            raise fallback_selection.FallbackSelectionError(
+                f"d14_packet.{field}: must be {expected_type.__name__}"
+            )
+
+
+def handle_d14_fallback(result: dict, args, artifact: str) -> int:
+    """Persist a packet-bound selection checkpoint before any D14 spawn."""
+    try:
+        packet = result.get("d14_packet")
+        _validate_d14_packet(packet)
+        checkpoint = fallback_selection.build_checkpoint_from_args(
+            args,
+            task_id=args.task_id or "unknown",
+            phase=args.phase,
+            trigger="reviewer chain unusable; D14 fallback requested",
+            role=fallback_selection.ROLE_D14,
+            rri=args.rri,
+            packet=packet,
+            trigger_kind=fallback_selection.TRIGGER_REVIEWER_UNUSABLE,
+        )
+        if checkpoint["status"] == fallback_selection.AUTHORIZED_STATUS:
+            fallback_selection.validate_authorized_checkpoint(checkpoint, packet)
+        selection_artifact = (
+            args.fallback_selection_artifact
+            or fallback_selection.default_checkpoint_path(artifact)
+        )
+        fallback_selection.write_checkpoint(checkpoint, selection_artifact)
+    except fallback_selection.FallbackSelectionError as exc:
+        reason = f"Fallback selection integrity error: {exc}"
+        write_blocked_artifact(reason, args.phase, artifact, "d14")
+        print(f"[peer-review] {reason}", file=sys.stderr)
+        return 2
+
+    review_result = {
+        **result,
+        "fallback_selection_artifact": selection_artifact,
+        "fallback_selection": checkpoint,
+    }
+    if checkpoint["status"] == fallback_selection.AWAITING_STATUS:
+        review_result["verdict"] = fallback_selection.AWAITING_STATUS
+        review_result["summary"] = (
+            "Reviewer chain unusable; human fallback selection is required "
+            "before D14 execution."
+        )
+        write_artifact(review_result, artifact)
+        print(
+            "[peer-review] awaiting fallback selection — "
+            f"recommended model={checkpoint['recommended_model']} "
+            f"effort={checkpoint['recommended_reasoning_effort']} "
+            f"selection_artifact={selection_artifact}",
+            file=sys.stderr,
+        )
+        return fallback_selection.HUMAN_SELECTION_EXIT_CODE
+
+    write_artifact(review_result, artifact)
+    print(
+        "[peer-review] D14 authorized — spawn exact "
+        f"model={checkpoint['selected_model']} "
+        f"effort={checkpoint['selected_reasoning_effort']} "
+        f"selection_artifact={selection_artifact}",
+        file=sys.stderr,
+    )
+    return 1
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -562,6 +641,7 @@ def parse_args():
         default=gemma_local.bool_from_env("DUBBRIDGE_REVIEW_THINK", gemma_local.DEFAULT_THINK),
     )
     parser.add_argument("--no-think", action="store_false", dest="think")
+    fallback_selection.add_cli_arguments(parser)
     return parser.parse_args()
 
 
@@ -602,14 +682,7 @@ def main() -> int:
         result = run_cross_vendor_review(packet, args.phase, peer)
 
         if result["verdict"] == "d14_required":
-            # Signal D14 is needed; artifact carries the isolation packet.
-            write_artifact(result, artifact)
-            print(
-                f"[peer-review] D14 required — peer '{peer}' unavailable. "
-                f"Spawn D14 adjudicator with artifact: {artifact}",
-                file=sys.stderr,
-            )
-            return 1
+            return handle_d14_fallback(result, args, artifact)
 
         write_artifact(result, artifact)
         verdict = result["verdict"]
@@ -619,25 +692,22 @@ def main() -> int:
     if qwen_band:
         result = run_qwen_band_review(content, args.phase, args)
         if result["verdict"] == "d14_required":
-            write_artifact(result, artifact)
-            print(
-                f"[peer-review] D14 required — qwen and Gemma were unusable. "
-                f"Spawn D14 adjudicator with artifact: {artifact}",
-                file=sys.stderr,
-            )
-            return 1
+            return handle_d14_fallback(result, args, artifact)
         write_artifact(result, artifact)
         verdict = result["verdict"]
         print(f"[peer-review] verdict={verdict.upper()} artifact={artifact}", file=sys.stderr)
         return review_exit_code(verdict)
 
-    # Gemma band (RRI 0-25).
-    try:
-        result = run_gemma_review(content, args.phase, args)
-    except (gemma_local.GemmaIdleTimeout, gemma_local.GemmaWallTimeout, RuntimeError) as exc:
-        print(f"[peer-review] Gemma unavailable: {exc}", file=sys.stderr)
-        write_blocked_artifact(str(exc), args.phase, artifact, "gemma")
-        return 2
+    # Gemma band (RRI 0-25). A fully unusable local chain reaches the same
+    # packet-bound D14 selection checkpoint as every other band.
+    result, gemma_error = _run_gemma_fallback(content, args.phase, args)
+    if result is None:
+        packet = _build_peer_packet(args.phase, content, args.task_id)
+        d14_result = run_d14_fallback(packet, args.phase, "gemma")
+        d14_result["summary"] = (
+            f"Gemma unavailable/invalid ({gemma_error}); D14 adjudication required."
+        )
+        return handle_d14_fallback(d14_result, args, artifact)
 
     write_artifact(result, artifact)
     verdict = result["verdict"]

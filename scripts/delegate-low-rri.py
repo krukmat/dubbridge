@@ -31,6 +31,7 @@ from urllib.error import URLError
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gemma_local
+import fallback_selection
 
 
 DEFAULT_HOST = gemma_local.DEFAULT_HOST
@@ -231,6 +232,25 @@ def parse_args():
         metavar="N",
         help="Optional attempt number recorded in the audit log.",
     )
+    parser.add_argument(
+        "--rri",
+        type=int,
+        default=None,
+        help=(
+            "Final task RRI. Required with --terminal-cloud-escalation so the "
+            "fallback-selection receipt can recommend the correct cloud model."
+        ),
+    )
+    parser.add_argument(
+        "--terminal-cloud-escalation",
+        action="store_true",
+        help=(
+            "Declare that the orchestrator exhausted the Low-band local repair "
+            "path. Only then may a local failure emit a cloud-implementer "
+            "selection checkpoint."
+        ),
+    )
+    fallback_selection.add_cli_arguments(parser)
     parser.add_argument(
         "--mode",
         choices=["full-file", "before-after"],
@@ -675,6 +695,92 @@ def write_result(delegation, out_path):
     return gemma_local.write_result(delegation, out_path)
 
 
+def build_terminal_fallback_packet(
+        packet, args, selected_model, terminal_reason, delegation=None):
+    """Return the exact evidence object bound to a terminal cloud handoff.
+
+    The explicit terminal flag is owned by the Low-band orchestrator, which is
+    the only participant that knows whether its one permitted repair cycle has
+    been exhausted. This wrapper must not infer terminality from a local error
+    or a model-authored BLOCKED response alone.
+    """
+    if args.rri is None:
+        raise fallback_selection.FallbackSelectionError(
+            "rri: required with --terminal-cloud-escalation"
+        )
+    if not 0 <= args.rri <= 25:
+        raise fallback_selection.FallbackSelectionError(
+            "rri: terminal Low implementation escalation requires 0-25"
+        )
+    evidence = {
+        "task_id": args.task_id or "unknown",
+        "attempt": args.attempt,
+        "local_model": selected_model,
+        "terminal_reason": terminal_reason,
+        "delegation_packet": packet,
+        "mode": args.mode,
+        "allow_paths": args.allow_path,
+        "idle_timeout": args.idle_timeout,
+        "max_wall": args.max_wall,
+    }
+    if delegation is not None:
+        evidence["delegation"] = delegation
+    return evidence
+
+
+def handle_terminal_cloud_escalation(
+        args, packet, selected_model, terminal_reason, delegation=None):
+    """Persist a packet-bound cloud selection checkpoint without invoking cloud.
+
+    Returns the process exit code for the paused or preauthorized handoff. An
+    invalid selection or receipt remains a normal fail-closed error (exit 2).
+    """
+    try:
+        evidence = build_terminal_fallback_packet(
+            packet, args, selected_model, terminal_reason, delegation
+        )
+        checkpoint = fallback_selection.build_checkpoint_from_args(
+            args,
+            task_id=args.task_id or "unknown",
+            phase="implementation",
+            trigger=terminal_reason,
+            role=fallback_selection.ROLE_CLOUD_IMPLEMENTER,
+            rri=args.rri,
+            packet=evidence,
+            trigger_kind=fallback_selection.TRIGGER_OPERATIONAL,
+        )
+        if checkpoint["status"] == fallback_selection.AUTHORIZED_STATUS:
+            fallback_selection.validate_authorized_checkpoint(checkpoint, evidence)
+        source_artifact = args.out or f"{args.task_id or 'low-delegation'}.json"
+        selection_artifact = (
+            args.fallback_selection_artifact
+            or fallback_selection.default_checkpoint_path(source_artifact)
+        )
+        fallback_selection.write_checkpoint(checkpoint, selection_artifact)
+    except fallback_selection.FallbackSelectionError as exc:
+        print(f"[delegate] fallback selection integrity error: {exc}", file=sys.stderr)
+        return 2
+
+    if checkpoint["status"] == fallback_selection.AWAITING_STATUS:
+        print(
+            "[delegate] awaiting fallback selection — "
+            f"recommended model={checkpoint['recommended_model']} "
+            f"effort={checkpoint['recommended_reasoning_effort']} "
+            f"selection_artifact={selection_artifact}",
+            file=sys.stderr,
+        )
+        return fallback_selection.HUMAN_SELECTION_EXIT_CODE
+
+    print(
+        "[delegate] cloud implementer authorized — invoke exact "
+        f"model={checkpoint['selected_model']} "
+        f"effort={checkpoint['selected_reasoning_effort']} "
+        f"selection_artifact={selection_artifact}",
+        file=sys.stderr,
+    )
+    return 1
+
+
 # --- T3 (docs/tasks/local-first-cloud-local-handoff.md): attempt-bundle adapter --
 # Additive only: does not change the tagged-block contract Gemma must return or
 # any field already written to the audit log above. Maps an existing delegation
@@ -963,7 +1069,17 @@ def main():
     if args.dry_run:
         selected_model = args.model
     else:
-        selected_model = resolve_model(args.host, args.model, args.idle_timeout)
+        try:
+            selected_model = resolve_model(args.host, args.model, args.idle_timeout)
+        except URLError:
+            if args.terminal_cloud_escalation:
+                return handle_terminal_cloud_escalation(
+                    args,
+                    packet,
+                    args.model,
+                    "local model unavailable after terminal Low repair path",
+                )
+            raise
 
     if args.mode == "before-after":
         payload = build_replacement_payload(
@@ -1000,9 +1116,25 @@ def main():
             idle_timeout=args.idle_timeout,
             max_wall=args.max_wall,
         )
+    except URLError:
+        if args.terminal_cloud_escalation:
+            return handle_terminal_cloud_escalation(
+                args,
+                packet,
+                selected_model,
+                "local Ollama request failed after terminal Low repair path",
+            )
+        raise
     except (DelegationIdleTimeout, DelegationWallTimeout) as exc:
         fallback_model = args.stall_fallback_model
         if not fallback_model or fallback_model == selected_model:
+            if args.terminal_cloud_escalation:
+                return handle_terminal_cloud_escalation(
+                    args,
+                    packet,
+                    selected_model,
+                    f"local delegation timeout after terminal Low repair path: {exc}",
+                )
             raise
         print(
             f"[delegate] {selected_model!r} stalled ({exc}); retrying once "
@@ -1012,12 +1144,31 @@ def main():
         selected_model = fallback_model
         payload["model"] = selected_model
         wall_start = time.monotonic()
-        stream_result = stream_chat(
-            endpoint(args.host, "/api/chat"),
-            payload,
-            idle_timeout=args.idle_timeout,
-            max_wall=args.max_wall,
-        )
+        try:
+            stream_result = stream_chat(
+                endpoint(args.host, "/api/chat"),
+                payload,
+                idle_timeout=args.idle_timeout,
+                max_wall=args.max_wall,
+            )
+        except URLError:
+            if args.terminal_cloud_escalation:
+                return handle_terminal_cloud_escalation(
+                    args,
+                    packet,
+                    selected_model,
+                    "local stall fallback request failed after terminal Low repair path",
+                )
+            raise
+        except (DelegationIdleTimeout, DelegationWallTimeout) as retry_exc:
+            if args.terminal_cloud_escalation:
+                return handle_terminal_cloud_escalation(
+                    args,
+                    packet,
+                    selected_model,
+                    f"local stall fallback timed out after terminal Low repair path: {retry_exc}",
+                )
+            raise
     content = gemma_local.stream_result_content(stream_result)
     usage = gemma_local.stream_result_usage(stream_result)
 
@@ -1089,6 +1240,15 @@ def main():
         "packet_tokens_est": gemma_local.estimate_payload_tokens(payload),
         "response_tokens": usage.response_tokens,
     })
+
+    if delegation["status"] == "blocked" and args.terminal_cloud_escalation:
+        return handle_terminal_cloud_escalation(
+            args,
+            packet,
+            selected_model,
+            "local delegation returned BLOCKED after terminal Low repair path",
+            delegation,
+        )
 
     return 0
 

@@ -48,6 +48,7 @@ doc gates).
 | [ADR-036](ADR-036-local-first-agentic-implementation-band.md) | Local-first agentic implementation band (RRI 26–40) and Apple Silicon local model stack | Accepted (scope: agent workflow / local delegation) |
 | [ADR-037](ADR-037-qwen36-27b-local-architect-complex-analyst.md) | Qwen3.6-27B as Local Architect and Complex Analyst | Accepted (scope: direct project advisory analysis) |
 | [ADR-038](ADR-038-med-high-architect-refined-single-attempt.md) | Architect-refined single local attempt for Med-high tasks | Accepted (amends ADR-036/ADR-037; agent workflow only) |
+| [ADR-039](ADR-039-human-selected-fallback-model-checkpoint.md) | Human-selected fallback model checkpoint | Accepted (amends ADR-034/036/038; agent workflow only) |
 
 ## Backfill note
 

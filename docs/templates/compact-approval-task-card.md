@@ -15,7 +15,8 @@ and RRI evidence in the linked task ledger or RRI artifact.
 | Routing | Resolved value |
 |---|---|
 | Orchestrator | `<agent and recommended model>` |
-| Implementation | `<resolved implementer and route>` |
+| Primary implementation | `<resolved local or cloud implementer and route>` |
+| Cloud takeover | `<trigger -> concrete model/reasoning effort; use n/a only when cloud cannot take control>` |
 | RRI | `<score> -> <band>; gates: <list>; penalties: <none/list>` |
 | Main drivers | `<two or three dominant RRI factors>` |
 | Full evidence | `<task-ledger or RRI-artifact link>` |
@@ -37,7 +38,7 @@ and RRI evidence in the linked task ledger or RRI artifact.
 | Analyze and scope | `<primary orchestrator>` | Compute RRI, freeze scope, and prepare the card |
 | Phase 1 review | `<resolved reviewer>` | Must PASS; fallback `<chain>` |
 | Approval | `<human approver>` | Required for RRI 26+ unless explicitly waived |
-| Implement | `<resolved implementer>` | Work only in scope; fallback `<route>` |
+| Implement | `<resolved implementer>` | Work only in scope; cloud takeover `<trigger -> concrete model/effort>` |
 | Reflect and verify | `<primary orchestrator>` | `<N>` passes; run `<checks>` |
 | Phase 2 review | `<resolved reviewer>` | Must PASS; fallback `<chain>` |
 | Close | `<primary orchestrator>` | Emit evidence and synchronize status artifacts |

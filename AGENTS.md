@@ -44,8 +44,9 @@ Card v2** defined by `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and instantiated a
 `docs/templates/compact-approval-task-card.md`:
 
 1. `Decision header` — task identity/status, RRI/band, Effort, approval gate,
-   Codex/Claude recommendations, resolved implementation route, penalties,
-   dominant RRI drivers, and link to the full RRI evidence.
+   Codex/Claude recommendations, resolved primary implementation route, cloud
+   takeover trigger/model, penalties, dominant RRI drivers, and link to the
+   full RRI evidence.
 2. `Scope and acceptance` — objective, in scope, out of scope, primary `HP-#` /
    `EC-#` behaviors for development tasks, evidence, and status sync.
 3. `Agent workflow` — the resolved orchestrator, phase-1 reviewer, human gate,
@@ -104,14 +105,26 @@ The Effort → Complexity mapping is a **fallback** used only when no RRI is ava
 - `Effort: M` -> `Complexity: Medium`
 - `Effort: L` -> `Complexity: High`
 
-Default recommended models:
+Current Codex cloud-takeover defaults (re-verify against official vendor guidance
+at task-presentation time):
 
-- Codex: `GPT-5.2-Codex`
-- Claude Code: `Claude Sonnet 4`
+- RRI 0–25 bounded Low-band cloud escalation: `gpt-5.6-luna` at `low`;
+  `gpt-5.6-terra` at `low` if Luna is unavailable.
+- RRI 26–40 local-first fallback: `gpt-5.6-terra` at `medium`.
+- RRI 41–55: operational-only fallback uses `gpt-5.6-terra` at `high`;
+  capability/risk takeover uses `gpt-5.6-sol` at `high`.
+- RRI 56+: cloud-primary uses `gpt-5.6-sol`, with effort resolved by the
+  canonical workflow table; RRI 86+ remains analysis/decomposition only.
 
-Escalation guidance:
+Claude Code model resolution remains provider-current and follows the canonical
+workflow guide. Task-local model pins override these defaults until explicitly
+updated.
 
-- use `Claude Opus 4.1` only when the task is long-context heavy, synthesis-heavy, or repeatedly stalls under Sonnet 4
+Escalation guidance (Claude side resolves via the dated "Current Claude Code
+capability resolution" table in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`, not
+a pin here):
+
+- use `claude-opus-5` only when the task is long-context heavy, synthesis-heavy, or repeatedly stalls under `claude-sonnet-5`
 - if a task is primarily code editing, repo navigation, shell execution or deterministic implementation work, keep Codex as the default
 
 If a task file already defines explicit complexity or model guidance, that task-local guidance overrides this file.

@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 import unittest
+from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
 _SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -266,6 +267,182 @@ class TestRunQwenBandReview(unittest.TestCase):
             result = _mod.run_qwen_band_review("packet", "task", self._args())
         self.assertEqual(result["reviewer"], "d14")
         self.assertEqual(result["verdict"], "d14_required")
+
+
+# ---------------------------------------------------------------------------
+# Human-selected D14 fallback checkpoint
+# ---------------------------------------------------------------------------
+
+class TestD14FallbackSelection(unittest.TestCase):
+    def _d14_result(self, phase):
+        return {
+            "reviewer": "d14",
+            "phase": phase,
+            "verdict": "d14_required",
+            "summary": "reviewer chain unusable",
+            "findings": [],
+            "d14_packet": {
+                "diff": "diff" if phase == "code" else "",
+                "criteria": "criteria" if phase == "task" else "",
+                "reconciled_findings": [],
+            },
+        }
+
+    def _run_main(self, rri, phase, mode="human-select", d14_result=None):
+        temporary_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary_dir.cleanup)
+        artifact = os.path.join(temporary_dir.name, "review.json")
+        selection_artifact = os.path.join(temporary_dir.name, "selection.json")
+        argv = [
+            "peer-workflow-review.py",
+            "--phase", phase,
+            "--rri", str(rri),
+            "--caller", "codex",
+            "--task-id", "FMC-2",
+            "--artifact", artifact,
+            "--fallback-selection-artifact", selection_artifact,
+            "--fallback-mode", mode,
+        ]
+        if mode == "preauthorized":
+            argv.extend([
+                "--fallback-model", "gpt-5.6-terra",
+                "--fallback-reasoning-effort", "medium",
+                "--fallback-selected-by", "owner",
+            ])
+
+        result = d14_result or self._d14_result(phase)
+        patches = [
+            patch("sys.argv", argv),
+            patch.object(_mod.gemma_local, "read_packet", return_value="content"),
+        ]
+        if rri <= 25:
+            patches.append(
+                patch.object(
+                    _mod,
+                    "_run_gemma_fallback",
+                    return_value=(None, "gemma unavailable"),
+                )
+            )
+            patches.append(patch.object(_mod, "run_d14_fallback", return_value=result))
+        elif rri <= 55:
+            patches.append(patch.object(_mod, "run_qwen_band_review", return_value=result))
+        else:
+            patches.append(patch.object(_mod, "run_cross_vendor_review", return_value=result))
+
+        with ExitStack() as stack:
+            for active_patch in patches:
+                stack.enter_context(active_patch)
+            exit_code = _mod.main()
+
+        with open(artifact, encoding="utf-8") as stream:
+            review = json.load(stream)
+        selection = None
+        if os.path.exists(selection_artifact):
+            with open(selection_artifact, encoding="utf-8") as stream:
+                selection = json.load(stream)
+        return exit_code, review, selection
+
+    def test_all_bands_and_phases_pause_before_d14_without_selection(self):
+        for rri in (12, 46, 60):
+            for phase in ("task", "code"):
+                with self.subTest(rri=rri, phase=phase):
+                    exit_code, review, selection = self._run_main(rri, phase)
+                    self.assertEqual(exit_code, 3)
+                    self.assertEqual(review["verdict"], "awaiting_fallback_selection")
+                    self.assertEqual(
+                        os.path.basename(review["fallback_selection_artifact"]),
+                        "selection.json",
+                    )
+                    self.assertEqual(review["fallback_selection"], selection)
+                    self.assertNotIn("authorization_receipt", selection)
+
+    def test_all_bands_and_phases_relay_exact_preauthorized_selection(self):
+        for rri in (12, 46, 60):
+            for phase in ("task", "code"):
+                with self.subTest(rri=rri, phase=phase):
+                    exit_code, review, selection = self._run_main(
+                        rri, phase, mode="preauthorized"
+                    )
+                    self.assertEqual(exit_code, 1)
+                    self.assertEqual(review["verdict"], "d14_required")
+                    self.assertEqual(review["fallback_selection"], selection)
+                    self.assertEqual(selection["selected_model"], "gpt-5.6-terra")
+                    self.assertEqual(selection["selected_reasoning_effort"], "medium")
+                    self.assertEqual(selection["selected_by"], "owner")
+                    self.assertIn("authorization_receipt", selection)
+                    self.assertEqual(
+                        selection["packet_sha256"],
+                        _mod.fallback_selection.packet_sha256(review["d14_packet"]),
+                    )
+
+    def test_malformed_d14_packet_fails_closed_without_spawn_authorization(self):
+        malformed = self._d14_result("task")
+        malformed["d14_packet"]["criteria"] = 123
+        exit_code, review, selection = self._run_main(46, "task", d14_result=malformed)
+
+        self.assertEqual(exit_code, 2)
+        self.assertEqual(review["verdict"], "blocked")
+        self.assertTrue(review["blocked"])
+        self.assertIn("integrity", review["summary"].lower())
+        self.assertIsNone(selection)
+
+    def test_checkpoint_hash_mismatch_fails_closed(self):
+        checkpoint = _mod.fallback_selection.build_checkpoint(
+            task_id="FMC-2",
+            phase="task",
+            trigger="reviewer chain unusable",
+            role=_mod.fallback_selection.ROLE_D14,
+            rri=46,
+            packet={"diff": "", "criteria": "different", "reconciled_findings": []},
+            trigger_kind=_mod.fallback_selection.TRIGGER_REVIEWER_UNUSABLE,
+            selection_mode=_mod.fallback_selection.MODE_PREAUTHORIZED,
+            selected_model="gpt-5.6-terra",
+            selected_reasoning_effort="medium",
+            selected_by="owner",
+        )
+        with patch.object(
+            _mod.fallback_selection,
+            "build_checkpoint_from_args",
+            return_value=checkpoint,
+        ):
+            exit_code, review, selection = self._run_main(
+                46, "task", mode="preauthorized"
+            )
+
+        self.assertEqual(exit_code, 2)
+        self.assertEqual(review["verdict"], "blocked")
+        self.assertTrue(review["blocked"])
+        self.assertIsNone(selection)
+
+    def test_non_fallback_result_has_no_selection_keys(self):
+        qwen_result = {
+            "reviewer": "qwen3.6:27b-q4_K_M",
+            "phase": "task",
+            "verdict": "pass",
+            "summary": "ok",
+            "findings": [],
+        }
+        temporary_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary_dir.cleanup)
+        artifact = os.path.join(temporary_dir.name, "review.json")
+        argv = [
+            "peer-workflow-review.py", "--phase", "task", "--rri", "46",
+            "--task-id", "FMC-2", "--artifact", artifact,
+        ]
+        with patch("sys.argv", argv), \
+             patch.object(_mod.gemma_local, "read_packet", return_value="content"), \
+             patch.object(_mod, "run_qwen_band_review", return_value=qwen_result):
+            exit_code = _mod.main()
+
+        self.assertEqual(exit_code, 0)
+        with open(artifact, encoding="utf-8") as stream:
+            review = json.load(stream)
+        self.assertEqual(
+            {key: value for key, value in review.items() if key != "ts"},
+            qwen_result,
+        )
+        self.assertNotIn("fallback_selection", review)
+        self.assertNotIn("fallback_selection_artifact", review)
 
 
 # ---------------------------------------------------------------------------

@@ -79,7 +79,9 @@ For eligible simple code patches, the delegating agent must:
 8. Run required verification commands.
 9. If requirements are missed or checks fail, run one bounded Gemma repair cycle
    with the failure evidence and the same allowed paths; if it still fails, stop and
-   escalate.
+   escalate. If Codex takes execution after that gate, use `gpt-5.6-luna` at
+   `low`, or `gpt-5.6-terra` at `low` when Luna is unavailable in the active
+   environment.
 10. Report the RRI, Gemma model used, files changed, the delegating agent's
     requirement-review result, verification commands, and whether a repair cycle
     was needed. If delegation times out, report `Gemma timeout after 120s`.
@@ -125,7 +127,12 @@ The default path for Moderate development tasks is:
    evidence-backed local repair attempts.
 9. After the repair budget is exhausted, or if the local runner/model is
    unavailable, escalate to cloud implementation with the ADR-036 escalation
-   packet rather than continuing with ad hoc local retries.
+   packet rather than continuing with ad hoc local retries. Use the concrete
+   cloud-takeover model already recorded in the approved task card: for Codex,
+   the current Balanced default is `gpt-5.6-terra` at `medium`. If the failures
+   reveal a capability, ambiguity, coupling, or risk gap, re-run
+   `scripts/rri.py` and re-apply the resulting gate before selecting the Premium
+   `gpt-5.6-sol` route; an Ollama outage alone does not justify that promotion.
 
 This routing is operative by owner override dated **2026-07-15**. It was
 adopted ahead of the original ADR-036 promotion gate so that live
@@ -167,10 +174,14 @@ The route:
    preserves the last checkpoint and partial diff.
 6. If the gate resolves CLOUD_REQUIRED, or the one local attempt does not
    reach success (timeout, failing acceptance, scope/boundary/organization
-   violation, or model substitution), escalate to Codex or Claude with the
-   full ADR-038 §5 evidence bundle: task capsule, refinement artifact,
+   violation, or model substitution), escalate to the concrete Codex or Claude
+   cloud-takeover model recorded in the approved task card, with the full
+   ADR-038 §5 evidence bundle: task capsule, refinement artifact,
    primary receipt, effective limits, transcript/checkpoint, partial diff,
    commands/tests run, stop reason, hashes, model identity, elapsed time.
+   When Codex executes, an operational-only fallback uses `gpt-5.6-terra` at
+   `high`; a hard exclusion, risk/capability `CLOUD_REQUIRED`, or local
+   acceptance/scope/organization failure uses `gpt-5.6-sol` at `high`.
 7. Run the approved verification commands and the organization gate before
    issuing a signed success audit, exactly as for Moderate. The
    `local-implementer` signature is valid only when scope, acceptance, and
