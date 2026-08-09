@@ -129,6 +129,19 @@ a pin here):
 
 If a task file already defines explicit complexity or model guidance, that task-local guidance overrides this file.
 
+## Human-selected fallback checkpoint
+
+Before any terminal local fallback can invoke D14 or a cloud implementer, emit the
+ADR-039 `fallback-selection-v1` artifact bound to the exact fallback packet.
+`human-select` is the default: without a complete human model, reasoning-effort,
+and selector choice, stop as `awaiting_fallback_selection`. `preauthorized` is
+allowed only when those exact fields were frozen in the approved task card or
+preflight; validate the receipt against the current packet, then use exactly its
+selected model and effort. This bounded checkpoint neither waives HITL nor changes
+RRI, reviewer independence, D14's read-only Balanced role, repair budgets, or task
+scope. See ADR-039 and `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` for the full
+protocol.
+
 ## Pseudocode Rule
 
 Include pseudocode only when at least one is true:

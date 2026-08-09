@@ -770,6 +770,31 @@ Compact-card rules:
 - Add a one-line rationale if the mapping is non-obvious (e.g., a Medium CC task
   escalated to High because of a Very High external-dependency count).
 
+### Human-selected fallback checkpoint (ADR-039)
+
+Before a terminal local-review or local-implementation failure can invoke D14 or
+a cloud implementer, the responsible script must emit a
+`fallback-selection-v1` artifact bound by SHA-256 to the exact fallback packet.
+The artifact authorizes a later invocation; it never invokes a model itself.
+
+- `human-select` is the interactive default. If model, reasoning effort, or
+  selector is absent, emit `awaiting_fallback_selection`, stop, and do not invoke
+  the fallback.
+- `preauthorized` is valid only when model, effort, and selector were frozen in
+  the approved card or preflight. Missing fields fail closed.
+- Before resuming, the orchestrator validates the receipt against the current
+  packet and invokes exactly the selected model and effort. A missing, stale,
+  role-mismatched, or digest-mismatched receipt remains blocked.
+- Preserve role and gate boundaries: D14 is still a read-only, context-isolated
+  Balanced-tier adjudicator; cloud implementation is separately selected. Neither
+  selection changes RRI, HITL approval, reviewer independence, repair budgets, or
+  scope/organization gates.
+
+The approval card records the selection mode and artifact/resume condition when
+a fallback is possible. The Low handoff packet records the same requirement for
+Gemma-to-cloud escalation. See ADR-039 for the schema and frozen recommendation
+matrix.
+
 ## Reflection design pattern for development tasks
 
 When a development task has an RRI of 26 or higher, the agent must apply

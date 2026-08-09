@@ -2,7 +2,7 @@
 type: TaskList
 title: "Tasks: Human-selected fallback model checkpoint"
 plan: docs/plan/fallback-model-checkpoint.md
-status: active
+status: done
 slice: FMC
 rri: 89
 band: Very high
@@ -39,8 +39,8 @@ effort: XL
 | FMC-3 | Gate Low-band Gemma-to-cloud implementation fallback | 49 / L | Done | FMC-1 |
 | FMC-4 | Gate Moderate local-runner cloud fallback | 44 / L | Done | FMC-1 |
 | FMC-5 | Gate Med-high `CLOUD_REQUIRED` and failed-attempt fallback | 50 / L | Done | FMC-1 |
-| FMC-6a | Synchronize authoritative workflow/policy/template docs | docs/policy-only | Pending | FMC-2..FMC-5 |
-| FMC-6b | Synchronize agent summaries and generated override | docs/config-only | Pending | FMC-6a |
+| FMC-6a | Synchronize authoritative workflow/policy/template docs | docs/policy-only | Done | FMC-2..FMC-5 |
+| FMC-6b | Synchronize agent summaries and generated override | docs/config-only | Done | FMC-6a |
 
 ## FMC-1 — Shared checkpoint and receipt contract
 
@@ -743,15 +743,51 @@ Required passes: 3 (`50` -> `Med-high`)
   scripts/local-agent/run_med_high_task_test.py docs/tasks/fallback-model-checkpoint.md
   docs/audit/gemma-evidence/FMC-5.json`.
 
-## FMC-6a/FMC-6b — Documentation and summary propagation
+## FMC-6a — Authoritative workflow, policy, and template propagation
 
-**Effort:** S (docs/config-only substeps; development review/Reflection exempt).
+**Status:** [x] Done — 2026-08-09
+
+**Effort:** S (policy-only; development review/Reflection exempt).
 
 Synchronize ADR-039, the workflow guide, RRI/HITL policies, Low handoff playbook,
-Compact Approval Task Card, `AGENTS.md`, `CLAUDE.md`, and regenerated
-`AGENTS.override.md`. Document `human-select` as the interactive default,
+and Compact Approval Task Card. Document `human-select` as the interactive default,
 `preauthorized` as the automation mode, the D14 Balanced floor, receipt validation,
-the pause exit, and exact phase-specific behavior.
+the pause exit, and exact phase-specific behavior. Do not update agent summaries or
+the generated override in this subtask.
 
 Task-analysis review: n/a — docs/policy/config-only exemption.
 Code-solution review: n/a — docs/policy/config-only exemption.
+
+### Completion evidence
+
+- Updated the workflow guide, RRI/HITL policies, Low handoff playbook, and
+  Compact Approval Task Card with ADR-039's packet-bound selection contract.
+- Verified: `git diff --check -- docs/templates/compact-approval-task-card.md
+  docs/policies/RRI_POLICY.md docs/policies/HITL_AUTONOMY_POLICY.md
+  docs/playbooks/LOW_RRI_LOCAL_MODEL_HANDOFF.md
+  docs/playbooks/AGENT_WORKFLOW_GUIDE.md docs/tasks/fallback-model-checkpoint.md`;
+  `make qa-docs`.
+- At this subtask's completion, FMC-6b remained pending; agent summaries and
+  `AGENTS.override.md` were intentionally not changed here.
+
+## FMC-6b — Agent-summary and generated-override propagation
+
+**Status:** [x] Done — 2026-08-09
+
+**Effort:** S (config-only; development review/Reflection exempt).
+
+Synchronize `AGENTS.md` and `CLAUDE.md`, then regenerate `AGENTS.override.md` with
+`python3 scripts/generate-agents-override.py --write`; do not edit the generated
+file manually. Verify the byte-exact drift gate before marking this subtask done.
+
+Task-analysis review: n/a — docs/policy/config-only exemption.
+Code-solution review: n/a — docs/policy/config-only exemption.
+
+### Completion evidence
+
+- Added the ADR-039 fallback-selection summary to `AGENTS.md` and `CLAUDE.md`.
+- Regenerated `AGENTS.override.md` exclusively with
+  `python3 scripts/generate-agents-override.py --write`; it was not hand-edited.
+- Verified: `git diff --check -- AGENTS.md CLAUDE.md AGENTS.override.md
+  docs/tasks/fallback-model-checkpoint.md docs/plan/fallback-model-checkpoint.md`;
+  `make qa-docs`.

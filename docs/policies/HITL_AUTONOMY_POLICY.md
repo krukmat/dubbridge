@@ -204,6 +204,28 @@ Use the Compact Approval Task Card v2 from the workflow guide. A user may waive
 this checkpoint only by explicitly authorizing execution without another
 approval for a clearly bounded task; record that waiver in the card or ledger.
 
+## Fallback model-selection checkpoint
+
+ADR-039 adds a bounded authorization checkpoint only when a terminal local review
+or implementation route needs D14 or a cloud implementer. It is not a replacement
+for the task's HITL approval and it never broadens the approved scope.
+
+1. The responsible script emits a `fallback-selection-v1` artifact, bound by
+   SHA-256 to the exact fallback packet, before invoking any fallback model.
+2. `human-select` is the interactive default. A missing model, reasoning effort,
+   or human selector returns `awaiting_fallback_selection`; the process stops and
+   must not invoke D14 or a cloud implementer.
+3. `preauthorized` is allowed only when all three selection fields were frozen in
+   the approved task card or preflight. Any incomplete preauthorization fails
+   closed.
+4. The orchestrator must validate the authorized receipt and packet digest, then
+   invoke exactly its selected model and effort. A stale, missing, mismatched, or
+   role-confused receipt stays blocked.
+
+D14 remains a read-only, context-isolated Balanced-tier reviewer. Selecting it
+does not authorize cloud implementation; selecting a cloud implementer does not
+waive independent review, RRI gates, repair limits, or scope checks.
+
 ## Permitted without prior approval
 
 - Read-only analysis, search, and codebase navigation.

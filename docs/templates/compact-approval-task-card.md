@@ -17,6 +17,7 @@ and RRI evidence in the linked task ledger or RRI artifact.
 | Orchestrator | `<agent and recommended model>` |
 | Primary implementation | `<resolved local or cloud implementer and route>` |
 | Cloud takeover | `<trigger -> concrete model/reasoning effort; use n/a only when cloud cannot take control>` |
+| Fallback selection | `<human-select | preauthorized | n/a>; receipt/artifact and resume condition>` |
 | RRI | `<score> -> <band>; gates: <list>; penalties: <none/list>` |
 | Main drivers | `<two or three dominant RRI factors>` |
 | Full evidence | `<task-ledger or RRI-artifact link>` |
@@ -30,6 +31,14 @@ and RRI evidence in the linked task ledger or RRI artifact.
   - `<criterion or HP-1>`
   - `<criterion or EC-1>`
 - **Evidence / status sync:** `<outputs, commands, ledgers, or reports>`
+
+When a terminal local route needs D14 or a cloud implementer, record the
+`fallback-selection-v1` artifact in the task evidence. `human-select` is the
+interactive default: it remains `awaiting_fallback_selection` until a human
+selects model, effort, and selector. `preauthorized` is valid only when those
+fields were frozen in the approved card or preflight. The orchestrator may invoke
+the fallback only after validating the receipt against the exact packet; selection
+never replaces the HITL gate or changes the selected role.
 
 ## 3. Agent workflow
 
