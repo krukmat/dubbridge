@@ -216,6 +216,11 @@ Code-solution review: <gemma|qwen3.6:27b-q4_K_M|codex|claude|d14> <artifact path
 See `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review` for the
 full contract.
 
+For every band, D14 must first use a responsive provider different from the
+primary orchestrator's provider. Same-provider D14 is allowed only as a
+recorded degraded fallback after the cross-provider attempt is unusable; see
+the authoritative guide's `Context-isolated adjudicator (D14)` section.
+
 ## Development Closure Rule
 
 For development-task closure, do not describe certification, final verification,

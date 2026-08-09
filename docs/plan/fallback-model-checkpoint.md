@@ -28,6 +28,11 @@ subtasks, each at RRI 55 or below; documentation propagation is split separately
 2. `human-select` is the default; `preauthorized` requires a complete selection.
 3. Packet SHA-256 and receipt SHA-256 bind authorization to exact evidence.
 4. A checkpoint authorizes but never invokes a model.
+5. **Owner routing directive (2026-08-09):** all remaining development tasks in
+   this plan use a cloud-primary implementation route until the plan is complete.
+   Do not invoke a local implementation agent for FMC-4 or FMC-5. This changes
+   only the authoring route; it does not change the runtime fallback semantics,
+   independent-review chain, HITL gate, or evidence requirements.
 5. Model recommendations are derived from RRI, role, and trigger cause; humans may
    choose another available model, subject to the D14 Balanced floor and any
    higher-band policy gate.
