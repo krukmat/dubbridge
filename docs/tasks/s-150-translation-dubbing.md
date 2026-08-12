@@ -1418,9 +1418,9 @@ Required passes: 2 (`39` → `Moderate`)
 
 **Type:** development
 **Effort:** L (RRI 52 — Med-high)
+**RRI:** 52 / Med-high
 **Depends on:** S-150-T2b-ii-a
-**Status:** [ ] Ready for closure — verification and phase-2 review passed;
-awaiting authorized commit for the reachable review receipt
+**Status:** [x] Done — 2026-08-12
 
 Task-analysis review: gemma `.agent/peer-task-review-S-150-T2b-ii-b.json` - PASS
 
@@ -1472,7 +1472,7 @@ failure transitions or queue code.
 **Stop condition:** Stop after atomic persistence tests. Do not start T2b-ii-c or
 T2c.
 
-### In-progress execution evidence
+### Execution evidence
 
 - ADR-038 refinement: Muse Glimmer `GO_LOCAL`, then primary receipt
   `CLOUD_REQUIRED` because ADR-038 Amendment 1 disables Med-high local developer
@@ -1485,7 +1485,7 @@ T2c.
 - Focused implemented-scope coverage: `crates/db/src/translation_delivery_repo.rs`
   reported `96.04%` line coverage under `cargo llvm-cov`.
 - Code-solution review: muse-glimmer
-  `.agent/peer-code-review-S-150-T2b-ii-b.json` - PASS
+  `docs/audit/gemma-evidence/S-150-T2b-ii-b.json` - PASS
 - Reflection pass 1 (contract coverage): found and repaired missing direct cases
   for an unknown target and a non-`Subtitle` source; focused tests passed after
   the revision.
@@ -1501,6 +1501,73 @@ T2c.
   The isolated verification therefore ran `dubbridge-api` serially against that
   fresh database, then ran the remaining workspace without its database override:
   both portions passed. The temporary container was removed afterward.
+
+### Peer Reviewer evidence
+
+- Reviewer: `muse-glimmer`
+- Model: `muse-glimmer:30b-q4_K_M`
+- Command: manual Ollama `/api/chat` phase-2 review with `stream=false`,
+  `think=false`, `num_ctx=131072`, and `num_predict=4096`
+- Artifact: `docs/audit/gemma-evidence/S-150-T2b-ii-b.json`
+- Verdict: `PASS`
+- Findings: none
+- Muse Glimmer fallback: not triggered — task-local Muse binding returned valid PASS
+- D14 fallback: not triggered — the local reviewer chain remained usable
+- D14 provider route: `n/a`
+- disposition_divergence: `none`
+- Primary-agent disposition: no findings to repair or reject
+- Review artifact: docs/audit/gemma-evidence/S-150-T2b-ii-b.json
+
+### Reflection log
+
+Required passes: 3 (`52` → `Med-high`)
+
+#### Pass 1
+
+- **Draft verdict:** The transaction and focused test suite implemented the approved
+  single-target persistence boundary.
+- **Critique findings:** Direct coverage was missing for unknown target membership
+  and a non-`Subtitle` source.
+- **Revisions applied:** Added both fail-closed cases to
+  `translation_delivery_repo_test`; the focused PostgreSQL suite passed afterward.
+
+#### Pass 2
+
+- **Draft verdict:** Scope validation precedes claim/status/outbox writes, with
+  `ON CONFLICT` preserving the one-identity contract.
+- **Critique findings:** No defect found in the atomicity, source-conflict, or
+  redelivery paths.
+- **Revisions applied:** none.
+
+#### Pass 3
+
+- **Draft verdict:** Existing dispatch state is returned as an explicit disposition
+  without queue inspection or state mutation.
+- **Critique findings:** No queue, enqueue-failure transition, migration, or other
+  T2b-ii-c/T2c behavior entered the final diff.
+- **Revisions applied:** none.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | Each caller-selected configured target creates one claim and one pending dispatch | `apps/api/tests/translation_delivery_repo_test.rs::persistence_creates_one_claim_and_pending_dispatch_for_each_selected_target` | passed |
+| HP-2 | Happy path | Redelivery reports durable active, retryable, and acknowledged dispositions | `apps/api/tests/translation_delivery_repo_test.rs::redelivery_classifies_existing_dispatch_state_without_mutation` | passed |
+| EC-1 | Edge case | Invalid project, target, or non-Subtitle source writes no claim or dispatch | `apps/api/tests/translation_delivery_repo_test.rs::invalid_requested_scope_fails_before_claim_or_dispatch_write` | passed |
+| EC-3 | Edge case | A generation request reused with another source conflicts without a second dispatch | `apps/api/tests/translation_delivery_repo_test.rs::same_generation_with_different_source_rolls_back_without_second_dispatch` | passed |
+
+### Owner final verification
+
+- Owner: Codex (primary agent and orchestrator of record)
+- Date: 2026-08-12
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior. The production API validates persisted scope before every write and exposes only durable dispatch dispositions; it does not enter queue or failure-transition scope.
+- Commands run: `cargo fmt --all -- --check`; `cargo check -p dubbridge-db`;
+  `cargo check -p dubbridge-api --test translation_delivery_repo_test`;
+  `DUBBRIDGE_DATABASE_URL='postgres://dubbridge:dubbridge@127.0.0.1:5432/dubbridge' cargo test -p dubbridge-api --test translation_delivery_repo_test -- --nocapture`;
+  `DUBBRIDGE_DATABASE_URL='postgres://dubbridge:dubbridge@127.0.0.1:5432/dubbridge' cargo llvm-cov --workspace --test translation_delivery_repo_test --summary-only`;
+  `cargo clippy --workspace --all-targets -- -D warnings`; `make qa-docs`; and
+  serial full-workspace verification split between fresh PostgreSQL `dubbridge-api`
+  and the no-database-override remainder.
 
 ---
 

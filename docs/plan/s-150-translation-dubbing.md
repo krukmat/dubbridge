@@ -17,8 +17,9 @@ slice: S-150
 > `S-150-T2b-ii` (durable delivery repository and exact target binding), then
 > `S-150-T2c` (versioned jobs and fan-out). T2b-i is complete; on 2026-08-12
 > T2b-ii was itself decomposed after an exact `RRI 57` into a scope-helper child,
-> an atomic persistence child, and a guarded failure-transition child. T2b-ii-a is
-> now the next executable task, after a fresh child RRI and approval. The
+> an atomic persistence child, and a guarded failure-transition child. T2b-ii-a and
+> T2b-ii-b are complete; T2b-ii-c is now the next executable child after a fresh
+> RRI and approval. The
 > plan-review conditions recorded for this slice remain in
 > force, especially the durable S-140/S-150 route discriminator, deterministic
 > initial generation-request identity, migration parity, review cutover, and
