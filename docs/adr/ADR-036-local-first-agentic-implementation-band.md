@@ -446,6 +446,67 @@ tightening `scripts/gemma-code-review.py`'s system prompt or grammar
 constraint for this model family, tracked informally here pending a formal
 task.
 
+## Amendment 2 (2026-08-11): Implementer binding moves to Qwen3.6-27B; Qwen3.6-35B-A3B retired
+
+**Reason:** Owner directive, 2026-08-11: restructure the local model stack so
+`qwen3.6:27b-q4_K_M` becomes the local implementer and `qwen3.6:35b-a3b` is
+removed from the stack entirely, "de momento" (for now). This is a deliberate
+**re-entry** into the "Qwen3.6-27B / Gemma 4 31B (large dense)" rejection this
+ADR's §1 originally recorded ("bandwidth-bound (~7–10 tok/s) on base M5; not
+practical as agentic implementers... Re-entry: higher-bandwidth hardware (M5
+Pro/Max class) or an offline batch-analysis role"). Neither listed re-entry
+condition has been formally satisfied by new hardware or a completed
+offline-batch pilot; the owner explicitly accepted this gap and directed
+proceeding on the basis of interactive smoke-test evidence
+(`docs/plan/local-model-stack-restructure-2026-08.md` § Evidence gathered)
+rather than a full ADR-036 §10-style benchmark. A follow-up formal benchmark
+comparable to Stage 1 remains an open item, not a precondition already met.
+
+**Changes to §1 (Local model stack):** the implementer binding changes; the
+model stack remains two roles:
+
+| Role | Model (dubbridge binding) |
+|---|---|
+| **Local implementer** | `qwen3.6:27b-q4_K_M` |
+| **Local reviewer / challenger / multimodal** | `gemma4:26b-a4b-it-qat` (RRI 0–25 only as of this amendment — see §5 below) |
+
+`qwen3.6:35b-a3b` is removed from the stack; it is no longer the implementer,
+reviewer, or any bound role. This also **retires** the informal "owner
+directive 2026-07-21" policy-layer override that had made `qwen3.6:27b-q4_K_M`
+the RRI 26–55 primary phase-1/phase-2 reviewer — that override lived in
+`docs/policies/RRI_POLICY.md` / `AGENT_WORKFLOW_GUIDE.md` /
+`HITL_AUTONOMY_POLICY.md` prose, not in this ADR's text; the propagating
+policy-doc change is tracked as
+`docs/tasks/local-model-stack-restructure-2026-08.md` T2. Qwen3.6-27B cannot
+simultaneously be the implementer and the independent reviewer for the same
+band without breaking §5's cross-family independence rule, which is the
+direct cause of the §5 change below.
+
+**Changes to §5 (Reviewer-pairing rule):**
+
+| Implementer | Phase-2 reviewer |
+|---|---|
+| Cloud primary agent (status quo) | Gemma Reviewer (unchanged) |
+| `qwen3.6:27b-q4_K_M` (this amendment, RRI 0–25 review context) | `muse-glimmer:30b-q4_K_M` (new; see ADR-037 Amendment 1) |
+| `qwen3.6:27b-q4_K_M` (this amendment, RRI 26–55 review context) | Gemma Reviewer (`gemma4:26b-a4b-it-qat`) |
+
+D14 (context-isolated subagent) remains the universal fallback in every row.
+The pairing rule's purpose is unchanged: whichever model implements, the
+phase-2 reviewer must come from a different model family.
+
+**Binding/code changes required:** tracked in
+`docs/tasks/local-model-stack-restructure-2026-08.md` T4a (implementer call
+sites), T4b (reviewer/Architect call sites and the `gemma_local.py`
+decoupled-constant fix), T4c (`delegate-low-rri.py` stall-fallback constant).
+
+**Consequence accepted:** this amendment reopens a rejection this ADR
+recorded with named re-entry conditions, before either condition was
+independently satisfied. The owner made this decision explicitly and in full
+view of that fact (see the plan's Decisions log, D-series). Production
+evidence of Qwen3.6-27B's actual agentic-loop latency/quality on base M5 is
+still pending and is carried forward as an open question below, not silently
+dropped.
+
 ## Related
 
 - `docs/plan/adr036-local-first-pilot.md` — Stage 1/Stage 2 pilot plan for §10

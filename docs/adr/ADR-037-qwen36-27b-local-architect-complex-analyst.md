@@ -304,6 +304,61 @@ Not adopted by this ADR. Cloud models may still be used through the normal prima
 agent workflow where policy allows, but the purpose here is a local, private,
 bounded advisory lane.
 
+## Amendment 1 (2026-08-11): Local Architect binding moves to Muse Glimmer
+
+**Reason:** ADR-036 Amendment 2 (2026-08-11) reassigns `qwen3.6:27b-q4_K_M`
+from this ADR's Local Architect / Complex Analyst role to the local
+**implementer** role. Qwen3.6-27B cannot simultaneously implement (ADR-036)
+and hold the upstream advisory-analysis role this ADR defines without
+collapsing the same-family independence §6 of this ADR exists to protect
+("This preserves cross-family independence when Qwen3.6-35B-A3B is the
+Moderate-band implementer" — now generalized to whichever model implements).
+The owner selected `muse-glimmer:30b-q4_K_M` as the replacement binding,
+already resident on the target machine and validated with two live smoke
+tests against the real Ollama endpoint
+(`docs/plan/local-model-stack-restructure-2026-08.md` § Evidence gathered).
+
+**Changes to §2 (Bind the role to a specific local model):**
+
+- **Requested binding:** `muse-glimmer:30b-q4_K_M` (was `qwen3.6:27b-q4_K_M`)
+- All other §2 provisions (Ollama runtime, 8K–16K default / 24K bounded
+  ceiling / 32K stress-only context, one-large-model-resident rule, no
+  silent substitution) apply unchanged to the new binding.
+
+**Changes to §7 (Evaluate through bounded Medium-agent tasks):** no change to
+the role definition or authority boundary in §1 — only the model identity
+underlying "Local Architect / Complex Analyst" changes. Every occurrence of
+"Qwen3.6-27B" elsewhere in this ADR's Decision section refers to the binding
+as it stood before this amendment; the role name and its may/may-not boundary
+(§1), invocation triggers (§3), packet contract (§4), output contract (§5),
+and circuit breaker (§9) are unchanged and apply identically to
+`muse-glimmer:30b-q4_K_M`.
+
+**Open question carried forward, not blocking:** the plan's smoke test used a
+generic PASS/findings review contract to validate that Muse Glimmer can
+follow a structured-output instruction at all. It did **not** exercise the
+full `med-high-refinement-v1` schema (ADR-038 §2) under real Med-high task
+load. Production observation of Muse Glimmer's schema-adherence rate in that
+specific role is an open item — see
+`docs/tasks/local-model-stack-restructure-2026-08.md` T1 / T7 — and does not
+block this amendment, matching this ADR's own §8 stance that operational
+criteria, not a pre-cleared benchmark, govern adoption.
+
+**Alternatives considered for this amendment:**
+
+- **Leave the Local Architect role vacant / merge it into the primary
+  agent's own analysis:** rejected — discards the bounded, attributable,
+  local-only advisory lane this ADR exists to provide, for a reason (model
+  reassignment) unrelated to the role's own operational record.
+- **Keep Qwen3.6-27B as both implementer and Local Architect:** rejected —
+  same-model self-review/self-analysis conflation is exactly what §6 and
+  ADR-036 §5's pairing rule are designed to prevent.
+
+**Consequence accepted:** Muse Glimmer's fitness for this specific advisory
+role beyond the generic smoke test is not yet production-proven; the circuit
+breaker in §9 remains the safeguard if an artifact invents facts, ignores a
+controlling ADR, or otherwise fails the existing quality bar.
+
 ## Follow-up tasks
 
 Follow-up tasks are tracked in

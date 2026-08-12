@@ -161,8 +161,48 @@ while official reviewer failure follows the review policy's own chain.
   ADR-037 decomposition lane and all bounded local implementation opportunities.
 - **Let Qwen27 implement:** rejected; ADR-037 keeps the dense model advisory and
   tool-free, and ADR-036 records why it is unsuitable for agentic loops.
+  **Superseded note (2026-08-11):** ADR-036 Amendment 2 records the owner's
+  explicit decision to re-enter this exact rejected option — Qwen3.6-27B is
+  now the local implementer. This historical rejection is preserved as the
+  record of the original engineering rationale (dense/bandwidth-bound decode
+  on base M5) and is not deleted; it no longer reflects the operative
+  binding. See Amendment 1 below.
 - **Allow one repair after a failed acceptance test:** rejected because it means
   two implementation attempts, contradicting the owner's one-round constraint.
+
+## Amendment 1 (2026-08-11): Rebind advisory refinement and implementer per ADR-036/037 Amendment set
+
+**Reason:** ADR-036 Amendment 2 moves the local implementer binding to
+`qwen3.6:27b-q4_K_M` (was `qwen3.6:35b-a3b`); ADR-037 Amendment 1 moves the
+Local Architect / Complex Analyst binding to `muse-glimmer:30b-q4_K_M` (was
+`qwen3.6:27b-q4_K_M`). This ADR names both bindings explicitly in its
+operative sections and must be amended in the same change to stay accurate,
+per the ADR change-propagation contract in
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md`.
+
+**Changes to §2 (Add one advisory refinement before Med-high implementation):**
+every reference to invoking "the ADR-037 Local Architect exactly once with
+`qwen3.6:27b-q4_K_M`" now reads "the ADR-037 Local Architect exactly once
+with `muse-glimmer:30b-q4_K_M` (per ADR-037 Amendment 1)". The
+`med-high-refinement-v1` artifact contract (task/capsule hash, model
+tag/digest, `GO_LOCAL`/`CLOUD_REQUIRED`, boundaries, steps, acceptance tests,
+risks/unknowns/stop-conditions/provenance) is unchanged.
+
+**Changes to §4 (Define "one local round" precisely):** "the exact local
+implementer binding `qwen3.6:35b-a3b`" now reads "the exact local implementer
+binding `qwen3.6:27b-q4_K_M` (per ADR-036 Amendment 2)". The 8-turn/300-second/
+0-repair budget and no-silent-substitution rule are unchanged.
+
+**Changes to Risk analysis table:** the "Same-model authority conflation"
+row's mitigation ("Separate artifacts and explicit role labels; primary and
+human retain authority") is strengthened by the rebind itself: the advisory
+refiner (Muse Glimmer) and the implementer (Qwen3.6-27B) are now different
+model families by construction, not only by role label — matching ADR-036
+§5's cross-family independence rule.
+
+**Not changed by this amendment:** the fail-closed route authority (§3), the
+hard exclusions from `GO_LOCAL` (§6), review/approval rigor (§7), and the
+evidence-preservation contract (§5) apply identically to the new bindings.
 
 ## Related
 
