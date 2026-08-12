@@ -1700,9 +1700,9 @@ class AttemptBundleEmission(unittest.TestCase):
         )
         self.assertEqual(bundle["outcome"], "success")
         self.assertEqual(bundle["capsule_hash"], self._CAPSULE_HASH)
-        # ADR-036 Amendment 2: implementer_id reflects the current binding
-        # (qwen27), independent of the model_tag string passed in.
-        self.assertEqual(bundle["implementer_id"], "qwen27")
+        # ADR-036 Amendment 3: implementer_id reflects the current binding
+        # (nemotron), independent of the model_tag string passed in.
+        self.assertEqual(bundle["implementer_id"], "nemotron")
 
     def test_hp2_two_attempt_repair_emits_two_bundles_same_capsule_hash(self):
         card = rlt.TaskCard(
@@ -2349,7 +2349,7 @@ class ResolveEffectiveLimitsTest(unittest.TestCase):
         self.assertEqual(limits.band, "Med-high")
         self.assertEqual(limits.max_total_turns, 8)
         self.assertEqual(limits.max_repair_attempts, 0)
-        self.assertEqual(limits.required_model, "qwen3.6:27b-q4_K_M")
+        self.assertEqual(limits.required_model, "nemotron-3.5-lightning:30b-a3b-q4_K_M")
 
     def test_hp1b_med_high_rri_without_band_resolves_tight_limits(self):
         card = rlt.TaskCard("t", "spec", [], [], rri=47)
@@ -2397,15 +2397,15 @@ class ResolveEffectiveLimitsTest(unittest.TestCase):
 
 
 class ParseArgsModelDefaultTest(unittest.TestCase):
-    """ADR-036 Amendment 2: --model / DUBBRIDGE_LOCAL_AGENT_MODEL resolution."""
+    """ADR-036 Amendment 3: --model / DUBBRIDGE_LOCAL_AGENT_MODEL resolution."""
 
-    def test_hp1_no_override_resolves_qwen27_default(self):
+    def test_hp1_no_override_resolves_nemotron_default(self):
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("DUBBRIDGE_LOCAL_AGENT_MODEL", None)
             args = rlt.parse_args(
                 ["--card", "card.json", "--worktree", ".", "--out", "result.json"]
             )
-        self.assertEqual(args.model, "qwen3.6:27b-q4_K_M")
+        self.assertEqual(args.model, "nemotron-3.5-lightning:30b-a3b-q4_K_M")
 
     def test_ec1_explicit_flag_overrides_the_new_default(self):
         args = rlt.parse_args([
@@ -2438,7 +2438,7 @@ class MedHighRunnerLimitsIntegrationTest(unittest.TestCase):
             exit_code = rlt.main(
                 [
                     "--card", card_path, "--worktree", worktree, "--out", out_path,
-                    "--model", "qwen3.6:27b-q4_K_M",
+                    "--model", "nemotron-3.5-lightning:30b-a3b-q4_K_M",
                 ],
                 chat_fn=chat,
                 test_runner=passing_tests,
@@ -2472,7 +2472,7 @@ class MedHighRunnerLimitsIntegrationTest(unittest.TestCase):
             exit_code = rlt.main(
                 [
                     "--card", card_path, "--worktree", worktree, "--out", out_path,
-                    "--model", "qwen3.6:27b-q4_K_M",
+                    "--model", "nemotron-3.5-lightning:30b-a3b-q4_K_M",
                 ],
                 chat_fn=chat,
                 test_runner=unused_tests,
@@ -2501,7 +2501,7 @@ class MedHighRunnerLimitsIntegrationTest(unittest.TestCase):
             exit_code = rlt.main(
                 [
                     "--card", card_path, "--worktree", worktree, "--out", out_path,
-                    "--model", "qwen3.6:27b-q4_K_M",
+                    "--model", "nemotron-3.5-lightning:30b-a3b-q4_K_M",
                 ],
                 chat_fn=chat,
                 test_runner=failing_tests,

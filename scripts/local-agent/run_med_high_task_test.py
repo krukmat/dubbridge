@@ -959,14 +959,17 @@ class SuperviseIntegrationTest(unittest.TestCase):
         self.assertFalse(os.path.isfile(bundle_path))
         self.assertIsNone(result.fallback_selection)
         self.assertIsNone(result.cloud_instruction)
-        # ADR-036 Amendment 2 (T4a): the GO_LOCAL route must supervise the
-        # session on MED_HIGH_RUNNER_MODEL (qwen3.6:27b-q4_K_M), never the
-        # retired qwen3.6:35b-a3b binding.
+        # ADR-036 Amendment 3 (superseding Amendment 2/T4a): the GO_LOCAL
+        # route must supervise the session on MED_HIGH_RUNNER_MODEL
+        # (nemotron-3.5-lightning:30b-a3b-q4_K_M), never the retired
+        # qwen3.6:27b-q4_K_M or qwen3.6:35b-a3b bindings.
         self.assertEqual(len(launched_argv), 1)
         self.assertIn("--model", launched_argv[0])
         model_idx = launched_argv[0].index("--model") + 1
         self.assertEqual(launched_argv[0][model_idx], _MOD.MED_HIGH_RUNNER_MODEL)
-        self.assertEqual(launched_argv[0][model_idx], "qwen3.6:27b-q4_K_M")
+        self.assertEqual(
+            launched_argv[0][model_idx], "nemotron-3.5-lightning:30b-a3b-q4_K_M"
+        )
 
     def test_hp1_operational_start_failure_authorizes_terra_against_bundle(self):
         card_path = _card(self.tmp.name)

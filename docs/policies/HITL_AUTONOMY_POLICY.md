@@ -106,7 +106,7 @@ The default path for Moderate development tasks is:
 2. Present the task and obtain explicit approval.
 3. Run the implementation through `scripts/local-agent/run_local_task.py` in a
    disposable git worktree, resolving the implementer from
-   `DUBBRIDGE_LOCAL_AGENT_MODEL` (default `qwen3.6:27b-q4_K_M`) and the endpoint
+   `DUBBRIDGE_LOCAL_AGENT_MODEL` (default `nemotron-3.5-lightning:30b-a3b-q4_K_M`) and the endpoint
    from `OLLAMA_HOST`.
 4. Keep the primary agent as orchestrator of record: it owns the task card,
    allowed paths, acceptance tests, reflection passes, closure, and all final
@@ -167,7 +167,7 @@ The route:
    is enforced structurally (the gate requires both sides to independently
    say GO_LOCAL), not by trusting either decision alone.
 5. If the gate resolves GO_LOCAL: `scripts/local-agent/run_med_high_task.py`
-   supervises exactly **one** session on the exact `qwen3.6:27b-q4_K_M` binding,
+   supervises exactly **one** session on the exact `nemotron-3.5-lightning:30b-a3b-q4_K_M` binding,
    as its own OS process group, bounded to **8 turns**, **300 seconds**
    wall clock, and **0 repair attempts**. No silent model substitution. A
    timeout kills the full process group (not just the immediate PID) and
@@ -258,8 +258,9 @@ The reviewer is determined by the task's RRI band:
 - **RRI 26–55 (Moderate + Med-high):** Gemma (phases 1 and 2, owner
   directive 2026-08-11) — see `docs/policies/RRI_POLICY.md § Local
   pipeline phase-1/phase-2 reviewer bindings`. This reverts the 2026-07-21
-  override that had used `qwen3.6:27b-q4_K_M` in this role (now the local
-  implementer, per ADR-036 Amendment 2), with Muse Glimmer as intermediate
+  override that had used `qwen3.6:27b-q4_K_M` in this role (that binding
+  became the local implementer per ADR-036 Amendment 2, since superseded by
+  Amendment 3's rebind to `nemotron-3.5-lightning:30b-a3b-q4_K_M`), with Muse Glimmer as intermediate
   fallback, regardless of whether implementation stayed local or escalated
   to cloud.
 - **RRI 56+ (Complex+):** cross-vendor peer (phases 1 and 2). The peer
@@ -321,8 +322,9 @@ inserted as the intermediate fallback before the context-isolated subagent
 `muse-glimmer:30b-q4_K_M → gemma4:26b-a4b-it-qat → D14`. For Moderate and
 Med-high (26–55), the equivalent mandatory review step uses **Gemma** as the
 primary reviewer — see § Band-routed peer review above — reverting the
-2026-07-21 override that had used `qwen3.6:27b-q4_K_M` in this role (now the
-local implementer), with Muse Glimmer inserted as the intermediate fallback
+2026-07-21 override that had used `qwen3.6:27b-q4_K_M` in this role (that
+binding became the local implementer under ADR-036 Amendment 2, since
+superseded by Amendment 3's rebind to `nemotron-3.5-lightning:30b-a3b-q4_K_M`), with Muse Glimmer inserted as the intermediate fallback
 before D14: `gemma4:26b-a4b-it-qat → muse-glimmer:30b-q4_K_M → D14`. The
 retry-then-escalate discipline described below applies at each step of both
 chains.

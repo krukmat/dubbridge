@@ -38,7 +38,7 @@ import escalation_packet
 import med_high_gate
 
 MED_HIGH_WALL_CLOCK_SECONDS = 300
-MED_HIGH_RUNNER_MODEL = "qwen3.6:27b-q4_K_M"
+MED_HIGH_RUNNER_MODEL = "nemotron-3.5-lightning:30b-a3b-q4_K_M"
 POST_KILL_WAIT_SECONDS = 5
 ROUTE_GO_LOCAL = med_high_gate.ROUTE_GO_LOCAL
 ROUTE_CLOUD_REQUIRED = med_high_gate.ROUTE_CLOUD_REQUIRED

@@ -190,7 +190,7 @@ band — never derive one output from another (e.g. do not infer capability from
 |---|---|---|---|---|---|---|---|---|
 | **0–25** | Low | **S** | Primary agent or Local Gemma via Ollama | Primary agent or Local Gemma via Ollama | Off | Muse Glimmer†† | Muse Glimmer Reviewer†† | **Low-band handling:** do not present the full task for approval; use local Gemma only for eligible simple code patches, otherwise execute directly with the primary agent. |
 | **26–40** | Moderate | **M** | Balanced | Balanced | Off | Gemma†† | Gemma Reviewer†† | Confirm tests exist in the affected area. **Implementation route:** local-first via `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL`; primary agent remains orchestrator, cloud implementation is escalation/fallback using the concrete takeover model in the task card. |
-| **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Gemma†† | Gemma Reviewer†† | Plan + explicit acceptance criteria required before approval. **Implementation route (ADR-038):** Muse Glimmer advisory refinement (GO_LOCAL/CLOUD_REQUIRED) → primary hash-bound route receipt (may downgrade, never upgrade) → if GO_LOCAL, exactly one bounded `qwen3.6:27b-q4_K_M` session (≤8 turns, ≤300s, 0 repairs) → otherwise the concrete cloud-takeover model recorded in the task card with the full evidence bundle. No repair attempt at this band. Review/approval rigor unchanged — 3 Reflection passes and this HITL gate still apply; phase-2 (and phase-1 when it applies) reviewer is Gemma, not the cross-vendor peer. |
+| **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Gemma†† | Gemma Reviewer†† | Plan + explicit acceptance criteria required before approval. **Implementation route (ADR-038):** Muse Glimmer advisory refinement (GO_LOCAL/CLOUD_REQUIRED) → primary hash-bound route receipt (may downgrade, never upgrade) → if GO_LOCAL, exactly one bounded `nemotron-3.5-lightning:30b-a3b-q4_K_M` session (≤8 turns, ≤300s, 0 repairs) → otherwise the concrete cloud-takeover model recorded in the task card with the full evidence bundle. No repair attempt at this band. Review/approval rigor unchanged — 3 Reflection passes and this HITL gate still apply; phase-2 (and phase-1 when it applies) reviewer is Gemma, not the cross-vendor peer. |
 | **56–70** | Complex | **L** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Plan first. **Decompose into subtasks before implementation.** Human reviews the plan. |
 | **71–85** | High | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Characterization tests + explicit acceptance criteria + human reviews the **diff** (not just the plan). **Decomposition remains mandatory.** |
 | **86–100** | Very high | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Do not implement directly. Produce an ADR + risk analysis + decompose into subtasks. |
@@ -203,8 +203,9 @@ stack restructure): RRI 0–25 phase-1/phase-2 reviewer is **Muse Glimmer**
 (`muse-glimmer:30b-q4_K_M`), with **Gemma** as intermediate fallback, then
 **D14**. RRI 26–55 phase-1/phase-2 reviewer is **Gemma**
 (`gemma4:26b-a4b-it-qat`) — this reverts the 2026-07-21 override that had
-used `qwen3.6:27b-q4_K_M` in this role (that binding is now the local
-implementer, per ADR-036 Amendment 2) — with **Muse Glimmer** as
+used `qwen3.6:27b-q4_K_M` in this role (that binding became the local
+implementer per ADR-036 Amendment 2, since superseded by Amendment 3's
+rebind to `nemotron-3.5-lightning:30b-a3b-q4_K_M`) — with **Muse Glimmer** as
 intermediate fallback, then **D14**. In both bands, D14 must first be
 cross-provider and may be same-provider only as a recorded degraded
 fallback after that cross-provider attempt is unusable; D14 unavailable →
@@ -277,7 +278,7 @@ path. The card must name both the local implementer and the cloud-takeover
 trigger/model; `Codex` or `Claude` alone is not a resolved implementation value.
 The default implementation route for development tasks scoring
 **RRI 26–55** is the local agentic runner. Resolve the implementer from
-`DUBBRIDGE_LOCAL_AGENT_MODEL`, defaulting to `qwen3.6:27b-q4_K_M`, and the Ollama
+`DUBBRIDGE_LOCAL_AGENT_MODEL`, defaulting to `nemotron-3.5-lightning:30b-a3b-q4_K_M`, and the Ollama
 endpoint from `OLLAMA_HOST`, defaulting to `http://localhost:11434`. The runner
 uses a simple tool contract (`read_file`/`write_file`/`apply_patch`/
 `run_command`/`finish`) with no language-server preflight — the implementer
@@ -409,7 +410,7 @@ For final **RRI 26–40**, the implementation default is **local-first**:
 - the code-authoring surface is `scripts/local-agent/run_local_task.py` in a
   disposable worktree;
 - the implementer resolves from `DUBBRIDGE_LOCAL_AGENT_MODEL` (default
-  `qwen3.6:27b-q4_K_M`);
+  `nemotron-3.5-lightning:30b-a3b-q4_K_M`);
 - post-run `allowed_paths` scope enforcement is mandatory;
 - the local path has a maximum of **2 repair attempts**, each requiring new
   evidence;
@@ -420,8 +421,9 @@ For final **RRI 26–40**, the implementation default is **local-first**:
 **Phase-1/phase-2 reviewer bindings (owner directive, 2026-08-11):** for this
 band, both non-exempt phase 1 and phase 2 default to **Gemma**
 (`gemma4:26b-a4b-it-qat`) — reverting the 2026-07-21 override that had used
-the Local Architect / Complex Analyst model (`qwen3.6:27b-q4_K_M`, now
-reassigned to the implementer role by ADR-036 Amendment 2) — see § Local
+the Local Architect / Complex Analyst model (`qwen3.6:27b-q4_K_M`,
+reassigned to the implementer role by ADR-036 Amendment 2 and since rebound
+to `nemotron-3.5-lightning:30b-a3b-q4_K_M` by Amendment 3) — see § Local
 pipeline phase-1/phase-2 reviewer bindings below. If Gemma is unavailable,
 stalled, or returns invalid/`BLOCKED` output, fall back to **Muse Glimmer**
 (`muse-glimmer:30b-q4_K_M`), then to **D14** as the final fallback.
@@ -431,7 +433,7 @@ Bindings used by the operative local-first route:
 | Env var | Default | Purpose |
 |---|---|---|
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint |
-| `DUBBRIDGE_LOCAL_AGENT_MODEL` | `qwen3.6:27b-q4_K_M` | Default local implementer for RRI 26–55 (Moderate + Med-high) |
+| `DUBBRIDGE_LOCAL_AGENT_MODEL` | `nemotron-3.5-lightning:30b-a3b-q4_K_M` | Default local implementer for RRI 26–55 (Moderate + Med-high) |
 
 **Rollback triggers:** revert Moderate-band implementation to the cloud path if
 the rolling 20-task window shows escalation rate `> 40%`, any accepted
@@ -450,7 +452,7 @@ approved Med-high card
   -> Muse Glimmer (muse-glimmer:30b-q4_K_M) advisory refinement: GO_LOCAL | CLOUD_REQUIRED
   -> primary agent hash-bound route receipt (may downgrade GO_LOCAL to cloud;
      may NEVER upgrade CLOUD_REQUIRED to local)
-  -> if GO_LOCAL: exactly ONE bounded session on qwen3.6:27b-q4_K_M
+  -> if GO_LOCAL: exactly ONE bounded session on nemotron-3.5-lightning:30b-a3b-q4_K_M
        (<=8 turns, <=300 seconds wall clock, 0 repair attempts, exact model
        binding — no silent substitution)
   -> otherwise (CLOUD_REQUIRED, timeout, or any failure): Codex or Claude with
@@ -467,7 +469,7 @@ Implementation surfaces:
   the primary receipt, card/capsule hash binding, exact model tag/digest, and
   the Med-high RRI band, then applies the fail-closed route rules.
 - `scripts/local-agent/run_local_task.py`'s `resolve_effective_limits()`
-  forces 8 turns / 0 repairs / exact `qwen3.6:27b-q4_K_M` binding for any card
+  forces 8 turns / 0 repairs / exact `nemotron-3.5-lightning:30b-a3b-q4_K_M` binding for any card
   whose band or RRI falls in 41–55 (Moderate's 30-turn/2-repair defaults are
   unchanged for cards outside this band).
 - `scripts/local-agent/run_med_high_task.py` supervises that one session as
@@ -492,7 +494,8 @@ otherwise unchanged):** for this band, both non-exempt phase 1 and phase 2
 default to **Gemma** (`gemma4:26b-a4b-it-qat`), not the cross-vendor peer —
 see § Local pipeline phase-1/phase-2 reviewer bindings below. This reverts
 the 2026-07-21 override that had used `qwen3.6:27b-q4_K_M` in this role
-(now the local implementer). Phase 1 remains exempt for
+(that binding became the local implementer, since superseded by Amendment 3's
+rebind to `nemotron-3.5-lightning:30b-a3b-q4_K_M`). Phase 1 remains exempt for
 migration-only/config-only/docs-only tasks as before; when phase 1 does
 apply, it also routes to Gemma rather than the cross-vendor peer. If Gemma
 is unavailable, stalled, or returns invalid/`BLOCKED` output, fall back to
@@ -578,8 +581,9 @@ phase-1 task-analysis reviewer and phase-2 code-solution reviewer for RRI
 - **RRI 26–55 (Moderate + Med-high):** primary **Gemma**
   (`gemma4:26b-a4b-it-qat` via Ollama). This **retires** the 2026-07-21
   override that had used the Local Architect / Complex Analyst model
-  (`qwen3.6:27b-q4_K_M`) in this role — that binding is now the local
-  implementer for this band (ADR-036 Amendment 2), and Qwen3.6-27B cannot
+  (`qwen3.6:27b-q4_K_M`) in this role — that binding became the local
+  implementer for this band (ADR-036 Amendment 2, since superseded by
+  Amendment 3's rebind to `nemotron-3.5-lightning:30b-a3b-q4_K_M`), and Qwen3.6-27B cannot
   simultaneously implement and independently review the same band without
   breaking the cross-family pairing rule (ADR-036 §5). Gemma reverts to the
   role it held before the 2026-07-21 override; the cross-vendor peer

@@ -507,6 +507,60 @@ evidence of Qwen3.6-27B's actual agentic-loop latency/quality on base M5 is
 still pending and is carried forward as an open question below, not silently
 dropped.
 
+## Amendment 3 (2026-08-12): Implementer binding moves to Nemotron-3.5-Lightning-30B-A3B
+
+**Reason:** Owner directive, 2026-08-12: rebind the local implementer from
+`qwen3.6:27b-q4_K_M` to `nemotron-3.5-lightning:30b-a3b-q4_K_M`. As with
+Amendment 2, this change was made directly by the owner without a completed
+formal ADR-036 §10-style benchmark for the new binding; production evidence
+of Nemotron-3.5-Lightning's actual agentic-loop latency/quality on this
+hardware is pending and carried forward as an open question, same as it was
+for Amendment 2's Qwen3.6-27B binding (never closed out).
+
+**Changes to §1 (Local model stack) / Amendment 2's table:** the implementer
+binding changes again; the model stack remains two roles:
+
+| Role | Model (dubbridge binding) |
+|---|---|
+| **Local implementer** | `nemotron-3.5-lightning:30b-a3b-q4_K_M` |
+| **Local reviewer / challenger / multimodal** | `gemma4:26b-a4b-it-qat` (RRI 0–25 only, per Amendment 2 §5 — unchanged by this amendment) |
+
+`qwen3.6:27b-q4_K_M` is removed from the implementer role. It is not retired
+from the stack the way `qwen3.6:35b-a3b` was in Amendment 2 — it has no
+other bound role in this repository as of this amendment, so it simply drops
+out of active use.
+
+**Changes to §5 (Reviewer-pairing rule) / Amendment 2's table:** the
+implementer identity in the cross-family-independence pairing rows updates
+to match; the reviewer side (Muse Glimmer for RRI 0–25, Gemma Reviewer for
+RRI 26–55, D14 as universal fallback) is unchanged by this amendment.
+
+| Implementer | Phase-2 reviewer |
+|---|---|
+| Cloud primary agent (status quo) | Gemma Reviewer (unchanged) |
+| `nemotron-3.5-lightning:30b-a3b-q4_K_M` (this amendment, RRI 0–25 review context) | `muse-glimmer:30b-q4_K_M` (unchanged; see ADR-037 Amendment 1) |
+| `nemotron-3.5-lightning:30b-a3b-q4_K_M` (this amendment, RRI 26–55 review context) | Gemma Reviewer (`gemma4:26b-a4b-it-qat`, unchanged) |
+
+D14 (context-isolated subagent) remains the universal fallback in every row.
+
+**Binding/code changes made:** `scripts/local-agent/run_local_task.py`
+(`MED_HIGH_REQUIRED_MODEL` constant, `DUBBRIDGE_LOCAL_AGENT_MODEL` argparse
+default, `implementer_id` evidence-bundle field), `scripts/local-agent/
+run_med_high_task.py` (`MED_HIGH_RUNNER_MODEL` constant), plus their direct
+unit tests. `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and `docs/policies/
+HITL_AUTONOMY_POLICY.md` prose naming the implementer binding are updated in
+the same change. Historical task ledgers, audit files, and evaluation
+reports that record `qwen3.6:27b-q4_K_M` as the model that actually executed
+a specific past run are deliberately left unchanged — they describe
+completed history, not live configuration.
+
+**Consequence accepted:** same pattern as Amendment 2 — a binding change
+made on owner directive ahead of a completed formal benchmark, with the
+benchmark gap carried forward as an open item rather than silently dropped.
+Amendment 2's own open benchmark question for Qwen3.6-27B is now moot (that
+binding is no longer in use), but was never formally closed before being
+superseded.
+
 ## Related
 
 - `docs/plan/adr036-local-first-pilot.md` — Stage 1/Stage 2 pilot plan for §10
