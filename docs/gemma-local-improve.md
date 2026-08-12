@@ -44,18 +44,21 @@ Operational surfaces:
   after `ci` completes on a `self-hosted` runner.
 - Local replay/debug: `make qa-gemma-push-review`.
 
-## Gemma Developer vs. Gemma Reviewer
+## Nemotron Developer vs. Gemma Reviewer
 
-The shared primary model is `gemma4:12b-mlx` as of 2026-07-01. The previous
-default, `gemma4:26b-a4b-it-qat`, remains the automatic fallback when no explicit
-model override is set and the primary model is not installed locally.
+The Low/S developer model is `nemotron-3.5-lightning:30b-a3b-q4_K_M`. It has no
+automatic alternate developer fallback when it is unavailable or stalls.
 Role-specific environment variables still take precedence
 (`DUBBRIDGE_REVIEW_MODEL`, `DUBBRIDGE_PUSH_REVIEW_MODEL`, then
 `DUBBRIDGE_LOW_RRI_MODEL` where applicable) and are treated as strict explicit
 choices. The MLX tag requires an Ollama runtime new enough to pull and run
 current Gemma 4 MLX manifests.
 
-| | Gemma Developer | Gemma Reviewer |
+The Low/S developer binding is now Nemotron, not Gemma; this document remains
+about shared Gemma transport and reviewer roles. See the Low-RRI handoff playbook
+for the developer binding.
+
+| | Nemotron Developer | Gemma Reviewer |
 |---|---|---|
 | **Purpose** | Implement a simple code patch | Review code for correctness and safety |
 | **Trigger** | Low RRI (0–25) eligible simple code patches | Low/Moderate RRI (0–40) development task completion |
@@ -66,12 +69,12 @@ current Gemma 4 MLX manifests.
 | **Make target** | n/a (invoked by agent directly) | `make qa-gemma-review` |
 | **Audit fields** | `mode`, `diff_added/removed`, `scope_violations`, `apply_result`, `verify_ok` | `passes_run/succeeded`, `degraded`, `consensus_count`, `disposition_divergence` |
 
-## Relationship between the three local Gemma roles
+## Relationship between the local developer and Gemma roles
 
 | Role | Primary input | Purpose | Final authority |
 |---|---|---|---|
 | **Push Reviewer** | Completed GitHub pipeline run + diff | Audit a push, score/reroute findings, optionally dispatch pure Low work | Primary agent / daily workflow |
-| **Gemma Developer** | Low-RRI delegation packet | Propose a narrow code/test patch | Delegating agent |
+| **Nemotron Developer** | Low-RRI delegation packet | Propose a narrow code/test patch | Delegating agent |
 | **Gemma Reviewer** | Final code diff + acceptance criteria | Review completed development work | Primary agent |
 
 ## Multi-pass review and mandatory fallback

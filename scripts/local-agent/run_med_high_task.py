@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
-"""Med-high hard-timeout supervisor and cloud evidence bundle (ADR-038 T4).
+"""Med-high cloud-handoff supervisor and evidence bundle (ADR-038 T4).
 
-Owns the two things ADR-038 section 4 assigns to the primary, not to the
-local implementer itself: (1) the hard 300-second wall-clock cutoff on the
-one bounded Qwen27 attempt, enforced by killing the *entire* process group
-`run_local_task.py` spawns (not just its immediate PID) so a stuck subprocess
-`run_local_task.py` itself launched (e.g. a hung `cargo test`) cannot survive
-the cutoff; and (2) emitting the complete ADR-038 section 5 evidence bundle on
-every non-success route, so cloud continuation never starts from a blank slate.
+Owns the Med-high cloud-handoff evidence required by ADR-038. Owner directive
+2026-08-12 limits the local developer to Low/S and Moderate/M, so a valid
+Med-high `GO_LOCAL` advisory is recorded as policy-excluded and never launches
+`run_local_task.py`.
 
 This module never edits code and never re-implements the runner's own turn
 loop, model binding, or repair budget -- that enforcement lives in
@@ -637,10 +634,12 @@ def supervise(
     fallback_selected_by: str | None = None,
     fallback_selection_artifact: str | None = None,
 ) -> SupervisorResult:
-    """The single entry point: decide route (T2 gate), then either hand off
-    to cloud immediately (HP-2) or supervise exactly one bounded Qwen27
-    attempt (HP-1) and emit a complete evidence bundle on any non-success
-    outcome (EC-1, EC-2)."""
+    """Validate the Med-high route and emit its cloud handoff bundle.
+
+    The refinement/receipt gate remains authoritative evidence. Local execution
+    is policy-excluded for this band, including an otherwise-valid GO_LOCAL
+    result, so this entry point never launches the local runner.
+    """
     bundle_kwargs = dict(
         bundle_out_path=bundle_out_path, card_path=card_path, out_path=out_path,
         refinement_artifact_path=refinement_artifact_path,
@@ -669,49 +668,21 @@ def supervise(
     else:
         result = None
 
-    if result is None and decision.route == ROUTE_CLOUD_REQUIRED:
-        # HP-2: routes directly to cloud without ever launching Qwen27.
-        result = _pre_launch_bundle(
-            **bundle_kwargs,
-            stop_reason="cloud_required", status="cloud_required", reason=decision.reason,
-        )
-
     if result is None:
-        launch_outcome = run_supervised_runner(
-            card_path=card_path, worktree=worktree, out_path=out_path,
-            model=MED_HIGH_RUNNER_MODEL,
-            wall_clock_seconds=wall_clock_seconds, popen_fn=popen_fn,
-            python_executable=python_executable,
-        )
-        elapsed_s = launch_outcome.get("elapsed_s", 0.0)
-        runner_value, runner_shape_failure_reason = _read_runner_out(out_path)
-        runner_result = (
-            {"status": "transcript_shape_invalid", "reason": runner_shape_failure_reason}
-            if runner_shape_failure_reason is not None
-            else runner_value
-        )
-
-        if (
-            launch_outcome["status"] == "runner_exited"
-            and runner_result is not None
-            and runner_result.get("status") == STATUS_SUCCESS
-        ):
-            # HP-1: exactly one exact-model runner launched, success recorded
-            # without escalation -- no bundle or fallback checkpoint is built.
-            result = SupervisorResult(
-                status=STATUS_SUCCESS, route=ROUTE_GO_LOCAL,
-                reason="Med-high session succeeded within budget.",
-                runner_result=runner_result, bundle_path=None, elapsed_s=elapsed_s,
+        if decision.route == ROUTE_GO_LOCAL:
+            stop_reason = "policy_excluded_local_execution"
+            reason = (
+                "Med-high local execution is disabled: the owner limits the "
+                "local developer to Low/S and Moderate/M."
             )
         else:
-            result = _post_launch_bundle(
-                **bundle_kwargs,
-                launch_outcome=launch_outcome, runner_result=runner_result,
-                elapsed_s=elapsed_s,
-            )
+            stop_reason = "cloud_required"
+            reason = decision.reason
+        result = _pre_launch_bundle(
+            **bundle_kwargs,
+            stop_reason=stop_reason, status="cloud_required", reason=reason,
+        )
 
-    if result.status == STATUS_SUCCESS:
-        return result
     return _attach_fallback_selection(
         card_path=card_path, rri=rri, result=result,
         fallback_mode=fallback_mode, fallback_model=fallback_model,

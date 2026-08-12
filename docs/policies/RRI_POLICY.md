@@ -20,7 +20,7 @@ RRI **determines the approval gate and evidence required** before an agent may
 implement a task. For bands **RRI 26+**, the HITL approval checkpoint is
 mandatory; what the band controls is what evidence the agent must bring to it.
 For band **RRI 0–25**, the agent skips the full human approval presentation and
-delegates execution to local Gemma through Ollama, then reviews, verifies, and
+may delegate eligible execution to local Nemotron through Ollama, then reviews, verifies, and
 reports the result (see `docs/policies/HITL_AUTONOMY_POLICY.md` for the full rule).
 
 ## Formula
@@ -178,8 +178,8 @@ Apply each penalty independently; they are additive.
 ## Bands, autonomy gates, and model tiers
 
 The HITL approval requirement applies at every band **except RRI 0–25**. Low-band
-tasks skip the full approval presentation, but they do **not** all use Gemma.
-Simple code patches may use local Gemma delegation; all other low-band work stays
+tasks skip the full approval presentation, but they do **not** all use Nemotron.
+Simple code patches may use bounded local Nemotron delegation; all other low-band work stays
 with the primary agent. For all other bands, what the band controls is the
 evidence and gates the agent must satisfy before and after that approval.
 
@@ -188,9 +188,9 @@ band — never derive one output from another (e.g. do not infer capability from
 
 | RRI band | Label | Effort | Capability (Codex) | Capability (Claude Code) | Thinking | Phase-1 reviewer | Phase-2 reviewer | Gate |
 |---|---|---|---|---|---|---|---|---|
-| **0–25** | Low | **S** | Primary agent or Local Gemma via Ollama | Primary agent or Local Gemma via Ollama | Off | Muse Glimmer†† | Muse Glimmer Reviewer†† | **Low-band handling:** do not present the full task for approval; use local Gemma only for eligible simple code patches, otherwise execute directly with the primary agent. |
+| **0–25** | Low | **S** | Primary agent or Local Nemotron via Ollama | Primary agent or Local Nemotron via Ollama | Off | Muse Glimmer†† | Muse Glimmer Reviewer†† | **Low-band handling:** do not present the full task for approval; use local Nemotron only for eligible simple code patches, otherwise execute directly with the primary agent. |
 | **26–40** | Moderate | **M** | Balanced | Balanced | Off | Gemma†† | Gemma Reviewer†† | Confirm tests exist in the affected area. **Implementation route:** local-first via `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL`; primary agent remains orchestrator, cloud implementation is escalation/fallback using the concrete takeover model in the task card. |
-| **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Gemma†† | Gemma Reviewer†† | Plan + explicit acceptance criteria required before approval. **Implementation route (ADR-038):** Muse Glimmer advisory refinement (GO_LOCAL/CLOUD_REQUIRED) → primary hash-bound route receipt (may downgrade, never upgrade) → if GO_LOCAL, exactly one bounded `nemotron-3.5-lightning:30b-a3b-q4_K_M` session (≤8 turns, ≤300s, 0 repairs) → otherwise the concrete cloud-takeover model recorded in the task card with the full evidence bundle. No repair attempt at this band. Review/approval rigor unchanged — 3 Reflection passes and this HITL gate still apply; phase-2 (and phase-1 when it applies) reviewer is Gemma, not the cross-vendor peer. |
+| **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Gemma†† | Gemma Reviewer†† | Plan + explicit acceptance criteria required before approval. **Implementation route (ADR-038):** Muse Glimmer advisory refinement → primary hash-bound route receipt → cloud takeover with the full evidence bundle. A `GO_LOCAL` advisory result is recorded but never launches a local developer. Review/approval rigor unchanged — 3 Reflection passes and this HITL gate still apply; phase-2 (and phase-1 when it applies) reviewer is Gemma, not the cross-vendor peer. |
 | **56–70** | Complex | **L** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Plan first. **Decompose into subtasks before implementation.** Human reviews the plan. |
 | **71–85** | High | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Characterization tests + explicit acceptance criteria + human reviews the **diff** (not just the plan). **Decomposition remains mandatory.** |
 | **86–100** | Very high | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Do not implement directly. Produce an ADR + risk analysis + decompose into subtasks. |
@@ -260,24 +260,24 @@ SHA-256; it does not invoke a model itself.
   is `gpt-5.6-terra` at `medium`.
 
 The Low band is special: vendor model resolution does not apply to its normal
-primary-agent/local path. Resolve a cloud model only when an eligible Gemma patch
+primary-agent/local path. Resolve a cloud model only when an eligible Nemotron patch
 attempt exhausts the bounded escalation path; use the Low row above and preserve
 the governing gate. Low-band tasks are otherwise handled directly by the primary
 agent or, for eligible simple code patches only, delegated to the local
-Ollama/Gemma path. When delegation is used, use `OLLAMA_HOST` when set, otherwise
+Ollama/Nemotron path. When delegation is used, use `OLLAMA_HOST` when set, otherwise
 `http://localhost:11434`. Use
-`DUBBRIDGE_LOW_RRI_MODEL` when set, otherwise `gemma4:26b-a4b-it-qat` (the
-former `gemma4:12b-mlx` fast lane was retired by ADR-036 Amendment 1 —
-resource contention with the reviewer model — and there is no separate
-fallback tier left to fall back to).
+`DUBBRIDGE_LOW_RRI_MODEL` when set, otherwise
+`nemotron-3.5-lightning:30b-a3b-q4_K_M`. There is no implicit alternate local
+developer fallback: a missing or stalled Nemotron attempt follows the bounded
+Low-band repair/escalation path.
 
-The Moderate and Med-high bands are special for **implementation routing**.
+The Moderate band is special for **implementation routing**.
 Task cards still present vendor-model recommendations for Codex and Claude
 Code because the primary agent remains the orchestrator and cloud escalation
 path. The card must name both the local implementer and the cloud-takeover
 trigger/model; `Codex` or `Claude` alone is not a resolved implementation value.
 The default implementation route for development tasks scoring
-**RRI 26–55** is the local agentic runner. Resolve the implementer from
+**RRI 26–40** is the local agentic runner. Resolve the implementer from
 `DUBBRIDGE_LOCAL_AGENT_MODEL`, defaulting to `nemotron-3.5-lightning:30b-a3b-q4_K_M`, and the Ollama
 endpoint from `OLLAMA_HOST`, defaulting to `http://localhost:11434`. The runner
 uses a simple tool contract (`read_file`/`write_file`/`apply_patch`/
@@ -285,16 +285,11 @@ uses a simple tool contract (`read_file`/`write_file`/`apply_patch`/
 reads the file it changes directly (see
 `docs/plan/local-agent-simple-editing.md`).
 
-Med-high (41–55) does **not** extend Moderate's direct local-first routing.
-ADR-038 (2026-07-26), amended 2026-08-11 for the Muse Glimmer rebind,
-replaces it with the Muse-Glimmer-refined, hash-bound,
-zero-repair single-attempt gate described in § Med-high Architect-refined
-single-attempt handling below, without relaxing any other control: the
-band-resolved independent reviewer remains mandatory, 3 Reflection passes
-still apply, and the RRI 41+ human approval gate still fires before
-implementation starts. A success audit in this band is complete only when
-scope, acceptance, and organization gates all pass and the audit carries the
-`local-implementer` signature.
+Med-high (41–55) remains cloud-only. ADR-038's Muse-Glimmer refinement and
+hash-bound receipt remain evidence gates, but their result never starts a local
+developer. The band-resolved independent reviewer remains mandatory, 3
+Reflection passes still apply, and the RRI 41+ human approval gate still fires
+before implementation starts.
 
 Thinking mode: activate for Balanced→Premium and above when the task requires
 multi-step reasoning that cannot be validated incrementally. Do **not** activate
@@ -303,7 +298,7 @@ for config edits, doc updates, or tasks where the strategy is fully pre-defined.
 ### Low RRI handling
 
 For final **RRI 0–25**, the active agent remains the orchestrator and reviewer.
-The default path is direct execution by the primary agent. Local Gemma delegation
+The default path is direct execution by the primary agent. Local Nemotron delegation
 is allowed only for **simple code patches**: narrow, mechanical code or test edits
 with a small allowed path set and low editorial risk. Do not use Gemma for docs,
 plans, task ledgers, ADRs, policy/workflow edits, or structure-heavy multi-file
@@ -361,7 +356,7 @@ The wrapper resolves:
 | Env var | Default | Purpose |
 |---|---|---|
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint |
-| `DUBBRIDGE_LOW_RRI_MODEL` | `gemma4:26b-a4b-it-qat` | Local model (fast-lane retired, ADR-036 Amendment 1) |
+| `DUBBRIDGE_LOW_RRI_MODEL` | `nemotron-3.5-lightning:30b-a3b-q4_K_M` | Default Low/S local developer; no implicit local substitute |
 | `DUBBRIDGE_LOW_RRI_IDLE_TIMEOUT_SECONDS` | `60` | Seconds without a token = stall |
 | `DUBBRIDGE_LOW_RRI_MAX_WALL_SECONDS` | `900` | Hard generation cap |
 | `DUBBRIDGE_LOW_RRI_NUM_CTX` | `16384` | Context window for packet + tagged contract |
@@ -433,7 +428,7 @@ Bindings used by the operative local-first route:
 | Env var | Default | Purpose |
 |---|---|---|
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint |
-| `DUBBRIDGE_LOCAL_AGENT_MODEL` | `nemotron-3.5-lightning:30b-a3b-q4_K_M` | Default local implementer for RRI 26–55 (Moderate + Med-high) |
+| `DUBBRIDGE_LOCAL_AGENT_MODEL` | `nemotron-3.5-lightning:30b-a3b-q4_K_M` | Default local implementer for RRI 26–40 (Moderate/M) |
 
 **Rollback triggers:** revert Moderate-band implementation to the cloud path if
 the rolling 20-task window shows escalation rate `> 40%`, any accepted
@@ -452,10 +447,8 @@ approved Med-high card
   -> Muse Glimmer (muse-glimmer:30b-q4_K_M) advisory refinement: GO_LOCAL | CLOUD_REQUIRED
   -> primary agent hash-bound route receipt (may downgrade GO_LOCAL to cloud;
      may NEVER upgrade CLOUD_REQUIRED to local)
-  -> if GO_LOCAL: exactly ONE bounded session on nemotron-3.5-lightning:30b-a3b-q4_K_M
-       (<=8 turns, <=300 seconds wall clock, 0 repair attempts, exact model
-       binding — no silent substitution)
-  -> otherwise (CLOUD_REQUIRED, timeout, or any failure): Codex or Claude with
+  -> GO_LOCAL is recorded as policy-excluded; no local developer starts
+  -> Codex or Claude with
      the full ADR-038 §5 evidence bundle (task capsule, refinement artifact,
      primary receipt, effective limits, transcript/checkpoint, partial diff,
      commands/tests run, stop reason, hashes, model identity, elapsed time)
@@ -468,20 +461,12 @@ Implementation surfaces:
 - `scripts/local-agent/med_high_gate.py` validates the refinement artifact,
   the primary receipt, card/capsule hash binding, exact model tag/digest, and
   the Med-high RRI band, then applies the fail-closed route rules.
-- `scripts/local-agent/run_local_task.py`'s `resolve_effective_limits()`
-  forces 8 turns / 0 repairs / exact `nemotron-3.5-lightning:30b-a3b-q4_K_M` binding for any card
-  whose band or RRI falls in 41–55 (Moderate's 30-turn/2-repair defaults are
-  unchanged for cards outside this band).
-- `scripts/local-agent/run_med_high_task.py` supervises that one session as
-  its own OS process group, kills the full group on the 300-second cutoff,
-  and emits the complete evidence bundle (via `escalation_packet.py`) on
-  every non-success route.
+- `scripts/local-agent/run_med_high_task.py` emits the complete evidence bundle
+  (via `escalation_packet.py`) for every Med-high decision, including an
+  otherwise-valid `GO_LOCAL` decision.
 
-There is no repair attempt at this band — zero, not one. A failed acceptance
-run, a timeout, a scope/boundary/organization violation, or a model
-substitution all terminate the session and route to cloud, never retry
-locally. This is tighter than Moderate's 2-repair budget and tighter than
-this band's own previous 1-repair-attempt behavior (retired by ADR-038).
+There is no local attempt or repair at this band. The refinement/receipt path
+is retained as evidence only, and every outcome routes to cloud.
 
 The approval path is **not** relaxed: 3 Reflection passes still apply, and
 the RRI 41+ human approval gate (plan + explicit acceptance criteria before
@@ -504,9 +489,8 @@ unavailable, stalled, or returns invalid/`BLOCKED` output, fall back to
 **D14**; if D14 is also unavailable, write a blocked-artifact record and
 stop — never self-review.
 
-Bindings: `OLLAMA_HOST` and `DUBBRIDGE_LOCAL_AGENT_MODEL` are the same
-variables Moderate uses (see table above); ADR-038 introduces no new
-environment variable, only the additional hash-bound artifacts above.
+ADR-038 introduces no local-developer environment variable for Med-high; its
+inputs are the refinement/receipt artifacts and its output is a cloud handoff.
 
 **Rollback triggers:** CLOUD_REQUIRED, timeout, or any gate rejection is not
 a rollback trigger — it is the designed fallback path and fires per task.

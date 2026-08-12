@@ -18,8 +18,9 @@ Behavioral coverage contract: unit-v1
 > exposed a schema gap against D1/D5, so `T1c` is now decomposed into `T1c-i`
 > (generation-claim/current-pointer schema, now complete) and `T1c-ii`
 > (repositories, now complete). The former T2 fan-out parent is decomposed into
-> T2b-i/T2b-ii/T2c; T2b-i is the next executable child after fresh RRI and
-> approval. The
+> T2b-i/T2b-ii/T2c. T2b-i is complete; T2b-ii was decomposed on 2026-08-12
+> into T2b-ii-a/T2b-ii-b/T2b-ii-c after an exact `RRI 57` result. T2b-ii-a is
+> the next executable child after its own fresh RRI and approval. The
 > plan-review conditions recorded for this slice remain in force, especially the
 > durable S-140/S-150 route marker, deterministic initial generation-request
 > derivation, and deferred ADR-028 ownership seam for TTS. Tasks T5, T6, and
@@ -1219,10 +1220,10 @@ PostgreSQL").
 
 ## S-150-T2b-ii: Durable translation delivery repository and exact target binding
 
-**Type:** development
-**Effort:** L (provisional RRI 48 — Med-high; recompute before presentation)
+**Type:** development parent
+**Effort:** L (RRI 57 — Complex; not an executable handoff)
 **Depends on:** S-150-T2b-i
-**Status:** [ ] Planned
+**Status:** [ ] Decomposed 2026-08-12 into S-150-T2b-ii-a, S-150-T2b-ii-b, and S-150-T2b-ii-c
 
 **Happy paths considered:**
 
@@ -1242,35 +1243,274 @@ PostgreSQL").
 - **EC-3:** A reused request ID with a different source remains a conflict and is
   never treated as a retry.
 
-**Acceptance criteria:** Add a focused DB API that, in one PostgreSQL transaction,
-validates the exact `(project_id, asset_id)` membership and obtains all configured
-target rows, validates the source `Subtitle`, creates/reuses the existing
-translation generation claims, and creates/reuses the matching dispatch rows. Its
-return type must distinguish a new/retryable dispatch from one already active or
-acknowledged, so T2c never guesses from queue state. Add a guarded failure update
-that can affect only the current matching localization unit and generation. The
-target lookup must join `project_assets`; `list_target_languages(project_id)` alone
-is insufficient for this path. Do not add job structs, Redis code, provider calls,
-or a review row.
+**Decomposition record:** The exact presentation-time score is `RRI 57`
+(`Complex`), including the `auth_security` penalty for the persisted ownership
+boundary. Mandatory decomposition was approved by Matias on 2026-08-12.
+`docs/audit/s-150-t2b-ii-rri.md` retains the full calculation and D14's passed
+task-analysis review. Each child must receive a fresh RRI, its own approval card,
+and its own verification before code changes begin.
 
-**Files expected to change:** `crates/db/src/translation_repo.rs` (or a focused
-extracted delivery module if required), `crates/db/src/target_language_repo.rs`,
-`crates/db/src/lib.rs` if a new module is introduced, and
-`apps/api/tests/localization_repo_test.rs`. `translation_repo.rs` currently exceeds
-the local 500-line read limit, so this task must use the ADR-038 cloud branch after
-approval unless a separate approved extraction reduces the actual read surface.
+**Decomposition constraints:** The reusable scope helper may decode/query delivery
+scope, but it must not make an authoritative pre-write decision. The persistence
+child must invoke that helper inside its single PostgreSQL transaction before any
+claim or dispatch write; this prevents a validation/write TOCTOU gap. The failure
+child must use full dispatch identity plus a permitted source-state predicate, so a
+stale or acknowledged dispatch cannot be changed into `enqueue_failed`.
 
-**Evidence to emit:** Exact RRI, route receipt, phase reviews, Reflection log,
-unit coverage certification, owner verification, and live-PostgreSQL transactional
-test evidence.
+**Status artifacts affected:** This ledger, the S-150 plan, and the roadmap.
+
+**Stop condition:** This parent is not executable. Do not start T2c until all three
+children are complete and their composed PostgreSQL acceptance matrix has passed.
+
+---
+
+## S-150-T2b-ii-a: Candidate delivery-scope query and decoding helpers
+
+**Type:** development
+**Effort:** M (RRI 39 — Moderate; replanned 2026-08-12)
+- **RRI:** 39 / Moderate (26–40)
+**Depends on:** S-150-T2b-i
+**Status:** [x] Done — 2026-08-12
+
+**Task-analysis review:** `gemma .agent/peer-task-review-S-150-T2b-ii-a-v2.json - PASS`
+The prior RRI 49 review is superseded and cannot authorize this changed scope.
+
+Code-solution review: gemma docs/audit/gemma-evidence/S-150-T2b-ii-a.json - PASS
+
+**Happy paths considered:**
+
+- **HP-1:** The persistence caller can obtain persisted candidate project/target
+  rows and an exact source `Subtitle` identity through a reusable delivery-scope
+  helper, without asserting any caller-selected project.
+
+**Edge cases considered:**
+
+- **EC-1:** Missing target configuration or a non-`Subtitle`/mismatched source
+  yields no candidate scope. Exact requested-project and target membership
+  enforcement belongs to T2b-ii-b inside its writer transaction.
+
+**Acceptance criteria:** Extract only read/query and decoding helpers needed to
+load persisted candidate delivery scope from an asset and source-artifact ID. The
+helper must accept the writer's transaction but must not open or commit it; it may
+not accept a caller-selected project, create claims/dispatches, or expose a
+standalone authorization decision. T2b-ii-b must select and enforce the requested
+project/target from these candidates inside that same transaction before any write.
+
+**Files expected to change:** `crates/db/src/target_language_repo.rs` and new
+focused integration test `apps/api/tests/delivery_scope_repo_test.rs`. This keeps
+the helper independent of the 542-line `translation_repo.rs` and avoids extending
+the 1,194-line legacy localization test. The exact RRI and routing evidence is
+`docs/audit/s-150-t2b-ii-a-rri.md`.
+
+**Evidence to emit:** Exact child RRI, phase reviews, unit tests for the helper
+contract, and an implementation handoff note for T2b-ii-b.
 
 **Status artifacts affected:** This ledger and the S-150 plan.
 
-**Agent handoff prompt:** Implement only the durable dispatch repository API and
-the asset/project/target binding; prove retry and sibling isolation; stop before
-job or Redis code.
+**Agent handoff prompt:** Extract only transaction-bound candidate delivery-scope
+read helpers; do not accept a requested project or make an authorization decision,
+and do not persist claims/dispatches.
 
-**Stop condition:** Stop after repository tests. Do not start T2c.
+**Stop condition:** Stop after the helper contract and tests. Do not start
+T2b-ii-b.
+
+### Implementation and route evidence
+
+- Implementer route: `qwen3.6:27b-q4_K_M` authored the production helper in the
+  disposable worktree. Nemotron was not invoked.
+- Local audit: `.agent/s-150-t2b-ii-a-qwen-helper-result.json` recorded the
+  expected in-scope production diff but could not sign success because the
+  organization gate measured 52 meaningful lines against its 35-line
+  file-growth budget. Matias explicitly accepted this bounded 52/35 exception;
+  scope, acceptance, tests, and review were not waived.
+- Test repair: the final Qwen run exhausted its six-turn budget and emitted
+  `.agent/s-150-t2b-ii-a-qwen-final-test-result.json`. Matias then explicitly
+  directed the current Codex orchestrator to correct the focused test and finish
+  this child without another local-model attempt. The resulting two-test suite
+  passed against live PostgreSQL.
+- Antares refinement/post-implementation: typed skip — this task carried no
+  task-relevant CWE hypothesis from `scripts/antares/cwe_watchlist.py`; no generic
+  security sweep was run.
+- Handoff to T2b-ii-b: invoke
+  `target_language_repo::list_delivery_scope_candidates_tx` inside the writer's
+  existing transaction, select the requested project/target from its returned
+  persisted candidates, and enforce that selection before the first claim or
+  dispatch write. Do not replace it with the first-target route helper.
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma`
+- Model: `gemma4:26b-a4b-it-qat`
+- Command: manual Ollama `/api/chat` phase-2 review with `think=false`,
+  `stream=false`, `num_ctx=131072`, and `num_predict=4096`
+- Artifact: `.agent/peer-code-review-S-150-T2b-ii-a.json`
+- Verdict: `PASS`
+- Findings: none
+- Retry: first response was semantic PASS but invalid under the raw-JSON schema;
+  the mandatory immediate retry returned
+  `{"verdict":"PASS","findings":[]}` with `done_reason: stop`
+- Muse Glimmer fallback: not triggered — Gemma's retry was usable
+- D14 fallback: not triggered — the local reviewer chain remained usable
+- D14 provider route: `n/a`
+- disposition_divergence: `none`
+- Primary-agent disposition: no findings to repair or reject
+- Review artifact: docs/audit/gemma-evidence/S-150-T2b-ii-a.json
+
+### Reflection log
+
+Required passes: 2 (`39` → `Moderate`)
+
+#### Pass 1
+
+- **Draft verdict:** The transaction-bound helper matched the approved read-only
+  contract, but Qwen's generated test fixture was incomplete and did not compile
+  or represent the migrated schema correctly.
+- **Critique findings:** The fixture omitted its organization row, referenced the
+  singular `artifact` table, moved owned `String` fields during SQL binding, and
+  did not yet contain HP-1/EC-1 assertions.
+- **Revisions applied:** After the final bounded Qwen run exhausted its turn
+  budget, the explicitly authorized Codex repair replaced raw artifact SQL with
+  existing `artifact_repo`/`subtitle_repo` seams, restored valid tenancy rows,
+  and added the two focused PostgreSQL tests.
+
+#### Pass 2
+
+- **Draft verdict:** The revised helper and tests compile and both behavioral
+  cases pass against live PostgreSQL; the implemented helper's executable lines
+  are 100% covered in the focused `cargo llvm-cov` run.
+- **Critique findings:** Rechecked the boundary for caller-selected project input,
+  hidden transaction ownership, writes/authorization decisions, nondeterministic
+  ordering, and non-Subtitle/mismatched/missing-target behavior. No code defect
+  remained. The unsigned local audit and 52/35 organization exception are
+  process evidence, not hidden as a signed success.
+- **Revisions applied:** none — Gemma's independent phase-2 retry returned PASS
+  with no findings.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | Decode every persisted candidate project/target for the exact Subtitle identity, without a caller-selected project, in deterministic order | `apps/api/tests/delivery_scope_repo_test.rs::delivery_scope_candidates_decode_all_targets_in_deterministic_order` | passed |
+| EC-1 | Edge case | Missing target configuration, non-Subtitle source, or mismatched asset/source yields no candidate | `apps/api/tests/delivery_scope_repo_test.rs::delivery_scope_candidates_fail_closed_for_missing_or_mismatched_scope` | passed |
+
+### Owner final verification
+
+- Owner: Codex (primary agent and orchestrator of record)
+- Date: 2026-08-12
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior. I also verified that the helper borrows the caller's transaction, performs no writes, accepts no requested project, and does not expose an authorization decision.
+- Commands run: `cargo fmt --all -- --check`; `cargo check -p dubbridge-db`; `cargo check -p dubbridge-api --test delivery_scope_repo_test`; `DUBBRIDGE_DATABASE_URL='postgres://dubbridge:dubbridge@127.0.0.1:5432/dubbridge' cargo test -p dubbridge-api --test delivery_scope_repo_test -- --nocapture`; `DUBBRIDGE_DATABASE_URL='postgres://dubbridge:dubbridge@127.0.0.1:5432/dubbridge' cargo llvm-cov --workspace --test delivery_scope_repo_test --summary-only`; `git diff --check`
+  Detailed command record:
+  - `cargo fmt --all -- --check`
+  - `cargo check -p dubbridge-db`
+  - `cargo check -p dubbridge-api --test delivery_scope_repo_test`
+  - `DUBBRIDGE_DATABASE_URL='postgres://dubbridge:dubbridge@127.0.0.1:5432/dubbridge' cargo test -p dubbridge-api --test delivery_scope_repo_test -- --nocapture`
+  - `DUBBRIDGE_DATABASE_URL='postgres://dubbridge:dubbridge@127.0.0.1:5432/dubbridge' cargo llvm-cov --workspace --test delivery_scope_repo_test --summary-only`
+  - `git diff --check`
+- Result: all commands passed; PostgreSQL behavioral tests passed `2/2`; LCOV
+  execution counts show every executable line in
+  `list_delivery_scope_candidates_tx` (lines 155–198) was exercised (`44/44`,
+  100% implemented-scope line coverage). The broader pre-existing repository file
+  is not claimed as 100% covered by this focused task.
+
+---
+
+## S-150-T2b-ii-b: Atomic delivery claim and dispatch persistence
+
+**Type:** development
+**Effort:** pending exact child RRI
+**Depends on:** S-150-T2b-ii-a
+**Status:** [ ] Planned
+
+**Happy paths considered:**
+
+- **HP-1:** One exact persisted `Subtitle` source creates or reuses one durable
+  translation claim and pending dispatch per configured target-language row.
+- **HP-2:** Re-delivery of the same source/request returns the existing dispatch;
+  retryable rows remain distinguishable from active or acknowledged rows.
+
+**Edge cases considered:**
+
+- **EC-3:** A reused request ID with a different source is a conflict and is never
+  treated as a retry.
+- **EC-1 (writer enforcement):** The transaction fails before its first
+  claim/dispatch write when the helper exposes invalid project/asset/target/source
+  scope.
+
+**Acceptance criteria:** Add the focused DB persistence API in one PostgreSQL
+transaction. It must invoke T2b-ii-a's delivery-scope helper inside that transaction
+before any claim or outbox write, then create/reuse the generation claims and
+dispatch rows. Its return type must explicitly classify `new`/`retryable` versus
+`active`/`acknowledged`; T2c must never infer this from queue state. Roll back the
+whole transaction for scope or identity conflict. Do not add job structs, Redis,
+provider calls, review rows, or enqueue-failure mutation.
+
+**Files expected to change:** `crates/db/src/translation_repo.rs` (or a focused
+delivery module), `crates/db/src/lib.rs` only if a module is introduced, and
+`apps/api/tests/localization_repo_test.rs`. Recheck actual full-read paths and the
+500-line gate when the child is presented.
+
+**Evidence to emit:** Exact child RRI, route receipt if required, phase reviews,
+live-PostgreSQL atomicity and redelivery evidence, Reflection log as required by
+the resulting band, unit coverage certification, and owner verification.
+
+**Status artifacts affected:** This ledger and the S-150 plan.
+
+**Agent handoff prompt:** Persist/reuse delivery claims and dispatches atomically;
+invoke the scope helper inside the writer transaction before any write; stop before
+failure transitions or queue code.
+
+**Stop condition:** Stop after atomic persistence tests. Do not start T2b-ii-c or
+T2c.
+
+---
+
+## S-150-T2b-ii-c: Guarded dispatch enqueue-failure transition
+
+**Type:** development
+**Effort:** pending exact child RRI
+**Depends on:** S-150-T2b-ii-b
+**Status:** [ ] Planned
+
+**Happy paths considered:**
+
+- **HP-3:** A retryable dispatch can be marked `enqueue_failed` through its exact
+  project, asset, target, generation, and dispatch identity without altering a
+  sibling localization unit.
+
+**Edge cases considered:**
+
+- **EC-2:** Marking one dispatch enqueue-failed changes only its localization unit;
+  sibling targets and their claims remain intact.
+- **EC-4:** An active or acknowledged dispatch, a stale generation, or a mismatched
+  identity is rejected (or affects zero rows) and cannot be converted to
+  `enqueue_failed`.
+
+**Acceptance criteria:** Add a bounded, idempotent failure transition using the
+full dispatch identity and a permitted source-state predicate. It must reject
+active/acknowledged and mismatched rows, expose an unambiguous affected-row/result
+contract, and preserve all sibling targets and claims. After this child, run the
+composed live-PostgreSQL matrix across T2b-ii-a/b/c: atomic scope validation plus
+persistence, concurrent/redelivery reuse, source-conflict rejection, and
+sibling-preserving guarded failure. Do not add Redis, job structs, provider calls,
+or a review row.
+
+**Files expected to change:** `crates/db/src/translation_repo.rs` (or its focused
+delivery module) and `apps/api/tests/localization_repo_test.rs`. Recheck actual
+full-read paths and the 500-line gate when the child is presented.
+
+**Evidence to emit:** Exact child RRI, phase reviews, composed live-PostgreSQL
+acceptance evidence, Reflection log as required by the resulting band, unit
+coverage certification, and owner verification.
+
+**Status artifacts affected:** This ledger, the S-150 plan, and the roadmap if the
+parent's execution status changes.
+
+**Agent handoff prompt:** Implement only the full-identity, state-guarded
+enqueue-failure transition and its composed PostgreSQL proof; do not start queue or
+job work.
+
+**Stop condition:** Stop after the composed repository acceptance matrix. Do not
+start T2c.
 
 ---
 
@@ -1278,7 +1518,7 @@ job or Redis code.
 
 **Type:** development
 **Effort:** L (provisional RRI 54 — Med-high; recompute before presentation)
-**Depends on:** S-150-T2b-ii
+**Depends on:** S-150-T2b-ii-c
 **Status:** [ ] Planned
 
 **Happy paths considered:**

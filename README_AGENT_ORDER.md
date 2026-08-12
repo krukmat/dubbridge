@@ -24,10 +24,13 @@ the `dubbridge` repository.
 
 ## Operating order for a task
 
-0. Run the local-stack precheck for development tasks (see
-   `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Mandatory workflow before
-   implementing`, Step 0). Skip for docs-only, config-only, migration-only,
-   ADR, plan, task-ledger, or policy-only tasks.
+0. For every task that will invoke an Ollama-backed local role, add the
+   per-task `Restart Ollama + local-stack precheck` checklist item and complete
+   it before the first local-model request, even when the server looks healthy
+   (see `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Mandatory workflow before
+   implementing`, Step 0). Skip only when the task will make no local-model
+   call; docs-only, config-only, migration-only, ADR, plan, task-ledger, and
+   policy-only tasks normally qualify for that exemption.
 1. Analyze context, dependencies, and affected files.
 2. Ensure a `docs/plan/<name>.md` and `docs/tasks/<name>.md` exist (create if not).
 3. Compute RRI with `scripts/rri.py`; present the next task using the `AGENTS.md`

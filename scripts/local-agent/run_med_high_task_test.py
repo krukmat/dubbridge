@@ -929,7 +929,7 @@ class SuperviseIntegrationTest(unittest.TestCase):
         _write_json(p_path, receipt)
         return r_path, p_path
 
-    def test_hp1_go_local_success_records_evidence_without_escalation(self):
+    def test_hp1_go_local_is_policy_excluded_and_never_launches_runner(self):
         card_path = _card(self.tmp.name)
         out_path = os.path.join(self.tmp.name, "out.json")
         bundle_path = os.path.join(self.tmp.name, "bundle.md")
@@ -938,13 +938,7 @@ class SuperviseIntegrationTest(unittest.TestCase):
 
         def fake_popen(argv, start_new_session=None):
             launched_argv.append(argv)
-
-            def _write_success():
-                _write_json(out_path, {
-                    "status": "success", "task_id": "T-MEDHIGH-1", "transcript": [],
-                    "model": "qwen3.6:35b-a3b",
-                })
-            return _FakeProcess(returncode=0, write_out=_write_success)
+            self.fail("Med-high GO_LOCAL must not launch a local runner")
 
         result = _MOD.supervise(
             card_path=card_path, worktree=self.tmp.name, out_path=out_path,
@@ -953,25 +947,15 @@ class SuperviseIntegrationTest(unittest.TestCase):
             popen_fn=fake_popen,
         )
 
-        self.assertEqual(result.status, "success")
-        self.assertEqual(result.route, med_high_gate.ROUTE_GO_LOCAL)
-        self.assertIsNone(result.bundle_path)
-        self.assertFalse(os.path.isfile(bundle_path))
-        self.assertIsNone(result.fallback_selection)
+        self.assertEqual(result.status, "cloud_required")
+        self.assertEqual(result.route, med_high_gate.ROUTE_CLOUD_REQUIRED)
+        self.assertTrue(os.path.isfile(bundle_path))
+        self.assertIn("Med-high local execution is disabled", result.reason)
+        self.assertEqual(result.fallback_selection["status"], "awaiting_fallback_selection")
         self.assertIsNone(result.cloud_instruction)
-        # ADR-036 Amendment 3 (superseding Amendment 2/T4a): the GO_LOCAL
-        # route must supervise the session on MED_HIGH_RUNNER_MODEL
-        # (nemotron-3.5-lightning:30b-a3b-q4_K_M), never the retired
-        # qwen3.6:27b-q4_K_M or qwen3.6:35b-a3b bindings.
-        self.assertEqual(len(launched_argv), 1)
-        self.assertIn("--model", launched_argv[0])
-        model_idx = launched_argv[0].index("--model") + 1
-        self.assertEqual(launched_argv[0][model_idx], _MOD.MED_HIGH_RUNNER_MODEL)
-        self.assertEqual(
-            launched_argv[0][model_idx], "nemotron-3.5-lightning:30b-a3b-q4_K_M"
-        )
+        self.assertEqual(launched_argv, [])
 
-    def test_hp1_operational_start_failure_authorizes_terra_against_bundle(self):
+    def test_hp1_go_local_authorizes_sol_against_policy_bundle(self):
         card_path = _card(self.tmp.name)
         out_path = os.path.join(self.tmp.name, "out.json")
         bundle_path = os.path.join(self.tmp.name, "bundle.md")
@@ -982,18 +966,18 @@ class SuperviseIntegrationTest(unittest.TestCase):
             card_path=card_path, worktree=self.tmp.name, out_path=out_path,
             bundle_out_path=bundle_path, refinement_artifact_path=r_path,
             primary_receipt_path=p_path, card_hash=CARD_HASH, rri=50,
-            popen_fn=lambda *a, **kw: (_ for _ in ()).throw(OSError("offline")),
-            fallback_mode="preauthorized", fallback_model="gpt-5.6-terra",
+            popen_fn=lambda *a, **kw: self.fail("must not launch"),
+            fallback_mode="preauthorized", fallback_model="gpt-5.6-sol",
             fallback_reasoning_effort="high", fallback_selected_by="owner",
             fallback_selection_artifact=selection_path,
         )
 
-        self.assertEqual(result.status, "transport_error")
+        self.assertEqual(result.status, "cloud_required")
         self.assertEqual(result.fallback_selection["status"], "fallback_authorized")
-        self.assertEqual(result.fallback_selection["recommended_model"], "gpt-5.6-terra")
+        self.assertEqual(result.fallback_selection["recommended_model"], "gpt-5.6-sol")
         self.assertEqual(result.fallback_selection["recommended_reasoning_effort"], "high")
         self.assertEqual(result.cloud_instruction, {
-            "model": "gpt-5.6-terra", "reasoning_effort": "high",
+            "model": "gpt-5.6-sol", "reasoning_effort": "high",
         })
         with open(selection_path, encoding="utf-8") as stream:
             checkpoint = json.load(stream)
@@ -1092,7 +1076,7 @@ class SuperviseIntegrationTest(unittest.TestCase):
         self.assertNotIn("authorization_receipt", result.fallback_selection)
         self.assertIsNone(result.cloud_instruction)
 
-    def test_ec1_timeout_emits_bundle_with_wall_clock_exceeded_reason(self):
+    def test_ec1_go_local_does_not_enter_timeout_path(self):
         import subprocess as _subprocess
 
         card_path = _card(self.tmp.name)
@@ -1120,13 +1104,13 @@ class SuperviseIntegrationTest(unittest.TestCase):
             os.getpgid = orig_getpgid
             os.killpg = orig_killpg
 
-        self.assertEqual(result.status, "wall_clock_exceeded")
+        self.assertEqual(result.status, "cloud_required")
         self.assertIsNotNone(result.bundle_path)
         with open(bundle_path, encoding="utf-8") as f:
             content = f.read()
-        self.assertIn("wall_clock_exceeded", content)
+        self.assertIn("policy_excluded_local_execution", content)
 
-    def test_ec2_failing_tests_route_emits_full_bundle(self):
+    def test_ec2_go_local_does_not_enter_runner_failure_path(self):
         card_path = _card(self.tmp.name)
         out_path = os.path.join(self.tmp.name, "out.json")
         bundle_path = os.path.join(self.tmp.name, "bundle.md")
@@ -1148,16 +1132,13 @@ class SuperviseIntegrationTest(unittest.TestCase):
             popen_fn=fake_popen,
         )
 
-        self.assertEqual(result.status, "budget_exhausted")
+        self.assertEqual(result.status, "cloud_required")
         self.assertTrue(os.path.isfile(bundle_path))
         with open(bundle_path, encoding="utf-8") as f:
             content = f.read()
-        self.assertIn("## 11. Effective limits", content)
-        self.assertIn("Med-high", content)
+        self.assertIn("policy_excluded_local_execution", content)
 
-    def test_ec2b_wrong_shaped_runner_output_via_supervise_renders_reason(self):
-        # Phase-2 review finding: _read_runner_out previously discarded the
-        # shape-check failure reason end to end through supervise().
+    def test_ec2b_go_local_does_not_consume_runner_output(self):
         card_path = _card(self.tmp.name)
         out_path = os.path.join(self.tmp.name, "out.json")
         bundle_path = os.path.join(self.tmp.name, "bundle.md")
@@ -1175,11 +1156,11 @@ class SuperviseIntegrationTest(unittest.TestCase):
             popen_fn=fake_popen,
         )
 
-        self.assertEqual(result.status, "transcript_shape_invalid")
+        self.assertEqual(result.status, "cloud_required")
         with open(bundle_path, encoding="utf-8") as f:
             content = f.read()
         self.assertIn(
-            "- Final status: `transcript_shape_invalid` (expected a JSON object, got list).",
+            "policy_excluded_local_execution",
             content,
         )
 
@@ -1365,7 +1346,7 @@ class SuperviseIntegrationTest(unittest.TestCase):
         self.assertFalse(result.bundle_write_ok)
         self.assertIn("bundle write failed", result.reason)
 
-    def test_ec1_post_launch_write_failure_propagates_bundle_write_ok_false(self):
+    def test_ec1_policy_handoff_write_failure_propagates_bundle_write_ok_false(self):
         card_path = _card(self.tmp.name)
         out_path = os.path.join(self.tmp.name, "out.json")
         bundle_path = os.path.join(self.tmp.name, "bundle.md")
@@ -1395,7 +1376,7 @@ class SuperviseIntegrationTest(unittest.TestCase):
         finally:
             os.replace = real_replace
 
-        self.assertEqual(result.status, "budget_exhausted")
+        self.assertEqual(result.status, "cloud_required")
         self.assertFalse(result.bundle_write_ok)
         self.assertIn("bundle write failed", result.reason)
 

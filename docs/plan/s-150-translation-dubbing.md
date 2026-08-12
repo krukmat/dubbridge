@@ -15,7 +15,10 @@ slice: S-150
 > implementations that consume that schema. The former `S-150-T2` parent was
 > decomposed on 2026-08-09: `S-150-T2b-i` (dispatch-outbox migration), then
 > `S-150-T2b-ii` (durable delivery repository and exact target binding), then
-> `S-150-T2c` (versioned jobs and fan-out) are the next executable sequence. The
+> `S-150-T2c` (versioned jobs and fan-out). T2b-i is complete; on 2026-08-12
+> T2b-ii was itself decomposed after an exact `RRI 57` into a scope-helper child,
+> an atomic persistence child, and a guarded failure-transition child. T2b-ii-a is
+> now the next executable task, after a fresh child RRI and approval. The
 > plan-review conditions recorded for this slice remain in
 > force, especially the durable S-140/S-150 route discriminator, deterministic
 > initial generation-request identity, migration parity, review cutover, and
@@ -297,8 +300,11 @@ no inference from project age, row presence, or feature timing is allowed.
 | T1c-ii | Translation/dubbing repositories and readiness evidence | development | 47 / L | Done 2026-08-02; repositories, strict artifact helpers, and readiness evidence verified with cloud-review fallback PASS |
 | T2 | Translation fan-out delivery parent | development parent | 50 / L historical parent | Decomposed 2026-08-09; not executable |
 | T2b-i | Translation dispatch outbox migration | migration | 55 / L | Done 2026-08-12; ADR-038 escalated (local `boundary_violation` on `docker` denylist, 0 repairs) to `gpt-5.6-terra`/high (ADR-039 human-selected); verified with 7/7 acceptance tests on live PostgreSQL by the primary agent after the cloud implementer's sandbox could not reach the local DB |
-| T2b-ii | Durable translation delivery repository and exact target binding | development | 48 / L provisional | Cloud branch unless a preceding approved extraction brings every full-read target below 500 lines |
-| T2c | Versioned localization jobs and outbox-backed fan-out | development | 54 / L provisional | Consumes T2b-ii; replaces first-target-only seam without provider execution |
+| T2b-ii | Durable translation delivery repository and exact target binding | development parent | 57 / L | Decomposed 2026-08-12 after exact RRI and D14 task-analysis PASS; not executable |
+| T2b-ii-a | Candidate delivery-scope query and decoding helpers | development | 39 / M | Done 2026-08-12; transaction-bound read-only candidate decoder verified with 2/2 live-PostgreSQL tests and Gemma phase-2 PASS; T2b-ii-b owns exact-project enforcement |
+| T2b-ii-b | Atomic delivery claim and dispatch persistence | development | pending exact child RRI | Invokes T2b-ii-a inside one PostgreSQL transaction before any write; owns create/reuse and conflict behavior |
+| T2b-ii-c | Guarded dispatch enqueue-failure transition | development | pending exact child RRI | Full-identity/state guard; completes the composed live-PostgreSQL matrix |
+| T2c | Versioned localization jobs and outbox-backed fan-out | development | 54 / L provisional | Consumes T2b-ii-c; replaces first-target-only seam without provider execution |
 | T3a | Translation provider/subprocess contract | development | 42 / L | Med-high |
 | T3b | Functional translation worker | development | 44 / L | Med-high |
 | T3c | Translation runtime persistence and readiness | development | 53 / L | Med-high |
@@ -319,7 +325,7 @@ coverage. T1c, T5, and T6 are parent requirements, not executable handoff cards;
 their child tasks must be created before coding begins. T8 is a non-blocking future
 parent and must be decomposed only when its governance program is activated.
 
-Sequence: `T0 -> T1a -> T1b -> T1c-i -> T1c-ii -> T2b-i -> T2b-ii -> T2c -> T3a -> T3b -> T3c -> T4
+Sequence: `T0 -> T1a -> T1b -> T1c-i -> T1c-ii -> T2b-i -> T2b-ii-a -> T2b-ii-b -> T2b-ii-c -> T2c -> T3a -> T3b -> T3c -> T4
 -> decomposed T5 children -> decomposed T6 children -> T7`. T8 is deliberately
 last and is not part of the S-150 delivery critical path; it is a future
 governance follow-up coordinated with `X-S-110-2`, `X-S-110-3`, X20, and S-180.
@@ -342,7 +348,7 @@ flowchart LR
 
 | Risk | Disposition |
 |---|---|
-| S-140 currently chooses only the first target language | T2b-i/T2b-ii create the durable per-target dispatch identity; T2c replaces this seam with deterministic all-target fan-out |
+| S-140 currently chooses only the first target language | T2b-i/T2b-ii-a/b/c create the durable per-target dispatch identity and guarded lifecycle; T2c replaces this seam with deterministic all-target fan-out |
 | S-140 currently has no post-ready route marker and always enqueues legacy review | D7/T2c adds a versioned job discriminator; missing legacy payload fields remain compatible and unknown values fail closed |
 | S-140 readiness has no initiating request ID | D5/T2c derives the initial ID deterministically from the exact persisted subtitle artifact; explicit regeneration uses a distinct command ID |
 | Asset-global status cannot distinguish target languages | D1 requires per-target status tables before runtime work |

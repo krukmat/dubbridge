@@ -13,11 +13,21 @@ governs: "all agent-facing workflow decisions in the repository"
 > It overrides `CLAUDE.md` (project and global) and `AGENTS.md` without exception.
 > `CLAUDE.md` applies only for topics not covered here.
 
+> **Current routing override (owner directive, 2026-08-12):**
+> `nemotron-3.5-lightning:30b-a3b-q4_K_M` is the local developer only for
+> eligible Low/S (RRI 0–25) and Moderate/M (RRI 26–40) development tasks.
+> Med-high/L (RRI 41–55), Complex, and XL bands are cloud-only. For Med-high,
+> the ADR-038 refinement/receipt still run as routing evidence, but a
+> `GO_LOCAL` result never starts a local developer. This override supersedes
+> earlier prose in this guide that describes a Nemotron Med-high attempt.
+
 ## Mandatory workflow before implementing
 
-0. **Local-stack precheck** — before starting any new development task
-   (RRI 0–70+), verify the local Ollama stack is healthy and the models the
-   task's band will actually invoke respond correctly under production
+0. **Per-task Ollama restart and local-stack precheck** — before the first
+   Ollama-backed action of every task that will invoke a local model, restart
+   Ollama even when the current server appears healthy, then verify that the
+   local stack and the models the task will actually invoke respond correctly
+   under production
    generation parameters (`think=false` where applicable, the repo's default
    `num_predict`/`num_ctx` from `gemma_local.py`). A silent `done_reason:
    "length"` with empty `content` (thinking-mode exhausting the token budget
@@ -26,11 +36,21 @@ governs: "all agent-facing workflow decisions in the repository"
    (Muse Glimmer → Gemma → D14 for RRI 0–25, or Gemma → Muse Glimmer → D14
    for RRI 26–55) and burns a review hop that a healthy stack would not have
    needed.
-   - Confirm the server process is up and listening:
-     `pgrep -fl ollama` and `lsof -iTCP:11434 -sTCP:LISTEN`. Restart
-     (`kill <pid>`; the macOS app relaunches it) only if the process is
-     absent, wedged, or the port is not listening — do not restart a
-     healthy server on every task.
+   - Treat the repository task ID as the restart boundary: perform exactly one
+     mandatory restart before that task's first local-model call. Retries,
+     repair attempts, and later local phases within the same task reuse the
+     restarted server unless it becomes unavailable or wedged. A new task ID
+     requires a new restart.
+   - Before restarting, confirm that no local-model runner for another task is
+     still active. If one is active, wait for its bounded run to finish or stop
+     it under that task's own timeout/termination contract; never kill an
+     unrelated in-flight task merely to satisfy this bootstrap step.
+   - Record the current `ollama serve` PID, terminate that server process
+     (`kill <pid>`; the macOS app relaunches it), and wait for the old listener
+     to disappear. Then confirm both a new server PID and a listening endpoint
+     with `pgrep -fl ollama` and `lsof -iTCP:11434 -sTCP:LISTEN`. A surviving
+     old PID, absent replacement PID, or missing listener leaves the restart
+     item blocked; do not issue the task's first local-model request.
    - Warm and re-test each model this task's band will use (at minimum the
      RRI 0–25 reviewer chain: `muse-glimmer:30b-q4_K_M` →
      `gemma4:26b-a4b-it-qat`; for RRI 26–55 add the reviewer chain
@@ -44,22 +64,31 @@ governs: "all agent-facing workflow decisions in the repository"
        "messages": [{"role": "user", "content": "You are a code reviewer. Reply with ONLY a JSON object: {\"verdict\": \"PASS\", \"findings\": []}"}],
        "stream": false,
        "think": false,
-       "options": {"num_predict": 4096, "num_ctx": 131072}
+       "options": {"num_predict": 4096, "num_ctx": <role production context>}
      }' -m 180
      ```
-     Confirm `done_reason: "stop"` with non-empty `content`. A `"length"`
+     Use the role's effective production context: `16384` for the Low/S
+     Nemotron delegation wrapper, `65536` for the Moderate/M local-agent
+     runner, and the configured reviewer context for review roles. Confirm
+     `done_reason: "stop"` with non-empty `content`. A `"length"`
      result with empty content on a small ping (e.g. `num_predict: 16`) is
      usually just an undersized budget, not the real failure — retry at the
      production `num_predict` before concluding the model is unhealthy.
-   - This precheck is informational infrastructure verification, not a
-     review gate: it does not replace, skip, or pre-decide the Band-routed
+   - Track this operation as `Restart Ollama + local-stack precheck —
+     <orchestrator>` in the live per-task checklist. It is an operational
+     prerequisite, not a review or approval gate, and completes only after the
+     PID/listener checks and required model warm-ups pass.
+   - This restart/precheck is infrastructure verification, not a
+   review gate: it does not replace, skip, or pre-decide the Band-routed
      peer review outcome for this task, and a healthy precheck does not
      retroactively change a prior phase's recorded result (e.g. a historical
      D14 fallback stays as recorded even if a later precheck shows the
      primary chain healthy again).
-   - Applies to all development tasks. Skip for docs-only, config-only,
-     migration-only, ADR, plan, task-ledger, or policy-only tasks, which
-     never invoke the local pipeline.
+   - Applies to any task type that will invoke an Ollama-backed local role,
+     including implementation, phase-1/phase-2 review, Local Architect,
+     Antares, or push-review work. Skip it only when the task will make no
+     local-model call; docs-only, config-only, migration-only, ADR, plan,
+     task-ledger, and policy-only tasks normally fall into that exemption.
 1. **Analyze** — read context, dependencies, and affected files.
    - For **mobile UI / presentation tasks** under `mobile/`, also read the root
      `DESIGN.md` before planning or implementation. `DESIGN.md` governs visual
@@ -95,7 +124,7 @@ governs: "all agent-facing workflow decisions in the repository"
        indexes, or downstream blocker docs that must be synchronized before the
        task can be reported complete.
 4. **Gate by RRI** — compute RRI with `scripts/rri.py`. For RRI 0–25, skip the
-   full human approval presentation. Use local Gemma delegation through Ollama
+   full human approval presentation. Use local Nemotron delegation through Ollama
    only for eligible simple code patches; otherwise execute directly as the
    primary agent. For **RRI 26–40 Moderate**, show the plan and tasks, wait
    for explicit approval, then use the **local-first implementation path** by
@@ -109,11 +138,9 @@ governs: "all agent-facing workflow decisions in the repository"
    explicit approval, then route through the **ADR-038 Architect-refined
    single-attempt gate**: Muse Glimmer advisory refinement (`GO_LOCAL` |
    `CLOUD_REQUIRED`) → primary hash-bound route receipt (may downgrade, never
-   upgrade) → if `GO_LOCAL`, exactly one bounded `nemotron-3.5-lightning:30b-a3b-q4_K_M` session
-   (≤8 turns, ≤300 seconds, **0** repair attempts, supervised as its own
-   process group by `scripts/local-agent/run_med_high_task.py`) → otherwise the
-   concrete Codex/Claude cloud-takeover model from Step 2 with the full evidence
-   bundle. Med-high keeps the
+   upgrade) → every result, including `GO_LOCAL`, produces the concrete
+   Codex/Claude cloud-takeover packet from Step 2 with the full evidence bundle.
+   Med-high keeps the
    band-resolved independent review route, 3 Reflection passes, and the human
    approval gate unchanged — the routing change affects only who authors the
    code, not who reviews or approves it. See § Local-first and
@@ -272,6 +299,13 @@ and a status of `pending`, `in_progress`, `blocked`, or `completed`.
 
 **Phase set by band:**
 
+- **Any task invoking an Ollama-backed local role:** prepend `Restart Ollama +
+  local-stack precheck — <resolved orchestrator>` to the applicable phase set.
+  Seed this entry immediately before the task's first local-model invocation,
+  even when that invocation is the phase-1 reviewer and therefore precedes the
+  approval card. Add the remaining phase entries when their route is resolved.
+  This operational entry does not add a human gate or replace any review phase.
+
 - **RRI 26+ (Moderate through Complex+):** one entry per row of the approval
   card's `Agent workflow` table — Analyze/scope, Phase 1 review, Approval,
   Implement, Reflect and verify, Phase 2 review, Close.
@@ -287,7 +321,8 @@ and a status of `pending`, `in_progress`, `blocked`, or `completed`.
 
 - Seed the list before implementation starts — immediately after the task is
   presented and approved (RRI 26+), or immediately before direct execution
-  (RRI 0–25).
+  (RRI 0–25). For a task whose first local-model call occurs earlier, seed the
+  mandatory Ollama restart/precheck entry before that call as specified above.
 - Normally exactly one phase entry is `in_progress` at a time.
 - Flip an entry to `completed` only when that phase's own gate has actually
   passed (for example, do not mark "Phase 1 review" `completed` before the
@@ -401,19 +436,17 @@ Concrete vendor model IDs change over time. Agents must therefore separate:
 
 Do not collapse these into one undocumented guess.
 
-The **RRI 0–25 Low band** is the exception to vendor model resolution: it uses
-local Gemma delegation through Ollama. Resolve the local model from
-`DUBBRIDGE_LOW_RRI_MODEL`, defaulting to `gemma4:26b-a4b-it-qat` (the former
-`gemma4:12b-mlx` fast lane was retired — ADR-036 Amendment 1 — so there is no
-separate fallback tier), and the Ollama endpoint from `OLLAMA_HOST`,
+The **RRI 0–25 Low band** is the exception to vendor model resolution: eligible
+simple patches may use local Nemotron delegation through Ollama. Resolve the
+local model from `DUBBRIDGE_LOW_RRI_MODEL`, defaulting to
+`nemotron-3.5-lightning:30b-a3b-q4_K_M`, and the Ollama endpoint from `OLLAMA_HOST`,
 defaulting to `http://localhost:11434`.
 
 ### Local-first and Architect-refined implementation routing (RRI 26–55)
 
-The **RRI 26–55 band (Moderate + Med-high)** is a routing exception for
-implementation: task cards still present Codex/Claude recommendations for the
-orchestrator and escalation environment, but the default code-authoring
-surface moves local. The two sub-bands now use different routes.
+The **RRI 26–40 Moderate band** is a routing exception for implementation:
+task cards still present Codex/Claude recommendations for the orchestrator and
+escalation environment, but the default code-authoring surface moves local.
 
 **Moderate (26–40):** the code-authoring surface is the local agentic runner
 (`scripts/local-agent/run_local_task.py`) using `DUBBRIDGE_LOCAL_AGENT_MODEL`
@@ -422,32 +455,24 @@ evidence-backed local repair attempts before escalating to cloud. This
 routing became operative by owner override on 2026-07-15, ahead of the
 original ADR-036 pilot promotion gate.
 
-**Med-high (41–55):** ADR-038 (2026-07-26) governs this band. It replaces the
-Moderate-style direct local-first route (and this band's own earlier
-1-repair-attempt variant, adopted 2026-07-21 and now retired) with a
-fail-closed, evidence-bearing gate:
+**Med-high (41–55):** ADR-038 (2026-07-26) remains its fail-closed,
+evidence-bearing refinement/receipt gate, but implementation is cloud-only:
 
 ```mermaid
 flowchart LR
     Card["Approved Med-high card\n(RRI 41-55)"] --> Glimmer["Muse Glimmer advisory refinement\nmuse-glimmer:30b-q4_K_M"]
     Glimmer -->|GO_LOCAL or CLOUD_REQUIRED| Receipt["Primary hash-bound\nroute receipt"]
     Receipt -->|"downgrade allowed;\nupgrade never allowed"| Gate{"med_high_gate.py\nboth sides GO_LOCAL?"}
-    Gate -->|No: CLOUD_REQUIRED| Cloud["Resolved Codex / Claude takeover model\n+ full ADR-038 S5 evidence bundle"]
-    Gate -->|Yes: GO_LOCAL| Runner["ONE bounded nemotron-3.5-lightning:30b-a3b-q4_K_M session\nsupervised as its own process group\n<=8 turns / <=300s / 0 repairs"]
-    Runner -->|success| Done["Signed local-implementer audit"]
-    Runner -->|timeout, failed acceptance,\nscope/boundary/org violation| Cloud
+    Gate -->|CLOUD_REQUIRED| Cloud["Resolved Codex / Claude takeover model\n+ full ADR-038 S5 evidence bundle"]
+    Gate -->|GO_LOCAL, policy excluded| Cloud
 ```
 
 Implementation surfaces: `scripts/local-architect/run_analysis.py`
 (`med-high-refinement-v1` profile) for the Muse Glimmer artifact,
-`scripts/local-agent/med_high_gate.py` for the fail-closed route decision,
-`scripts/local-agent/run_local_task.py`'s `resolve_effective_limits()` for
-the tightened 8-turn/0-repair/exact-model budget, and
-`scripts/local-agent/run_med_high_task.py` for the process-group-supervised
-300-second cutoff and automatic evidence-bundle emission on every
-non-success route. There is no repair attempt at this band — a failed
-acceptance run, timeout, or violation routes directly to cloud, never
-retries locally.
+`scripts/local-agent/med_high_gate.py` for the fail-closed route decision, and
+`scripts/local-agent/run_med_high_task.py` for automatic cloud-evidence-bundle
+emission on every Med-high result. There is no local attempt or repair at this
+band.
 
 Both sub-bands keep the independent reviewer resolved by the canonical band
 table (currently Gemma, then Muse Glimmer, then D14), 3 Reflection
@@ -613,10 +638,10 @@ documentation change replaces it.
 
 | RRI / capability | Local-first position | When cloud takes control | Codex model to present | Starting reasoning effort |
 |---|---|---|---|---|
-| **0–25 / Low** | Primary-agent direct by default; Gemma only for an eligible simple patch | Gemma is unavailable/unusable or its bounded repair fails and the Low-band escalation gate is followed | `gpt-5.6-luna`; use `gpt-5.6-terra` at `low` only when Luna is unavailable in the active environment | `low` |
+| **0–25 / Low** | Primary-agent direct by default; Nemotron only for an eligible simple patch | Nemotron is unavailable/unusable or its bounded repair fails and the Low-band escalation gate is followed | `gpt-5.6-luna`; use `gpt-5.6-terra` at `low` only when Luna is unavailable in the active environment | `low` |
 | **26–40 / Balanced** | `nemotron-3.5-lightning:30b-a3b-q4_K_M` local-first, up to 2 evidence-backed repairs | Local runner/model is unavailable, scope enforcement fails, or the repair budget is exhausted | `gpt-5.6-terra` | `medium` |
-| **41–55 / Balanced -> Premium** | ADR-038 gate, then at most one bounded local attempt | Operational-only fallback with no new risk or ambiguity | `gpt-5.6-terra` | `high` |
-| **41–55 / Balanced -> Premium** | ADR-038 gate, then at most one bounded local attempt | `CLOUD_REQUIRED` because of a hard exclusion, ambiguity, coupling/risk, or a local acceptance/scope/organization failure | `gpt-5.6-sol` | `high` |
+| **41–55 / Balanced -> Premium** | ADR-038 evidence gate, then cloud-only | Operational-only cloud route | `gpt-5.6-terra` | `high` |
+| **41–55 / Balanced -> Premium** | ADR-038 evidence gate, then cloud-only | `CLOUD_REQUIRED` or capability/risk boundary | `gpt-5.6-sol` | `high` |
 | **56–70 / Premium** | Cloud is the primary route after mandatory decomposition | Approved decomposed subtask proceeds on Codex | `gpt-5.6-sol` | `high`; use `xhigh` only when eval evidence shows a gain |
 | **71–85 / Premium** | Cloud is the primary route after mandatory decomposition | Approved subtask proceeds on Codex with human diff review | `gpt-5.6-sol` | `xhigh`; compare `max` only for the hardest quality-first case |
 | **86–100 / Premium** | No direct implementation | Cloud performs ADR/risk analysis and decomposition only | `gpt-5.6-sol` | `max` |
@@ -672,7 +697,7 @@ place.
 
 | RRI band | Capability | Claude model to present | Thinking | Escalation within band |
 |---|---|---|---|---|
-| **0–25 / Low** | n/a — primary agent direct or local Gemma | Whichever model is already running the session; no Claude-cloud resolution needed | Off | n/a |
+| **0–25 / Low** | n/a — primary agent direct or local Nemotron | Whichever model is already running the session; no Claude-cloud resolution needed | Off | n/a |
 | **26–40 / Balanced** | Balanced | `claude-sonnet-5` | Off | none — stays on Sonnet 5 |
 | **41–55 / Balanced → Premium** | Balanced → Premium | `claude-sonnet-5`; escalate to `claude-opus-5` only if the bounded attempt stalls or repeatedly fails | On | Sonnet 5 → Opus 5 on stall/failure |
 | **56–70 / Premium** | Premium | `claude-opus-5` | On | n/a |
@@ -872,7 +897,7 @@ Required passes: <N> (`<RRI>` → `<band>`)
 - **Revisions applied:** <bullet list of changes made, or "none">
 ```
 
-For RRI 0–25 tasks delegated to local Gemma, the delegating agent applies the
+For RRI 0–25 tasks delegated to local Nemotron, the delegating agent applies the
 Reflection cycle to Gemma's output during the mandatory review step. Record the
 reflection log in the final report, not inside the delegated task.
 
@@ -910,7 +935,7 @@ A human-agent handoff prompt must contain only:
 4. Exact acceptance criteria (bullets only, no prose)
 5. Stop condition: what the agent must do last and must NOT start next
 
-For RRI 0–25 local Gemma delegation, build a delegation packet instead of the
+For RRI 0–25 local Nemotron delegation, build a delegation packet instead of the
 human-agent handoff prompt. It must contain only: task excerpt, acceptance
 criteria, RRI output, allowed paths, relevant file snippets, and stop conditions.
 Send the packet with `scripts/delegate-low-rri.py`, which performs the local
@@ -927,7 +952,7 @@ knobs such as `--temperature` / `DUBBRIDGE_LOW_RRI_TEMPERATURE` and `--think` /
 it only for a bounded experiment because it can consume the token budget before
 the tagged response is completed.
 
-For **RRI 26–55 local-first implementation** (Moderate + Med-high), use
+For **RRI 26–40 local-first implementation** (Moderate), use
 `scripts/local-agent/run_local_task.py` in a disposable git worktree. The
 primary agent remains orchestrator of record: it owns the task card,
 `allowed_paths`, verification commands, Reflection passes, closure, and final
@@ -951,9 +976,9 @@ signature. A success audit must record scope result, acceptance/verification
 results, organization result, edit metrics (tool, path, line/byte counts),
 implementer model, and the signature itself. Use at most **2**
 evidence-backed local repair attempts for Moderate (26–40). Med-high (41–55)
-uses the ADR-038 single-attempt route with **0** repair attempts. If the local
-runner/model is unavailable, the applicable repair budget is exhausted, or the
-task violates the scope boundary, escalate with the relevant ADR-036/ADR-038
+is cloud-only after its ADR-038 evidence gate. If the local runner/model is
+unavailable, the applicable repair budget is exhausted, or the task violates the
+scope boundary, escalate with the relevant ADR-036/ADR-038
 evidence packet to the concrete cloud-takeover model recorded in the task card
 instead of continuing locally. Med-high tasks still go through the
 band-resolved independent review route (phases 1 and 2) and 3 Reflection passes
@@ -968,7 +993,7 @@ affected band (Moderate and/or Med-high) to cloud implementation while
 retaining the local review roles.
 
 **Target-file size gate (owner directive, 2026-07-22):** before building a
-task card for RRI 26–55 local-first delegation, check every file in
+task card for RRI 26–40 local-first delegation, check every file in
 `allowed_paths` and every file the local implementer must read in full. If
 any exceeds **500 lines**, do not delegate as-is — decompose the task so each
 subtask's touched/read files stay under the threshold (preferred; see the

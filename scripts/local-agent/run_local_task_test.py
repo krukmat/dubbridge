@@ -1459,6 +1459,35 @@ class BuildLiveChatFn(unittest.TestCase):
         self.assertEqual(captured_labels[0], f"local-agent turn 1/{rlt.MAX_TOTAL_TURNS}")
         self.assertEqual(captured_labels[1], f"local-agent turn 2/{rlt.MAX_TOTAL_TURNS}")
 
+    def test_per_run_generation_limits_reach_ollama_payload_and_progress(self):
+        fake_stream_result = gemma_local.StreamChatResult(
+            content=json.dumps(_tool_call("finish", {})),
+            usage=gemma_local.StreamUsage(),
+        )
+        captured = {}
+
+        def spy_stream_chat(url, payload, idle_timeout, max_wall, progress_label="delegate"):
+            captured["payload"] = payload
+            captured["progress_label"] = progress_label
+            return fake_stream_result
+
+        with patch.object(gemma_local, "ensure_model_available", return_value="qwen3.6:27b-q4_K_M"):
+            with patch.object(gemma_local, "stream_chat", side_effect=spy_stream_chat):
+                chat_fn = rlt.build_live_chat_fn(
+                    "http://localhost:11434",
+                    "qwen3.6:27b-q4_K_M",
+                    idle_timeout=5,
+                    max_wall=30,
+                    num_ctx=49152,
+                    num_predict=8192,
+                    max_total_turns=8,
+                )
+                chat_fn([{"role": "system", "content": "spec"}])
+
+        self.assertEqual(captured["payload"]["options"]["num_ctx"], 49152)
+        self.assertEqual(captured["payload"]["options"]["num_predict"], 8192)
+        self.assertEqual(captured["progress_label"], "local-agent turn 1/8")
+
     def test_non_json_model_response_raises_malformed_tool_call(self):
         fake_stream_result = gemma_local.StreamChatResult(
             content="not json at all",
@@ -2420,6 +2449,23 @@ class ParseArgsModelDefaultTest(unittest.TestCase):
                 ["--card", "card.json", "--worktree", ".", "--out", "result.json"]
             )
         self.assertEqual(args.model, "env-model:tag")
+
+    def test_per_run_budget_flags_are_parsed_without_changing_defaults(self):
+        args = rlt.parse_args([
+            "--card", "card.json", "--worktree", ".", "--out", "result.json",
+            "--num-ctx", "49152", "--num-predict", "8192", "--max-turns", "8",
+        ])
+        self.assertEqual(args.num_ctx, 49152)
+        self.assertEqual(args.num_predict, 8192)
+        self.assertEqual(args.max_turns, 8)
+
+    def test_default_generation_budgets_remain_unchanged(self):
+        args = rlt.parse_args(
+            ["--card", "card.json", "--worktree", ".", "--out", "result.json"]
+        )
+        self.assertEqual(args.num_ctx, rlt.MODEL_CONTEXT_TOKENS)
+        self.assertEqual(args.num_predict, rlt.GENERATION_TOKEN_BUDGET)
+        self.assertIsNone(args.max_turns)
 
 
 class MedHighRunnerLimitsIntegrationTest(unittest.TestCase):

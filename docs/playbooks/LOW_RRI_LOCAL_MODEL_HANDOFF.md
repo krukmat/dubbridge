@@ -13,6 +13,10 @@ local model through Ollama. This playbook is operational: it explains how to sco
 the work, how to write the packet, how to review the result, and when to shrink the
 task or escalate.
 
+**Active developer binding (owner directive, 2026-08-12):**
+`nemotron-3.5-lightning:30b-a3b-q4_K_M`. Reviewer bindings are separate and
+unchanged. No alternate local developer is selected implicitly.
+
 ## When to use this playbook
 
 Use this playbook when all of the following are true:
@@ -219,19 +223,19 @@ Before accepting the result, verify all of the following:
 
 ## Patch delegation vs. code review
 
-This playbook covers **Gemma Developer** — the patch-delegation path where Gemma
+This playbook covers the **Nemotron Developer** — the patch-delegation path where Nemotron
 returns file contents that the wrapper applies. It does not cover **Gemma
 Reviewer**, which is a separate read-only role.
 
 Key distinction:
 
-| Gemma Developer | Gemma Reviewer |
+| Nemotron Developer | Gemma Reviewer |
 |---|---|
 | Returns tagged file blocks with complete contents | Returns only tagged finding blocks — no file contents, no diffs |
 | Used for simple code patch delegation (Low band) | Used for post-implementation code review (Low and Moderate bands) |
 | `scripts/delegate-low-rri.py` | `scripts/gemma-code-review.py` |
 
-A single task may use both in sequence: Gemma Developer for the patch, then
+A single task may use both in sequence: Nemotron Developer for the patch, then
 Gemma Reviewer for advisory code review in a fresh invocation. The primary agent
 must perform an independent review and may not delegate final acceptance to either
 Gemma role.
@@ -241,7 +245,7 @@ Reviewer authority boundary, trigger conditions, and completion evidence format.
 
 ## Audit log
 
-Every invocation of Gemma Developer (`scripts/delegate-low-rri.py`) and Gemma
+Every invocation of Nemotron Developer (`scripts/delegate-low-rri.py`) and Gemma
 Reviewer (`scripts/gemma-code-review.py`) appends one JSONL record to
 `logs/gemma-audit/YYYY-MM.jsonl` via `scripts/gemma_local.py:append_audit_log()`.
 The log is local telemetry only — git-ignored, never committed, never required

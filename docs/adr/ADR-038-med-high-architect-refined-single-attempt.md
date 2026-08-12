@@ -42,6 +42,15 @@ supervision, tests, and status synchronization are treated as one patch. It must
 therefore be delivered as the subtasks in
 `docs/tasks/med-high-local-refinement.md`, each scoring RRI <= 55.
 
+## Amendment 1 (2026-08-12): Med-high local execution disabled
+
+Owner directive: Nemotron is scoped to Low/S and Moderate/M only. Therefore the
+Med-high refinement and primary receipt remain required evidence, but their
+combined `GO_LOCAL` result is policy-excluded from launching a local developer.
+The supervisor emits the normal cloud handoff bundle for every valid Med-high
+route, including `GO_LOCAL`; reviewer independence, approval, and fallback
+selection remain unchanged.
+
 ## Decision
 
 ### 1. Preserve Low and Moderate routing
@@ -213,4 +222,3 @@ evidence-preservation contract (§5) apply identically to the new bindings.
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
 - `docs/policies/RRI_POLICY.md`
 - `docs/policies/HITL_AUTONOMY_POLICY.md`
-

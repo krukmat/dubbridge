@@ -106,10 +106,10 @@ GENERATION_TOKEN_BUDGET = 8192
 # workspace's task sizes). ADR-036 Amendment 2 (2026-08-11) rebound the
 # implementer to qwen3.6:27b-q4_K_M; Amendment 3 (2026-08-12) rebinds it again
 # to nemotron-3.5-lightning:30b-a3b-q4_K_M. This ceiling has not been
-# re-measured against either binding and is carried forward unchanged pending
-# that measurement -- tracked as an open follow-up, not a verified value for
-# the current binding.
-MODEL_CONTEXT_TOKENS = 90112
+# re-measured against either binding. Owner directive, 2026-08-12, sets the
+# Moderate/M operational ceiling to 64K: enough room for multi-turn tool
+# history and full-file reads without the 90K KV-cache allocation.
+MODEL_CONTEXT_TOKENS = 65536
 
 # Prepended to every card's own spec as the system message. The model is not
 # given native tool-calling (see build_live_chat_fn's docstring) — it must be
@@ -681,7 +681,16 @@ def run_loop(
         continue
 
 
-def build_live_chat_fn(host, model, idle_timeout, max_wall):
+def build_live_chat_fn(
+    host,
+    model,
+    idle_timeout,
+    max_wall,
+    *,
+    num_predict=GENERATION_TOKEN_BUDGET,
+    num_ctx=MODEL_CONTEXT_TOKENS,
+    max_total_turns=MAX_TOTAL_TURNS,
+):
     """Adapt gemma_local's single-shot stream_chat to this loop's per-turn chat_fn shape.
 
     Each call is one /api/chat turn with the full running message list; Ollama
@@ -725,8 +734,8 @@ def build_live_chat_fn(host, model, idle_timeout, max_wall):
                 # have no size cap in this tool contract, so the output
                 # budget must comfortably exceed one full file's worth of
                 # text, not just a short tool-call envelope.
-                "num_predict": GENERATION_TOKEN_BUDGET,
-                "num_ctx": MODEL_CONTEXT_TOKENS,
+                "num_predict": num_predict,
+                "num_ctx": num_ctx,
             },
         }
         result = gemma_local.stream_chat(
@@ -734,7 +743,7 @@ def build_live_chat_fn(host, model, idle_timeout, max_wall):
             payload,
             idle_timeout,
             max_wall,
-            progress_label=f"local-agent turn {turn_counter['n']}/{MAX_TOTAL_TURNS}",
+            progress_label=f"local-agent turn {turn_counter['n']}/{max_total_turns}",
         )
         content = gemma_local.stream_result_content(result)
         try:
@@ -795,6 +804,30 @@ def parse_args(argv=None):
         type=int,
         default=DEFAULT_MAX_WALL_SECONDS,
         help="Maximum wall-clock seconds for a single chat turn.",
+    )
+    parser.add_argument(
+        "--num-ctx",
+        type=int,
+        default=MODEL_CONTEXT_TOKENS,
+        help=f"Ollama context window per turn; defaults to {MODEL_CONTEXT_TOKENS}.",
+    )
+    parser.add_argument(
+        "--num-predict",
+        type=int,
+        default=GENERATION_TOKEN_BUDGET,
+        help=(
+            "Ollama generation-token budget per turn; defaults to "
+            f"{GENERATION_TOKEN_BUDGET}."
+        ),
+    )
+    parser.add_argument(
+        "--max-turns",
+        type=int,
+        default=None,
+        help=(
+            "Optional tighter session turn cap. It may not exceed the "
+            "band-resolved limit."
+        ),
     )
     fallback_selection.add_cli_arguments(parser)
     return parser.parse_args(argv)
@@ -1134,6 +1167,18 @@ def main(
         organization_gate_fn or runner_workflow_gate.run_organization_gate
     )
     limits = resolve_effective_limits(card)
+    for flag, value in (("--num-ctx", args.num_ctx), ("--num-predict", args.num_predict)):
+        if value <= 0:
+            raise ValueError(f"{flag} must be greater than zero")
+    if args.max_turns is not None:
+        if args.max_turns <= 0:
+            raise ValueError("--max-turns must be greater than zero")
+        if args.max_turns > limits.max_total_turns:
+            raise ValueError(
+                "--max-turns may tighten but not exceed the band-resolved "
+                f"limit ({limits.max_total_turns})"
+            )
+        limits.max_total_turns = args.max_turns
 
     # ADR-038 T3 EC-2: a Med-high card must run under the exact required
     # model -- no silent substitution. This is a routing-evidence check, not
@@ -1183,7 +1228,13 @@ def main(
 
     session_start = datetime.datetime.now(datetime.timezone.utc)
     chat_fn = chat_fn or build_live_chat_fn(
-        args.host, args.model, args.idle_timeout, args.max_wall
+        args.host,
+        args.model,
+        args.idle_timeout,
+        args.max_wall,
+        num_predict=args.num_predict,
+        num_ctx=args.num_ctx,
+        max_total_turns=limits.max_total_turns,
     )
     # The missing fallback (chat_fn and boundary above both had theirs): the
     # CLI never injects test_runner, so without this it stayed None and every

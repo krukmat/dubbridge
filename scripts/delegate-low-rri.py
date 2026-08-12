@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Delegate a Low-RRI task packet to local Ollama/Gemma.
+"""Delegate a Low-RRI task packet to local Ollama/Nemotron.
 
-The script intentionally keeps Gemma sandboxed: it receives a packet and returns
+The script intentionally keeps Nemotron sandboxed: it receives a packet and returns
 tagged text with complete file contents. The orchestrating agent still validates,
 builds the diff, applies it, reviews it, and verifies any patch.
 
@@ -35,21 +35,19 @@ import fallback_selection
 
 
 DEFAULT_HOST = gemma_local.DEFAULT_HOST
-DEFAULT_MODEL = gemma_local.DEFAULT_MODEL
-# Stall fallback (distinct from gemma_local.DEFAULT_FALLBACK_MODEL, which is
-# an install-availability fallback and currently resolves to the same Gemma
-# model). This one is for a *responding but non-convergent* primary model —
-# originally observed live during S-140-T1c-ii, where run_local_task.py's
-# Moderate/Med-high path stalled with qwen3.6:35b-a3b as the *primary*
-# implementer. Here roles are reversed: Gemma is primary for Low-band
-# delegation, so this stall-fallback target is an alternate model, not the
-# implementer band. That model was fully retired from the local model stack
-# by ADR-036 Amendment 2 (T4a, 2026-08-11); this fallback now points to
-# qwen3.6:27b-q4_K_M, its sole surviving Qwen successor.
-DEFAULT_STALL_FALLBACK_MODEL = "qwen3.6:27b-q4_K_M"
+DEFAULT_MODEL = "nemotron-3.5-lightning:30b-a3b-q4_K_M"
+# Owner directive, 2026-08-12: Nemotron is the Low/S local developer. Do not
+# silently replace an unavailable or stalled developer with Gemma or Qwen.
+# An operator may still explicitly name a stall fallback for a bounded
+# experiment; the default is disabled.
+DEFAULT_STALL_FALLBACK_MODEL = ""
 DEFAULT_IDLE_TIMEOUT_SECONDS = gemma_local.DEFAULT_IDLE_TIMEOUT_SECONDS
 DEFAULT_MAX_WALL_SECONDS = gemma_local.DEFAULT_MAX_WALL_SECONDS
-DEFAULT_NUM_CTX = gemma_local.DEFAULT_NUM_CTX
+# Low/S packets are deliberately bounded: a narrow task capsule plus one
+# complete-file response do not need the shared reviewer's 131K window. Keeping
+# this independent prevents the developer role from allocating an oversized KV
+# cache merely because the reviewer has a larger context default.
+DEFAULT_NUM_CTX = 16384
 DEFAULT_NUM_PREDICT = gemma_local.DEFAULT_NUM_PREDICT
 DEFAULT_TEMPERATURE = gemma_local.DEFAULT_TEMPERATURE
 DEFAULT_THINK = gemma_local.DEFAULT_THINK
@@ -68,7 +66,7 @@ MAX_BEFORE_LINES = 40
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Send a Low-RRI delegation packet to local Ollama/Gemma.",
+        description="Send a Low-RRI delegation packet to local Ollama/Nemotron.",
     )
     parser.add_argument(
         "packet",
@@ -304,8 +302,7 @@ def get_json(url, timeout):
 
 
 def resolve_model(host, model, timeout):
-    fallback = gemma_local.default_fallback_model_for("DUBBRIDGE_LOW_RRI_MODEL")
-    return gemma_local.resolve_model_with_fallback(host, model, timeout, fallback)
+    return gemma_local.resolve_model_with_fallback(host, model, timeout)
 
 
 def build_replacement_payload(model, packet, num_ctx, num_predict, temperature, think):

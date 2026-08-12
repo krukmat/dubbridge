@@ -684,7 +684,7 @@ class CliBehavior(unittest.TestCase):
         finally:
             os.unlink(fname)
 
-    def test_dry_run_uses_shared_default_model(self):
+    def test_hp1_dry_run_uses_nemotron_default_model(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
             f.write("# test packet\n")
             fname = f.name
@@ -694,7 +694,7 @@ class CliBehavior(unittest.TestCase):
             r = self.run_cli(fname, "--dry-run", env=env)
             self.assertEqual(r.returncode, 0, r.stderr)
             data = json.loads(r.stdout)
-            self.assertEqual(data["model"], "gemma4:26b-a4b-it-qat")
+            self.assertEqual(data["model"], "nemotron-3.5-lightning:30b-a3b-q4_K_M")
         finally:
             os.unlink(fname)
 
@@ -778,6 +778,19 @@ class CliBehavior(unittest.TestCase):
     def test_help_exits_0(self):
         r = self.run_cli("--help")
         self.assertEqual(r.returncode, 0)
+
+
+class ModelResolution(unittest.TestCase):
+    def test_ec1_missing_nemotron_does_not_substitute_another_developer(self):
+        with patch.object(
+            _mod.gemma_local,
+            "_installed_model_names",
+            return_value={"gemma4:26b-a4b-it-qat", "qwen3.6:27b-q4_K_M"},
+        ):
+            with self.assertRaises(RuntimeError) as ctx:
+                _mod.resolve_model("http://localhost:11434", _mod.DEFAULT_MODEL, 5)
+        self.assertIn(_mod.DEFAULT_MODEL, str(ctx.exception))
+        self.assertNotIn("falling back", str(ctx.exception))
 
 
 # ---------------------------------------------------------------------------
@@ -911,20 +924,40 @@ class StallFallback(unittest.TestCase):
                 _mod.main()
         return captured
 
-    def test_retries_once_against_stall_fallback_model(self):
+    def test_ec2_default_stall_does_not_retry_another_model(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out_path = os.path.join(tmp, "result.json")
+            packet_file = os.path.join(tmp, "packet.md")
+            with open(packet_file, "w") as f:
+                f.write("# test packet\n")
+            argv = [_SCRIPT, packet_file, "--out", out_path]
+            with patch("sys.argv", argv), \
+                 patch.object(_mod, "resolve_model", return_value=_mod.DEFAULT_MODEL), \
+                 patch.object(_mod, "stream_chat", side_effect=_mod.DelegationIdleTimeout(60)) as chat:
+                with self.assertRaises(_mod.DelegationIdleTimeout):
+                    _mod.main()
+        self.assertEqual(chat.call_count, 1)
+
+    def test_explicit_stall_fallback_retries_once_against_named_model(self):
         ok_response = _mod.gemma_local.StreamChatResult(
             content="STATUS: NO_PATCH\nSUMMARY: ok",
             usage=_mod.gemma_local.StreamUsage(response_tokens=5),
         )
-        records = self._run([_mod.DelegationIdleTimeout(60), ok_response])
+        records = self._run(
+            [_mod.DelegationIdleTimeout(60), ok_response],
+            extra_args=["--stall-fallback-model", "explicit-fallback"],
+        )
         self.assertEqual(len(records), 1)
-        self.assertEqual(records[0]["model"], "qwen3.6:27b-q4_K_M")
+        self.assertEqual(records[0]["model"], "explicit-fallback")
         self.assertEqual(records[0]["outcome"], "NO_PATCH")
 
-    def test_wall_timeout_also_triggers_fallback(self):
+    def test_wall_timeout_also_triggers_explicit_fallback(self):
         ok_response = "STATUS: NO_PATCH\nSUMMARY: ok"
-        records = self._run([_mod.DelegationWallTimeout(900), ok_response])
-        self.assertEqual(records[0]["model"], "qwen3.6:27b-q4_K_M")
+        records = self._run(
+            [_mod.DelegationWallTimeout(900), ok_response],
+            extra_args=["--stall-fallback-model", "explicit-fallback"],
+        )
+        self.assertEqual(records[0]["model"], "explicit-fallback")
 
     def test_custom_stall_fallback_model_honoured(self):
         ok_response = "STATUS: NO_PATCH\nSUMMARY: ok"
@@ -1063,7 +1096,7 @@ class TerminalCloudFallbackSelection(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertEqual(selection["status"], "fallback_authorized")
 
-    def test_terminal_timeout_after_stall_retry_awaits_selection(self):
+    def test_terminal_timeout_without_default_stall_retry_awaits_selection(self):
         exit_code, selection, _ = self._run(
             stream_side_effect=[
                 _mod.DelegationIdleTimeout(60),
@@ -1072,7 +1105,7 @@ class TerminalCloudFallbackSelection(unittest.TestCase):
         )
         self.assertEqual(exit_code, 3)
         self.assertEqual(selection["status"], "awaiting_fallback_selection")
-        self.assertIn("stall fallback timed out", selection["trigger"])
+        self.assertIn("local delegation timeout", selection["trigger"])
 
     def test_terminal_timeout_without_stall_retry_awaits_selection(self):
         exit_code, selection, _ = self._run(

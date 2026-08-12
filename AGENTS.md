@@ -87,6 +87,15 @@ task-ledger/policy-only tasks use the reduced phase set defined in
 `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Live per-task phase todo list`,
 which is authoritative for the full contract.
 
+For any task that will invoke an Ollama-backed local role, prepend the explicit
+`Restart Ollama + local-stack precheck — <resolved orchestrator>` item before
+the first local-model call. This restart is mandatory once per task even when
+the server is healthy; retries and later local phases of the same task reuse the
+restarted server unless it becomes unavailable or wedged. The authoritative
+sequence and task-boundary rules are in
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Mandatory workflow before
+implementing`, Step 0.
+
 ## Complexity And Model Guidance
 
 **When RRI has been computed**, the `Complexity` field in the task presentation must
@@ -201,9 +210,10 @@ the gate defined by `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and
 
 Under the canonical RRI mapping in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and
 `docs/policies/RRI_POLICY.md`, `Effort: S` normally corresponds to the **RRI 0–25**
-Low band. Those tasks skip the full approval presentation; use local Gemma
-delegation through Ollama only for eligible simple code patches, and otherwise
-handle them directly as the primary agent while still following the low-band gate.
+Low band. Those tasks skip the full approval presentation; use bounded local
+Nemotron delegation through Ollama only for eligible simple code patches, and
+otherwise handle them directly as the primary agent while still following the
+low-band gate.
 
 ## Band-routed peer review report lines
 

@@ -561,6 +561,25 @@ Amendment 2's own open benchmark question for Qwen3.6-27B is now moot (that
 binding is no longer in use), but was never formally closed before being
 superseded.
 
+## Amendment 4 (2026-08-12): Nemotron scope is Low/S and Moderate/M only
+
+**Decision:** Owner directive, confirmed 2026-08-12: the Nemotron local
+developer binding is limited to eligible Low/S (RRI 0–25) and Moderate/M
+(RRI 26–40) development work. Low uses the bounded tagged-patch wrapper;
+Moderate uses the disposable-worktree agentic runner. Neither route changes the
+independent reviewer bindings.
+
+Med-high/L (RRI 41–55) is cloud-only. ADR-038's refinement and hash-bound
+receipt continue to produce routing evidence, but a `GO_LOCAL` result no longer
+authorizes or starts a local implementation process. Complex and XL bands remain
+cloud-only under the existing RRI policy.
+
+**Consequence:** `DUBBRIDGE_LOW_RRI_MODEL` and
+`DUBBRIDGE_LOCAL_AGENT_MODEL` both default to
+`nemotron-3.5-lightning:30b-a3b-q4_K_M` in their respective S and M lanes. A
+missing or stalled Low/S model does not silently select Gemma or Qwen as a
+developer; it follows the existing bounded repair and cloud-escalation protocol.
+
 ## Related
 
 - `docs/plan/adr036-local-first-pilot.md` — Stage 1/Stage 2 pilot plan for §10

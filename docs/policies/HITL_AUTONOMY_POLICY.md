@@ -46,17 +46,39 @@ The only exception to the approval gate is when the user explicitly says "procee
 without asking" (or equivalent) for a clearly bounded scope, or when the
 computed RRI is 0–25 and the task stays within the low-band handling rules below.
 
+## Per-task local-stack restart
+
+Owner directive, 2026-08-12: every task that will invoke an Ollama-backed local
+role must restart Ollama once before its first local-model request, even when the
+current server appears healthy. The orchestrator records and completes the
+`Restart Ollama + local-stack precheck` checklist item before allowing that
+request. A new repository task ID creates a new restart boundary; retries,
+repairs, and later local phases of the same task reuse the restarted server
+unless it becomes unavailable or wedged.
+
+Before the restart, the orchestrator must establish that no local runner for a
+different task remains active. An unrelated bounded run is allowed to finish or
+is stopped under its own termination contract; it is not killed as collateral
+work. The restart is complete only when the previous server PID is gone, a new
+`ollama serve` PID is present, port `11434` is listening, and every local model
+required by the task passes the workflow guide's warm-up probe. Failure leaves
+the operational checklist item blocked and prohibits the task's first local
+request. This prerequisite does not waive or replace HITL approval, independent
+review, fallback selection, or any RRI gate. The authoritative procedure is
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Mandatory workflow before
+implementing`, Step 0.
+
 ## Local delegation (RRI 0–25)
 
 When the computed RRI falls in the **0–25 Low band**, the agent must not present
 the full task for human approval. The default low-band path is **direct execution
-by the primary agent**. Local Gemma delegation through Ollama is reserved only for
+by the primary agent**. Local Nemotron delegation through Ollama is reserved only for
 **simple code patching**: narrow, mechanical code or test edits with a small
 allowed path set and low editorial risk. Docs, plans, task ledgers, ADRs,
 policies, workflow scripts, and other structure-heavy or interpretation-heavy work
 must stay with the primary agent even when the RRI is Low.
 
-When Gemma delegation is used, Gemma must not evaluate, approve, or mark its own
+When Nemotron delegation is used, Nemotron must not evaluate, approve, or mark its own
 delegated work as complete. Only the delegating agent may decide whether the task
 satisfies the requirements.
 
@@ -65,7 +87,7 @@ For eligible simple code patches, the delegating agent must:
 1. Compute RRI with `scripts/rri.py`.
 2. Build a local delegation packet with the task excerpt, acceptance criteria, RRI
    output, allowed paths, relevant file snippets, and stop conditions.
-3. Send the packet to Ollama/Gemma with `scripts/delegate-low-rri.py`, which uses
+3. Send the packet to Ollama/Nemotron with `scripts/delegate-low-rri.py`, which uses
    the 120-second timeout and tagged-block response protocol defined in
    `docs/policies/RRI_POLICY.md`; require complete file contents, not JSON and not
    a unified diff.
@@ -73,18 +95,18 @@ For eligible simple code patches, the delegating agent must:
    `git apply --check`, and reject any patch outside the allowed task scope.
 5. Apply only a valid in-scope patch.
 6. Personally review the solution against every task requirement and acceptance
-   criterion; this evaluation must be performed by the delegating agent, not Gemma.
+criterion; this evaluation must be performed by the delegating agent, not Nemotron.
 7. Recompute/check actual touched scope; if the result now scores above RRI 25 or
    triggers a higher gate, stop and escalate to the normal approval workflow.
 8. Run required verification commands.
-9. If requirements are missed or checks fail, run one bounded Gemma repair cycle
+9. If requirements are missed or checks fail, run one bounded Nemotron repair cycle
    with the failure evidence and the same allowed paths; if it still fails, stop and
    escalate. If Codex takes execution after that gate, use `gpt-5.6-luna` at
    `low`, or `gpt-5.6-terra` at `low` when Luna is unavailable in the active
    environment.
-10. Report the RRI, Gemma model used, files changed, the delegating agent's
+10. Report the RRI, Nemotron model used, files changed, the delegating agent's
     requirement-review result, verification commands, and whether a repair cycle
-    was needed. If delegation times out, report `Gemma timeout after 120s`.
+    was needed. If delegation times out, report `Nemotron timeout after 120s`.
 
 If penalties are present and the final RRI is still ≤ 25, the low-band handling
 still applies. When delegation is used, state all active penalties explicitly in
@@ -166,15 +188,9 @@ The route:
    GO_LOCAL to cloud; it may **never upgrade** CLOUD_REQUIRED to local — this
    is enforced structurally (the gate requires both sides to independently
    say GO_LOCAL), not by trusting either decision alone.
-5. If the gate resolves GO_LOCAL: `scripts/local-agent/run_med_high_task.py`
-   supervises exactly **one** session on the exact `nemotron-3.5-lightning:30b-a3b-q4_K_M` binding,
-   as its own OS process group, bounded to **8 turns**, **300 seconds**
-   wall clock, and **0 repair attempts**. No silent model substitution. A
-   timeout kills the full process group (not just the immediate PID) and
-   preserves the last checkpoint and partial diff.
-6. If the gate resolves CLOUD_REQUIRED, or the one local attempt does not
-   reach success (timeout, failing acceptance, scope/boundary/organization
-   violation, or model substitution), escalate to the concrete Codex or Claude
+5. `scripts/local-agent/run_med_high_task.py` records every gate result as a
+   cloud handoff; even `GO_LOCAL` is policy-excluded from local development.
+6. Escalate to the concrete Codex or Claude
    cloud-takeover model recorded in the approved task card, with the full
    ADR-038 §5 evidence bundle: task capsule, refinement artifact,
    primary receipt, effective limits, transcript/checkpoint, partial diff,
@@ -182,10 +198,8 @@ The route:
    When Codex executes, an operational-only fallback uses `gpt-5.6-terra` at
    `high`; a hard exclusion, risk/capability `CLOUD_REQUIRED`, or local
    acceptance/scope/organization failure uses `gpt-5.6-sol` at `high`.
-7. Run the approved verification commands and the organization gate before
-   issuing a signed success audit, exactly as for Moderate. The
-   `local-implementer` signature is valid only when scope, acceptance, and
-   organization gates all pass.
+7. Run the approved verification commands and the organization gate on the
+   cloud-authored implementation.
 
 Hard exclusions from GO_LOCAL regardless of the Muse Glimmer recommendation:
 auth/security work, rights/consent/governance invariants, schema/migrations/

@@ -6,6 +6,22 @@ use crate::error::DbError;
 use dubbridge_domain::asset::AssetId;
 use dubbridge_domain::workspace::{ProjectId, TargetLanguage};
 
+/// A candidate delivery scope: a project and the target language to translate into.
+#[derive(Debug, Clone)]
+pub struct DeliveryScopeCandidate {
+    pub project_id: ProjectId,
+    pub target_language: TargetLanguage,
+}
+
+#[derive(sqlx::FromRow)]
+struct DeliveryScopeCandidateRow {
+    project_id: Uuid,
+    target_language_id: Uuid,
+    source_lang: String,
+    target_lang: String,
+    created_at: OffsetDateTime,
+}
+
 #[derive(sqlx::FromRow)]
 pub(crate) struct TargetLanguageRow {
     id: Uuid,
@@ -133,6 +149,52 @@ pub async fn get_source_language_for_asset(
     .await
     .map_err(DbError::QueryFailed)?;
     Ok(lang)
+}
+
+/// List all delivery scope candidates for a source subtitle artifact across projects.
+pub async fn list_delivery_scope_candidates_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    asset_id: AssetId,
+    source_subtitle_artifact_id: Uuid,
+) -> Result<Vec<DeliveryScopeCandidate>, DbError> {
+    let rows = sqlx::query_as::<_, DeliveryScopeCandidateRow>(
+        r#"
+        SELECT pa.project_id,
+               tl.id AS target_language_id,
+               tl.source_lang,
+               tl.target_lang,
+               tl.created_at
+        FROM artifact_records ar
+        JOIN project_assets pa ON pa.asset_id = ar.asset_id
+        JOIN target_languages tl ON tl.project_id = pa.project_id
+        WHERE ar.id = $1
+          AND ar.asset_id = $2
+          AND ar.kind = 'subtitle'
+          AND ar.parent_artifact_id IS NOT NULL
+        ORDER BY pa.project_id,
+                 tl.target_lang COLLATE "C",
+                 tl.id
+        "#,
+    )
+    .bind(source_subtitle_artifact_id)
+    .bind(asset_id.0)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| DeliveryScopeCandidate {
+            project_id: ProjectId(r.project_id),
+            target_language: TargetLanguage {
+                id: r.target_language_id,
+                project_id: ProjectId(r.project_id),
+                source_lang: r.source_lang,
+                target_lang: r.target_lang,
+                created_at: r.created_at,
+            },
+        })
+        .collect())
 }
 
 /// Return the asset project plus the deterministic first subtitle target for enqueue.
