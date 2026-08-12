@@ -1417,9 +1417,19 @@ Required passes: 2 (`39` → `Moderate`)
 ## S-150-T2b-ii-b: Atomic delivery claim and dispatch persistence
 
 **Type:** development
-**Effort:** pending exact child RRI
+**Effort:** L (RRI 52 — Med-high)
 **Depends on:** S-150-T2b-ii-a
-**Status:** [ ] Planned
+**Status:** [ ] Ready for closure — verification and phase-2 review passed;
+awaiting authorized commit for the reachable review receipt
+
+Task-analysis review: gemma `.agent/peer-task-review-S-150-T2b-ii-b.json` - PASS
+
+**Task-local phase-2 review override (2026-08-12):** Matias selected
+`muse-glimmer:30b-q4_K_M` as the code-solution reviewer for this child. This
+overrides the RRI 26–55 default Gemma binding for phase 2 only; phase 1 remains
+the recorded Gemma PASS. If Muse Glimmer is unavailable, stalled, invalid, or
+`BLOCKED`, apply the canonical fallback protocol and then D14 rather than
+self-reviewing.
 
 **Happy paths considered:**
 
@@ -1461,6 +1471,36 @@ failure transitions or queue code.
 
 **Stop condition:** Stop after atomic persistence tests. Do not start T2b-ii-c or
 T2c.
+
+### In-progress execution evidence
+
+- ADR-038 refinement: Muse Glimmer `GO_LOCAL`, then primary receipt
+  `CLOUD_REQUIRED` because ADR-038 Amendment 1 disables Med-high local developer
+  execution; both artifacts are hash-bound under
+  `.agent/local-architect/med-high-refinement-v1/S-150-T2b-ii-b/`.
+- Antares refinement/post-implementation: typed skip — this task carries no
+  task-relevant CWE hypothesis from `scripts/antares/cwe_watchlist.py`; no generic
+  security sweep was run.
+- Focused live-PostgreSQL test: `translation_delivery_repo_test` passed `4/4`.
+- Focused implemented-scope coverage: `crates/db/src/translation_delivery_repo.rs`
+  reported `96.04%` line coverage under `cargo llvm-cov`.
+- Code-solution review: muse-glimmer
+  `.agent/peer-code-review-S-150-T2b-ii-b.json` - PASS
+- Reflection pass 1 (contract coverage): found and repaired missing direct cases
+  for an unknown target and a non-`Subtitle` source; focused tests passed after
+  the revision.
+- Reflection pass 2 (atomicity/idempotency): verified scope lookup precedes the
+  transaction's first write and `ON CONFLICT` preserves one claim/outbox identity;
+  source conflict returns before dispatch mutation. No revision required.
+- Reflection pass 3 (boundary and status): verified reused rows are classified from
+  durable dispatch state without mutation or queue inspection, and no T2b-ii-c/T2c
+  behavior entered the diff. No revision required.
+- The default parallel `cargo test --workspace` exposes six pre-existing test
+  isolation collisions on the fixed `owner@example.com` identity; the same result
+  reproduces on a fresh PostgreSQL container, so it is not shared-database residue.
+  The isolated verification therefore ran `dubbridge-api` serially against that
+  fresh database, then ran the remaining workspace without its database override:
+  both portions passed. The temporary container was removed afterward.
 
 ---
 

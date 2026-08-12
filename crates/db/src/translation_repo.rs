@@ -279,14 +279,29 @@ pub async fn claim_translation_generation(
     require_source_subtitle(pool, input.asset_id, input.source_subtitle_artifact_id).await?;
 
     let mut tx = pool.begin().await.map_err(DbError::QueryFailed)?;
-    let inserted = insert_claim_if_absent(&mut tx, input).await?;
+    let claim = claim_translation_generation_tx(&mut tx, input).await?;
+    tx.commit().await.map_err(DbError::QueryFailed)?;
+    Ok(claim)
+}
+
+/// Create or reuse a translation generation claim using the caller's transaction.
+///
+/// The caller must validate the exact source identity before invoking this helper.
+/// `translation_delivery_repo` does that through its transaction-bound delivery-scope
+/// query, preserving the no-write-before-scope-validation contract for S-150-T2b-ii-b.
+pub(crate) async fn claim_translation_generation_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    input: TranslationClaimInput,
+) -> Result<TranslationGenerationClaim, DbError> {
+    validate_translation_claim_mode(&input)?;
+    let inserted = insert_claim_if_absent(tx, input).await?;
 
     let claim = if let Some(claim) = inserted {
-        set_current_generation_tx(&mut tx, input).await?;
+        set_current_generation_tx(tx, input).await?;
         claim
     } else {
         let claim = get_claim_tx(
-            &mut tx,
+            tx,
             input.project_id,
             input.asset_id,
             input.target_language_id,
@@ -302,7 +317,6 @@ pub async fn claim_translation_generation(
         claim
     };
 
-    tx.commit().await.map_err(DbError::QueryFailed)?;
     Ok(claim)
 }
 
