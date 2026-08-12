@@ -106,7 +106,7 @@ The default path for Moderate development tasks is:
 2. Present the task and obtain explicit approval.
 3. Run the implementation through `scripts/local-agent/run_local_task.py` in a
    disposable git worktree, resolving the implementer from
-   `DUBBRIDGE_LOCAL_AGENT_MODEL` (default `qwen3.6:35b-a3b`) and the endpoint
+   `DUBBRIDGE_LOCAL_AGENT_MODEL` (default `qwen3.6:27b-q4_K_M`) and the endpoint
    from `OLLAMA_HOST`.
 4. Keep the primary agent as orchestrator of record: it owns the task card,
    allowed paths, acceptance tests, reflection passes, closure, and all final
@@ -157,7 +157,7 @@ The route:
 
 1. Compute RRI with `scripts/rri.py`; confirm it falls in 41–55.
 2. Present the task and obtain explicit approval.
-3. Request a Qwen27 (`qwen3.6:27b-q4_K_M`) advisory refinement via
+3. Request a Muse Glimmer (`muse-glimmer:30b-q4_K_M`) advisory refinement via
    `scripts/local-architect/run_analysis.py`'s `med-high-refinement-v1`
    profile. It returns `route_recommendation: GO_LOCAL | CLOUD_REQUIRED`
    bound to the task capsule hash and its own model tag/digest.
@@ -167,7 +167,7 @@ The route:
    is enforced structurally (the gate requires both sides to independently
    say GO_LOCAL), not by trusting either decision alone.
 5. If the gate resolves GO_LOCAL: `scripts/local-agent/run_med_high_task.py`
-   supervises exactly **one** session on the exact `qwen3.6:35b-a3b` binding,
+   supervises exactly **one** session on the exact `qwen3.6:27b-q4_K_M` binding,
    as its own OS process group, bounded to **8 turns**, **300 seconds**
    wall clock, and **0 repair attempts**. No silent model substitution. A
    timeout kills the full process group (not just the immediate PID) and
@@ -187,7 +187,7 @@ The route:
    `local-implementer` signature is valid only when scope, acceptance, and
    organization gates all pass.
 
-Hard exclusions from GO_LOCAL regardless of the Qwen27 recommendation:
+Hard exclusions from GO_LOCAL regardless of the Muse Glimmer recommendation:
 auth/security work, rights/consent/governance invariants, schema/migrations/
 release cuts, unresolved ADR decisions, and unbounded scope — see ADR-038 §6.
 
@@ -252,13 +252,16 @@ waive independent review, RRI gates, repair limits, or scope checks.
 Every development task is reviewed by an independent reviewer at two phases.
 The reviewer is determined by the task's RRI band:
 
-- **RRI 0–25 (Low):** Gemma (phases 1 and 2). Phase-2 = existing Gemma
-  Reviewer N-pass; phase-1 = advisory Gemma review of the task card.
-- **RRI 26–55 (Moderate + Med-high):** `qwen3.6:27b-q4_K_M` (phases 1 and 2,
-  owner directive 2026-07-21) — see `docs/policies/RRI_POLICY.md § Local
-  pipeline phase-2 reviewer override`. Replaces Gemma (Moderate) and the
-  cross-vendor peer (Med-high) as the default reviewer for this band,
-  regardless of whether implementation stayed local or escalated to cloud.
+- **RRI 0–25 (Low):** Muse Glimmer (phases 1 and 2, owner directive
+  2026-08-11), with Gemma as intermediate fallback. Phase-2 = Muse Glimmer
+  Reviewer N-pass; phase-1 = advisory Muse Glimmer review of the task card.
+- **RRI 26–55 (Moderate + Med-high):** Gemma (phases 1 and 2, owner
+  directive 2026-08-11) — see `docs/policies/RRI_POLICY.md § Local
+  pipeline phase-1/phase-2 reviewer bindings`. This reverts the 2026-07-21
+  override that had used `qwen3.6:27b-q4_K_M` in this role (now the local
+  implementer, per ADR-036 Amendment 2), with Muse Glimmer as intermediate
+  fallback, regardless of whether implementation stayed local or escalated
+  to cloud.
 - **RRI 56+ (Complex+):** cross-vendor peer (phases 1 and 2). The peer
   replaces Gemma as the code-solution reviewer for this band.
 
@@ -272,14 +275,24 @@ provider. Same-provider D14 is allowed only after that cross-provider attempt
 is unavailable, unauthenticated, stalled, or invalid/`BLOCKED`; record it as a
 degraded fallback with the failed cross-provider evidence.
 
+**Failure modes (RRI 0–25):**
+1. Muse Glimmer unavailable, stalled, or returns invalid/`BLOCKED` output →
+   fall back to **Gemma** (one immediate retry with the same review packet
+   if Muse Glimmer itself is unusable on the first attempt).
+2. Muse Glimmer + Gemma both unavailable/unusable → fall back to **D14**
+   (Balanced tier, cross-provider first; same-provider only as a recorded
+   degraded final fallback).
+3. Muse Glimmer + Gemma + D14 all unavailable → write a blocked-artifact
+   record and stop. Never self-review. Report the task as blocked.
+
 **Failure modes (RRI 26–55):**
-1. `qwen3.6:27b-q4_K_M` unavailable, stalled, or returns invalid/`BLOCKED`
-   output → fall back to **Gemma** (one immediate retry with the same review
-   packet if Gemma itself is unusable on the first attempt).
-2. `qwen3.6:27b-q4_K_M` + Gemma both unavailable/unusable → fall back to
+1. Gemma unavailable, stalled, or returns invalid/`BLOCKED`
+   output → fall back to **Muse Glimmer** (one immediate retry with the same
+   review packet if Gemma itself is unusable on the first attempt).
+2. Gemma + Muse Glimmer both unavailable/unusable → fall back to
    **D14** (Balanced tier, cross-provider first; same-provider only as a
    recorded degraded final fallback).
-3. `qwen3.6:27b-q4_K_M` + Gemma + D14 all unavailable → write a
+3. Gemma + Muse Glimmer + D14 all unavailable → write a
    blocked-artifact record and stop. Never self-review. Report the task as
    blocked.
 
@@ -301,15 +314,18 @@ full routing table, report line contract, and enforcement note.
 
 ## Gemma Reviewer availability
 
-The review step is **mandatory** for all Low (0–25) development tasks. Gemma
-is the preferred reviewer; the context-isolated subagent (D14,
-`scripts/adjudicator-packet.py`) is the required fallback. For Moderate and
-Med-high (26–55), the equivalent mandatory review step uses
-`qwen3.6:27b-q4_K_M` in place of Gemma as the primary reviewer — see §
-Band-routed peer review above — with Gemma inserted as the intermediate
-fallback (owner directive 2026-07-21) before D14: `qwen3.6:27b-q4_K_M` → Gemma
-→ D14. The retry-then-escalate discipline described below applies at each
-step of that chain.
+The review step is **mandatory** for all Low (0–25) development tasks. Muse
+Glimmer is the preferred reviewer (owner directive, 2026-08-11), with Gemma
+inserted as the intermediate fallback before the context-isolated subagent
+(D14, `scripts/adjudicator-packet.py`), the required final fallback:
+`muse-glimmer:30b-q4_K_M → gemma4:26b-a4b-it-qat → D14`. For Moderate and
+Med-high (26–55), the equivalent mandatory review step uses **Gemma** as the
+primary reviewer — see § Band-routed peer review above — reverting the
+2026-07-21 override that had used `qwen3.6:27b-q4_K_M` in this role (now the
+local implementer), with Muse Glimmer inserted as the intermediate fallback
+before D14: `gemma4:26b-a4b-it-qat → muse-glimmer:30b-q4_K_M → D14`. The
+retry-then-escalate discipline described below applies at each step of both
+chains.
 
 When Ollama is unavailable, the model is absent, the reviewer stalls, output
 is invalid, the review result is `BLOCKED`, or no usable consolidated review

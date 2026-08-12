@@ -23,17 +23,21 @@ governs: "all agent-facing workflow decisions in the repository"
    "length"` with empty `content` (thinking-mode exhausting the token budget
    before any visible output) is a known failure mode — catching it here
    avoids discovering it mid-review, where it forces an avoidable fallback
-   (Gemma → D14, or `qwen3.6:27b-q4_K_M` → Gemma → D14) and burns a review
-   hop that a healthy stack would not have needed.
+   (Muse Glimmer → Gemma → D14 for RRI 0–25, or Gemma → Muse Glimmer → D14
+   for RRI 26–55) and burns a review hop that a healthy stack would not have
+   needed.
    - Confirm the server process is up and listening:
      `pgrep -fl ollama` and `lsof -iTCP:11434 -sTCP:LISTEN`. Restart
      (`kill <pid>`; the macOS app relaunches it) only if the process is
      absent, wedged, or the port is not listening — do not restart a
      healthy server on every task.
    - Warm and re-test each model this task's band will use (at minimum the
-     phase-1/phase-2 reviewer chain: `qwen3.6:27b-q4_K_M` → Gemma; add
-     `qwen3.6:35b-a3b` for RRI 26–55 local-first/ADR-038 routes) with a
-     review-style prompt at production `num_predict`/`num_ctx`, e.g.:
+     RRI 0–25 reviewer chain: `muse-glimmer:30b-q4_K_M` →
+     `gemma4:26b-a4b-it-qat`; for RRI 26–55 add the reviewer chain
+     `gemma4:26b-a4b-it-qat` → `muse-glimmer:30b-q4_K_M`, the implementer
+     binding `qwen3.6:27b-q4_K_M`, and, for Med-high ADR-038 routes, the
+     Local Architect binding `muse-glimmer:30b-q4_K_M`) with a review-style
+     prompt at production `num_predict`/`num_ctx`, e.g.:
      ```bash
      curl -s http://127.0.0.1:11434/api/chat -d '{
        "model": "<model>",
@@ -97,15 +101,15 @@ governs: "all agent-facing workflow decisions in the repository"
    for explicit approval, then use the **local-first implementation path** by
    default: `scripts/local-agent/run_local_task.py` in a disposable worktree,
    resolving the implementer from `DUBBRIDGE_LOCAL_AGENT_MODEL` (default
-   `qwen3.6:35b-a3b`), with at most 2 evidence-backed local repair attempts
+   `qwen3.6:27b-q4_K_M`), with at most 2 evidence-backed local repair attempts
    before escalating to the cloud-takeover model resolved in Step 2. The primary
    agent remains the orchestrator of record and cloud implementation is the
    escalation/fallback path, not the default. For **RRI 41–55 Med-high**, show
    the plan and tasks, wait for
    explicit approval, then route through the **ADR-038 Architect-refined
-   single-attempt gate**: Qwen27 advisory refinement (`GO_LOCAL` |
+   single-attempt gate**: Muse Glimmer advisory refinement (`GO_LOCAL` |
    `CLOUD_REQUIRED`) → primary hash-bound route receipt (may downgrade, never
-   upgrade) → if `GO_LOCAL`, exactly one bounded `qwen3.6:35b-a3b` session
+   upgrade) → if `GO_LOCAL`, exactly one bounded `qwen3.6:27b-q4_K_M` session
    (≤8 turns, ≤300 seconds, **0** repair attempts, supervised as its own
    process group by `scripts/local-agent/run_med_high_task.py`) → otherwise the
    concrete Codex/Claude cloud-takeover model from Step 2 with the full evidence
@@ -413,7 +417,7 @@ surface moves local. The two sub-bands now use different routes.
 
 **Moderate (26–40):** the code-authoring surface is the local agentic runner
 (`scripts/local-agent/run_local_task.py`) using `DUBBRIDGE_LOCAL_AGENT_MODEL`
-(default `qwen3.6:35b-a3b`) inside a disposable worktree, with at most 2
+(default `qwen3.6:27b-q4_K_M`) inside a disposable worktree, with at most 2
 evidence-backed local repair attempts before escalating to cloud. This
 routing became operative by owner override on 2026-07-15, ahead of the
 original ADR-036 pilot promotion gate.
@@ -425,17 +429,17 @@ fail-closed, evidence-bearing gate:
 
 ```mermaid
 flowchart LR
-    Card["Approved Med-high card\n(RRI 41-55)"] --> Q27["Qwen27 advisory refinement\nqwen3.6:27b-q4_K_M"]
-    Q27 -->|GO_LOCAL or CLOUD_REQUIRED| Receipt["Primary hash-bound\nroute receipt"]
+    Card["Approved Med-high card\n(RRI 41-55)"] --> Glimmer["Muse Glimmer advisory refinement\nmuse-glimmer:30b-q4_K_M"]
+    Glimmer -->|GO_LOCAL or CLOUD_REQUIRED| Receipt["Primary hash-bound\nroute receipt"]
     Receipt -->|"downgrade allowed;\nupgrade never allowed"| Gate{"med_high_gate.py\nboth sides GO_LOCAL?"}
     Gate -->|No: CLOUD_REQUIRED| Cloud["Resolved Codex / Claude takeover model\n+ full ADR-038 S5 evidence bundle"]
-    Gate -->|Yes: GO_LOCAL| Runner["ONE bounded qwen3.6:35b-a3b session\nsupervised as its own process group\n<=8 turns / <=300s / 0 repairs"]
+    Gate -->|Yes: GO_LOCAL| Runner["ONE bounded qwen3.6:27b-q4_K_M session\nsupervised as its own process group\n<=8 turns / <=300s / 0 repairs"]
     Runner -->|success| Done["Signed local-implementer audit"]
     Runner -->|timeout, failed acceptance,\nscope/boundary/org violation| Cloud
 ```
 
 Implementation surfaces: `scripts/local-architect/run_analysis.py`
-(`med-high-refinement-v1` profile) for the Qwen27 artifact,
+(`med-high-refinement-v1` profile) for the Muse Glimmer artifact,
 `scripts/local-agent/med_high_gate.py` for the fail-closed route decision,
 `scripts/local-agent/run_local_task.py`'s `resolve_effective_limits()` for
 the tightened 8-turn/0-repair/exact-model budget, and
@@ -446,7 +450,7 @@ acceptance run, timeout, or violation routes directly to cloud, never
 retries locally.
 
 Both sub-bands keep the independent reviewer resolved by the canonical band
-table (currently `qwen3.6:27b-q4_K_M`, then Gemma, then D14), 3 Reflection
+table (currently Gemma, then Muse Glimmer, then D14), 3 Reflection
 passes, and the RRI 26+/41+ human approval gate exactly as before — the
 routing change affects only who authors the code, not who reviews or
 approves it.
@@ -610,7 +614,7 @@ documentation change replaces it.
 | RRI / capability | Local-first position | When cloud takes control | Codex model to present | Starting reasoning effort |
 |---|---|---|---|---|
 | **0–25 / Low** | Primary-agent direct by default; Gemma only for an eligible simple patch | Gemma is unavailable/unusable or its bounded repair fails and the Low-band escalation gate is followed | `gpt-5.6-luna`; use `gpt-5.6-terra` at `low` only when Luna is unavailable in the active environment | `low` |
-| **26–40 / Balanced** | `qwen3.6:35b-a3b` local-first, up to 2 evidence-backed repairs | Local runner/model is unavailable, scope enforcement fails, or the repair budget is exhausted | `gpt-5.6-terra` | `medium` |
+| **26–40 / Balanced** | `qwen3.6:27b-q4_K_M` local-first, up to 2 evidence-backed repairs | Local runner/model is unavailable, scope enforcement fails, or the repair budget is exhausted | `gpt-5.6-terra` | `medium` |
 | **41–55 / Balanced -> Premium** | ADR-038 gate, then at most one bounded local attempt | Operational-only fallback with no new risk or ambiguity | `gpt-5.6-terra` | `high` |
 | **41–55 / Balanced -> Premium** | ADR-038 gate, then at most one bounded local attempt | `CLOUD_REQUIRED` because of a hard exclusion, ambiguity, coupling/risk, or a local acceptance/scope/organization failure | `gpt-5.6-sol` | `high` |
 | **56–70 / Premium** | Cloud is the primary route after mandatory decomposition | Approved decomposed subtask proceeds on Codex | `gpt-5.6-sol` | `high`; use `xhigh` only when eval evidence shows a gain |
@@ -928,7 +932,7 @@ For **RRI 26–55 local-first implementation** (Moderate + Med-high), use
 primary agent remains orchestrator of record: it owns the task card,
 `allowed_paths`, verification commands, Reflection passes, closure, and final
 accept/reject judgment. The local implementer resolves from
-`DUBBRIDGE_LOCAL_AGENT_MODEL` (default `qwen3.6:35b-a3b`), may run ordinary
+`DUBBRIDGE_LOCAL_AGENT_MODEL` (default `qwen3.6:27b-q4_K_M`), may run ordinary
 development commands inside the disposable worktree, and is constrained by the
 existing narrow denylist (`git push`, `docker`, `rm -rf`), stripped
 credentials, and post-run diff scope enforcement.
@@ -1029,7 +1033,7 @@ task closure record. Omit the line entirely when the change is trivially
 within budget (no meaningful margin question) — only include it when the
 margin is tight (within ~10% of the derived budget) or when the escape was
 used. This band is the only one the gate currently evaluates; 26–55 and 56+
-route to `qwen3.6:27b-q4_K_M` / cross-vendor peer review respectively, neither
+route to Gemma / cross-vendor peer review respectively, neither
 of which has a derived budget yet, so no equivalent line applies to them.
 
 ## Language
@@ -1053,17 +1057,30 @@ resolved from the task's RRI band and the review phase:
 
 | Review phase | RRI 0–25 (Low) | RRI 26–55 (Moderate + Med-high) | RRI 56+ (Complex+) |
 |---|---|---|---|
-| **Phase 1 — Task-analysis review** (before task-card presentation or delegation) | **Gemma** (advisory) | `qwen3.6:27b-q4_K_M`†; Gemma fallback‡; D14 final fallback | **Cross-vendor peer**; D14 fallback |
-| **Phase 2 — Code-solution review** (after implementation, before closure) | **Gemma Reviewer** (existing N-pass) | `qwen3.6:27b-q4_K_M`† replaces Gemma/peer; Gemma fallback‡; D14 final fallback | **Cross-vendor peer replaces Gemma**; D14 fallback |
+| **Phase 1 — Task-analysis review** (before task-card presentation or delegation) | **Muse Glimmer** (advisory)†; Gemma fallback‡; D14 final fallback | **Gemma**§; Muse Glimmer fallback¶; D14 final fallback | **Cross-vendor peer**; D14 fallback |
+| **Phase 2 — Code-solution review** (after implementation, before closure) | **Muse Glimmer Reviewer** (N-pass)†; Gemma fallback‡; D14 final fallback | **Gemma Reviewer**§ (existing N-pass); Muse Glimmer fallback¶; D14 final fallback | **Cross-vendor peer replaces Gemma**; D14 fallback |
 
-† **Owner directive, 2026-07-21** — see `docs/policies/RRI_POLICY.md § Local
-pipeline phase-1/phase-2 reviewer override`. Applies regardless of whether
-implementation stayed local or escalated to cloud.
+† **Owner directive, 2026-08-11** (local model stack restructure) — Muse
+Glimmer (`muse-glimmer:30b-q4_K_M`) becomes the RRI 0–25 primary reviewer,
+replacing Gemma in that role. See `docs/policies/RRI_POLICY.md § Local
+pipeline phase-1/phase-2 reviewer bindings` and ADR-037 Amendment 1.
 
-‡ **Owner directive, 2026-07-21** — when `qwen3.6:27b-q4_K_M` is unavailable,
+‡ **Owner directive, 2026-08-11** — when Muse Glimmer is unavailable,
 stalled, or returns invalid/`BLOCKED` output, fall back to **Gemma** (one
 retry with the same packet if Gemma itself is unusable) before escalating to
-D14. Chain: `qwen3.6:27b-q4_K_M → Gemma → D14`.
+D14. Chain: `muse-glimmer:30b-q4_K_M → gemma4:26b-a4b-it-qat → D14`.
+
+§ **Owner directive, 2026-08-11** — this **retires** the prior 2026-07-21
+override that made `qwen3.6:27b-q4_K_M` the RRI 26–55 primary reviewer
+(retired because that binding is now the local implementer — see ADR-036
+Amendment 2). Gemma reverts to the RRI 26–55 primary reviewer role, the
+role it held before the 2026-07-21 override. Applies regardless of whether
+implementation stayed local or escalated to cloud.
+
+¶ **Owner directive, 2026-08-11** — when Gemma is unavailable, stalled, or
+returns invalid/`BLOCKED` output, fall back to **Muse Glimmer** (one retry
+with the same packet if Muse Glimmer itself is unusable) before escalating
+to D14. Chain: `gemma4:26b-a4b-it-qat → muse-glimmer:30b-q4_K_M → D14`.
 
 ### Cross-vendor peer and D14 provider resolution
 
@@ -1091,34 +1108,42 @@ and the closure report (phase 2). A docs/policy/config-only task records `n/a` w
 the exemption stated for phase 2.
 
 ```
-Task-analysis review: <gemma|qwen3.6:27b-q4_K_M|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
-Code-solution review: <gemma|qwen3.6:27b-q4_K_M|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
+Task-analysis review: <gemma|muse-glimmer|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
+Code-solution review: <gemma|muse-glimmer|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
 ```
 
-- `<reviewer>` ∈ `gemma | qwen3.6:27b-q4_K_M | codex | claude | d14`. In the
-  26–55 band, use `gemma` when `qwen3.6:27b-q4_K_M` was
-  unavailable/stalled/invalid and Gemma handled the review instead; use `d14`
-  when both `qwen3.6:27b-q4_K_M` and Gemma were unusable and D14 handled it.
-  Outside 26–55, use `d14` when the resolved reviewer (peer CLI or
-  `qwen3.6:27b-q4_K_M`) was unavailable/unauthenticated/stalled and D14
-  handled the review.
+- `<reviewer>` ∈ `gemma | muse-glimmer | codex | claude | d14`. In the 0–25
+  band, use `gemma` when Muse Glimmer was unavailable/stalled/invalid and
+  Gemma handled the review instead. In the 26–55 band, use `muse-glimmer`
+  when Gemma was unavailable/stalled/invalid and Muse Glimmer handled the
+  review instead. In either band, use `d14` when both models in that band's
+  chain were unusable and D14 handled it. Outside 0–55, use `d14` when the
+  resolved reviewer (peer CLI) was unavailable/unauthenticated/stalled and
+  D14 handled the review.
 - `PASS` — the phase may proceed (presentation or closure).
 - `BLOCKED` — non-pass verdict, or every reviewer in the band's fallback
-  chain unavailable (26–55: `qwen3.6:27b-q4_K_M` + Gemma + D14 all
-  unavailable; other bands: primary reviewer + D14 both unavailable). The
-  caller stops and reports a blocked artifact. Clearing it requires revision,
-  an explicit user waiver, or reporting the task blocked. Never downgrade
-  silently to self-review.
+  chain unavailable (0–25: Muse Glimmer + Gemma + D14 all unavailable; 26–55:
+  Gemma + Muse Glimmer + D14 all unavailable; other bands: primary reviewer +
+  D14 both unavailable). The caller stops and reports a blocked artifact.
+  Clearing it requires revision, an explicit user waiver, or reporting the
+  task blocked. Never downgrade silently to self-review.
 
 ### Interaction with existing gates
 
 - Peer review **does not replace** the HITL human approval gate required by the
   RRI band. It is a separate, independent check that runs in addition to it.
-- In the RRI 26–55 band, `qwen3.6:27b-q4_K_M` **replaces** Gemma (Moderate)
-  and the cross-vendor peer (Med-high) as the primary reviewer for both phases.
-  If `qwen3.6:27b-q4_K_M` is unavailable/stalled/invalid, **Gemma** is the
-  intermediate fallback (owner directive 2026-07-21) before **D14**, which
-  remains the mandatory final fallback: `qwen3.6:27b-q4_K_M → Gemma → D14`.
+- In the RRI 0–25 band, **Muse Glimmer** (owner directive, 2026-08-11)
+  replaces Gemma as the primary reviewer for both phases. If Muse Glimmer is
+  unavailable/stalled/invalid, **Gemma** is the intermediate fallback before
+  **D14**, which remains the mandatory final fallback:
+  `muse-glimmer:30b-q4_K_M → Gemma → D14`.
+- In the RRI 26–55 band, **Gemma** (owner directive, 2026-08-11) reverts to
+  the primary reviewer for both phases, retiring the 2026-07-21 override
+  that had used `qwen3.6:27b-q4_K_M` in this role (that binding is now the
+  local implementer — ADR-036 Amendment 2). If Gemma is
+  unavailable/stalled/invalid, **Muse Glimmer** is the intermediate fallback
+  before **D14**, which remains the mandatory final fallback:
+  `Gemma → muse-glimmer:30b-q4_K_M → D14`.
 - In the RRI 56+ band the cross-vendor peer **replaces Gemma** as the
   code-solution reviewer (they do not both run). **D14** remains the
   mandatory fallback.
@@ -1134,12 +1159,18 @@ are implemented, peer review is a **workflow and reporting contract**: the calle
 must perform the review and record the two report lines. Hook enforcement is not
 active in PPR-1.
 
-## Gemma Reviewer
+## Gemma Reviewer / Muse Glimmer Reviewer
 
-**Gemma Reviewer** is a read-only local model role. It is the primary reviewer
-for Low (0–25) development tasks and the intermediate fallback for RRI 26–55
-when `qwen3.6:27b-q4_K_M` is unusable. It is distinct from **Gemma Developer**,
-which is the patch-delegation path for eligible simple code patches.
+**Gemma Reviewer** and **Muse Glimmer Reviewer** are read-only local model
+roles sharing one mechanism (`scripts/gemma-code-review.py`, N sequential
+passes, consolidated findings). Owner directive, 2026-08-11: **Muse Glimmer**
+is the primary reviewer for RRI 0–25 development tasks, with Gemma as the
+intermediate fallback; **Gemma** is the primary reviewer for RRI 26–55, with
+Muse Glimmer as the intermediate fallback. D14 is the mandatory final
+fallback in both bands. Both roles are distinct from **Gemma Developer**,
+which is the patch-delegation path for eligible simple code patches and
+stays bound to Gemma regardless of this restructure (see `scripts/gemma_local.py`
+`DEFAULT_MODEL`, decoupled from the reviewer-role default).
 
 ### Authority boundary
 
@@ -1157,8 +1188,10 @@ For Low development tasks, or when the RRI 26–55 reviewer fallback is triggere
 after implementation:
 
 1. Implementation completes (primary agent or eligible Gemma Developer).
-2. Gemma Reviewer runs N sequential passes (default 3, `--passes N`,
-   env `DUBBRIDGE_REVIEW_PASSES`) via `scripts/gemma-code-review.py`.
+2. The band's resolved primary reviewer (Muse Glimmer for RRI 0–25, Gemma
+   for RRI 26–55) runs N sequential passes (default 3, `--passes N`,
+   env `DUBBRIDGE_REVIEW_PASSES`) via `scripts/gemma-code-review.py`, which
+   resolves the model from `DEFAULT_REVIEW_MODEL` per band.
    - Each parseable pass contributes review comments to one consolidated
      developer-review packet.
    - Duplicate findings are consolidated and source buckets are preserved.
@@ -1177,24 +1210,29 @@ Reflection cycle.
 
 ### Availability
 
-The review step is mandatory. Gemma is the preferred Low-band reviewer and the
-intermediate RRI 26–55 fallback; D14 is the final fallback defined by the
-canonical band table.
+The review step is mandatory. For RRI 0–25, **Muse Glimmer** is the preferred
+primary reviewer and **Gemma** is the intermediate fallback. For RRI 26–55,
+**Gemma** is the preferred primary reviewer and **Muse Glimmer** is the
+intermediate fallback. D14 is the final fallback in both bands, defined by
+the canonical band table.
 
-- **Gemma available and a usable consolidated result is produced:** run
-  `make qa-gemma-review`, read the consolidated developer-review packet, and
-  disposition every finding.
-- **Gemma unavailable, stalls, returns invalid output, returns `BLOCKED`, or no
-  usable consolidated result can be produced:** the agent must perform **one
-  immediate retry** with the same review packet first. If the retry yields a
-  usable consolidated result, continue on the Gemma path. If the retry fails
-  for the same class of reason or still produces no usable consolidated result,
-  spawn a context-isolated subagent as the mandatory fallback reviewer. The
-  subagent receives an isolation packet (diff + acceptance criteria + any
-  usable partial findings) and its output is advisory, exactly as Gemma's. The
-  primary agent reconciles and records `disposition_divergence` in the audit
-  log.
-- **Neither path may be skipped.** No additional human approval gate beyond
+- **Primary model available and a usable consolidated result is produced:**
+  run `make qa-gemma-review`, read the consolidated developer-review packet,
+  and disposition every finding.
+- **Primary model unavailable, stalls, returns invalid output, returns
+  `BLOCKED`, or no usable consolidated result can be produced:** the agent
+  must perform **one immediate retry** with the same review packet against
+  the primary model first. If the retry yields a usable consolidated result,
+  continue on that path. If the retry fails for the same class of reason or
+  still produces no usable consolidated result, retry once against the
+  band's intermediate-fallback model (Gemma for RRI 0–25, Muse Glimmer for
+  RRI 26–55) with the same packet. If that also fails, spawn a
+  context-isolated subagent (D14) as the mandatory final fallback reviewer.
+  The subagent receives an isolation packet (diff + acceptance criteria + any
+  usable partial findings) and its output is advisory, exactly as the
+  primary model's. The primary agent reconciles and records
+  `disposition_divergence` in the audit log.
+- **No path may be skipped.** No additional human approval gate beyond
   what the RRI band already requires is opened by using the fallback.
 
 Docs-only, config-only, migration-only, ADR, plan, task-ledger, and policy-only
@@ -1278,7 +1316,7 @@ qa-peer-workflow-review` write a committed JSON receipt when invoked with
 `docs/audit/gemma-evidence/<task_id>.json`:
 
 ```json
-{"task_id": "<task_id>", "commit_sha": "<sha>", "reviewer": "gemma|qwen3.6:27b-q4_K_M|d14", "verdict": "PASS|FINDINGS-ACKED|...", "timestamp": "<ISO 8601>"}
+{"task_id": "<task_id>", "commit_sha": "<sha>", "reviewer": "gemma|muse-glimmer|d14", "verdict": "PASS|FINDINGS-ACKED|...", "timestamp": "<ISO 8601>"}
 ```
 
 The completed section in the task file must reference it:
@@ -1311,29 +1349,31 @@ all bands)`.
 
 ## Local Architect / Complex Analyst (ADR-037)
 
-**Local Architect / Complex Analyst** (`qwen3.6:27b-q4_K_M` via Ollama) is a
-bounded, advisory-only role for architecture synthesis and complex causal
-analysis on a real work item, invoked before the primary agent authors the
-target ADR/plan/tasks. It is not an implementer, not a technical judge, and
-does not replace D14 or human approval — see ADR-037 §1 for the full
-may/may-not boundary and §3 for the eight invocation triggers (e.g. a likely
-ADR decision, multi-module failure analysis, or a high-RRI problem needing
-decomposition before execution).
+**Local Architect / Complex Analyst** (`muse-glimmer:30b-q4_K_M` via Ollama,
+per ADR-037 Amendment 1, 2026-08-11) is a bounded, advisory-only role for
+architecture synthesis and complex causal analysis on a real work item,
+invoked before the primary agent authors the target ADR/plan/tasks. It is
+not an implementer, not a technical judge, and does not replace D14 or human
+approval — see ADR-037 §1 for the full may/may-not boundary and §3 for the
+eight invocation triggers (e.g. a likely ADR decision, multi-module failure
+analysis, or a high-RRI problem needing decomposition before execution).
 
-**Scoped exception (owner directive, 2026-07-21):** for RRI 26–55 non-exempt
-phase-1 task-analysis and phase-2 code-solution review, this model *does*
-replace Gemma Reviewer and the cross-vendor peer as the default reviewer — see
-`docs/policies/RRI_POLICY.md § Local pipeline phase-1/phase-2 reviewer override` and
-`§ Band-routed peer review` above. Outside that narrow review role, the
-ADR-037 boundary is unchanged: it remains advisory-only for architecture/
-analysis synthesis, may not author the target document itself, and does not
-satisfy the human-approval gate.
+**Retired scoped exception:** the 2026-07-21 owner directive that had this
+role's prior binding (`qwen3.6:27b-q4_K_M`) also serve as the RRI 26–55
+phase-1/phase-2 reviewer is **retired as of 2026-08-11** — see
+`docs/policies/RRI_POLICY.md § Local pipeline phase-1/phase-2 reviewer
+bindings` and `§ Band-routed peer review` above, where RRI 26–55 review
+reverts to Gemma (primary) / Muse Glimmer (fallback). This role no longer
+doubles as a phase-1/phase-2 reviewer for any band: the ADR-037 boundary
+applies without exception again — advisory-only for architecture/analysis
+synthesis, may not author the target document itself, and does not satisfy
+the human-approval gate.
 
-Its advisory-analysis output (the ADR-037 role, not the phase-2 review role)
-carries no approval authority of its own; the primary agent must
-independently verify every claim against repository evidence before
-authoring any canonical document. Full procedure, task cards, and
-operational evidence: `docs/tasks/adr037-local-architect-direct-project.md`;
+Its advisory-analysis output carries no approval authority of its own; the
+primary agent must independently verify every claim against repository
+evidence before authoring any canonical document. Full procedure, task
+cards, and operational evidence:
+`docs/tasks/adr037-local-architect-direct-project.md`;
 `docs/evaluations/adr037-direct-project-report.md`.
 
 ## Antares Security-Specialist Advisor
@@ -1467,18 +1507,23 @@ Exempt only: `docs-only`, `config-only`, `migration-only`, `ADR`, `plan`,
 
 **Reviewer is determined by RRI band** (see `Band-routed peer review` above):
 
-#### Step 1-A — RRI 0–25 (Low): Gemma Reviewer / D14
+#### Step 1-A — RRI 0–25 (Low): Muse Glimmer Reviewer / Gemma / D14
+
+**Owner directive, 2026-08-11:** Muse Glimmer (`muse-glimmer:30b-q4_K_M`) is
+the RRI 0–25 primary reviewer, with Gemma as the intermediate fallback
+before D14.
 
 ```
 [ ] 1a. Run `make qa-gemma-review`
-        - Gemma runs N sequential passes (default 3, env DUBBRIDGE_REVIEW_PASSES).
+        - Muse Glimmer runs N sequential passes (default 3, env DUBBRIDGE_REVIEW_PASSES).
         - Every parseable pass contributes to one consolidated developer-review
           packet; there is no quorum gate.
         - Wrapper classifies findings: consensus | pass-specific |
           severity-inconsistent | location-inconsistent | likely-false-positive.
         - One or more parseable passes produce a usable aggregate. Zero parseable
-          passes, invalid output, stall, unavailable model, or `BLOCKED` status
-          routes to D14 fallback.
+          passes, invalid output, stall, or unavailable model retries once against
+          Muse Glimmer, then falls back to Gemma with the same packet; `BLOCKED`
+          status on Gemma too routes to D14 fallback.
         - `make qa-gemma-review` automatically runs `parse-review-findings.py`
           after writing the result. If findings exist in ANY bucket (findings[],
           consensus, pass_specific, location_inconsistent, severity_inconsistent,
@@ -1487,43 +1532,47 @@ Exempt only: `docs-only`, `config-only`, `migration-only`, `ADR`, `plan`,
           Do NOT report "0 findings" without verifying the script exit code.
 
 [ ] 1b. Evaluate D14 trigger — spawn context-isolated subagent if ANY of:
-        - Gemma unavailable, stalled, returned invalid output, returned `BLOCKED`,
-          or no usable consolidated result was produced  ← mandatory
+        - Muse Glimmer unavailable, stalled, returned invalid output, or
+          returned `BLOCKED`, **and** the Gemma fallback also failed the same
+          way  ← mandatory
         The D14 subagent must be spawned at the Balanced model tier, using a
         responsive cross-provider first; same-provider is a recorded degraded
         fallback only after that attempt is unusable.
         Its output is advisory; record disposition_divergence.
 
-[ ] 1c. Record `### Gemma Reviewer evidence` block in the task entry.
+[ ] 1c. Record `### Gemma Reviewer evidence` block in the task entry
+        (`Model:` names whichever of Muse Glimmer/Gemma/D14 actually ran).
         For RRI 0–25 primary-agent tasks: record in the task entry.
         For RRI 0–25 delegated Gemma Developer tasks: record in the final report.
         Neither path may be skipped.
 ```
 
-#### Step 1-B — RRI 26–55 (Moderate + Med-high): `qwen3.6:27b-q4_K_M` / Gemma / D14
+#### Step 1-B — RRI 26–55 (Moderate + Med-high): Gemma / Muse Glimmer / D14
 
-**Owner directive, 2026-07-21:** phase 2, and non-exempt phase 1, defaults to
-the **Local Architect / Complex Analyst model** (`qwen3.6:27b-q4_K_M` via
-Ollama) throughout RRI 26–55. See `docs/policies/RRI_POLICY.md § Local pipeline
-phase-2 reviewer override` for the full contract and ADR-037 scope note.
+**Owner directive, 2026-08-11:** phase 2, and non-exempt phase 1, default to
+**Gemma** (`gemma4:26b-a4b-it-qat`) throughout RRI 26–55, reverting the prior
+2026-07-21 override that used `qwen3.6:27b-q4_K_M` (now the local
+implementer — ADR-036 Amendment 2). See
+`docs/policies/RRI_POLICY.md § Local pipeline phase-1/phase-2 reviewer
+bindings` for the full contract and ADR-037 scope note.
 
 ```
 [ ] 1d. Send the diff, task acceptance criteria, and any independently-
         verified facts (verification/test output already produced) to
-        `qwen3.6:27b-q4_K_M` via the Ollama `/api/chat` endpoint
+        Gemma (`gemma4:26b-a4b-it-qat`) via the Ollama `/api/chat` endpoint
         (`OLLAMA_HOST`, default `http://localhost:11434`). No tagged-block
         contract required — request a structured PASS/FINDINGS verdict with
         findings by severity.
 
-[ ] 1e. Evaluate Gemma fallback (owner directive, 2026-07-21) — route to
-        Gemma if `qwen3.6:27b-q4_K_M` unavailable, stalled, or returns
-        invalid/`BLOCKED` output. One retry against `qwen3.6:27b-q4_K_M`
-        with the same packet first; if the retry also fails, send the same
-        review packet to Gemma instead.
+[ ] 1e. Evaluate Muse Glimmer fallback (owner directive, 2026-08-11) — route
+        to Muse Glimmer (`muse-glimmer:30b-q4_K_M`) if Gemma unavailable,
+        stalled, or returns invalid/`BLOCKED` output. One retry against
+        Gemma with the same packet first; if the retry also fails, send the
+        same review packet to Muse Glimmer instead.
 
 [ ] 1f. Evaluate D14 fallback — spawn context-isolated subagent if:
-        - `qwen3.6:27b-q4_K_M` unavailable/stalled/invalid **and** Gemma
-          also unavailable, stalled, or returns invalid/`BLOCKED` output.
+        - Gemma unavailable/stalled/invalid **and** Muse Glimmer also
+          unavailable, stalled, or returns invalid/`BLOCKED` output.
         - If D14 is also unavailable: write a blocked-artifact record and stop.
           Never self-review. Report the task as blocked.
         The D14 subagent runs at the Balanced model tier, cross-provider first;
@@ -1531,12 +1580,12 @@ phase-2 reviewer override` for the full contract and ADR-037 scope note.
         is unusable. Output is advisory.
 
 [ ] 1g. Record `### Peer Reviewer evidence` block in the task entry:
-        - Reviewer: `<qwen3.6:27b-q4_K_M|gemma|d14>`
+        - Reviewer: `<gemma|muse-glimmer|d14>`
         - Command: `<exact command or manual invocation>`
         - Artifact: `<path to review artifact>`
         - Verdict: `PASS | BLOCKED`
         - Findings: `<summary or "none">`
-        - Gemma fallback: `triggered | not triggered` — reason: `<condition or n/a>`
+        - Muse Glimmer fallback: `triggered | not triggered` — reason: `<condition or n/a>`
         - D14 fallback: `triggered | not triggered` — reason: `<condition or n/a>`
         - D14 provider route: `cross-provider | same-provider-degraded | n/a` — reason: `<provider and failed cross-provider attempt, or n/a>`
         - disposition_divergence: `none | partial | full | null`
@@ -1546,9 +1595,9 @@ phase-2 reviewer override` for the full contract and ADR-037 scope note.
 #### Step 1-C — RRI 56+ (Complex and above): cross-vendor peer / D14
 
 The cross-vendor peer **replaces Gemma** as the code-solution reviewer for
-this band (the `qwen3.6:27b-q4_K_M` override above applies only to 26–55).
-Do not run Gemma Reviewer for RRI 56+ tasks; the peer is the mandatory
-path and D14 is the mandatory fallback.
+this band (the Gemma/Muse Glimmer routing in Step 1-B above applies only to
+26–55). Do not run Gemma Reviewer or Muse Glimmer Reviewer for RRI 56+
+tasks; the peer is the mandatory path and D14 is the mandatory fallback.
 
 ```
 [ ] 1d. Resolve the cross-vendor peer from the caller identity:
@@ -1581,7 +1630,7 @@ path and D14 is the mandatory fallback.
 Record the phase-2 report line in the closure report:
 
 ```
-Code-solution review: <gemma|qwen3.6:27b-q4_K_M|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
+Code-solution review: <gemma|muse-glimmer|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
 ```
 
 ### Step 2 — Reflection log (RRI 26+)

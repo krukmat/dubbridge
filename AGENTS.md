@@ -213,12 +213,12 @@ time. Docs-only, config-only, migration-only, ADR, plan, task-ledger, and
 policy-only tasks record `n/a` with the exemption stated for phase 2.
 
 ```
-Task-analysis review: <gemma|qwen3.6:27b-q4_K_M|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
-Code-solution review: <gemma|qwen3.6:27b-q4_K_M|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
+Task-analysis review: <gemma|muse-glimmer|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
+Code-solution review: <gemma|muse-glimmer|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
 ```
 
-- `gemma` — primary reviewer for RRI 0–25; intermediate fallback for RRI 26–55.
-- `qwen3.6:27b-q4_K_M` — primary reviewer for both phases in RRI 26–55.
+- `muse-glimmer` — primary reviewer for RRI 0–25; intermediate fallback for RRI 26–55.
+- `gemma` — primary reviewer for RRI 26–55; intermediate fallback for RRI 0–25.
 - `codex | claude` — RRI 56+, resolved from caller identity
   (`claude-code → codex`, `codex → claude`, others → `claude`).
 - `d14` — final fallback when the preceding reviewer chain is unusable.
