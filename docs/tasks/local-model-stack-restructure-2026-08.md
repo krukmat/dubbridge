@@ -41,8 +41,8 @@ slice: local-model-stack-restructure-2026-08
 | T4b Reviewer/Architect binding swap + decoupling | `[x] Done` | 44 Med-high | `gemma_local.py`, `gemma-code-review.py`, `peer-workflow-review.py`, `run_analysis.py`, `med_high_gate.py` + tests | T1 |
 | T4c `delegate-low-rri.py` stall-fallback cleanup | `[x] Done` | 18 Low | 1 script + test | T1 |
 | T5 Regenerate `AGENTS.override.md` | `[x] Done` | 3 Low | 1 generated file | T2 |
-| T6 Cross-reference notes on open task/plan docs | `[ ] Pending` | 16 Low | 6 live task/plan docs | T1 |
-| T7 Integrated verification, reviews and closure | `[ ] Pending` | n/a (rollup) | tests, QA, status closure | T3, T4a, T4b, T4c, T5, T6 |
+| T6 Cross-reference notes on open task/plan docs | `[x] Done` | 16 Low | 6 live task/plan docs | T1 |
+| T7 Integrated verification, reviews and closure | `[x] Done` | n/a (rollup) | tests, QA, status closure | T3, T4a, T4b, T4c, T5, T6 |
 
 ## T1 — ADR-036 Amendment 2 + ADR-037 Amendment 1 + ADR-038 Amendment 1
 
@@ -811,6 +811,15 @@ satisfied, while T6 and T7 themselves were not started.
 - **Acceptance:** each file has exactly one added pointer note; no other
   content changed.
 
+### T6 completion record
+
+- Added exactly one dated current-binding pointer note near the top of each of
+  the six allowed live task/plan documents. Historical execution-log content
+  was not rewritten.
+- **Verification:** `git diff --check`; pointer-note count `1` in each allowed
+  file; `make qa-docs` passed.
+- **Status artifacts affected:** this ledger row (`[x] Done`).
+
 ## T7 — Integrated verification, reviews and closure
 
 - **Objective:** `make qa-local`, `make qa-docs`, the full Python test suite
@@ -823,3 +832,45 @@ satisfied, while T6 and T7 themselves were not started.
   (Muse Glimmer production observation under real Med-high load) is either
   answered or explicitly carried forward as a tracked follow-up, not
   silently dropped.
+
+### T7 execution record — 2026-08-12 (closure blocked)
+
+- **Integrated verification passed:** `make qa-local`; `make qa-docs`;
+  `python3 scripts/local-agent/run_local_task_test.py` (90 tests);
+  `python3 scripts/local-agent/run_med_high_task_test.py` (50 tests);
+  `python3 scripts/local-bench/run_stage1_benchmark_test.py` (7 tests);
+  `python3 scripts/gemma_local_test.py` (37 tests);
+  `python3 scripts/gemma_code_review_test.py` (55 tests);
+  `python3 scripts/peer_workflow_review_test.py` (49 tests);
+  `python3 scripts/local-architect/run_analysis_test.py` (20 tests);
+  `python3 scripts/local-agent/med_high_gate_test.py` (28 tests); and
+  `python3 scripts/delegate_low_rri_test.py` (100 tests).
+- **Post-T4 golden-fixture reconciliation:**
+  `scripts/local-agent/run_med_high_task_test.py` now expects the actual
+  Muse Glimmer refinement tag (`muse-glimmer:30b-q4_K_M`) and its derived
+  artifact SHA-256 (`31d923290a7ec004229a8ca7407af072b1de021aeff1ed97fe7bee9eb39befa2`).
+  This leaves the Qwen27 implementer binding unchanged.
+- **T4a/T4b `disposition_divergence` reconciliation:** both phase-2 review
+  receipts report `gemma` / `PASS` with no findings. Their completion records
+  in this ledger each record `disposition_divergence: none`; neither review
+  triggered the Muse Glimmer or D14 fallback. The receipt schemas do not
+  carry a top-level `disposition_divergence` field, so the completion records
+  are the authoritative source for that reconciliation.
+- **Status artifacts:** this ledger and the linked plan were updated. The
+  roadmap was checked and left unchanged because it contains no reference to
+  the local pipeline roles. The plan now carries F1, the explicit tracked
+  follow-up for T1's real Med-high production observation.
+- **Historical exception:** T4a and T4b are development tasks, but each completion
+  record states `Task-analysis review: gemma n/a`. The governing workflow
+  requires a band-resolved phase-1 review before implementation for such
+  tasks, and the docs-only exemption does not apply. A post-hoc review cannot
+  satisfy that ordering.
+- **Owner waiver:** 2026-08-12 — the user explicitly approved closing T7
+  despite this historical T4a/T4b phase-1-review gap. This waiver is limited
+  to that already-recorded ordering exception; it does not waive any test,
+  phase-2, or future phase-1 requirement.
+- Task-analysis review: n/a — task-ledger/plan closure exemption.
+- Code-solution review: n/a — task-ledger/plan closure exemption.
+
+**T7 status: `[x] Done` — all verification gates passed; historical T4a/T4b
+phase-1 ordering gap closed by the owner waiver above.**

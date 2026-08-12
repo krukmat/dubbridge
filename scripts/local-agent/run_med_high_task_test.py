@@ -12,7 +12,7 @@ import med_high_gate
 import run_med_high_task as _MOD
 
 CARD_HASH = "a" * 64
-_RECEIPT_SHA = "5f4f97e0703e24ba083fcf764bb874d9ffcb583581cd340e83ffe68e9c450523"
+_RECEIPT_SHA = "31d923290a7ec004229a8ca7407af072b1de021aeff1ed97fe7bee9eb39befa2"
 
 # Captured after T1, T2, and T4 have all landed (plan D4): covers T4's schema
 # change (new "8. Acceptance tests" section, sections 8-11 renumbered to
@@ -71,7 +71,7 @@ MISSING
   "model": {{
     "expected_digest": "sha256:deadbeef",
     "resolved_digest": "sha256:deadbeef",
-    "tag": "qwen3.6:27b-q4_K_M"
+    "tag": "muse-glimmer:30b-q4_K_M"
   }},
   "packet": {{
     "sha256": "{CARD_HASH}"

@@ -205,6 +205,19 @@ flowchart TD
     T6 --> T7
 ```
 
+## Follow-up and closure state
+
+- **F1 — Muse Glimmer production observation (open, non-blocking):** on the
+  first eligible real Med-high workload, capture the
+  `med-high-refinement-v1` artifact and its route receipt for
+  `muse-glimmer:30b-q4_K_M`; measure schema adherence and record the result
+  in this plan and in the T7 execution record. The earlier smoke test is not
+  a substitute for this observation.
+- **T7 roll-up:** verification commands passed on 2026-08-12. The owner
+  explicitly waived the historical T4a/T4b phase-1 ordering gap on the same
+  date, so T7 is closed; the waiver is recorded in the task ledger's T7
+  execution record.
+
 ## Related
 
 - `docs/adr/ADR-036-local-first-agentic-implementation-band.md`

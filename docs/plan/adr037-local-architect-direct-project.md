@@ -8,6 +8,8 @@ governed_by: [ADR-037, ADR-036, ADR-034]
 
 # Plan: ADR-037 Local Architect / Complex Analyst Direct Project Use
 
+> **Current binding note (2026-08-11):** References below to prior local-model bindings are retained as task-history and planning context. For operative bindings, use ADR-036 Amendment 2 and ADR-037 Amendment 1; see `docs/tasks/local-model-stack-restructure-2026-08.md`.
+
 ## Objective
 
 Introduce `qwen3.6:27b-q4_K_M` directly into real DubBridge planning work as a
