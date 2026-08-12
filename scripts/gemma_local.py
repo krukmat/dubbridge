@@ -21,6 +21,15 @@ from typing import Optional
 DEFAULT_HOST = "http://localhost:11434"
 DEFAULT_MODEL = "gemma4:26b-a4b-it-qat"
 DEFAULT_FALLBACK_MODEL = "gemma4:26b-a4b-it-qat"
+# ADR-036 Amendment 2 / owner directive 2026-08-11: the RRI 0-25 primary
+# reviewer role (Gemma Reviewer / Muse Glimmer Reviewer) is Muse Glimmer,
+# distinct from Gemma Developer's DEFAULT_MODEL above. Deliberately a
+# separate constant, not a repoint of DEFAULT_MODEL/DEFAULT_FALLBACK_MODEL --
+# those stay Gemma so Gemma Developer (patch delegation) is unaffected by
+# reviewer-role rebinding (plan Design decision 2). DEFAULT_FALLBACK_MODEL
+# doubles as this role's own "Muse Glimmer unavailable -> Gemma" intermediate
+# fallback target, since it already holds Gemma's tag.
+DEFAULT_REVIEW_MODEL = "muse-glimmer:30b-q4_K_M"
 DEFAULT_IDLE_TIMEOUT_SECONDS = 180
 DEFAULT_MAX_WALL_SECONDS = 900
 DEFAULT_NUM_CTX = 131072

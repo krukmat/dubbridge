@@ -437,10 +437,21 @@ def parse_args() -> Config:
     )
     parser.add_argument("--expected-packet-sha256", required=True, help="Expected SHA-256 for the packet bytes.")
     parser.add_argument("--output", required=True, help="Artifact path to write atomically.")
-    parser.add_argument("--model-tag", default="qwen3.6:27b-q4_K_M", help="Exact Ollama model tag to verify and run.")
+    parser.add_argument(
+        "--model-tag",
+        # ADR-037 Amendment 1 (T4b): the Local Architect / Complex Analyst
+        # binding moved from qwen3.6:27b-q4_K_M (reassigned to the local
+        # implementer by ADR-036 Amendment 2) to Muse Glimmer.
+        default="muse-glimmer:30b-q4_K_M",
+        help="Exact Ollama model tag to verify and run.",
+    )
     parser.add_argument(
         "--expected-model-digest",
-        default="a50eda8ed977ab48a12431878896b27ffd5cef552c17af3317d9623b939a7f1e",
+        # Paired with --model-tag's default above -- must always name the
+        # exact digest of that same model tag, or the fail-closed
+        # model_digest_mismatch check in run_analysis() rejects every
+        # default-args invocation.
+        default="de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
         help="Expected Ollama digest for the exact model tag.",
     )
     parser.add_argument("--ollama-url", default="http://127.0.0.1:11434", help="Base URL for the local Ollama API.")

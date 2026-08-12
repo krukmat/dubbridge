@@ -24,6 +24,14 @@ class SharedConfig(unittest.TestCase):
         self.assertEqual(gemma_local.DEFAULT_TEMPERATURE, 0.1)
         self.assertFalse(gemma_local.DEFAULT_THINK)
 
+    def test_ec1_review_model_default_is_decoupled_from_developer_default(self):
+        # ADR-036 Amendment 2 (T4b): DEFAULT_REVIEW_MODEL must be Muse
+        # Glimmer's own tag and must never clobber DEFAULT_MODEL/
+        # DEFAULT_FALLBACK_MODEL, which stay Gemma for Gemma Developer.
+        self.assertEqual(gemma_local.DEFAULT_REVIEW_MODEL, "muse-glimmer:30b-q4_K_M")
+        self.assertEqual(gemma_local.DEFAULT_MODEL, "gemma4:26b-a4b-it-qat")
+        self.assertNotEqual(gemma_local.DEFAULT_REVIEW_MODEL, gemma_local.DEFAULT_MODEL)
+
     def test_resolve_num_predict_raises_default_for_gemma(self):
         self.assertEqual(
             gemma_local.resolve_num_predict("gemma4:26b-a4b-it-qat", 4096),

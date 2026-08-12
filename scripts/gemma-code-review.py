@@ -49,13 +49,13 @@ def parse_args():
     )
     parser.add_argument(
         "--model",
-        default=os.environ.get(
-            "DUBBRIDGE_REVIEW_MODEL",
-            os.environ.get("DUBBRIDGE_LOW_RRI_MODEL", gemma_local.DEFAULT_MODEL),
-        ),
+        default=os.environ.get("DUBBRIDGE_REVIEW_MODEL", gemma_local.DEFAULT_REVIEW_MODEL),
         help=(
-            "Review model; defaults to DUBBRIDGE_REVIEW_MODEL, then "
-            "DUBBRIDGE_LOW_RRI_MODEL, then the repo local Gemma default."
+            "Review model; defaults to DUBBRIDGE_REVIEW_MODEL, then the "
+            "repo's Muse Glimmer reviewer default (ADR-036 Amendment 2, "
+            "owner directive 2026-08-11). Decoupled from "
+            "DUBBRIDGE_LOW_RRI_MODEL, which is Gemma Developer's own env "
+            "var and must not influence reviewer-role resolution."
         ),
     )
     parser.add_argument(
@@ -517,14 +517,14 @@ def main():
 
     selected_model = args.model
     if not args.dry_run:
+        # EC-3: Muse Glimmer unavailable/not-installed falls back to Gemma
+        # next (DEFAULT_FALLBACK_MODEL already holds Gemma's tag), not
+        # straight to D14.
         selected_model = gemma_local.resolve_model_with_fallback(
             args.host,
             args.model,
             args.idle_timeout,
-            gemma_local.default_fallback_model_for(
-                "DUBBRIDGE_REVIEW_MODEL",
-                "DUBBRIDGE_LOW_RRI_MODEL",
-            ),
+            gemma_local.default_fallback_model_for("DUBBRIDGE_REVIEW_MODEL"),
         )
 
     payload = build_review_payload(

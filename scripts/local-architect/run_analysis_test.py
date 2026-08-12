@@ -8,6 +8,7 @@ import json
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 
@@ -460,6 +461,40 @@ class MedHighRefinementProfileTest(unittest.TestCase):
 
         self.assertEqual(ctx.exception.code, "invalid_profile")
         self.assertFalse(fetcher.calls)
+
+
+class ParseArgsDefaultsTest(unittest.TestCase):
+    """ADR-037 Amendment 1 (T4b): --model-tag / --expected-model-digest
+    defaults must resolve to Muse Glimmer's tag and its paired digest --
+    a stale pairing would fail_closed on model_digest_mismatch for every
+    default-args invocation."""
+
+    def _parse(self, extra_args: list[str]) -> "_MOD.Config":
+        argv = [
+            "run_analysis.py",
+            "--packet", "packet.json",
+            "--expected-packet-sha256", "a" * 64,
+            "--output", "out.json",
+            *extra_args,
+        ]
+        with unittest.mock.patch.object(sys, "argv", argv):
+            return _MOD.parse_args()
+
+    def test_hp1_model_tag_and_digest_defaults_resolve_to_muse_glimmer(self) -> None:
+        config = self._parse([])
+        self.assertEqual(config.model_tag, "muse-glimmer:30b-q4_K_M")
+        self.assertEqual(
+            config.expected_model_digest,
+            "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+        )
+
+    def test_ec1_explicit_model_tag_and_digest_override_the_new_default(self) -> None:
+        config = self._parse([
+            "--model-tag", "some-other-model:tag",
+            "--expected-model-digest", "some-other-digest",
+        ])
+        self.assertEqual(config.model_tag, "some-other-model:tag")
+        self.assertEqual(config.expected_model_digest, "some-other-digest")
 
 
 if __name__ == "__main__":

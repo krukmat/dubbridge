@@ -8,8 +8,19 @@ Implements the review contract defined in docs/plan/portable-peer-review-gate.md
 
 Reviewer is resolved from the task's RRI band:
   RRI 0-25   (Low)                  -> Gemma (local Ollama)
-  RRI 26-55  (Moderate + Med-high)  -> qwen3.6:27b-q4_K_M, Gemma fallback, D14
+  RRI 26-55  (Moderate + Med-high)  -> gemma4:26b-a4b-it-qat, muse-glimmer fallback, D14
   RRI 56+    (Complex+)             -> cross-vendor peer, with D14 fallback
+
+ADR-036 Amendment 2 / owner directive 2026-08-11: the RRI 26-55 primary
+reviewer reverted from qwen3.6:27b-q4_K_M (now the local implementer) to
+Gemma, with Muse Glimmer as the intermediate fallback before D14. The
+"qwen" names below (DEFAULT_QWEN_REVIEW_MODEL, --qwen-model,
+run_qwen_band_review, _run_qwen_with_retry) are retained for CLI-flag,
+env-var, and test-mock stability; their bound VALUE is Gemma's tag, not
+qwen3.6:27b-q4_K_M. The Low-band (RRI 0-25) Gemma-only path below predates
+the separate 2026-08-11 Low-band Muse-Glimmer-primary directive and is not
+in T4b's scope (see docs/tasks/local-model-stack-restructure-2026-08.md
+T4b completion record for the explicit judgment call).
 
 Cross-vendor resolution (RRI 56+ only):
   claude-code | claude  -> codex
@@ -42,7 +53,9 @@ import gemma_local
 
 QWEN_REVIEW_MIN_RRI = 26
 CROSS_VENDOR_MIN_RRI = 56
-DEFAULT_QWEN_REVIEW_MODEL = "qwen3.6:27b-q4_K_M"
+# ADR-036 Amendment 2 / owner directive 2026-08-11: resolves to Gemma's tag,
+# not qwen3.6:27b-q4_K_M (see module docstring for the naming-retention note).
+DEFAULT_QWEN_REVIEW_MODEL = gemma_local.DEFAULT_MODEL
 
 CALLER_TO_PEER = {
     "claude-code": "codex",
@@ -281,21 +294,47 @@ def _run_gemma_fallback(packet: str, phase: str, args) -> Tuple[Optional[dict], 
     return None, last_error or "gemma reviewer unavailable"
 
 
+def _run_muse_glimmer_fallback(packet: str, phase: str, args) -> Tuple[Optional[dict], Optional[str]]:
+    """RRI 26-55 band intermediate fallback (owner directive 2026-08-11):
+    Muse Glimmer, invoked when the Gemma primary (still resolved through the
+    "qwen"-named args.qwen_model / DEFAULT_QWEN_REVIEW_MODEL for CLI/test
+    stability) is unavailable, stalled, or returns invalid/BLOCKED output."""
+    last_error = None
+    for _ in range(2):
+        try:
+            result = run_local_structured_review(
+                packet,
+                phase,
+                args,
+                model=gemma_local.DEFAULT_REVIEW_MODEL,
+                reviewer=gemma_local.DEFAULT_REVIEW_MODEL,
+            )
+        except (gemma_local.GemmaIdleTimeout, gemma_local.GemmaWallTimeout, RuntimeError) as exc:
+            last_error = str(exc)
+            continue
+        if result["verdict"] == "blocked":
+            last_error = "muse-glimmer reviewer returned BLOCKED"
+            continue
+        return result, None
+    return None, last_error or "muse-glimmer reviewer unavailable"
+
+
 def run_qwen_band_review(content: str, phase: str, args) -> dict:
     packet = _build_peer_packet(phase, content, args.task_id)
     qwen_result, qwen_error = _run_qwen_with_retry(packet, phase, args, args.qwen_model)
     if qwen_result is not None:
         return qwen_result
 
-    print(f"[peer-review] qwen fallback triggered: {qwen_error}", file=sys.stderr)
-    gemma_result, gemma_error = _run_gemma_fallback(content, phase, args)
-    if gemma_result is not None:
-        return gemma_result
+    print(f"[peer-review] gemma (26-55 primary) fallback triggered: {qwen_error}", file=sys.stderr)
+    glimmer_result, glimmer_error = _run_muse_glimmer_fallback(packet, phase, args)
+    if glimmer_result is not None:
+        return glimmer_result
 
-    print(f"[peer-review] gemma fallback failed: {gemma_error}", file=sys.stderr)
+    print(f"[peer-review] muse-glimmer fallback failed: {glimmer_error}", file=sys.stderr)
     d14_result = run_d14_fallback(packet, phase, DEFAULT_QWEN_REVIEW_MODEL)
     d14_result["summary"] = (
-        f"qwen unavailable/invalid ({qwen_error}); gemma unavailable/invalid ({gemma_error}); "
+        f"gemma (26-55 primary) unavailable/invalid ({qwen_error}); "
+        f"muse-glimmer unavailable/invalid ({glimmer_error}); "
         "D14 adjudication required."
     )
     return d14_result
@@ -604,7 +643,11 @@ def parse_args():
     parser.add_argument(
         "--qwen-model",
         default=os.environ.get("DUBBRIDGE_QWEN_REVIEW_MODEL", DEFAULT_QWEN_REVIEW_MODEL),
-        help="Primary Ollama reviewer model for RRI 26-55.",
+        help=(
+            "Primary Ollama reviewer model for RRI 26-55 (flag/env name "
+            "retained for stability; defaults to Gemma's tag as of ADR-036 "
+            "Amendment 2, owner directive 2026-08-11)."
+        ),
     )
     parser.add_argument(
         "--idle-timeout",

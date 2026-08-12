@@ -230,14 +230,17 @@ class CliBehavior(unittest.TestCase):
         payload = json.loads(r.stdout)
         self.assertEqual(payload["model"], "review-model")
 
-    def test_dry_run_falls_back_to_low_rri_model_env(self):
+    def test_ec1_dry_run_ignores_low_rri_model_env(self):
+        # ADR-036 Amendment 2 (T4b): the reviewer-role default is decoupled
+        # from Gemma Developer's DUBBRIDGE_LOW_RRI_MODEL env var -- setting
+        # it must not influence review-model resolution at all.
         env = os.environ.copy()
         env.pop("DUBBRIDGE_REVIEW_MODEL", None)
         env["DUBBRIDGE_LOW_RRI_MODEL"] = "low-model"
         r = self.run_cli("-", "--dry-run", stdin=_packet(), env=env)
         self.assertEqual(r.returncode, 0, r.stderr)
         payload = json.loads(r.stdout)
-        self.assertEqual(payload["model"], "low-model")
+        self.assertEqual(payload["model"], "muse-glimmer:30b-q4_K_M")
 
     def test_dry_run_falls_back_to_shared_default(self):
         env = os.environ.copy()
@@ -246,7 +249,7 @@ class CliBehavior(unittest.TestCase):
         r = self.run_cli("-", "--dry-run", stdin=_packet(), env=env)
         self.assertEqual(r.returncode, 0, r.stderr)
         payload = json.loads(r.stdout)
-        self.assertEqual(payload["model"], "gemma4:26b-a4b-it-qat")
+        self.assertEqual(payload["model"], "muse-glimmer:30b-q4_K_M")
 
     def test_empty_packet_exits_1(self):
         r = self.run_cli("-", stdin=" \n")
