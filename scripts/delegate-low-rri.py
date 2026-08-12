@@ -39,11 +39,14 @@ DEFAULT_MODEL = gemma_local.DEFAULT_MODEL
 # Stall fallback (distinct from gemma_local.DEFAULT_FALLBACK_MODEL, which is
 # an install-availability fallback and currently resolves to the same Gemma
 # model). This one is for a *responding but non-convergent* primary model —
-# observed live during S-140-T1c-ii, where run_local_task.py's Moderate/
-# Med-high path stalled with qwen3.6:35b-a3b as the *primary* implementer.
-# Here roles are reversed: Gemma is primary for Low-band delegation, so the
-# stall fallback goes to qwen3.6:35b-a3b instead.
-DEFAULT_STALL_FALLBACK_MODEL = "qwen3.6:35b-a3b"
+# originally observed live during S-140-T1c-ii, where run_local_task.py's
+# Moderate/Med-high path stalled with qwen3.6:35b-a3b as the *primary*
+# implementer. Here roles are reversed: Gemma is primary for Low-band
+# delegation, so this stall-fallback target is an alternate model, not the
+# implementer band. That model was fully retired from the local model stack
+# by ADR-036 Amendment 2 (T4a, 2026-08-11); this fallback now points to
+# qwen3.6:27b-q4_K_M, its sole surviving Qwen successor.
+DEFAULT_STALL_FALLBACK_MODEL = "qwen3.6:27b-q4_K_M"
 DEFAULT_IDLE_TIMEOUT_SECONDS = gemma_local.DEFAULT_IDLE_TIMEOUT_SECONDS
 DEFAULT_MAX_WALL_SECONDS = gemma_local.DEFAULT_MAX_WALL_SECONDS
 DEFAULT_NUM_CTX = gemma_local.DEFAULT_NUM_CTX

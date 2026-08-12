@@ -918,13 +918,13 @@ class StallFallback(unittest.TestCase):
         )
         records = self._run([_mod.DelegationIdleTimeout(60), ok_response])
         self.assertEqual(len(records), 1)
-        self.assertEqual(records[0]["model"], "qwen3.6:35b-a3b")
+        self.assertEqual(records[0]["model"], "qwen3.6:27b-q4_K_M")
         self.assertEqual(records[0]["outcome"], "NO_PATCH")
 
     def test_wall_timeout_also_triggers_fallback(self):
         ok_response = "STATUS: NO_PATCH\nSUMMARY: ok"
         records = self._run([_mod.DelegationWallTimeout(900), ok_response])
-        self.assertEqual(records[0]["model"], "qwen3.6:35b-a3b")
+        self.assertEqual(records[0]["model"], "qwen3.6:27b-q4_K_M")
 
     def test_custom_stall_fallback_model_honoured(self):
         ok_response = "STATUS: NO_PATCH\nSUMMARY: ok"
