@@ -296,7 +296,7 @@ no inference from project age, row presence, or feature timing is allowed.
 | T1c-i | Generation-claim and exact-pointer schema migration | migration | 52 / L | Done 2026-08-02; verified on fresh PostgreSQL 16; cloud-required by owner request |
 | T1c-ii | Translation/dubbing repositories and readiness evidence | development | 47 / L | Done 2026-08-02; repositories, strict artifact helpers, and readiness evidence verified with cloud-review fallback PASS |
 | T2 | Translation fan-out delivery parent | development parent | 50 / L historical parent | Decomposed 2026-08-09; not executable |
-| T2b-i | Translation dispatch outbox migration | migration | 55 / L | Must validate durable per-target dispatch identity before repository code |
+| T2b-i | Translation dispatch outbox migration | migration | 55 / L | Done 2026-08-12; ADR-038 escalated (local `boundary_violation` on `docker` denylist, 0 repairs) to `gpt-5.6-terra`/high (ADR-039 human-selected); verified with 7/7 acceptance tests on live PostgreSQL by the primary agent after the cloud implementer's sandbox could not reach the local DB |
 | T2b-ii | Durable translation delivery repository and exact target binding | development | 48 / L provisional | Cloud branch unless a preceding approved extraction brings every full-read target below 500 lines |
 | T2c | Versioned localization jobs and outbox-backed fan-out | development | 54 / L provisional | Consumes T2b-ii; replaces first-target-only seam without provider execution |
 | T3a | Translation provider/subprocess contract | development | 42 / L | Med-high |
