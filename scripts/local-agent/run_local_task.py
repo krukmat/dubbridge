@@ -81,13 +81,13 @@ COMMAND_TIMEOUT_SECONDS = 120
 
 # ADR-038 T3: Med-high (RRI 41-55) forces a materially tighter budget than
 # the Moderate default above -- one session, 8 turns, zero repairs, and the
-# exact qwen3.6:35b-a3b binding -- because ADR-038's whole premise is that an
+# exact qwen3.6:27b-q4_K_M binding -- because ADR-038's whole premise is that an
 # unbounded Med-high local attempt (a real RRI 55 session ran to turn 23
 # without a patch) must fail closed to cloud quickly instead of stalling.
 MED_HIGH_BAND_LABEL = "Med-high"
 MED_HIGH_MAX_TOTAL_TURNS = 8
 MED_HIGH_MAX_REPAIR_ATTEMPTS = 0
-MED_HIGH_REQUIRED_MODEL = "qwen3.6:35b-a3b"
+MED_HIGH_REQUIRED_MODEL = "qwen3.6:27b-q4_K_M"
 MED_HIGH_RRI_MIN = 41
 MED_HIGH_RRI_MAX = 55
 # Output-token budget per turn. read_file/write_file/apply_patch have no size
@@ -96,12 +96,17 @@ MED_HIGH_RRI_MAX = 55
 # this workspace's largest source files while leaving room for the JSON
 # envelope around it.
 GENERATION_TOKEN_BUDGET = 8192
-# qwen3.6:35b-a3b's advertised context window (`ollama show`) is 131072, but
-# that full size measurably slows generation. Set explicitly to a smaller
-# ceiling rather than trusting Ollama's server-side default (smaller still,
-# and would silently truncate the model's view of a full-file read_file
-# result on a long session) or the full advertised window (slow in practice
-# for this workspace's task sizes).
+# Originally set for qwen3.6:35b-a3b: its advertised context window
+# (`ollama show`) is 131072, but that full size measurably slowed
+# generation, so this was set explicitly to a smaller ceiling rather than
+# trusting Ollama's server-side default (smaller still, and would silently
+# truncate the model's view of a full-file read_file result on a long
+# session) or the full advertised window (slow in practice for this
+# workspace's task sizes). ADR-036 Amendment 2 (2026-08-11) rebinds the
+# implementer to qwen3.6:27b-q4_K_M; this ceiling has not been re-measured
+# against that model and is carried forward unchanged pending that
+# measurement -- tracked as an open follow-up, not a verified value for the
+# new binding.
 MODEL_CONTEXT_TOKENS = 90112
 
 # Prepended to every card's own spec as the system message. The model is not
@@ -284,7 +289,7 @@ def _is_med_high(card):
 def resolve_effective_limits(card):
     """Band-aware limits (ADR-038 T3). Moderate keeps the original
     30-turn/two-repair runner behavior exactly; Med-high forces 8 turns,
-    zero repairs, and the exact qwen3.6:35b-a3b binding."""
+    zero repairs, and the exact qwen3.6:27b-q4_K_M binding."""
     if _is_med_high(card):
         return EffectiveLimits(
             band=MED_HIGH_BAND_LABEL,
@@ -771,7 +776,7 @@ def parse_args(argv=None):
     )
     parser.add_argument(
         "--model",
-        default=os.environ.get("DUBBRIDGE_LOCAL_AGENT_MODEL", "qwen3.6:35b-a3b"),
+        default=os.environ.get("DUBBRIDGE_LOCAL_AGENT_MODEL", "qwen3.6:27b-q4_K_M"),
         help="Local implementer model tag (ADR-036 binding).",
     )
     parser.add_argument(
@@ -1010,7 +1015,7 @@ def build_attempt_bundles(card, result, model, session_start, session_end):
         bundles.append(
             {
                 "capsule_hash": card.capsule_hash,
-                "implementer_id": "qwen35",
+                "implementer_id": "qwen27",
                 "model_tag": model,
                 "start_ts": session_start.isoformat().replace("+00:00", "Z"),
                 "end_ts": session_end.isoformat().replace("+00:00", "Z"),
@@ -1127,7 +1132,7 @@ def main(
 
     # ADR-038 T3 EC-2: a Med-high card must run under the exact required
     # model -- no silent substitution. This is a routing-evidence check, not
-    # a capability check: --model defaults to the same qwen3.6:35b-a3b tag,
+    # a capability check: --model defaults to the same qwen3.6:27b-q4_K_M tag,
     # so this only ever fires when a caller explicitly overrides --model for
     # a card the gate (T2) already routed to Med-high local implementation.
     if limits.required_model and args.model != limits.required_model:

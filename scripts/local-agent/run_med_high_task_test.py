@@ -934,8 +934,11 @@ class SuperviseIntegrationTest(unittest.TestCase):
         out_path = os.path.join(self.tmp.name, "out.json")
         bundle_path = os.path.join(self.tmp.name, "bundle.md")
         r_path, p_path = self._write_gate_inputs("GO_LOCAL", "GO_LOCAL")
+        launched_argv = []
 
         def fake_popen(argv, start_new_session=None):
+            launched_argv.append(argv)
+
             def _write_success():
                 _write_json(out_path, {
                     "status": "success", "task_id": "T-MEDHIGH-1", "transcript": [],
@@ -956,6 +959,14 @@ class SuperviseIntegrationTest(unittest.TestCase):
         self.assertFalse(os.path.isfile(bundle_path))
         self.assertIsNone(result.fallback_selection)
         self.assertIsNone(result.cloud_instruction)
+        # ADR-036 Amendment 2 (T4a): the GO_LOCAL route must supervise the
+        # session on MED_HIGH_RUNNER_MODEL (qwen3.6:27b-q4_K_M), never the
+        # retired qwen3.6:35b-a3b binding.
+        self.assertEqual(len(launched_argv), 1)
+        self.assertIn("--model", launched_argv[0])
+        model_idx = launched_argv[0].index("--model") + 1
+        self.assertEqual(launched_argv[0][model_idx], _MOD.MED_HIGH_RUNNER_MODEL)
+        self.assertEqual(launched_argv[0][model_idx], "qwen3.6:27b-q4_K_M")
 
     def test_hp1_operational_start_failure_authorizes_terra_against_bundle(self):
         card_path = _card(self.tmp.name)

@@ -149,7 +149,7 @@ def main(argv=None):
     parser.add_argument("--work-dir", required=True, help="Scratch dir for worktrees + temp card files.")
     parser.add_argument("--only", nargs="*", help="Task IDs to run (default: all cards found).")
     parser.add_argument("--host", default=os.environ.get("OLLAMA_HOST", "http://localhost:11434"))
-    parser.add_argument("--model", default="qwen3.6:35b-a3b")
+    parser.add_argument("--model", default="qwen3.6:27b-q4_K_M")
     parser.add_argument("--keep-worktree", action="store_true")
     args = parser.parse_args(argv)
 

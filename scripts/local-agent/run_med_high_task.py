@@ -3,7 +3,7 @@
 
 Owns the two things ADR-038 section 4 assigns to the primary, not to the
 local implementer itself: (1) the hard 300-second wall-clock cutoff on the
-one bounded Qwen35 attempt, enforced by killing the *entire* process group
+one bounded Qwen27 attempt, enforced by killing the *entire* process group
 `run_local_task.py` spawns (not just its immediate PID) so a stuck subprocess
 `run_local_task.py` itself launched (e.g. a hung `cargo test`) cannot survive
 the cutoff; and (2) emitting the complete ADR-038 section 5 evidence bundle on
@@ -38,7 +38,7 @@ import escalation_packet
 import med_high_gate
 
 MED_HIGH_WALL_CLOCK_SECONDS = 300
-MED_HIGH_RUNNER_MODEL = "qwen3.6:35b-a3b"
+MED_HIGH_RUNNER_MODEL = "qwen3.6:27b-q4_K_M"
 POST_KILL_WAIT_SECONDS = 5
 ROUTE_GO_LOCAL = med_high_gate.ROUTE_GO_LOCAL
 ROUTE_CLOUD_REQUIRED = med_high_gate.ROUTE_CLOUD_REQUIRED
@@ -638,7 +638,7 @@ def supervise(
     fallback_selection_artifact: str | None = None,
 ) -> SupervisorResult:
     """The single entry point: decide route (T2 gate), then either hand off
-    to cloud immediately (HP-2) or supervise exactly one bounded Qwen35
+    to cloud immediately (HP-2) or supervise exactly one bounded Qwen27
     attempt (HP-1) and emit a complete evidence bundle on any non-success
     outcome (EC-1, EC-2)."""
     bundle_kwargs = dict(
@@ -670,7 +670,7 @@ def supervise(
         result = None
 
     if result is None and decision.route == ROUTE_CLOUD_REQUIRED:
-        # HP-2: routes directly to cloud without ever launching Qwen35.
+        # HP-2: routes directly to cloud without ever launching Qwen27.
         result = _pre_launch_bundle(
             **bundle_kwargs,
             stop_reason="cloud_required", status="cloud_required", reason=decision.reason,
@@ -725,7 +725,7 @@ def parse_args(argv=None):
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Supervise the one bounded Med-high Qwen35 attempt and emit a cloud evidence bundle on any non-success route (ADR-038 T4).",
+        description="Supervise the one bounded Med-high Qwen27 attempt and emit a cloud evidence bundle on any non-success route (ADR-038 T4).",
     )
     parser.add_argument("--card", required=True)
     parser.add_argument("--worktree", required=True)
