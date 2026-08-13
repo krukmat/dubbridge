@@ -53,3 +53,20 @@ Both full-read paths are below the 500-line local target-file threshold at
 presentation time (189 and 398 lines). Cloud takeover is
 `gpt-5.6-terra` at `medium` if the local runner is unavailable, its scope gate
 fails, or its two evidence-backed repair attempts are exhausted.
+
+## Execution and closure
+
+- Completed: 2026-08-13.
+- Local DEV: `qwen3.6:35b-a3b`; two evidence-backed compile repairs; final scope
+  and all operator-authored acceptance commands passed.
+- Integration: commit `f835b01` on `main`.
+- Focused verification: `translation_delivery_repo_test` passed `8/8`; the
+  repository pre-push Rust gates also passed.
+- Task-analysis review: gemma
+  `.agent/peer-task-review-S-150-T2b-ii-c.json` - PASS
+- Code-solution review: gemma
+  `docs/audit/gemma-evidence/S-150-T2b-ii-c.json` - PASS
+- The local transcript's terminal organization result records the obsolete
+  line-growth gate. Per Matias's explicit directive, line count is not a DEV
+  correctness decision; the implementation was accepted only after scope and
+  functional acceptance passed.

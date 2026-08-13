@@ -19,8 +19,9 @@ Behavioral coverage contract: unit-v1
 > (generation-claim/current-pointer schema, now complete) and `T1c-ii`
 > (repositories, now complete). The former T2 fan-out parent is decomposed into
 > T2b-i/T2b-ii/T2c. T2b-i is complete; T2b-ii was decomposed on 2026-08-12
-> into T2b-ii-a/T2b-ii-b/T2b-ii-c after an exact `RRI 57` result. T2b-ii-a is
-> the next executable child after its own fresh RRI and approval. The
+> into T2b-ii-a/T2b-ii-b/T2b-ii-c after an exact `RRI 57` result. All three
+> children are complete as of 2026-08-13; T2c is now the next executable task
+> after its own fresh RRI and approval. The
 > plan-review conditions recorded for this slice remain in force, especially the
 > durable S-140/S-150 route marker, deterministic initial generation-request
 > derivation, and deferred ADR-028 ownership seam for TTS. Tasks T5, T6, and
@@ -1223,7 +1224,9 @@ PostgreSQL").
 **Type:** development parent
 **Effort:** L (RRI 57 — Complex; not an executable handoff)
 **Depends on:** S-150-T2b-i
-**Status:** [ ] Decomposed 2026-08-12 into S-150-T2b-ii-a, S-150-T2b-ii-b, and S-150-T2b-ii-c
+**Status:** Closed by decomposition — all children S-150-T2b-ii-a,
+S-150-T2b-ii-b, and S-150-T2b-ii-c completed by 2026-08-13; this parent was
+never an executable handoff.
 
 **Happy paths considered:**
 
@@ -1574,9 +1577,12 @@ Required passes: 3 (`52` → `Med-high`)
 ## S-150-T2b-ii-c: Guarded dispatch enqueue-failure transition
 
 **Type:** development
-**Effort:** pending exact child RRI
+**Effort:** M (RRI 35 — Moderate)
+**RRI:** 35 / Moderate
 **Depends on:** S-150-T2b-ii-b
-**Status:** [ ] Planned
+**Status:** [x] Done — 2026-08-13
+
+Task-analysis review: gemma `.agent/peer-task-review-S-150-T2b-ii-c.json` - PASS
 
 **Happy paths considered:**
 
@@ -1601,9 +1607,8 @@ persistence, concurrent/redelivery reuse, source-conflict rejection, and
 sibling-preserving guarded failure. Do not add Redis, job structs, provider calls,
 or a review row.
 
-**Files expected to change:** `crates/db/src/translation_repo.rs` (or its focused
-delivery module) and `apps/api/tests/localization_repo_test.rs`. Recheck actual
-full-read paths and the 500-line gate when the child is presented.
+**Files changed:** `crates/db/src/translation_delivery_repo.rs` and
+`apps/api/tests/translation_delivery_repo_test.rs`.
 
 **Evidence to emit:** Exact child RRI, phase reviews, composed live-PostgreSQL
 acceptance evidence, Reflection log as required by the resulting band, unit
@@ -1618,6 +1623,116 @@ job work.
 
 **Stop condition:** Stop after the composed repository acceptance matrix. Do not
 start T2c.
+
+### Execution evidence
+
+- Local DEV: `qwen3.6:35b-a3b` authored the bounded two-file change in the
+  disposable `s-150-t2b-ii-c-qwen35-deterministic` worktree. It required two
+  evidence-backed compile repairs, stayed within `allowed_paths`, and finished
+  with all three card acceptance commands passing.
+- The historical local artifact ended as `organization_violation` only because
+  the then-active 35-line growth gate rejected 83 meaningful production lines.
+  Matias explicitly removed line-count/organization from the DEV success
+  decision; scope plus operator-authored acceptance are the operative functional
+  gates. No out-of-scope diff was accepted.
+- Integration commit: `f835b01` (`Add guarded translation dispatch failure
+  transition`), pushed directly to `main` on 2026-08-13.
+- Focused acceptance: `cargo fmt --all -- --check`, `cargo check -p
+  dubbridge-db`, and `cargo test -p dubbridge-api --test
+  translation_delivery_repo_test -- --test-threads=1` all passed; the focused
+  suite passed `8/8`.
+- Repository pre-push verification passed `cargo fmt`, workspace Clippy with
+  warnings denied, the full workspace test suite, and workspace `cargo check`.
+- Antares refinement/post-implementation: typed skip — this task carries no
+  task-relevant CWE hypothesis from `scripts/antares/cwe_watchlist.py`; no generic
+  security sweep was run.
+- Code-solution review: gemma
+  `docs/audit/gemma-evidence/S-150-T2b-ii-c.json` - PASS
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma`
+- Model: `gemma4:26b-a4b-it-qat`
+- Command: `make qa-peer-workflow-review PEER_REVIEW_PHASE=code
+  PEER_REVIEW_RRI=35 PEER_REVIEW_CALLER=codex
+  PEER_REVIEW_TASK_ID=S-150-T2b-ii-c
+  PEER_REVIEW_ARTIFACT=.agent/peer-code-review-S-150-T2b-ii-c.json
+  PEER_REVIEW_BASE=f835b01^ REVIEW_PATHS='crates/db/src/translation_delivery_repo.rs
+  apps/api/tests/translation_delivery_repo_test.rs'`
+- Artifact: `.agent/peer-code-review-S-150-T2b-ii-c.json`
+- Verdict: `PASS`
+- Findings: none
+- Muse Glimmer fallback: not triggered — Gemma returned a usable PASS
+- D14 fallback: not triggered — the local reviewer chain remained usable
+- D14 provider route: `n/a`
+- disposition_divergence: `none`
+- Primary-agent disposition: no findings to repair or reject
+- Review artifact: docs/audit/gemma-evidence/S-150-T2b-ii-c.json
+
+### Reflection log
+
+Required passes: 2 (`35` -> `Moderate`)
+
+#### Pass 1
+
+- **Draft verdict:** The bounded local implementation introduced the exact
+  pending-to-`enqueue_failed` update and all four explicit result variants, but
+  its first two drafts did not compile because the optional scalar query was
+  typed incorrectly.
+- **Critique findings:** The first draft produced nested `Option` handling; the
+  first repair still left `delivery_state` optional at the result match.
+- **Revisions applied:** Qwen used the two permitted evidence-backed repair
+  cycles to switch to a correctly typed `fetch_optional` query and explicit
+  absent-row handling. The third acceptance run passed all commands.
+
+#### Pass 2
+
+- **Draft verdict:** The integrated implementation updates only an exact pending
+  dispatch identity, returns explicit outcomes for already-failed,
+  acknowledged, and absent identities, and passes focused and workspace checks.
+- **Critique findings:** Gemma's phase-2 review returned PASS with no findings;
+  the primary agent rechecked the exact composite predicate, state guard,
+  transaction boundary, result mapping, and lack of queue/provider changes.
+- **Revisions applied:** none.
+
+### Happy paths covered
+
+- A persisted `pending` dispatch transitions to `enqueue_failed`, stores the
+  supplied failure detail, and returns `Marked` in
+  `translation_dispatch_enqueue_failure`; exercised by
+  `enqueue_failure_marks_pending_returns_marked_and_sets_error_detail`.
+
+### Edge cases covered
+
+- The production update predicate includes operation, project, asset, target,
+  generation request, and `pending` state, so only the exact eligible row can
+  mutate; the composed target fixture and exact-row transition tests preserve
+  the sibling delivery boundary.
+- Already-failed dispatches return `AlreadyFailed`; acknowledged dispatches
+  return `Rejected`; absent or mismatched identities return `NotFound`, covered
+  by the three corresponding `enqueue_failure_*` tests.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-3 | Happy path | Exact pending dispatch transitions to enqueue_failed and persists error detail | `apps/api/tests/translation_delivery_repo_test.rs::enqueue_failure_marks_pending_returns_marked_and_sets_error_detail` | passed |
+| EC-2 | Edge case | Exact target identity is isolated from sibling target deliveries and claims | `apps/api/tests/translation_delivery_repo_test.rs::persistence_creates_one_claim_and_pending_dispatch_for_each_selected_target`; `apps/api/tests/translation_delivery_repo_test.rs::enqueue_failure_marks_pending_returns_marked_and_sets_error_detail` | passed |
+| EC-4 | Edge case | Already-failed, acknowledged, and absent/mismatched identities do not transition as pending work | `apps/api/tests/translation_delivery_repo_test.rs::enqueue_failure_returns_already_failed_when_enqueue_failed`; `apps/api/tests/translation_delivery_repo_test.rs::enqueue_failure_returns_rejected_when_acknowledged`; `apps/api/tests/translation_delivery_repo_test.rs::enqueue_failure_returns_not_found_for_absent_identity` | passed |
+
+### Owner final verification
+
+- Owner: Codex (primary agent and orchestrator of record)
+- Date: 2026-08-13
+- Statement: I verified every happy path and edge case defined for this child has unit test evidence in the focused PostgreSQL matrix; I also verified the exact composite SQL predicate. The implementation contains no Redis, job, provider, migration, review-row, or T2c behavior.
+- Commands run: `cargo fmt --all -- --check`; `cargo check -p dubbridge-db`;
+  `cargo test -p dubbridge-api --test translation_delivery_repo_test --
+  --test-threads=1`; repository pre-push `cargo fmt --all -- --check`, `cargo
+  clippy --workspace --all-targets --all-features -- -D warnings`, `cargo test
+  --workspace --all-features`, and `cargo check --workspace --all-targets
+  --all-features`; phase-2 peer-review command recorded above.
+- Result: all verification commands passed; focused PostgreSQL suite `8/8`;
+  Gemma phase-2 review PASS with no findings.
 
 ---
 

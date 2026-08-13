@@ -17,9 +17,9 @@ slice: S-150
 > `S-150-T2b-ii` (durable delivery repository and exact target binding), then
 > `S-150-T2c` (versioned jobs and fan-out). T2b-i is complete; on 2026-08-12
 > T2b-ii was itself decomposed after an exact `RRI 57` into a scope-helper child,
-> an atomic persistence child, and a guarded failure-transition child. T2b-ii-a and
-> T2b-ii-b are complete; T2b-ii-c is now the next executable child after a fresh
-> RRI and approval. The
+> an atomic persistence child, and a guarded failure-transition child. T2b-ii-a,
+> T2b-ii-b, and T2b-ii-c are complete; T2c is now the next executable task after
+> a fresh RRI and approval. The
 > plan-review conditions recorded for this slice remain in
 > force, especially the durable S-140/S-150 route discriminator, deterministic
 > initial generation-request identity, migration parity, review cutover, and
@@ -301,10 +301,10 @@ no inference from project age, row presence, or feature timing is allowed.
 | T1c-ii | Translation/dubbing repositories and readiness evidence | development | 47 / L | Done 2026-08-02; repositories, strict artifact helpers, and readiness evidence verified with cloud-review fallback PASS |
 | T2 | Translation fan-out delivery parent | development parent | 50 / L historical parent | Decomposed 2026-08-09; not executable |
 | T2b-i | Translation dispatch outbox migration | migration | 55 / L | Done 2026-08-12; ADR-038 escalated (local `boundary_violation` on `docker` denylist, 0 repairs) to `gpt-5.6-terra`/high (ADR-039 human-selected); verified with 7/7 acceptance tests on live PostgreSQL by the primary agent after the cloud implementer's sandbox could not reach the local DB |
-| T2b-ii | Durable translation delivery repository and exact target binding | development parent | 57 / L | Decomposed 2026-08-12 after exact RRI and D14 task-analysis PASS; not executable |
+| T2b-ii | Durable translation delivery repository and exact target binding | development parent | 57 / L | Done 2026-08-13 through completed children T2b-ii-a/b/c |
 | T2b-ii-a | Candidate delivery-scope query and decoding helpers | development | 39 / M | Done 2026-08-12; transaction-bound read-only candidate decoder verified with 2/2 live-PostgreSQL tests and Gemma phase-2 PASS; T2b-ii-b owns exact-project enforcement |
-| T2b-ii-b | Atomic delivery claim and dispatch persistence | development | pending exact child RRI | Invokes T2b-ii-a inside one PostgreSQL transaction before any write; owns create/reuse and conflict behavior |
-| T2b-ii-c | Guarded dispatch enqueue-failure transition | development | pending exact child RRI | Full-identity/state guard; completes the composed live-PostgreSQL matrix |
+| T2b-ii-b | Atomic delivery claim and dispatch persistence | development | 52 / L | Done 2026-08-12; atomic create/reuse and source-conflict behavior verified with live PostgreSQL and Muse Glimmer phase-2 PASS |
+| T2b-ii-c | Guarded dispatch enqueue-failure transition | development | 35 / M | Done 2026-08-13; Qwen local DEV, exact composite pending-state guard, focused PostgreSQL suite 8/8, Gemma phase-2 PASS; integrated in `f835b01` |
 | T2c | Versioned localization jobs and outbox-backed fan-out | development | 54 / L provisional | Consumes T2b-ii-c; replaces first-target-only seam without provider execution |
 | T3a | Translation provider/subprocess contract | development | 42 / L | Med-high |
 | T3b | Functional translation worker | development | 44 / L | Med-high |
