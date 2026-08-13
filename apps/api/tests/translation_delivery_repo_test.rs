@@ -4,7 +4,8 @@ use dubbridge_db::{
     artifact_repo, subtitle_repo,
     transcription_repo::{self, TranscriptArtifactMeta},
     translation_delivery_repo::{
-        self, TranslationDeliveryInput, TranslationDispatchDisposition,
+        self, TranslationDeliveryInput, TranslationDispatchAcknowledgementInput,
+        TranslationDispatchAcknowledgementResult, TranslationDispatchDisposition,
         TranslationDispatchFailureInput, TranslationDispatchFailureResult,
     },
     translation_repo::TranslationClaimMode,
@@ -169,6 +170,19 @@ fn failure_input(
         target_language_id,
         generation_request_id,
         error_detail: "test-failure".to_string(),
+    }
+}
+
+fn acknowledgement_input(
+    scope: &Scope,
+    target_language_id: Uuid,
+    generation_request_id: Uuid,
+) -> TranslationDispatchAcknowledgementInput {
+    TranslationDispatchAcknowledgementInput {
+        project_id: scope.project_id,
+        asset_id: scope.asset_id,
+        target_language_id,
+        generation_request_id,
     }
 }
 
@@ -476,13 +490,18 @@ async fn enqueue_failure_returns_already_failed_when_enqueue_failed() {
     let subtitle = insert_subtitle_source(&pool, scope.asset_id, "fail-already").await;
     let request_id = Uuid::new_v4();
     let fail_input = failure_input(&scope, scope.target_language_id, request_id);
-
-    set_dispatch_state(
+    translation_delivery_repo::persist_translation_delivery(
         &pool,
         delivery_input(&scope, scope.target_language_id, subtitle.id, request_id),
-        "enqueue_failed",
     )
-    .await;
+    .await
+    .expect("create pending dispatch");
+    assert_eq!(
+        translation_delivery_repo::translation_dispatch_enqueue_failure(&pool, fail_input.clone())
+            .await
+            .expect("mark enqueue failed"),
+        TranslationDispatchFailureResult::Marked
+    );
 
     assert_eq!(
         translation_delivery_repo::translation_dispatch_enqueue_failure(&pool, fail_input.clone())
@@ -501,13 +520,16 @@ async fn enqueue_failure_returns_rejected_when_acknowledged() {
     let subtitle = insert_subtitle_source(&pool, scope.asset_id, "fail-reject").await;
     let request_id = Uuid::new_v4();
     let fail_input = failure_input(&scope, scope.target_language_id, request_id);
-
-    set_dispatch_state(
+    let input = delivery_input(&scope, scope.target_language_id, subtitle.id, request_id);
+    translation_delivery_repo::persist_translation_delivery(&pool, input)
+        .await
+        .expect("create pending dispatch");
+    translation_delivery_repo::translation_dispatch_acknowledge(
         &pool,
-        delivery_input(&scope, scope.target_language_id, subtitle.id, request_id),
-        "acknowledged",
+        acknowledgement_input(&scope, scope.target_language_id, request_id),
     )
-    .await;
+    .await
+    .expect("acknowledge dispatch");
 
     assert_eq!(
         translation_delivery_repo::translation_dispatch_enqueue_failure(&pool, fail_input)
@@ -515,6 +537,20 @@ async fn enqueue_failure_returns_rejected_when_acknowledged() {
             .expect("rejected"),
         TranslationDispatchFailureResult::Rejected
     );
+    let state: String = sqlx::query_scalar(
+        r#"SELECT delivery_state FROM translation_dispatch_outbox
+           WHERE operation = $1 AND project_id = $2 AND asset_id = $3
+             AND target_language_id = $4 AND generation_request_id = $5"#,
+    )
+    .bind("translation")
+    .bind(scope.project_id.0)
+    .bind(scope.asset_id.0)
+    .bind(scope.target_language_id)
+    .bind(request_id)
+    .fetch_one(&pool)
+    .await
+    .expect("read back acknowledged state");
+    assert_eq!(state, "acknowledged");
 }
 
 #[tokio::test]
@@ -536,5 +572,104 @@ async fn enqueue_failure_returns_not_found_for_absent_identity() {
             .await
             .expect("not found"),
         TranslationDispatchFailureResult::NotFound
+    );
+}
+
+#[tokio::test]
+async fn acknowledgement_marks_pending_dispatch_and_is_idempotent() {
+    let Some(pool) = setup_pool().await else {
+        return;
+    };
+    let scope = insert_scope(&pool).await;
+    let subtitle = insert_subtitle_source(&pool, scope.asset_id, "ack-mark").await;
+    let request_id = Uuid::new_v4();
+    let input = delivery_input(&scope, scope.target_language_id, subtitle.id, request_id);
+    translation_delivery_repo::persist_translation_delivery(&pool, input)
+        .await
+        .expect("create pending dispatch");
+
+    let acknowledgement = acknowledgement_input(&scope, scope.target_language_id, request_id);
+    assert_eq!(
+        translation_delivery_repo::translation_dispatch_acknowledge(&pool, acknowledgement)
+            .await
+            .expect("mark acknowledged"),
+        TranslationDispatchAcknowledgementResult::Marked
+    );
+    assert_eq!(
+        translation_delivery_repo::translation_dispatch_acknowledge(&pool, acknowledgement)
+            .await
+            .expect("duplicate acknowledgement"),
+        TranslationDispatchAcknowledgementResult::AlreadyAcknowledged
+    );
+
+    let state: String = sqlx::query_scalar(
+        r#"SELECT delivery_state FROM translation_dispatch_outbox
+           WHERE operation = $1 AND project_id = $2 AND asset_id = $3
+             AND target_language_id = $4 AND generation_request_id = $5"#,
+    )
+    .bind("translation")
+    .bind(scope.project_id.0)
+    .bind(scope.asset_id.0)
+    .bind(scope.target_language_id)
+    .bind(request_id)
+    .fetch_one(&pool)
+    .await
+    .expect("read back acknowledged state");
+    assert_eq!(state, "acknowledged");
+}
+
+#[tokio::test]
+async fn acknowledgement_rejects_failed_dispatch_without_mutation() {
+    let Some(pool) = setup_pool().await else {
+        return;
+    };
+    let scope = insert_scope(&pool).await;
+    let subtitle = insert_subtitle_source(&pool, scope.asset_id, "ack-reject").await;
+    let request_id = Uuid::new_v4();
+    let input = delivery_input(&scope, scope.target_language_id, subtitle.id, request_id);
+    translation_delivery_repo::persist_translation_delivery(&pool, input)
+        .await
+        .expect("create pending dispatch");
+    translation_delivery_repo::translation_dispatch_enqueue_failure(
+        &pool,
+        failure_input(&scope, scope.target_language_id, request_id),
+    )
+    .await
+    .expect("mark enqueue failed");
+
+    assert_eq!(
+        translation_delivery_repo::translation_dispatch_acknowledge(
+            &pool,
+            acknowledgement_input(&scope, scope.target_language_id, request_id),
+        )
+        .await
+        .expect("reject acknowledgement after failure"),
+        TranslationDispatchAcknowledgementResult::Rejected
+    );
+}
+
+#[tokio::test]
+async fn acknowledgement_returns_not_found_for_distinct_dispatch_identity() {
+    let Some(pool) = setup_pool().await else {
+        return;
+    };
+    let scope = insert_scope(&pool).await;
+    let subtitle = insert_subtitle_source(&pool, scope.asset_id, "ack-not-found").await;
+    let request_id = Uuid::new_v4();
+    translation_delivery_repo::persist_translation_delivery(
+        &pool,
+        delivery_input(&scope, scope.target_language_id, subtitle.id, request_id),
+    )
+    .await
+    .expect("create sibling dispatch");
+
+    assert_eq!(
+        translation_delivery_repo::translation_dispatch_acknowledge(
+            &pool,
+            acknowledgement_input(&scope, scope.target_language_id, Uuid::new_v4()),
+        )
+        .await
+        .expect("distinct identity is not found"),
+        TranslationDispatchAcknowledgementResult::NotFound
     );
 }
