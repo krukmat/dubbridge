@@ -18,10 +18,14 @@ slice: S-150
 > `S-150-T2c` (versioned jobs and fan-out). T2b-i is complete; on 2026-08-12
 > T2b-ii was itself decomposed after an exact `RRI 57` into a scope-helper child,
 > an atomic persistence child, and a guarded failure-transition child. T2b-ii-a,
-> T2b-ii-b, and T2b-ii-c are complete; T2c is now the next executable task after
-> a fresh RRI and approval. The
+> T2b-ii-b, T2b-ii-c, T2c-i, T2c-ii, and T2c-iii are complete. On 2026-08-13
+> the owner rejected the unused legacy-review compatibility premise; T2c-iv was
+> rescored at RRI 63 and decomposed into contract retirement, producer cutover,
+> and durable fan-out children, followed by a narrowed Redis adapter task and a
+> decomposed runtime/cleanup cutover. T2c-iv-a0 is now the next executable task
+> after a fresh RRI, phase-1 review, and approval. The
 > plan-review conditions recorded for this slice remain in
-> force, especially the durable S-140/S-150 route discriminator, deterministic
+> force, especially deterministic
 > initial generation-request identity, migration parity, review cutover, and
 > deferred voice-consent hardening boundary.
 > **Roadmap phase:** `S-150` — Translation + dubbing (TTS / voice cloning).
@@ -235,30 +239,25 @@ S-160 rows. S-140's premature `subtitle_artifact_id: None` enqueue is retired fr
 full localization route; S-150 enqueues into the same ADR-030 gate after its exact
 reviewable artifact set is ready. No parallel review or publication path is allowed.
 
-The cutover is staged explicitly. T2 may suppress the legacy null-artifact enqueue
-only for work adopted by the S-150 localization route; it must not globally remove
-the compatibility path used by pre-S-150 subtitle-only flows. Until T6 lands, S-150
-generations do not create a legacy review row and remain pending review enqueue even
-when their artifact readiness is complete. T6 atomically introduces generation-aware
-uniqueness and exact artifact bindings, preserves/backfills readable legacy rows,
-enqueues any complete S-150 generations accumulated during the transition, and only
-then retires the compatibility path. This avoids both tuple collisions and a window
-where a null-bound decision could authorize a regenerated artifact set.
+The cutover is staged explicitly. The 2026-08-13 owner decision confirms that no
+queued legacy subtitle jobs require compatibility, so T2 retires the null-artifact
+review enqueue rather than preserving a second runtime route. Until T6 lands, S-150
+generations do not create a review row and remain pending review enqueue even when
+their artifact readiness is complete. T6 atomically introduces generation-aware
+uniqueness and exact artifact bindings, preserves/backfills any readable review rows
+that exist in storage, and enqueues complete S-150 generations accumulated during
+the transition. This avoids both tuple collisions and a window where a null-bound
+decision could authorize a regenerated artifact set.
 
-The route discriminator is concrete and travels in the durable serialized
-`SubtitleJob` payload as a versioned `post_ready_route` enum with the wire values
-`legacy_subtitle_review_v1` and `s150_localization_v1`. A missing field defaults only
-to `legacy_subtitle_review_v1`, preserving already queued S-140 JSON; an unknown
-value fails deserialization. The existing `SubtitleJob::new` constructor remains the
-explicit legacy constructor, while T2 adds and uses an explicit localization
-constructor for newly adopted S-150 work. On `legacy_subtitle_review_v1`, subtitle
-readiness continues to call `prepare_review_post_ready` with the existing
-`target_language`. On `s150_localization_v1`, the runtime ignores that legacy target
-field, resolves every current `target_languages` row, derives the initial request ID
-from the exact persisted `Subtitle` artifact as specified in D5, enqueues translation
-fan-out, and does not call the null-bound review enqueue. The generation claim then
-persists the route outcome through its operation, source artifact, and request ID;
-no inference from project age, row presence, or feature timing is allowed.
+`SubtitleJob` therefore has one active post-ready meaning and carries only the
+asset/project identity needed by subtitle processing and localization fan-out. T2c
+retires the temporary `post_ready_route`, both route wire values, and the
+review-only free-form `target_language` field. After subtitle readiness, Rust
+resolves every current `target_languages` row, derives the initial request ID from
+the exact persisted `Subtitle` artifact as specified in D5, persists durable fan-out,
+and delivers eligible translation jobs without calling `prepare_review_post_ready`.
+The generation claim persists the operation, source artifact, and request ID; no
+inference from project age, row presence, or feature timing is allowed.
 
 ## Governing constraints
 
@@ -305,12 +304,19 @@ no inference from project age, row presence, or feature timing is allowed.
 | T2b-ii-a | Candidate delivery-scope query and decoding helpers | development | 39 / M | Done 2026-08-12; transaction-bound read-only candidate decoder verified with 2/2 live-PostgreSQL tests and Gemma phase-2 PASS; T2b-ii-b owns exact-project enforcement |
 | T2b-ii-b | Atomic delivery claim and dispatch persistence | development | 52 / L | Done 2026-08-12; atomic create/reuse and source-conflict behavior verified with live PostgreSQL and Muse Glimmer phase-2 PASS |
 | T2b-ii-c | Guarded dispatch enqueue-failure transition | development | 35 / M | Done 2026-08-13; Qwen local DEV, exact composite pending-state guard, focused PostgreSQL suite 8/8, Gemma phase-2 PASS; integrated in `f835b01` |
-| T2c | Versioned localization jobs and outbox-backed fan-out | development parent | 65 / L Complex | Decomposed 2026-08-13 into T2c-i through T2c-v. Parent phase-1 exception evidence remains in `.agent/peer-task-review-S-150-T2c-local-pair.json`; child RRI evidence is `docs/audit/s-150-t2c-decomposition-rri.md`. |
-| T2c-i | Versioned subtitle/translation job contracts | development | 41 / L Med-high | Done 2026-08-13; versioned route and deterministic UUIDv5 job contracts are in `crates/jobs`. |
+| T2c | Versioned localization jobs and outbox-backed fan-out | development parent | 65 / L Complex | Replanned 2026-08-13 into T2c-i through T2c-vi after legacy compatibility was rejected. Parent phase-1 exception evidence remains in `.agent/peer-task-review-S-150-T2c-local-pair.json`; child RRI evidence is `docs/audit/s-150-t2c-decomposition-rri.md`. |
+| T2c-i | Versioned subtitle/translation job contracts | development | 41 / L Med-high | Done 2026-08-13; its temporary route compatibility is superseded by T2c-iv-a; deterministic UUIDv5 translation identity remains authoritative. |
 | T2c-ii | Exact persisted subtitle resolver | development | 37 / M Moderate | Done 2026-08-13; exact fail-closed persisted Subtitle resolver verified with live PostgreSQL and Gemma phase-2 PASS. |
 | T2c-iii | Translation dispatch acknowledgement transition | development | 43 / L Med-high | Done 2026-08-13; exact guarded `pending` to `acknowledged` transition, live PostgreSQL state matrix 11/11, 94.69% relevant line coverage, and Gemma phase-2 PASS. |
-| T2c-iv | Localization route branch and durable target fan-out | development | 48 / L Med-high | Depends on T2c-i/ii/iii; approval pending. |
-| T2c-v | Redis translation queue and worker topology | development | 50 / L Med-high | Depends on T2c-i/iii/iv; approval pending. |
+| T2c-iv | Legacy-route retirement and durable target fan-out | development parent | 63 / L Complex | Replanned and decomposed into T2c-iv-a0/a/b/c; not executable. |
+| T2c-iv-a0 | Extract SubtitleJob below the local-file budget | development | 34 / M Moderate | Done 2026-08-13; cloud-authored, behavior-preserving extraction leaves a 449-line re-exporting `lib.rs` and a 286-line job-contract module; focused coverage 98.58%, Gemma phase-2 PASS. |
+| T2c-iv-a | Retire the legacy SubtitleJob payload contract | development | provisional 38 / M Moderate | Depends on T2c-iv-a0; local-first after extraction; approval pending. |
+| T2c-iv-b | Cut subtitle producer over to the single contract | development | provisional 32 / M Moderate | Depends on T2c-iv-a; approval pending. |
+| T2c-iv-c | Durable localization fan-out service | development | provisional 49 / L Med-high | Depends on T2c-ii/iii and T2c-iv-b; approval pending. |
+| T2c-v | Redis translation queue adapter | development | 50 / L Med-high | Depends on T2c-i/iii/iv-c; approval pending. |
+| T2c-vi | Runtime cutover and legacy review retirement | development parent | Complex surface | Decomposed into T2c-vi-a/b; not executable. |
+| T2c-vi-a | Integrate localization fan-out into subtitle runtime | development | provisional 51 / L Med-high | Depends on T2c-iv-c/v; approval pending. |
+| T2c-vi-b | Delete dead legacy review module and sync S-140 BDD | development/docs | provisional 31 / M Moderate | Depends on T2c-vi-a; approval pending. |
 | T3a | Translation provider/subprocess contract | development | 42 / L | Med-high |
 | T3b | Functional translation worker | development | 44 / L | Med-high |
 | T3c | Translation runtime persistence and readiness | development | 53 / L | Med-high |
@@ -331,7 +337,7 @@ coverage. T1c, T5, and T6 are parent requirements, not executable handoff cards;
 their child tasks must be created before coding begins. T8 is a non-blocking future
 parent and must be decomposed only when its governance program is activated.
 
-Sequence: `T0 -> T1a -> T1b -> T1c-i -> T1c-ii -> T2b-i -> T2b-ii-a -> T2b-ii-b -> T2b-ii-c -> T2c-i -> T2c-ii + T2c-iii -> T2c-iv -> T2c-v -> T3a -> T3b -> T3c -> T4
+Sequence: `T0 -> T1a -> T1b -> T1c-i -> T1c-ii -> T2b-i -> T2b-ii-a -> T2b-ii-b -> T2b-ii-c -> T2c-i -> T2c-ii + T2c-iii -> T2c-iv-a0 -> T2c-iv-a -> T2c-iv-b -> T2c-iv-c -> T2c-v -> T2c-vi-a -> T2c-vi-b -> T3a -> T3b -> T3c -> T4
 -> decomposed T5 children -> decomposed T6 children -> T7`. T8 is deliberately
 last and is not part of the S-150 delivery critical path; it is a future
 governance follow-up coordinated with `X-S-110-2`, `X-S-110-3`, X20, and S-180.

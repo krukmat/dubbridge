@@ -21,10 +21,14 @@ Behavioral coverage contract: unit-v1
 > T2b-i/T2b-ii/T2c. T2b-i is complete; T2b-ii was decomposed on 2026-08-12
 > into T2b-ii-a/T2b-ii-b/T2b-ii-c after an exact `RRI 57` result. All three
 > children are complete as of 2026-08-13. Complex parent T2c was decomposed on
-> 2026-08-13 into T2c-i through T2c-v; T2c-i is the next executable task after
-> its own phase-1 review and approval. The
+> 2026-08-13 into T2c-i through T2c-v, then replanned on 2026-08-13 after the
+> owner rejected the unused legacy-review compatibility premise. T2c-iv is now
+> a non-executable parent decomposed into T2c-iv-a0/a/b/c, T2c-v is narrowed to the
+> Redis adapter, and T2c-vi owns final runtime integration and legacy-module
+> retirement. T2c-iv-a0 is the next executable task after its own phase-1 review
+> and approval. The
 > plan-review conditions recorded for this slice remain in force, especially the
-> durable S-140/S-150 route marker, deterministic initial generation-request
+> deterministic initial generation-request
 > derivation, and deferred ADR-028 ownership seam for TTS. Tasks T5, T6, and
 > future follow-up T8 remain non-executable parent requirements whose
 > provisional RRI requires decomposition before implementation.
@@ -45,13 +49,15 @@ Behavioral coverage contract: unit-v1
 - Initial translation fan-out derives its request ID from the exact persisted
   subtitle artifact under the fixed `S150_INITIAL_TRANSLATION_NAMESPACE`; explicit
   regeneration never uses that derivation path.
-- The serialized `SubtitleJob.post_ready_route` is the sole S-140/S-150 branch
-  discriminator. Missing fields decode as legacy for queued-job compatibility;
-  unknown values fail closed.
+- `SubtitleJob` has one active post-ready meaning: S-150 localization fan-out.
+  The temporary `post_ready_route`, its `legacy_subtitle_review_v1` value, and
+  the review-only `target_language` payload field are retired without a queued-job
+  compatibility path, per the 2026-08-13 owner decision that no legacy jobs exist.
 - TTS implementation cannot start before T4 resolves the app-neutral ADR-028
   consent seam and decomposes the Complex parent.
-- T2 suppresses legacy null-bound review enqueue only for the S-150 route. T6 owns
-  the generation-aware cutover/backfill and retirement of the compatibility path.
+- T2 retires the null-bound subtitle review enqueue before translation runtime is
+  activated. T6 still owns generation-aware review creation for completed S-150
+  artifact sets; it no longer owns retirement of a legacy compatibility path.
 - T6 cannot execute as a single task: RRI 71 requires decomposition and human
   review of the eventual diff.
 - Stop after each task and synchronize this ledger plus every named status
@@ -1583,6 +1589,12 @@ Required passes: 3 (`52` → `Med-high`)
 **Depends on:** S-150-T2b-ii-b
 **Status:** [x] Done — 2026-08-13
 
+**Superseded contract note (2026-08-13):** The route enum/default and legacy
+constructor behavior below remain historical completion evidence for T2c-i, but
+are intentionally scheduled for removal by T2c-iv-a after the owner confirmed
+that no queued legacy jobs require compatibility. The `TranslationJob` identity
+and deterministic UUIDv5 helper remain authoritative.
+
 Task-analysis review: gemma `.agent/peer-task-review-S-150-T2b-ii-c.json` - PASS
 
 **Happy paths considered:**
@@ -1742,7 +1754,8 @@ Required passes: 2 (`35` -> `Moderate`)
 **Type:** development
 **Effort:** L (RRI 65 — Complex; mandatory decomposition before presentation)
 **Depends on:** S-150-T2b-ii-c
-**Status:** [~] Decomposed 2026-08-13 into S-150-T2c-i through S-150-T2c-v
+**Status:** [~] Decomposed 2026-08-13 into S-150-T2c-i through S-150-T2c-vi;
+T2c-iv and T2c-vi are non-executable parents with children
 
 **RRI evidence:** `docs/audit/s-150-t2c-rri.md`; decomposition evidence:
 `docs/audit/s-150-t2c-decomposition-rri.md`
@@ -1762,16 +1775,16 @@ decomposed child tests.
 - **HP-1:** A localization-routed subtitle readiness event resolves its exact
   persisted `Subtitle`, derives the deterministic initial request ID, and creates
   one logical dispatch for every validated target.
-- **HP-2:** A serialized pre-S-150 `SubtitleJob` without `post_ready_route`
-  decodes to `legacy_subtitle_review_v1` and preserves legacy review enqueue.
-- **HP-3:** A newly constructed localization `SubtitleJob` serializes
-  `s150_localization_v1`; its emitted `TranslationJob`s carry project, asset,
+- **HP-2:** Every newly enqueued `SubtitleJob` carries only the asset/project
+  identity needed for subtitle generation and subsequent localization fan-out.
+- **HP-3:** A newly constructed `SubtitleJob` has one localization meaning; its
+  emitted `TranslationJob`s carry project, asset,
   target-language ID, exact source artifact ID, and generation-request ID.
 
 **Edge cases considered:**
 
-- **EC-1:** An unknown `post_ready_route` fails deserialization; legacy jobs never
-  fan out and localization jobs never call the null-artifact review enqueue.
+- **EC-1:** Subtitle readiness never creates a null-artifact review row; failure
+  in one localization target remains isolated from sibling durable dispatches.
 - **EC-2:** Replay resolves the existing subtitle by the exact
   `(asset_id, word_alignment_parent_artifact_id)` boundary rather than inserting a
   replacement; an explicit regeneration uses caller-minted UUIDv4 rather than the
@@ -1779,16 +1792,13 @@ decomposed child tests.
 - **EC-3:** One Redis enqueue failure marks only its outbox/localization unit
   failed and leaves retryable durable work; no sibling claim is corrupted.
 
-**Acceptance criteria:** Add `SubtitleJob.post_ready_route` with exactly
-`legacy_subtitle_review_v1` and `s150_localization_v1` wire values. `SubtitleJob::new`
-must remain explicitly legacy; an absent field defaults only to the legacy value;
-unknown values must fail closed. Add an explicit localization constructor and a
+**Acceptance criteria:** Retire `SubtitleJob.post_ready_route`,
+`legacy_subtitle_review_v1`, and the review-only free-form target field; the single
+subtitle-job constructor carries only asset/project identity. Preserve the
 `TranslationJob`/queue contract containing the full durable identity, including
-`target_language_id` rather than a free-form target string. At the extracted
-post-ready seam, branch exclusively on this route: the legacy branch calls the
-existing review enqueue; the localization branch resolves the exact stored subtitle,
-derives `UUIDv5(S150_INITIAL_TRANSLATION_NAMESPACE,
-"initial-translation-v1:" || canonical_lowercase_subtitle_artifact_uuid)`, asks
+`target_language_id`. At the extracted post-ready seam, resolve the exact stored
+subtitle, derive `UUIDv5(S150_INITIAL_TRANSLATION_NAMESPACE,
+"initial-translation-v1:" || canonical_lowercase_subtitle_artifact_uuid)`, ask
 T2b-ii for durable dispatches, and enqueues only dispatches its returned state marks
 eligible. Persist acknowledgement or enqueue failure through T2b-ii. Wire Redis
 translation enqueue into the subtitle worker, but do not register provider execution
@@ -1809,11 +1819,12 @@ Redis/in-memory queue evidence.
 **Status artifacts affected:** This ledger, the S-150 plan, and the S-140 plan/ledger
 only if their delivered handoff wording becomes materially stale.
 
-**Agent handoff prompt:** Add only the versioned route, exact-id job contract, and
-outbox-backed fan-out; preserve legacy behavior and stop before provider execution.
+**Agent handoff prompt:** Retire the unused legacy subtitle-review route, preserve
+the exact-id translation contract, and add outbox-backed fan-out; stop before
+provider execution or generation-aware review creation.
 
 **Stop condition:** This parent is not executable. Present and execute the children
-in order; do not start T3a before T2c-v closes.
+in order; do not start T3a before T2c-vi closes.
 
 ---
 
@@ -1947,11 +1958,11 @@ Required passes: 3 (`41` → `Med-high`)
 
 | Case ID | Type | Behavior | Unit test evidence | Result |
 |---|---|---|---|---|
-| HP-1 | Happy path | Legacy JSON defaults to the legacy route and `SubtitleJob::new` remains legacy | `crates/jobs/src/lib.rs::tests::legacy_subtitle_job_json_defaults_to_legacy_route` | passed |
-| HP-2 | Happy path | Localization serialization and translation payload retain versioned route and full UUID identity | `crates/jobs/src/lib.rs::tests::localization_subtitle_job_serializes_its_versioned_route`; `crates/jobs/src/lib.rs::tests::translation_job_serializes_the_full_durable_identity`; `crates/jobs/src/lib.rs::tests::in_memory_translation_queue_records_jobs` | passed |
-| HP-3 | Happy path | The same subtitle UUID derives a stable initial translation request ID | `crates/jobs/src/lib.rs::tests::initial_translation_request_id_is_deterministic_and_canonical` | passed |
-| EC-1 | Edge case | Unknown route strings fail deserialization rather than selecting a fallback | `crates/jobs/src/lib.rs::tests::unknown_subtitle_post_ready_route_fails_deserialization` | passed |
-| EC-2 | Edge case | Initial derivation uses the canonical lowercase hyphenated UUID name | `crates/jobs/src/lib.rs::tests::initial_translation_request_id_is_deterministic_and_canonical` | passed |
+| HP-1 | Happy path | Legacy JSON defaults to the legacy route and `SubtitleJob::new` remains legacy | `crates/jobs/src/subtitle_job.rs::tests::legacy_subtitle_job_json_defaults_to_legacy_route` | passed |
+| HP-2 | Happy path | Localization serialization and translation payload retain versioned route and full UUID identity | `crates/jobs/src/subtitle_job.rs::tests::localization_subtitle_job_serializes_its_versioned_route`; `crates/jobs/src/subtitle_job.rs::tests::translation_job_serializes_the_full_durable_identity`; `crates/jobs/src/subtitle_job.rs::tests::in_memory_translation_queue_records_jobs` | passed |
+| HP-3 | Happy path | The same subtitle UUID derives a stable initial translation request ID | `crates/jobs/src/subtitle_job.rs::tests::initial_translation_request_id_is_deterministic_and_canonical` | passed |
+| EC-1 | Edge case | Unknown route strings fail deserialization rather than selecting a fallback | `crates/jobs/src/subtitle_job.rs::tests::unknown_subtitle_post_ready_route_fails_deserialization` | passed |
+| EC-2 | Edge case | Initial derivation uses the canonical lowercase hyphenated UUID name | `crates/jobs/src/subtitle_job.rs::tests::initial_translation_request_id_is_deterministic_and_canonical` | passed |
 
 ### Owner final verification
 
@@ -2233,50 +2244,236 @@ Required passes: 3 (`43` → `Med-high`)
 
 ---
 
-## S-150-T2c-iv: Localization route branch and durable target fan-out
+## S-150-T2c-iv: Legacy-route retirement and durable target fan-out
 
 **Type:** development
-**Effort:** L (RRI 48 — Med-high)
+**Effort:** L (superseded exact RRI 63 — Complex; mandatory decomposition)
 **Decomposed from:** S-150-T2c
 **Depends on:** S-150-T2c-i, S-150-T2c-ii, S-150-T2c-iii
+**Status:** [~] Replanned and decomposed 2026-08-13 into S-150-T2c-iv-a0/a/b/c
+
+**RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
+
+**Decision:** The owner confirmed that no queued legacy subtitle jobs require
+compatibility. The former two-route design is therefore retired rather than
+carried into the localization runtime. This parent is not executable.
+
+**Stop condition:** Execute T2c-iv-a0, T2c-iv-a, T2c-iv-b, and T2c-iv-c independently;
+then T2c-v; do not integrate the runtime before T2c-v provides the Redis adapter.
+
+---
+
+## S-150-T2c-iv-a0: Extract the SubtitleJob contract below the local-file budget
+
+**Type:** development
+**Effort:** M (provisional RRI 34 — Moderate; recompute before presentation)
+**RRI:** 34
+**Decomposed from:** S-150-T2c-iv
+**Depends on:** S-150-T2c-i
+**Status:** [x] Done — 2026-08-13
+
+**RRI evidence:** `docs/audit/s-150-t2c-iv-a0-rri.md` (exact 34, recomputed 2026-08-13; decomposition context: `docs/audit/s-150-t2c-decomposition-rri.md`)
+
+Task-analysis review: `gemma` `docs/audit/s-150-t2c-iv-a0-phase1-review.json` - `PASS`
+
+**Happy paths considered:**
+
+- **HP-1:** The existing `SubtitleJob`, `TranslationJob`, and deterministic
+  request-ID behavior remain byte-for-byte compatible after their contract code
+  moves into `crates/jobs/src/subtitle_job.rs`.
+
+**Edge cases considered:**
+
+- **EC-1:** The public re-exports preserve existing callers and every current
+  serialization/deserialization test continues to pass without a behavior change.
+
+**Acceptance criteria:** Move the complete subtitle and translation job contract
+and its focused tests from the oversized `crates/jobs/src/lib.rs` into
+`crates/jobs/src/subtitle_job.rs`; leave `lib.rs` as module declaration and public
+re-exports. Do not retire a field, constructor, route, or wire value in this task.
+
+**Files expected to change:** `crates/jobs/src/lib.rs`,
+`crates/jobs/src/subtitle_job.rs`.
+
+**Evidence to emit:** Exact RRI, phase reviews, module-extraction regression tests,
+Reflection log, unit coverage certification, and owner verification.
+
+**Status artifacts affected:** This ledger and the S-150 plan.
+
+**Stop condition:** Stop after a behavior-preserving extraction. The source file is
+currently 693 lines, so this preceding refactor satisfies the target-file size gate;
+it is cloud-authored rather than local-delegated because it must read that oversized
+source in full. Do not retire compatibility in this task.
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma`
+- Model: `gemma4:26b-a4b-it-qat`
+- Command: `curl http://127.0.0.1:11434/api/chat` (direct structured Gemma code-solution packet; `think=false`, `num_predict=4096`, `num_ctx=131072`)
+- Artifact: `docs/audit/s-150-t2c-iv-a0-phase2-review.json`
+- Verdict: `PASS`
+- Findings: none. An earlier wrapper pass raised a minor re-export warning; `subtitle_job_contract_remains_publicly_reexported` was added before this final direct review.
+- Muse Glimmer fallback: not triggered — final direct Gemma response was structured and usable. The wrapper retry was not usable because Gemma omitted its wrapper-specific `SUMMARY` header.
+- D14 fallback: not triggered — the local reviewer chain remained usable.
+- D14 provider route: `n/a`
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted the re-export concern and added a root-level regression test; no production behavior changed.
+
+Code-solution review: `gemma` `docs/audit/s-150-t2c-iv-a0-phase2-review.json` - `PASS`
+
+### Reflection log
+
+Required passes: 2 (`34` → `Moderate`)
+
+#### Pass 1
+
+- **Draft verdict:** `SubtitleJob`, `TranslationJob`, their queues, UUIDv5 contract, and focused tests now reside in `subtitle_job.rs`, while `lib.rs` re-exports the former root API.
+- **Critique findings:** The only material extraction risk was breaking a root-path import; the initial code review also raised this concern.
+- **Revisions applied:** Added a root-level public-reexport regression test; no contract implementation changed.
+
+#### Pass 2
+
+- **Draft verdict:** The extraction stays within the approved two code paths, and the new module is 286 lines.
+- **Critique findings:** Focused tests pass and `subtitle_job.rs` has 98.58% line coverage; no route, field, constructor, or wire-value changed.
+- **Revisions applied:** none.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | Subtitle/translation contracts and deterministic UUIDv5 request IDs preserve behavior after extraction | `crates/jobs/src/subtitle_job.rs::tests::translation_job_serializes_the_full_durable_identity`; `crates/jobs/src/subtitle_job.rs::tests::initial_translation_request_id_is_deterministic_and_canonical` | passed |
+| EC-1 | Edge case | Root re-exports retain existing callers and legacy/invalid route Serde behavior | `crates/jobs/src/lib.rs::tests::subtitle_job_contract_remains_publicly_reexported`; `crates/jobs/src/subtitle_job.rs::tests::legacy_subtitle_job_json_defaults_to_legacy_route`; `crates/jobs/src/subtitle_job.rs::tests::unknown_subtitle_post_ready_route_fails_deserialization` | passed |
+
+### Owner final verification
+
+- Owner: Codex
+- Date: 2026-08-13
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
+- Commands run: `cargo fmt --check`; `cargo test -p dubbridge-jobs`; `cargo clippy -p dubbridge-jobs --all-targets -- -D warnings`; `cargo llvm-cov -p dubbridge-jobs --summary-only`; `git diff --check`.
+
+- Review artifact: `docs/audit/gemma-evidence/S-150-T2c-iv-a0.json`
+
+**S-150-T2c-iv-a0 status: `[x] Done`**
+
+---
+
+## S-150-T2c-iv-a: Retire the legacy SubtitleJob payload contract
+
+**Type:** development
+**Effort:** M (provisional RRI 38 — Moderate; recompute before presentation)
+**Decomposed from:** S-150-T2c-iv
+**Depends on:** S-150-T2c-iv-a0
 **Status:** [ ] Planned — approval pending
 
 **RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
 
 **Happy paths considered:**
 
-- **HP-1:** The localization route resolves the exact subtitle and creates one
-  durable dispatch intent per eligible target while legacy jobs still enqueue their
-  legacy review.
+- **HP-1:** A new `SubtitleJob` serializes with only `asset_id` and `project_id`;
+  its sole post-ready meaning is localization fan-out.
 
 **Edge cases considered:**
 
-- **EC-1:** The localization route never calls null-artifact review enqueue and
-  leaves a failed target independent from its siblings.
+- **EC-1:** Deserializing a job without the removed route and target-language
+  fields succeeds; no default can silently select legacy review behavior.
 
-**Acceptance criteria:** Branch only at the extracted post-ready seam; use T2c-i
-contracts, T2c-ii exact resolver, and T2b-ii persistence to build durable per-target
-work. Keep queue transport injected and in-memory only; do not connect Redis or run
-a translation worker.
+**Acceptance criteria:** Remove `SubtitlePostReadyRoute`, `post_ready_route`,
+`legacy_subtitle_review_v1`, `s150_localization_v1`, and the review-only
+`target_language` field from `SubtitleJob`. Collapse the constructors to one
+asset/project constructor. Preserve `TranslationJob` and deterministic request-ID
+contracts unchanged.
 
-**Files expected to change:** `apps/worker-runner/src/subtitle_runtime.rs` and
-`apps/worker-runner/src/subtitle_runtime_tests.rs`.
+**Files expected to change:** `crates/jobs/src/subtitle_job.rs` only.
+
+**Evidence to emit:** Exact RRI, phase reviews, serialization tests, Reflection
+log, unit coverage certification, and owner verification.
+
+**Status artifacts affected:** This ledger and the S-150 plan.
+
+**Stop condition:** Stop after job-contract tests; do not change a producer or
+runtime call site. The preceding extraction keeps this file below 500 lines, so
+this Moderate task uses the default local `qwen3.6:35b-a3b` route.
+
+---
+
+## S-150-T2c-iv-b: Cut the subtitle producer over to the single contract
+
+**Type:** development
+**Effort:** M (provisional RRI 32 — Moderate; recompute before presentation)
+**Decomposed from:** S-150-T2c-iv
+**Depends on:** S-150-T2c-iv-a
+**Status:** [ ] Planned — approval pending
+
+**RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
+
+**Happy paths considered:**
+
+- **HP-1:** A pending subtitle claim enqueues exactly one job with the owning
+  asset/project identity using the single constructor.
+
+**Edge cases considered:**
+
+- **EC-1:** Missing asset-to-project routing fails closed and records subtitle
+  failure without enqueueing a job.
+
+**Acceptance criteria:** Update the active subtitle producer and its focused tests
+for the route-free `SubtitleJob`. Do not select or serialize a target language for
+review compatibility. Preserve the existing pending-claim idempotency boundary.
+
+**Files expected to change:** `apps/worker-runner/src/subtitle_enqueue.rs` only.
+
+**Evidence to emit:** Exact RRI, phase reviews, producer/idempotency tests,
+Reflection log, unit coverage certification, and owner verification.
+
+**Status artifacts affected:** This ledger and the S-150 plan.
+
+**Stop condition:** Stop after producer tests; do not change post-ready runtime.
+
+---
+
+## S-150-T2c-iv-c: Durable localization fan-out service
+
+**Type:** development
+**Effort:** L (provisional RRI 49 — Med-high; recompute before presentation)
+**Decomposed from:** S-150-T2c-iv
+**Depends on:** S-150-T2c-ii, S-150-T2c-iii, S-150-T2c-iv-b
+**Status:** [ ] Planned — approval pending
+
+**RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
+
+**Happy paths considered:**
+
+- **HP-1:** The service resolves the exact persisted subtitle and creates one
+  durable dispatch intent per eligible configured target.
+
+**Edge cases considered:**
+
+- **EC-1:** A target-specific persistence failure is reported without corrupting
+  sibling durable dispatch identities or creating review work.
+
+**Acceptance criteria:** Add a focused fan-out service using the T2c-ii exact
+resolver and T2b-ii persistence boundary. Return only dispatches eligible for queue
+delivery, with complete `TranslationJob` identity. Do not connect Redis, alter the
+subtitle runtime, or create review rows.
+
+**Files expected to change:** new `apps/worker-runner/src/translation_fanout.rs`
+and `apps/worker-runner/src/translation_fanout_tests.rs`.
 
 **Evidence to emit:** RRI, phase reviews, ADR-038 receipt, route/fan-out test
 evidence, Reflection log, unit coverage certification, and owner verification.
 
 **Status artifacts affected:** This ledger and the S-150 plan.
 
-**Stop condition:** Stop after route/fan-out tests. Do not alter runner topology.
+**Stop condition:** Stop after service tests. Do not alter runtime or topology.
 
 ---
 
-## S-150-T2c-v: Redis translation queue and worker topology
+## S-150-T2c-v: Redis translation queue adapter
 
 **Type:** development
 **Effort:** L (RRI 50 — Med-high)
 **Decomposed from:** S-150-T2c
-**Depends on:** S-150-T2c-i, S-150-T2c-iii, S-150-T2c-iv
+**Depends on:** S-150-T2c-i, S-150-T2c-iii, S-150-T2c-iv-c
 **Status:** [ ] Planned — approval pending
 
 **RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
@@ -2291,21 +2488,145 @@ evidence, Reflection log, unit coverage certification, and owner verification.
 - **EC-1:** Redis enqueue failure records only that dispatch's `enqueue_failed`
   state and does not start provider execution.
 
-**Acceptance criteria:** Implement the Redis adapter, worker-runner queue wiring,
-and enqueue/failure/acknowledgement seam using T2c-i and T2c-iii contracts. Prove
-namespace separation and fail-closed Redis errors. Do not register provider
-execution, subprocesses, or S-150 review rows.
+**Acceptance criteria:** Implement the Redis adapter using T2c-i contracts and
+prove namespace separation plus fail-closed Redis errors. Do not yet alter the
+subtitle runtime, register provider execution, subprocesses, or S-150 review rows.
 
 **Files expected to change:** `crates/jobs/src/lib.rs`,
-`apps/worker-runner/src/translation_enqueue.rs`, `apps/worker-runner/src/main.rs`,
-and `apps/worker-runner/src/runner_topology_tests.rs`.
+`apps/worker-runner/src/translation_enqueue.rs` and its focused tests. Recompute
+the exact path list before presentation.
 
 **Evidence to emit:** RRI, phase reviews, ADR-038 receipt, Redis/in-memory queue
 evidence, Reflection log, unit coverage certification, and owner verification.
 
+**Status artifacts affected:** This ledger and the S-150 plan.
+
+**Stop condition:** Stop after adapter tests. Do not alter runtime topology.
+
+---
+
+## S-150-T2c-vi: Runtime cutover and legacy review retirement
+
+**Type:** development parent
+**Effort:** L (provisional Complex surface; mandatory exact decomposition before execution)
+**Depends on:** S-150-T2c-iv-c, S-150-T2c-v
+**Status:** [~] Decomposed 2026-08-13 into S-150-T2c-vi-a/b
+
+**Happy paths considered:**
+
+- **HP-1:** Subtitle readiness calls the durable fan-out service, delivers every
+  eligible dispatch through the Redis translation queue, and acknowledges exact
+  successful identities.
+
+**Edge cases considered:**
+
+- **EC-1:** One queue failure marks only that exact dispatch failed; subtitle
+  readiness never creates a null-bound review task.
+
+**Acceptance criteria:** Inject the translation queue into subtitle processing,
+wire the Redis backend in worker topology, replace `prepare_review_post_ready`
+with durable fan-out/delivery, and remove the now-unused `review_enqueue` module.
+Synchronize S-140 BDD wording to describe subtitle readiness without claiming a
+legacy review enqueue. Do not start provider execution or create generation-aware
+review rows; T6 retains that responsibility.
+
+**Files expected to change:** `apps/worker-runner/src/subtitle_runtime.rs`,
+`apps/worker-runner/src/subtitle_runtime_tests.rs`, `apps/worker-runner/src/main.rs`,
+`apps/worker-runner/src/runner_topology_tests.rs`, deletion of
+`apps/worker-runner/src/review_enqueue.rs`, and S-140 BDD/status documentation.
+
+**Evidence to emit:** Exact decomposition RRI, phase reviews, queue/fan-out/runtime
+evidence, BDD mapping evidence, Reflection logs, unit coverage certifications, and
+owner verification.
+
+**Status artifacts affected:** This ledger, the S-150 plan, roadmap,
+`docs/bdd/README.md`, `docs/bdd/s-140-subtitle-generation.feature`, and the S-140
+plan/task ledger where delivered wording becomes stale.
+
+**Stop condition:** This parent is not executable. Execute T2c-vi-a then
+T2c-vi-b; do not start T3a until both children close.
+
+---
+
+## S-150-T2c-vi-a: Integrate localization fan-out into subtitle runtime
+
+**Type:** development
+**Effort:** L (provisional RRI 51 — Med-high; recompute before presentation)
+**Decomposed from:** S-150-T2c-vi
+**Depends on:** S-150-T2c-iv-c, S-150-T2c-v
+**Status:** [ ] Planned — approval pending
+
+**RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
+
+**Happy paths considered:**
+
+- **HP-1:** Subtitle readiness fans out to every eligible target, enqueues each
+  exact translation job, and acknowledges each successful dispatch identity.
+
+**Edge cases considered:**
+
+- **EC-1:** One translation-queue failure marks only that dispatch failed and
+  preserves sibling outcomes; no review task is created.
+
+**Acceptance criteria:** Inject `TranslationJobQueue` into subtitle processing,
+call the durable fan-out service after exact subtitle readiness, deliver only
+eligible jobs, persist acknowledgement/failure through T2c-iii, and wire the Redis
+adapter into worker topology. Replace all runtime calls to
+`prepare_review_post_ready`; leave dead-module deletion to T2c-vi-b.
+
+**Files expected to change:** `apps/worker-runner/src/subtitle_runtime.rs`,
+`apps/worker-runner/src/subtitle_runtime_tests.rs`, `apps/worker-runner/src/main.rs`,
+and `apps/worker-runner/src/runner_topology_tests.rs`.
+
+**Evidence to emit:** Exact RRI, phase reviews, ADR-038 receipt, focused runtime
+and topology tests, Reflection log, unit coverage certification, and owner
+verification.
+
 **Status artifacts affected:** This ledger, the S-150 plan, and roadmap.
 
-**Stop condition:** Stop after queue-topology tests. Do not start T3a.
+**Stop condition:** Stop after runtime/topology tests; do not delete the legacy
+module or start provider execution.
+
+---
+
+## S-150-T2c-vi-b: Delete the dead legacy review module and sync S-140 BDD
+
+**Type:** development/docs synchronization
+**Effort:** M (provisional RRI 31 — Moderate; recompute before presentation)
+**Decomposed from:** S-150-T2c-vi
+**Depends on:** S-150-T2c-vi-a
+**Status:** [ ] Planned — approval pending
+
+**RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
+
+**Happy paths considered:**
+
+- **HP-1:** Canonical BDD describes successful subtitle readiness followed by
+  localization fan-out, with executable mappings to the replacement tests.
+
+**Edge cases considered:**
+
+- **EC-1:** No runtime module, test, task, or active plan statement claims that
+  subtitle readiness creates a null-bound legacy review row.
+
+**Acceptance criteria:** Delete `apps/worker-runner/src/review_enqueue.rs`, remove
+its module registration, and synchronize the S-140 feature/mapping plus materially
+stale S-140 task/plan wording. Preserve ADR-030's requirement that future complete
+artifact sets enter the single review/publication gate through T6.
+
+**Files expected to change:** deletion of
+`apps/worker-runner/src/review_enqueue.rs`, `apps/worker-runner/src/main.rs`,
+`docs/bdd/README.md`, `docs/bdd/s-140-subtitle-generation.feature`, and only the
+materially stale S-140 plan/task sections.
+
+**Evidence to emit:** Exact RRI, phase reviews, dead-reference search, BDD/doc QA,
+focused compile/tests, Reflection log, unit coverage certification, and owner
+verification.
+
+**Status artifacts affected:** This ledger, the S-150 plan, roadmap, S-140
+plan/task ledger, and canonical BDD mapping.
+
+**Stop condition:** Stop after docs/status synchronization. Do not start T3a.
 
 ---
 
@@ -2545,11 +2866,12 @@ child passes its own gates.
 **Acceptance criteria:** Decompose schema/version identity, domain/repository/API
 compatibility, enqueue wiring, and migration/backfill behavior into separately
 approved tasks with characterization tests. Human reviews the resulting diffs per
-the High-band gate. The decomposition must preserve legacy rows, introduce
+the High-band gate. The decomposition must preserve readable pre-existing review
+rows (not the retired subtitle-job route), introduce
 generation-aware uniqueness and exact bindings atomically, backfill/enqueue complete
-S-150 generations accumulated before cutover, and retire the compatibility path only
-after the new route is live. Close `X-S-160-3` only after exact version behavior is
-proven.
+S-150 generations accumulated before cutover, and complete the generation-aware
+review cutover after the new route is live. Close `X-S-160-3` only after exact
+version behavior is proven.
 
 **Evidence to emit:** Decomposition/RRI artifacts, migration and compatibility
 evidence, phase reviews, Reflection logs, unit coverage, human diff approval, and
