@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""File tools for the local runner: read, write, and single-anchor patch.
+"""Bounded editing tools for the local runner.
 
 Deliberately simple. There is no language server, no symbol lookup, and no
 line/byte budget: the local implementer has a very large context window (the
@@ -10,20 +10,15 @@ safety kept from the earlier semantic tools is the filesystem hardening
 the "anchor must match exactly once" rule, which stops a blind patch from
 silently editing the wrong occurrence.
 
-Boundary enforcement (path allow-listing) stays owned by the injected
-``boundary``; this module calls ``boundary.check_write(path)`` before every
-read or write, exactly as the old tools did.
+Boundary enforcement stays owned by the injected ``boundary``; this module
+checks every path before reading or mutating it. It also builds the initial
+card context from the same checked paths so the model receives the complete
+authorized working set without repository exploration.
 """
 
 import os
 
-ALLOWED_TOOL_NAMES = (
-    "read_file",
-    "write_file",
-    "apply_patch",
-    "run_command",
-    "finish",
-)
+ALLOWED_TOOL_NAMES = ("write_file", "apply_patch", "finish")
 
 
 class RunnerFileTools:
@@ -32,6 +27,7 @@ class RunnerFileTools:
         self._boundary = boundary
         self._malformed_error = malformed_error
         self._boundary_error = boundary_error
+        self._edited_paths = set()
 
     def close(self):
         # Present for interface parity with the old semantic tools (main()
@@ -41,25 +37,63 @@ class RunnerFileTools:
     def allowed_tool_names(self):
         return ALLOWED_TOOL_NAMES
 
+    @property
+    def edited_paths(self):
+        return tuple(sorted(self._edited_paths))
+
+    def read_checked(self, path):
+        return self._read_existing(path)
+
+    def preload_context(self, allowed_paths):
+        """Return complete contents for every file authorized by the card.
+
+        Existing directory capabilities are expanded recursively without
+        following directory symlinks. Missing exact paths are represented so
+        the model knows it may create them. Every resulting file still passes
+        through the boundary before it is opened.
+        """
+        entries = []
+        for path in allowed_paths:
+            self._boundary.check_write(path)
+            target = os.path.join(self._worktree_dir, path)
+            if not os.path.exists(target):
+                entries.append({"path": path, "missing": True, "content": None})
+                continue
+            if os.path.isdir(target):
+                for root, dirs, files in os.walk(target, followlinks=False):
+                    dirs[:] = [
+                        name
+                        for name in sorted(dirs)
+                        if not os.path.islink(os.path.join(root, name))
+                    ]
+                    for name in sorted(files):
+                        absolute = os.path.join(root, name)
+                        if os.path.islink(absolute):
+                            continue
+                        relative = os.path.relpath(absolute, self._worktree_dir)
+                        entries.append(
+                            {
+                                "path": relative,
+                                "missing": False,
+                                "content": self._read_existing(relative),
+                            }
+                        )
+                continue
+            entries.append(
+                {
+                    "path": path,
+                    "missing": False,
+                    "content": self._read_existing(path),
+                }
+            )
+        return entries
+
     def handle(self, call):
-        if call.name == "read_file":
-            return self._read_file(call.arguments)
         if call.name == "write_file":
             return self._write_file(call.arguments)
         if call.name == "apply_patch":
             return self._apply_patch(call.arguments)
         return None
-
-    def _read_file(self, arguments):
-        path = self._require(arguments, "path")
-        content = self._read_existing(path)
-        return {
-            "tool": "read_file",
-            "path": path,
-            "ok": True,
-            "content": content,
-            "line_count": self._line_count(content),
-        }
 
     def _write_file(self, arguments):
         path = self._require(arguments, "path")
@@ -69,6 +103,7 @@ class RunnerFileTools:
         os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
         created = not os.path.exists(target)
         self._write_nofollow(target, path, content)
+        self._edited_paths.add(os.path.normpath(path))
         return {
             "tool": "write_file",
             "path": path,
@@ -91,6 +126,7 @@ class RunnerFileTools:
         updated = content.replace(anchor, replacement, 1)
         target = os.path.join(self._worktree_dir, path)
         self._write_nofollow(target, path, updated)
+        self._edited_paths.add(os.path.normpath(path))
         return {
             "tool": "apply_patch",
             "path": path,
@@ -99,6 +135,12 @@ class RunnerFileTools:
             "line_count": self._line_count(replacement),
             "byte_count": len(replacement.encode("utf-8")),
         }
+
+    def replace_from_runner(self, path, content):
+        """Write operator-produced content through the same path boundary."""
+        self._boundary.check_write(path)
+        target = os.path.join(self._worktree_dir, path)
+        self._write_nofollow(target, path, content)
 
     def _read_existing(self, path):
         self._boundary.check_write(path)

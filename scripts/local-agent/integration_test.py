@@ -81,11 +81,11 @@ class ChatSequencer:
         return response
 
 
-def _make_card(tmp_dir, allowed_paths=None):
+def _make_card(tmp_dir, allowed_paths=None, acceptance_tests=None):
     card = {
         "task_id": "integration-1",
         "spec": "spec",
-        "acceptance_tests": [],
+        "acceptance_tests": acceptance_tests or [],
         "allowed_paths": allowed_paths or [],
     }
     path = os.path.join(tmp_dir, "card.json")
@@ -95,10 +95,10 @@ def _make_card(tmp_dir, allowed_paths=None):
 
 
 class RealBoundaryWiredIntoRunner(unittest.TestCase):
-    def test_run_command_wires_stripped_env_from_real_boundary_into_subprocess(self):
+    def test_runner_controlled_acceptance_wires_stripped_env_into_subprocess(self):
         # Verifies the actual integration gap this test class exists to
-        # close: apply_tool_call (via _run_command_with_timeout) must launch
-        # the subprocess with env=boundary.env_for_subprocess(), not the
+        # close: the runner-controlled acceptance path must launch the
+        # subprocess with env=boundary.env_for_subprocess(), not the
         # inherited full environment. Asserted by inspecting the real
         # subprocess.Popen call arguments (not by hoping a shell command
         # prints env back out, which depends on allowlisted commands
@@ -106,17 +106,15 @@ class RealBoundaryWiredIntoRunner(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             worktree = os.path.join(tmp, "worktree")
             _git_init_worktree(worktree)
-            card_path = _make_card(tmp)
+            card_path = _make_card(tmp, acceptance_tests=["cargo check"])
             out_path = os.path.join(tmp, "transcript.json")
 
-            responses = [
-                _tool_call("run_command", {"argv": ["cargo", "check"]}),
-                _tool_call("finish", {}),
-            ]
+            responses = [_tool_call("finish", {})]
             chat = ChatSequencer(responses)
-            passing_tests = lambda wt: {"passed": True, "output": "ok"}
 
-            real_boundary = b.LocalAgentBoundary(worktree)
+            real_boundary = b.LocalAgentBoundary(
+                worktree, [], [["cargo", "check"]]
+            )
             captured_env = {}
 
             class FakeProcess:
@@ -143,7 +141,6 @@ class RealBoundaryWiredIntoRunner(unittest.TestCase):
                 exit_code = rlt.main(
                     ["--card", card_path, "--worktree", worktree, "--out", out_path],
                     chat_fn=chat,
-                    test_runner=passing_tests,
                     boundary=real_boundary,
                 )
 
@@ -161,7 +158,7 @@ class RealBoundaryWiredIntoRunner(unittest.TestCase):
 
             chat = ChatSequencer([_tool_call("write_file", {"path": "../escape.txt", "content": "x"})])
             unused_tests = lambda wt: self.fail("must not run after boundary violation")
-            real_boundary = b.LocalAgentBoundary(worktree)
+            real_boundary = b.LocalAgentBoundary(worktree, [], [])
 
             exit_code = rlt.main(
                 ["--card", card_path, "--worktree", worktree, "--out", out_path],
@@ -176,17 +173,7 @@ class RealBoundaryWiredIntoRunner(unittest.TestCase):
                 transcript = json.load(f)
             self.assertEqual(transcript["status"], "boundary_violation")
 
-    def test_previously_allowlist_rejected_command_via_real_boundary_now_reaches_execution(self):
-        # T7b-3: check_command no longer allowlists by executable/argument
-        # vocabulary — a command like `curl` (previously rejected because it
-        # wasn't on ALLOWED_COMMAND_PREFIXES, not because it was denylisted)
-        # must now reach real execution via run_command, not abort with
-        # boundary_violation. `git push` is a different case — see
-        # test_denylisted_command_via_real_boundary_still_aborts below — the
-        # short DENIED_COMMAND_PREFIXES denylist retained as defense-in-depth
-        # still rejects it. Popen is faked the same way
-        # test_run_command_wires_stripped_env_... fakes it above, so no real
-        # network call is made.
+    def test_unlisted_command_via_real_boundary_never_reaches_execution(self):
         with tempfile.TemporaryDirectory() as tmp:
             worktree = os.path.join(tmp, "worktree")
             _git_init_worktree(worktree)
@@ -200,7 +187,7 @@ class RealBoundaryWiredIntoRunner(unittest.TestCase):
             ]
             chat = ChatSequencer(responses)
             passing_tests = lambda wt: {"passed": True, "output": "ok"}
-            real_boundary = b.LocalAgentBoundary(worktree)
+            real_boundary = b.LocalAgentBoundary(worktree, [], [])
 
             class FakeProcess:
                 returncode = 0
@@ -225,29 +212,17 @@ class RealBoundaryWiredIntoRunner(unittest.TestCase):
                     boundary=real_boundary,
                 )
 
-            self.assertEqual(exit_code, 0)
+            self.assertNotEqual(exit_code, 0)
             with open(out_path, encoding="utf-8") as f:
                 result = json.load(f)
-            self.assertNotEqual(result["status"], "boundary_violation")
+            self.assertEqual(result["status"], "boundary_violation")
             run_command_events = [
                 e for e in result["transcript"]
                 if e.get("event") == "tool_result"
                 and e["result"].get("tool") == "run_command"
             ]
-            self.assertEqual(len(run_command_events), 1)
-            self.assertEqual(run_command_events[0]["result"]["returncode"], 0)
-
-            # Codex peer review finding: prove the exact previously-rejected
-            # argv actually reached subprocess.Popen with the worktree cwd
-            # and the stripped (credential-free) environment, not just that
-            # check_command allowed it and the runner reported success.
-            self.assertEqual(len(captured_calls), 1)
-            call_args, call_kwargs = captured_calls[0]
-            self.assertEqual(call_args[0], curl_argv)
-            self.assertEqual(call_kwargs["cwd"], worktree)
-            self.assertTrue(call_kwargs.get("start_new_session"))
-            self.assertNotIn("HOME", call_kwargs["env"])
-            self.assertIn("PATH", call_kwargs["env"])
+            self.assertEqual(run_command_events, [])
+            self.assertEqual(captured_calls, [])
 
     def test_denylisted_command_via_real_boundary_still_aborts(self):
         # Reintroduced denylist (post pre-push Gemma Reviewer finding): the
@@ -262,7 +237,7 @@ class RealBoundaryWiredIntoRunner(unittest.TestCase):
 
             chat = ChatSequencer([_tool_call("run_command", {"argv": ["git", "push"]})])
             unused_tests = lambda wt: self.fail("must not run after boundary violation")
-            real_boundary = b.LocalAgentBoundary(worktree)
+            real_boundary = b.LocalAgentBoundary(worktree, [], [])
 
             exit_code = rlt.main(
                 ["--card", card_path, "--worktree", worktree, "--out", out_path],
@@ -288,6 +263,7 @@ class AuditRecordScopeCheckAggregation(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             worktree = os.path.join(tmp, "worktree")
             _git_init_worktree(worktree)
+            os.makedirs(os.path.join(worktree, "src"))
             card_path = _make_card(tmp, allowed_paths=["src"])
             out_path = os.path.join(tmp, "transcript.json")
 
@@ -297,7 +273,7 @@ class AuditRecordScopeCheckAggregation(unittest.TestCase):
             ]
             chat = ChatSequencer(responses)
             passing_tests = lambda wt: {"passed": True, "output": "ok"}
-            real_boundary = b.LocalAgentBoundary(worktree)
+            real_boundary = b.LocalAgentBoundary(worktree, ["src"], [])
 
             captured = {}
 
@@ -332,6 +308,7 @@ class AuditRecordScopeCheckAggregation(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             worktree = os.path.join(tmp, "worktree")
             _git_init_worktree(worktree)
+            os.makedirs(os.path.join(worktree, "src"))
             card_path = _make_card(tmp, allowed_paths=["src"])
             out_path = os.path.join(tmp, "transcript.json")
 
@@ -341,7 +318,7 @@ class AuditRecordScopeCheckAggregation(unittest.TestCase):
             ]
             chat = ChatSequencer(responses)
             unused_tests = lambda wt: self.fail("must not run after an out-of-scope finish")
-            real_boundary = b.LocalAgentBoundary(worktree)
+            real_boundary = b.LocalAgentBoundary(worktree, ["src"], [])
 
             captured = {}
 
@@ -358,11 +335,8 @@ class AuditRecordScopeCheckAggregation(unittest.TestCase):
 
             self.assertNotEqual(exit_code, 0)
             record = captured["record"]
-            self.assertEqual(record["outcome"], "OUT_OF_SCOPE")
-            self.assertEqual(
-                record["scope_check"],
-                {"in_scope": False, "offending_paths": ["outside.txt"]},
-            )
+            self.assertEqual(record["outcome"], "BOUNDARY_VIOLATION")
+            self.assertIsNone(record["scope_check"])
 
 
 class TOCTOUWriteRaceAgainstRealOpen(unittest.TestCase):
@@ -387,10 +361,10 @@ class TOCTOUWriteRaceAgainstRealOpen(unittest.TestCase):
                 link_path = os.path.join(worktree, "link")
                 os.symlink(outside_target, link_path)
 
-                real_boundary = b.LocalAgentBoundary(worktree)
                 call = rlt.ToolCall("write_file", {"path": "link", "content": "PWNED"})
 
                 with self.assertRaises(rlt.BoundaryViolation):
+                    real_boundary = b.LocalAgentBoundary(worktree, ["link"], [])
                     rlt.apply_tool_call(call, worktree, real_boundary)
 
                 with open(outside_target, encoding="utf-8") as f:
@@ -413,7 +387,7 @@ class TOCTOUWriteRaceAgainstRealOpen(unittest.TestCase):
                 link_path = os.path.join(worktree, "link")
                 os.symlink(inside_target, link_path)
 
-                real_boundary = b.LocalAgentBoundary(worktree)
+                real_boundary = b.LocalAgentBoundary(worktree, ["link"], [])
                 outside_target = os.path.join(outside, "secret.txt")
                 with open(outside_target, "w", encoding="utf-8") as f:
                     f.write("SECRET DATA")

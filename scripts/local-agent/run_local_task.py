@@ -26,9 +26,12 @@ import argparse
 import datetime
 import json
 import os
+import re
+import shlex
 import signal
 import subprocess
 import sys
+import tempfile
 
 # When this file is run directly (`python3 run_local_task.py ...`, the real
 # CLI path), Python executes it as module `__main__`. boundary.py separately
@@ -54,15 +57,14 @@ import gemma_local
 import fallback_selection
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import runner_workflow_gate
 import scope_check
 from runner_file_tools import ALLOWED_TOOL_NAMES, RunnerFileTools
 
 MAX_REPAIR_ATTEMPTS = 2
-# Independent of MAX_REPAIR_ATTEMPTS (only counts failed finish->test cycles)
+# Independent of MAX_REPAIR_ATTEMPTS (only counts failed finish validation cycles)
 # and MAX_MALFORMED_BOUNCES (only counts consecutive malformed calls): a
-# model that keeps issuing valid, successful tool calls (e.g. read_file
-# repeatedly) without ever calling finish has no other bound on total turns.
+# model that keeps issuing valid, successful edit calls without ever calling
+# finish has no other bound on total turns.
 # Discovered live: a real qwen3.6:35b-a3b session ran well past 300 turns in
 # a single card with neither counter ever tripping, burning ~14 minutes
 # before being killed manually.
@@ -91,7 +93,7 @@ MED_HIGH_MAX_REPAIR_ATTEMPTS = 0
 MED_HIGH_REQUIRED_MODEL = "nemotron-3.5-lightning:30b-a3b-q4_K_M"
 MED_HIGH_RRI_MIN = 41
 MED_HIGH_RRI_MAX = 55
-# Output-token budget per turn. read_file/write_file/apply_patch have no size
+# Output-token budget per turn. write_file/apply_patch have no size
 # cap (see runner_file_tools.py), so a turn can legitimately need to emit a
 # large "content"/"replacement" string; 4096 is comfortably above any file in
 # this workspace's largest source files while leaving room for the JSON
@@ -101,7 +103,7 @@ GENERATION_TOKEN_BUDGET = 8192
 # (`ollama show`) is 131072, but that full size measurably slowed
 # generation, so this was set explicitly to a smaller ceiling rather than
 # trusting Ollama's server-side default (smaller still, and would silently
-# truncate the model's view of a full-file read_file result on a long
+# truncate the model's view of the supplied full-file context on a long
 # session) or the full advertised window (slow in practice for this
 # workspace's task sizes). ADR-036 Amendment 2 (2026-08-11) rebound the
 # implementer to qwen3.6:27b-q4_K_M; Amendment 3 (2026-08-12) rebinds it again
@@ -117,21 +119,18 @@ MODEL_CONTEXT_TOKENS = 65536
 # replies with ordinary prose and every turn is bounced as a malformed tool
 # call.
 TOOL_CALLING_SYSTEM_PROMPT = """\
-You are an autonomous coding agent working inside a disposable, isolated git \
-worktree. Ordinary development commands (build, test, format, lint, etc.) \
-are permitted — there is no fixed command allowlist. What determines success \
-is the final scoped diff you produce and the operator-controlled acceptance \
-tests run against it.
+You are the bounded implementer for one fully specified task. The operator has \
+already selected the files, requirements, and acceptance commands. Do not \
+explore the repository, choose a different design, or expand the task.
 
 This session has a hard budget of {MAX_TOTAL_TURNS} turns total. Prioritize \
-reaching a working `finish` call over open-ended exploration — do not spend \
-more than a small fraction of your budget reading files before you start \
-editing.
+focused edits followed by `finish`.
 
-All paths you pass to read_file, write_file, apply_patch, and run_command's \
-argv are resolved relative to the worktree root you are already running in. \
-Never emit an absolute host path (for example anything starting with \
-`/home/` or `/Users/`) — it will not exist and the call will fail.
+The complete contents of every authorized existing file are included below. \
+Use that supplied context directly. You do not inspect the repository or run \
+commands. You may only edit the listed allowed_paths and then call finish. Any \
+read attempt, command attempt, or unlisted path terminates immediately as \
+boundary_violation.
 
 You act only by responding with a single JSON object \
 of the exact form:
@@ -144,25 +143,19 @@ Respond with ONLY that JSON object — no prose before or after it, no markdown 
 code fences.
 
 Available tools:
-- read_file: arguments {"path": "<repo-relative path>"}. Returns the full current \
-contents of an existing file. There is no size limit — read the whole file you need \
-to change.
 - write_file: arguments {"path": "<repo-relative path>", "content": "<full file contents>"}. \
 Creates a new file or overwrites an existing one with exactly the content you supply.
 - apply_patch: arguments {"path": "<repo-relative path>", "anchor": "<exact existing text>", "replacement": "<replacement text>"}. \
 Replaces exactly one occurrence of "anchor" (which must appear exactly once in the file) \
 with "replacement". Use this for a focused edit to a large file instead of rewriting it \
-whole. If the anchor is not unique, read the file and include more surrounding text so it is.
-- run_command: arguments {"argv": ["<program>", "<arg1>", ...]}. Runs a command inside \
-the worktree and returns its real exit code, stdout, and stderr.
+whole. If the anchor is not unique, use more surrounding text from the supplied context.
 - finish: arguments {}. Signals you believe the task is complete; this triggers the \
-acceptance tests. If they fail, you will see the failure output and get another turn \
-to fix it (bounded number of repair attempts).
+runner-controlled formatter and acceptance tests. If they fail, you receive the \
+failure output plus refreshed authorized files and get a bounded repair turn.
 
-Typical workflow: read_file the file(s) named in your task, make your edits with \
-apply_patch (focused changes to large files) or write_file (new files or small full \
-rewrites), run the acceptance command yourself with run_command to check, then call \
-finish.
+Typical workflow: inspect the supplied authorized file contents, make the required \
+focused edits with apply_patch or write_file, then call finish. The runner alone \
+formats edited Rust files and runs the full operator-authored acceptance suite.
 
 Call exactly one tool per turn. Only call finish once you believe the acceptance \
 tests described in your task will pass.
@@ -234,6 +227,53 @@ class NullBoundary:
         return None
 
 
+def parse_acceptance_commands(commands):
+    """Parse operator-authored commands into the exact argv capability set."""
+    if not isinstance(commands, list):
+        raise ValueError("acceptance_tests must be a list")
+
+    parsed = []
+    for command in commands:
+        if not isinstance(command, str) or not command.strip():
+            raise ValueError(f"invalid acceptance command: {command!r}")
+        if "\n" in command or "\r" in command:
+            raise ValueError("multiline acceptance commands are not supported")
+        try:
+            argv = shlex.split(command)
+        except ValueError as exc:
+            raise ValueError(f"unparsable acceptance command {command!r}: {exc}") from exc
+        if not argv:
+            raise ValueError(f"empty acceptance command: {command!r}")
+
+        # Preserve the common `NAME=value command ...` card form without a
+        # shell: execute it through `env` as explicit argv. The resulting
+        # canonical argv is what the model must match exactly.
+        assignments = []
+        while argv and "=" in argv[0] and not argv[0].startswith("="):
+            name, _value = argv[0].split("=", 1)
+            if not name.replace("_", "a").isalnum() or name[0].isdigit():
+                break
+            assignments.append(argv.pop(0))
+        if assignments:
+            if not argv:
+                raise ValueError(
+                    f"acceptance command contains assignments but no executable: {command!r}"
+                )
+            argv = ["env", *assignments, *argv]
+
+        # Shell composition is permitted only when the operator explicitly
+        # names a shell executable (for example `bash -lc '...'`). Bare shell
+        # syntax would otherwise become misleading literal argv under
+        # shell=False, so fail card loading closed.
+        shell_tokens = {"|", "||", "&&", ";", "&", "<", ">", ">>", "2>", "2>>"}
+        if any(token in shell_tokens for token in argv):
+            raise ValueError(
+                f"bare shell composition is not supported in acceptance command: {command!r}"
+            )
+        parsed.append(argv)
+    return parsed
+
+
 class TaskCard:
     def __init__(
         self, task_id, spec, acceptance_tests, allowed_paths, rri=None, band=None,
@@ -242,6 +282,9 @@ class TaskCard:
         self.task_id = task_id
         self.spec = spec
         self.acceptance_tests = acceptance_tests
+        self.acceptance_argvs = parse_acceptance_commands(acceptance_tests)
+        if not isinstance(allowed_paths, list):
+            raise ValueError("allowed_paths must be a list")
         self.allowed_paths = allowed_paths
         self.rri = rri
         self.band = band
@@ -318,6 +361,9 @@ class MalformedToolCall(ValueError):
     pass
 
 
+FORBIDDEN_MODEL_TOOL_NAMES = frozenset(("read_file", "run_command"))
+
+
 def parse_tool_call(raw_message):
     tool_calls = raw_message.get("tool_calls")
     if not tool_calls:
@@ -325,6 +371,8 @@ def parse_tool_call(raw_message):
     call = tool_calls[0]
     function = call.get("function", {})
     name = function.get("name")
+    if name in FORBIDDEN_MODEL_TOOL_NAMES:
+        raise BoundaryViolation(f"model tool is operator-controlled: {name}")
     if name not in ALLOWED_TOOL_NAMES:
         raise MalformedToolCall(f"unknown tool name: {name!r}")
     raw_arguments = function.get("arguments", {})
@@ -431,20 +479,6 @@ def apply_tool_call(call, worktree_dir, boundary, file_tools=None):
     file_result = file_tools.handle(call)
     if file_result is not None:
         return file_result
-    if call.name == "run_command":
-        argv = require_argument(call, "argv")
-        # T7d-fix: a real qwen3.6:35b-a3b session sent argv as a single raw
-        # string (e.g. "cd mobile && npm install") instead of a list. Popen
-        # would treat the whole string as a literal executable name and raise
-        # an uncaught FileNotFoundError, crashing the entire benchmark batch
-        # (MC-01, see run_stage1_benchmark.py's per-card isolation fix for the
-        # same incident). Reject the wrong type here, before it ever reaches
-        # check_command/Popen, as ordinary malformed model output.
-        if not isinstance(argv, list) or not all(isinstance(item, str) for item in argv):
-            raise MalformedToolCall(f"run_command: argv must be a list of strings, got {argv!r}")
-        boundary.check_command(argv)
-        return _run_command_with_timeout(argv, worktree_dir, boundary)
-
     if call.name == "finish":
         return {"tool": "finish", "ok": True}
 
@@ -455,6 +489,37 @@ def run_acceptance_tests(test_runner, worktree_dir):
     return test_runner(worktree_dir)
 
 
+def render_authorized_context(card, file_tools):
+    authorized_files = file_tools.preload_context(card.allowed_paths)
+    context_blocks = []
+    for entry in authorized_files:
+        path = json.dumps(entry["path"], ensure_ascii=False)
+        if entry["missing"]:
+            context_blocks.append(f"--- {path} (missing; creation allowed) ---")
+        else:
+            context_blocks.append(
+                f"--- BEGIN {path} ---\n{entry['content']}\n--- END {path} ---"
+            )
+    return "\n\n".join(context_blocks) if context_blocks else "(none)"
+
+
+def build_initial_system_message(card, file_tools, max_total_turns):
+
+    return (
+        TOOL_CALLING_SYSTEM_PROMPT.replace(
+            "{MAX_TOTAL_TURNS}", str(max_total_turns)
+        )
+        + "\n\nTask specification:\n"
+        + card.spec
+        + "\n\nAllowed paths (complete capability list):\n"
+        + json.dumps(card.allowed_paths, ensure_ascii=False, indent=2)
+        + "\n\nRunner-controlled acceptance commands (not model tools):\n"
+        + json.dumps(card.acceptance_tests, ensure_ascii=False, indent=2)
+        + "\n\nAuthorized file context:\n"
+        + render_authorized_context(card, file_tools)
+    )
+
+
 def run_loop(
     card,
     chat_fn,
@@ -462,9 +527,9 @@ def run_loop(
     worktree_dir,
     boundary,
     file_tools,
-    organization_gate_fn,
     checkpoint_fn=None,
     limits=None,
+    formatter_fn=None,
 ):
     """checkpoint_fn(transcript, total_turns), if given, is called after every
     turn that continues the loop. A session killed between turns (e.g. an
@@ -489,11 +554,9 @@ def run_loop(
     messages = [
         {
             "role": "system",
-            "content": TOOL_CALLING_SYSTEM_PROMPT.replace(
-                "{MAX_TOTAL_TURNS}", str(max_total_turns)
-            )
-            + "\n\nTask:\n"
-            + card.spec,
+            "content": build_initial_system_message(
+                card, file_tools, max_total_turns
+            ),
         }
     ]
 
@@ -628,26 +691,41 @@ def run_loop(
                     "transcript": transcript,
                 }
 
+            if formatter_fn is not None:
+                format_result = formatter_fn(worktree_dir)
+                transcript.append({"event": "format_result", "result": format_result})
+                if not format_result["passed"]:
+                    if repair_attempt >= max_repair_attempts:
+                        return {
+                            "status": "budget_exhausted",
+                            "reason": "repair_attempts_exhausted",
+                            "attempts": repair_attempt,
+                            "transcript": transcript,
+                        }
+                    repair_attempt += 1
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": (
+                                f"Runner formatting failed: {format_result['output']}. "
+                                f"Repair attempt {repair_attempt}.\n\n"
+                                "Current authorized files:\n"
+                                + render_authorized_context(card, file_tools)
+                            ),
+                        }
+                    )
+                    if checkpoint_fn is not None:
+                        checkpoint_fn(transcript, total_turns)
+                    continue
+
             test_result = run_acceptance_tests(test_runner, worktree_dir)
             transcript.append({"event": "test_result", "result": test_result})
 
             if test_result["passed"]:
-                organization_result = organization_gate_fn(worktree_dir)
-                transcript.append(
-                    {"event": "organization_gate", "result": organization_result}
-                )
-                if organization_result.get("status") != "pass":
-                    return {
-                        "status": "organization_violation",
-                        "reason": organization_result.get("status", "organization_violation"),
-                        "organization_gate": organization_result,
-                        "transcript": transcript,
-                    }
-                return {
-                    "status": "success",
-                    "organization_gate": organization_result,
-                    "transcript": transcript,
-                }
+                # The local DEV boundary ends here. Code organization, review,
+                # coverage, and closure belong to later workflow phases owned by
+                # the orchestrator; they must not rewrite a passing DEV result.
+                return {"status": "success", "transcript": transcript}
 
             if repair_attempt >= max_repair_attempts:
                 return {
@@ -661,18 +739,21 @@ def run_loop(
             messages.append(
                 {
                     "role": "user",
-                    "content": f"Tests failed: {test_result['output']}. Repair attempt {repair_attempt}.",
+                    "content": (
+                        f"Acceptance failed: {test_result['output']}. "
+                        f"Repair attempt {repair_attempt}.\n\n"
+                        "Current authorized files:\n"
+                        + render_authorized_context(card, file_tools)
+                    ),
                 }
             )
             if checkpoint_fn is not None:
                 checkpoint_fn(transcript, total_turns)
             continue
 
-        # read_file / write_file / run_command: report the real tool result
-        # back into the conversation so the model has actual new information
-        # to act on next turn (file content, write confirmation, command
-        # output) instead of an unchanged message list that gives it no
-        # signal that its last action already happened.
+        # Report edit confirmation so the next turn knows the prior mutation
+        # completed. File refreshes are injected automatically after a failed
+        # finish; the model has no read or command tool of its own.
         messages.append(
             {"role": "user", "content": f"Tool result: {json.dumps(result)}"}
         )
@@ -728,10 +809,9 @@ def build_live_chat_fn(
                 # Confirmed live (S-140-T2b-i pilot, 2026-07-22): with no
                 # explicit num_predict, Ollama's server-side default cut a
                 # real apply_patch tool call mid-JSON (done_reason="length")
-                # on the turn right after a full-file read_file put ~14k
-                # tokens of context in play — the model still had a large
-                # "replacement" string left to emit. read_file/write_file
-                # have no size cap in this tool contract, so the output
+                # with ~14k tokens of file context in play — the model still
+                # had a large "replacement" string left to emit. write_file
+                # and apply_patch have no size cap in this tool contract, so the output
                 # budget must comfortably exceed one full file's worth of
                 # text, not just a short tool-call envelope.
                 "num_predict": num_predict,
@@ -833,18 +913,111 @@ def parse_args(argv=None):
     return parser.parse_args(argv)
 
 
-def build_default_boundary(worktree_root):
+def build_default_boundary(worktree_root, card):
     # Deferred import: boundary.py imports this module (for BoundaryViolation),
     # so importing it at module load time here would create a circular import.
     import boundary
 
-    return boundary.LocalAgentBoundary(worktree_root)
+    return boundary.LocalAgentBoundary(
+        worktree_root,
+        card.allowed_paths,
+        card.acceptance_argvs,
+    )
 
 
-def build_default_test_runner(card):
-    """CLI fallback: turn card.acceptance_tests (a list of shell command
-    strings) into the test_runner run_loop calls at finish. Mirrors
-    run_stage1_benchmark.make_test_runner.
+def _rust_edition_for_path(worktree_root, relative_path):
+    """Resolve the nearest explicit Cargo edition, then the workspace default."""
+
+    def manifest_edition(manifest_path, workspace=False):
+        try:
+            with open(manifest_path, encoding="utf-8") as handle:
+                lines = handle.readlines()
+        except OSError:
+            return None
+        wanted_section = "workspace.package" if workspace else "package"
+        active = False
+        for line in lines:
+            section_match = re.match(r"\s*\[([^]]+)\]\s*(?:#.*)?$", line)
+            if section_match:
+                active = section_match.group(1).strip() == wanted_section
+                continue
+            if active:
+                edition_match = re.match(
+                    r"\s*edition\s*=\s*['\"]([^'\"]+)['\"]", line
+                )
+                if edition_match:
+                    return edition_match.group(1)
+        return None
+
+    root_manifest = os.path.join(worktree_root, "Cargo.toml")
+    fallback = (
+        manifest_edition(root_manifest, workspace=True)
+        or manifest_edition(root_manifest)
+        or "2021"
+    )
+    current = os.path.dirname(os.path.join(worktree_root, relative_path))
+    while os.path.commonpath((current, worktree_root)) == worktree_root:
+        edition = manifest_edition(os.path.join(current, "Cargo.toml"))
+        if edition:
+            return edition
+        if current == worktree_root:
+            break
+        current = os.path.dirname(current)
+    return fallback
+
+
+def build_default_formatter(card, boundary, file_tools):
+    """Format only edited Rust paths, via isolated copies outside the worktree."""
+
+    def formatter(worktree_dir):
+        rust_paths = [path for path in file_tools.edited_paths if path.endswith(".rs")]
+        if not rust_paths:
+            return {"passed": True, "formatted_paths": [], "output": "no edited Rust files"}
+
+        formatted_paths = []
+        outputs = []
+        with tempfile.TemporaryDirectory(prefix="dubbridge-local-format-") as temp_dir:
+            for index, path in enumerate(rust_paths):
+                source = file_tools.read_checked(path)
+                temp_path = os.path.join(temp_dir, f"{index}-{os.path.basename(path)}")
+                with open(temp_path, "w", encoding="utf-8") as handle:
+                    handle.write(source)
+                edition = _rust_edition_for_path(worktree_dir, path)
+                argv = [
+                    "rustfmt",
+                    "--edition",
+                    edition,
+                    "--config",
+                    "skip_children=true",
+                    temp_path,
+                ]
+                result = _run_command_with_timeout(argv, worktree_dir, boundary)
+                outputs.append(
+                    f"$ rustfmt --edition {edition} --config skip_children=true {path}\n"
+                    f"(exit {result['returncode']})\n{result['stdout']}\n{result['stderr']}"
+                )
+                if not result["ok"]:
+                    return {
+                        "passed": False,
+                        "formatted_paths": formatted_paths,
+                        "output": "\n\n".join(outputs),
+                    }
+                with open(temp_path, encoding="utf-8") as handle:
+                    formatted = handle.read()
+                file_tools.replace_from_runner(path, formatted)
+                formatted_paths.append(path)
+
+        return {
+            "passed": True,
+            "formatted_paths": formatted_paths,
+            "output": "\n\n".join(outputs),
+        }
+
+    return formatter
+
+
+def build_default_test_runner(card, boundary):
+    """Run the parsed operator acceptance argv directly at finish.
 
     Before this existed, main()'s CLI path left test_runner=None -- unlike
     chat_fn and boundary, which both have `x or build_x(...)` fallbacks -- so
@@ -862,28 +1035,26 @@ def build_default_test_runner(card):
 
     def test_runner(worktree_dir):
         outputs = []
-        for cmd in card.acceptance_tests:
-            try:
-                completed = subprocess.run(
-                    cmd,
-                    shell=True,
-                    cwd=worktree_dir,
-                    capture_output=True,
-                    text=True,
-                    timeout=COMMAND_TIMEOUT_SECONDS,
-                )
-            except subprocess.TimeoutExpired:
-                # A hung acceptance command must surface as a failed test, not
-                # an uncaught exception that would crash the runner at finish --
-                # exactly the failure class this fallback exists to remove.
-                outputs.append(f"$ {cmd}\n[TIMEOUT after {COMMAND_TIMEOUT_SECONDS}s]")
-                return {"passed": False, "output": "\n\n".join(outputs)}
+        command_results = []
+        for command, argv in zip(card.acceptance_tests, card.acceptance_argvs):
+            boundary.check_command(argv)
+            result = _run_command_with_timeout(argv, worktree_dir, boundary)
+            command_results.append(result)
             outputs.append(
-                f"$ {cmd}\n(exit {completed.returncode})\n{completed.stdout}\n{completed.stderr}"
+                f"$ {command}\n(exit {result['returncode']})\n"
+                f"{result['stdout']}\n{result['stderr']}"
             )
-            if completed.returncode != 0:
-                return {"passed": False, "output": "\n\n".join(outputs)}
-        return {"passed": True, "output": "\n\n".join(outputs)}
+            if not result["ok"]:
+                return {
+                    "passed": False,
+                    "output": "\n\n".join(outputs),
+                    "commands": command_results,
+                }
+        return {
+            "passed": True,
+            "output": "\n\n".join(outputs),
+            "commands": command_results,
+        }
 
     return test_runner
 
@@ -898,6 +1069,11 @@ def build_audit_record(card, result, model, elapsed_s, effective_limits=None):
         e["result"] for e in transcript
         if e.get("event") == "tool_result" and e["result"].get("tool") == "run_command"
     ]
+    command_events.extend(
+        command
+        for event in test_events
+        for command in event["result"].get("commands", [])
+    )
     edit_events = [
         e["result"] for e in transcript
         if e.get("event") == "tool_result" and e["result"].get("tool") in ("write_file", "apply_patch")
@@ -905,29 +1081,16 @@ def build_audit_record(card, result, model, elapsed_s, effective_limits=None):
     boundary_violations = [e for e in transcript if e.get("event") == "boundary_violation"]
     scope_check_events = [e for e in transcript if e.get("event") == "scope_check"]
     scope_check_result = scope_check_events[-1] if scope_check_events else None
-    organization_events = [
-        e["result"] for e in transcript
-        if e.get("event") == "organization_gate"
-    ]
-    organization_result = (
-        result.get("organization_gate")
-        or (organization_events[-1] if organization_events else None)
-    )
     acceptance_results = [e["result"]["passed"] for e in test_events]
     verification_results = {
         "acceptance_tests": acceptance_results,
         "final_acceptance_passed": acceptance_results[-1] if acceptance_results else None,
         "scope_in_scope": scope_check_result["in_scope"] if scope_check_result else None,
-        "organization_status": (
-            organization_result.get("status") if organization_result else None
-        ),
     }
     validation_errors = []
     if result["status"] == "success":
         if scope_check_result is None or not scope_check_result["in_scope"]:
             validation_errors.append("scope_gate_not_passed")
-        if organization_result is None or organization_result.get("status") != "pass":
-            validation_errors.append("organization_gate_not_passed")
         if verification_results["final_acceptance_passed"] is not True:
             validation_errors.append("acceptance_tests_not_passed")
     signed = result["status"] == "success" and not validation_errors
@@ -968,7 +1131,6 @@ def build_audit_record(card, result, model, elapsed_s, effective_limits=None):
         ],
         "test_results": [e["result"]["passed"] for e in test_events],
         "boundary_violations": len(boundary_violations),
-        "organization_gate": organization_result,
         "scope_check": {
             "in_scope": scope_check_result["in_scope"],
             "offending_paths": scope_check_result["offending_paths"],
@@ -1158,14 +1320,10 @@ def main(
     chat_fn=None,
     test_runner=None,
     boundary=None,
-    organization_gate_fn=None,
 ):
     args = parse_args(argv)
     card = load_card(args.card)
-    boundary = boundary or build_default_boundary(args.worktree)
-    organization_gate_fn = (
-        organization_gate_fn or runner_workflow_gate.run_organization_gate
-    )
+    boundary = boundary or build_default_boundary(args.worktree, card)
     limits = resolve_effective_limits(card)
     for flag, value in (("--num-ctx", args.num_ctx), ("--num-predict", args.num_predict)):
         if value <= 0:
@@ -1239,10 +1397,11 @@ def main(
     # The missing fallback (chat_fn and boundary above both had theirs): the
     # CLI never injects test_runner, so without this it stayed None and every
     # finish crashed with TypeError. See build_default_test_runner's docstring.
-    test_runner = test_runner or build_default_test_runner(card)
+    test_runner = test_runner or build_default_test_runner(card, boundary)
     file_tools = RunnerFileTools(
         args.worktree, boundary, MalformedToolCall, BoundaryViolation
     )
+    formatter_fn = build_default_formatter(card, boundary, file_tools)
     try:
         result = run_loop(
             card,
@@ -1251,9 +1410,9 @@ def main(
             args.worktree,
             boundary,
             file_tools,
-            organization_gate_fn,
             checkpoint_fn=checkpoint_fn,
             limits=limits,
+            formatter_fn=formatter_fn,
         )
     finally:
         file_tools.close()

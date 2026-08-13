@@ -957,24 +957,29 @@ For **RRI 26–40 local-first implementation** (Moderate), use
 primary agent remains orchestrator of record: it owns the task card,
 `allowed_paths`, verification commands, Reflection passes, closure, and final
 accept/reject judgment. The local implementer resolves from
-`DUBBRIDGE_LOCAL_AGENT_MODEL` (default `nemotron-3.5-lightning:30b-a3b-q4_K_M`), may run ordinary
-development commands inside the disposable worktree, and is constrained by the
-existing narrow denylist (`git push`, `docker`, `rm -rf`), stripped
-credentials, and post-run diff scope enforcement.
+`DUBBRIDGE_LOCAL_AGENT_MODEL` (default `nemotron-3.5-lightning:30b-a3b-q4_K_M`).
+The model receives the complete authorized file contents up front and cannot
+read files or run processes itself.
 
-The runner exposes a deliberately simple tool contract — `read_file` (whole
-file, no size cap), `write_file` (create or overwrite), `apply_patch`
-(single-unique-anchor replacement), `run_command`, and `finish`. There is no
-language-server / symbol-server preflight: the local implementer has a large
-context window and reads the file it must change directly. (This replaced an
-earlier Serena/semantic-tool path that never produced a successful edit — see
-`docs/plan/local-agent-simple-editing.md`.)
+The runner exposes a deliberately simple, card-bound tool contract —
+`write_file` (create or overwrite), `apply_patch` (single-unique-anchor
+replacement), and `finish`. Every edit is limited to the card's
+`allowed_paths`; any model-issued read, command, or unlisted-path access
+terminates immediately as `boundary_violation`. On `finish`, the runner formats
+only edited authorized Rust files through isolated temporary copies, then runs
+the operator-authored `acceptance_tests` in order. A formatter or acceptance
+failure returns its output plus refreshed authorized file contents for a bounded
+repair. The final diff scope check remains mandatory as defense in depth. (This
+replaced an earlier Serena/semantic-tool path that never produced a successful
+edit — see `docs/plan/local-agent-simple-editing.md`.)
 
-At finish, success signing is fail-closed: scope, acceptance, and organization
-gates must all pass before the audit may carry the `local-implementer`
-signature. A success audit must record scope result, acceptance/verification
-results, organization result, edit metrics (tool, path, line/byte counts),
-implementer model, and the signature itself. Use at most **2**
+At finish, the DEV result is fail-closed on its own responsibilities only: the
+final diff must remain in scope and the operator-authored acceptance commands
+must pass before the audit may carry the `local-implementer` signature. Code
+organization, independent review, coverage, and closure remain later workflow
+phases owned by the orchestrator and do not rewrite the DEV result. A success
+audit records scope, acceptance/verification results, edit metrics, implementer
+model, and the signature. Use at most **2**
 evidence-backed local repair attempts for Moderate (26–40). Med-high (41–55)
 is cloud-only after its ADR-038 evidence gate. If the local runner/model is
 unavailable, the applicable repair budget is exhausted, or the task violates the

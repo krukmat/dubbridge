@@ -133,17 +133,23 @@ The default path for Moderate development tasks is:
 4. Keep the primary agent as orchestrator of record: it owns the task card,
    allowed paths, acceptance tests, reflection passes, closure, and all final
    judgments about correctness.
-5. The runner uses a simple tool contract — `read_file` (whole file),
-   `write_file` (create or overwrite), `apply_patch` (single-unique-anchor
-   replacement), `run_command`, `finish`. There is no language-server preflight;
-   the implementer reads the file it changes directly. (See
+5. The runner gives the model only `write_file`, `apply_patch`, and `finish`.
+   Complete authorized file contents are preloaded; model-issued reads and
+   commands are disabled. Every edit is restricted to `allowed_paths`, and any
+   forbidden tool or unlisted path terminates as `boundary_violation`. On
+   `finish`, the runner formats only edited authorized Rust files via isolated
+   copies and executes the card's acceptance commands in order. Failures return
+   bounded repair evidence and refreshed authorized contents. (See
    `docs/plan/local-agent-simple-editing.md` for why the earlier Serena path
    was removed.)
-6. Enforce the task's `allowed_paths` after the local run. Any out-of-scope
-   diff fails closed and is never accepted into the primary checkout.
-7. Run the approved verification commands and the organization gate before
-   issuing a signed success audit. The `local-implementer` signature is valid
-   only when scope, acceptance, and organization gates all pass.
+6. Enforce the task's `allowed_paths` both at every file-tool call and after
+   the local run. Any unlisted access or out-of-scope diff fails closed and is
+   never accepted into the primary checkout.
+7. Run the approved verification commands before issuing a signed DEV success
+   audit. The `local-implementer` signature is valid when the final diff remains
+   in scope and acceptance passes. Organization, review, coverage, and closure
+   are separate orchestrator-owned workflow phases and do not alter that DEV
+   result.
 8. If the local run fails the acceptance signal, hits the scope boundary, or
    the local path is unavailable, the primary agent may run at most **2**
    evidence-backed local repair attempts.

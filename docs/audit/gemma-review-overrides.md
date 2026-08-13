@@ -23,3 +23,4 @@ as new rows with a note referencing the original.
 | GEG-TEST-PIPEFAIL | pipeline-failure | synthetic validator test row | Failed-attempt: local-agent malformed_tool_call_repeated | 2026-07-22 |
 | GEG-TEST-NOTAPP | not-applicable | synthetic validator test row | Scope-note: synthetic fixture | 2026-07-22 |
 | review-gate-diff-path-scoping | not-applicable | config-only Makefile wiring change (opt-in `REVIEW_PATHS` pathspec + existing tested `--files` flag; no new logic) — exempt from Step 1 mandatory code-solution review per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Development task closure checklist` config-only exemption | Scope-note: no domain/application code touched, task type declared `config` in the task ledger | 2026-07-30 |
+| LASS-0 | not-applicable | ADR/policy/docs-only strict-scope contract ratification; exempt from phase reviews | Scope-note: no executable code changed in LASS-0 | 2026-08-13 |

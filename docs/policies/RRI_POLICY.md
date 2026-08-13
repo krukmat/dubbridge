@@ -280,9 +280,12 @@ The default implementation route for development tasks scoring
 **RRI 26–40** is the local agentic runner. Resolve the implementer from
 `DUBBRIDGE_LOCAL_AGENT_MODEL`, defaulting to `nemotron-3.5-lightning:30b-a3b-q4_K_M`, and the Ollama
 endpoint from `OLLAMA_HOST`, defaulting to `http://localhost:11434`. The runner
-uses a simple tool contract (`read_file`/`write_file`/`apply_patch`/
-`run_command`/`finish`) with no language-server preflight — the implementer
-reads the file it changes directly (see
+preloads the complete authorized files and gives the model only the
+card-bound `write_file`/`apply_patch`/`finish` contract. Model-issued reads and
+commands are disabled; every edit must be inside `allowed_paths`, and any
+violation terminates the attempt immediately. On `finish`, the runner formats
+edited authorized Rust files in isolation and executes the operator-authored
+acceptance commands itself (see
 `docs/plan/local-agent-simple-editing.md`).
 
 Med-high (41–55) remains cloud-only. ADR-038's Muse-Glimmer refinement and
@@ -406,7 +409,7 @@ For final **RRI 26–40**, the implementation default is **local-first**:
   disposable worktree;
 - the implementer resolves from `DUBBRIDGE_LOCAL_AGENT_MODEL` (default
   `nemotron-3.5-lightning:30b-a3b-q4_K_M`);
-- post-run `allowed_paths` scope enforcement is mandatory;
+- tool-call-time and post-run `allowed_paths` scope enforcement are mandatory;
 - the local path has a maximum of **2 repair attempts**, each requiring new
   evidence;
 - cloud implementation is the escalation/fallback path when the local runner,

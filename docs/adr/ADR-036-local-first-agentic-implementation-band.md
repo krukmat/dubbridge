@@ -116,33 +116,27 @@ code:
 - The Low band (0–25) keeps the existing packet protocol; migrating it to the
   agentic runner is a possible follow-up, not part of this decision.
 
-### 3. Offline productivity containment for the local implementer
+### 3. Strict task-scope containment for the local implementer
 
-Stage 1 showed that command-level allowlisting dominated the result: normal
-repository inspection (`cat`, `find`, `wc`, direct test invocations, and shell
-composition) terminated otherwise viable sessions. For the local offline pilot,
-the worktree is the disposable containment boundary; the runner does not attempt
-to behave like a production execution sandbox.
+Stage 1 showed that a coarse executable-prefix allowlist harmed the exploratory
+offline benchmark. Production task evidence later showed the opposite failure:
+an unrestricted model could spend its complete turn budget reading unrelated
+repository paths even when the approved card named an exact two-file scope.
+The operative production boundary is therefore capability-based and derived
+from the task card, not from a global executable-prefix list.
 
-- **Isolated disposable git worktree** per task. The model may read, write, and
-  run arbitrary development commands inside it. A broken worktree is deleted;
+- **Isolated disposable git worktree** per task. A broken worktree is deleted;
   the primary checkout is never the execution directory.
-- **No command allowlist or command-policy aborts** for the general case.
-  Shell composition, repository inspection, dependency tooling, formatters,
-  compilers, and tests are permitted. Productivity is measured against the
-  resulting diff and gates, not against which command vocabulary the model
-  selected.
-  **Amendment (T7b-3, recorded post-implementation):** a short, fixed
-  denylist (`git push`, `docker`, `rm -rf`) is retained as defense-in-depth
-  for the three highest-severity, hardest-to-undo actions, reintroduced
-  after the pre-push Gemma Reviewer gate flagged unrestricted execution as a
-  major finding. This is materially narrower than the positive allowlist
-  this ADR's §3 already rejects (an ~10-entry "which tools may run" list);
-  it is three specific irreversible/exfiltration-adjacent actions, not a
-  return to allowlist-first policy. See
-  `docs/tasks/adr036-local-first-pilot.md` T7b-3 "Design revision" for the
-  full trail.
-- **Post-run scope enforcement:** after the model finishes, the orchestrator
+- **Card-bound file capabilities:** `read_file`, `write_file`, and
+  `apply_patch` accept only repository-relative paths included by the card's
+  `allowed_paths`. An absolute, escaping, symlink-resolved, or simply unlisted
+  path terminates the attempt immediately as `boundary_violation`.
+- **Card-bound command capabilities:** model-issued `run_command` accepts only
+  argv exactly matching an operator-authored `acceptance_tests` command in the
+  card. Unlisted reconnaissance or shell composition terminates immediately.
+  The operator-controlled suite still runs independently on `finish`.
+- **Post-run scope enforcement remains mandatory:** after the model finishes,
+  the orchestrator
   compares the worktree diff with the card's `allowed_paths`. Out-of-scope
   changes fail the card and are never applied to the primary checkout.
 - **Minimal credential surface:** the subprocess environment remains stripped
@@ -155,10 +149,10 @@ to behave like a production execution sandbox.
   run after implementation and determine success independently of the model's
   self-assessment.
 
-This is an explicit productivity tradeoff for a local, offline benchmark. It is
-not a claim that arbitrary command execution is appropriate for CI runners,
-shared hosts, production credentials, or remote multi-tenant agents; those
-surfaces require a real OS/container sandbox and a separate ADR amendment.
+This boundary constrains the model-visible task context and commands; it is not
+a complete operating-system confidentiality sandbox. Accepted compilers and
+tests may read their normal dependency graph, so shared hosts or untrusted
+repositories still require OS/container isolation.
 
 ### 4. Test-first delegation contract
 
