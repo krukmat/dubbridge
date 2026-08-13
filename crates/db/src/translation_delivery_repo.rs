@@ -133,6 +133,24 @@ pub enum TranslationDispatchFailureResult {
     NotFound,
 }
 
+/// Public acknowledgement input carrying the exact dispatch identity.
+#[derive(Debug, Clone, Copy)]
+pub struct TranslationDispatchAcknowledgementInput {
+    pub project_id: ProjectId,
+    pub asset_id: AssetId,
+    pub target_language_id: Uuid,
+    pub generation_request_id: Uuid,
+}
+
+/// Public result contract distinguishing all acknowledgement outcomes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TranslationDispatchAcknowledgementResult {
+    Marked,
+    AlreadyAcknowledged,
+    Rejected,
+    NotFound,
+}
+
 async fn update_enqueue_failed_tx(
     tx: &mut Transaction<'_, Postgres>,
     input: &TranslationDispatchFailureInput,
@@ -163,6 +181,84 @@ async fn update_enqueue_failed_tx(
     .map_err(DbError::QueryFailed)?;
 
     Ok(!updated.is_empty())
+}
+
+async fn update_acknowledged_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    input: TranslationDispatchAcknowledgementInput,
+) -> Result<bool, DbError> {
+    let updated = sqlx::query(
+        r#"
+        UPDATE translation_dispatch_outbox
+        SET delivery_state = 'acknowledged',
+            updated_at = now()
+        WHERE operation = $1
+          AND project_id = $2
+          AND asset_id = $3
+          AND target_language_id = $4
+          AND generation_request_id = $5
+          AND delivery_state = 'pending'
+        RETURNING 1
+        "#,
+    )
+    .bind(OPERATION)
+    .bind(input.project_id.0)
+    .bind(input.asset_id.0)
+    .bind(input.target_language_id)
+    .bind(input.generation_request_id)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    Ok(!updated.is_empty())
+}
+
+/// Atomically acknowledge a pending dispatch, or inspect the same row.
+pub async fn translation_dispatch_acknowledge(
+    pool: &PgPool,
+    input: TranslationDispatchAcknowledgementInput,
+) -> Result<TranslationDispatchAcknowledgementResult, DbError> {
+    let mut tx = pool.begin().await.map_err(DbError::QueryFailed)?;
+
+    if update_acknowledged_tx(&mut tx, input).await? {
+        tx.commit().await.map_err(DbError::QueryFailed)?;
+        return Ok(TranslationDispatchAcknowledgementResult::Marked);
+    }
+
+    let maybe_state: Option<String> = sqlx::query_scalar(
+        r#"
+        SELECT delivery_state
+        FROM translation_dispatch_outbox
+        WHERE operation = $1
+          AND project_id = $2
+          AND asset_id = $3
+          AND target_language_id = $4
+          AND generation_request_id = $5
+        "#,
+    )
+    .bind(OPERATION)
+    .bind(input.project_id.0)
+    .bind(input.asset_id.0)
+    .bind(input.target_language_id)
+    .bind(input.generation_request_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    let result = match maybe_state.as_deref() {
+        Some("acknowledged") => TranslationDispatchAcknowledgementResult::AlreadyAcknowledged,
+        Some("enqueue_failed") => TranslationDispatchAcknowledgementResult::Rejected,
+        None => TranslationDispatchAcknowledgementResult::NotFound,
+        Some(other) => {
+            return Err(DbError::UnknownStoredValue {
+                field: "translation_dispatch_outbox.delivery_state",
+                value: other.to_owned(),
+            });
+        }
+    };
+
+    tx.commit().await.map_err(DbError::QueryFailed)?;
+    Ok(result)
 }
 
 /// Atomically mark a pending dispatch as enqueue_failed, or inspect the same row.

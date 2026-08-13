@@ -2123,11 +2123,14 @@ Required passes: 2 (`37` -> `Moderate`)
 
 **Type:** development
 **Effort:** L (RRI 43 — Med-high)
+**RRI:** 43 / Med-high
 **Decomposed from:** S-150-T2c
 **Depends on:** S-150-T2b-ii-c
-**Status:** [ ] Planned — approval pending
+**Status:** [x] Done — 2026-08-13
 
 **RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
+
+Task-analysis review: `gemma` `.agent/peer-task-review-S-150-T2c-iii.json` - `PASS`
 
 **Happy paths considered:**
 
@@ -2153,6 +2156,80 @@ matrix, Reflection log, unit coverage certification, and owner verification.
 **Status artifacts affected:** This ledger and the S-150 plan.
 
 **Stop condition:** Stop after acknowledgement-transition tests. Do not wire Redis.
+
+### Execution evidence
+
+- ADR-038 Muse Glimmer refinement: `GO_LOCAL` —
+  `.agent/local-architect/med-high-refinement-v1/S-150-T2c-iii/refinement-artifact.json`.
+- Hash-bound primary receipt: `GO_LOCAL`; Med-high local execution is
+  policy-excluded, therefore the supervisor emitted the cloud handoff.
+- ADR-039 fallback receipt: capability-risk `gpt-5.6-sol` / `high`, selected by
+  Matías — `.agent/local-architect/med-high-refinement-v1/S-150-T2c-iii/fallback-selection.json`.
+- Antares refinement and post-implementation: typed skip — this repository-state
+  transition has no task-relevant CWE hypothesis on `scripts/antares/cwe_watchlist.py`.
+- Live PostgreSQL state matrix: 11/11 tests passed with
+  `DUBBRIDGE_DATABASE_URL` configured; the focused coverage run measured
+  `crates/db/src/translation_delivery_repo.rs` at 94.69% lines and 89.60% regions.
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma`
+- Model: `gemma4:26b-a4b-it-qat`
+- Command: `PEER_REVIEW_PHASE=code PEER_REVIEW_RRI=43 PEER_REVIEW_CALLER=codex
+  PEER_REVIEW_TASK_ID=S-150-T2c-iii
+  PEER_REVIEW_ARTIFACT=.agent/peer-code-review-S-150-T2c-iii.json
+  PEER_REVIEW_BASE=HEAD REVIEW_PATHS='crates/db/src/translation_delivery_repo.rs
+  apps/api/tests/translation_delivery_repo_test.rs' make qa-peer-workflow-review`
+- Artifact: `.agent/peer-code-review-S-150-T2c-iii.json`
+- Verdict: `PASS`
+- Findings: none
+- Muse Glimmer fallback: not triggered — Gemma returned a usable PASS.
+- D14 fallback: not triggered — the local reviewer chain remained usable.
+- D14 provider route: `n/a`
+- disposition_divergence: `none`
+- Primary-agent disposition: no findings to repair or reject.
+
+Code-solution review: `gemma` `.agent/peer-code-review-S-150-T2c-iii.json` - `PASS`
+
+### Reflection log
+
+Required passes: 3 (`43` → `Med-high`)
+
+#### Pass 1
+
+- **Draft verdict:** The guarded `pending` to `acknowledged` transition returns a typed result for every expected stored state.
+- **Critique findings:** The exact composite identity and duplicate-acknowledgement behavior are covered; no production-code issue found.
+- **Revisions applied:** none.
+
+#### Pass 2
+
+- **Draft verdict:** Failure after acknowledgement and acknowledgement after failure preserve their terminal rows.
+- **Critique findings:** A pre-existing `AlreadyFailed` test updated a nonexistent row and only passed when database tests self-skipped.
+- **Revisions applied:** Created the pending dispatch and performed the first real failure transition before asserting the idempotent second failure result.
+
+#### Pass 3
+
+- **Draft verdict:** The final real-PostgreSQL matrix covers success, idempotency, rejected terminal states, and an exact-identity miss.
+- **Critique findings:** The focused line coverage is above the 90% target; independent Gemma phase-2 review reported no findings.
+- **Revisions applied:** none.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | Successful enqueue acknowledges exactly one durable dispatch identity | `apps/api/tests/translation_delivery_repo_test.rs::acknowledgement_marks_pending_dispatch_and_is_idempotent` | passed |
+| EC-1 | Edge case | Duplicate acknowledgement or failure after acknowledgement leaves the row acknowledged | `apps/api/tests/translation_delivery_repo_test.rs::acknowledgement_marks_pending_dispatch_and_is_idempotent`; `apps/api/tests/translation_delivery_repo_test.rs::enqueue_failure_returns_rejected_when_acknowledged` | passed |
+
+### Owner final verification
+
+- Owner: Codex
+- Date: 2026-08-13
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior, including against the live local PostgreSQL service.
+- Commands run: `cargo fmt --check`; `DUBBRIDGE_DATABASE_URL='<local PostgreSQL URL>' cargo test -p dubbridge-api --test translation_delivery_repo_test -- --test-threads=1`; `DUBBRIDGE_DATABASE_URL='<local PostgreSQL URL>' cargo llvm-cov --workspace --test translation_delivery_repo_test --summary-only`; `git diff --check`.
+
+- Review artifact: `docs/audit/gemma-evidence/S-150-T2c-iii.json`
+
+**S-150-T2c-iii status: `[x] Done`**
 
 ---
 
