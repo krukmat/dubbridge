@@ -74,6 +74,28 @@ async fn insert_word_alignment_parent(pool: &PgPool, asset_id: AssetId) -> Uuid 
     alignment.id
 }
 
+async fn insert_transcript_parent(pool: &PgPool, asset_id: AssetId) -> Uuid {
+    let source = insert_source_artifact(pool, asset_id).await;
+    let (transcript, _alignment) = transcription_repo::insert_transcript_artifacts(
+        pool,
+        asset_id,
+        source.id,
+        TranscriptArtifactMeta {
+            storage_key: &transcript_key(&asset_id.to_string()),
+            size_bytes: 256,
+            checksum: "transcriptsum",
+        },
+        TranscriptArtifactMeta {
+            storage_key: &alignment_key(&asset_id.to_string()),
+            size_bytes: 128,
+            checksum: "alignmentsum",
+        },
+    )
+    .await
+    .expect("insert transcript artifacts");
+    transcript.id
+}
+
 // HP-1: insert a subtitle artifact linked to a WordAlignment parent.
 #[tokio::test]
 async fn insert_subtitle_artifact_links_to_word_alignment_parent() {
@@ -102,6 +124,125 @@ async fn insert_subtitle_artifact_links_to_word_alignment_parent() {
     assert_eq!(inserted.content_type, "text/vtt");
     assert_eq!(inserted.size_bytes, 64);
     assert_eq!(inserted.checksum, "subtitlesum");
+}
+
+// S-150-T2c-ii HP-1: replay recovers the exact persisted subtitle rather than
+// substituting a sibling subtitle for a different WordAlignment parent.
+#[tokio::test]
+async fn find_subtitle_for_exact_asset_and_word_alignment_parent_returns_persisted_row() {
+    let Some(pool) = setup_pool().await else {
+        return;
+    };
+
+    let asset_id = insert_asset(&pool).await;
+    let first_parent = insert_word_alignment_parent(&pool, asset_id).await;
+    let exact_parent = insert_word_alignment_parent(&pool, asset_id).await;
+    let sibling = subtitle_repo::insert_subtitle_artifact(
+        &pool,
+        asset_id,
+        first_parent,
+        &format!("subtitles/{asset_id}/sibling.vtt"),
+        "text/vtt",
+        64,
+        "siblingsum",
+    )
+    .await
+    .expect("insert sibling subtitle");
+    let persisted = subtitle_repo::insert_subtitle_artifact(
+        &pool,
+        asset_id,
+        exact_parent,
+        &format!("subtitles/{asset_id}/exact.vtt"),
+        "text/vtt",
+        96,
+        "exactsum",
+    )
+    .await
+    .expect("insert exact subtitle");
+
+    let resolved = subtitle_repo::find_subtitle_for_asset_and_word_alignment_parent(
+        &pool,
+        asset_id,
+        exact_parent,
+    )
+    .await
+    .expect("resolve exact persisted subtitle");
+
+    assert_ne!(resolved.id, sibling.id);
+    assert_eq!(resolved.id, persisted.id);
+    assert_eq!(resolved.asset_id, persisted.asset_id);
+    assert_eq!(resolved.parent_artifact_id, persisted.parent_artifact_id);
+    assert_eq!(resolved.kind, ArtifactKind::Subtitle);
+    assert_eq!(resolved.storage_key, persisted.storage_key);
+    assert_eq!(resolved.content_type, persisted.content_type);
+    assert_eq!(resolved.size_bytes, persisted.size_bytes);
+    assert_eq!(resolved.checksum, persisted.checksum);
+}
+
+// S-150-T2c-ii EC-1: a Subtitle-shaped child of a TranscriptText parent must
+// not be substituted with a valid sibling subtitle.
+#[tokio::test]
+async fn find_subtitle_rejects_wrong_kind_parent_without_substitution() {
+    let Some(pool) = setup_pool().await else {
+        return;
+    };
+
+    let asset_id = insert_asset(&pool).await;
+    let valid_parent = insert_word_alignment_parent(&pool, asset_id).await;
+    subtitle_repo::insert_subtitle_artifact(
+        &pool,
+        asset_id,
+        valid_parent,
+        &format!("subtitles/{asset_id}/valid.vtt"),
+        "text/vtt",
+        64,
+        "validsum",
+    )
+    .await
+    .expect("insert valid sibling subtitle");
+
+    let transcript_parent = insert_transcript_parent(&pool, asset_id).await;
+    let invalid_child = dubbridge_domain::artifact::DerivedArtifact::new(
+        asset_id,
+        transcript_parent,
+        ArtifactKind::Subtitle,
+        format!("subtitles/{asset_id}/invalid.vtt"),
+        "text/vtt".into(),
+        64,
+        "invalidsum".into(),
+    );
+    artifact_repo::insert_derived_artifact_record(&pool, &invalid_child)
+        .await
+        .expect("seed wrong-kind child permitted by the generic artifact table");
+
+    let err = subtitle_repo::find_subtitle_for_asset_and_word_alignment_parent(
+        &pool,
+        asset_id,
+        transcript_parent,
+    )
+    .await
+    .expect_err("TranscriptText parent must not resolve a subtitle");
+
+    assert!(matches!(err, dubbridge_db::error::DbError::NotFound));
+}
+
+// S-150-T2c-ii EC-1: a missing requested parent is a typed not-found result.
+#[tokio::test]
+async fn find_subtitle_rejects_missing_parent() {
+    let Some(pool) = setup_pool().await else {
+        return;
+    };
+
+    let asset_id = insert_asset(&pool).await;
+    let err = subtitle_repo::find_subtitle_for_asset_and_word_alignment_parent(
+        &pool,
+        asset_id,
+        Uuid::new_v4(),
+    )
+    .await
+    .expect_err("missing parent must not resolve a substitute subtitle");
+
+    assert!(matches!(err, dubbridge_db::error::DbError::NotFound));
 }
 
 // Artifact HP: distinct parents (e.g. two languages' WordAlignment artifacts) each accept a subtitle.

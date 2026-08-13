@@ -307,7 +307,7 @@ no inference from project age, row presence, or feature timing is allowed.
 | T2b-ii-c | Guarded dispatch enqueue-failure transition | development | 35 / M | Done 2026-08-13; Qwen local DEV, exact composite pending-state guard, focused PostgreSQL suite 8/8, Gemma phase-2 PASS; integrated in `f835b01` |
 | T2c | Versioned localization jobs and outbox-backed fan-out | development parent | 65 / L Complex | Decomposed 2026-08-13 into T2c-i through T2c-v. Parent phase-1 exception evidence remains in `.agent/peer-task-review-S-150-T2c-local-pair.json`; child RRI evidence is `docs/audit/s-150-t2c-decomposition-rri.md`. |
 | T2c-i | Versioned subtitle/translation job contracts | development | 41 / L Med-high | Done 2026-08-13; versioned route and deterministic UUIDv5 job contracts are in `crates/jobs`. |
-| T2c-ii | Exact persisted subtitle resolver | development | 37 / M Moderate | Depends on T2b-ii-c; approval pending. |
+| T2c-ii | Exact persisted subtitle resolver | development | 37 / M Moderate | Done 2026-08-13; exact fail-closed persisted Subtitle resolver verified with live PostgreSQL and Gemma phase-2 PASS. |
 | T2c-iii | Translation dispatch acknowledgement transition | development | 43 / L Med-high | Depends on T2b-ii-c; approval pending. |
 | T2c-iv | Localization route branch and durable target fan-out | development | 48 / L Med-high | Depends on T2c-i/ii/iii; approval pending. |
 | T2c-v | Redis translation queue and worker topology | development | 50 / L Med-high | Depends on T2c-i/iii/iv; approval pending. |

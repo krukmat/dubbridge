@@ -1972,9 +1972,12 @@ Required passes: 3 (`41` → `Med-high`)
 
 **Type:** development
 **Effort:** M (RRI 37 — Moderate)
+**RRI:** 37 / Moderate
 **Decomposed from:** S-150-T2c
 **Depends on:** S-150-T2b-ii-c
-**Status:** [ ] Planned — approval pending
+**Status:** [x] Done — 2026-08-13
+
+Task-analysis review: gemma `.agent/peer-task-review-S-150-T2c-ii.json` - PASS
 
 **RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
 
@@ -2001,6 +2004,118 @@ log, unit coverage certification, and owner verification.
 **Status artifacts affected:** This ledger and the S-150 plan.
 
 **Stop condition:** Stop after exact-lookup tests. Do not add runtime routing.
+
+### Execution evidence
+
+- User approval includes a bounded waiver of the 500-line local-delegation
+  gate and authorizes Codex intervention only after the local development and
+  repair rounds.
+- Local DEV: `qwen3.6:35b-a3b` ran in the disposable
+  `.agent/worktrees/s-150-t2c-ii-local` worktree. It stayed within the two
+  allowed paths but exhausted its two evidence-backed repairs: it introduced
+  the nonexistent `DbError::MissingRecord`, then mismatched the existing
+  `UnknownStoredValue` field type. Its final acceptance failed at
+  `cargo check -p dubbridge-db`; no local diff was accepted.
+- Fallback selection: the terminal packet is bound in
+  `.agent/s-150-t2c-ii-local-run.json`; the user's approved intervention route
+  is recorded in `.agent/s-150-t2c-ii-local-run.fallback-authorized.json` as
+  `gpt-5.6-terra` / `medium` for the operational-only repair exhaustion.
+- Codex replaced the failed local draft with one exact `INNER JOIN` lookup and
+  focused PostgreSQL tests; no migration, readiness, queue, job, provider, or
+  runtime-routing code changed.
+- Focused real-PostgreSQL evidence: with
+  `DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@127.0.0.1:5432/dubbridge`,
+  `subtitle_repo_test` passed `20/20` tests. `cargo llvm-cov --workspace --test
+  subtitle_repo_test --summary-only` measured `subtitle_repo.rs` at 95.06%
+  regions and 98.03% lines.
+- Antares refinement/post-implementation: typed skip — this task carries no
+  task-relevant CWE hypothesis from `scripts/antares/cwe_watchlist.py`; no
+  generic security sweep was run.
+- Code-solution review: gemma
+  `.agent/peer-code-review-S-150-T2c-ii.json` - PASS
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma`
+- Model: `gemma4:26b-a4b-it-qat`
+- Command: `PEER_REVIEW_PHASE=code PEER_REVIEW_RRI=37 PEER_REVIEW_CALLER=codex
+  PEER_REVIEW_TASK_ID=S-150-T2c-ii
+  PEER_REVIEW_ARTIFACT=.agent/peer-code-review-S-150-T2c-ii.json
+  PEER_REVIEW_BASE=HEAD REVIEW_PATHS='crates/db/src/subtitle_repo.rs
+  apps/api/tests/subtitle_repo_test.rs' make qa-peer-workflow-review`
+- Artifact: `.agent/peer-code-review-S-150-T2c-ii.json`
+- Verdict: `PASS`
+- Findings: none
+- Muse Glimmer fallback: not triggered — Gemma returned a usable PASS
+- D14 fallback: not triggered — the local reviewer chain remained usable
+- D14 provider route: `n/a`
+- disposition_divergence: `none`
+- Primary-agent disposition: no findings to repair or reject
+- Review artifact: docs/audit/gemma-evidence/S-150-T2c-ii.json
+
+### Reflection log
+
+Required passes: 2 (`37` -> `Moderate`)
+
+#### Pass 1
+
+- **Draft verdict:** The bounded local draft was in scope but did not compile:
+  it relied on a nonexistent `DbError::MissingRecord`, duplicated resolver
+  documentation, and added no PostgreSQL acceptance coverage.
+- **Critique findings:** A resolver must use the existing typed `DbError::NotFound`;
+  the lookup must express the child/parent/asset/kind boundary in one query; and
+  HP-1/EC-1 need live database tests rather than a returned local value.
+- **Revisions applied:** After the two permitted local repairs were exhausted,
+  Codex implemented one `INNER JOIN` query with all four predicates and added
+  exact-row, wrong-kind-with-valid-sibling, and missing-parent tests.
+
+#### Pass 2
+
+- **Draft verdict:** The revised implementation returns only the persisted
+  Subtitle whose child and WordAlignment parent share the requested asset, and
+  it passed the focused live-PostgreSQL suite.
+- **Critique findings:** Gemma phase-2 returned PASS with no findings. The
+  primary agent independently rechecked that every mismatch is filtered by the
+  query and therefore reaches `DbError::NotFound`, with no insert or readiness
+  side effect.
+- **Revisions applied:** none.
+
+### Happy paths covered
+
+- `crates/db/src/subtitle_repo.rs::find_subtitle_for_asset_and_word_alignment_parent`
+  returns the persisted `DerivedArtifact` only for the exact asset/parent pair;
+  `apps/api/tests/subtitle_repo_test.rs::find_subtitle_for_exact_asset_and_word_alignment_parent_returns_persisted_row`
+  proves the returned identity and metadata cannot be a sibling substitute.
+
+### Edge cases covered
+
+- The resolver's `INNER JOIN` requires the parent to be `word_alignment` for
+  the same requested asset and returns `DbError::NotFound` when no row remains.
+  `find_subtitle_rejects_wrong_kind_parent_without_substitution` seeds a valid
+  sibling plus a TranscriptText-parent child and proves no substitution;
+  `find_subtitle_rejects_missing_parent` proves the typed missing-parent path.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | Persisted Subtitle is recovered by exact asset and WordAlignment-parent identity | `apps/api/tests/subtitle_repo_test.rs::find_subtitle_for_exact_asset_and_word_alignment_parent_returns_persisted_row` | passed |
+| EC-1 | Edge case | Missing or wrong-kind parent returns no substitute through the typed error path | `apps/api/tests/subtitle_repo_test.rs::find_subtitle_rejects_wrong_kind_parent_without_substitution`; `apps/api/tests/subtitle_repo_test.rs::find_subtitle_rejects_missing_parent` | passed |
+
+### Owner final verification
+
+- Owner: Codex (primary agent and escalation implementer)
+- Date: 2026-08-13
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior. I also verified the exact SQL boundary against live PostgreSQL; the accepted diff is limited to the resolver and its tests, with no insert, readiness, fan-out, queue, job, provider, migration, or runtime-routing behavior.
+- Commands run: `cargo fmt --all`; `cargo check -p dubbridge-db`; `cargo test
+  -p dubbridge-api --test subtitle_repo_test -- --test-threads=1`; `cargo clippy
+  -p dubbridge-db --all-targets -- -D warnings`; `DUBBRIDGE_DATABASE_URL='postgres://dubbridge:dubbridge@127.0.0.1:5432/dubbridge'
+  cargo test -p dubbridge-api --test subtitle_repo_test -- --test-threads=1`;
+  `DUBBRIDGE_DATABASE_URL='postgres://dubbridge:dubbridge@127.0.0.1:5432/dubbridge'
+  cargo llvm-cov --workspace --test subtitle_repo_test --summary-only`; phase-2
+  peer-review command recorded above; `git diff --check`.
+- Result: all commands passed; live PostgreSQL suite `20/20`; relevant file
+  coverage 95.06% regions / 98.03% lines; Gemma phase-2 PASS with no findings.
 
 ---
 

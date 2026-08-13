@@ -36,6 +36,18 @@ struct SubtitleStatusRow {
     updated_at: OffsetDateTime,
 }
 
+#[derive(sqlx::FromRow)]
+struct PersistedSubtitleRow {
+    id: Uuid,
+    asset_id: Uuid,
+    parent_artifact_id: Uuid,
+    storage_key: String,
+    content_type: String,
+    size_bytes: i64,
+    checksum: String,
+    created_at: OffsetDateTime,
+}
+
 fn is_unique_violation(error: &sqlx::Error) -> bool {
     error
         .as_database_error()
@@ -183,6 +195,58 @@ pub async fn insert_subtitle_artifact(
     })?;
 
     Ok(artifact)
+}
+
+/// Return the persisted `Subtitle` for exactly one asset and WordAlignment parent.
+///
+/// The parent join is intentional: a child row alone is insufficient evidence for
+/// replay identity. A missing parent, a parent from another asset, or a parent of
+/// any kind other than `WordAlignment` is indistinguishable from no matching
+/// subtitle and fails closed with `DbError::NotFound`.
+pub async fn find_subtitle_for_asset_and_word_alignment_parent(
+    pool: &PgPool,
+    asset_id: AssetId,
+    word_alignment_parent_artifact_id: Uuid,
+) -> Result<DerivedArtifact, DbError> {
+    let row = sqlx::query_as::<_, PersistedSubtitleRow>(
+        r#"
+        SELECT
+            subtitle.id,
+            subtitle.asset_id,
+            subtitle.parent_artifact_id,
+            subtitle.storage_key,
+            subtitle.content_type,
+            subtitle.size_bytes,
+            subtitle.checksum,
+            subtitle.created_at
+        FROM artifact_records AS subtitle
+        INNER JOIN artifact_records AS parent
+            ON parent.id = subtitle.parent_artifact_id
+        WHERE subtitle.asset_id = $1
+          AND subtitle.parent_artifact_id = $2
+          AND subtitle.kind = 'subtitle'
+          AND parent.asset_id = $1
+          AND parent.kind = 'word_alignment'
+        "#,
+    )
+    .bind(asset_id.0)
+    .bind(word_alignment_parent_artifact_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(DbError::QueryFailed)?
+    .ok_or(DbError::NotFound)?;
+
+    Ok(DerivedArtifact {
+        id: row.id,
+        asset_id: AssetId(row.asset_id),
+        parent_artifact_id: row.parent_artifact_id,
+        kind: ArtifactKind::Subtitle,
+        storage_key: row.storage_key,
+        content_type: row.content_type,
+        size_bytes: row.size_bytes,
+        checksum: row.checksum,
+        created_at: row.created_at,
+    })
 }
 
 /// Return `true` only when a `Subtitle` derived artifact exists for the asset
