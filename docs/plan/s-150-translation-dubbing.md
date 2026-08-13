@@ -305,7 +305,12 @@ no inference from project age, row presence, or feature timing is allowed.
 | T2b-ii-a | Candidate delivery-scope query and decoding helpers | development | 39 / M | Done 2026-08-12; transaction-bound read-only candidate decoder verified with 2/2 live-PostgreSQL tests and Gemma phase-2 PASS; T2b-ii-b owns exact-project enforcement |
 | T2b-ii-b | Atomic delivery claim and dispatch persistence | development | 52 / L | Done 2026-08-12; atomic create/reuse and source-conflict behavior verified with live PostgreSQL and Muse Glimmer phase-2 PASS |
 | T2b-ii-c | Guarded dispatch enqueue-failure transition | development | 35 / M | Done 2026-08-13; Qwen local DEV, exact composite pending-state guard, focused PostgreSQL suite 8/8, Gemma phase-2 PASS; integrated in `f835b01` |
-| T2c | Versioned localization jobs and outbox-backed fan-out | development parent | 65 / L Complex | Recomputed 2026-08-13; mandatory decomposition before implementation. Phase-1 cross-vendor review is awaiting the ADR-039 human fallback selection after the Claude CLI was unavailable. |
+| T2c | Versioned localization jobs and outbox-backed fan-out | development parent | 65 / L Complex | Decomposed 2026-08-13 into T2c-i through T2c-v. Parent phase-1 exception evidence remains in `.agent/peer-task-review-S-150-T2c-local-pair.json`; child RRI evidence is `docs/audit/s-150-t2c-decomposition-rri.md`. |
+| T2c-i | Versioned subtitle/translation job contracts | development | 41 / L Med-high | Done 2026-08-13; versioned route and deterministic UUIDv5 job contracts are in `crates/jobs`. |
+| T2c-ii | Exact persisted subtitle resolver | development | 37 / M Moderate | Depends on T2b-ii-c; approval pending. |
+| T2c-iii | Translation dispatch acknowledgement transition | development | 43 / L Med-high | Depends on T2b-ii-c; approval pending. |
+| T2c-iv | Localization route branch and durable target fan-out | development | 48 / L Med-high | Depends on T2c-i/ii/iii; approval pending. |
+| T2c-v | Redis translation queue and worker topology | development | 50 / L Med-high | Depends on T2c-i/iii/iv; approval pending. |
 | T3a | Translation provider/subprocess contract | development | 42 / L | Med-high |
 | T3b | Functional translation worker | development | 44 / L | Med-high |
 | T3c | Translation runtime persistence and readiness | development | 53 / L | Med-high |
@@ -326,7 +331,7 @@ coverage. T1c, T5, and T6 are parent requirements, not executable handoff cards;
 their child tasks must be created before coding begins. T8 is a non-blocking future
 parent and must be decomposed only when its governance program is activated.
 
-Sequence: `T0 -> T1a -> T1b -> T1c-i -> T1c-ii -> T2b-i -> T2b-ii-a -> T2b-ii-b -> T2b-ii-c -> T2c -> T3a -> T3b -> T3c -> T4
+Sequence: `T0 -> T1a -> T1b -> T1c-i -> T1c-ii -> T2b-i -> T2b-ii-a -> T2b-ii-b -> T2b-ii-c -> T2c-i -> T2c-ii + T2c-iii -> T2c-iv -> T2c-v -> T3a -> T3b -> T3c -> T4
 -> decomposed T5 children -> decomposed T6 children -> T7`. T8 is deliberately
 last and is not part of the S-150 delivery critical path; it is a future
 governance follow-up coordinated with `X-S-110-2`, `X-S-110-3`, X20, and S-180.

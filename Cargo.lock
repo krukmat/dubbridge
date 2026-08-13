@@ -857,6 +857,7 @@ dependencies = [
  "apalis-redis",
  "async-trait",
  "serde",
+ "serde_json",
  "tokio",
  "tokio-test",
  "uuid",
@@ -3733,6 +3734,7 @@ dependencies = [
  "getrandom 0.4.2",
  "js-sys",
  "serde_core",
+ "sha1_smol",
  "wasm-bindgen",
 ]
 

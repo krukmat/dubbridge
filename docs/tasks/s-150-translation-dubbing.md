@@ -20,8 +20,9 @@ Behavioral coverage contract: unit-v1
 > (repositories, now complete). The former T2 fan-out parent is decomposed into
 > T2b-i/T2b-ii/T2c. T2b-i is complete; T2b-ii was decomposed on 2026-08-12
 > into T2b-ii-a/T2b-ii-b/T2b-ii-c after an exact `RRI 57` result. All three
-> children are complete as of 2026-08-13; T2c is now the next executable task
-> after its own fresh RRI and approval. The
+> children are complete as of 2026-08-13. Complex parent T2c was decomposed on
+> 2026-08-13 into T2c-i through T2c-v; T2c-i is the next executable task after
+> its own phase-1 review and approval. The
 > plan-review conditions recorded for this slice remain in force, especially the
 > durable S-140/S-150 route marker, deterministic initial generation-request
 > derivation, and deferred ADR-028 ownership seam for TTS. Tasks T5, T6, and
@@ -1741,9 +1742,20 @@ Required passes: 2 (`35` -> `Moderate`)
 **Type:** development
 **Effort:** L (RRI 65 — Complex; mandatory decomposition before presentation)
 **Depends on:** S-150-T2b-ii-c
-**Status:** [ ] Blocked on mandatory decomposition and phase-1 review fallback selection — 2026-08-13
+**Status:** [~] Decomposed 2026-08-13 into S-150-T2c-i through S-150-T2c-v
 
-**RRI evidence:** `docs/audit/s-150-t2c-rri.md`
+**RRI evidence:** `docs/audit/s-150-t2c-rri.md`; decomposition evidence:
+`docs/audit/s-150-t2c-decomposition-rri.md`
+
+Task-analysis review: `muse-glimmer` `.agent/peer-task-review-S-150-T2c-local-pair.json` - `PASS`
+
+**Review routing exception (2026-08-13):** Matias selected two local analysis
+passes (`muse-glimmer:30b-q4_K_M` and `gemma4:26b-a4b-it-qat`) in place of the
+normal Complex-band cross-vendor reviewer after that route was unavailable. Muse
+returned no findings. Gemma's two findings are retained with the primary-agent
+dispositions in `.agent/peer-task-review-S-150-T2c-local-pair.json`; neither
+requires a parent-scope change, but the UUIDv5 basis must be explicit in the
+decomposed child tests.
 
 **Happy paths considered:**
 
@@ -1800,7 +1812,308 @@ only if their delivered handoff wording becomes materially stale.
 **Agent handoff prompt:** Add only the versioned route, exact-id job contract, and
 outbox-backed fan-out; preserve legacy behavior and stop before provider execution.
 
-**Stop condition:** Stop after enqueue/idempotency tests. Do not start T3a.
+**Stop condition:** This parent is not executable. Present and execute the children
+in order; do not start T3a before T2c-v closes.
+
+---
+
+## S-150-T2c-i: Versioned subtitle and translation job contracts
+
+**Type:** development
+**Effort:** L (RRI 41 — Med-high)
+**RRI:** 41
+**Decomposed from:** S-150-T2c
+**Depends on:** S-150-T2b-ii-c
+**Status:** [x] Done — 2026-08-13
+
+**RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
+
+Task-analysis review: `gemma` `.agent/peer-task-review-S-150-T2c-i.json` - `PASS`
+
+**Phase-1 disposition:** Gemma requested a concrete fail-closed deserialization
+mechanism. The acceptance test must assert a serde error for an unknown route wire
+value; derived enum behavior is sufficient only if that test passes, otherwise the
+implementation must supply the minimum custom deserializer. No scope expansion is
+authorized.
+
+**Happy paths considered:**
+
+- **HP-1:** Pre-S-150 serialized `SubtitleJob` JSON without `post_ready_route`
+  decodes as `legacy_subtitle_review_v1`; `SubtitleJob::new` stays explicit legacy.
+- **HP-2:** A localization constructor emits `s150_localization_v1`, and its
+  `TranslationJob` carries project, asset, target-language UUID, exact subtitle UUID,
+  and generation-request UUID.
+- **HP-3:** The same exact subtitle UUID derives the same initial UUIDv5 request ID
+  in every replay and target fan-out.
+
+**Edge cases considered:**
+
+- **EC-1:** An unknown route wire value fails deserialization instead of falling
+  back to either behavior.
+- **EC-2:** The helper uses a canonical lowercase hyphenated UUID input; explicit
+  regeneration is not represented by the deterministic initial-ID helper.
+
+**Acceptance criteria:** Add the serde-compatible route enum with an absent-field
+legacy default; keep `SubtitleJob::new` legacy; add an explicit localization
+constructor; add `TranslationJob`, queue trait, and in-memory queue contracts. Own
+the public `S150_INITIAL_TRANSLATION_NAMESPACE` and a pure helper using exactly
+`initial-translation-v1:` plus the canonical lowercase subtitle UUID. No database,
+Redis, route dispatch, provider work, or review-row creation is allowed.
+
+**Files expected to change:** `Cargo.toml`, `crates/jobs/Cargo.toml`, `Cargo.lock`,
+and focused unit tests in `crates/jobs/src/lib.rs`. The manifest/lockfile changes
+only enable the existing `uuid` dependency's UUIDv5 support and the existing
+workspace `serde_json` crate for JSON characterization tests.
+
+**Evidence to emit:** RRI, phase reviews, ADR-038 route receipt, Reflection log,
+unit coverage certification, owner verification, and JSON/UUID characterization
+tests.
+
+**Status artifacts affected:** This ledger, `docs/plan/s-150-translation-dubbing.md`,
+and `docs/plan/roadmap.md`.
+
+**Agent handoff prompt:** Implement only versioned job serialization and pure
+identity contracts in `crates/jobs/src/lib.rs`; prove legacy JSON and UUIDv5
+determinism; stop before database or Redis code.
+
+**Stop condition:** Stop after focused jobs tests. Do not start T2c-ii, T2c-iii, or
+runtime wiring.
+
+### ADR-038 route evidence
+
+- Muse Glimmer refinement: `GO_LOCAL` —
+  `.agent/local-architect/med-high-refinement-v1/S-150-T2c-i/refinement-artifact.json`.
+- Primary receipt: `GO_LOCAL` —
+  `.agent/local-architect/med-high-refinement-v1/S-150-T2c-i/primary-receipt.json`.
+- Gate: `GO_LOCAL`; Med-high local execution is policy-excluded, so the supervisor
+  emitted the cloud handoff and ADR-039 preauthorized `gpt-5.6-sol` / `high` for
+  the approved capability-risk route —
+  `.agent/local-architect/med-high-refinement-v1/S-150-T2c-i/fallback-selection.json`.
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma`
+- Command: `GEMMA_REVIEW_BASE=HEAD GEMMA_REVIEW_TASK_ID=S-150-T2c-i GEMMA_REVIEW_RESULT=.agent/peer-code-review-S-150-T2c-i.json REVIEW_PATHS='Cargo.toml crates/jobs/Cargo.toml crates/jobs/src/lib.rs' make qa-gemma-review`
+- Artifact: `.agent/peer-code-review-S-150-T2c-i.json`
+- Verdict: `PASS`
+- Findings: one pass-specific `nit` on `#[derive(Default)]`; verified by
+  `cargo clippy -p dubbridge-jobs --all-targets -- -D warnings` on the current
+  toolchain, which accepts the derive and `#[default]` variant. No change needed.
+- Muse Glimmer fallback: not triggered — Gemma returned 3/3 usable passes.
+- D14 fallback: not triggered — Gemma aggregate was usable.
+- D14 provider route: n/a — reason: n/a.
+- disposition_divergence: null
+- Primary-agent disposition: reviewed_no_change; the test and Clippy evidence
+  resolve the reviewer nit without expanding scope.
+
+Code-solution review: `gemma` `.agent/peer-code-review-S-150-T2c-i.json` - `PASS`
+
+### Reflection log
+
+Required passes: 3 (`41` → `Med-high`)
+
+#### Pass 1
+
+- **Draft verdict:** Added the versioned route, immutable UUID identity contract,
+  in-memory translation queue, and focused JSON/UUID tests.
+- **Critique findings:** UUIDv5 was unavailable from the workspace feature set;
+  JSON characterization tests required the existing workspace `serde_json` crate
+  as a direct dev dependency.
+- **Revisions applied:** Enabled `uuid` feature `v5`, added the focused
+  `serde_json` dev dependency, and recorded the resulting lockfile update.
+
+#### Pass 2
+
+- **Draft verdict:** Focused tests passed; the first Clippy run rejected a manual
+  `Default` implementation as derivable.
+- **Critique findings:** The route's default must remain explicit, idiomatic, and
+  stable under the repository lint policy.
+- **Revisions applied:** Replaced the manual implementation with
+  `#[derive(Default)]` and a `#[default]` legacy variant; focused tests and
+  Clippy then passed.
+
+#### Pass 3
+
+- **Draft verdict:** Gemma completed 3/3 code-review passes and found one
+  pass-specific toolchain-compatibility nit.
+- **Critique findings:** Confirm whether `#[default]` is accepted by the actual
+  repository toolchain rather than relying on inference.
+- **Revisions applied:** None; the exact Clippy command passed. The focused
+  `cargo llvm-cov` report remains affected by pre-existing Redis code in this
+  large module (60.94% aggregate), while every approved HP/EC has direct unit
+  evidence below.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | Legacy JSON defaults to the legacy route and `SubtitleJob::new` remains legacy | `crates/jobs/src/lib.rs::tests::legacy_subtitle_job_json_defaults_to_legacy_route` | passed |
+| HP-2 | Happy path | Localization serialization and translation payload retain versioned route and full UUID identity | `crates/jobs/src/lib.rs::tests::localization_subtitle_job_serializes_its_versioned_route`; `crates/jobs/src/lib.rs::tests::translation_job_serializes_the_full_durable_identity`; `crates/jobs/src/lib.rs::tests::in_memory_translation_queue_records_jobs` | passed |
+| HP-3 | Happy path | The same subtitle UUID derives a stable initial translation request ID | `crates/jobs/src/lib.rs::tests::initial_translation_request_id_is_deterministic_and_canonical` | passed |
+| EC-1 | Edge case | Unknown route strings fail deserialization rather than selecting a fallback | `crates/jobs/src/lib.rs::tests::unknown_subtitle_post_ready_route_fails_deserialization` | passed |
+| EC-2 | Edge case | Initial derivation uses the canonical lowercase hyphenated UUID name | `crates/jobs/src/lib.rs::tests::initial_translation_request_id_is_deterministic_and_canonical` | passed |
+
+### Owner final verification
+
+- Owner: Codex (primary agent and approved cloud-route implementer)
+- Date: 2026-08-13
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior; I also confirmed the sole Gemma nit against the actual toolchain and kept the implementation inside the versioned job-contract boundary.
+- Commands run: `cargo fmt --all`; `cargo test -p dubbridge-jobs`;
+  `cargo clippy -p dubbridge-jobs --all-targets -- -D warnings`; `cargo fmt --check`;
+  `cargo llvm-cov -p dubbridge-jobs --lib --summary-only`; `git diff --check`.
+
+- Review artifact: `docs/audit/gemma-evidence/S-150-T2c-i.json`
+
+**S-150-T2c-i status: `[x] Done`**
+
+---
+
+## S-150-T2c-ii: Exact persisted subtitle resolver
+
+**Type:** development
+**Effort:** M (RRI 37 — Moderate)
+**Decomposed from:** S-150-T2c
+**Depends on:** S-150-T2b-ii-c
+**Status:** [ ] Planned — approval pending
+
+**RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
+
+**Happy paths considered:**
+
+- **HP-1:** A persisted `Subtitle` is recovered by its exact asset and
+  word-alignment-parent artifact boundary for deterministic replay identity.
+
+**Edge cases considered:**
+
+- **EC-1:** A missing or wrong-kind parent produces no substitute artifact and
+  fails through the repository's typed error path.
+
+**Acceptance criteria:** Add only a fail-closed exact `Subtitle` lookup API and live
+PostgreSQL coverage for its composite identity. Do not insert, mutate readiness,
+fan out, or inspect queue state.
+
+**Files expected to change:** `crates/db/src/subtitle_repo.rs` and
+`apps/api/tests/subtitle_repo_test.rs`.
+
+**Evidence to emit:** RRI, phase reviews, focused PostgreSQL evidence, Reflection
+log, unit coverage certification, and owner verification.
+
+**Status artifacts affected:** This ledger and the S-150 plan.
+
+**Stop condition:** Stop after exact-lookup tests. Do not add runtime routing.
+
+---
+
+## S-150-T2c-iii: Translation dispatch acknowledgement transition
+
+**Type:** development
+**Effort:** L (RRI 43 — Med-high)
+**Decomposed from:** S-150-T2c
+**Depends on:** S-150-T2b-ii-c
+**Status:** [ ] Planned — approval pending
+
+**RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
+
+**Happy paths considered:**
+
+- **HP-1:** A successful enqueue records `acknowledged` for exactly one durable
+  dispatch identity.
+
+**Edge cases considered:**
+
+- **EC-1:** A duplicate acknowledgement or failure after acknowledgement does not
+  reopen, overwrite, or corrupt the outbox row.
+
+**Acceptance criteria:** Add only the guarded acknowledgement repository transition
+and its typed result contract; preserve the failure transition and exact composite
+identity. No queue connection, worker, route discriminator, or provider execution
+is in scope.
+
+**Files expected to change:** `crates/db/src/translation_delivery_repo.rs` and
+`apps/api/tests/translation_delivery_repo_test.rs`.
+
+**Evidence to emit:** RRI, phase reviews, ADR-038 receipt, live PostgreSQL state
+matrix, Reflection log, unit coverage certification, and owner verification.
+
+**Status artifacts affected:** This ledger and the S-150 plan.
+
+**Stop condition:** Stop after acknowledgement-transition tests. Do not wire Redis.
+
+---
+
+## S-150-T2c-iv: Localization route branch and durable target fan-out
+
+**Type:** development
+**Effort:** L (RRI 48 — Med-high)
+**Decomposed from:** S-150-T2c
+**Depends on:** S-150-T2c-i, S-150-T2c-ii, S-150-T2c-iii
+**Status:** [ ] Planned — approval pending
+
+**RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
+
+**Happy paths considered:**
+
+- **HP-1:** The localization route resolves the exact subtitle and creates one
+  durable dispatch intent per eligible target while legacy jobs still enqueue their
+  legacy review.
+
+**Edge cases considered:**
+
+- **EC-1:** The localization route never calls null-artifact review enqueue and
+  leaves a failed target independent from its siblings.
+
+**Acceptance criteria:** Branch only at the extracted post-ready seam; use T2c-i
+contracts, T2c-ii exact resolver, and T2b-ii persistence to build durable per-target
+work. Keep queue transport injected and in-memory only; do not connect Redis or run
+a translation worker.
+
+**Files expected to change:** `apps/worker-runner/src/subtitle_runtime.rs` and
+`apps/worker-runner/src/subtitle_runtime_tests.rs`.
+
+**Evidence to emit:** RRI, phase reviews, ADR-038 receipt, route/fan-out test
+evidence, Reflection log, unit coverage certification, and owner verification.
+
+**Status artifacts affected:** This ledger and the S-150 plan.
+
+**Stop condition:** Stop after route/fan-out tests. Do not alter runner topology.
+
+---
+
+## S-150-T2c-v: Redis translation queue and worker topology
+
+**Type:** development
+**Effort:** L (RRI 50 — Med-high)
+**Decomposed from:** S-150-T2c
+**Depends on:** S-150-T2c-i, S-150-T2c-iii, S-150-T2c-iv
+**Status:** [ ] Planned — approval pending
+
+**RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
+
+**Happy paths considered:**
+
+- **HP-1:** A durable eligible dispatch is enqueued to the dedicated translation
+  namespace and then acknowledged with its exact identity.
+
+**Edge cases considered:**
+
+- **EC-1:** Redis enqueue failure records only that dispatch's `enqueue_failed`
+  state and does not start provider execution.
+
+**Acceptance criteria:** Implement the Redis adapter, worker-runner queue wiring,
+and enqueue/failure/acknowledgement seam using T2c-i and T2c-iii contracts. Prove
+namespace separation and fail-closed Redis errors. Do not register provider
+execution, subprocesses, or S-150 review rows.
+
+**Files expected to change:** `crates/jobs/src/lib.rs`,
+`apps/worker-runner/src/translation_enqueue.rs`, `apps/worker-runner/src/main.rs`,
+and `apps/worker-runner/src/runner_topology_tests.rs`.
+
+**Evidence to emit:** RRI, phase reviews, ADR-038 receipt, Redis/in-memory queue
+evidence, Reflection log, unit coverage certification, and owner verification.
+
+**Status artifacts affected:** This ledger, the S-150 plan, and roadmap.
+
+**Stop condition:** Stop after queue-topology tests. Do not start T3a.
 
 ---
 
