@@ -305,7 +305,7 @@ no inference from project age, row presence, or feature timing is allowed.
 | T2b-ii-a | Candidate delivery-scope query and decoding helpers | development | 39 / M | Done 2026-08-12; transaction-bound read-only candidate decoder verified with 2/2 live-PostgreSQL tests and Gemma phase-2 PASS; T2b-ii-b owns exact-project enforcement |
 | T2b-ii-b | Atomic delivery claim and dispatch persistence | development | 52 / L | Done 2026-08-12; atomic create/reuse and source-conflict behavior verified with live PostgreSQL and Muse Glimmer phase-2 PASS |
 | T2b-ii-c | Guarded dispatch enqueue-failure transition | development | 35 / M | Done 2026-08-13; Qwen local DEV, exact composite pending-state guard, focused PostgreSQL suite 8/8, Gemma phase-2 PASS; integrated in `f835b01` |
-| T2c | Versioned localization jobs and outbox-backed fan-out | development | 54 / L provisional | Consumes T2b-ii-c; replaces first-target-only seam without provider execution |
+| T2c | Versioned localization jobs and outbox-backed fan-out | development parent | 65 / L Complex | Recomputed 2026-08-13; mandatory decomposition before implementation. Phase-1 cross-vendor review is awaiting the ADR-039 human fallback selection after the Claude CLI was unavailable. |
 | T3a | Translation provider/subprocess contract | development | 42 / L | Med-high |
 | T3b | Functional translation worker | development | 44 / L | Med-high |
 | T3c | Translation runtime persistence and readiness | development | 53 / L | Med-high |

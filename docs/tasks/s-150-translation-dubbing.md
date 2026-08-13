@@ -1739,9 +1739,11 @@ Required passes: 2 (`35` -> `Moderate`)
 ## S-150-T2c: Versioned localization jobs and outbox-backed fan-out
 
 **Type:** development
-**Effort:** L (provisional RRI 54 — Med-high; recompute before presentation)
+**Effort:** L (RRI 65 — Complex; mandatory decomposition before presentation)
 **Depends on:** S-150-T2b-ii-c
-**Status:** [ ] Planned
+**Status:** [ ] Blocked on mandatory decomposition and phase-1 review fallback selection — 2026-08-13
+
+**RRI evidence:** `docs/audit/s-150-t2c-rri.md`
 
 **Happy paths considered:**
 
