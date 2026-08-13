@@ -2426,15 +2426,15 @@ class ResolveEffectiveLimitsTest(unittest.TestCase):
 
 
 class ParseArgsModelDefaultTest(unittest.TestCase):
-    """ADR-036 Amendment 3: --model / DUBBRIDGE_LOCAL_AGENT_MODEL resolution."""
+    """ADR-036 Amendment 5: --model / DUBBRIDGE_LOCAL_AGENT_MODEL resolution."""
 
-    def test_hp1_no_override_resolves_nemotron_default(self):
+    def test_hp1_no_override_resolves_qwen_default(self):
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("DUBBRIDGE_LOCAL_AGENT_MODEL", None)
             args = rlt.parse_args(
                 ["--card", "card.json", "--worktree", ".", "--out", "result.json"]
             )
-        self.assertEqual(args.model, "nemotron-3.5-lightning:30b-a3b-q4_K_M")
+        self.assertEqual(args.model, "qwen3.6:35b-a3b")
 
     def test_ec1_explicit_flag_overrides_the_new_default(self):
         args = rlt.parse_args([

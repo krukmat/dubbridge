@@ -273,9 +273,10 @@ governs: "all agent-facing workflow decisions in the repository"
 > It overrides `CLAUDE.md` (project and global) and `AGENTS.md` without exception.
 > `CLAUDE.md` applies only for topics not covered here.
 
-> **Current routing override (owner directive, 2026-08-12):**
-> `nemotron-3.5-lightning:30b-a3b-q4_K_M` is the local developer only for
-> eligible Low/S (RRI 0–25) and Moderate/M (RRI 26–40) development tasks.
+> **Current routing override (owner directive, 2026-08-13):**
+> `nemotron-3.5-lightning:30b-a3b-q4_K_M` remains the eligible Low/S
+> (RRI 0–25) developer, while `qwen3.6:35b-a3b` is the Moderate/M
+> (RRI 26–40) developer.
 > Med-high/L (RRI 41–55), Complex, and XL bands are cloud-only. For Med-high,
 > the ADR-038 refinement/receipt still run as routing evidence, but a
 > `GO_LOCAL` result never starts a local developer. This override supersedes
@@ -315,7 +316,7 @@ governs: "all agent-facing workflow decisions in the repository"
      RRI 0–25 reviewer chain: `muse-glimmer:30b-q4_K_M` →
      `gemma4:26b-a4b-it-qat`; for RRI 26–55 add the reviewer chain
      `gemma4:26b-a4b-it-qat` → `muse-glimmer:30b-q4_K_M`, the implementer
-     binding `nemotron-3.5-lightning:30b-a3b-q4_K_M`, and, for Med-high ADR-038 routes, the
+     binding `qwen3.6:35b-a3b`, and, for Med-high ADR-038 routes, the
      Local Architect binding `muse-glimmer:30b-q4_K_M`) with a review-style
      prompt at production `num_predict`/`num_ctx`, e.g.:
      ```bash
@@ -390,7 +391,7 @@ governs: "all agent-facing workflow decisions in the repository"
    for explicit approval, then use the **local-first implementation path** by
    default: `scripts/local-agent/run_local_task.py` in a disposable worktree,
    resolving the implementer from `DUBBRIDGE_LOCAL_AGENT_MODEL` (default
-   `nemotron-3.5-lightning:30b-a3b-q4_K_M`), with at most 2 evidence-backed local repair attempts
+   `qwen3.6:35b-a3b`), with at most 2 evidence-backed local repair attempts
    before escalating to the cloud-takeover model resolved in Step 2. The primary
    agent remains the orchestrator of record and cloud implementation is the
    escalation/fallback path, not the default. For **RRI 41–55 Med-high**, show
@@ -710,7 +711,7 @@ escalation environment, but the default code-authoring surface moves local.
 
 **Moderate (26–40):** the code-authoring surface is the local agentic runner
 (`scripts/local-agent/run_local_task.py`) using `DUBBRIDGE_LOCAL_AGENT_MODEL`
-(default `nemotron-3.5-lightning:30b-a3b-q4_K_M`) inside a disposable worktree, with at most 2
+(default `qwen3.6:35b-a3b`) inside a disposable worktree, with at most 2
 evidence-backed local repair attempts before escalating to cloud. This
 routing became operative by owner override on 2026-07-15, ahead of the
 original ADR-036 pilot promotion gate.
@@ -899,7 +900,7 @@ documentation change replaces it.
 | RRI / capability | Local-first position | When cloud takes control | Codex model to present | Starting reasoning effort |
 |---|---|---|---|---|
 | **0–25 / Low** | Primary-agent direct by default; Nemotron only for an eligible simple patch | Nemotron is unavailable/unusable or its bounded repair fails and the Low-band escalation gate is followed | `gpt-5.6-luna`; use `gpt-5.6-terra` at `low` only when Luna is unavailable in the active environment | `low` |
-| **26–40 / Balanced** | `nemotron-3.5-lightning:30b-a3b-q4_K_M` local-first, up to 2 evidence-backed repairs | Local runner/model is unavailable, scope enforcement fails, or the repair budget is exhausted | `gpt-5.6-terra` | `medium` |
+| **26–40 / Balanced** | `qwen3.6:35b-a3b` local-first, up to 2 evidence-backed repairs | Local runner/model is unavailable, scope enforcement fails, or the repair budget is exhausted | `gpt-5.6-terra` | `medium` |
 | **41–55 / Balanced -> Premium** | ADR-038 evidence gate, then cloud-only | Operational-only cloud route | `gpt-5.6-terra` | `high` |
 | **41–55 / Balanced -> Premium** | ADR-038 evidence gate, then cloud-only | `CLOUD_REQUIRED` or capability/risk boundary | `gpt-5.6-sol` | `high` |
 | **56–70 / Premium** | Cloud is the primary route after mandatory decomposition | Approved decomposed subtask proceeds on Codex | `gpt-5.6-sol` | `high`; use `xhigh` only when eval evidence shows a gain |
@@ -1217,7 +1218,7 @@ For **RRI 26–40 local-first implementation** (Moderate), use
 primary agent remains orchestrator of record: it owns the task card,
 `allowed_paths`, verification commands, Reflection passes, closure, and final
 accept/reject judgment. The local implementer resolves from
-`DUBBRIDGE_LOCAL_AGENT_MODEL` (default `nemotron-3.5-lightning:30b-a3b-q4_K_M`).
+`DUBBRIDGE_LOCAL_AGENT_MODEL` (default `qwen3.6:35b-a3b`).
 The model receives the complete authorized file contents up front and cannot
 read files or run processes itself.
 
@@ -2109,7 +2110,7 @@ The default path for Moderate development tasks is:
 2. Present the task and obtain explicit approval.
 3. Run the implementation through `scripts/local-agent/run_local_task.py` in a
    disposable git worktree, resolving the implementer from
-   `DUBBRIDGE_LOCAL_AGENT_MODEL` (default `nemotron-3.5-lightning:30b-a3b-q4_K_M`) and the endpoint
+   `DUBBRIDGE_LOCAL_AGENT_MODEL` (default `qwen3.6:35b-a3b`) and the endpoint
    from `OLLAMA_HOST`.
 4. Keep the primary agent as orchestrator of record: it owns the task card,
    allowed paths, acceptance tests, reflection passes, closure, and all final

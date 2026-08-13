@@ -278,7 +278,7 @@ path. The card must name both the local implementer and the cloud-takeover
 trigger/model; `Codex` or `Claude` alone is not a resolved implementation value.
 The default implementation route for development tasks scoring
 **RRI 26–40** is the local agentic runner. Resolve the implementer from
-`DUBBRIDGE_LOCAL_AGENT_MODEL`, defaulting to `nemotron-3.5-lightning:30b-a3b-q4_K_M`, and the Ollama
+`DUBBRIDGE_LOCAL_AGENT_MODEL`, defaulting to `qwen3.6:35b-a3b`, and the Ollama
 endpoint from `OLLAMA_HOST`, defaulting to `http://localhost:11434`. The runner
 preloads the complete authorized files and gives the model only the
 card-bound `write_file`/`apply_patch`/`finish` contract. Model-issued reads and
@@ -408,7 +408,7 @@ For final **RRI 26–40**, the implementation default is **local-first**:
 - the code-authoring surface is `scripts/local-agent/run_local_task.py` in a
   disposable worktree;
 - the implementer resolves from `DUBBRIDGE_LOCAL_AGENT_MODEL` (default
-  `nemotron-3.5-lightning:30b-a3b-q4_K_M`);
+  `qwen3.6:35b-a3b`);
 - tool-call-time and post-run `allowed_paths` scope enforcement are mandatory;
 - the local path has a maximum of **2 repair attempts**, each requiring new
   evidence;
@@ -431,7 +431,7 @@ Bindings used by the operative local-first route:
 | Env var | Default | Purpose |
 |---|---|---|
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint |
-| `DUBBRIDGE_LOCAL_AGENT_MODEL` | `nemotron-3.5-lightning:30b-a3b-q4_K_M` | Default local implementer for RRI 26–40 (Moderate/M) |
+| `DUBBRIDGE_LOCAL_AGENT_MODEL` | `qwen3.6:35b-a3b` | Default local implementer for RRI 26–40 (Moderate/M) |
 
 **Rollback triggers:** revert Moderate-band implementation to the cloud path if
 the rolling 20-task window shows escalation rate `> 40%`, any accepted

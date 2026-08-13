@@ -574,6 +574,24 @@ cloud-only under the existing RRI policy.
 missing or stalled Low/S model does not silently select Gemma or Qwen as a
 developer; it follows the existing bounded repair and cloud-escalation protocol.
 
+## Amendment 5 (2026-08-13): Moderate/M implementer returns to Qwen3.6-35B-A3B
+
+**Decision:** Owner directive, 2026-08-13: bind the Moderate/M
+`DUBBRIDGE_LOCAL_AGENT_MODEL` default to `qwen3.6:35b-a3b`. The Low/S packet
+route remains bound independently through `DUBBRIDGE_LOW_RRI_MODEL` to
+`nemotron-3.5-lightning:30b-a3b-q4_K_M`. Reviewer bindings are unchanged.
+
+**Evidence:** A live `S-150-T2b-ii-c` run using `qwen3.6:35b-a3b` stayed
+within its two-file card, completed the initial attempt plus two bounded repair
+cycles, and passed the exact operator-controlled acceptance suite: Rust format,
+`cargo check -p dubbridge-db`, and all 8 tests in
+`translation_delivery_repo_test`.
+
+**Consequence:** Amendment 3 remains the historical record of the Nemotron
+rebind, while this amendment supersedes its Moderate/M default. Med-high/L
+remains cloud-only, and this change does not alter approval, scope, repair,
+review, Reflection, or closure gates.
+
 ## Related
 
 - `docs/plan/adr036-local-first-pilot.md` — Stage 1/Stage 2 pilot plan for §10
