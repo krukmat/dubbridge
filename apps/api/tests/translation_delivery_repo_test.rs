@@ -3,7 +3,10 @@ use std::env;
 use dubbridge_db::{
     artifact_repo, subtitle_repo,
     transcription_repo::{self, TranscriptArtifactMeta},
-    translation_delivery_repo::{self, TranslationDeliveryInput, TranslationDispatchDisposition},
+    translation_delivery_repo::{
+        self, TranslationDeliveryInput, TranslationDispatchDisposition,
+        TranslationDispatchFailureInput, TranslationDispatchFailureResult,
+    },
     translation_repo::TranslationClaimMode,
 };
 use dubbridge_domain::{
@@ -152,6 +155,20 @@ fn delivery_input(
         source_subtitle_artifact_id,
         expected_initial_generation_request_id: generation_request_id,
         mode: TranslationClaimMode::InitialDelivery,
+    }
+}
+
+fn failure_input(
+    scope: &Scope,
+    target_language_id: Uuid,
+    generation_request_id: Uuid,
+) -> TranslationDispatchFailureInput {
+    TranslationDispatchFailureInput {
+        project_id: scope.project_id,
+        asset_id: scope.asset_id,
+        target_language_id,
+        generation_request_id,
+        error_detail: "test-failure".to_string(),
     }
 }
 
@@ -394,5 +411,130 @@ async fn same_generation_with_different_source_rolls_back_without_second_dispatc
     assert_eq!(
         count_rows(&pool, "translation_dispatch_outbox", first).await,
         1
+    );
+}
+
+#[tokio::test]
+async fn enqueue_failure_marks_pending_returns_marked_and_sets_error_detail() {
+    let Some(pool) = setup_pool().await else {
+        return;
+    };
+    let scope = insert_scope(&pool).await;
+    let subtitle = insert_subtitle_source(&pool, scope.asset_id, "fail-mark").await;
+    let request_id = Uuid::new_v4();
+    let input = delivery_input(&scope, scope.target_language_id, subtitle.id, request_id);
+
+    translation_delivery_repo::persist_translation_delivery(&pool, input)
+        .await
+        .expect("create pending dispatch");
+
+    let fail_input = failure_input(&scope, scope.target_language_id, request_id);
+    assert_eq!(
+        translation_delivery_repo::translation_dispatch_enqueue_failure(&pool, fail_input.clone())
+            .await
+            .expect("mark enqueue_failed"),
+        TranslationDispatchFailureResult::Marked
+    );
+
+    let updated: String = sqlx::query_scalar(
+        r#"SELECT delivery_state FROM translation_dispatch_outbox
+           WHERE operation = $1 AND project_id = $2 AND asset_id = $3
+             AND target_language_id = $4 AND generation_request_id = $5"#,
+    )
+    .bind("translation")
+    .bind(scope.project_id.0)
+    .bind(scope.asset_id.0)
+    .bind(scope.target_language_id)
+    .bind(request_id)
+    .fetch_one(&pool)
+    .await
+    .expect("read back state");
+    assert_eq!(updated, "enqueue_failed");
+
+    let error_detail: String = sqlx::query_scalar(
+        r#"SELECT error_detail FROM translation_dispatch_outbox
+           WHERE operation = $1 AND project_id = $2 AND asset_id = $3
+             AND target_language_id = $4 AND generation_request_id = $5"#,
+    )
+    .bind("translation")
+    .bind(scope.project_id.0)
+    .bind(scope.asset_id.0)
+    .bind(scope.target_language_id)
+    .bind(request_id)
+    .fetch_one(&pool)
+    .await
+    .expect("read back error_detail");
+    assert_eq!(error_detail, "test-failure");
+}
+
+#[tokio::test]
+async fn enqueue_failure_returns_already_failed_when_enqueue_failed() {
+    let Some(pool) = setup_pool().await else {
+        return;
+    };
+    let scope = insert_scope(&pool).await;
+    let subtitle = insert_subtitle_source(&pool, scope.asset_id, "fail-already").await;
+    let request_id = Uuid::new_v4();
+    let fail_input = failure_input(&scope, scope.target_language_id, request_id);
+
+    set_dispatch_state(
+        &pool,
+        delivery_input(&scope, scope.target_language_id, subtitle.id, request_id),
+        "enqueue_failed",
+    )
+    .await;
+
+    assert_eq!(
+        translation_delivery_repo::translation_dispatch_enqueue_failure(&pool, fail_input.clone())
+            .await
+            .expect("already failed"),
+        TranslationDispatchFailureResult::AlreadyFailed
+    );
+}
+
+#[tokio::test]
+async fn enqueue_failure_returns_rejected_when_acknowledged() {
+    let Some(pool) = setup_pool().await else {
+        return;
+    };
+    let scope = insert_scope(&pool).await;
+    let subtitle = insert_subtitle_source(&pool, scope.asset_id, "fail-reject").await;
+    let request_id = Uuid::new_v4();
+    let fail_input = failure_input(&scope, scope.target_language_id, request_id);
+
+    set_dispatch_state(
+        &pool,
+        delivery_input(&scope, scope.target_language_id, subtitle.id, request_id),
+        "acknowledged",
+    )
+    .await;
+
+    assert_eq!(
+        translation_delivery_repo::translation_dispatch_enqueue_failure(&pool, fail_input)
+            .await
+            .expect("rejected"),
+        TranslationDispatchFailureResult::Rejected
+    );
+}
+
+#[tokio::test]
+async fn enqueue_failure_returns_not_found_for_absent_identity() {
+    let Some(pool) = setup_pool().await else {
+        return;
+    };
+    let scope = insert_scope(&pool).await;
+    let fail_input = TranslationDispatchFailureInput {
+        project_id: ProjectId(Uuid::new_v4()),
+        asset_id: scope.asset_id,
+        target_language_id: scope.target_language_id,
+        generation_request_id: Uuid::new_v4(),
+        error_detail: "no-op".to_string(),
+    };
+
+    assert_eq!(
+        translation_delivery_repo::translation_dispatch_enqueue_failure(&pool, fail_input)
+            .await
+            .expect("not found"),
+        TranslationDispatchFailureResult::NotFound
     );
 }

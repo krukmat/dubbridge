@@ -112,6 +112,114 @@ async fn get_dispatch_tx(
     .ok_or(DbError::NotFound)
 }
 
+// ── enqueue-failure repair dispatch ──────────────────────────────────────
+
+/// Public failure-input carrying the exact dispatch identity.
+#[derive(Debug, Clone)]
+pub struct TranslationDispatchFailureInput {
+    pub project_id: ProjectId,
+    pub asset_id: AssetId,
+    pub target_language_id: Uuid,
+    pub generation_request_id: Uuid,
+    pub error_detail: String,
+}
+
+/// Public result contract distinguishing all outcomes of the repair.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TranslationDispatchFailureResult {
+    Marked,
+    AlreadyFailed,
+    Rejected,
+    NotFound,
+}
+
+async fn update_enqueue_failed_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    input: &TranslationDispatchFailureInput,
+) -> Result<bool, DbError> {
+    let updated = sqlx::query(
+        r#"
+        UPDATE translation_dispatch_outbox
+        SET delivery_state = 'enqueue_failed',
+            error_detail = $2,
+            updated_at = now()
+        WHERE operation = $1
+          AND project_id = $3
+          AND asset_id = $4
+          AND target_language_id = $5
+          AND generation_request_id = $6
+          AND delivery_state = 'pending'
+        RETURNING 1
+        "#,
+    )
+    .bind(OPERATION)
+    .bind(&input.error_detail)
+    .bind(input.project_id.0)
+    .bind(input.asset_id.0)
+    .bind(input.target_language_id)
+    .bind(input.generation_request_id)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    Ok(!updated.is_empty())
+}
+
+/// Atomically mark a pending dispatch as enqueue_failed, or inspect the same row.
+pub async fn translation_dispatch_enqueue_failure(
+    pool: &PgPool,
+    input: TranslationDispatchFailureInput,
+) -> Result<TranslationDispatchFailureResult, DbError> {
+    let mut tx = pool.begin().await.map_err(DbError::QueryFailed)?;
+
+    let updated_rows = update_enqueue_failed_tx(&mut tx, &input).await?;
+
+    if updated_rows {
+        tx.commit().await.map_err(DbError::QueryFailed)?;
+        return Ok(TranslationDispatchFailureResult::Marked);
+    }
+
+    // No update means the row was not pending; inspect exact identity.
+    let maybe_state: Option<String> = sqlx::query_scalar(
+        r#"
+        SELECT delivery_state
+        FROM translation_dispatch_outbox
+        WHERE operation = $1
+          AND project_id = $2
+          AND asset_id = $3
+          AND target_language_id = $4
+          AND generation_request_id = $5
+        "#,
+    )
+    .bind(OPERATION)
+    .bind(input.project_id.0)
+    .bind(input.asset_id.0)
+    .bind(input.target_language_id)
+    .bind(input.generation_request_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    let delivery_state = match maybe_state {
+        Some(s) => s,
+        None => {
+            tx.commit().await.map_err(DbError::QueryFailed)?;
+            return Ok(TranslationDispatchFailureResult::NotFound);
+        }
+    };
+
+    tx.commit().await.map_err(DbError::QueryFailed)?;
+
+    match delivery_state.as_str() {
+        "enqueue_failed" => Ok(TranslationDispatchFailureResult::AlreadyFailed),
+        "acknowledged" => Ok(TranslationDispatchFailureResult::Rejected),
+        _ => Err(DbError::UnknownStoredValue {
+            field: "translation_dispatch_outbox.delivery_state",
+            value: delivery_state,
+        }),
+    }
+}
+
 /// Persist or reuse one configured target-language delivery in one transaction.
 ///
 /// This is intentionally one target at a time. T2c owns fan-out and calls this
