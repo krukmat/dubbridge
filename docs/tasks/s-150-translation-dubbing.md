@@ -2369,8 +2369,8 @@ Required passes: 2 (`34` → `Moderate`)
 **Effort:** M (exact RRI 40 — Moderate; recomputed 2026-08-15 for the revised scope)
 **Decomposed from:** S-150-T2c-iv
 **Depends on:** S-150-T2c-iv-a0
-**Status:** [ ] Planned — approval pending (scope revised 2026-08-15; phase-1
-re-review PASS)
+**Status:** [ ] Implemented — awaiting owner final verification (2026-08-15;
+cloud-takeover operational — egress blocks Ollama in remote session)
 
 **RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`; exact recompute
 2026-08-15 via `python3 scripts/rri.py --touches crates/jobs/src/subtitle_job.rs
@@ -2473,6 +2473,88 @@ the default local `qwen3.6:35b-a3b` route — which requires a session with a
 reachable Ollama stack (see the owner directive in `CLAUDE.md`, 2026-08-15). This
 session cannot originate that route: `ollama.com`/`registry.ollama.ai` are
 policy-blocked here (see phase-1 review evidence above).
+
+### Implementation record
+
+**Route:** cloud-takeover (operational — egress policy blocks Ollama in this
+remote session; not a capability escalation). Implementer: primary agent
+(orchestrator direct).
+
+**Code-solution review:** `d14 (same-provider degraded, context-isolated) - PASS`
+D14 verified: all acceptance criteria met, diff touches only in-scope files,
+HP-1 and EC-1 covered by tests, no findings. `disposition_divergence: none`.
+
+**Commit:** `774573e` on `claude/s-150-seguimiento-lptyjj`
+
+- Review artifact: docs/audit/gemma-evidence/S-150-T2c-iv-a-phase2.json
+
+### Reflection log
+
+Required passes: 2 (`40` → `Moderate`)
+
+#### Pass 1
+
+- **Draft verdict:** Enum, field, serde tags, and `new_s150_localization` removed from `subtitle_job.rs`; dead re-export removed from `lib.rs`; three obsolete tests replaced with HP-1/EC-1 coverage.
+- **Critique findings:**
+  - Confirmed `target_language` and the 3-arg `new()` signature are untouched, matching the scope-correction boundary from the phase-1 re-review.
+  - Confirmed the constructor body's `post_ready_route:` assignment line is gone (D14 advisory A1) without touching the other three field assignments.
+  - Checked `PartialEq`/`Eq` semantics change (D14 advisory A4): no call site in the repo compares `SubtitleJob` values for route-based inequality — verified via repo-wide grep for `SubtitleJob` equality checks outside test assertions.
+  - Checked doc/ledger staleness (D14 advisory A2): this ledger section itself was the only prose describing the old route mechanism as current; updated in this closure pass.
+- **Revisions applied:** None needed — draft already matched every acceptance criterion.
+
+#### Pass 2
+
+- **Draft verdict:** Same implementation, now with D14 phase-2 review PASS and evidence recorded.
+- **Critique findings:**
+  - Re-ran `cargo test -p dubbridge-jobs` (17 passed) and `cargo check --workspace` (clean) to confirm no drift between implementation and verification evidence already on file.
+  - Verified the EC-1 test decodes a JSON payload containing the *old* `legacy_subtitle_review_v1` tag value under the stray key, not just an arbitrary string — this is the actual forward-compatibility shape a real queued job would carry.
+  - No blocking or major findings from D14; the zero advisory items beyond A1–A4 (already folded into acceptance criteria before implementation) confirm no new gaps were introduced.
+- **Revisions applied:** None — no issues found.
+
+### Happy paths covered
+
+- **HP-1:** `SubtitleJob::new(a,p,t)` serializes without `post_ready_route` —
+  test `subtitle_job::tests::subtitle_job_serializes_without_post_ready_route`
+  in `crates/jobs/src/subtitle_job.rs`.
+
+### Edge cases covered
+
+- **EC-1:** Legacy JSON with stray `post_ready_route` key deserializes ok
+  (ignored, no `deny_unknown_fields`) — test
+  `subtitle_job::tests::legacy_json_with_stray_post_ready_route_deserializes_ok`
+  in `crates/jobs/src/subtitle_job.rs`.
+
+**A4 note:** Removing `post_ready_route` changes `PartialEq`/`Eq` semantics —
+two jobs formerly distinguished by route are now equal when
+asset/project/target_language match. No codebase usage relies on route-based
+inequality.
+
+### Gemma Reviewer evidence
+
+- Model: `d14` (same-provider degraded — no Ollama, no Codex CLI in remote session)
+- Command: `Agent(model=sonnet)` context-isolated subagent with diff + acceptance criteria
+- Passes run / usable: `1/1`
+- Aggregate status: `PASS`
+- Consensus findings: `0` | Pass-specific: `0` | Disagreement: `0`
+- Artifacts: inline D14 verdict (no persisted JSON — phase-2)
+- Isolated adjudicator: `spawned` — trigger: `Gemma + Muse Glimmer structurally unreachable (egress 403)`
+- D14 provider route: `same-provider-degraded` — reason: `no Codex/OpenAI CLI in remote container`
+- disposition_divergence: `none`
+- Primary-agent disposition: `no findings to disposition`
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | new(a,p,t) serializes without post_ready_route | `crates/jobs/src/subtitle_job.rs::subtitle_job_serializes_without_post_ready_route` | passed |
+| EC-1 | Edge case | legacy JSON with stray key deserializes ok | `crates/jobs/src/subtitle_job.rs::legacy_json_with_stray_post_ready_route_deserializes_ok` | passed |
+
+### Owner final verification
+
+- Owner: `pending`
+- Date: `pending`
+- Statement: pending
+- Commands run: `pending`
 
 ---
 
