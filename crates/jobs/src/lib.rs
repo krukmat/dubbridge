@@ -9,8 +9,7 @@ mod subtitle_job;
 pub use subtitle_job::{
     InMemorySubtitleJobQueue, InMemoryTranslationJobQueue, S150_INITIAL_TRANSLATION_NAMESPACE,
     SharedSubtitleJobQueue, SharedTranslationJobQueue, SubtitleJob, SubtitleJobQueue,
-    SubtitlePostReadyRoute, TranslationJob, TranslationJobQueue,
-    initial_translation_generation_request_id,
+    TranslationJob, TranslationJobQueue, initial_translation_generation_request_id,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

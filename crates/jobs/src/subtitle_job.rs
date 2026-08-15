@@ -6,22 +6,11 @@ use uuid::Uuid;
 
 use crate::QueueError;
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SubtitlePostReadyRoute {
-    #[serde(rename = "legacy_subtitle_review_v1")]
-    #[default]
-    LegacySubtitleReviewV1,
-    #[serde(rename = "s150_localization_v1")]
-    S150LocalizationV1,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SubtitleJob {
     pub asset_id: Uuid,
     pub project_id: Uuid,
     pub target_language: String,
-    #[serde(default)]
-    pub post_ready_route: SubtitlePostReadyRoute,
 }
 
 impl SubtitleJob {
@@ -32,20 +21,6 @@ impl SubtitleJob {
             asset_id,
             project_id,
             target_language: target_language.into(),
-            post_ready_route: SubtitlePostReadyRoute::LegacySubtitleReviewV1,
-        }
-    }
-
-    pub fn new_s150_localization(
-        asset_id: Uuid,
-        project_id: Uuid,
-        target_language: impl Into<String>,
-    ) -> Self {
-        Self {
-            asset_id,
-            project_id,
-            target_language: target_language.into(),
-            post_ready_route: SubtitlePostReadyRoute::S150LocalizationV1,
         }
     }
 }
@@ -182,44 +157,27 @@ mod tests {
     }
 
     #[test]
-    fn legacy_subtitle_job_json_defaults_to_legacy_route() {
+    fn legacy_json_with_stray_post_ready_route_deserializes_ok() {
         let asset_id = Uuid::new_v4();
         let project_id = Uuid::new_v4();
         let job: SubtitleJob = serde_json::from_value(serde_json::json!({
             "asset_id": asset_id,
             "project_id": project_id,
-            "target_language": "en"
-        }))
-        .expect("legacy job JSON should decode");
-
-        assert_eq!(
-            job.post_ready_route,
-            SubtitlePostReadyRoute::LegacySubtitleReviewV1
-        );
-        assert_eq!(
-            SubtitleJob::new(asset_id, project_id, "en").post_ready_route,
-            SubtitlePostReadyRoute::LegacySubtitleReviewV1
-        );
-    }
-
-    #[test]
-    fn unknown_subtitle_post_ready_route_fails_deserialization() {
-        let result: Result<SubtitleJob, _> = serde_json::from_value(serde_json::json!({
-            "asset_id": Uuid::new_v4(),
-            "project_id": Uuid::new_v4(),
             "target_language": "en",
-            "post_ready_route": "unexpected_route"
-        }));
+            "post_ready_route": "legacy_subtitle_review_v1"
+        }))
+        .expect("stray post_ready_route key must be ignored");
 
-        assert!(result.is_err(), "unknown routes must fail closed");
+        assert_eq!(job, SubtitleJob::new(asset_id, project_id, "en"));
     }
 
     #[test]
-    fn localization_subtitle_job_serializes_its_versioned_route() {
-        let job = SubtitleJob::new_s150_localization(Uuid::new_v4(), Uuid::new_v4(), "es");
-        let value = serde_json::to_value(job).expect("serialize localization job");
+    fn subtitle_job_serializes_without_post_ready_route() {
+        let job = SubtitleJob::new(Uuid::new_v4(), Uuid::new_v4(), "es");
+        let value = serde_json::to_value(&job).expect("serialize");
 
-        assert_eq!(value["post_ready_route"], "s150_localization_v1");
+        assert!(value.get("post_ready_route").is_none());
+        assert_eq!(value["target_language"], "es");
     }
 
     #[test]
