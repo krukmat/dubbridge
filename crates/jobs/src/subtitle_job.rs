@@ -6,46 +6,20 @@ use uuid::Uuid;
 
 use crate::QueueError;
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SubtitlePostReadyRoute {
-    #[serde(rename = "legacy_subtitle_review_v1")]
-    #[default]
-    LegacySubtitleReviewV1,
-    #[serde(rename = "s150_localization_v1")]
-    S150LocalizationV1,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SubtitleJob {
     pub asset_id: Uuid,
     pub project_id: Uuid,
-    pub target_language: String,
-    #[serde(default)]
-    pub post_ready_route: SubtitlePostReadyRoute,
 }
 
 impl SubtitleJob {
     pub const JOB_TYPE: &str = "subtitle_generation";
 
-    pub fn new(asset_id: Uuid, project_id: Uuid, target_language: impl Into<String>) -> Self {
+    pub fn new(asset_id: Uuid, project_id: Uuid) -> Self {
         Self {
             asset_id,
             project_id,
-            target_language: target_language.into(),
-            post_ready_route: SubtitlePostReadyRoute::LegacySubtitleReviewV1,
-        }
-    }
-
-    pub fn new_s150_localization(
-        asset_id: Uuid,
-        project_id: Uuid,
-        target_language: impl Into<String>,
-    ) -> Self {
-        Self {
-            asset_id,
-            project_id,
-            target_language: target_language.into(),
-            post_ready_route: SubtitlePostReadyRoute::S150LocalizationV1,
         }
     }
 }
@@ -168,7 +142,7 @@ mod tests {
     #[test]
     fn in_memory_subtitle_queue_records_jobs() {
         let queue = InMemorySubtitleJobQueue::default();
-        let job = SubtitleJob::new(Uuid::new_v4(), Uuid::new_v4(), "en");
+        let job = SubtitleJob::new(Uuid::new_v4(), Uuid::new_v4());
 
         tokio_test::block_on(async { queue.enqueue(job.clone()).await.expect("enqueue") });
 
@@ -182,44 +156,41 @@ mod tests {
     }
 
     #[test]
-    fn legacy_subtitle_job_json_defaults_to_legacy_route() {
+    fn subtitle_job_serializes_only_asset_and_project_ids() {
+        let asset_id = Uuid::new_v4();
+        let project_id = Uuid::new_v4();
+        let value = serde_json::to_value(SubtitleJob::new(asset_id, project_id))
+            .expect("serialize subtitle job");
+
+        assert_eq!(value["asset_id"], asset_id.to_string());
+        assert_eq!(value["project_id"], project_id.to_string());
+        assert_eq!(value.as_object().map(|object| object.len()), Some(2));
+    }
+
+    #[test]
+    fn subtitle_job_deserializes_from_asset_and_project_only() {
         let asset_id = Uuid::new_v4();
         let project_id = Uuid::new_v4();
         let job: SubtitleJob = serde_json::from_value(serde_json::json!({
             "asset_id": asset_id,
-            "project_id": project_id,
-            "target_language": "en"
+            "project_id": project_id
         }))
-        .expect("legacy job JSON should decode");
+        .expect("decode route-free subtitle job");
 
-        assert_eq!(
-            job.post_ready_route,
-            SubtitlePostReadyRoute::LegacySubtitleReviewV1
-        );
-        assert_eq!(
-            SubtitleJob::new(asset_id, project_id, "en").post_ready_route,
-            SubtitlePostReadyRoute::LegacySubtitleReviewV1
-        );
+        assert_eq!(job.asset_id, asset_id);
+        assert_eq!(job.project_id, project_id);
     }
 
     #[test]
-    fn unknown_subtitle_post_ready_route_fails_deserialization() {
+    fn subtitle_job_rejects_retired_payload_fields() {
         let result: Result<SubtitleJob, _> = serde_json::from_value(serde_json::json!({
             "asset_id": Uuid::new_v4(),
             "project_id": Uuid::new_v4(),
-            "target_language": "en",
-            "post_ready_route": "unexpected_route"
+            "target_language": "es",
+            "post_ready_route": "legacy_subtitle_review_v1"
         }));
 
-        assert!(result.is_err(), "unknown routes must fail closed");
-    }
-
-    #[test]
-    fn localization_subtitle_job_serializes_its_versioned_route() {
-        let job = SubtitleJob::new_s150_localization(Uuid::new_v4(), Uuid::new_v4(), "es");
-        let value = serde_json::to_value(job).expect("serialize localization job");
-
-        assert_eq!(value["post_ready_route"], "s150_localization_v1");
+        assert!(result.is_err(), "retired payload fields must fail closed");
     }
 
     #[test]

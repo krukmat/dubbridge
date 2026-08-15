@@ -9,8 +9,7 @@ mod subtitle_job;
 pub use subtitle_job::{
     InMemorySubtitleJobQueue, InMemoryTranslationJobQueue, S150_INITIAL_TRANSLATION_NAMESPACE,
     SharedSubtitleJobQueue, SharedTranslationJobQueue, SubtitleJob, SubtitleJobQueue,
-    SubtitlePostReadyRoute, TranslationJob, TranslationJobQueue,
-    initial_translation_generation_request_id,
+    TranslationJob, TranslationJobQueue, initial_translation_generation_request_id,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -274,7 +273,7 @@ mod tests {
     fn subtitle_job_contract_remains_publicly_reexported() {
         let asset_id = Uuid::new_v4();
         let project_id = Uuid::new_v4();
-        let job = SubtitleJob::new(asset_id, project_id, "en");
+        let job = SubtitleJob::new(asset_id, project_id);
 
         assert_eq!(job.asset_id, asset_id);
         assert_eq!(SubtitleJob::JOB_TYPE, "subtitle_generation");
@@ -353,7 +352,7 @@ mod tests {
         let queue = RedisSubtitleJobQueue::connect(&url)
             .await
             .expect("redis connect");
-        let job = SubtitleJob::new(Uuid::new_v4(), Uuid::new_v4(), "en");
+        let job = SubtitleJob::new(Uuid::new_v4(), Uuid::new_v4());
         assert!(queue.enqueue(job).await.is_ok());
     }
 

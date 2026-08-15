@@ -1839,6 +1839,12 @@ in order; do not start T3a before T2c-vi closes.
 
 **RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
 
+> **Superseded contract note (2026-08-13):** The temporary subtitle route
+> compatibility introduced here was deliberately retired by `S-150-T2c-iv-a`
+> after the owner confirmed that no queued legacy jobs require support. The
+> historical completion record remains below; its route-specific unit evidence
+> now points to the replacement fail-closed behavior.
+
 Task-analysis review: `gemma` `.agent/peer-task-review-S-150-T2c-i.json` - `PASS`
 
 **Phase-1 disposition:** Gemma requested a concrete fail-closed deserialization
@@ -1958,10 +1964,10 @@ Required passes: 3 (`41` → `Med-high`)
 
 | Case ID | Type | Behavior | Unit test evidence | Result |
 |---|---|---|---|---|
-| HP-1 | Happy path | Legacy JSON defaults to the legacy route and `SubtitleJob::new` remains legacy | `crates/jobs/src/subtitle_job.rs::tests::legacy_subtitle_job_json_defaults_to_legacy_route` | passed |
-| HP-2 | Happy path | Localization serialization and translation payload retain versioned route and full UUID identity | `crates/jobs/src/subtitle_job.rs::tests::localization_subtitle_job_serializes_its_versioned_route`; `crates/jobs/src/subtitle_job.rs::tests::translation_job_serializes_the_full_durable_identity`; `crates/jobs/src/subtitle_job.rs::tests::in_memory_translation_queue_records_jobs` | passed |
+| HP-1 | Happy path | Superseded: route-free `SubtitleJob` uses only the owning asset/project identity | `crates/jobs/src/subtitle_job.rs::tests::subtitle_job_serializes_only_asset_and_project_ids` | passed |
+| HP-2 | Happy path | Superseded route compatibility; the durable `TranslationJob` payload and queue identity remain intact | `crates/jobs/src/subtitle_job.rs::tests::translation_job_serializes_the_full_durable_identity`; `crates/jobs/src/subtitle_job.rs::tests::in_memory_translation_queue_records_jobs` | passed |
 | HP-3 | Happy path | The same subtitle UUID derives a stable initial translation request ID | `crates/jobs/src/subtitle_job.rs::tests::initial_translation_request_id_is_deterministic_and_canonical` | passed |
-| EC-1 | Edge case | Unknown route strings fail deserialization rather than selecting a fallback | `crates/jobs/src/subtitle_job.rs::tests::unknown_subtitle_post_ready_route_fails_deserialization` | passed |
+| EC-1 | Edge case | Retired route/language fields fail deserialization rather than selecting a fallback | `crates/jobs/src/subtitle_job.rs::tests::subtitle_job_rejects_retired_payload_fields` | passed |
 | EC-2 | Edge case | Initial derivation uses the canonical lowercase hyphenated UUID name | `crates/jobs/src/subtitle_job.rs::tests::initial_translation_request_id_is_deterministic_and_canonical` | passed |
 
 ### Owner final verification
@@ -2274,6 +2280,11 @@ then T2c-v; do not integrate the runtime before T2c-v provides the Redis adapter
 
 **RRI evidence:** `docs/audit/s-150-t2c-iv-a0-rri.md` (exact 34, recomputed 2026-08-13; decomposition context: `docs/audit/s-150-t2c-decomposition-rri.md`)
 
+> **Superseded contract note (2026-08-13):** This extraction intentionally
+> preserved the then-current route contract. `S-150-T2c-iv-a` subsequently
+> retired it, so the historical route-specific test references below now cite
+> the replacement route-free/fail-closed contract.
+
 Task-analysis review: `gemma` `docs/audit/s-150-t2c-iv-a0-phase1-review.json` - `PASS`
 
 **Happy paths considered:**
@@ -2342,7 +2353,7 @@ Required passes: 2 (`34` → `Moderate`)
 | Case ID | Type | Behavior | Unit test evidence | Result |
 |---|---|---|---|---|
 | HP-1 | Happy path | Subtitle/translation contracts and deterministic UUIDv5 request IDs preserve behavior after extraction | `crates/jobs/src/subtitle_job.rs::tests::translation_job_serializes_the_full_durable_identity`; `crates/jobs/src/subtitle_job.rs::tests::initial_translation_request_id_is_deterministic_and_canonical` | passed |
-| EC-1 | Edge case | Root re-exports retain existing callers and legacy/invalid route Serde behavior | `crates/jobs/src/lib.rs::tests::subtitle_job_contract_remains_publicly_reexported`; `crates/jobs/src/subtitle_job.rs::tests::legacy_subtitle_job_json_defaults_to_legacy_route`; `crates/jobs/src/subtitle_job.rs::tests::unknown_subtitle_post_ready_route_fails_deserialization` | passed |
+| EC-1 | Edge case | Root re-exports retain callers; retired route fields are rejected by the replacement contract | `crates/jobs/src/lib.rs::tests::subtitle_job_contract_remains_publicly_reexported`; `crates/jobs/src/subtitle_job.rs::tests::subtitle_job_rejects_retired_payload_fields` | passed |
 
 ### Owner final verification
 
@@ -2360,12 +2371,16 @@ Required passes: 2 (`34` → `Moderate`)
 ## S-150-T2c-iv-a: Retire the legacy SubtitleJob payload contract
 
 **Type:** development
-**Effort:** M (provisional RRI 38 — Moderate; recompute before presentation)
+**Effort:** M (RRI 40 — Moderate; recomputed 2026-08-13)
 **Decomposed from:** S-150-T2c-iv
 **Depends on:** S-150-T2c-iv-a0
-**Status:** [ ] Planned — approval pending
+**Status:** [~] Contract cutover implemented 2026-08-13 — integration remains
+pending on the separately sequenced `S-150-T2c-iv-b` producer and `S-150-T2c-vi-a`
+runtime cuts.
 
-**RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
+**RRI evidence:** `docs/audit/s-150-t2c-iv-a-rri.md` (exact 40; decomposition context: `docs/audit/s-150-t2c-decomposition-rri.md`)
+
+Task-analysis review: `gemma` `docs/audit/s-150-t2c-iv-a-phase1-review-v2.json` - `PASS`
 
 **Happy paths considered:**
 
@@ -2375,7 +2390,8 @@ Required passes: 2 (`34` → `Moderate`)
 **Edge cases considered:**
 
 - **EC-1:** Deserializing a job without the removed route and target-language
-  fields succeeds; no default can silently select legacy review behavior.
+  fields succeeds; payloads that still carry retired fields fail closed, so no
+  default can silently select legacy review behavior.
 
 **Acceptance criteria:** Remove `SubtitlePostReadyRoute`, `post_ready_route`,
 `legacy_subtitle_review_v1`, `s150_localization_v1`, and the review-only
@@ -2383,7 +2399,8 @@ Required passes: 2 (`34` → `Moderate`)
 asset/project constructor. Preserve `TranslationJob` and deterministic request-ID
 contracts unchanged.
 
-**Files expected to change:** `crates/jobs/src/subtitle_job.rs` only.
+**Files changed:** `crates/jobs/src/subtitle_job.rs`, `crates/jobs/src/lib.rs`
+(the latter is the required crate-root reexport and crate-local queue-test cleanup).
 
 **Evidence to emit:** Exact RRI, phase reviews, serialization tests, Reflection
 log, unit coverage certification, and owner verification.
@@ -2393,6 +2410,22 @@ log, unit coverage certification, and owner verification.
 **Stop condition:** Stop after job-contract tests; do not change a producer or
 runtime call site. The preceding extraction keeps this file below 500 lines, so
 this Moderate task uses the default local `qwen3.6:35b-a3b` route.
+
+### Implementation evidence (integration pending)
+
+- Local implementation attempt: `.agent/s-150-t2c-iv-a-local-run.json` — the
+  bounded Qwen run produced the intended `subtitle_job.rs` diff, then exhausted
+  its repair budget when crate-root and worker consumers surfaced.
+- Primary implementation: completed the necessary two-file crate-internal scope;
+  no producer or runtime call site was changed.
+- `cargo fmt --check`, `cargo test -p dubbridge-jobs` (18 passed, 5 ignored), and
+  `cargo clippy -p dubbridge-jobs --all-targets -- -D warnings` passed.
+- Focused coverage: `crates/jobs/src/subtitle_job.rs` — 98.46% lines.
+- `cargo check --workspace` is intentionally not green yet: its only new failures
+  are the producer call in `S-150-T2c-iv-b` and the legacy review dispatch in
+  `S-150-T2c-vi-a`. This task therefore remains `[~]`, not `[x] Done`.
+
+Code-solution review: `gemma` `docs/audit/s-150-t2c-iv-a-phase2-review.json` - `PASS`
 
 ---
 

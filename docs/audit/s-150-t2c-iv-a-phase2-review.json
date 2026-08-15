@@ -1,0 +1,21 @@
+{
+  "task_id": "S-150-T2c-iv-a",
+  "phase": "code-solution",
+  "reviewer": "gemma4:26b-a4b-it-qat",
+  "model": "gemma4:26b-a4b-it-qat",
+  "verdict": "PASS",
+  "timestamp": "2026-08-13T17:57:38Z",
+  "scope": [
+    "crates/jobs/src/subtitle_job.rs",
+    "crates/jobs/src/lib.rs"
+  ],
+  "findings": [],
+  "rationale": "The diff removes the legacy route enum and payload, leaves SubtitleJob with only asset/project identity, rejects retired payload keys fail-closed, updates root reexports and queue tests, proves two-field serialization/deserialization, and leaves TranslationJob and UUIDv5 behavior untouched.",
+  "verification": {
+    "cargo_fmt_check": "passed",
+    "cargo_test_p_dubbridge_jobs": "18 passed; 5 ignored",
+    "cargo_clippy_p_dubbridge_jobs_all_targets": "passed",
+    "cargo_llvm_cov_subtitle_job_lines": "98.46%",
+    "cargo_check_workspace": "fails only at separately sequenced SubtitleJob consumers in apps/worker-runner"
+  }
+}
