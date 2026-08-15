@@ -1,0 +1,60 @@
+{
+  "task_id": "S-150-T2c-iv-a",
+  "phase": "task-analysis",
+  "reviewer": "d14",
+  "verdict": "BLOCKED",
+  "rri": {
+    "final": 38,
+    "band": "Moderate (26-40)",
+    "command": "python3 scripts/rri.py --touches crates/jobs/src/subtitle_job.rs --cc 4 --D 3 --K 3 --P 4 --T 3 --A 1 --X 2",
+    "note": "Exact recompute confirms the provisional 38 recorded in docs/audit/s-150-t2c-decomposition-rri.md."
+  },
+  "reviewer_routing": {
+    "band_primary": "gemma4:26b-a4b-it-qat",
+    "band_intermediate_fallback": "muse-glimmer:30b-q4_K_M",
+    "resolved": "d14",
+    "reason": "Session runs in an ephemeral remote container with no local stack: no `ollama` binary, no listener on 127.0.0.1:11434, OLLAMA_HOST unset, 15 GB RAM and no GPU. Both band-chain models are structurally unreachable (gemma4:26b ~16 GB and muse-glimmer:30b ~18 GB exceed available RAM), so this is infrastructure-level unavailability rather than a retryable stall.",
+    "provider_route": "same-provider-degraded",
+    "provider_route_reason": "Cross-provider D14 attempted first and unavailable: no Codex/OpenAI CLI or credentials in this environment, and every agent type exposed to the orchestrator resolves to the same provider (Anthropic). Same-provider D14 used as the recorded degraded final fallback with context isolation preserved (subagent received only the task definition, acceptance criteria, and file contents; no development transcript)."
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "blocking",
+      "file": "crates/jobs/src/lib.rs",
+      "detail": "Declared scope is `crates/jobs/src/subtitle_job.rs` only, but lib.rs re-exports `SubtitlePostReadyRoute` (line 12) and calls the 3-argument `SubtitleJob::new(..)` at lines 277 and 356. Collapsing the constructor to (asset_id, project_id) breaks compilation of the task's own crate: `cargo check -p dubbridge-jobs` cannot pass within the declared scope."
+    },
+    {
+      "id": "F2",
+      "severity": "blocking",
+      "file": "apps/worker-runner/src/subtitle_runtime.rs",
+      "detail": "Line 122 reads `job.target_language` in production post-ready logic. No task before T2c-vi-a is scoped to touch this file, so removing the field leaves the worker-runner binary non-compiling across T2c-iv-a, T2c-iv-b, T2c-iv-c and T2c-v. This conflicts with the repository rule that no commit may land with broken tests."
+    },
+    {
+      "id": "F3",
+      "severity": "blocking",
+      "file": "apps/worker-runner/src/transcription_runtime.rs",
+      "detail": "Line 508 asserts `jobs[0].target_language == \"de\"`, and this file is not assigned to any task in the current T2c decomposition, including T2c-vi-a. The sequence therefore has no planned owner for this breakage."
+    },
+    {
+      "id": "F4",
+      "severity": "major",
+      "file": "apps/worker-runner/src/subtitle_runtime_tests.rs",
+      "detail": "Five call sites use the 3-argument constructor (lines 166, 217, 284, 334, 357). Covered by T2c-vi-a's declared paths, but only after three intermediate tasks land, so the same non-compiling window as F2 applies."
+    }
+  ],
+  "questions_resolved": {
+    "q1_scope_sufficient": "No. `crates/jobs/src/lib.rs` requires edits for the task's own crate to compile; the ledger's `Files expected to change` line is factually incomplete.",
+    "q2_workspace_breakage": "Yes. `cargo build --workspace` and `cargo test --workspace` break if the task lands as scoped. Not an acceptable intermediate state under the current unqualified testing rule.",
+    "q3_sequencing_sound": "No. The worker-runner binary stays non-compiling across four sequenced tasks, and transcription_runtime.rs has no planned fix at all."
+  },
+  "recommended_resolution": [
+    "Expand T2c-iv-a `Files expected to change` to include `crates/jobs/src/lib.rs` (re-export list plus the two test call sites), or revise the acceptance criteria.",
+    "Decide explicitly between (a) bundling T2c-iv-a with T2c-iv-b and the runtime fixes into one workspace-green change, or (b) a documented compatibility shim that keeps the workspace compiling until T2c-vi-a.",
+    "Assign `apps/worker-runner/src/transcription_runtime.rs` to a concrete task in the decomposition."
+  ],
+  "disposition": "Primary agent independently verified F1-F4 against the working tree before the D14 run and reached the same conclusions; disposition_divergence = none. Presentation of the S-150-T2c-iv-a approval card is stopped until the ledger scope is corrected.",
+  "authority_note": "Advisory only. This artifact does not approve, block, or close the task; it records the phase-1 verdict for the primary agent and the human owner.",
+  "command": "Agent(subagent_type=general-purpose, model=sonnet, isolation=worktree) with a context-isolated task-analysis packet",
+  "timestamp": "2026-08-15T00:00:00Z"
+}

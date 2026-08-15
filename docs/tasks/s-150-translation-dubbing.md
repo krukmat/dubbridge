@@ -25,8 +25,14 @@ Behavioral coverage contract: unit-v1
 > owner rejected the unused legacy-review compatibility premise. T2c-iv is now
 > a non-executable parent decomposed into T2c-iv-a0/a/b/c, T2c-v is narrowed to the
 > Redis adapter, and T2c-vi owns final runtime integration and legacy-module
-> retirement. T2c-iv-a0 is the next executable task after its own phase-1 review
-> and approval. The
+> retirement. T2c-iv-a0 closed on 2026-08-13. T2c-iv-a is the next task in
+> sequence but is **blocked**: its 2026-08-15 phase-1 review
+> (`docs/audit/s-150-t2c-iv-a-phase1-review.json`) returned `BLOCKED` on four
+> scope findings — `crates/jobs/src/lib.rs` is missing from its declared scope,
+> and the worker-runner binary would stay non-compiling across T2c-iv-a through
+> T2c-v, with `apps/worker-runner/src/transcription_runtime.rs` owned by no task
+> at all. The scope must be revised, and the bundle-vs-shim decision made, before
+> T2c-iv-a can be presented for approval. The
 > plan-review conditions recorded for this slice remain in force, especially the
 > deterministic initial generation-request
 > derivation, and deferred ADR-028 ownership seam for TTS. Tasks T5, T6, and
@@ -2360,12 +2366,55 @@ Required passes: 2 (`34` → `Moderate`)
 ## S-150-T2c-iv-a: Retire the legacy SubtitleJob payload contract
 
 **Type:** development
-**Effort:** M (provisional RRI 38 — Moderate; recompute before presentation)
+**Effort:** M (exact RRI 38 — Moderate; recomputed 2026-08-15)
 **Decomposed from:** S-150-T2c-iv
 **Depends on:** S-150-T2c-iv-a0
-**Status:** [ ] Planned — approval pending
+**Status:** [!] Blocked — phase-1 review returned BLOCKED; scope revision required
+before presentation
 
-**RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
+**RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`; exact recompute
+2026-08-15 via `python3 scripts/rri.py --touches crates/jobs/src/subtitle_job.rs
+--cc 4 --D 3 --K 3 --P 4 --T 3 --A 1 --X 2` → **38, Moderate**, no penalties,
+decomposition not triggered. The provisional estimate is confirmed exact.
+
+**Task-analysis review:** `d14 docs/audit/s-150-t2c-iv-a-phase1-review.json -
+BLOCKED`
+
+Reviewer routing: the RRI 26–55 chain (`gemma4:26b-a4b-it-qat` →
+`muse-glimmer:30b-q4_K_M` → D14) resolved to D14 because the session ran in an
+ephemeral remote container with no local stack — no `ollama` binary, no listener
+on `127.0.0.1:11434`, `OLLAMA_HOST` unset, 15 GB RAM and no GPU, so both band
+models exceed available memory. D14 ran same-provider degraded with context
+isolation after no cross-provider reviewer was reachable. `disposition_divergence:
+none` — the primary agent had independently reached the same findings against the
+working tree before the D14 run.
+
+**Blocking findings (must be resolved before this task is presented):**
+
+- **F1 — `crates/jobs/src/lib.rs` is missing from scope.** It re-exports
+  `SubtitlePostReadyRoute` (line 12) and calls the 3-argument `SubtitleJob::new`
+  at lines 277 and 356 (the latter inside the regression test T2c-iv-a0 added).
+  Collapsing the constructor breaks `cargo check -p dubbridge-jobs` within the
+  declared scope, so "`subtitle_job.rs` only" is not achievable as written.
+- **F2 — worker-runner stays non-compiling across four tasks.**
+  `apps/worker-runner/src/subtitle_runtime.rs:122` reads `job.target_language` in
+  production post-ready logic, and no task before T2c-vi-a is scoped to touch it.
+  Landing T2c-iv-a → T2c-iv-b → T2c-iv-c → T2c-v in sequence leaves the binary
+  broken throughout, conflicting with the repository rule that no commit may land
+  with broken tests.
+- **F3 — `apps/worker-runner/src/transcription_runtime.rs:508` has no owner.** It
+  asserts on `target_language` and is not assigned to any task in the current T2c
+  decomposition, including T2c-vi-a.
+- **F4 — `apps/worker-runner/src/subtitle_runtime_tests.rs`** uses the 3-argument
+  constructor at lines 166, 217, 284, 334 and 357. Covered by T2c-vi-a's declared
+  paths, but only after three intermediate tasks land, so F2's window applies.
+
+**Required resolution (owner decision, then ledger revision):** expand this
+task's scope to include `crates/jobs/src/lib.rs`; choose explicitly between
+bundling T2c-iv-a with T2c-iv-b plus the runtime fixes into one workspace-green
+change, or introducing a documented compatibility shim that keeps the workspace
+compiling until T2c-vi-a; and assign `transcription_runtime.rs` to a concrete
+task.
 
 **Happy paths considered:**
 
@@ -2383,7 +2432,9 @@ Required passes: 2 (`34` → `Moderate`)
 asset/project constructor. Preserve `TranslationJob` and deterministic request-ID
 contracts unchanged.
 
-**Files expected to change:** `crates/jobs/src/subtitle_job.rs` only.
+**Files expected to change:** `crates/jobs/src/subtitle_job.rs` only. **Contested
+by phase-1 finding F1** — `crates/jobs/src/lib.rs` must be added for the crate to
+compile. Do not treat this line as authoritative until the scope revision lands.
 
 **Evidence to emit:** Exact RRI, phase reviews, serialization tests, Reflection
 log, unit coverage certification, and owner verification.
@@ -2392,7 +2443,9 @@ log, unit coverage certification, and owner verification.
 
 **Stop condition:** Stop after job-contract tests; do not change a producer or
 runtime call site. The preceding extraction keeps this file below 500 lines, so
-this Moderate task uses the default local `qwen3.6:35b-a3b` route.
+this Moderate task uses the default local `qwen3.6:35b-a3b` route — which
+requires a session with a reachable Ollama stack (see the owner directive in
+`CLAUDE.md`, 2026-08-15).
 
 ---
 

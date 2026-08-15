@@ -147,6 +147,44 @@ config-only, migration-only, planning, ADR, task-ledger, or policy-only) or
 whether the workflow requires the mandatory band-resolved review gate
 before certification or final verification is discussed.
 
+## Owner directive — local-first execution and orchestrator-only role (2026-08-15)
+
+Standing directive from the owner, applicable to **every task in this
+repository and to every new session**, not only the task in flight when it was
+issued:
+
+1. **Maximize local model usage.** Route all eligible work to the local
+   Ollama-backed roles resolved by the RRI band — implementer
+   (`DUBBRIDGE_LOCAL_AGENT_MODEL`) and reviewers (Gemma / Muse Glimmer). Use
+   the local path whenever the band's routing permits it, not only when it is
+   convenient.
+2. **Minimize primary-agent and Codex token usage.** The primary agent acts as
+   **orchestrator of record only**: it computes RRI, builds delegation packets,
+   enforces scope and gates, reviews results, and records evidence. It does not
+   author implementation that an eligible local role could author, and it does
+   not spend cloud capacity on work the local stack can perform.
+3. **Escalate by consultation, not by substitution.** When the local path
+   cannot advance — model unavailable, repair budget exhausted, band excludes
+   local, or an environment lacks the local stack entirely — **stop and ask the
+   owner with concrete options**. Do not silently absorb the work into the
+   primary agent or promote it to Codex to keep moving.
+
+This directive constrains *who executes*; it never relaxes a gate. RRI
+computation, HITL approval, band-routed review, Reflection passes, coverage
+certification, and closure requirements in
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` apply unchanged.
+
+**Environment precondition.** The local roles require a reachable Ollama stack.
+Ephemeral remote containers (Claude Code on the web / cloud sessions) do not
+have one, and cannot host one: the band models (`gemma4:26b-a4b-it-qat` ~16 GB,
+`muse-glimmer:30b-q4_K_M` ~18 GB, `qwen3.6:35b-a3b` ~20 GB) exceed the memory
+available there. In such an environment, do not route implementation work to
+cloud as a workaround — restrict the session to work that is genuinely exempt
+from local-model gates (docs-only, config-only, migration-only, ADR, plan,
+task-ledger, policy-only) and consult the owner about moving the remaining work
+to a local session. Verify the stack with the Step 0 precheck before assuming
+either state.
+
 ## Task Presentation Contract
 
 Before executing a task that belongs to a staged plan or task list, present the task first when the workflow or the user requires approval.
