@@ -46,23 +46,31 @@ The only exception to the approval gate is when the user explicitly says "procee
 without asking" (or equivalent) for a clearly bounded scope, or when the
 computed RRI is 0–25 and the task stays within the low-band handling rules below.
 
-## Per-task local-stack restart
+## Per-phase local-stack evaluation and restart
 
-Owner directive, 2026-08-12: every task that will invoke an Ollama-backed local
-role must restart Ollama once before its first local-model request, even when the
-current server appears healthy. The orchestrator records and completes the
-`Restart Ollama + local-stack precheck` checklist item before allowing that
-request. A new repository task ID creates a new restart boundary; retries,
-repairs, and later local phases of the same task reuse the restarted server
-unless it becomes unavailable or wedged.
+Owner directive, 2026-08-15 (superseding the per-task boundary of 2026-08-12):
+every **phase** that will invoke an Ollama-backed local role must first evaluate
+host memory and general process state, then warm the exact models that phase
+will invoke. The evaluation and the warm-up are unconditional; the restart is
+conditional on what the evaluation finds. The orchestrator records and completes
+a `Memory/stack precheck (<phase>)` checklist item before allowing that phase's
+first local-model request — one entry per phase, not one per task. A new
+repository task ID still requires a full restart before its first phase.
 
-Before the restart, the orchestrator must establish that no local runner for a
+Restart `ollama serve`, or stop/defer unrelated memory-heavy processes, whenever
+the evaluation shows insufficient headroom for the models the phase will load, a
+stale resident model from a previous phase, a wedged or unresponsive server, or
+an abnormally terminated previous phase. A server carried over from the previous
+phase of the same task may be reused only after the evaluation records it as
+healthy and adequately provisioned.
+
+Before any restart, the orchestrator must establish that no local runner for a
 different task remains active. An unrelated bounded run is allowed to finish or
 is stopped under its own termination contract; it is not killed as collateral
-work. The restart is complete only when the previous server PID is gone, a new
+work. A restart is complete only when the previous server PID is gone, a new
 `ollama serve` PID is present, port `11434` is listening, and every local model
-required by the task passes the workflow guide's warm-up probe. Failure leaves
-the operational checklist item blocked and prohibits the task's first local
+**that phase** requires passes the workflow guide's warm-up probe. Failure leaves
+the operational checklist item blocked and prohibits that phase's first local
 request. This prerequisite does not waive or replace HITL approval, independent
 review, fallback selection, or any RRI gate. The authoritative procedure is
 `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Mandatory workflow before

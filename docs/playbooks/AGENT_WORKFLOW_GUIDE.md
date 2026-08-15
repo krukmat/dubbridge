@@ -24,7 +24,8 @@ governs: "all agent-facing workflow decisions in the repository"
 
 ## Mandatory workflow before implementing
 
-0. **Per-task Ollama restart and local-stack precheck** — before the first
+0. **Per-phase memory evaluation, conditional Ollama restart, and local-stack
+   precheck** — before the first
    Ollama-backed action of every task that will invoke a local model, restart
    Ollama even when the current server appears healthy, then verify that the
    local stack and the models the task will actually invoke respond correctly
@@ -37,11 +38,33 @@ governs: "all agent-facing workflow decisions in the repository"
    (Muse Glimmer → Gemma → D14 for RRI 0–25, or Gemma → Muse Glimmer → D14
    for RRI 26–55) and burns a review hop that a healthy stack would not have
    needed.
-   - Treat the repository task ID as the restart boundary: perform exactly one
-     mandatory restart before that task's first local-model call. Retries,
-     repair attempts, and later local phases within the same task reuse the
-     restarted server unless it becomes unavailable or wedged. A new task ID
-     requires a new restart.
+   - **Owner directive, 2026-08-15 — the boundary is the phase, not the task.**
+     This supersedes the prior task-ID restart boundary. Before **every phase**
+     of a task that will issue a local-model call — phase-1 review,
+     implementation, each repair attempt, phase-2 review, Local Architect,
+     Antares — evaluate host memory and general process state first, then warm
+     the models that specific phase will invoke. The evaluation is mandatory;
+     the restart is conditional on what it finds.
+     - **Evaluate first.** Record free/available memory, swap pressure, and any
+       process holding significant resident memory (`free -g` / `vm_stat`,
+       `ps -eo pid,rss,comm --sort=-rss | head`, `ollama ps` for currently
+       loaded models). A phase must not start while the host lacks headroom for
+       the models that phase will load.
+     - **Restart or reclaim when the evaluation says so.** Restart `ollama serve`
+       when memory is insufficient, a model from a previous phase is still
+       resident and not needed by this one, the server is wedged or
+       unresponsive, or the previous phase ended abnormally. Stop or defer
+       unrelated memory-heavy processes under their own termination contract —
+       never kill an unrelated in-flight task merely to satisfy this step. A
+       healthy, adequately-provisioned server carried over from the previous
+       phase of the same task may be reused without a restart, but only after
+       the evaluation above records that it is healthy.
+     - **Warm every model of every phase.** Warming is not conditional and does
+       not carry over: each phase warms the exact model bindings it is about to
+       invoke, using the production-parameter probe below, even when a previous
+       phase warmed a different model on the same server. A phase whose models
+       are not confirmed warm does not start.
+     A new task ID still requires a full restart before its first phase.
    - Before restarting, confirm that no local-model runner for another task is
      still active. If one is active, wait for its bounded run to finish or stop
      it under that task's own timeout/termination contract; never kill an
@@ -52,7 +75,8 @@ governs: "all agent-facing workflow decisions in the repository"
      with `pgrep -fl ollama` and `lsof -iTCP:11434 -sTCP:LISTEN`. A surviving
      old PID, absent replacement PID, or missing listener leaves the restart
      item blocked; do not issue the task's first local-model request.
-   - Warm and re-test each model this task's band will use (at minimum the
+   - Warm and re-test each model **the phase being entered** will use (at
+     minimum the
      RRI 0–25 reviewer chain: `muse-glimmer:30b-q4_K_M` →
      `gemma4:26b-a4b-it-qat`; for RRI 26–55 add the reviewer chain
      `gemma4:26b-a4b-it-qat` → `muse-glimmer:30b-q4_K_M`, the implementer
@@ -75,10 +99,12 @@ governs: "all agent-facing workflow decisions in the repository"
      result with empty content on a small ping (e.g. `num_predict: 16`) is
      usually just an undersized budget, not the real failure — retry at the
      production `num_predict` before concluding the model is unhealthy.
-   - Track this operation as `Restart Ollama + local-stack precheck —
-     <orchestrator>` in the live per-task checklist. It is an operational
-     prerequisite, not a review or approval gate, and completes only after the
-     PID/listener checks and required model warm-ups pass.
+   - Track this operation as `Memory/stack precheck (<phase>) —
+     <orchestrator>` in the live per-task checklist, one entry per phase that
+     invokes a local model, seeded immediately before that phase starts. It is
+     an operational prerequisite, not a review or approval gate, and completes
+     only after the memory evaluation, the PID/listener checks, and that
+     phase's model warm-ups pass.
    - This restart/precheck is infrastructure verification, not a
    review gate: it does not replace, skip, or pre-decide the Band-routed
      peer review outcome for this task, and a healthy precheck does not
@@ -300,8 +326,10 @@ and a status of `pending`, `in_progress`, `blocked`, or `completed`.
 
 **Phase set by band:**
 
-- **Any task invoking an Ollama-backed local role:** prepend `Restart Ollama +
-  local-stack precheck — <resolved orchestrator>` to the applicable phase set.
+- **Any task invoking an Ollama-backed local role:** insert a
+  `Memory/stack precheck (<phase>) — <resolved orchestrator>` entry immediately
+  before **each** phase that will issue a local-model call, per the owner
+  directive of 2026-08-15 in Step 0 — not a single entry for the whole task.
   Seed this entry immediately before the task's first local-model invocation,
   even when that invocation is the phase-1 reviewer and therefore precedes the
   approval card. Add the remaining phase entries when their route is resolved.

@@ -169,10 +169,22 @@ issued:
    owner with concrete options**. Do not silently absorb the work into the
    primary agent or promote it to Codex to keep moving.
 
-This directive constrains *who executes*; it never relaxes a gate. RRI
-computation, HITL approval, band-routed review, Reflection passes, coverage
-certification, and closure requirements in
-`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` apply unchanged.
+4. **Evaluate the host before every phase, warm every phase's models.** Local
+   throughput depends on memory headroom, so before each phase that issues a
+   local-model call the orchestrator evaluates free memory, swap pressure, and
+   resident processes; restarts Ollama or reclaims memory when that evaluation
+   requires it; and warms the exact model bindings that phase will invoke. The
+   authoritative procedure is
+   `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Mandatory workflow before
+   implementing`, Step 0 (owner directive, 2026-08-15), which replaced the
+   earlier once-per-task restart boundary. `docs/policies/HITL_AUTONOMY_POLICY.md
+   § Per-phase local-stack evaluation and restart` carries the matching
+   autonomy contract.
+
+This directive constrains *who executes* and *how the local host is kept
+serviceable*; it never relaxes a gate. RRI computation, HITL approval,
+band-routed review, Reflection passes, coverage certification, and closure
+requirements in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` apply unchanged.
 
 **Environment precondition.** The local roles require a reachable Ollama stack.
 Ephemeral remote containers (Claude Code on the web / cloud sessions) do not
