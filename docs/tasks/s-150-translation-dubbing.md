@@ -2681,7 +2681,7 @@ cargo test -p dubbridge-worker-runner subtitle_enqueue -- --test-threads=1` —
 `cargo clippy -p dubbridge-worker-runner --all-targets --all-features -- -D
 warnings` clean.
 
-Code-solution review: `muse-glimmer` `.agent/s-150-t2c-iv-b-debt-review-result.json` - `PASS`
+Code-solution review: `muse-glimmer` `docs/audit/gemma-evidence/S-150-T2c-iv-b-debt-1.json` - `PASS`
 
 ### Gemma Reviewer evidence
 
@@ -2695,6 +2695,7 @@ Code-solution review: `muse-glimmer` `.agent/s-150-t2c-iv-b-debt-review-result.j
 - D14 provider route: `n/a`
 - disposition_divergence: `none`
 - Primary-agent disposition: accepted — no findings to disposition
+- Review artifact: `docs/audit/gemma-evidence/S-150-T2c-iv-b-debt-1.json`
 
 ### Owner final verification
 
