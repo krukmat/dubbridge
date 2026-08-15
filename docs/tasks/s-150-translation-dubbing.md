@@ -2427,6 +2427,41 @@ this Moderate task uses the default local `qwen3.6:35b-a3b` route.
 
 Code-solution review: `gemma` `docs/audit/s-150-t2c-iv-a-phase2-review.json` - `PASS`
 
+### Workspace-compile compatibility patch (2026-08-15)
+
+To keep `main` buildable while `S-150-T2c-iv-b` and `S-150-T2c-vi-a` remain
+`[ ] Planned — approval pending`, a minimal, behavior-preserving patch was
+applied directly to their target files so `cargo check --workspace` and
+`cargo clippy --workspace --all-targets --all-features -- -D warnings` pass
+again:
+
+- `apps/worker-runner/src/subtitle_enqueue.rs`: drop the removed third
+  constructor argument (`SubtitleJob::new(asset_id.0, route.project_id.0)`).
+  This happens to satisfy `S-150-T2c-iv-b`'s stated acceptance criteria
+  content-wise, but **does not** constitute that task's formal closure — no
+  RRI was computed or presented for it, no phase review ran, and no
+  Reflection log/coverage cert/owner verification was recorded under its own
+  heading. Its `Status` checkbox is intentionally left unchanged below.
+- `apps/worker-runner/src/subtitle_runtime.rs`: `dispatch_post_ready` now
+  re-resolves `target_language` from `target_language_repo::get_asset_subtitle_route`
+  (the same source `subtitle_enqueue.rs` uses to build the job) instead of
+  reading it off the job payload, and still calls `prepare_review_post_ready`
+  exactly as before. This is intentionally **not** `S-150-T2c-vi-a`'s design
+  (injecting `TranslationJobQueue`, calling the durable fan-out service,
+  replacing the `prepare_review_post_ready` call) — that task's dependencies
+  (`S-150-T2c-iv-c`, `S-150-T2c-v`) do not exist yet, so its scope is
+  unchanged and its `Status` checkbox below is left unchanged.
+- Full verification: `make qa-local` (fmt + clippy + `cargo test --workspace
+  --all-features` + `cargo check --workspace --all-targets --all-features`) —
+  all green, 0 failed across every crate.
+- Review evidence: `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` designates Gemma
+  Reviewer as mandatory before development-task closure for RRI 26+ work;
+  this patch is explicitly framed as a non-closing compatibility fix on
+  already-reviewed T2c-iv-a scope (not a new task's closure), so no
+  additional review artifact is recorded here. `S-150-T2c-iv-b` and
+  `S-150-T2c-vi-a` still require their own RRI, approval, and band-routed
+  review before their `Status` checkboxes can move.
+
 ---
 
 ## S-150-T2c-iv-b: Cut the subtitle producer over to the single contract
@@ -2436,6 +2471,13 @@ Code-solution review: `gemma` `docs/audit/s-150-t2c-iv-a-phase2-review.json` - `
 **Decomposed from:** S-150-T2c-iv
 **Depends on:** S-150-T2c-iv-a
 **Status:** [ ] Planned — approval pending
+
+> **Note (2026-08-15):** `apps/worker-runner/src/subtitle_enqueue.rs` already
+> carries a transitional compatibility patch (see T2c-iv-a's "Workspace-compile
+> compatibility patch" section) that drops the removed `target_language`
+> constructor argument so the workspace compiles. This task's own RRI,
+> approval, phase reviews, Reflection log, coverage certification, and owner
+> verification are still outstanding before its `Status` can change.
 
 **RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
 
@@ -2588,6 +2630,18 @@ T2c-vi-b; do not start T3a until both children close.
 **Decomposed from:** S-150-T2c-vi
 **Depends on:** S-150-T2c-iv-c, S-150-T2c-v
 **Status:** [ ] Planned — approval pending
+
+> **Note (2026-08-15):** `apps/worker-runner/src/subtitle_runtime.rs` already
+> carries a transitional compatibility patch (see T2c-iv-a's "Workspace-compile
+> compatibility patch" section): `dispatch_post_ready` re-resolves
+> `target_language` from `target_language_repo::get_asset_subtitle_route`
+> instead of the (now route-free) job payload, but still calls
+> `prepare_review_post_ready` exactly as before. This is **not** this task's
+> design (`TranslationJobQueue` injection, durable fan-out, replacing the
+> `prepare_review_post_ready` call) — its dependencies (`S-150-T2c-iv-c`,
+> `S-150-T2c-v`) do not exist yet, so this task's own RRI, approval, phase
+> reviews, Reflection log, coverage certification, and owner verification
+> remain fully outstanding.
 
 **RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
 

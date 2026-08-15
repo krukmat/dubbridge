@@ -99,11 +99,7 @@ async fn try_enqueue_subtitle(
 
     let route = resolve_subtitle_route(pool, asset_id).await?;
     queue
-        .enqueue(SubtitleJob::new(
-            asset_id.0,
-            route.project_id.0,
-            route.target_language,
-        ))
+        .enqueue(SubtitleJob::new(asset_id.0, route.project_id.0))
         .await
         .map_err(|error| {
             tracing::warn!(asset_id = %asset_id, error = %error, "failed to enqueue SubtitleJob");
@@ -307,7 +303,12 @@ mod tests {
         assert_eq!(jobs.len(), 1);
         assert_eq!(jobs[0].asset_id, asset_id.0);
         assert_eq!(jobs[0].project_id, project_id.0);
-        assert_eq!(jobs[0].target_language, "de");
+
+        let route = target_language_repo::get_asset_subtitle_route(&pool, asset_id)
+            .await
+            .expect("get asset subtitle route")
+            .expect("subtitle route");
+        assert_eq!(route.target_language, "de");
 
         let status = subtitle_repo::get_subtitle_status(&pool, asset_id)
             .await

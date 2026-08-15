@@ -163,7 +163,7 @@ async fn process_subtitle_job_marks_ready_and_stores_artifact_on_success() {
         .expect("set pending");
     let project_id = insert_project_with_targets(&pool, asset_id, "en", &["es"]).await;
 
-    let job = dubbridge_jobs::SubtitleJob::new(asset_id.0, project_id.0, "es");
+    let job = dubbridge_jobs::SubtitleJob::new(asset_id.0, project_id.0);
     process_subtitle_job(&pool, &storage, job)
         .await
         .expect("process subtitle job");
@@ -214,7 +214,7 @@ async fn process_subtitle_job_fails_when_alignment_missing() {
         .expect("set pending");
     insert_project_with_targets(&pool, asset_id, "en", &["es"]).await;
 
-    let job = dubbridge_jobs::SubtitleJob::new(asset_id.0, Uuid::new_v4(), "es");
+    let job = dubbridge_jobs::SubtitleJob::new(asset_id.0, Uuid::new_v4());
     let storage_workspace = tempfile::TempDir::new().unwrap();
     let storage = LocalFsAdapter::new(storage_workspace.path());
     let err = process_subtitle_job(&pool, &storage, job)
@@ -281,7 +281,7 @@ async fn process_subtitle_job_fails_closed_on_invalid_segmentation_output() {
         .expect("set pending");
     insert_project_with_targets(&pool, asset_id, "en", &["es"]).await;
 
-    let job = dubbridge_jobs::SubtitleJob::new(asset_id.0, Uuid::new_v4(), "es");
+    let job = dubbridge_jobs::SubtitleJob::new(asset_id.0, Uuid::new_v4());
     let err = process_subtitle_job(&pool, &storage, job)
         .await
         .expect_err("segmentation must fail on overlapping timing");
@@ -331,7 +331,7 @@ async fn process_subtitle_envelope_rejects_wrong_job_type() {
         &LocalFsAdapter::new(tempfile::TempDir::new().unwrap().path()),
         JobEnvelope::new(
             "media_preparation",
-            dubbridge_jobs::SubtitleJob::new(asset_id.0, Uuid::new_v4(), "es"),
+            dubbridge_jobs::SubtitleJob::new(asset_id.0, Uuid::new_v4()),
         ),
     )
     .await
@@ -354,7 +354,7 @@ async fn process_subtitle_review_tasks_no_row_on_failure() {
         .expect("set pending");
     // No project/target languages inserted -> missing project case
 
-    let job = dubbridge_jobs::SubtitleJob::new(asset_id.0, Uuid::new_v4(), "es");
+    let job = dubbridge_jobs::SubtitleJob::new(asset_id.0, Uuid::new_v4());
     let storage_workspace = tempfile::TempDir::new().unwrap();
     let storage = LocalFsAdapter::new(storage_workspace.path());
     let err = process_subtitle_job(&pool, &storage, job)

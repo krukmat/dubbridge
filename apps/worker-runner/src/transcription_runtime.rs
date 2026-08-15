@@ -505,7 +505,12 @@ mod tests {
         assert_eq!(jobs.len(), 1);
         assert_eq!(jobs[0].asset_id, asset_id.0);
         assert_eq!(jobs[0].project_id, project_id.0);
-        assert_eq!(jobs[0].target_language, "de");
+
+        let route = target_language_repo::get_asset_subtitle_route(&pool, asset_id)
+            .await
+            .expect("get asset subtitle route")
+            .expect("subtitle route");
+        assert_eq!(route.target_language, "de");
     }
 
     #[tokio::test]

@@ -115,11 +115,16 @@ async fn dispatch_post_ready(
     asset_id: dubbridge_domain::asset::AssetId,
     job: &dubbridge_jobs::SubtitleJob,
 ) -> anyhow::Result<()> {
+    let Some(route) =
+        dubbridge_db::target_language_repo::get_asset_subtitle_route(pool, asset_id).await?
+    else {
+        return Ok(());
+    };
     crate::review_enqueue::prepare_review_post_ready(
         pool,
         asset_id,
         dubbridge_domain::workspace::ProjectId(job.project_id),
-        &job.target_language,
+        &route.target_language,
     )
     .await;
     Ok(())
