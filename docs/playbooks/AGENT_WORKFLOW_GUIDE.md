@@ -32,7 +32,10 @@ governs: "all agent-facing workflow decisions in the repository"
    generation parameters (`think=false` where applicable, the repo's default
    `num_predict`/`num_ctx` from `gemma_local.py`). A silent `done_reason:
    "length"` with empty `content` (thinking-mode exhausting the token budget
-   before any visible output) is a known failure mode — catching it here
+   before any visible output) is a known failure mode. Empty `content` with any
+   terminal reason is also a possible local-memory or context-capacity failure;
+   it must enter the resource-recovery protocol below rather than be retried
+   unchanged. Catching either condition here
    avoids discovering it mid-review, where it forces an avoidable fallback
    (Muse Glimmer → Gemma → D14 for RRI 0–25, or Gemma → Muse Glimmer → D14
    for RRI 26–55) and burns a review hop that a healthy stack would not have
@@ -75,6 +78,30 @@ governs: "all agent-facing workflow decisions in the repository"
      result with empty content on a small ping (e.g. `num_predict: 16`) is
      usually just an undersized budget, not the real failure — retry at the
      production `num_predict` before concluding the model is unhealthy.
+   - **Local resource-recovery protocol** — when an otherwise valid Ollama
+     response has empty `content`, do **not** repeat the same request with the
+     same or larger model/context budget. Treat it as a capacity symptom until
+     disproved. In this exact order:
+     1. unload the affected model (`ollama stop <model>`); inspect
+        `GET /api/ps`, `pgrep -fl ollama`, and host memory pressure (on macOS,
+        `memory_pressure` or `vm_stat`) so the observation is recorded;
+     2. set `think=false`, `temperature=0`, `num_ctx` at or below `16384`, and
+        `num_predict` to `512`–`1024`; then issue one bounded JSON-only probe;
+     3. if that probe is usable, rebuild the actual review/delegation packet so
+        it fits the reduced context (split source excerpts or the task when
+        necessary) and make one bounded retry using that profile; and
+     4. if the reduced retry is still empty or invalid, unload it and proceed to
+        the band's normal reviewer/fallback route. Do not burn additional
+        retries on the same high-memory profile.
+
+     A smaller local model may be used only for a separate local D14 review
+     after the normal chain has failed and the ADR-039 fallback-selection
+     receipt authorizes that exact model, effort, and same-provider-degraded
+     route. It is not a silent substitute for the band-resolved reviewer.
+     Record the model, `num_ctx`, `num_predict`, `think`, terminal reason,
+     content length, loaded-model state, and the recovery decision in the
+     precheck or review artifact. A reduced-profile success does not certify
+     the original high-memory production profile as healthy.
    - Track this operation as `Restart Ollama + local-stack precheck —
      <orchestrator>` in the live per-task checklist. It is an operational
      prerequisite, not a review or approval gate, and completes only after the
@@ -1282,6 +1309,22 @@ unusable and must be recorded as a degraded fallback. The
 `scripts/adjudicator-packet.py` module implements the trigger gate
 (`should_adjudicate()`) and the isolation packet builder
 (`build_adjudicator_packet()`).
+
+**Isolated-context profile.** “Context-isolated” has two separate, mandatory
+dimensions; a short prompt alone is not isolation:
+
+- **Minimal packet:** include only the task ID, final diff (or task scope for
+  phase 1), acceptance criteria, independently verified command output, and
+  reconciled findings. Exclude the implementation transcript, source files not
+  needed to assess the diff, prior model output, and chain-of-thought.
+- **Window:** use `num_ctx=65536` as the normal local isolated-review ceiling,
+  with `think=false`, a JSON-only response contract, and an output allowance
+  sized to the review. The configured window is a memory allocation budget,
+  not a target prompt size: do not pad a minimal packet to fill it.
+- **Capacity override:** if the local resource-recovery protocol is triggered,
+  reduce both packet and window to its `16384` maximum before the one bounded
+  retry. Record that the D14/reviewer ran under the reduced profile; do not
+  silently retain `65536` after an empty-content capacity symptom.
 
 **Trigger conditions (any one fires):**
 
