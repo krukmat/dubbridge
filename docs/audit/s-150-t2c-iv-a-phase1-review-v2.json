@@ -1,0 +1,63 @@
+{
+  "task_id": "S-150-T2c-iv-a",
+  "phase": "task-analysis",
+  "revision": 2,
+  "supersedes": "docs/audit/s-150-t2c-iv-a-phase1-review.json",
+  "reviewer": "d14",
+  "verdict": "PASS",
+  "rri": {
+    "final": 40,
+    "band": "Moderate (26-40)",
+    "command": "python3 scripts/rri.py --touches crates/jobs/src/subtitle_job.rs --touches crates/jobs/src/lib.rs --cc 4 --D 3 --K 3 --P 4 --T 3 --A 1 --X 2",
+    "note": "Recomputed with lib.rs added to the touched-file set per F1. 40 is the Moderate band ceiling; any further scope growth would cross into Med-high (41-55) and lose local-first eligibility under ADR-038."
+  },
+  "reviewer_routing": {
+    "band_primary": "gemma4:26b-a4b-it-qat",
+    "band_intermediate_fallback": "muse-glimmer:30b-q4_K_M",
+    "resolved": "d14",
+    "reason": "Session runs in an ephemeral remote container with no local stack: no `ollama` binary, no listener on 127.0.0.1:11434, OLLAMA_HOST unset, 15 GB RAM. Confirmed this run: ollama.com:443 blocked by egress policy (403, connect_rejected), api.github.com release download blocked (403, session not enabled for that repo). Both band-chain models are structurally unreachable regardless of retry.",
+    "provider_route": "same-provider-degraded",
+    "provider_route_reason": "Cross-provider D14 attempted first and unavailable: no Codex/OpenAI CLI in this environment (command -v codex returns nothing). Same-provider D14 used as the recorded degraded final fallback with context isolation preserved (subagent received only the task definition, acceptance criteria, and file contents; no development transcript or chain-of-thought)."
+  },
+  "scope_revision": {
+    "cause": "The original acceptance criteria assumed `target_language` should be removed from `SubtitleJob` in this task, on the premise that it was 'review-only'. Independent verification (repo-wide grep) showed it is NOT review-only: apps/worker-runner/src/subtitle_enqueue.rs populates it at enqueue time from target_language_repo, and apps/worker-runner/src/subtitle_runtime.rs:122 reads it in production logic that is out of this task's scope.",
+    "resolution": "Narrow the acceptance criteria: remove only `SubtitlePostReadyRoute`, `post_ready_route`, `legacy_subtitle_review_v1`, `s150_localization_v1`, and the `new_s150_localization` constructor. Keep `target_language` and the existing 3-argument `new()` constructor unchanged. Its removal is deferred to T2c-vi-a, which already plans to replace every runtime call site that currently depends on it.",
+    "effect_on_findings": {
+      "F1": "Still applies — resolved by adding crates/jobs/src/lib.rs to scope (remove the dead `SubtitlePostReadyRoute` re-export only; the two `SubtitleJob::new(..)` calls in lib.rs's own tests are 3-argument and need no change).",
+      "F2": "No longer applies — target_language is not removed, so apps/worker-runner/src/subtitle_runtime.rs:122 is untouched and keeps compiling.",
+      "F3": "No longer applies — target_language is not removed, so apps/worker-runner/src/transcription_runtime.rs:508 is untouched and keeps compiling. No task needs to claim ownership of this file for T2c-iv-a to proceed.",
+      "F4": "No longer applies — the 3-argument constructor signature is unchanged, so all 5 call sites in apps/worker-runner/src/subtitle_runtime_tests.rs keep compiling."
+    }
+  },
+  "verification_evidence": [
+    "grep -rn \"SubtitlePostReadyRoute|post_ready_route|new_s150_localization\" across the repository: matches only in crates/jobs/src/subtitle_job.rs and crates/jobs/src/lib.rs (plus docs/ledger prose).",
+    "grep -rn \"SubtitleJob::new\\b\" across the repository: every call site outside the two in-scope files uses the 3-argument form and never references post_ready_route.",
+    "wc -l crates/jobs/src/subtitle_job.rs (286) and crates/jobs/src/lib.rs (449): both remain under the 500-line local-delegation gate."
+  ],
+  "findings": [
+    {
+      "id": "A1",
+      "severity": "advisory",
+      "detail": "The constructor's struct-literal body currently assigns `post_ready_route: SubtitlePostReadyRoute::LegacySubtitleReviewV1`; this line must be deleted as a logically necessary consequence of removing the field. The task card should say the constructor's signature and its three preserved-field assignments stay unchanged, not that the constructor body is untouched."
+    },
+    {
+      "id": "A2",
+      "severity": "advisory",
+      "detail": "At closure, check whether any doc/ledger prose still describes SubtitlePostReadyRoute/post_ready_route/new_s150_localization as current behavior and flag it stale; the edit itself may be out of this task's code scope."
+    },
+    {
+      "id": "A3",
+      "severity": "advisory",
+      "detail": "SubtitleJob has no #[serde(deny_unknown_fields)], so already-queued job JSON containing a stray legacy post_ready_route key will still deserialize successfully post-removal (ignored). The test that implicitly covered this (legacy_subtitle_job_json_defaults_to_legacy_route) is being deleted; consider keeping a slimmed variant that decodes legacy JSON with a stray post_ready_route key and asserts the result matches SubtitleJob::new(..), since this is a queued-job payload shape, not just an internal API."
+    },
+    {
+      "id": "A4",
+      "severity": "advisory",
+      "detail": "Removing post_ready_route changes SubtitleJob's derived PartialEq/Eq semantics: two jobs formerly distinguished by route become equal whenever asset/project/target_language match. Nothing shown relies on route-based inequality, but note the behavior change in the closure record."
+    }
+  ],
+  "disposition": "PASS, no blocking findings. Primary agent will fold A1-A4 into the revised acceptance criteria and stop condition before presentation. disposition_divergence: none.",
+  "authority_note": "Advisory only. This artifact does not approve, block, or close the task; it records the phase-1 verdict. Human approval is still required before implementation (RRI 40, Moderate band).",
+  "command": "Agent(subagent_type=general-purpose) with a context-isolated task-analysis packet (isolation=worktree not used; no code execution, review-only)",
+  "timestamp": "2026-08-15T14:30:00Z"
+}
