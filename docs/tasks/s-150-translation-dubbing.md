@@ -1962,12 +1962,20 @@ Required passes: 3 (`41` → `Med-high`)
 
 ### Unit coverage certification
 
+**Superseded note (2026-08-15):** `S-150-T2c-iv-a` retired the
+`SubtitlePostReadyRoute` mechanism this task introduced, per the owner's
+2026-08-13 rejection of the unused legacy-review compatibility path referenced
+above. HP-1, HP-2, and EC-1 describe route behavior that no longer exists;
+their evidence below is repointed to the closest surviving/successor tests so
+this certification stays live rather than citing deleted functions. HP-3 and
+EC-2 (UUIDv5 identity) are unaffected and unchanged.
+
 | Case ID | Type | Behavior | Unit test evidence | Result |
 |---|---|---|---|---|
-| HP-1 | Happy path | Legacy JSON defaults to the legacy route and `SubtitleJob::new` remains legacy | `crates/jobs/src/subtitle_job.rs::tests::legacy_subtitle_job_json_defaults_to_legacy_route` | passed |
-| HP-2 | Happy path | Localization serialization and translation payload retain versioned route and full UUID identity | `crates/jobs/src/subtitle_job.rs::tests::localization_subtitle_job_serializes_its_versioned_route`; `crates/jobs/src/subtitle_job.rs::tests::translation_job_serializes_the_full_durable_identity`; `crates/jobs/src/subtitle_job.rs::tests::in_memory_translation_queue_records_jobs` | passed |
+| HP-1 | Happy path | (superseded by T2c-iv-a) No route field exists; legacy JSON carrying a stray `post_ready_route` key still deserializes, ignored | `crates/jobs/src/subtitle_job.rs::tests::legacy_json_with_stray_post_ready_route_deserializes_ok` | passed |
+| HP-2 | Happy path | (superseded by T2c-iv-a) The legacy/localization route distinction was retired; every `SubtitleJob` serializes with only asset/project/target_language, and `TranslationJob` retains its full UUID identity | `crates/jobs/src/subtitle_job.rs::tests::subtitle_job_serializes_without_post_ready_route`; `crates/jobs/src/subtitle_job.rs::tests::translation_job_serializes_the_full_durable_identity`; `crates/jobs/src/subtitle_job.rs::tests::in_memory_translation_queue_records_jobs` | passed |
 | HP-3 | Happy path | The same subtitle UUID derives a stable initial translation request ID | `crates/jobs/src/subtitle_job.rs::tests::initial_translation_request_id_is_deterministic_and_canonical` | passed |
-| EC-1 | Edge case | Unknown route strings fail deserialization rather than selecting a fallback | `crates/jobs/src/subtitle_job.rs::tests::unknown_subtitle_post_ready_route_fails_deserialization` | passed |
+| EC-1 | Edge case | (superseded by T2c-iv-a) The route field itself was retired, so there is no unknown-route case; the field's absence has no observable deserialization effect | `crates/jobs/src/subtitle_job.rs::tests::legacy_json_with_stray_post_ready_route_deserializes_ok` | passed |
 | EC-2 | Edge case | Initial derivation uses the canonical lowercase hyphenated UUID name | `crates/jobs/src/subtitle_job.rs::tests::initial_translation_request_id_is_deterministic_and_canonical` | passed |
 
 ### Owner final verification
@@ -2345,10 +2353,15 @@ Required passes: 2 (`34` → `Moderate`)
 
 ### Unit coverage certification
 
+**Superseded note (2026-08-15):** `S-150-T2c-iv-a` retired the
+`SubtitlePostReadyRoute` mechanism this extraction preserved byte-for-byte at
+the time. EC-1's route-Serde evidence is repointed to the closest surviving
+successor test; its re-export evidence is unaffected and unchanged.
+
 | Case ID | Type | Behavior | Unit test evidence | Result |
 |---|---|---|---|---|
 | HP-1 | Happy path | Subtitle/translation contracts and deterministic UUIDv5 request IDs preserve behavior after extraction | `crates/jobs/src/subtitle_job.rs::tests::translation_job_serializes_the_full_durable_identity`; `crates/jobs/src/subtitle_job.rs::tests::initial_translation_request_id_is_deterministic_and_canonical` | passed |
-| EC-1 | Edge case | Root re-exports retain existing callers and legacy/invalid route Serde behavior | `crates/jobs/src/lib.rs::tests::subtitle_job_contract_remains_publicly_reexported`; `crates/jobs/src/subtitle_job.rs::tests::legacy_subtitle_job_json_defaults_to_legacy_route`; `crates/jobs/src/subtitle_job.rs::tests::unknown_subtitle_post_ready_route_fails_deserialization` | passed |
+| EC-1 | Edge case | Root re-exports retain existing callers; (superseded by T2c-iv-a) legacy-JSON Serde tolerance is now proven by the forward-compat test | `crates/jobs/src/lib.rs::tests::subtitle_job_contract_remains_publicly_reexported`; `crates/jobs/src/subtitle_job.rs::tests::legacy_json_with_stray_post_ready_route_deserializes_ok` | passed |
 
 ### Owner final verification
 
@@ -2369,8 +2382,8 @@ Required passes: 2 (`34` → `Moderate`)
 **Effort:** M (exact RRI 40 — Moderate; recomputed 2026-08-15 for the revised scope)
 **Decomposed from:** S-150-T2c-iv
 **Depends on:** S-150-T2c-iv-a0
-**Status:** [ ] Implemented — awaiting owner final verification (2026-08-15;
-cloud-takeover operational — egress blocks Ollama in remote session)
+**Status:** [x] Done (2026-08-15; cloud-takeover operational — egress blocks
+Ollama in remote session)
 
 **RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`; exact recompute
 2026-08-15 via `python3 scripts/rri.py --touches crates/jobs/src/subtitle_job.rs
@@ -2476,6 +2489,8 @@ policy-blocked here (see phase-1 review evidence above).
 
 ### Implementation record
 
+**RRI:** 40 / Moderate
+
 **Route:** cloud-takeover (operational — egress policy blocks Ollama in this
 remote session; not a capability escalation). Implementer: primary agent
 (orchestrator direct).
@@ -2486,7 +2501,7 @@ HP-1 and EC-1 covered by tests, no findings. `disposition_divergence: none`.
 
 **Commit:** `774573e` on `claude/s-150-seguimiento-lptyjj`
 
-- Review artifact: docs/audit/gemma-evidence/S-150-T2c-iv-a-phase2.json
+- Review artifact: docs/audit/gemma-evidence/S-150-T2c-iv-a.json
 
 ### Reflection log
 
@@ -2551,10 +2566,10 @@ inequality.
 
 ### Owner final verification
 
-- Owner: `pending`
-- Date: `pending`
-- Statement: pending
-- Commands run: `pending`
+- Owner: kruk.matias@gmail.com
+- Date: 2026-08-15
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
+- Commands run: `cargo test -p dubbridge-jobs`; `cargo check --workspace`
 
 ---
 

@@ -249,13 +249,19 @@ that exist in storage, and enqueues complete S-150 generations accumulated durin
 the transition. This avoids both tuple collisions and a window where a null-bound
 decision could authorize a regenerated artifact set.
 
-`SubtitleJob` therefore has one active post-ready meaning and carries only the
-asset/project identity needed by subtitle processing and localization fan-out. T2c
-retires the temporary `post_ready_route`, both route wire values, and the
-review-only free-form `target_language` field. After subtitle readiness, Rust
-resolves every current `target_languages` row, derives the initial request ID from
-the exact persisted `Subtitle` artifact as specified in D5, persists durable fan-out,
-and delivers eligible translation jobs without calling `prepare_review_post_ready`.
+`SubtitleJob` therefore has one active post-ready meaning: localization fan-out.
+`T2c-iv-a` retired the temporary `post_ready_route` field and both route wire
+values (`crates/jobs/src/subtitle_job.rs`, `crates/jobs/src/lib.rs`). Repository
+verification during that task's phase-1 re-review corrected an earlier premise
+here: `target_language` is not review-only — it is populated from
+`target_language_repo` at enqueue time and read in production by
+`apps/worker-runner/src/subtitle_runtime.rs`. Its removal is deferred to
+`T2c-vi-a`, which replaces every runtime call site that depends on it once the
+durable fan-out service resolves per-target languages independently of the job
+payload. After subtitle readiness, Rust resolves every current `target_languages`
+row, derives the initial request ID from the exact persisted `Subtitle` artifact
+as specified in D5, persists durable fan-out, and delivers eligible translation
+jobs without calling `prepare_review_post_ready`.
 The generation claim persists the operation, source artifact, and request ID; no
 inference from project age, row presence, or feature timing is allowed.
 
