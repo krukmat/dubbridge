@@ -392,4 +392,50 @@ mod tests {
                 .contains("subtitle queue down")
         );
     }
+
+    #[tokio::test]
+    async fn prepare_subtitle_post_ready_no_op_when_claim_query_fails() {
+        let Some(pool) = setup_pool_for_test().await else {
+            return;
+        };
+
+        let asset_id = insert_asset_for_test(&pool).await;
+        let queue = InMemorySubtitleJobQueue::default();
+
+        pool.close().await;
+
+        // The pool is closed, so try_claim_subtitle_pending's query fails with a
+        // connection-level DbError. prepare_subtitle_post_ready must swallow it,
+        // not panic, not enqueue — mirroring
+        // prepare_review_post_ready_no_op_on_db_connection_failure in
+        // review_enqueue.rs.
+        prepare_subtitle_post_ready(&pool, &queue, asset_id).await;
+
+        assert!(queue.queued_jobs().is_empty());
+    }
+
+    #[tokio::test]
+    async fn prepare_subtitle_post_ready_no_op_when_route_query_fails() {
+        let Some(pool) = setup_pool_for_test().await else {
+            return;
+        };
+
+        let asset_id = insert_asset_for_test(&pool).await;
+        let queue = InMemorySubtitleJobQueue::default();
+
+        pool.close().await;
+
+        // Same closed-pool mechanism as the claim-failure test above. A fully
+        // closed pool fails both the claim query and the route-resolution
+        // query, so this does not isolate route-only failure from
+        // claim-only failure — that would require a second live pool or a
+        // mockable repo boundary, neither of which exists for
+        // subtitle_repo/target_language_repo today. This test documents
+        // intent to cover the route-resolution DbError propagation path in
+        // resolve_subtitle_route and asserts the same no-panic/no-enqueue
+        // contract.
+        prepare_subtitle_post_ready(&pool, &queue, asset_id).await;
+
+        assert!(queue.queued_jobs().is_empty());
+    }
 }

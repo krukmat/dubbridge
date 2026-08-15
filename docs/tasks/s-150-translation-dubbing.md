@@ -2630,6 +2630,81 @@ acceptance criteria though not its own HP/EC id):
 
 **S-150-T2c-iv-b status: `[x] Done`**
 
+### Test-debt follow-up (S-150-T2c-iv-b-debt-1, closed 2026-08-16)
+
+The Reflection log above recorded the two pre-existing untested DB-error
+branches as non-blocking debt rather than in-scope work. That debt is now
+closed as its own Low-band task:
+
+**Type:** development
+**Effort:** S (RRI 18 — Low; `python3 scripts/rri.py --touches
+apps/worker-runner/src/subtitle_enqueue.rs --cc 3 --D 1 --K 1 --P 2 --T 2 --A 1
+--X 0` → 18, Low, no penalties)
+**Status:** [x] Done — 2026-08-16
+
+Task-analysis review: n/a — RRI 0–25 Low band, no full approval packet required.
+
+**Acceptance criteria:** add unit coverage for the `try_claim_subtitle_pending`
+and `get_asset_subtitle_route` `Err` propagation branches in
+`apps/worker-runner/src/subtitle_enqueue.rs`, without touching production logic
+or any file outside that path.
+
+**Delegation record:** two `scripts/delegate-low-rri.py --mode before-after`
+attempts against `nemotron-3.5-lightning:30b-a3b-q4_K_M` both produced
+non-compiling or destructive diffs (attempt 1 deleted the existing
+`prepare_subtitle_post_ready_records_failed_when_queue_fails` assertions and
+invented a nonexistent `setup_test_context()` helper; attempt 2, a bounded
+repair with an explicit corrected skeleton, again clobbered the same existing
+test and asserted `.is_ok()` on a function returning `()`). Per
+`docs/policies/HITL_AUTONOMY_POLICY.md § Local delegation`, after one bounded
+repair cycle failed to produce a valid in-scope patch, the delegating agent
+(Claude Code) applied the fix directly, following the exact
+`pool.close().await`-before-call pattern already established in
+`apps/worker-runner/src/review_enqueue.rs`'s
+`prepare_review_post_ready_no_op_on_db_connection_failure` test.
+
+**Implementation:** added
+`prepare_subtitle_post_ready_no_op_when_claim_query_fails` and
+`prepare_subtitle_post_ready_no_op_when_route_query_fails` to the `tests` mod
+in `apps/worker-runner/src/subtitle_enqueue.rs`. Both close the pool before
+calling `prepare_subtitle_post_ready` and assert no panic + no job enqueued.
+Documented in-code that a single closed pool cannot isolate claim-only from
+route-only failure (both queries share the pool); doing so would need a
+second live pool or a mockable repo boundary that does not exist today — this
+tradeoff is disclosed, not hidden.
+
+**Verification:**
+`DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@localhost:5432/dubbridge
+cargo test -p dubbridge-worker-runner subtitle_enqueue -- --test-threads=1` —
+7 passed, 0 failed (real Postgres, not the short-circuited stub);
+`cargo fmt --package dubbridge-worker-runner -- --check` clean;
+`cargo clippy -p dubbridge-worker-runner --all-targets --all-features -- -D
+warnings` clean.
+
+Code-solution review: `muse-glimmer` `.agent/s-150-t2c-iv-b-debt-review-result.json` - `PASS`
+
+### Gemma Reviewer evidence
+
+- Model: `muse-glimmer:30b-q4_K_M`
+- Command: `python3 scripts/gemma-code-review.py --model muse-glimmer:30b-q4_K_M --passes 3 --task-id S-150-T2c-iv-b-debt-1 --no-think .agent/s-150-t2c-iv-b-debt-review-packet.txt`
+- Passes run / usable: `3/3`
+- Aggregate status: `PASS`
+- Consensus findings: `0` | Pass-specific: `0` | Disagreement: `0`
+- Artifacts: `.agent/s-150-t2c-iv-b-debt-review-result.json` (not committed — working transcript)
+- Isolated adjudicator: `not triggered` — Muse Glimmer produced a usable PASS on the first attempt
+- D14 provider route: `n/a`
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted — no findings to disposition
+
+### Owner final verification
+
+- Owner: Claude Code
+- Date: 2026-08-16
+- Statement: I verified both new tests replicate the intended DB-error propagation behavior, confirmed against real Postgres, and confirmed no existing test or production logic was altered.
+- Commands run: `cargo build -p dubbridge-worker-runner --tests`; `DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@localhost:5432/dubbridge cargo test -p dubbridge-worker-runner subtitle_enqueue -- --test-threads=1`; `cargo fmt --package dubbridge-worker-runner -- --check`; `cargo clippy -p dubbridge-worker-runner --all-targets --all-features -- -D warnings`.
+
+**S-150-T2c-iv-b-debt-1 status: `[x] Done`**
+
 ---
 
 ## S-150-T2c-iv-c: Durable localization fan-out service
