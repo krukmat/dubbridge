@@ -22,8 +22,10 @@ slice: S-150
 > the owner rejected the unused legacy-review compatibility premise; T2c-iv was
 > rescored at RRI 63 and decomposed into contract retirement, producer cutover,
 > and durable fan-out children, followed by a narrowed Redis adapter task and a
-> decomposed runtime/cleanup cutover. T2c-iv-a0 is now the next executable task
-> after a fresh RRI, phase-1 review, and approval. The
+> decomposed runtime/cleanup cutover. T2c-iv-a0, T2c-iv-a (contract cutover),
+> and T2c-iv-b (producer cutover) are complete as of 2026-08-15. T2c-iv-c
+> (durable fan-out service) is now the next executable task after a fresh RRI,
+> phase-1 review, and approval. The
 > plan-review conditions recorded for this slice remain in
 > force, especially deterministic
 > initial generation-request identity, migration parity, review cutover, and
@@ -310,9 +312,9 @@ inference from project age, row presence, or feature timing is allowed.
 | T2c-iii | Translation dispatch acknowledgement transition | development | 43 / L Med-high | Done 2026-08-13; exact guarded `pending` to `acknowledged` transition, live PostgreSQL state matrix 11/11, 94.69% relevant line coverage, and Gemma phase-2 PASS. |
 | T2c-iv | Legacy-route retirement and durable target fan-out | development parent | 63 / L Complex | Replanned and decomposed into T2c-iv-a0/a/b/c; not executable. |
 | T2c-iv-a0 | Extract SubtitleJob below the local-file budget | development | 34 / M Moderate | Done 2026-08-13; cloud-authored, behavior-preserving extraction leaves a 449-line re-exporting `lib.rs` and a 286-line job-contract module; focused coverage 98.58%, Gemma phase-2 PASS. |
-| T2c-iv-a | Retire the legacy SubtitleJob payload contract | development | 40 / M Moderate | Contract cutover implemented 2026-08-13 (two-file `jobs` scope; Gemma phase-2 PASS); worker producer/runtime integration remains separately sequenced in T2c-iv-b and T2c-vi-a. Workspace-compile compatibility patch added 2026-08-15 in `subtitle_enqueue.rs`/`subtitle_runtime.rs` to keep `cargo check --workspace` green; not a substitute for T2c-iv-b/T2c-vi-a's own closure (see T2c-iv-a ledger entry). |
-| T2c-iv-b | Cut subtitle producer over to the single contract | development | provisional 32 / M Moderate | Depends on T2c-iv-a; approval pending. |
-| T2c-iv-c | Durable localization fan-out service | development | provisional 49 / L Med-high | Depends on T2c-ii/iii and T2c-iv-b; approval pending. |
+| T2c-iv-a | Retire the legacy SubtitleJob payload contract | development | 40 / M Moderate | Contract cutover implemented 2026-08-13 (two-file `jobs` scope; Gemma phase-2 PASS); worker producer cutover closed via T2c-iv-b 2026-08-15; runtime integration remains sequenced in T2c-vi-a. Workspace-compile compatibility patch added 2026-08-15 in `subtitle_enqueue.rs`/`subtitle_runtime.rs` to keep `cargo check --workspace` green; the `subtitle_runtime.rs` half is still not a substitute for T2c-vi-a's own closure (see T2c-iv-a ledger entry). |
+| T2c-iv-b | Cut subtitle producer over to the single contract | development | 32 / M Moderate | Done 2026-08-15; zero-diff formal closure of the 2026-08-15 compat patch — local-first `qwen3.6:35b-a3b` run confirmed no further edit needed, real-Postgres test run (5/5 passed), Gemma phase-1/phase-2 review (phase-2: FINDINGS-ACKED, 1 pre-existing out-of-scope minor finding). |
+| T2c-iv-c | Durable localization fan-out service | development | provisional 49 / L Med-high | Depends on T2c-ii/iii and T2c-iv-b (now done); approval pending. |
 | T2c-v | Redis translation queue adapter | development | 50 / L Med-high | Depends on T2c-i/iii/iv-c; approval pending. |
 | T2c-vi | Runtime cutover and legacy review retirement | development parent | Complex surface | Decomposed into T2c-vi-a/b; not executable. |
 | T2c-vi-a | Integrate localization fan-out into subtitle runtime | development | provisional 51 / L Med-high | Depends on T2c-iv-c/v; approval pending. |

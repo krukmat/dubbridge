@@ -2374,9 +2374,9 @@ Required passes: 2 (`34` → `Moderate`)
 **Effort:** M (RRI 40 — Moderate; recomputed 2026-08-13)
 **Decomposed from:** S-150-T2c-iv
 **Depends on:** S-150-T2c-iv-a0
-**Status:** [~] Contract cutover implemented 2026-08-13 — integration remains
-pending on the separately sequenced `S-150-T2c-iv-b` producer and `S-150-T2c-vi-a`
-runtime cuts.
+**Status:** [~] Contract cutover implemented 2026-08-13 — `S-150-T2c-iv-b`
+(producer cutover) closed `[x] Done` 2026-08-15; integration remains pending
+on the separately sequenced `S-150-T2c-vi-a` runtime cut.
 
 **RRI evidence:** `docs/audit/s-150-t2c-iv-a-rri.md` (exact 40; decomposition context: `docs/audit/s-150-t2c-decomposition-rri.md`)
 
@@ -2462,24 +2462,30 @@ again:
   `S-150-T2c-vi-a` still require their own RRI, approval, and band-routed
   review before their `Status` checkboxes can move.
 
+> **Addendum (2026-08-15, later same day):** `S-150-T2c-iv-b` subsequently ran
+> its own full closure (RRI, phase-1/phase-2 review, Reflection, coverage
+> cert, owner verification) under its own heading below and is now
+> `[x] Done`. `S-150-T2c-vi-a` remains `[ ] Planned` — this compat patch's
+> `subtitle_runtime.rs` change is still not that task's design and does not
+> satisfy it.
+
 ---
 
 ## S-150-T2c-iv-b: Cut the subtitle producer over to the single contract
 
 **Type:** development
-**Effort:** M (provisional RRI 32 — Moderate; recompute before presentation)
+**Effort:** M (RRI 32 — Moderate; recomputed 2026-08-15)
+**RRI:** 32 → Moderate (26–40)
 **Decomposed from:** S-150-T2c-iv
 **Depends on:** S-150-T2c-iv-a
-**Status:** [ ] Planned — approval pending
+**Status:** [x] Done — 2026-08-15
 
-> **Note (2026-08-15):** `apps/worker-runner/src/subtitle_enqueue.rs` already
-> carries a transitional compatibility patch (see T2c-iv-a's "Workspace-compile
-> compatibility patch" section) that drops the removed `target_language`
-> constructor argument so the workspace compiles. This task's own RRI,
-> approval, phase reviews, Reflection log, coverage certification, and owner
-> verification are still outstanding before its `Status` can change.
+**RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md` (provisional 32);
+recomputed exact at presentation: `python3 scripts/rri.py --touches
+apps/worker-runner/src/subtitle_enqueue.rs --cc 3 --D 2 --K 3 --P 3 --T 3 --A 1
+--X 1 --platform dubbridge` → 32, Moderate, no penalties.
 
-**RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
+Task-analysis review: `gemma` `docs/audit/s-150-t2c-iv-b-phase1-review.json` - `PASS`
 
 **Happy paths considered:**
 
@@ -2500,9 +2506,129 @@ review compatibility. Preserve the existing pending-claim idempotency boundary.
 **Evidence to emit:** Exact RRI, phase reviews, producer/idempotency tests,
 Reflection log, unit coverage certification, and owner verification.
 
-**Status artifacts affected:** This ledger and the S-150 plan.
+**Status artifacts affected:** This ledger and the S-150 plan (`docs/plan/roadmap.md`).
 
 **Stop condition:** Stop after producer tests; do not change post-ready runtime.
+
+### Implementation evidence
+
+A 2026-08-15 workspace-compile compatibility patch (recorded under T2c-iv-a,
+commit `fae2dd2`) had already changed `try_enqueue_subtitle` to
+`SubtitleJob::new(asset_id.0, route.project_id.0)` — the single, route-free
+constructor — so this task's content was already in place before its own RRI
+was computed. Per the Moderate-band local-first default
+(`docs/policies/HITL_AUTONOMY_POLICY.md § Local-first implementation`), the
+formal implementation step still ran through the local-first surface rather
+than being self-verified by the primary agent:
+
+- Local-first run: `scripts/local-agent/run_local_task.py`, implementer
+  `qwen3.6:35b-a3b`, disposable worktree, `allowed_paths:
+  [apps/worker-runner/src/subtitle_enqueue.rs]`. Transcript:
+  `.agent/s-150-t2c-iv-b-local-run.json`. Result: `status: success`, turn 1
+  called `finish` directly — `scope_check: {has_diff: false, in_scope: true,
+  offending_paths: []}`, `format_result: {passed: true}`, acceptance command
+  (`cargo test -p dubbridge-worker-runner subtitle_enqueue`) `ok: true,
+  returncode: 0`. No repair attempts needed.
+- Independent re-verification against real Postgres (the local-agent's
+  acceptance run used its own worktree DB state; re-run directly against
+  `infra/local/docker-compose.yml`'s `postgres` service for durable evidence):
+  `DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@localhost:5432/dubbridge
+  cargo test -p dubbridge-worker-runner subtitle_enqueue -- --test-threads=1`
+  → 5 passed, 0 failed, 1.60s (non-zero wall time confirms real DB I/O, not a
+  short-circuited `setup_pool_for_test` early return).
+- `cargo fmt -p dubbridge-worker-runner --check`: clean.
+- `cargo clippy -p dubbridge-worker-runner --all-targets -- -D warnings`: clean.
+- `cargo llvm-cov -p dubbridge-worker-runner -- subtitle_enqueue --test-threads=1`
+  (scoped run): `subtitle_enqueue.rs` 86.76% lines / 88.04% regions. Missed
+  lines are (a) transcription-side code sharing the file (out of scope) and
+  (b) two pre-existing untested DB-error branches in the subtitle path
+  (`try_claim_subtitle_pending` map_err, `get_asset_subtitle_route` map_err)
+  that predate this task and are unrelated to the route-free contract change
+  — see Reflection Pass 2 and Peer Reviewer evidence below.
+
+Code-solution review: `gemma` `docs/audit/gemma-evidence/S-150-T2c-iv-b.json` - `FINDINGS-ACKED`
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma` (`gemma4:26b-a4b-it-qat`)
+- Command: `python3 scripts/gemma-code-review.py .agent/s-150-t2c-iv-b-phase2-packet.txt --model gemma4:26b-a4b-it-qat --passes 3 --task-id S-150-T2c-iv-b --num-ctx 65536 --no-think`
+- Artifact: `.agent/s-150-t2c-iv-b-phase2-review-result.json`; receipt
+  `docs/audit/gemma-evidence/S-150-T2c-iv-b.json`
+- Verdict: `FINDINGS` (3/3 passes succeeded; 1 consensus finding, 1
+  likely-false-positive bucket item that is actually a confirmatory note, not
+  a defect)
+- Findings: consensus — `try_claim_subtitle_pending`'s `map_err` branch
+  (line 98 in the reviewed packet excerpt) is untested; reviewer itself
+  classified it `scope: out-of-scope`, `severity: minor`, matching the
+  primary agent's own Reflection Pass 2 finding independently.
+- Muse Glimmer fallback: not triggered — reason: Gemma responded `stop` with
+  a parseable structured result on all 3 passes.
+- D14 fallback: not triggered — reason: n/a.
+- D14 provider route: n/a.
+- disposition_divergence: `none` — reviewer and primary agent independently
+  reached the identical disposition (acknowledge, no revision, out of scope).
+- Primary-agent disposition: accepted as informational; no revision — the
+  finding names a pre-existing DB-error branch not introduced or touched by
+  this task and not covered by its acceptance criteria (HP-1/EC-1/idempotency/
+  route-free constructor). Expanding coverage of that branch is out of this
+  task's scope; left as non-blocking test debt.
+
+### Reflection log
+
+Required passes: 2 (`32` → `Moderate`)
+
+#### Pass 1
+
+- **Draft verdict:** Current implementation (zero-diff; confirmed via the
+  local-first run) already builds `SubtitleJob` via the single,
+  route-free constructor and the three named tests
+  (`prepare_subtitle_post_ready_enqueues_first_target_in_c_order`,
+  `prepare_subtitle_post_ready_is_idempotent_after_pending_claim`,
+  `prepare_subtitle_post_ready_records_failed_when_route_missing`) exist and
+  pass against real Postgres.
+- **Critique findings:** No issues found against HP-1, EC-1, or the
+  idempotency boundary. `resolve_subtitle_route` still resolves
+  `target_language` internally (needed for C-order target selection), but it
+  is never passed into `SubtitleJob::new`, satisfying "do not select or
+  serialize a target language for review compatibility."
+- **Revisions applied:** None.
+
+#### Pass 2
+
+- **Draft verdict:** `cargo fmt`/`clippy` clean; scoped `cargo llvm-cov` shows
+  86.76% lines / 88.04% regions on `subtitle_enqueue.rs`.
+- **Critique findings:** Two pre-existing, untested DB-error branches —
+  `try_claim_subtitle_pending` map_err (lines 93–95) and
+  `get_asset_subtitle_route` map_err (lines 131–133) — neither introduced by
+  this task nor related to the route-free `SubtitleJob` contract; both
+  predate the 2026-08-15 compatibility patch.
+- **Revisions applied:** None — adding tests for those pre-existing branches
+  is outside this task's acceptance criteria (scope-creep); recorded as
+  non-blocking test debt instead. Gemma Reviewer's phase-2 pass reached the
+  same disposition independently (see Peer Reviewer evidence above).
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | Pending subtitle claim enqueues exactly one job with the owning asset/project identity via the single constructor | `apps/worker-runner/src/subtitle_enqueue.rs::tests::prepare_subtitle_post_ready_enqueues_first_target_in_c_order` | passed |
+| EC-1 | Edge case | Missing asset-to-project routing fails closed, records `SubtitleStatus::Failed`, enqueues no job | `apps/worker-runner/src/subtitle_enqueue.rs::tests::prepare_subtitle_post_ready_records_failed_when_route_missing` | passed |
+
+Supplementary (idempotency boundary preserved, explicitly required by the
+acceptance criteria though not its own HP/EC id):
+`apps/worker-runner/src/subtitle_enqueue.rs::tests::prepare_subtitle_post_ready_is_idempotent_after_pending_claim`
+— passed.
+
+### Owner final verification
+
+- Owner: Claude Code
+- Date: 2026-08-15
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior, confirmed against real Postgres (not a short-circuited test-pool stub).
+- Commands run: `DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@localhost:5432/dubbridge cargo test -p dubbridge-worker-runner subtitle_enqueue -- --test-threads=1`; `cargo fmt -p dubbridge-worker-runner --check`; `cargo clippy -p dubbridge-worker-runner --all-targets -- -D warnings`; `cargo llvm-cov -p dubbridge-worker-runner -- subtitle_enqueue --test-threads=1`.
+
+- Review artifact: `docs/audit/gemma-evidence/S-150-T2c-iv-b.json`
+
+**S-150-T2c-iv-b status: `[x] Done`**
 
 ---
 
