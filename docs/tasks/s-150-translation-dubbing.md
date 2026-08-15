@@ -2363,89 +2363,116 @@ Required passes: 2 (`34` → `Moderate`)
 
 ---
 
-## S-150-T2c-iv-a: Retire the legacy SubtitleJob payload contract
+## S-150-T2c-iv-a: Retire the legacy SubtitleJob post-ready route
 
 **Type:** development
-**Effort:** M (exact RRI 38 — Moderate; recomputed 2026-08-15)
+**Effort:** M (exact RRI 40 — Moderate; recomputed 2026-08-15 for the revised scope)
 **Decomposed from:** S-150-T2c-iv
 **Depends on:** S-150-T2c-iv-a0
-**Status:** [!] Blocked — phase-1 review returned BLOCKED; scope revision required
-before presentation
+**Status:** [ ] Planned — approval pending (scope revised 2026-08-15; phase-1
+re-review PASS)
 
 **RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`; exact recompute
 2026-08-15 via `python3 scripts/rri.py --touches crates/jobs/src/subtitle_job.rs
---cc 4 --D 3 --K 3 --P 4 --T 3 --A 1 --X 2` → **38, Moderate**, no penalties,
-decomposition not triggered. The provisional estimate is confirmed exact.
+--touches crates/jobs/src/lib.rs --cc 4 --D 3 --K 3 --P 4 --T 3 --A 1 --X 2` →
+**40, Moderate** (band ceiling), no penalties, decomposition not triggered.
+`lib.rs` added to the touched-file set per finding F1 below.
 
-**Task-analysis review:** `d14 docs/audit/s-150-t2c-iv-a-phase1-review.json -
-BLOCKED`
+**Task-analysis review:** `d14 docs/audit/s-150-t2c-iv-a-phase1-review-v2.json -
+PASS` (supersedes the first review,
+`docs/audit/s-150-t2c-iv-a-phase1-review.json`, BLOCKED)
 
 Reviewer routing: the RRI 26–55 chain (`gemma4:26b-a4b-it-qat` →
-`muse-glimmer:30b-q4_K_M` → D14) resolved to D14 because the session ran in an
-ephemeral remote container with no local stack — no `ollama` binary, no listener
-on `127.0.0.1:11434`, `OLLAMA_HOST` unset, 15 GB RAM and no GPU, so both band
-models exceed available memory. D14 ran same-provider degraded with context
-isolation after no cross-provider reviewer was reachable. `disposition_divergence:
-none` — the primary agent had independently reached the same findings against the
-working tree before the D14 run.
+`muse-glimmer:30b-q4_K_M` → D14) resolved to D14 again on the re-review — this
+run confirmed `ollama.com` and `registry.ollama.ai` are refused at CONNECT by the
+session's egress policy (403, `connect_rejected`), so the band models are
+structurally unreachable, not merely stalled. No cross-provider CLI was present
+(`command -v codex` empty), so D14 ran same-provider degraded with context
+isolation, as it did on the first review. `disposition_divergence: none`.
 
-**Blocking findings (must be resolved before this task is presented):**
+**Scope correction (resolves the first review's BLOCKED verdict):** the original
+acceptance criteria assumed `target_language` was a review-only field this task
+should remove. Repository verification contradicts that: `SubtitleJob::new` is
+populated from `target_language_repo` at enqueue time
+(`apps/worker-runner/src/subtitle_enqueue.rs`), and
+`apps/worker-runner/src/subtitle_runtime.rs:122` reads it in production post-ready
+logic outside this task's scope. This task now removes only the post-ready-route
+mechanism and **keeps `target_language` and the existing 3-argument `new()`
+constructor unchanged**; their removal is deferred to T2c-vi-a, which already
+plans to replace every runtime call site that depends on them once the durable
+fan-out service resolves per-target languages independently of the job payload.
 
-- **F1 — `crates/jobs/src/lib.rs` is missing from scope.** It re-exports
-  `SubtitlePostReadyRoute` (line 12) and calls the 3-argument `SubtitleJob::new`
-  at lines 277 and 356 (the latter inside the regression test T2c-iv-a0 added).
-  Collapsing the constructor breaks `cargo check -p dubbridge-jobs` within the
-  declared scope, so "`subtitle_job.rs` only" is not achievable as written.
-- **F2 — worker-runner stays non-compiling across four tasks.**
-  `apps/worker-runner/src/subtitle_runtime.rs:122` reads `job.target_language` in
-  production post-ready logic, and no task before T2c-vi-a is scoped to touch it.
-  Landing T2c-iv-a → T2c-iv-b → T2c-iv-c → T2c-v in sequence leaves the binary
-  broken throughout, conflicting with the repository rule that no commit may land
-  with broken tests.
-- **F3 — `apps/worker-runner/src/transcription_runtime.rs:508` has no owner.** It
-  asserts on `target_language` and is not assigned to any task in the current T2c
-  decomposition, including T2c-vi-a.
-- **F4 — `apps/worker-runner/src/subtitle_runtime_tests.rs`** uses the 3-argument
-  constructor at lines 166, 217, 284, 334 and 357. Covered by T2c-vi-a's declared
-  paths, but only after three intermediate tasks land, so F2's window applies.
+That resolves the first review's F2–F4 without a compatibility shim: a
+repository-wide grep for `SubtitlePostReadyRoute`, `post_ready_route`, and
+`new_s150_localization` returns matches only in `crates/jobs/src/subtitle_job.rs`
+and `crates/jobs/src/lib.rs`; every `SubtitleJob::new(..)` call site outside those
+two files uses the unaffected 3-argument form. F1 is resolved by adding `lib.rs`
+to scope, below.
 
-**Required resolution (owner decision, then ledger revision):** expand this
-task's scope to include `crates/jobs/src/lib.rs`; choose explicitly between
-bundling T2c-iv-a with T2c-iv-b plus the runtime fixes into one workspace-green
-change, or introducing a documented compatibility shim that keeps the workspace
-compiling until T2c-vi-a; and assign `transcription_runtime.rs` to a concrete
-task.
+- **F1 — resolved.** `crates/jobs/src/lib.rs` is now in scope; the only edit
+  required there is removing the dead `SubtitlePostReadyRoute` name from the
+  `pub use subtitle_job::{...}` re-export list (line 12). The file's own
+  `SubtitleJob::new(..)` test calls (originally lines 277, 356) are 3-argument
+  and need no change.
+- **F2, F3, F4 — no longer apply.** None of `apps/worker-runner/src/
+  subtitle_runtime.rs`, `apps/worker-runner/src/transcription_runtime.rs`, or
+  `apps/worker-runner/src/subtitle_runtime_tests.rs` reference
+  `post_ready_route`/`SubtitlePostReadyRoute`/`new_s150_localization`; all are
+  untouched by this diff and keep compiling.
 
 **Happy paths considered:**
 
-- **HP-1:** A new `SubtitleJob` serializes with only `asset_id` and `project_id`;
-  its sole post-ready meaning is localization fan-out.
+- **HP-1:** A `SubtitleJob` built with `new(asset_id, project_id, target_language)`
+  serializes without a `post_ready_route` field; its sole post-ready meaning is
+  localization fan-out.
 
 **Edge cases considered:**
 
-- **EC-1:** Deserializing a job without the removed route and target-language
-  fields succeeds; no default can silently select legacy review behavior.
+- **EC-1:** Deserializing a job JSON that still carries a stray legacy
+  `post_ready_route` key (already-queued payload shape) succeeds and is ignored;
+  no default can silently select legacy review behavior. (D14 advisory A3 below.)
 
-**Acceptance criteria:** Remove `SubtitlePostReadyRoute`, `post_ready_route`,
-`legacy_subtitle_review_v1`, `s150_localization_v1`, and the review-only
-`target_language` field from `SubtitleJob`. Collapse the constructors to one
-asset/project constructor. Preserve `TranslationJob` and deterministic request-ID
-contracts unchanged.
+**Acceptance criteria:** Remove `SubtitlePostReadyRoute`, the `post_ready_route`
+field, its two serde route tags (`legacy_subtitle_review_v1`,
+`s150_localization_v1`), and the `new_s150_localization` constructor from
+`crates/jobs/src/subtitle_job.rs`. Keep `target_language` and the existing
+`new(asset_id, project_id, target_language)` constructor's signature and its three
+preserved-field assignments unchanged — only the `post_ready_route:` line inside
+the constructor body is deleted as a necessary consequence of removing the field
+(D14 advisory A1: do not read "constructor unchanged" as "constructor body
+untouched"). Remove the dead `SubtitlePostReadyRoute` re-export from
+`crates/jobs/src/lib.rs`. Preserve `TranslationJob` and deterministic
+request-ID contracts unchanged. Update `subtitle_job.rs`'s own tests
+(`legacy_subtitle_job_json_defaults_to_legacy_route`,
+`unknown_subtitle_post_ready_route_fails_deserialization`,
+`localization_subtitle_job_serializes_its_versioned_route`) for the removed
+enum/field/constructor; keep a slimmed variant of the legacy-JSON test that
+decodes a stray `post_ready_route` key and asserts the result matches
+`SubtitleJob::new(..)` (D14 advisory A3 — forward-compatibility for
+already-queued payloads, since `SubtitleJob` has no `deny_unknown_fields`).
 
-**Files expected to change:** `crates/jobs/src/subtitle_job.rs` only. **Contested
-by phase-1 finding F1** — `crates/jobs/src/lib.rs` must be added for the crate to
-compile. Do not treat this line as authoritative until the scope revision lands.
+**Files expected to change:** `crates/jobs/src/subtitle_job.rs` and
+`crates/jobs/src/lib.rs` only.
 
-**Evidence to emit:** Exact RRI, phase reviews, serialization tests, Reflection
-log, unit coverage certification, and owner verification.
+**Evidence to emit:** Exact RRI, phase reviews, serialization tests including the
+retained legacy-JSON forward-compatibility case, Reflection log, unit coverage
+certification, and owner verification. Note in the closure record that removing
+`post_ready_route` changes `SubtitleJob`'s derived `PartialEq`/`Eq` semantics —
+two jobs formerly distinguished by route become equal whenever
+asset/project/target_language match (D14 advisory A4; nothing in the current
+codebase relies on route-based inequality).
 
-**Status artifacts affected:** This ledger and the S-150 plan.
+**Status artifacts affected:** This ledger and the S-150 plan. At closure, check
+for stale doc/ledger prose describing `SubtitlePostReadyRoute`/`post_ready_route`/
+`new_s150_localization` as current behavior (D14 advisory A2).
 
 **Stop condition:** Stop after job-contract tests; do not change a producer or
-runtime call site. The preceding extraction keeps this file below 500 lines, so
-this Moderate task uses the default local `qwen3.6:35b-a3b` route — which
-requires a session with a reachable Ollama stack (see the owner directive in
-`CLAUDE.md`, 2026-08-15).
+runtime call site, and do not touch `target_language` or its constructor
+signature. Both in-scope files stay below 500 lines, so this Moderate task uses
+the default local `qwen3.6:35b-a3b` route — which requires a session with a
+reachable Ollama stack (see the owner directive in `CLAUDE.md`, 2026-08-15). This
+session cannot originate that route: `ollama.com`/`registry.ollama.ai` are
+policy-blocked here (see phase-1 review evidence above).
 
 ---
 
