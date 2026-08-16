@@ -26,7 +26,13 @@ Behavioral coverage contract: unit-v1
 > a non-executable parent decomposed into T2c-iv-a0/a/b/c, T2c-v is narrowed to the
 > Redis adapter, and T2c-vi owns final runtime integration and legacy-module
 > retirement. T2c-iv-a0 is the next executable task after its own phase-1 review
-> and approval. The
+> and approval. **T2c-v through T3c were reopened for the S-230 POC on
+> 2026-08-16 (second-pass scope amendment)**, tracked and sequenced as
+> `S-230-T3b` (`docs/tasks/s-230-poc-v1-digitalocean.md`); T4 onward
+> (TTS/dubbing) stays parked and out of scope. T2c-v itself keeps its own
+> separate, unresolved "Redis-topic decision" parking note — confirm that with
+> the owner before its first implementation attempt, independent of the S-230
+> scope question. The
 > plan-review conditions recorded for this slice remain in force, especially the
 > deterministic initial generation-request
 > derivation, and deferred ADR-028 ownership seam for TTS. Tasks T5, T6, and
@@ -2936,6 +2942,15 @@ same local Postgres instance.
 **Decomposed from:** S-150-T2c
 **Depends on:** S-150-T2c-i, S-150-T2c-iii, S-150-T2c-iv-c
 **Status:** [ ] Planned — approval pending
+
+> **S-230 tracking note (2026-08-16, second-pass scope amendment):** this task
+> is child 1 of `S-230-T3b` (`docs/tasks/s-230-poc-v1-digitalocean.md`), which
+> reopened `T2c-v` through `T3c` for the S-230 POC. This task keeps its own
+> full RRI/approval/review/closure requirements unchanged — `S-230-T3b`'s
+> approval does not pre-approve it. It also keeps its own separate,
+> unresolved "Redis-topic decision" parking note (see the plan/ledger status
+> headers above) — confirm that with the owner before starting, independent
+> of the S-230 scope question.
 
 **RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
 

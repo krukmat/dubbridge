@@ -14,8 +14,19 @@ ledger.
 
 ## Slice execution contract
 
-- Product scope is frozen: subtitles + governed review/publication. `S-150` is
-  out of scope for this slice and is not reopened by any task here.
+- Product scope: subtitles + governed review/publication, plus (owner scope
+  amendment, 2026-08-16, second pass) text-only cross-language subtitle
+  translation through the `S-150-T2c-v -> T2c-vi-a -> T2c-vi-b -> T3a -> T3b ->
+  T3c` chain, tracked as `S-230-T3b`. This reverses the original freeze after
+  the owner reviewed and explicitly overrode the plan's own recorded
+  recommendation against it (`docs/plan/s-230-poc-v1-digitalocean.md` § "The
+  market-audience gap, examined"). TTS/dubbed audio (`S-150-T4` through `T7`)
+  remains out of scope and blocked on ADR-028; it is not reopened by any task
+  here. `S-150-T2c-v` also carries its own separate, still-unresolved
+  "Redis-topic decision" parking note (`docs/plan/s-150-translation-dubbing.md`
+  line 31) — this scope amendment authorizes presenting/implementing the chain
+  under S-230, it does not itself resolve that separate parking condition;
+  confirm it with the owner before `S-230-T3b`'s first child task starts.
 - No new application technology. PostgreSQL, Redis, S3-compatible storage,
   ffmpeg, and Python/faster-whisper are all pre-existing dependencies.
 - Every RRI must be computed with `scripts/rri.py` before the task is presented;
@@ -24,11 +35,18 @@ ledger.
   closure checklist (band-routed review, Reflection where the band requires it,
   unit coverage certification, owner verification). T4, T5, T6 are
   config/ops-shaped; their exemption status is decided per task at presentation
-  time, not assumed here.
+  time, not assumed here. T3b is a non-executable parent — each of its six
+  children carries its own full closure checklist under the S-150 ledger; T3b
+  itself is never implemented or marked Done directly.
 - Tasks touching `mobile/` (T7, T7b, T7c) must read the root `DESIGN.md` before
   planning or implementation, per the workflow guide's Analyze step.
 - Task order is a dependency order, not a suggestion. T4 must not start while any
-  of T1–T3 is open.
+  of T1–T3 is open. **T3b is the one exception to strict table-position
+  ordering:** despite sitting between T3 and T4 in the index below, it is an
+  independent parallel track (`Depends on: T0` only) and is explicitly excluded
+  from T4's gate — T4 does not wait on it. T4/T5/T6 each carry a conditional
+  (non-blocking) scope addition if T3b's children finish before they run; see
+  each task's own card and `S-230-T3b` §"Downstream coupling."
 
 ## Task index
 
@@ -39,6 +57,7 @@ ledger.
 | T1b | API preparation queue bound to Redis | development | M | T0 | [ ] Planned |
 | T2 | Migration runner in the production path | development | M | T0 | [ ] Planned |
 | T3 | Real readiness probes for api and gateway | development | M | T0 | [ ] Planned |
+| T3b | Cross-language subtitle translation pipeline (S-150 reopening) | development parent | XL | T0 | [ ] Planned — approval pending per child |
 | T4 | Production container images | config/dev | M | T1, T1b, T2, T3 | [ ] Planned |
 | T5 | Production deployment descriptor and secret boundary | config-only | M | T4 | [ ] Planned |
 | T6 | First deploy and end-to-end smoke on Digital Ocean | operational | L | T5 | [ ] Planned |
@@ -46,7 +65,8 @@ ledger.
 | T7b | Mobile registration screen | development | M | T7 | [ ] Planned — droppable (first) |
 | T7c | Session lifetime and expiry behavior | development/config | S | T7 | [ ] Planned |
 | T8 | Subtitle visible in the review surface (optional) | development | M | T6 | [ ] Planned — droppable (second) |
-| T9 | Status, README, and debt-register closeout | docs-only | S | T7, plus each of T7b / T7c / T8 that was executed | [ ] Planned |
+| T8b | Translated subtitle visible in the review surface | development | M | T3b, T8 | [ ] Planned — double-conditional |
+| T9 | Status, README, and debt-register closeout | docs-only | S | T7, plus each of T7b / T7c / T8 / T8b / T3b that was executed | [ ] Planned |
 
 ---
 
@@ -650,6 +670,213 @@ Leave `/health/live` cheap. No new endpoints.
 
 ---
 
+## S-230-T3b: Cross-language subtitle translation pipeline (S-150 reopening)
+
+**Type:** development parent (not executable as written)
+**Effort:** XL (aggregate of 5 Med-high + 1 Moderate children; each child scores and
+is approved independently — see child RRI figures below)
+**Depends on:** S-230-T0 (independent of T1/T1b/T2/T3/T4/T5 — parallel track, not
+on the deployment critical path)
+**Status:** [ ] Planned — not executable directly; execute children in order
+
+> **Owner scope amendment, 2026-08-16 (second pass).** The original S-230 scope
+> froze `S-150` out entirely (`docs/plan/s-230-poc-v1-digitalocean.md` §"Scope
+> decision"). A same-day follow-up review ("The market-audience gap, examined")
+> computed the exact cost of reopening it and **explicitly recommended against
+> doing so inside this window** ("Recommendation: C for this POC... Do not let
+> the desire for a translated-clip moment pull S-150 scope back into S-230
+> piecemeal"). The owner reviewed that recommendation and its cost table and
+> explicitly confirmed reopening anyway, to make the product's actual
+> differentiator (cross-language output, per `README.md:3`) demonstrable rather
+> than asserted. This task is the resulting scope amendment record and
+> integration tracker. It does not re-litigate that decision; it exists so the
+> calendar and governance cost is visible rather than absorbed silently into
+> "T2c-v."
+
+**Objective:** Produce one real (non-mocked) translated-subtitle artifact for a
+target language, through the already-reviewed S-150 delivery pipeline, so the
+POC can demonstrate genuine cross-language output — text-only, no dubbed audio.
+
+**Why this is a parent, not a single task:** the six child tasks below are
+already fully defined with their own HP/EC, RRI, and acceptance criteria in
+`docs/tasks/s-150-translation-dubbing.md`. This task does not redefine them; it
+sequences them under S-230 and adds the cross-slice integration/demo
+acceptance check. Duplicating their content here would create two sources of
+truth for the same requirements — the S-150 ledger stays authoritative for
+each child's own definition, RRI, review, Reflection, and closure.
+
+**Ordered children (execute in this order; each still needs its own RRI
+presentation + explicit approval before implementation — this parent's
+approval does not pre-approve them):**
+
+| Order | Task ID | What it does | RRI | Band |
+|---|---|---|---|---|
+| 1 | `S-150-T2c-v` | Redis translation-queue adapter | 50 | Med-high |
+| 2 | `S-150-T2c-vi-a` | Wire `fan_out_localization` into the subtitle runtime, replacing `prepare_review_post_ready` | 51 | Med-high |
+| 3 | `S-150-T2c-vi-b` | Delete the dead legacy review module, sync S-140 BDD | 31 | Moderate |
+| 4 | `S-150-T3a` | Typed translation provider/subprocess contract | 42 | Med-high |
+| 5 | `S-150-T3b` | Functional Python translation worker | 44 | Med-high |
+| 6 | `S-150-T3c` | Rust translation runtime persistence + readiness transition | 53 | Med-high |
+
+Every Med-high child routes cloud-only under ADR-038 (Muse Glimmer refinement
+-> primary receipt -> cloud takeover, no local repair attempts); `T2c-vi-b` is
+Moderate and may use the local-first path. Each carries its own band-resolved
+phase-1/phase-2 review, Reflection passes, unit coverage certification, and
+owner verification — this parent adds no exemption from any of that.
+
+**Explicit boundary (unchanged from the original freeze):** `S-150-T4`
+(ADR-028 amendment) through `S-150-T7` — i.e. TTS/dubbed audio — remain out of
+scope for S-230. This chain produces translated subtitle text only. Do not
+implement T4/T5/T6/T7 under this task or this slice.
+
+**Blocking precondition not resolved by this amendment:** `S-150-T2c-v`
+carries its own, separate "parked pending a Redis-topic decision" note
+(`docs/plan/s-150-translation-dubbing.md:31`, `:322`) that predates and is
+independent of the S-230 scope freeze. This task authorizes presenting and
+implementing the chain under S-230; it does not itself reopen that Redis-topic
+decision. Confirm that separately with the owner before starting child 1.
+
+**Happy paths considered:**
+
+- **HP-1:** For one real S-140 subtitle artifact and one configured target
+  language, the full chain (queue -> runtime fan-out -> provider -> worker ->
+  persistence) produces a persisted `TranslatedSubtitle` artifact that a
+  Redis-backed consumer actually processed — not just "enqueued."
+
+**Edge cases considered:**
+
+- **EC-1:** If any child in the chain is not complete by the time T6 or T9
+  runs, the POC's e2e smoke and closure report state that plainly ("translation
+  chain partial: children N/6 done") rather than silently describing the POC
+  as showing translated output it does not yet produce. This mirrors the
+  project's own "assert on observed downstream state, never a 2xx alone"
+  principle (T6 acceptance criteria) applied to this task's own status
+  reporting.
+
+**Acceptance criteria:**
+
+- All six children above are `[x] Done` with their own full closure records in
+  `docs/tasks/s-150-translation-dubbing.md`.
+- A real test asset's source-language subtitle produces a persisted
+  translated-subtitle artifact for at least one target language, verified
+  against real Redis/PostgreSQL/storage (not mocks) — this is the integration
+  check this parent owns on top of each child's own acceptance criteria.
+  **This proves the artifact exists in storage; it does not make it visible
+  to a human reviewer — that is `S-230-T8b`'s separate scope.**
+- `S-150-T2c-v`'s separate Redis-topic parking note is confirmed resolved by
+  the owner before child 1 starts (see blocking precondition above).
+- No `S-150-T4`–`T7` (TTS/dubbing) code is touched.
+
+**Calendar note (owner-acknowledged cost):** the plan's own cost analysis
+(`docs/plan/s-230-poc-v1-digitalocean.md` §"D, scoped") found this chain does
+not fit inside the original 10-day window alongside a first deployment. This
+task therefore runs as a **parallel track**, not a hard gate on `S-230-T6`
+(first deploy + smoke): T6 may complete and demonstrate the pre-existing
+subtitle/review/publication path on schedule even if this chain is still in
+progress. If complete before `S-230-T9` closeout, the translated-subtitle
+capability is folded into the demo narrative and the debt register entry for
+"no cross-language capability" is removed; if not, T9 records the exact
+child-completion state instead of a blanket "done" or "not applicable."
+
+**Downstream coupling with S-230 deployment tasks (conditional, not
+blocking).** This task's own acceptance criteria (above) only requires the
+chain to run against real local/dev-infra Redis/PostgreSQL/storage, matching
+how every other S-150 task has been verified — that alone does **not** put
+translation on the deployed Digital Ocean droplet. `S-150-T3b` ("Functional
+translation worker") is structurally identical to the existing ASR worker
+(`workers/asr-worker-py`): a Python subprocess `apps/worker-runner` shells out
+to, per its own acceptance criteria ("Implement the Python stdin/stdout
+worker... keep model credentials in injected environment only"). For the
+translated-subtitle capability to actually appear on the deployed POC, not
+only in this chain's own closure evidence, three sibling tasks need
+conditional scope additions **if and when this chain is done before they
+execute** — none of these are hard blocking dependencies added to those
+tasks' `Depends on` fields, since `T3b` may still be in progress when they run:
+
+- **`S-230-T4` (production images):** the worker-runner image must also bundle
+  `workers/translation-worker-py` and its dependencies, mirroring the existing
+  ffmpeg/Python/faster-whisper bundling for ASR, with whatever
+  path/interpreter env vars `S-150-T3c` defines for it (mirroring
+  `DUBBRIDGE_ASR_WORKER_PATH`/`DUBBRIDGE_ASR_WORKER_PYTHON`). If `T3b`'s
+  children are not yet done when `T4` builds its image, `T4` proceeds without
+  the translation worker and a follow-up image rebuild is needed once they
+  close — this is now recorded as a known follow-up, not a silent gap.
+- **`S-230-T5` (descriptor + secret boundary):** the environment template must
+  add whichever `DUBBRIDGE_*` variable(s) `S-150-T3b`'s configurable provider
+  needs for real (non-fake) credentials, the same way T5 already carries
+  `S-230-T7c`'s JWT-expiry decision without owning it. T5 owns only carrying
+  the variable; `T3b`'s children define its name and requirement.
+- **`S-230-T6` (deploy + smoke):** if the translation worker is present in the
+  deployed image by the time of the smoke run, the runbook additionally
+  asserts a translated-subtitle artifact on observed downstream state (same
+  "never a 2xx alone" standard T6 already applies to every other stage); if
+  not present, T6 proceeds exactly as originally scoped and T9 records the gap.
+- **`S-230-T8b` (translated subtitle visible in review, added 2026-08-16):**
+  producing and persisting a translated artifact (this task's own acceptance
+  criteria) is **not** the same as a human being able to see it. `T8b` is the
+  task that actually closes that gap — it is a separate, double-conditional
+  task (depends on both this task and `T8`), not a bullet on an existing task,
+  because it needs its own read endpoint and mobile rendering work. Without
+  `T8b`, a fully-closed `T3b` still leaves the translated artifact invisible
+  to any reviewer, which undercuts this task's own stated objective.
+
+Whoever executes `S-150-T3c` (the last child, which defines the actual
+worker-path env var names) must update this section and the tasks above with
+the concrete variable names once they are fixed — this section names the
+coupling now so it isn't discovered late, but the exact names are `T3c`'s to
+define, not this task's.
+
+**Technical-scope diagram — child sequence and downstream coupling:**
+
+```mermaid
+flowchart TD
+    T2CV["1 . S-150-T2c-v<br/>Redis adapter . RRI 50"] --> T2CVIA["2 . S-150-T2c-vi-a<br/>Runtime fan-out . RRI 51"]
+    T2CVIA --> T2CVIB["3 . S-150-T2c-vi-b<br/>Cleanup + BDD sync . RRI 31"]
+    T2CVIB --> T3A["4 . S-150-T3a<br/>Provider contract . RRI 42"]
+    T3A --> T3Bc["5 . S-150-T3b<br/>Python worker . RRI 44"]
+    T3Bc --> T3C["6 . S-150-T3c<br/>Persistence + readiness . RRI 53"]
+
+    T3C -. "if done: bundle worker" .-> T4["S-230-T4<br/>production images"]
+    T3C -. "if done: add credential var" .-> T5["S-230-T5<br/>descriptor + secrets"]
+    T3C -. "if done: assert translated subtitle" .-> T6["S-230-T6<br/>deploy + smoke"]
+    T3C --> T8b["S-230-T8b<br/>visible in review"]
+    T8["S-230-T8<br/>subtitle in review"] --> T8b
+
+    classDef child fill:#faf0dc,stroke:#8a5f0b,color:#1f2420;
+    classDef ext fill:#ffffff,stroke:#ddd7c9,color:#1f2420;
+    class T2CV,T2CVIA,T2CVIB,T3A,T3Bc,T3C child;
+    class T4,T5,T6,T8,T8b ext;
+```
+
+Solid edges are real dependencies (the ordered child chain; `T8b` depending on
+both `T3C` and `T8`). Dotted edges into `T4`/`T5`/`T6` are conditional —
+those tasks never wait on this chain; each proceeds as originally scoped if
+`T3c` is not yet done when they run.
+
+**Evidence to emit:** each child's own full evidence bundle (RRI, phase
+reviews, Reflection log, unit coverage certification, owner verification) per
+`docs/tasks/s-150-translation-dubbing.md`; plus this parent's own integration
+evidence (real chain run against a real test asset) and the Redis-topic
+resolution confirmation.
+
+**Status artifacts affected:** this ledger; `docs/tasks/s-150-translation-dubbing.md`
+(child status, and the top-of-file/roadmap "parked for S-230" framing);
+`docs/plan/s-150-translation-dubbing.md` (same); `docs/plan/roadmap.md` (S-150
+and S-230 rows); `docs/plan/s-230-poc-v1-digitalocean.md` (scope decision,
+demo-quality review, out-of-scope section, module-dependency diagram).
+
+**Agent handoff prompt:** Do not implement this parent directly. Present and
+execute `S-150-T2c-v` first, in its own RRI 26+ approval cycle, after
+confirming the separate Redis-topic decision with the owner. Continue through
+the ordered children only after each prior child closes. Stop before any
+`S-150-T4`+ (TTS/dubbing) work.
+
+**Stop condition:** Stop once all six children are closed and the integration
+check passes, or report the exact partial state at T9 if the window closes
+first. Do not start TTS/dubbing work under this task.
+
+---
+
 ## S-230-T4: Production container images
 
 **Type:** config/development
@@ -668,6 +895,13 @@ spawns `python3 workers/asr-worker-py/main.py` as a subprocess.
 - A worker-runner image containing the Rust binary, ffmpeg/ffprobe, Python, and
   faster-whisper, with `DUBBRIDGE_ASR_WORKER_PATH` and
   `DUBBRIDGE_ASR_WORKER_PYTHON` resolving inside the image.
+- **Conditional on `S-230-T3b`:** if `S-150-T3b`/`T3c` (functional translation
+  worker + its Rust consumer) are `[x] Done` at the time this task executes,
+  the worker-runner image also bundles `workers/translation-worker-py` and its
+  dependencies, with whichever path/interpreter env vars `T3c` defines for it
+  (see `S-230-T3b` §"Downstream coupling"). If not done yet, this task
+  proceeds without it and records a follow-up image rebuild as debt rather
+  than silently shipping an image that cannot run translation.
 - `ASR_MODEL_SIZE` is an explicit build/run parameter; the POC value is `small`,
   not the `large-v3` default (plan G7).
 - A migration image or entry point derived from T2 that Compose can run as a
@@ -737,6 +971,13 @@ there is no `.env.example` at the repository root.
 - `rsa_public_key_path` is supplied as an explicit placeholder with an inline
   comment recording that ADR-031 made the field dead; removing it is T9 debt, not
   T5 work.
+- **Conditional on `S-230-T3b`:** if `S-150-T3b`'s configurable translation
+  provider is done and requires a real (non-fake) credential by the time this
+  task executes, the template adds whichever `DUBBRIDGE_*` variable(s) that
+  provider needs (see `S-230-T3b` §"Downstream coupling"). T5 owns only
+  carrying the variable in the template, exactly as it already does for
+  `S-230-T7c`'s JWT-expiry value; `T3b`'s children define the name and
+  requirement.
 
 **Evidence to emit:** the descriptor and environment template; a local
 dry-run of the descriptor against local infrastructure; confirmation that no
@@ -782,6 +1023,13 @@ template, and real `config/production.toml` values. Commit no secrets.
   assumed.
 - A runbook records provisioning, deploy, migrate, rollback, log access, and
   observed timings for preparation and ASR.
+- **Conditional on `S-230-T3b`/`T4`:** if the deployed worker-runner image
+  bundles the translation worker (see `S-230-T4`'s conditional bullet), the
+  smoke run additionally asserts a translated-subtitle artifact on observed
+  downstream state for at least one target language, held to the same "never
+  a 2xx alone" standard as every other stage above. If the image does not yet
+  bundle it, this task proceeds exactly as originally scoped and the gap is
+  recorded at T9, not silently passed over.
 
 **Evidence to emit:** provisioning record, deploy transcript, per-stage E2E
 evidence, runbook, cost summary.
@@ -1071,21 +1319,110 @@ touch S-150 artifacts.
 
 ---
 
+## S-230-T8b: Translated subtitle visible in the review surface (conditional on T3b + T8)
+
+**Type:** development (mobile + API)
+**Effort:** M (provisional; recompute with `scripts/rri.py`)
+**Depends on:** S-230-T3b (translated-subtitle artifact must exist), S-230-T8
+(the review surface this task extends)
+**Status:** [ ] Planned — double-conditional, not on the original 10-day path;
+only reachable if both `T3b` and `T8` close
+
+> Added 2026-08-16 at owner request, closing a coupling gap found while
+> reviewing `S-230-T3b`'s dependencies: `S-230-T3b` only proves a translated
+> subtitle can be *produced and persisted* (`asset_translation_status.
+> current_translated_subtitle_artifact_id`, migration `0028`). Nothing makes
+> it *visible* to a reviewer. `S-230-T8` renders only the source-language
+> `review_tasks.subtitle_artifact_id` (migration `0026`) — a different column,
+> bound at a different time, for a different artifact. Without this task, a
+> completed `T3b` chain closes with a translated artifact sitting in
+> Postgres that no human ever sees, which does not satisfy `S-230-T3b`'s own
+> stated objective ("so the POC can demonstrate genuine cross-language
+> output") — the demonstration needs a person to actually see it.
+
+**Problem:** `review_tasks` has no column referencing a translated subtitle.
+The current pointer to the latest translated subtitle for a given
+`(project_id, asset_id, target_language_id)` lives on
+`asset_translation_status.current_translated_subtitle_artifact_id`
+(`infra/migrations/0028_add_localization_generation_claims_and_exact_pointers.sql:35`),
+not on the review task itself.
+
+**Explicit boundary:** this is **not** `S-150-T6`, for the same reason `T8`
+is not `S-150-T6`. It does **not** add a migration, does **not** bind a
+translated-subtitle column onto `review_tasks`, introduces no generation-aware
+review identity, and does not close `X-S-160-3`. It only adds a **read-only**
+resolution path: given a review task's existing asset/target-language
+identity, look up the current translated-subtitle pointer from the already-
+existing `asset_translation_status` row and render it if present. If a future
+task (`S-150-T6`) later adds real generation-aware review binding, this
+read-only path is superseded, not conflicting with it.
+
+**Happy paths considered:**
+
+- **HP-1:** For a review task whose asset has a target language with a
+  `Ready` translation status, the review surface renders both the
+  source-language subtitle (via existing `T8`) and the current
+  translated-subtitle text for that target language, without a migration.
+
+**Edge cases considered:**
+
+- **EC-1:** When `asset_translation_status` has no row, or its status is not
+  `Ready`, or its `current_translated_subtitle_artifact_id` is null, the
+  surface renders the source subtitle only (from `T8`) and shows the target
+  language as "translation pending" rather than erroring or showing stale
+  content.
+- **EC-2:** Translated-subtitle content is only served to a caller already
+  authorized for that review task's organization — same guard as `T8`.
+- **EC-3:** A review task for an asset with no configured target language at
+  all shows no translation section, matching today's behavior exactly.
+
+**Acceptance criteria:** a read endpoint resolves the current translated
+subtitle for the review task's asset/target-language via
+`asset_translation_status`, scoped by the existing org guard; the mobile
+review surface renders it alongside the source subtitle `T8` already added;
+no migration; no change to the ADR-030 publication gate; no change to
+`S-150-T6`'s eventual scope.
+
+**Files expected to change:** a scoped API route (read-only), and
+`mobile/src/screens/ReviewDetailScreen.tsx`. Recompute before presentation.
+
+**Evidence to emit:** RRI report, phase reviews, Reflection log if the band
+requires it, unit coverage certification, owner verification, screenshot
+evidence of both the translation-present and translation-pending states.
+
+**Status artifacts affected:** this ledger; explicitly **not** `X-S-160-3`,
+which stays open and owned by `S-150-T6`.
+
+**Handoff prompt:** Add a read-only resolution of the current translated
+subtitle onto the existing review surface `T8` built. Do not add a migration,
+do not bind a new `review_tasks` column, do not touch `S-150-T6`'s scope.
+
+**Stop condition:** Stop once the review surface renders translated content
+when present and degrades visibly when absent. Do not touch S-150 artifacts
+or migrations.
+
+---
+
 ## S-230-T9: Status, README, and debt-register closeout
 
 **Type:** docs-only
 **Effort:** S
-**Depends on:** S-230-T7, and whichever of S-230-T7b / S-230-T7c / S-230-T8 were
-executed rather than dropped
+**Depends on:** S-230-T7, and whichever of S-230-T7b / S-230-T7c / S-230-T8 /
+S-230-T8b / T3b were executed rather than dropped
 **Status:** [ ] Planned
 
 **Acceptance criteria:**
 
-- `docs/plan/roadmap.md` carries the `S-230` row, records `S-150` as parked for
-  the POC window, and updates S-030 Phase 3 and X9/X21 wording to match what
-  T1/T5 actually delivered.
+- `docs/plan/roadmap.md` carries the `S-230` row, records the exact `S-150`
+  reopening state (which of the six `T3b` children are done vs. still open,
+  per the amended scope — no longer a blanket "parked"), and updates S-030
+  Phase 3 and X9/X21 wording to match what T1/T5 actually delivered.
 - README status table reflects what the deployed POC genuinely does; nothing
-  deferred is described as working.
+  deferred is described as working. If `S-230-T3b` completed all six children,
+  README states the POC produces real translated-subtitle text for at least
+  one target language, explicitly still without dubbed audio. If `T3b` is
+  partial, README states the exact child-completion count rather than
+  claiming cross-language capability.
 - Debt carried by this slice is registered explicitly: gateway body buffering
   (G8), null-bound review tasks if T8 was dropped (G9), the vestigial required
   `auth.rsa_public_key_path` field that ADR-031 made dead (G11), the coexisting
@@ -1096,8 +1433,9 @@ executed rather than dropped
   `StorageSettings`'s `Debug` derive leaving `access_key_id`/`secret_access_key`
   unredacted (T1 phase-2 Gemma finding, accepted-follow-up — matches the
   pre-existing unredacted `jwt_secret`/`client_secret` pattern in the same file;
-  a redaction pass is cross-cutting, not T1-scoped), and any T6 finding not fixed
-  in-window.
+  a redaction pass is cross-cutting, not T1-scoped), TTS/dubbed audio
+  (`S-150-T4`–`T7`) remaining out of scope and blocked on ADR-028 regardless of
+  `T3b`'s outcome, and any T6 finding not fixed in-window.
 - The status of every droppable task is stated explicitly — executed or dropped,
   and why — so the debt register cannot silently omit a dropped task's gap.
 - The stale roadmap note "`S-070` (JWKS) remains recommended before production

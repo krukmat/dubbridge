@@ -20,11 +20,11 @@ exists because something concrete blocks a real deploy today.
 
 | Decision | Resolution |
 |---|---|
-| POC v1 product scope | Subtitles + governed review/publication. `S-150` (translation + dubbing) is **explicitly out** and stays parked. |
+| POC v1 product scope | Subtitles + governed review/publication, **plus** (owner scope amendment below) text-only cross-language subtitle translation through the `S-150-T2c-v`→`T3c` chain, tracked as `S-230-T3b`. TTS/dubbed audio (`S-150-T4`–`T7`) stays **out** and remains blocked on ADR-028. |
 | Deployment target | Single Digital Ocean droplet + production Docker Compose. Not App Platform. |
 | Gateway | Deployed as-is. Its request/response buffering is accepted as recorded debt and bounded by lowering the POC upload limit. |
 
-### Why S-150 is out
+### Why S-150 was originally out (superseded below — kept for the record)
 
 The remaining `S-150` work is `T2c-v` (RRI 50), `T2c-vi-a` (51), `T2c-vi-b` (31),
 `T3a` (42), `T3b` (44), `T3c` (53), `T4` (26), `T5` (68–70, mandatory
@@ -38,6 +38,27 @@ days alongside a first deployment, and attempting both would deliver neither.
 The `S-150-T2c-v` Redis-adapter decision the owner parked therefore stops being a
 blocker for this window: it belongs to a slice that is out of POC scope.
 
+### Scope amendment (owner, 2026-08-16, second pass)
+
+The "market-audience gap" follow-up below computed the exact cost of reopening
+`S-150-T2c-v` through `T3c` (six tasks, five Med-high + one Moderate, all
+cloud-only under ADR-038 for the Med-high ones) and **recommended against
+reopening it inside this window** — see "Recommendation" under §"The
+market-audience gap, examined". The owner reviewed that recommendation and its
+cost table directly and explicitly confirmed reopening it anyway, so the POC's
+stated differentiator (cross-language output) is demonstrated rather than only
+asserted. This is recorded as an explicit override of the plan's own
+recommendation, not a silent scope creep — the reasoning above and below stays
+in the document as the record of what was weighed.
+
+Concretely: `S-150-T2c-v`, `T2c-vi-a`, `T2c-vi-b`, `T3a`, `T3b`, and `T3c` are
+back in scope, tracked as `S-230-T3b` (`docs/tasks/s-230-poc-v1-digitalocean.md`).
+`T4` through `T7` (TTS/dubbed audio) are **not** reopened — they stay out, per
+the original reasoning above (ADR-028 consent seam unresolved, `T5`/`T6` both
+require mandatory decomposition before they are even executable). `T3b` runs as
+a parallel track, not a hard gate on `T6`'s deploy/smoke milestone — see
+"Calendar note" in its task card.
+
 ### What POC v1 demonstrates
 
 ```text
@@ -45,10 +66,15 @@ mobile login (S-200) -> upload + rights gate (S-010, ADR-008)
   -> HLS preparation (S-120) -> ASR transcription (S-130)
   -> subtitle generation (S-140) -> review task (S-160)
   -> human approval -> publication gate (ADR-030) -> in-app HLS playback (S-125, S-127)
+  -> [S-230-T3b, parallel track] translation fan-out (S-150-T2c-vi-a)
+     -> translation worker (S-150-T3a/T3b) -> translated-subtitle persistence (S-150-T3c)
 ```
 
-Every stage above is already implemented and closed on the roadmap. Nothing in
-this slice adds a pipeline stage.
+Everything above the `T3b` branch is already implemented and closed on the
+roadmap; nothing in `S-230-T1`–`T9` adds a pipeline stage there. The `T3b`
+branch is new pipeline capability, reopened from `S-150` by the 2026-08-16
+scope amendment above — it is the one place this slice does add a stage,
+scoped to text-only translation.
 
 ## Position on Redis (owner constraint: no new technologies)
 
@@ -418,12 +444,11 @@ rights gate (ADR-008), durable audit (ADR-018), HITL review and the publication
 gate (ADR-030), authorized HLS delivery (ADR-032), and a real async pipeline on
 real infrastructure — the parts that are expensive to retrofit.
 
-It is weak for a **market/product** audience: nothing in the demonstrated path is
-cross-language, so the differentiator the name and README promise is absent. No
-cheap path to add it exists inside this window — the remaining `S-150` surface to
-reach translated subtitles alone is `T2c-v` (50), `T2c-vi-a` (51), `T2c-vi-b`
-(31) plus the `T3a`/`T3b` worker tasks (42, 44). Closing this gap is a separate
-slice after the deploy, not a scope adjustment to S-230.
+It was weak for a **market/product** audience under the original freeze: nothing
+in the demonstrated path was cross-language, so the differentiator the name and
+README promise was absent. This is the gap the 2026-08-16 second-pass scope
+amendment (see "Scope decision" above) exists to close — see the recommendation
+and its override below.
 
 G14, G15 and G16 are the highest value-per-cost changes to the demo and are all
 inside the existing task surface (G14/G15 are small additions; G16 is a
@@ -511,6 +536,18 @@ minimum five sequential Med-high approval/review cycles before a translated
 table, not the earlier one-line estimate, as the basis for any go/no-go
 timing decision on D.
 
+**Owner override of this recommendation (2026-08-16, same day):** the owner
+reviewed the recommendation and cost table directly above and explicitly
+confirmed proceeding with D anyway — `T2c-v` through `T3c` (the six-row table
+above), translated subtitles only, no dubbed audio. This is recorded as an
+informed override, not a reversal of the analysis: the cost table stays
+accurate and is the basis for `S-230-T3b`'s own calendar framing (it runs as a
+parallel track, not a hard gate on `T6`, per that task's card). See "Scope
+amendment (owner, 2026-08-16, second pass)" under "Scope decision" above for
+the authoritative scope statement, and
+`docs/tasks/s-230-poc-v1-digitalocean.md` § `S-230-T3b` for the execution
+tracker.
+
 ## Target architecture (single droplet)
 
 ```mermaid
@@ -566,7 +603,27 @@ flowchart LR
     T8 --> T9
     T7b --> T9
     T7c --> T9
+    T0["T0 plan + ledger"] -.parallel track, not a T6 gate.-> T3b["T3b S-150 translation chain<br/>(T2c-v..T3c)"]
+    T3b -.if done: bundle translation worker.-> T4
+    T3b -.if done: add provider credential var.-> T5
+    T3b -.if done: assert translated subtitle.-> T6
+    T3b --> T8b["T8b translated subtitle<br/>visible in review"]
+    T8 --> T8b
+    T8b --> T9
+    T3b -.folds into demo if done in time.-> T9
 ```
+
+The three dotted `T3b -.if done...->` edges into `T4`/`T5`/`T6` are
+**conditional, not blocking**: those tasks never wait on `T3b`. `T8b` is
+different — it is a real (solid-edge) dependency on both `T3b` and `T8`,
+because producing and persisting a translated artifact (`T3b`'s own scope) is
+not the same as a reviewer being able to see it (`T8b`'s scope): `T8b` needs
+its own read endpoint and mobile rendering work, so it is a separate task
+rather than a bullet on an existing one. If `T3b`'s children are not yet
+closed when `T4`/`T5`/`T6` run, each proceeds exactly as originally scoped and
+the gap is recorded rather than silently absorbed — see each task's own card
+in `docs/tasks/s-230-poc-v1-digitalocean.md` and `S-230-T3b` §"Downstream
+coupling with S-230 deployment tasks."
 
 T1, T1b, T2 and T3 are independent of each other and all four gate T4: an image
 that cannot authenticate to Spaces, cannot dispatch work to its own workers,
@@ -606,6 +663,15 @@ terms but it is the difference between a demo and an inert deployment, so it is
 not a candidate for dropping. Verifying it end to end is folded into T6's smoke
 run rather than costing separate calendar time.
 
+**T3b (S-150 translation chain) is deliberately not in this table.** Per its
+own cost analysis above (six tasks, five Med-high cloud-only), it does not fit
+inside these ten days without displacing T4–T9. It runs as a parallel track
+starting whenever `T0` is done, on its own governance timeline (each of its six
+children needs its own RRI presentation, approval, and closure). `T6`'s
+deploy/smoke milestone does not wait on it. If it completes before `T9`
+closeout, the demo narrative and README gain the translated-subtitle claim; if
+not, `T9` records the exact partial state.
+
 ## Risks
 
 | Risk | Impact | Mitigation |
@@ -621,8 +687,13 @@ run rather than costing separate calendar time.
 
 ## Out of scope
 
-- `S-150` translation and dubbing in full, including the parked `T2c-v` Redis
-  adapter decision.
+- `S-150-T4` through `T7` — TTS/dubbed audio. Blocked on the ADR-028
+  app-neutral consent seam (`T4`); `T5`/`T6` both require mandatory
+  decomposition before they are even executable. Not reopened by the
+  2026-08-16 second-pass scope amendment, which covers only text-only
+  translated subtitles (`T2c-v` through `T3c`, tracked as `S-230-T3b`).
+  `S-150-T2c-v`'s own separate "Redis-topic decision" parking note is also not
+  resolved by this amendment — see `S-230-T3b`'s task card.
 - `S-170` / `S-180` runtime slices (no plan exists for either).
 - `S-070` production identity hardening. ADR-031 moved token issuance in-house
   (HS256 in `apps/api`), so JWKS discovery is not on the POC path; `X-S-200-1`
