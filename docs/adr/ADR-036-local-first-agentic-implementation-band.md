@@ -592,6 +592,141 @@ rebind, while this amendment supersedes its Moderate/M default. Med-high/L
 remains cloud-only, and this change does not alter approval, scope, repair,
 review, Reflection, or closure gates.
 
+## Amendment 6 (2026-08-16): Moderate/M implementer rebinds to Qwen3.8-27B-MLX
+
+**Decision:** Owner directive, 2026-08-16: bind the Moderate/M
+`DUBBRIDGE_LOCAL_AGENT_MODEL` default to `qwen3.8:27b-mlx`. The Low/S packet
+route remains bound independently through `DUBBRIDGE_LOW_RRI_MODEL` to
+`nemotron-3.5-lightning:30b-a3b-q4_K_M`, and reviewer bindings (Muse Glimmer
+for RRI 0–25, Gemma Reviewer for RRI 26–55, D14 as universal fallback) are
+unchanged. As with prior implementer rebinds (Amendments 2, 3, 5), this
+change was made directly by the owner ahead of a completed formal ADR-036
+§10-style benchmark; production evidence of Qwen3.8-27B-MLX's actual
+agentic-loop latency/quality on this hardware is pending and will accumulate
+from live Moderate-band task runs going forward, per the owner's stated
+intent to evaluate it against upcoming development work rather than a
+dedicated benchmark pass first.
+
+**Changes to §1 (Local model stack) / Amendment 5's table:** the implementer
+binding changes again; the model stack remains two roles:
+
+| Role | Model (dubbridge binding) |
+|---|---|
+| **Local implementer (Moderate/M)** | `qwen3.8:27b-mlx` |
+| **Local reviewer / challenger / multimodal** | `gemma4:26b-a4b-it-qat` (RRI 0–25 only, per Amendment 2 §5 — unchanged by this amendment) |
+
+`qwen3.6:35b-a3b` is removed from the implementer role. As with
+`qwen3.6:27b-q4_K_M` after Amendment 3, it has no other bound role in this
+repository as of this amendment, so it simply drops out of active use rather
+than requiring an explicit retirement step.
+
+**Changes to §5 (Reviewer-pairing rule) / Amendment 5's table:** the
+implementer identity in the cross-family-independence pairing rows updates
+to match; the reviewer side is unchanged by this amendment.
+
+| Implementer | Phase-2 reviewer |
+|---|---|
+| Cloud primary agent (status quo) | Gemma Reviewer (unchanged) |
+| `qwen3.8:27b-mlx` (this amendment, RRI 0–25 review context) | `muse-glimmer:30b-q4_K_M` (unchanged; see ADR-037 Amendment 1) |
+| `qwen3.8:27b-mlx` (this amendment, RRI 26–55 review context) | Gemma Reviewer (`gemma4:26b-a4b-it-qat`, unchanged) |
+
+D14 (context-isolated subagent) remains the universal fallback in every row.
+
+**Binding/code changes made:** `scripts/local-agent/run_local_task.py`
+(`DUBBRIDGE_LOCAL_AGENT_MODEL` argparse default). `docs/playbooks/
+AGENT_WORKFLOW_GUIDE.md`, `docs/policies/HITL_AUTONOMY_POLICY.md`, and
+`docs/policies/RRI_POLICY.md` prose naming the implementer binding are
+updated in the same change; `AGENTS.override.md` was regenerated from its
+sources (`scripts/generate-agents-override.py --write`) rather than
+hand-edited. Historical task ledgers, audit files, evaluation reports, and
+`docs/plan/roadmap.md` narrative that record `qwen3.6:35b-a3b` as the model
+that actually executed a specific past run are deliberately left unchanged —
+they describe completed history, not live configuration.
+
+**Consequence accepted:** same pattern as Amendments 2, 3, and 5 — a binding
+change made on owner directive ahead of a completed formal benchmark, with
+the benchmark gap carried forward as an open item rather than silently
+dropped. Amendment 5's live `S-150-T2b-ii-c`/`T2c-iv-b` evidence for
+`qwen3.6:35b-a3b` remains the historical record of that binding's
+performance; it does not carry forward as evidence for this amendment's new
+binding.
+
+## Amendment 7 (2026-08-16): Low/S implementer rebinds to Qwen3.8-27B-MLX; Nemotron retired from live routing
+
+**Decision:** Owner directive, 2026-08-16: bind the Low/S `DUBBRIDGE_LOW_RRI_MODEL`
+default to `qwen3.8:27b-mlx`, replacing the `nemotron-3.5-lightning:30b-a3b-q4_K_M`
+binding set by Amendment 3 (and scoped to Low/S and Moderate/M by Amendment 4).
+Motivation, per the owner: the repository is actively pushing development work
+that scores Moderate/Med-high down into decomposed Low-band subtasks (§
+"Post-repair-budget Low-band decomposition", `docs/playbooks/
+AGENT_WORKFLOW_GUIDE.md` and `docs/policies/HITL_AUTONOMY_POLICY.md`), so the
+Low/S developer now carries materially more live-routing weight than when it
+was bound to Nemotron; standardizing it on the same Qwen3.8-27B-MLX binding
+already carrying the Moderate/M role (Amendment 6) removes a second model
+family from the day-to-day local loop. As with prior implementer rebinds
+(Amendments 2, 3, 5, 6), this change was made directly by the owner ahead of
+a completed formal ADR-036 §10-style benchmark; production evidence of
+Qwen3.8-27B-MLX's actual tagged-block patch-delegation quality (a materially
+different task shape than the Moderate/M agentic-loop role it already holds)
+is pending and will accumulate from live Low-band delegations going forward.
+
+**Changes to §1 (Local model stack) / Amendment 6's table:** the Low/S and
+Moderate/M implementer bindings now converge on one model; the stack remains
+two roles:
+
+| Role | Model (dubbridge binding) |
+|---|---|
+| **Local implementer (Low/S and Moderate/M)** | `qwen3.8:27b-mlx` |
+| **Local reviewer / challenger / multimodal** | `gemma4:26b-a4b-it-qat` (RRI 0–25 only, per Amendment 2 §5 — unchanged by this amendment) |
+
+`nemotron-3.5-lightning:30b-a3b-q4_K_M` drops out of live routing entirely as
+of this amendment. It remains referenced only in the frozen, policy-excluded
+`MED_HIGH_REQUIRED_MODEL` (`scripts/local-agent/run_local_task.py`) and
+`MED_HIGH_RUNNER_MODEL` (`scripts/local-agent/run_med_high_task.py`)
+constants documented by Amendment 3 — those constants gate a whole-task
+Med-high local path that Amendment 4 already policy-excluded from ever
+launching, so this amendment deliberately leaves them unchanged rather than
+rebinding dead code; a future amendment should revisit them only if Med-high
+local routing is ever reopened.
+
+**Changes to §5 (Reviewer-pairing rule) / Amendment 6's table:** the
+implementer identity for the Low/S row now matches the Moderate/M row; the
+reviewer side is unchanged by this amendment.
+
+| Implementer | Phase-2 reviewer |
+|---|---|
+| Cloud primary agent (status quo) | Gemma Reviewer (unchanged) |
+| `qwen3.8:27b-mlx` (this amendment, RRI 0–25 review context — both Low/S delegation and Moderate/M local-agent) | `muse-glimmer:30b-q4_K_M` (unchanged; see ADR-037 Amendment 1) |
+| `qwen3.8:27b-mlx` (RRI 26–55 review context) | Gemma Reviewer (`gemma4:26b-a4b-it-qat`, unchanged) |
+
+D14 (context-isolated subagent) remains the universal fallback in every row.
+
+**Binding/code changes made:** `scripts/delegate-low-rri.py` (`DEFAULT_MODEL`
+constant and its Nemotron-specific comments/docstrings) and
+`scripts/delegate_low_rri_test.py` (literal-default assertions and test
+names) in the same change. `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`,
+`docs/policies/HITL_AUTONOMY_POLICY.md`, `docs/policies/RRI_POLICY.md`,
+`docs/playbooks/LOW_RRI_LOCAL_MODEL_HANDOFF.md`, and
+`docs/gemma-local-improve.md` prose naming the Low/S developer binding are
+updated in the same change, including renaming the role from "Nemotron
+Developer" to "Qwen Developer" everywhere it described live routing.
+`AGENTS.override.md` was regenerated from its sources
+(`scripts/generate-agents-override.py --write`) rather than hand-edited.
+Historical task ledgers, audit files, evaluation reports, and prose that
+records `nemotron-3.5-lightning:30b-a3b-q4_K_M` as the model that actually
+executed a specific past run — including the Amendment 2/3 reviewer-binding
+history parentheticals scattered through the policy docs — are deliberately
+left unchanged; they describe completed history, not live configuration.
+
+**Consequence accepted:** same pattern as Amendments 2, 3, 5, and 6 — a
+binding change made on owner directive ahead of a completed formal
+benchmark, with the benchmark gap carried forward as an open item rather
+than silently dropped. Amendment 3's Nemotron binding is now fully retired
+from live routing (Low/S was its last remaining live role after Amendment 6
+moved Moderate/M off it); Amendment 4's Low/S-and-Moderate/M scope
+restriction is unaffected — both bands still share one implementer, it is
+simply a different model now.
+
 ## Related
 
 - `docs/plan/adr036-local-first-pilot.md` — Stage 1/Stage 2 pilot plan for §10

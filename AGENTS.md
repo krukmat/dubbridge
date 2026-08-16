@@ -211,7 +211,7 @@ the gate defined by `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and
 Under the canonical RRI mapping in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and
 `docs/policies/RRI_POLICY.md`, `Effort: S` normally corresponds to the **RRI 0–25**
 Low band. Those tasks skip the full approval presentation; use bounded local
-Nemotron delegation through Ollama only for eligible simple code patches, and
+Qwen Developer delegation through Ollama only for eligible simple code patches, and
 otherwise handle them directly as the primary agent while still following the
 low-band gate.
 

@@ -684,7 +684,7 @@ class CliBehavior(unittest.TestCase):
         finally:
             os.unlink(fname)
 
-    def test_hp1_dry_run_uses_nemotron_default_model(self):
+    def test_hp1_dry_run_uses_qwen_default_model(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
             f.write("# test packet\n")
             fname = f.name
@@ -694,7 +694,7 @@ class CliBehavior(unittest.TestCase):
             r = self.run_cli(fname, "--dry-run", env=env)
             self.assertEqual(r.returncode, 0, r.stderr)
             data = json.loads(r.stdout)
-            self.assertEqual(data["model"], "nemotron-3.5-lightning:30b-a3b-q4_K_M")
+            self.assertEqual(data["model"], "qwen3.8:27b-mlx")
         finally:
             os.unlink(fname)
 
@@ -781,7 +781,7 @@ class CliBehavior(unittest.TestCase):
 
 
 class ModelResolution(unittest.TestCase):
-    def test_ec1_missing_nemotron_does_not_substitute_another_developer(self):
+    def test_ec1_missing_qwen_does_not_substitute_another_developer(self):
         with patch.object(
             _mod.gemma_local,
             "_installed_model_names",

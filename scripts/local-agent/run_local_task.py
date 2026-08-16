@@ -869,7 +869,7 @@ def parse_args(argv=None):
     parser.add_argument(
         "--model",
         default=os.environ.get(
-            "DUBBRIDGE_LOCAL_AGENT_MODEL", "qwen3.6:35b-a3b"
+            "DUBBRIDGE_LOCAL_AGENT_MODEL", "qwen3.8:27b-mlx"
         ),
         help="Local implementer model tag (ADR-036 binding).",
     )

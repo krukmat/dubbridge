@@ -72,13 +72,18 @@ implementing`, Step 0.
 
 When the computed RRI falls in the **0–25 Low band**, the agent must not present
 the full task for human approval. The default low-band path is **direct execution
-by the primary agent**. Local Nemotron delegation through Ollama is reserved only for
+by the primary agent**. Local Qwen Developer delegation through Ollama is reserved only for
 **simple code patching**: narrow, mechanical code or test edits with a small
 allowed path set and low editorial risk. Docs, plans, task ledgers, ADRs,
 policies, workflow scripts, and other structure-heavy or interpretation-heavy work
 must stay with the primary agent even when the RRI is Low.
 
-When Nemotron delegation is used, Nemotron must not evaluate, approve, or mark its own
+The Low/S developer binding is `qwen3.8:27b-mlx` (owner directive, 2026-08-16,
+replacing the prior `nemotron-3.5-lightning:30b-a3b-q4_K_M` binding — ADR-036
+Amendments 3/4/7), the same model family as the Moderate/M implementer
+(ADR-036 Amendment 6).
+
+When Qwen Developer delegation is used, it must not evaluate, approve, or mark its own
 delegated work as complete. Only the delegating agent may decide whether the task
 satisfies the requirements.
 
@@ -87,7 +92,7 @@ For eligible simple code patches, the delegating agent must:
 1. Compute RRI with `scripts/rri.py`.
 2. Build a local delegation packet with the task excerpt, acceptance criteria, RRI
    output, allowed paths, relevant file snippets, and stop conditions.
-3. Send the packet to Ollama/Nemotron with `scripts/delegate-low-rri.py`, which uses
+3. Send the packet to Ollama/Qwen with `scripts/delegate-low-rri.py`, which uses
    the 120-second timeout and tagged-block response protocol defined in
    `docs/policies/RRI_POLICY.md`; require complete file contents, not JSON and not
    a unified diff.
@@ -95,18 +100,18 @@ For eligible simple code patches, the delegating agent must:
    `git apply --check`, and reject any patch outside the allowed task scope.
 5. Apply only a valid in-scope patch.
 6. Personally review the solution against every task requirement and acceptance
-criterion; this evaluation must be performed by the delegating agent, not Nemotron.
+criterion; this evaluation must be performed by the delegating agent, not Qwen Developer.
 7. Recompute/check actual touched scope; if the result now scores above RRI 25 or
    triggers a higher gate, stop and escalate to the normal approval workflow.
 8. Run required verification commands.
-9. If requirements are missed or checks fail, run one bounded Nemotron repair cycle
+9. If requirements are missed or checks fail, run one bounded Qwen Developer repair cycle
    with the failure evidence and the same allowed paths; if it still fails, stop and
    escalate. If Codex takes execution after that gate, use `gpt-5.6-luna` at
    `low`, or `gpt-5.6-terra` at `low` when Luna is unavailable in the active
    environment.
-10. Report the RRI, Nemotron model used, files changed, the delegating agent's
+10. Report the RRI, Qwen Developer model used, files changed, the delegating agent's
     requirement-review result, verification commands, and whether a repair cycle
-    was needed. If delegation times out, report `Nemotron timeout after 120s`.
+    was needed. If delegation times out, report `Qwen Developer timeout after 120s`.
 
 If penalties are present and the final RRI is still ≤ 25, the low-band handling
 still applies. When delegation is used, state all active penalties explicitly in
@@ -128,7 +133,7 @@ The default path for Moderate development tasks is:
 2. Present the task and obtain explicit approval.
 3. Run the implementation through `scripts/local-agent/run_local_task.py` in a
    disposable git worktree, resolving the implementer from
-   `DUBBRIDGE_LOCAL_AGENT_MODEL` (default `qwen3.6:35b-a3b`) and the endpoint
+   `DUBBRIDGE_LOCAL_AGENT_MODEL` (default `qwen3.8:27b-mlx`) and the endpoint
    from `OLLAMA_HOST`.
 4. Keep the primary agent as orchestrator of record: it owns the task card,
    allowed paths, acceptance tests, reflection passes, closure, and all final

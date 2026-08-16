@@ -13,9 +13,11 @@ local model through Ollama. This playbook is operational: it explains how to sco
 the work, how to write the packet, how to review the result, and when to shrink the
 task or escalate.
 
-**Active developer binding (owner directive, 2026-08-12):**
-`nemotron-3.5-lightning:30b-a3b-q4_K_M`. Reviewer bindings are separate and
-unchanged. No alternate local developer is selected implicitly.
+**Active developer binding (owner directive, 2026-08-16):** `qwen3.8:27b-mlx`,
+replacing the prior `nemotron-3.5-lightning:30b-a3b-q4_K_M` binding
+(ADR-036 Amendments 3/4) so the Low band uses the same model family as the
+Moderate/M implementer (ADR-036 Amendment 6). Reviewer bindings are separate
+and unchanged. No alternate local developer is selected implicitly.
 
 ## When to use this playbook
 
@@ -223,19 +225,19 @@ Before accepting the result, verify all of the following:
 
 ## Patch delegation vs. code review
 
-This playbook covers the **Nemotron Developer** — the patch-delegation path where Nemotron
+This playbook covers the **Qwen Developer** — the patch-delegation path where Qwen
 returns file contents that the wrapper applies. It does not cover **Gemma
 Reviewer**, which is a separate read-only role.
 
 Key distinction:
 
-| Nemotron Developer | Gemma Reviewer |
+| Qwen Developer | Gemma Reviewer |
 |---|---|
 | Returns tagged file blocks with complete contents | Returns only tagged finding blocks — no file contents, no diffs |
 | Used for simple code patch delegation (Low band) | Used for post-implementation code review (Low and Moderate bands) |
 | `scripts/delegate-low-rri.py` | `scripts/gemma-code-review.py` |
 
-A single task may use both in sequence: Nemotron Developer for the patch, then
+A single task may use both in sequence: Qwen Developer for the patch, then
 Gemma Reviewer for advisory code review in a fresh invocation. The primary agent
 must perform an independent review and may not delegate final acceptance to either
 Gemma role.
@@ -245,7 +247,7 @@ Reviewer authority boundary, trigger conditions, and completion evidence format.
 
 ## Audit log
 
-Every invocation of Nemotron Developer (`scripts/delegate-low-rri.py`) and Gemma
+Every invocation of Qwen Developer (`scripts/delegate-low-rri.py`) and Gemma
 Reviewer (`scripts/gemma-code-review.py`) appends one JSONL record to
 `logs/gemma-audit/YYYY-MM.jsonl` via `scripts/gemma_local.py:append_audit_log()`.
 The log is local telemetry only — git-ignored, never committed, never required

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Delegate a Low-RRI task packet to local Ollama/Nemotron.
+"""Delegate a Low-RRI task packet to local Ollama/Qwen.
 
-The script intentionally keeps Nemotron sandboxed: it receives a packet and returns
-tagged text with complete file contents. The orchestrating agent still validates,
-builds the diff, applies it, reviews it, and verifies any patch.
+The script intentionally keeps the Qwen Developer sandboxed: it receives a packet
+and returns tagged text with complete file contents. The orchestrating agent still
+validates, builds the diff, applies it, reviews it, and verifies any patch.
 
 Transport: streaming (`stream: true`).  Each NDJSON chunk resets the idle
 timer (`--idle-timeout`, default 60 s).  A separate `--max-wall` cap (default
@@ -35,11 +35,14 @@ import fallback_selection
 
 
 DEFAULT_HOST = gemma_local.DEFAULT_HOST
-DEFAULT_MODEL = "nemotron-3.5-lightning:30b-a3b-q4_K_M"
-# Owner directive, 2026-08-12: Nemotron is the Low/S local developer. Do not
-# silently replace an unavailable or stalled developer with Gemma or Qwen.
-# An operator may still explicitly name a stall fallback for a bounded
-# experiment; the default is disabled.
+DEFAULT_MODEL = "qwen3.8:27b-mlx"
+# Owner directive, 2026-08-16: Qwen3.8-27B-MLX is the Low/S local developer,
+# replacing the prior Nemotron-3.5-Lightning-30B-A3B binding (ADR-036
+# Amendment 3/4) so the Low band uses the same model family as the
+# Moderate/M implementer (Amendment 6). Do not silently replace an
+# unavailable or stalled developer with Gemma or another model. An operator
+# may still explicitly name a stall fallback for a bounded experiment; the
+# default is disabled.
 DEFAULT_STALL_FALLBACK_MODEL = ""
 DEFAULT_IDLE_TIMEOUT_SECONDS = gemma_local.DEFAULT_IDLE_TIMEOUT_SECONDS
 DEFAULT_MAX_WALL_SECONDS = gemma_local.DEFAULT_MAX_WALL_SECONDS
@@ -66,7 +69,7 @@ MAX_BEFORE_LINES = 40
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Send a Low-RRI delegation packet to local Ollama/Nemotron.",
+        description="Send a Low-RRI delegation packet to local Ollama/Qwen.",
     )
     parser.add_argument(
         "packet",

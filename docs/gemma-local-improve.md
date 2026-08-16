@@ -44,21 +44,22 @@ Operational surfaces:
   after `ci` completes on a `self-hosted` runner.
 - Local replay/debug: `make qa-gemma-push-review`.
 
-## Nemotron Developer vs. Gemma Reviewer
+## Qwen Developer vs. Gemma Reviewer
 
-The Low/S developer model is `nemotron-3.5-lightning:30b-a3b-q4_K_M`. It has no
-automatic alternate developer fallback when it is unavailable or stalls.
-Role-specific environment variables still take precedence
+The Low/S developer model is `qwen3.8:27b-mlx` (owner directive, 2026-08-16,
+replacing the prior `nemotron-3.5-lightning:30b-a3b-q4_K_M` binding — ADR-036
+Amendments 3/4/7). It has no automatic alternate developer fallback when it is
+unavailable or stalls. Role-specific environment variables still take precedence
 (`DUBBRIDGE_REVIEW_MODEL`, `DUBBRIDGE_PUSH_REVIEW_MODEL`, then
 `DUBBRIDGE_LOW_RRI_MODEL` where applicable) and are treated as strict explicit
 choices. The MLX tag requires an Ollama runtime new enough to pull and run
 current Gemma 4 MLX manifests.
 
-The Low/S developer binding is now Nemotron, not Gemma; this document remains
+The Low/S developer binding is now Qwen, not Gemma; this document remains
 about shared Gemma transport and reviewer roles. See the Low-RRI handoff playbook
 for the developer binding.
 
-| | Nemotron Developer | Gemma Reviewer |
+| | Qwen Developer | Gemma Reviewer |
 |---|---|---|
 | **Purpose** | Implement a simple code patch | Review code for correctness and safety |
 | **Trigger** | Low RRI (0–25) eligible simple code patches | Low/Moderate RRI (0–40) development task completion |
@@ -74,7 +75,7 @@ for the developer binding.
 | Role | Primary input | Purpose | Final authority |
 |---|---|---|---|
 | **Push Reviewer** | Completed GitHub pipeline run + diff | Audit a push, score/reroute findings, optionally dispatch pure Low work | Primary agent / daily workflow |
-| **Nemotron Developer** | Low-RRI delegation packet | Propose a narrow code/test patch | Delegating agent |
+| **Qwen Developer** | Low-RRI delegation packet | Propose a narrow code/test patch | Delegating agent |
 | **Gemma Reviewer** | Final code diff + acceptance criteria | Review completed development work | Primary agent |
 
 ## Multi-pass review and mandatory fallback

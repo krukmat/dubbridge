@@ -13,10 +13,11 @@ governs: "all agent-facing workflow decisions in the repository"
 > It overrides `CLAUDE.md` (project and global) and `AGENTS.md` without exception.
 > `CLAUDE.md` applies only for topics not covered here.
 
-> **Current routing override (owner directive, 2026-08-13):**
-> `nemotron-3.5-lightning:30b-a3b-q4_K_M` remains the eligible Low/S
-> (RRI 0–25) developer, while `qwen3.6:35b-a3b` is the Moderate/M
-> (RRI 26–40) developer.
+> **Current routing override (owner directive, 2026-08-16):**
+> `qwen3.8:27b-mlx` is now both the eligible Low/S (RRI 0–25) developer and
+> the Moderate/M (RRI 26–40) developer, replacing the prior
+> `nemotron-3.5-lightning:30b-a3b-q4_K_M` Low/S binding (ADR-036 Amendments
+> 3/4/7) so both bands share one implementer model family.
 > Med-high/L (RRI 41–55), Complex, and XL bands are cloud-only. For Med-high,
 > the ADR-038 refinement/receipt still run as routing evidence, but a
 > `GO_LOCAL` result never starts a local developer. This override supersedes
@@ -59,7 +60,7 @@ governs: "all agent-facing workflow decisions in the repository"
      RRI 0–25 reviewer chain: `muse-glimmer:30b-q4_K_M` →
      `gemma4:26b-a4b-it-qat`; for RRI 26–55 add the reviewer chain
      `gemma4:26b-a4b-it-qat` → `muse-glimmer:30b-q4_K_M`, the implementer
-     binding `qwen3.6:35b-a3b`, and, for Med-high ADR-038 routes, the
+     binding `qwen3.8:27b-mlx`, and, for Med-high ADR-038 routes, the
      Local Architect binding `muse-glimmer:30b-q4_K_M`) with a review-style
      prompt at production `num_predict`/`num_ctx`, e.g.:
      ```bash
@@ -72,7 +73,7 @@ governs: "all agent-facing workflow decisions in the repository"
      }' -m 180
      ```
      Use the role's effective production context: `16384` for the Low/S
-     Nemotron delegation wrapper, `65536` for the Moderate/M local-agent
+     Qwen Developer delegation wrapper, `65536` for the Moderate/M local-agent
      runner, and the configured reviewer context for review roles. Confirm
      `done_reason: "stop"` with non-empty `content`. A `"length"`
      result with empty content on a small ping (e.g. `num_predict: 16`) is
@@ -152,13 +153,13 @@ governs: "all agent-facing workflow decisions in the repository"
        indexes, or downstream blocker docs that must be synchronized before the
        task can be reported complete.
 4. **Gate by RRI** — compute RRI with `scripts/rri.py`. For RRI 0–25, skip the
-   full human approval presentation. Use local Nemotron delegation through Ollama
+   full human approval presentation. Use local Qwen Developer delegation through Ollama
    only for eligible simple code patches; otherwise execute directly as the
    primary agent. For **RRI 26–40 Moderate**, show the plan and tasks, wait
    for explicit approval, then use the **local-first implementation path** by
    default: `scripts/local-agent/run_local_task.py` in a disposable worktree,
    resolving the implementer from `DUBBRIDGE_LOCAL_AGENT_MODEL` (default
-   `qwen3.6:35b-a3b`), with at most 2 evidence-backed local repair attempts
+   `qwen3.8:27b-mlx`), with at most 2 evidence-backed local repair attempts
    before escalating to the cloud-takeover model resolved in Step 2. The primary
    agent remains the orchestrator of record and cloud implementation is the
    escalation/fallback path, not the default. For **RRI 41–55 Med-high**, show
@@ -465,9 +466,9 @@ Concrete vendor model IDs change over time. Agents must therefore separate:
 Do not collapse these into one undocumented guess.
 
 The **RRI 0–25 Low band** is the exception to vendor model resolution: eligible
-simple patches may use local Nemotron delegation through Ollama. Resolve the
+simple patches may use local Qwen Developer delegation through Ollama. Resolve the
 local model from `DUBBRIDGE_LOW_RRI_MODEL`, defaulting to
-`nemotron-3.5-lightning:30b-a3b-q4_K_M`, and the Ollama endpoint from `OLLAMA_HOST`,
+`qwen3.8:27b-mlx`, and the Ollama endpoint from `OLLAMA_HOST`,
 defaulting to `http://localhost:11434`.
 
 ### Local-first and Architect-refined implementation routing (RRI 26–55)
@@ -478,7 +479,7 @@ escalation environment, but the default code-authoring surface moves local.
 
 **Moderate (26–40):** the code-authoring surface is the local agentic runner
 (`scripts/local-agent/run_local_task.py`) using `DUBBRIDGE_LOCAL_AGENT_MODEL`
-(default `qwen3.6:35b-a3b`) inside a disposable worktree, with at most 2
+(default `qwen3.8:27b-mlx`) inside a disposable worktree, with at most 2
 evidence-backed local repair attempts before escalating to cloud. This
 routing became operative by owner override on 2026-07-15, ahead of the
 original ADR-036 pilot promotion gate.
@@ -768,8 +769,8 @@ documentation change replaces it.
 
 | RRI / capability | Local-first position | When cloud takes control | Codex model to present | Starting reasoning effort |
 |---|---|---|---|---|
-| **0–25 / Low** | Primary-agent direct by default; Nemotron only for an eligible simple patch | Nemotron is unavailable/unusable or its bounded repair fails and the Low-band escalation gate is followed | `gpt-5.6-luna`; use `gpt-5.6-terra` at `low` only when Luna is unavailable in the active environment | `low` |
-| **26–40 / Balanced** | `qwen3.6:35b-a3b` local-first, up to 2 evidence-backed repairs | Local runner/model is unavailable, scope enforcement fails, or the repair budget is exhausted | `gpt-5.6-terra` | `medium` |
+| **0–25 / Low** | Primary-agent direct by default; Qwen Developer only for an eligible simple patch | Qwen Developer is unavailable/unusable or its bounded repair fails and the Low-band escalation gate is followed | `gpt-5.6-luna`; use `gpt-5.6-terra` at `low` only when Luna is unavailable in the active environment | `low` |
+| **26–40 / Balanced** | `qwen3.8:27b-mlx` local-first, up to 2 evidence-backed repairs | Local runner/model is unavailable, scope enforcement fails, or the repair budget is exhausted | `gpt-5.6-terra` | `medium` |
 | **41–55 / Balanced -> Premium** | ADR-038 evidence gate, then cloud-only | Operational-only cloud route | `gpt-5.6-terra` | `high` |
 | **41–55 / Balanced -> Premium** | ADR-038 evidence gate, then cloud-only | `CLOUD_REQUIRED` or capability/risk boundary | `gpt-5.6-sol` | `high` |
 | **56–70 / Premium** | Cloud is the primary route after mandatory decomposition | Approved decomposed subtask proceeds on Codex | `gpt-5.6-sol` | `high`; use `xhigh` only when eval evidence shows a gain |
@@ -827,7 +828,7 @@ place.
 
 | RRI band | Capability | Claude model to present | Thinking | Escalation within band |
 |---|---|---|---|---|
-| **0–25 / Low** | n/a — primary agent direct or local Nemotron | Whichever model is already running the session; no Claude-cloud resolution needed | Off | n/a |
+| **0–25 / Low** | n/a — primary agent direct or local Qwen Developer | Whichever model is already running the session; no Claude-cloud resolution needed | Off | n/a |
 | **26–40 / Balanced** | Balanced | `claude-sonnet-5` | Off | none — stays on Sonnet 5 |
 | **41–55 / Balanced → Premium** | Balanced → Premium | `claude-sonnet-5`; escalate to `claude-opus-5` only if the bounded attempt stalls or repeatedly fails | On | Sonnet 5 → Opus 5 on stall/failure |
 | **56–70 / Premium** | Premium | `claude-opus-5` | On | n/a |
@@ -1027,7 +1028,7 @@ Required passes: <N> (`<RRI>` → `<band>`)
 - **Revisions applied:** <bullet list of changes made, or "none">
 ```
 
-For RRI 0–25 tasks delegated to local Nemotron, the delegating agent applies the
+For RRI 0–25 tasks delegated to local Qwen Developer, the delegating agent applies the
 Reflection cycle to Gemma's output during the mandatory review step. Record the
 reflection log in the final report, not inside the delegated task.
 
@@ -1065,15 +1066,15 @@ A human-agent handoff prompt must contain only:
 4. Exact acceptance criteria (bullets only, no prose)
 5. Stop condition: what the agent must do last and must NOT start next
 
-For RRI 0–25 local Nemotron delegation, build a delegation packet instead of the
+For RRI 0–25 local Qwen Developer delegation, build a delegation packet instead of the
 human-agent handoff prompt. It must contain only: task excerpt, acceptance
 criteria, RRI output, allowed paths, relevant file snippets, and stop conditions.
 Send the packet with `scripts/delegate-low-rri.py`, which performs the local
-Ollama request with the repository timeout. Gemma must return the tagged-block
+Ollama request with the repository timeout. Qwen Developer must return the tagged-block
 contract with complete file contents for each changed file; the delegating agent
 must validate the tagged response, let the wrapper build and check the diff,
 personally review the solution against the requirements, run verification, and
-perform at most one bounded repair cycle before escalating. Gemma must not
+perform at most one bounded repair cycle before escalating. Qwen Developer must not
 evaluate or approve its own delegated work.
 
 For harder but still Low-RRI attempts, the wrapper supports explicit generation
@@ -1087,7 +1088,7 @@ For **RRI 26–40 local-first implementation** (Moderate), use
 primary agent remains orchestrator of record: it owns the task card,
 `allowed_paths`, verification commands, Reflection passes, closure, and final
 accept/reject judgment. The local implementer resolves from
-`DUBBRIDGE_LOCAL_AGENT_MODEL` (default `qwen3.6:35b-a3b`).
+`DUBBRIDGE_LOCAL_AGENT_MODEL` (default `qwen3.8:27b-mlx`).
 The model receives the complete authorized file contents up front and cannot
 read files or run processes itself.
 

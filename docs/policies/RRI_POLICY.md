@@ -20,7 +20,7 @@ RRI **determines the approval gate and evidence required** before an agent may
 implement a task. For bands **RRI 26+**, the HITL approval checkpoint is
 mandatory; what the band controls is what evidence the agent must bring to it.
 For band **RRI 0–25**, the agent skips the full human approval presentation and
-may delegate eligible execution to local Nemotron through Ollama, then reviews, verifies, and
+may delegate eligible execution to local Qwen Developer through Ollama, then reviews, verifies, and
 reports the result (see `docs/policies/HITL_AUTONOMY_POLICY.md` for the full rule).
 
 ## Formula
@@ -178,8 +178,8 @@ Apply each penalty independently; they are additive.
 ## Bands, autonomy gates, and model tiers
 
 The HITL approval requirement applies at every band **except RRI 0–25**. Low-band
-tasks skip the full approval presentation, but they do **not** all use Nemotron.
-Simple code patches may use bounded local Nemotron delegation; all other low-band work stays
+tasks skip the full approval presentation, but they do **not** all use Qwen Developer.
+Simple code patches may use bounded local Qwen Developer delegation; all other low-band work stays
 with the primary agent. For all other bands, what the band controls is the
 evidence and gates the agent must satisfy before and after that approval.
 
@@ -188,7 +188,7 @@ band — never derive one output from another (e.g. do not infer capability from
 
 | RRI band | Label | Effort | Capability (Codex) | Capability (Claude Code) | Thinking | Phase-1 reviewer | Phase-2 reviewer | Gate |
 |---|---|---|---|---|---|---|---|---|
-| **0–25** | Low | **S** | Primary agent or Local Nemotron via Ollama | Primary agent or Local Nemotron via Ollama | Off | Muse Glimmer†† | Muse Glimmer Reviewer†† | **Low-band handling:** do not present the full task for approval; use local Nemotron only for eligible simple code patches, otherwise execute directly with the primary agent. |
+| **0–25** | Low | **S** | Primary agent or Local Qwen Developer via Ollama | Primary agent or Local Qwen Developer via Ollama | Off | Muse Glimmer†† | Muse Glimmer Reviewer†† | **Low-band handling:** do not present the full task for approval; use local Qwen Developer only for eligible simple code patches, otherwise execute directly with the primary agent. |
 | **26–40** | Moderate | **M** | Balanced | Balanced | Off | Gemma†† | Gemma Reviewer†† | Confirm tests exist in the affected area. **Implementation route:** local-first via `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL`; primary agent remains orchestrator, cloud implementation is escalation/fallback using the concrete takeover model in the task card. A ≥2-file task with heterogeneous per-module CC may instead use ADR-040 per-module split routing — see § Per-module complexity-split routing below. |
 | **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Gemma†† | Gemma Reviewer†† | Plan + explicit acceptance criteria required before approval. **Implementation route (ADR-038):** Muse Glimmer advisory refinement → primary hash-bound route receipt → cloud takeover with the full evidence bundle. A `GO_LOCAL` advisory result is recorded but never launches a local developer, **except** for modules independently qualifying under ADR-040 per-module split routing (Amendment 2) — see § Per-module complexity-split routing below. Review/approval rigor unchanged — 3 Reflection passes and this HITL gate still apply; phase-2 (and phase-1 when it applies) reviewer is Gemma, not the cross-vendor peer. |
 | **56–70** | Complex | **L** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Plan first. **Decompose into subtasks before implementation.** Human reviews the plan. |
@@ -260,15 +260,15 @@ SHA-256; it does not invoke a model itself.
   is `gpt-5.6-terra` at `medium`.
 
 The Low band is special: vendor model resolution does not apply to its normal
-primary-agent/local path. Resolve a cloud model only when an eligible Nemotron patch
+primary-agent/local path. Resolve a cloud model only when an eligible Qwen Developer patch
 attempt exhausts the bounded escalation path; use the Low row above and preserve
 the governing gate. Low-band tasks are otherwise handled directly by the primary
 agent or, for eligible simple code patches only, delegated to the local
-Ollama/Nemotron path. When delegation is used, use `OLLAMA_HOST` when set, otherwise
+Ollama/Qwen path. When delegation is used, use `OLLAMA_HOST` when set, otherwise
 `http://localhost:11434`. Use
 `DUBBRIDGE_LOW_RRI_MODEL` when set, otherwise
-`nemotron-3.5-lightning:30b-a3b-q4_K_M`. There is no implicit alternate local
-developer fallback: a missing or stalled Nemotron attempt follows the bounded
+`qwen3.8:27b-mlx`. There is no implicit alternate local
+developer fallback: a missing or stalled Qwen Developer attempt follows the bounded
 Low-band repair/escalation path.
 
 The Moderate band is special for **implementation routing**.
@@ -278,7 +278,7 @@ path. The card must name both the local implementer and the cloud-takeover
 trigger/model; `Codex` or `Claude` alone is not a resolved implementation value.
 The default implementation route for development tasks scoring
 **RRI 26–40** is the local agentic runner. Resolve the implementer from
-`DUBBRIDGE_LOCAL_AGENT_MODEL`, defaulting to `qwen3.6:35b-a3b`, and the Ollama
+`DUBBRIDGE_LOCAL_AGENT_MODEL`, defaulting to `qwen3.8:27b-mlx`, and the Ollama
 endpoint from `OLLAMA_HOST`, defaulting to `http://localhost:11434`. The runner
 preloads the complete authorized files and gives the model only the
 card-bound `write_file`/`apply_patch`/`finish` contract. Model-issued reads and
@@ -301,15 +301,15 @@ for config edits, doc updates, or tasks where the strategy is fully pre-defined.
 ### Low RRI handling
 
 For final **RRI 0–25**, the active agent remains the orchestrator and reviewer.
-The default path is direct execution by the primary agent. Local Nemotron delegation
+The default path is direct execution by the primary agent. Local Qwen Developer delegation
 is allowed only for **simple code patches**: narrow, mechanical code or test edits
-with a small allowed path set and low editorial risk. Do not use Gemma for docs,
+with a small allowed path set and low editorial risk. Do not use Qwen Developer for docs,
 plans, task ledgers, ADRs, policy/workflow edits, or structure-heavy multi-file
 changes even when they score in the Low band.
 
-When Gemma is used, it has no direct filesystem or shell authority; it returns
+When Qwen Developer is used, it has no direct filesystem or shell authority; it returns
 **full file contents** plus verification intent, and the caller (the script +
-orchestrating agent) deterministically builds the diff and applies it. Gemma must
+orchestrating agent) deterministically builds the diff and applies it. Qwen Developer must
 not evaluate, approve, or mark its own delegated work as complete; the delegating
 agent owns that decision.
 
@@ -328,7 +328,7 @@ Use `scripts/delegate-low-rri.py` to communicate with Ollama. The wrapper avoids
 shell-quoting failures, checks that the resolved model is installed, and uses the
 `/api/chat` endpoint with **`stream: true`**. Each received token resets an
 idle-timeout (default 60 s); a separate max-wall cap (default 900 s) guards
-against runaway generation. This distinguishes a stalled Gemma (no tokens for 60 s
+against runaway generation. This distinguishes a stalled Qwen Developer (no tokens for 60 s
 → exit 124) from a slow but working one (tokens still arriving), making the
 delegation reliable at any generation speed without imposing a blind wall-clock
 timeout against total generation time.
@@ -343,7 +343,7 @@ tool timeout (typically 120 s) does not abort a legitimately long generation:
 scripts/delegate-low-rri.py packet.md \
   --allow-path scripts/ --apply --out result.json
 # Exit 0  → read result.json (includes the built unified_diff + apply_result)
-# Exit 124 → Gemma stalled (idle) or hit the max-wall cap; escalate
+# Exit 124 → Qwen Developer stalled (idle) or hit the max-wall cap; escalate
 # Exit 2   → Ollama unreachable
 # Exit 1   → validation / out-of-scope path / git apply failure
 ```
@@ -359,7 +359,7 @@ The wrapper resolves:
 | Env var | Default | Purpose |
 |---|---|---|
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint |
-| `DUBBRIDGE_LOW_RRI_MODEL` | `nemotron-3.5-lightning:30b-a3b-q4_K_M` | Default Low/S local developer; no implicit local substitute |
+| `DUBBRIDGE_LOW_RRI_MODEL` | `qwen3.8:27b-mlx` | Default Low/S local developer; no implicit local substitute |
 | `DUBBRIDGE_LOW_RRI_IDLE_TIMEOUT_SECONDS` | `60` | Seconds without a token = stall |
 | `DUBBRIDGE_LOW_RRI_MAX_WALL_SECONDS` | `900` | Hard generation cap |
 | `DUBBRIDGE_LOW_RRI_NUM_CTX` | `16384` | Context window for packet + tagged contract |
@@ -391,12 +391,12 @@ and (with `--apply`) runs `git apply --check` followed by `git apply`, recording
 the diff under `unified_diff` and the outcome under `apply_result` in the result
 JSON. The orchestrator must still personally evaluate the applied result against
 all task requirements and acceptance criteria, and run the required checks — this
-evaluation is performed by the delegating agent, not by Gemma. If requirements are
+evaluation is performed by the delegating agent, not by Qwen Developer. If requirements are
 missed or checks fail, the orchestrator may run one bounded repair request through
-Gemma with the same allowed paths and the failure evidence. A second failure, an
+Qwen Developer with the same allowed paths and the failure evidence. A second failure, an
 out-of-scope path, invalid tagged response, unavailable Ollama/model, or a
 post-application RRI above 25 must escalate to the normal human-gated workflow.
-If the delegation times out (exit 124), report it explicitly as `Gemma timeout
+If the delegation times out (exit 124), report it explicitly as `Qwen Developer timeout
 (idle|wall)` in the final task summary.
 
 ### Moderate local-first handling
@@ -408,7 +408,7 @@ For final **RRI 26–40**, the implementation default is **local-first**:
 - the code-authoring surface is `scripts/local-agent/run_local_task.py` in a
   disposable worktree;
 - the implementer resolves from `DUBBRIDGE_LOCAL_AGENT_MODEL` (default
-  `qwen3.6:35b-a3b`);
+  `qwen3.8:27b-mlx`);
 - tool-call-time and post-run `allowed_paths` scope enforcement are mandatory;
 - the local path has a maximum of **2 repair attempts**, each requiring new
   evidence;
@@ -431,7 +431,7 @@ Bindings used by the operative local-first route:
 | Env var | Default | Purpose |
 |---|---|---|
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint |
-| `DUBBRIDGE_LOCAL_AGENT_MODEL` | `qwen3.6:35b-a3b` | Default local implementer for RRI 26–40 (Moderate/M) |
+| `DUBBRIDGE_LOCAL_AGENT_MODEL` | `qwen3.8:27b-mlx` | Default local implementer for RRI 26–40 (Moderate/M) |
 
 **Rollback triggers:** revert Moderate-band implementation to the cloud path if
 the rolling 20-task window shows escalation rate `> 40%`, any accepted
@@ -877,16 +877,16 @@ Run the script, then store its markdown output unchanged in the task ledger or a
 linked RRI artifact. Do not recompute it. The script output **is** the full RRI
 report; the approval card is only its compact decision projection.
 
-## Gemma Developer vs. Gemma Reviewer
+## Qwen Developer vs. Gemma Reviewer
 
 The **Low band (0–25)** distinguishes two separate local model roles:
 
 | Role | When | Can write files? | Can approve? |
 |---|---|---|---|
-| **Gemma Developer** | Simple code patch delegation | Yes (tagged-block contract) | No |
+| **Qwen Developer** | Simple code patch delegation | Yes (tagged-block contract) | No |
 | **Gemma Reviewer** | Post-implementation code review for RRI 0–25 development tasks | No | No |
 
-A task may use Gemma Developer for its implementation and Gemma Reviewer for its
+A task may use Qwen Developer for its implementation and Gemma Reviewer for its
 code review in separate invocations. Gemma Reviewer must not be used as a
 substitute for the primary agent's final Reflection cycle; it is advisory input
 to that cycle.
