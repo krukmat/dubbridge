@@ -54,7 +54,7 @@ ledger.
 |---|---|---|---|---|---|
 | T0 | Slice plan, ledger, and roadmap entry | docs-only | S | — | [x] Done |
 | T1 | S3/Spaces credential and region wiring | development | M | T0 | [x] Done |
-| T1b | API preparation queue bound to Redis | development | M | T0 | [ ] Planned |
+| T1b | API preparation queue bound to Redis | development | M (recomputed, RRI 35 Moderate) | T0 | [ ] Implementation complete — owner verification pending |
 | T2 | Migration runner in the production path | development | M | T0 | [ ] Planned |
 | T3 | Real readiness probes for api and gateway | development | M | T0 | [ ] Planned |
 | T3b | Cross-language subtitle translation pipeline (S-150 reopening) | development parent | XL | T0 | [ ] Planned — approval pending per child |
@@ -489,7 +489,9 @@ Required passes: 3 (`43` → `Med-high`)
 ## S-230-T1b: API preparation queue bound to Redis
 
 **Type:** development
-**Effort:** M (provisional Moderate; recompute with `scripts/rri.py`)
+**Effort:** M (recomputed and confirmed Moderate — see RRI note below; the
+provisional M estimate was briefly superseded by a mis-scored Med-high draft,
+then corrected back to Moderate)
 **Depends on:** S-230-T0
 **Status:** [ ] Planned — approval pending
 
@@ -552,9 +554,51 @@ currently serve an authenticated API.
 and possibly `crates/jobs/src/lib.rs` for a shared constructor seam. Recompute the
 exact list before presentation.
 
-**Evidence to emit:** RRI report, phase-1 and phase-2 review artifacts, evidence
-that a real worker consumed an API-enqueued job, Reflection log if the band
-requires it, unit coverage certification, owner verification.
+**RRI:** 35 (Moderate, 26–40). `--auto-cc` measured CC=1 across both
+currently-known touched files (no cognitive-complexity warnings).
+
+An earlier draft of this note scored RRI 41 (Med-high) by raising D and K to
+4 using the RRI policy's general scoring-band language for "async
+orchestration" / "queues". That was inconsistent with this ledger's own
+precedent: `S-230-T1`'s recorded RRI note (above) hit the identical
+D/K-floor-vs-general-band ambiguity for `crates/storage` — the anchor
+rubric's `crates/jobs`/`crates/storage`/... row literally contains the phrase
+"async orchestration" at floor D/K/P=3, while the general D band separately
+lists "async orchestration" at D=4 — and explicitly resolved it by **keeping
+the floor** ("the floor, not the CC measurement, is what governs here").
+Recomputed consistently with that precedent:
+
+- **D=3, K=3, P=3** — anchor-rubric floor for the `crates/jobs`/async-
+  orchestration row (ADR-006, ADR-018), not raised, matching T1's approach.
+  P is not raised toward 4/5: this task changes an internal constructor
+  signature, not a public route, `apps/gateway/src/auth/**`, `crates/auth`,
+  or a rights/audit path.
+- **T=2** ("partial tests exist"), grounded in actual test evidence rather
+  than guessed: `apps/api/tests/ingestion_test.rs:150` already has a working
+  harness that constructs `AppState::with_preparation_queue` with an
+  observable `InMemoryPreparationJobQueue` and exercises the finalize
+  enqueue path end to end. The area is not untested — what's net-new and
+  uncovered is specifically the Redis-backed construction and the
+  consolidated (`auth_service` + injected queue) constructor. An earlier
+  pass under-evidenced this as "T=2 apps/main.rs has unrelated auth tests
+  only" without checking `ingestion_test.rs`; checking it changes nothing
+  about the final T value but grounds it in evidence instead of a guess.
+- **A=1** (task has explicit HP/EC and acceptance criteria in this ledger).
+- **X=2** (2 files: `apps/api/src/state.rs` + `apps/api/src/main.rs`).
+
+This reading is not on a band boundary (35 sits mid-Moderate, not adjacent to
+41), so it is more stable than the earlier 41 call, which pivoted on a single
+un-evidenced point (T=3 vs T=4 would have flipped it either way). Recorded
+plainly as a correction, not silently overwritten, since the earlier number
+was already shown to you.
+
+**Evidence to emit:** RRI report, phase-1 and phase-2 Gemma review artifacts,
+evidence that a job enqueued through the API's configured queue is visible to
+a Redis-backed consumer, 2-pass Reflection log, unit coverage certification,
+owner verification. (Corrected from an earlier draft of this line that
+carried over ADR-038/Muse Glimmer/3-pass language from the mis-scored RRI 41
+Med-high draft above — this task's confirmed RRI is 35, Moderate, which uses
+the direct local-first route and 2 Reflection passes, not ADR-038.)
 
 **Status artifacts affected:** this ledger; the plan's G10 entry.
 
@@ -566,6 +610,223 @@ behavior, the job payload, or the queue namespace.
 **Stop condition:** Stop once a Redis-backed consumer is shown to receive an
 API-enqueued job. Do not start T2 and do not touch the worker-runner's worker
 registration.
+
+**Task-analysis review:** gemma `docs/audit/gemma-evidence/s-230-t1b-phase1.json` - PASS
+
+### Implementation routing evidence
+
+**Whole-task route:** RRI 35 (Moderate). Presented and approved in a prior
+session; routed through the direct local-first path
+(`scripts/local-agent/run_local_task.py`, `DUBBRIDGE_LOCAL_AGENT_MODEL`) per
+`docs/policies/HITL_AUTONOMY_POLICY.md § Local-first implementation (RRI
+26-40 Moderate)`. Both evidence-backed local repair attempts were exhausted
+(`.agent/local-runs/s-230-t1b/attempt1.json`, `attempt2.json`) without a
+usable in-scope patch, triggering
+`docs/policies/HITL_AUTONOMY_POLICY.md § Post-repair-budget Low-band
+decomposition` (owner directive 2026-08-16): decompose the remaining work
+into Low-band (RRI 0-25) subtasks rather than escalate to cloud, orchestrator
+acting as orchestrator only.
+
+**Low-band subtasks dispatched** (all via `scripts/delegate-low-rri.py`,
+personally reviewed by the orchestrator against acceptance criteria before
+any patch was applied — build, test, clippy `-D warnings`, and `cargo fmt
+--check` re-verified after every apply):
+
+| Subtask | RRI | Scope | Attempts | Outcome |
+|---|---|---|---|---|
+| S-230-T1b-low-a | 24 | `apps/api/src/state.rs`: `with_auth_service_and_preparation_queue` constructor + 2 unit tests | 6 (see below) | Landed on attempt 6 (`muse-glimmer:30b-q4_K_M`) |
+| S-230-T1b-low-b | 24 | `apps/api/src/main.rs`: Redis connect + constructor call site | 2 (`qwen3.8:27b-mlx`) | Landed on attempt 2 |
+| S-230-T1b-low-c1 | 4 | `apps/api/Cargo.toml`: `apalis`/`apalis-redis` dev-dependencies | 1 (`qwen3.8:27b-mlx`) | Landed on attempt 1 |
+| S-230-T1b-low-c2 | 20 | `apps/api/tests/redis_preparation_queue_test.rs` (new file): Redis-consumer-visibility integration test | 1 (`qwen3.8:27b-mlx`) | Landed on attempt 1 |
+
+**Subtask A attempt detail** (`.agent/local-runs/s-230-t1b/low-band/`):
+attempt 3 (`qwen3.8:27b-mlx`) failed to compile — the orchestrator's own
+packet specified a nonexistent `InMemoryStorageAdapter` and a fictional
+4-string-argument `enqueue`, corrected in place by reading
+`crates/storage/src/lib.rs` and `crates/jobs/src/lib.rs` directly rather than
+guessing (root cause: orchestrator packet error, not the model). Attempt 4
+(`qwen3.8:27b-mlx`, corrected packet) regressed by deleting the pre-existing
+`with_preparation_queue` function — root cause: an oversized BEFORE anchor
+plus an ambiguous "replace your test module" instruction let the model
+over-scope (again an orchestrator packet defect). Attempts 5
+(`qwen3.8:27b-mlx`) and 6 (`muse-glimmer:30b-q4_K_M`, escalated per the
+documented Low-band reviewer/developer fallback chain after two consecutive
+same-class failures) both independently reproduced the identical
+`unexpected closing delimiter` defect against a minimal 2-line append-only
+anchor — cross-model reproduction of the same defect against the same packet
+is what isolated the root cause to the orchestrator's own packet (an anchor
+that closed `impl AppState` combined with append content that assumed the
+block was still open), not either model. The packet was rewritten to append
+a complete, self-contained second `impl AppState { ... }` block, removing
+the ambiguity; the rewritten packet landed cleanly on the next dispatch.
+
+**Subtask B attempt detail:** attempt 1 (`qwen3.8:27b-mlx`) correctly
+returned `BLOCKED` rather than guessing, because the orchestrator's
+first-draft packet described the required edit in prose without embedding
+the literal BEFORE anchor text (unlike subtask A's packet) — again an
+orchestrator packet defect, not a model failure; the model's refusal to
+proceed without seeing real file content was the correct behavior. The
+packet was rewritten with an explicit BEFORE/AFTER block (verified
+byte-unique against the real file before dispatch) and landed on the next
+attempt.
+
+**Acceptance-criteria gap found during closure, not part of the original
+decomposition:** the ledger's acceptance criteria required "an
+integration-level test proves a job enqueued through the API's configured
+queue is visible to a Redis-backed consumer, not only that `enqueue`
+returned `Ok`" — subtasks A and B did not cover this (they only added unit
+tests using `InMemoryPreparationJobQueue` as a test double). Discovered
+during the orchestrator's own closure review (re-reading the ledger's
+acceptance criteria against the applied diff), not flagged by any model.
+Decomposed into subtasks C1 (dev-dependency wiring) and C2 (the test itself,
+mirroring the already-proven `crates/jobs::redis_enqueued_job_is_retrievable_from_its_namespace`
+pattern through `AppState`'s own constructor). The Makefile's `qa-test-redis`
+target was deliberately NOT extended to cover this new test in this task —
+`Makefile` recipe lines are tab-indented and a local-model transcription
+error there fails silently (`*** missing separator`) in a way `cargo
+build`/`clippy` cannot catch; wiring it in is left as an explicit follow-up.
+The new test documents its own manual run command instead
+(`cargo test -p dubbridge-api --test redis_preparation_queue_test --
+--ignored`, requires `DUBBRIDGE_REDIS_URL`) and was verified for real against
+a local Redis instance (`redis://127.0.0.1:6379/15`, matching the db index
+already used by the project's own `qa-test-redis` documentation) before and
+after delegation.
+
+**Whitespace-only mechanical fixes applied directly by the orchestrator**
+(the narrow "mechanical, lint-driven refactor of already-verified logic, no
+behavior change" exception in `docs/policies/HITL_AUTONOMY_POLICY.md §
+Post-repair-budget Low-band decomposition`, step 7): `cargo fmt` was run
+after landing subtasks A, B, and C2, each time correcting only indentation
+(an extra space on continuation lines from the local models' text
+formatting) — re-verified with `cargo build`, `cargo test`, and `cargo
+clippy -D warnings` after each fmt pass. No logic was authored directly by
+the orchestrator at any point in this task.
+
+**Net authorship split:** 100% of production and test logic was authored by
+local models (`qwen3.8:27b-mlx`, `muse-glimmer:30b-q4_K_M`) across 4
+Low-band delegations; the orchestrator's direct contribution was limited to
+diagnosis (reading real crate signatures before writing packets), packet
+construction/correction across 3 rounds of root-cause analysis, review, and
+mechanical `cargo fmt` normalization.
+
+### Reflection log
+
+Required passes: 2 (`35` -> `Moderate`)
+
+#### Pass 1
+
+- **Draft verdict:** all four subtasks (A/B/C1/C2) applied together; build,
+  86 non-ignored tests, the ignored Redis integration test (against a real
+  local Redis instance), `cargo clippy -D warnings`, and `cargo fmt --check`
+  all pass clean.
+- **Critique findings:**
+  - HP-1's ledger wording ("the worker observes and executes it") is a
+    stronger claim than what the new integration test actually exercises:
+    the test proves visibility via an independent `apalis_redis::RedisStorage
+    ::fetch_by_id` probe in the same namespace a worker polls (mirroring the
+    project's own precedent test in `crates/jobs`), not a live worker
+    process popping and executing the job end to end. The task's own
+    acceptance-criteria bullet ("proves a job... is visible to a
+    Redis-backed consumer, not only that `enqueue` returned `Ok`") is the
+    narrower, authoritative bar and is fully met; standing up a live
+    `apalis` `WorkerBuilder` consumer loop for this task would be
+    disproportionate scope. Recorded as an explicit interpretation rather
+    than silently claiming full end-to-end HP-1 coverage.
+  - EC-1 (fail-closed on enqueue error) is untouched by this task
+    (`apps/api/src/routes/ingestion.rs` has zero diff) and already has a
+    dedicated pre-existing test
+    (`finalize_marks_preparation_failed_when_enqueue_fails`) — confirmed
+    still passing, no regression.
+  - EC-3 ("misconfigured `redis_url` surfaces at boot") cannot be unit
+    tested at the `main()` level (it is the binary entrypoint and blocks on
+    `axum::serve`); the underlying fail-closed connect behavior it depends
+    on is already unit-tested at `crates/jobs::redis_queue_fails_closed_on_malformed_url`
+    / `redis_queue_fails_closed_on_unreachable_server`, and the boot-order
+    guarantee itself follows from `?` inside `async fn main() ->
+    anyhow::Result<()>` propagating before any later statement (including
+    `axum::serve`) runs — a Rust language guarantee, not something that
+    needs a bespoke test.
+  - No adjacent-module side effects: the six constructor parameters are all
+    distinct types, so the compiler would reject any transposed-argument
+    regression; already build-verified.
+  - `TempDir` lifetime in the new integration test: `storage_dir` is bound
+    for the full test function scope, matching the existing working pattern
+    in `apps/api/tests/ingestion_test.rs` — no early-drop risk.
+- **Revisions applied:** none required; findings were interpretation notes
+  to record explicitly, not defects.
+
+#### Pass 2
+
+- **Draft verdict:** stable; incorporating Gemma Reviewer's phase-2 finding
+  as input per policy.
+- **Critique findings:** Gemma Reviewer (3/3 passes, consensus) flagged that
+  `with_auth_service_and_preparation_queue` duplicates
+  `workspace_service: pg_workspace_service(pool.clone())` construction
+  already present in `new`, `with_auth_service`, `with_workspace_service`,
+  and `with_preparation_queue` (`nit` severity). Verified by direct
+  inspection (`grep -n pg_workspace_service apps/api/src/state.rs`): this
+  duplication is a **pre-existing pattern across all four prior
+  constructors**, not a regression introduced by this task — the new
+  constructor follows the exact established convention. A builder-pattern
+  refactor across all of `AppState`'s constructors is explicitly out of this
+  task's scope (its own "do not do this" boundary: "Do NOT modify the
+  existing `new`, `with_auth_service`, `with_workspace_service`, or
+  `with_preparation_queue` functions or their signatures") and would touch
+  every call site in the crate, warranting its own separately-scoped task.
+- **Revisions applied:** none in this task's scope; disposition recorded as
+  `accepted-follow-up` (valid observation, pre-existing pattern, deferred to
+  a future AppState-constructor cleanup task, not this one).
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma`
+- Command: `REVIEW_PATHS="apps/api/src/state.rs apps/api/src/main.rs apps/api/Cargo.toml apps/api/tests/redis_preparation_queue_test.rs" GEMMA_REVIEW_TASK_ID=s-230-t1b make qa-gemma-review`
+- Artifact: `docs/audit/gemma-evidence/s-230-t1b.json`
+- Verdict: PASS
+- Findings: 1 consensus `nit` (duplicated `workspace_service` construction,
+  pre-existing pattern — see Reflection log Pass 2)
+- Muse Glimmer fallback: not triggered — reason: n/a (Gemma responded with a
+  usable 3/3-pass consolidated result)
+- D14 fallback: not triggered — reason: n/a
+- D14 provider route: n/a
+- disposition_divergence: none
+- Primary-agent disposition: accepted the finding as valid but out of this
+  task's scope (pre-existing duplication pattern across all AppState
+  constructors); no code change made in response
+
+Code-solution review: gemma `docs/audit/gemma-evidence/s-230-t1b.json` - PASS
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | job enqueued through the API's configured (Redis) queue is visible to a Redis-backed consumer via the same namespace/fetch mechanism a worker polls | `apps/api/tests/redis_preparation_queue_test.rs::job_enqueued_through_api_configured_queue_is_visible_to_redis_consumer` (requires `DUBBRIDGE_REDIS_URL`; verified against a real local Redis instance) | passed |
+| HP-2 | Happy path | `AppState` carries both a real auth service and an injected preparation queue at once | `apps/api/src/state.rs::tests::with_auth_service_and_preparation_queue_sets_auth_service`, `apps/api/src/state.rs::tests::with_auth_service_and_preparation_queue_uses_passed_queue` | passed |
+| EC-1 | Edge case | Redis-unreachable enqueue failure fails closed: `preparation_status = Failed`, 500 response | `apps/api/tests/ingestion_test.rs::finalize_marks_preparation_failed_when_enqueue_fails` (pre-existing, unmodified by this task, re-verified passing) | passed |
+| EC-2 | Edge case | `InMemoryPreparationJobQueue` remains usable as a test double after this task | `apps/api/src/state.rs::tests::with_auth_service_and_preparation_queue_uses_passed_queue` (uses `InMemoryPreparationJobQueue` directly); full existing `apps/api/tests/ingestion_test.rs` suite (which also uses it) re-verified passing with no regression | passed |
+| EC-3 | Edge case | misconfigured `redis_url` fails the process at boot, not on first request | `crates/jobs/src/lib.rs::tests::redis_queue_fails_closed_on_malformed_url`, `crates/jobs/src/lib.rs::tests::redis_queue_fails_closed_on_unreachable_server` (fail-closed connect behavior this task's `main.rs` wiring depends on); boot-ordering itself follows from Rust's `?`-propagation semantics in `apps/api/src/main.rs`'s `async fn main() -> anyhow::Result<()>`, verified by code inspection (not independently unit-testable without spawning the binary as a subprocess) | passed |
+
+### Owner final verification
+
+- Owner: **pending — requires explicit sign-off from the human owner before
+  this task can be marked `[x] Done`.** The orchestrator cannot self-certify
+  this step; per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Development task
+  closure checklist`, Step 4 is a human act, not an automated or
+  agent-authored one.
+- Suggested statement (for the owner to confirm or amend): "I verified every
+  happy path and edge case defined for this task has unit test evidence that
+  replicates the expected behavior, with HP-1 and EC-3 covered by evidence at
+  the narrower/underlying level documented above rather than a bespoke
+  end-to-end test, for the reasons stated in the Reflection log and
+  certification table."
+- Commands available for independent verification: `cargo build -p
+  dubbridge-api`, `cargo test -p dubbridge-api`,
+  `DUBBRIDGE_REDIS_URL=redis://127.0.0.1:6379/15 cargo test -p dubbridge-api
+  --test redis_preparation_queue_test -- --ignored --test-threads=1`,
+  `cargo clippy -p dubbridge-api --all-targets -- -D warnings`, `cargo fmt -p
+  dubbridge-api --check`
+
+**Status:** [ ] Implementation complete — owner verification pending
 
 ---
 

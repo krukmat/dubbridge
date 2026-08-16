@@ -225,6 +225,22 @@ constructor that takes both, plus Redis wiring in `main.rs`.
 
 Tracked as `S-230-T1b`.
 
+**Resolved 2026-08-16 (implementation complete, owner verification
+pending):** `apps/api/src/state.rs` gained
+`AppState::with_auth_service_and_preparation_queue`, carrying both a real
+auth service and an injected queue; `apps/api/src/main.rs` now connects
+`RedisPreparationJobQueue::connect(&config.redis_url)` at startup (failing
+the process at boot on a bad URL) and uses the new constructor.
+`InMemoryPreparationJobQueue` is no longer reachable from any binary's
+production startup path — only from test code, where it remains a valid
+double. A new integration test
+(`apps/api/tests/redis_preparation_queue_test.rs`, requires
+`DUBBRIDGE_REDIS_URL`) proves a job enqueued through the API's configured
+queue is visible to a Redis-backed consumer via the same namespace/fetch
+mechanism a worker polls, not only that `enqueue` returned `Ok`. Full
+evidence, Reflection log, and closure record: `docs/tasks/s-230-poc-v1-digitalocean.md`
+§ S-230-T1b.
+
 ### G11 — `config/production.toml` has no `[auth]` block, so no binary boots
 
 Added 2026-08-16 by the same review.

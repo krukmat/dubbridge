@@ -695,6 +695,8 @@ name = "dubbridge-api"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "apalis",
+ "apalis-redis",
  "async-trait",
  "axum 0.8.9",
  "dubbridge-audit",

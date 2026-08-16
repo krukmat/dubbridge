@@ -36,6 +36,8 @@ async-trait = "0.1"
 jsonwebtoken.workspace = true
 tower = { version = "0.5", features = ["util"] }
 dubbridge-media = { path = "../../crates/media" }
+apalis.workspace = true
+apalis-redis.workspace = true
 
 [lints]
 workspace = true

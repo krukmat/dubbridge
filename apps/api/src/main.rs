@@ -26,12 +26,18 @@ async fn main() -> anyhow::Result<()> {
     let storage_config = dubbridge_storage::StorageConfig::from(&config.storage);
     let storage = dubbridge_storage::build_adapter(&storage_config)
         .context("failed to initialize configured storage backend")?;
-    let app_state = Arc::new(AppState::with_auth_service(
+    let preparation_queue = Arc::new(
+        dubbridge_jobs::RedisPreparationJobQueue::connect(&config.redis_url)
+            .await
+            .context("failed to connect preparation Redis queue")?,
+    );
+    let app_state = Arc::new(AppState::with_auth_service_and_preparation_queue(
         pool,
         storage,
         verifier.clone(),
         config.clone(),
         auth_service,
+        preparation_queue,
     ));
     let api_port = app_state.config.api_port;
     let resolved_env = app_state.config.env.clone();
