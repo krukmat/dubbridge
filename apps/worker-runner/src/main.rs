@@ -37,6 +37,9 @@ mod subtitle_runtime;
 #[cfg(test)]
 mod subtitle_runtime_tests;
 mod transcription_runtime;
+mod translation_fanout;
+#[cfg(test)]
+mod translation_fanout_tests;
 
 const ASR_WORKER_RELATIVE_PATH: &str = "workers/asr-worker-py/main.py";
 const WORKER_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(10);

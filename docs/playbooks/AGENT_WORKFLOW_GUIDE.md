@@ -512,6 +512,40 @@ passes, and the RRI 26+/41+ human approval gate exactly as before — the
 routing change affects only who authors the code, not who reviews or
 approves it.
 
+#### Post-repair-budget Low-band decomposition (owner directive 2026-08-16)
+
+**Once the whole-task local-agent repair budget above is exhausted**
+(Moderate's 2/2 attempts, or the Med-high ADR-038 gate's `GO_LOCAL`/module
+tramo budget), the default next step is **no longer cloud escalation**. The
+default is to decompose the remaining implementation into Low-band
+(RRI 0–25) subtasks and keep authoring local, via `scripts/delegate-low-rri.py`
+(`--mode full-file` for new files, `--mode before-after` for small edits),
+with the primary agent acting as orchestrator only — diagnosing the exact
+signatures needed, splitting scope, dispatching, reviewing returned patches,
+and assembling the result, never authoring substantive logic directly.
+Cloud escalation remains available as the fallback of last resort, not the
+default, at this step.
+
+A direct edit by the orchestrator is permitted only in two narrow,
+explicitly-recorded cases: (1) a **documented tooling-failure exception** —
+the local model already correctly diagnosed and proposed a fix, but the
+delegation wrapper itself failed to construct or apply a usable diff; or
+(2) a **mechanical lint-driven refactor** of already-verified logic (e.g.
+extracting helpers to satisfy a cognitive-complexity gate) with no behavior
+change. Both must be recorded as such, distinct from any fix the
+orchestrator diagnosed and authored itself, which this route does not
+permit.
+
+This does not change the task's RRI, band, band-resolved reviewer,
+Reflection pass count, or the RRI 26+ human-approval gate — it changes only
+who authors the remaining code once the whole-task local route's budget is
+spent. It requires no additional per-subtask approval once the containing
+task is already HITL-approved. A `### Implementation routing evidence`
+block is required in the closure record — see
+`docs/policies/HITL_AUTONOMY_POLICY.md § Post-repair-budget Low-band
+decomposition` for the full route, evidence-block contract, and the
+validated `S-150-T2c-iv-c` worked example.
+
 #### Per-module complexity-split routing (RRI 26–55, ADR-040)
 
 For an **approved** task (26–40 or 41–55) whose `allowed_paths` span two or

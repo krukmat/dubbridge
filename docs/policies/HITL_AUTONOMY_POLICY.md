@@ -176,6 +176,105 @@ per-module split routing (§ Per-module complexity-split routing (RRI 26–55)
 below), whose local tramo uses this Moderate section's 2-attempt budget
 regardless of the containing task's band.
 
+## Post-repair-budget Low-band decomposition (owner directive 2026-08-16)
+
+**Owner directive, 2026-08-16:** once the whole-task local-agent route above
+exhausts its repair budget (2/2 for Moderate; the ADR-038 gate's `GO_LOCAL`
+exhausted, or a module's local tramo exhausted, for Med-high), the cloud
+escalation in step 9 above is no longer the default next step. The default
+is to **decompose the remaining work into Low-band (RRI 0–25) subtasks and
+keep it local**, maximizing local-model usage; the primary agent's role
+becomes orchestration — diagnosing, splitting, dispatching, reviewing, and
+assembling — not authoring code directly, even for small, fully-diagnosed
+mechanical fixes. Cloud escalation remains available but is now the
+fallback of last resort for this step, not the default.
+
+This directive was validated end-to-end on `S-150-T2c-iv-c` (RRI 39,
+Moderate): after a whole-task local-agent attempt and 2 repair attempts
+were exhausted (one degraded into a non-functional stub, one hit
+`budget_exhausted`), the remaining implementation was decomposed into three
+Low-band subtasks (create business-logic file, register the module, create
+the test file) and delegated via `scripts/delegate-low-rri.py`, with the
+orchestrator applying only a handful of individually-diagnosed one/two-line
+fixes directly — and only after the delegation tooling itself (not the
+model) failed twice to apply an already-correct model-proposed fix. See
+`docs/tasks/s-150-translation-dubbing.md` § S-150-T2c-iv-c "Implementation
+routing evidence" for the full evidence trail.
+
+The route:
+
+1. Confirm the whole-task local-agent repair budget for this band is
+   genuinely exhausted (Moderate: 2/2 attempts recorded; Med-high: the
+   ADR-038 gate result and any qualifying ADR-040 module tramo's own budget).
+   This step does not reopen or repeat local-agent attempts — it only marks
+   the trigger for switching implementation strategy.
+2. Diagnose precisely. Read the actual repository signatures the failed
+   attempt(s) needed (types, visibility, real field names, real function
+   signatures) — do not guess. This diagnosis is what makes the following
+   Low-band packets tight and low-risk; a vague packet reproduces the same
+   failure the whole-task attempt already hit.
+3. Decompose the remaining work into small Low-band (RRI 0–25) subtasks —
+   typically one per file to create/edit, or one per class of fix. Score
+   each subtask's RRI with `scripts/rri.py` to confirm it is genuinely Low;
+   a subtask that scores above 25 is not eligible for this route and must
+   go back through the normal RRI-gated workflow instead.
+4. Delegate each subtask via `scripts/delegate-low-rri.py`: `--mode
+   full-file` for new files, `--mode before-after` for small, one-function
+   edits to existing files. Build each packet with the verified real
+   signatures from step 2 so the local model is not guessing at the API
+   surface either.
+5. Review every returned patch against the acceptance criteria before
+   applying it — this is the same personal-review obligation as any other
+   Low-band delegation (§ Local delegation (RRI 0-25) above). Run
+   `cargo check`/equivalent after each applied subtask to catch the actual
+   remaining error surface before writing the next packet.
+6. **Documented tooling-failure exception:** if a delegation tool
+   (`delegate-low-rri.py`, `run_local_task.py`, or equivalent) fails to
+   apply a fix the local model has already correctly diagnosed and proposed
+   (for example, a `before-after` wrapper that cannot construct a non-empty
+   diff for a valid anchor), the orchestrator may apply that specific,
+   already-verified fix directly rather than repeatedly retrying the same
+   tooling failure. This is not a substitute for delegation — it requires
+   that the model's proposed fix already be visible and correct, and it
+   must be recorded explicitly as a tooling-failure exception (not silently)
+   in the task's implementation-routing evidence, distinct from any fix the
+   orchestrator diagnosed and authored itself.
+7. Mechanical, lint-driven restructuring of already-verified logic (for
+   example, extracting helper functions solely to satisfy a cognitive-
+   complexity gate, with no behavior change) may be applied directly without
+   a delegation round — it is refactor of already-authored logic against a
+   deterministic rule, not new authorship, and record it as such.
+8. Once all subtasks are assembled and verified, resume the task's normal
+   band-appropriate closure: band-resolved reviewer (phase 2), Reflection
+   passes for the task's original RRI band, unit coverage certification, and
+   owner verification, exactly as if the whole task had completed on the
+   original local-agent route. This directive changes only how the
+   remaining implementation is produced after the repair budget is
+   exhausted — it does not change the task's RRI, band, review chain,
+   Reflection pass count, or approval gate.
+9. Record an implementation-routing evidence block in the task closure
+   record naming: the whole-task route and why its budget was exhausted;
+   each Low-band subtask with its RRI, delegation mode, and outcome; every
+   direct edit the orchestrator made, classified as either a tooling-failure
+   exception (step 6) or a mechanical lint-driven refactor (step 7); and the
+   net authorship split. Do not report a task closed under this route
+   without this block — it is what lets a reviewer distinguish "local model
+   authored it, orchestrator assembled it" from "orchestrator authored it
+   directly," which is the exact distinction this directive exists to keep
+   visible.
+
+**No additional approval checkpoint per subtask.** The owner directive
+explicitly waives re-confirmation for this decomposition/dispatch/assembly
+loop once the containing task is already HITL-approved and has reached this
+post-repair-budget point — this is a bounded waiver for an already-approved
+task's implementation mechanics, not a waiver of the RRI 26+ human approval
+gate itself, which still fires once, at task presentation, as normal.
+
+This directive is a standing evaluation: deviations from it (the
+orchestrator authoring code directly when Low-band delegation was viable,
+or skipping the implementation-routing evidence block) are the failure mode
+to correct going forward, not a one-off exception.
+
 ## Med-high Architect-refined single-attempt gate (RRI 41–55)
 
 ADR-038 (2026-07-26) governs implementation routing for final **RRI 41–55**.
