@@ -337,6 +337,180 @@ three stay as recorded observations.
   The block must still hold non-localhost URLs to pass
   `GatewaySettings::validate`, so the placeholders stay.
 
+## Demo-quality review (2026-08-16)
+
+Owner question: does the POC as scoped show the product's potential, or does the
+scope need to change? The gap list above answers "will it run"; this section
+answers "will it read as DubBridge". None of these findings is deploy-blocking —
+they are demo-narrative gaps, evaluated against the runtime surface.
+
+**Framing.** POC v1 stops at `S-140`. `S-140` turns the S-130 timed transcript
+into a canonical subtitle artifact (`docs/plan/s-140-subtitle-generation.md`
+§Purpose) — subtitles in the **source** language. Cross-language output is
+`S-150`, parked. `README.md:3` states the product as "takes a video filmed in one
+language and turns it into a version people can watch in another — with new
+spoken audio and subtitles". The POC therefore demonstrates the governed pipeline
+and the platform invariants end to end, and demonstrates **no cross-language
+capability at all**. That is a deliberate consequence of the frozen scope, not a
+defect, but it decides which audience the POC is for and must be stated
+explicitly rather than discovered during a demo.
+
+### G14 — Language renders as a raw UUID in the reviewer surface
+
+`ReviewInboxScreen.tsx:29` renders `formatId(task.target_language_id) ||
+"Language TBD"` as the card title, and `ReviewDetailScreen.tsx:47` renders the
+full `task.target_language_id`. `formatId` (`mobile/src/format/index.ts:65`) only
+truncates a string; it resolves nothing. `project_target_languages` already
+carries `source_lang` / `target_lang` and the mobile app already renders them in
+`ProjectDetailScreen.tsx:22`, `:54`.
+
+**Consequence:** in a localization product, the reviewer's primary axis is shown
+as `a3f2c1d0…`. Low cost to fix (resolve the id to its language pair on the
+review DTO); disproportionate effect on how the demo reads.
+
+### G15 — No pipeline visibility and no "ready to review" signal
+
+`apps/api/src/lib.rs:30`–`38` mounts auth, compliance, ingestion, notifications,
+playback, review and workspace. There is no transcription/subtitle/preparation
+status route, and `mobile/src/api/` has no asset-processing client. The mobile
+surface shows only `asset.status` (`AssetDetailScreen.tsx:59`, `:109`), which is
+the ingestion status.
+
+Notifications exist but fire on the wrong side of the pipeline:
+`apps/api/src/review_gate.rs` inserts them in `approve_review_task` (`:224`),
+`reject_review_task` (`:258`) and `publish_review_task` (`:315`) — reviewer
+decisions. `apps/worker-runner/src/review_enqueue.rs` emits none when the review
+task is created.
+
+**Consequence:** after finalize, the uploader sees a terminal-looking state while
+ffmpeg and faster-whisper run for minutes, with no progress, no ETA, and no
+notification when subtitles are ready. Discovering the result requires manually
+opening the review inbox. On a live demo this is several minutes of dead screen
+at the exact moment the product is supposed to be working.
+
+### G16 — T8 is the demo's core and is currently the second thing dropped
+
+The ten-day sequence drops `T8` (subtitle visible in review) second, ahead of
+only `T7c`. The plan itself records the cost: "a reviewer approving content they
+cannot see is a visible hole in the product story". Combined with G14, dropping
+T8 leaves a reviewer approving an unnamed language whose content is not shown.
+
+**Recommendation:** T8 is not interchangeable with T7b as buffer. Reordering the
+soft-day drop list so T8 survives is a scope-neutral change to the sequence, not
+new work.
+
+### G17 — Configured target languages are inert in the POC path
+
+`ProjectDetailScreen.tsx:22`, `:54`–`:74` lets an operator see per-project
+`source_lang` / `target_lang` rows, and `apps/worker-runner/src/main.rs:105`–
+`109` registers exactly three workers (preparation, transcription, subtitle) with
+no translation consumer. A POC user can therefore configure target languages that
+nothing acts on.
+
+**Consequence:** the UI advertises the parked capability. Either the demo script
+avoids that screen, or the surface says explicitly that translation targets are
+not yet processed. This is copy, not code.
+
+### Assessment
+
+The POC is sound for a **platform/risk** audience: it proves the fail-closed
+rights gate (ADR-008), durable audit (ADR-018), HITL review and the publication
+gate (ADR-030), authorized HLS delivery (ADR-032), and a real async pipeline on
+real infrastructure — the parts that are expensive to retrofit.
+
+It is weak for a **market/product** audience: nothing in the demonstrated path is
+cross-language, so the differentiator the name and README promise is absent. No
+cheap path to add it exists inside this window — the remaining `S-150` surface to
+reach translated subtitles alone is `T2c-v` (50), `T2c-vi-a` (51), `T2c-vi-b`
+(31) plus the `T3a`/`T3b` worker tasks (42, 44). Closing this gap is a separate
+slice after the deploy, not a scope adjustment to S-230.
+
+G14, G15 and G16 are the highest value-per-cost changes to the demo and are all
+inside the existing task surface (G14/G15 are small additions; G16 is a
+sequencing decision). They are recorded here as findings for owner decision, not
+adopted into scope.
+
+### The market-audience gap, examined (2026-08-16 follow-up)
+
+The first pass at this review understated how far `S-150` actually is from a
+demonstrable clip. Checked directly: `workers/translation-worker-py/` and
+`workers/tts-worker-py/` each contain only `Dockerfile`, three JSON schemas, and
+a one-line `README.md` stating the directory is "reserved for the ... worker
+implementation." There is no `main.py`, no model integration, in either
+directory. This matches the task ledger — `S-150-T3a` is titled "Translation
+provider/subprocess contract" and `S-150-T3b` "Functional translation worker"
+(`docs/tasks/s-150-translation-dubbing.md:3106`, `:3151`) — both still `Planned`.
+
+What *is* real: `apps/worker-runner/src/translation_fanout.rs` is a tested,
+working Rust service that resolves the source subtitle, lists target-language
+candidates, and independently persists a `TranslationJob` per target
+(`S-150-T2c-iv-c`). It is explicitly `#[allow(dead_code)]` and commented "Not
+yet wired into any caller/dispatcher by design ... the runtime integration is
+sequenced in `S-150-T2c-vi-a`" (`translation_fanout.rs:8`–`9`). So the
+distributed-systems half of localization — exactly-once dispatch, per-target
+failure isolation, durable claim/outbox — is built and reviewed. The half that
+would actually produce translated text or dubbed audio does not exist yet, not
+even as a stub that calls out to a third-party API.
+
+This rules out any "just wire it in" option: even connecting the fan-out
+service to the Redis queue would leave `TranslationJob`s with no consumer,
+reproducing the exact G10 failure shape for a second pipeline stage.
+
+**Options considered for closing the market-facing gap:**
+
+| Option | What it is | Cost | Risk |
+|---|---|---|---|
+| A — Canned example clip | Produce one dubbed clip out-of-band (manual MT/TTS, outside DubBridge), embed it as a labeled "vision preview" | Very low, no S-230 impact | The demo now contains one asset the live system did not produce; any due-diligence question about "is this live" has to be answered honestly, which undercuts the moment it was added to strengthen |
+| B — Sell the architecture, not the output | Present `translation_fanout.rs` / the delivery-repo design as evidence the hard part of multi-target localization is done | Zero — it exists today | Only lands with an audience that can evaluate distributed-systems design; not a demo moment |
+| C — Reframe the POC's claim | Position this POC explicitly as "the governed pipeline that will carry dubbing," lead with rights/audit/review/publication as the proof point, show `S-150` only as an architecture/roadmap slide | Zero — documentation and pitch framing only | None; weakest on "wow," strongest on credibility |
+| D — Minimal real worker, follow-on slice | Implement `S-150-T3a`/`T3b` against one off-the-shelf MT/TTS API for a single hardcoded language pair, wire `translation_fanout.rs` in, produce one real (not canned) generated clip | Larger than a single task — see "D, scoped" below | Bounded if scoped to exactly one language pair and demo purposes, not production quality |
+
+**Recommendation:** C for this POC, and only pursue D as a small, explicitly
+scoped follow-on slice if an actual investment conversation is imminent enough
+to justify the calendar cost. Reject A outright — DubBridge's own credibility
+argument in this same document is that a human reviews and approves every
+version before it goes public; a demo asset the system did not produce
+undermines that argument the first time someone asks how it was made. B is a
+useful secondary talking point for technical due diligence but cannot carry a
+general audience by itself. Do not let the desire for a translated-clip moment
+pull `S-150` scope back into `S-230` piecemeal — the governance-calendar risk
+this plan already flags (RRI, two review phases, Reflection, coverage, owner
+verification per task) applies to a follow-on slice exactly as it applies here.
+
+**D, scoped (2026-08-16 follow-up):** the first pass at Option D undercounted
+its cost by describing it as "T3a/T3b." Checked against the actual S-150
+ledger (`docs/tasks/s-150-translation-dubbing.md`), a real end-to-end clip
+needs the queue and runtime wiring as a hard prerequisite, not just the
+worker:
+
+| Task | What it does | Provisional RRI | Band |
+|---|---|---|---|
+| `S-150-T2c-v` | Redis translation-queue adapter (parked pending a topic decision, not an S-230 blocker) | 50 | Med-high |
+| `S-150-T2c-vi-a` | Wire `fan_out_localization` into the subtitle runtime, replacing `prepare_review_post_ready` | 51 | Med-high |
+| `S-150-T2c-vi-b` | Delete the dead legacy review module, sync S-140 BDD | 31 | Moderate |
+| `S-150-T3a` | Typed translation provider/subprocess contract | 42 | Med-high |
+| `S-150-T3b` | Functional Python translation worker | 44 | Med-high |
+| `S-150-T3c` | Rust translation runtime persistence + readiness transition | 53 | Med-high |
+
+That is **five Med-high tasks plus one Moderate task in sequence**, every
+Med-high one routed cloud-only under ADR-038 (Muse Glimmer refinement →
+primary receipt → cloud takeover, no local repair attempts), each carrying
+its own band-resolved review (phases 1 and 2), 3 Reflection passes, unit
+coverage certification, and owner verification. `T2c-vi-b` is cleanup/docs
+sync, not functionally load-bearing for a demo clip — it could be deferred
+past a demo-only cut, but doing so leaves the dead `review_enqueue.rs`
+module and stale S-140 BDD wording as recorded debt, not a silent omission.
+TTS/dubbing (`T4`–`T7`, RRI 26–71, two requiring mandatory decomposition) is
+**not** included above — this scope produces a translated-subtitle clip
+only, not a dubbed-audio one; adding real TTS roughly doubles this chain.
+
+This does not change the recommendation (C now, D only if investment timing
+demands it) but corrects what "small, explicitly scoped" actually costs: at
+minimum five sequential Med-high approval/review cycles before a translated
+(non-dubbed) clip exists, or roughly double that for dubbed audio. Treat this
+table, not the earlier one-line estimate, as the basis for any go/no-go
+timing decision on D.
+
 ## Target architecture (single droplet)
 
 ```mermaid
