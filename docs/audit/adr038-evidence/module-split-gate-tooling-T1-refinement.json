@@ -1,0 +1,18 @@
+{
+  "success": true,
+  "profile": "med-high-refinement-v1",
+  "packet": {
+    "sha256": "77fc51b9c243d0fb2c8589eeed866768937adfead4347ec239261bacc5f6ba4f"
+  },
+  "model": {
+    "tag": "muse-glimmer:30b-q4_K_M",
+    "expected_digest": "n/a-manual-invocation",
+    "resolved_digest": "n/a-manual-invocation"
+  },
+  "response": {
+    "validated": {
+      "route_recommendation": "GO_LOCAL",
+      "summary": "The task implements pure workflow-tooling decision logic for module-split routing; it does not perform auth/security work, rights/consent/governance, schema/migrations, or release cuts. Encoding a hard-exclusion policy in tooling is ordinary internal logic, not security-sensitive application work."
+    }
+  }
+}

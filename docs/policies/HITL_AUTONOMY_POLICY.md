@@ -171,7 +171,10 @@ with a tighter 1-attempt repair budget, and subsequently **replaced** for
 Med-high by ADR-038 (2026-07-26) — see § Med-high Architect-refined
 single-attempt gate (RRI 41–55) below. Med-high no longer uses any repair
 attempt at all; the historical 1-attempt figure no longer applies to this
-band.
+band, **except** for a module independently qualified under ADR-040
+per-module split routing (§ Per-module complexity-split routing (RRI 26–55)
+below), whose local tramo uses this Moderate section's 2-attempt budget
+regardless of the containing task's band.
 
 ## Med-high Architect-refined single-attempt gate (RRI 41–55)
 
@@ -195,7 +198,11 @@ The route:
    is enforced structurally (the gate requires both sides to independently
    say GO_LOCAL), not by trusting either decision alone.
 5. `scripts/local-agent/run_med_high_task.py` records every gate result as a
-   cloud handoff; even `GO_LOCAL` is policy-excluded from local development.
+   cloud handoff; even `GO_LOCAL` is policy-excluded from local development
+   — **except** for a module independently qualified under ADR-040
+   per-module split routing (§ Per-module complexity-split routing (RRI
+   26–55) below), which is a narrower, separately-gated exception and does
+   not reopen whole-task Med-high local development.
 6. Escalate to the concrete Codex or Claude
    cloud-takeover model recorded in the approved task card, with the full
    ADR-038 §5 evidence bundle: task capsule, refinement artifact,
@@ -213,6 +220,47 @@ release cuts, unresolved ADR decisions, and unbounded scope — see ADR-038 §6.
 
 This gate does not weaken the independent review route defined by the
 "Band-routed peer review" section below.
+
+## Per-module complexity-split routing (RRI 26–55, ADR-040)
+
+Owner directive, 2026-08-16, formalized as `ADR-040` (amends ADR-036 and
+ADR-038 Amendment 2): for an **approved** development task with final RRI
+26–55 whose `allowed_paths` span two or more files, the orchestrator may
+split implementation authorship by per-module cyclomatic complexity instead
+of routing the whole task through §§ above as one unit.
+
+- **Trigger:** measure raw CC per file (`--auto-cc`, existing RRI `C` table).
+  Split only when heterogeneous — at least one module C≥2 (CC≥11) and at
+  least one C≤1 (CC≤10). A uniform-tier task is not split.
+- **Hard domain exclusion carried from ADR-038 §6:** a module touching auth,
+  security, rights/consent/governance invariants, schema/migrations, an
+  unresolved ADR decision, or unbounded scope is always cloud-eligible
+  regardless of its own CC. This is what keeps this exception from
+  reopening the risk ADR-038 Amendment 1 (2026-08-12) closed for Med-high.
+- **Disjoint `allowed_paths`:** the two tramos must partition the file set
+  with no overlap, or the task is not split.
+- **Interface freeze:** before dispatch, the orchestrator records the exact
+  boundary contract between the local- and cloud-eligible modules; neither
+  implementer redefines it.
+- **Routing and repair budgets:** C≤1/non-excluded modules go to the local
+  implementer (`run_local_task.py`) with **2** evidence-backed repair
+  attempts, uniformly regardless of the task's overall band. C≥2 or
+  hard-excluded modules go to the band's resolved cloud model with **1**
+  repair attempt, then **one** escalation to the band's higher cloud tier,
+  then stop and report blocked for that module.
+- **Integration gate (mandatory):** run the task's full verification against
+  the merged diff before Reflection. A tramo-attributable failure is a
+  bounded repair against that tramo's own budget. A failure attributable to
+  the interface contract itself abandons the split and escalates the whole
+  task to its normal band route — never retried as a split.
+- **Review/approval unaffected:** the band-resolved reviewer (Gemma), the
+  Reflection pass count for the task's band, the RRI 26+/41+ human approval
+  gate, unit coverage certification, and owner verification all evaluate the
+  final unified diff as one task, exactly as if no split had occurred.
+
+Full contract, evidence-block format, and tooling status:
+`docs/adr/ADR-040-per-module-complexity-split-implementation-routing.md` and
+`docs/policies/RRI_POLICY.md` § Per-module complexity-split routing.
 
 ## Approval checkpoint wording
 
@@ -407,3 +455,4 @@ review gate.
 - `CLAUDE.md`, `AGENTS.md`, `README_AGENT_ORDER.md`
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
 - `docs/adr/ADR-008-rights-ledger-fail-closed-precondition.md`
+- `docs/adr/ADR-040-per-module-complexity-split-implementation-routing.md`

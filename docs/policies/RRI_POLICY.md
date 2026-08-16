@@ -189,8 +189,8 @@ band — never derive one output from another (e.g. do not infer capability from
 | RRI band | Label | Effort | Capability (Codex) | Capability (Claude Code) | Thinking | Phase-1 reviewer | Phase-2 reviewer | Gate |
 |---|---|---|---|---|---|---|---|---|
 | **0–25** | Low | **S** | Primary agent or Local Nemotron via Ollama | Primary agent or Local Nemotron via Ollama | Off | Muse Glimmer†† | Muse Glimmer Reviewer†† | **Low-band handling:** do not present the full task for approval; use local Nemotron only for eligible simple code patches, otherwise execute directly with the primary agent. |
-| **26–40** | Moderate | **M** | Balanced | Balanced | Off | Gemma†† | Gemma Reviewer†† | Confirm tests exist in the affected area. **Implementation route:** local-first via `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL`; primary agent remains orchestrator, cloud implementation is escalation/fallback using the concrete takeover model in the task card. |
-| **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Gemma†† | Gemma Reviewer†† | Plan + explicit acceptance criteria required before approval. **Implementation route (ADR-038):** Muse Glimmer advisory refinement → primary hash-bound route receipt → cloud takeover with the full evidence bundle. A `GO_LOCAL` advisory result is recorded but never launches a local developer. Review/approval rigor unchanged — 3 Reflection passes and this HITL gate still apply; phase-2 (and phase-1 when it applies) reviewer is Gemma, not the cross-vendor peer. |
+| **26–40** | Moderate | **M** | Balanced | Balanced | Off | Gemma†† | Gemma Reviewer†† | Confirm tests exist in the affected area. **Implementation route:** local-first via `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL`; primary agent remains orchestrator, cloud implementation is escalation/fallback using the concrete takeover model in the task card. A ≥2-file task with heterogeneous per-module CC may instead use ADR-040 per-module split routing — see § Per-module complexity-split routing below. |
+| **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Gemma†† | Gemma Reviewer†† | Plan + explicit acceptance criteria required before approval. **Implementation route (ADR-038):** Muse Glimmer advisory refinement → primary hash-bound route receipt → cloud takeover with the full evidence bundle. A `GO_LOCAL` advisory result is recorded but never launches a local developer, **except** for modules independently qualifying under ADR-040 per-module split routing (Amendment 2) — see § Per-module complexity-split routing below. Review/approval rigor unchanged — 3 Reflection passes and this HITL gate still apply; phase-2 (and phase-1 when it applies) reviewer is Gemma, not the cross-vendor peer. |
 | **56–70** | Complex | **L** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Plan first. **Decompose into subtasks before implementation.** Human reviews the plan. |
 | **71–85** | High | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Characterization tests + explicit acceptance criteria + human reviews the **diff** (not just the plan). **Decomposition remains mandatory.** |
 | **86–100** | Very high | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Do not implement directly. Produce an ADR + risk analysis + decompose into subtasks. |
@@ -502,6 +502,79 @@ directly to cloud) if the rolling 20-task window shows a GO_LOCAL success
 rate `< 40%`, any accepted out-of-scope diff, any unintended change escaping
 the disposable worktree boundary, or any confirmed CLOUD_REQUIRED-to-local
 upgrade (a gate defect, not an expected outcome).
+
+### Per-module complexity-split routing (ADR-040)
+
+Owner directive, 2026-08-16, formalized as `ADR-040`: for an **approved**
+development task with final RRI **26–55** whose `allowed_paths` span **two
+or more files**, the orchestrator may split implementation authorship by
+per-module cyclomatic complexity instead of routing the whole task to one
+implementer. This is a routing refinement, not a new approval gate — it
+fires after the task's HITL approval and phase-1 review, and it does not
+change the task's RRI, band, or phase-1/phase-2 reviewer (both stay Gemma
+per the existing 26–55 binding).
+
+**Trigger — heterogeneity required.** Measure raw CC per file (highest CC
+among functions created/materially changed in that file) using the same
+`--auto-cc` mechanism as the C variable above; map to the existing C score
+table. Split only if at least one module scores **C ≥ 2** (CC ≥ 11) and at
+least one scores **C ≤ 1** (CC ≤ 10). Uniform-tier tasks are not split — they
+follow the existing whole-task Moderate/Med-high route unchanged.
+
+**Hard domain exclusion.** A module matching an anchor-rubric floor of
+D/P/K ≥ 4 above (auth, security, rights/consent/governance, migrations, an
+unresolved ADR decision, unbounded scope — the same set ADR-038 §6 already
+hard-excludes) is always cloud-eligible, never local-eligible, regardless of
+its own CC score. CC measures branching, not domain risk.
+
+**Disjoint paths.** The local and cloud tramos' `allowed_paths` must
+partition the file set with no overlap. If no clean partition exists, do not
+split.
+
+**Routing and repair budgets:**
+
+| Tramo | Route | Repair budget |
+|---|---|---|
+| C ≤ 1, not hard-excluded | Local: `scripts/local-agent/run_local_task.py`, `DUBBRIDGE_LOCAL_AGENT_MODEL` | 2 evidence-backed attempts, uniformly (whether the task's overall band is Moderate or Med-high) |
+| C ≥ 2, or hard-excluded | Cloud: band's resolved model (Moderate: `gpt-5.6-terra`/medium or `claude-sonnet-5`; Med-high: `gpt-5.6-sol`/high or `claude-sonnet-5`) | 1 attempt, then escalate once to the band's higher tier (Moderate Codex: → `gpt-5.6-sol`/high; Moderate Claude — narrow scoped exception to the "no escalation" Moderate row above, `claude-sonnet-5` → `claude-opus-5`, for this tramo only; Med-high Codex: same model, effort `high` → `xhigh`; Med-high Claude: `claude-sonnet-5` → `claude-opus-5`, the row's existing escalation). Still failing after escalation → stop, report blocked for that module. |
+
+**Interface freeze.** Before dispatching either tramo, the orchestrator
+records the exact boundary contract (signatures/types/error contracts)
+between the local- and cloud-eligible modules in a module-split capsule.
+Neither implementer redefines it.
+
+**Integration gate — mandatory, whole-task, post-both-tramos, pre-Reflection.**
+Run the task's full verification commands against the merged diff. A
+failure attributable to one tramo's code is a bounded repair against that
+tramo's own budget above. A failure attributable to the interface contract
+itself **abandons the split** — escalate the entire task to its band's
+normal whole-task route (ADR-036 or ADR-038) rather than retrying the split
+with a revised contract.
+
+**Review, Reflection, coverage, and closure stay whole-task**, evaluating the
+final unified diff exactly as they would for a non-split task.
+
+**Evidence:** record a `### Module-split routing evidence` block per task —
+see `ADR-040` § Evidence for the required fields (split trigger and reason,
+per-module C score and routing decision, repair attempts used per tramo,
+integration gate result).
+
+**Tooling status:** the per-file CC/partition decision function
+(`scripts/local-agent/module_split_gate.py`, tested in
+`module_split_gate_test.py`) is implemented — `evaluate_split()` measures
+per-path CC (reusing `scripts/rri.py`'s CC->C table), enforces the SS4 hard
+domain exclusion via the shared DubBridge anchor rubric (D/P/K >= 4), and
+returns a fail-closed `no_split`/`split` decision. `next_cloud_action()`
+tracks the cloud-tramo repair-budget state machine (attempt -> escalate ->
+stop). The module-split **capsule format** (SS6 interface freeze) is still
+policy-only: `module_split_gate.py` consumes a task capsule
+(`allowed_paths` + `cc_by_path`) but does not itself define or persist the
+interface-freeze document. `run_local_task.py` / `run_med_high_task.py`
+integration (actually dispatching the two tramos) remains a separate
+follow-up task. Until that integration lands, an orchestrator using this
+route invokes `module_split_gate.py` for the split decision itself but still
+performs capsule recording and tramo dispatch manually. Full contract:
+`docs/adr/ADR-040-per-module-complexity-split-implementation-routing.md`.
 
 ### Target-file size gate for local-first delegation
 
@@ -835,6 +908,7 @@ trigger, authority boundary, and evidence format.
 
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` — highest authority; adopts this policy
 - `docs/policies/HITL_AUTONOMY_POLICY.md` — approval requirements and local delegation rule
+- `docs/adr/ADR-040-per-module-complexity-split-implementation-routing.md` — per-module complexity-split routing for RRI 26–55
 - `docs/tasks/rri-integration.md` — integration task ledger
 - `scripts/rri.py` — canonical calculator
 - `scripts/rri_test.py` — unit tests (run via `make qa-rri`)

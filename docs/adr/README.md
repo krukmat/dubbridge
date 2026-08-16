@@ -49,6 +49,7 @@ doc gates).
 | [ADR-037](ADR-037-qwen36-27b-local-architect-complex-analyst.md) | Qwen3.6-27B as Local Architect and Complex Analyst | Accepted (scope: direct project advisory analysis) |
 | [ADR-038](ADR-038-med-high-architect-refined-single-attempt.md) | Architect-refined single local attempt for Med-high tasks | Accepted (amends ADR-036/ADR-037; agent workflow only) |
 | [ADR-039](ADR-039-human-selected-fallback-model-checkpoint.md) | Human-selected fallback model checkpoint | Accepted (amends ADR-034/036/038; agent workflow only) |
+| [ADR-040](ADR-040-per-module-complexity-split-implementation-routing.md) | Per-module complexity-split implementation routing (RRI 26-55) | Accepted (amends ADR-036/ADR-038; agent workflow only) |
 
 ## Backfill note
 

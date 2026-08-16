@@ -213,10 +213,56 @@ model families by construction, not only by role label — matching ADR-036
 hard exclusions from `GO_LOCAL` (§6), review/approval rigor (§7), and the
 evidence-preservation contract (§5) apply identically to the new bindings.
 
+## Amendment 2 (2026-08-16): Narrow per-module exception to "no local attempt"
+
+**Reason:** owner directive, formalized as `ADR-040` — per-module
+complexity-split implementation routing. This amendment is a targeted
+qualification of Amendment 1 (2026-08-12), not a reversal of it.
+
+**Changes to Amendment 1 (2026-08-12: Med-high local execution disabled):**
+Amendment 1's rule — that a `GO_LOCAL` refinement/receipt result is
+policy-excluded from starting a local developer, and every Med-high task
+routes to cloud — now reads: *unless the task qualifies for `ADR-040`
+per-module complexity-split routing*, in which case the modules `ADR-040`
+independently determines to be low-CC (raw CC ≤ 10) **and** not hard-excluded
+by §6 below may be authored by the local implementer, under `ADR-040`'s own
+2-attempt repair budget. Every other module in the task — including every
+module `ADR-040` classifies as cloud-eligible, and the whole task when
+`ADR-040`'s split trigger is not met — still follows this ADR's existing
+cloud-only route unchanged.
+
+**§6 (Exclude high-confidence surfaces from `GO_LOCAL`) is not weakened by
+this amendment — it is extended.** `ADR-040` §4 requires every module
+matching this section's hard-exclusion criteria to route cloud regardless of
+its own cyclomatic complexity. A module inside a `GO_LOCAL`-refined,
+low-CC-qualifying task that nonetheless touches an excluded surface (auth,
+security, rights/consent/governance invariants, schema/migrations, an
+unresolved ADR decision, or unbounded scope) is cloud-eligible under
+`ADR-040`, never local-eligible, exactly as this section already requires for
+the whole-task case.
+
+**§4 (Define "one local round" precisely) does not apply to an `ADR-040`
+module-split local tramo.** §4's 8-turn/300-second/zero-repair budget governs
+a whole-task Med-high local attempt, which Amendment 1 already disabled.
+`ADR-040`'s local tramo is a different, narrower mechanism — restricted to
+modules independently verified as both low-CC and domain-non-sensitive — and
+uses `ADR-040` §8's own repair budget (2 attempts), not this section's.
+
+**§7 (Keep review and approval rigor unchanged) is unaffected.** The
+band-resolved reviewer (Gemma), 3 Reflection passes, the RRI 41+ human
+approval gate, owner verification, and status synchronization all continue
+to evaluate the task's final unified diff as a whole, per `ADR-040` §10.
+
+**Not changed by this amendment:** the fail-closed route authority (§3), the
+refinement/receipt evidence requirement (§2, §5), and the Amendment 1
+policy-exclusion of `GO_LOCAL` for every module `ADR-040` does not
+independently qualify for local routing.
+
 ## Related
 
 - `docs/adr/ADR-036-local-first-agentic-implementation-band.md`
 - `docs/adr/ADR-037-qwen36-27b-local-architect-complex-analyst.md`
+- `docs/adr/ADR-040-per-module-complexity-split-implementation-routing.md`
 - `docs/plan/med-high-local-refinement.md`
 - `docs/tasks/med-high-local-refinement.md`
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`

@@ -1,0 +1,7 @@
+{
+  "route": "CLOUD_REQUIRED",
+  "reason": "Primary receipt downgraded GO_LOCAL to cloud.",
+  "rri": 47,
+  "band": "Med-high",
+  "card_hash": "77fc51b9c243d0fb2c8589eeed866768937adfead4347ec239261bacc5f6ba4f"
+}

@@ -1,0 +1,8 @@
+{
+  "primary_id": "claude-code",
+  "decision": "CLOUD_REQUIRED",
+  "rationale": "ADR-038 Amendment 1 (2026-08-12) policy-excludes local implementation for the entire Med-high band regardless of Muse Glimmer's route_recommendation, except for a module independently qualifying under ADR-040 per-module split routing. This task's own task card already recorded 'Module-split routing evidence: no split' (module + its own test file, not independently-partitionable production modules), so the ADR-040 exception does not apply here. Downgrading GO_LOCAL to CLOUD_REQUIRED per Amendment 1's blanket policy exclusion, not per a discretionary risk judgment.",
+  "timestamp": "2026-08-16T00:00:00Z",
+  "card_hash": "77fc51b9c243d0fb2c8589eeed866768937adfead4347ec239261bacc5f6ba4f",
+  "refinement_artifact_sha256": "025df4f5c5bfdc9c3d75f2c341a087c4e4f3419fd4eadf6c8a31796f1c31391b"
+}
