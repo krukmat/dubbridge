@@ -5,6 +5,9 @@ use sqlx::PgPool;
 use tracing::{debug, warn};
 use uuid::Uuid;
 
+// Not yet wired into any caller/dispatcher by design (S-150-T2c-iv-c scope);
+// the runtime integration is sequenced in S-150-T2c-vi-a.
+#[allow(dead_code)]
 pub async fn fan_out_localization(
     pool: &PgPool,
     asset_id: dubbridge_domain::asset::AssetId,

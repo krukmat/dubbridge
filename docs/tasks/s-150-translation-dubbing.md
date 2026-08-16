@@ -2885,8 +2885,22 @@ Required passes: 2 (`RRI 39` → `Moderate`)
 - Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior, executed against a real local Postgres instance (not mocked), with no regressions in the containing crate's other 55 tests.
 - Commands run: `cargo test -p dubbridge-worker-runner translation_fanout -- --test-threads=1`;
   `cargo test -p dubbridge-worker-runner -- --test-threads=1`;
-  `cargo fmt --check -p dubbridge-worker-runner`;
-  `cargo clippy -p dubbridge-worker-runner --tests -- -D warnings`
+  `cargo fmt --all -- --check`;
+  `cargo clippy --workspace --all-targets --all-features -- -D warnings`;
+  `cargo check --workspace --all-targets`
+
+**Pre-push verification gap found and fixed:** the closure verification
+above initially ran `cargo clippy -p dubbridge-worker-runner --tests` only,
+which passed because the test module calls `fan_out_localization`. The
+full-workspace `make qa-lint` (`cargo clippy --workspace --all-targets --
+-D warnings`, matching CI/pre-push) failed with `dead_code` on
+`fan_out_localization` and its three helpers, since the function is
+intentionally not wired into any caller yet (S-150-T2c-vi-a's scope).
+Fixed by adding `#[allow(dead_code)]` with a comment explaining the
+intentional non-wiring, verified clean across the full workspace before
+pushing. Recorded here because the original `--tests`-only clippy command
+this section reports was insufficient on its own — the workspace-wide
+commands above are now the reproducible ones.
 
 **Task-analysis review:** gemma `docs/audit/gemma-evidence/S-150-T2c-iv-c.json` - PASS (phase 1, prior session)
 **Code-solution review:** gemma `docs/audit/gemma-evidence/S-150-T2c-iv-c.json` - PASS (phase 2, 0 findings)
