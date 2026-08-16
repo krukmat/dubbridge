@@ -557,7 +557,17 @@ def run_loop(
             "content": build_initial_system_message(
                 card, file_tools, max_total_turns
             ),
-        }
+        },
+        # Some locally-served backends (confirmed: the MLX runtime behind
+        # qwen3.8:27b-mlx, the current DUBBRIDGE_LOCAL_AGENT_MODEL binding)
+        # reject a system-only /api/chat request with "no user query found
+        # in messages" (HTTP 500) instead of degrading gracefully. GGUF
+        # backends tolerate a system-only first turn, so this kickoff
+        # message is added unconditionally rather than branching per model.
+        {
+            "role": "user",
+            "content": "Begin.",
+        },
     ]
 
     while True:
