@@ -8,6 +8,8 @@ env = "staging"
 backend = "s3"
 base_path = ""
 bucket = "dubbridge-staging"
+endpoint = "https://nyc3.digitaloceanspaces.com"
+region = "nyc3"
 
 [observability]
 log_format = "json"

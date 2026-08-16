@@ -3,7 +3,7 @@ pub use dubbridge_config::StorageBackend;
 use dubbridge_config::StorageSettings;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct StorageConfig {
     /// Runtime backend selector.
     pub backend: StorageBackend,
@@ -13,6 +13,12 @@ pub struct StorageConfig {
     pub base_path: String,
     /// Optional S3-compatible endpoint URL (None → AWS S3 defaults).
     pub endpoint_url: Option<String>,
+    /// S3-compatible region (e.g. DigitalOcean Spaces `nyc3`).
+    pub region: Option<String>,
+    /// Static credential: access key ID. Env-only (ADR-026, Decision 4).
+    pub access_key_id: Option<String>,
+    /// Static credential: secret access key. Env-only (ADR-026, Decision 4).
+    pub secret_access_key: Option<String>,
 }
 
 impl From<&StorageSettings> for StorageConfig {
@@ -22,6 +28,9 @@ impl From<&StorageSettings> for StorageConfig {
             bucket: settings.bucket.clone(),
             base_path: settings.base_path.clone(),
             endpoint_url: settings.endpoint_url.clone(),
+            region: settings.region.clone(),
+            access_key_id: settings.access_key_id.clone(),
+            secret_access_key: settings.secret_access_key.clone(),
         }
     }
 }
@@ -33,10 +42,13 @@ mod tests {
 
     fn sample_settings() -> StorageSettings {
         StorageSettings {
-            backend: StorageBackend::LocalFs,
             base_path: "/var/dubbridge/storage".to_string(),
             bucket: "dubbridge-local".to_string(),
             endpoint_url: Some("http://localhost:9000".to_string()),
+            region: Some("nyc3".to_string()),
+            access_key_id: Some("test-access-key".to_string()),
+            secret_access_key: Some("test-secret-key".to_string()),
+            ..Default::default()
         }
     }
 
@@ -75,5 +87,30 @@ mod tests {
         settings.endpoint_url = None;
         let cfg = StorageConfig::from(&settings);
         assert!(cfg.endpoint_url.is_none());
+    }
+
+    #[test]
+    fn from_storage_settings_copies_region() {
+        let settings = sample_settings();
+        let cfg = StorageConfig::from(&settings);
+        assert_eq!(cfg.region.as_deref(), Some("nyc3"));
+    }
+
+    #[test]
+    fn from_storage_settings_copies_credentials() {
+        let settings = sample_settings();
+        let cfg = StorageConfig::from(&settings);
+        assert_eq!(cfg.access_key_id.as_deref(), Some("test-access-key"));
+        assert_eq!(cfg.secret_access_key.as_deref(), Some("test-secret-key"));
+    }
+
+    #[test]
+    fn from_storage_settings_preserves_none_credentials() {
+        let mut settings = sample_settings();
+        settings.access_key_id = None;
+        settings.secret_access_key = None;
+        let cfg = StorageConfig::from(&settings);
+        assert!(cfg.access_key_id.is_none());
+        assert!(cfg.secret_access_key.is_none());
     }
 }

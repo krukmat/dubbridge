@@ -61,9 +61,10 @@ pub enum ConfigError {
 }
 
 // T2-B: storage backend selector — seam for S2 S3 adapter (ADR-006, ADR-026 Decision 5)
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StorageBackend {
+    #[default]
     LocalFs,
     S3,
 }
@@ -77,12 +78,27 @@ pub enum LogFormat {
 }
 
 // T2-B: grouped storage settings — absorbs StorageConfig::from_env (T2-D)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+// S-230-T1: region + static credential references added for DigitalOcean
+// Spaces. Credentials are env-only (ADR-026, Decision 4) — figment's
+// `DUBBRIDGE_` env layer is the only provider that can populate
+// access_key_id/secret_access_key; config/*.toml must never set them.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct StorageSettings {
     pub backend: StorageBackend,
     pub base_path: String,
     pub bucket: String,
+    // TOML key is `endpoint` (frozen by the S-230-T1 ADR-040 interface
+    // contract, already applied to config/{staging,production}.toml before
+    // this struct changed); the Rust field stays `endpoint_url` because it
+    // is the pre-existing public name consumed by S3Adapter::new/callers.
+    #[serde(alias = "endpoint")]
     pub endpoint_url: Option<String>,
+    #[serde(default)]
+    pub region: Option<String>,
+    #[serde(default)]
+    pub access_key_id: Option<String>,
+    #[serde(default)]
+    pub secret_access_key: Option<String>,
 }
 
 // T2-B: grouped observability settings — consolidates RUST_LOG reader (ADR-026 §3, Phase 0)
@@ -193,6 +209,10 @@ impl AppConfig {
             ));
         }
 
+        if matches!(self.storage.backend, StorageBackend::S3) {
+            self.storage.validate_s3_production()?;
+        }
+
         if self.auth.is_none() {
             return Err(ConfigError::Validation(
                 "auth settings are required in production-like environments".to_string(),
@@ -242,6 +262,9 @@ impl AppConfig {
                 bucket: std::env::var("DUBBRIDGE_STORAGE_BUCKET")
                     .unwrap_or_else(|_| "dubbridge-local".to_string()),
                 endpoint_url: std::env::var("DUBBRIDGE_STORAGE_ENDPOINT").ok(),
+                region: std::env::var("DUBBRIDGE_STORAGE_REGION").ok(),
+                access_key_id: std::env::var("DUBBRIDGE_STORAGE_ACCESS_KEY_ID").ok(),
+                secret_access_key: std::env::var("DUBBRIDGE_STORAGE_SECRET_ACCESS_KEY").ok(),
             },
             observability: ObsSettings {
                 log_format: LogFormat::Pretty,
@@ -266,6 +289,51 @@ impl AppConfig {
     fn is_local_address_url(url: &str) -> bool {
         let normalized = url.to_ascii_lowercase();
         normalized.contains("localhost") || normalized.contains("127.0.0.1")
+    }
+}
+
+impl StorageSettings {
+    /// Fail-closed schema validation for an `s3` backend in a production-like
+    /// environment (S-230-T1, EC-1). Checks schema validity — not just
+    /// presence — per the Gemma phase-1 note and the ADR-038 refinement
+    /// contract: a present-but-malformed value must fail exactly like a
+    /// missing one, before any request is served.
+    fn validate_s3_production(&self) -> Result<(), ConfigError> {
+        let endpoint = self.endpoint_url.as_deref().unwrap_or("").trim();
+        if endpoint.is_empty() {
+            return Err(ConfigError::Validation(
+                "storage.endpoint_url is required when storage.backend is s3 in production-like environments".to_string(),
+            ));
+        }
+        if !(endpoint.starts_with("https://") || endpoint.starts_with("http://")) {
+            return Err(ConfigError::Validation(
+                "storage.endpoint_url must be a valid http(s) URL when storage.backend is s3"
+                    .to_string(),
+            ));
+        }
+
+        let region = self.region.as_deref().unwrap_or("").trim();
+        if region.is_empty() {
+            return Err(ConfigError::Validation(
+                "storage.region is required when storage.backend is s3 in production-like environments".to_string(),
+            ));
+        }
+
+        let access_key_id = self.access_key_id.as_deref().unwrap_or("").trim();
+        if access_key_id.is_empty() {
+            return Err(ConfigError::Validation(
+                "storage.access_key_id is required when storage.backend is s3 in production-like environments (set via DUBBRIDGE_STORAGE_ACCESS_KEY_ID)".to_string(),
+            ));
+        }
+
+        let secret_access_key = self.secret_access_key.as_deref().unwrap_or("").trim();
+        if secret_access_key.is_empty() {
+            return Err(ConfigError::Validation(
+                "storage.secret_access_key is required when storage.backend is s3 in production-like environments (set via DUBBRIDGE_STORAGE_SECRET_ACCESS_KEY)".to_string(),
+            ));
+        }
+
+        Ok(())
     }
 }
 
@@ -649,6 +717,14 @@ mod tests {
                     "DUBBRIDGE_GATEWAY__OAUTH__CLIENT_SECRET",
                     Some("staging-gateway-secret"),
                 ),
+                (
+                    "DUBBRIDGE_STORAGE__ACCESS_KEY_ID",
+                    Some("staging-access-key"),
+                ),
+                (
+                    "DUBBRIDGE_STORAGE__SECRET_ACCESS_KEY",
+                    Some("staging-secret-key"),
+                ),
             ],
             || {
                 let cfg = AppConfig::load().expect("staging profile should load");
@@ -774,9 +850,12 @@ mod tests {
             worker_concurrency: 4,
             storage: StorageSettings {
                 backend: StorageBackend::S3,
-                base_path: String::new(),
                 bucket: "dubbridge-production".to_string(),
-                endpoint_url: None,
+                endpoint_url: Some("https://nyc3.digitaloceanspaces.com".to_string()),
+                region: Some("nyc3".to_string()),
+                access_key_id: Some("test-access-key".to_string()),
+                secret_access_key: Some("test-secret-key".to_string()),
+                ..Default::default()
             },
             observability: ObsSettings {
                 log_format: LogFormat::Json,
@@ -860,6 +939,104 @@ mod tests {
     }
 
     #[test]
+    fn app_config_validate_rejects_s3_backend_missing_endpoint_in_production() {
+        let mut cfg = production_like_config();
+        cfg.storage.endpoint_url = None;
+
+        let result = cfg.validate();
+
+        assert!(
+            matches!(result, Err(ConfigError::Validation(ref msg)) if msg.contains("endpoint_url")),
+            "expected Validation(endpoint_url), got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn app_config_validate_rejects_s3_backend_malformed_endpoint_in_production() {
+        let mut cfg = production_like_config();
+        cfg.storage.endpoint_url = Some("nyc3.digitaloceanspaces.com".to_string());
+
+        let result = cfg.validate();
+
+        assert!(
+            matches!(result, Err(ConfigError::Validation(ref msg)) if msg.contains("endpoint_url")),
+            "expected Validation(endpoint_url) for a schema-invalid URL, got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn app_config_validate_rejects_s3_backend_blank_endpoint_in_production() {
+        let mut cfg = production_like_config();
+        cfg.storage.endpoint_url = Some("   ".to_string());
+
+        let result = cfg.validate();
+
+        assert!(
+            matches!(result, Err(ConfigError::Validation(ref msg)) if msg.contains("endpoint_url")),
+            "expected Validation(endpoint_url) for a whitespace-only value, got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn app_config_validate_rejects_s3_backend_missing_region_in_production() {
+        let mut cfg = production_like_config();
+        cfg.storage.region = None;
+
+        let result = cfg.validate();
+
+        assert!(
+            matches!(result, Err(ConfigError::Validation(ref msg)) if msg.contains("region")),
+            "expected Validation(region), got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn app_config_validate_rejects_s3_backend_blank_region_in_production() {
+        let mut cfg = production_like_config();
+        cfg.storage.region = Some("".to_string());
+
+        let result = cfg.validate();
+
+        assert!(
+            matches!(result, Err(ConfigError::Validation(ref msg)) if msg.contains("region")),
+            "expected Validation(region) for an empty value, got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn app_config_validate_rejects_s3_backend_missing_access_key_id_in_production() {
+        let mut cfg = production_like_config();
+        cfg.storage.access_key_id = None;
+
+        let result = cfg.validate();
+
+        assert!(
+            matches!(result, Err(ConfigError::Validation(ref msg)) if msg.contains("access_key_id")),
+            "expected Validation(access_key_id), got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn app_config_validate_rejects_s3_backend_missing_secret_access_key_in_production() {
+        let mut cfg = production_like_config();
+        cfg.storage.secret_access_key = None;
+
+        let result = cfg.validate();
+
+        assert!(
+            matches!(result, Err(ConfigError::Validation(ref msg)) if msg.contains("secret_access_key")),
+            "expected Validation(secret_access_key), got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn app_config_validate_accepts_well_formed_s3_backend_in_production() {
+        let cfg = production_like_config();
+
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
     fn app_config_validate_rejects_pretty_logs_in_production() {
         let mut cfg = production_like_config();
         cfg.observability.log_format = LogFormat::Pretty;
@@ -881,10 +1058,9 @@ mod tests {
             redis_url: "redis://127.0.0.1:6379".to_string(),
             worker_concurrency: 4,
             storage: StorageSettings {
-                backend: StorageBackend::LocalFs,
                 base_path: "/tmp/dubbridge-storage".to_string(),
                 bucket: "dubbridge-local".to_string(),
-                endpoint_url: None,
+                ..Default::default()
             },
             observability: ObsSettings {
                 log_format: LogFormat::Pretty,
@@ -1017,6 +1193,11 @@ mod tests {
                 (
                     "DUBBRIDGE_GATEWAY__OAUTH__CLIENT_SECRET",
                     Some("prod-gateway-secret"),
+                ),
+                ("DUBBRIDGE_STORAGE__ACCESS_KEY_ID", Some("prod-access-key")),
+                (
+                    "DUBBRIDGE_STORAGE__SECRET_ACCESS_KEY",
+                    Some("prod-secret-key"),
                 ),
             ],
             || {

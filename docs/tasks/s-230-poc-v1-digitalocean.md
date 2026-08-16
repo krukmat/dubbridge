@@ -35,7 +35,7 @@ ledger.
 | ID | Title | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
 | T0 | Slice plan, ledger, and roadmap entry | docs-only | S | — | [x] Done |
-| T1 | S3/Spaces credential and region wiring | development | M | T0 | [ ] Planned |
+| T1 | S3/Spaces credential and region wiring | development | M | T0 | [x] Done |
 | T1b | API preparation queue bound to Redis | development | M | T0 | [ ] Planned |
 | T2 | Migration runner in the production path | development | M | T0 | [ ] Planned |
 | T3 | Real readiness probes for api and gateway | development | M | T0 | [ ] Planned |
@@ -79,7 +79,13 @@ doc consistency, task coverage, roadmap drift, OKF frontmatter all green).
 **Type:** development
 **Effort:** M (provisional Moderate; recompute with `scripts/rri.py`)
 **Depends on:** S-230-T0
-**Status:** [ ] Planned — approval pending
+**Status:** [x] Done 2026-08-16
+
+**Task-analysis review:** gemma `docs/audit/gemma-evidence/s-230-t1-phase1.json` - PASS
+**Code-solution review:** gemma `docs/audit/gemma-evidence/s-230-t1-cloud-tramo.json` - FINDINGS (3 rejected as false positive, 1 accepted-follow-up; see evidence below)
+(note: ensure `AppConfig::validate()` checks schema validity of `endpoint`/`region`,
+not only presence, to fully satisfy EC-1 — carried into the cloud-tramo handoff
+prompt below.)
 
 **Problem (plan G1):** `crates/storage/src/s3.rs:17` uses
 `AmazonS3Builder::new()`, which reads no environment. Credentials fall through to
@@ -120,18 +126,343 @@ region silently defaults to `us-east-1`.
 `crates/storage/src/lib.rs`, `config/production.toml`, `config/staging.toml`.
 Recompute the exact list before presentation.
 
-**Evidence to emit:** RRI report, phase-1 and phase-2 review artifacts,
-round-trip evidence against a real endpoint, Reflection log if the band requires
-it, unit coverage certification, owner verification.
+**RRI:** 43 (Med-high, 41–55). `--auto-cc` measured CC=1 across all four
+touched `.rs` files (zero `clippy::cognitive_complexity` warnings), which
+in isolation would put `C`'s contribution at a Moderate-range 37. Owner
+directive: the anchor-rubric floors on `D`/`K`/`P` (ADR-006, ADR-018 —
+`crates/storage` touches immutable-artifact and durable-audit invariants)
+are kept at 3 regardless of the low measured CC, so the task stays Med-high.
+Do not silently re-derive the band from `--auto-cc` alone without an
+explicit re-approval — the floor, not the CC measurement, is what governs
+here.
+
+### Module-split routing evidence (ADR-040) — authoritative
+
+**Owner directive, 2026-08-16: split adopted as the authoritative
+implementation routing for this task, superseding whole-task Med-high
+cloud-only routing.**
+
+- **Trigger check:** `allowed_paths` spans 6 files (≥2, satisfied).
+  Heterogeneity: `config/production.toml` and `config/staging.toml` carry no
+  Rust logic (not clippy-measurable, effectively C≤1 by inspection — pure
+  key/value additions); `crates/storage/src/s3.rs`,
+  `crates/storage/src/config.rs`, `crates/storage/src/lib.rs`, and
+  `crates/config/src/lib.rs` are the ADR-006/ADR-018 anchor-rubric-floored
+  Rust surface. Treated as heterogeneous by file kind and domain floor, not
+  by `--auto-cc` score (which read C=1 uniformly — see RRI note above).
+- **Hard domain exclusion (ADR-038 §6):** all four `.rs` files touch
+  credential handling, endpoint/region wiring, and fail-closed production
+  validation — auth/credential and governance-invariant surface. Cloud-only
+  regardless of measured CC.
+- **Disjoint partition:**
+  - **Local tramo (Low-band, RRI 0–25):** `config/production.toml`,
+    `config/staging.toml`. Scope: add `endpoint` and `region` keys under
+    `[storage]` in both files (non-secret values only — no credentials, per
+    ADR-026 Decision 4). Route: `scripts/delegate-low-rri.py --mode
+    before-after`, one delegation packet per file. Repair budget: 1 bounded
+    Qwen Developer repair cycle per § Local delegation (RRI 0–25); escalate to the
+    orchestrator only under the documented tooling-failure exception.
+  - **Cloud tramo (Med-high, ADR-038):** `crates/config/src/lib.rs`,
+    `crates/storage/src/config.rs`, `crates/storage/src/s3.rs`,
+    `crates/storage/src/lib.rs`. Scope: `StorageSettings` region/credential
+    fields, `S3Adapter::new` explicit endpoint/region/static-credential
+    wiring, `AppConfig::validate()` fail-closed rejection of an incomplete
+    `s3` backend. Route: Muse Glimmer advisory refinement →
+    `med_high_gate.py` hash-bound receipt → cloud-takeover model per the
+    approved task card (full ADR-038 §5 evidence bundle).
+- **Interface freeze:** the cloud tramo owns the `endpoint_url`/region field
+  names and shapes on `StorageSettings`/`StorageConfig`; the local tramo's
+  `.toml` keys (`endpoint`, `region` under `[storage]`) must match those
+  names exactly. Freeze the field names before dispatching either tramo —
+  the local tramo's packet must state them literally, not infer them.
+- **Integration gate:** run T1's full acceptance criteria (round-trip
+  against a real S3-compatible endpoint, production validation test) against
+  the merged diff before Reflection. A `.toml`-tramo failure repairs within
+  its own 1-attempt Low-band budget; an `.rs`-tramo failure repairs within
+  Med-high's normal (zero-whole-task-repair) ADR-038 gate; an interface
+  mismatch (field name drift) abandons the split and re-routes the whole
+  task through whole-task Med-high cloud-only implementation.
+- **Review/approval unaffected:** phase-1/phase-2 Gemma review, 3 Reflection
+  passes, and the RRI 41+ human approval gate below all evaluate the final
+  merged diff as one task, per ADR-040.
+
+### Cloud-tramo ADR-038 refinement — resolved 2026-08-16
+
+- **Muse Glimmer advisory refinement:** `route_recommendation: CLOUD_REQUIRED`.
+  Model `muse-glimmer:30b-q4_K_M`, digest
+  `de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1`. Rationale:
+  all four `.rs` files match the ADR-038 §6 hard domain exclusion (credential
+  handling, endpoint/region wiring, fail-closed production validation) —
+  cloud-only regardless of measured complexity. Two `unknowns` flagged for the
+  cloud implementer to resolve before/during implementation: (1) exact
+  `DUBBRIDGE_*` env var names for the S3 credentials are not yet fixed; (2) the
+  precise schema-validity rules for endpoint/region/credentials (beyond mere
+  presence) are not yet fully defined — the cloud implementer must define both
+  as part of this task, consistent with Gemma's phase-1 note.
+  Artifact: `docs/audit/med-high/s-230-t1-refinement-artifact.json`.
+- **Primary route receipt:** `claude-sonnet-5-orchestrator` independently
+  concurs `CLOUD_REQUIRED` (a receipt may only downgrade GO_LOCAL to cloud,
+  never upgrade CLOUD_REQUIRED to local — moot here since both sides already
+  agree). Artifact: `docs/audit/med-high/s-230-t1-primary-receipt.json`.
+- **Gate decision (`med_high_gate.py`):** `route: CLOUD_REQUIRED` — both
+  inputs validated (hash-bound to packet `295c0488671a4f0ce9f5dd386c7ef882153f4e09aefe1aa48d5d2420005da678`),
+  RRI 43 confirmed in-band. Artifact:
+  `docs/audit/med-high/s-230-t1-gate-decision.json`. Task packet:
+  `docs/audit/med-high/s-230-t1-packet.json`.
+- **Refined scope/steps/acceptance tests/stop conditions from the artifact**
+  are the binding cloud-tramo implementation contract, superseding the
+  shorter "Handoff prompt (cloud tramo)" bullet below where more specific:
+  extend `StorageConfig`/`StorageSettings` with region + credential
+  references; update `S3Adapter::new` to set bucket/endpoint/region/static
+  credentials explicitly; strengthen `AppConfig::validate()` for both
+  presence and schema validity; add and record a real round-trip
+  put-then-get test against an S3-compatible endpoint; do not touch
+  `config/production.toml` or `config/staging.toml`, upload path, key
+  layout, or any task beyond S-230-T1.
+- **Local tramo unaffected:** this refinement covers only the cloud tramo.
+  The local tramo (`config/production.toml`, `config/staging.toml`) remains
+  routed as Low-band delegation per the split above and has not yet been
+  dispatched.
+
+### Local-tramo delegation evidence — completed 2026-08-16
+
+- **`config/production.toml`, attempt 1 — REJECTED (out-of-scope diff):**
+  `qwen3.8:27b-mlx` via `delegate-low-rri.py --mode before-after` correctly
+  added `endpoint`/`region` but also silently rewrote `base_path` (`""` →
+  `"/data"`) and `bucket` (`"dubbridge-production"` → `"prod-assets"`),
+  violating the explicit "do not change" constraint. Applied diff was
+  reverted with `git checkout -- config/production.toml` before any commit.
+  Artifact: `docs/audit/low-rri/s-230-t1-prod-attempt1-failed.json`.
+- **`config/production.toml`, attempt 2 — APPLIED (repair, 1/1 budget
+  used):** re-delegated with a stricter packet showing the exact required
+  AFTER block verbatim and calling out the prior failure explicitly. Result:
+  `base_path`/`bucket` preserved exactly, only `endpoint =
+  "https://nyc3.digitaloceanspaces.com"` and `region = "nyc3"` added.
+  Verified in scope via `git diff`. Artifact:
+  `docs/audit/low-rri/s-230-t1-prod-attempt2-applied.json`.
+- **`config/staging.toml`, attempt 1 — APPLIED:** delegated directly with the
+  same strict verbatim-AFTER-block packet style (informed by the production
+  repair). Correct on the first attempt: `backend`/`base_path`/`bucket`
+  preserved, `endpoint`/`region` added with the same placeholder values.
+  Artifact: `docs/audit/low-rri/s-230-t1-staging-attempt1-applied.json`.
+- **Values used (non-secret placeholders, both files):** `endpoint =
+  "https://nyc3.digitaloceanspaces.com"`, `region = "nyc3"`. These are
+  DigitalOcean Spaces placeholder values, not yet confirmed against the
+  actual POC infrastructure region — the cloud-tramo implementer and/or T4-T6
+  operational tasks must confirm or replace them with the real target region
+  before production use.
+- **No credentials were added to either file** (EC-2 preserved).
+- **Field names match the cloud-tramo interface freeze exactly**
+  (`endpoint`, `region`), confirmed against
+  `docs/audit/med-high/s-230-t1-refinement-artifact.json`.
+
+**Evidence to emit:** RRI report, this module-split routing block, phase-1
+and phase-2 review artifacts, round-trip evidence against a real endpoint,
+Reflection log, unit coverage certification, owner verification.
 
 **Status artifacts affected:** this ledger; roadmap X9 wording if the storage
 contract changes materially.
 
-**Handoff prompt:** Wire explicit S3 credentials and region through config into
-`S3Adapter`, fail closed in production when any are absent, and prove one real
-round-trip. Do not touch the upload path or key layout.
+**Handoff prompt (cloud tramo):** Wire explicit S3 credentials and region
+through config into `S3Adapter`, fail closed in production when any are
+absent, and prove one real round-trip. Do not touch the upload path or key
+layout. Consume `endpoint`/`region` key names exactly as frozen in the
+interface-freeze note above — the `.toml` tramo is dispatched separately.
+Per Gemma's phase-1 note: `AppConfig::validate()` must reject not only a
+missing `endpoint`/`region`, but also a malformed/empty value (schema
+validity, not just presence), to fully satisfy EC-1.
 
-**Stop condition:** Stop after the round-trip evidence. Do not start T2.
+**Handoff prompt (local tramo):** Add `endpoint` and `region` keys under
+`[storage]` in `config/production.toml` and `config/staging.toml`, using the
+non-secret placeholder values appropriate to each environment. No
+credentials. Field names are frozen — do not rename.
+
+**Stop condition:** Stop after the round-trip evidence on the merged diff.
+Do not start T2.
+
+### Cloud-tramo implementation evidence — completed 2026-08-16
+
+Implemented per the ADR-038 refinement artifact's binding contract
+(`docs/audit/med-high/s-230-t1-refinement-artifact.json`).
+
+**Files changed:**
+- `crates/config/src/lib.rs` — `StorageSettings` gains `region`,
+  `access_key_id`, `secret_access_key` (`Option<String>`, env-only);
+  `#[serde(alias = "endpoint")]` on the pre-existing `endpoint_url` field to
+  reconcile the frozen TOML key name with the actual Rust field name (see
+  interface-mismatch fix below); `AppConfig::validate()` calls
+  `StorageSettings::validate_s3_production()` when `backend == S3`, itself
+  gated by the pre-existing `production_like` early-return; `from_env()`
+  reads the 3 new fields from single-underscore env vars (legacy reader,
+  unaffected production path). `Default` derived on `StorageBackend`
+  (`#[default] LocalFs`) and `StorageSettings`.
+- `crates/storage/src/config.rs` — `StorageConfig` mirrors the same 3 fields
+  and `Default`; `From<&StorageSettings>` copies them.
+- `crates/storage/src/s3.rs` — `S3Adapter::new` wires `region`,
+  `access_key_id`, `secret_access_key` explicitly into `AmazonS3Builder`
+  alongside the pre-existing `endpoint`/`allow_http`.
+- `crates/storage/src/lib.rs` — test-fixture updates only (no production
+  logic; this crate doesn't construct `StorageSettings`).
+
+**Interface-mismatch fix (not anticipated in the refinement artifact):** the
+frozen contract named the TOML key `endpoint` and implied a matching Rust
+field name, but the pre-existing public field was `endpoint_url` (consumed
+by `S3Adapter::new` and other callers). Resolved via `#[serde(alias =
+"endpoint")]` rather than reopening the already-evidence-recorded local
+tramo or renaming a public field mid-task. Verified via the two tests that
+load the real `config/staging.toml`/`production.toml`
+(`app_config_load_staging_profile_reads_staging_toml_values`,
+`app_config_validate_production_profile_with_representative_secrets_passes`).
+
+**Maintainability fix (owner feedback mid-task):** the first implementation
+pass repeated the full 7-field `StorageSettings`/`StorageConfig` struct
+literal across ~13 test-fixture call sites in `apps/api`, `apps/gateway`,
+and 3 gateway integration-test files. Flagged as copy-paste by the task
+owner; resolved by deriving `Default` on `StorageBackend`/`StorageSettings`/
+`StorageConfig` and reducing every fixture to its materially-relevant fields
+plus `..Default::default()`.
+
+**HP-1 real round-trip:** `crates/storage/src/s3.rs::s3_adapter_new_real_put_get_round_trip_against_s3_compatible_endpoint`
+(`#[ignore]`-gated, following the `crates/jobs` Redis-integration pattern),
+run explicitly against local MinIO
+(`infra/local/docker-compose.yml`, service `minio`):
+
+```
+DUBBRIDGE_STORAGE_TEST_ENDPOINT="http://localhost:9000" \
+DUBBRIDGE_STORAGE_TEST_ACCESS_KEY_ID="dubbridge" \
+DUBBRIDGE_STORAGE_TEST_SECRET_ACCESS_KEY="dubbridge123" \
+DUBBRIDGE_STORAGE_TEST_BUCKET="dubbridge-local" \
+cargo test -p dubbridge-storage --lib s3::tests::s3_adapter_new_real_put_get_round_trip_against_s3_compatible_endpoint -- --ignored --nocapture
+```
+
+Result: `ok` — `put` then `get` round-tripped identical bytes against a real
+S3-compatible endpoint, then cleanup `delete`. Re-confirmed against the
+final merged diff (both tramos applied) during the integration gate below,
+same result.
+
+### ADR-040 integration gate — passed 2026-08-16
+
+Run against the merged diff of both tramos (local `.toml` + cloud `.rs`),
+per the module-split contract's mandatory integration-gate step, before
+Reflection:
+
+| Check | Command | Result |
+|---|---|---|
+| Workspace build | `cargo build --workspace --all-features` | clean |
+| Full test suite | `cargo test --workspace --all-features` | 0 failed across all crates (all `test result: ok`) |
+| Real S3 round-trip (HP-1) | see command above | `ok`, 1 passed |
+| Format | `cargo fmt --check` | clean, exit 0 |
+| Lint | `cargo clippy --workspace --all-targets --all-features -- -D warnings` | clean, exit 0 (only pre-existing unrelated `apalis-redis` future-incompat warning) |
+
+No tramo-attributable or interface-attributable failure occurred — the split
+is not abandoned and the whole task did not re-route to whole-task
+cloud-only implementation.
+
+### Reflection log
+
+Required passes: 3 (`43` → `Med-high`)
+
+#### Pass 1 — Contract correctness
+
+- **Draft verdict:** region + static credentials wired into `S3Adapter::new`;
+  `AppConfig::validate()` fail-closed for `backend = s3`.
+- **Critique findings:** EC-1 needs schema validity, not just presence
+  (Gemma phase-1 note); interface-freeze `endpoint`/`endpoint_url` mismatch
+  against the completed local tramo; HP-1 requires a real round-trip, not a
+  unit test alone.
+- **Revisions applied:** added `validate_s3_production()` (blank/malformed
+  rejection on all 4 fields); added `#[serde(alias = "endpoint")]`; added and
+  ran the `#[ignore]`-gated real MinIO round-trip test.
+
+#### Pass 2 — Failure boundaries and side effects
+
+- **Draft verdict:** S3 validation branch is additive and gated; `LocalFs`
+  path untouched; no credential values in `config/*.toml`.
+- **Critique findings:** confirmed via grep that no credential value exists
+  in `config/production.toml`/`config/staging.toml` (EC-2); confirmed the
+  3-field widening of `StorageSettings`/`StorageConfig` didn't silently break
+  ~13 downstream test-fixture sites (caught via iterative
+  `cargo build`/`cargo test --workspace` compile-error cycles, all resolved).
+- **Revisions applied:** none beyond Pass 1 — the `Default`-based fixture
+  pattern from the maintainability fix already removes the main
+  silent-staleness risk in copy-pasted literals.
+
+#### Pass 3 — Coverage and maintainability
+
+- **Draft verdict:** 8 new `AppConfig::validate()` unit tests (one per
+  rejection branch plus the accept case), 3 new `StorageConfig::from`
+  tests, 1 real round-trip integration test.
+- **Critique findings:** verified every branch of
+  `validate_s3_production()` has a dedicated test; confirmed the
+  copy-paste pattern is fully remediated workspace-wide (`Default` derive +
+  `..Default::default()` at all 13 touched call sites).
+- **Revisions applied:** none — satisfied by Pass 1/Pass 2 work.
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma`
+- Command: `REVIEW_PATHS="crates/config/src/lib.rs crates/storage/src/config.rs crates/storage/src/s3.rs crates/storage/src/lib.rs" GEMMA_REVIEW_TASK_ID="s-230-t1-cloud-tramo" make qa-gemma-review`
+- Artifact: `docs/audit/gemma-evidence/s-230-t1-cloud-tramo.json`
+- Verdict: `FINDINGS` (2/3 passes usable; aggregate `status: findings`)
+- Findings: 4 — all verified against current source before disposition:
+  1. `crates/config/src/lib.rs:212` major — "`validate_s3_production` runs
+     without checking `production_like`." **Rejected (false positive):**
+     `validate()` line 188-190 has an unconditional early-return on
+     `!is_production_like()` before line 212 is reachable.
+  2. `crates/config/src/lib.rs:262` major — "`from_env` env var names
+     mismatch Figment's `__` convention." **Rejected (false positive):**
+     `from_env()` is the pre-existing, explicitly-documented legacy reader
+     ("do not add new callers — use load() instead"); `load()` is the real
+     production path and correctly uses the `__` convention.
+  3. `crates/config/src/lib.rs:78` minor — "`StorageSettings` derives
+     `Debug` and holds `secret_access_key`; leak risk via `{:?}`."
+     **Accepted-follow-up:** no current call site logs it (verified by
+     grep), and it matches the pre-existing unredacted-secret pattern
+     already on `AuthSettings::jwt_secret`/`GatewayOAuthSettings::client_secret`
+     in the same file — a redaction pass is cross-cutting, deferred to the
+     T9 debt register rather than fixed in this task's scope.
+  4. `crates/config/src/lib.rs:262` minor — "`from_env` omits explicit
+     `backend`/`base_path`, relies on `Default`." **Rejected (false
+     positive):** direct read shows `from_env()` sets both explicitly
+     (lines 259-263); it does not use `..Default::default()`.
+- Muse Glimmer fallback: not triggered — reason: Gemma produced a usable
+  aggregate (2/3 parseable passes)
+- D14 fallback: not triggered — reason: n/a
+- D14 provider route: n/a — reason: n/a
+- disposition_divergence: `none`
+- Primary-agent disposition: 3 rejected as false positives (cited against
+  current source line-by-line), 1 accepted as a follow-up debt item
+  (recorded in the T9 debt register above)
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | explicit endpoint/region/credentials build a static-credential S3 adapter; real put+get round-trips identical bytes against an S3-compatible endpoint | `crates/storage/src/s3.rs::s3_adapter_new_real_put_get_round_trip_against_s3_compatible_endpoint` (run explicitly, `--ignored`) | passed |
+| HP-2 | Happy path | local MinIO path keeps working unchanged with the same config shape | `crates/storage/src/lib.rs::build_adapter_s3_returns_s3_adapter` (existing S3-shape construction test, unaffected by the field additions) | passed |
+| EC-1 | Edge case | `backend = s3` in production with missing/blank/malformed endpoint, region, or credentials fails `AppConfig::validate()` before any request | `crates/config/src/lib.rs::app_config_validate_rejects_s3_backend_missing_endpoint_in_production`, `::_malformed_endpoint_in_production`, `::_blank_endpoint_in_production`, `::_missing_region_in_production`, `::_blank_region_in_production`, `::_missing_access_key_id_in_production`, `::_missing_secret_access_key_in_production`, and the accept case `::app_config_validate_accepts_well_formed_s3_backend_in_production` | passed |
+| EC-2 | Edge case | credentials never appear in `config/*.toml`; only `DUBBRIDGE_*` env vars carry them | `crates/config/src/lib.rs::app_config_load_staging_profile_reads_staging_toml_values` and `::app_config_validate_production_profile_with_representative_secrets_passes` (both inject credentials only via `DUBBRIDGE_STORAGE__ACCESS_KEY_ID`/`_SECRET_ACCESS_KEY` env vars, never via TOML); confirmed by direct read that `config/production.toml`/`config/staging.toml` carry no `access_key`/`secret` key | passed |
+
+### Owner final verification
+
+- Owner: `matias`
+- Date: 2026-08-16
+- Statement: I verified every happy path and edge case defined for this task
+  has unit or integration test evidence that replicates the expected
+  behavior, including a real (non-mocked) round-trip against an
+  S3-compatible endpoint for HP-1, and reviewed the Gemma phase-2 findings
+  disposition against the current source before accepting it.
+- Commands run:
+  ```
+  cargo build --workspace --all-features
+  cargo test --workspace --all-features
+  DUBBRIDGE_STORAGE_TEST_ENDPOINT="http://localhost:9000" DUBBRIDGE_STORAGE_TEST_ACCESS_KEY_ID="dubbridge" DUBBRIDGE_STORAGE_TEST_SECRET_ACCESS_KEY="dubbridge123" DUBBRIDGE_STORAGE_TEST_BUCKET="dubbridge-local" cargo test -p dubbridge-storage --lib s3::tests::s3_adapter_new_real_put_get_round_trip_against_s3_compatible_endpoint -- --ignored --nocapture
+  cargo fmt --check
+  cargo clippy --workspace --all-targets --all-features -- -D warnings
+  REVIEW_PATHS="crates/config/src/lib.rs crates/storage/src/config.rs crates/storage/src/s3.rs crates/storage/src/lib.rs" GEMMA_REVIEW_TASK_ID="s-230-t1-cloud-tramo" make qa-gemma-review
+  ```
+
+**Status: [x] Done 2026-08-16**
 
 ---
 
@@ -762,7 +1093,11 @@ executed rather than dropped
   full-segment in-memory reads in `StorageAdapter::get`, the absent mobile
   registration screen **if T7b was dropped** (G12), the absence of any refresh or
   silent-renewal path (G13, a deliberate POC decision rather than an oversight),
-  and any T6 finding not fixed in-window.
+  `StorageSettings`'s `Debug` derive leaving `access_key_id`/`secret_access_key`
+  unredacted (T1 phase-2 Gemma finding, accepted-follow-up — matches the
+  pre-existing unredacted `jwt_secret`/`client_secret` pattern in the same file;
+  a redaction pass is cross-cutting, not T1-scoped), and any T6 finding not fixed
+  in-window.
 - The status of every droppable task is stated explicitly — executed or dropped,
   and why — so the debt register cannot silently omit a dropped task's gap.
 - The stale roadmap note "`S-070` (JWKS) remains recommended before production

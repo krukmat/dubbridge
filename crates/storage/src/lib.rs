@@ -298,10 +298,9 @@ mod tests {
     fn build_adapter_local_fs_returns_file_adapter() {
         let dir = TempDir::new().unwrap();
         let config = Cfg {
-            backend: StorageBackend::LocalFs,
             bucket: "dubbridge-local".to_string(),
             base_path: dir.path().to_string_lossy().into_owned(),
-            endpoint_url: None,
+            ..Default::default()
         };
 
         let adapter = build_adapter(&config).unwrap();
@@ -318,6 +317,9 @@ mod tests {
             bucket: "dubbridge-local".to_string(),
             base_path: "/tmp/dubbridge-storage".to_string(),
             endpoint_url: Some("http://localhost:9000".to_string()),
+            region: Some("us-east-1".to_string()),
+            access_key_id: Some("dubbridge".to_string()),
+            secret_access_key: Some("dubbridge123".to_string()),
         };
 
         let adapter = build_adapter(&config).unwrap();
@@ -335,6 +337,7 @@ mod tests {
             bucket: " ".to_string(),
             base_path: "/tmp/dubbridge-storage".to_string(),
             endpoint_url: Some("http://localhost:9000".to_string()),
+            ..Default::default()
         };
 
         match build_adapter(&config) {
@@ -351,6 +354,7 @@ mod tests {
             bucket: "dubbridge-local".to_string(),
             base_path: "/tmp/dubbridge-storage".to_string(),
             endpoint_url: Some("not-a-url".to_string()),
+            ..Default::default()
         };
 
         match build_adapter(&config) {

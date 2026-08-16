@@ -1,0 +1,14 @@
+{
+  "after_block": "[storage]\nbackend = \"s3\"\nbase_path = \"\"\nbucket = \"dubbridge-staging\"\nendpoint = \"https://nyc3.digitaloceanspaces.com\"\nregion = \"nyc3\"",
+  "apply_result": "applied",
+  "path": "config/staging.toml",
+  "risk_notes": [
+    "None"
+  ],
+  "status": "patch",
+  "summary": "Add endpoint and region keys to [storage] section in config/staging.toml",
+  "test_commands": [
+    "toml-validator config/staging.toml"
+  ],
+  "unified_diff": "diff --git a/config/staging.toml b/config/staging.toml\nindex bfa28f1..dfe4ea0 100644\n--- a/config/staging.toml\n+++ b/config/staging.toml\n@@ -8,6 +8,8 @@ env = \"staging\"\n backend = \"s3\"\n base_path = \"\"\n bucket = \"dubbridge-staging\"\n+endpoint = \"https://nyc3.digitaloceanspaces.com\"\n+region = \"nyc3\"\n \n [observability]\n log_format = \"json\"\n"
+}

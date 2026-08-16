@@ -1,0 +1,8 @@
+{
+  "primary_id": "claude-sonnet-5-orchestrator",
+  "decision": "CLOUD_REQUIRED",
+  "rationale": "Concur with Muse Glimmer: all four .rs files in the cloud tramo touch credential handling, endpoint/region wiring, and fail-closed production validation, matching the ADR-038 section 6 hard domain exclusion (auth/credential and governance-invariant surface). This is a structural exclusion independent of measured cyclomatic complexity, so downgrade to cloud regardless of any GO_LOCAL signal.",
+  "timestamp": "2026-08-16T14:51:38.529440Z",
+  "card_hash": "295c0488671a4f0ce9f5dd386c7ef882153f4e09aefe1aa48d5d2420005da678",
+  "refinement_artifact_sha256": "b84239e3b67c2423219974191e62d3d693b9a63717a9ebad52f427cb0a0f7925"
+}

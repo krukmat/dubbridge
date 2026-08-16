@@ -1,0 +1,14 @@
+{
+  "after_block": "[storage]\nbackend = \"s3\"\nbase_path = \"\"\nbucket = \"dubbridge-production\"\nendpoint = \"https://nyc3.digitaloceanspaces.com\"\nregion = \"nyc3\"",
+  "apply_result": "applied",
+  "path": "config/production.toml",
+  "risk_notes": [
+    "None"
+  ],
+  "status": "patch",
+  "summary": "Add endpoint and region keys to [storage] section in config/production.toml",
+  "test_commands": [
+    "toml-validator config/production.toml"
+  ],
+  "unified_diff": "diff --git a/config/production.toml b/config/production.toml\nindex c9e947e..101fa02 100644\n--- a/config/production.toml\n+++ b/config/production.toml\n@@ -12,6 +12,8 @@ env = \"production\"\n backend = \"s3\"\n base_path = \"\"\n bucket = \"dubbridge-production\"\n+endpoint = \"https://nyc3.digitaloceanspaces.com\"\n+region = \"nyc3\"\n \n [observability]\n log_format = \"json\"\n"
+}

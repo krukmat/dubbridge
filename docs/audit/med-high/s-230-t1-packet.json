@@ -1,0 +1,31 @@
+{
+  "task_id": "s-230-t1-cloud-tramo",
+  "objective": "Wire explicit DigitalOcean Spaces (S3-compatible) endpoint, region, and static credentials into S3Adapter, and make production validation fail closed when any are missing or malformed.",
+  "rri": 43,
+  "band": "Med-high",
+  "hard_domain_exclusion": "ADR-038 section 6: credential handling, endpoint/region wiring, and fail-closed production validation are auth/credential and governance-invariant surface, cloud-only regardless of measured cyclomatic complexity.",
+  "allowed_paths": [
+    "crates/config/src/lib.rs",
+    "crates/storage/src/config.rs",
+    "crates/storage/src/s3.rs",
+    "crates/storage/src/lib.rs"
+  ],
+  "out_of_scope": [
+    "config/production.toml",
+    "config/staging.toml"
+  ],
+  "interface_contract": "This cloud tramo owns the endpoint_url and region field names/shapes on StorageSettings and StorageConfig. A separate Low-band local tramo adds literal 'endpoint' and 'region' TOML keys under [storage] in config/production.toml and config/staging.toml, matching these field names exactly. Field names must not be renamed after this refinement without re-freezing the interface.",
+  "current_code_s3_adapter_new": "pub fn new(config: &StorageConfig) -> Result<Self, StorageError> {\n    let mut builder = AmazonS3Builder::new().with_bucket_name(&config.bucket);\n    if let Some(url) = &config.endpoint_url {\n        builder = builder.with_endpoint(url).with_allow_http(true);\n    }\n    let store = builder.build().map_err(|e| StorageError::Backend(e.to_string()))?;\n    Ok(Self { store: Arc::new(store), bucket: config.bucket.clone() })\n}",
+  "current_code_storage_config": "pub struct StorageConfig {\n    pub backend: StorageBackend,\n    pub bucket: String,\n    pub base_path: String,\n    pub endpoint_url: Option<String>,\n}\n// no region field, no credential fields yet",
+  "current_config_production_toml_storage_section": "backend = \"s3\"\nbase_path = \"\"\nbucket = \"dubbridge-production\"\n// no endpoint or region keys present yet",
+  "acceptance_criteria": [
+    "StorageSettings carries region and credential references; secrets are env-only and absent from config/*.toml.",
+    "S3Adapter::new sets bucket, endpoint, region, and static credentials explicitly.",
+    "AppConfig::validate() rejects an s3 backend that is missing endpoint, region, or credentials, AND rejects malformed/empty values for those fields (schema validity, not just presence) -- per Gemma's phase-1 review note.",
+    "A real round-trip (put then get) against an S3-compatible endpoint is executed and recorded; a unit test alone does not satisfy this.",
+    "The existing local MinIO path keeps working unchanged with the same configuration shape.",
+    "Credentials never appear in configuration files, logs, or traces -- only injected DUBBRIDGE_* environment variables carry them (ADR-026 Decision 4, ADR-018 redaction)."
+  ],
+  "gemma_phase1_note": "Ensure AppConfig::validate() covers both presence and schema validity of endpoint/region to fully satisfy EC-1.",
+  "stop_conditions_hint": "Stop after producing round-trip evidence against a real S3-compatible endpoint. Do not touch the upload path or key layout. Do not start any task beyond S-230-T1."
+}

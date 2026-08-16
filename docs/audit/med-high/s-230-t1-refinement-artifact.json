@@ -1,0 +1,106 @@
+{
+  "error": null,
+  "finished_at": "2026-08-16T14:50:45.299756Z",
+  "generation": {
+    "created_at": "2026-08-16T14:50:45.278531Z",
+    "done": true,
+    "eval_count": 672,
+    "eval_duration": 139824719000,
+    "load_duration": 11129875375,
+    "prompt_eval_count": 1061,
+    "prompt_eval_duration": 12348924000,
+    "think_disabled": true,
+    "thinking_present": false,
+    "thinking_sha256": null,
+    "total_duration": 163334230042
+  },
+  "model": {
+    "expected_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "resolved_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "tag": "muse-glimmer:30b-q4_K_M"
+  },
+  "packet": {
+    "expected_sha256": "295c0488671a4f0ce9f5dd386c7ef882153f4e09aefe1aa48d5d2420005da678",
+    "path": "/private/tmp/claude-501/-Users-matias-dubbridge/de8ca1ea-760d-4951-8646-e4e05d6b9b15/scratchpad/s230-t1-cloud-tramo-packet.json",
+    "sha256": "295c0488671a4f0ce9f5dd386c7ef882153f4e09aefe1aa48d5d2420005da678"
+  },
+  "profile": "med-high-refinement-v1",
+  "prompt": {
+    "profile": "med-high-refinement-v1",
+    "sha256": "e910d84df6eb31bb40fe125aa0dfc2c13341564415edcc0b7c2c6c70b0b396a9",
+    "version": "med-high-refinement-prompt-v1"
+  },
+  "response": {
+    "raw_text_sha256": "24fdec650b4048587ab4e907bbd5db0e1937c8789289c130b759800dc788f9a3",
+    "validated": {
+      "acceptance_tests": [
+        "StorageSettings carries region and credential references; secrets absent from config/*.toml.",
+        "S3Adapter::new sets bucket, endpoint, region, static credentials explicitly.",
+        "AppConfig::validate() rejects s3 backend missing or malformed endpoint/region/credentials.",
+        "Real round-trip put then get against S3-compatible endpoint is executed and recorded."
+      ],
+      "claims": [
+        {
+          "label": "SUPPORTED",
+          "statement": "Hard domain exclusion mandates cloud-only for credential handling and validation."
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Current code lacks region and credential fields."
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Round-trip test is required not just unit test."
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Field names must not be renamed after refinement."
+        }
+      ],
+      "excluded_scope": [
+        "config/production.toml and config/staging.toml edits are out of scope.",
+        "Do not touch upload path or key layout.",
+        "Do not start tasks beyond S-230-T1."
+      ],
+      "implementation_steps": [
+        "Extend StorageConfig with region and credential fields referencing env vars.",
+        "Modify S3Adapter::new to use endpoint_url, region, and static credentials from config.",
+        "Update AppConfig::validate() for presence and schema validity of endpoint/region/credentials.",
+        "Add round-trip put then get test against real S3-compatible endpoint and record evidence."
+      ],
+      "refined_scope": [
+        "Add region and credential references to StorageSettings and StorageConfig in allowed paths.",
+        "Update S3Adapter::new to set bucket, endpoint, region, and static credentials explicitly.",
+        "Strengthen AppConfig::validate() to reject missing or malformed endpoint, region, credentials for s3 backend.",
+        "Ensure secrets are env-only and absent from config/*.toml.",
+        "Preserve existing local MinIO path with same configuration shape."
+      ],
+      "risks": [
+        "Interface contract requires exact field names for endpoint_url and region; rename would break downstream Low-band tramo.",
+        "Credential leakage risk if env vars are logged or written to config files."
+      ],
+      "route_recommendation": "CLOUD_REQUIRED",
+      "stop_conditions": [
+        "Stop after producing round-trip evidence against real S3-compatible endpoint.",
+        "Do not modify config/production.toml or config/staging.toml.",
+        "Do not start any task beyond S-230-T1."
+      ],
+      "summary": "Credential handling, endpoint/region wiring, and fail-closed production validation are auth/credential and governance-invariant surface per ADR-038 section 6. Hard domain exclusion requires cloud-only ownership.",
+      "unknowns": [
+        "Exact env var names for DUBBRIDGE_* credentials not specified in packet.",
+        "Schema validity rules for endpoint/region/credentials not fully defined."
+      ]
+    }
+  },
+  "runtime": {
+    "num_ctx": 65536,
+    "num_predict": 4096,
+    "ollama_url": "http://127.0.0.1:11434",
+    "temperature": 0.0,
+    "timeout_seconds": 180.0
+  },
+  "schema_version": "adr037-local-architect-artifact-v1",
+  "started_at": "2026-08-16T14:48:01.917500Z",
+  "status": "ok",
+  "success": true
+}

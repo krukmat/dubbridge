@@ -12,6 +12,8 @@ env = "production"
 backend = "s3"
 base_path = ""
 bucket = "dubbridge-production"
+endpoint = "https://nyc3.digitaloceanspaces.com"
+region = "nyc3"
 
 [observability]
 log_format = "json"

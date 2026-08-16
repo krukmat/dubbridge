@@ -18,6 +18,15 @@ impl S3Adapter {
         if let Some(url) = &config.endpoint_url {
             builder = builder.with_endpoint(url).with_allow_http(true);
         }
+        if let Some(region) = &config.region {
+            builder = builder.with_region(region);
+        }
+        if let Some(access_key_id) = &config.access_key_id {
+            builder = builder.with_access_key_id(access_key_id);
+        }
+        if let Some(secret_access_key) = &config.secret_access_key {
+            builder = builder.with_secret_access_key(secret_access_key);
+        }
         let store = builder
             .build()
             .map_err(|e| StorageError::Backend(e.to_string()))?;
@@ -131,6 +140,7 @@ impl StorageAdapter for S3Adapter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::StorageBackend;
     use tempfile::NamedTempFile;
     use tokio::io::AsyncWriteExt;
 
@@ -139,6 +149,52 @@ mod tests {
             Arc::new(object_store::memory::InMemory::new()),
             "test-bucket",
         )
+    }
+
+    // S-230-T1 HP-1: a real round-trip against an S3-compatible endpoint,
+    // exercising S3Adapter::new (not new_for_tests / InMemory) with explicit
+    // endpoint/region/static-credential wiring end to end. Requires local
+    // MinIO (`infra/local/docker-compose.yml`), which is S3-compatible and
+    // exercises the same AmazonS3Builder wiring DigitalOcean Spaces uses.
+    fn minio_config_for_test() -> StorageConfig {
+        let endpoint_url = std::env::var("DUBBRIDGE_STORAGE_TEST_ENDPOINT").expect(
+            "DUBBRIDGE_STORAGE_TEST_ENDPOINT must be set when running ignored S3 integration tests",
+        );
+        let access_key_id = std::env::var("DUBBRIDGE_STORAGE_TEST_ACCESS_KEY_ID")
+            .expect("DUBBRIDGE_STORAGE_TEST_ACCESS_KEY_ID must be set when running ignored S3 integration tests");
+        let secret_access_key = std::env::var("DUBBRIDGE_STORAGE_TEST_SECRET_ACCESS_KEY")
+            .expect("DUBBRIDGE_STORAGE_TEST_SECRET_ACCESS_KEY must be set when running ignored S3 integration tests");
+        let bucket = std::env::var("DUBBRIDGE_STORAGE_TEST_BUCKET")
+            .unwrap_or_else(|_| "dubbridge-local".to_string());
+
+        StorageConfig {
+            backend: StorageBackend::S3,
+            bucket,
+            base_path: String::new(),
+            endpoint_url: Some(endpoint_url),
+            region: Some("us-east-1".to_string()),
+            access_key_id: Some(access_key_id),
+            secret_access_key: Some(secret_access_key),
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "requires local MinIO + DUBBRIDGE_STORAGE_TEST_* env vars; run explicitly via qa-test-s3"]
+    async fn s3_adapter_new_real_put_get_round_trip_against_s3_compatible_endpoint() {
+        let config = minio_config_for_test();
+        let adapter = S3Adapter::new(&config)
+            .expect("S3Adapter::new with explicit endpoint/region/credentials");
+
+        let key = format!("s-230-t1-roundtrip/{}.bin", uuid::Uuid::new_v4());
+        let data = b"dubbridge s-230-t1 real s3-compatible round trip".to_vec();
+
+        let stored_key = adapter.put(&key, data.clone()).await.expect("put");
+        assert_eq!(stored_key, key);
+
+        let retrieved = adapter.get(&key).await.expect("get");
+        assert_eq!(retrieved, data);
+
+        adapter.delete(&key).await.expect("cleanup delete");
     }
 
     #[tokio::test]
