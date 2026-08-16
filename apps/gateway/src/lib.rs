@@ -93,10 +93,9 @@ mod tests {
             redis_url: "redis://127.0.0.1:6379".to_string(),
             worker_concurrency: 4,
             storage: dubbridge_config::StorageSettings {
-                backend: dubbridge_config::StorageBackend::LocalFs,
                 base_path: "/tmp/dubbridge-storage".to_string(),
                 bucket: "dubbridge-local".to_string(),
-                endpoint_url: None,
+                ..Default::default()
             },
             observability: dubbridge_config::ObsSettings {
                 log_format: dubbridge_config::LogFormat::Pretty,

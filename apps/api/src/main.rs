@@ -158,9 +158,8 @@ mod tests {
             worker_concurrency: 4,
             storage: dubbridge_config::StorageSettings {
                 backend: dubbridge_config::StorageBackend::S3,
-                base_path: String::new(),
                 bucket: "dubbridge-test".to_string(),
-                endpoint_url: None,
+                ..Default::default()
             },
             observability: dubbridge_config::ObsSettings {
                 log_format: dubbridge_config::LogFormat::Json,
