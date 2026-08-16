@@ -2902,6 +2902,28 @@ pushing. Recorded here because the original `--tests`-only clippy command
 this section reports was insufficient on its own — the workspace-wide
 commands above are now the reproducible ones.
 
+**Unrelated pre-existing local-DB contamination found during pre-push
+verification (not caused by this task, not fixed by it):** running
+`cargo test --workspace --all-features` (and, separately,
+`cargo test -p dubbridge-api --all-features -- --test-threads=1`) against
+the same local Postgres instance used throughout this task surfaced 6 and 1
+failing tests respectively in `dubbridge-api` — `routes::auth::tests::*`,
+`routes::compliance::tests::get_audit_timeline_handler_returns_owned_events`,
+and `notification_schema_test::push_tokens_accept_valid_rows_and_reject_duplicate_provider_device_pairs`.
+All failures are unique-constraint conflicts or count mismatches consistent
+with leftover seed data from earlier test runs in this session's local
+database (e.g. `duplicate key value violates unique constraint
+"push_tokens_provider_device_unique"`), not a code defect. None of this
+task's three commits (`0e4a634`, `b77997e`, `8a0fbe4`) touch `apps/api` or
+any file under its ownership. `dubbridge-worker-runner` itself remained
+57/57 passing, `cargo fmt --all -- --check` and
+`cargo clippy --workspace --all-targets --all-features -- -D warnings` both
+clean across the whole workspace. Not investigated or remediated as part of
+this task — CI runs against a fresh database per run and would not
+reproduce this local-only contamination; flagged here as a known local-only
+condition for whoever next runs the full `dubbridge-api` suite against this
+same local Postgres instance.
+
 **Task-analysis review:** gemma `docs/audit/gemma-evidence/S-150-T2c-iv-c.json` - PASS (phase 1, prior session)
 **Code-solution review:** gemma `docs/audit/gemma-evidence/S-150-T2c-iv-c.json` - PASS (phase 2, 0 findings)
 
