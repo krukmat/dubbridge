@@ -198,19 +198,11 @@ band — never derive one output from another (e.g. do not infer capability from
 
 \* **Cross-vendor peer** (RRI 56+ only): `claude-code → codex | codex → claude | other → claude`. Unavailable peer CLI falls back to **D14** (Balanced tier); D14 first uses a responsive provider different from the primary orchestrator, and may use the same provider only after that cross-provider attempt is unusable and is recorded as degraded. Peer + D14 both unavailable → blocked artifact, stop. Phase-1 exemptions (docs/policy/config-only tasks) record `n/a`. Full contract: `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review`.
 
-†† **Local reviewer bindings** (owner directive, 2026-08-11 — local model
-stack restructure): RRI 0–25 phase-1/phase-2 reviewer is **Muse Glimmer**
-(`muse-glimmer:30b-q4_K_M`), with **Gemma** as intermediate fallback, then
-**D14**. RRI 26–55 phase-1/phase-2 reviewer is **Gemma**
-(`gemma4:26b-a4b-it-qat`) — this reverts the 2026-07-21 override that had
-used `qwen3.6:27b-q4_K_M` in this role (that binding became the local
-implementer per ADR-036 Amendment 2, since superseded by Amendment 3's
-rebind to `nemotron-3.5-lightning:30b-a3b-q4_K_M`) — with **Muse Glimmer** as
-intermediate fallback, then **D14**. In both bands, D14 must first be
-cross-provider and may be same-provider only as a recorded degraded
-fallback after that cross-provider attempt is unusable; D14 unavailable →
-blocked artifact, stop. See § Local pipeline phase-1/phase-2 reviewer
-bindings below for the full contract and ADR-037 scope note.
+†† **Local reviewer bindings:** the phase-1/phase-2 chains for RRI 0–55, their
+retry discipline, D14's cross-provider requirement, and the ADR-037 scope note
+are defined once in § Local pipeline phase-1/phase-2 reviewer bindings below;
+full model-binding lineage is in
+`docs/audit/agent-workflow-binding-history.md`.
 
 ### Model tier resolution
 
@@ -362,7 +354,7 @@ The wrapper resolves:
 | `DUBBRIDGE_LOW_RRI_MODEL` | `qwen3.8:27b-mlx` | Default Low/S local developer; no implicit local substitute |
 | `DUBBRIDGE_LOW_RRI_IDLE_TIMEOUT_SECONDS` | `60` | Seconds without a token = stall |
 | `DUBBRIDGE_LOW_RRI_MAX_WALL_SECONDS` | `900` | Hard generation cap |
-| `DUBBRIDGE_LOW_RRI_NUM_CTX` | `16384` | Context window for packet + tagged contract |
+| `DUBBRIDGE_LOW_RRI_NUM_CTX` | `65536` | Context window for packet + tagged contract |
 | `DUBBRIDGE_LOW_RRI_NUM_PREDICT` | `4096` | Maximum generated tokens |
 | `DUBBRIDGE_LOW_RRI_TEMPERATURE` | `0.1` | Sampling temperature; raise slightly for harder bounded attempts |
 | `DUBBRIDGE_LOW_RRI_THINK` | `0` | Ollama thinking mode flag; keep off by default for Low-RRI wrapper reliability |
@@ -416,15 +408,9 @@ For final **RRI 26–40**, the implementation default is **local-first**:
   model binding, repair budget, or scope boundary fails; the task card must
   already record the concrete takeover trigger/model from the workflow table.
 
-**Phase-1/phase-2 reviewer bindings (owner directive, 2026-08-11):** for this
-band, both non-exempt phase 1 and phase 2 default to **Gemma**
-(`gemma4:26b-a4b-it-qat`) — reverting the 2026-07-21 override that had used
-the Local Architect / Complex Analyst model (`qwen3.6:27b-q4_K_M`,
-reassigned to the implementer role by ADR-036 Amendment 2 and since rebound
-to `nemotron-3.5-lightning:30b-a3b-q4_K_M` by Amendment 3) — see § Local
-pipeline phase-1/phase-2 reviewer bindings below. If Gemma is unavailable,
-stalled, or returns invalid/`BLOCKED` output, fall back to **Muse Glimmer**
-(`muse-glimmer:30b-q4_K_M`), then to **D14** as the final fallback.
+**Phase-1/phase-2 reviewer bindings:** both non-exempt phase 1 and phase 2
+use the RRI 26–55 chain defined in § Local pipeline phase-1/phase-2 reviewer
+bindings below.
 
 Bindings used by the operative local-first route:
 
@@ -442,8 +428,8 @@ implementer.
 ### Med-high Architect-refined single-attempt handling
 
 For final **RRI 41–55**, implementation does **not** use Moderate's direct
-local-first route. ADR-038 (2026-07-26) replaces it with a fail-closed,
-evidence-bearing gate:
+local-first route. ADR-038 defines a fail-closed,
+evidence-bearing gate instead:
 
 ```text
 approved Med-high card
@@ -471,26 +457,17 @@ Implementation surfaces:
 There is no local attempt or repair at this band. The refinement/receipt path
 is retained as evidence only, and every outcome routes to cloud.
 
-The approval path is **not** relaxed: 3 Reflection passes still apply, and
+The approval path is **not** relaxed: 3 Reflection passes apply, and
 the RRI 41+ human approval gate (plan + explicit acceptance criteria before
-implementation) still fires. The primary agent remains the planner,
+implementation) fires. The primary agent remains the planner,
 approver-facing presenter, reviewer, and closer regardless of which route
 Muse Glimmer/the gate select.
 
-**Phase-1/phase-2 reviewer bindings (owner directive, 2026-08-11; ADR-038
-otherwise unchanged):** for this band, both non-exempt phase 1 and phase 2
-default to **Gemma** (`gemma4:26b-a4b-it-qat`), not the cross-vendor peer —
-see § Local pipeline phase-1/phase-2 reviewer bindings below. This reverts
-the 2026-07-21 override that had used `qwen3.6:27b-q4_K_M` in this role
-(that binding became the local implementer, since superseded by Amendment 3's
-rebind to `nemotron-3.5-lightning:30b-a3b-q4_K_M`). Phase 1 remains exempt for
-migration-only/config-only/docs-only tasks as before; when phase 1 does
-apply, it also routes to Gemma rather than the cross-vendor peer. If Gemma
-is unavailable, stalled, or returns invalid/`BLOCKED` output, fall back to
-**Muse Glimmer** (`muse-glimmer:30b-q4_K_M`); if Muse Glimmer is also
-unavailable, stalled, or returns invalid/`BLOCKED` output, fall back to
-**D14**; if D14 is also unavailable, write a blocked-artifact record and
-stop — never self-review.
+**Phase-1/phase-2 reviewer bindings:** for this band, both non-exempt phase 1
+and phase 2 use the RRI 26–55 chain defined in § Local pipeline
+phase-1/phase-2 reviewer bindings below — **not** the cross-vendor peer.
+Phase 1 is exempt for migration-only/config-only/docs-only tasks; when it
+does apply, it routes to that chain rather than the cross-vendor peer.
 
 ADR-038 introduces no local-developer environment variable for Med-high; its
 inputs are the refinement/receipt artifacts and its output is a cloud handoff.
@@ -505,14 +482,14 @@ upgrade (a gate defect, not an expected outcome).
 
 ### Per-module complexity-split routing (ADR-040)
 
-Owner directive, 2026-08-16, formalized as `ADR-040`: for an **approved**
+Under `ADR-040`: for an **approved**
 development task with final RRI **26–55** whose `allowed_paths` span **two
 or more files**, the orchestrator may split implementation authorship by
 per-module cyclomatic complexity instead of routing the whole task to one
 implementer. This is a routing refinement, not a new approval gate — it
 fires after the task's HITL approval and phase-1 review, and it does not
 change the task's RRI, band, or phase-1/phase-2 reviewer (both stay Gemma
-per the existing 26–55 binding).
+per the 26–55 binding).
 
 **Trigger — heterogeneity required.** Measure raw CC per file (highest CC
 among functions created/materially changed in that file) using the same
@@ -578,7 +555,7 @@ performs capsule recording and tramo dispatch manually. Full contract:
 
 ### Target-file size gate for local-first delegation
 
-Owner directive, 2026-07-22: before building a task card for either local-first
+Before building a task card for either local-first
 band (Moderate or Med-high), the orchestrating agent must check the line count
 of every file in the card's `allowed_paths` and every file the local
 implementer will need to read in full to complete the task (not just files it
@@ -622,48 +599,35 @@ edits — a large file it must read for context counts too).
 **Tooling maintainability (not a delegation gate, a standing code-health
 rule):** `scripts/local-agent/*.py` and other pipeline/orchestrator scripts
 should not be allowed to grow past ~500 lines without deliberate justification
-either — e.g. `run_local_task.py` (918 lines as of 2026-07-22) is a refactor
+either — an oversized `run_local_task.py` is a refactor
 candidate, splitting the tool-call parsing, boundary/scope enforcement, and
 the draft/test/repair loop into separate modules the way `boundary.py` and
-`scope_check.py` already are. `scripts/check-maintainability.py` does not yet
-have a Python profile (`RUST_SOURCE`/`RUST_TEST`/`MOBILE_SOURCE`/`MOBILE_TEST`
-only) — adding one is tracked as follow-up work, not a blocking requirement of
-this policy change.
+`scope_check.py` already are. `scripts/check-maintainability.py` has no
+Python profile (`RUST_SOURCE`/`RUST_TEST`/`MOBILE_SOURCE`/`MOBILE_TEST`
+only), so this rule is enforced by review, not by the gate.
 
 ### Local pipeline phase-1/phase-2 reviewer bindings
 
-Owner directive, 2026-08-11 (local model stack restructure): the non-exempt
-phase-1 task-analysis reviewer and phase-2 code-solution reviewer for RRI
-0–55 are:
+The non-exempt phase-1 task-analysis reviewer and phase-2 code-solution
+reviewer for RRI 0–55 are:
 
 - **RRI 0–25 (Low):** primary **Muse Glimmer** (`muse-glimmer:30b-q4_K_M`
-  via Ollama), replacing Gemma Reviewer as the default path.
+  via Ollama).
 - **RRI 26–55 (Moderate + Med-high):** primary **Gemma**
-  (`gemma4:26b-a4b-it-qat` via Ollama). This **retires** the 2026-07-21
-  override that had used the Local Architect / Complex Analyst model
-  (`qwen3.6:27b-q4_K_M`) in this role — that binding became the local
-  implementer for this band (ADR-036 Amendment 2, since superseded by
-  Amendment 3's rebind to `nemotron-3.5-lightning:30b-a3b-q4_K_M`), and Qwen3.6-27B cannot
-  simultaneously implement and independently review the same band without
-  breaking the cross-family pairing rule (ADR-036 §5). Gemma reverts to the
-  role it held before the 2026-07-21 override; the cross-vendor peer
-  (Med-high's other historical default) is still not used in this band.
+  (`gemma4:26b-a4b-it-qat` via Ollama) — never the band's own local
+  implementer model, which cannot simultaneously implement and independently
+  review the same band without breaking the cross-family pairing rule
+  (ADR-036 §5); and never the cross-vendor peer, which is RRI 56+ only.
 
 Both bindings apply regardless of whether implementation stayed on the
 local-first runner or escalated to cloud implementation — the binding
 governs *who reviews*, independently of *who authored the code*.
 
-The RRI 26–55 binding is a deliberate, scoped exception to ADR-037's written
-boundary for the Local Architect / Complex Analyst role, which otherwise
-restricts it to advisory architecture/analysis work and explicitly states
-that it does not replace any workflow reviewer, D14, or human approval (see
-`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Local Architect / Complex
-Analyst`) — except that, as of this 2026-08-11 restructure, the Local
-Architect / Complex Analyst model is no longer `qwen3.6:27b-q4_K_M` (it is
-now `muse-glimmer:30b-q4_K_M`, per ADR-037 Amendment 1) and this model is
-**not** used as a phase-1/phase-2 reviewer for RRI 26–55 — that role
-reverted to Gemma. The Local Architect boundary now applies without
-exception in every band.
+**ADR-037 scope note:** the Local Architect / Complex Analyst model
+(`muse-glimmer:30b-q4_K_M`) is not a phase-1/phase-2 reviewer for RRI 26–55,
+so ADR-037's advisory-only boundary applies without exception in every band
+(see `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Local Architect / Complex
+Analyst`).
 
 Invocation: send the diff, task acceptance criteria, and any independently-
 verified facts (test/verification output the orchestrator already produced)
@@ -673,7 +637,7 @@ contract is required for review output (unlike Gemma Developer) — a
 structured PASS/FINDINGS verdict with findings-by-severity is sufficient,
 since the model is not writing files.
 
-**Fallback (owner directive, 2026-08-11):** if the band's primary reviewer
+**Fallback:** if the band's primary reviewer
 model is unavailable, stalled, returns invalid output, or returns
 `BLOCKED`, retry once against the same primary model with the same packet;
 if that retry also fails, fall back to the band's intermediate-fallback
@@ -696,16 +660,15 @@ otherwise unchanged.
 
 ### Review evidence gate (artifact-or-override, all bands)
 
-Owner directive, 2026-07-22 (GEG-1): every task-file section that reaches
+Every task-file section that reaches
 `[x] Done` with `Type: development` must carry machine-checkable evidence
 that the mandatory review gate for its band actually ran — a Gemma Reviewer
 pass, a cross-vendor peer review, or D14, per the routing rules above. This
 requirement is **band-agnostic**: it applies at RRI 0-25 (Low), 26-40
-(Moderate), and 41-55 (Med-high) alike, not only to the sub-40 tier the
-original ledger validator checked. `scripts/check-task-unit-coverage.sh`
+(Moderate), and 41-55 (Med-high) alike. `scripts/check-task-unit-coverage.sh`
 enforces it for every section dated on or after the cutover recorded in that
 script (`REVIEW_EVIDENCE_CUTOVER_DATE`); sections predating the cutover are
-grandfathered and keep the pre-GEG-1 behavior.
+grandfathered.
 
 The section must contain **one** of:
 
@@ -891,14 +854,10 @@ code review in separate invocations. Gemma Reviewer must not be used as a
 substitute for the primary agent's final Reflection cycle; it is advisory input
 to that cycle.
 
-The review step is **mandatory for all development tasks**. For RRI 0–25 (Low),
-Muse Glimmer is the preferred path (N sequential passes, default 3), with
-Gemma as intermediate fallback; the context-isolated subagent (D14) is the
-required final fallback. For RRI 26–55 (Moderate + Med-high), Gemma is the
-preferred path (owner directive 2026-08-11, reverting the 2026-07-21
-`qwen3.6:27b-q4_K_M` override) — see § Local pipeline phase-1/phase-2
-reviewer bindings — with Muse Glimmer as intermediate fallback and the same
-D14 final fallback. The completion evidence block records passes run/succeeded,
+The review step is **mandatory for all development tasks**. The band's primary
+reviewer runs N sequential passes (default 3) and its chain to D14 is defined
+in § Local pipeline phase-1/phase-2 reviewer bindings. The completion evidence
+block records passes run/succeeded,
 quorum result, aggregate status, consensus/disagreement counts, `degraded`
 flag, isolated adjudicator status, and `disposition_divergence`. See
 `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer` for the full

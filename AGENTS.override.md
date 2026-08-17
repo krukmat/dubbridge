@@ -114,27 +114,19 @@ The Effort → Complexity mapping is a **fallback** used only when no RRI is ava
 - `Effort: M` -> `Complexity: Medium`
 - `Effort: L` -> `Complexity: High`
 
-Current Codex cloud-takeover defaults (re-verify against official vendor guidance
-at task-presentation time):
+Codex cloud-takeover defaults and Claude Code capability resolution both
+resolve via the dated tables in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
+(§ "Current Codex cloud-takeover resolution" and § "Current Claude Code
+capability resolution") — this file does not carry its own copy of the
+concrete model names, so there is exactly one place to re-verify against
+official vendor guidance at task-presentation time. Task-local model pins
+override those defaults until explicitly updated.
 
-- RRI 0–25 bounded Low-band cloud escalation: `gpt-5.6-luna` at `low`;
-  `gpt-5.6-terra` at `low` if Luna is unavailable.
-- RRI 26–40 local-first fallback: `gpt-5.6-terra` at `medium`.
-- RRI 41–55: operational-only fallback uses `gpt-5.6-terra` at `high`;
-  capability/risk takeover uses `gpt-5.6-sol` at `high`.
-- RRI 56+: cloud-primary uses `gpt-5.6-sol`, with effort resolved by the
-  canonical workflow table; RRI 86+ remains analysis/decomposition only.
-
-Claude Code model resolution remains provider-current and follows the canonical
-workflow guide. Task-local model pins override these defaults until explicitly
-updated.
-
-Escalation guidance (Claude side resolves via the dated "Current Claude Code
-capability resolution" table in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`, not
-a pin here):
-
-- use `claude-opus-5` only when the task is long-context heavy, synthesis-heavy, or repeatedly stalls under `claude-sonnet-5`
-- if a task is primarily code editing, repo navigation, shell execution or deterministic implementation work, keep Codex as the default
+Escalation guidance summary: use `claude-opus-5` only when the task is
+long-context heavy, synthesis-heavy, or repeatedly stalls under
+`claude-sonnet-5`; if a task is primarily code editing, repo navigation,
+shell execution, or deterministic implementation work, keep the band's
+default model.
 
 If a task file already defines explicit complexity or model guidance, that task-local guidance overrides this file.
 
@@ -273,15 +265,23 @@ governs: "all agent-facing workflow decisions in the repository"
 > It overrides `CLAUDE.md` (project and global) and `AGENTS.md` without exception.
 > `CLAUDE.md` applies only for topics not covered here.
 
-> **Current routing override (owner directive, 2026-08-16):**
-> `qwen3.8:27b-mlx` is now both the eligible Low/S (RRI 0–25) developer and
-> the Moderate/M (RRI 26–40) developer, replacing the prior
-> `nemotron-3.5-lightning:30b-a3b-q4_K_M` Low/S binding (ADR-036 Amendments
-> 3/4/7) so both bands share one implementer model family.
-> Med-high/L (RRI 41–55), Complex, and XL bands are cloud-only. For Med-high,
-> the ADR-038 refinement/receipt still run as routing evidence, but a
-> `GO_LOCAL` result never starts a local developer. This override supersedes
-> earlier prose in this guide that describes a Nemotron Med-high attempt.
+> **Directives only.** This guide states the rules in force. Superseded
+> bindings, retired overrides, and the dated lineage behind a rule are
+> recorded in `docs/audit/agent-workflow-binding-history.md` and the relevant
+> ADRs — never here.
+
+## Local-model role bindings
+
+| Role | Binding |
+|---|---|
+| Local implementer, RRI 0–40 | `qwen3.8:27b-mlx` |
+| RRI 0–25 reviewer chain (phases 1 and 2) | `muse-glimmer:30b-q4_K_M` → `gemma4:26b-a4b-it-qat` → D14 |
+| RRI 26–55 reviewer chain (phases 1 and 2) | `gemma4:26b-a4b-it-qat` → `muse-glimmer:30b-q4_K_M` → D14 |
+| Local Architect / Complex Analyst | `muse-glimmer:30b-q4_K_M` — advisory-only (ADR-037), never a phase-1/phase-2 reviewer in any band |
+
+RRI 41–55, Complex, and XL are cloud-only for implementation: the ADR-038
+refinement and receipt run as routing evidence, but a `GO_LOCAL` result never
+starts a local developer.
 
 ## Mandatory workflow before implementing
 
@@ -296,11 +296,9 @@ governs: "all agent-facing workflow decisions in the repository"
    before any visible output) is a known failure mode. Empty `content` with any
    terminal reason is also a possible local-memory or context-capacity failure;
    it must enter the resource-recovery protocol below rather than be retried
-   unchanged. Catching either condition here
-   avoids discovering it mid-review, where it forces an avoidable fallback
-   (Muse Glimmer → Gemma → D14 for RRI 0–25, or Gemma → Muse Glimmer → D14
-   for RRI 26–55) and burns a review hop that a healthy stack would not have
-   needed.
+   unchanged. Catching either condition here avoids discovering it mid-review,
+   where it forces an avoidable hop down the band's reviewer chain that a
+   healthy stack would not have needed.
    - Treat the repository task ID as the restart boundary: perform exactly one
      mandatory restart before that task's first local-model call. Retries,
      repair attempts, and later local phases within the same task reuse the
@@ -316,13 +314,12 @@ governs: "all agent-facing workflow decisions in the repository"
      with `pgrep -fl ollama` and `lsof -iTCP:11434 -sTCP:LISTEN`. A surviving
      old PID, absent replacement PID, or missing listener leaves the restart
      item blocked; do not issue the task's first local-model request.
-   - Warm and re-test each model this task's band will use (at minimum the
-     RRI 0–25 reviewer chain: `muse-glimmer:30b-q4_K_M` →
-     `gemma4:26b-a4b-it-qat`; for RRI 26–55 add the reviewer chain
-     `gemma4:26b-a4b-it-qat` → `muse-glimmer:30b-q4_K_M`, the implementer
-     binding `qwen3.8:27b-mlx`, and, for Med-high ADR-038 routes, the
-     Local Architect binding `muse-glimmer:30b-q4_K_M`) with a review-style
-     prompt at production `num_predict`/`num_ctx`, e.g.:
+   - Warm and re-test each model this task's band will use — at minimum both
+     local models in the band's reviewer chain (§ Band-routed peer review),
+     plus for RRI 26–55 the implementer binding `qwen3.8:27b-mlx` and, for
+     Med-high ADR-038 routes, the Local Architect binding
+     `muse-glimmer:30b-q4_K_M` — with a review-style prompt at production
+     `num_predict`/`num_ctx`, e.g.:
      ```bash
      curl -s http://127.0.0.1:11434/api/chat -d '{
        "model": "<model>",
@@ -332,7 +329,7 @@ governs: "all agent-facing workflow decisions in the repository"
        "options": {"num_predict": 4096, "num_ctx": <role production context>}
      }' -m 180
      ```
-     Use the role's effective production context: `16384` for the Low/S
+     Use the role's effective production context: `65536` for the Low/S
      Qwen Developer delegation wrapper, `65536` for the Moderate/M local-agent
      runner, and the configured reviewer context for review roles. Confirm
      `done_reason: "stop"` with non-empty `content`. A `"length"`
@@ -412,32 +409,32 @@ governs: "all agent-facing workflow decisions in the repository"
      - **Status artifacts affected** — the exact ledgers, plans, reports, ADR
        indexes, or downstream blocker docs that must be synchronized before the
        task can be reported complete.
-4. **Gate by RRI** — compute RRI with `scripts/rri.py`. For RRI 0–25, skip the
-   full human approval presentation. Use local Qwen Developer delegation through Ollama
-   only for eligible simple code patches; otherwise execute directly as the
-   primary agent. For **RRI 26–40 Moderate**, show the plan and tasks, wait
-   for explicit approval, then use the **local-first implementation path** by
-   default: `scripts/local-agent/run_local_task.py` in a disposable worktree,
-   resolving the implementer from `DUBBRIDGE_LOCAL_AGENT_MODEL` (default
-   `qwen3.8:27b-mlx`), with at most 2 evidence-backed local repair attempts
-   before escalating to the cloud-takeover model resolved in Step 2. The primary
-   agent remains the orchestrator of record and cloud implementation is the
-   escalation/fallback path, not the default. For **RRI 41–55 Med-high**, show
-   the plan and tasks, wait for
-   explicit approval, then route through the **ADR-038 Architect-refined
-   single-attempt gate**: Muse Glimmer advisory refinement (`GO_LOCAL` |
-   `CLOUD_REQUIRED`) → primary hash-bound route receipt (may downgrade, never
-   upgrade) → every result, including `GO_LOCAL`, produces the concrete
-   Codex/Claude cloud-takeover packet from Step 2 with the full evidence bundle.
-   Med-high keeps the
-   band-resolved independent review route, 3 Reflection passes, and the human
-   approval gate unchanged — the routing change affects only who authors the
-   code, not who reviews or approves it. See § Local-first and
-   Architect-refined implementation routing (RRI 26–55) below for the full
-   diagram and contract. For **RRI 56+**, show the plan and tasks and wait for
-   explicit approval before starting implementation, even if a plan was
-   approved in a prior session; implementation stays on the cloud path
-   (Premium tier) and decomposition remains mandatory before implementation.
+4. **Gate by RRI** — compute RRI with `scripts/rri.py`, then apply the band's
+   approval gate and implementation route:
+   - **0–25 Low** — skip the full human approval presentation. Use local Qwen
+     Developer delegation through Ollama only for eligible simple code
+     patches; otherwise execute directly as the primary agent.
+   - **26–40 Moderate** — show the plan and tasks, wait for explicit approval,
+     then implement local-first via `scripts/local-agent/run_local_task.py` in
+     a disposable worktree (`DUBBRIDGE_LOCAL_AGENT_MODEL`, default
+     `qwen3.8:27b-mlx`), at most 2 evidence-backed local repair attempts before
+     escalating to the cloud-takeover model resolved in Step 2.
+   - **41–55 Med-high** — show the plan and tasks, wait for explicit approval,
+     then route through the **ADR-038 Architect-refined single-attempt gate**:
+     Muse Glimmer advisory refinement (`GO_LOCAL` | `CLOUD_REQUIRED`) → primary
+     hash-bound route receipt (may downgrade, never upgrade) → every result,
+     including `GO_LOCAL`, produces the concrete Codex/Claude cloud-takeover
+     packet from Step 2 with the full evidence bundle.
+   - **56+** — show the plan and tasks and wait for explicit approval before
+     starting implementation, even if a plan was approved in a prior session;
+     implementation stays on the cloud path (Premium tier) and decomposition
+     remains mandatory before implementation.
+
+   Full routing contract and diagrams: § Local-first and Architect-refined
+   implementation routing (RRI 26–55). In every band the primary agent stays
+   orchestrator of record, and the human approval gate, band-resolved
+   independent review, and Reflection pass count are fixed by the band — never
+   by where the code was authored.
 5. **Implement** — one task at a time, in the defined order.
 6. **Mark progress** — update the tasks document after each completed task (it is
    the crash-safe progress ledger).
@@ -740,11 +737,9 @@ escalation environment, but the default code-authoring surface moves local.
 **Moderate (26–40):** the code-authoring surface is the local agentic runner
 (`scripts/local-agent/run_local_task.py`) using `DUBBRIDGE_LOCAL_AGENT_MODEL`
 (default `qwen3.8:27b-mlx`) inside a disposable worktree, with at most 2
-evidence-backed local repair attempts before escalating to cloud. This
-routing became operative by owner override on 2026-07-15, ahead of the
-original ADR-036 pilot promotion gate.
+evidence-backed local repair attempts before escalating to cloud.
 
-**Med-high (41–55):** ADR-038 (2026-07-26) remains its fail-closed,
+**Med-high (41–55):** ADR-038 is its fail-closed,
 evidence-bearing refinement/receipt gate, and implementation is cloud-only
 **for the whole task** except for individual modules that independently
 qualify for ADR-040 per-module split routing (§ Per-module complexity-split
@@ -767,17 +762,14 @@ emission on every Med-high result. There is no whole-task local attempt or
 repair at this band; the only local authoring surface Med-high permits is a
 module independently qualified under ADR-040 (see below).
 
-Both sub-bands keep the independent reviewer resolved by the canonical band
-table (currently Gemma, then Muse Glimmer, then D14), 3 Reflection
-passes, and the RRI 26+/41+ human approval gate exactly as before — the
-routing change affects only who authors the code, not who reviews or
-approves it.
+Both sub-bands keep the band-resolved independent reviewer, 3 Reflection
+passes, and the RRI 26+/41+ human approval gate.
 
-#### Post-repair-budget Low-band decomposition (owner directive 2026-08-16)
+#### Post-repair-budget Low-band decomposition
 
 **Once the whole-task local-agent repair budget above is exhausted**
 (Moderate's 2/2 attempts, or the Med-high ADR-038 gate's `GO_LOCAL`/module
-tramo budget), the default next step is **no longer cloud escalation**. The
+tramo budget), the default next step is **not cloud escalation**. The
 default is to decompose the remaining implementation into Low-band
 (RRI 0–25) subtasks and keep authoring local, via `scripts/delegate-low-rri.py`
 (`--mode full-file` for new files, `--mode before-after` for small edits),
@@ -875,25 +867,19 @@ When preparing a task for presentation or local delegation, the agent must compu
 a complexity score and derive the recommended model tier or local delegation
 target from it. Do not guess; use the procedure below.
 
-### RRI — canonical scoring method (adopted 2026-06-04)
+### RRI — canonical scoring method
 
-This guide adopts the **Required Reasoning Index (RRI)** as the canonical method
-for deriving complexity, risk, model tier, and autonomy gates. The full procedure
+The **Required Reasoning Index (RRI)** is the canonical method for deriving
+complexity, risk, model tier, and autonomy gates. The full procedure
 (formula, scoring rubric, repo-specific anchor rubric, penalty table, bands, and
-decomposition triggers) lives in `docs/policies/RRI_POLICY.md`.
-
-**Adoption note:** RRI supersedes the single-axis cyclomatic-complexity scoring
-that previously drove the tier mapping. No ADR is required — RRI is a workflow
-policy, not a runtime architecture decision. `AGENTS.md` and `CLAUDE.md` are
-summaries of this guide and must be synchronized whenever its presentation or
-routing contract changes.
+decomposition triggers) lives in `docs/policies/RRI_POLICY.md`. `AGENTS.md` and
+`CLAUDE.md` are summaries of this guide and must be synchronized whenever its
+presentation or routing contract changes.
 
 **How Steps 1 and 2 below relate to RRI:**
 - The cyclomatic-complexity formula in Step 1 maps directly to the **`C` variable**
-  of the RRI formula. Step 1 remains the procedure for computing `C`.
-- The tier mapping in Step 2 is now driven by the **RRI band** (not the raw CC
-  label). The tier names (Economy / Balanced / Premium) and thinking-mode rules
-  are unchanged; only the input that selects the tier changes.
+  of the RRI formula. Step 1 is the procedure for computing `C`.
+- The tier mapping in Step 2 is driven by the **RRI band**, not the raw CC label.
 - Step 3 includes the compact RRI summary in the task presentation for RRI 26+,
   or in the local delegation packet and final report for RRI 0–25.
 
@@ -977,13 +963,10 @@ over time; the workflow should stay stable across agents and providers.
 | Balanced | Medium-complexity, standard implementation work |
 | Premium | High / Very High complexity, architecture, synthesis, deep debugging |
 
-Mapping (now driven by RRI band — see the canonical crosswalk in
-`docs/policies/RRI_POLICY.md` §Bands, autonomy gates, and model tiers):
-
-> **Subsumed by RRI:** the complexity label alone no longer determines the tier.
-> The RRI band (which incorporates `C`, `F`, `D`, `T`, `A`, `K`, `P`, `X`, and
-> penalties) selects the canonical crosswalk row. The tier names and thinking-mode
-> rules are unchanged; only the input that selects the tier has changed.
+Mapping: the **RRI band** — which incorporates `C`, `F`, `D`, `T`, `A`, `K`,
+`P`, `X`, and penalties — selects the tier via the canonical crosswalk in
+`docs/policies/RRI_POLICY.md` §Bands, autonomy gates, and model tiers. The
+complexity label alone never determines the tier.
 
 Agent-specific resolution rules:
 
@@ -1360,9 +1343,7 @@ terminates immediately as `boundary_violation`. On `finish`, the runner formats
 only edited authorized Rust files through isolated temporary copies, then runs
 the operator-authored `acceptance_tests` in order. A formatter or acceptance
 failure returns its output plus refreshed authorized file contents for a bounded
-repair. The final diff scope check remains mandatory as defense in depth. (This
-replaced an earlier Serena/semantic-tool path that never produced a successful
-edit — see `docs/plan/local-agent-simple-editing.md`.)
+repair. The final diff scope check remains mandatory as defense in depth.
 
 At finish, the DEV result is fail-closed on its own responsibilities only: the
 final diff must remain in scope and the operator-authored acceptance commands
@@ -1388,7 +1369,7 @@ swap/thermal degradation attributable to the local implementer, revert the
 affected band (Moderate and/or Med-high) to cloud implementation while
 retaining the local review roles.
 
-**Target-file size gate (owner directive, 2026-07-22):** before building a
+**Target-file size gate:** before building a
 task card for RRI 26–40 local-first delegation, check every file in
 `allowed_paths` and every file the local implementer must read in full. If
 any exceeds **500 lines**, do not delegate as-is — decompose the task so each
@@ -1469,7 +1450,7 @@ Agent communication must follow a **Socratic doubt model**:
 - **Do not consent by default.** Do not affirm, validate, or agree with a user statement unless you have verified it independently. A question is not a position; treat it as a question.
 - **Doubt with trusted sources.** Every claim about the codebase, a policy rule, a score, or a fact must be grounded in a source you can cite (a file, a line, a tool output). If you cannot cite a source, say so explicitly rather than asserting.
 - **No hallucination.** Do not infer positions from tone or phrasing. Do not attribute intent, agreement, or correctness to a message that does not state them. If a message is ambiguous, ask — do not deduce.
-- **Challenge your own output.** Before reporting a result, ask whether it could be wrong and whether the source you used is current. The RRI self-scoring error in T1 (estimated ~16/28 by hand; script returned 27) is the canonical example of why this matters.
+- **Challenge your own output.** Before reporting a result, ask whether it could be wrong and whether the source you used is current. Hand-estimated scores and remembered rules are both untrusted sources; re-derive from the tool or the file.
 
 ## Band-routed peer review (two phases)
 
@@ -1478,31 +1459,21 @@ resolved from the task's RRI band and the review phase:
 
 | Review phase | RRI 0–25 (Low) | RRI 26–55 (Moderate + Med-high) | RRI 56+ (Complex+) |
 |---|---|---|---|
-| **Phase 1 — Task-analysis review** (before task-card presentation or delegation) | **Muse Glimmer** (advisory)†; Gemma fallback‡; D14 final fallback | **Gemma**§; Muse Glimmer fallback¶; D14 final fallback | **Cross-vendor peer**; D14 fallback |
-| **Phase 2 — Code-solution review** (after implementation, before closure) | **Muse Glimmer Reviewer** (N-pass)†; Gemma fallback‡; D14 final fallback | **Gemma Reviewer**§ (existing N-pass); Muse Glimmer fallback¶; D14 final fallback | **Cross-vendor peer replaces Gemma**; D14 fallback |
+| **Phase 1 — Task-analysis review** (before task-card presentation or delegation) | **Muse Glimmer** (advisory) | **Gemma** | **Cross-vendor peer** |
+| **Phase 2 — Code-solution review** (after implementation, before closure) | **Muse Glimmer Reviewer** (N-pass) | **Gemma Reviewer** (N-pass) | **Cross-vendor peer replaces Gemma** |
 
-† **Owner directive, 2026-08-11** (local model stack restructure) — Muse
-Glimmer (`muse-glimmer:30b-q4_K_M`) becomes the RRI 0–25 primary reviewer,
-replacing Gemma in that role. See `docs/policies/RRI_POLICY.md § Local
-pipeline phase-1/phase-2 reviewer bindings` and ADR-037 Amendment 1.
+These are the canonical chains — every other section names them by band
+instead of re-deriving them:
 
-‡ **Owner directive, 2026-08-11** — when Muse Glimmer is unavailable,
-stalled, or returns invalid/`BLOCKED` output, fall back to **Gemma** (one
-retry with the same packet if Gemma itself is unusable) before escalating to
-D14. Chain: `muse-glimmer:30b-q4_K_M → gemma4:26b-a4b-it-qat → D14`.
+- **RRI 0–25 chain:** `muse-glimmer:30b-q4_K_M` → `gemma4:26b-a4b-it-qat` → D14
+- **RRI 26–55 chain:** `gemma4:26b-a4b-it-qat` → `muse-glimmer:30b-q4_K_M` → D14
+- **RRI 56+ chain:** cross-vendor peer → D14
 
-§ **Owner directive, 2026-08-11** — this **retires** the prior 2026-07-21
-override that made `qwen3.6:27b-q4_K_M` the RRI 26–55 primary reviewer
-(retired because that binding became the local implementer — see ADR-036
-Amendment 2, since superseded by Amendment 3's rebind to
-`nemotron-3.5-lightning:30b-a3b-q4_K_M`). Gemma reverts to the RRI 26–55 primary reviewer role, the
-role it held before the 2026-07-21 override. Applies regardless of whether
-implementation stayed local or escalated to cloud.
-
-¶ **Owner directive, 2026-08-11** — when Gemma is unavailable, stalled, or
-returns invalid/`BLOCKED` output, fall back to **Muse Glimmer** (one retry
-with the same packet if Muse Glimmer itself is unusable) before escalating
-to D14. Chain: `gemma4:26b-a4b-it-qat → muse-glimmer:30b-q4_K_M → D14`.
+D14 is the mandatory final fallback in every band. Both local chains apply
+regardless of whether implementation stayed local or escalated to cloud. For
+the retry discipline at each hop, see § Gemma Reviewer / Muse Glimmer Reviewer
+§ Availability; for binding rationale, `docs/policies/RRI_POLICY.md § Local
+pipeline phase-1/phase-2 reviewer bindings`.
 
 ### Cross-vendor peer and D14 provider resolution
 
@@ -1534,42 +1505,25 @@ Task-analysis review: <gemma|muse-glimmer|codex|claude|d14> <artifact path> - <P
 Code-solution review: <gemma|muse-glimmer|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
 ```
 
-- `<reviewer>` ∈ `gemma | muse-glimmer | codex | claude | d14`. In the 0–25
-  band, use `gemma` when Muse Glimmer was unavailable/stalled/invalid and
-  Gemma handled the review instead. In the 26–55 band, use `muse-glimmer`
-  when Gemma was unavailable/stalled/invalid and Muse Glimmer handled the
-  review instead. In either band, use `d14` when both models in that band's
-  chain were unusable and D14 handled it. Outside 0–55, use `d14` when the
-  resolved reviewer (peer CLI) was unavailable/unauthenticated/stalled and
-  D14 handled the review.
+- `<reviewer>` ∈ `gemma | muse-glimmer | codex | claude | d14` — name whichever
+  participant actually produced the verdict: the band's primary, the
+  intermediate fallback that took over when the primary was
+  unavailable/stalled/invalid, or `d14` when everything above it in the band's
+  chain was unusable.
 - `PASS` — the phase may proceed (presentation or closure).
-- `BLOCKED` — non-pass verdict, or every reviewer in the band's fallback
-  chain unavailable (0–25: Muse Glimmer + Gemma + D14 all unavailable; 26–55:
-  Gemma + Muse Glimmer + D14 all unavailable; other bands: primary reviewer +
-  D14 both unavailable). The caller stops and reports a blocked artifact.
-  Clearing it requires revision, an explicit user waiver, or reporting the
-  task blocked. Never downgrade silently to self-review.
+- `BLOCKED` — non-pass verdict, or every reviewer in the band's chain
+  (D14 included) is unavailable. The caller stops and reports a blocked
+  artifact. Clearing it requires revision, an explicit user waiver, or
+  reporting the task blocked. Never downgrade silently to self-review.
 
 ### Interaction with existing gates
 
 - Peer review **does not replace** the HITL human approval gate required by the
   RRI band. It is a separate, independent check that runs in addition to it.
-- In the RRI 0–25 band, **Muse Glimmer** (owner directive, 2026-08-11)
-  replaces Gemma as the primary reviewer for both phases. If Muse Glimmer is
-  unavailable/stalled/invalid, **Gemma** is the intermediate fallback before
-  **D14**, which remains the mandatory final fallback:
-  `muse-glimmer:30b-q4_K_M → Gemma → D14`.
-- In the RRI 26–55 band, **Gemma** (owner directive, 2026-08-11) reverts to
-  the primary reviewer for both phases, retiring the 2026-07-21 override
-  that had used `qwen3.6:27b-q4_K_M` in this role (that binding became the
-  local implementer under ADR-036 Amendment 2, since superseded by
-  Amendment 3's rebind to `nemotron-3.5-lightning:30b-a3b-q4_K_M`). If Gemma is
-  unavailable/stalled/invalid, **Muse Glimmer** is the intermediate fallback
-  before **D14**, which remains the mandatory final fallback:
-  `Gemma → muse-glimmer:30b-q4_K_M → D14`.
-- In the RRI 56+ band the cross-vendor peer **replaces Gemma** as the
-  code-solution reviewer (they do not both run). **D14** remains the
-  mandatory fallback.
+- Each band's primary reviewer, intermediate fallback, and D14's mandatory
+  final position are the chains above; both phases of a band use the same
+  chain. In RRI 56+ the cross-vendor peer **replaces** Gemma/Muse Glimmer —
+  they do not both run.
 - The four existing development-task closure blocks (Step 1 reviewer/D14,
   Step 2 Reflection log, Step 3 coverage cert, Step 4 owner verification) are
   preserved. The band-resolved reviewer occupies the reviewer slot inside
@@ -1586,14 +1540,12 @@ active in PPR-1.
 
 **Gemma Reviewer** and **Muse Glimmer Reviewer** are read-only local model
 roles sharing one mechanism (`scripts/gemma-code-review.py`, N sequential
-passes, consolidated findings). Owner directive, 2026-08-11: **Muse Glimmer**
-is the primary reviewer for RRI 0–25 development tasks, with Gemma as the
-intermediate fallback; **Gemma** is the primary reviewer for RRI 26–55, with
-Muse Glimmer as the intermediate fallback. D14 is the mandatory final
-fallback in both bands. Both roles are distinct from **Gemma Developer**,
-which is the patch-delegation path for eligible simple code patches and
-stays bound to Gemma regardless of this restructure (see `scripts/gemma_local.py`
-`DEFAULT_MODEL`, decoupled from the reviewer-role default).
+passes, consolidated findings). Which of the two is primary in a given band,
+and the fallback order behind it, is resolved by § Band-routed peer review's
+chains. Both roles are distinct from **Gemma Developer**, the patch-delegation
+path for eligible simple code patches, which stays bound to Gemma regardless
+of the reviewer restructure (see `scripts/gemma_local.py` `DEFAULT_MODEL`,
+decoupled from the reviewer-role default).
 
 ### Authority boundary
 
@@ -1611,10 +1563,10 @@ For Low development tasks, or when the RRI 26–55 reviewer fallback is triggere
 after implementation:
 
 1. Implementation completes (primary agent or eligible Gemma Developer).
-2. The band's resolved primary reviewer (Muse Glimmer for RRI 0–25, Gemma
-   for RRI 26–55) runs N sequential passes (default 3, `--passes N`,
-   env `DUBBRIDGE_REVIEW_PASSES`) via `scripts/gemma-code-review.py`, which
-   resolves the model from `DEFAULT_REVIEW_MODEL` per band.
+2. The band's resolved primary reviewer runs N sequential passes (default 3,
+   `--passes N`, env `DUBBRIDGE_REVIEW_PASSES`) via
+   `scripts/gemma-code-review.py`, which resolves the model from
+   `DEFAULT_REVIEW_MODEL` per band.
    - Each parseable pass contributes review comments to one consolidated
      developer-review packet.
    - Duplicate findings are consolidated and source buckets are preserved.
@@ -1633,11 +1585,9 @@ Reflection cycle.
 
 ### Availability
 
-The review step is mandatory. For RRI 0–25, **Muse Glimmer** is the preferred
-primary reviewer and **Gemma** is the intermediate fallback. For RRI 26–55,
-**Gemma** is the preferred primary reviewer and **Muse Glimmer** is the
-intermediate fallback. D14 is the final fallback in both bands, defined by
-the canonical band table.
+The review step is mandatory. The primary reviewer, its intermediate fallback,
+and D14's final position come from § Band-routed peer review's chains; this
+section defines only the retry discipline for moving along them.
 
 - **Primary model available and a usable consolidated result is produced:**
   run `make qa-gemma-review`, read the consolidated developer-review packet,
@@ -1648,9 +1598,9 @@ the canonical band table.
   the primary model first. If the retry yields a usable consolidated result,
   continue on that path. If the retry fails for the same class of reason or
   still produces no usable consolidated result, retry once against the
-  band's intermediate-fallback model (Gemma for RRI 0–25, Muse Glimmer for
-  RRI 26–55) with the same packet. If that also fails, spawn a
-  context-isolated subagent (D14) as the mandatory final fallback reviewer.
+  band's intermediate-fallback model with the same packet. If that also
+  fails, spawn a context-isolated subagent (D14) as the mandatory final
+  fallback reviewer.
   The subagent receives an isolation packet (diff + acceptance criteria + any
   usable partial findings) and its output is advisory, exactly as the
   primary model's. The primary agent reconciles and records
@@ -1749,7 +1699,7 @@ RRI band, not only 0–40.
 
 ### Review artifact receipt and REVIEW-OVERRIDE lines (GEG-1)
 
-Owner directive, 2026-07-22: `make qa-gemma-review` and `make
+`make qa-gemma-review` and `make
 qa-peer-workflow-review` write a committed JSON receipt when invoked with
 `GEMMA_REVIEW_TASK_ID=<task_id>`, at
 `docs/audit/gemma-evidence/<task_id>.json`:
@@ -1789,7 +1739,7 @@ all bands)`.
 ## Local Architect / Complex Analyst (ADR-037)
 
 **Local Architect / Complex Analyst** (`muse-glimmer:30b-q4_K_M` via Ollama,
-per ADR-037 Amendment 1, 2026-08-11) is a bounded, advisory-only role for
+per ADR-037) is a bounded, advisory-only role for
 architecture synthesis and complex causal analysis on a real work item,
 invoked before the primary agent authors the target ADR/plan/tasks. It is
 not an implementer, not a technical judge, and does not replace D14 or human
@@ -1797,17 +1747,10 @@ approval — see ADR-037 §1 for the full may/may-not boundary and §3 for the
 eight invocation triggers (e.g. a likely ADR decision, multi-module failure
 analysis, or a high-RRI problem needing decomposition before execution).
 
-**Retired scoped exception:** the 2026-07-21 owner directive that had this
-role's prior binding (`qwen3.6:27b-q4_K_M`, later rebound to
-`nemotron-3.5-lightning:30b-a3b-q4_K_M` under ADR-036 Amendment 3) also serve
-as the RRI 26–55 phase-1/phase-2 reviewer is **retired as of 2026-08-11** — see
-`docs/policies/RRI_POLICY.md § Local pipeline phase-1/phase-2 reviewer
-bindings` and `§ Band-routed peer review` above, where RRI 26–55 review
-reverts to Gemma (primary) / Muse Glimmer (fallback). This role no longer
-doubles as a phase-1/phase-2 reviewer for any band: the ADR-037 boundary
-applies without exception again — advisory-only for architecture/analysis
-synthesis, may not author the target document itself, and does not satisfy
-the human-approval gate.
+The ADR-037 boundary applies without exception in every band: this role is
+**not** a phase-1/phase-2 reviewer anywhere (see § Band-routed peer review
+above), may not author the target document itself, and does not satisfy the
+human-approval gate.
 
 Its advisory-analysis output carries no approval authority of its own; the
 primary agent must independently verify every claim against repository
@@ -1829,12 +1772,11 @@ ranked list of candidate source files and the terminal exploration trace. It doe
 not choose the CWE, threat-model the task, explain why a candidate is vulnerable,
 recommend tests or remediation, or produce an RRI proposal.
 
-As of the T5 promote decision (`docs/tasks/antares-security-specialist-advisor.md`
-§ T5 Decision record, 2026-08-06), the role is active for every RRI 26+ task that
-carries a task-relevant CWE hypothesis already on the T3a watchlist
-(`scripts/antares/cwe_watchlist.py`) — this is the same eligibility rule T4 fixed
-for its own pilot sample, not an undeclared per-slice flag. The primary security
-advisor invokes it at three touchpoints under that condition:
+The role is active for every RRI 26+ task that carries a task-relevant CWE
+hypothesis already on the watchlist (`scripts/antares/cwe_watchlist.py`). That
+watchlist membership is the whole eligibility rule — there is no per-slice
+flag. The primary security advisor invokes it at three touchpoints under that
+condition:
 
 - **refinement** — a mandatory step inside § "Mandatory workflow before
   implementing" (step 1, Analyze) for any eligible task, against the existing
@@ -1844,9 +1786,8 @@ advisor invokes it at three touchpoints under that condition:
   checklist" for any eligible task, against the candidate snapshot, as
   supplemental triage separate from the reviewer-of-record verdict and closure
   gate;
-- **post-CI** — already wired as CI automation: `.github/workflows/push-review.yml`'s
-  "Antares post-CI observe-only pilot (T4)" step, against the exact completed
-  revision.
+- **post-CI** — wired as CI automation in `.github/workflows/push-review.yml`,
+  observe-only, against the exact completed revision.
 
 If no justified CWE exists for a task, the touchpoint is skipped and the reason
 is recorded; Antares must never invent a generic sweep merely to satisfy
@@ -1870,16 +1811,13 @@ task-ledger, and policy-only tasks are exempt from all three touchpoints.
 - The primary agent must independently verify any repository claim cited from
   Antares output before propagating it into a canonical plan, task, policy, or
   closure record.
-- **Production workflow touchpoints are active** as of the T5 promote decision
-  (`docs/tasks/antares-security-specialist-advisor.md` § T5 Decision record,
-  2026-08-06). This promotion was recorded **without** a completed calibration
-  run against the fixed thresholds (File F1 >= 0.30 macro-averaged per
-  watchlisted CWE, true-negative rate >= 0.70) or a completed 30-day pilot
-  window — the T5 decision record states that gap explicitly as an
-  owner-directed deviation, not as evidence the thresholds were met. A future
-  calibration or pilot result that contradicts those thresholds is grounds to
-  revisit this decision (narrow or retire); it is not a standing blocker on the
-  promotion already in effect.
+- **The three production touchpoints are active**, but the role's calibration
+  thresholds (File F1 >= 0.30 macro-averaged per watchlisted CWE, true-negative
+  rate >= 0.70) have never been measured against it. Treat a calibration or
+  pilot result that contradicts those thresholds as grounds to narrow or retire
+  the role, not as a standing blocker on the touchpoints already in effect.
+  Provenance: `docs/tasks/antares-security-specialist-advisor.md` § T5 Decision
+  record.
 
 ## Push Reviewer
 
@@ -1919,25 +1857,19 @@ not permitted — including for Low (0–25) tasks.
 
 ### Pre-closure — Antares post-implementation touchpoint (conditional)
 
-Runs before Step 1 below, not as a replacement or renumbering of it. Applies to:
-any RRI 26+ development task that carries a task-relevant CWE hypothesis already
-on the T3a watchlist (`scripts/antares/cwe_watchlist.py`) — the same eligibility
-rule as the refinement touchpoint in § "Mandatory workflow before implementing".
-Exempt: docs-only, config-only, migration-only, ADR, plan, task-ledger, or
-policy-only tasks, and any RRI 0–25 task with no eligible CWE hypothesis.
-
-Invoke Antares against the candidate (post-implementation) snapshot as
-supplemental triage. Record every candidate in the disposition ledger
-(`scripts/antares/disposition_ledger.py`) and disposition each one
-(`accepted-now`, `accepted-follow-up`, `rejected`, or
-`needs-human-security-review`) per § Antares Security-Specialist Advisor
-§ Authority boundary below. If no eligible CWE hypothesis exists, record a
+Runs before Step 1 below, not as a replacement or renumbering of it. This is
+the **post-implementation** touchpoint of § Antares Security-Specialist
+Advisor — same eligibility rule and same exemptions as its refinement
+touchpoint, invoked against the candidate (post-implementation) snapshot as
+supplemental triage, with every candidate recorded and dispositioned in the
+disposition ledger (`scripts/antares/disposition_ledger.py`) per that
+section's authority boundary. If no eligible CWE hypothesis exists, record a
 typed skip instead of invoking Antares.
 
-This step is strictly advisory: it never blocks, delays, or substitutes for
-Step 1's code-solution review, never satisfies the band-routed reviewer or the
-HITL approval gate, and its absence, failure, or a degraded Antares run never
-blocks closure — record the degraded result and proceed.
+Strictly advisory: it never blocks, delays, or substitutes for Step 1's
+code-solution review, never satisfies the band-routed reviewer or the HITL
+approval gate, and its absence, failure, or a degraded run never blocks
+closure — record the degraded result and proceed.
 
 ### Step 1 — Code-solution review (all development tasks, mandatory)
 
@@ -1948,10 +1880,6 @@ Exempt only: `docs-only`, `config-only`, `migration-only`, `ADR`, `plan`,
 **Reviewer is determined by RRI band** (see `Band-routed peer review` above):
 
 #### Step 1-A — RRI 0–25 (Low): Muse Glimmer Reviewer / Gemma / D14
-
-**Owner directive, 2026-08-11:** Muse Glimmer (`muse-glimmer:30b-q4_K_M`) is
-the RRI 0–25 primary reviewer, with Gemma as the intermediate fallback
-before D14.
 
 ```
 [ ] 1a. Run `make qa-gemma-review`
@@ -1975,10 +1903,8 @@ before D14.
         - Muse Glimmer unavailable, stalled, returned invalid output, or
           returned `BLOCKED`, **and** the Gemma fallback also failed the same
           way  ← mandatory
-        The D14 subagent must be spawned at the Balanced model tier, using a
-        responsive cross-provider first; same-provider is a recorded degraded
-        fallback only after that attempt is unusable.
-        Its output is advisory; record disposition_divergence.
+        Spawn per § Context-isolated adjudicator (D14). Output is advisory;
+        record disposition_divergence.
 
 [ ] 1c. Record `### Gemma Reviewer evidence` block in the task entry
         (`Model:` names whichever of Muse Glimmer/Gemma/D14 actually ran).
@@ -1989,14 +1915,6 @@ before D14.
 
 #### Step 1-B — RRI 26–55 (Moderate + Med-high): Gemma / Muse Glimmer / D14
 
-**Owner directive, 2026-08-11:** phase 2, and non-exempt phase 1, default to
-**Gemma** (`gemma4:26b-a4b-it-qat`) throughout RRI 26–55, reverting the prior
-2026-07-21 override that used `qwen3.6:27b-q4_K_M` (that binding became the
-local implementer under ADR-036 Amendment 2, since superseded by
-Amendment 3's rebind to `nemotron-3.5-lightning:30b-a3b-q4_K_M`). See
-`docs/policies/RRI_POLICY.md § Local pipeline phase-1/phase-2 reviewer
-bindings` for the full contract and ADR-037 scope note.
-
 ```
 [ ] 1d. Send the diff, task acceptance criteria, and any independently-
         verified facts (verification/test output already produced) to
@@ -2005,20 +1923,18 @@ bindings` for the full contract and ADR-037 scope note.
         contract required — request a structured PASS/FINDINGS verdict with
         findings by severity.
 
-[ ] 1e. Evaluate Muse Glimmer fallback (owner directive, 2026-08-11) — route
-        to Muse Glimmer (`muse-glimmer:30b-q4_K_M`) if Gemma unavailable,
-        stalled, or returns invalid/`BLOCKED` output. One retry against
-        Gemma with the same packet first; if the retry also fails, send the
-        same review packet to Muse Glimmer instead.
+[ ] 1e. Evaluate Muse Glimmer fallback — route to Muse Glimmer
+        (`muse-glimmer:30b-q4_K_M`) if Gemma is unavailable, stalled, or
+        returns invalid/`BLOCKED` output. One retry against Gemma with the
+        same packet first; if the retry also fails, send the same review
+        packet to Muse Glimmer instead.
 
 [ ] 1f. Evaluate D14 fallback — spawn context-isolated subagent if:
         - Gemma unavailable/stalled/invalid **and** Muse Glimmer also
           unavailable, stalled, or returns invalid/`BLOCKED` output.
         - If D14 is also unavailable: write a blocked-artifact record and stop.
           Never self-review. Report the task as blocked.
-        The D14 subagent runs at the Balanced model tier, cross-provider first;
-        same-provider is a recorded degraded fallback only after that attempt
-        is unusable. Output is advisory.
+        Spawn per § Context-isolated adjudicator (D14). Output is advisory.
 
 [ ] 1g. Record `### Peer Reviewer evidence` block in the task entry:
         - Reviewer: `<gemma|muse-glimmer|d14>`
@@ -2052,20 +1968,11 @@ tasks; the peer is the mandatory path and D14 is the mandatory fallback.
         - Peer CLI unavailable, unauthenticated, or returns invalid output.
         - If D14 is also unavailable: write a blocked-artifact record and stop.
           Never self-review. Report the task as blocked.
-        The D14 subagent runs at the Balanced model tier, cross-provider first;
-        same-provider is a recorded degraded fallback only after that attempt
-        is unusable. Output is advisory.
+        Spawn per § Context-isolated adjudicator (D14). Output is advisory.
 
-[ ] 1g. Record `### Peer Reviewer evidence` block in the task entry:
-        - Reviewer: `<codex|claude|d14>`
-        - Command: `<exact command or manual invocation>`
-        - Artifact: `<path to review artifact>`
-        - Verdict: `PASS | BLOCKED`
-        - Findings: `<summary or "none">`
-        - D14 fallback: `triggered | not triggered` — reason: `<condition or n/a>`
-        - D14 provider route: `cross-provider | same-provider-degraded | n/a` — reason: `<provider and failed cross-provider attempt, or n/a>`
-        - disposition_divergence: `none | partial | full | null`
-        - Primary-agent disposition: `<accepted / rejected false positives / repaired>`
+[ ] 1g. Record `### Peer Reviewer evidence` block in the task entry — same
+        fields as Step 1-B's 1g, with `Reviewer: <codex|claude|d14>` and no
+        Muse Glimmer fallback line.
 ```
 
 Record the phase-2 report line in the closure report:
@@ -2135,10 +2042,11 @@ governs: "when explicit human approval is required and what autonomy is permitte
 
 # Human-in-the-Loop (HITL) Autonomy Policy
 
-> **Status:** Scaffold. This policy consolidates the approval and autonomy rules
-> already stated in the project and global `CLAUDE.md` and in `AGENTS.md`. It exists
-> to resolve the dangling reference in `AGENTS.md`. `CLAUDE.md` is authoritative on
-> conflict.
+> **Status:** Scaffold. This policy states the approval/autonomy boundary.
+> `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` is highest authority and owns the
+> full procedure for every route named below; this file states *when approval
+> is required* and *what autonomy is granted*, and points to the guide for
+> *how* each route executes. `CLAUDE.md` is authoritative on conflict.
 
 ## Principle
 
@@ -2147,21 +2055,13 @@ processes authorized media and enforces fail-closed governance (see
 `docs/adr/ADR-008-...md`), so irreversible or outward-facing actions require explicit
 human sign-off.
 
-The Local Architect / Complex Analyst role (ADR-037) produces advisory
-analysis only; it never evaluates, approves, or satisfies any human-approval
-gate on its own behalf or on behalf of the task it informed — see
+Two advisory-only roles never satisfy this gate on their own behalf: the
+Local Architect / Complex Analyst (ADR-037) and the Antares
+Security-Specialist Advisor. Both may inform a decision; neither approves,
+blocks, computes RRI, or replaces the band-routed review chain. See
 `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Local Architect / Complex Analyst
-(ADR-037)`.
-
-The Antares Security-Specialist Advisor workflow is likewise advisory-only. The
-primary agent or human security specialist owns the CWE hypothesis, threat model,
-security rationale, tests, remediation, and final disposition. Antares only
-localizes candidate files for an externally supplied CWE against an existing
-snapshot and returns its exploration trace. It never computes the canonical RRI,
-satisfies the human-approval gate, replaces the band-routed review chain, blocks
-CI or closure, or closes work on its own authority. Every material candidate
-requires a durable human disposition, and absence or failure of Antares never
-grants or withholds approval.
+(ADR-037)` and `§ Antares Security-Specialist Advisor` for their full
+authority boundary.
 
 ## Always requires explicit approval
 
@@ -2177,23 +2077,15 @@ computed RRI is 0–25 and the task stays within the low-band handling rules bel
 
 ## Per-task local-stack restart
 
-Owner directive, 2026-08-12: every task that will invoke an Ollama-backed local
-role must restart Ollama once before its first local-model request, even when the
-current server appears healthy. The orchestrator records and completes the
-`Restart Ollama + local-stack precheck` checklist item before allowing that
-request. A new repository task ID creates a new restart boundary; retries,
+Every task that will invoke an Ollama-backed local role must restart Ollama
+once before its first local-model request, even when the current server
+appears healthy, and pass the warm-up probe for every model that task's band
+will use. A new repository task ID creates a new restart boundary; retries,
 repairs, and later local phases of the same task reuse the restarted server
-unless it becomes unavailable or wedged.
-
-Before the restart, the orchestrator must establish that no local runner for a
-different task remains active. An unrelated bounded run is allowed to finish or
-is stopped under its own termination contract; it is not killed as collateral
-work. The restart is complete only when the previous server PID is gone, a new
-`ollama serve` PID is present, port `11434` is listening, and every local model
-required by the task passes the workflow guide's warm-up probe. Failure leaves
-the operational checklist item blocked and prohibits the task's first local
-request. This prerequisite does not waive or replace HITL approval, independent
-review, fallback selection, or any RRI gate. The authoritative procedure is
+unless it becomes unavailable or wedged. This is an operational precondition
+only — it does not waive or replace HITL approval, independent review,
+fallback selection, or any RRI gate. Full sequence, PID/listener checks, and
+the resource-recovery protocol for empty-content responses:
 `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Mandatory workflow before
 implementing`, Step 0.
 
@@ -2207,40 +2099,16 @@ allowed path set and low editorial risk. Docs, plans, task ledgers, ADRs,
 policies, workflow scripts, and other structure-heavy or interpretation-heavy work
 must stay with the primary agent even when the RRI is Low.
 
-The Low/S developer binding is `qwen3.8:27b-mlx` (owner directive, 2026-08-16,
-replacing the prior `nemotron-3.5-lightning:30b-a3b-q4_K_M` binding — ADR-036
-Amendments 3/4/7), the same model family as the Moderate/M implementer
-(ADR-036 Amendment 6).
-
-When Qwen Developer delegation is used, it must not evaluate, approve, or mark its own
-delegated work as complete. Only the delegating agent may decide whether the task
-satisfies the requirements.
-
-For eligible simple code patches, the delegating agent must:
-
-1. Compute RRI with `scripts/rri.py`.
-2. Build a local delegation packet with the task excerpt, acceptance criteria, RRI
-   output, allowed paths, relevant file snippets, and stop conditions.
-3. Send the packet to Ollama/Qwen with `scripts/delegate-low-rri.py`, which uses
-   the 120-second timeout and tagged-block response protocol defined in
-   `docs/policies/RRI_POLICY.md`; require complete file contents, not JSON and not
-   a unified diff.
-4. Validate the tagged response, check the wrapper-built diff with
-   `git apply --check`, and reject any patch outside the allowed task scope.
-5. Apply only a valid in-scope patch.
-6. Personally review the solution against every task requirement and acceptance
-criterion; this evaluation must be performed by the delegating agent, not Qwen Developer.
-7. Recompute/check actual touched scope; if the result now scores above RRI 25 or
-   triggers a higher gate, stop and escalate to the normal approval workflow.
-8. Run required verification commands.
-9. If requirements are missed or checks fail, run one bounded Qwen Developer repair cycle
-   with the failure evidence and the same allowed paths; if it still fails, stop and
-   escalate. If Codex takes execution after that gate, use `gpt-5.6-luna` at
-   `low`, or `gpt-5.6-terra` at `low` when Luna is unavailable in the active
-   environment.
-10. Report the RRI, Qwen Developer model used, files changed, the delegating agent's
-    requirement-review result, verification commands, and whether a repair cycle
-    was needed. If delegation times out, report `Qwen Developer timeout after 120s`.
+The current Low/S developer binding, the full 10-step delegation procedure
+(packet construction, `scripts/delegate-low-rri.py` invocation, validation,
+personal review, repair-cycle rule, and reporting format), and the tagged-block
+response contract are defined in `docs/policies/RRI_POLICY.md § Low RRI
+handling` and `docs/playbooks/LOW_RRI_LOCAL_MODEL_HANDOFF.md`. This section's
+scope is only the approval boundary: Qwen Developer delegation never
+evaluates, approves, or marks its own delegated work complete — only the
+delegating agent decides whether the task satisfies requirements — and a
+missed requirement or failed check permits at most one bounded repair cycle
+before escalating to the normal approval workflow.
 
 If penalties are present and the final RRI is still ≤ 25, the low-band handling
 still applies. When delegation is used, state all active penalties explicitly in
@@ -2248,252 +2116,104 @@ the delegation packet and final report so the score is transparent.
 
 ## Local-first implementation (RRI 26–40 Moderate)
 
-For the **26–40 Moderate** band, the approval gate is unchanged: the agent
-must present the task and wait for explicit human approval before
-implementation. What changes is the default implementation route.
+For the **26–40 Moderate** band, the approval gate is the standard one: the
+agent must present the task and wait for explicit human approval before
+implementation. The band's exception is only its default implementation route.
 
 The **41–55 Med-high** band does **not** use this direct local-first route —
 see § Med-high Architect-refined single-attempt gate (RRI 41–55) below for
 its own routing.
 
-The default path for Moderate development tasks is:
+The default path for Moderate development tasks runs the implementation
+through `scripts/local-agent/run_local_task.py` in a disposable git
+worktree, with the primary agent as orchestrator of record and a maximum of
+**2** evidence-backed local repair attempts before escalating to the
+cloud-takeover model recorded in the approved task card. Full route (tool
+contract, scope enforcement, DEV success-audit signature, escalation
+trigger) and rollback triggers:
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Local-first and Architect-refined
+implementation routing (RRI 26–55)` and `§ Handoff prompt format`.
 
-1. Compute RRI with `scripts/rri.py`.
-2. Present the task and obtain explicit approval.
-3. Run the implementation through `scripts/local-agent/run_local_task.py` in a
-   disposable git worktree, resolving the implementer from
-   `DUBBRIDGE_LOCAL_AGENT_MODEL` (default `qwen3.8:27b-mlx`) and the endpoint
-   from `OLLAMA_HOST`.
-4. Keep the primary agent as orchestrator of record: it owns the task card,
-   allowed paths, acceptance tests, reflection passes, closure, and all final
-   judgments about correctness.
-5. The runner gives the model only `write_file`, `apply_patch`, and `finish`.
-   Complete authorized file contents are preloaded; model-issued reads and
-   commands are disabled. Every edit is restricted to `allowed_paths`, and any
-   forbidden tool or unlisted path terminates as `boundary_violation`. On
-   `finish`, the runner formats only edited authorized Rust files via isolated
-   copies and executes the card's acceptance commands in order. Failures return
-   bounded repair evidence and refreshed authorized contents. (See
-   `docs/plan/local-agent-simple-editing.md` for why the earlier Serena path
-   was removed.)
-6. Enforce the task's `allowed_paths` both at every file-tool call and after
-   the local run. Any unlisted access or out-of-scope diff fails closed and is
-   never accepted into the primary checkout.
-7. Run the approved verification commands before issuing a signed DEV success
-   audit. The `local-implementer` signature is valid when the final diff remains
-   in scope and acceptance passes. Organization, review, coverage, and closure
-   are separate orchestrator-owned workflow phases and do not alter that DEV
-   result.
-8. If the local run fails the acceptance signal, hits the scope boundary, or
-   the local path is unavailable, the primary agent may run at most **2**
-   evidence-backed local repair attempts.
-9. After the repair budget is exhausted, or if the local runner/model is
-   unavailable, escalate to cloud implementation with the ADR-036 escalation
-   packet rather than continuing with ad hoc local retries. Use the concrete
-   cloud-takeover model already recorded in the approved task card: for Codex,
-   the current Balanced default is `gpt-5.6-terra` at `medium`. If the failures
-   reveal a capability, ambiguity, coupling, or risk gap, re-run
-   `scripts/rri.py` and re-apply the resulting gate before selecting the Premium
-   `gpt-5.6-sol` route; an Ollama outage alone does not justify that promotion.
+Med-high uses no whole-task repair attempt, **except** for a
+module independently qualified under ADR-040 per-module split routing (§
+Per-module complexity-split routing (RRI 26–55) below), whose local tramo
+uses this Moderate section's 2-attempt budget regardless of the containing
+task's band.
 
-This routing is operative by owner override dated **2026-07-15**. It was
-adopted ahead of the original ADR-036 promotion gate so that live
-Moderate-band tasks become the evaluation surface.
+## Post-repair-budget Low-band decomposition
 
-It was extended to the Med-high band by owner override dated **2026-07-21**
-with a tighter 1-attempt repair budget, and subsequently **replaced** for
-Med-high by ADR-038 (2026-07-26) — see § Med-high Architect-refined
-single-attempt gate (RRI 41–55) below. Med-high no longer uses any repair
-attempt at all; the historical 1-attempt figure no longer applies to this
-band, **except** for a module independently qualified under ADR-040
-per-module split routing (§ Per-module complexity-split routing (RRI 26–55)
-below), whose local tramo uses this Moderate section's 2-attempt budget
-regardless of the containing task's band.
-
-## Post-repair-budget Low-band decomposition (owner directive 2026-08-16)
-
-**Owner directive, 2026-08-16:** once the whole-task local-agent route above
+Once the whole-task local-agent route above
 exhausts its repair budget (2/2 for Moderate; the ADR-038 gate's `GO_LOCAL`
-exhausted, or a module's local tramo exhausted, for Med-high), the cloud
-escalation in step 9 above is no longer the default next step. The default
-is to **decompose the remaining work into Low-band (RRI 0–25) subtasks and
-keep it local**, maximizing local-model usage; the primary agent's role
-becomes orchestration — diagnosing, splitting, dispatching, reviewing, and
+exhausted, or a module's local tramo exhausted, for Med-high), cloud
+escalation is **not** the default next step. The default is to
+**decompose the remaining work into Low-band (RRI 0–25) subtasks and keep it
+local**, maximizing local-model usage; the primary agent's role becomes
+orchestration — diagnosing, splitting, dispatching, reviewing, and
 assembling — not authoring code directly, even for small, fully-diagnosed
-mechanical fixes. Cloud escalation remains available but is now the
-fallback of last resort for this step, not the default.
+mechanical fixes. Cloud escalation stays available as the fallback
+of last resort for this step, never the default.
 
-This directive was validated end-to-end on `S-150-T2c-iv-c` (RRI 39,
-Moderate): after a whole-task local-agent attempt and 2 repair attempts
-were exhausted (one degraded into a non-functional stub, one hit
-`budget_exhausted`), the remaining implementation was decomposed into three
-Low-band subtasks (create business-logic file, register the module, create
-the test file) and delegated via `scripts/delegate-low-rri.py`, with the
-orchestrator applying only a handful of individually-diagnosed one/two-line
-fixes directly — and only after the delegation tooling itself (not the
-model) failed twice to apply an already-correct model-proposed fix. See
-`docs/tasks/s-150-translation-dubbing.md` § S-150-T2c-iv-c "Implementation
-routing evidence" for the full evidence trail.
+The full 9-step route (confirm budget exhaustion, diagnose real signatures,
+decompose into scored Low-band subtasks, delegate via
+`scripts/delegate-low-rri.py`, review every returned patch, the two narrow
+direct-edit exceptions — documented tooling-failure and mechanical
+lint-driven refactor — resume normal band-appropriate closure, and record
+the `### Implementation routing evidence` block) is defined in
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Post-repair-budget Low-band
+decomposition`, validated end-to-end on
+`S-150-T2c-iv-c` (see `docs/tasks/s-150-translation-dubbing.md` §
+S-150-T2c-iv-c "Implementation routing evidence").
 
-The route:
-
-1. Confirm the whole-task local-agent repair budget for this band is
-   genuinely exhausted (Moderate: 2/2 attempts recorded; Med-high: the
-   ADR-038 gate result and any qualifying ADR-040 module tramo's own budget).
-   This step does not reopen or repeat local-agent attempts — it only marks
-   the trigger for switching implementation strategy.
-2. Diagnose precisely. Read the actual repository signatures the failed
-   attempt(s) needed (types, visibility, real field names, real function
-   signatures) — do not guess. This diagnosis is what makes the following
-   Low-band packets tight and low-risk; a vague packet reproduces the same
-   failure the whole-task attempt already hit.
-3. Decompose the remaining work into small Low-band (RRI 0–25) subtasks —
-   typically one per file to create/edit, or one per class of fix. Score
-   each subtask's RRI with `scripts/rri.py` to confirm it is genuinely Low;
-   a subtask that scores above 25 is not eligible for this route and must
-   go back through the normal RRI-gated workflow instead.
-4. Delegate each subtask via `scripts/delegate-low-rri.py`: `--mode
-   full-file` for new files, `--mode before-after` for small, one-function
-   edits to existing files. Build each packet with the verified real
-   signatures from step 2 so the local model is not guessing at the API
-   surface either.
-5. Review every returned patch against the acceptance criteria before
-   applying it — this is the same personal-review obligation as any other
-   Low-band delegation (§ Local delegation (RRI 0-25) above). Run
-   `cargo check`/equivalent after each applied subtask to catch the actual
-   remaining error surface before writing the next packet.
-6. **Documented tooling-failure exception:** if a delegation tool
-   (`delegate-low-rri.py`, `run_local_task.py`, or equivalent) fails to
-   apply a fix the local model has already correctly diagnosed and proposed
-   (for example, a `before-after` wrapper that cannot construct a non-empty
-   diff for a valid anchor), the orchestrator may apply that specific,
-   already-verified fix directly rather than repeatedly retrying the same
-   tooling failure. This is not a substitute for delegation — it requires
-   that the model's proposed fix already be visible and correct, and it
-   must be recorded explicitly as a tooling-failure exception (not silently)
-   in the task's implementation-routing evidence, distinct from any fix the
-   orchestrator diagnosed and authored itself.
-7. Mechanical, lint-driven restructuring of already-verified logic (for
-   example, extracting helper functions solely to satisfy a cognitive-
-   complexity gate, with no behavior change) may be applied directly without
-   a delegation round — it is refactor of already-authored logic against a
-   deterministic rule, not new authorship, and record it as such.
-8. Once all subtasks are assembled and verified, resume the task's normal
-   band-appropriate closure: band-resolved reviewer (phase 2), Reflection
-   passes for the task's original RRI band, unit coverage certification, and
-   owner verification, exactly as if the whole task had completed on the
-   original local-agent route. This directive changes only how the
-   remaining implementation is produced after the repair budget is
-   exhausted — it does not change the task's RRI, band, review chain,
-   Reflection pass count, or approval gate.
-9. Record an implementation-routing evidence block in the task closure
-   record naming: the whole-task route and why its budget was exhausted;
-   each Low-band subtask with its RRI, delegation mode, and outcome; every
-   direct edit the orchestrator made, classified as either a tooling-failure
-   exception (step 6) or a mechanical lint-driven refactor (step 7); and the
-   net authorship split. Do not report a task closed under this route
-   without this block — it is what lets a reviewer distinguish "local model
-   authored it, orchestrator assembled it" from "orchestrator authored it
-   directly," which is the exact distinction this directive exists to keep
-   visible.
-
-**No additional approval checkpoint per subtask.** The owner directive
-explicitly waives re-confirmation for this decomposition/dispatch/assembly
+**No additional approval checkpoint per subtask.** Re-confirmation is waived
+for this decomposition/dispatch/assembly
 loop once the containing task is already HITL-approved and has reached this
-post-repair-budget point — this is a bounded waiver for an already-approved
+post-repair-budget point — a bounded waiver for an already-approved
 task's implementation mechanics, not a waiver of the RRI 26+ human approval
-gate itself, which still fires once, at task presentation, as normal.
-
-This directive is a standing evaluation: deviations from it (the
-orchestrator authoring code directly when Low-band delegation was viable,
-or skipping the implementation-routing evidence block) are the failure mode
-to correct going forward, not a one-off exception.
+gate itself, which still fires once, at task presentation, as normal. This
+route changes only how the remaining implementation is produced after
+the repair budget is exhausted — never the task's RRI, band, review chain,
+Reflection pass count, or approval gate.
 
 ## Med-high Architect-refined single-attempt gate (RRI 41–55)
 
-ADR-038 (2026-07-26) governs implementation routing for final **RRI 41–55**.
-The approval gate is unchanged: the agent must present the task and wait for
-explicit human approval before implementation. Band-resolved independent
+ADR-038 governs implementation routing for final **RRI 41–55**.
+The approval gate is the standard one: the agent must present the task and wait
+for explicit human approval before implementation. Band-resolved independent
 review (phases 1 and 2), 3 Reflection passes, and the "Plan + explicit
-acceptance criteria" gate all still apply.
+acceptance criteria" gate all apply.
 
-The route:
-
-1. Compute RRI with `scripts/rri.py`; confirm it falls in 41–55.
-2. Present the task and obtain explicit approval.
-3. Request a Muse Glimmer (`muse-glimmer:30b-q4_K_M`) advisory refinement via
-   `scripts/local-architect/run_analysis.py`'s `med-high-refinement-v1`
-   profile. It returns `route_recommendation: GO_LOCAL | CLOUD_REQUIRED`
-   bound to the task capsule hash and its own model tag/digest.
-4. The primary agent issues its own hash-bound route receipt, evaluated by
-   `scripts/local-agent/med_high_gate.py`. The primary may **downgrade**
-   GO_LOCAL to cloud; it may **never upgrade** CLOUD_REQUIRED to local — this
-   is enforced structurally (the gate requires both sides to independently
-   say GO_LOCAL), not by trusting either decision alone.
-5. `scripts/local-agent/run_med_high_task.py` records every gate result as a
-   cloud handoff; even `GO_LOCAL` is policy-excluded from local development
-   — **except** for a module independently qualified under ADR-040
-   per-module split routing (§ Per-module complexity-split routing (RRI
-   26–55) below), which is a narrower, separately-gated exception and does
-   not reopen whole-task Med-high local development.
-6. Escalate to the concrete Codex or Claude
-   cloud-takeover model recorded in the approved task card, with the full
-   ADR-038 §5 evidence bundle: task capsule, refinement artifact,
-   primary receipt, effective limits, transcript/checkpoint, partial diff,
-   commands/tests run, stop reason, hashes, model identity, elapsed time.
-   When Codex executes, an operational-only fallback uses `gpt-5.6-terra` at
-   `high`; a hard exclusion, risk/capability `CLOUD_REQUIRED`, or local
-   acceptance/scope/organization failure uses `gpt-5.6-sol` at `high`.
-7. Run the approved verification commands and the organization gate on the
-   cloud-authored implementation.
-
-Hard exclusions from GO_LOCAL regardless of the Muse Glimmer recommendation:
-auth/security work, rights/consent/governance invariants, schema/migrations/
-release cuts, unresolved ADR decisions, and unbounded scope — see ADR-038 §6.
+Route summary: Muse Glimmer advisory refinement (`GO_LOCAL` |
+`CLOUD_REQUIRED`) → primary agent's own hash-bound route receipt (may
+downgrade `GO_LOCAL` to cloud; may never upgrade `CLOUD_REQUIRED` to local)
+→ every result (including `GO_LOCAL`) escalates to the concrete cloud
+takeover model with the full ADR-038 §5 evidence bundle — **except** for a
+module independently qualified under ADR-040 per-module split routing (§
+Per-module complexity-split routing (RRI 26–55) below). Hard exclusions from
+`GO_LOCAL` regardless of the Muse Glimmer recommendation: auth/security
+work, rights/consent/governance invariants, schema/migrations/release cuts,
+unresolved ADR decisions, and unbounded scope (ADR-038 §6). Full route,
+implementation surfaces, and evidence-bundle contents:
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Local-first and Architect-refined
+implementation routing (RRI 26–55)` and ADR-038.
 
 This gate does not weaken the independent review route defined by the
 "Band-routed peer review" section below.
 
 ## Per-module complexity-split routing (RRI 26–55, ADR-040)
 
-Owner directive, 2026-08-16, formalized as `ADR-040` (amends ADR-036 and
-ADR-038 Amendment 2): for an **approved** development task with final RRI
+Under `ADR-040`: for an **approved** development task with final RRI
 26–55 whose `allowed_paths` span two or more files, the orchestrator may
 split implementation authorship by per-module cyclomatic complexity instead
-of routing the whole task through §§ above as one unit.
+of routing the whole task through the sections above as one unit. This is a
+routing refinement, not a new approval gate — it fires after HITL approval
+and phase-1 review, and never changes the task's RRI, band, phase-1/phase-2
+reviewer, Reflection pass count, or closure gates.
 
-- **Trigger:** measure raw CC per file (`--auto-cc`, existing RRI `C` table).
-  Split only when heterogeneous — at least one module C≥2 (CC≥11) and at
-  least one C≤1 (CC≤10). A uniform-tier task is not split.
-- **Hard domain exclusion carried from ADR-038 §6:** a module touching auth,
-  security, rights/consent/governance invariants, schema/migrations, an
-  unresolved ADR decision, or unbounded scope is always cloud-eligible
-  regardless of its own CC. This is what keeps this exception from
-  reopening the risk ADR-038 Amendment 1 (2026-08-12) closed for Med-high.
-- **Disjoint `allowed_paths`:** the two tramos must partition the file set
-  with no overlap, or the task is not split.
-- **Interface freeze:** before dispatch, the orchestrator records the exact
-  boundary contract between the local- and cloud-eligible modules; neither
-  implementer redefines it.
-- **Routing and repair budgets:** C≤1/non-excluded modules go to the local
-  implementer (`run_local_task.py`) with **2** evidence-backed repair
-  attempts, uniformly regardless of the task's overall band. C≥2 or
-  hard-excluded modules go to the band's resolved cloud model with **1**
-  repair attempt, then **one** escalation to the band's higher cloud tier,
-  then stop and report blocked for that module.
-- **Integration gate (mandatory):** run the task's full verification against
-  the merged diff before Reflection. A tramo-attributable failure is a
-  bounded repair against that tramo's own budget. A failure attributable to
-  the interface contract itself abandons the split and escalates the whole
-  task to its normal band route — never retried as a split.
-- **Review/approval unaffected:** the band-resolved reviewer (Gemma), the
-  Reflection pass count for the task's band, the RRI 26+/41+ human approval
-  gate, unit coverage certification, and owner verification all evaluate the
-  final unified diff as one task, exactly as if no split had occurred.
-
-Full contract, evidence-block format, and tooling status:
-`docs/adr/ADR-040-per-module-complexity-split-implementation-routing.md` and
-`docs/policies/RRI_POLICY.md` § Per-module complexity-split routing.
+Trigger, hard domain exclusion, repair budgets, interface-freeze
+requirement, and the mandatory integration gate are defined in full in
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Per-module complexity-split
+routing (RRI 26–55, ADR-040)` and
+`docs/adr/ADR-040-per-module-complexity-split-implementation-routing.md`.
 
 ## Approval checkpoint wording
 
@@ -2511,21 +2231,20 @@ ADR-039 adds a bounded authorization checkpoint only when a terminal local revie
 or implementation route needs D14 or a cloud implementer. It is not a replacement
 for the task's HITL approval and it never broadens the approved scope.
 
-1. The responsible script emits a `fallback-selection-v1` artifact, bound by
-   SHA-256 to the exact fallback packet, before invoking any fallback model.
-2. `human-select` is the interactive default. A missing model, reasoning effort,
-   or human selector returns `awaiting_fallback_selection`; the process stops and
-   must not invoke D14 or a cloud implementer.
-3. `preauthorized` is allowed only when all three selection fields were frozen in
-   the approved task card or preflight. Any incomplete preauthorization fails
-   closed.
-4. The orchestrator must validate the authorized receipt and packet digest, then
-   invoke exactly its selected model and effort. A stale, missing, mismatched, or
-   role-confused receipt stays blocked.
+`human-select` is the interactive default: a missing model, reasoning
+effort, or human selector returns `awaiting_fallback_selection` and the
+process stops without invoking the fallback. `preauthorized` is allowed only
+when all three fields were frozen in the approved task card or preflight; an
+incomplete preauthorization fails closed. The orchestrator must validate the
+authorized receipt and packet digest before invoking exactly the selected
+model/effort — a missing, stale, or role-mismatched receipt stays blocked.
+Full schema and the frozen recommendation matrix: ADR-039 and
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Human-selected fallback checkpoint
+(ADR-039)`.
 
 D14 remains a read-only, context-isolated Balanced-tier reviewer. Selecting it
 does not authorize cloud implementation; selecting a cloud implementer does not
-waive independent review, RRI gates, repair limits, or scope checks.
+waive independent review, RRI gates, repair budgets, or scope checks.
 
 ## Permitted without prior approval
 
@@ -2550,59 +2269,20 @@ waive independent review, RRI gates, repair limits, or scope checks.
 
 ## Band-routed peer review
 
-Every development task is reviewed by an independent reviewer at two phases.
-The reviewer is determined by the task's RRI band:
+Every development task is reviewed by an independent reviewer at two phases,
+resolved from the task's RRI band:
 
-- **RRI 0–25 (Low):** Muse Glimmer (phases 1 and 2, owner directive
-  2026-08-11), with Gemma as intermediate fallback. Phase-2 = Muse Glimmer
-  Reviewer N-pass; phase-1 = advisory Muse Glimmer review of the task card.
-- **RRI 26–55 (Moderate + Med-high):** Gemma (phases 1 and 2, owner
-  directive 2026-08-11) — see `docs/policies/RRI_POLICY.md § Local
-  pipeline phase-1/phase-2 reviewer bindings`. This reverts the 2026-07-21
-  override that had used `qwen3.6:27b-q4_K_M` in this role (that binding
-  became the local implementer per ADR-036 Amendment 2, since superseded by
-  Amendment 3's rebind to `nemotron-3.5-lightning:30b-a3b-q4_K_M`), with Muse Glimmer as intermediate
-  fallback, regardless of whether implementation stayed local or escalated
-  to cloud.
-- **RRI 56+ (Complex+):** cross-vendor peer (phases 1 and 2). The peer
-  replaces Gemma as the code-solution reviewer for this band.
+- **RRI 0–25 (Low):** Muse Glimmer primary, Gemma intermediate fallback, D14 final fallback.
+- **RRI 26–55 (Moderate + Med-high):** Gemma primary, Muse Glimmer intermediate fallback, D14 final fallback.
+- **RRI 56+ (Complex+):** cross-vendor peer (replaces Gemma), D14 fallback.
 
-**Cross-vendor primary-review resolution (RRI 56+ only):**
-`claude-code → codex | codex → claude | local-provider → claude |
-remote-provider → claude | unknown → claude`
-
-**D14 provider resolution (all bands):** when D14 is triggered, first use a
-responsive reviewer from a provider different from the primary orchestrator's
-provider. Same-provider D14 is allowed only after that cross-provider attempt
-is unavailable, unauthenticated, stalled, or invalid/`BLOCKED`; record it as a
-degraded fallback with the failed cross-provider evidence.
-
-**Failure modes (RRI 0–25):**
-1. Muse Glimmer unavailable, stalled, or returns invalid/`BLOCKED` output →
-   fall back to **Gemma** (one immediate retry with the same review packet
-   if Muse Glimmer itself is unusable on the first attempt).
-2. Muse Glimmer + Gemma both unavailable/unusable → fall back to **D14**
-   (Balanced tier, cross-provider first; same-provider only as a recorded
-   degraded final fallback).
-3. Muse Glimmer + Gemma + D14 all unavailable → write a blocked-artifact
-   record and stop. Never self-review. Report the task as blocked.
-
-**Failure modes (RRI 26–55):**
-1. Gemma unavailable, stalled, or returns invalid/`BLOCKED`
-   output → fall back to **Muse Glimmer** (one immediate retry with the same
-   review packet if Gemma itself is unusable on the first attempt).
-2. Gemma + Muse Glimmer both unavailable/unusable → fall back to
-   **D14** (Balanced tier, cross-provider first; same-provider only as a
-   recorded degraded final fallback).
-3. Gemma + Muse Glimmer + D14 all unavailable → write a
-   blocked-artifact record and stop. Never self-review. Report the task as
-   blocked.
-
-**Failure modes (RRI 56+):**
-1. Peer CLI unavailable or unauthenticated → fall back to **D14** (Balanced tier,
-   cross-provider first; same-provider only as a recorded degraded final fallback).
-2. Peer + D14 both unavailable → write a blocked-artifact record and stop. Never
-   self-review. Report the task as blocked.
+Both bindings apply regardless of whether implementation stayed local or
+escalated to cloud — the binding governs *who reviews*, independently of
+*who authored the code*. The full routing table, current model bindings and
+their change history, per-band failure-mode sequencing, the cross-vendor and
+D14 provider-resolution rules, and the report-line contract are the single
+canonical definition in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed
+peer review (two phases)` — this policy does not restate them.
 
 Peer review **does not replace** the human approval gate required by the RRI band
 (HITL). It is a separate, independent check — the human approval gate still fires
@@ -2611,45 +2291,15 @@ for every RRI 26+ task after the peer review passes.
 Phase-1 (task-analysis) exemptions: docs-only, config-only, migration-only, ADR,
 plan, task-ledger, and policy-only tasks record `Task-analysis review: n/a`.
 
-See `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review` for the
-full routing table, report line contract, and enforcement note.
-
 ## Gemma Reviewer availability
 
-The review step is **mandatory** for all Low (0–25) development tasks. Muse
-Glimmer is the preferred reviewer (owner directive, 2026-08-11), with Gemma
-inserted as the intermediate fallback before the context-isolated subagent
-(D14, `scripts/adjudicator-packet.py`), the required final fallback:
-`muse-glimmer:30b-q4_K_M → gemma4:26b-a4b-it-qat → D14`. For Moderate and
-Med-high (26–55), the equivalent mandatory review step uses **Gemma** as the
-primary reviewer — see § Band-routed peer review above — reverting the
-2026-07-21 override that had used `qwen3.6:27b-q4_K_M` in this role (that
-binding became the local implementer under ADR-036 Amendment 2, since
-superseded by Amendment 3's rebind to `nemotron-3.5-lightning:30b-a3b-q4_K_M`), with Muse Glimmer inserted as the intermediate fallback
-before D14: `gemma4:26b-a4b-it-qat → muse-glimmer:30b-q4_K_M → D14`. The
-retry-then-escalate discipline described below applies at each step of both
-chains.
-
-When Ollama is unavailable, the model is absent, the reviewer stalls, output
-is invalid, the review result is `BLOCKED`, or no usable consolidated review
-result can be produced, the agent must perform **one immediate retry** with
-the same review packet first. If the retry succeeds with a usable result, the
-primary path continues normally. If the retry fails for the same class of
-reason or still produces no usable result, the agent **must** spawn a
-context-isolated subagent as the mandatory fallback reviewer. D14 must first
-be cross-provider; same-provider D14 is permitted only after a failed,
-evidenced cross-provider attempt and is recorded as degraded. The subagent
-receives an isolation packet (diff + acceptance criteria + any usable partial
-findings) and its output is advisory, exactly as the primary reviewer's would
-be. The primary agent reconciles and records `disposition_divergence` in the
-audit log.
-
-Reviewer unavailability or unusable local review output does not open a human
-approval gate beyond what the RRI band already requires. The review is never
-skipped.
-
-See `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer` for the full
-authority boundary, trigger conditions, and evidence format.
+The review step is **mandatory** for every development task regardless of
+band; no path may be skipped, and reviewer unavailability never opens a
+human approval gate beyond what the RRI band already requires. Full trigger
+conditions, the retry-then-escalate discipline, and the current fallback
+chains per band are defined once in
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer / Muse Glimmer
+Reviewer § Availability`.
 
 ## Reviewability budget escape
 
@@ -2669,11 +2319,11 @@ budget derivation and override mechanics.
 
 ## Review evidence override (urgency, human-only)
 
-Owner directive, 2026-07-22 (GEG-1): a completed development section may
-close without a `Review artifact:` receipt only via a typed
-`REVIEW-OVERRIDE:` line (see `docs/policies/RRI_POLICY.md § Review evidence
-gate` and `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Review artifact receipt
-and REVIEW-OVERRIDE lines`). Two of the three override types —
+A completed development section may close without a `Review artifact:`
+receipt only via a typed `REVIEW-OVERRIDE:` line (see
+`docs/policies/RRI_POLICY.md § Review evidence gate` and
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Review artifact receipt and
+REVIEW-OVERRIDE lines`). Two of the three override types —
 `pipeline-failure` and `not-applicable` — are ordinary agent-supplied
 evidence, no different in kind from the other autonomous escapes in this
 policy. The third, **`urgency`**, is not: it requires a `Waiver-by: <human
@@ -2687,5 +2337,9 @@ review gate.
 
 - `CLAUDE.md`, `AGENTS.md`, `README_AGENT_ORDER.md`
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
+- `docs/policies/RRI_POLICY.md`
 - `docs/adr/ADR-008-rights-ledger-fail-closed-precondition.md`
+- `docs/adr/ADR-036-local-first-agentic-implementation-band.md`
+- `docs/adr/ADR-038-med-high-architect-refined-single-attempt.md`
+- `docs/adr/ADR-039-human-selected-fallback-model-checkpoint.md`
 - `docs/adr/ADR-040-per-module-complexity-split-implementation-routing.md`

@@ -114,27 +114,19 @@ The Effort → Complexity mapping is a **fallback** used only when no RRI is ava
 - `Effort: M` -> `Complexity: Medium`
 - `Effort: L` -> `Complexity: High`
 
-Current Codex cloud-takeover defaults (re-verify against official vendor guidance
-at task-presentation time):
+Codex cloud-takeover defaults and Claude Code capability resolution both
+resolve via the dated tables in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
+(§ "Current Codex cloud-takeover resolution" and § "Current Claude Code
+capability resolution") — this file does not carry its own copy of the
+concrete model names, so there is exactly one place to re-verify against
+official vendor guidance at task-presentation time. Task-local model pins
+override those defaults until explicitly updated.
 
-- RRI 0–25 bounded Low-band cloud escalation: `gpt-5.6-luna` at `low`;
-  `gpt-5.6-terra` at `low` if Luna is unavailable.
-- RRI 26–40 local-first fallback: `gpt-5.6-terra` at `medium`.
-- RRI 41–55: operational-only fallback uses `gpt-5.6-terra` at `high`;
-  capability/risk takeover uses `gpt-5.6-sol` at `high`.
-- RRI 56+: cloud-primary uses `gpt-5.6-sol`, with effort resolved by the
-  canonical workflow table; RRI 86+ remains analysis/decomposition only.
-
-Claude Code model resolution remains provider-current and follows the canonical
-workflow guide. Task-local model pins override these defaults until explicitly
-updated.
-
-Escalation guidance (Claude side resolves via the dated "Current Claude Code
-capability resolution" table in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`, not
-a pin here):
-
-- use `claude-opus-5` only when the task is long-context heavy, synthesis-heavy, or repeatedly stalls under `claude-sonnet-5`
-- if a task is primarily code editing, repo navigation, shell execution or deterministic implementation work, keep Codex as the default
+Escalation guidance summary: use `claude-opus-5` only when the task is
+long-context heavy, synthesis-heavy, or repeatedly stalls under
+`claude-sonnet-5`; if a task is primarily code editing, repo navigation,
+shell execution, or deterministic implementation work, keep the band's
+default model.
 
 If a task file already defines explicit complexity or model guidance, that task-local guidance overrides this file.
 
