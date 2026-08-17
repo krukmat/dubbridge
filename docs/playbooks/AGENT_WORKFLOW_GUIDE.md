@@ -233,6 +233,26 @@ starts a local developer.
   waived by the user, or reported as blocked. Docs-only, config-only,
   migration-only, ADR, plan, task-ledger, and policy-only tasks are exempt from
   phase 1 and record `n/a` with the exemption stated.
+- **Every local-developer delegation packet requires its own phase-1 pass
+  before it is sent — not only the task as a whole.** A phase-1 `PASS`
+  obtained on an earlier version of the packet does not carry forward to a
+  materially revised packet (a corrected interface contract, a fixed
+  constraint, a re-scoped acceptance criterion, etc.). Any packet the
+  orchestrator changes before a repair/re-delegation attempt must go back
+  through the band's phase-1 reviewer and receive its own `PASS` (or a
+  recorded, resolved `BLOCKED`) before it is sent to the local developer
+  (`qwen3.8:27b-mlx` or the band's equivalent). This applies within a single
+  task's repair-attempt budget, not only across separate tasks — a second or
+  later delegation attempt is a new phase-1 event, and its own artifact and
+  verdict must be recorded distinctly from the first attempt's (do not
+  overwrite or merge them). If the reviewer flags something in the revised
+  packet that the orchestrator believes is incorrect, verify the claim
+  directly (a reproducible test, not assertion) before accepting or
+  overriding it, and record both the original verdict and the resolution —
+  see the worked example in `docs/tasks/s-230-poc-v1-digitalocean.md`
+  § S-230-T4a for the full pattern (a `declare -A` bash-3.2 incompatibility
+  triggered a revised packet, whose own phase-1 re-review then flagged and
+  the orchestrator disproved a second, unrelated claim before re-delegating).
 - Present the next task using the `AGENTS.md` presentation contract before executing
   it when approval is required. For RRI 0–25, do not present the full task for
   approval. If the task is an eligible simple code patch, prepare a local

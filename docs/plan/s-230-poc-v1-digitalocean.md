@@ -145,6 +145,17 @@ non-trivial one: `apps/worker-runner` shells out to `ffprobe`/`ffmpeg`
 (`apps/worker-runner/src/main.rs:184-227`), so Rust binary, ffmpeg, Python, and
 faster-whisper must coexist in one image.
 
+**Execution decomposition (owner direction, 2026-08-17):** the original T4
+whole-task score was RRI 47 Med-high, which would require cloud implementation.
+Because no Codex cloud tokens are available for that route, T4 is now a
+non-executable parent over 17 independently-scored Low/S children (`T4a`–`T4q`,
+RRI 10–25). Local Qwen authors every eligible one-path development patch;
+test-contract children precede Dockerfile children; the primary orchestrator
+runs the final operational smoke and status closeout. Full scores and commands:
+`docs/audit/s-230-t4-low-rri-decomposition.md`. This changes authorship and
+sequencing only: the aggregate image, reproducibility, readiness, migration,
+ASR, and local-pipeline acceptance contract is unchanged.
+
 ### G5 — No production deployment descriptor (blocking)
 
 `S-030` Phase 3 ("production deployment descriptor + secret-manager injection
@@ -597,19 +608,22 @@ string are not the operator's problem during a POC. Redis stays as a container o
 the droplet: the queues are not the system of record, and a managed instance is
 avoidable cost for this window.
 
-The `API -->|enqueue| RD` edge above is the **target**, not the current state:
-today the API enqueues into an in-process vector and never opens a Redis
-connection. `S-230-T1b` is what makes that edge real (G10).
+The `API -->|enqueue| RD` edge above is now the **current state**, not only
+the target: `S-230-T1b` (closed 2026-08-17) made the API construct a
+`RedisPreparationJobQueue` from `config.redis_url` at startup and bind it
+into `AppState`, replacing the prior in-process-vector enqueue (G10).
 
 ## Module dependencies
 
 ```mermaid
 flowchart LR
-    T1["T1 storage credentials<br/>crates/config, crates/storage"] --> T4
-    T1b["T1b API queue to Redis<br/>apps/api state + main"] --> T4
-    T2["T2 migration runner<br/>apps/cli"] --> T4
-    T3["T3 ✓ real readiness probe<br/>apps/api, apps/gateway"] --> T4
-    T4["T4 production images"] --> T5["T5 DO descriptor + secrets"]
+    T1["T1 ✓ storage credentials<br/>crates/config, crates/storage"] --> T4
+    T1b["T1b ✓ API queue to Redis<br/>apps/api state + main"] --> T4
+    T2["T2 ✓ migration runner<br/>apps/cli"] --> T4
+    T3["T3 ✓ real readiness probe<br/>apps/api, apps/gateway"] --> T4A
+    T4A["T4a–T4o Low/S<br/>tests + image patches"] --> T4P["T4p local evidence"]
+    T4P --> T4Q["T4q parent closeout"]
+    T4Q --> T5["T5 DO descriptor + secrets"]
     T5 --> T6["T6 deploy + E2E smoke"]
     T6 --> T7["T7 mobile build vs DO"]
     T6 --> T8["T8 subtitle visible in review (optional)"]
@@ -620,7 +634,7 @@ flowchart LR
     T7b --> T9
     T7c --> T9
     T0["T0 plan + ledger"] -.parallel track, not a T6 gate.-> T3b["T3b S-150 translation chain<br/>(T2c-v..T3c)"]
-    T3b -.if done: bundle translation worker.-> T4
+    T3b -.if done: T4m/T4n bundle translation worker.-> T4A
     T3b -.if done: add provider credential var.-> T5
     T3b -.if done: assert translated subtitle.-> T6
     T3b --> T8b["T8b translated subtitle<br/>visible in review"]
@@ -629,19 +643,20 @@ flowchart LR
     T3b -.folds into demo if done in time.-> T9
 ```
 
-The three dotted `T3b -.if done...->` edges into `T4`/`T5`/`T6` are
+The three dotted `T3b -.if done...->` edges into `T4a`–`T4o`/`T5`/`T6` are
 **conditional, not blocking**: those tasks never wait on `T3b`. `T8b` is
 different — it is a real (solid-edge) dependency on both `T3b` and `T8`,
 because producing and persisting a translated artifact (`T3b`'s own scope) is
 not the same as a reviewer being able to see it (`T8b`'s scope): `T8b` needs
 its own read endpoint and mobile rendering work, so it is a separate task
 rather than a bullet on an existing one. If `T3b`'s children are not yet
-closed when `T4`/`T5`/`T6` run, each proceeds exactly as originally scoped and
+closed when `T4m`/`T5`/`T6` run, each proceeds exactly as originally scoped and
 the gap is recorded rather than silently absorbed — see each task's own card
 in `docs/tasks/s-230-poc-v1-digitalocean.md` and `S-230-T3b` §"Downstream
 coupling with S-230 deployment tasks."
 
-T1, T1b, T2 and T3 are independent of each other and all four gate T4: an image
+T1, T1b, T2 and T3 are independent of each other and all four gate the T4 child
+chain: an image
 that cannot authenticate to Spaces, cannot dispatch work to its own workers,
 cannot migrate, or lies about its readiness is not worth building.
 
@@ -655,7 +670,7 @@ make failures loud; T1b is what makes success possible.
 | 1 | T0 plan/ledger; T1 storage credentials + region | Spaces writes possible |
 | 2 | T1b API preparation queue bound to Redis; T2 migration runner | **Pipeline actually dispatches**; fresh DB can be schema'd |
 | 3 | T3 real readiness probes | Broken deploys fail visibly |
-| 4–5 | T4 production images (worker image is the hard one) | Images build and run locally |
+| 4–5 | T4a–T4q Low/S chain: test contracts, four images, local evidence, closeout | Images build and run locally without cloud authoring |
 | 5–6 | T5 DO descriptor, secrets boundary, env example | Deployable artifact exists |
 | 6–7 | T6 provision, deploy, E2E smoke with a real video | **Backend live on DO** |
 | 8 | T7 mobile build against the deployed URL; T7c session lifetime + expiry | **POC usable end to end** |
@@ -695,7 +710,7 @@ not, `T9` records the exact partial state.
 | faster-whisper `large-v3` default exhausts droplet RAM (G7) | ASR silently fails or OOMs the droplet | Set `ASR_MODEL_SIZE=small` in the production descriptor; size the droplet at 8GB |
 | ffmpeg HLS transcode is CPU-bound on a droplet | Long preparation times during the demo | Use short demo videos; document expected timing in the runbook |
 | Gateway body buffering (G8) | OOM under concurrent uploads | Lower effective upload limit for the POC; single-user demo; recorded as debt |
-| Governance overhead per task | 8 tasks × (RRI, approval, 2 review phases, Reflection, coverage, owner verification) is real calendar cost | T4/T5/T6 are config/ops-shaped and carry lighter gates; the three code tasks (T1–T3) are front-loaded |
+| Governance overhead per task | T4 is now 17 Low/S children, each with its own local-model restart and review boundary | Keep every patch to one writable path; use the ordered contract→implementation chain; T4p/T4q remain primary-orchestrator operational/docs work |
 | First contact with DO Spaces signature/region behavior | T6 slips | T1 acceptance includes a real round-trip against a Spaces bucket, not only a unit test |
 | Managed PostgreSQL requires TLS | api/worker fail to connect | Verify `sslmode` handling in `create_pool` during T6; treat as a T6 finding, not a surprise |
 | G10-class silent no-ops elsewhere in the wiring | A deploy is green and does nothing, and the failure is invisible to every probe | T6's smoke run asserts on **observed downstream state** (artifact rows, a review task appearing in the inbox), never on a 2xx from finalize; T3's readiness probe is what makes a broken Redis/storage binding visible at all |

@@ -58,8 +58,25 @@ ledger.
 | T2 | Migration runner in the production path | development | M (recomputed, RRI 28 Moderate) | T0 | [x] Done |
 | T3 | Real readiness probes for api and gateway | development | M | T0 | [x] Done 2026-08-17 |
 | T3b | Cross-language subtitle translation pipeline (S-150 reopening) | development parent | XL | T0 | [ ] Planned — approval pending per child |
-| T4 | Production container images | config/dev | M | T1, T1b, T2, T3 | [ ] Planned |
-| T5 | Production deployment descriptor and secret boundary | config-only | M | T4 | [ ] Planned |
+| T4 | Production container images (non-executable parent) | development parent | 17 Low/S children | T1, T1b, T2, T3 | [ ] Decomposed — execute T4a–T4q |
+| T4a | Production-image test harness | development/test | S (RRI 15 Low) | T3 | [ ] Planned |
+| T4b | API image contract tests | development/test | S (RRI 16 Low) | T4a | [ ] Planned |
+| T4c | API production image | development/config | S (RRI 18 Low) | T4b | [ ] Planned |
+| T4d | Gateway image contract tests | development/test | S (RRI 16 Low) | T4a | [ ] Planned |
+| T4e | Gateway production image | development/config | S (RRI 18 Low) | T4d | [ ] Planned |
+| T4f | Migration image contract tests | development/test | S (RRI 20 Low) | T4a, T2 | [ ] Planned |
+| T4g | Migration production image | development/config | S (RRI 17 Low) | T4f | [ ] Planned |
+| T4h | Exact ASR dependency lock | development/config | S (RRI 14 Low) | T4a | [ ] Planned |
+| T4i | Worker native-runtime contract tests | development/test | S (RRI 21 Low) | T4a, T4h | [ ] Planned |
+| T4j | Worker native-runtime image | development/config | S (RRI 21 Low) | T4i | [ ] Planned |
+| T4k | Worker ASR-bundle contract tests | development/test | S (RRI 24 Low) | T4j | [ ] Planned |
+| T4l | Worker ASR-bundle image | development/config | S (RRI 21 Low) | T4k | [ ] Planned |
+| T4m | Translation-bundle contract tests (conditional) | development/test | S (RRI 24 Low) | T4l, T3b | [ ] Conditional |
+| T4n | Translation-bundle image (conditional) | development/config | S (RRI 21 Low) | T4m | [ ] Conditional |
+| T4o | Full local image-pipeline contract | development/test | S (RRI 25 Low) | T4c, T4e, T4g, T4l; T4n if executed | [ ] Planned |
+| T4p | Execute and record local image evidence | operational/evidence | S (RRI 19 Low) | T4o | [ ] Planned |
+| T4q | T4 parent closeout and status sync | docs-only | S (RRI 10 Low) | T4p; T4n if executed | [ ] Planned |
+| T5 | Production deployment descriptor and secret boundary | config-only | M | T4q | [ ] Planned |
 | T6 | First deploy and end-to-end smoke on Digital Ocean | operational | L | T5 | [ ] Planned |
 | T7 | Mobile POC build against the deployed backend | development/ops | M | T6 | [ ] Planned |
 | T7b | Mobile registration screen | development | M | T7 | [ ] Planned — droppable (first) |
@@ -1120,7 +1137,11 @@ Leave `/health/live` cheap. No new endpoints.
 - Verification: `cargo test -p dubbridge-api --lib --no-fail-fast` — 89 passed; `cargo test -p dubbridge-gateway --lib --no-fail-fast` — 13 passed.
 - Scope verified: API readiness probes PostgreSQL, Redis, and storage; gateway readiness probes its upstream API; liveness routes remain independent.
 - Formatting note: `git diff --check` reports trailing whitespace in `apps/gateway/src/lib.rs`; the owner explicitly accepted leaving it unchanged.
-- Closure remains pending: no recomputed RRI report, phase-1 artifact, Reflection log, unit-coverage certification, or owner final verification is recorded.
+- **Owner-directed closure (2026-08-17):** Matias declared S-230-T3 closed. This
+  resolves T3 as a dependency for downstream tasks. The missing retrospective
+  RRI, phase-1 artifact, Reflection log, unit-coverage certification, and
+  structured owner-verification record remain an evidence debt; they are not
+  represented as having been reconstructed or passed retroactively.
 
 ---
 
@@ -1331,12 +1352,70 @@ first. Do not start TTS/dubbing work under this task.
 
 ---
 
-## S-230-T4: Production container images
+## S-230-T4: Production container images (non-executable parent)
 
-**Type:** config/development
-**Effort:** M
+**Type:** development parent (not executable as written)
+**Effort:** aggregate of 17 independently-scored Low/S children
 **Depends on:** S-230-T1, S-230-T1b, S-230-T2, S-230-T3
-**Status:** [ ] Planned
+**Status:** [ ] Decomposed 2026-08-17 — execute `S-230-T4a` through `T4q`
+
+**Historical whole-task RRI:** 47 — Med-high (41–55), no penalties. Evidence:
+`docs/audit/s-230-t4-rri.md`. This route is superseded before implementation by
+the owner-directed Low-band decomposition below because cloud implementation
+tokens are unavailable. The parent preserves the aggregate contract but may not
+be delegated or implemented directly. Child scores and exact commands:
+`docs/audit/s-230-t4-low-rri-decomposition.md`.
+
+**Task-analysis review:** Gemma's initial review
+(`docs/audit/gemma-evidence/s-230-t4-phase1.json`) was **BLOCKED** by the then
+unresolved T3 record. The owner-directed closure recorded in S-230-T3 resolves
+that dependency for T4; its retrospective evidence debt remains tracked but is
+not a T4 presentation blocker. The revised review
+(`docs/audit/gemma-evidence/s-230-t4-phase1-rerun.json`) passed against this
+synchronized record; the final task-definition review
+(`docs/audit/gemma-evidence/s-230-t4-phase1-final.json`) is **PASS**. The
+frozen T4 scope below already incorporates the initial review's reproducibility
+and ASR-resource findings.
+
+### Low-band decomposition contract (owner direction, 2026-08-17)
+
+Every development child is an independent simple patch with one writable path,
+`Effort: S`, and RRI 0–25. Test-contract children precede image-authoring
+children so each Dockerfile is implemented against an existing automated
+contract. The orchestrator supplies verified immutable OCI digests in the
+delegation packet; local models never choose or refresh a base-image version.
+
+Implementation uses `qwen3.8:27b-mlx` through
+`scripts/delegate-low-rri.py`. Independent phase-1 and phase-2 review uses the
+Low-band chain `muse-glimmer:30b-q4_K_M` ->
+`gemma4:26b-a4b-it-qat` -> D14. Each child is its own mandatory Ollama restart
+boundary. No child inherits the parent's prior Gemma review: it receives its own
+Muse Glimmer phase-1 review before delegation. Low-band children require no full
+approval card.
+
+| Child | Result | Writable path | Purpose |
+|---|---:|---|---|
+| T4a | RRI 15 | `scripts/test-production-images.sh` | bounded test harness |
+| T4b | RRI 16 | same | API contract tests |
+| T4c | RRI 18 | `apps/api/Dockerfile` | API image |
+| T4d | RRI 16 | test script | gateway contract tests |
+| T4e | RRI 18 | `apps/gateway/Dockerfile` | gateway image |
+| T4f | RRI 20 | test script | migration contract tests |
+| T4g | RRI 17 | `apps/cli/Dockerfile` | migration image |
+| T4h | RRI 14 | `workers/asr-worker-py/requirements.txt` | exact ASR dependency lock |
+| T4i | RRI 21 | test script | worker native-runtime tests |
+| T4j | RRI 21 | `apps/worker-runner/Dockerfile` | Rust + ffmpeg worker image |
+| T4k | RRI 24 | test script | ASR bundle tests |
+| T4l | RRI 21 | worker Dockerfile | Python + ASR bundle |
+| T4m | RRI 24 | test script | conditional translation tests |
+| T4n | RRI 21 | worker Dockerfile | conditional translation bundle |
+| T4o | RRI 25 | test script | full local image-pipeline contract |
+| T4p | RRI 19 | `docs/audit/s-230-t4-local-image-evidence.md` | execute and record evidence |
+| T4q | RRI 10 | task/plan/roadmap docs | aggregate closure and status sync |
+
+`T4m`/`T4n` execute only if `S-150-T3b` and `S-150-T3c` are done before
+worker-image integration. Otherwise `T4p` records the follow-up image rebuild as
+debt and `T4q` may close the parent without those conditional children.
 
 **Problem (plan G4):** Dockerfiles exist only for the Python workers. The
 worker-runner image is the hard one: it shells out to `ffprobe`/`ffmpeg` and
@@ -1349,6 +1428,10 @@ spawns `python3 workers/asr-worker-py/main.py` as a subprocess.
 - A worker-runner image containing the Rust binary, ffmpeg/ffprobe, Python, and
   faster-whisper, with `DUBBRIDGE_ASR_WORKER_PATH` and
   `DUBBRIDGE_ASR_WORKER_PYTHON` resolving inside the image.
+- Base images are pinned to explicit OCI digests; the image evidence records the
+  resolved OS package versions and `pip freeze --all` output. The ASR dependency
+  input is exact-version pinned in `workers/asr-worker-py/requirements.txt`; no
+  floating Python package constraint is permitted in the production image path.
 - **Conditional on `S-230-T3b`:** if `S-150-T3b`/`T3c` (functional translation
   worker + its Rust consumer) are `[x] Done` at the time this task executes,
   the worker-runner image also bundles `workers/translation-worker-py` and its
@@ -1357,14 +1440,35 @@ spawns `python3 workers/asr-worker-py/main.py` as a subprocess.
   proceeds without it and records a follow-up image rebuild as debt rather
   than silently shipping an image that cannot run translation.
 - `ASR_MODEL_SIZE` is an explicit build/run parameter; the POC value is `small`,
-  not the `large-v3` default (plan G7).
+  not the `large-v3` default (plan G7). The worker startup/run evidence must show
+  an incompatible or unavailable selected model fails the job/start path loudly;
+  it must not silently fall back to `large-v3` or report readiness for work it
+  cannot perform.
 - A migration image or entry point derived from T2 that Compose can run as a
   one-shot job.
 - Every image starts against local infrastructure and passes its own
   `/health/ready` where applicable.
 
-**Evidence to emit:** Dockerfiles; local build and run transcripts; image sizes;
-a successful local pipeline run using the built images rather than `cargo run`.
+**Behavioral examples:**
+
+- **HP-1:** With the documented local infrastructure available, the built API,
+  gateway, and worker-runner images start using their production entry points;
+  API and gateway become ready and a media-preparation-to-ASR flow succeeds
+  without invoking `cargo run`.
+- **HP-2:** The one-shot migration image applies the current migration set to an
+  empty local database and exits successfully.
+- **EC-1:** If PostgreSQL, Redis, S3-compatible storage, or the gateway's API
+  upstream is unavailable, the corresponding readiness endpoint reports not
+  ready while its liveness endpoint stays cheap and independent.
+- **EC-2:** If the selected `ASR_MODEL_SIZE=small` cannot be loaded in the image,
+  the ASR job/start path fails visibly, never falls back to `large-v3`, and
+  never reports false readiness.
+
+**Evidence to emit:** Dockerfiles and exact ASR dependency input; local build and
+run transcripts; OCI base-image digests, OS/Python package inventories, image
+sizes; a successful local pipeline run using the built images rather than `cargo
+run`; RRI evidence; phase reviews; 3-pass Reflection log; unit-coverage
+certification; owner verification.
 
 **Status artifacts affected:** this ledger; `DEVELOPMENT_REFERENCE.md` if the
 documented local run path changes.
@@ -1376,13 +1480,385 @@ point. Prove each starts and reports ready locally.
 **Stop condition:** Stop after local image verification. Do not provision cloud
 resources.
 
+### S-230-T4a: Production-image test harness
+
+**Type:** development/test infrastructure
+**Effort:** S — RRI 15 Low
+**Depends on:** S-230-T3
+**Status:** [x] Done — 2026-08-17
+**Writable path:** `scripts/test-production-images.sh`
+
+Create a bounded Bash harness with named `contract` and `run` modes, strict
+error handling, deterministic cleanup, and an unknown-case failure. Keep it
+below 500 lines. **HP-1:** listing and executing a registered contract returns
+zero. **EC-1:** an unknown case or missing required argument returns non-zero
+without launching Docker. Evidence: RRI artifact; Muse phase reviews; `bash -n`;
+named harness self-tests; HP/EC unit certification; owner verification. Status
+artifact: this ledger. Handoff: create only the harness foundation; stop before
+adding any service-specific image contract.
+
+**RRI:** 15 (Low). Source: `docs/audit/s-230-t4-low-rri-decomposition.md`
+(`python3 scripts/rri.py --touches scripts/test-production-images.sh --cc 4
+--D 1 --K 2 --P 0 --T 2 --A 0 --X 1`).
+
+**Implementation routing:** local delegation to `qwen3.8:27b-mlx` via
+`scripts/delegate-low-rri.py --mode full-file`. Attempt 1 used
+`declare -A CASES=( [self-check]=1 )`, which fails on the actual deployment
+shell (`GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)` — macOS
+stock `/bin/bash` predates bash 4's associative arrays: `declare: -A: invalid
+option`). Root-caused via a minimal repro (`bash -c 'declare -A CASES=(
+[self-check]=1 )'` on this shell reproduces the identical failure) before any
+re-delegation. The orchestrator revised the frozen interface contract to
+mandate a bash-3.2-safe, space-delimited case registry (`CASE_LIST` + `for`
+loop membership test) instead, matching every other script already in
+`scripts/`, none of which uses `declare -A`. Attempt 2 against the revised
+packet produced a working script; this is the accepted implementation (one
+bounded repair, within the Low-band's 1-repair budget).
+
+**Phase-1 review correction:** the first phase-1 pass on the revised packet
+returned `BLOCKED`, flagging that `contract_self-check()` (a hyphenated bash
+function name) is a syntax error on bash 3.2. The orchestrator tested this
+claim directly against the target shell before accepting or rejecting it:
+`bash -n` and execution both succeed for a hyphenated function name defined,
+looked up via `declare -F`, and invoked indirectly via `"$func_name"` — bash
+restricts hyphens in *variable* names, not function names. This counter-
+evidence was returned to the reviewer, which then reversed to `PASS` and
+confirmed the rest of the contract (bash-3.2 constraints, HP-1/EC-1, stop
+condition) was otherwise unambiguous. Both the original `BLOCKED` and the
+corrected `PASS` are preserved in the review artifacts below rather than
+overwritten.
+
+**Post-delegation defect:** the delegation wrapper's tagged-block response
+leaked a stray trailing `--- CONTENT ---` marker into the returned file
+content (a wrapper/template artifact, not model-authored logic). Stripped
+before the file was written to the real repo path; confirmed by line-count
+and `bash -n` before and after.
+
+### Gemma Reviewer evidence
+
+- Model: `muse-glimmer:30b-q4_K_M` (Low-band phase-1/phase-2 primary)
+- Phase 1 (task-analysis, pre-delegation):
+  - Pass 1 (original packet, pre-bash-3.2-fix): `PASS` —
+    `t4a-phase1-response-v2.json` (scratchpad, superseded by the packet
+    revision below; not applicable to the delegated packet).
+  - Pass 2 (revised bash-3.2-safe packet): `BLOCKED` — hyphenated function
+    name finding — `t4a-phase1-response-v3.json` (scratchpad).
+  - Pass 3 (same packet + orchestrator counter-evidence): `PASS`, findings
+    explicitly note the prior claim was falsified by reproducible test —
+    `t4a-phase1-response-v4.json` (scratchpad).
+- Phase 2 (code-solution, post-implementation): `PASS`, 0 findings —
+  `t4a-phase2-response.json` (scratchpad).
+- Passes run / usable: `1/1` per phase (single-pass, not the N-pass
+  consolidated-aggregate mode).
+- Aggregate status: `PASS`
+- Isolated adjudicator (D14): not triggered — Muse Glimmer was available and
+  produced usable verdicts at both phases.
+- disposition_divergence: `none`
+- Primary-agent disposition: phase-1 `BLOCKED` finding investigated and
+  disproved with a direct, reproducible bash-3.2 test before re-submission;
+  phase-2 raised no findings to disposition.
+- REVIEW-OVERRIDE: not used — both phases have artifact-backed verdicts.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | `contract self-check` exits 0 | `bash scripts/test-production-images.sh contract self-check` → exit 0, printed `Bash version: 3.2.57(1)-release` | passed |
+| HP-1 | Happy path | `run self-check` exits 0 | `bash scripts/test-production-images.sh run self-check` → exit 0 | passed |
+| EC-1 | Edge case | 0 args fails closed, no docker call | `bash scripts/test-production-images.sh` → exit 1, usage to stderr; `docker` only referenced inside `contract_self-check`/`run_self-check` (lines 47-48, 63-64), unreachable before validation | passed |
+| EC-1 | Edge case | 1 arg fails closed | `bash scripts/test-production-images.sh contract` → exit 1 | passed |
+| EC-1 | Edge case | invalid mode fails closed | `bash scripts/test-production-images.sh bogus-mode self-check` → exit 1 | passed |
+| EC-1 | Edge case | unknown case fails closed | `bash scripts/test-production-images.sh contract nonexistent-case` → exit 1 | passed |
+
+`bash -n scripts/test-production-images.sh` → no syntax errors. File is 106
+lines (well under the 500-line ceiling).
+
+### Owner final verification
+
+- Owner: `matias` (primary agent, orchestrator of record for this Low-band
+  task per the RRI 0-25 route — no separate human approval gate applies)
+- Date: `2026-08-17`
+- Statement: I verified every HP-1 and EC-1 case defined for this task by
+  executing the exact invocations above against the real repository file
+  `scripts/test-production-images.sh` on the actual deployment shell (bash
+  3.2.57), confirmed matching exit codes, confirmed `docker` is never
+  reachable before the three-step validation completes, and confirmed the
+  phase-1 `BLOCKED` finding was investigated to a reproducible conclusion
+  rather than accepted or dismissed without evidence.
+- Commands run: `bash -n scripts/test-production-images.sh`; the six HP-1/EC-1
+  invocations listed in the coverage table above; `wc -l
+  scripts/test-production-images.sh`.
+
+Reviewability budget: not evaluated — this is a single new ~106-line file,
+trivially within any derived Low-band review budget; no margin question.
+
+### S-230-T4b: API image contract tests
+
+**Type:** development/test
+**Effort:** S — RRI 16 Low
+**Depends on:** S-230-T4a
+**Status:** [ ] Planned
+**Writable path:** `scripts/test-production-images.sh`
+
+Add named API contract/runtime cases. **HP-1:** contract mode verifies the
+expected `dubbridge-api` binary, port, `/health/live`, and `/health/ready` probe.
+**EC-1:** runtime mode rejects an image with no executable or a readiness
+response that stays 200 while a required dependency is unavailable. Evidence:
+RRI artifact; Muse phase reviews; harness tests; HP/EC certification; owner
+verification. Status artifact: this ledger. Stop before creating the API
+Dockerfile.
+
+### S-230-T4c: API production image
+
+**Type:** development/config
+**Effort:** S — RRI 18 Low
+**Depends on:** S-230-T4b
+**Status:** [ ] Planned
+**Writable path:** `apps/api/Dockerfile`
+
+Create a digest-pinned multi-stage image that builds only `dubbridge-api` and
+contains no Rust toolchain in its runtime stage. **HP-1:** the T4b runtime case
+starts the image and reaches ready with local dependencies. **EC-1:** removing a
+required dependency makes readiness fail while liveness remains available.
+Evidence: RRI artifact; Muse phase reviews; exact build/run command; image size
+and base digest; T4b test result; HP/EC certification; owner verification.
+Status artifact: this ledger. Stop without changing application source or other
+images.
+
+### S-230-T4d: Gateway image contract tests
+
+**Type:** development/test
+**Effort:** S — RRI 16 Low
+**Depends on:** S-230-T4a
+**Status:** [ ] Planned
+**Writable path:** `scripts/test-production-images.sh`
+
+Add named gateway contract/runtime cases. **HP-1:** contract mode verifies the
+expected `dubbridge-gateway` binary, port, liveness, and readiness paths.
+**EC-1:** runtime mode detects that an unavailable API upstream makes gateway
+readiness fail without making liveness dependent on that upstream. Evidence:
+RRI artifact; Muse phase reviews; harness tests; HP/EC certification; owner
+verification. Status artifact: this ledger. Stop before creating the gateway
+Dockerfile.
+
+### S-230-T4e: Gateway production image
+
+**Type:** development/config
+**Effort:** S — RRI 18 Low
+**Depends on:** S-230-T4d
+**Status:** [ ] Planned
+**Writable path:** `apps/gateway/Dockerfile`
+
+Create a digest-pinned multi-stage image that builds only
+`dubbridge-gateway` and has no build toolchain in the runtime stage. **HP-1:**
+the T4d runtime case reaches ready against a healthy API. **EC-1:** stopping the
+API changes readiness to non-ready while liveness remains available. Evidence:
+RRI artifact; Muse phase reviews; build/run command; image size/base digest;
+T4d result; HP/EC certification; owner verification. Status artifact: this
+ledger. Stop without changing gateway source or the production descriptor.
+
+### S-230-T4f: Migration image contract tests
+
+**Type:** development/test
+**Effort:** S — RRI 20 Low
+**Depends on:** S-230-T4a, S-230-T2
+**Status:** [ ] Planned
+**Writable path:** `scripts/test-production-images.sh`
+
+Add one-shot migration cases. **HP-1:** contract mode requires
+`dubbridge-cli` as the entry point and the compiled migration set in the image.
+**EC-1:** runtime mode requires a non-zero exit against an unreachable database
+and must not report migration success. Evidence: RRI artifact; Muse phase
+reviews; harness tests; HP/EC certification; owner verification. Status
+artifact: this ledger. Stop before creating the CLI Dockerfile.
+
+### S-230-T4g: Migration production image
+
+**Type:** development/config
+**Effort:** S — RRI 17 Low
+**Depends on:** S-230-T4f
+**Status:** [ ] Planned
+**Writable path:** `apps/cli/Dockerfile`
+
+Create a digest-pinned multi-stage one-shot image for `dubbridge-cli`, including
+the compile-time migration directory and no runtime Rust toolchain. **HP-1:** it
+applies the current migrations to an empty local database and exits zero.
+**EC-1:** an unreachable database exits non-zero. Evidence: RRI artifact; Muse
+phase reviews; image size/base digest; empty-DB and rerun transcripts; T4f
+result; HP/EC certification; owner verification. Status artifact: this ledger.
+Stop without changing migrations or CLI source.
+
+### S-230-T4h: Exact ASR dependency lock
+
+**Type:** development/config
+**Effort:** S — RRI 14 Low
+**Depends on:** S-230-T4a
+**Status:** [ ] Planned
+**Writable path:** `workers/asr-worker-py/requirements.txt`
+
+Replace the floating constraint with the exact existing lower-bound release
+`faster-whisper==1.1.0`; do not add packages. **HP-1:** a clean Python 3.12
+environment installs the requirement and `pip freeze --all` reports the exact
+version. **EC-1:** the production dependency input contains no `>=`, wildcard,
+or unpinned direct dependency. Evidence: RRI artifact; Muse phase reviews;
+install/freeze transcript; HP/EC certification; owner verification. Status
+artifact: this ledger. Stop before editing either Dockerfile.
+
+### S-230-T4i: Worker native-runtime contract tests
+
+**Type:** development/test
+**Effort:** S — RRI 21 Low
+**Depends on:** S-230-T4a, S-230-T4h
+**Status:** [ ] Planned
+**Writable path:** `scripts/test-production-images.sh`
+
+Add worker cases for the Rust executable and native media tools only.
+**HP-1:** contract mode requires `dubbridge-worker-runner`, `ffmpeg`, and
+`ffprobe` in the runtime image. **EC-1:** runtime mode fails when either native
+tool is missing or non-executable. Evidence: RRI artifact; Muse phase reviews;
+harness tests; HP/EC certification; owner verification. Status artifact: this
+ledger. Stop before creating the worker Dockerfile or adding Python.
+
+### S-230-T4j: Worker native-runtime image
+
+**Type:** development/config
+**Effort:** S — RRI 21 Low
+**Depends on:** S-230-T4i
+**Status:** [ ] Planned
+**Writable path:** `apps/worker-runner/Dockerfile`
+
+Create the digest-pinned multi-stage worker image with the Rust binary,
+`ffmpeg`, and `ffprobe`, but no ASR Python layer yet. Record resolved OS package
+versions. **HP-1:** T4i confirms all three executables. **EC-1:** the runtime
+contains no Rust build toolchain and the contract fails if a native tool is
+removed. Evidence: RRI artifact; Muse phase reviews; build transcript; base
+digest, image size and OS inventory; T4i result; HP/EC certification; owner
+verification. Status artifact: this ledger. Stop before bundling Python/ASR.
+
+### S-230-T4k: Worker ASR-bundle contract tests
+
+**Type:** development/test
+**Effort:** S — RRI 24 Low
+**Depends on:** S-230-T4j
+**Status:** [ ] Planned
+**Writable path:** `scripts/test-production-images.sh`
+
+Add ASR-bundle cases. **HP-1:** contract mode requires Python 3,
+`workers/asr-worker-py/main.py`, exact `faster-whisper==1.1.0`,
+`DUBBRIDGE_ASR_WORKER_PATH`, `DUBBRIDGE_ASR_WORKER_PYTHON`, and default
+`ASR_MODEL_SIZE=small`. **EC-1:** a deliberately invalid selected model must
+produce a visible protocol/job failure and never fall back to `large-v3` or a
+false-ready result. Evidence: RRI artifact; Muse phase reviews; harness tests;
+HP/EC certification; owner verification. Status artifact: this ledger. Stop
+before modifying the worker image.
+
+### S-230-T4l: Worker ASR-bundle image
+
+**Type:** development/config
+**Effort:** S — RRI 21 Low
+**Depends on:** S-230-T4k
+**Status:** [ ] Planned
+**Writable path:** `apps/worker-runner/Dockerfile`
+
+Extend the worker image with Python, the ASR worker, and its exact dependencies;
+set the two `DUBBRIDGE_ASR_WORKER_*` paths to locations that exist inside the
+image and set `ASR_MODEL_SIZE=small`. **HP-1:** T4k confirms the bundled worker
+accepts a valid protocol request. **EC-1:** the invalid-model case fails loudly
+with no `large-v3` fallback. Evidence: RRI artifact; Muse phase reviews; build
+and protocol transcripts; `pip freeze --all`; image size; T4k result; HP/EC
+certification; owner verification. Status artifact: this ledger. Stop before
+translation bundling or cross-service smoke.
+
+### S-230-T4m: Translation-bundle contract tests (conditional)
+
+**Type:** development/test
+**Effort:** S — RRI 24 Low
+**Depends on:** S-230-T4l and completed `S-150-T3b`/`S-150-T3c`
+**Status:** [ ] Conditional — skip when the translation runtime is still open
+**Writable path:** `scripts/test-production-images.sh`
+
+Add the translation-worker paths, interpreter variables, and protocol case
+defined by the completed S-150 tasks. **HP-1:** contract mode names the exact
+finished worker entry point and its runtime dependencies. **EC-1:** a missing
+entry point or interpreter fails before queue consumption. Evidence: RRI
+artifact; Muse phase reviews; harness tests; HP/EC certification; owner
+verification. Status artifact: this ledger. Stop before changing the worker
+image. Do not invent unfinished S-150 variable names.
+
+### S-230-T4n: Translation-bundle image (conditional)
+
+**Type:** development/config
+**Effort:** S — RRI 21 Low
+**Depends on:** S-230-T4m
+**Status:** [ ] Conditional — skip when T4m is skipped
+**Writable path:** `apps/worker-runner/Dockerfile`
+
+Bundle only the translation runtime frozen by completed S-150 tasks. **HP-1:**
+T4m passes with the worker path and interpreter resolved inside the image.
+**EC-1:** the image fails the contract when the bundled worker or dependency is
+absent. Evidence: RRI artifact; Muse phase reviews; build/protocol transcript;
+dependency inventory; image-size delta; HP/EC certification; owner verification.
+Status artifact: this ledger. Stop without changing translation source.
+
+### S-230-T4o: Full local image-pipeline contract
+
+**Type:** development/test
+**Effort:** S — RRI 25 Low
+**Depends on:** S-230-T4c, T4e, T4g, T4l; T4n if executed
+**Status:** [ ] Planned
+**Writable path:** `scripts/test-production-images.sh`
+
+Add the final composed test sequence without adding a production descriptor.
+**HP-1:** against `infra/local/docker-compose.yml` infrastructure, the migration
+image exits zero, API/gateway reach ready, and one preparation-to-ASR flow
+produces observed downstream state using the built images rather than
+`cargo run`. **EC-1:** a failed migration, dependency readiness failure, or ASR
+failure stops the sequence and returns non-zero instead of accepting a 2xx as
+success. Evidence: RRI artifact; Muse phase reviews; harness self-tests; HP/EC
+certification; owner verification. Status artifact: this ledger. Stop before
+running the full sequence or editing Compose.
+
+### S-230-T4p: Execute and record local image evidence
+
+**Type:** operational/evidence
+**Effort:** S — RRI 19 Low
+**Depends on:** S-230-T4o
+**Status:** [ ] Planned
+**Writable path:** `docs/audit/s-230-t4-local-image-evidence.md`
+
+The primary orchestrator runs T4o and records exact commands, exit codes,
+immutable base digests, image sizes, OS/Python inventories, readiness results,
+migration output, and observed downstream ASR state. **HP-1:** all required
+images complete the local flow. **EC-1:** one intentionally degraded dependency
+produces the expected non-ready/non-zero result. If T4m/T4n were skipped, record
+the translation-image rebuild debt explicitly. Evidence/status artifact: the
+single audit file plus this ledger. This operational task is not a Qwen patch;
+stop before provisioning Digital Ocean or editing deployment descriptors.
+
+### S-230-T4q: T4 parent closeout and status sync
+
+**Type:** docs-only
+**Effort:** S — RRI 10 Low
+**Depends on:** S-230-T4p; T4n only when its condition fired
+**Status:** [ ] Planned
+**Writable paths:** this ledger, `docs/plan/s-230-poc-v1-digitalocean.md`,
+`docs/plan/roadmap.md`
+
+Verify every applicable child is Done, link all phase-review and execution
+artifacts, record skipped conditional children and debt, mark the T4 parent
+Done, and make T5 depend on the completed aggregate. **HP-1:** all three status
+documents agree on the same T4 state. **EC-1:** any open mandatory child or
+missing evidence keeps T4 and T5 blocked. Evidence: `make qa-docs` and
+`git diff --check`. Phase reviews, Reflection, and unit certification are `n/a`
+for this docs-only closeout; do not alter implementation files or start T5.
+
 ---
 
 ## S-230-T5: Production deployment descriptor and secret boundary
 
 **Type:** config-only
 **Effort:** M
-**Depends on:** S-230-T4
+**Depends on:** S-230-T4q (which closes the S-230-T4 parent)
 **Status:** [ ] Planned
 
 **Problem (plan G5, G6):** `S-030` Phase 3 is deferred, so no production
