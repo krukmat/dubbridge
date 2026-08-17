@@ -860,14 +860,20 @@ card to no more than six content blocks:
    approval gate. Include a small routing table with the orchestrator, concrete
    Codex/Claude recommendations, resolved primary implementation route, the
    cloud-takeover trigger and model, penalties, two or three dominant RRI
-   drivers, and a link to full RRI evidence.
+   drivers, and a link to full RRI evidence. For RRI 26–55, the cloud-takeover
+   field must name the § Post-repair-budget Low-band decomposition default
+   (decompose into Low-band subtasks, orchestrator-only authorship) before the
+   last-resort cloud trigger — never show repair-budget exhaustion escalating
+   straight to cloud.
 2. **Scope and acceptance** — one-sentence objective, in-scope paths/behaviors,
    explicit out-of-scope boundary, the primary acceptance criteria (`HP-#` and
    `EC-#` for development), evidence to emit, and status artifacts to sync.
 3. **Agent workflow** — a table naming the actual responsible participant for
    analysis, phase-1 review, human approval, implementation, Reflection/testing,
    phase-2 review, and closure. Each row states its gate/output and any fallback.
-   Show the route resolved for this task, not every possible band route.
+   Show the route resolved for this task, not every possible band route. For RRI
+   26–55, the `Implement` row's fallback must name the same Low-band
+   decomposition default before cloud, consistent with the decision header.
 4. **Diagrams** — one compact agent-workflow Mermaid diagram. Development tasks
    add one compact technical-scope diagram; never exceed two diagrams.
 5. **References** — task, plan, and only materially governing policies/ADRs.
