@@ -3,7 +3,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # Case registry - bash 3.2 compatible (no associative arrays)
-CASE_LIST="self-check"
+CASE_LIST="self-check api"
 
 # Cleanup machinery
 TEMP_DIR=""
@@ -32,11 +32,15 @@ EOF
 case_exists() {
     local needle="$1"
     local c
+    local old_ifs="$IFS"
+    IFS=' '
     for c in $CASE_LIST; do
         if [[ "$c" == "$needle" ]]; then
+            IFS="$old_ifs"
             return 0
         fi
     done
+    IFS="$old_ifs"
     return 1
 }
 
@@ -70,6 +74,132 @@ run_self-check() {
     fi
     # Print bash version
     echo "Bash version: $BASH_VERSION"
+    return 0
+}
+
+contract_api() {
+    echo "Contract check for api case"
+    # Verify Dockerfile exists
+    if [ ! -f "apps/api/Dockerfile" ]; then
+        echo "ERROR: apps/api/Dockerfile not found" >&2
+        return 1
+    fi
+    # Verify ENTRYPOINT
+    if ! grep -q 'ENTRYPOINT \["/app/dubbridge-api"\]' "apps/api/Dockerfile"; then
+        echo "ERROR: ENTRYPOINT [\"/app/dubbridge-api\"] not found in Dockerfile" >&2
+        return 1
+    fi
+    # Verify EXPOSE
+    if ! grep -q 'EXPOSE 8080' "apps/api/Dockerfile"; then
+        echo "ERROR: EXPOSE 8080 not found in Dockerfile" >&2
+        return 1
+    fi
+    echo "Contract check passed for api"
+    return 0
+}
+
+run_api() {
+    echo "Run check for api case"
+    # Verify required commands are on PATH
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "ERROR: docker not found on PATH" >&2
+        return 1
+    fi
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "ERROR: curl not found on PATH" >&2
+        return 1
+    fi
+
+    # Define dependency container
+    dep_container="${DUBBRIDGE_TEST_DEPENDENCY_CONTAINER:-local-postgres-1}"
+    
+    # Verify dependency is running
+    dep_running=$(docker inspect -f '{{.State.Running}}' "$dep_container" 2>/dev/null)
+    if [ "$dep_running" != "true" ]; then
+        echo "ERROR: dependency container '$dep_container' is not running — bring up infra/local/docker-compose.yml first" >&2
+        return 1
+    fi
+
+    # Resolve network dynamically
+    test_network=$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$dep_container" 2>/dev/null | head -n 1)
+    if [ -z "$test_network" ]; then
+        echo "ERROR: could not resolve network for dependency container '$dep_container'" >&2
+        return 1
+    fi
+
+    # Define cleanup function
+    # `|| true` on each step: under `set -e`, a failure inside a RETURN trap
+    # (e.g. stopping a --rm container that already self-removed) would abort
+    # the whole script and clobber the real exit status of run_api().
+    cleanup_api() {
+        docker stop dubbridge-api-contract-test >/dev/null 2>&1 || true
+        docker start "$dep_container" >/dev/null 2>&1 || true
+    }
+    
+    # Register trap for cleanup
+    trap cleanup_api RETURN
+
+    # Start API container
+    api_image="${DUBBRIDGE_API_IMAGE_TAG:-dubbridge-api-t4c:test}"
+    docker run -d --rm --network "$test_network" -p 8080:8080 \
+        -e DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@postgres:5432/dubbridge \
+        -e DUBBRIDGE_REDIS_URL=redis://redis:6379 \
+        -e DUBBRIDGE_STORAGE__ENDPOINT_URL=http://minio:9000 \
+        -e DUBBRIDGE_ENV=local \
+        -e AWS_ACCESS_KEY_ID=dubbridge \
+        -e AWS_SECRET_ACCESS_KEY=dubbridge123 \
+        -e AWS_REGION=us-east-1 \
+        -e DUBBRIDGE_STORAGE__BACKEND=local_fs \
+        -e DUBBRIDGE_STORAGE__BUCKET=dubbridge-local \
+        --name dubbridge-api-contract-test \
+        "$api_image"
+
+    # Poll /health/live
+    live_ok=0
+    for i in $(seq 1 30); do
+        if curl -sf -o /dev/null http://localhost:8080/health/live; then
+            live_ok=1
+            break
+        fi
+        sleep 1
+    done
+
+    if [ "$live_ok" -ne 1 ]; then
+        echo "ERROR: /health/live did not become ready within timeout" >&2
+        return 1
+    fi
+
+    # Poll /health/ready
+    ready_ok=0
+    for i in $(seq 1 30); do
+        if curl -sf -o /dev/null http://localhost:8080/health/ready; then
+            ready_ok=1
+            break
+        fi
+        sleep 1
+    done
+
+    if [ "$ready_ok" -ne 1 ]; then
+        echo "ERROR: /health/ready did not become ready within timeout" >&2
+        return 1
+    fi
+
+    # EC-1: Stop dependency and verify readiness degrades
+    docker stop "$dep_container" >/dev/null 2>&1
+    
+    # Re-check /health/ready (should fail)
+    if curl -sf -o /dev/null http://localhost:8080/health/ready; then
+        echo "ERROR: EC-1 FAILED: readiness did not degrade after dependency stop" >&2
+        return 1
+    fi
+
+    # Re-check /health/live (should still pass)
+    if ! curl -sf -o /dev/null http://localhost:8080/health/live; then
+        echo "ERROR: EC-1 FAILED: liveness incorrectly depends on downstream dependency" >&2
+        return 1
+    fi
+
+    echo "Run check passed for api"
     return 0
 }
 

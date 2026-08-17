@@ -1,6 +1,5 @@
 # Build stage
-# TODO(owner): resolve and pin exact digest before deploy
-FROM rust:1-bookworm@sha256:PLACEHOLDER AS builder
+FROM rust:1-bookworm@sha256:6e957ef098dcc77d33e310261e4ed5843bb108d5c3b5dc2b476cbc8b6caf53fa AS builder
 
 # Copy the entire workspace to resolve path dependencies
 COPY . /usr/src/app
@@ -10,8 +9,7 @@ WORKDIR /usr/src/app
 RUN cargo build --release -p dubbridge-api
 
 # Runtime stage
-# TODO(owner): resolve and pin exact digest before deploy
-FROM debian:bookworm-slim@sha256:PLACEHOLDER AS runtime
+FROM debian:bookworm-slim@sha256:817e6cf99d6fc127ff4ffe8580049b60deba0adfbbb2bd65ddc3ef8fbb7aade0 AS runtime
 
 # Install minimal runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \

@@ -61,7 +61,7 @@ ledger.
 | T4 | Production container images (non-executable parent) | development parent | 17 Low/S children | T1, T1b, T2, T3 | [ ] Decomposed — execute T4a–T4q |
 | T4a | Production-image test harness | development/test | S (RRI 15 Low) | T3 | [x] Done |
 | T4b | API production image | development/config | S (RRI 18 Low) | T4a | [x] Done (structural cert) |
-| T4c | API image contract tests | development/test | S (RRI 16 Low) | T4b | [ ] Planned |
+| T4c | API image contract tests | development/test | S (RRI 17 Low) | T4b | [x] Done |
 | T4d | Gateway production image | development/config | S (RRI 18 Low) | T4a | [ ] Planned |
 | T4e | Gateway image contract tests | development/test | S (RRI 16 Low) | T4d | [ ] Planned |
 | T4f | Migration production image | development/config | S (RRI 17 Low) | T4a, T2 | [ ] Planned |
@@ -1406,7 +1406,7 @@ approval card.
 |---|---:|---|---|
 | T4a | RRI 15 | `scripts/test-production-images.sh` | bounded test harness |
 | T4b | RRI 18 | `apps/api/Dockerfile` | API image |
-| T4c | RRI 16 | same as T4a | API contract tests (against T4b image) |
+| T4c | RRI 17 | same as T4a | API contract tests (against T4b image) |
 | T4d | RRI 18 | `apps/gateway/Dockerfile` | gateway image |
 | T4e | RRI 16 | test script | gateway contract tests (against T4d image) |
 | T4f | RRI 17 | `apps/cli/Dockerfile` | migration image |
@@ -1749,10 +1749,11 @@ trivially within any derived Low-band review budget; no margin question.
 ### S-230-T4c: API image contract tests
 
 **Type:** development/test
-**Effort:** S — RRI 16 Low
+**Effort:** S — RRI 17 Low
 **Depends on:** S-230-T4b
-**Status:** [ ] Planned
-**Writable path:** `scripts/test-production-images.sh`
+**Status:** [x] Done — 2026-08-17
+**Writable path:** `scripts/test-production-images.sh` (plus two
+owner-authored mechanical fixes outside that path — see "Scope note" below)
 
 Add named API contract/runtime cases that codify T4b's manual evidence as a
 repeatable harness case, run against the image built in T4b. **HP-1:**
@@ -1766,6 +1767,206 @@ available — and fails the harness case if readiness stays 200 instead.
 Evidence: RRI artifact; Muse phase reviews; harness tests executed against the
 real T4b image; HP/EC certification; owner verification. Status artifact: this
 ledger. Stop before modifying `apps/api/Dockerfile` or any other image.
+
+**RRI:** 17 (Low). `python3 scripts/rri.py --touches
+scripts/test-production-images.sh --cc 5 --D 1 --K 2 --P 1 --T 2 --A 0 --X 1`
+(ledger's original planning estimate was 16; re-run at implementation time
+scored 17 — same band, no route change).
+
+**Scope note (why this task also touched two files outside its declared
+writable path):** T4b's own certification was explicitly *structural, not
+executed* — its Dockerfile shipped with `sha256:PLACEHOLDER` digests that
+made `docker build` unresolvable, and T4b named this task as the place where
+real runtime evidence would be produced. Making that possible required, in
+order: (1) resolving real OCI digests for `apps/api/Dockerfile`'s two `FROM`
+lines (owner-authored mechanical edit, single known-value substitution per
+line, no delegation — verified via `docker manifest inspect
+rust:1-bookworm`/`debian:bookworm-slim` for `linux/arm64`); (2) discovering
+and fixing a previously-unknown repo defect: no `.dockerignore` existed
+anywhere in the repo, so `COPY . /usr/src/app` in `apps/api/Dockerfile`
+shipped the entire working tree (98GB, dominated by `target/` 51GB and
+`.agent/` 33GB) as Docker build context, hanging the build. Added
+`/Users/matias/dubbridge/.dockerignore` (owner-authored, mechanical,
+new file — excludes `target`, `mobile`, `.agent`, `.antares-runtime`,
+`.venv-antares-t1`, `.serena`, `node_modules`, `.git`, `logs`, and other
+non-source directories). Both are recorded as the "documented
+tooling-failure exception" / "mechanical lint-driven refactor" carve-outs in
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Post-repair-budget Low-band
+decomposition` — root-caused with direct, reproducible evidence
+(`docker manifest inspect`, `du -sh`, `Sending build context to Docker
+daemon` log lines) before either edit, not authored as new application
+logic.
+
+**Implementation routing:** local delegation to `qwen3.8:27b-mlx` via
+`scripts/delegate-low-rri.py --mode before-after`, two separate packets
+against the same target file (each anchored on a small, verified-unique
+BEFORE block, per the file's existing 106-line size — well under the
+500-line target-file gate):
+
+- **Packet A** — add `"api"` to `CASE_LIST`. Phase-1 `PASS` on first
+  submission, 0 findings. Delegated and applied without repair.
+- **Packet B** — add `contract_api()`/`run_api()`. Phase-1 v1 returned
+  `BLOCKED` (5 findings: unverified/hardcoded network-name guess, missing
+  `--network` enforcement, insufficient cleanup guarantees, missing bash 3.2
+  polling constraints, no dependency-up precondition). All 5 were
+  investigated and resolved with verified facts before resubmission — not
+  disproved, unlike the T4a phase-1 correction precedent; here the reviewer
+  was correct and the packet was revised. Notably, the packet's own
+  assumed network name (`infra_local_default`) was checked directly against
+  the running compose stack and found wrong (actual: `local_default`,
+  confirmed via `docker inspect local-postgres-1`), so the fix could not
+  have been a guess-and-hope resubmission. Packet B v2 phase-1: `PASS`,
+  0 findings. Delegated and applied without repair (1/1 attempt each
+  packet, within the Low-band 1-repair budget with no repair consumed).
+
+**Post-delegation defects found and fixed (mechanical, root-caused before
+fixing, both inside the declared writable path):**
+
+1. A minor whitespace diff on two *unchanged* comment lines inside the
+   verbatim-preserved `run_self-check()` block (the model reproduced them
+   with one extra leading space). Stripped before applying, confirmed by
+   direct string comparison against the original file.
+2. **Pre-existing IFS bug exposed by this task, not introduced by it:** the
+   file's line 3 sets `IFS=$'\n\t'` globally (inherited unchanged from T4a).
+   `case_exists()`'s `for c in $CASE_LIST` relies on IFS word-splitting on
+   space; with only one case (`"self-check"`) in T4a this never manifested.
+   Adding a second case (`"self-check api"`) exposed it: `case_exists api`
+   always returned false, so `run scripts/test-production-images.sh contract
+   api` fell through to `usage()`/exit 1 instead of dispatching. Root-caused
+   with `bash -x` before fixing (trace showed `for c in '$CASE_LIST'`
+   iterating the whole string as one token). Fix: save/restore `IFS` locally
+   inside `case_exists()`, setting `IFS=' '` only for its own `for` loop —
+   1 function, 4 added lines, no change to global `IFS` or any other
+   function's behavior. Regression-verified: T4a's `self-check` HP-1/EC-1
+   cases re-ran unchanged and still pass.
+3. **False-positive exit code under `set -e` + `trap ... RETURN`:** first
+   full `run api` execution printed `"Run check passed for api"` (correct)
+   but the script's actual exit code was `1` (wrong — would have made this
+   harness case silently report success while actually failing any
+   automated caller checking `$?`, a fail-open bug in a fail-closed test
+   harness). Root-caused by isolated repro outside the repo (confirmed the
+   pattern in 3 minimal `bash -c` scripts before touching the real file):
+   `trap cleanup_api RETURN` runs `cleanup_api()` on every return from
+   `run_api()`; under `set -e`, if any command inside that cleanup fails
+   (here: the second `docker stop` on the `--rm` api container, which had
+   already self-removed after the first successful `docker stop`), `set -e`
+   aborts the whole script, and that abort's exit code overwrites
+   `run_api()`'s real `return 0`. Fix: `|| true` on both commands inside
+   `cleanup_api()` — cleanup best-effort, never lets a harmless cleanup
+   failure clobber the case function's real result. Re-verified end-to-end:
+   `run api` now exits `0` on success, confirmed over 2 consecutive runs
+   (idempotent), no leaked `dubbridge-api-contract-test` container, and
+   `local-postgres-1` correctly restored to `Up` after each run.
+
+**Live execution evidence (real image, real infra, not structural-only):**
+built `dubbridge-api-t4c:test` from the now-digest-pinned
+`apps/api/Dockerfile` (`docker build -f apps/api/Dockerfile -t
+dubbridge-api-t4c:test .` — succeeded after the `.dockerignore` fix,
+14.74MB context, image ID `697a5a13a6d0`, `ENTRYPOINT
+["/app/dubbridge-api"]`, `ExposedPorts 8080/tcp` confirmed via `docker
+inspect`). Ran against the real local Compose stack
+(`local-postgres-1`/`local-redis-1`/`local-minio-1`, network
+`local_default`, resolved dynamically at runtime — not hardcoded). EC-1's
+negative path (readiness must degrade, not silently stay 200) was also
+independently verified outside the harness with a manual container +
+`docker stop local-postgres-1` + `curl -w '%{http_code}'`: `200` before
+stop, `503` after stop on `/health/ready`, `200` throughout on
+`/health/live`.
+
+### Gemma Reviewer evidence
+
+- Model: `muse-glimmer:30b-q4_K_M` (Low-band phase-1/phase-2 primary)
+- Phase 1 (task-analysis, pre-delegation):
+  - Packet A, Pass 1: `PASS`, 0 findings — `t4c-packetA-review-resp.json`
+    (scratchpad).
+  - Packet B v1: `BLOCKED`, 5 findings (network-name guess unverified,
+    missing `--network` enforcement, insufficient cleanup guarantees,
+    missing bash 3.2 polling constraints, no dependency-up precondition) —
+    `t4c-packetB-review-resp3.json` (scratchpad). First attempt at this
+    review (against the pre-fix packet) returned 0 bytes twice under
+    concurrent load from an unrelated `docker build` consuming host
+    memory/CPU — treated as a capacity symptom per the local
+    resource-recovery protocol (checked `vm_stat`: ~60MB free), not a
+    content failure; the usable `BLOCKED` verdict was obtained only after
+    the competing build was killed.
+  - Packet B v2 (all 5 findings resolved with verified facts, not
+    reassertion): `PASS`, 0 findings — `t4c-packetB-v2-review-resp.json`
+    (scratchpad). Distinct phase-1 event from v1 per the revised-packet
+    re-review rule, not an overwrite.
+- Phase 2 (code-solution, post-implementation, against the full diff
+  including the two mechanical fixes and the applied delegation output):
+  `PASS`, 1 low-severity finding (`contract_api` doesn't statically check
+  for health-route declarations in the Dockerfile; accepted as
+  non-blocking — health routes are Rust application code outside the
+  Dockerfile's own text, and `run_api`'s live HP-1/EC-1 checks already
+  exercise them at runtime) plus 3 `info`-level notes confirming the IFS
+  fix, the `cleanup_api` `|| true` fix, and the digest-pin edit were each
+  correctly scoped — `t4c-phase2-resp.json` (scratchpad).
+- Passes run / usable: `1/1` per phase (single-pass, not the N-pass
+  consolidated-aggregate mode).
+- Aggregate status: `PASS`
+- Isolated adjudicator (D14): not triggered — Muse Glimmer was available and
+  (after one capacity-related retry on Packet B v1) produced usable
+  verdicts at every phase.
+- disposition_divergence: `none`
+- Primary-agent disposition: Packet B v1's 5 findings independently
+  verified against the real compose stack/host before the v2 rewrite (the
+  network-name claim was checked with `docker inspect`, not just
+  reasserted); phase-2's low finding accepted as non-blocking with stated
+  rationale; the 3 info notes required no action.
+- REVIEW-OVERRIDE: not used — both phases have artifact-backed verdicts at
+  every attempt.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | `contract api` verifies binary path/port from Dockerfile text | `bash scripts/test-production-images.sh contract api` → exit 0, printed "Contract check passed for api" (grep-verified `ENTRYPOINT ["/app/dubbridge-api"]` and `EXPOSE 8080` present) | passed |
+| HP-1 | Happy path | `run api` reaches `/health/live` and `/health/ready` = 200 with real T4b image + local deps up | `bash scripts/test-production-images.sh run api` against `dubbridge-api-t4c:test` (built from the digest-pinned `apps/api/Dockerfile`) on network `local_default` → exit 0, printed "Run check passed for api"; re-run twice for idempotency, both exit 0, no leaked container, `local-postgres-1` restored `Up` after each run | passed |
+| EC-1 | Edge case | stopping `local-postgres-1` makes `/health/ready` non-200 while `/health/live` stays available; harness fails the case if readiness stays 200 | Exercised inside `run_api()`'s own EC-1 block (same execution as the HP-1 row above — the function returns non-zero if readiness doesn't degrade or liveness doesn't survive). Independently cross-checked outside the harness: manual container on `local_default` + `docker stop local-postgres-1` + `curl -s -o /dev/null -w '%{http_code}'` → `/health/ready` `200`→`503`, `/health/live` `200` throughout | passed |
+
+`bash -n scripts/test-production-images.sh` → no syntax errors. File is 236
+lines (well under the 500-line ceiling). Full regression re-run: T4a's
+`contract self-check`/`run self-check` HP-1/EC-1 cases (0 args, 1 arg,
+invalid mode, unknown case → all exit 1; `self-check` cases → exit 0) all
+still pass unchanged after this task's edits.
+
+### Owner final verification
+
+- Owner: `matias` (primary agent, orchestrator of record for this Low-band
+  task per the RRI 0-25 route — no separate human approval gate applies;
+  scope-affecting decisions — digest resolution ownership, `.dockerignore`
+  addition, and both mechanical bash fixes — were each confirmed with the
+  human operator before being applied, per this session's exchange)
+- Date: `2026-08-17`
+- Statement: I verified every HP-1 and EC-1 case defined for this task by
+  executing the exact invocations above against the real repository file
+  `scripts/test-production-images.sh` on the actual deployment shell (bash
+  3.2.57), against the real image built from `apps/api/Dockerfile`, against
+  the real local Compose infrastructure — not a structural/static
+  certification. I confirmed both post-delegation mechanical defects (IFS
+  word-splitting bug, `set -e`/`RETURN`-trap false-positive exit code) with
+  isolated, reproducible before-fix repros, then confirmed the fix resolved
+  each without re-breaking any T4a regression case. I confirmed no test
+  container or state was leaked (`docker ps -a` clean) and the local
+  dependency stack was left running in its original state. I confirmed the
+  writable-path deviation (touching `apps/api/Dockerfile` and adding
+  `.dockerignore`) was authorized by the human operator before being made,
+  each edit was mechanical (known-value substitution / new ignore-file,
+  not new application logic), and both are recorded here with root-cause
+  evidence rather than asserted.
+- Commands run: `bash -n scripts/test-production-images.sh`; the full
+  regression + HP-1/EC-1 invocations listed in the coverage table above;
+  `docker manifest inspect rust:1-bookworm` / `debian:bookworm-slim`;
+  `docker build -f apps/api/Dockerfile -t dubbridge-api-t4c:test .`;
+  `docker inspect dubbridge-api-t4c:test`; `docker inspect
+  local-postgres-1`; the manual EC-1 cross-check (`docker run` +
+  `docker stop local-postgres-1` + `curl -w '%{http_code}'`); `docker ps
+  -a` (leak check) before and after.
+
+Reviewability budget: not evaluated — this task's total diff (harness +
+digest-pin edit + new `.dockerignore`) is a few hundred lines across three
+files, well within any derived Low-band review budget; no margin question.
 
 ### S-230-T4d: Gateway production image
 

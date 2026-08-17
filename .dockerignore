@@ -1,0 +1,24 @@
+# Build artifacts and dependency caches — never needed inside a build context.
+# Without this file, `COPY . <dest>` in every Dockerfile ships the entire
+# working tree (including a 50GB+ /target and a multi-GB mobile/) as build
+# context on every invocation. Discovered by S-230-T4c when the first real
+# (non-placeholder-digest) apps/api/Dockerfile build hung uploading context.
+target
+mobile
+node_modules
+.git
+logs
+.next
+dist
+coverage
+tmp
+.DS_Store
+.env
+.env.*
+__pycache__
+*.pyc
+.pytest_cache
+.agent
+.antares-runtime
+.venv-antares-t1
+.serena
