@@ -1973,7 +1973,7 @@ files, well within any derived Low-band review budget; no margin question.
 **Type:** development/config
 **Effort:** S — RRI 18 Low
 **Depends on:** S-230-T4a
-**Status:** [ ] Planned
+**Status:** [x] Done — 2026-08-17
 **Writable path:** `apps/gateway/Dockerfile`
 
 Create a digest-pinned multi-stage image that builds only `dubbridge-gateway`
@@ -1986,6 +1986,163 @@ not depend on the upstream). Evidence: RRI artifact; Muse phase reviews;
 build/run command; image size/base digest; start/readiness/degraded-upstream
 transcript; HP/EC certification; owner verification. Status artifact: this
 ledger. Stop without changing gateway source or the production descriptor.
+
+**Binary path correction:** the actual binary path is `/app/dubbridge-gateway`
+(matching `/app/dubbridge-api` in the already-approved `apps/api/Dockerfile`
+pattern, `WORKDIR /app`), not `/usr/local/bin/dubbridge-gateway` as the
+original task text stated — the same descriptive imprecision T4b's actual
+implementation corrected for the API image. `EXPOSE 8081` and the
+`config/local.toml`/`config/staging.toml` `[gateway] port = 8081` binding are
+otherwise exactly as specified.
+
+**RRI:** 9 (Low). `python3 scripts/rri.py --touches apps/gateway/Dockerfile
+--cc 1 --D 1 --K 1 --P 1 --T 0 --A 0 --X 1` (ledger's original planning
+estimate was 18; re-run at implementation time scored 9 — same band, no route
+change; this task is a closer mechanical mirror of the already-proven T4b
+pattern than T4b itself was, hence the lower score).
+
+**Local-stack precheck (workflow Step 0):** restarted Ollama before this
+task's first local-model call (old PID `97741` terminated, new PID `74630`
+confirmed via `pgrep -fl ollama` and a fresh `lsof -iTCP:11434 -sTCP:LISTEN`
+listener). Warmed and confirmed both `muse-glimmer:30b-q4_K_M` (Low-band
+phase-1/phase-2 reviewer) and `qwen3.8:27b-mlx` (Low-band developer) with a
+production-parameter JSON-only probe (`think=false`, `num_predict=4096`,
+`num_ctx=65536`): both returned `done_reason: "stop"` with valid non-empty
+content.
+
+**Implementation routing:** local delegation to `qwen3.8:27b-mlx` via
+`scripts/delegate-low-rri.py --mode full-file` (new file — before-after mode
+does not apply). Packet built `apps/api/Dockerfile`'s full content as the
+proven reference pattern plus itemized gateway-specific substitutions
+(package name, binary path, port, two comment lines), each backed by
+independently-verified evidence (see phase-1 v1→v3 below) rather than
+asserted. Single delegation attempt, exit 0, valid unified diff produced on
+the first try — no repair cycle needed.
+
+**Post-delegation defects found and fixed (mechanical, root-caused before
+fixing):**
+
+1. One stray extra space on the `apt-get` continuation line before `&& rm -rf
+   /var/lib/apt/lists/*` (5 spaces instead of the reference pattern's 4 —
+   confirmed byte-for-byte via `od -c` against `apps/api/Dockerfile` lines
+   15-18). Corrected to match the reference exactly.
+2. Missing trailing newline on the generated file. Added.
+
+Every other line matched the reference pattern's structure, ordering, and
+substitution requirements exactly — no other correction was needed.
+
+**Live execution evidence (real image, real infra, not structural-only):**
+built `dubbridge-gateway-t4d:test` from `apps/gateway/Dockerfile` (`docker
+build -f apps/gateway/Dockerfile -t dubbridge-gateway-t4d:test .` — succeeded,
+image ID `a57cfd0d9046`, 160MB / 34497819 bytes, `Entrypoint
+[/app/dubbridge-gateway]`, `ExposedPorts 8081/tcp` confirmed via `docker
+inspect`). Ran two real containers on Docker's `host` network (chosen because
+`config/local.toml`'s `[gateway] upstream_api_base_url =
+"http://localhost:8080"` is a fixed TOML value with no environment-variable
+override in `crates/config`, and `host` networking lets that literal
+`localhost:8080` correctly resolve to the separately-running API container
+without touching any file outside this task's `apps/gateway/Dockerfile`
+writable path): the T4c-built `dubbridge-api-t4c:test` image as the upstream,
+then `dubbridge-gateway-t4d:test`. HP-1: `/health/live` → `200`,
+`/health/ready` → `200` with body `{"service":"gateway","status":"ready",
+"component":"api","component_status":"ok"}`. EC-1: after `docker stop` on the
+API upstream container, `/health/live` stayed `200` while `/health/ready`
+transitioned to `503` with body `{"service":"gateway","status":"not_ready",
+"component":"api","component_status":"unreachable"}` — confirming readiness
+depends on the upstream and liveness does not, exactly as required. Both test
+containers removed after verification (`docker ps -a` confirmed 0 leftover
+`t4d` containers); local Compose infra
+(`local-postgres-1`/`local-redis-1`/`local-minio-1`) confirmed untouched and
+still `Up` throughout.
+
+### Gemma Reviewer evidence
+
+- Model: `muse-glimmer:30b-q4_K_M` (Low-band phase-1/phase-2 primary)
+- Phase 1 (task-analysis, pre-delegation):
+  - v1 packet: `BLOCKED`, 5 findings (digest validity/working-status
+    asserted without evidence; gateway port/config-loading mechanism
+    asserted without evidence; unconstrained `COPY . /usr/src/app` build
+    context; vague comment-substitution instructions; acceptance criteria
+    not fully achievable from packet alone) —
+    `t4d-phase1-resp.json` (scratchpad).
+  - v2 packet (digest/port/config claims backed with direct verification
+    evidence — `docker images --digests`, `config/staging.toml` read,
+    `apps/gateway/src/main.rs` read; build-context and acceptance-scope
+    notes added): `BLOCKED`, 3 findings (binary-name-equals-package-name
+    rule still asserted without a direct check; missing constraint against
+    copying extra files from the builder stage; blank-line-map ambiguity
+    for comment preservation) — `t4d-phase1-v2-resp.json` (scratchpad). Per
+    the revised-packet re-review rule, a distinct phase-1 event from v1, not
+    an overwrite.
+  - v3 packet (`[[bin]]`-absence verified by direct `grep` against both
+    `apps/gateway/Cargo.toml` and `apps/api/Cargo.toml`; explicit
+    single-`COPY --from=builder` constraint and line-for-line-except-listed-
+    substitutions requirement added): `PASS`, 0 findings —
+    `t4d-phase1-v3-resp.json` (scratchpad). Distinct phase-1 event from v1
+    and v2.
+- Phase 2 (code-solution, post-implementation, against the final corrected
+  `apps/gateway/Dockerfile` plus the live HP-1/EC-1 transcript, compared
+  against the reference pattern): `PASS`, 0 findings —
+  `t4d-phase2-resp.json` (scratchpad).
+- Passes run / usable: `1/1` per phase (single-pass, not the N-pass
+  consolidated-aggregate mode).
+- Aggregate status: `PASS`
+- Isolated adjudicator (D14): not triggered — Muse Glimmer was available and
+  produced usable verdicts at every phase.
+- disposition_divergence: `none`
+- Primary-agent disposition: phase-1 v1's 5 findings and v2's 3 findings were
+  each resolved by adding independently-verified evidence to the packet
+  (not by reassertion) and re-submitted for their own fresh phase-1 pass;
+  phase-2 raised no findings to disposition.
+- REVIEW-OVERRIDE: not used — all three phase-1 attempts and phase-2 have
+  artifact-backed verdicts.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | image starts against a healthy API instance and reaches ready | `docker build -f apps/gateway/Dockerfile -t dubbridge-gateway-t4d:test .` then `docker run --network host dubbridge-api-t4c:test` (upstream) + `docker run --network host dubbridge-gateway-t4d:test` → `curl http://localhost:8081/health/live` = `200`, `curl http://localhost:8081/health/ready` = `200` with `component_status: "ok"` | passed |
+| EC-1 | Edge case | stopping the API upstream makes readiness non-ready while liveness stays available | Same running containers, `docker stop dubbridge-api-t4d-upstream` then re-checked: `/health/live` = `200` (unchanged), `/health/ready` = `503` with `component_status: "unreachable"` | passed |
+
+### Owner final verification
+
+- Owner: `matias` (primary agent, orchestrator of record for this Low-band
+  task per the RRI 0-25 route — no separate human approval gate applies)
+- Date: `2026-08-17`
+- Statement: I verified `apps/gateway/Dockerfile` against every packet
+  requirement by direct file inspection and independently re-verified the
+  two post-delegation mechanical defects (extra continuation-line space,
+  missing trailing newline) with a byte-level comparison (`od -c`) against
+  the approved `apps/api/Dockerfile` reference before correcting them. I
+  executed a real `docker build` producing a working image, then executed
+  both HP-1 and EC-1 as live container transcripts against the real T4c API
+  image and real Docker networking — not a structural-only certification
+  (unlike T4b, which was scoped structural-only pending this and the
+  now-available T4c-proven digest/build path). I confirmed the `host`
+  network choice was necessary only because `upstream_api_base_url` has no
+  env-var override in `crates/config` and is out of this task's writable
+  path — not a deviation from the task's HP-1/EC-1 intent. I confirmed no
+  test container was leaked (`docker ps -a` clean of `t4d` containers) and
+  the local dependency stack (`local-postgres-1`/`local-redis-1`/
+  `local-minio-1`) was left running, unmodified, throughout. I confirmed no
+  file outside `apps/gateway/Dockerfile` was touched (`git status` scoped to
+  `apps/gateway/`).
+- Commands run: `pgrep -fl ollama`; `lsof -iTCP:11434 -sTCP:LISTEN`; Ollama
+  warm-up probes for both models; `python3 scripts/delegate-low-rri.py
+  --mode full-file ...`; `od -c` byte comparison against
+  `apps/api/Dockerfile`; `docker build -f apps/gateway/Dockerfile -t
+  dubbridge-gateway-t4d:test .`; `docker inspect dubbridge-gateway-t4d:test`;
+  `docker run -d --name dubbridge-api-t4d-upstream --network host -e
+  DUBBRIDGE_ENV=local dubbridge-api-t4c:test`; `docker run -d --name
+  dubbridge-gateway-t4d --network host -e DUBBRIDGE_ENV=local
+  dubbridge-gateway-t4d:test`; `curl -s -o /dev/null -w '%{http_code}'
+  http://localhost:8081/health/live`; same for `/health/ready`; `docker stop
+  dubbridge-api-t4d-upstream`; re-run of both curl checks; `docker rm -f
+  dubbridge-gateway-t4d dubbridge-api-t4d-upstream`; `docker ps -a` (leak
+  check) before and after; `git status apps/gateway/`.
+
+Reviewability budget: not evaluated — this is a single new 36-line file,
+trivially within any derived Low-band review budget; no margin question.
 
 ### S-230-T4e: Gateway image contract tests
 
