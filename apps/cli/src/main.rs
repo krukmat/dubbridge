@@ -1,12 +1,16 @@
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let config = dubbridge_config::AppConfig::from_env();
+    let config = dubbridge_config::AppConfig::load()?;
     dubbridge_observability::init_tracing(&config.observability);
     tracing::info!(
-        api_port = config.api_port,
-        storage_bucket = %config.storage.bucket,
-        "dubbridge cli skeleton ready"
+        database_url_configured = true,
+        "dubbridge-cli: applying migrations"
     );
+
+    let pool = dubbridge_db::create_pool(&config.database_url).await?;
+    sqlx::migrate!("../../infra/migrations").run(&pool).await?;
+
+    tracing::info!("dubbridge-cli: migrations applied successfully");
 
     Ok(())
 }

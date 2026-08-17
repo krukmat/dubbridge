@@ -8,7 +8,9 @@ license.workspace = true
 anyhow.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+sqlx = { workspace = true, features = ["migrate"] }
 dubbridge-config = { path = "../../crates/config" }
+dubbridge-db = { path = "../../crates/db" }
 dubbridge-observability = { path = "../../crates/observability" }
 
 [lints]

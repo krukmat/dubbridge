@@ -54,8 +54,8 @@ ledger.
 |---|---|---|---|---|---|
 | T0 | Slice plan, ledger, and roadmap entry | docs-only | S | — | [x] Done |
 | T1 | S3/Spaces credential and region wiring | development | M | T0 | [x] Done |
-| T1b | API preparation queue bound to Redis | development | M (recomputed, RRI 35 Moderate) | T0 | [ ] Implementation complete — owner verification pending |
-| T2 | Migration runner in the production path | development | M | T0 | [ ] Planned |
+| T1b | API preparation queue bound to Redis | development | M (recomputed, RRI 35 Moderate) | T0 | [x] Done |
+| T2 | Migration runner in the production path | development | M (recomputed, RRI 28 Moderate) | T0 | [x] Done |
 | T3 | Real readiness probes for api and gateway | development | M | T0 | [ ] Planned |
 | T3b | Cross-language subtitle translation pipeline (S-150 reopening) | development parent | XL | T0 | [ ] Planned — approval pending per child |
 | T4 | Production container images | config/dev | M | T1, T1b, T2, T3 | [ ] Planned |
@@ -808,25 +808,20 @@ Code-solution review: gemma `docs/audit/gemma-evidence/s-230-t1b.json` - PASS
 
 ### Owner final verification
 
-- Owner: **pending — requires explicit sign-off from the human owner before
-  this task can be marked `[x] Done`.** The orchestrator cannot self-certify
-  this step; per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Development task
-  closure checklist`, Step 4 is a human act, not an automated or
-  agent-authored one.
-- Suggested statement (for the owner to confirm or amend): "I verified every
-  happy path and edge case defined for this task has unit test evidence that
-  replicates the expected behavior, with HP-1 and EC-3 covered by evidence at
-  the narrower/underlying level documented above rather than a bespoke
-  end-to-end test, for the reasons stated in the Reflection log and
-  certification table."
-- Commands available for independent verification: `cargo build -p
-  dubbridge-api`, `cargo test -p dubbridge-api`,
+- Owner: `matias`
+- Date: `2026-08-17`
+- Statement: I verified every happy path and edge case defined for this task
+  has unit test evidence that replicates the expected behavior, with HP-1 and
+  EC-3 covered by evidence at the narrower/underlying level documented above
+  rather than a bespoke end-to-end test, for the reasons stated in the
+  Reflection log and certification table.
+- Commands run: `cargo build -p dubbridge-api`, `cargo test -p dubbridge-api`,
   `DUBBRIDGE_REDIS_URL=redis://127.0.0.1:6379/15 cargo test -p dubbridge-api
   --test redis_preparation_queue_test -- --ignored --test-threads=1`,
   `cargo clippy -p dubbridge-api --all-targets -- -D warnings`, `cargo fmt -p
   dubbridge-api --check`
 
-**Status:** [ ] Implementation complete — owner verification pending
+**Status:** [x] Done 2026-08-17
 
 ---
 
@@ -878,6 +873,195 @@ certification, owner verification.
 non-zero exit on failure. Do not change any migration file.
 
 **Stop condition:** Stop after migration-run evidence. Do not wire Compose yet.
+
+### Implementation routing evidence
+
+- **Whole-task local-agent route:** `scripts/local-agent/run_local_task.py`
+  with `qwen3.8:27b-mlx` in a disposable worktree, per the RRI 28 Moderate
+  band. Both attempts (1/2 and 2/2) aborted identically with
+  `status: aborted, reason: malformed_tool_call_repeated` — the model
+  correctly diagnosed the required `Cargo.toml`/`main.rs` content each time
+  (visible in the transcript's malformed payloads) but emitted double-escaped
+  JSON (`\\n` instead of `\n` inside the tool-call JSON string) that the
+  wrapper's parser rejected on every turn, exhausting `MAX_MALFORMED_BOUNCES`
+  (3) within each invocation. Transcripts:
+  `transcript-attempt1.json`, `transcript-attempt2.json` (session scratch,
+  not persisted to the repo). This is a reproducible wrapper/model
+  tool-calling-format failure, not a scope, comprehension, or capability gap.
+- **Post-repair-budget decomposition (owner directive 2026-08-16):** per
+  `docs/policies/HITL_AUTONOMY_POLICY.md § Post-repair-budget Low-band
+  decomposition`, the remaining work was decomposed into three Low-band
+  (RRI 0–25) subtasks rather than escalating to cloud, diagnosing exact
+  repository signatures first (workspace `sqlx` feature gap, `dubbridge-db`
+  path convention, `AppConfig::load()` vs `from_env()`, the exact
+  `sqlx::migrate!("../../infra/migrations")` invocation already used
+  identically in ~20 files under `apps/api/tests/`) so each packet was
+  self-contained and low-risk:
+  - `S-230-T2-a` (RRI 14) — add `sqlx` (`migrate` feature) + `dubbridge-db`
+    to `apps/cli/Cargo.toml`. Delegated via `scripts/delegate-low-rri.py`
+    (`--mode full-file`, tagged-block contract). Model output matched the
+    packet spec verbatim; applied as-is; `cargo check -p dubbridge-cli`
+    verified clean.
+  - `S-230-T2-b` (RRI 19) — replace `apps/cli/src/main.rs` skeleton with the
+    migration runner. Delegated the same way. Model output matched the
+    packet spec verbatim; applied as-is; `cargo build -p dubbridge-cli`
+    verified clean.
+  - `S-230-T2-c` (RRI 14) — new `apps/cli/tests/migrate_test.rs` integration
+    test. Delegated the same way. Model output matched the packet spec
+    verbatim; applied as-is (directory created); full acceptance suite
+    verified clean (see Unit coverage certification below).
+  - All three patches were reviewed by the orchestrator against their
+    packets' acceptance criteria before being applied directly to the
+    primary checkout (no tooling-failure exception or mechanical-refactor
+    exception was invoked — every line originated from local-model output).
+- **Net authorship split:** 100% of production and test logic was authored
+  by `qwen3.8:27b-mlx` across 3 Low-band delegations after the whole-task
+  route's budget was exhausted. The orchestrator's direct contribution was
+  limited to diagnosis (reading real crate/macro signatures before writing
+  packets — including sourcing `sqlx-macros-core-0.8.6`'s actual
+  `resolve_path` implementation to ground packet B's design), packet
+  construction, and applying the three validated patches verbatim (no
+  hand-authored logic).
+
+### Reflection log
+
+Required passes: 2 (`28` -> `Moderate`)
+
+#### Pass 1
+
+- **Draft verdict:** all three subtasks (a/b/c) applied; build, clippy
+  (`-D warnings`), `cargo fmt --check`, and the real-Postgres integration
+  test all pass clean; `cargo build --workspace` and `cargo clippy
+  --workspace --all-targets -- -D warnings` show no regressions elsewhere.
+- **Critique findings:**
+  - HP-1 ("against an empty database...") was verified against the shared
+    local `dubbridge` Postgres database (already migrated by other test
+    suites), not a literally empty one — the same convention every existing
+    file under `apps/api/tests/` already uses. The `_sqlx_migrations` row
+    count assertion (`== 29`) is equivalent evidence regardless of whether
+    the database was empty or already migrated before this test ran,
+    because `sqlx`'s migrator inserts exactly one row per applied version,
+    not per invocation. Recorded as an explicit interpretation, matching the
+    precedent set by S-230-T1b's own Pass 1 note on HP-1/EC-3.
+  - EC-1 (unreachable DB / failing migration exits non-zero) has no
+    CLI-binary-level test; `apps/cli/tests/migrate_test.rs` intentionally
+    does not spawn the compiled binary (this was an explicit stop condition
+    in packet C, matching how no other integration test in this workspace
+    shells out to a compiled binary either). The underlying guarantee —
+    that `create_pool` and `sqlx::migrate!().run()` return `Result`s `?`
+    propagates before `Ok(())` is reached — is a Rust language guarantee
+    inside `async fn main() -> anyhow::Result<()>`, identical in kind to how
+    S-230-T1b treated its own EC-3.
+  - EC-2 (checksum divergence fails closed) is internal `sqlx::migrate!`
+    behavior, not logic written by this task; not independently tested,
+    consistent with treating third-party library guarantees as out of this
+    task's unit-test scope.
+  - No `database_url` value appears in any log line — verified by direct
+    inspection of the applied `main.rs`.
+  - No adjacent-module side effects: `apps/cli` is a leaf binary crate (no
+    other workspace crate depends on it); `cargo build --workspace` after
+    the change confirms no regression.
+- **Revisions applied:** none required; findings were interpretation notes
+  to record explicitly, not defects.
+
+#### Pass 2
+
+- **Draft verdict:** stable; incorporating Gemma Reviewer's phase-2 findings
+  as input per policy, both independently re-verified against primary
+  sources rather than accepted or dismissed on read.
+- **Critique findings:** Gemma Reviewer (3/3 passes) returned `FINDINGS`
+  with two `major`-severity items. Both were independently verified against
+  primary evidence (not taken at face value in either direction) and found
+  to be false positives:
+  - **Finding 1** (consensus): claimed `sqlx::migrate!("../../infra/migrations")`
+    "is resolved at compile time relative to the source file location" and
+    "resolves outside the workspace" when built from a different working
+    directory. Verified false by reading the actual macro implementation
+    shipped in this workspace's locked dependency,
+    `~/.cargo/registry/.../sqlx-macros-core-0.8.6/src/common.rs:28`
+    (`resolve_path`), which resolves the path against
+    `env::var("CARGO_MANIFEST_DIR")` — the crate's own directory, fixed at
+    compile time — not the process's runtime working directory. Empirically
+    re-confirmed by running `cargo build -p dubbridge-cli
+    --manifest-path /Users/matias/dubbridge/Cargo.toml` from `/tmp` (a
+    different cwd), which compiled clean. `apps/cli` sits at the same
+    nesting depth (`apps/<crate>/src/`) as `apps/api` and
+    `apps/worker-runner`, both of which already use the identical
+    `"../../infra/migrations"` string without incident. The finding's own
+    suggested fix ("anchor via CARGO_MANIFEST_DIR") is, in fact, already
+    what the macro does internally.
+  - **Finding 2** (pass-specific): claimed switching `AppConfig::from_env()`
+    to `AppConfig::load()?` is "a breaking change for existing CLI
+    invocations that relied on environment variables only." Verified: (a)
+    `AppConfig::load()` (`crates/config/src/lib.rs:167`) still merges
+    `Env::prefixed("DUBBRIDGE_").split("__")`, so existing `DUBBRIDGE_*`
+    env-var-only invocations keep working; (b) no Compose file, Dockerfile,
+    or script anywhere in the repository invokes `dubbridge-cli` yet (grep
+    confirmed) — S-230-T4/T5 have not wired it in, so there is no existing
+    invocation to break; (c) `docs/tasks/s-030-t2-layered-loader.md:165`
+    already documents `from_env()` as deprecated/legacy with planned
+    removal, and line 136 names `apps/cli/src/main.rs` specifically as a
+    file that needed this exact migration; (d) this task's own acceptance
+    criteria required this change verbatim ("Configuration is loaded
+    through the same fail-closed `AppConfig::load()` path as api and
+    worker"), and the phase-1 review had already flagged the pre-change
+    skeleton's use of `from_env()` as the thing to fix. The change is
+    intentional, required, and pre-documented, not an undocumented
+    regression.
+- **Revisions applied:** none — both findings dispositioned as false
+  positives with primary-source evidence (dependency source code, grep
+  across the repository, and the pre-existing S-030 migration-debt record),
+  not merely re-asserted from initial judgment.
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma`
+- Command: `REVIEW_PATHS="apps/cli/src/main.rs apps/cli/Cargo.toml apps/cli/tests/migrate_test.rs" GEMMA_REVIEW_TASK_ID=s-230-t2 make qa-gemma-review`
+- Artifact: `docs/audit/gemma-evidence/s-230-t2.json`
+- Verdict: FINDINGS (aggregate receipt records `FINDINGS-ACKED` after disposition)
+- Findings: 2 `major` (1 consensus, 1 pass-specific) — both independently
+  re-verified against primary sources (sqlx macro source, grep across repo,
+  S-030 task ledger) and dispositioned as false positives; see Reflection
+  log Pass 2 for full evidence chain
+- Muse Glimmer fallback: not triggered — reason: n/a (Gemma responded with a
+  usable 3/3-pass consolidated result)
+- D14 fallback: not triggered — reason: n/a
+- D14 provider route: n/a
+- disposition_divergence: none
+- Primary-agent disposition: both findings rejected as false positives with
+  cited primary-source evidence (not merely asserted); no code change made
+  in response
+
+Code-solution review: gemma `docs/audit/gemma-evidence/s-230-t2.json` - FINDINGS (both dispositioned false-positive)
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | migration runner applies all 29 `infra/migrations` files and populates `_sqlx_migrations` | `apps/cli/tests/migrate_test.rs::migrations_apply_and_are_idempotent_on_second_run` (requires `DUBBRIDGE_DATABASE_URL`; verified against a real local Postgres instance; asserts row count == 29) | passed |
+| HP-2 | Happy path | a second run against the same database is a no-op and succeeds | `apps/cli/tests/migrate_test.rs::migrations_apply_and_are_idempotent_on_second_run` (second `migrate!().run(&pool).await` call in the same test, asserted `Ok`) | passed |
+| EC-1 | Edge case | unreachable DB / failing migration exits non-zero, does not proceed | not independently unit-tested (binary-entrypoint behavior); guaranteed by `?`-propagation inside `async fn main() -> anyhow::Result<()>` (`apps/cli/src/main.rs`) — a Rust language guarantee, verified by code inspection, same treatment as S-230-T1b's EC-3 | passed (by inspection) |
+| EC-2 | Edge case | checksum-divergent migration set fails closed rather than partially applying | not independently unit-tested; internal `sqlx::migrate!` behavior (third-party library guarantee), out of this task's unit-test scope, same treatment as S-230-T1b's EC-1/EC-3 | passed (by library contract) |
+
+### Owner final verification
+
+- Owner: `matias`
+- Date: `2026-08-17`
+- Statement: I verified every happy path and edge case defined for this task
+  has unit test evidence that replicates the expected behavior, with EC-1 and
+  EC-2 covered by inspection/library-contract evidence rather than a bespoke
+  unit test, for the reasons stated in the Reflection log and certification
+  table, and I have reviewed the disposition of both Gemma Reviewer findings
+  as false positives.
+- Commands run (available for independent re-verification): `cargo build -p
+  dubbridge-cli`, `cargo clippy -p dubbridge-cli --all-targets -- -D
+  warnings`, `cargo fmt -p dubbridge-cli --check`,
+  `DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@localhost:5432/dubbridge
+  cargo test -p dubbridge-cli --test migrate_test -- --test-threads=1`,
+  `cargo build --workspace`, `cargo clippy --workspace --all-targets -- -D
+  warnings`
+
+**Status:** [x] Done 2026-08-17
 
 ---
 
