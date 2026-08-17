@@ -608,7 +608,7 @@ flowchart LR
     T1["T1 storage credentials<br/>crates/config, crates/storage"] --> T4
     T1b["T1b API queue to Redis<br/>apps/api state + main"] --> T4
     T2["T2 migration runner<br/>apps/cli"] --> T4
-    T3["T3 real readiness probe<br/>apps/api, apps/gateway"] --> T4
+    T3["T3 ✓ real readiness probe<br/>apps/api, apps/gateway"] --> T4
     T4["T4 production images"] --> T5["T5 DO descriptor + secrets"]
     T5 --> T6["T6 deploy + E2E smoke"]
     T6 --> T7["T7 mobile build vs DO"]

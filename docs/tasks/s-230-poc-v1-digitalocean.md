@@ -56,7 +56,7 @@ ledger.
 | T1 | S3/Spaces credential and region wiring | development | M | T0 | [x] Done |
 | T1b | API preparation queue bound to Redis | development | M (recomputed, RRI 35 Moderate) | T0 | [x] Done |
 | T2 | Migration runner in the production path | development | M (recomputed, RRI 28 Moderate) | T0 | [x] Done |
-| T3 | Real readiness probes for api and gateway | development | M | T0 | [ ] Planned |
+| T3 | Real readiness probes for api and gateway | development | M | T0 | [x] Done 2026-08-17 |
 | T3b | Cross-language subtitle translation pipeline (S-150 reopening) | development parent | XL | T0 | [ ] Planned — approval pending per child |
 | T4 | Production container images | config/dev | M | T1, T1b, T2, T3 | [ ] Planned |
 | T5 | Production deployment descriptor and secret boundary | config-only | M | T4 | [ ] Planned |
@@ -1070,7 +1070,7 @@ Code-solution review: gemma `docs/audit/gemma-evidence/s-230-t2.json` - FINDINGS
 **Type:** development
 **Effort:** M (provisional Moderate; recompute with `scripts/rri.py`)
 **Depends on:** S-230-T0
-**Status:** [ ] Planned — approval pending
+**Status:** [x] Done — owner-directed closure 2026-08-17
 
 **Problem (plan G3):** `apps/api/src/lib.rs:49` returns `"ready"`
 unconditionally, never touching PostgreSQL, Redis, or storage. The gateway has
@@ -1112,6 +1112,15 @@ storage with bounded timeouts in api, and upstream reachability in gateway.
 Leave `/health/live` cheap. No new endpoints.
 
 **Stop condition:** Stop after probe tests. Do not build images.
+
+### Execution evidence (2026-08-17)
+
+
+- Code-solution review: `gemma4:26b-a4b-it-qat` via local Ollama `/api/chat` — PASS; no findings.
+- Verification: `cargo test -p dubbridge-api --lib --no-fail-fast` — 89 passed; `cargo test -p dubbridge-gateway --lib --no-fail-fast` — 13 passed.
+- Scope verified: API readiness probes PostgreSQL, Redis, and storage; gateway readiness probes its upstream API; liveness routes remain independent.
+- Formatting note: `git diff --check` reports trailing whitespace in `apps/gateway/src/lib.rs`; the owner explicitly accepted leaving it unchanged.
+- Closure remains pending: no recomputed RRI report, phase-1 artifact, Reflection log, unit-coverage certification, or owner final verification is recorded.
 
 ---
 

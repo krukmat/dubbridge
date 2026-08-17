@@ -17,6 +17,7 @@ sqlx = { workspace = true, features = ["migrate"] }
 uuid.workspace = true
 time.workspace = true
 sha2 = "0.10"
+redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
 thiserror = "2.0"
 async-trait = "0.1"
 tempfile = "3"
@@ -29,7 +30,7 @@ dubbridge-jobs = { path = "../../crates/jobs" }
 dubbridge-playback = { path = "../../crates/playback" }
 dubbridge-storage = { path = "../../crates/storage" }
 dubbridge-ingestion = { path = "../../crates/ingestion" }
-dubbridge-audit    = { path = "../../crates/audit" }
+dubbridge-audit     = { path = "../../crates/audit" }
 
 [dev-dependencies]
 async-trait = "0.1"

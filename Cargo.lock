@@ -711,6 +711,7 @@ dependencies = [
  "dubbridge-playback",
  "dubbridge-storage",
  "jsonwebtoken",
+ "redis 0.27.6",
  "serde",
  "serde_json",
  "sha2",
