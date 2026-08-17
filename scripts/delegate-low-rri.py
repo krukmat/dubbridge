@@ -46,11 +46,10 @@ DEFAULT_MODEL = "qwen3.8:27b-mlx"
 DEFAULT_STALL_FALLBACK_MODEL = ""
 DEFAULT_IDLE_TIMEOUT_SECONDS = gemma_local.DEFAULT_IDLE_TIMEOUT_SECONDS
 DEFAULT_MAX_WALL_SECONDS = gemma_local.DEFAULT_MAX_WALL_SECONDS
-# Low/S packets are deliberately bounded: a narrow task capsule plus one
-# complete-file response do not need the shared reviewer's 131K window. Keeping
-# this independent prevents the developer role from allocating an oversized KV
-# cache merely because the reviewer has a larger context default.
-DEFAULT_NUM_CTX = 16384
+# Owner directive, 2026-08-17: raised to match the Moderate/M local-agent
+# runner's MODEL_CONTEXT_TOKENS ceiling (scripts/local-agent/run_local_task.py)
+# instead of staying independently bounded below it.
+DEFAULT_NUM_CTX = 65536
 DEFAULT_NUM_PREDICT = gemma_local.DEFAULT_NUM_PREDICT
 DEFAULT_TEMPERATURE = gemma_local.DEFAULT_TEMPERATURE
 DEFAULT_THINK = gemma_local.DEFAULT_THINK
