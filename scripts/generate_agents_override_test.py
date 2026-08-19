@@ -31,10 +31,15 @@ class GenerateAgentsOverrideTest(unittest.TestCase):
                 "AGENTS.md": "agents-content\n",
                 "docs/playbooks/AGENT_WORKFLOW_GUIDE.md": "workflow-content\n",
                 "docs/policies/HITL_AUTONOMY_POLICY.md": "hitl-content\n",
+                "docs/plan/roadmap.md": "roadmap-content\n",
+                "docs/architecture.md": "architecture-content\n",
             }[relative_path],
         ):
             result = generator.generate()
-        self.assertEqual(result, "agents-content\nworkflow-content\nhitl-content\n")
+        self.assertEqual(
+            result,
+            "agents-content\nworkflow-content\nhitl-content\nroadmap-content\narchitecture-content\n",
+        )
 
     def test_hp2_generate_includes_hitl_source(self) -> None:
         with patch.object(
@@ -44,6 +49,24 @@ class GenerateAgentsOverrideTest(unittest.TestCase):
         ):
             result = generator.generate()
         self.assertIn("[docs/policies/HITL_AUTONOMY_POLICY.md]", result)
+
+    def test_hp2b_generate_includes_roadmap_source(self) -> None:
+        with patch.object(
+            generator,
+            "read_source",
+            side_effect=lambda relative_path: f"[{relative_path}]",
+        ):
+            result = generator.generate()
+        self.assertIn("[docs/plan/roadmap.md]", result)
+
+    def test_hp2c_generate_includes_architecture_source_last(self) -> None:
+        with patch.object(
+            generator,
+            "read_source",
+            side_effect=lambda relative_path: f"[{relative_path}]",
+        ):
+            result = generator.generate()
+        self.assertTrue(result.endswith("[docs/architecture.md]"))
 
     def test_hp3_generate_is_idempotent(self) -> None:
         with patch.object(
@@ -62,7 +85,7 @@ class GenerateAgentsOverrideTest(unittest.TestCase):
             side_effect=lambda relative_path: "X",
         ):
             result = generator.generate()
-        self.assertEqual(result, "XXX")
+        self.assertEqual(result, "XXXXX")
 
     def test_ec2_missing_source_file_exits_nonzero(self) -> None:
         with patch.object(Path, "is_file", return_value=False):

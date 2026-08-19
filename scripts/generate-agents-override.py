@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""Deterministically generate AGENTS.override.md from its three source files.
+"""Deterministically generate AGENTS.override.md from its five source files.
 
 Concatenates AGENTS.md + docs/playbooks/AGENT_WORKFLOW_GUIDE.md +
-docs/policies/HITL_AUTONOMY_POLICY.md, in that order, with no separator
-inserted between them (each source file's own leading frontmatter fence is
-what visually reads as a seam). Default mode prints to stdout for the
+docs/policies/HITL_AUTONOMY_POLICY.md + docs/plan/roadmap.md +
+docs/architecture.md, in that order, with no separator inserted between them
+(each source file's own leading frontmatter fence is what visually reads as
+a seam). roadmap.md and architecture.md are appended last, mirroring
+CLAUDE.md's native-import order, so they stay the mechanism's most volatile
+sources without disturbing the byte offsets of the three governance
+documents ahead of them. Default mode prints to stdout for the
 check-doc-consistency.sh drift check; --write overwrites AGENTS.override.md.
 """
 
@@ -19,6 +23,8 @@ SOURCE_RELATIVE_PATHS = (
     "AGENTS.md",
     "docs/playbooks/AGENT_WORKFLOW_GUIDE.md",
     "docs/policies/HITL_AUTONOMY_POLICY.md",
+    "docs/plan/roadmap.md",
+    "docs/architecture.md",
 )
 OUTPUT_RELATIVE_PATH = "AGENTS.override.md"
 
