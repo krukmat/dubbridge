@@ -2147,9 +2147,9 @@ trivially within any derived Low-band review budget; no margin question.
 ### S-230-T4e: Gateway image contract tests
 
 **Type:** development/test
-**Effort:** S — RRI 16 Low
+**Effort:** S — RRI 21 Low
 **Depends on:** S-230-T4d
-**Status:** [ ] Planned
+**Status:** [x] Done
 **Writable path:** `scripts/test-production-images.sh`
 
 Add named gateway contract/runtime cases that codify T4d's manual evidence as
@@ -2163,6 +2163,101 @@ case if readiness stays healthy instead. Evidence: RRI artifact; Muse phase
 reviews; harness tests executed against the real T4d image; HP/EC
 certification; owner verification. Status artifact: this ledger. Stop before
 modifying `apps/gateway/Dockerfile` or any other image.
+
+Added `contract_gateway()`/`run_gateway()` to
+`scripts/test-production-images.sh`, mirroring `contract_api()`/`run_api()`.
+`contract_gateway()` checks `apps/gateway/Dockerfile` for
+`ENTRYPOINT ["/app/dubbridge-gateway"]` and `EXPOSE 8081`. `run_gateway()`
+starts `dubbridge-api-t4c:test` as an upstream dependency (`--network host`,
+since `config/local.toml`'s `upstream_api_base_url` is a fixed
+`http://localhost:8080` with no env override; connection strings use
+`localhost` against the docker-compose published host ports 5432/6379/9000,
+since bridge-network service hostnames are unreachable under host
+networking), then `dubbridge-gateway-t4d:test`, polls `:8081/health/live`
+and `/health/ready`, and for EC-1 stops the API dependency container and
+re-checks readiness (must fail) and liveness (must still pass).
+`cleanup_gateway()` mirrors `cleanup_api()`'s `|| true`-guarded RETURN trap.
+
+### Gemma Reviewer evidence
+
+- Model: `muse-glimmer:30b-q4_K_M` (RRI 0–25 band primary, both phases)
+- Task-analysis review (Phase 1): trimmed packet
+  (`t4e-phase1-review-prompt-v2.txt`, ~30 lines) after the original packet
+  stalled; retried after the local resource-recovery protocol
+  (kill → unload → memory-pressure check → bounded probe → rebuilt packet).
+  Verdict: `PASS`, no findings.
+- Code-solution review (Phase 2): trimmed packet
+  (`t4e-phase2-review-prompt-v2.txt`, 172 lines: terse header + full 161-line
+  diff) after the original 187-line packet stalled the same way; same
+  recovery protocol applied, retried at `num_ctx=16384`, `num_predict=1536`,
+  `temperature=0`, `think=false`. Completed in 22.2s. Verdict: `PASS`, no
+  findings (`{"verdict":"PASS","findings":[]}`).
+- Passes run / usable: `1/1` both phases (single-pass, not the N-pass
+  consolidated mode).
+- Muse Glimmer fallback: not triggered (primary model itself, after packet
+  resizing, produced usable results both times).
+- D14 fallback: not triggered.
+- disposition_divergence: `n/a` (no findings to reconcile).
+- Primary-agent disposition: accepted both PASS verdicts as-is.
+
+### Reflection log
+
+Not a separate section for RRI 0–25 (folded into the mandatory review step
+above per `AGENT_WORKFLOW_GUIDE.md`). During personal review of the
+delegated implementation (prior to the Phase 2 packet above), three defects
+were found and fixed before acceptance: (1) `git apply` fuzzy-context scope
+creep on Packet A touched unrelated whitespace outside the declared anchor —
+applied the single intended line change manually instead; (2) Packet B
+delegation attempt 1 returned a mismatched `PATH` header, rejected by
+`delegate-low-rri.py`'s own validation, and attempt 2 (bounded repair cycle)
+returned the correct path; (3) the accepted Packet B content used
+env-var passthrough (`-e VAR="${VAR}"`, evaluating to empty strings) instead
+of `run_api()`'s actual hardcoded-literal pattern, and used bridge-network
+hostnames unreachable under `--network host` — both rewritten by hand after
+verifying `run_api()`'s real pattern directly (`scripts/test-production-images.sh`
+lines 142–155) and cross-checking `infra/local/docker-compose.yml`'s
+published host ports. A fourth defect (`DUBBRIDGE_ENV` unset, causing the
+gateway container to fail closed per ADR-026) was found during live
+execution, not static review, and fixed by cross-referencing T4d's own
+documented live-execution evidence in this ledger.
+
+### Unit coverage certification
+
+This task adds a bash test-harness case rather than Rust unit-testable
+logic; HP-1/EC-1 evidence is the live execution transcript against the real
+T4c/T4d images, following the same pattern T4c/T4d used for their own
+closure records.
+
+| Case ID | Type | Behavior | Evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | contract checks Dockerfile ENTRYPOINT+EXPOSE; gateway `:8081/health/live` and `/health/ready` return 200 against `dubbridge-gateway-t4d:test` with a healthy `dubbridge-api-t4c:test` upstream | `bash scripts/test-production-images.sh contract gateway` and `bash scripts/test-production-images.sh run gateway`, both exit 0, live against real images | passed |
+| EC-1 | Edge case | after stopping the API dependency container, gateway `/health/ready` fails and `/health/live` still passes | same live `run gateway` execution, EC-1 block observed: readiness check correctly fails, liveness check correctly still passes | passed |
+
+Additional regression check: `bash scripts/test-production-images.sh run api`
+still passes (no regression to the pre-existing `api` case); `bash -n
+scripts/test-production-images.sh` syntax check passes on bash 3.2.57; no
+orphaned containers after either run (cleanup traps verified).
+
+Reviewability budget: not applicable (Low band; diff line count not the
+constraint encountered — see Reflection log for the actual packet-size
+issue with the *review* step, which is separate from the formal
+`qa-review-budget` gate).
+
+### Owner final verification
+
+- Owner: `matias` (primary agent, orchestrator of record, RRI 0–25 direct
+  execution band)
+- Date: `2026-08-19`
+- Statement: I verified every happy path and edge case defined for this
+  task has live-execution evidence that replicates the expected behavior
+  against the real `dubbridge-api-t4c:test` and `dubbridge-gateway-t4d:test`
+  images, with no regression to the pre-existing `self-check`/`api` cases.
+- Commands run: `bash -n scripts/test-production-images.sh`;
+  `bash scripts/test-production-images.sh contract self-check`;
+  `bash scripts/test-production-images.sh contract api`;
+  `bash scripts/test-production-images.sh contract gateway`;
+  `bash scripts/test-production-images.sh run api`;
+  `bash scripts/test-production-images.sh run gateway`
 
 ### S-230-T4f: Migration production image
 

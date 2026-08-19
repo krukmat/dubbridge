@@ -3,7 +3,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # Case registry - bash 3.2 compatible (no associative arrays)
-CASE_LIST="self-check api"
+CASE_LIST="self-check api gateway"
 
 # Cleanup machinery
 TEMP_DIR=""
@@ -200,6 +200,147 @@ run_api() {
     fi
 
     echo "Run check passed for api"
+    return 0
+}
+
+contract_gateway() {
+    echo "Contract check for gateway case"
+    if [ ! -f "apps/gateway/Dockerfile" ]; then
+        echo "ERROR: apps/gateway/Dockerfile not found" >&2
+        return 1
+    fi
+
+    if ! grep -q 'ENTRYPOINT \["/app/dubbridge-gateway"\]' apps/gateway/Dockerfile; then
+        echo "ERROR: ENTRYPOINT [\"/app/dubbridge-gateway\"] not found in Dockerfile" >&2
+        return 1
+    fi
+
+    if ! grep -q 'EXPOSE 8081' apps/gateway/Dockerfile; then
+        echo "ERROR: EXPOSE 8081 not found in Dockerfile" >&2
+        return 1
+    fi
+
+    echo "Contract check passed for gateway"
+    return 0
+}
+
+run_gateway() {
+    echo "Run check for gateway case"
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "ERROR: docker not found on PATH" >&2
+        return 1
+    fi
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "ERROR: curl not found on PATH" >&2
+        return 1
+    fi
+
+    api_image="${DUBBRIDGE_API_IMAGE_TAG:-dubbridge-api-t4c:test}"
+    gateway_image="${DUBBRIDGE_GATEWAY_IMAGE_TAG:-dubbridge-gateway-t4d:test}"
+
+    # `|| true` on each step: under `set -e`, a failure inside a RETURN trap
+    # (e.g. stopping a --rm container that already self-removed) would abort
+    # the whole script and clobber the real exit status of run_gateway().
+    cleanup_gateway() {
+        docker stop dubbridge-gateway-contract-test >/dev/null 2>&1 || true
+        docker stop dubbridge-api-gateway-dep >/dev/null 2>&1 || true
+    }
+    trap cleanup_gateway RETURN
+
+    # Start API dependency container. --network host means bridge-network
+    # service names (postgres/redis/minio) are unreachable; use localhost
+    # against the docker-compose published host ports instead.
+    docker run -d --rm --network host \
+        -e DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@localhost:5432/dubbridge \
+        -e DUBBRIDGE_REDIS_URL=redis://localhost:6379 \
+        -e DUBBRIDGE_STORAGE__ENDPOINT_URL=http://localhost:9000 \
+        -e DUBBRIDGE_ENV=local \
+        -e AWS_ACCESS_KEY_ID=dubbridge \
+        -e AWS_SECRET_ACCESS_KEY=dubbridge123 \
+        -e AWS_REGION=us-east-1 \
+        -e DUBBRIDGE_STORAGE__BACKEND=local_fs \
+        -e DUBBRIDGE_STORAGE__BUCKET=dubbridge-local \
+        --name dubbridge-api-gateway-dep \
+        "$api_image"
+
+    # Poll API /health/live
+    api_live_ok=0
+    for i in $(seq 1 30); do
+        if curl -sf -o /dev/null http://localhost:8080/health/live; then
+            api_live_ok=1
+            break
+        fi
+        sleep 1
+    done
+    if [ "$api_live_ok" -ne 1 ]; then
+        echo "ERROR: API dependency /health/live did not become ready within timeout" >&2
+        return 1
+    fi
+
+    # Poll API /health/ready
+    api_ready_ok=0
+    for i in $(seq 1 30); do
+        if curl -sf -o /dev/null http://localhost:8080/health/ready; then
+            api_ready_ok=1
+            break
+        fi
+        sleep 1
+    done
+    if [ "$api_ready_ok" -ne 1 ]; then
+        echo "ERROR: API dependency /health/ready did not become ready within timeout" >&2
+        return 1
+    fi
+
+    # Start gateway container
+    docker run -d --rm --network host \
+        -e DUBBRIDGE_ENV=local \
+        --name dubbridge-gateway-contract-test \
+        "$gateway_image"
+
+    # Poll gateway /health/live
+    gw_live_ok=0
+    for i in $(seq 1 30); do
+        if curl -sf -o /dev/null http://localhost:8081/health/live; then
+            gw_live_ok=1
+            break
+        fi
+        sleep 1
+    done
+    if [ "$gw_live_ok" -ne 1 ]; then
+        echo "ERROR: gateway /health/live did not become ready within timeout" >&2
+        return 1
+    fi
+
+    # Poll gateway /health/ready
+    gw_ready_ok=0
+    for i in $(seq 1 30); do
+        if curl -sf -o /dev/null http://localhost:8081/health/ready; then
+            gw_ready_ok=1
+            break
+        fi
+        sleep 1
+    done
+    if [ "$gw_ready_ok" -ne 1 ]; then
+        echo "ERROR: gateway /health/ready did not become ready within timeout" >&2
+        return 1
+    fi
+
+    # EC-1: Stop API dependency and verify gateway readiness degrades
+    docker stop dubbridge-api-gateway-dep >/dev/null 2>&1
+
+    # Re-check gateway /health/ready (should fail)
+    if curl -sf -o /dev/null http://localhost:8081/health/ready; then
+        echo "ERROR: EC-1 FAILED: gateway readiness did not degrade after API dependency stop" >&2
+        return 1
+    fi
+
+    # Re-check gateway /health/live (should still pass)
+    if ! curl -sf -o /dev/null http://localhost:8081/health/live; then
+        echo "ERROR: EC-1 FAILED: gateway liveness incorrectly depends on API dependency" >&2
+        return 1
+    fi
+
+    echo "Run check passed for gateway"
     return 0
 }
 
