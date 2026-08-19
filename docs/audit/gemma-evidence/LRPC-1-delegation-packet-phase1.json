@@ -1,0 +1,1 @@
+{"model":"gemma4:26b-a4b-it-qat","created_at":"2026-08-19T20:44:14.072729Z","message":{"role":"assistant","content":"```json\n{\n  \"verdict\": \"PASS\",\n  \"findings\": []\n}\n```"},"done":true,"done_reason":"stop","total_duration":4638508166,"load_duration":242076375,"prompt_eval_count":2756,"prompt_eval_duration":3503626000,"eval_count":24,"eval_duration":606390000}
