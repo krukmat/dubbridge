@@ -15,7 +15,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import run_local_task as rlt
 import handoff_schema
 gemma_local = rlt.gemma_local
-runner_workflow_gate = rlt.runner_workflow_gate
 
 
 _audit_log_patch = None
