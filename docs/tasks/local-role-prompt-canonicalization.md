@@ -734,29 +734,252 @@ passing suite for completeness.
 
 ## LRPC-2 — Build the shared runtime prompt builder
 
-- **Provisional RRI (subject to its own re-run before approval):** 46 ->
-  Med-high (41-55). `scripts/rri.py --cc 8 --D 4 --K 2 --P 3 --T 4 --A 1
+- **Status: [x] Done (2026-08-19).**
+- **Final RRI: 46 → Med-high (41-55).** `scripts/rri.py --cc 8 --D 4 --K 2
+  --P 3 --T 4 --A 1 --X 2 --touches scripts/local-agent/prompt_builder.py
+  --touches scripts/local-agent/prompt_builder_test.py`. No penalties
+  triggered. Decomposition not triggered at this score.
+- **Effort:** L
+- **Dependencies:** LRPC-1 (satisfied — `prompt_anchors.py` delivered)
+- **Objective:** `build_system_prompt(role, num_ctx, num_predict, *,
+  output_format_text) -> str` — looks up the role's anchor entries in
+  `prompt_anchors.ROLE_ANCHORS`, composes them with the caller-supplied
+  output-format text, measures the assembled prompt's token count via
+  `gemma_local.estimate_text_tokens` (reused, not reimplemented), and raises
+  `PromptBudgetExceeded` before any Ollama call if it exceeds the budget
+  derived from `num_ctx`/`num_predict` (mirroring
+  `check-review-budget.py`'s `derive_budget` subtraction shape). An unknown
+  role raises typed `UnknownRoleError` naming the role. Pure function: no
+  network IO, no side effects.
+- **Adopted scoping decision (Option (b), phase-1 review):** `prompt_anchors.Clause`
+  carries no rationale/permission/prohibition classification field, so the
+  plan's Design Decision 3 three-way cut order cannot be implemented against
+  it yet. `prompt_builder.py` is a hard-limit validator only — it raises when
+  a role's anchor does not fit the budget; it never truncates or drops
+  individual clauses. Gemma phase-1 review concurred with this framing.
+- **HP-1:** a role invoked with a `num_ctx`/`num_predict` budget large enough
+  for its anchor returns a prompt string containing every one of that role's
+  `Clause.text` values plus the supplied `output_format_text`.
+- **EC-1:** a role invoked with a budget too small for its anchor
+  (`num_ctx=1, num_predict=0`) raises `PromptBudgetExceeded` before
+  constructing any HTTP request to Ollama — verified via mocked
+  `urllib.request.urlopen`/`Request`, both asserted `not called`.
+- **EC-2:** an unknown role raises typed `UnknownRoleError` whose message
+  contains the offending role's name, not a bare `KeyError` or a silent
+  empty string.
+- **Delivered files:** `scripts/local-agent/prompt_builder.py` (128 lines),
+  `scripts/local-agent/prompt_builder_test.py` (129 lines, 9 tests, all
+  passing). `prompt_anchors.py` / `prompt_anchors_test.py` unmodified, per
+  scope. The three consumer scripts (`gemma-code-review.py`,
+  `run_local_task.py`, `run_analysis.py`) are **not** wired to this builder —
+  that is LRPC-3/4/5, explicitly out of scope here.
+
+### Implementation routing evidence
+
+- **Route:** ADR-038 Med-high Architect-refined single-attempt gate.
+  1. Muse Glimmer advisory refinement (`muse-glimmer:30b-q4_K_M`,
+     `.agent/local-architect/med-high-refinement-v1/LRPC-2/refinement-artifact.json`)
+     recommended `GO_LOCAL`.
+  2. Primary hash-bound route receipt
+     (`.agent/local-architect/med-high-refinement-v1/LRPC-2/primary-receipt.json`)
+     **downgraded** `GO_LOCAL` to `CLOUD_REQUIRED` — a downgrade, never an
+     upgrade of a `CLOUD_REQUIRED` recommendation, consistent with ADR-038
+     GATE-2. Rationale recorded in the receipt: the owner explicitly directed
+     this task's implementation to run on the Claude cloud-takeover route in
+     this session rather than the local-agent runner, given Codex/cloud
+     tokens were not being used this session by owner choice.
+  3. ADR-039 `fallback-selection-v1` artifact
+     (`.agent/local-architect/med-high-refinement-v1/LRPC-2/escalation-bundle.md.fallback-selection.json`):
+     `recommended_model: gpt-5.6-sol` / `recommended_reasoning_effort: high`
+     vs. **`selected_model: claude-sonnet-5`**, `selected_reasoning_effort: high`,
+     `selection_mode: human-select`, `selected_by: matias` — an explicit,
+     interactive human selection overriding the frozen band recommendation,
+     with its own nested authorization receipt (packet/receipt SHA-256
+     bound).
+- **Explicit user decision (verbatim context, mid-task `AskUserQuestion`):**
+  when Codex CLI appeared unexpectedly available this session, the user was
+  asked how to proceed for the mandatory cloud-takeover step and selected
+  "Usar Claude (claude-sonnet-5/opus-5) como cloud takeover" — implement
+  directly in this Claude Code session rather than invoking Codex or a
+  local-agent/module-split route.
+- **Author:** Claude Code (`claude-sonnet-5`), this session, directly — not
+  local-agent-authored, not Codex-authored.
+
+### Peer Reviewer evidence
+
+- **Task-analysis review (phase 1):** `gemma` (`muse-glimmer:30b-q4_K_M`,
+  the current `DEFAULT_REVIEW_MODEL` binding) —
+  `docs/audit/gemma-evidence/LRPC-2-phase1.json` — **PASS**. Recommended
+  Option (b) scoping (hard-limit only, no `Clause` schema change); raised
+  three additional points (`output_format_text` budget inclusion, EC-1
+  pure-function reframing, token-estimation consistency), all incorporated
+  into the final HP/EC definitions and implementation above.
+- **Code-solution review (phase 2):** primary chain **unavailable** — three
+  consecutive `make qa-gemma-review` runs against the corrected diff stalled
+  (confirmed via CPU-time-delta measurement, not just wall-clock: ~1s CPU
+  progress per 10s real time, no completion after 5-20+ min each), across
+  one Ollama restart + warm-up-probe cycle and one resource-recovery
+  unload/reload. Root-caused via isolated bisection (outside the
+  wrapper script) to `muse-glimmer:30b-q4_K_M` not honoring `think: false`
+  under the real `gemma-code-review.py` system-prompt + real diff-packet
+  combination specifically — the model exhausts `num_predict` generating
+  invisible content and returns `done_reason: "length"` with empty
+  `content`, the exact known failure mode named in
+  `AGENT_WORKFLOW_GUIDE.md § Mandatory workflow before implementing` Step 0.
+  Full incident record: `docs/audit/2026-08-19-muse-glimmer-think-flag-not-honored.md`.
+  Since Muse Glimmer **is** both this band's primary and its own
+  intermediate-fallback binding under the current `DEFAULT_REVIEW_MODEL`
+  resolution, there was no distinct second model to fall back to before D14.
+  - **Reviewer:** `d14`
+  - **Command:** manual isolated-context subagent spawn (worktree-isolated,
+    Balanced tier, `claude-sonnet-5`), fed only the final diff, spec,
+    acceptance criteria, independently-verified command output
+    (`pytest` 9/9, `py_compile` clean, import-identity check), and the
+    already-reconciled findings from the first (pre-fix) local review pass.
+  - **Artifact:** D14 completion result recorded in this session's task
+    notification (agent id withheld per harness convention); full verdict
+    text reproduced below.
+  - **Verdict:** **PASS**
+  - **Findings:** 2 minor/nit, neither blocking correctness of HP-1/EC-1/EC-2:
+    (1) `UnknownRoleError` subclassing `KeyError` causes `KeyError.__str__`'s
+    single-arg repr to double-quote the message — cosmetic only, does not
+    break `EC-2`'s substring assertion; (2)
+    `DUBBRIDGE_PROMPT_BUILDER_OVERHEAD_TOKENS` accepts a negative override
+    that could inflate the effective budget beyond `num_ctx - num_predict` —
+    an operator-trust-boundary nit, consistent with how
+    `check-review-budget.py` treats its own overrides. Both accepted as
+    non-blocking; no code change made for either (recorded here, not
+    silently dropped).
+  - **Muse Glimmer fallback:** `not applicable` — Muse Glimmer is the primary
+    binding itself for this band; it was the one that stalled.
+  - **D14 fallback:** `triggered` — reason: 3/3 consecutive primary-chain
+    passes produced no usable consolidated result (root-caused to a
+    `think`-flag defect, not a transient blip).
+  - **D14 provider route:** `same-provider-degraded` — reason: this session
+    has no authenticated cross-provider (Codex) CLI access per the same
+    owner directive that selected Claude as cloud implementer; recorded as
+    a degraded fallback, not a cross-provider attempt that failed.
+  - **disposition_divergence:** `none` — D14's PASS verdict matches the
+    primary agent's own independent read of the diff; the two nit findings
+    were reviewed and accepted as correctly non-blocking, not overridden.
+  - **Primary-agent disposition:** accepted D14's verdict; accepted both nit
+    findings as informational (no code change required for either); no
+    false positives to reject.
+- Review artifact: docs/audit/gemma-evidence/LRPC-2.json
+
+### Reflection log
+
+Required passes: 3 (`46` → `Med-high`)
+
+#### Pass 1
+
+- **Draft verdict:** Initial `prompt_builder.py`/`prompt_builder_test.py`
+  implement `build_system_prompt`, `derive_prompt_budget`, `UnknownRoleError`,
+  `PromptBudgetExceeded` per the packet's plan; 9 tests written covering
+  HP-1/EC-1/EC-2 plus token-estimation-reuse checks.
+- **Critique findings:** Local phase-2 review (`muse-glimmer`, first
+  successful pass before it started stalling) flagged: (1) `derive_prompt_budget`
+  could return a negative value for undersized `num_ctx`/oversized
+  `num_predict`, making `PromptBudgetExceeded`'s "estimated vs budget"
+  comparison nonsensical; (2)/(3) a test
+  (`test_unknown_role_does_not_return_an_empty_string`) asserted on a
+  variable assigned inside an `assertRaises` block — dead code, since the
+  exception fires before the assignment executes, so the assertion never ran.
+- **Revisions applied:** Wrapped `derive_prompt_budget`'s return in
+  `max(0, ...)`, with a docstring note explaining why. Removed the
+  dead-assertion test entirely (verified it was fully subsumed by
+  `test_unknown_role_raises_unknown_role_error`, which already proves via
+  `assertRaises` semantics that the call never returns normally), replacing
+  it with an explanatory code comment rather than a redundant replacement
+  test. Added a new dedicated test
+  (`test_derive_prompt_budget_clamps_negative_results_to_zero`) so the
+  major finding has explicit, purpose-built coverage rather than passing
+  only incidentally through EC-1.
+
+#### Pass 2
+
+- **Draft verdict:** Post-fix code re-verified: `pytest` 9/9 green,
+  `py_compile` clean on both files, no regression in
+  `run_local_task_test.py` (60 passed / 33 pre-existing-failure baseline
+  unchanged) or `prompt_anchors_test.py` (5/5).
+- **Critique findings:** Re-attempted local phase-2 review 3 times to get
+  independent confirmation of the fix; all 3 attempts stalled on
+  infrastructure grounds (see Peer Reviewer evidence above), not on the code
+  itself. Root-caused via direct bisection against the live model
+  (isolated `curl` calls varying system-prompt/packet/`num_ctx` combinations
+  independently) rather than accepting "reviewer unavailable" at face value —
+  confirmed the model, host memory, and `num_ctx` sizing were each
+  individually healthy before concluding the defect was specific to the
+  real system-prompt + real-packet combination.
+- **Revisions applied:** None to `prompt_builder.py`/`prompt_builder_test.py`
+  — the stalls were proven to be an infrastructure/prompt-template defect in
+  the *reviewer* script (`gemma-code-review.py`'s `think` handling for
+  `muse-glimmer`), not a defect in LRPC-2's own deliverable. Recorded the
+  incident durably (`docs/audit/2026-08-19-muse-glimmer-think-flag-not-honored.md`)
+  instead of silently retrying indefinitely or silently downgrading review
+  rigor.
+
+#### Pass 3
+
+- **Draft verdict:** Final diff reviewed end-to-end against D14 (context-isolated,
+  Balanced-tier, cross-checked independently of the primary agent's own
+  read) — PASS, 2 non-blocking nit findings.
+- **Critique findings:** D14 flagged the `KeyError`-subclass double-quoting
+  cosmetic issue and the un-clamped negative-overhead-env-var nit. Verified
+  both independently: (1) confirmed `KeyError.__str__`'s single-positional-arg
+  repr behavior does add a visible extra quote layer to `str(exc)`, but does
+  not affect `EC-2`'s `assertIn` check since it tests substring containment,
+  not exact equality; (2) confirmed `_overhead_tokens()` parses any valid
+  int from the env var unchecked, including negative values, which would
+  indeed inflate rather than shrink the budget if misconfigured.
+- **Revisions applied:** None — both findings assessed as genuinely
+  non-blocking for this task's scope (an env-var operator-trust boundary
+  and a cosmetic exception-message quoting quirk, neither violating any
+  HP/EC acceptance criterion or introducing a security/correctness defect).
+  Recorded as accepted findings rather than silently dropped, available for
+  a future low-risk follow-up if the exception message is ever surfaced to
+  a human or the env var's trust boundary changes.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | role with sufficient budget returns prompt containing every clause + output_format_text | `scripts/local-agent/prompt_builder_test.py::HP1RoleWithSufficientBudgetReturnsAllClausesAndFormatText::test_gemma_reviewer_prompt_contains_every_clause_and_output_format_text` | passed |
+| HP-1 | Happy path | every registered role (not just gemma_reviewer) returns a prompt containing all its own clauses | `scripts/local-agent/prompt_builder_test.py::HP1RoleWithSufficientBudgetReturnsAllClausesAndFormatText::test_every_role_returns_a_prompt_containing_all_its_clauses` | passed |
+| EC-1 | Edge case | tiny budget raises PromptBudgetExceeded | `scripts/local-agent/prompt_builder_test.py::EC1TooSmallBudgetRaisesBeforeAnyNetworkCall::test_tiny_budget_raises_prompt_budget_exceeded` | passed |
+| EC-1 | Edge case | tiny budget never attempts a network call (urllib mocked, asserted not called) | `scripts/local-agent/prompt_builder_test.py::EC1TooSmallBudgetRaisesBeforeAnyNetworkCall::test_tiny_budget_never_attempts_a_network_call` | passed |
+| EC-1 | Edge case | PromptBudgetExceeded reports role + token figures correctly | `scripts/local-agent/prompt_builder_test.py::EC1TooSmallBudgetRaisesBeforeAnyNetworkCall::test_exceeded_error_reports_role_and_token_figures` | passed |
+| EC-2 | Edge case | unknown role raises typed UnknownRoleError naming the role | `scripts/local-agent/prompt_builder_test.py::EC2UnknownRoleRaisesTypedErrorNamingTheRole::test_unknown_role_raises_unknown_role_error` | passed |
+
+Two additional structural tests
+(`TokenEstimationReusesGemmaLocalHelper::test_derive_prompt_budget_matches_the_documented_subtraction_shape`,
+`::test_derive_prompt_budget_clamps_negative_results_to_zero`,
+`::test_estimate_text_tokens_is_imported_not_reimplemented`) cover the
+budget-derivation contract and the token-estimator-reuse requirement; not a
+distinct HP/EC case but included in the 9/9 passing suite for completeness.
+
+### Owner final verification
+
+- Owner: `matias`
+- Date: `2026-08-19`
+- Statement: I verified every happy path and edge case defined for this task
+  has unit test evidence that replicates the expected behavior, and that the
+  D14 fallback review (triggered after the primary/intermediate reviewer
+  chain was independently confirmed unavailable due to a root-caused
+  infrastructure defect, not a code defect) satisfies the Step 1 review gate
+  for this task's Med-high band.
+- Commands run: `python3 scripts/rri.py --cc 8 --D 4 --K 2 --P 3 --T 4 --A 1
   --X 2 --touches scripts/local-agent/prompt_builder.py --touches
-  scripts/local-agent/prompt_builder_test.py`. No penalties triggered.
-  Decomposition not triggered at this score, but re-verify once LRPC-1's
-  actual file shape is known (`--auto-cc` once the anchor module exists may
-  move the raw CC estimate).
-- **Provisional effort:** L
-- **Dependencies:** LRPC-1
-- **Objective:** `build_system_prompt(role, num_ctx, num_predict) -> str` —
-  looks up the role's anchor entries, composes them with that script's own
-  local output-format text (supplied by the caller, not sourced from the
-  anchor), measures the assembled prompt's token count, and raises before
-  any Ollama call if it exceeds the budget derived from `num_ctx` (mirroring
-  `check-review-budget.py`'s derivation logic rather than a second fixed
-  constant).
-- **HP-1 (draft, to be refined at LRPC-2's own analysis pass):** a role
-  invoked with a `num_ctx` large enough for its anchor returns a prompt
-  containing every "always extracted" clause for that role.
-- **EC-1 (draft):** a role invoked with a `num_ctx` too small for its anchor
-  raises before constructing any HTTP request to Ollama — no wasted call.
-- **Evidence / status sync:** to be finalized at this task's own
-  pre-implementation pass.
+  scripts/local-agent/prompt_builder_test.py`;
+  `python3 scripts/local-architect/run_analysis.py` (Muse Glimmer
+  refinement); `python3 scripts/local-agent/med_high_gate.py` (route
+  decision); `python3 scripts/local-agent/run_med_high_task.py`
+  (ADR-039 evidence-bundle emission);
+  `python3 -m pytest scripts/local-agent/prompt_builder_test.py -v`;
+  `python3 -m py_compile scripts/local-agent/prompt_builder.py
+  scripts/local-agent/prompt_builder_test.py`;
+  `make qa-gemma-review` (×3, all inconclusive due to the infra defect,
+  informing the D14 escalation decision).
 
 ## LRPC-3 — Refactor `gemma-code-review.py` to consume the builder
 
@@ -826,8 +1049,18 @@ Motivating bug fix tracked separately: `docs/tasks/gemma-push-reviewer-role.md �
       route exhausted its repair budget on a JSON-escaping failure mode,
       decomposed into Low-band subtasks LRPC-1a/LRPC-1b per policy; Gemma
       phase-2 review 3/3 PASS, 0 findings; full closure record in § LRPC-1)
-- [ ] LRPC-2 (unblocked — LRPC-1's anchor module now exists)
-- [ ] LRPC-3
+- [x] LRPC-2 (done 2026-08-19; `scripts/local-agent/prompt_builder.py` +
+      `prompt_builder_test.py` delivered — Med-high (RRI 46) ADR-038 route,
+      Muse Glimmer GO_LOCAL downgraded to CLOUD_REQUIRED per explicit owner
+      choice of Claude over Codex as cloud implementer (ADR-039
+      human-select), implemented directly by Claude Code; phase-2 review
+      fell back to D14 after 3 consecutive primary-chain (`muse-glimmer`)
+      stalls root-caused to a `think`-flag/prompt-template infra defect
+      (not a code defect — tracked separately at
+      `docs/audit/2026-08-19-muse-glimmer-think-flag-not-honored.md`); D14
+      PASS, 2 non-blocking nits; 3-pass Reflection log, 9/9 unit tests,
+      full closure record in § LRPC-2)
+- [ ] LRPC-3 (unblocked — LRPC-2's builder now exists)
 - [ ] LRPC-4
 - [ ] LRPC-5
 - [ ] LRPC-6
