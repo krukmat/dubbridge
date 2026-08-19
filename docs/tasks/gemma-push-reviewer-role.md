@@ -63,6 +63,7 @@ flowchart TD
     T4 --> T6["T6 daily/governance docs"]
     T5 --> T7["T7 live audit dry run"]
     T6 --> T7
+    T7 --> T8["T8 escalation follow-through (proposed r3)"]
 ```
 
 ---
@@ -937,3 +938,251 @@ evidence; do not start another slice.
   the blocked exploratory replay, plus follow-up operational items.
 - Verified a successful live replay against GitHub run `28156296888` and a
   blocked-but-visible replay against run `28157583084`.
+
+---
+
+## T8 - Escalation follow-through for blocked/deferred push-review findings (proposed r3)
+
+- **Status:** [ ] Proposed — not approved for implementation
+- **Type:** development
+- **Effort:** L
+- **RRI:** 55 -> Med-high (`scripts/rri.py --touches scripts/gemma-push-review.py
+  --touches scripts/gemma_push_review_test.py --touches docs/daily/README.md
+  --touches scripts/push_review_commit.py --cc 10 --D 4 --K 3 --P 2 --T 1 --A 2
+  --X 3 --penalty arch_decision`; D/K/P have no anchor-rubric match for scripts/,
+  agent judgment governs per RRI_POLICY.md §How to obtain each variable)
+- **Scope:** `scripts/gemma-push-review.py`, `scripts/gemma_push_review_test.py`,
+  `scripts/push_review_commit.py`, `docs/daily/README.md`
+- **Depends on:** T3, T4 (both Done)
+
+### Context — gap found during a functioning review (2026-08-17)
+
+T3/T4 are marked Done and pass their own unit tests, but a live-behavior review
+of the last 3 days of production reports found that findings routinely reach a
+markdown report and then stop — they never reach a phase-1-reviewer re-diagnosis
+or a local-dev fix attempt, contradicting the slice's own stated purpose ("Why
+This Slice": *"what evidence should be carried into the daily ledger"*).
+Concretely, grounded in repo evidence:
+
+1. **Pure-Low dispatch is single-shot with zero repair.** `dispatch_pure_low_candidates`
+   (`scripts/gemma-push-review.py:1345-1443`) calls `delegate-low-rri.py` exactly
+   once per candidate; on any failure (timeout, out-of-scope, verification
+   failure) it immediately sets `candidate["routing"] = "daily-non-gemma-review"`
+   (line 1440) with no retry and no phase-1-reviewer re-diagnosis of *why* the
+   delegation failed. This is a stricter contract than the general Low-RRI
+   delegation protocol elsewhere in the repo, which allows "at most one bounded
+   repair cycle before escalating" (`docs/policies/HITL_AUTONOMY_POLICY.md §
+   Local delegation (RRI 0-25)`). Observed live: `docs/reports/push-review/2026-08-16-2b98da8.md`
+   — dispatch `blocked`, immediately deferred, no second attempt.
+2. **A blocked dispatch is mislabeled `review_status: "in_review"`.** Both
+   `_build_development_report` (line 1336) and `dispatch_pure_low_candidates`
+   (line 1427) set `review_status: "in_review"` unconditionally, even when
+   `developer_status == "blocked"` (no patch exists to review). This is asserted
+   as intentional by `test_ec3_failed_delegate_writes_blocked_report`
+   (`scripts/gemma_push_review_test.py:1514-1534`), but it means a human/agent
+   scanning `developer_dispatch.review_status` cannot distinguish "a real patch
+   is waiting for post-development review" from "nothing was produced, this
+   needs someone to act." `docs/daily/README.md:27-28` tells the daily agent to
+   register that the patch "sigue `in_review`" — which is misleading for the
+   blocked case and likely contributes to these rows being read as "already
+   being handled" and skipped.
+3. **Moderate/Med-high/Complex findings correctly never auto-implement**
+   (HITL gate, RRI > 25) — that part of the design is sound. But the only
+   mechanism that is supposed to turn them into an approved task card is a
+   **manual** step: `docs/daily/README.md:12` assigns "Completar §4 issues + §5
+   mejoras + §7 reconciliación" to "orquestador/humano" at cierre, and line 68
+   says push-review findings with non-Low RRI need "task o decisión explícita."
+   `push_review_commit.py` (the CI bot that runs automatically after every push)
+   only ever writes to daily §3 ("Push-review post-pipeline") — it never touches
+   §5 (Issues ledger) or creates a task stub. Checked against the actual last 3
+   daily ledgers:
+   - `docs/daily/2026-08-15.md` — §3 lists 1 `findings`/Moderate row
+     (`fae2dd2`, "approval before implementation"); §5 Issues ledger: **empty**.
+   - `docs/daily/2026-08-16.md` — §3 lists 2 `findings` rows (`241591a`,
+     `2b98da8`); §5 Issues ledger: **empty**.
+   - `docs/daily/2026-08-17.md` — §3 lists 2 `blocked` rows (whole-audit
+     failures, e.g. `a985239` "empty content" from Gemma) and 2 `findings`
+     rows; §5 Issues ledger: **empty**.
+   Three consecutive days show the exact failure mode reported by the user:
+   reports come down, but nothing ever reaches a task card, phase-1 review, or
+   an implementation attempt — the hand-off step the design assumes never fires.
+
+### Objective
+
+Close the escalation gap without weakening the HITL approval gate for
+Moderate+ findings: give a failed pure-Low dispatch one bounded, evidence-backed
+repair attempt before it dead-ends; stop mislabeling blocked dispatches as
+`in_review`; and make the daily hand-off for HITL-gated findings
+machine-assisted so a finding cannot silently expire once its day's note is
+closed.
+
+### Happy Path Examples
+
+- **HP-1:** Pure-Low dispatch to `delegate-low-rri.py` fails on the first
+  attempt for a diagnosable reason (e.g. stale packet content, transient
+  Ollama stall) -> wrapper performs exactly one bounded repair attempt with a
+  corrected/re-fetched packet before falling back to `daily-non-gemma-review`,
+  and both attempts are recorded in the development report.
+- **HP-2:** A Moderate/Med-high/Complex finding is written to the push-review
+  report -> a machine-generated draft task-ledger stub is emitted (or an
+  explicit §5 Issues-ledger row is pre-populated) so the finding cannot be
+  closed out of a daily note without an explicit human/orchestrator
+  disposition recorded against it.
+
+### Edge Case Examples
+
+- **EC-1:** The bounded repair attempt also fails -> candidate routes to
+  `daily-non-gemma-review` exactly as today; no silent retry loop, no
+  escalation beyond the one repair attempt.
+- **EC-2:** A dispatch produces no patch (timeout / out-of-scope / verification
+  failure) -> `developer_dispatch.review_status` must not be `in_review`; it
+  must be a value that is unambiguous about "no patch exists" (e.g.
+  `not_applicable` or `needs_retry`), reserving `in_review` for dispatches that
+  actually produced a patch pending post-development review.
+- **EC-3:** A finding is still unresolved (`daily-non-gemma-review` or a
+  blocked whole-audit sentinel) after N days with no recorded disposition ->
+  daily tooling must surface it as still-open on the next day's note instead of
+  letting it silently disappear when the day rolls over (mirrors the existing
+  drift-check pattern in `scripts/daily-open.sh`).
+
+### Acceptance Criteria
+
+- The single pure-Low dispatch attempt in `dispatch_pure_low_candidates`
+  becomes at most two attempts (one bounded repair), consistent with the
+  general Low-RRI delegation contract; the repair attempt is only taken for a
+  diagnosable failure class, never for a rejection on scope/editorial/
+  high-impact grounds (those stay hard refusals, per T3 EC-1/EC-2).
+- `review_status` distinguishes "no patch produced" from "patch pending
+  review"; existing tests asserting the old blocked-implies-`in_review`
+  behavior (`gemma_push_review_test.py:1533-1534`) are updated to the new
+  contract, not left contradicting it.
+- Every Moderate+ (non-pure-Low) finding and every whole-audit `blocked`
+  sentinel produces a durable, greppable artifact that daily tooling can
+  enumerate as "still open" until a human/orchestrator disposition is
+  recorded — this may not weaken or bypass the RRI 26+ HITL approval gate; it
+  only ensures the finding is not lost before that gate is reached.
+- `docs/daily/README.md` is corrected so it no longer instructs the daily
+  agent to record a blocked dispatch as `in_review`.
+- Unit tests cover HP-1, HP-2, EC-1, EC-2, EC-3.
+
+### Evidence to emit
+
+- Updated `docs/reports/push-review/*.md` samples (or fixtures) showing the
+  new repair-attempt count and corrected `review_status` values.
+- A short before/after comparison against the three dead-end reports cited
+  above (`fae2dd2`, `2b98da8`, `a985239`) demonstrating each now produces a
+  durable "still open" artifact instead of a dead markdown row.
+
+### Status artifacts affected
+
+- `docs/plan/gemma-push-reviewer-role.md` (add Revision r3 note once approved).
+- `docs/daily/README.md` §Push Reviewer (§3) and §Taxonomía de issues (§4).
+- `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Push Reviewer, if the daily
+  hand-off mechanism changes materially.
+
+### Agent Handoff Prompt
+
+T8 - Close the push-review escalation gap. Governing docs:
+`docs/plan/gemma-push-reviewer-role.md`, `docs/tasks/gemma-push-reviewer-role.md`
+§T8, `docs/daily/README.md`. Files: `scripts/gemma-push-review.py`,
+`scripts/gemma_push_review_test.py`, `scripts/push_review_commit.py`,
+`docs/daily/README.md`. Acceptance: bounded repair attempt for failed pure-Low
+dispatch (HP-1, EC-1); corrected `review_status` semantics (EC-2); durable
+still-open surfacing for Moderate+/blocked findings until human disposition
+(HP-2, EC-3). Stop after acceptance criteria are met; do not touch T0-T7 scope
+beyond what EC-2's test correction requires.
+
+---
+
+## T9 - Gemma Reviewer authority-boundary text drift (`scripts/gemma-code-review.py`)
+
+- **Status:** [ ] Proposed — Low RRI, execute-ready, not yet applied
+- **Type:** development
+- **Effort:** S
+- **RRI:** 23 -> Low (`scripts/rri.py --cc 2 --D 1 --K 1 --P 2 --T 4 --A 0 --X 1
+  --touches scripts/gemma-code-review.py`)
+- **Scope:** `scripts/gemma-code-review.py`
+- **Depends on:** none
+
+### Context — gap found while researching a separate initiative (2026-08-19)
+
+While grounding a discussion about canonicalizing local-role system prompts
+(`docs/plan/local-role-prompt-canonicalization.md`), a direct read of
+`scripts/gemma-code-review.py:186-204` found its hardcoded authority-boundary
+sentence has drifted from its own canonical source. **Note the role
+boundary:** this is the **Gemma Reviewer / Muse Glimmer Reviewer**
+code-solution review role (`scripts/gemma-code-review.py`), not the Gemma
+Push Reviewer role this ledger otherwise tracks — D1a keeps the two
+deliberately separate and non-reused. Filed here, not in a new ledger,
+because it is a concrete instance of the same failure class T8 diagnosed
+(review-pipeline governance text silently drifting from its own canonical
+source and no one noticing until a live-behavior read), not because it
+touches push-review code.
+
+`AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer / Muse Glimmer Reviewer §
+Authority boundary` states the role:
+
+> "may not write files, apply patches, approve tasks, **certify coverage**,
+> or **mark tasks complete**."
+
+`scripts/gemma-code-review.py:188-189`'s actual hardcoded prompt reads:
+
+> "Do not approve, **close tasks**, modify files, emit patches, emit unified
+> diffs, or output file bodies."
+
+"certify coverage" is missing entirely; "mark tasks complete" was
+paraphrased to "close tasks" — a different phrase, introduced by manual
+edit, not a deliberate wording change. This sits in the text that governs
+the review role every RRI 26-55 task's phase-1/phase-2 gate depends on
+(`docs/policies/RRI_POLICY.md § Local pipeline phase-1/phase-2 reviewer
+bindings`).
+
+### Objective
+
+Align the hardcoded boundary sentence with its canonical source: restore
+"certify coverage" and correct "close tasks" to "mark tasks complete".
+
+### Happy Path Examples
+
+- **HP-1:** after the fix, the boundary sentence contains both "certify
+  coverage" and "mark tasks complete" as substrings, matching
+  `AGENT_WORKFLOW_GUIDE.md`'s canonical sentence exactly.
+
+### Edge Case Examples
+
+- **EC-1:** the tagged-block output-format contract below the boundary
+  sentence (`STATUS`/`FINDING` shape, lines 190-203) is byte-identical before
+  and after — this task touches only the one sentence, nothing else.
+
+### Acceptance Criteria
+
+- `scripts/gemma-code-review.py`'s `system_prompt` boundary sentence is an
+  exact match (not a paraphrase) of the canonical "may not write files,
+  apply patches, approve tasks, certify coverage, or mark tasks complete"
+  clause.
+- No other line in `build_review_payload` changes.
+
+### Evidence to emit
+
+- Diff; a one-line before/after quote pair in the completion record.
+
+### Status artifacts affected
+
+- None beyond this ledger entry — no ADR, roadmap, or slice status changes.
+  Superseded automatically if/when
+  `docs/tasks/local-role-prompt-canonicalization.md`'s LRPC-3 (builder-sourced
+  prompt refactor) lands: the sentence would then be generated from a
+  provenance-tracked canonical anchor instead of hardcoded, so this manual
+  fix is an immediate correction of the one live instance, not the durable
+  fix for the drift class.
+
+### Agent Handoff Prompt
+
+T9 - Fix the one boundary sentence in `scripts/gemma-code-review.py:188-189`
+to match `AGENT_WORKFLOW_GUIDE.md`'s canonical "may not write files, apply
+patches, approve tasks, certify coverage, or mark tasks complete" clause
+exactly. Governing docs: `docs/tasks/gemma-push-reviewer-role.md` §T9,
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Gemma Reviewer / Muse Glimmer
+Reviewer § Authority boundary. File: `scripts/gemma-code-review.py`.
+Acceptance: HP-1, EC-1. Stop after the one-sentence fix; do not touch the
+tagged-block contract or any other part of the file.

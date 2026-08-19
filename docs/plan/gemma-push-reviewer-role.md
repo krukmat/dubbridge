@@ -715,6 +715,33 @@ Changes in this revision are marked "(added r2)" at their headings:
   surface. T1B gives the invocation an owning task; D11 and the Model Invocation
   Contract give it config and a contract.
 
+## Revision r3 Note (2026-08-17, proposed — not yet approved)
+
+A functioning review of T3/T4 in production (`docs/reports/push-review/`,
+`docs/daily/2026-08-15.md` through `2026-08-17.md`) found that findings
+reach a markdown report and then dead-end: pure-Low dispatch failures get no
+repair attempt and are mislabeled `review_status: "in_review"`, and
+Moderate+/blocked findings depend on a manual daily "cierre" transcription
+into the Issues ledger that is not happening (3/3 days checked show an empty
+§5 Issues ledger despite open push-review rows). Full diagnosis and proposed
+fix: `docs/tasks/gemma-push-reviewer-role.md` § T8 (proposed, RRI 55 ->
+Med-high, not yet approved for implementation).
+
+## Revision r4 Note (2026-08-19, proposed — Low RRI, not yet applied)
+
+Unrelated to push-review routing (r3/T8): while grounding a separate
+discussion about canonicalizing local-role system prompts
+(`docs/plan/local-role-prompt-canonicalization.md`), a direct read of
+`scripts/gemma-code-review.py:188-204` found the **Gemma Reviewer /
+Muse Glimmer Reviewer** role's hardcoded authority-boundary sentence has
+drifted from its canonical source in `AGENT_WORKFLOW_GUIDE.md` — missing
+"certify coverage" and paraphrasing "mark tasks complete" as "close tasks".
+Filed here as the same failure class T8 diagnosed for push-review routing
+(governance text silently drifting, unnoticed until a live-behavior read),
+not because it touches push-review code — D1a's separation between the two
+Gemma roles is otherwise unaffected. Full diagnosis and fix:
+`docs/tasks/gemma-push-reviewer-role.md` § T9 (RRI 23 -> Low, execute-ready).
+
 ## Open Approval Items
 
 - [ ] Approve the role authority boundary: audit/dispatch only, no direct
