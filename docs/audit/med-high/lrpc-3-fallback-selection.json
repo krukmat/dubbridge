@@ -1,0 +1,30 @@
+{
+  "schema_version": "fallback-selection-v1",
+  "task_id": "LRPC-3",
+  "phase": "implementation",
+  "status": "fallback_authorized",
+  "trigger": "adr038-med-high-mandatory-cloud-takeover",
+  "trigger_kind": "capability-risk",
+  "role": "cloud-implementer",
+  "rri": 42,
+  "recommended_model": "gpt-5.6-sol",
+  "recommended_reasoning_effort": "high",
+  "selection_mode": "human-select",
+  "selected_model": "claude-sonnet-5",
+  "selected_reasoning_effort": "medium",
+  "selected_by": "user (kruk.matias@gmail.com), via AskUserQuestion 2026-08-19",
+  "packet_sha256": "68fb1e8c39f933a1962ae252787368e4e652ddee349bb9b3a35b6ce7d719dded",
+  "authorization_receipt": {
+    "schema_version": "fallback-selection-v1",
+    "task_id": "LRPC-3",
+    "phase": "implementation",
+    "role": "cloud-implementer",
+    "selection_mode": "human-select",
+    "selected_model": "claude-sonnet-5",
+    "selected_reasoning_effort": "medium",
+    "selected_by": "user (kruk.matias@gmail.com), via AskUserQuestion 2026-08-19",
+    "packet_sha256": "68fb1e8c39f933a1962ae252787368e4e652ddee349bb9b3a35b6ce7d719dded",
+    "authorized_at": "2026-08-19T23:01:05.656453Z",
+    "receipt_sha256": "292d10a3262bb7187ef5311276c6ff241743e35f03ee459ce502f34c36f6fb83"
+  }
+}

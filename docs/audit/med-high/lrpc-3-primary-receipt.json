@@ -1,0 +1,8 @@
+{
+  "primary_id": "claude-code-orchestrator",
+  "decision": "GO_LOCAL",
+  "rationale": "Independently verified against ADR-038 s.6 hard exclusions: LRPC-3 touches only scripts/gemma-code-review.py::build_review_payload() and scripts/gemma_code_review_test.py::BuildReviewPayload. No auth/security work, no rights/consent/governance invariant, no schema/migration/release cut, no unresolved ADR decision, and scope is fully bounded (two named functions, explicit in/out-of-scope lists, explicit failure-mode and test-ownership contracts, all confirmed PASS at phase-1 by both gemma (canonical primary) and muse-glimmer). Concurs with Muse Glimmer's GO_LOCAL recommendation; no downgrade applied.",
+  "timestamp": "2026-08-19T23:10:00.000000Z",
+  "card_hash": "718f1f0676c1ca207a35f92f9bc34f36f912add41c23c97d01f125913bb34ded",
+  "refinement_artifact_sha256": "96bf3181487cef28ca1dc1099f3c60b5967617ac854a063cb641e7644887d83f"
+}

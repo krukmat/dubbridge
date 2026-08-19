@@ -66,6 +66,9 @@ class BuildReviewPayload(unittest.TestCase):
         self.assertIn("Do not approve", system)
         self.assertIn("output file bodies", system)
         self.assertIn("STATUS: PASS", system)
+        self.assertIn("certify coverage", system)
+        self.assertIn("mark tasks complete", system)
+        self.assertNotIn("close tasks", system)
 
     def test_generation_options_are_shared_shape(self):
         payload = _mod.build_review_payload("model", "packet", 8192, 2048, 0.25, True)
@@ -74,6 +77,12 @@ class BuildReviewPayload(unittest.TestCase):
         self.assertEqual(payload["options"]["temperature"], 0.25)
         self.assertEqual(payload["options"]["num_ctx"], 8192)
         self.assertEqual(payload["options"]["num_predict"], 2048)
+
+    def test_budget_exceeded_propagates_uncaught_before_any_ollama_call(self):
+        with patch.object(_mod.gemma_local, "stream_chat") as mock_stream_chat:
+            with self.assertRaises(_mod.prompt_builder.PromptBudgetExceeded):
+                _mod.build_review_payload("model", "packet", num_ctx=64, num_predict=32, temperature=0.1, think=False)
+        mock_stream_chat.assert_not_called()
 
 
 class ParseReviewResponse(unittest.TestCase):

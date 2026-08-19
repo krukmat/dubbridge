@@ -986,9 +986,233 @@ distinct HP/EC case but included in the 9/9 passing suite for completeness.
 - **Dependencies:** LRPC-2. Supersedes the standalone manual fix tracked at
   `docs/tasks/gemma-push-reviewer-role.md § T9` once merged (both can land
   independently in the meantime — T9 is not blocked on this).
-- **Provisional effort:** S. RRI to be computed at this task's own analysis
-  pass (expect Moderate: single-file swap of a hardcoded string for a
-  builder call, but P/K judgment from LRPC-1/2 likely carries forward).
+- **RRI:** 42 → **Med-high (41-55)**. `scripts/rri.py --cc 4 --D 4 --K 2
+  --P 3 --T 4 --A 1 --X 2 --touches scripts/gemma-code-review.py --touches
+  scripts/gemma_code_review_test.py`. D=4/P=3/X=2 carried forward from
+  LRPC-2 for consistency (same review-pipeline-integrity rationale, same
+  drift-fidelity concern — this consumer script is what actually reaches
+  Ollama). CC=4 (single-branch swap inside `build_review_payload`, no new
+  control flow beyond a pass-through `try`/propagate).
+- **Effort: L** (corrected from an initial provisional `S` — RRI 41-55
+  requires `Effort: L` per `AGENT_WORKFLOW_GUIDE.md`'s canonical
+  RRI-band-to-Effort crosswalk; a Med-high task may never carry `Effort: S`
+  regardless of how mechanical the underlying diff looks). Phase-1 review
+  (Muse Glimmer) flagged the original `S` as blocking; corrected in this
+  revision.
+
+### Scope
+
+**In scope:** `scripts/gemma-code-review.py`'s `build_review_payload()`
+function (currently lines 185-213). Replace the hardcoded authority-boundary
+sentence inside `system_prompt` with a call to
+`prompt_builder.build_system_prompt(role="gemma_reviewer", num_ctx=num_ctx,
+num_predict=num_predict, output_format_text=<STATUS/FINDING contract>)`.
+
+**Out of scope:**
+- The STATUS/FINDING tagged-block output-format contract itself (no
+  canonical-doc source; stays hardcoded local to this script per the parent
+  plan's scope line — pass it as `output_format_text` unchanged).
+- Any change to `prompt_anchors.py` or `prompt_builder.py` (frozen,
+  delivered by LRPC-1/LRPC-2).
+- `num_ctx`/`num_predict` sourcing: unchanged — both continue to come from
+  the existing CLI args (`args.num_ctx`, `args.num_predict`) exactly as
+  today; this task does not touch argument parsing or defaults.
+- `DEFAULT_REVIEW_MODEL` binding (`gemma_local.py`): unchanged.
+- The 3-pass review-loop callers (`run_review_passes` / N-pass consolidation
+  logic): unchanged — they call `build_review_payload()` and are agnostic to
+  how its `system_prompt` is assembled internally.
+
+**Required failure-mode behavior (resolves EC-1 ambiguity):**
+`build_review_payload()` must **not** catch `PromptBudgetExceeded`. Let it
+propagate uncaught out of `build_review_payload()` to the caller (`main()`),
+matching `prompt_builder`'s own documented contract ("fails ... before any
+Ollama call is constructed"). No new try/except is added around the builder
+call; no network request may be attempted once the exception is raised. This
+is the same fail-closed shape `prompt_builder.py` already uses elsewhere in
+this repo — no new error-handling policy is introduced.
+
+**Test ownership (resolves the preserve-vs-update conflict):** updating
+`scripts/gemma_code_review_test.py::BuildReviewPayload` is **in scope** for
+this task, not a separate task. The two existing tests
+(`test_prompt_is_read_only`, `test_generation_options_are_shared_shape`) are
+updated in place, in the same commit, to assert against the canonical
+phrasing instead of the paraphrased one — they are not left failing and not
+deferred.
+
+### Behavioral examples
+
+- **HP-1:** `build_review_payload()` constructs its system prompt via
+  `prompt_builder.build_system_prompt(role="gemma_reviewer", ...)` instead of
+  a hardcoded authority-boundary string; the assembled prompt contains the
+  exact canonical phrase `"certify coverage"` and `"mark tasks complete"`.
+- **HP-2:** the STATUS/FINDING output-format contract text is unchanged in
+  content and still appears in the assembled prompt (passed through as
+  `output_format_text`, not regenerated).
+- **EC-1:** when `num_ctx`/`num_predict` make the assembled prompt exceed its
+  derived budget, `build_review_payload()` propagates
+  `prompt_builder.PromptBudgetExceeded` uncaught, before any Ollama HTTP call
+  is constructed (assert via a mocked/spied HTTP layer that no call was
+  attempted).
+- **EC-2:** `test_prompt_is_read_only` and
+  `test_generation_options_are_shared_shape` are updated to assert the new
+  canonical phrasing (`"certify coverage"`, `"mark tasks complete"`) and to
+  explicitly assert the **absence** of the old paraphrase text ("close
+  tasks" must not appear standalone as the old sentence produced it), so a
+  regression back to the hardcoded/paraphrased string is caught, not just a
+  presence check on the new one.
+
+### Evidence to emit / status artifacts affected
+
+- Evidence: updated `scripts/gemma-code-review.py`, updated
+  `scripts/gemma_code_review_test.py`, `pytest` output, `py_compile` output,
+  ADR-038 evidence bundle (Med-high route), phase-1/phase-2 review artifacts.
+- Status artifacts: this task ledger (`§ LRPC-3` closure record, `§
+  Progress` checklist), `docs/plan/local-role-prompt-canonicalization.md`
+  (if scope/architecture notes need updating — expected no-op unless
+  implementation surfaces a deviation).
+
+### ADR-038 Med-high routing evidence
+
+- Muse Glimmer advisory refinement (`med-high-refinement-v1`):
+  `route_recommendation: GO_LOCAL`. Artifact:
+  `docs/audit/med-high/lrpc-3-refinement-artifact.json`. Model tag/digest
+  verified against live `/api/tags` (`de878ce3...4c1`, matched, no
+  `n/a-manual-invocation` fallback needed).
+- Primary hash-bound route receipt: `GO_LOCAL` (concurs, no downgrade).
+  Artifact: `docs/audit/med-high/lrpc-3-primary-receipt.json`.
+- Gate evaluation (`scripts/local-agent/med_high_gate.py`): `{"route":
+  "GO_LOCAL", "reason": "Muse Glimmer and primary both recommend
+  GO_LOCAL."}` — both card-hash and refinement-artifact-sha256 binding
+  checks passed.
+- Per `AGENT_WORKFLOW_GUIDE.md § Local-first and Architect-refined
+  implementation routing`, Med-high is cloud-only implementation
+  **regardless** of `GO_LOCAL` — the gate result governs only the evidence
+  trail, not whether local execution is permitted. No local implementation
+  attempt was made.
+- ADR-039 fallback-selection checkpoint: `human-select` mode. User selected
+  `claude-sonnet-5` / reasoning effort `medium` via `AskUserQuestion`, trigger
+  kind `capability-risk` (the mandatory Med-high cloud takeover is a routine
+  capability-tier requirement of the band, not an operational-unavailability
+  fallback). Recommended alternative was `gpt-5.6-sol`/`high`
+  (frozen matrix default for `capability-risk` + RRI 42); the user's explicit
+  choice of `claude-sonnet-5` overrides the recommendation, which the checkpoint
+  permits. Artifact: `docs/audit/med-high/lrpc-3-fallback-selection.json`
+  (`status: fallback_authorized`).
+- Implementer: `claude-sonnet-5` (this session), thinking off (Balanced tier,
+  no stall/failure — task stayed on Sonnet per
+  `AGENT_WORKFLOW_GUIDE.md § Current Claude Code capability resolution`'s
+  escalation guidance: code-editing work, no long-context/synthesis-heavy
+  signal to justify Opus).
+
+### Phase-1 reviewer-chain correction
+
+The first phase-1 pass for this task was run against `muse-glimmer:30b-q4_K_M`
+as primary, deviating from the canonical RRI 26-55 chain (`gemma` primary →
+`muse-glimmer` intermediate fallback → D14) without first confirming Gemma
+was actually unavailable. Before proceeding to ADR-038 refinement, Gemma was
+probed directly (`gemma4:26b-a4b-it-qat`, production params, `num_ctx=65536`,
+`think=false`) and responded `done_reason: stop` — Gemma was reachable and
+healthy the whole time. The identical finalized task packet was then
+re-submitted to Gemma as primary and returned **PASS** (3 non-blocking minor
+findings, all praise-toned) — independently confirming the same verdict Muse
+Glimmer had given non-canonically. `docs/audit/gemma-evidence/LRPC-3-phase1.json`
+was updated in place to record Gemma as the canonical `reviewer` with a
+`chain_correction` field preserving both Muse Glimmer runs for audit
+transparency. No task-definition content changed as a result of this
+correction — only the reviewer-of-record.
+
+### Reflection log
+
+Required passes: 3 (`42` → `Med-high`)
+
+#### Pass 1 — contract fidelity
+
+- **Draft verdict:** `build_review_payload()` now sources its authority-boundary
+  clause via `prompt_builder.build_system_prompt(role="gemma_reviewer", ...)`;
+  HP-1/HP-2 confirmed via `--dry-run` CLI inspection.
+- **Critique findings:** checked whether `output_format_text` accidentally
+  duplicated or dropped any content from the original hardcoded string —
+  only the redundant `"close tasks,"` fragment was removed (now covered by
+  the canonical anchor's `"mark tasks complete"`); checked the new
+  `sys.path.insert` for the `local-agent` import matches existing repo
+  convention (`scripts/delegate_low_rri_test.py` uses the identical pattern)
+  rather than inventing a new import style.
+- **Revisions applied:** none — no issues found.
+
+#### Pass 2 — failure boundary (budget exceeded)
+
+- **Draft verdict:** `PromptBudgetExceeded` is raised inside
+  `prompt_builder.build_system_prompt()`, called directly (no try/except) from
+  `build_review_payload()`.
+- **Critique findings:** inspected `main()` (lines 520-545) for any
+  surrounding broad `except` clause between the `build_review_payload()` call
+  site and its caller that could swallow the exception — none exists; the
+  call is unguarded and the exception propagates straight to the top-level
+  script exit.
+- **Revisions applied:** none — no issues found.
+
+#### Pass 3 — test-regression coverage
+
+- **Draft verdict:** `test_prompt_is_read_only` now asserts presence of
+  `"certify coverage"`/`"mark tasks complete"` and absence of `"close
+  tasks"`; a new `test_budget_exceeded_propagates_uncaught_before_any_ollama_call`
+  test covers EC-1 with a mocked `gemma_local.stream_chat` asserted
+  never-called.
+- **Critique findings:** verified the absence-assertion is a real regression
+  guard and not tautological — the pre-fix hardcoded string literally
+  contained the substring `"close tasks"` (`"Do not approve, close tasks,
+  modify files"`), so reverting the fix would fail
+  `assertNotIn("close tasks", system)`. Verified `num_ctx=64, num_predict=32`
+  deterministically derives a budget of `0`
+  (`max(0, 64-32-64)`), guaranteeing `PromptBudgetExceeded` for any non-empty
+  prompt rather than depending on a borderline value.
+- **Revisions applied:** none — no issues found.
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma`
+- Command: manual `POST /api/chat` with the diff + acceptance-criteria packet
+  (equivalent to `make qa-gemma-review` packet shape; single-pass manual
+  invocation, not the 3-pass wrapper)
+- Artifact: `docs/audit/gemma-evidence/LRPC-3-phase2.json`
+- Verdict: `PASS`
+- Findings: none
+- Muse Glimmer fallback: not triggered — reason: Gemma responded
+  `done_reason: stop` with a valid parseable verdict on first attempt
+- D14 fallback: not triggered — reason: n/a, Gemma primary succeeded
+- D14 provider route: n/a
+- disposition_divergence: `null`
+- Primary-agent disposition: accepted (0 findings to disposition)
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | builder-sourced prompt contains canonical phrases | `scripts/gemma_code_review_test.py::BuildReviewPayload::test_prompt_is_read_only` | passed |
+| HP-2 | Happy path | STATUS/FINDING contract text unchanged, passed through | `scripts/gemma_code_review_test.py::BuildReviewPayload::test_prompt_is_read_only` | passed |
+| EC-1 | Edge case | `PromptBudgetExceeded` propagates uncaught, no HTTP call | `scripts/gemma_code_review_test.py::BuildReviewPayload::test_budget_exceeded_propagates_uncaught_before_any_ollama_call` | passed |
+| EC-2 | Edge case | tests assert new phrasing and absence of old paraphrase | `scripts/gemma_code_review_test.py::BuildReviewPayload::test_prompt_is_read_only` | passed |
+
+### Owner final verification
+
+- Owner: `claude-sonnet-5 (orchestrator + implementer, this session)`
+- Date: `2026-08-19`
+- Statement: I verified every happy path and edge case defined for this task
+  has unit test evidence that replicates the expected behavior, confirmed
+  both changed files compile cleanly, confirmed the full
+  `gemma_code_review_test.py` suite (56 tests) and the frozen LRPC-1/LRPC-2
+  suites (14 tests) remain green, and manually inspected the assembled
+  system prompt via `--dry-run` to confirm the canonical anchor clause and
+  unchanged output-format contract both appear correctly in the live output.
+- Commands run: `python3 -m pytest scripts/gemma_code_review_test.py
+  scripts/local-agent/prompt_builder_test.py
+  scripts/local-agent/prompt_anchors_test.py -q`; `python3 -m py_compile
+  scripts/gemma-code-review.py scripts/gemma_code_review_test.py`; `python3
+  scripts/gemma-code-review.py --dry-run` (manual packet via stdin).
+
+Review artifact: docs/audit/gemma-evidence/LRPC-3-phase2.json
+
+**Status: `[x] Done`**
 
 ## LRPC-4 — Refactor `run_local_task.py` to consume the builder
 
@@ -1060,7 +1284,23 @@ Motivating bug fix tracked separately: `docs/tasks/gemma-push-reviewer-role.md �
       `docs/audit/2026-08-19-muse-glimmer-think-flag-not-honored.md`); D14
       PASS, 2 non-blocking nits; 3-pass Reflection log, 9/9 unit tests,
       full closure record in § LRPC-2)
-- [ ] LRPC-3 (unblocked — LRPC-2's builder now exists)
+- [x] LRPC-3 (done 2026-08-19; `scripts/gemma-code-review.py`'s
+      `build_review_payload()` now sources its authority-boundary clause via
+      `prompt_builder.build_system_prompt(role="gemma_reviewer", ...)`,
+      closing the drift bug that motivated this whole plan (missing
+      "certify coverage" + paraphrased "close tasks" → "mark tasks
+      complete") for this script — Med-high (RRI 42) ADR-038 route, Muse
+      Glimmer + primary receipt both `GO_LOCAL`, cloud-only implementation
+      per band policy regardless; ADR-039 human-select checkpoint, owner
+      chose `claude-sonnet-5`/medium over the recommended
+      `gpt-5.6-sol`/high; implemented directly by Claude Code. Phase-1
+      reviewer-chain correction applied mid-task: an initial pass ran
+      non-canonically against `muse-glimmer` as primary, corrected by
+      verifying Gemma was actually healthy and re-running phase-1 through
+      Gemma (canonical primary), which independently confirmed PASS. Phase-2
+      Gemma review: PASS, 0 findings, no fallback triggered. 3-pass
+      Reflection log, 4/4 HP/EC unit tests (+56/56 full suite, +14/14 frozen
+      LRPC-1/LRPC-2 suites unaffected); full closure record in § LRPC-3)
 - [ ] LRPC-4
 - [ ] LRPC-5
 - [ ] LRPC-6

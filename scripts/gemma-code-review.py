@@ -15,7 +15,9 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "local-agent"))
 import gemma_local
+import prompt_builder
 
 
 STATUS_VALUES = {"PASS": "pass", "FINDINGS": "findings", "BLOCKED": "blocked"}
@@ -183,10 +185,10 @@ def parse_args():
 
 
 def build_review_payload(model, packet, num_ctx, num_predict, temperature, think):
-    system_prompt = (
+    output_format_text = (
         "You are Gemma Reviewer for DubBridge. You are read-only.\n"
-        "Review the supplied packet and diff. Do not approve, close tasks, "
-        "modify files, emit patches, emit unified diffs, or output file bodies.\n"
+        "Review the supplied packet and diff. Do not approve, modify files, "
+        "emit patches, emit unified diffs, or output file bodies.\n"
         "Return ONLY tagged text in this exact shape:\n"
         "STATUS: PASS\n"
         "SUMMARY: short review summary\n"
@@ -201,6 +203,12 @@ def build_review_payload(model, packet, num_ctx, num_predict, temperature, think
         "Use PASS with no finding blocks when no issues are found. Use FINDINGS "
         "with one or more finding blocks. Use BLOCKED only when the packet is not "
         "reviewable. No markdown fences, no JSON, no diff, no patch, no extra text."
+    )
+    system_prompt = prompt_builder.build_system_prompt(
+        role="gemma_reviewer",
+        num_ctx=num_ctx,
+        num_predict=num_predict,
+        output_format_text=output_format_text,
     )
     return gemma_local.build_chat_payload(
         model=model,

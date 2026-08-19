@@ -1,0 +1,112 @@
+{
+  "error": null,
+  "finished_at": "2026-08-19T22:58:15.429675Z",
+  "generation": {
+    "created_at": "2026-08-19T22:58:15.413703Z",
+    "done": true,
+    "eval_count": 660,
+    "eval_duration": 91037885000,
+    "load_duration": 6630360625,
+    "prompt_eval_count": 975,
+    "prompt_eval_duration": 5784853000,
+    "think_disabled": true,
+    "thinking_present": false,
+    "thinking_sha256": null,
+    "total_duration": 103484855583
+  },
+  "model": {
+    "expected_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "resolved_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "tag": "muse-glimmer:30b-q4_K_M"
+  },
+  "packet": {
+    "expected_sha256": "718f1f0676c1ca207a35f92f9bc34f36f912add41c23c97d01f125913bb34ded",
+    "path": "/private/tmp/claude-501/-Users-matias-dubbridge/19f3a1b9-921d-421b-917b-068e946677bb/scratchpad/lrpc3_packet.json",
+    "sha256": "718f1f0676c1ca207a35f92f9bc34f36f912add41c23c97d01f125913bb34ded"
+  },
+  "profile": "med-high-refinement-v1",
+  "prompt": {
+    "profile": "med-high-refinement-v1",
+    "sha256": "b26674ba28a50089ee30d94b04fdb1e9f4451caa6c3b3efb88f9486f79e8ec31",
+    "version": "med-high-refinement-prompt-v1"
+  },
+  "response": {
+    "raw_text_sha256": "0ff657f038fc6ce85907fa084c94ffc108a9a5891765b6c04a2be486f991ba1a",
+    "validated": {
+      "acceptance_tests": [
+        "HP-1 system prompt contains exact phrases 'certify coverage' and 'mark tasks complete' from builder",
+        "HP-2 STATUS/FINDING contract text unchanged and passed as output_format_text",
+        "EC-1 PromptBudgetExceeded propagates before Ollama HTTP construction under mocked layer",
+        "EC-2 tests assert new canonical phrasing and absence of 'close tasks' standalone"
+      ],
+      "claims": [
+        {
+          "label": "SUPPORTED",
+          "statement": "Scope is bounded to one production function and one test class"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Phase1 review verdict is PASS with max severity minor"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Hard exclusions check indicates no auth/security work"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "PromptBudgetExceeded must propagate uncaught to main"
+        }
+      ],
+      "excluded_scope": [
+        "STATUS/FINDING contract text content modification",
+        "prompt_anchors.py or prompt_builder.py changes",
+        "num_ctx/num_predict sourcing changes",
+        "DEFAULT_REVIEW_MODEL binding in gemma_local.py",
+        "run_review_passes / N-pass consolidation callers"
+      ],
+      "implementation_steps": [
+        "Locate build_review_payload lines 185-213 in scripts/gemma-code-review.py",
+        "Remove hardcoded authority-boundary sentence and insert builder call with required args",
+        "Verify builder call uses role='gemma_reviewer' and forwards num_ctx, num_predict, output_format_text",
+        "Confirm no try/except around PromptBudgetExceeded in build_review_payload",
+        "Update scripts/gemma_code_review_test.py BuildReviewPayload tests for canonical phrasing and absence check",
+        "Run existing tests to ensure no regression"
+      ],
+      "refined_scope": [
+        "Replace hardcoded authority-boundary sentence in build_review_payload with prompt_builder.build_system_prompt(role='gemma_reviewer',...)",
+        "Pass num_ctx, num_predict and output_format_text through to builder unchanged",
+        "Ensure PromptBudgetExceeded propagates uncaught with no HTTP call constructed",
+        "Update BuildReviewPayload tests to assert canonical phrases 'certify coverage' and 'mark tasks complete'",
+        "Assert absence of old paraphrase 'close tasks' standalone in prompt",
+        "Keep STATUS/FINDING contract text passed through unchanged"
+      ],
+      "risks": [
+        "Builder API signature mismatch if LRPC-2 delivery differs from assumed params",
+        "Test assertions may be brittle to whitespace changes in builder output",
+        "PromptBudgetExceeded propagation could be masked by upstream caller handling"
+      ],
+      "route_recommendation": "GO_LOCAL",
+      "stop_conditions": [
+        "Builder call introduces new network request or exception handling",
+        "Scope expands beyond build_review_payload and named tests",
+        "STATUS/FINDING contract text is modified"
+      ],
+      "summary": "Scope is bounded to build_review_payload() refactor and two test assertions. Dependencies LRPC-2 are assumed delivered. No auth/security or schema changes.",
+      "unknowns": [
+        "Exact output_format_text content not provided in packet",
+        "Current hardcoded sentence wording not provided for diff verification"
+      ]
+    }
+  },
+  "runtime": {
+    "num_ctx": 65536,
+    "num_predict": 4096,
+    "ollama_url": "http://127.0.0.1:11434",
+    "temperature": 0.0,
+    "timeout_seconds": 180.0
+  },
+  "schema_version": "adr037-local-architect-artifact-v1",
+  "started_at": "2026-08-19T22:56:31.914807Z",
+  "status": "ok",
+  "success": true
+}
