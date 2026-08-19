@@ -2203,6 +2203,50 @@ class SystemPromptCopyTest(unittest.TestCase):
             self.assertNotIn(phrase, prompt_lower)
 
 
+class LRPC4PromptBuilderIntegration(unittest.TestCase):
+    """LRPC-4: cli.py's boundary clause is sourced from prompt_builder /
+    prompt_anchors.ROLE_ANCHORS["local_developer"], not hardcoded.
+    """
+
+    def test_hp1_canonical_local_developer_clause_is_a_verbatim_substring(self):
+        from prompt_anchors import ROLE_ANCHORS
+
+        clause = ROLE_ANCHORS["local_developer"][0].text
+        self.assertIn(clause, rlt.TOOL_CALLING_SYSTEM_PROMPT)
+
+    def test_hp2_output_format_contract_content_is_unchanged(self):
+        prompt = rlt.TOOL_CALLING_SYSTEM_PROMPT
+        for marker in (
+            "{MAX_TOTAL_TURNS} turns total",
+            '{"tool_calls": [{"function"',
+            "write_file",
+            "apply_patch",
+            "finish:",
+            "Call exactly one tool per turn.",
+        ):
+            self.assertIn(marker, prompt)
+
+    def test_ec1_budget_exceeded_propagates_uncaught_before_any_ollama_call(self):
+        import prompt_builder
+
+        with patch("prompt_builder.estimate_text_tokens", return_value=10**9):
+            with self.assertRaises(prompt_builder.PromptBudgetExceeded):
+                prompt_builder.build_system_prompt(
+                    role="local_developer",
+                    num_ctx=rlt.MODEL_CONTEXT_TOKENS,
+                    num_predict=rlt.GENERATION_TOKEN_BUDGET,
+                    output_format_text="irrelevant",
+                )
+
+    def test_ec2_old_hardcoded_boundary_phrasing_does_not_survive(self):
+        # Regression guard: the pre-LRPC-4 hardcoded clause must not
+        # reappear duplicated alongside the canonical anchor.
+        self.assertNotIn(
+            "You may only edit the listed allowed_paths and then call finish",
+            rlt.TOOL_CALLING_SYSTEM_PROMPT,
+        )
+
+
 class T7cB2ScopeCheckGate(unittest.TestCase):
     """T7c-b2: finish must call scope_check.check_scope before acceptance tests."""
 

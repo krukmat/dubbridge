@@ -1216,11 +1216,353 @@ Review artifact: docs/audit/gemma-evidence/LRPC-3-phase2.json
 
 ## LRPC-4 — Refactor `run_local_task.py` to consume the builder
 
-- **Dependencies:** LRPC-2.
-- **Provisional effort:** S. Lower risk than LRPC-5: this script's current
-  boundary clause already tracks its canonical source closely (see plan §
-  Why this exists), so the refactor is expected to be a faithfulness check
-  more than a content fix.
+- **Status: `[x] Done` (2026-08-19).**
+- **Dependencies:** LRPC-2 (satisfied — `prompt_builder.py` delivered).
+- **Final RRI: 42 → Med-high (41-55)** — corrects the ledger's original
+  "Provisional effort: S", the same class of correction LRPC-3 already
+  applied to itself. `scripts/rri.py --cc 3 --D 4 --K 2 --P 3 --T 4 --A 1
+  --X 2 --touches scripts/local-agent/cli.py --touches
+  scripts/local-agent/run_local_task_test.py`. D=4/P=3/K=2/X=2 carried
+  forward from LRPC-2/LRPC-3 for the same review-pipeline-integrity
+  rationale (this consumer script is what actually builds the prompt the
+  local implementer receives). No penalties triggered.
+- **Effort: L** (derived from the Med-high band per the canonical
+  RRI-to-Effort crosswalk).
+
+### Scope
+
+**In scope:** `scripts/local-agent/cli.py`'s `TOOL_CALLING_SYSTEM_PROMPT`
+module-level constant (moved here by LRPC-0b). Replaced the hardcoded
+boundary-clause sentence ("You may only edit the listed allowed_paths and
+then call finish. Any read attempt, command attempt, or unlisted path
+terminates immediately as boundary_violation.") with a call to
+`prompt_builder.build_system_prompt(role="local_developer", num_ctx=...,
+num_predict=..., output_format_text=<rest of the existing prompt text>)`.
+
+**Out of scope (unchanged):** `prompt_anchors.py`/`prompt_builder.py`
+(frozen, LRPC-1/LRPC-2); `session_loop.py`, `audit_record.py`,
+`rust_toolchain.py`; the tool-calling JSON schema / available-tools text
+(no canonical-doc source, stays local, passed through unchanged as
+`output_format_text`); `args.num_ctx`/`args.num_predict` CLI sourcing
+(unchanged — the assembled prompt is still built once at import time
+against this module's own defaults, exactly as the pre-existing hardcoded
+string was; this task replaces *how* the string is built, not *when*); the
+33 pre-existing unrelated test failures in `run_local_task_test.py`
+(documented separately in LRPC-0b — confirmed unchanged, byte-identical
+failing-test-name set, before/after this task).
+
+**Required failure-mode behavior:** the module-level `build_system_prompt`
+call is unguarded — no `try`/`except` wraps it, matching `prompt_builder`'s
+own fail-closed contract and LRPC-3's identical precedent. A budget overrun
+against the module defaults would propagate `PromptBudgetExceeded` uncaught
+at import time.
+
+### Behavioral examples
+
+- **HP-1:** the assembled prompt via
+  `build_system_prompt(role="local_developer", ...)` contains the exact
+  canonical clause text from `prompt_anchors.ROLE_ANCHORS["local_developer"]`
+  as a verbatim substring, including its original two-line wrap.
+- **HP-2:** the rest of the contract (turn-budget placeholder, tool-call
+  JSON schema, available tools, workflow instructions) is unchanged in
+  content, passed through as `output_format_text`.
+- **EC-1:** `PromptBudgetExceeded` propagates uncaught before any Ollama
+  HTTP call is constructed when `num_ctx`/`num_predict` make the assembled
+  prompt exceed its derived budget (verified directly against
+  `prompt_builder.build_system_prompt` with a patched
+  `estimate_text_tokens`, mirroring LRPC-3's EC-1 test shape).
+- **EC-2:** the 60 tests in `run_local_task_test.py` that were passing
+  before this change remain passing, with an identical outcome, after it —
+  verified via a byte-identical diff of the failing-test-name set
+  (before/after), not just a raw pass count.
+
+### Implementation routing evidence
+
+- **Route:** ADR-038 Med-high Architect-refined single-attempt gate.
+  1. Muse Glimmer advisory refinement (`muse-glimmer:30b-q4_K_M`,
+     `docs/audit/med-high/lrpc-4-refinement-artifact.json`): recommended
+     `GO_LOCAL`.
+  2. Primary hash-bound route receipt
+     (`docs/audit/med-high/lrpc-4-primary-receipt.json`): **concurred**
+     `GO_LOCAL`, no downgrade — same class of change as the already-closed
+     LRPC-3 precedent (identical pattern, RRI 42, different consumer
+     script of the same frozen builder), no auth/security, no
+     rights/consent/governance invariant, no schema/migration/release cut,
+     no unresolved ADR decision, no unbounded scope.
+  3. Gate evaluation (`scripts/local-agent/med_high_gate.py`): `{"route":
+     "GO_LOCAL", "reason": "Muse Glimmer and primary both recommend
+     GO_LOCAL."}` — both card-hash and refinement-artifact-sha256 binding
+     checks passed.
+  4. Per `AGENT_WORKFLOW_GUIDE.md § Local-first and Architect-refined
+     implementation routing`, Med-high is cloud-only implementation
+     **regardless** of `GO_LOCAL` — the gate result governs only the
+     evidence trail, not whether local execution is permitted. No local
+     implementation attempt was made.
+  5. ADR-039 fallback-selection checkpoint: `human-select` mode. User
+     selected `claude-sonnet-5` / reasoning effort `high` via
+     `AskUserQuestion`, trigger kind `capability-risk` (the mandatory
+     Med-high cloud takeover is a routine capability-tier requirement of
+     the band, not an operational-unavailability fallback). Recommended
+     alternative was `gpt-5.6-sol`/`high` (frozen matrix default for
+     `capability-risk` + RRI 42); the user's explicit choice overrides the
+     recommendation, which the checkpoint permits. Artifact:
+     `docs/audit/med-high/lrpc-4-fallback-selection.json` (`status:
+     fallback_authorized`).
+- **Implementer:** `claude-sonnet-5` (this session), thinking on (Balanced
+  tier per band default; no stall/failure requiring Opus escalation — this
+  was code-editing work with a fully pre-specified target shape, matching
+  LRPC-3's escalation-guidance rationale for staying on Sonnet).
+
+### Design note: constant construction, not per-invocation build
+
+`TOOL_CALLING_SYSTEM_PROMPT` remains a module-level string constant, built
+once at import time by calling `build_system_prompt` against this module's
+own fixed defaults (`_DEFAULT_MODEL_CONTEXT_TOKENS = 65536`,
+`_DEFAULT_GENERATION_TOKEN_BUDGET = 8192` — duplicated from
+`run_local_task.py`'s `MODEL_CONTEXT_TOKENS`/`GENERATION_TOKEN_BUDGET` to
+avoid a circular import, since `run_local_task.py` already does `import
+cli`). This exactly mirrors the pre-existing behavior: the hardcoded string
+never depended on `args.num_ctx`/`args.num_predict` either. This task
+changes *how* the constant is built (builder call vs. literal string), not
+*when* (still import-time) or *what it depends on* (still fixed module
+defaults, not the real per-invocation CLI args) — both explicitly out of
+scope per the approved task card ("num_ctx/num_predict sourcing:
+unchanged"). Flagged here for visibility, not as a defect: a future task
+could make the prompt genuinely per-invocation-budget-aware if that is ever
+judged necessary, but that is a scope expansion this task does not make.
+
+### Phase 1 — Task-analysis review
+
+`Task-analysis review: gemma docs/audit/gemma-evidence/LRPC-4-phase1.json - PASS`
+
+- Reviewer: `gemma` (`gemma4:26b-a4b-it-qat`, explicit `--model` override —
+  same rationale as LRPC-3: the bare script default resolves to
+  `muse-glimmer:30b-q4_K_M`, the RRI 26-55 intermediate fallback, not the
+  RRI 26-55 primary)
+- Precheck: Ollama restarted for this task ID (`53087` → `5789`), listener
+  confirmed on `:11434`, warm-up probes for both `gemma4:26b-a4b-it-qat`
+  and `muse-glimmer:30b-q4_K_M` returned `done_reason: stop` with non-empty
+  content before the real packets were sent.
+- Command: manual `POST /api/chat`, `num_ctx=65536`, `num_predict=2048`,
+  `temperature=0`, `think=false`
+- Artifact: `docs/audit/gemma-evidence/LRPC-4-phase1.json`
+- Verdict: `PASS` — no blocking findings
+- Findings: one non-blocking note (preserve the newline separating the
+  canonical anchor clause from the turn-budget text when splicing
+  `output_format_text`) — verified satisfied in the implemented output (see
+  Reflection Pass 1 below).
+- Muse Glimmer fallback: not triggered — primary Gemma responded normally.
+- D14 fallback: not triggered.
+- disposition_divergence: `none`.
+
+### Implementation notes
+
+`TOOL_CALLING_SYSTEM_PROMPT` is referenced as a plain module-level string
+by every existing caller and test (`rlt.TOOL_CALLING_SYSTEM_PROMPT`, no
+call syntax) — most notably `run_local_task_test.py`'s
+`SystemPromptCopyTest`/`SystemPromptTurnBudgetInterpolation` classes and
+both `run_local_task.py` `run_loop`/`main` wrappers, which pass it as
+`tool_calling_system_prompt=TOOL_CALLING_SYSTEM_PROMPT` explicitly (the
+`cli.main()` parameter's own default is never exercised in practice).
+Preserving this exact public shape (a string, not a function) was required
+for HP-2/EC-2 without also rewriting every caller — so the builder call
+happens once, at import time, producing the same kind of object
+(`str`) the constant always was. `prompt_builder` is imported directly
+(`from prompt_builder import build_system_prompt`); no new `sys.path`
+wiring was needed since `run_local_task.py` (this module's only production
+importer) already adds both `scripts/` and `scripts/local-agent/` to
+`sys.path` before importing `cli`.
+
+### Reflection log
+
+Required passes: 3 (`42` → `Med-high`)
+
+#### Pass 1 — contract fidelity
+
+- **Draft verdict:** `cli.py`'s `TOOL_CALLING_SYSTEM_PROMPT` now sources its
+  boundary clause via `build_system_prompt(role="local_developer", ...)`;
+  the rest of the original text moved into a new
+  `_TOOL_CALLING_OUTPUT_FORMAT_TEXT` constant passed through unchanged.
+- **Critique findings:** fragment-by-fragment check of every sentence in
+  the original hardcoded string against the assembled output — all 17
+  content fragments present, zero loss; the old literal boundary sentence
+  ("You may only edit the listed allowed_paths and then call finish...")
+  confirmed absent (no duplication); phase-1's newline-preservation note
+  verified satisfied (blank line separates the anchor clause block from
+  the turn-budget paragraph, matching `build_system_prompt`'s own
+  `f"{clause_block}\n\n{output_format_text}"` join).
+- **Revisions applied:** none — no issues found.
+
+#### Pass 2 — failure boundary and import wiring
+
+- **Draft verdict:** the module-level `build_system_prompt(...)` call is
+  unguarded; `run_local_task.py` imports `cli` cleanly with no circular-
+  import error.
+- **Critique findings:** confirmed no `try`/`except` wraps the constant's
+  construction (grep across the file, only pre-existing unrelated
+  try/except blocks at lines 212/395/430/451). Identified one design point
+  worth recording explicitly rather than silently: the assembled prompt is
+  still built once at import time against this module's own fixed
+  defaults, not per-invocation against the real `args.num_ctx`/
+  `args.num_predict` — verified this exactly mirrors pre-existing behavior
+  (git diff confirms the old hardcoded string never referenced `args`
+  either), so this is not a regression, and per-invocation budget-awareness
+  was explicitly out of scope for this task ("num_ctx/num_predict sourcing:
+  unchanged"). Recorded as a design note above rather than silently
+  omitted.
+- **Revisions applied:** none — added the "Design note" section above to
+  make this explicit for future readers; no code change.
+
+#### Pass 3 — test-regression coverage
+
+- **Draft verdict:** 4 new tests added
+  (`LRPC4PromptBuilderIntegration`) covering HP-1/HP-2/EC-1/EC-2; full
+  suite run shows 64 passed (60 original + 4 new) / 33 pre-existing
+  failures, byte-identical failing-test-name set confirmed via `diff`
+  against the pre-change baseline.
+- **Critique findings:** independently re-verified the phase-2 reviewer's
+  major consensus finding (see Peer Reviewer evidence below) was a false
+  positive caused by the reviewer only seeing the diff, not the merged
+  runtime prompt — re-confirmed directly by importing `cli` and checking
+  `boundary_violation`/`allowed_paths`/the canonical clause are all present
+  in `cli.TOOL_CALLING_SYSTEM_PROMPT`. Also re-verified the reviewer's
+  pass-specific minor finding about `rlt.MODEL_CONTEXT_TOKENS`/
+  `rlt.GENERATION_TOKEN_BUDGET` "not being defined" was also a false
+  positive — both symbols are untouched in `run_local_task.py` (the
+  reviewer conflated them with this task's newly-added, differently-named
+  `_DEFAULT_MODEL_CONTEXT_TOKENS`/`_DEFAULT_GENERATION_TOKEN_BUDGET` module
+  constants in `cli.py`, a distinct pair of names). Ran a real end-to-end
+  subprocess CLI invocation (unreachable host, same pattern as LRPC-0b) to
+  confirm the full import/composition chain works for a real process, not
+  just the in-process test harness — reached the first live network call
+  before failing on the deliberately-unreachable host, as expected.
+- **Revisions applied:** none — both re-verified findings disposed as false
+  positives with reproducible evidence (not just re-asserted); the one
+  genuine minor finding (constant duplication across `cli.py`/
+  `run_local_task.py`) was already documented in-code with its rationale
+  (avoiding a circular import) at implementation time, so no separate
+  revision was needed.
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma` (`gemma4:26b-a4b-it-qat`, explicit `--model` override —
+  `make qa-gemma-review` without an override resolves to
+  `DEFAULT_REVIEW_MODEL` = `muse-glimmer:30b-q4_K_M`, the intermediate
+  fallback for this band, not the primary; an initial invocation via the
+  bare Makefile target was caught mid-run against the wrong model and
+  killed before completion, then correctly re-invoked with the explicit
+  `--model gemma4:26b-a4b-it-qat` override — the same class of
+  reviewer-chain correction LRPC-3 already recorded for its own phase-1
+  pass, here caught before the run completed rather than after)
+- Command: `python3 scripts/gemma-code-review.py --model
+  gemma4:26b-a4b-it-qat --num-ctx 65536 --num-predict 4096 --no-think
+  --passes 3 --task-id LRPC-4 --out docs/audit/gemma-evidence/LRPC-4.json
+  <packet scoped to scripts/local-agent/cli.py +
+  scripts/local-agent/run_local_task_test.py, base main>`
+- Passes run / usable: `3/3`
+- Aggregate status: `FINDINGS` (1 consensus major, 3 pass-specific — 1
+  duplicate of the consensus item, 2 distinct minors)
+- Artifact: `docs/audit/gemma-evidence/LRPC-4.json`; receipt
+  `docs/audit/gemma-evidence/LRPC-4-receipt.json` (`verdict:
+  FINDINGS-ACKED`)
+- Findings and disposition:
+  - **Consensus major (all 3 passes) — "boundary enforcement clause
+    removed, may not be re-injected":** the reviewer packet is a diff-only
+    view (no full merged file, no runtime execution), so it could not
+    observe that `build_system_prompt(role="local_developer", ...)`
+    re-injects the equivalent canonical clause at import time. **Disposed
+    as false positive** — independently verified by importing the real
+    `cli` module and confirming `boundary_violation`, `allowed_paths`, and
+    the exact canonical clause text are all present in the assembled
+    `TOOL_CALLING_SYSTEM_PROMPT` (see Reflection Pass 3; this is also
+    exactly what HP-1's own unit test asserts).
+  - **Pass-specific minor — `rlt.MODEL_CONTEXT_TOKENS`/
+    `rlt.GENERATION_TOKEN_BUDGET` "not defined in the diff":** the
+    reviewer conflated `run_local_task.py`'s existing, untouched
+    `MODEL_CONTEXT_TOKENS`/`GENERATION_TOKEN_BUDGET` module constants with
+    this task's new, differently-prefixed `_DEFAULT_MODEL_CONTEXT_TOKENS`/
+    `_DEFAULT_GENERATION_TOKEN_BUDGET` constants added to `cli.py`.
+    **Disposed as false positive** — `grep` confirms both original symbols
+    are untouched in `run_local_task.py:135,148`, and
+    `test_ec1_budget_exceeded_propagates_uncaught_before_any_ollama_call`
+    (which references them) is in the 4 passing new tests.
+  - **Pass-specific minor — constant duplication across files:**
+    genuine, already-acknowledged trade-off. **Accepted, no code change** —
+    the duplication and its rationale (avoiding a circular import, since
+    `run_local_task.py` already does `import cli`) are documented directly
+    in `cli.py`'s own code comment at the point of duplication, written at
+    implementation time before this review ran.
+- Muse Glimmer fallback: not triggered — primary Gemma responded normally
+  across all 3 passes (after the corrected re-invocation).
+- D14 fallback: not triggered.
+- disposition_divergence: `partial` — the reviewer's own severity
+  labels (1 major, 2 distinct minors) were accepted as-recorded, but two of
+  the three underlying claims were independently verified false on
+  reproducible evidence rather than accepted at face value; the third
+  (genuine) minor was accepted with no code change since it was already
+  self-documented.
+- Primary-agent disposition: 2 false positives rejected with reproducible
+  counter-evidence; 1 genuine minor accepted as already-documented,
+  non-blocking.
+
+Review artifact: docs/audit/gemma-evidence/LRPC-4.json
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | assembled prompt contains the canonical `local_developer` clause verbatim | `scripts/local-agent/run_local_task_test.py::LRPC4PromptBuilderIntegration::test_hp1_canonical_local_developer_clause_is_a_verbatim_substring` | passed |
+| HP-2 | Happy path | output-format contract content unchanged, passed through | `scripts/local-agent/run_local_task_test.py::LRPC4PromptBuilderIntegration::test_hp2_output_format_contract_content_is_unchanged` | passed |
+| EC-1 | Edge case | `PromptBudgetExceeded` propagates uncaught before any Ollama HTTP call | `scripts/local-agent/run_local_task_test.py::LRPC4PromptBuilderIntegration::test_ec1_budget_exceeded_propagates_uncaught_before_any_ollama_call` | passed |
+| EC-2 | Edge case | the 60 previously-passing tests remain passing, identical outcome | `scripts/local-agent/run_local_task_test.py::LRPC4PromptBuilderIntegration::test_ec2_old_hardcoded_boundary_phrasing_does_not_survive` (regression guard) + full-suite diff of failing-test names, byte-identical before/after | passed |
+
+Supplementary verification beyond the task's own HP/EC set (Reflection
+Pass 3): full `run_local_task_test.py` suite (64/97 passed, 33
+pre-existing unrelated failures, byte-identical set to the pre-task
+baseline); frozen `prompt_anchors_test.py` + `prompt_builder_test.py` +
+`gemma_code_review_test.py` suites (70/70 passed, no regression);
+`boundary_test.py` + `integration_test.py` (20/20 passed); a real
+end-to-end subprocess CLI invocation reaching the first live network call
+before failing on a deliberately-unreachable host (proves the full
+import/composition chain works for a real process invocation).
+
+### Owner final verification
+
+- Owner: `matias` (via Claude Code orchestrator, session 2026-08-19)
+- Date: `2026-08-19`
+- Statement: I verified LRPC-4's HP-1, HP-2, EC-1, and EC-2 all have
+  concrete unit test evidence that replicates the expected behavior.
+  I independently re-verified both false-positive findings from the Gemma
+  phase-2 review (the "boundary clause removed" major and the "constants
+  not defined" minor) against the actual runtime module output rather than
+  accepting the reviewer's diff-only read at face value, and confirmed the
+  one genuine minor finding (constant duplication) was already
+  self-documented at implementation time. The Med-high ADR-038 route
+  (Muse Glimmer + primary receipt both `GO_LOCAL`, cloud-only
+  implementation per band policy regardless, ADR-039 human-select
+  checkpoint) was followed in full, and the 3-pass Reflection cycle ran
+  regardless of the local-vs-cloud authorship question this band does not
+  leave open.
+- Commands run: `python3 scripts/rri.py --cc 3 --D 4 --K 2 --P 3 --T 4 --A 1
+  --X 2 --touches scripts/local-agent/cli.py --touches
+  scripts/local-agent/run_local_task_test.py`; `python3
+  scripts/local-architect/run_analysis.py --profile med-high-refinement-v1
+  ...` (Muse Glimmer refinement); `python3 scripts/local-agent/med_high_gate.py
+  ...` (route decision); `python3 -m pytest
+  scripts/local-agent/run_local_task_test.py -q --tb=no -rA`; `diff` of
+  failing-test-name sets before/after; `python3 -m pytest
+  scripts/local-agent/prompt_anchors_test.py
+  scripts/local-agent/prompt_builder_test.py
+  scripts/gemma_code_review_test.py scripts/local-agent/boundary_test.py
+  scripts/local-agent/integration_test.py -q`; `python3 -m py_compile
+  scripts/local-agent/cli.py scripts/local-agent/run_local_task_test.py`;
+  `python3 scripts/gemma-code-review.py --model gemma4:26b-a4b-it-qat
+  --num-ctx 65536 --num-predict 4096 --no-think --passes 3 --task-id
+  LRPC-4 ...`; a real subprocess `python3 scripts/local-agent/run_local_task.py
+  --card ... --worktree ... --out ...` smoke invocation.
+
+Reminder: run `/compact` (or `/clear` if this task's context is no longer
+needed) now that LRPC-4 is closed.
 
 ## LRPC-5 — Refactor `run_analysis.py` to consume the builder
 
@@ -1301,7 +1643,27 @@ Motivating bug fix tracked separately: `docs/tasks/gemma-push-reviewer-role.md �
       Gemma review: PASS, 0 findings, no fallback triggered. 3-pass
       Reflection log, 4/4 HP/EC unit tests (+56/56 full suite, +14/14 frozen
       LRPC-1/LRPC-2 suites unaffected); full closure record in § LRPC-3)
-- [ ] LRPC-4
+- [x] LRPC-4 (done 2026-08-19; `scripts/local-agent/cli.py`'s
+      `TOOL_CALLING_SYSTEM_PROMPT` now sources its boundary clause via
+      `prompt_builder.build_system_prompt(role="local_developer", ...)`,
+      mirroring LRPC-3's pattern for the second consumer script — Med-high
+      (RRI 42, corrected from the ledger's stale "Provisional effort: S")
+      ADR-038 route, Muse Glimmer + primary receipt both `GO_LOCAL`,
+      cloud-only implementation per band policy regardless; ADR-039
+      human-select checkpoint, owner chose `claude-sonnet-5`/high over the
+      recommended `gpt-5.6-sol`/high; implemented directly by Claude Code.
+      Phase-2 Gemma review initially mis-invoked against the wrong model
+      (bare `make qa-gemma-review` resolves to the intermediate-fallback
+      `muse-glimmer` binding, not the RRI 26-55 primary) — caught mid-run
+      and corrected with an explicit `--model gemma4:26b-a4b-it-qat`
+      override before completion, the same reviewer-chain-correction
+      pattern LRPC-3 already recorded. Phase-2 verdict: `FINDINGS`, 1
+      consensus major + 1 distinct pass-specific minor, both independently
+      re-verified as false positives against the real runtime module
+      output (not accepted at face value); 1 genuine minor (constant
+      duplication) accepted as already self-documented. 3-pass Reflection
+      log, 4/4 new HP/EC unit tests, byte-identical 60→64-passed/33-failed
+      regression baseline, full closure record in § LRPC-4)
 - [ ] LRPC-5
 - [ ] LRPC-6
 - [ ] LRPC-7

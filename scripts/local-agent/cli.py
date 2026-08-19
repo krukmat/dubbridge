@@ -22,16 +22,25 @@ from audit_record import (
     build_moderate_fallback_checkpoint,
     build_terminal_attempt_packet,
 )
+from prompt_builder import build_system_prompt
 from rust_toolchain import build_default_boundary, build_default_formatter
 from runner_file_tools import ALLOWED_TOOL_NAMES, RunnerFileTools
 from session_loop import BoundaryViolation, MalformedToolCall, run_loop
 
-# Prepended to every card's own spec as the system message. The model is not
-# given native tool-calling (see build_live_chat_fn's docstring) — it must be
-# told, in plain text, the exact JSON shape parse_tool_call() expects, or it
-# replies with ordinary prose and every turn is bounced as a malformed tool
-# call.
-TOOL_CALLING_SYSTEM_PROMPT = """\
+# Mirrors run_local_task.py's MODEL_CONTEXT_TOKENS / GENERATION_TOKEN_BUDGET
+# module-level defaults. Duplicated here rather than imported to avoid the
+# circular import (run_local_task.py already does `import cli`); both sides
+# are the same ADR-036 local-implementer defaults, not two independent
+# guesses.
+_DEFAULT_MODEL_CONTEXT_TOKENS = 65536
+_DEFAULT_GENERATION_TOKEN_BUDGET = 8192
+
+# Output-format contract local to this script's tool-call transport: no
+# canonical-doc source, so it is not sourced from prompt_anchors.py (LRPC-4,
+# docs/tasks/local-role-prompt-canonicalization.md). Only the boundary clause
+# above it (now supplied by build_system_prompt's "local_developer" anchor)
+# has a canonical source.
+_TOOL_CALLING_OUTPUT_FORMAT_TEXT = """\
 You are the bounded implementer for one fully specified task. The operator has \
 already selected the files, requirements, and acceptance commands. Do not \
 explore the repository, choose a different design, or expand the task.
@@ -41,9 +50,7 @@ focused edits followed by `finish`.
 
 The complete contents of every authorized existing file are included below. \
 Use that supplied context directly. You do not inspect the repository or run \
-commands. You may only edit the listed allowed_paths and then call finish. Any \
-read attempt, command attempt, or unlisted path terminates immediately as \
-boundary_violation.
+commands.
 
 You act only by responding with a single JSON object \
 of the exact form:
@@ -73,6 +80,29 @@ formats edited Rust files and runs the full operator-authored acceptance suite.
 Call exactly one tool per turn. Only call finish once you believe the acceptance \
 tests described in your task will pass.
 """
+
+# Prepended to every card's own spec as the system message. The model is not
+# given native tool-calling (see build_live_chat_fn's docstring) — it must be
+# told, in plain text, the exact JSON shape parse_tool_call() expects, or it
+# replies with ordinary prose and every turn is bounced as a malformed tool
+# call.
+#
+# The boundary clause (allowed_paths / boundary_violation) is now sourced
+# from prompt_anchors.ROLE_ANCHORS["local_developer"] via build_system_prompt
+# (LRPC-4), not hardcoded — closing the drift risk this plan was opened to
+# fix (docs/plan/local-role-prompt-canonicalization.md). Built once at
+# import time against this module's own defaults, matching this constant's
+# pre-existing module-level-string shape so every caller/test that reads
+# TOOL_CALLING_SYSTEM_PROMPT as a plain string keeps working unchanged.
+# PromptBudgetExceeded is intentionally not caught here: propagates uncaught
+# to any import-time failure, matching prompt_builder's own fail-closed
+# contract and LRPC-3's identical precedent for gemma-code-review.py.
+TOOL_CALLING_SYSTEM_PROMPT = build_system_prompt(
+    role="local_developer",
+    num_ctx=_DEFAULT_MODEL_CONTEXT_TOKENS,
+    num_predict=_DEFAULT_GENERATION_TOKEN_BUDGET,
+    output_format_text=_TOOL_CALLING_OUTPUT_FORMAT_TEXT,
+)
 
 # Passed as Ollama's `format` request field (constrained/structured-output
 # decoding): confirmed via web research that small/medium local models

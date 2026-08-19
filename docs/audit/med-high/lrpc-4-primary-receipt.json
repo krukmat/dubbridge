@@ -1,0 +1,8 @@
+{
+  "primary_id": "claude-code-orchestrator",
+  "decision": "GO_LOCAL",
+  "card_hash": "5868fc480d25bf7a2cb06d210f379223ba6522032d86cf94bfa3bcde62002a31",
+  "refinement_artifact_sha256": "912c6978c47832ecf0e7d51490833b5f1a6f6fd840800285af56cf8ffab22bd2",
+  "rationale": "Concurs with Muse Glimmer GO_LOCAL. Same class of change as the already-completed LRPC-3 precedent (RRI 42, identical pattern applied to a different consumer script of the same frozen builder). No auth/security, no rights/consent/governance invariant, no schema/migration/release cut, no unresolved ADR decision, no unbounded scope. Per AGENT_WORKFLOW_GUIDE.md, Med-high implementation stays cloud-only regardless of GO_LOCAL -- this receipt governs only the evidence trail, not whether local execution is permitted.",
+  "timestamp": "2026-08-19T23:22:24Z"
+}

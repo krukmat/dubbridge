@@ -1,0 +1,110 @@
+{
+  "error": null,
+  "finished_at": "2026-08-19T23:21:17.025146Z",
+  "generation": {
+    "created_at": "2026-08-19T23:21:16.995029Z",
+    "done": true,
+    "eval_count": 650,
+    "eval_duration": 85083355000,
+    "load_duration": 7043168042,
+    "prompt_eval_count": 1080,
+    "prompt_eval_duration": 6407993000,
+    "think_disabled": true,
+    "thinking_present": false,
+    "thinking_sha256": null,
+    "total_duration": 98553637042
+  },
+  "model": {
+    "expected_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "resolved_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "tag": "muse-glimmer:30b-q4_K_M"
+  },
+  "packet": {
+    "expected_sha256": "5868fc480d25bf7a2cb06d210f379223ba6522032d86cf94bfa3bcde62002a31",
+    "path": "/private/tmp/claude-501/-Users-matias-dubbridge/61f500a3-458c-4cff-b850-caad4b7c3ee2/scratchpad/lrpc4_packet.json",
+    "sha256": "5868fc480d25bf7a2cb06d210f379223ba6522032d86cf94bfa3bcde62002a31"
+  },
+  "profile": "med-high-refinement-v1",
+  "prompt": {
+    "profile": "med-high-refinement-v1",
+    "sha256": "fd9b1f2476e2b5e9fa02a9ea0c29f1dc4bf57e2134b7d170f9295114d570788c",
+    "version": "med-high-refinement-prompt-v1"
+  },
+  "response": {
+    "raw_text_sha256": "036259107e4ce1b344dd3013c491281039cb82060400e9254224c4b82b009c4a",
+    "validated": {
+      "acceptance_tests": [
+        "HP-1 assembled prompt contains exact canonical clause from prompt_anchors.ROLE_ANCHORS['local_developer']",
+        "HP-2 rest of contract unchanged and passed through as output_format_text",
+        "EC-1 PromptBudgetExceeded propagates uncaught before Ollama HTTP call under mocked layer",
+        "EC-2 60 passing tests in run_local_task_test.py remain passing with same 33 pre-existing failures"
+      ],
+      "claims": [
+        {
+          "label": "SUPPORTED",
+          "statement": "LRPC-3 precedent completed identical refactor shape with GO_LOCAL receipt"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Phase1 review PASS with no blocking findings"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "prompt_builder is frozen per LRPC-2"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Required failure behavior is propagation of PromptBudgetExceeded uncaught"
+        }
+      ],
+      "excluded_scope": [
+        "prompt_anchors.py and prompt_builder.py remain frozen",
+        "No changes to tool-calling JSON schema or available-tools text",
+        "No auth/security/rights/consent/governance work",
+        "No schema/migration/release cut",
+        "Do not modify session_loop.py, audit_record.py, rust_toolchain.py"
+      ],
+      "implementation_steps": [
+        "Locate TOOL_CALLING_SYSTEM_PROMPT construction in cli.py",
+        "Extract existing non-anchor prompt tail as output_format_text",
+        "Insert build_system_prompt(role='local_developer', num_ctx=..., num_predict=..., output_format_text=...)",
+        "Verify canonical clause substring appears from prompt_anchors.ROLE_ANCHORS",
+        "Confirm PromptBudgetExceeded is not caught at call site"
+      ],
+      "refined_scope": [
+        "Replace hardcoded boundary clause in scripts/local-agent/cli.py TOOL_CALLING_SYSTEM_PROMPT with build_system_prompt call",
+        "Pass role='local_developer' and existing num_ctx/num_predict/output_format_text through to builder",
+        "Preserve newline separation between anchor clause and turn-budget text per phase1 note",
+        "Ensure PromptBudgetExceeded propagates uncaught before any Ollama HTTP call",
+        "Maintain 60 passing tests in run_local_task_test.py with identical outcome"
+      ],
+      "risks": [
+        "Splicing may drop newline between anchor and turn-budget text",
+        "Accidental catch of PromptBudgetExceeded breaking fail-closed contract",
+        "Hardcoded clause remnants left in prompt causing duplication"
+      ],
+      "route_recommendation": "GO_LOCAL",
+      "stop_conditions": [
+        "Canonical clause not present as substring after build",
+        "PromptBudgetExceeded is caught or suppressed",
+        "Test count deviates from 60 passed / 33 failures baseline"
+      ],
+      "summary": "Refactor cli.py to use prompt_builder.build_system_prompt for the local_developer role while preserving existing output_format_text and failure semantics.",
+      "unknowns": [
+        "Exact num_ctx/num_predict values used at call site in cli.py",
+        "Full content of output_format_text to ensure no unintended drift"
+      ]
+    }
+  },
+  "runtime": {
+    "num_ctx": 65536,
+    "num_predict": 2048,
+    "ollama_url": "http://127.0.0.1:11434",
+    "temperature": 0.0,
+    "timeout_seconds": 180.0
+  },
+  "schema_version": "adr037-local-architect-artifact-v1",
+  "started_at": "2026-08-19T23:19:38.428065Z",
+  "status": "ok",
+  "success": true
+}
