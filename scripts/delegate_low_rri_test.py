@@ -714,7 +714,9 @@ class CliBehavior(unittest.TestCase):
             f.write("# p\n")
             fname = f.name
         try:
-            r = self.run_cli(fname, "--dry-run")
+            with patch.dict(os.environ, {}, clear=False):
+                os.environ.pop("DUBBRIDGE_LOW_RRI_NUM_CTX", None)
+                r = self.run_cli(fname, "--dry-run")
             data = json.loads(r.stdout)
             self.assertEqual(data["options"]["num_ctx"], _mod.DEFAULT_NUM_CTX)
         finally:
@@ -1185,10 +1187,10 @@ class BuildAttemptBundle(unittest.TestCase):
             "risk_notes": [],
         }
         bundle = _mod.build_attempt_bundle(
-            delegation, self.capsule_hash, "gemma4:26b-a4b-it-qat", self.start_ts, self.end_ts
+            delegation, self.capsule_hash, "qwen3.8:27b-mlx", self.start_ts, self.end_ts
         )
         self.assertEqual(bundle["outcome"], "success")
-        self.assertEqual(bundle["implementer_id"], "gemma")
+        self.assertEqual(bundle["implementer_id"], "qwen38")
         self.assertEqual(bundle["diff_ref"], [{"path": "scripts/x.py", "action": "create"}])
         validated = _schema.validate_attempt_bundle(bundle, {self.capsule_hash})
         self.assertEqual(validated["outcome"], "success")
@@ -1202,7 +1204,7 @@ class BuildAttemptBundle(unittest.TestCase):
             "risk_notes": ["ambiguous scope"],
         }
         bundle = _mod.build_attempt_bundle(
-            delegation, self.capsule_hash, "gemma4:26b-a4b-it-qat", self.start_ts, self.end_ts
+            delegation, self.capsule_hash, "qwen3.8:27b-mlx", self.start_ts, self.end_ts
         )
         self.assertEqual(bundle["outcome"], "blocked")
         self.assertEqual(bundle["diff_ref"], [])
@@ -1213,7 +1215,7 @@ class BuildAttemptBundle(unittest.TestCase):
         delegation = {"status": "no_patch", "summary": "nothing to do", "files": [],
                        "test_commands": [], "risk_notes": []}
         bundle = _mod.build_attempt_bundle(
-            delegation, self.capsule_hash, "gemma4:26b-a4b-it-qat", self.start_ts, self.end_ts
+            delegation, self.capsule_hash, "qwen3.8:27b-mlx", self.start_ts, self.end_ts
         )
         self.assertEqual(bundle["outcome"], "success")
         _schema.validate_attempt_bundle(bundle, {self.capsule_hash})
@@ -1222,7 +1224,7 @@ class BuildAttemptBundle(unittest.TestCase):
         delegation = {"status": "patch", "summary": "ok", "files": [],
                        "test_commands": [], "risk_notes": []}
         bundle = _mod.build_attempt_bundle(
-            delegation, None, "gemma4:26b-a4b-it-qat", self.start_ts, self.end_ts
+            delegation, None, "qwen3.8:27b-mlx", self.start_ts, self.end_ts
         )
         self.assertIsNone(bundle)
 

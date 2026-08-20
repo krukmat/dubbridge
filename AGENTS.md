@@ -2,104 +2,101 @@
 
 ## Purpose
 
-This file defines the default task-presentation contract for agents working in the `dubbridge` repository.
+This file defines the default task-presentation contract for agents working
+in the `dubbridge` repository. It is a **summary**, not a replacement for the
+canonical guides. Use it to route into those sources only when the current
+task requires them:
 
-It works together with the canonical agent guides that govern implementation in
-this repository. Read them before executing work:
-
-- `README_AGENT_ORDER.md` — orientation and reading order for agents.
-- `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` — the mandatory plan → tasks → approval →
-  implement workflow.
+- `README_AGENT_ORDER.md` — orientation and reading order.
+- `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` — authoritative for all workflow
+  topics: the mandatory plan → tasks → approval → implement flow, model
+  resolution, and closure gates.
 - `docs/policies/HITL_AUTONOMY_POLICY.md` — human-in-the-loop approval rules.
 - `docs/adr/` — architecture decisions that constrain implementation.
-- `docs/plan/roadmap.md` — the general plan: slice sequence, dependencies, and where
-  each slice/task sits.
+- `docs/plan/roadmap.md` — slice sequence, dependencies, and where each
+  slice/task sits.
 
-For workflow topics, `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` is authoritative.
-`CLAUDE.md` (project and the user's global) remains authoritative only for
-topics not overridden there.
+`CLAUDE.md` (project and global) is authoritative only for topics the
+workflow guide does not cover.
+
+## Context Loading Policy
+
+`AGENTS.override.md` is the always-loaded Codex bootstrap and is a generated,
+byte-exact projection of this file. Do not inline the full workflow guide,
+policies, roadmap, architecture overview, ADR corpus, or task ledgers into it.
+Load canonical detail only when the current task requires it:
+
+- Before presenting or executing staged work, read
+  `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`, the active `docs/plan/<slice>.md`,
+  and `docs/tasks/<slice>.md` completely enough to apply their current gates.
+- Read `docs/policies/HITL_AUTONOMY_POLICY.md` and
+  `docs/policies/RRI_POLICY.md` when approval, autonomy, scoring, routing,
+  fallback, or review evidence is in scope.
+- Read `docs/plan/roadmap.md` for slice status/dependencies and
+  `docs/architecture.md` plus only the applicable files in `docs/adr/` when a
+  task touches product sequencing, runtime boundaries, or architecture
+  decisions.
+- Read task-specific BDD/product/design/config sources only when they
+  materially constrain the requested work. For mobile UI/presentation work,
+  `DESIGN.md` is mandatory.
+
+Do not bulk-load canonical documents merely because they are linked here. A
+link is a routing instruction, not duplicated operative prose; once loaded,
+the canonical source controls any summary conflict.
+
+## Non-negotiable Safety And Closure
+
+- Preserve user-owned worktree changes and keep edits inside the authorized
+  task scope. Never commit, push, delete, overwrite user data, or perform an
+  external write without the applicable explicit approval.
+- Run `scripts/rri.py` before presenting or delegating executable staged work.
+  RRI 26+ requires the workflow guide's approval/review route; RRI 0–25 skips
+  the full card. Any Ollama-backed role requires the per-task restart/precheck.
+- Before reporting completion, run relevant verification, record mandatory
+  review/coverage evidence for development tasks, and synchronize every
+  materially affected plan, task, roadmap, ADR, or status artifact.
+- Do not commit with failing tests. Ask before deletion. Report failures,
+  skipped gates, assumptions, and unresolved risks plainly.
 
 ## Task Presentation Rule
 
-When a user asks an agent to execute a staged task or a task from a task file, the agent must present the next task before execution when the active workflow requires approval.
+Present the next task before execution when the active workflow requires
+approval. Verify current requirements in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
+before presenting or executing any staged task — task-type-specific
+requirements there are mandatory even when not restated here.
 
-The presentation must be concise but operationally complete.
-
-Before presenting or executing any staged task, the agent must verify the
-current requirements in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`. This file is a
-presentation contract summary, not a replacement for the workflow guide.
-Task-type-specific requirements defined there are mandatory even when they are
-not restated verbatim below.
-
-When answering questions about development-task completion or before marking a
-development task done, the agent must explicitly determine whether the task is
-exempt (docs-only, config-only, migration-only, planning, ADR, task-ledger, or
-policy-only) or whether the workflow requires the band-resolved independent
-review before citing unit coverage certification or owner final verification.
+Before marking a development task done, explicitly determine whether it is
+exempt (docs/config/migration/planning/ADR/task-ledger/policy-only) or
+whether the band-resolved independent review is required before citing unit
+coverage certification or owner final verification.
 
 ## Required Task Presentation Format
 
-For RRI 26+ approval presentations, use the six-block **Compact Approval Task
-Card v2** defined by `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and instantiated at
-`docs/templates/compact-approval-task-card.md`:
-
-1. `Decision header` — task identity/status, RRI/band, Effort, approval gate,
-   Codex/Claude recommendations, resolved primary implementation route, cloud
-   takeover trigger/model, penalties, dominant RRI drivers, and link to the
-   full RRI evidence.
-2. `Scope and acceptance` — objective, in scope, out of scope, primary `HP-#` /
-   `EC-#` behaviors for development tasks, evidence, and status sync.
-3. `Agent workflow` — the resolved orchestrator, phase-1 reviewer, human gate,
-   implementer, Reflection/verifier, phase-2 reviewer, and closure owner. State
-   each responsibility, gate, and fallback.
-4. `Diagrams` — one agent-workflow diagram; development tasks add one technical
-   scope diagram. Never exceed two diagrams.
-5. `References` — task, plan, and only materially governing documents.
-6. `Approval checkpoint` — required wording or explicit bounded user waiver.
-
-Do not copy the full task definition or RRI variable table into the approval
-card. Those remain in the linked task ledger/RRI artifact. RRI 0–25 tasks still
-skip the full approval card under the Low-band route.
-
-`Evidence to emit` and `Status artifacts to sync` remain part of the execution
-contract; summarize them in the card and keep their full paths in the task ledger.
+For RRI 26+, use the six-block **Compact Approval Task Card v2** defined by
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Step 3` and instantiated at
+`docs/templates/compact-approval-task-card.md`: Decision header, Scope and
+acceptance, Agent workflow, Diagrams, References, Approval checkpoint (full
+block contents in the workflow guide). Do not copy the full task definition
+or RRI variable table into the card — those stay in the linked task
+ledger/RRI artifact. RRI 0–25 tasks skip the full approval card under the
+Low-band route.
 
 ## Live per-task todo list (Claude Code and Codex)
 
-Block 3 (`Agent workflow`) is a frozen snapshot taken at presentation time.
-Every orchestrator — Claude Code and Codex alike — must additionally keep a
-**live, per-task todo/checklist** that mirrors block 3's rows and stays
-current as the task actually moves through phases: seed it before
-implementation starts, keep normally one entry `in_progress` at a time, flip
-an entry to `completed` only once that phase's own gate has passed, and keep
-a `BLOCKED` or escalated entry visible (never silently dropped) until it is
-resolved, user-waived, or reported blocked. If a phase reroutes mid-task
-(local implementer escalates to cloud, a reviewer falls back down its chain),
-update that entry's named responsible agent/model to the actual participant.
-
-Use whichever native mechanism the orchestrator has — Claude Code's
-`TodoWrite` tool, Codex's own plan/task tracking — as long as it renders an
-equivalent visible list naming the resolved responsible agent per phase, not
-a generic role label. This list is a transparency/tracking artifact, not an
-approval or review gate: an entry marked `completed` still requires that
-phase's own evidence to exist. RRI 0–25 and docs/config/migration/ADR/plan/
-task-ledger/policy-only tasks use the reduced phase set defined in
-`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Live per-task phase todo list`,
-which is authoritative for the full contract.
-
-For any task that will invoke an Ollama-backed local role, prepend the explicit
-`Restart Ollama + local-stack precheck — <resolved orchestrator>` item before
-the first local-model call. This restart is mandatory once per task even when
-the server is healthy; retries and later local phases of the same task reuse the
-restarted server unless it becomes unavailable or wedged. The authoritative
-sequence and task-boundary rules are in
-`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Mandatory workflow before
-implementing`, Step 0.
+Every orchestrator must keep a **live, per-task todo/checklist** mirroring
+the card's `Agent workflow` block, kept current as the task moves through
+phases — seeded before implementation, normally one entry `in_progress` at a
+time, flipped to `completed` only once that phase's gate has passed, with a
+`BLOCKED`/escalated entry kept visible until resolved. Full contract, phase
+sets by band, and the mandatory `Restart Ollama + local-stack precheck`
+prepend for any task invoking a local role:
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Live per-task phase todo list` and
+§ Mandatory workflow before implementing, Step 0.
 
 ## Complexity And Model Guidance
 
-**When RRI has been computed**, the `Complexity` field in the task presentation must
-use the RRI band name — not the Effort-based mapping below:
+**When RRI has been computed**, the `Complexity` field must use the RRI band
+name:
 
 | RRI range | Complexity to present |
 |---|---|
@@ -108,145 +105,101 @@ use the RRI band name — not the Effort-based mapping below:
 | 41–55 | Med-high |
 | 56–70 | Complex |
 
-The Effort → Complexity mapping is a **fallback** used only when no RRI is available:
+Fallback only when no RRI is available: `Effort: S` → `Low`, `M` → `Medium`,
+`L` → `High`.
 
-- `Effort: S` -> `Complexity: Low`
-- `Effort: M` -> `Complexity: Medium`
-- `Effort: L` -> `Complexity: High`
-
-Codex cloud-takeover defaults and Claude Code capability resolution both
-resolve via the dated tables in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
-(§ "Current Codex cloud-takeover resolution" and § "Current Claude Code
-capability resolution") — this file does not carry its own copy of the
-concrete model names, so there is exactly one place to re-verify against
-official vendor guidance at task-presentation time. Task-local model pins
-override those defaults until explicitly updated.
-
-Escalation guidance summary: use `claude-opus-5` only when the task is
-long-context heavy, synthesis-heavy, or repeatedly stalls under
-`claude-sonnet-5`; if a task is primarily code editing, repo navigation,
-shell execution, or deterministic implementation work, keep the band's
-default model.
-
-If a task file already defines explicit complexity or model guidance, that task-local guidance overrides this file.
+Codex and Claude Code model resolution both live in
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` (§ "Current Codex cloud-takeover
+resolution", § "Current Claude Code capability resolution") — this file
+carries no copy of concrete model names, so there is exactly one place to
+re-verify against vendor guidance. Task-local model pins override those
+defaults until explicitly updated. If a task file already defines explicit
+complexity/model guidance, it overrides this file.
 
 ## Human-selected fallback checkpoint
 
-Before any terminal local fallback can invoke D14 or a cloud implementer, emit the
-ADR-039 `fallback-selection-v1` artifact bound to the exact fallback packet.
-`human-select` is the default: without a complete human model, reasoning-effort,
-and selector choice, stop as `awaiting_fallback_selection`. `preauthorized` is
-allowed only when those exact fields were frozen in the approved task card or
-preflight; validate the receipt against the current packet, then use exactly its
-selected model and effort. This bounded checkpoint neither waives HITL nor changes
-RRI, reviewer independence, D14's read-only Balanced role, repair budgets, or task
-scope. See ADR-039 and `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` for the full
-protocol.
+Before any terminal local fallback invokes D14 or a cloud implementer, emit
+the ADR-039 `fallback-selection-v1` artifact bound to the exact fallback
+packet. `human-select` is the default — without a complete human
+model/effort/selector, stop as `awaiting_fallback_selection`.
+`preauthorized` is allowed only when those fields were frozen in the
+approved card or preflight. Neither waives HITL nor changes RRI, reviewer
+independence, D14's read-only Balanced role, repair budgets, or task scope.
+See ADR-039 and `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Human-selected
+fallback checkpoint`.
 
 ## Pseudocode Rule
 
-Include pseudocode only when at least one is true:
-
-- the task has branching logic
-- the task transforms data across multiple stages
-- the task defines a reusable workflow that benefits from an execution sketch
-- the implementation risk is easier to evaluate through a structured outline
-
-Do not add pseudocode for trivial file creation, simple edits, or direct command execution.
+Include pseudocode only for branching logic, multi-stage data
+transformations, a reusable workflow that benefits from an execution sketch,
+or risk that's easier to evaluate as a structured outline. Skip it for
+trivial file creation, simple edits, or direct command execution.
 
 ## Diagram Rule
 
-Every approval card includes a compact agent-workflow Mermaid diagram. For
-development tasks, also include a technical-scope diagram showing the relevant
-flow, boundary, dependency direction, state transition, or ownership split.
-
-For non-development tasks, add no second diagram unless at least one is true:
-
-- the task changes architecture boundaries
-- the task spans multiple services, crates, workers or repositories
-- the task introduces a pipeline, state machine or dependency flow
-- the task is easier to approve when shown as a compact technical flow
-
-Never exceed two diagrams. Simple documentation-only tasks normally use only the
-agent-workflow diagram.
+Every approval card includes a compact agent-workflow Mermaid diagram;
+development tasks add a technical-scope diagram (flow, boundary, dependency
+direction, state transition, or ownership split). Non-development tasks add
+a second diagram only if the task changes architecture boundaries, spans
+multiple services/crates/workers/repos, introduces a pipeline/state machine,
+or is materially easier to approve as a compact flow. Never exceed two
+diagrams; simple docs-only tasks normally use only the agent-workflow one.
 
 ## Related Documents Rule
 
-The agent must list only the documents that materially constrain the task. Avoid dumping broad reading lists when only a few files are directly relevant.
-
-Priority order:
-
-1. task file
-2. linked plan
-3. workflow/policy files
-4. ADRs
-5. prompt files
-6. configs/templates
-
-For mobile UI / presentation tasks under `mobile/`, include root `DESIGN.md` in
-`Related documents` when it materially constrains the visual work. Treat it as the
-mobile design-intent contract, while plan/task files remain authoritative for
-behavior, acceptance criteria, and verification.
+List only documents that materially constrain the task, in priority order:
+task file, linked plan, workflow/policy files, ADRs, prompt files,
+configs/templates. For mobile UI/presentation tasks under `mobile/`, include
+root `DESIGN.md` when it materially constrains the visual work — it governs
+design intent; plan/task files remain authoritative for behavior, acceptance
+criteria, and verification.
 
 ## Approval Boundary
 
-If the current workflow says the agent must wait for approval before executing a task, the presentation must end with a direct approval checkpoint.
-
-Recommended wording:
+When the workflow requires approval before executing a task, end the
+presentation with:
 
 `Execution has not started. Approve this task to proceed.`
 
-If no approval is required under the active workflow, the agent may continue under
-the gate defined by `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and
-`docs/policies/RRI_POLICY.md`.
-
-Under the canonical RRI mapping in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and
-`docs/policies/RRI_POLICY.md`, `Effort: S` normally corresponds to the **RRI 0–25**
-Low band. Those tasks skip the full approval presentation; use bounded local
-Qwen Developer delegation through Ollama only for eligible simple code patches, and
-otherwise handle them directly as the primary agent while still following the
-low-band gate.
+If no approval is required, continue under the gate defined by
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and `docs/policies/RRI_POLICY.md`.
+`Effort: S` normally corresponds to the **RRI 0–25** Low band, which skips
+the full approval presentation — use bounded local Qwen Developer delegation
+only for eligible simple code patches, otherwise handle directly as the
+primary agent under the low-band gate.
 
 ## Band-routed peer review report lines
 
-Every task card must include a phase-1 line, and every development closure report
-must include a phase-2 line. The reviewer token is resolved by RRI band at report
-time. Docs-only, config-only, migration-only, ADR, plan, task-ledger, and
-policy-only tasks record `n/a` with the exemption stated for phase 2.
+Every task card needs a phase-1 line; every development closure report needs
+a phase-2 line, reviewer resolved by RRI band. Docs/config/migration/ADR/
+plan/task-ledger/policy-only tasks record `n/a` for phase 2.
 
 ```
 Task-analysis review: <gemma|muse-glimmer|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
 Code-solution review: <gemma|muse-glimmer|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
 ```
 
-- `muse-glimmer` — primary reviewer for RRI 0–25; intermediate fallback for RRI 26–55.
-- `gemma` — primary reviewer for RRI 26–55; intermediate fallback for RRI 0–25.
-- `codex | claude` — RRI 56+, resolved from caller identity
-  (`claude-code → codex`, `codex → claude`, others → `claude`).
-- `d14` — final fallback when the preceding reviewer chain is unusable.
-- `BLOCKED` — non-pass verdict or the band's full reviewer/fallback chain is
-  unavailable. Stops presentation (phase 1) or closure (phase 2) until revised,
-  user-waived, or reported blocked.
-
-See `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review` for the
-full contract.
-
-For every band, D14 must first use a responsive provider different from the
-primary orchestrator's provider. Same-provider D14 is allowed only as a
-recorded degraded fallback after the cross-provider attempt is unusable; see
-the authoritative guide's `Context-isolated adjudicator (D14)` section.
+`muse-glimmer` — primary for RRI 0–25, intermediate fallback for 26–55.
+`gemma` — primary for 26–55, intermediate fallback for 0–25. `codex|claude`
+— RRI 56+, resolved from caller identity (`claude-code → codex`,
+`codex → claude`, others → `claude`). `d14` — final fallback when the
+preceding chain is unusable, always via a responsive cross-provider reviewer
+first (same-provider only as a recorded degraded fallback). `BLOCKED` —
+non-pass verdict or the whole chain unavailable; stops presentation/closure
+until revised, user-waived, or reported blocked. Full contract:
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review`.
 
 ## Development Closure Rule
 
-For development-task closure, do not describe certification, final verification,
-or status flips as the first completion step. First determine whether the task
-must pass the mandatory code-solution review gate resolved by the canonical RRI
-band table under `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
-and `docs/policies/HITL_AUTONOMY_POLICY.md`, then describe the remaining closure
+Do not describe certification, final verification, or status flips as the
+first completion step. First determine whether the task must pass the
+mandatory code-solution review gate resolved by the RRI band table in
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and
+`docs/policies/HITL_AUTONOMY_POLICY.md`, then describe the remaining closure
 blocks in order.
 
 ## Language
 
-Agent-facing repository instructions must be written in English.
-
-User-facing presentation may be adapted to the user's language, but task metadata, filenames and model identifiers should remain exact.
+Agent-facing repository instructions: English. User-facing presentation may
+be adapted to the user's language; task metadata, filenames, and model
+identifiers stay exact.

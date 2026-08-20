@@ -15,30 +15,9 @@ Roadmap phases use a single canonical `S-xxx` identifier. Older `S0`/`P*`/`T*`
 labels remain as legacy aliases in source plans and historical task ledgers until
 those files are renamed, but new roadmap references should use `S-xxx`.
 
-Last consolidated: 2026-05-31 after the roadmap/ADR/architecture review in
-`docs/audit/2026-05-31-roadmap-adr-architecture-consolidation.md` (including the
-same-day ADR-traceability follow-up G1–G4 in that file). Updated the same day
-after `S-020`/H1 completion. Updated 2026-06-03: scoped `S-030` around environment
-separation and fail-closed configuration (see "S-030 Strategy" below, principle
-added, and X21), then synchronized after `S-030` Task 2 and Task 3 completion.
-Updated 2026-06-03 again: added plan/task ledgers for `S-040` (first-party session
-gateway / BFF) and introduced `S-050` (first-party mobile client, React Native + Expo)
-as an `S-040`-gated consumer
-(ADR-024). Updated 2026-06-03 once more after
-`S-030` Task 5 moved local Compose under `infra/local/` and wired the opt-in `app`
-profile to fail-closed local config. Updated again on 2026-06-03 after `S-030` Task 6
-aligned the local Rust image with `rust-toolchain.toml` and added the committed-config
-secret guard. Updated 2026-06-07 after `S-050` T0–T5 completion: the mobile app is now
-implemented, tested, and reflected in the architecture/task status documents.
-Updated 2026-06-18 to add `S-125` HLS playback delivery and ADR-032 so prepared
-`.m3u8` packages are served through an explicit backend boundary instead of being
-hidden inside later publication work. Updated 2026-08-20 to track the Tiger Style
-adoption evaluation (`docs/proposals/tiger-style-adaptation-evaluation.md`) as a
-cross-cutting item pending owner resolution of its three decision points before any
-plan/task ledger is drafted. Updated 2026-08-20 to add cross-cutting item X27
-tracking the proposed-but-unapproved Gemma Push Reviewer role
-(`docs/plan/gemma-push-reviewer-role.md`, revision r2, 2026-08-19) as scheduled
-next-up work with no fixed date.
+Last consolidated 2026-08-20. This file intentionally keeps only current status,
+dependencies, and links — full consolidation changelog, design rationale, and
+detailed per-slice history live in `docs/audit/roadmap-history.md`.
 
 ## Status legend
 - ✅ Done · 🟡 In progress · ⬜ Not started · 📄 Planned (plan exists, not built)
@@ -122,303 +101,104 @@ Plan: `docs/plan/h1-governance-atomicity-hardening.md`
 | **S-020** | Ingestion hardening: pending-upload durability, cleanup, coverage, finalize atomicity, durable audit | S-010 | ✅ done | `docs/plan/tuning-hardening.md`, `docs/plan/h1-governance-atomicity-hardening.md` |
 | **S-030** | Environment separation + deployment runtime wiring | S-000, S-010 | ✅ done — Phase 0 and Phase 1 complete; later env-driven runtime behavior stays deferred to S-080+ | `docs/plan/s-030-environment-separation.md`, `docs/tasks/s-030-environment-separation.md` |
 | **S-040** | First-party session gateway / BFF | S-000, external authorization-server contract | ✅ done — browser/cookie + mobile-safe gateway transport delivered; transport superseded by ADR-031/S-200 (gateway → transparent relay) | `docs/plan/s-040-session-gateway-bff.md`, `docs/tasks/s-040-session-gateway-bff.md`, `docs/tasks/s-040-t7-mobile-session-handoff.md` (ADR-024 → ADR-031) |
-| **S-050** | First-party mobile client (React Native + Expo) | S-040-T7; S-070 recommended for production device login | ✅ done — T0–T5 complete as of 2026-06-07; auth transport superseded by ADR-031/S-200 (opaque `session_ref` → backend-issued bearer JWT) | `docs/plan/s-050-mobile-client.md`, `docs/tasks/s-050-mobile-client.md` (ADR-024 → ADR-031) |
-| **S-055** | Maestro screenshot / visual-audit suite | S-050 | ✅ done — V1–V8 complete as of 2026-06-12; two-phase Maestro suite captures `01_auth_login` + `02_home`; `npm run screenshots` wired | `docs/plan/s-055-maestro-screenshot-suite.md`, `docs/tasks/s-055-maestro-screenshot-suite.md` |
-| **S-060** | First-party mobile asset lifecycle: `GET /assets`, mobile list, upload→rights→finalize, BDD/Maestro, mock `/api/*` | S-050, S-055 infra, S-010 | ✅ done — T0–T6 + X-P3F-1/X-P3F-2 complete as of 2026-06-12; `GET /assets/{id}` ownership-enforced; `postMultipart` uses `expo-file-system/legacy` uploadAsync; SC-INGEST-1/SC-INGEST-2 Maestro flows complete (6 phases in runner) | `docs/plan/s-060-mobile-asset-lifecycle.md`, `docs/tasks/s-060-mobile-asset-lifecycle.md` |
+| **S-050** | First-party mobile client (React Native + Expo) | S-040-T7; S-070 recommended for production device login | ✅ done — T0–T5 complete; auth transport superseded by ADR-031/S-200 (opaque `session_ref` → backend-issued bearer JWT) | `docs/plan/s-050-mobile-client.md`, `docs/tasks/s-050-mobile-client.md` (ADR-024 → ADR-031) |
+| **S-055** | Maestro screenshot / visual-audit suite | S-050 | ✅ done — Maestro suite captures login + home screenshots; `npm run screenshots` wired | `docs/plan/s-055-maestro-screenshot-suite.md`, `docs/tasks/s-055-maestro-screenshot-suite.md` |
+| **S-060** | First-party mobile asset lifecycle: `GET /assets`, mobile list, upload→rights→finalize, BDD/Maestro, mock `/api/*` | S-050, S-055 infra, S-010 | ✅ done — mobile asset lifecycle (list/upload/rights/finalize) delivered with Maestro ingest coverage | `docs/plan/s-060-mobile-asset-lifecycle.md`, `docs/tasks/s-060-mobile-asset-lifecycle.md` |
 | **S-070** | Production identity hardening (JWKS discovery, automatic key rotation, subject mapping if needed) | S-000 | ⬜ no plan yet | ADR-023 |
-| **S-080** | Object storage switchover (MinIO/S3 behind `StorageAdapter`) | S-010-T4 | ✅ done 2026-06-18 — T0–T6 complete; S3-compatible adapter, bounded-memory upload path, orphan reconciliation, and drift-gate false-positive fix delivered | `docs/plan/s-080-object-storage-switchover.md`, `docs/tasks/s-080-object-storage-switchover.md` |
-| **S-090** | Platform ingest (owner-authorized download: first supported provider) | S-000-T2, S-010, S-020; S-080 prudent before heavy writes | 🟡 REPLANNED 2026-05-31 — foundation T0/T0c/T1/T2 done; S-040/S-070/S-050 done; later connector work deferred | `docs/plan/stream-recording-ingest.md` |
+| **S-080** | Object storage switchover (MinIO/S3 behind `StorageAdapter`) | S-010-T4 | ✅ done — S3-compatible adapter, bounded-memory upload path, orphan reconciliation delivered | `docs/plan/s-080-object-storage-switchover.md`, `docs/tasks/s-080-object-storage-switchover.md` |
+| **S-090** | Platform ingest (owner-authorized download: first supported provider) | S-000-T2, S-010, S-020; S-080 prudent before heavy writes | 🟡 REPLANNED 2026-05-31 — foundation T0/T0c/T1/T2 done; S-040/S-070/S-050 done; connector work (`C4`–`C7`) deferred | `docs/plan/stream-recording-ingest.md` |
 | **S-095** | Stream recording ingest (RTMP/SRT live capture) | S-090 foundation | ⬜ deferred — built only for live-broadcast clients | `docs/plan/stream-recording-ingest.md` |
-| **S-100** | Collaborative localization workspace: orgs, roles, projects, target languages, org authz, historical web prototype, mobile project surfaces | S-000, S-010, S-040, S-050; coordinates with S-055/S-060 | ✅ done — T0–T7 complete as of 2026-06-12; workspace API, authz, mobile projects, and a historical web prototype delivered. The web artifacts were retired by S-105. | `docs/plan/s-100-collaborative-workspace.md`, `docs/tasks/s-100-collaborative-workspace.md` |
-| **S-105** | Mobile workspace parity and authenticated web-console retirement | S-100, S-050, S-060 | ✅ done — T0–T3 complete 2026-06-13; organization selection, members, target languages, compliance navigation, mobile-only BDD evidence, and web removal delivered | `docs/plan/s-105-mobile-workspace-parity.md`, `docs/tasks/s-105-mobile-workspace-parity.md` |
-| **S-110** | Mobile compliance & consent center: audit/rights viewer, voice-consent ledger, fail-closed TTS precondition | S-105, S-010 audit/rights data | ✅ done — T0–T3, T5, and T6 complete 2026-06-13; T4 web dashboard cancelled and superseded by the complete mobile center; X11 closed at contract level | `docs/plan/s-110-compliance-consent-center.md`, `docs/tasks/s-110-compliance-consent-center.md` |
-| **S-115** | Mobile UX foundation & design-system adoption: theme tokens + primitives, single "ink + teal" palette (ADR-029 mobile surface), safe-area correctness, consistent state/touch/accessibility, behavior- and testID-preserving migration | S-105, S-110 | ✅ done — T0–T5 complete 2026-06-13; design-system (tokens + 7 primitives) + SafeAreaProvider + all 13 screens migrated; a11y pass + Maestro syntax valid; 10 suites / 117 tests green | `docs/plan/s-115-mobile-ux-foundation.md`, `docs/tasks/s-115-mobile-ux-foundation.md` |
-| **S-120** | Media preparation (ffprobe metadata + HLS transcode) | S-010, S-080 | ✅ done 2026-06-19 — T1–T5c complete; preparation schema/lineage, probe persistence, HLS persistence, finalize enqueue, worker execution, and evidence-driven readiness gating delivered | `docs/plan/s-120-media-preparation.md`, `docs/tasks/s-120-media-preparation.md` |
-| **S-125** | HLS playback delivery (authorized `.m3u8` + segment serving) | S-120, S-080, S-160 review/publication gate contract | ✅ done 2026-06-22 — T0–T5c complete; playback grants, rewritten manifests, short-lived scoped segment references, and ADR-032 acceptance are delivered and the canonical docs/status artifacts are synchronized | `docs/plan/s-125-hls-playback-delivery.md`, `docs/tasks/s-125-hls-playback-delivery.md` (ADR-032) |
-| **S-127** | Mobile review player surface: playback API client, `<VideoPlayer>` primitive (expo-video), `ReviewDetailScreen` v2 with embedded HLS player, `AssetDetailScreen` Play entry | S-125, S-115, S-190 | ✅ done 2026-06-24 — T0/T0b/T1/T2b/T2a/T3/T4/T5 complete; 159 tests green; typecheck clean; Maestro playback.yaml authored; BDD mapping synchronized; Maestro runtime execution pending Java-capable environment | `docs/plan/s-127-mobile-review-player.md`, `docs/tasks/s-127-mobile-review-player.md` (ADR-032, ADR-029) |
-| **S-130** | Processing / ASR (transcription) | S-100 target-language intent, S-120 | ✅ done 2026-07-19 — T1–T5 complete; domain/migration/repository, preparation-ready enqueue, ASR worker dispatch + readiness gating, Python `faster-whisper` worker, and canonical BDD/docs sync are delivered; plan/task evidence committed and `check-roadmap-drift` passes | `docs/plan/s-130-asr-transcription.md`, `docs/tasks/s-130-asr-transcription.md` |
-| **S-140** | Subtitle generation | S-130 | ✅ done 2026-07-30 — T0/T1a/T1b-i/T1b-ii/T1c/T1d/T2a/T2b-i/T2b-ii/T3a/T3b/T3c-i/T3c-ii/T3c-iii/T5a/T5b-a/T6 complete; canonical BDD + roadmap/plan/task sync landed 2026-07-30. `T3c-ii` closed via owner-waived phase-2 review; `T3c-iii` added explicit Redis CI gating + review evidence; `T3c-iv` and the remaining `X-S-160-3` / `T5b` wiring-version follow-up were explicitly deferred beyond slice closeout and require future re-scoping | `docs/plan/s-140-subtitle-generation.md`, `docs/tasks/s-140-subtitle-generation.md` |
-| **S-150** | Translation + dubbing (TTS / voice cloning) | S-140, S-110 consent precondition | 🟡 planned 2026-08-16 — T0, T1a, T1b, T1c-i, T1c-ii, the T2a seam extraction, T2b-i, all three T2b-ii delivery-repository children, `T2c-i`, `T2c-ii`, `T2c-iii`, `T2c-iv-a0`, `T2c-iv-b`, and `T2c-iv-c` are complete; `T2c-iv-a` has its contract cutover implemented and reviewed but stays `[~]` pending the still-open `T2c-vi-a` runtime cut. The slice now has product-code domain types, four artifact kinds, per-localization statuses, exact current-generation pointer/claim storage, fail-closed repositories, durable per-target dispatch identities, atomic claim/outbox persistence, guarded pending-to-enqueue-failed and pending-to-acknowledged transitions, versioned subtitle/translation job contracts with deterministic initial UUIDv5 identity, exact persisted Subtitle replay resolution, a local-sized 286-line job-contract module, a subtitle producer that builds `SubtitleJob` with only the route-free asset/project constructor (`T2c-iv-b`, RRI 32, zero-diff formal closure of the 2026-08-15 workspace-compile compatibility patch, local-first `qwen3.6:35b-a3b` run + Gemma phase-1/phase-2 review), and a durable localization fan-out service that resolves the exact persisted subtitle and independently persists/dispatches one `TranslationJob` per eligible configured target without letting one target's persistence failure corrupt another's (`T2c-iv-c`, RRI 39 Moderate, corrected from a provisional RRI 49/Med-high estimate; whole-task local-agent route exhausted its 2-attempt budget — attempt 1 missed module registration/an import path, repair 1 degraded into a non-functional stub, repair 2 hit `budget_exhausted` — after which, per an owner directive to maximize local-model usage and keep the cloud role orchestration-only, the remaining work was decomposed into three Low-band (RRI 0-25) subtasks delegated to local Nemotron via `scripts/delegate-low-rri.py`, with a handful of individually-diagnosed one/two-line type fixes applied directly only after the delegation tooling itself failed to produce a usable before-after diff twice; Gemma phase-2 review PASS, 0 findings). On 2026-08-13 the owner rejected the unused legacy-review compatibility path; the resulting T2c-iv surface scored RRI 63 and is decomposed into `T2c-iv-a0/a/b/c`, followed by the narrowed `T2c-v` Redis adapter and decomposed `T2c-vi` runtime/cleanup cutover. `T2c-v` (Redis translation queue adapter) is next — still carries its own separate, unresolved "Redis-topic decision" parking note, independent of the S-230 scope question below — followed by the `T2c-vi-a/b` runtime cutover. Queue, worker, and TTS/runtime work remain pending; T8 tracks non-blocking future voice-consent hardening. **Partially reopened 2026-08-16 (second pass) for the S-230 POC window**, reversing the same-day initial parking: `T2c-v`(50), `T2c-vi-a`(51), `T2c-vi-b`(31), `T3a`(42), `T3b`(44), `T3c`(53) are back in scope, tracked and sequenced as `S-230-T3b` (`docs/tasks/s-230-poc-v1-digitalocean.md`), after the owner reviewed and explicitly overrode the S-230 plan's own recommendation against reopening them (`docs/plan/s-230-poc-v1-digitalocean.md` §"The market-audience gap, examined"). `T4`(26), `T5`(68–70, mandatory decomposition), `T6`(71, mandatory decomposition), and `T7` — the TTS/dubbed-audio surface — remain parked/out of scope, blocked on the ADR-028 consent seam. `S-230-T3b` runs as a parallel track outside S-230's original ten-day critical path, not a hard gate on `S-230-T6`. | `docs/plan/s-150-translation-dubbing.md`, `docs/tasks/s-150-translation-dubbing.md`, `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md`, `workers/translation-worker-py`, `workers/tts-worker-py` |
-| **S-160** | Human review & publication workspace: review tasks, decisions, publication gate, notifications, complete mobile surface | S-105, S-115; forward-integrates S-140/S-150 derived artifacts | ✅ done 2026-06-13 — T0–T8 complete; review state machine, publication gate, notifications, complete mobile reviewer surface, Maestro fixtures, and docs sync are delivered | `docs/plan/s-160-review-publication-workspace.md`, `docs/tasks/s-160-review-publication-workspace.md` |
+| **S-100** | Collaborative localization workspace: orgs, roles, projects, target languages, org authz, historical web prototype, mobile project surfaces | S-000, S-010, S-040, S-050; coordinates with S-055/S-060 | ✅ done — workspace API, authz, and mobile projects delivered; the historical web prototype was retired by S-105 | `docs/plan/s-100-collaborative-workspace.md`, `docs/tasks/s-100-collaborative-workspace.md` |
+| **S-105** | Mobile workspace parity and authenticated web-console retirement | S-100, S-050, S-060 | ✅ done — org selection, members, target languages, compliance navigation, and web removal delivered | `docs/plan/s-105-mobile-workspace-parity.md`, `docs/tasks/s-105-mobile-workspace-parity.md` |
+| **S-110** | Mobile compliance & consent center: audit/rights viewer, voice-consent ledger, fail-closed TTS precondition | S-105, S-010 audit/rights data | ✅ done — compliance/consent center delivered; T4 web dashboard cancelled and superseded by the mobile center; X11 closed at contract level | `docs/plan/s-110-compliance-consent-center.md`, `docs/tasks/s-110-compliance-consent-center.md` |
+| **S-115** | Mobile UX foundation & design-system adoption: theme tokens + primitives, single "ink + teal" palette (ADR-029 mobile surface), safe-area correctness, consistent state/touch/accessibility, behavior- and testID-preserving migration | S-105, S-110 | ✅ done — design-system (tokens + primitives) + safe-area + accessibility migration delivered across all mobile screens | `docs/plan/s-115-mobile-ux-foundation.md`, `docs/tasks/s-115-mobile-ux-foundation.md` |
+| **S-120** | Media preparation (ffprobe metadata + HLS transcode) | S-010, S-080 | ✅ done — probe/HLS persistence, finalize enqueue, worker execution, and evidence-driven readiness gating delivered | `docs/plan/s-120-media-preparation.md`, `docs/tasks/s-120-media-preparation.md` |
+| **S-125** | HLS playback delivery (authorized `.m3u8` + segment serving) | S-120, S-080, S-160 review/publication gate contract | ✅ done — playback grants, rewritten manifests, and short-lived scoped segment references delivered; ADR-032 accepted | `docs/plan/s-125-hls-playback-delivery.md`, `docs/tasks/s-125-hls-playback-delivery.md` (ADR-032) |
+| **S-127** | Mobile review player surface: playback API client, `<VideoPlayer>` primitive (expo-video), `ReviewDetailScreen` v2 with embedded HLS player, `AssetDetailScreen` Play entry | S-125, S-115, S-190 | ✅ done — playback API client, `<VideoPlayer>` primitive, and review/detail player surfaces delivered; Maestro `playback.yaml` authored, runtime execution pending a Java-capable environment | `docs/plan/s-127-mobile-review-player.md`, `docs/tasks/s-127-mobile-review-player.md` (ADR-032, ADR-029) |
+| **S-130** | Processing / ASR (transcription) | S-100 target-language intent, S-120 | ✅ done — ASR domain/repository, preparation-ready enqueue, worker dispatch + readiness gating, and the Python `faster-whisper` worker delivered | `docs/plan/s-130-asr-transcription.md`, `docs/tasks/s-130-asr-transcription.md` |
+| **S-140** | Subtitle generation | S-130 | ✅ done — subtitle generation pipeline delivered; `T3c-iv` and the `X-S-160-3`/`T5b` wiring-version follow-up explicitly deferred beyond slice closeout | `docs/plan/s-140-subtitle-generation.md`, `docs/tasks/s-140-subtitle-generation.md` |
+| **S-150** | Translation + dubbing (TTS / voice cloning) | S-140, S-110 consent precondition | 🟡 in progress — T0 through `T2c-iv-c` and the ADR-040 module-split foundation are done; `T2c-v` (Redis translation queue adapter) is next, then the `T2c-vi-a/b` runtime cutover. `T3a`–`T3c` (text-only cross-language subtitle translation) are reopened and tracked as `S-230-T3b`. `T4`–`T7` (TTS/dubbed audio) remain parked, blocked on the ADR-028 consent seam. Full history: `docs/audit/roadmap-history.md` § S-150. | `docs/plan/s-150-translation-dubbing.md`, `docs/tasks/s-150-translation-dubbing.md`, `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md`, `workers/translation-worker-py`, `workers/tts-worker-py` |
+| **S-160** | Human review & publication workspace: review tasks, decisions, publication gate, notifications, complete mobile surface | S-105, S-115; forward-integrates S-140/S-150 derived artifacts | ✅ done — review state machine, publication gate, notifications, and the complete mobile reviewer surface delivered | `docs/plan/s-160-review-publication-workspace.md`, `docs/tasks/s-160-review-publication-workspace.md` |
 | **S-170** | Human review runtime (HITL execution over generated artifacts) | S-125, S-140, S-150, S-160 | ⬜ no plan yet | — |
 | **S-180** | Publication runtime | S-125, S-170, S-160 publication gate | ⬜ no plan yet | — |
-| **S-200** | Mobile credential login with backend-issued JWT (FenixCRM parity) | S-000, S-040, S-050 (re-architects their auth) | ✅ done 2026-06-18 — T0–T7 complete; ADR-031 Accepted; HS256 issuer + alg pinning (T1), user_account migration + repo (T2), bcrypt + AuthService (T3), apps/api auth handlers (T4), gateway relay (T5), mobile bearer auth runtime (T6), BDD + Maestro + docs sync (T7) | `docs/plan/s-200-mobile-jwt-credential-auth.md`, `docs/tasks/s-200-mobile-jwt-credential-auth.md` (ADR-031) |
-| **S-205** | Mobile DESIGN.md adoption: agent-readable mobile design-intent contract, lint command, workflow integration, and playback-surface audit | S-115, S-190, S-127 | ✅ done 2026-06-25 — root `DESIGN.md` authored; `make qa-design` added as an opt-in alpha gate; mobile UI workflow now reads `DESIGN.md`; playback audit completed with two narrow follow-up patches delivered as separate tasks | `docs/plan/mobile-design-md-adoption.md`, `docs/tasks/mobile-design-md-adoption.md` |
-| **S-210** | Mobile product experience (dashboard, ergonomics, media-first) | S-115, S-190, S-160, S-127 | ✅ done 2026-06-28 — T0–T9 complete; Home became a live dashboard, bottom action bars landed, technical ids were demoted, and screenshot-backed polish closed the post-S-190 audit | `docs/plan/s-210-mobile-product-experience.md`, `docs/tasks/s-210-mobile-product-experience.md` |
-| **S-215** | Mobile streaming-style organization & continuity pass | S-210, S-125, S-160 | ✅ done 2026-06-29 — T1–T8 complete; continuity-led Home, library IA, media-first detail/review context, playback/publication reliability, palette recalibration, screenshot evidence, and docs sync are delivered | `docs/plan/s-215-mobile-streaming-organization-pass.md`, `docs/tasks/s-215-mobile-streaming-organization-pass.md` |
-| **S-220** | Mobile dark theme — Netflix-style dark canvas | S-215 | ✅ done 2026-06-29 — T0–T5 complete; dark canvas `#141414` + Netflix-red `#E50914` accent shipped; WCAG AA certified; component and screen audit clean; Maestro screenshot baseline refreshed; follow-ups X-S-220-1–3 deferred | `docs/plan/s-220-mobile-dark-theme.md`, `docs/tasks/s-220-mobile-dark-theme.md` |
-| **S-230** | POC v1 deployment (Digital Ocean): production images, migration runner, S3/Spaces credential wiring, real readiness probes, production deployment descriptor, first deploy + end-to-end smoke | S-010, S-030 Phase 3, S-080, S-120, S-125, S-130, S-140, S-160, S-200 | 🟡 planned 2026-08-17 — T0, T1, T1b, T2, and T3 done. T4 was decomposed before implementation from one RRI 47 Med-high cloud task into 17 independently-scored Low/S children (`T4a`–`T4q`, RRI 10–25) by owner direction because Codex cloud tokens are unavailable; eligible one-path development patches route to local `qwen3.8:27b-mlx`, with Muse Glimmer independent review, while T4p/T4q remain primary-orchestrator operational/docs work. T3b, the T4 child chain, T5–T7, T7b, T7c, T8, and T9 remain pending. Deployment-enablement slice, not a product slice: it takes the already-closed upload → rights → HLS → ASR → subtitles → review → publication → playback path and makes it publicly runnable on a Digital Ocean droplet. Owner-scoped 2026-08-16, amended same day (second pass): `S-150-T2c-v` through `T3c` (text-only cross-language subtitle translation) is reopened and tracked as `T3b`, after the owner reviewed and explicitly overrode this plan's own recorded recommendation against doing so; `S-150-T4`–`T7` (TTS/dubbed audio) remain parked/out of scope, blocked on ADR-028. Deployment target is droplet + production Compose (not App Platform); `apps/gateway` ships as-is with its request/response buffering accepted as recorded debt and bounded by a lowered POC upload ceiling. Adds no new application technology beyond what `T3b`'s S-150 children already depend on (Redis, already in use for 3 other queues). A 2026-08-16 owner-requested coverage review confirmed that **nothing from `S-070`, `S-090`, `S-095` or `S-150` needs to move into this slice** — none of the four mounts a route or registers a worker on the POC path — but it added two blocking gaps that the first pass missed: **G10**, `apps/api` formerly enqueued preparation jobs into an in-process `Mutex<Vec<_>>` while the worker-runner consumed from Redis (closed by `T1b`); and **G11**, `config/production.toml` carries no `[auth]` block while `AppConfig::validate()` requires one in production-like environments, so all three binaries fail closed at boot until five `DUBBRIDGE_AUTH__*` variables are injected (assigned to `T5`). On 2026-08-16 the owner promoted two secondary findings into planned work: **G12**, the mobile app has no registration surface although the backend route exists (now `T7b`, droppable, with T6's direct API fallback); and **G13**, tokens default to 24h with no refresh path and stored sessions need an expiry check (now `T7c`). | `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md` |
+| **S-200** | Mobile credential login with backend-issued JWT (FenixCRM parity) | S-000, S-040, S-050 (re-architects their auth) | ✅ done — ADR-031 accepted; HS256 issuer + alg pinning, `user_account` migration, gateway relay, and mobile bearer auth runtime delivered | `docs/plan/s-200-mobile-jwt-credential-auth.md`, `docs/tasks/s-200-mobile-jwt-credential-auth.md` (ADR-031) |
+| **S-205** | Mobile DESIGN.md adoption: agent-readable mobile design-intent contract, lint command, workflow integration, and playback-surface audit | S-115, S-190, S-127 | ✅ done — root `DESIGN.md` authored; `make qa-design` added as an opt-in gate; mobile UI workflow now reads `DESIGN.md` | `docs/plan/mobile-design-md-adoption.md`, `docs/tasks/mobile-design-md-adoption.md` |
+| **S-210** | Mobile product experience (dashboard, ergonomics, media-first) | S-115, S-190, S-160, S-127 | ✅ done — Home became a live dashboard, bottom action bars landed, and screenshot-backed polish closed the post-S-190 audit | `docs/plan/s-210-mobile-product-experience.md`, `docs/tasks/s-210-mobile-product-experience.md` |
+| **S-215** | Mobile streaming-style organization & continuity pass | S-210, S-125, S-160 | ✅ done — continuity-led Home, library IA, media-first detail/review context, and palette recalibration delivered | `docs/plan/s-215-mobile-streaming-organization-pass.md`, `docs/tasks/s-215-mobile-streaming-organization-pass.md` |
+| **S-220** | Mobile dark theme — Netflix-style dark canvas | S-215 | ✅ done — dark canvas `#141414` + Netflix-red `#E50914` accent shipped; WCAG AA certified | `docs/plan/s-220-mobile-dark-theme.md`, `docs/tasks/s-220-mobile-dark-theme.md` |
+| **S-230** | POC v1 deployment (Digital Ocean): production images, migration runner, S3/Spaces credential wiring, real readiness probes, production deployment descriptor, first deploy + end-to-end smoke | S-010, S-030 Phase 3, S-080, S-120, S-125, S-130, S-140, S-160, S-200 | 🟡 in progress — T0–T3 done; `T4` decomposed into 17 Low/S children (`T4a`–`T4q`) routed to local `qwen3.8:27b-mlx` + Muse Glimmer review; `T3b` (reopened S-150 subtitle-translation work), the T4 child chain, and `T5`–`T9` remain pending. Deployment-enablement slice: makes the already-closed pipeline publicly runnable on a Digital Ocean droplet; adds no new technology beyond Redis (already in use). Full history incl. gap findings G10–G13: `docs/audit/roadmap-history.md` § S-230. | `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md` |
 
 `S-040` must be planned before building a first-party browser, operator-console, or
-mobile auth flow. It does not block S-080 or S-090.
+mobile auth flow; it does not block S-080 or S-090.
 
-**Product-layer phases.** `S-100`, `S-105`, `S-110`, and `S-160` turn the governed pipeline
-into a team-usable product. `S-100` is the collaboration foundation: orgs, roles,
-projects, and target languages. `S-105` establishes mobile as the only authenticated
-product UI (ADR-029) and retires the historical web prototype. `S-110` is intentionally
-placed before `S-150` because TTS/dubbing must fail closed without voice consent.
-`S-160` can be built against fixtures before `S-140/S-150` land, but its canonical
-runtime role is to supply the review/publication gate that `S-170/S-180` adopt.
-`S-125` supplies the shared HLS playback-delivery boundary those runtime slices use
-for review preview and publication playback; it is not a public web/player UI.
-These product-layer phases introduced architecture decisions that are now captured
-by ADR-027, ADR-028, ADR-029, ADR-030, and ADR-032.
+**Product-layer phases** (`S-100`, `S-105`, `S-110`, `S-160`) turn the governed
+pipeline into a team-usable product: `S-100` is the collaboration foundation
+(orgs/roles/projects/languages); `S-105` establishes mobile as the only
+authenticated product UI (ADR-029); `S-110` gates TTS/dubbing on voice consent
+ahead of `S-150`; `S-160` supplies the review/publication gate `S-170`/`S-180`
+adopt; `S-125` supplies the shared HLS playback-delivery boundary those runtime
+slices use. Captured by ADR-027, ADR-028, ADR-029, ADR-030, ADR-032.
 
-`S-050` (mobile) is a first-party interactive client and therefore a hard consumer of
-the `S-040` gateway (ADR-024): the device must terminate in the same session-gateway
-trust boundary as the web app and must not hold long-lived tokens. `S-040` was
-completed for the browser/cookie transport on 2026-06-04; `S-050-T0` verified the
-delivered surface was browser-oriented only. `S-040-T7` is the unblock, decomposed in
-`docs/tasks/s-040-t7-mobile-session-handoff.md`. T7.1 (contract definition) is
-complete as of 2026-06-04: five gateway surfaces are specified (`GET
-/auth/login?return_uri`, mobile callback redirect with one-time handoff code,
-`POST /auth/mobile/session` redemption, `ANY /api/*` and `POST /auth/logout`
-with `X-Dubbridge-Session` header), ADR-024 invariants (no access or refresh
-token on device, no parallel auth path) are enumerated, and implementation notes
-for T7.2–T7.4 are recorded. T7.2 is now complete: the gateway validates
-registered mobile `return_uri` values, carries the mobile intent through pending
-OAuth state, and branches callback completion between the browser cookie path and
-the mobile `handoff_code` redirect with no cookies set. T7.3 is now complete:
-the gateway exposes `POST /auth/mobile/session`, redeems handoff codes into
-opaque `session_ref` values, accepts `X-Dubbridge-Session` on `/api/*`, and
-rejects mismatched cookie/header transports fail-closed. T7.4 is now complete:
-mobile refresh returns the rotated opaque session reference in
-`X-Dubbridge-Session`, mobile logout accepts the same transport, and a
-deterministic end-to-end mobile lifecycle is covered by tests. Session renewal and
-rotation are gateway-owned: mobile carries only the current opaque reference and
-persists a rotated replacement when the gateway returns one. Stack decision
-(2026-06-03): React Native + Expo. The mobile
-app is now implemented in `mobile/` with gateway-backed auth, navigation, asset
-list/detail surfaces, and deterministic Jest coverage. A planned
-mobile-hardening sub-slice, **S-055** (Maestro screenshot / visual-audit suite,
-`docs/plan/s-055-maestro-screenshot-suite.md` + `docs/tasks/s-055-maestro-screenshot-suite.md`)**,
-was gated on **S-050-T4** and approved with Option A (ADR-024 handoff-code bootstrap,
-no JWT on device) + sequencing S-080 (defer until after T4). That gate is satisfied.
-The sub-slice is complete: test IDs, screenshot env, mock OAuth fixture,
-handoff-code seed, dev-gated E2E bootstrap, both Maestro flow files, the
-`seed-and-run.sh` runner with report sanitization, and the `npm run screenshots`
-alias are all delivered. Both phases capture their screenshots (`01_auth_login.png`,
-`02_home.png`). S-055 is done as of 2026-06-12.
+`S-050` (mobile) consumes the `S-040` gateway as the transparent relay delivered
+by S-200 (ADR-031): the device stores the backend-issued HS256 bearer JWT in secure
+storage, and the gateway forwards authenticated requests to `apps/api`. The former
+ADR-024 opaque-session transport is superseded historical context. `S-040-T7` and
+`S-055` are complete. Full narrative: `docs/audit/roadmap-history.md`.
 
-## S-030 Strategy: environment separation & fail-closed configuration
+## S-030, S-090/S-095 design rationale
 
-`S-030` makes the local ↔ production boundary explicit and hard to confuse. Today
-`crates/config` compiles local defaults into the binary (`AppConfig::from_env` falls
-back to `localhost` Postgres/Redis and `/tmp` storage), so a misconfigured production
-process boots silently against development resources. `S-030` inverts this to the same
-fail-closed posture as the rights gate (ADR-008): wrong configuration must abort
-startup, not degrade silently.
-
-Design (recommended: typed layered config; no Kubernetes assumed at this stage):
-
-- One explicit discriminator `DUBBRIDGE_ENV ∈ {local, staging, production}` with no
-  compiled default; an unknown or missing value fails closed at startup.
-- Resolution layers: code defaults (universal only) ← `config/default.toml` ←
-  `config/<env>.toml` (committed, non-secret) ← `DUBBRIDGE_*` env vars (secrets and
-  per-deploy overrides). The former in-code `localhost`/`/tmp` fallbacks move into
-  `config/local.toml`; they never live in the binary again.
-- A single typed schema + `validate()` is read by `apps/api` and `apps/worker-runner`
-  alike and, in production-like environments, rejects localhost datastores, the
-  local-fs storage backend, absent auth (ADR-023), and human-pretty log format
-  (must be JSON, ADR-018).
-- Storage backend selection becomes env-driven (`build_adapter` switches on a backend
-  selector). The selector boundary is `S-030`; the MinIO/S3 adapter itself is `S-080` (X9).
-- Observability format/exporter become env-driven (`init_tracing` parameterized):
-  local pretty, production JSON + exporter (ADR-018).
-- `infra/` is split so Compose is local infrastructure only (a banner states it is
-  not the production descriptor); the production deployment descriptor is a separate
-  artifact added when a first deploy target exists.
-
-Phasing (now vs later):
-
-- Phase 0 (now): `DUBBRIDGE_ENV` + a typed `load()` + `validate()`; move local
-  defaults to `config/local.toml`; add `config/default.toml` and `.env.example`;
-  api/worker switch to fail-closed load. This portion is complete and closes the
-  compiled-default leak (core of X18).
-- Phase 1 (now): reorganize to `infra/local/`; Compose = infra + app under a profile
-  with a non-production banner. The file move, app-profile env wiring, and Rust image
-  alignment to `rust-toolchain.toml` are complete.
-- Phase 2 (couples with `S-080`): env-driven storage backend selector (X9) and env-driven
-  observability format/exporter (ADR-018).
-- Phase 3 (later): production deployment descriptor + secret-manager injection
-  boundary; owner-credential secret-store decision (X20).
-- Phase 4 (deferred): orchestration (k8s/Helm or Nomad), telemetry collector, config
-  service — only if multiple live environments or teams justify it. Not assumed now.
-
-The layered fail-closed configuration & environment-separation decision is recorded
-in ADR-026. The owner-credential secret-store mechanism (X20) remains an open decision
-and warrants its own ADR when authored (X3).
-
-## Why Platform Ingest Is S-090 (And Live Recording Is S-095)
-
-**Replan 2026-05-31 (ADR-025).** The real `S-090` intake use case is owner-authorized
-**platform download**: the content owner provides scoped credentials to their own
-platform account and DubBridge downloads the owner's content on their behalf. This
-is the primary `S-090` path. RTMP/SRT live capture
-is demoted to a deferred sub-slice (**S-095**) for the minority of clients who produce
-live broadcasts.
-
-Intake (in either mode) widens the funnel and has no dependency on media preparation
-or ML stages, so it belongs before `S-120`–`S-180`. Hard dependencies of the **primary
-platform-download path**:
-
-- `S-000` verified principals for Axum ingest endpoints (ADR-023).
-- `S-010`'s reusable finalize path (`finalize_ingestion_core`) and `StorageAdapter`
-  boundary (ADR-006, ADR-021) — reused producer-agnostically.
-- A per-connector engine behind `crates/connectors` (`PlatformConnector` trait),
-  mirroring the `crates/media` pure-builder / IO-executor boundary (ADR-025).
-- Owner-credential handling stored by reference and redacted (ADR-025, ADR-018).
-- H1 atomicity and durable-audit hardening before the reused finalize path expands.
-- The completed YouTube spike (`S-090-C2`), which ruled out YouTube as the pinned
-  backend-download v1 provider, and a new provider-capability spike (`S-090-C4`) before
-  the first connector is built.
-
-The **deferred `S-095` live-recording path** additionally needs the FFmpeg-subprocess
-recorder (ADR-019), the segment/lifecycle model and T0c output contract (ADR-020),
-and RTMP/SRT capture-edge authentication (ADR-022). Its domain + migration foundation
-(T1/T2) is already built and shared with the primary path.
-
-`S-080` remains a prudent predecessor because intake is the first sustained, high-volume
-writer. The trait boundaries make `S-090` technically possible without `S-080`, but building
-retention and upload against the production-like MinIO/S3 adapter avoids rework.
-
-## S-090 Internal Task Map (REPLANNED 2026-05-31, ADR-025)
-
-The `S-090` ledger is `docs/tasks/stream-recording-ingest.md`. The primary intake use
-case is owner-authorized **platform download**, not RTMP/SRT live capture. The
-FFmpeg recorder (ex-T3–T8) is deferred to **S-095**.
-
-```text
-Shared foundation (DONE, reused by both paths):
-  T0  reusable S-010 finalize core
-  T0b duplicate audit type removed (via T1-T5)
-  H1  atomicity + durable-audit gate closed
-  T0c (S-095 only) HLS fMP4 staging + assembled MP4 contract fixed
-  T1  domain: recording aggregate, ArtifactKind, audit generalization
-  T2  migrations: recording_sessions + audit generalization
-
-PRIMARY S-090 — platform ingest (internal S-090-C1 -> S-090-C7):
-  S-090-C1 connector trait boundary (crates/connectors) + PlatformIngestSession domain
-  S-090-C2 YouTube retrieval-mechanism spike (gate) -> DONE 2026-06-03
-  S-090-C3 provider-path replan after YouTube spike -> DONE 2026-06-03
-  S-090-C4 first supported-provider capability spike (gate) -> DEFERRED for this phase
-  S-090-C5 first supported-provider connector v1 -> DEFERRED for this phase
-  S-090-C6 PlatformIngestJob + download->bridge wiring + platform_ingest_sessions migration -> DEFERRED for this phase
-  S-090-C7 API endpoints (/ingests/platform) -> DEFERRED for this phase
-
-S-095 — live recorder (DEFERRED): ex-T3 recorder crate, ex-T4 jobs/storage,
-  ex-T5 bridge, ex-T6 API, ex-T7 worker, ex-T8 tests. Marked [~] REPLANNED.
-```
-
-`T9` (docker-compose Rust pin) is independent low-priority housekeeping.
+`S-030`'s environment-separation strategy (phasing, config-layering design) and the
+rationale for splitting intake into primary `S-090` platform-download vs. deferred
+`S-095` live-recording (including the `S-090` internal task map) are archived in
+`docs/audit/roadmap-history.md`. The operative rule from that work is already
+captured above under Governing principles and ADR-025/ADR-026.
 
 ## Cross-cutting obligations
 
 | Item | Obligation | Owner / next action |
 |------|------------|---------------------|
 | **X1** | Reconcile `crates/audit` duplicate type | ✅ closed by T1 Task 5; H1 now owns central audit emission semantics |
-| **X2** | Align docker-compose Rust pin with toolchain policy | ✅ closed by `S-030` Task 6 on 2026-06-03 (`infra/local/docker-compose.yml` now tracks `rust-toolchain.toml` = `stable`) |
+| **X2** | Align docker-compose Rust pin with toolchain policy | ✅ closed by `S-030` Task 6 (`infra/local/docker-compose.yml` tracks `rust-toolchain.toml` = `stable`) |
 | **X3** | Backfill remaining open ADR numbers only when real decisions are identified | layered fail-closed configuration & environment separation now recorded as ADR-026; owner-credential secret-store (X20) still open, ADR to be authored |
 | **X4** | Persist pending upload sessions across API restarts | ✅ closed by T1 Task 1 |
 | **X5** | Add TTL/cleanup for abandoned pending uploads | ✅ closed by T1 Task 2 |
 | **X6** | Enforce the 90% coverage gate | ✅ closed by T1 Task 3 |
-| **X7** | Prevent partial relational finalization and cleanup-vs-finalize blob loss | ✅ closed by H1 on 2026-05-31 |
-| **X8** | Centralize durable audit + tracing emission; do not use fire-and-forget governance audit | ✅ closed by H1 on 2026-05-31 |
+| **X7** | Prevent partial relational finalization and cleanup-vs-finalize blob loss | ✅ closed by H1 |
+| **X8** | Centralize durable audit + tracing emission; do not use fire-and-forget governance audit | ✅ closed by H1 |
 | **X9** | Add production object-store adapter, canonical storage-owned key construction, orphan reconciliation, and a streaming/presigned strategy that avoids buffering large uploads in API memory | `S-080` |
-| **X10** | Resolve recording segment/upload/asset cardinality before recorder implementation | ✅ closed by `S-090` Task 0c on 2026-05-31 |
+| **X10** | Resolve recording segment/upload/asset cardinality before recorder implementation | ✅ closed by `S-090` Task 0c |
 | **X11** | Enforce consent and voice-cloning permissions before TTS derivatives | `S-110` defines the gate; `S-150` T0 ratified enqueue-time + dispatch-time enforcement but runtime implementation remains pending; `S-180` observes it at publication |
 | **X12** | Preserve lineage and quality-gate transitions for every derived artifact | `S-120`–`S-180` |
 | **X13** | Plan first-party browser auth through a session gateway / BFF | ✅ closed by `S-040` |
 | **X14** | Plan JWKS rotation and production identity-provider integration | `S-070` |
 | **X15** | Keep RTSP, HLS pull, WebRTC, and per-segment publication as explicit live-recording follow-ups | post-`S-095` backlog |
-| **X16** | Move reusable finalize logic from `apps/api` into an app-neutral shared boundary | ✅ closed by H1 on 2026-05-31 |
-| **X17** | Enforce append-only rights rows and strict decoding of stored governance states | ✅ closed by H1 on 2026-05-31 |
-| **X18** | Wire container service DNS, database/Redis URLs, auth bootstrap, health checks, and version policy so documented local startup is reproducible | ✅ closed by `S-030` Tasks 2-6 on 2026-06-03 for the documented local startup path |
+| **X16** | Move reusable finalize logic from `apps/api` into an app-neutral shared boundary | ✅ closed by H1 |
+| **X17** | Enforce append-only rights rows and strict decoding of stored governance states | ✅ closed by H1 |
+| **X18** | Wire container service DNS, database/Redis URLs, auth bootstrap, health checks, and version policy so documented local startup is reproducible | ✅ closed by `S-030` Tasks 2-6 for the documented local startup path |
 | **X19** | Enforce fail-closed source authentication (RTMP stream key / SRT passphrase, credential redaction, `rtmp`/`srt` scheme allow-list) before any capture begins | `S-095` (domain T1 done, migration T2 done, recorder ex-T3, API ex-T6); ADR-022 |
 | **X20** | Decide the secrets-store mechanism for owner-provided platform credentials (storage by reference, scope minimization, redaction); no dedicated ADR yet | `S-090-C1`–`S-090-C6` + `S-030` config/secret split; ADR-025 |
-| **X21** | Make runtime configuration fail-closed and environment-explicit: no compiled environment-specific defaults; `DUBBRIDGE_ENV` required; production rejects localhost datastores, local-fs storage, absent auth, and pretty logs; committed non-secret per-env profiles separated from injected secrets; Compose is local-infra-only (ADR-026) | ✅ closed by `S-030` Tasks 1-6 on 2026-06-03 |
-| **X22** | Define the org/membership/role authorization model: multi-tenant boundary, RBAC scopes layered over ADR-023 principal, org-scoped API enforcement | ✅ closed by ADR-027 (S-100-T0b, 2026-06-12); org-membership guard + `workspaces:*` scopes delivered in S-100-T2/T3 |
+| **X21** | Make runtime configuration fail-closed and environment-explicit: no compiled environment-specific defaults; `DUBBRIDGE_ENV` required; production rejects localhost datastores, local-fs storage, absent auth, and pretty logs; committed non-secret per-env profiles separated from injected secrets; Compose is local-infra-only (ADR-026) | ✅ closed by `S-030` Tasks 1-6 |
+| **X22** | Define the org/membership/role authorization model: multi-tenant boundary, RBAC scopes layered over ADR-023 principal, org-scoped API enforcement | ✅ closed by ADR-027 (S-100-T0b); org-membership guard + `workspaces:*` scopes delivered in S-100-T2/T3 |
 | **X-S-100-3** | Non-hierarchical role extensions: current linear role order (`Viewer < Reviewer < Editor < Admin < Owner`) may not fit all future governance patterns; flat RBAC or per-resource role overrides deferred | open — revisit before S-110 membership model adds consent-specific roles |
 | **X-S-100-4** | Configure external authorization server to issue `workspaces:write` and `workspaces:read` scopes; tests currently stub the verifier | open — required before workspace endpoints are usable in production deployment |
-| **X23** | Define the review/decision/publication gate model: append-only decision ledger, fail-closed publication precondition (ADR-008 spirit), S-140/S-150 artifact contract | ✅ closed by ADR-030 (S-160-T0b, 2026-06-13); S-160-T1a/T1b/T1c/T2 consume it |
-| **X24** | Define the voice-consent ledger and TTS precondition: append-only consent rows, evidence stored by reference (ADR-025 spirit), fail-closed gate before any TTS derivative; closes **X11** at the contract level | ✅ closed by ADR-028 (S-110-T0b, 2026-06-12); S-110-T1/T2 implemented it; `S-150-T0` ratified two-check runtime enforcement, while implementation remains pending behind S-150-T4/T5 |
+| **X23** | Define the review/decision/publication gate model: append-only decision ledger, fail-closed publication precondition (ADR-008 spirit), S-140/S-150 artifact contract | ✅ closed by ADR-030 (S-160-T0b); S-160-T1a/T1b/T1c/T2 consume it |
+| **X24** | Define the voice-consent ledger and TTS precondition: append-only consent rows, evidence stored by reference (ADR-025 spirit), fail-closed gate before any TTS derivative; closes **X11** at the contract level | ✅ closed by ADR-028 (S-110-T0b); S-110-T1/T2 implemented it; `S-150-T0` ratified two-check runtime enforcement, while implementation remains pending behind S-150-T4/T5 |
 | **X-S-150-1** | Future voice-consent hardening: consent-proof evidence lifecycle, automated real-stack checks, speaker/voice-profile scope, expiry/revocation effects on existing derivatives, and provider-side material governance | `S-150-T8` future High-RRI parent; coordinate `X-S-110-2`, `X-S-110-3`, X20, and S-180. Non-blocking for S-150 T1-T7 and does not reopen X24/X11 unless an approved future ADR changes the contract. |
-| **X25** | Define and implement HLS playback delivery for prepared `.m3u8` manifests and segments without exposing raw object-store keys | ADR-032 created; implement as `S-125` before S-170/S-180 runtime consumers |
-| **X26** | Tiger Style adoption for the Rust/Python backend: evidence-based gap analysis complete (`docs/proposals/tiger-style-adaptation-evaluation.md`), 13 requirements (R1–R13) drafted. Blocked on three owner decision points before a plan/task ledger can be drafted: **D1** always-on production assertions in Rust (touches `crates/domain`/`ingestion`/`playback` broadly, not a localized patch), **D2** tightening clippy's `too_many_lines` from 100 toward ~70 lines, **D3** promoting opt-in Postgres/Redis/MinIO integration tests to mandatory CI. R13 (green-field Tiger-Style acceptance criteria for `translation-worker-py`/`tts-worker-py`) has no decision dependency and can be folded into S-150 `T4`–`T7` whenever that work unblocks, independent of D1–D3. | Owner sign-off on D1 (at minimum) required before `docs/plan/tiger-style-adaptation.md` is drafted; re-evaluate this item once resolved or if repo state drifts materially from the evaluation's evidence base |
-| **X27** | Gemma Push Reviewer role: post-pipeline advisory audit of the latest GitHub push (run metadata, job status, logs, annotations, artifacts), triaged into RRI-scored candidate tasks with pure-Low eligible incidents dispatched to Gemma Developer. Plan is drafted and audit-review ready (`docs/plan/gemma-push-reviewer-role.md`, revision r2, 2026-08-19) with its task ledger at `docs/tasks/gemma-push-reviewer-role.md`, but **not approved for implementation**. Precedent: `docs/adr/ADR-034-gemma-process-audit-and-reviewer-reconciliation.md`. Scheduled next-up, no fixed date. | Owner approval required before starting `docs/tasks/gemma-push-reviewer-role.md`; no blocking dependency identified |
+| **X25** | Define and implement HLS playback delivery for prepared `.m3u8` manifests and segments without exposing raw object-store keys | ADR-032 created; implemented as `S-125` |
+| **X26** | Tiger Style adoption for the Rust/Python backend: evidence-based gap analysis complete (`docs/proposals/tiger-style-adaptation-evaluation.md`, R1–R13). Blocked on three owner decision points (D1 always-on Rust assertions, D2 clippy `too_many_lines` tightening, D3 mandatory Postgres/Redis/MinIO CI) before a plan/task ledger is drafted; R13 can fold into S-150 `T4`–`T7` independently of D1–D3. | Owner sign-off on D1 (at minimum) required before `docs/plan/tiger-style-adaptation.md` is drafted; re-evaluate if repo state drifts materially from the evaluation's evidence base. Full detail: `docs/audit/roadmap-history.md`. |
+| **X27** | Gemma Push Reviewer role: post-pipeline advisory audit of the latest GitHub push, triaged into RRI-scored candidate tasks with pure-Low eligible incidents dispatched to Gemma Developer. Plan + task ledger drafted (`docs/plan/gemma-push-reviewer-role.md` r2, `docs/tasks/gemma-push-reviewer-role.md`), not approved for implementation. Precedent: ADR-034. | Owner approval required before `T1` starts; no blocking dependency identified |
 
 ## Known planning gaps
 
-- **S-090 replanned 2026-05-31 (ADR-025).** Primary path is owner-authorized platform
-  download. `S-090-C1`/`S-090-C2`/`S-090-C3` are complete; the remaining `S-090-C4`–`S-090-C7` work is intentionally
-  deferred for this phase. RTMP/SRT live recording (ex-T3–T8) is the deferred `S-095`
-  sub-case.
-- The shared foundation (T0/T0b/T0c/H1/T1/T2) is complete and reused by both paths.
-  T0c only governs `S-095` (it fixed the live-recording output contract).
-- The YouTube retrieval mechanism for the platform path was spiked on 2026-06-03.
-  Result: official docs validate `resolve()` but not an API-driven backend
-  `download()` path. YouTube is therefore deferred for backend-download in this
-  slice; `S-090-C4` is the next gate for selecting the first officially
-  supported provider.
-- The owner-credential secrets-store mechanism (X20) has no dedicated ADR yet and
-  must be decided during `S-090-C1`–`S-090-C6`; `S-030` establishes the config/secret
-  split it plugs into.
-- `S-070` still needs plan/task ledgers before execution. `S-120` is now complete
-  with `docs/plan/s-120-media-preparation.md` + `docs/tasks/s-120-media-preparation.md`
-  synchronized through `T5c`.
-  `S-125` is now complete: `docs/plan/s-125-hls-playback-delivery.md` +
-  `docs/tasks/s-125-hls-playback-delivery.md` record the delivered grant contract,
-  schema/repo, pure rewriter, issuance API, rewritten manifests, short-lived scoped
-  segment references, and ADR/docs propagation. ADR-032 is `Accepted`.
-  `S-030` now has `docs/plan/s-030-environment-separation.md` +
-  `docs/tasks/s-030-environment-separation.md` with its current Phase 0 / Phase 1
-  scope complete. `S-040` now has
-  `docs/plan/s-040-session-gateway-bff.md` + `docs/tasks/s-040-session-gateway-bff.md`
-  (complete). `S-080` must include the object-store adapter, storage-key
-  ownership, orphan reconciliation, and upload memory-safety strategy.
-- **Mobile is phase S-050, introduced 2026-06-03 and completed 2026-06-07.** The
-  repository now contains the first-party React Native + Expo app in `mobile/`.
-  `S-050` has `docs/plan/s-050-mobile-client.md` + `docs/tasks/s-050-mobile-client.md` and
-  is a hard consumer of the `S-040` gateway (ADR-024): a first-party device must
-  terminate in the session-gateway trust boundary and must not hold long-lived
-  tokens. `S-070` (JWKS) remains recommended before production device login. Stack:
-  React Native + Expo.
 - `S-xxx` numbering is canonical. Update this map whenever a phase, dependency, or
   ADR materially changes; do not introduce new active `P*` or bare `S0`–`S9` phase IDs.
-- ADR-021 is generalized to all non-upload intake; ADR-019/020/022 are scoped to the
-  deferred `S-095` live-recording sub-case (their technical decisions are unchanged).
-- **ADR candidates for product-layer phases (X22/X23/X24).** These are now all closed:
-  - **X22 → X-S-100-1:** ✅ closed by ADR-027 (S-100-T0b). Org-membership guard + `workspaces:*` scopes delivered in S-100. Open follow-ups: X-S-100-3 (role extensions), X-S-100-4 (auth server scope config).
-  - **X23 → X-S-160-1:** ✅ closed by ADR-030 (S-160-T0b). Review/publication gate model fixed before S-160 schema/runtime work.
-  - **X-S-160-2:** ✅ closed 2026-06-13 (S-160-T8). E2E mock-gateway review/notification fixtures and Maestro review flow (`mobile/maestro/review.yaml`) authored and passing. BDD mapping rows (SC-REVIEW-1/2/3, SC-PUBLISH-1/2, SC-NOTIFY-1) closed with executable evidence.
-  - **X-S-160-3:** open, now owned by `S-150-T6` — S-140 creates review tasks from real subtitle readiness and `S-140-T5b-a` added nullable `review_tasks.subtitle_artifact_id`, but it still enqueues `None` and cannot bind decisions to a regenerated translation/dub set. `S-150-T0` ratified a normalized exact-artifact/version binding; T6 must be decomposed (provisional RRI 71) and implemented before this item can close.
-  - **X24 → X-S-110-1:** ✅ closed by ADR-028 (S-110-T0b). Voice-consent ledger + TTS fail-closed precondition fixed before S-110 implementation.
-- **Tiger Style adoption evaluation (X26, 2026-08-20).** The requirements-defining
-  report is complete and evidence-backed (`docs/proposals/tiger-style-adaptation-evaluation.md`),
-  but it is explicitly a precursor artifact, not a plan. It must be **re-evaluated**
-  before drafting `docs/plan/tiger-style-adaptation.md`: the owner needs to resolve
-  D1–D3, and since the underlying Rust/Python surfaces (especially `S-150`'s parked
-  `translation-worker-py`/`tts-worker-py`) keep changing, the evaluation's evidence
-  base (file:line citations, function-length inventory, dependency-pinning state)
-  should be spot-checked for drift rather than assumed still accurate at that point.
-- **Gemma Push Reviewer role (X27, plan drafted 2026-08-19, revision r2).** A
-  separate role from Gemma Reviewer code review: it audits the latest GitHub push
-  after the pipeline completes, collects run metadata/job status/logs/annotations/
-  artifacts, triages findings into RRI-scored candidate tasks, and dispatches pure
-  Low eligible incidents to the existing Gemma Developer role. The plan
-  (`docs/plan/gemma-push-reviewer-role.md`) is audit-review ready with its task
-  ledger (`docs/tasks/gemma-push-reviewer-role.md`) already covering the model
-  invocation contract, log-budget/redaction, quorum staging, and audit trail —
-  but status is `proposed`, not approved for implementation. Scheduled to work on
-  next, no fixed date; requires explicit owner approval before `T1` starts.
-- **S-200 mobile auth re-architecture (planned 2026-06-17, ADR-031 Proposed).** A
-  platform directive adapts mobile auth to the FenixCRM reference flow at full
-  fidelity: `apps/api` issues its own HS256 JWT, the gateway becomes a transparent
-  relay, and the device stores the token directly. This **inverts** ADR-023
-  (resource-server-only, RS256) and ADR-024 (no token on device, opaque session) and
-  amends ADR-029 (transport only). It is a deliberate, directive-driven security
-  downgrade with the accepted regressions recorded in ADR-031 §Risk analysis. The
-  initiative RRI is 109 (Excessive), so only the ADR + risk + decomposition package
-  exists today; ADR-031 acceptance (S-200-T0) and every code task require explicit
-  approval. Recommended hardening X-S-200-1 (RS256) and X-S-200-2 (revocation) remain
-  open.
+- `S-070` (JWKS / production identity hardening) and `S-170`/`S-180` (human review
+  and publication runtime) still need plan/task ledgers before execution.
+- Full historical detail behind every closed gap above (the S-090 replan, X22–X24
+  ADR closures, the S-200/ADR-031 mobile-auth decision, etc.):
+  `docs/audit/roadmap-history.md`.
+
+## Related
+
+- `docs/audit/roadmap-history.md` — archived consolidation changelog, design
+  rationale, and detailed per-slice status narrative trimmed from this file

@@ -122,10 +122,10 @@ class Bands(unittest.TestCase):
         self.assertEqual(b["effort"], "M")
         self.assertEqual(b["thinking"], "Off")
 
-    def test_low_band_uses_local_gemma_delegation(self):
+    def test_low_band_uses_local_qwen_developer_delegation(self):
         b = rri.resolve_band(25)
-        self.assertEqual(b["codex"], "Local Gemma via Ollama")
-        self.assertEqual(b["claude"], "Local Gemma via Ollama")
+        self.assertEqual(b["codex"], "Local Qwen Developer via Ollama")
+        self.assertEqual(b["claude"], "Local Qwen Developer via Ollama")
         self.assertIn("Local delegation", b["gate"])
 
 

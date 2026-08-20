@@ -439,8 +439,8 @@ def detect_penalties(scores, matched_auth, manual):
 # --- Bands crosswalk (RRI_POLICY.md "Bands, autonomy gates, and model tiers") ---
 # (upper_inclusive, label, effort, codex, claude, thinking, gate)
 BANDS = [
-    (25, "Low", "S", "Local Gemma via Ollama", "Local Gemma via Ollama", "Off",
-     "Local delegation: delegate to local Gemma via Ollama; validate and apply only an in-scope diff; review against requirements; verify; report."),
+    (25, "Low", "S", "Local Qwen Developer via Ollama", "Local Qwen Developer via Ollama", "Off",
+     "Local delegation: delegate to local Qwen Developer via Ollama; validate and apply only an in-scope diff; review against requirements; verify; report."),
     (40, "Moderate", "M", "Balanced", "Balanced", "Off",
      "Confirm tests exist in the affected area."),
     (55, "Med-high", "L", "Balanced -> Premium", "Balanced -> Premium", "On",

@@ -6,7 +6,14 @@ plan: docs/plan/agents-override-sync.md
 ---
 # Tasks: AGENTS.override.md generation and drift guard
 
-> **Current binding note (2026-08-11):** References below to prior local-model bindings are retained as task-history and planning context. For operative bindings, use ADR-036 Amendment 2 and ADR-037 Amendment 1; see `docs/tasks/local-model-stack-restructure-2026-08.md`.
+> **Current binding note (2026-08-20):** AOS1's five-source/full-projection
+> behavior and completion evidence below are retained as dated delivery history.
+> WPC-T7 in `docs/tasks/workflow-policy-consolidation.md` supersedes that content
+> contract with a bounded `AGENTS.md` bootstrap while preserving the same
+> deterministic drift guard. Historical unit-test identifiers are retained for
+> ledger-reference compatibility but now exercise the superseding bootstrap
+> behavior. References below to prior local-model bindings are likewise task
+> history; use the current workflow guide for operative bindings.
 
 Governing plan: `docs/plan/agents-override-sync.md`
 Governing guides: `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`, `docs/policies/RRI_POLICY.md`,

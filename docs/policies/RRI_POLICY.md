@@ -189,7 +189,7 @@ band — never derive one output from another (e.g. do not infer capability from
 | RRI band | Label | Effort | Capability (Codex) | Capability (Claude Code) | Thinking | Phase-1 reviewer | Phase-2 reviewer | Gate |
 |---|---|---|---|---|---|---|---|---|
 | **0–25** | Low | **S** | Primary agent or Local Qwen Developer via Ollama | Primary agent or Local Qwen Developer via Ollama | Off | Muse Glimmer†† | Muse Glimmer Reviewer†† | **Low-band handling:** do not present the full task for approval; use local Qwen Developer only for eligible simple code patches, otherwise execute directly with the primary agent. |
-| **26–40** | Moderate | **M** | Balanced | Balanced | Off | Gemma†† | Gemma Reviewer†† | Confirm tests exist in the affected area. **Implementation route:** local-first via `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL`; primary agent remains orchestrator, cloud implementation is escalation/fallback using the concrete takeover model in the task card. A ≥2-file task with heterogeneous per-module CC may instead use ADR-040 per-module split routing — see § Per-module complexity-split routing below. |
+| **26–40** | Moderate | **M** | Balanced | Balanced | Off | Gemma†† | Gemma Reviewer†† | Confirm tests exist in the affected area. **Implementation route:** local-first via `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL`; after 2/2 repairs, decompose remaining work into scored Low-band subtasks before the concrete task-card cloud takeover is considered as last resort. A ≥2-file task with heterogeneous per-module CC may instead use ADR-040 per-module split routing — see § Per-module complexity-split routing below. |
 | **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Gemma†† | Gemma Reviewer†† | Plan + explicit acceptance criteria required before approval. **Implementation route (ADR-038):** Muse Glimmer advisory refinement → primary hash-bound route receipt → cloud takeover with the full evidence bundle. A `GO_LOCAL` advisory result is recorded but never launches a local developer, **except** for modules independently qualifying under ADR-040 per-module split routing (Amendment 2) — see § Per-module complexity-split routing below. Review/approval rigor unchanged — 3 Reflection passes and this HITL gate still apply; phase-2 (and phase-1 when it applies) reviewer is Gemma, not the cross-vendor peer. |
 | **56–70** | Complex | **L** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Plan first. **Decompose into subtasks before implementation.** Human reviews the plan. |
 | **71–85** | High | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Characterization tests + explicit acceptance criteria + human reviews the **diff** (not just the plan). **Decomposition remains mandatory.** |
@@ -215,7 +215,7 @@ For Codex, the current cloud-takeover projection is:
 
 | RRI band | Cloud position | Codex resolution to present |
 |---|---|---|
-| **0–25** | Only after the optional Gemma patch path exhausts its bounded escalation path | `gpt-5.6-luna` at `low`; `gpt-5.6-terra` at `low` if Luna is unavailable |
+| **0–25** | Only after the optional Qwen Developer patch path exhausts its bounded escalation path | `gpt-5.6-luna` at `low`; `gpt-5.6-terra` at `low` if Luna is unavailable |
 | **26–40** | Local-first fallback | `gpt-5.6-terra` at `medium` |
 | **41–55** | Cloud may win at the ADR-038 gate or become the one-attempt fallback | Operational-only fallback: `gpt-5.6-terra` at `high`; capability/risk takeover: `gpt-5.6-sol` at `high` |
 | **56–70** | Cloud-primary after decomposition | `gpt-5.6-sol` at `high` |
@@ -404,9 +404,12 @@ For final **RRI 26–40**, the implementation default is **local-first**:
 - tool-call-time and post-run `allowed_paths` scope enforcement are mandatory;
 - the local path has a maximum of **2 repair attempts**, each requiring new
   evidence;
-- cloud implementation is the escalation/fallback path when the local runner,
-  model binding, repair budget, or scope boundary fails; the task card must
-  already record the concrete takeover trigger/model from the workflow table.
+- after 2/2 repairs, remaining work is first decomposed into scored Low-band
+  subtasks; cloud implementation from the task card is the last resort if that
+  route cannot proceed;
+- an operational runner/model failure or a scope-boundary failure follows its
+  separate approved cloud-takeover condition; the task card must already
+  record the concrete trigger/model from the workflow table.
 
 **Phase-1/phase-2 reviewer bindings:** both non-exempt phase 1 and phase 2
 use the RRI 26–55 chain defined in § Local pipeline phase-1/phase-2 reviewer
@@ -633,7 +636,7 @@ Invocation: send the diff, task acceptance criteria, and any independently-
 verified facts (test/verification output the orchestrator already produced)
 directly to the band's primary reviewer model via the Ollama `/api/chat`
 endpoint (`OLLAMA_HOST`, default `http://localhost:11434`). No tagged-block
-contract is required for review output (unlike Gemma Developer) — a
+contract is required for review output (unlike Qwen Developer) — a
 structured PASS/FINDINGS verdict with findings-by-severity is sufficient,
 since the model is not writing files.
 

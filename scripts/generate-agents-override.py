@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Deterministically generate AGENTS.override.md from its five source files.
+"""Deterministically generate the bounded Codex instruction bootstrap.
 
-Concatenates AGENTS.md + docs/playbooks/AGENT_WORKFLOW_GUIDE.md +
-docs/policies/HITL_AUTONOMY_POLICY.md + docs/plan/roadmap.md +
-docs/architecture.md, in that order, with no separator inserted between them
-(each source file's own leading frontmatter fence is what visually reads as
-a seam). roadmap.md and architecture.md are appended last, mirroring
-CLAUDE.md's native-import order, so they stay the mechanism's most volatile
-sources without disturbing the byte offsets of the three governance
-documents ahead of them. Default mode prints to stdout for the
-check-doc-consistency.sh drift check; --write overwrites AGENTS.override.md.
+AGENTS.override.md is a byte-exact projection of AGENTS.md. Canonical workflow,
+policy, roadmap, architecture, ADR, plan, and task detail stays in its owning
+document and is loaded on demand through the bootstrap's routing rules. This
+avoids injecting the whole governance/documentation corpus into every Codex
+session while preserving one generated file and one byte-exact drift check.
+
+Default mode prints to stdout for check-doc-consistency.sh; --write overwrites
+AGENTS.override.md only after the source exists, is non-empty, and fits the
+bounded always-loaded-context budget.
 """
 
 from __future__ import annotations
@@ -21,12 +21,12 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SOURCE_RELATIVE_PATHS = (
     "AGENTS.md",
-    "docs/playbooks/AGENT_WORKFLOW_GUIDE.md",
-    "docs/policies/HITL_AUTONOMY_POLICY.md",
-    "docs/plan/roadmap.md",
-    "docs/architecture.md",
 )
 OUTPUT_RELATIVE_PATH = "AGENTS.override.md"
+# A conservative, dependency-free size guard for the proposed 3k-6k-token
+# ceiling. Byte count is not an exact tokenizer result, so closure also reports
+# a separate token estimate; the current English Markdown stays well below it.
+MAX_OUTPUT_BYTES = 24 * 1024
 
 
 def read_source(relative_path: str) -> str:
@@ -40,7 +40,15 @@ def read_source(relative_path: str) -> str:
 
 
 def generate() -> str:
-    return "".join(read_source(relative_path) for relative_path in SOURCE_RELATIVE_PATHS)
+    content = "".join(read_source(relative_path) for relative_path in SOURCE_RELATIVE_PATHS)
+    size = len(content.encode("utf-8"))
+    if size > MAX_OUTPUT_BYTES:
+        raise SystemExit(
+            "generate-agents-override: bootstrap exceeds "
+            f"{MAX_OUTPUT_BYTES} bytes ({size} bytes); move detail to canonical "
+            "on-demand documents instead of expanding always-loaded context"
+        )
+    return content
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

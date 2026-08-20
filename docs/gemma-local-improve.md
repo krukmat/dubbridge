@@ -1,12 +1,13 @@
 # Local Ollama Rules
 
-This document summarizes the **active** local Gemma contracts used in DubBridge.
+This document summarizes the **active** local reviewer and shared-transport
+contracts used in DubBridge.
 It is guidance, not the governing authority.
 
 Authoritative sources:
 
 - `docs/policies/RRI_POLICY.md`
-- `docs/playbooks/LOW_RRI_LOCAL_MODEL_HANDOFF.md` — Gemma Developer (patch delegation)
+- `docs/playbooks/LOW_RRI_LOCAL_MODEL_HANDOFF.md` — Qwen Developer (patch delegation)
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer` — Gemma Reviewer (code review)
 - `docs/adr/ADR-034-gemma-process-audit-and-reviewer-reconciliation.md` — audit + multi-pass ADR
 - `scripts/delegate-low-rri.py` — patch delegation wrapper
@@ -28,15 +29,15 @@ out-of-scope findings, dismissed-major rate.
 **Gemma Push Reviewer** is a separate local Gemma role. It starts only after a
 GitHub push pipeline has completed, collects GitHub run metadata/log evidence,
 runs a push-audit quorum, routes findings through `scripts/rri.py`, and may
-dispatch only pure Low eligible incidents to Gemma Developer.
+dispatch only pure Low eligible incidents to Qwen Developer.
 
 It is an **audit/dispatch orchestrator**, not an approver:
 
 - It does not replace Gemma Reviewer code review.
 - It does not compute final RRI itself; `scripts/rri.py` is the only final RRI source.
 - It does not accept or close delegated patches.
-- Any Gemma Developer patch created from Push Reviewer findings remains
-  `review_status: in_review` until a non-Gemma agent completes post-development review.
+- Any Qwen Developer patch created from Push Reviewer findings remains
+  `review_status: in_review` until the primary agent completes post-development review.
 
 Operational surfaces:
 
@@ -53,7 +54,7 @@ unavailable or stalls. Role-specific environment variables still take precedence
 (`DUBBRIDGE_REVIEW_MODEL`, `DUBBRIDGE_PUSH_REVIEW_MODEL`, then
 `DUBBRIDGE_LOW_RRI_MODEL` where applicable) and are treated as strict explicit
 choices. The MLX tag requires an Ollama runtime new enough to pull and run
-current Gemma 4 MLX manifests.
+current Qwen MLX manifests.
 
 The Low/S developer binding is now Qwen, not Gemma; this document remains
 about shared Gemma transport and reviewer roles. See the Low-RRI handoff playbook
@@ -126,7 +127,7 @@ Exit codes for `scripts/gemma-code-review.py`:
 A `BLOCKING` finding does not fail the gate by itself. The primary agent reads
 the artifact and decides disposition.
 
-## Gemma Developer response contract (patch delegation)
+## Qwen Developer response contract (patch delegation)
 
 The local model never writes files and never authors a unified diff.
 

@@ -10,7 +10,7 @@ timer (`--idle-timeout`, default 60 s).  A separate `--max-wall` cap (default
 900 s) guards against runaway generation.  This lets the agent invoke the script
 in the background (no 120 s Bash foreground limit) and be notified when it
 completes naturally — rather than racing a blind wall-clock timeout against
-Gemma's generation speed.
+Qwen's generation speed.
 
 Invoke from an agent:
     scripts/delegate-low-rri.py packet.md --out result.json
@@ -40,7 +40,7 @@ DEFAULT_MODEL = "qwen3.8:27b-mlx"
 # replacing the prior Nemotron-3.5-Lightning-30B-A3B binding (ADR-036
 # Amendment 3/4) so the Low band uses the same model family as the
 # Moderate/M implementer (Amendment 6). Do not silently replace an
-# unavailable or stalled developer with Gemma or another model. An operator
+# unavailable or stalled developer with another model. An operator
 # may still explicitly name a stall fallback for a bounded experiment; the
 # default is disabled.
 DEFAULT_STALL_FALLBACK_MODEL = ""
@@ -53,8 +53,18 @@ DEFAULT_NUM_CTX = 65536
 DEFAULT_NUM_PREDICT = gemma_local.DEFAULT_NUM_PREDICT
 DEFAULT_TEMPERATURE = gemma_local.DEFAULT_TEMPERATURE
 DEFAULT_THINK = gemma_local.DEFAULT_THINK
-DelegationIdleTimeout = gemma_local.GemmaIdleTimeout
-DelegationWallTimeout = gemma_local.GemmaWallTimeout
+
+
+class DelegationIdleTimeout(RuntimeError):
+    def __init__(self, idle):
+        super().__init__(f"Qwen Developer idle timeout after {idle}s without a token")
+        self.exit_code = 124
+
+
+class DelegationWallTimeout(RuntimeError):
+    def __init__(self, wall):
+        super().__init__(f"Qwen Developer wall timeout after {wall}s total")
+        self.exit_code = 124
 
 STATUS_VALUES = {"PATCH": "patch", "NO_PATCH": "no_patch", "BLOCKED": "blocked"}
 ACTION_VALUES = {"create", "modify", "delete"}
@@ -113,7 +123,7 @@ def parse_args():
             )
         ),
         help=(
-            "Seconds without a new token before treating Gemma as stalled "
+            "Seconds without a new token before treating Qwen Developer as stalled "
             f"(exit 124); default {DEFAULT_IDLE_TIMEOUT_SECONDS}."
         ),
     )
@@ -198,7 +208,7 @@ def parse_args():
         metavar="PATH",
         help=(
             "Repo-relative in-scope path prefix or glob; repeatable. Any file "
-            "Gemma returns outside this set is rejected. Required for --apply."
+            "Qwen Developer returns outside this set is rejected. Required for --apply."
         ),
     )
     parser.add_argument(
@@ -260,8 +270,8 @@ def parse_args():
         default="full-file",
         dest="mode",
         help=(
-            "Delegation mode. 'full-file' (default): Gemma emits the complete file. "
-            "'before-after': Gemma emits only the replacement block; the wrapper "
+            "Delegation mode. 'full-file' (default): Qwen Developer emits the complete file. "
+            "'before-after': Qwen Developer emits only the replacement block; the wrapper "
             "performs a literal find-and-replace on the target file. Use for files "
             "over ~400 lines. Requires --target-path and --before-file."
         ),
@@ -376,30 +386,30 @@ def validate_delegation_payload(payload):
     required = ["status", "summary", "files", "test_commands", "risk_notes"]
     missing = [key for key in required if key not in payload]
     if missing:
-        raise RuntimeError(f"Gemma response is missing required keys: {missing}")
+        raise RuntimeError(f"Qwen Developer response is missing required keys: {missing}")
     if payload["status"] not in {"patch", "no_patch", "blocked"}:
-        raise RuntimeError(f"Gemma response has invalid status: {payload['status']!r}")
+        raise RuntimeError(f"Qwen Developer response has invalid status: {payload['status']!r}")
     if not isinstance(payload["files"], list):
-        raise RuntimeError("Gemma response files must be an array")
+        raise RuntimeError("Qwen Developer response files must be an array")
     for i, entry in enumerate(payload["files"]):
         if not isinstance(entry, dict):
-            raise RuntimeError(f"Gemma response files[{i}] is not an object")
+            raise RuntimeError(f"Qwen Developer response files[{i}] is not an object")
         for key in ("path", "action", "contents"):
             if key not in entry:
-                raise RuntimeError(f"Gemma response files[{i}] missing {key!r}")
+                raise RuntimeError(f"Qwen Developer response files[{i}] missing {key!r}")
         if entry["action"] not in {"create", "modify", "delete"}:
             raise RuntimeError(
-                f"Gemma response files[{i}] has invalid action: {entry['action']!r}")
+                f"Qwen Developer response files[{i}] has invalid action: {entry['action']!r}")
         if not isinstance(entry["path"], str) or not entry["path"].strip():
-            raise RuntimeError(f"Gemma response files[{i}] path must be a non-empty string")
+            raise RuntimeError(f"Qwen Developer response files[{i}] path must be a non-empty string")
         if not isinstance(entry["contents"], str):
-            raise RuntimeError(f"Gemma response files[{i}] contents must be a string")
+            raise RuntimeError(f"Qwen Developer response files[{i}] contents must be a string")
     if payload["status"] == "patch" and not payload["files"]:
-        raise RuntimeError("Gemma response status is 'patch' but files is empty")
+        raise RuntimeError("Qwen Developer response status is 'patch' but files is empty")
     if not isinstance(payload["test_commands"], list):
-        raise RuntimeError("Gemma response test_commands must be an array")
+        raise RuntimeError("Qwen Developer response test_commands must be an array")
     if not isinstance(payload["risk_notes"], list):
-        raise RuntimeError("Gemma response risk_notes must be an array")
+        raise RuntimeError("Qwen Developer response risk_notes must be an array")
 
 
 def stream_chat(url, payload, idle_timeout, max_wall):
@@ -784,7 +794,7 @@ def handle_terminal_cloud_escalation(
 
 
 # --- T3 (docs/tasks/local-first-cloud-local-handoff.md): attempt-bundle adapter --
-# Additive only: does not change the tagged-block contract Gemma must return or
+# Additive only: does not change the tagged-block contract Qwen Developer must return or
 # any field already written to the audit log above. Maps an existing delegation
 # result onto T1's capsule/attempt-bundle schema (scripts/local-agent/
 # handoff_schema.py) so the Low-band lane produces the same envelope the
@@ -811,7 +821,7 @@ def build_attempt_bundle(delegation, capsule_hash, model, start_ts, end_ts):
     outcome = DELEGATION_STATUS_TO_OUTCOME[delegation["status"]]
     return {
         "capsule_hash": capsule_hash,
-        "implementer_id": "gemma",
+        "implementer_id": "qwen38",
         "model_tag": model,
         "start_ts": start_ts.isoformat().replace("+00:00", "Z"),
         "end_ts": end_ts.isoformat().replace("+00:00", "Z"),
@@ -826,7 +836,7 @@ def build_attempt_bundle(delegation, capsule_hash, model, start_ts, end_ts):
 
 
 # --- Caller-side patch construction (the work the small model can't do) ---------
-# Gemma returns full file contents; the deterministic steps below — scope
+# Qwen Developer returns full file contents; the deterministic steps below — scope
 # enforcement, diff construction, and `git apply` — run in the caller, never the
 # model. This is the part the workflow guide assigns to the orchestrating agent.
 
@@ -1262,7 +1272,7 @@ if __name__ == "__main__":
         print(str(exc), file=sys.stderr)
         raise SystemExit(124)
     except URLError as exc:
-        print(f"Gemma/Ollama request failed: {exc}", file=sys.stderr)
+        print(f"Qwen Developer/Ollama request failed: {exc}", file=sys.stderr)
         raise SystemExit(2)
     except RuntimeError as exc:
         print(str(exc), file=sys.stderr)

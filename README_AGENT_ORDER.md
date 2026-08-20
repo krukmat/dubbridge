@@ -10,17 +10,28 @@ the `dubbridge` repository.
 
 ## Read order (highest authority first)
 
-1. **`CLAUDE.md`** (project) and the user's global `CLAUDE.md` — behavioral rules
-   not overridden by the workflow guide.
-2. **`docs/playbooks/AGENT_WORKFLOW_GUIDE.md`** — the highest-authority workflow
+1. **`docs/playbooks/AGENT_WORKFLOW_GUIDE.md`** — the highest-authority workflow
    source for task flow, gating, presentation requirements, completion, and
-   status-artifact synchronization.
+   status-artifact synchronization. It controls every conflict it covers.
+2. **`CLAUDE.md`** (project) and the user's global `CLAUDE.md` — behavioral rules
+   only for topics the workflow guide does not cover.
 3. **`AGENTS.md`** — the task-presentation contract shared by Codex and Claude Code;
    read it as a summary that must stay consistent with the workflow guide.
 4. **`docs/policies/HITL_AUTONOMY_POLICY.md`** — when approval is required and what
    autonomy is permitted.
 5. **`docs/adr/`** — architecture decisions that constrain implementation.
 6. **`docs/plan/` and `docs/tasks/`** — the active slice's plan and task ledger.
+
+## Generated override inputs
+
+`AGENTS.override.md` is generated, never hand-maintained. Its sole content
+source is the compact `AGENTS.md` bootstrap; the generator enforces a bounded
+output size and the documentation QA gate compares it byte-for-byte. The
+workflow guide, HITL/RRI policies, roadmap, architecture overview, ADRs, and
+active plan/task ledger remain canonical documents loaded on demand through
+the bootstrap's routing rules; see `scripts/generate-agents-override.py`.
+`README_AGENT_ORDER.md` and `CLAUDE.md` orient agents but are not generator
+inputs.
 
 ## Operating order for a task
 
@@ -37,7 +48,7 @@ the `dubbridge` repository.
    presentation contract only when approval is required.
 4. If the computed RRI requires approval, wait for explicit approval (see the HITL
    policy). If the task is in the RRI 0–25 Low band (normally `Effort: S` under the
-   canonical mapping), use local Gemma delegation through Ollama only for eligible
+   canonical mapping), use local Qwen Developer delegation through Ollama only for eligible
    simple code patches; otherwise handle the task directly as the primary agent.
 5. Implement one task at a time, in order.
 6. Before implementation, identify any evidence/metrics the task must emit and any
