@@ -1566,14 +1566,345 @@ needed) now that LRPC-4 is closed.
 
 ## LRPC-5 — Refactor `run_analysis.py` to consume the builder
 
-- **Dependencies:** LRPC-2.
-- **Provisional effort:** M. Elevated relative to LRPC-3/4: `run_analysis.py`
-  line 90-92 carries an explicit code comment — "Keep the ADR-037 prompt
-  byte-for-byte stable for callers that do not select a profile explicitly"
-  — meaning the builder's output for `local_architect_default` must
-  reproduce that exact text, verified by a byte-equality test, not merely
-  judged "equivalent." Both `DEFAULT_PROFILE` and `MED_HIGH_REFINEMENT_PROFILE`
-  are in scope.
+- **Status: `[x] Done` (2026-08-20).**
+- **Dependencies:** LRPC-2 (satisfied — `prompt_builder.py` delivered).
+- **Final RRI: 42 → Med-high (41-55)** — same class of correction LRPC-3/
+  LRPC-4 already applied to themselves against the ledger's stale
+  "Provisional effort: M". `scripts/rri.py --cc 3 --D 4 --K 2 --P 3 --T 4
+  --A 1 --X 2 --touches scripts/local-architect/run_analysis.py --touches
+  scripts/local-architect/run_analysis_test.py`. D=4/P=3/K=2/X=2 carried
+  forward from LRPC-2/LRPC-3/LRPC-4 for the same review-pipeline-integrity
+  rationale (this consumer script builds the prompt the Local Architect
+  advisory role receives, including the ADR-038 Muse Glimmer refinement
+  gate LRPC-5 itself must be routed through). No penalties triggered.
+- **Effort: L** (derived from the Med-high band per the canonical
+  RRI-to-Effort crosswalk).
+
+### Scope
+
+**In scope:** `scripts/local-architect/run_analysis.py`'s `build_prompt()`,
+both branches — `DEFAULT_PROFILE` (`role="local_architect_default"`) and
+`MED_HIGH_REFINEMENT_PROFILE` (`role="local_architect_med_high"`) — now call
+`prompt_builder.build_system_prompt(role=..., num_ctx=_BOUNDARY_BUDGET_NUM_CTX,
+num_predict=_BOUNDARY_BUDGET_NUM_PREDICT, output_format_text=<schema +
+instructions + packet_json, unchanged per profile>)` instead of the prior
+fully-hardcoded prompt strings.
+
+**Out of scope (unchanged):** `prompt_anchors.py`/`prompt_builder.py`
+(frozen, LRPC-1/LRPC-2); `scripts/local-agent/run_local_task.py`,
+`scripts/local-agent/cli.py`, `scripts/gemma-code-review.py` (frozen,
+LRPC-3/LRPC-4); the JSON schema/instructions text per profile (no
+canonical-doc source, stays local, passed through unchanged as
+`output_format_text`); `parse_args`'s CLI `num_ctx`/`num_predict` sourcing
+(unchanged — `build_prompt()` uses its own fixed
+`_BOUNDARY_BUDGET_NUM_CTX`/`_BOUNDARY_BUDGET_NUM_PREDICT` defaults for the
+boundary-clause budget check regardless of the real per-invocation CLI
+args, mirroring LRPC-4's identical "budget check uses fixed defaults, not
+live args" precedent); the 33 pre-existing unrelated test failures in
+`run_local_task_test.py` (LRPC-5 does not touch this file at all — `git
+diff --stat` confirms zero changes — so this is a pure non-regression
+check, not new scope).
+
+**HP-1 reinterpretation (owner-approved deviation, 2026-08-20):** the
+original task stub required the assembled `DEFAULT_PROFILE` prompt to be
+**byte-for-byte identical** to the pre-existing hardcoded opener text
+("advisory-only, read-only, and must not claim authority..."). Mid-
+implementation this was found to be impossible to satisfy simultaneously
+with the task's actual purpose (replacing the paraphrased opener with the
+canonical ADR-037 clauses from `prompt_anchors.ROLE_ANCHORS
+["local_architect_default"]`): none of the five canonical "may not" clauses
+were ever present as a substring in the old hardcoded string — it was a
+paraphrase, not a verbatim subset, meaning the old string already violated
+this plan's own "extraction, not paraphrase" design principle (plan doc
+§ Design decisions). Byte-for-byte fidelity to that string would have
+required *keeping* the exact drift class this whole plan exists to close.
+Surfaced to the user via `AskUserQuestion` with two labeled options (A:
+reinterpret HP-1 as "contains every canonical clause verbatim," same
+pattern LRPC-3/LRPC-4 already use for their own HP-1; B: keep the old
+paraphrased string byte-identical and treat LRPC-5 as a no-op). User asked
+for the concrete practical impact of Option A on context-window budget
+before deciding; answered with measured (not estimated) numbers: the new
+builder-sourced prompt is ≈82 tokens larger than the old hardcoded string
+against `_BOUNDARY_BUDGET_NUM_CTX=8192`/`_BOUNDARY_BUDGET_NUM_PREDICT=4096`
+(≈4096-token available prompt budget), a ≈2% growth — not a practical
+constraint. User approved Option A ("Sí, proceder"). This reinterpretation
+governs HP-1/HP-2 below; it does not change scope, RRI, or the Med-high
+routing already in effect.
+
+### Behavioral examples
+
+- **HP-1:** the assembled `DEFAULT_PROFILE` prompt via
+  `build_system_prompt(role="local_architect_default", ...)` contains every
+  one of the five canonical `prompt_anchors.ROLE_ANCHORS
+  ["local_architect_default"]` clause texts as a verbatim substring
+  (reinterpreted from byte-for-byte identity to the old paraphrase — see
+  deviation note above).
+- **HP-2:** the assembled `MED_HIGH_REFINEMENT_PROFILE` prompt via
+  `build_system_prompt(role="local_architect_med_high", ...)` contains
+  every one of the same five canonical clause texts verbatim (both roles
+  share the identical `Clause` set by LRPC-1 design).
+- **HP-3/HP-4:** for both profiles, the JSON schema block, the
+  profile-specific instructions ("Choose CLOUD_REQUIRED whenever...",
+  compact-response constraints for med-high), and the injected
+  `packet_json` content remain present and unchanged, passed through as
+  `output_format_text`.
+- **EC-1/EC-2:** `PromptBudgetExceeded` propagates uncaught before any
+  Ollama HTTP call is constructed, for both profiles, when
+  `num_ctx`/`num_predict` make the assembled prompt exceed its derived
+  budget (verified against `prompt_builder.build_system_prompt` with a
+  patched `estimate_text_tokens`, mirroring LRPC-3/LRPC-4's identical EC
+  test shape).
+- **EC-3:** an unknown `role` value would raise `UnknownRoleError`, not
+  silently fall back to a default role's clauses (regression-style
+  assertion on `prompt_builder`'s own contract; `build_prompt()` never
+  passes a caller-controlled `role`, so this is defense-in-depth, not a
+  reachable path in the current callers).
+
+### Implementation routing evidence
+
+- **Route:** ADR-038 Med-high Architect-refined single-attempt gate.
+  1. Muse Glimmer advisory refinement (`muse-glimmer:30b-q4_K_M`,
+     `docs/audit/med-high/lrpc-5-refinement-artifact.json`): recommended
+     **`CLOUD_REQUIRED`** — "Byte-identical DEFAULT_PROFILE requirement
+     cannot be safely bounded locally without golden-string evidence and
+     builder output verification." (This was the refinement run against
+     the task's *original* byte-for-byte HP-1 wording, before the
+     HP-1 deviation was raised and approved — the refinement's own
+     skepticism about that literal requirement is part of what surfaced
+     the conflict.)
+  2. Primary hash-bound route receipt
+     (`docs/audit/med-high/lrpc-5-primary-receipt.json`): **concurred**
+     `CLOUD_REQUIRED` — no downgrade. Unlike the `GO_LOCAL` precedent in
+     LRPC-3/LRPC-4, this task's original HP-1 acceptance criterion demanded
+     byte-for-byte identity against a string proven (by direct
+     substring-check against `prompt_anchors.py`) not to contain the
+     canonical clauses it was meant to carry, which is exactly the kind of
+     unresolved-requirement ambiguity ADR-038 §6 treats as excluding
+     `GO_LOCAL` regardless of the advisory recommendation.
+  3. Gate evaluation (`scripts/local-agent/med_high_gate.py`):
+     `{"route": "CLOUD_REQUIRED", ...}` — both card-hash and
+     refinement-artifact-sha256 binding checks passed.
+  4. Per `AGENT_WORKFLOW_GUIDE.md § Local-first and Architect-refined
+     implementation routing`, Med-high is cloud-only implementation in
+     every case; here the gate additionally concurred explicitly rather
+     than being overridden by the band default. No local implementation
+     attempt was made.
+  5. ADR-039 fallback-selection checkpoint: `human-select` mode. User
+     selected `claude-sonnet-5` / reasoning effort `high` via
+     `AskUserQuestion`, trigger kind `capability-risk` (the `CLOUD_REQUIRED`
+     gate result, concurred by the primary receipt, confirms a genuine
+     capability/risk takeover, not a mere operational-unavailability
+     fallback). Recommended alternative was `gpt-5.6-sol`/`high` (frozen
+     matrix default for `capability-risk` + RRI 42); the user's explicit
+     choice overrides the recommendation, which the checkpoint permits.
+     Artifact: `docs/audit/med-high/lrpc-5-fallback-selection.json`
+     (`status: fallback_authorized`).
+- **Implementer:** `claude-sonnet-5` (this session), thinking on (Balanced
+  tier per band default; no stall/failure requiring Opus escalation — code-
+  editing work with a fully pre-specified target shape once the HP-1
+  conflict was resolved by explicit user decision).
+
+### Design note: per-invocation build, not import-time constant
+
+Unlike LRPC-4's `cli.py` (a module-level string built once at import time),
+`run_analysis.py`'s `build_prompt(packet, profile)` is called per-invocation
+with the real packet content, so the builder call happens inline inside
+each `if profile == ...` branch rather than as a top-level constant. The
+boundary-clause budget check (`_BOUNDARY_BUDGET_NUM_CTX=8192`,
+`_BOUNDARY_BUDGET_NUM_PREDICT=4096`) still uses fixed module-level defaults
+rather than the real per-invocation `args.num_ctx`/`args.num_predict` from
+`parse_args` — this exactly mirrors the pre-existing behavior (the old
+hardcoded strings never depended on `args` either) and was explicitly out
+of scope, same as LRPC-4's identical design note.
+
+### Phase 1 — Task-analysis review
+
+`Task-analysis review: gemma docs/audit/gemma-evidence/LRPC-5-phase1.json - PASS`
+
+- Reviewer: `gemma` (`gemma4:26b-a4b-it-qat`, explicit model selection —
+  same rationale as LRPC-3/LRPC-4: the bare script default resolves to
+  `muse-glimmer:30b-q4_K_M`, the RRI 26-55 intermediate fallback, not the
+  RRI 26-55 primary)
+- Precheck: Ollama restarted for this task ID, listener confirmed on
+  `:11434`, warm-up probe for `gemma4:26b-a4b-it-qat` returned
+  `done_reason: stop` with non-empty content before the real packet was
+  sent.
+- First attempt returned a bare `{"verdict": "PASS", "findings": []}` with
+  no visible reasoning (52 chars). Judged insufficiently rigorous review
+  depth (not a technical failure — valid JSON, `done_reason: stop`) and
+  retried once with an explicit reasoning-before-verdict instruction, which
+  produced a substantive analysis addressing scope-boundedness, byte-for-
+  byte fidelity risk, `MED_HIGH_REFINEMENT_PROFILE` risk, RRI/route
+  consistency, and opener-duplication risk. Both attempts recorded in the
+  artifact; the retry's reasoning is the canonical evidence.
+- Artifact: `docs/audit/gemma-evidence/LRPC-5-phase1.json`
+- Verdict: `PASS` — no blocking findings
+- Muse Glimmer fallback: not triggered — primary Gemma responded normally.
+- D14 fallback: not triggered.
+- disposition_divergence: `none`.
+
+### Reflection log
+
+Required passes: 3 (`42` → `Med-high`)
+
+#### Pass 1 — contract fidelity
+
+- **Draft verdict:** both `build_prompt()` branches now source their
+  boundary-clause opener via `build_system_prompt(role="local_architect_
+  default"|"local_architect_med_high", ...)`; the schema/instructions/
+  packet_json text for each profile moved into `output_format_text`
+  unchanged.
+- **Critique findings:** verified all five canonical
+  `local_architect_default` clause texts (and, separately, all five
+  `local_architect_med_high` clause texts — confirmed identical sets by
+  design) appear as exact substrings in the assembled output for each
+  profile, via direct string-containment checks against
+  `prompt_anchors.ROLE_ANCHORS`. Confirmed the JSON schema block, the
+  profile-specific instructions, and the `packet_json` injection are
+  byte-identical to the pre-change strings (diffed the surviving fragment
+  text against `git diff` context lines). Confirmed the old paraphrased
+  opener ("advisory-only, read-only, and must not claim authority...") does
+  not survive in either profile's output (no duplication of old + new
+  opener text).
+- **Revisions applied:** none — no issues found.
+
+#### Pass 2 — failure boundary and per-invocation wiring
+
+- **Draft verdict:** both `build_system_prompt(...)` calls are unguarded
+  inside `build_prompt()` — no `try`/`except` wraps them; a
+  `PromptBudgetExceeded` from either branch propagates to `build_prompt()`'s
+  own caller uncaught.
+- **Critique findings:** confirmed via `grep` that no `try`/`except` wraps
+  either branch (the function's only other exception path is the explicit
+  `raise AnalysisError("invalid_profile", ...)` for an unrecognized
+  `profile` value, unrelated to the builder call). Confirmed
+  `_BOUNDARY_BUDGET_NUM_CTX`/`_BOUNDARY_BUDGET_NUM_PREDICT` are fixed
+  module constants independent of `parse_args`'s real CLI values — verified
+  this exactly mirrors pre-existing behavior (the old hardcoded strings
+  never referenced `args` either), so not a regression; recorded explicitly
+  in the Design note above rather than left implicit.
+- **Revisions applied:** none — added the "Design note" section above for
+  visibility; no code change.
+
+#### Pass 3 — test-regression coverage
+
+- **Draft verdict:** 8 new tests added (`PromptBuilderIntegrationTest`)
+  covering HP-1/HP-2/HP-3/HP-4/EC-1/EC-2/EC-3 (HP-2b added as a
+  supplementary same-clause-set assertion beyond the task's own case list);
+  full local suite run shows 28/28 passed (20 original + 8 new).
+- **Critique findings:** ran the cross-suite regression check spanning
+  every frozen LRPC-1/2/3 artifact plus this task's own suite — 101/101
+  passed, zero regressions. Independently confirmed
+  `scripts/local-agent/run_local_task_test.py` (out of scope, untouched by
+  this diff) has zero uncommitted changes (`git status --short` empty for
+  that file) and its failing-test-name set is the same 33-name baseline
+  documented at LRPC-4 closure (64 passed / 33 pre-existing-unrelated —
+  the 64, not 60, is LRPC-4's own delta of +4 tests to that same file,
+  already recorded at LRPC-4 closure line 1420, not a new LRPC-5 change).
+  This reconciles what was flagged as an open discrepancy before this pass:
+  64 passed is the correct current baseline for that file, not a
+  regression signal.
+- **Revisions applied:** none — all counts reconciled against documented
+  baselines with reproducible evidence, no discrepancy remained.
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma` (`gemma4:26b-a4b-it-qat`, explicit `--model` override —
+  same rationale as LRPC-3/LRPC-4: the bare script/Makefile default
+  resolves to `muse-glimmer:30b-q4_K_M`, the intermediate fallback for this
+  band, not the primary)
+- Command: `python3 scripts/gemma-code-review.py --model
+  gemma4:26b-a4b-it-qat --passes 3 --task-id LRPC-5 --max-wall 180 --out
+  docs/audit/gemma-evidence/LRPC-5.json <packet: diff of
+  scripts/local-architect/run_analysis.py +
+  scripts/local-architect/run_analysis_test.py, plus LRPC-5 acceptance
+  criteria and independently-verified facts>`
+- Passes run / usable: `3/3`
+- Aggregate status: `FINDINGS` (1 consensus minor, both consensus and the
+  single pass-specific-only variant explicitly scoped `out-of-scope` by the
+  reviewer itself)
+- Artifact: `docs/audit/gemma-evidence/LRPC-5.json`; receipt
+  `docs/audit/gemma-evidence/LRPC-5-receipt.json` (`verdict:
+  FINDINGS-ACKED`)
+- Findings and disposition:
+  - **Consensus minor — `sys.path.insert(0, ...)` sibling-directory import
+    pattern (line 18-19), reviewer-scoped `out-of-scope`:** this is the
+    same import-wiring pattern already used identically by
+    `prompt_builder.py` itself (LRPC-2), `cli.py` (LRPC-4), and every other
+    script in this repo that imports a sibling script as a module — not
+    introduced or changed by this diff. **Accepted, no code change** — the
+    reviewer's own `out-of-scope` label matches the primary agent's
+    independent assessment; a repo-wide import-mechanism change is
+    explicitly out of LRPC-5's scope.
+- Muse Glimmer fallback: not triggered — primary Gemma responded normally
+  across all 3 passes.
+- D14 fallback: not triggered.
+- disposition_divergence: `none`.
+- Primary-agent disposition: 1 out-of-scope minor accepted with no code
+  change, consistent with the reviewer's own scope label.
+
+Review artifact: docs/audit/gemma-evidence/LRPC-5.json
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | `DEFAULT_PROFILE` prompt contains every canonical `local_architect_default` clause verbatim | `scripts/local-architect/run_analysis_test.py::PromptBuilderIntegrationTest::test_hp1_default_profile_prompt_contains_every_local_architect_default_clause` | passed |
+| HP-2 | Happy path | `MED_HIGH_REFINEMENT_PROFILE` prompt contains every canonical `local_architect_med_high` clause verbatim | `scripts/local-architect/run_analysis_test.py::PromptBuilderIntegrationTest::test_hp2_med_high_profile_prompt_contains_every_local_architect_med_high_clause` | passed |
+| HP-3 | Happy path | `DEFAULT_PROFILE` schema + packet content unchanged | `scripts/local-architect/run_analysis_test.py::PromptBuilderIntegrationTest::test_hp3_default_profile_schema_and_packet_content_still_present` | passed |
+| HP-4 | Happy path | `MED_HIGH_REFINEMENT_PROFILE` schema + packet content unchanged | `scripts/local-architect/run_analysis_test.py::PromptBuilderIntegrationTest::test_hp4_med_high_profile_schema_and_packet_content_still_present` | passed |
+| EC-1 | Edge case | `PromptBudgetExceeded` propagates uncaught before any Ollama call, `DEFAULT_PROFILE` | `scripts/local-architect/run_analysis_test.py::PromptBuilderIntegrationTest::test_ec1_budget_exceeded_propagates_uncaught_before_any_ollama_call_default` | passed |
+| EC-2 | Edge case | `PromptBudgetExceeded` propagates uncaught before any Ollama call, `MED_HIGH_REFINEMENT_PROFILE` | `scripts/local-architect/run_analysis_test.py::PromptBuilderIntegrationTest::test_ec2_budget_exceeded_propagates_uncaught_before_any_ollama_call_med_high` | passed |
+| EC-3 | Edge case | unknown `role` raises `UnknownRoleError`, no silent default fallback | `scripts/local-architect/run_analysis_test.py::PromptBuilderIntegrationTest::test_ec3_unknown_role_would_raise_typed_error_not_silently_default` | passed |
+
+Supplementary verification beyond the task's own HP/EC set (Reflection
+Pass 3): `test_hp2b_default_and_med_high_profiles_reuse_the_identical_clause_set`
+(both roles' clause sets confirmed identical by design, not merely by
+coincidence); full cross-suite run of `prompt_anchors_test.py` +
+`prompt_builder_test.py` + `gemma_code_review_test.py` +
+`run_analysis_test.py` + `adr037_handoff_mapping_test.py` (101/101 passed,
+zero regression across every frozen LRPC-1/2/3 suite);
+`run_local_task_test.py` confirmed untouched (0 uncommitted changes) with
+its documented 64-passed/33-pre-existing-failure baseline (LRPC-4's own
++4 delta) intact; `python3 -m py_compile
+scripts/local-architect/run_analysis.py` clean.
+
+### Owner final verification
+
+- Owner: `matias` (via Claude Code orchestrator, session 2026-08-20)
+- Date: `2026-08-20`
+- Statement: I verified LRPC-5's HP-1, HP-2, HP-3, HP-4, EC-1, EC-2, and
+  EC-3 all have concrete unit test evidence that replicates the expected
+  behavior. I explicitly reviewed and approved the HP-1 deviation (byte-
+  for-byte identity reinterpreted as verbatim-clause-containment) after
+  being shown the practical token-budget impact of the change (≈82 tokens,
+  ≈2% of the available prompt budget) before deciding. The Med-high
+  ADR-038 route (Muse Glimmer + primary receipt both `CLOUD_REQUIRED`,
+  cloud-only implementation, ADR-039 human-select checkpoint) was followed
+  in full, and the 3-pass Reflection cycle ran to completion. I confirmed
+  the `run_local_task_test.py` 64-vs-60-passed question was a benign
+  reconciliation against LRPC-4's own already-documented +4 test delta to
+  that file, not a real regression introduced by this task.
+- Commands run: `python3 scripts/rri.py --cc 3 --D 4 --K 2 --P 3 --T 4 --A 1
+  --X 2 --touches scripts/local-architect/run_analysis.py --touches
+  scripts/local-architect/run_analysis_test.py`; `python3
+  scripts/local-architect/run_analysis.py --profile med-high-refinement-v1
+  ...` (Muse Glimmer refinement); `python3
+  scripts/local-agent/med_high_gate.py ...` (route decision); `python3 -m
+  pytest scripts/local-architect/run_analysis_test.py -v`; `python3 -m
+  pytest scripts/local-agent/prompt_anchors_test.py
+  scripts/local-agent/prompt_builder_test.py scripts/gemma_code_review_test.py
+  scripts/local-architect/run_analysis_test.py
+  scripts/local-architect/adr037_handoff_mapping_test.py -q`; `python3 -m
+  pytest scripts/local-agent/run_local_task_test.py -q --tb=no -rA`; `git
+  status --short scripts/local-agent/run_local_task_test.py`; `python3 -m
+  py_compile scripts/local-architect/run_analysis.py`; `python3
+  scripts/gemma-code-review.py --model gemma4:26b-a4b-it-qat --passes 3
+  --task-id LRPC-5 --max-wall 180 --out docs/audit/gemma-evidence/LRPC-5.json
+  ...`.
+
+Reminder: run `/compact` (or `/clear` if this task's context is no longer
+needed) now that LRPC-5 is closed.
 
 ## LRPC-6 — Golden-set behavioral-equivalence harness
 
@@ -1597,7 +1928,8 @@ needed) now that LRPC-4 is closed.
 
 ## LRPC-8 — Docs propagation
 
-- **Dependencies:** LRPC-3, LRPC-4, LRPC-5.
+- **Dependencies:** LRPC-3, LRPC-4, LRPC-5 (all satisfied as of 2026-08-20 —
+  unblocked, not yet started).
 - **Provisional effort:** S. Update `AGENT_WORKFLOW_GUIDE.md § Gemma
   Reviewer / Muse Glimmer Reviewer`, `§ Handoff prompt format`, and
   `§ Local Architect / Complex Analyst` to describe the builder-sourced
@@ -1664,7 +1996,37 @@ Motivating bug fix tracked separately: `docs/tasks/gemma-push-reviewer-role.md �
       duplication) accepted as already self-documented. 3-pass Reflection
       log, 4/4 new HP/EC unit tests, byte-identical 60→64-passed/33-failed
       regression baseline, full closure record in § LRPC-4)
-- [ ] LRPC-5
+- [x] LRPC-5 (done 2026-08-20; `scripts/local-architect/run_analysis.py`'s
+      `build_prompt()` — both `DEFAULT_PROFILE` and
+      `MED_HIGH_REFINEMENT_PROFILE` branches — now sources its
+      authority-boundary opener via `prompt_builder.build_system_prompt
+      (role="local_architect_default"|"local_architect_med_high", ...)`,
+      closing the third and last hardcoded-opener consumer script this plan
+      targets (after LRPC-3's `gemma-code-review.py` and LRPC-4's `cli.py`)
+      — Med-high (RRI 42) ADR-038 route, Muse Glimmer + primary receipt
+      both `CLOUD_REQUIRED` (concurred, no downgrade — unlike the
+      `GO_LOCAL` precedent in LRPC-3/LRPC-4), cloud-only implementation per
+      band policy; ADR-039 human-select checkpoint, owner chose
+      `claude-sonnet-5`/high over the recommended `gpt-5.6-sol`/high;
+      implemented directly by Claude Code. Mid-task, the original HP-1
+      acceptance criterion (byte-for-byte identity with the old hardcoded
+      opener) was found factually impossible to satisfy together with the
+      task's actual purpose — none of the five canonical ADR-037 clauses
+      were ever present in that string, which was a paraphrase, not a
+      subset — surfaced to the user via `AskUserQuestion` with measured
+      (not estimated) token-budget impact (≈82 tokens, ≈2% of budget)
+      before the user approved reinterpreting HP-1 as verbatim-clause-
+      containment, the same pattern LRPC-3/LRPC-4 already use. Phase-1
+      Gemma review: PASS (retried once after a bare/shallow first response
+      to force substantive reasoning). Phase-2 Gemma review: PASS, 1
+      consensus minor finding explicitly self-scoped `out-of-scope` by the
+      reviewer (pre-existing `sys.path.insert` import pattern, unchanged by
+      this diff), no fallback triggered. 3-pass Reflection log, 7/7 HP/EC
+      unit tests (+1 supplementary, 28/28 full local suite, 101/101 frozen
+      LRPC-1/2/3 cross-suite unaffected); confirmed
+      `run_local_task_test.py`'s 64-passed/33-failed count is LRPC-4's own
+      already-documented baseline (not a new regression); full closure
+      record in § LRPC-5)
 - [ ] LRPC-6
 - [ ] LRPC-7
 - [ ] LRPC-8

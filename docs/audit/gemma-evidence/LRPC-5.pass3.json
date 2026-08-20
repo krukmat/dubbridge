@@ -1,0 +1,19 @@
+{
+  "changed_paths": [],
+  "findings": [
+    {
+      "detail": "The use of `sys.path.insert(0, ...)` to import from a sibling directory is a brittle way to handle local module resolution and can lead to issues if the script is executed from different working directories or if the environment is not set up as expected.",
+      "line": 18,
+      "path": "scripts/local-architect/run_analysis.py",
+      "scope": "out-of-scope",
+      "severity": "minor",
+      "suggestion": "Consider installing the `local-agent` package in editable mode during development or using a proper `PYTHONPATH` configuration."
+    }
+  ],
+  "format_warnings": [
+    "bare STATUS value accepted (non-standard format): 'PASS'",
+    "STATUS PASS with findings coerced to FINDINGS"
+  ],
+  "status": "findings",
+  "summary": "The changes successfully refactor `build_prompt` to use `build_system_prompt` for sourcing authority-boundary clauses, ensuring canonicalization of the local architect roles as per ADR-037. The implementation correctly preserves the JSON schema and packet content while adding comprehensive integration tests to verify clause presence, budget propagation, and role validation."
+}

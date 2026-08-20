@@ -1,0 +1,8 @@
+{
+  "primary_id": "claude-code-orchestrator",
+  "decision": "CLOUD_REQUIRED",
+  "card_hash": "1db93586b039a2e266320a4656a46546098e205776c3d3ce1d6f501f9b1169df",
+  "refinement_artifact_sha256": "bf50ad7e1fbc668f08ea7c07851e3be26fb5383a182b6b4c266636748e97b365",
+  "rationale": "Concurs with Muse Glimmer CLOUD_REQUIRED. Unlike the GO_LOCAL precedent in LRPC-3/LRPC-4 (same RRI 42 class, same review-pipeline-integrity rationale), this task's HP-1 acceptance criterion demands byte-for-byte identity for the DEFAULT_PROFILE prompt output, not substring presence -- Muse Glimmer correctly flagged this as not safely boundable locally without direct golden-string evidence and builder output verification. No auth/security, no rights/consent/governance invariant, no schema/migration/release cut, no unresolved ADR decision, no unbounded scope. Per AGENT_WORKFLOW_GUIDE.md, Med-high implementation is cloud-only regardless of the recommendation --  this receipt governs only the evidence trail.",
+  "timestamp": "2026-08-20T06:28:35.787458Z"
+}

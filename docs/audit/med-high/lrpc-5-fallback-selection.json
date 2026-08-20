@@ -1,0 +1,15 @@
+{
+  "task_id": "LRPC-5",
+  "checkpoint": "adr-039-fallback-selection-v1",
+  "trigger_kind": "capability-risk",
+  "trigger_reason": "Mandatory Med-high cloud takeover per band policy -- CLOUD_REQUIRED gate result (Muse Glimmer concurred with primary receipt) confirms cloud-only implementation.",
+  "recommended_model": "gpt-5.6-sol",
+  "recommended_reasoning_effort": "high",
+  "selection_mode": "human-select",
+  "selected_by": "matias",
+  "selected_model": "claude-sonnet-5",
+  "selected_reasoning_effort": "high",
+  "selected_via": "AskUserQuestion",
+  "status": "fallback_authorized",
+  "timestamp": "2026-08-20T06:33:10.496973Z"
+}

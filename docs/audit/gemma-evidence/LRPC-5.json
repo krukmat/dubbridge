@@ -1,0 +1,47 @@
+{
+  "changed_paths": [],
+  "findings": [
+    {
+      "detail": "The use of `sys.path.insert(0, ...)` to import from a sibling directory is a common pattern in scripts but can lead to issues if the execution context changes or if multiple modules with the same name exist in the path.",
+      "line": 18,
+      "path": "scripts/local-architect/run_analysis.py",
+      "scope": "out-of-scope",
+      "severity": "minor",
+      "suggestion": "Consider making the package structure more formal or using `PYTHONPATH` to manage imports."
+    }
+  ],
+  "passes_run": 3,
+  "passes_succeeded": 3,
+  "reconciliation": {
+    "consensus": [
+      {
+        "detail": "The use of `sys.path.insert(0, ...)` to import from a sibling directory is a common pattern in scripts but can lead to issues if the execution context changes or if multiple modules with the same name exist in the path.",
+        "line": 18,
+        "path": "scripts/local-architect/run_analysis.py",
+        "scope": "out-of-scope",
+        "severity": "minor",
+        "suggestion": "Consider making the package structure more formal or using `PYTHONPATH` to manage imports."
+      }
+    ],
+    "consensus_count": 1,
+    "likely_false_positive": [
+      {
+        "detail": "The use of `sys.path.insert(0, ...)` to import from a sibling directory is a brittle way to handle local module resolution and can lead to issues if the script is executed from different working directories or if the environment is not set up as expected.",
+        "line": 19,
+        "path": "scripts/local-architect/run_analysis.py",
+        "scope": "out-of-scope",
+        "severity": "minor",
+        "suggestion": "Consider installing the `local-agent` package in editable mode during development or using a proper `PYTHONPATH` configuration."
+      }
+    ],
+    "likely_false_positive_count": 1,
+    "location_inconsistent": [],
+    "location_inconsistent_count": 0,
+    "pass_specific": [],
+    "pass_specific_count": 0,
+    "severity_inconsistent": [],
+    "severity_inconsistent_count": 0
+  },
+  "status": "findings",
+  "summary": "The diff correctly implements the canonicalization of authority-boundary clauses by delegating prompt construction to `build_system_prompt` with the specified roles. It preserves the existing JSON schema and packet injection logic. Comprehensive integration tests have been added to verify clause presence, schema integrity, and error propagation."
+}

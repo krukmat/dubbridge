@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import socket
+import sys
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -15,6 +16,20 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib import error, request
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "local-agent"))
+
+from prompt_builder import build_system_prompt  # noqa: E402
+
+# Default num_ctx/num_predict used to build the module-level-equivalent
+# boundary text below. The real per-invocation values come from Config
+# (parse_args), matching this module's existing behavior of not tying the
+# authority-boundary text to CLI args (LRPC-4 precedent, scripts/local-agent
+# /cli.py). Not a module-level constant here (unlike LRPC-4) because
+# build_prompt() is called per-invocation with the real packet, not once at
+# import time -- but the boundary-clause budget check uses the same fixed
+# defaults regardless of the actual CLI num_ctx/num_predict for that reason.
+_BOUNDARY_BUDGET_NUM_CTX = 8192
+_BOUNDARY_BUDGET_NUM_PREDICT = 4096
 
 ARTIFACT_SCHEMA_VERSION = "adr037-local-architect-artifact-v1"
 PROMPT_VERSION = "adr037-local-architect-prompt-v1"
@@ -87,53 +102,76 @@ def sha256_bytes(payload: bytes) -> str:
 def build_prompt(packet: dict[str, Any], profile: str = DEFAULT_PROFILE) -> str:
     packet_json = json.dumps(packet, ensure_ascii=True, indent=2, sort_keys=True)
     if profile == DEFAULT_PROFILE:
-        # Keep the ADR-037 prompt byte-for-byte stable for callers that do not
-        # select a profile explicitly.
-        return (
-            "You are the DubBridge Local Architect / Complex Analyst. "
-            "You are advisory-only, read-only, and must not claim authority.\n\n"
-            "Return JSON only. Do not use Markdown fences.\n"
-            "Required schema:\n"
-            "{\n"
-            '  "objective": string,\n'
-            '  "current_state": string,\n'
-            '  "constraints": [string],\n'
-            '  "risks": [string],\n'
-            '  "recommendations": [string],\n'
-            '  "open_questions": [string],\n'
-            '  "evidence_gaps": [string],\n'
-            '  "claims": [{"statement": string, "label": "SUPPORTED|INFERRED|UNKNOWN"}]\n'
-            "}\n\n"
-            "Use only facts supported by the packet. Mark uncertainty explicitly.\n\n"
-            "Project packet:\n"
-            f"{packet_json}\n"
+        # LRPC-5: the authority-boundary opener is now sourced from
+        # prompt_anchors.ROLE_ANCHORS["local_architect_default"] (ADR-037's
+        # canonical five "may not" clauses) via build_system_prompt, instead
+        # of the prior hardcoded paraphrase ("advisory-only, read-only, and
+        # must not claim authority"). The removed code comment above this
+        # branch ("Keep the ADR-037 prompt byte-for-byte stable...") no
+        # longer applies and is intentionally deleted: verified none of the
+        # five canonical clauses were ever present verbatim in the prior
+        # hardcoded string, so byte-for-byte stability was never actually
+        # achieved against the ADR-037 source -- it was byte-for-byte
+        # stability against a paraphrase, the exact drift class this whole
+        # plan exists to close (docs/plan/local-role-prompt-canonicalization
+        # .md). Owner-approved deviation from this task's original HP-1
+        # wording, 2026-08-20 -- see LRPC-5 closure record.
+        return build_system_prompt(
+            role="local_architect_default",
+            num_ctx=_BOUNDARY_BUDGET_NUM_CTX,
+            num_predict=_BOUNDARY_BUDGET_NUM_PREDICT,
+            output_format_text=(
+                "Return JSON only. Do not use Markdown fences.\n"
+                "Required schema:\n"
+                "{\n"
+                '  "objective": string,\n'
+                '  "current_state": string,\n'
+                '  "constraints": [string],\n'
+                '  "risks": [string],\n'
+                '  "recommendations": [string],\n'
+                '  "open_questions": [string],\n'
+                '  "evidence_gaps": [string],\n'
+                '  "claims": [{"statement": string, "label": "SUPPORTED|INFERRED|UNKNOWN"}]\n'
+                "}\n\n"
+                "Use only facts supported by the packet. Mark uncertainty explicitly.\n\n"
+                "Project packet:\n"
+                f"{packet_json}\n"
+            ),
         )
     if profile == MED_HIGH_REFINEMENT_PROFILE:
-        return (
-            "You are the DubBridge Local Architect refining one approved Med-high task. "
-            "You are advisory-only, read-only, tool-free, and must not claim approval or implementation authority.\n\n"
-            "Return JSON only. Do not use Markdown fences.\n"
-            "Required schema:\n"
-            "{\n"
-            '  "route_recommendation": "GO_LOCAL|CLOUD_REQUIRED",\n'
-            '  "summary": string,\n'
-            '  "refined_scope": [string],\n'
-            '  "excluded_scope": [string],\n'
-            '  "implementation_steps": [string],\n'
-            '  "acceptance_tests": [string],\n'
-            '  "risks": [string],\n'
-            '  "unknowns": [string],\n'
-            '  "stop_conditions": [string],\n'
-            '  "claims": [{"statement": string, "label": "SUPPORTED|INFERRED|UNKNOWN"}]\n'
-            "}\n\n"
-            "Choose CLOUD_REQUIRED whenever evidence is incomplete, scope is unbounded, "
-            "acceptance is non-deterministic, or a material unknown prevents a safe bounded implementation. "
-            "Do not expand the approved scope. Use only facts supported by the packet and mark uncertainty explicitly.\n\n"
-            "Keep the response compact so it fits the available generation budget: at most 6 items per "
-            "array field, at most 2 sentences per item, and at most 4 claims. Do not pad with restated "
-            "packet content.\n\n"
-            "Approved task packet:\n"
-            f"{packet_json}\n"
+        # LRPC-5: same builder-sourced boundary clause, role="local_architect_
+        # med_high" -- reuses the identical five Clause objects as
+        # local_architect_default by design (established in LRPC-1: the
+        # ADR-037 "may not" boundary is invariant across both refinement
+        # profiles).
+        return build_system_prompt(
+            role="local_architect_med_high",
+            num_ctx=_BOUNDARY_BUDGET_NUM_CTX,
+            num_predict=_BOUNDARY_BUDGET_NUM_PREDICT,
+            output_format_text=(
+                "Return JSON only. Do not use Markdown fences.\n"
+                "Required schema:\n"
+                "{\n"
+                '  "route_recommendation": "GO_LOCAL|CLOUD_REQUIRED",\n'
+                '  "summary": string,\n'
+                '  "refined_scope": [string],\n'
+                '  "excluded_scope": [string],\n'
+                '  "implementation_steps": [string],\n'
+                '  "acceptance_tests": [string],\n'
+                '  "risks": [string],\n'
+                '  "unknowns": [string],\n'
+                '  "stop_conditions": [string],\n'
+                '  "claims": [{"statement": string, "label": "SUPPORTED|INFERRED|UNKNOWN"}]\n'
+                "}\n\n"
+                "Choose CLOUD_REQUIRED whenever evidence is incomplete, scope is unbounded, "
+                "acceptance is non-deterministic, or a material unknown prevents a safe bounded implementation. "
+                "Do not expand the approved scope. Use only facts supported by the packet and mark uncertainty explicitly.\n\n"
+                "Keep the response compact so it fits the available generation budget: at most 6 items per "
+                "array field, at most 2 sentences per item, and at most 4 claims. Do not pad with restated "
+                "packet content.\n\n"
+                "Approved task packet:\n"
+                f"{packet_json}\n"
+            ),
         )
     raise AnalysisError("invalid_profile", f"Unsupported analysis profile: {profile!r}.")
 

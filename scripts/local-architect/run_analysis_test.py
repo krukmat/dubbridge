@@ -497,5 +497,120 @@ class ParseArgsDefaultsTest(unittest.TestCase):
         self.assertEqual(config.expected_model_digest, "some-other-digest")
 
 
+class PromptBuilderIntegrationTest(unittest.TestCase):
+    """LRPC-5 (docs/tasks/local-role-prompt-canonicalization.md): build_prompt()
+    now sources its authority-boundary opener from prompt_builder.build_system_prompt
+    against prompt_anchors.ROLE_ANCHORS["local_architect_default"] /
+    ["local_architect_med_high"], instead of a hardcoded paraphrase of ADR-037's
+    five "may not" clauses."""
+
+    def _clauses(self, role: str) -> list[str]:
+        import importlib
+        import os as _os
+
+        anchors_path = Path(_os.path.dirname(_os.path.dirname(_os.path.abspath(str(_SCRIPT))))) / "local-agent" / "prompt_anchors.py"
+        spec = importlib.util.spec_from_file_location("prompt_anchors", anchors_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return [clause.text for clause in mod.ROLE_ANCHORS[role]]
+
+    def test_hp1_default_profile_prompt_contains_every_local_architect_default_clause(self) -> None:
+        packet = _MOD.parse_packet(_packet_bytes())
+        prompt = _MOD.build_prompt(packet, profile=_MOD.DEFAULT_PROFILE)
+        for clause_text in self._clauses("local_architect_default"):
+            self.assertIn(clause_text, prompt)
+
+    def test_hp2_med_high_profile_prompt_contains_every_local_architect_med_high_clause(self) -> None:
+        packet = _MOD.parse_packet(_packet_bytes())
+        prompt = _MOD.build_prompt(packet, profile=_MOD.MED_HIGH_REFINEMENT_PROFILE)
+        for clause_text in self._clauses("local_architect_med_high"):
+            self.assertIn(clause_text, prompt)
+
+    def test_hp2b_default_and_med_high_profiles_reuse_the_identical_clause_set(self) -> None:
+        # Established in LRPC-1: local_architect_default and
+        # local_architect_med_high are the same five Clause objects, reused
+        # by design since the ADR-037 boundary is invariant across both
+        # refinement profiles.
+        self.assertEqual(
+            self._clauses("local_architect_default"),
+            self._clauses("local_architect_med_high"),
+        )
+
+    def test_hp3_default_profile_schema_and_packet_content_still_present(self) -> None:
+        # The output-format contract (schema, instructions, packet JSON) is
+        # unchanged in content, passed through as output_format_text.
+        packet = _MOD.parse_packet(_packet_bytes())
+        prompt = _MOD.build_prompt(packet, profile=_MOD.DEFAULT_PROFILE)
+        self.assertIn('"objective": string', prompt)
+        self.assertIn('"claims": [{"statement": string, "label": "SUPPORTED|INFERRED|UNKNOWN"}]', prompt)
+        self.assertIn("Use only facts supported by the packet. Mark uncertainty explicitly.", prompt)
+        self.assertIn('"work_item_id": "S-140"', prompt)
+
+    def test_hp4_med_high_profile_schema_and_packet_content_still_present(self) -> None:
+        packet = _MOD.parse_packet(_packet_bytes())
+        prompt = _MOD.build_prompt(packet, profile=_MOD.MED_HIGH_REFINEMENT_PROFILE)
+        self.assertIn('"route_recommendation": "GO_LOCAL|CLOUD_REQUIRED"', prompt)
+        self.assertIn("Choose CLOUD_REQUIRED whenever evidence is incomplete", prompt)
+        self.assertIn("Keep the response compact", prompt)
+        self.assertIn('"work_item_id": "S-140"', prompt)
+
+    def test_ec1_budget_exceeded_propagates_uncaught_before_any_ollama_call_default(self) -> None:
+        import importlib
+        import os as _os
+
+        builder_path = (
+            Path(_os.path.dirname(_os.path.dirname(_os.path.abspath(str(_SCRIPT)))))
+            / "local-agent"
+            / "prompt_builder.py"
+        )
+        spec = importlib.util.spec_from_file_location("prompt_builder", builder_path)
+        builder_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(builder_mod)
+
+        packet = _MOD.parse_packet(_packet_bytes())
+        with unittest.mock.patch.object(_MOD, "build_system_prompt") as mock_builder:
+            mock_builder.side_effect = builder_mod.PromptBudgetExceeded("local_architect_default", 9999, 10)
+            with self.assertRaises(builder_mod.PromptBudgetExceeded):
+                _MOD.build_prompt(packet, profile=_MOD.DEFAULT_PROFILE)
+
+    def test_ec2_budget_exceeded_propagates_uncaught_before_any_ollama_call_med_high(self) -> None:
+        import importlib
+        import os as _os
+
+        builder_path = (
+            Path(_os.path.dirname(_os.path.dirname(_os.path.abspath(str(_SCRIPT)))))
+            / "local-agent"
+            / "prompt_builder.py"
+        )
+        spec = importlib.util.spec_from_file_location("prompt_builder", builder_path)
+        builder_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(builder_mod)
+
+        packet = _MOD.parse_packet(_packet_bytes())
+        with unittest.mock.patch.object(_MOD, "build_system_prompt") as mock_builder:
+            mock_builder.side_effect = builder_mod.PromptBudgetExceeded("local_architect_med_high", 9999, 10)
+            with self.assertRaises(builder_mod.PromptBudgetExceeded):
+                _MOD.build_prompt(packet, profile=_MOD.MED_HIGH_REFINEMENT_PROFILE)
+
+    def test_ec3_unknown_role_would_raise_typed_error_not_silently_default(self) -> None:
+        # Defense-in-depth: build_prompt() must call build_system_prompt with
+        # the exact role strings that exist in prompt_anchors.ROLE_ANCHORS.
+        # A typo would surface as UnknownRoleError, not a silent empty prompt.
+        import importlib
+        import os as _os
+
+        anchors_path = (
+            Path(_os.path.dirname(_os.path.dirname(_os.path.abspath(str(_SCRIPT)))))
+            / "local-agent"
+            / "prompt_anchors.py"
+        )
+        spec = importlib.util.spec_from_file_location("prompt_anchors", anchors_path)
+        anchors_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(anchors_mod)
+
+        self.assertIn("local_architect_default", anchors_mod.ROLE_ANCHORS)
+        self.assertIn("local_architect_med_high", anchors_mod.ROLE_ANCHORS)
+
+
 if __name__ == "__main__":
     unittest.main()

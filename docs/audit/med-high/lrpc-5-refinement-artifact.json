@@ -1,0 +1,107 @@
+{
+  "error": null,
+  "finished_at": "2026-08-20T06:27:14.446965Z",
+  "generation": {
+    "created_at": "2026-08-20T06:27:14.411015Z",
+    "done": true,
+    "eval_count": 712,
+    "eval_duration": 98602647000,
+    "load_duration": 6493487167,
+    "prompt_eval_count": 920,
+    "prompt_eval_duration": 6361661000,
+    "think_disabled": true,
+    "thinking_present": false,
+    "thinking_sha256": null,
+    "total_duration": 111484596209
+  },
+  "model": {
+    "expected_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "resolved_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "tag": "muse-glimmer:30b-q4_K_M"
+  },
+  "packet": {
+    "expected_sha256": "1db93586b039a2e266320a4656a46546098e205776c3d3ce1d6f501f9b1169df",
+    "path": "/private/tmp/claude-501/-Users-matias-dubbridge/c7a3565e-44ef-40be-b9d0-f4ebfa9efdab/scratchpad/lrpc5-approved-packet.json",
+    "sha256": "1db93586b039a2e266320a4656a46546098e205776c3d3ce1d6f501f9b1169df"
+  },
+  "profile": "med-high-refinement-v1",
+  "prompt": {
+    "profile": "med-high-refinement-v1",
+    "sha256": "48aef31a5a9bfe67dd5c909cd4fc9b24d170a4028d442d6e2399eade184d2a48",
+    "version": "med-high-refinement-prompt-v1"
+  },
+  "response": {
+    "raw_text_sha256": "53cb2219c53a292fbc91e3da006d56cb5ce08c8aa6431c07fa39d032fedd83ba",
+    "validated": {
+      "acceptance_tests": [
+        "Golden-string byte equality test for DEFAULT_PROFILE passes",
+        "MED_HIGH_REFINEMENT_PROFILE contains same 5 boundary clauses",
+        "PromptBudgetExceeded raised before Ollama call for both profiles",
+        "run_analysis_test.py suite green with updated phrasing"
+      ],
+      "claims": [
+        {
+          "label": "SUPPORTED",
+          "statement": "DEFAULT_PROFILE must be byte-identical to current hardcoded string"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "MED_HIGH_REFINEMENT_PROFILE must contain same 5 boundary clauses"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "prompt_builder.py is frozen per out_of_scope"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Precedent LRPC-3/LRPC-4 used ADR-038 route"
+        }
+      ],
+      "excluded_scope": [
+        "prompt_anchors.py / prompt_builder.py changes",
+        "JSON schema/field-list text modification",
+        "Config and CLI arg parsing changes"
+      ],
+      "implementation_steps": [
+        "Extract current hardcoded DEFAULT_PROFILE string as golden reference",
+        "Invoke prompt_builder.build_system_prompt with role local_architect_default and compare bytes",
+        "Repeat comparison for MED_HIGH_REFINEMENT_PROFILE with 5 clause check",
+        "Add golden-string diff test and budget exception test"
+      ],
+      "refined_scope": [
+        "Verify build_prompt() builder call for DEFAULT_PROFILE yields byte-identical output to hardcoded string",
+        "Verify MED_HIGH_REFINEMENT_PROFILE builder call preserves 5 boundary clauses",
+        "Confirm PromptBudgetExceeded propagates before Ollama HTTP call for both profiles",
+        "Update run_analysis_test.py assertions for new phrasing while keeping pass/fail set"
+      ],
+      "risks": [
+        "Builder output may differ by whitespace or ordering breaking byte identity",
+        "Golden string not captured leading to silent drift",
+        "Test updates may alter pass/fail set unintentionally"
+      ],
+      "route_recommendation": "CLOUD_REQUIRED",
+      "stop_conditions": [
+        "Byte identity test fails for DEFAULT_PROFILE",
+        "Boundary clause count mismatch for MED_HIGH_REFINEMENT_PROFILE",
+        "PromptBudgetExceeded no longer preempts Ollama call"
+      ],
+      "summary": "Byte-identical DEFAULT_PROFILE requirement cannot be safely bounded locally without golden-string evidence and builder output verification.",
+      "unknowns": [
+        "Exact current hardcoded strings for both profiles",
+        "Builder output format for role local_architect_default/med_high",
+        "Location of golden string reference"
+      ]
+    }
+  },
+  "runtime": {
+    "num_ctx": 65536,
+    "num_predict": 4096,
+    "ollama_url": "http://127.0.0.1:11434",
+    "temperature": 0.0,
+    "timeout_seconds": 180.0
+  },
+  "schema_version": "adr037-local-architect-artifact-v1",
+  "started_at": "2026-08-20T06:25:22.911359Z",
+  "status": "ok",
+  "success": true
+}
