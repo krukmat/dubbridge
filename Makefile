@@ -1,4 +1,4 @@
-.PHONY: qa-fmt qa-lint qa-test qa-test-redis qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-docs-review qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review show-codex-session-model install-hooks
+.PHONY: qa-fmt qa-lint qa-test qa-test-redis qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-docs-review qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review qa-golden-set show-codex-session-model install-hooks
 
 COVERAGE_MIN ?= 90
 PEER_REVIEW_RRI      ?= 22
@@ -12,6 +12,8 @@ GEMMA_REVIEW_RESULT ?= /tmp/dubbridge-gemma-review.json
 GEMMA_REVIEW_TASK_ID ?=
 GEMMA_EVIDENCE_DIR   ?= docs/audit/gemma-evidence
 REVIEW_PATHS         ?=
+GOLDEN_SET_MODEL     ?= gemma4:26b-a4b-it-qat
+GOLDEN_SET_RESULT    ?= /tmp/dubbridge-golden-set.json
 COVERAGE_IGNORE_REGEX ?= (apps/(api|cli|worker-runner)/src/(main|cleanup)\.rs|apps/api/src/(dto/ingestion|lib|routes/ingestion|state)\.rs|crates/(db|jobs|observability)/src/lib\.rs|crates/db/src/(artifact_repo|asset_repo|audit_repo|pending_ingestion_repo|rights_repo)\.rs|crates/(audit|ingestion)/src/lib\.rs)
 CARGO ?= $(if $(shell command -v cargo 2>/dev/null),$(shell command -v cargo),$(HOME)/.cargo/bin/cargo)
 
@@ -128,6 +130,15 @@ qa-gemma-review:
 		echo "[gemma-review] receipt written to $(GEMMA_EVIDENCE_DIR)/$(GEMMA_REVIEW_TASK_ID).json"; \
 	fi; \
 	exit $$findings_status
+
+qa-golden-set:
+	@if [ "$${DUBBRIDGE_SKIP_GOLDEN_SET:-0}" = "1" ]; then \
+		echo "[golden-set] skipped (DUBBRIDGE_SKIP_GOLDEN_SET=1)"; exit 0; \
+	fi; \
+	python3 scripts/local-agent/golden_set.py \
+		--model "$(GOLDEN_SET_MODEL)" \
+		--out "$(GOLDEN_SET_RESULT)" \
+	&& echo "[golden-set] result written to $(GOLDEN_SET_RESULT)"
 
 qa-gemma-push-review:
 	@if [ "$${DUBBRIDGE_SKIP_GEMMA_PUSH_REVIEW:-0}" = "1" ]; then \

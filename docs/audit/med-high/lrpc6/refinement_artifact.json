@@ -1,0 +1,108 @@
+{
+  "error": null,
+  "finished_at": "2026-08-20T07:11:04.611590Z",
+  "generation": {
+    "created_at": "2026-08-20T07:11:04.574953Z",
+    "done": true,
+    "eval_count": 675,
+    "eval_duration": 95150726000,
+    "load_duration": 6672586416,
+    "prompt_eval_count": 1377,
+    "prompt_eval_duration": 8234375000,
+    "think_disabled": true,
+    "thinking_present": false,
+    "thinking_sha256": null,
+    "total_duration": 110093302375
+  },
+  "model": {
+    "expected_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "resolved_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "tag": "muse-glimmer:30b-q4_K_M"
+  },
+  "packet": {
+    "expected_sha256": "9b9bd1e66a18bdc5df89087862d01bbd2a30b949c19981a83e3f2d834de56f1e",
+    "path": "/private/tmp/claude-501/-Users-matias-dubbridge/de6c87ff-f176-4022-9c6f-59a234ee55a4/scratchpad/lrpc6_packet.json",
+    "sha256": "9b9bd1e66a18bdc5df89087862d01bbd2a30b949c19981a83e3f2d834de56f1e"
+  },
+  "profile": "med-high-refinement-v1",
+  "prompt": {
+    "profile": "med-high-refinement-v1",
+    "sha256": "53e138078b59731fc4971aff55497adc0435761fe8d2963c14121f2bfa9b145a",
+    "version": "med-high-refinement-prompt-v1"
+  },
+  "response": {
+    "raw_text_sha256": "e4b12c7999f5de2be0c9beac0e1a2dfc550033dd6df05a382374c7b0357bd4e6",
+    "validated": {
+      "acceptance_tests": [
+        "HP-1 passes: verdicts identical for canonical prose vs builder output on boundary-clause fixtures.",
+        "EC-1 passes: harness detects mismatch on deliberately corrupted builder output.",
+        "golden_set_test.py passes deterministically with mocked responses.",
+        "make qa-golden-set runs locally with fixed model and fixture path."
+      ],
+      "claims": [
+        {
+          "label": "SUPPORTED",
+          "statement": "prompt_anchors.ROLE_ANCHORS has exactly 4 roles"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "build_system_prompt is pure and raises before network call"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "make qa-gemma-review is precedent opt-in local pattern"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Design decision 6 defines verification approach"
+        }
+      ],
+      "excluded_scope": [
+        "No changes to prompt_anchors.py or prompt_builder.py.",
+        "No changes to gemma-code-review.py, run_local_task.py/cli.py, run_analysis.py.",
+        "Do not wire qa-golden-set into make qa-ci or CI gate.",
+        "No check-review-budget.py PACKET_OVERHEAD_TOKENS work.",
+        "No AGENT_WORKFLOW_GUIDE.md propagation."
+      ],
+      "implementation_steps": [
+        "Implement golden_set.py using gemma_local primitives for Ollama calls and builder output generation.",
+        "Create minimal adversarial fixtures per role targeting boundary clause wording sensitivity.",
+        "Implement golden_set_test.py with mocked model responses to verify verdict comparison logic.",
+        "Add Makefile qa-golden-set target mirroring qa-gemma-review pattern."
+      ],
+      "refined_scope": [
+        "Create scripts/local-agent/golden_set.py loading fixed adversarial fixtures per role and asserting identical verdicts for canonical prose vs builder output.",
+        "Create fixture set covering gemma_reviewer, local_developer, local_architect_default, local_architect_med_high.",
+        "Create scripts/local-agent/golden_set_test.py with deterministic mocked tests for comparison/parsing logic.",
+        "Add Makefile target make qa-golden-set opt-in outside qa-ci with fixed model and fixture path by convention."
+      ],
+      "risks": [
+        "Live Ollama dependency makes results non-deterministic across environments.",
+        "Fixture design may be insufficient to expose LRPC drift if not adversarial enough.",
+        "Token budget differences between prose and builder could affect model behavior."
+      ],
+      "route_recommendation": "GO_LOCAL",
+      "stop_conditions": [
+        "Harness reports mismatched verdicts for any fixture.",
+        "golden_set_test.py fails.",
+        "Makefile target does not mirror qa-gemma-review convention."
+      ],
+      "summary": "Create opt-in golden-set harness that compares live model verdicts using full canonical prose vs builder output for four frozen roles, proving behavioral equivalence without modifying frozen prompt code.",
+      "unknowns": [
+        "Exact fixture packets needed to reliably flip verdict on lossy paraphrase.",
+        "Model version stability for reproducible verdicts over time."
+      ]
+    }
+  },
+  "runtime": {
+    "num_ctx": 32768,
+    "num_predict": 4096,
+    "ollama_url": "http://127.0.0.1:11434",
+    "temperature": 0.0,
+    "timeout_seconds": 240.0
+  },
+  "schema_version": "adr037-local-architect-artifact-v1",
+  "started_at": "2026-08-20T07:09:14.469554Z",
+  "status": "ok",
+  "success": true
+}

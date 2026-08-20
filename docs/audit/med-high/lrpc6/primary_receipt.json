@@ -1,0 +1,9 @@
+{
+  "task_id": "LRPC-6",
+  "card_hash": "9b9bd1e66a18bdc5df89087862d01bbd2a30b949c19981a83e3f2d834de56f1e",
+  "refinement_artifact_sha256": "165ef76ad170c0b45e95476c0ced6c33c9e886695d051cde39b23ac0c4cffa0d",
+  "decision": "CLOUD_REQUIRED",
+  "primary_id": "claude-sonnet-5",
+  "rationale": "Muse Glimmer's refinement recommended GO_LOCAL, but ADR-038 Amendment 1 (2026-08-12, 'Med-high local execution disabled') policy-excludes every GO_LOCAL result from launching a local developer for the whole task: the local implementer is scoped to Low/S and Moderate/M only. Per Amendment 1, the primary receipt downgrades GO_LOCAL to CLOUD_REQUIRED and the supervisor emits the normal cloud handoff bundle. ADR-040 per-module split routing was evaluated and not applied: all of LRPC-6's touched paths (scripts/local-agent/golden_set.py, golden_set_test.py, a new fixture set, and one Makefile line) are new files with no pre-implementation CC measurement, and the task's dominant RRI driver is D=4 (review-pipeline integrity), uniform across all deliverables rather than a heterogeneous CC split between a low-complexity and high-complexity module. No hard-excluded domain (auth/security/rights/consent/governance/schema/migration) is touched either way.",
+  "timestamp": "2026-08-20T07:12:07Z"
+}

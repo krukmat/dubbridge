@@ -1,0 +1,17 @@
+{
+  "schema_version": "fallback-selection-v1",
+  "task_id": "LRPC-6",
+  "mode": "human-select",
+  "packet_binding": {
+    "card_hash": "9b9bd1e66a18bdc5df89087862d01bbd2a30b949c19981a83e3f2d834de56f1e",
+    "refinement_artifact_sha256": "165ef76ad170c0b45e95476c0ced6c33c9e886695d051cde39b23ac0c4cffa0d",
+    "gate_route": "CLOUD_REQUIRED"
+  },
+  "selection": {
+    "model": "claude-sonnet-5",
+    "reasoning_effort": "high",
+    "selector": "matias (owner, interactive AskUserQuestion, 2026-08-20)"
+  },
+  "rationale": "Med-high RRI 41-55 default cloud resolution is claude-sonnet-5, escalating to claude-opus-5 only on repeated stall/failure (docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Current Claude Code capability resolution) -- no such failure occurred for LRPC-6. gpt-5.6-sol was offered as the alternative capability/risk-takeover resolution but Codex CLI is not on PATH in this environment (reference_codex_cli_location memory); owner selected the in-session claude-sonnet-5 implementer directly rather than pursue an unavailable path.",
+  "timestamp": "2026-08-20T07:12:07Z"
+}

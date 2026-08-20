@@ -1917,6 +1917,147 @@ needed) now that LRPC-5 is closed.
   verdicts. Requires live Ollama calls; fixture design must be deliberately
   discriminating, not just plausible-looking.
 
+**RRI 51 (Med-high)** — `python3 scripts/rri.py --cc 10 --D 4 --K 3 --P 3 --T 3
+--A 2 --X 3 --touches scripts/local-agent/golden_set.py --touches
+scripts/local-agent/golden_set_test.py --touches
+scripts/local-agent/golden_fixtures.py`. D=4 (review-pipeline integrity,
+consistent with LRPC-1 through LRPC-5); X raised to 3 relative to prior LRPC
+tasks because this is the first task in the plan requiring live Ollama
+calls as its actual verification mechanism, not just as an implementation
+detail. Card approved by the user (Makefile-target sub-question resolved
+first via `AskUserQuestion`: confirmed `make qa-golden-set`, mirroring `make
+qa-gemma-review`'s opt-in/outside-`qa-ci`/fixed-model-by-convention
+pattern), then explicit final approval ("aprobado") for the full card.
+
+**ADR-038 routing:** Muse Glimmer refinement
+(`docs/audit/med-high/lrpc6/refinement_artifact.json`) recommended
+`GO_LOCAL`. Primary hash-bound route receipt
+(`docs/audit/med-high/lrpc6/primary_receipt.json`) downgraded to
+`CLOUD_REQUIRED` per ADR-038 Amendment 1 (2026-08-12, "Med-high local
+execution disabled" — every `GO_LOCAL` result is policy-excluded from
+starting a local developer for the whole task). `med_high_gate.py --rri 51`
+confirmed `{"route": "CLOUD_REQUIRED", "reason": "Primary receipt downgraded
+GO_LOCAL to cloud."}`. ADR-040 per-module split was evaluated and not
+applied: all touched paths are new files with no pre-implementation CC
+measurement and no heterogeneous complexity signal, and no hard-excluded
+domain (auth/security/rights/consent/governance/schema/migration) is
+touched either way — recorded in the primary receipt's rationale field.
+ADR-039 human-select checkpoint
+(`docs/audit/med-high/lrpc6/fallback_selection.json`): owner chose
+`claude-sonnet-5`/high (self, in-session) over the alternative
+`gpt-5.6-sol`/high offered per the Med-high capability/risk-takeover
+resolution — Codex CLI is not on `$PATH` in this environment (see
+`reference_codex_cli_location` memory); implemented directly by Claude Code.
+
+**Delivered:** `scripts/local-agent/golden_fixtures.py` (12 adversarial
+fixtures spanning all 4 `ROLE_ANCHORS` roles, each targeting one specific
+extracted clause, each role carrying at least one `PASS` and one
+`VIOLATION` fixture), `scripts/local-agent/golden_set.py` (harness: builds
+both the full-canonical-prose and `build_system_prompt()` system prompts
+per fixture, sends the same transcript to the same live model under both,
+parses a fail-closed `{"verdict": "PASS"|"VIOLATION", "reason": ...}`
+response, and marks a fixture `equivalent` only if both conditions agree
+with each other and with the fixture's `expected_verdict`),
+`scripts/local-agent/golden_set_test.py` (11 deterministic tests, every
+Ollama call mocked via `unittest.mock.patch.object(golden_set,
+"stream_chat", ...)` — never live in this suite or in `make qa-ci`), and
+`make qa-golden-set` (opt-in, outside `qa-ci`, `DUBBRIDGE_SKIP_GOLDEN_SET`
+escape hatch, `GOLDEN_SET_MODEL`/`GOLDEN_SET_RESULT` variables, mirrors
+`qa-gemma-review`'s exact pattern).
+
+**The harness found a real production defect on its first live run** (this
+is the harness working correctly, not a harness bug — exactly what LRPC-6's
+EC-1 requires it to be capable of). Running all 11 fixtures live against
+`gemma4:26b-a4b-it-qat` produced 8/11 PASS, 3/11 FAIL — all three failures on
+`local_architect_default`/`local_architect_med_high` fixtures. Root cause:
+`prompt_anchors.ROLE_ANCHORS` extracted the 5 ADR-037 "may not" list items as
+bare clause fragments (e.g. `"edit source code, tests, configuration,
+policies, ledgers, or canonical ADRs;"`) without their governing header
+("The role may not:", ADR-037 line 70), so `build_system_prompt()`'s
+assembled prompt read as an unqualified list with no prohibition marker.
+Both `gemma4` and `muse-glimmer` interpreted the builder-output condition as
+*permitting* exactly what the full canonical prose (which does carry "The
+role may not:") correctly flagged as a violation — e.g. "the agent is
+running a shell command ... which is explicitly permitted under the
+authority to 'run shell commands or operate a repository worktree'." This
+affects the Local Architect / Complex Analyst role in live production use,
+including the LRPC-6 Muse Glimmer refinement call made earlier in this same
+task.
+
+Flagged to the user before proceeding (this reopens `prompt_anchors.py`,
+frozen by LRPC-1). Owner directed an immediate fix within this task rather
+than deferring to a separate ledger entry. Fix: prepended the verbatim
+substring `"The role may not:\n\n- "` to the first clause of both
+`local_architect_default` and `local_architect_med_high` (verbatim-substring
+provenance preserved per Design decision 1 — "The role may not:" is itself a
+literal substring of ADR-037 at line 70; both frozen structural tests,
+`prompt_anchors_test.py` and `prompt_builder_test.py`, pass unmodified
+against the corrected clause text). Re-ran the harness live after the fix:
+11/11 PASS against `gemma4:26b-a4b-it-qat`; additionally re-verified
+`local_architect_default` (3/3) and `local_architect_med_high` (2/2)
+specifically against `muse-glimmer:30b-q4_K_M` — the exact model bound to
+that role in production — both clean. Full `run_analysis_test.py` (28/28)
+and `med_high_gate_test.py` (30/30) unaffected.
+
+**Reflection log** (3 passes, Med-high):
+
+- *Pass 1 (contract fidelity):* verified the harness compares live-model
+  verdicts across conditions rather than inspecting builder-output text
+  content, which is the actual novel proof Design decision 6 requires (LRPC-
+  1/2's own tests already cover substring containment). No revision needed.
+- *Pass 2 (failure boundaries):* verified `run_condition` catches
+  `GoldenSetError`/`RuntimeError` per-condition without crashing the run
+  (`ConditionErrorIsRecordedNotRaised` test); verified `--role` with no
+  matching fixtures exits 2 with a clear message; verified the harness is
+  non-vacuous — it caught a real defect on its first live run, satisfying
+  EC-1 directly rather than only by construction. No revision needed.
+- *Pass 3 (coverage):* verified all 4 `ROLE_ANCHORS` roles have both a
+  `PASS` and a `VIOLATION` fixture (`FixtureCoverageSpansAllFourRoles`);
+  confirmed `qa-ci`'s dependency list does not include `qa-golden-set`;
+  confirmed the deterministic suite alone cannot certify live-model
+  behavior — evidenced by running the harness live against both `gemma4`
+  and `muse-glimmer` for every fixture, not relying on mocked tests as
+  closure evidence. No revision needed.
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma`
+- Command: `REVIEW_PATHS="Makefile scripts/local-agent/prompt_anchors.py scripts/local-agent/golden_fixtures.py scripts/local-agent/golden_set.py scripts/local-agent/golden_set_test.py" GEMMA_REVIEW_TASK_ID=LRPC-6 make qa-gemma-review`
+- Artifact: `docs/audit/gemma-evidence/LRPC-6.json`, `/tmp/dubbridge-gemma-review.json` (3-pass aggregate)
+- Verdict: `PASS`
+- Findings: none (0 across every bucket — consensus, pass-specific, severity-inconsistent, location-inconsistent, likely-false-positive)
+- Muse Glimmer fallback: not triggered — reason: Gemma primary healthy, 3/3 passes usable
+- D14 fallback: not triggered — reason: n/a
+- D14 provider route: n/a
+- disposition_divergence: none
+- Primary-agent disposition: accepted (no findings to disposition)
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | fixture whose verdict depends on exact clause wording produces identical live verdicts under full-prose and builder-output conditions | `scripts/local-agent/golden_set_test.py::HP1EquivalentFixtureAcrossBothConditionsPasses::test_matching_expected_verdicts_in_both_conditions_marks_equivalent` | passed |
+| EC-1 | Edge case | a lossy/corrupted builder condition that flips the verdict is detected as a mismatch, not silently passed | `scripts/local-agent/golden_set_test.py::EC1DivergentConditionVerdictsAreDetectedAsMismatch::test_builder_condition_disagreeing_with_expected_verdict_is_not_equivalent` | passed |
+
+EC-1 is additionally certified by the live run itself: the harness detected
+a real divergence (3/11 FAIL) on its first live execution before the
+`prompt_anchors.py` fix, and confirmed 11/11 PASS after — direct evidence
+the harness discriminates rather than passing vacuously, beyond what the
+mocked unit test alone can prove.
+
+### Owner final verification
+
+- Owner: `matias`
+- Date: `2026-08-20`
+- Statement: I verified the golden-set harness is discriminating (it caught
+  and the fix resolved a real production defect in the Local Architect
+  role's assembled prompt), that HP-1 and EC-1 have unit test evidence
+  replicating the described behavior, that the live-model runs confirm the
+  fix against both models bound to the affected role in production, and
+  that the frozen LRPC-1/2/3/4/5 test suites remain unaffected by the
+  `prompt_anchors.py` correction.
+- Commands run: `python3 -m pytest scripts/local-agent/prompt_anchors_test.py scripts/local-agent/prompt_builder_test.py scripts/local-agent/golden_set_test.py scripts/local-agent/med_high_gate_test.py scripts/local-architect/run_analysis_test.py -q` (81 passed); `python3 scripts/local-agent/golden_set.py --model gemma4:26b-a4b-it-qat --out /tmp/dubbridge-golden-set-v2.json` (11/11 PASS); `python3 scripts/local-agent/golden_set.py --model muse-glimmer:30b-q4_K_M --role local_architect_default ...` (3/3 PASS); `python3 scripts/local-agent/golden_set.py --model muse-glimmer:30b-q4_K_M --role local_architect_med_high ...` (2/2 PASS); `REVIEW_PATHS=... GEMMA_REVIEW_TASK_ID=LRPC-6 make qa-gemma-review` (PASS, 0 findings); `make -n qa-golden-set` (confirmed not reachable from `qa-ci`).
+
 ## LRPC-7 — Cross-check `check-review-budget.py`'s `PACKET_OVERHEAD_TOKENS`
 
 - **Dependencies:** LRPC-2.
@@ -2027,6 +2168,23 @@ Motivating bug fix tracked separately: `docs/tasks/gemma-push-reviewer-role.md �
       `run_local_task_test.py`'s 64-passed/33-failed count is LRPC-4's own
       already-documented baseline (not a new regression); full closure
       record in § LRPC-5)
-- [ ] LRPC-6
+- [x] LRPC-6 (done 2026-08-20; `scripts/local-agent/golden_fixtures.py` +
+      `golden_set.py` + `golden_set_test.py` + `make qa-golden-set`
+      delivered — Med-high (RRI 51) ADR-038 route, Muse Glimmer `GO_LOCAL`
+      downgraded to `CLOUD_REQUIRED` per Amendment 1 policy exclusion (not a
+      capability/risk downgrade like LRPC-3/LRPC-4/LRPC-5's pattern);
+      ADR-039 human-select checkpoint, owner chose `claude-sonnet-5`/high
+      (self) over `gpt-5.6-sol`/high (Codex CLI unavailable); implemented
+      directly by Claude Code. The harness found a genuine production
+      defect on its first live run — `local_architect_default`/
+      `local_architect_med_high` clauses were missing their "The role may
+      not:" governing header, so both `gemma4` and `muse-glimmer` read the
+      assembled prompt as permissions instead of prohibitions (3/11 FAIL) —
+      flagged to the user, owner directed an immediate fix reopening the
+      frozen `prompt_anchors.py`, re-verified 11/11 PASS live against both
+      production-bound models after the fix, all frozen LRPC-1-5 suites
+      (81 tests in final closure scope) unaffected. Gemma phase-2 review:
+      PASS, 0 findings. 3-pass Reflection log, 2/2 HP/EC unit tests plus
+      live-run EC-1 evidence; full closure record in § LRPC-6)
 - [ ] LRPC-7
 - [ ] LRPC-8

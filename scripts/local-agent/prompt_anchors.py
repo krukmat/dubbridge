@@ -24,7 +24,7 @@ ROLE_ANCHORS: dict[str, list[Clause]] = {
     ],
     "local_architect_default": [
         Clause(
-            text="edit source code, tests, configuration, policies, ledgers, or canonical ADRs;",
+            text="The role may not:\n\n- edit source code, tests, configuration, policies, ledgers, or canonical ADRs;",
             source_file="docs/adr/ADR-037-qwen36-27b-local-architect-complex-analyst.md",
             source_section="Decision > 1. Add one advisory role: Local Architect / Complex Analyst > The role may not:"
         ),
@@ -51,7 +51,7 @@ ROLE_ANCHORS: dict[str, list[Clause]] = {
     ],
     "local_architect_med_high": [
         Clause(
-            text="edit source code, tests, configuration, policies, ledgers, or canonical ADRs;",
+            text="The role may not:\n\n- edit source code, tests, configuration, policies, ledgers, or canonical ADRs;",
             source_file="docs/adr/ADR-037-qwen36-27b-local-architect-complex-analyst.md",
             source_section="Decision > 1. Add one advisory role: Local Architect / Complex Analyst > The role may not:"
         ),
