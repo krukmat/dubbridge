@@ -1,0 +1,29 @@
+{
+  "changed_paths": [
+    "scripts/local-agent/cli.py",
+    "scripts/local-agent/run_local_task_test.py"
+  ],
+  "findings": [
+    {
+      "detail": "The `_TOOL_CALLING_OUTPUT_FORMAT_TEXT` constant has been truncated, removing the critical safety instruction: \"Any read attempt, command attempt, or unlisted path terminates immediately as boundary_violation.\" While the intent is to source this from `prompt_anchors`, the current implementation of `TOOL_CALLING_SYSTEM_PROMPT` via `build_system_prompt` must be verified to ensure it actually injects this exact safety clause into the final prompt. If `build_system_prompt` only handles the \"role\" part, the agent loses its primary boundary enforcement instruction.",
+      "line": 54,
+      "path": "scripts/local-agent/cli.py",
+      "scope": "in-scope",
+      "severity": "major",
+      "suggestion": "Verify that `build_system_prompt` explicitly appends the boundary clause to the `output_format_text` or ensure the `local_developer` anchor contains the full safety logic."
+    },
+    {
+      "detail": "Duplication of `MODEL_CONTEXT_TOKENS` and `GENERATION_TOKEN_BUDGET` constants from `run_local_task.py` to avoid circular imports. While documented, this increases maintenance surface area.",
+      "line": 35,
+      "path": "scripts/local-agent/cli.py",
+      "scope": "in-scope",
+      "severity": "minor",
+      "suggestion": "Consider moving these constants to a shared `constants.py` or `config.py` to maintain a single source of truth without circular dependencies."
+    }
+  ],
+  "format_warnings": [
+    "bare STATUS value accepted (non-standard format): 'FINDINGS'"
+  ],
+  "status": "findings",
+  "summary": "The refactor to canonicalize the system prompt via `build_system_prompt` introduces a regression in `cli.py` where the boundary clause (allowed_paths/boundary_violation) is removed from the hardcoded string but is not actually being re-inserted into the `_TOOL_CALLING_OUTPUT_FORMAT_TEXT` or the `build_system_prompt` call in a way that preserves the original logic. Specifically, `test_ec2_old_hardcoded_boundary_phrasing_does_not_survive` will fail because the logic that previously defined the boundary is now stripped from the constant, and the new `TOOL_CALLING_SYSTEM_PROMPT` relies on `build_system_prompt` to inject it, but the `_TOOL_CALLING_OUTPUT_FORMAT_TEXT` constant has been truncated, potentially losing the specific \"Any read attempt...\" warning required for the agent's safety."
+}

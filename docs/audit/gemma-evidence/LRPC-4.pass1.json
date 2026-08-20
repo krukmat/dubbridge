@@ -1,0 +1,29 @@
+{
+  "changed_paths": [
+    "scripts/local-agent/cli.py",
+    "scripts/local-agent/run_local_task_test.py"
+  ],
+  "findings": [
+    {
+      "detail": "The boundary enforcement clause (\"Any read attempt, command attempt, or unlisted path terminates immediately as boundary_violation\") has been removed from the local `_TOOL_CALLING_OUTPUT_FORMAT_TEXT` and the hardcoded `TOOL_CALLING_SYSTEM_PROMPT`. If `build_system_prompt` does not inject this exact text via the `local_developer` anchor, the agent will lose its primary safety constraint.",
+      "line": 54,
+      "path": "scripts/local-agent/cli.py",
+      "scope": "in-scope",
+      "severity": "major",
+      "suggestion": "Verify that `prompt_anchors.ROLE_ANCHORS[\"local_developer\"]` contains the exact boundary violation enforcement text required for safety."
+    },
+    {
+      "detail": "`test_ec1_budget_exceeded_propagates_uncaught_before_any_ollama_call` uses `rlt.MODEL_CONTEXT_TOKENS` and `rlt.GENERATION_TOKEN_BUDGET` which are not defined in the provided diff (they appear to be renamed to `_DEFAULT_...` in `cli.py`).",
+      "line": 258,
+      "path": "scripts/local-agent/run_local_task_test.py",
+      "scope": "in-scope",
+      "severity": "minor",
+      "suggestion": "Update test to use the new `_DEFAULT_` prefixed constants or ensure they are exported."
+    }
+  ],
+  "format_warnings": [
+    "bare STATUS value accepted (non-standard format): 'FINDINGS'"
+  ],
+  "status": "findings",
+  "summary": "The refactor to canonicalize the system prompt via `build_system_prompt` introduces a regression in `cli.py`. The `_TOOL_CALLING_OUTPUT_FORMAT_TEXT` constant now omits the critical boundary clause (\"Any read attempt, command attempt, or unlisted path terminates immediately as boundary_violation\") which was previously part of the hardcoded `TOOL_CALLING_SYSTEM_PROMPT`. While the intent is to source this from `prompt_anchors`, the current diff removes it from the local string but the `build_system_prompt` call in `cli.py` is expected to inject it. However, the test `test_ec2_old_hardcoded_boundary_phrasing_does_not_survive` explicitly asserts that the old phrasing must *not* exist in the final prompt, creating a high risk that the canonical anchor in `prompt_anchors` does not actually contain the required enforcement text, or that the logic in `build_system_prompt` fails to merge them correctly."
+}
