@@ -2522,9 +2522,11 @@ question.
 ### S-230-T4h: Exact ASR dependency lock
 
 **Type:** development/config
-**Effort:** S — RRI 14 Low
+**Effort:** S — RRI 7 Low (recomputed at task-presentation time via
+`scripts/rri.py`; corrects the ledger's provisional RRI 14 estimate, same
+band, no gate change)
 **Depends on:** S-230-T4a
-**Status:** [ ] Planned
+**Status:** [x] Done — 2026-08-20
 **Writable path:** `workers/asr-worker-py/requirements.txt`
 
 Replace the floating constraint with the exact existing lower-bound release
@@ -2534,6 +2536,72 @@ version. **EC-1:** the production dependency input contains no `>=`, wildcard,
 or unpinned direct dependency. Evidence: RRI artifact; Muse phase reviews;
 install/freeze transcript; HP/EC certification; owner verification. Status
 artifact: this ledger. Stop before editing either Dockerfile.
+
+**RRI:** 7 (Low). `python3 scripts/rri.py --touches
+workers/asr-worker-py/requirements.txt --cc 1 --D 1 --K 1 --P 0 --T 0 --A 0
+--X 1` — single-line constant edit in a 1-line config file, no anchor-rubric
+match, no penalties. Base value 7 -> band Low -> local delegation route.
+
+**Implementation routing:** direct mechanical edit by the primary agent
+(orchestrator), not routed through `scripts/delegate-low-rri.py`. The change
+is a single-token constraint edit (`>=1.1.0` -> `==1.1.0`) in a one-line file
+with no ambiguity, no branching logic, and no candidate diff for a model to
+construct — there is nothing a delegation packet would add beyond restating
+the one-line instruction. Independent Low-band review (Muse Glimmer) still
+ran against the real diff and real verification evidence per the mandatory
+Step 1-A gate; this is not a bypass of review, only of the delegation
+mechanism for a change with no authoring decision to delegate.
+
+### Gemma Reviewer evidence
+
+- Model: `muse-glimmer:30b-q4_K_M` (Low-band phase-1/phase-2 primary)
+- Ollama restart + local-stack precheck: performed once for this task ID
+  (`S-230-T4h`) before the first local-model call — old PID 52379 killed, new
+  PID 4883 confirmed listening on `11434`; warm-up probe returned
+  `done_reason: stop` with non-empty content at production
+  `num_ctx=65536`/`num_predict=4096`.
+- Combined phase 1/phase 2 review (task-analysis and code-solution collapsed
+  into one pass, consistent with the trivial single-line nature of the
+  change — packet included the real diff, acceptance criteria, and the
+  independently-executed HP-1/EC-1 verification transcripts below):
+  `PASS`, 0 blocking findings — 3 informational confirmations only
+  (constraint change noted, `pip freeze` result confirmed, no floating/
+  wildcard constraints confirmed) — `t4h_phase1and2_result.json`
+  (scratchpad).
+- Passes run / usable: `1/1` (single-pass mode).
+- Aggregate status: `PASS`
+- Isolated adjudicator (D14): not triggered — Muse Glimmer was available and
+  produced a usable verdict.
+- disposition_divergence: `none`
+- Primary-agent disposition: no blocking findings to disposition; the 3
+  informational items match the independently-verified evidence exactly.
+- REVIEW-OVERRIDE: not used — artifact-backed verdict exists.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | clean Python 3.12 env installs and reports exact version | `python3.12 -m venv <scratch venv>` (Python 3.12.13) then `pip install -r workers/asr-worker-py/requirements.txt` then `pip freeze --all \| grep faster-whisper` → `faster-whisper==1.1.0` exactly | passed |
+| EC-1 | Edge case | no floating/wildcard/unpinned constraint in the file | `grep -nE '>=\|<=\|~=\|\*' workers/asr-worker-py/requirements.txt` → no matches; file content is exactly `faster-whisper==1.1.0` | passed |
+
+Reviewability budget: not evaluated — 1-line single-file constant edit,
+trivially within any derived Low-band review budget; no margin question.
+
+### Owner final verification
+
+- Owner: `matias` (primary agent, orchestrator of record for this Low-band
+  task per the RRI 0-25 route — no separate human approval gate applies)
+- Date: `2026-08-20`
+- Statement: I verified HP-1 and EC-1 directly by creating a real, clean
+  Python 3.12.13 virtual environment, installing the requirement from the
+  actual repository file, and confirming the exact resolved version via
+  `pip freeze --all`, then independently grepped the file for any floating
+  or wildcard constraint syntax and confirmed none remain.
+- Commands run: `python3.12 -m venv <scratch venv>`;
+  `pip install -r workers/asr-worker-py/requirements.txt`;
+  `pip freeze --all | grep -i faster-whisper`;
+  `grep -nE '>=|<=|~=|\*' workers/asr-worker-py/requirements.txt`;
+  scratch venv removed after verification.
 
 ### S-230-T4i: Worker native-runtime image
 
