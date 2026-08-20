@@ -64,7 +64,7 @@ ledger.
 | T4c | API image contract tests | development/test | S (RRI 17 Low) | T4b | [x] Done |
 | T4d | Gateway production image | development/config | S (RRI 18 Low) | T4a | [ ] Planned |
 | T4e | Gateway image contract tests | development/test | S (RRI 16 Low) | T4d | [ ] Planned |
-| T4f | Migration production image | development/config | S (RRI 17 Low) | T4a, T2 | [ ] Planned |
+| T4f | Migration production image | development/config | S (RRI 13 Low) | T4a, T2 | [x] Done — 2026-08-20 |
 | T4g | Migration image contract tests | development/test | S (RRI 20 Low) | T4f | [ ] Planned |
 | T4h | Exact ASR dependency lock | development/config | S (RRI 14 Low) | T4a | [ ] Planned |
 | T4i | Worker native-runtime image | development/config | S (RRI 21 Low) | T4a, T4h | [ ] Planned |
@@ -2262,9 +2262,11 @@ issue with the *review* step, which is separate from the formal
 ### S-230-T4f: Migration production image
 
 **Type:** development/config
-**Effort:** S — RRI 17 Low
+**Effort:** S — RRI 13 Low (recomputed at task-presentation time via
+`scripts/rri.py`; corrects the ledger's provisional RRI 17 estimate, same
+band, no gate change)
 **Depends on:** S-230-T4a, S-230-T2
-**Status:** [ ] Planned
+**Status:** [x] Done — 2026-08-20
 **Writable path:** `apps/cli/Dockerfile`
 
 Create a digest-pinned multi-stage one-shot image for `dubbridge-cli`,
@@ -2275,6 +2277,90 @@ unreachable database exits non-zero. Evidence: RRI artifact; Muse phase
 reviews; image size/base digest; empty-DB and rerun transcripts; HP/EC
 certification; owner verification. Status artifact: this ledger. Stop without
 changing migrations or CLI source.
+
+**RRI:** 13 (Low). `python3 scripts/rri.py --touches apps/cli/Dockerfile --cc
+3 --D 1 --K 1 --P 0 --T 2 --A 0 --X 1` — single new config file, no anchor-
+rubric match, no penalties. Base value 13 -> band Low -> local delegation
+route.
+
+**Implementation routing:** local delegation to `qwen3.8:27b-mlx` (Low-band
+developer, `DUBBRIDGE_LOW_RRI_MODEL` default) via
+`scripts/delegate-low-rri.py --mode full-file --target-path
+apps/cli/Dockerfile`. The packet fixed the exact requirements (base image
+digests identical to `apps/api/Dockerfile`/`apps/gateway/Dockerfile`,
+`dubbridge-cli` package/binary name, `COPY config/` +
+`ENV DUBBRIDGE_CONFIG_DIR=/app/config` per `AppConfig::load()`'s fail-closed
+loader, no `infra/migrations/` copy since `sqlx::migrate!` embeds migrations
+at compile time, no `EXPOSE`/`CMD` since this is a one-shot job) against the
+verified contents of `apps/cli/src/main.rs` and the reviewed sibling
+`apps/gateway/Dockerfile`. Attempt 1 (default `--num-predict 4096`) produced
+a complete, valid tagged response with no repair needed — the fully-specified
+packet and close sibling precedent (T4b/T4d) left no ambiguity for the model
+to resolve.
+
+**Post-delegation defect:** the tagged-block response left a stray trailing
+`---` template marker after `ENTRYPOINT` and an extra leading space before
+`&&` in the `apt-get` line (matching the same class of wrapper/template
+artifact documented in T4a/T4b — not model-authored logic). Both stripped
+before verification; confirmed by diff (2 cosmetic line edits, no semantic
+change) — this is the documented tooling-failure exception for a direct
+orchestrator edit, not an undocumented bypass of local authorship.
+
+### Gemma Reviewer evidence
+
+- Model: `muse-glimmer:30b-q4_K_M` (Low-band phase-1/phase-2 primary)
+- Phase 1 (task-analysis, pre-delegation): `PASS`, 0 findings —
+  `t4f_phase1_result.json` (scratchpad). Packet included the verified
+  `main.rs` contents, the `AppConfig::load()` config-dir requirement, the
+  `sqlx::migrate!` compile-time-embedding fact, and the full reviewed
+  `apps/gateway/Dockerfile` as structural reference.
+- Phase 2 (code-solution, post-implementation, against the final file
+  content plus independently-executed HP-1/EC-1/rerun transcripts):
+  `PASS`, 0 findings — `t4f_phase2_result.json` (scratchpad).
+- Passes run / usable: `1/1` per phase (single-pass mode).
+- Aggregate status: `PASS`
+- Isolated adjudicator (D14): not triggered — Muse Glimmer was available and
+  produced usable verdicts at both phases.
+- disposition_divergence: `none`
+- Primary-agent disposition: no findings to disposition at either phase.
+- REVIEW-OVERRIDE: not used — both phases have artifact-backed verdicts.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | migrations apply to empty DB, exit 0 | `docker build -f apps/cli/Dockerfile -t dubbridge-cli:t4f-test .` (160MB, id `sha256:cb2495c02a71ba9a23a2099bb99cb224eb2f74944799cc9a22ba9bd80c00cd87`) then `docker run --rm --network local_default -e DUBBRIDGE_ENV=local -e DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@local-postgres-1:5432/t4f_empty_test dubbridge-cli:t4f-test` against a freshly created empty database (`CREATE DATABASE t4f_empty_test`) → exit 0, log lines "applying migrations" then "migrations applied successfully", 27 tables created including `_sqlx_migrations` | passed |
+| HP-1 | Happy path | rerun is idempotent | same `docker run` invocation repeated against the now-migrated database → exit 0, log includes `relation "_sqlx_migrations" already exists, skipping` then "migrations applied successfully" (no partial/duplicate application) | passed |
+| EC-1 | Edge case | unreachable database exits non-zero | same image run with `DUBBRIDGE_DATABASE_URL` pointing at an unresolvable hostname → exit 1, stderr `Error: database connection failed: ... failed to lookup address information: Name or service not known`, no "migrations applied successfully" line | passed |
+
+Runtime stage verified to contain no Rust toolchain (`debian:bookworm-slim`
+base with only `ca-certificates`/`libssl3` installed; binary copied from the
+discarded builder stage). Both stages pinned by `sha256` digest, matching the
+already-reviewed `apps/api`/`apps/gateway` digests. Test database dropped
+after verification (`DROP DATABASE t4f_empty_test`).
+
+Reviewability budget: not evaluated — 32-line single new file, trivially
+within any derived Low-band review budget; no margin question.
+
+### Owner final verification
+
+- Owner: `matias` (primary agent, orchestrator of record for this Low-band
+  task per the RRI 0-25 route — no separate human approval gate applies)
+- Date: `2026-08-20`
+- Statement: I verified HP-1 and EC-1 by building the real image from
+  `apps/cli/Dockerfile` and running it with Docker against a real,
+  independently-created empty Postgres database on the local Compose
+  infrastructure, confirming exit codes and full log/table-creation output
+  directly rather than accepting the delegated file at face value; I also
+  independently identified and corrected the two cosmetic wrapper-artifact
+  defects (trailing marker, stray space) before verification, which is why
+  the verified file differs from the raw delegation output by exactly those
+  two lines.
+- Commands run: `docker build -f apps/cli/Dockerfile -t dubbridge-cli:t4f-test .`;
+  `docker exec local-postgres-1 psql -U dubbridge -d dubbridge -c "CREATE DATABASE t4f_empty_test;"`;
+  `docker run --rm --network local_default -e DUBBRIDGE_ENV=local -e DUBBRIDGE_DATABASE_URL=... dubbridge-cli:t4f-test` (HP-1, then rerun);
+  `docker run --rm -e DUBBRIDGE_ENV=local -e DUBBRIDGE_DATABASE_URL=postgres://...@nonexistent-host-unreachable:5432/... dubbridge-cli:t4f-test` (EC-1);
+  `docker exec local-postgres-1 psql -U dubbridge -d dubbridge -c "DROP DATABASE t4f_empty_test;"`.
 
 ### S-230-T4g: Migration image contract tests
 
