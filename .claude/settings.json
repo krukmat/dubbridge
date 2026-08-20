@@ -280,7 +280,7 @@
           },
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/agent-preflight.py\" hook-load --provider claude --repo-root \"$CLAUDE_PROJECT_DIR\" --document AGENTS.md --document docs/policies/HITL_AUTONOMY_POLICY.md --document docs/policies/RRI_POLICY.md >/dev/null 2>&1 || true"
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/agent-preflight.py\" hook-load --provider claude --repo-root \"$CLAUDE_PROJECT_DIR\" --document AGENTS.md --document docs/policies/HITL_AUTONOMY_POLICY.md --document docs/policies/RRI_POLICY.md --document docs/templates/compact-approval-task-card.md >/dev/null 2>&1 || true"
           }
         ]
       }

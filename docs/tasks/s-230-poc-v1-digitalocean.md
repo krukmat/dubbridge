@@ -66,8 +66,8 @@ ledger.
 | T4e | Gateway image contract tests | development/test | S (RRI 16 Low) | T4d | [ ] Planned |
 | T4f | Migration production image | development/config | S (RRI 13 Low) | T4a, T2 | [x] Done — 2026-08-20 |
 | T4g | Migration image contract tests | development/test | S (RRI 20 Low) | T4f | [ ] Planned |
-| T4h | Exact ASR dependency lock | development/config | S (RRI 14 Low) | T4a | [ ] Planned |
-| T4i | Worker native-runtime image | development/config | S (RRI 21 Low) | T4a, T4h | [ ] Planned |
+| T4h | Exact ASR dependency lock | development/config | S (RRI 7 Low) | T4a | [x] Done — 2026-08-20 |
+| T4i | Worker native-runtime image | development/config | S (RRI 13 Low) | T4a, T4h | [x] Done — 2026-08-20 |
 | T4j | Worker native-runtime contract tests | development/test | S (RRI 21 Low) | T4i | [ ] Planned |
 | T4k | Worker ASR-bundle image | development/config | S (RRI 21 Low) | T4j | [ ] Planned |
 | T4l | Worker ASR-bundle contract tests | development/test | S (RRI 24 Low) | T4k | [ ] Planned |
@@ -2606,9 +2606,11 @@ trivially within any derived Low-band review budget; no margin question.
 ### S-230-T4i: Worker native-runtime image
 
 **Type:** development/config
-**Effort:** S — RRI 21 Low
+**Effort:** S — RRI 13 Low (recomputed at task-presentation time via
+`scripts/rri.py`; corrects the ledger's provisional RRI 21 estimate, same
+band, no gate change)
 **Depends on:** S-230-T4a, S-230-T4h
-**Status:** [ ] Planned
+**Status:** [x] Done — 2026-08-20
 **Writable path:** `apps/worker-runner/Dockerfile`
 
 Create the digest-pinned multi-stage worker image with the Rust binary
@@ -2621,6 +2623,175 @@ against the built image) causes an invocation failure. Evidence: RRI artifact;
 Muse phase reviews; build transcript; base digest, image size and OS
 inventory; executable-presence transcript; HP/EC certification; owner
 verification. Status artifact: this ledger. Stop before bundling Python/ASR.
+
+**RRI:** 13 (Low). `python3 scripts/rri.py --touches
+apps/worker-runner/Dockerfile --cc 2 --D 1 --K 2 --P 0 --T 1 --A 0 --X 2` —
+single-file Dockerfile edit, no anchor-rubric match, no penalties. Base value
+13 -> band Low -> local delegation route (ledger's original planning estimate
+was 21; re-run at implementation time scored 13, same band, no route change).
+
+**Implementation routing:** a Dockerfile matching this task's scope already
+existed untracked in the working tree (owner-authored draft, digest-pinned to
+the same real OCI digests resolved in T4c for `apps/api/Dockerfile`, correctly
+covered by the repo-root `.dockerignore` added in T4c). The orchestrator
+adopted it as the candidate rather than re-delegating from scratch, but it
+still went through its own mandatory phase-1 review before being treated as
+accepted (per the per-packet review rule — an existing draft is not exempt
+from review just because a model didn't just author it).
+
+**Ollama restart + local-stack precheck:** performed once for this task ID
+(`S-230-T4i`) — old PID `12245` killed (interactive `quit` was cancelled by
+a system dialog, so the process was killed directly), new PID `41354`
+confirmed listening on `11434`. Warm-up probes at production
+`num_ctx=65536`/`num_predict=4096`, `think=false`: `muse-glimmer:30b-q4_K_M`
+→ `done_reason: stop`, 15-char content; `gemma4:26b-a4b-it-qat` →
+`done_reason: stop`, 15-char content. Both usable before the first real
+review call.
+
+**Phase-1 finding and resolution:** the first phase-1 pass (Muse Glimmer,
+against the candidate Dockerfile text only, pre-build) returned `BLOCKED`
+with one blocking finding: the task's "Record resolved OS package versions"
+requirement had no evidence anywhere — the Dockerfile installs `ffmpeg` via
+apt but nothing captured which versions apt would actually resolve. Two
+informational findings also noted: (1) `ffprobe` is not installed explicitly,
+relying on the Debian `ffmpeg` package bundling it — a documented, verified
+assumption (Debian's `ffmpeg` package has shipped `ffprobe` in the same
+package for years), not a defect; (2) `COPY . /usr/src/app` in the builder
+stage still copies Python/ASR sources into the build context, mitigated by
+the existing repo-root `.dockerignore`.
+
+The orchestrator did not argue the blocking finding away — it was correct:
+nothing had actually built the image or captured real package versions yet.
+Docker was available in this environment (via Colima), unlike T4b's
+delegation environment which had none, so the orchestrator built the image
+for real instead of deferring runtime evidence to T4j (the contract-test
+child), which is what T4b/T4c did under a no-Docker constraint that does not
+apply here.
+
+**Build execution note:** the first `docker build` invocation was
+interrupted (killed) by the orchestrator after mistaking slow-but-genuine
+rustup/cargo network activity for a stall (verified after the fact via
+`docker inspect` RestartCount and `colima ssh -- top`/`docker stats` showing
+real CPU/network I/O, not a hang). The kill produced a misleading "exit 0"
+because it terminated the process cleanly via the `tail` pipe, not because
+the build actually completed — no image existed after that attempt. The
+build was re-run to completion without interruption (logged directly to a
+file rather than through a `tail` pipe this time), producing the image below.
+This is recorded as a root-caused operational mistake corrected within the
+same task, not a build defect.
+
+Full command:
+```
+docker build -t dubbridge-worker-runner-t4i:test -f apps/worker-runner/Dockerfile .
+```
+Result: `Successfully built e8069bd44166` / `Successfully tagged
+dubbridge-worker-runner-t4i:test`, `EXIT_CODE=0`.
+
+**Image evidence:**
+- Digest: `dubbridge-worker-runner-t4i@sha256:e8069bd4416673eae615ee9bf233299e26b2b644371c89563a22d4fc65fce9de`
+- Content size: 194MB; total disk usage: 729MB
+- Base digests (unchanged from the reviewed candidate):
+  `rust:1-bookworm@sha256:6e957ef098dcc77d33e310261e4ed5843bb108d5c3b5dc2b476cbc8b6caf53fa`
+  (builder), `debian:bookworm-slim@sha256:817e6cf99d6fc127ff4ffe8580049b60deba0adfbbb2bd65ddc3ef8fbb7aade0`
+  (runtime)
+- **Resolved OS package versions** (`dpkg -l` inside the built container,
+  resolving the phase-1 blocking finding):
+  - `ca-certificates` `20250419~deb12u1` (all)
+  - `ffmpeg` `7:5.1.9-0+deb12u1` (arm64)
+  - `libssl3` `3.0.20-1~deb12u2` (arm64)
+
+**HP-1 executed transcript** (`docker run` against the built image, not
+simulated):
+- `dubbridge-worker-runner`: present at `/app/dubbridge-worker-runner`,
+  `-rwxr-xr-x`, 17,631,264 bytes. Invoking it with no environment configured
+  produces `Error: DUBBRIDGE_ENV is not set; set it to one of: local,
+  staging, production` — the application's own ADR-026 fail-closed config
+  validation firing correctly (not a missing-binary or crash error).
+- `ffmpeg -version`: `ffmpeg version 5.1.9-0+deb12u1 ... built with gcc 12
+  (Debian 12.2.0-14+deb12u1)` — succeeded.
+- `ffprobe -version`: `ffprobe version 5.1.9-0+deb12u1 ...` — succeeded,
+  confirming the bundled-with-`ffmpeg` assumption flagged in phase-1 was
+  correct.
+
+**EC-1 executed transcript** (`docker run` against the built image):
+- No Rust build toolchain: `which cargo rustc` inside the running container
+  produced no output, exit code 1.
+- Manual removal + invocation failure: `rm /usr/bin/ffmpeg` followed by
+  `ffmpeg -version` in the same container produced `/bin/sh: 3: ffmpeg: not
+  found`, exit code 127 — matching EC-1's acceptance wording exactly.
+
+### Gemma Reviewer evidence
+
+- Model: `muse-glimmer:30b-q4_K_M` (Low-band phase-1/phase-2 primary)
+- Ollama restart + local-stack precheck: performed once for this task ID
+  (see above) — new PID `41354`; warm-up `done_reason: stop` for both
+  `muse-glimmer:30b-q4_K_M` and `gemma4:26b-a4b-it-qat`.
+- Phase 1 (task-analysis, pre-build, against the candidate Dockerfile text):
+  `BLOCKED`, 1 blocking finding (missing resolved-OS-package-version
+  evidence) + 2 informational — `t4i_phase1_result.json` (scratchpad).
+- Phase 2 (code-solution, post-build, against the real executed HP-1/EC-1
+  transcripts and resolved package versions): `PASS`, 0 blocking findings —
+  3 informational confirmations (HP-1 satisfied, EC-1 satisfied, package
+  versions now recorded) — `t4i_phase2_result.json` (scratchpad).
+- Passes run / usable: `1/1` per phase (single-pass mode).
+- Aggregate status: `PASS` (phase 1 blocking finding resolved by producing
+  the missing evidence, not by re-arguing the finding)
+- Isolated adjudicator (D14): not triggered — Muse Glimmer was available and
+  produced usable verdicts at both phases.
+- disposition_divergence: `none`
+- Primary-agent disposition: phase-1 blocking finding accepted as correct
+  and resolved by actually building the image and capturing real `dpkg -l`
+  output (Docker was available in this environment, unlike the T4b
+  precedent); phase-1 informational findings both independently verified
+  (ffprobe bundling confirmed via executed `-version` transcript;
+  `.dockerignore` coverage confirmed pre-existing from T4c); phase-2 raised
+  no findings to disposition beyond confirmatory notes.
+- REVIEW-OVERRIDE: not used — both phases have artifact-backed verdicts.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | built image contains all three executables, each directly invocable | `docker run --rm --entrypoint /bin/sh dubbridge-worker-runner-t4i:test -c 'ls -la /app/dubbridge-worker-runner'` → `-rwxr-xr-x`, 17631264 bytes; `docker run --rm --entrypoint ffmpeg ... -version` → `ffmpeg version 5.1.9-0+deb12u1`; `docker run --rm --entrypoint ffprobe ... -version` → `ffprobe version 5.1.9-0+deb12u1` | passed |
+| EC-1 | Edge case | no Rust toolchain in runtime; missing native tool causes invocation failure | `docker run --rm --entrypoint /bin/sh ... -c 'which cargo rustc'` → no output, exit 1; `docker run --rm --entrypoint /bin/sh ... -c 'rm /usr/bin/ffmpeg && ffmpeg -version'` → `/bin/sh: 3: ffmpeg: not found`, exit 127 | passed |
+
+Reviewability budget: not evaluated — single-file, 34-line Dockerfile,
+trivially within any derived Low-band review budget; no margin question.
+
+### Owner final verification
+
+- Owner: `matias` (primary agent, orchestrator of record for this Low-band
+  task per the RRI 0-25 route — no separate human approval gate applies)
+- Date: `2026-08-20`
+- Statement: I verified HP-1 and EC-1 directly against a real, freshly built
+  Docker image (not a structural-only review) — confirmed the compiled
+  Rust binary, `ffmpeg`, and `ffprobe` are all present and independently
+  invocable inside the container, confirmed the binary's fail-closed
+  behavior on missing `DUBBRIDGE_ENV` matches existing ADR-026 semantics
+  rather than being a build defect, confirmed no Rust toolchain exists in
+  the runtime stage, and confirmed that removing a native tool produces a
+  real invocation failure. I confirmed the resolved OS package versions via
+  `dpkg -l` inside the built container, resolving the phase-1 blocking
+  finding with real evidence rather than argument. I confirmed no file
+  outside the declared writable path was touched (`git status` showed only
+  `apps/worker-runner/Dockerfile` as untracked/added). I also recorded, as
+  an explicit operational note rather than omitting it, that my first build
+  attempt was killed prematurely on a mistaken stall diagnosis and had to be
+  re-run to completion.
+- Commands run: `docker build -t dubbridge-worker-runner-t4i:test -f
+  apps/worker-runner/Dockerfile .`; `docker images
+  dubbridge-worker-runner-t4i:test`; `docker run --rm --entrypoint /bin/sh
+  dubbridge-worker-runner-t4i:test -c 'ls -la /app/dubbridge-worker-runner'`;
+  `docker run --rm --entrypoint /app/dubbridge-worker-runner
+  dubbridge-worker-runner-t4i:test`; `docker run --rm --entrypoint ffmpeg
+  dubbridge-worker-runner-t4i:test -version`; `docker run --rm --entrypoint
+  ffprobe dubbridge-worker-runner-t4i:test -version`; `docker run --rm
+  --entrypoint /bin/sh dubbridge-worker-runner-t4i:test -c 'which cargo
+  rustc'`; `docker run --rm --entrypoint /bin/sh
+  dubbridge-worker-runner-t4i:test -c 'rm /usr/bin/ffmpeg && ffmpeg
+  -version'`; `docker run --rm --entrypoint /bin/sh
+  dubbridge-worker-runner-t4i:test -c 'dpkg -l ca-certificates libssl3
+  ffmpeg'`; `git status apps/worker-runner/Dockerfile`.
 
 ### S-230-T4j: Worker native-runtime contract tests
 
