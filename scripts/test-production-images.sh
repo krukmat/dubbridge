@@ -3,7 +3,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # Case registry - bash 3.2 compatible (no associative arrays)
-CASE_LIST="self-check api gateway"
+CASE_LIST="self-check api gateway migration"
 
 # Cleanup machinery
 TEMP_DIR=""
@@ -341,6 +341,72 @@ run_gateway() {
     fi
 
     echo "Run check passed for gateway"
+    return 0
+}
+
+contract_migration() {
+    echo "Contract check for migration case"
+    if [ ! -f "apps/cli/Dockerfile" ]; then
+        echo "ERROR: apps/cli/Dockerfile not found" >&2
+        return 1
+    fi
+    if ! grep -q 'ENTRYPOINT \["/app/dubbridge-cli"\]' "apps/cli/Dockerfile"; then
+        echo "ERROR: ENTRYPOINT [\"/app/dubbridge-cli\"] not found in Dockerfile" >&2
+        return 1
+    fi
+    if ! grep -q 'sqlx::migrate' apps/cli/src/main.rs; then
+        echo "ERROR: sqlx::migrate! macro call not found in apps/cli/src/main.rs" >&2
+        return 1
+    fi
+    echo "Contract check passed for migration"
+    return 0
+}
+
+run_migration() {
+    echo "Run check for migration case"
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "ERROR: docker not found on PATH" >&2
+        return 1
+    fi
+    dep_container="${DUBBRIDGE_TEST_DEPENDENCY_CONTAINER:-local-postgres-1}"
+    dep_running=$(docker inspect -f '{{.State.Running}}' "$dep_container" 2>/dev/null) ; if [ "$dep_running" != "true" ]; then echo "ERROR: dependency container '$dep_container' is not running — bring up infra/local/docker-compose.yml first" >&2; return 1; fi
+    test_network=$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$dep_container" 2>/dev/null | head -n 1) ; if [ -z "$test_network" ]; then echo "ERROR: could not resolve network for dependency container '$dep_container'" >&2; return 1; fi
+    cli_image="${DUBBRIDGE_CLI_IMAGE_TAG:-dubbridge-cli:t4f-test}"
+    test_db="t4g_contract_test"
+    cleanup_migration() {
+        # `|| true` on each step: under `set -e`, a failure inside a RETURN
+        # trap (e.g. dropping a database that was never created) would abort
+        # the whole script and clobber the real exit status of run_migration().
+        docker exec "$dep_container" psql -U dubbridge -d dubbridge -c "DROP DATABASE IF EXISTS $test_db;" >/dev/null 2>&1 || true
+    }
+    trap cleanup_migration RETURN
+    docker exec "$dep_container" psql -U dubbridge -d dubbridge -c "CREATE DATABASE $test_db;" >/dev/null 2>&1 || {
+      echo "ERROR: could not create test database '$test_db'" >&2
+      return 1
+    }
+    hp1_output=$(docker run --rm --network "$test_network" -e DUBBRIDGE_ENV=local -e DUBBRIDGE_DATABASE_URL="postgres://dubbridge:dubbridge@${dep_container}:5432/${test_db}" "$cli_image" 2>&1)
+    hp1_exit=$?
+    if [ "$hp1_exit" -ne 0 ]; then
+        echo "ERROR: HP-1 FAILED: migration run against empty DB exited $hp1_exit" >&2
+        echo "$hp1_output" >&2
+        return 1
+    fi
+    if ! echo "$hp1_output" | grep -q "migrations applied successfully"; then
+        echo "ERROR: HP-1 FAILED: success log line not found in migration output" >&2
+        echo "$hp1_output" >&2
+        return 1
+    fi
+    ec1_exit=0
+    ec1_output=$(docker run --rm -e DUBBRIDGE_ENV=local -e DUBBRIDGE_DATABASE_URL="postgres://dubbridge:dubbridge@nonexistent-host-unreachable:5432/${test_db}" "$cli_image" 2>&1) || ec1_exit=$?
+    if [ "$ec1_exit" -eq 0 ]; then
+        echo "ERROR: EC-1 FAILED: migration run against unreachable DB exited 0" >&2
+        return 1
+    fi
+    if echo "$ec1_output" | grep -q "migrations applied successfully"; then
+        echo "ERROR: EC-1 FAILED: success log line present despite unreachable DB" >&2
+        return 1
+    fi
+    echo "Run check passed for migration"
     return 0
 }
 

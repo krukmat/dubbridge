@@ -2365,9 +2365,12 @@ within any derived Low-band review budget; no margin question.
 ### S-230-T4g: Migration image contract tests
 
 **Type:** development/test
-**Effort:** S — RRI 20 Low
+**Effort:** S — RRI 20 Low (recomputed at task-presentation time via
+`scripts/rri.py`: `--touches scripts/test-production-images.sh --cc 5 --D 1
+--K 1 --P 0 --T 2 --A 0 --X 1` -> base 13 -> band Low, same band as the
+ledger's provisional RRI 20, no gate change)
 **Depends on:** S-230-T4f
-**Status:** [ ] Planned
+**Status:** [x] Done — 2026-08-20
 **Writable path:** `scripts/test-production-images.sh`
 
 Add one-shot migration cases that codify T4f's manual evidence as a repeatable
@@ -2380,6 +2383,141 @@ success. Evidence: RRI artifact; Muse phase reviews; harness tests executed
 against the real T4f image; HP/EC certification; owner verification. Status
 artifact: this ledger. Stop before modifying `apps/cli/Dockerfile` or any
 other image.
+
+**Implementation routing:** local delegation to `qwen3.8:27b-mlx` (Low-band
+developer) via `scripts/delegate-low-rri.py --mode before-after`, in two
+separate single-anchor edits (per-edit anchors kept small, matching
+`feedback_before_after_needs_small_anchors`): edit 1 appended `migration` to
+`CASE_LIST`; edit 2 inserted `contract_migration()`/`run_migration()`
+immediately before `# Main execution`, mirroring `contract_api`/`run_api`'s
+structure with no HTTP health polling (the CLI image is a one-shot job, not a
+server). Each edit's delegation packet went through its own phase-1 review
+(see below), consistent with `feedback_phase1_review_per_delegation_packet` —
+a materially revised packet is a new phase-1 event, not a carry-forward of an
+earlier PASS.
+
+**Post-delegation defect (mechanical, orchestrator-fixed):** independent
+verification against the real T4f image and real local Postgres
+(`local-postgres-1`) surfaced a `set -e` bug in the delegated `run_migration`:
+`ec1_output=$(docker run ...)` followed by `ec1_exit=$?` on the next line
+aborted the script before `ec1_exit=$?` could execute, because EC-1's `docker
+run` is *expected* to exit non-zero (unreachable DB) and `set -e` treats a
+non-zero command-substitution result as script-fatal unless guarded. `hp1_exit`
+did not need the same fix since HP-1's `docker run` is expected to succeed.
+Fixed by initializing `ec1_exit=0` and capturing via `|| ec1_exit=$?` on the
+`docker run` line itself — a one-line mechanical fix to code the local model
+authored, not new logic, matching the documented tooling-failure exception
+pattern used in T4a/T4b/T4f. Confirmed by direct real-infrastructure
+verification (below) and independently re-checked by Muse Glimmer phase 2.
+
+A second, purely cosmetic artifact — 3 pre-existing trailing-whitespace blank
+lines inside `run_api()` (unrelated to this task, already present at `HEAD`)
+were incidentally stripped by the before-after wrapper's diff/apply step on
+both edits — was restored to its original byte content each time, keeping the
+final diff scoped to exactly the `CASE_LIST` line and the two new functions.
+
+### Gemma Reviewer evidence
+
+- Model: `muse-glimmer:30b-q4_K_M` (Low-band phase-1/phase-2 primary)
+- Ollama restart + local-stack precheck: performed once for this task ID
+  (`S-230-T4g`) before the first local-model call — old PID 49570 killed, new
+  PID 52379 confirmed listening on `11434`; warm-up probe returned
+  `done_reason: stop` with non-empty content at production
+  `num_ctx=65536`/`num_predict=4096`.
+- Phase 1 (task-analysis, pre-delegation), edit 1 (CASE_LIST): `PASS` on the
+  first pass — bundled into the same review as edit 2's first attempt.
+- Phase 1 (task-analysis, pre-delegation), edit 2 (`contract_migration`/
+  `run_migration`), attempt 1: `BLOCKED` — 5 findings (2 high: DB-provisioning
+  under-specified, "compiled migration set" check method undefined; 2 medium:
+  ambiguous success-log assertion, unspecified unreachable-host value; 1 low:
+  CLI image-tag override usage pattern not exemplified). Packet revised with
+  the exact DB name/commands from T4f's verified transcript, the
+  `sqlx::migrate!` proxy check, and the literal unreachable hostname.
+- Phase 1, edit 2, attempt 2 (revised packet): `BLOCKED` under a reduced-context
+  recovery profile (see below) — 3 findings (2 medium: cleanup-comment
+  instruction self-contradictory, ENTRYPOINT grep escaping not shown verbatim;
+  1 low: insertion anchor relied on context not present in the reduced
+  excerpt). Packet revised again with a verbatim fixed `cleanup_migration()`
+  body/comment, the exact `contract_api`-derived grep line, and an explicit
+  byte-for-byte insertion anchor.
+- Phase 1, edit 2, attempt 3 (revised packet): `PASS`, 0 findings.
+- Phase 2 (code-solution, post-implementation, against the final diff plus
+  independently-executed HP-1/EC-1/contract-mode transcripts, including the
+  `set -e` fix): `PASS`, 4 info-level findings confirming HP-1/EC-1 coverage,
+  the `set -e` fix's correctness, and pattern consistency with
+  `contract_api`/`run_api`/`contract_gateway`/`run_gateway`.
+- Passes run / usable: `1/1` per phase (single-pass mode); 3 phase-1 attempts
+  total for edit 2 due to two rounds of packet revision, each with its own
+  independent review per `feedback_phase1_review_per_delegation_packet`.
+- Aggregate status: `PASS`
+- Local resource-recovery protocol: triggered once, between phase-1 attempt 1
+  and attempt 2 of edit 2 — the first re-review request returned `done_reason:
+  stop` with **empty content** (0 bytes) despite `think:false`, matching the
+  known `muse-glimmer` real-packet failure mode
+  (`feedback_muse_glimmer_think_flag_defect`). Followed the documented
+  protocol: unloaded the model, confirmed low free memory via
+  `memory_pressure` (≈73MB free), ran a bounded `num_ctx<=16384`/
+  `num_predict<=1024` probe (succeeded), then rebuilt the actual review packet
+  as a reduced excerpt (file header + `run_api()` reference + insertion point
+  only, instead of the full 378-line file) under the same reduced profile for
+  all three phase-1 attempts and the phase-2 review. This is a capacity
+  symptom, not a stall — the model was actively loaded and responding to
+  `/api/ps` keepalive throughout.
+- Isolated adjudicator (D14): not triggered — Muse Glimmer was available and
+  produced usable verdicts at every phase once the reduced-context profile was
+  applied; no attempt exhausted the retry-then-fallback chain.
+- disposition_divergence: `none`
+- Primary-agent disposition: all `BLOCKED` findings across both phase-1
+  revision rounds were accepted and resolved by revising the delegation
+  packet (not overridden); phase-2 info findings required no further action.
+- REVIEW-OVERRIDE: not used — every phase has an artifact-backed verdict.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | contract mode passes for the real T4f Dockerfile/CLI source | `bash scripts/test-production-images.sh contract migration` against the real `apps/cli/Dockerfile` (line 33 `ENTRYPOINT ["/app/dubbridge-cli"]`) and `apps/cli/src/main.rs` (line 11 `sqlx::migrate!(...)`) → `Contract check for migration case` / `Contract check passed for migration`, exit 0 | passed |
+| HP-1 | Happy path | run mode reproduces T4f's empty-DB zero-exit result | `bash scripts/test-production-images.sh run migration` — rebuilt the real `dubbridge-cli:t4f-test` image (`docker build -f apps/cli/Dockerfile -t dubbridge-cli:t4f-test .`), ran it via the harness against a fresh throwaway database (`t4g_contract_test`) created on the real `local-postgres-1` dependency container → internal trace confirms `docker run` exit 0 with combined output containing `dubbridge-cli: migrations applied successfully`; harness prints `Run check passed for migration`, exit 0 | passed |
+| EC-1 | Edge case | run mode fails closed against an unreachable database | Same `run migration` invocation's internal EC-1 stage — `docker run` against `DUBBRIDGE_DATABASE_URL` pointing at `nonexistent-host-unreachable` → non-zero exit, combined output containing `failed to lookup address information: Name or service not known`, no `migrations applied successfully` line anywhere in the captured output | passed |
+
+Regression check: `bash scripts/test-production-images.sh contract self-check`,
+`contract api`, and `contract gateway` all still pass unchanged after both
+edits. `bash -n scripts/test-production-images.sh` confirms no syntax errors
+introduced. Throwaway test database dropped by `run_migration`'s own
+`cleanup_migration` RETURN trap (verified via `psql -c '\l'` showing no `t4g_*`
+database remaining); the `dubbridge-cli:t4f-test` test image removed after
+verification (`docker rmi`), matching T4f's own test-image lifecycle.
+
+Reviewability budget: not evaluated — 68-line addition to an existing 378-line
+file, trivially within any derived Low-band review budget; no margin
+question.
+
+### Owner final verification
+
+- Owner: `matias` (primary agent, orchestrator of record for this Low-band
+  task per the RRI 0-25 route — no separate human approval gate applies)
+- Date: `2026-08-20`
+- Statement: I verified HP-1 and EC-1 by rebuilding the real T4f image from
+  `apps/cli/Dockerfile` and running the new harness case against real Docker
+  and a real, independently-created throwaway Postgres database on the local
+  Compose infrastructure, confirming exit codes and log output directly via
+  both the harness's own output and a full `bash -x` trace rather than
+  accepting the delegated code at face value. I independently diagnosed and
+  fixed the one `set -e`/command-substitution defect the delegated code
+  contained (a one-line mechanical fix, not new logic), reverted an unrelated
+  cosmetic whitespace side-effect from the before-after wrapper on both edits,
+  and re-ran phase-2 review against the corrected final diff before closing.
+- Commands run: `docker build -f apps/cli/Dockerfile -t dubbridge-cli:t4f-test .`;
+  `bash scripts/test-production-images.sh contract migration`;
+  `bash -x scripts/test-production-images.sh run migration` (initial trace,
+  isolated the `set -e` defect); `docker exec local-postgres-1 psql -U
+  dubbridge -d dubbridge -c "DROP DATABASE IF EXISTS t4g_contract_test;"`
+  (cleanup between attempts); `bash scripts/test-production-images.sh run
+  migration` (final clean run, exit 0); `bash scripts/test-production-images.sh
+  contract self-check`, `contract api`, `contract gateway` (regression check);
+  `bash -n scripts/test-production-images.sh` (syntax check);
+  `docker exec local-postgres-1 psql -U dubbridge -d dubbridge -c "\l"`
+  (confirmed no residual `t4g_*` database); `docker rmi dubbridge-cli:t4f-test`.
 
 ### S-230-T4h: Exact ASR dependency lock
 
