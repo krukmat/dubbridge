@@ -1,13 +1,18 @@
 ---
 type: Plan
 title: "Plan: Local Role Prompt Canonicalization"
-status: proposed
+status: done
 supersedes: ""
 ---
 
 # Plan: Local Role Prompt Canonicalization
 
-> **Status:** Proposed - initial analysis closed, not yet approved for implementation.
+> **Status:** Done - LRPC-0b through LRPC-8 all complete as of 2026-08-20.
+> `prompt_anchors.py` + `prompt_builder.py` are delivered and consumed by all
+> three target scripts (`gemma-code-review.py`, `run_local_task.py`'s
+> `cli.py`, `run_analysis.py`); the `check-review-budget.py` overhead
+> cross-check (LRPC-7) and `AGENT_WORKFLOW_GUIDE.md` docs propagation
+> (LRPC-8) close the sequence.
 > **Tasks ledger:** `docs/tasks/local-role-prompt-canonicalization.md`
 
 ## Objective

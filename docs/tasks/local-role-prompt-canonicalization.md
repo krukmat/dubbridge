@@ -2067,6 +2067,125 @@ mocked unit test alone can prove.
   one budget seam the plan does not structurally eliminate (see plan §
   Architecture).
 
+**RRI 23 (Low)** — `python3 scripts/rri.py --touches scripts/check-review-budget.py
+--touches scripts/check_review_budget_test.py --cc 4 --D 2 --K 2 --P 2 --T 1
+--A 1 --X 0`. No approval packet required; executed directly by the primary
+agent (not delegated — the divergence-vs-merge design call in the task
+definition needed one read of both scripts' actual measured/estimated
+quantities before picking a route, which is a judgment call rather than a
+mechanical patch).
+
+**Design call (divergence check, not merge):** `PACKET_OVERHEAD_TOKENS`
+estimates the whole delegation packet Gemma receives (system prompt +
+contract + acceptance criteria); `prompt_builder.build_system_prompt()`
+measures only the assembled system prompt for one role (clauses +
+output-format text), a strict subset of the same packet. Feeding one
+directly into the other would conflate two different quantities, so this
+task implements the plan's own "cross-check, not merged into one constant"
+architecture note (plan § Architecture) rather than the alternative
+feed-from-builder option.
+
+**Implementation:** `scripts/check-review-budget.py` now loads
+`prompt_builder.py` by path (fixed `_load()` to accept a `Path` directly
+instead of `Path(__file__).with_name(...)`, since `prompt_builder.py` lives
+in `scripts/local-agent/`, a different directory than the other two
+by-path-loaded modules). `measured_packet_overhead_tokens()` calls
+`build_system_prompt(role="gemma_reviewer", ...)` against the exact
+`output_format_text` literal `gemma-code-review.py`'s `build_review_payload()`
+sends (kept as a verbatim cross-check fixture, `_GEMMA_REVIEWER_OUTPUT_FORMAT_TEXT`,
+not a second source of truth — drift between the two only weakens this
+check's fidelity, it does not change what Gemma actually receives), then
+measures it with `gemma_local.estimate_text_tokens()`. `check_overhead_divergence()`
+compares that measurement against `packet_overhead_tokens()` (the existing
+fixed/env-tunable constant) and returns a warning string when relative
+divergence exceeds `OVERHEAD_DIVERGENCE_THRESHOLD` (20%), or `None` when the
+two remain in reasonable agreement. `main()` prints the warning (prefixed
+`warning:`) after the existing pass/fail report, without changing the exit
+code — this is advisory cross-check evidence, not a second gate.
+
+**Live finding surfaced by this task's own instrumentation:** running the
+new check against the current constant shows real drift —
+`PACKET_OVERHEAD_TOKENS=1300` vs. the builder's actual measured
+`gemma_reviewer` prompt of `207` tokens (84% divergence). `PACKET_OVERHEAD_TOKENS`
+was set before `prompt_builder.py` existed (LRPC-2) and is a deliberately
+conservative pre-LRPC estimate; the drift does not make the reviewability
+budget gate unsafe (a smaller true overhead means `derive_budget()` is
+currently *more* conservative than necessary, not less — it under-counts
+the true usable window rather than over-counting it), so this is recorded
+as a follow-up tuning note, not a blocking defect. Tuning
+`DUBBRIDGE_REVIEW_PACKET_OVERHEAD_TOKENS` or the `PACKET_OVERHEAD_TOKENS`
+default in light of this measurement is left to a human/operator decision,
+per this task's own scope (cross-check, not autonomous re-tuning of a
+budget constant other tasks depend on).
+
+**Testing:** `scripts/check_review_budget_test.py` — 8 new tests
+(`MeasuredPacketOverheadTokensTest` x2, `CheckOverheadDivergenceTest` x4,
+`MainIntegrationTest::test_ec_divergence_warning_never_flips_exit_code`),
+all passing. 3 pre-existing failures in `DeriveBudgetTest` (stale hardcoded
+`32768`/`4096` expectations against `gemma_local.DEFAULT_NUM_CTX`/
+`DEFAULT_NUM_PREDICT`, which have since changed) reproduced identically on
+`main` before this change (`git stash` verification) — unrelated to this
+task, not introduced by it, not fixed by it (out of scope). Full command:
+`python3 -m pytest scripts/check_review_budget_test.py -q` → `3 failed
+(pre-existing), 20 passed`. Cross-suite regression check:
+`python3 -m pytest scripts/local-agent/prompt_builder_test.py
+scripts/local-agent/prompt_anchors_test.py -q` → `14 passed`, unaffected.
+End-to-end: `REVIEW_PATHS="scripts/check-review-budget.py
+scripts/check_review_budget_test.py" make qa-review-budget` → gate passes
+(0/549 lines), divergence warning printed as designed.
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma`
+- Command: `REVIEW_PATHS="scripts/check-review-budget.py scripts/check_review_budget_test.py" GEMMA_REVIEW_TASK_ID=LRPC-7 make qa-gemma-review`
+- Artifact: `docs/audit/gemma-evidence/LRPC-7.json`, `/tmp/dubbridge-gemma-review.json` (aggregate)
+- Verdict: `PASS`
+- Passes run / usable: `3/1` — pass 1 completed (66 tokens, 98s) with `PASS`,
+  0 findings; passes 2 and 3 hit `Gemma idle timeout after 180s without a
+  token` (a known local-stack latency symptom, not a code-side failure —
+  one usable parseable pass still produces a usable aggregate per
+  `AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer / Muse Glimmer Reviewer § When
+  it runs`, no fallback required)
+- Findings: none
+- Muse Glimmer fallback: not triggered — reason: one usable parseable pass was sufficient; no retry needed
+- D14 fallback: not triggered — reason: n/a
+- D14 provider route: n/a
+- disposition_divergence: none
+- Primary-agent disposition: accepted (no findings to disposition)
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | measured overhead within threshold of fixed constant → no warning | `scripts/check_review_budget_test.py::CheckOverheadDivergenceTest::test_hp_no_warning_when_measured_close_to_fixed` | passed |
+| EC-1 | Edge case | fixed constant far from measured value → divergence warning with both figures | `scripts/check_review_budget_test.py::CheckOverheadDivergenceTest::test_ec_warns_when_fixed_constant_diverges` | passed |
+| EC-2 | Edge case | prompt_builder raises (unknown role) → warning reports unavailable instead of propagating the exception | `scripts/check_review_budget_test.py::CheckOverheadDivergenceTest::test_ec_unknown_role_reports_unavailable_instead_of_raising` | passed |
+| EC-3 | Edge case | divergence warning present → main() exit code unaffected (advisory only) | `scripts/check_review_budget_test.py::MainIntegrationTest::test_ec_divergence_warning_never_flips_exit_code` | passed |
+
+### Owner final verification
+
+- Owner: Claude Code (autonomous execution per explicit user directive —
+  "Analiza y ejecuta sin pedir aprobacion LRPC-8" issued in advance for
+  LRPC-8; LRPC-7 itself required no approval gate independently, RRI 23
+  Low-band)
+- Date: 2026-08-20
+- Statement: Verified every HP/EC case defined for this task has unit test
+  evidence that replicates the expected behavior; verified the divergence
+  check is genuinely advisory (does not alter `qa-review-budget`'s exit
+  code); verified the 3 pre-existing `DeriveBudgetTest` failures are
+  unrelated to this change via `git stash` before/after comparison.
+- Commands run: `python3 -m pytest scripts/check_review_budget_test.py -q`;
+  `python3 -m pytest scripts/local-agent/prompt_builder_test.py
+  scripts/local-agent/prompt_anchors_test.py -q`; `python3 -m py_compile
+  scripts/check-review-budget.py`; `REVIEW_PATHS="scripts/check-review-budget.py
+  scripts/check_review_budget_test.py" make qa-review-budget`;
+  `REVIEW_PATHS="scripts/check-review-budget.py
+  scripts/check_review_budget_test.py" GEMMA_REVIEW_TASK_ID=LRPC-7 make
+  qa-gemma-review`.
+
+Reminder: run `/compact` (or `/clear` if this task's context is no longer
+needed) now that LRPC-7 is closed.
+
 ## LRPC-8 — Docs propagation
 
 - **Dependencies:** LRPC-3, LRPC-4, LRPC-5 (all satisfied as of 2026-08-20 —
@@ -2077,6 +2196,78 @@ mocked unit test alone can prove.
   mechanism as the actual implementation, per this guide's own ADR/status
   propagation discipline. Docs-only — exempt from phase-1/phase-2 review and
   Reflection passes.
+
+**Executed 2026-08-20, immediately following LRPC-7's closure, per explicit
+prior user directive** ("Cuando se cierre la task LRPC-7 que deberas ir
+monitoreando. Analiza y ejecuta sin pedir aprobacion LRPC-8.") — docs-only,
+no RRI/approval gate applies (task's own definition states the exemption;
+consistent with `AGENT_WORKFLOW_GUIDE.md`'s general docs-only exemption from
+phase-1/phase-2 review and Reflection passes).
+
+**Sections updated**, each with an "Implementation note (local-role prompt
+canonicalization)" paragraph naming the concrete source files and pointing
+back to this ledger:
+
+- `§ Gemma Reviewer / Muse Glimmer Reviewer § Authority boundary` — the
+  "may not write files ... certify coverage, or mark tasks complete"
+  sentence is now named as the canonical source for `prompt_anchors.py`'s
+  `gemma_reviewer` entry, assembled by `prompt_builder.build_system_prompt()`
+  and consumed by `gemma-code-review.py`'s `build_review_payload()` (LRPC-1
+  through LRPC-3), closing the drift this whole plan was opened to fix.
+- `§ Handoff prompt format` (the `run_local_task.py` tool-contract
+  paragraph) — the `allowed_paths`/`boundary_violation` clause is now named
+  as the canonical source for `prompt_anchors.py`'s `local_developer` entry,
+  consumed by `scripts/local-agent/cli.py`'s `TOOL_CALLING_SYSTEM_PROMPT`
+  (LRPC-4).
+- `§ Local Architect / Complex Analyst (ADR-037)` — ADR-037 §1's may/may-not
+  boundary is now named as the canonical source for
+  `prompt_anchors.py`'s `local_architect_default` /
+  `local_architect_med_high` entries, consumed by
+  `scripts/local-architect/run_analysis.py`'s `build_prompt()` (LRPC-5),
+  including a pointer to the LRPC-6 governing-header ("The role may not:")
+  defect and fix so a future reader of this section understands why that
+  exact substring matters.
+
+Each note also states the maintenance obligation going forward: an edit to
+the cited prose must be mirrored into the corresponding `prompt_anchors.py`
+entry in the same change — this is prose guidance (human/agent discipline),
+not a machine-enforced check; no drift-detection tooling was added as part
+of this task (out of scope — LRPC-7 already closed the one *measurable*
+budget-seam cross-check the plan's architecture section called out).
+
+**Propagation checklist:** `AGENTS.override.md` is generated from
+`AGENT_WORKFLOW_GUIDE.md` and other sources
+(`python3 scripts/generate-agents-override.py --write`); regenerated in the
+same change after `make qa-docs` flagged it stale. No ADR was created,
+amended, or superseded by this task, so the ADR-change-propagation
+contract's definition-of-done does not apply. `docs/plan/roadmap.md` and
+`docs/architecture.md` were checked and require no update — this task adds
+no new runtime surface, crate boundary, or slice-scope change; it documents
+an already-delivered internal mechanism (LRPC-1 through LRPC-5). No other
+canonical doc cites the hardcoded-prompt mechanism this task retires.
+
+**Verification:** `make qa-docs` → all four checks pass (doc consistency
+including the regenerated `AGENTS.override.md`, task-unit-coverage,
+roadmap-drift, OKF frontmatter) — deterministic, no LLM, as documented for
+this target.
+
+### Owner final verification
+
+- Owner: Claude Code (autonomous execution per the same explicit user
+  directive that authorized LRPC-8 without a separate approval step)
+- Date: 2026-08-20
+- Statement: Verified each of the three named `AGENT_WORKFLOW_GUIDE.md`
+  sections now names the concrete implementation (files, roles, consuming
+  scripts) instead of only describing the prose-level authority boundary;
+  verified no other canonical doc requires a matching update; verified
+  `make qa-docs` passes after regenerating `AGENTS.override.md`.
+- Commands run: `python3 scripts/generate-agents-override.py --write`;
+  `make qa-docs`.
+
+Reminder: run `/compact` (or `/clear` if this task's context is no longer
+needed) now that LRPC-8 is closed. This closes the
+`local-role-prompt-canonicalization` plan's full LRPC-0b through LRPC-8
+sequence.
 
 ## Progress
 
@@ -2186,5 +2377,25 @@ Motivating bug fix tracked separately: `docs/tasks/gemma-push-reviewer-role.md �
       (81 tests in final closure scope) unaffected. Gemma phase-2 review:
       PASS, 0 findings. 3-pass Reflection log, 2/2 HP/EC unit tests plus
       live-run EC-1 evidence; full closure record in § LRPC-6)
-- [ ] LRPC-7
-- [ ] LRPC-8
+- [x] LRPC-7 (done 2026-08-20; `scripts/check-review-budget.py` now cross-
+      checks `PACKET_OVERHEAD_TOKENS` against `prompt_builder`'s measured
+      `gemma_reviewer` system-prompt size via `check_overhead_divergence()`,
+      printed as a non-blocking `warning:` line — closed as a cross-check
+      per the plan's own architecture note, not merged into one constant;
+      RRI 23 Low, no approval gate; surfaced real 84% drift
+      (`PACKET_OVERHEAD_TOKENS=1300` vs. measured `207`) as a follow-up
+      tuning note, not a blocker; Gemma phase-2 review 1/3 usable passes
+      (2 idle-timeouts, infra not code), PASS, 0 findings; 8/8 new unit
+      tests passing, 3 pre-existing unrelated `DeriveBudgetTest` failures
+      confirmed via `git stash` to predate this change; full closure record
+      in § LRPC-7)
+- [x] LRPC-8 (done 2026-08-20; `AGENT_WORKFLOW_GUIDE.md`'s § Gemma Reviewer /
+      Muse Glimmer Reviewer, § Handoff prompt format, and § Local Architect /
+      Complex Analyst each gained an "Implementation note" naming the
+      builder-sourced mechanism (`prompt_anchors.py` + `prompt_builder.py`)
+      as the actual implementation behind that section's authority-boundary
+      prose, plus the LRPC-6 governing-header defect pointer under Local
+      Architect; `AGENTS.override.md` regenerated; docs-only, no
+      review/Reflection gate per task definition; `make qa-docs` passing;
+      full closure record in § LRPC-8. Closes the plan's full LRPC-0b
+      through LRPC-8 sequence.)

@@ -1119,6 +1119,18 @@ the operator-authored `acceptance_tests` in order. A formatter or acceptance
 failure returns its output plus refreshed authorized file contents for a bounded
 repair. The final diff scope check remains mandatory as defense in depth.
 
+**Implementation note (local-role prompt canonicalization):** the
+`allowed_paths`/`boundary_violation` clause above is the canonical source
+for `local_developer`'s authority-boundary text. `scripts/local-agent/cli.py`'s
+`TOOL_CALLING_SYSTEM_PROMPT` sources it from
+`scripts/local-agent/prompt_anchors.py` via
+`scripts/local-agent/prompt_builder.py`'s `build_system_prompt(role=
+"local_developer", ...)`, built once at import time — not hand-maintained
+inline — mirroring the same mechanism as Gemma Reviewer and Local Architect
+above. See `docs/tasks/local-role-prompt-canonicalization.md` § LRPC-4 for
+the delivery record. Edits to this boundary description should be mirrored
+into `prompt_anchors.py`'s `local_developer` entry in the same change.
+
 At finish, the DEV result is fail-closed on its own responsibilities only: the
 final diff must remain in scope and the operator-authored acceptance commands
 must pass before the audit may carry the `local-implementer` signature. Code
@@ -1331,6 +1343,27 @@ decoupled from the reviewer-role default).
 - Gemma-authored Low-RRI patches require an independent primary-agent review even
   when Gemma Reviewer also runs.
 
+**Implementation note (local-role prompt canonicalization):** the sentence
+above is the canonical source for the authority-boundary clause actually
+sent to Ollama as part of Gemma Reviewer's system prompt. It is no longer a
+hand-paraphrased string maintained independently inside
+`scripts/gemma-code-review.py`. `scripts/local-agent/prompt_anchors.py`
+holds a verbatim, provenance-tagged extraction of this clause under the
+`gemma_reviewer` role key, and `scripts/local-agent/prompt_builder.py`'s
+`build_system_prompt(role="gemma_reviewer", ...)` assembles it with the
+script's own output-format contract, enforcing a token budget derived from
+the invocation's `num_ctx`/`num_predict` and raising before any Ollama call
+if the assembled prompt does not fit. `gemma-code-review.py`'s
+`build_review_payload()` consumes this builder output directly. This closes
+the drift class of bug that previously let the live prompt diverge from
+this prose (a missing "certify coverage" and a paraphrased "close tasks" in
+place of "mark tasks complete") — see
+`docs/plan/local-role-prompt-canonicalization.md` and
+`docs/tasks/local-role-prompt-canonicalization.md` (LRPC-1 through LRPC-5)
+for the full mechanism and delivery record. Edits to this prose sentence
+should be mirrored into `prompt_anchors.py`'s `gemma_reviewer` entry in the
+same change, per that plan's provenance discipline.
+
 ### When it runs
 
 For Low development tasks, or when the RRI 26–55 reviewer fallback is triggered
@@ -1532,6 +1565,25 @@ evidence before authoring any canonical document. Full procedure, task
 cards, and operational evidence:
 `docs/tasks/adr037-local-architect-direct-project.md`;
 `docs/evaluations/adr037-direct-project-report.md`.
+
+**Implementation note (local-role prompt canonicalization):** the ADR-037
+§1 may/may-not boundary this section summarizes is the canonical source for
+the authority-boundary clause `scripts/local-architect/run_analysis.py`
+sends to Ollama for both `DEFAULT_PROFILE` (`local_architect_default`) and
+`MED_HIGH_REFINEMENT_PROFILE` (`local_architect_med_high`). As with Gemma
+Reviewer above, that clause is a verbatim, provenance-tagged extraction in
+`scripts/local-agent/prompt_anchors.py`, assembled at call time by
+`scripts/local-agent/prompt_builder.py`'s `build_system_prompt()` rather
+than hand-maintained inline in `run_analysis.py`. A live-production defect
+found during this canonicalization (`prompt_anchors.py`'s original
+extraction omitted ADR-037 line 70's governing header, "The role may not:",
+before its prohibition list — both `gemma4` and `muse-glimmer` then read
+the assembled prompt as *permitting* what the full ADR-037 prose correctly
+prohibits) was corrected by prepending that verbatim header substring; see
+`docs/tasks/local-role-prompt-canonicalization.md` § LRPC-6 for the full
+defect record and fix. Edits to ADR-037's authority-boundary prose should
+be mirrored into `prompt_anchors.py`'s `local_architect_default` /
+`local_architect_med_high` entries in the same change.
 
 ## Antares Security-Specialist Advisor
 

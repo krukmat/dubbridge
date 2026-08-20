@@ -51,6 +51,66 @@ class DeriveBudgetTest(unittest.TestCase):
             self.assertEqual(gate.derive_budget(), (32768 - 4096 - 300) // gate.TOKENS_PER_DIFF_LINE)
 
 
+class MeasuredPacketOverheadTokensTest(unittest.TestCase):
+    def test_returns_positive_int_for_gemma_reviewer(self) -> None:
+        tokens = gate.measured_packet_overhead_tokens()
+        self.assertIsInstance(tokens, int)
+        self.assertGreater(tokens, 0)
+
+    def test_matches_prompt_builder_measurement_directly(self) -> None:
+        expected = gate._gemma.estimate_text_tokens(
+            gate._prompt_builder.build_system_prompt(
+                role="gemma_reviewer",
+                num_ctx=1 << 20,
+                num_predict=0,
+                output_format_text=gate._GEMMA_REVIEWER_OUTPUT_FORMAT_TEXT,
+            )
+        )
+        self.assertEqual(gate.measured_packet_overhead_tokens(), expected)
+
+
+class CheckOverheadDivergenceTest(unittest.TestCase):
+    def test_hp_no_warning_when_measured_close_to_fixed(self) -> None:
+        measured = gate.measured_packet_overhead_tokens()
+        with mock.patch.dict(
+            gate.os.environ,
+            {"DUBBRIDGE_REVIEW_PACKET_OVERHEAD_TOKENS": str(measured)},
+            clear=True,
+        ):
+            self.assertIsNone(gate.check_overhead_divergence())
+
+    def test_ec_warns_when_fixed_constant_diverges(self) -> None:
+        with mock.patch.dict(
+            gate.os.environ,
+            {"DUBBRIDGE_REVIEW_PACKET_OVERHEAD_TOKENS": "1"},
+            clear=True,
+        ):
+            warning = gate.check_overhead_divergence()
+        self.assertIsNotNone(warning)
+        assert warning is not None
+        self.assertIn("packet-overhead drift", warning)
+        self.assertIn("PACKET_OVERHEAD_TOKENS=1 ", warning)
+
+    def test_ec_unknown_role_reports_unavailable_instead_of_raising(self) -> None:
+        with mock.patch.object(
+            gate._prompt_builder,
+            "build_system_prompt",
+            side_effect=gate._prompt_builder.UnknownRoleError("gemma_reviewer"),
+        ):
+            warning = gate.check_overhead_divergence()
+        self.assertIsNotNone(warning)
+        assert warning is not None
+        self.assertIn("cross-check unavailable", warning)
+
+    def test_ec_zero_fixed_overhead_short_circuits(self) -> None:
+        with mock.patch.dict(
+            gate.os.environ,
+            {"DUBBRIDGE_REVIEW_PACKET_OVERHEAD_TOKENS": "0"},
+            clear=True,
+        ):
+            self.assertIsNone(gate.check_overhead_divergence())
+
+
 class FindOverrideTest(unittest.TestCase):
     def test_marker_with_reason_is_extracted(self) -> None:
         text = "fix(x): mechanical rename\n\nD14-OVERRIDE: irreducible 900-line rename, see ADR-XX"
@@ -108,6 +168,16 @@ class MainIntegrationTest(unittest.TestCase):
              mock.patch.object(gate, "derive_budget", return_value=549), \
              mock.patch.object(gate._maint, "discover_base", return_value=None), \
              mock.patch.object(gate._maint, "changed_files", return_value=["crates/x/src/a.rs"]):
+            self.assertEqual(gate.main([]), 0)
+
+    def test_ec_divergence_warning_never_flips_exit_code(self) -> None:
+        with mock.patch.object(gate, "count_reviewable_lines", return_value=10), \
+             mock.patch.object(gate, "derive_budget", return_value=549), \
+             mock.patch.object(gate._maint, "discover_base", return_value=None), \
+             mock.patch.object(gate._maint, "changed_files", return_value=["crates/x/src/a.rs"]), \
+             mock.patch.object(
+                 gate, "check_overhead_divergence", return_value="packet-overhead drift: ..."
+             ):
             self.assertEqual(gate.main([]), 0)
 
 
