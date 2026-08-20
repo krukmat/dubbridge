@@ -3,7 +3,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # Case registry - bash 3.2 compatible (no associative arrays)
-CASE_LIST="self-check api gateway migration"
+CASE_LIST="self-check api gateway migration worker"
 
 # Cleanup machinery
 TEMP_DIR=""
@@ -112,7 +112,7 @@ run_api() {
 
     # Define dependency container
     dep_container="${DUBBRIDGE_TEST_DEPENDENCY_CONTAINER:-local-postgres-1}"
-    
+
     # Verify dependency is running
     dep_running=$(docker inspect -f '{{.State.Running}}' "$dep_container" 2>/dev/null)
     if [ "$dep_running" != "true" ]; then
@@ -135,7 +135,7 @@ run_api() {
         docker stop dubbridge-api-contract-test >/dev/null 2>&1 || true
         docker start "$dep_container" >/dev/null 2>&1 || true
     }
-    
+
     # Register trap for cleanup
     trap cleanup_api RETURN
 
@@ -186,7 +186,7 @@ run_api() {
 
     # EC-1: Stop dependency and verify readiness degrades
     docker stop "$dep_container" >/dev/null 2>&1
-    
+
     # Re-check /health/ready (should fail)
     if curl -sf -o /dev/null http://localhost:8080/health/ready; then
         echo "ERROR: EC-1 FAILED: readiness did not degrade after dependency stop" >&2
@@ -407,6 +407,70 @@ run_migration() {
         return 1
     fi
     echo "Run check passed for migration"
+    return 0
+}
+
+contract_worker() {
+    echo "Contract check for worker case"
+    if [ ! -f "apps/worker-runner/Dockerfile" ]; then
+        echo "ERROR: apps/worker-runner/Dockerfile not found" >&2
+        return 1
+    fi
+    if ! grep -q 'ENTRYPOINT \["/app/dubbridge-worker-runner"\]' "apps/worker-runner/Dockerfile"; then
+        echo "ERROR: ENTRYPOINT [\"/app/dubbridge-worker-runner\"] not found in Dockerfile" >&2
+        return 1
+    fi
+    if ! grep -qE '^\s*ffmpeg\s*\\?\s*$' "apps/worker-runner/Dockerfile"; then
+        echo "ERROR: ffmpeg package install not found in Dockerfile" >&2
+        return 1
+    fi
+    echo "Contract check passed for worker"
+    return 0
+}
+
+run_worker() {
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "ERROR: docker not found on PATH" >&2
+        return 1
+    fi
+
+    worker_image="${DUBBRIDGE_WORKER_IMAGE_TAG:-dubbridge-worker-runner-t4i:test}"
+
+    # HP-1
+    hp1_exit=0
+    hp1_output=$(docker run --rm --entrypoint /bin/sh "$worker_image" -c 'ls -la /app/dubbridge-worker-runner' 2>&1) || hp1_exit=$?
+    if [ "$hp1_exit" -ne 0 ] || ! echo "$hp1_output" | grep -qE '^-rwx'; then
+        echo "ERROR: HP-1 FAILED: executable permission check failed" >&2
+        echo "$hp1_output" >&2
+        return 1
+    fi
+
+    hp1_exit=0
+    hp1_output=$(docker run --rm --entrypoint ffmpeg "$worker_image" -version 2>&1) || hp1_exit=$?
+    if [ "$hp1_exit" -ne 0 ]; then
+        echo "ERROR: HP-1 FAILED: ffmpeg version check failed" >&2
+        echo "$hp1_output" >&2
+        return 1
+    fi
+
+    hp1_exit=0
+    hp1_output=$(docker run --rm --entrypoint ffprobe "$worker_image" -version 2>&1) || hp1_exit=$?
+    if [ "$hp1_exit" -ne 0 ]; then
+        echo "ERROR: HP-1 FAILED: ffprobe version check failed" >&2
+        echo "$hp1_output" >&2
+        return 1
+    fi
+
+    # EC-1
+    ec1_exit=0
+    ec1_output=$(docker run --rm --entrypoint /bin/sh "$worker_image" -c 'rm /usr/bin/ffmpeg && ffmpeg -version' 2>&1) || ec1_exit=$?
+    if [ "$ec1_exit" -eq 0 ]; then
+        echo "ERROR: EC-1 FAILED: invocation succeeded after removing ffmpeg" >&2
+        echo "$ec1_output" >&2
+        return 1
+    fi
+
+    echo "Run check passed for worker"
     return 0
 }
 

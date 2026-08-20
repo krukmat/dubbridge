@@ -1413,7 +1413,7 @@ approval card.
 | T4g | RRI 20 | test script | migration contract tests (against T4f image) |
 | T4h | RRI 14 | `workers/asr-worker-py/requirements.txt` | exact ASR dependency lock |
 | T4i | RRI 21 | `apps/worker-runner/Dockerfile` | Rust + ffmpeg worker image |
-| T4j | RRI 21 | test script | worker native-runtime tests (against T4i image) |
+| T4j | RRI 13 | test script | worker native-runtime tests (against T4i image) |
 | T4k | RRI 21 | worker Dockerfile | Python + ASR bundle image |
 | T4l | RRI 24 | test script | ASR bundle tests (against T4k image) |
 | T4m | RRI 21 | worker Dockerfile | conditional translation bundle image |
@@ -2796,9 +2796,11 @@ trivially within any derived Low-band review budget; no margin question.
 ### S-230-T4j: Worker native-runtime contract tests
 
 **Type:** development/test
-**Effort:** S — RRI 21 Low
+**Effort:** S — RRI 13 Low (recomputed at task-presentation time via
+`scripts/rri.py`; corrects the ledger's provisional RRI 21 estimate, same
+band, no gate change)
 **Depends on:** S-230-T4i
-**Status:** [ ] Planned
+**Status:** [x] Done — 2026-08-20
 **Writable path:** `scripts/test-production-images.sh`
 
 Add worker cases for the Rust executable and native media tools only,
@@ -2811,6 +2813,222 @@ Evidence: RRI artifact; Muse phase reviews; harness tests executed against the
 real T4i image; HP/EC certification; owner verification. Status artifact: this
 ledger. Stop before modifying `apps/worker-runner/Dockerfile` or adding
 Python.
+
+**RRI:** 13 (Low). `python3 scripts/rri.py --touches
+scripts/test-production-images.sh --cc 3 --D 1 --K 2 --P 0 --T 1 --A 0 --X 2`
+— single-file edit adding two functions matching an existing pattern, no
+anchor-rubric match, no penalties. Base value 13 -> band Low -> local
+delegation route (ledger's original planning estimate was 21, same band, no
+route change).
+
+**Ollama restart + local-stack precheck:** performed once for this task ID
+(`S-230-T4j`) — old PID `41354` (carried over from T4i's own restart earlier
+in this session) killed directly (interactive `quit` was again cancelled by
+a system dialog, matching the T4i precedent), new PID `19386` confirmed
+listening on `11434`. Warm-up probes at production `num_ctx=65536`/
+`num_predict=4096`, `think=false`: `muse-glimmer:30b-q4_K_M` ->
+`done_reason: stop`, 5-char content; `gemma4:26b-a4b-it-qat` ->
+`done_reason: stop`, 5-char content. `qwen3.8:27b-mlx` confirmed present via
+`/api/tags`. Both review models usable before the first real review call.
+
+**Implementation routing:** the `CASE_LIST="self-check api gateway migration"`
+-> `... worker"` edit (a single-token addition to an already-verified
+constant, no new logic) was applied directly by the orchestrator as the
+narrow mechanical-edit exception, not delegated. The substantive logic — the
+`contract_worker()`/`run_worker()` function bodies — was delegated to Qwen
+Developer (`qwen3.8:27b-mlx`) via `scripts/delegate-low-rri.py --mode
+before-after`, anchored on the small `# Main execution` / `main() {` header
+(2-line BEFORE block, well under the 40-line safety cap), per
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Handoff prompt format` and the
+target-file-size/small-anchor discipline (443-line file, before-after mode
+used with a small anchor rather than full-file rewrite).
+
+**Phase-1 findings and resolution (3 packet revisions before PASS):**
+
+- **v1** (`muse-glimmer:30b-q4_K_M`, against the packet + full file text):
+  `BLOCKED`, 2 blocking findings — (1) `contract_worker()`'s description
+  ambiguously allowed a `docker image inspect` call, which would violate the
+  established convention (confirmed by re-reading `contract_migration`/
+  `contract_api`/`contract_gateway`: all three are static-only, no Docker
+  invocation); (2) EC-1's "single shell command" requirement was stated only
+  in prose, risking the implementer splitting removal and re-invocation into
+  two separate `docker run` calls, which would invalidate the test under
+  `--rm` ephemeral-container semantics. Both findings verified as genuine
+  specification gaps in the packet, not false positives — resolved by
+  rewriting the packet with an explicit static-only contract_worker()
+  constraint and explicit single-invocation EC-1 wording.
+- **v2** (revised packet, own fresh phase-1 pass per the per-packet review
+  rule): `BLOCKED` again, 2 blocking findings — (1) the static-only
+  constraint was still described in prose without concrete grep patterns;
+  (2) the EC-1 guarded-capture syntax needed under the file's active `set
+  -euo pipefail` (line 2) was not made explicit, risking a bare failing
+  `docker run` aborting the whole script instead of being handled by the
+  function. Both verified genuine: the exact `ffmpeg` grep pattern was
+  independently checked against the real Dockerfile
+  (`grep -qE '^\s*ffmpeg\s*\\?\s*$' apps/worker-runner/Dockerfile` ->
+  matches) before including it verbatim in the packet; the `set -e` guard
+  requirement was cross-checked against `run_migration`'s existing
+  `|| ec1_exit=$?` pattern in the same file. Resolved by adding literal,
+  pre-verified bash code blocks for both functions' critical sections
+  instead of prose description.
+- **v3** (revised packet, own fresh phase-1 pass): `PASS`, 0 findings.
+
+**Delegation attempt 1 of 2 — repair required:** Qwen Developer's first
+before-after response reproduced `contract_worker()`/`run_worker()`
+correctly per the reviewed v3 spec, but its AFTER block dropped the `main()
+{` line from the 2-line BEFORE anchor (`# Main execution` / `main() {`),
+which the wrapper's literal find-and-replace would have applied verbatim —
+this would have orphaned the `main` function body outside any function
+definition, a real correctness defect caught before application (the
+`--apply` flag was withheld on this attempt; nothing was written to disk).
+Per the Moderate-band cross-delegate discipline (repair goes back to the
+local pipeline, not fixed directly by the orchestrator), a repair packet was
+built explicitly instructing the implementer to preserve both anchor lines,
+and — per the per-packet review rule — this repair packet received its own
+fresh phase-1 pass (`PASS`, 1 informational confirmation) before
+re-delegation.
+
+**Delegation attempt 2 of 2 (repair) — success:** Qwen Developer's repaired
+response preserved `# Main execution` / `main() {` correctly, kept both
+function bodies structurally identical to the already-reviewed spec, and was
+applied with `--apply`. The diff also showed three unrelated
+trailing-whitespace normalizations inside the pre-existing `run_api()`
+function (lines 115, 138, 189) — investigated and confirmed as a deliberate,
+documented wrapper behavior (`_strip_trailing()` in
+`scripts/delegate-low-rri.py::apply_before_after`, applied to the *entire*
+original file content to avoid whitespace-sensitive BEFORE-block matching
+failures), not a model-authored scope leak or semantic change (bash
+disregards trailing whitespace on blank/comment lines); accepted without
+further repair.
+
+**Real execution evidence (not simulated):**
+
+- `bash scripts/test-production-images.sh contract worker` -> exit 0,
+  "Contract check passed for worker" (static-only, no Docker daemon call).
+- Rebuilt `dubbridge-worker-runner-t4i:test` for real via `docker build -t
+  dubbridge-worker-runner-t4i:test -f apps/worker-runner/Dockerfile .`
+  (T4i's original `:test` tag was not persisted across the session) ->
+  `Successfully built 8e37af071eaa` / `Successfully tagged
+  dubbridge-worker-runner-t4i:test`, exit 0. Cached base layers from T4i's
+  earlier build in this session kept the rebuild fast.
+- `bash scripts/test-production-images.sh run worker` -> exit 0, "Run check
+  passed for worker" — HP-1 and EC-1 both executed for real against the
+  rebuilt image inside the harness.
+- **Independent reproduction outside the harness** (HP-1): `docker run --rm
+  --entrypoint /bin/sh dubbridge-worker-runner-t4i:test -c 'ls -la
+  /app/dubbridge-worker-runner'` -> `-rwxr-xr-x 1 root root 17631264 ...`;
+  `docker run --rm --entrypoint ffmpeg ... -version` -> `ffmpeg version
+  5.1.9-0+deb12u1`; `docker run --rm --entrypoint ffprobe ... -version` ->
+  `ffprobe version 5.1.9-0+deb12u1`.
+- **Independent reproduction outside the harness** (EC-1): `docker run --rm
+  --entrypoint /bin/sh dubbridge-worker-runner-t4i:test -c 'rm
+  /usr/bin/ffmpeg && ffmpeg -version'` -> `/bin/sh: 1: ffmpeg: not found`,
+  exit 127.
+- **Negative-path harness test** (confirms the guarded-capture pattern
+  fails closed under a real failure instead of a `set -e` abort):
+  `DUBBRIDGE_WORKER_IMAGE_TAG=nonexistent-image-xyz:test bash
+  scripts/test-production-images.sh run worker` -> exit 1, clear `ERROR:
+  HP-1 FAILED: ...` plus surfaced Docker `pull access denied` message.
+- `bash scripts/test-production-images.sh contract self-check` (unaffected
+  case, regression check) -> unchanged output, exit 0.
+- `bash -n scripts/test-production-images.sh` -> syntax OK.
+- `git status --short` -> only `scripts/test-production-images.sh` modified.
+
+### Gemma Reviewer evidence
+
+- Model: `muse-glimmer:30b-q4_K_M` (Low-band phase-1/phase-2 primary)
+- Ollama restart + local-stack precheck: performed once for this task ID
+  (see above) — new PID `19386`; warm-up `done_reason: stop` for both
+  `muse-glimmer:30b-q4_K_M` and `gemma4:26b-a4b-it-qat`.
+- Phase 1 (task-analysis, pre-delegation, against the packet + full file):
+  `BLOCKED` (v1, 2 blocking) -> `BLOCKED` (v2, 2 blocking) -> `PASS` (v3, 0
+  findings) — three fresh phase-1 passes, one per materially revised
+  packet, per the per-packet review rule. A fourth fresh pass on the repair
+  packet also returned `PASS` (1 informational) before the second
+  delegation attempt.
+- Phase 2 (code-solution, post-implementation, against the real diff + the
+  independently-verified execution evidence above): `PASS`, 0 blocking
+  findings — 5 informational confirmations (static-only contract check
+  confirmed; guarded exit-code capture confirmed; single combined-invocation
+  EC-1 confirmed; HP-1 checks confirmed; no unintended side effects/scope
+  leaks observed).
+- Passes run / usable: `1/1` per phase-2 pass (single-pass mode); 4 total
+  phase-1 passes across packet revisions, all usable.
+- Aggregate status: `PASS` (both phase-1 blocking-finding rounds resolved by
+  producing corrected, pre-verified packet content, not by re-arguing the
+  findings; the delegation-attempt-1 defect was resolved via cross-delegated
+  repair, not a direct orchestrator fix)
+- Isolated adjudicator (D14): not triggered — Muse Glimmer was available and
+  produced usable verdicts at every phase-1 and phase-2 call.
+- disposition_divergence: `none`
+- Primary-agent disposition: all four phase-1 blocking findings accepted as
+  correct and resolved with verified evidence (grep pattern independently
+  matched against the real Dockerfile; `set -e` guard pattern cross-checked
+  against `run_migration`'s existing precedent); the delegation-attempt-1
+  dropped-`main()`-line defect was independently caught by the orchestrator
+  before `--apply`, and repaired via a fresh cross-delegated repair packet
+  rather than a direct edit; the three trailing-whitespace diff lines in
+  `run_api()` were investigated and confirmed as deliberate wrapper
+  behavior, not a scope violation.
+- REVIEW-OVERRIDE: not used — both phases have artifact-backed verdicts.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | contract mode requires `dubbridge-worker-runner`, `ffmpeg`, `ffprobe` present in the T4i runtime image | `bash scripts/test-production-images.sh contract worker` -> exit 0; `bash scripts/test-production-images.sh run worker` -> exit 0 (HP-1 checks executed inside `run_worker()`); independently reproduced outside the harness via direct `docker run --entrypoint {sh,ffmpeg,ffprobe}` invocations, all succeeding with expected output | passed |
+| EC-1 | Edge case | runtime mode fails when a native tool is missing or non-executable | `run_worker()`'s EC-1 block (`rm /usr/bin/ffmpeg && ffmpeg -version` in one combined `docker run`) executed inside `bash scripts/test-production-images.sh run worker` -> exit 0 overall because the harness correctly treats the expected non-zero EC-1 sub-exit as a pass condition; independently reproduced outside the harness: same command directly -> `ffmpeg: not found`, exit 127; negative-path harness test with a nonexistent image tag -> exit 1 with clear `ERROR: HP-1 FAILED: ...` message, confirming the guarded-capture pattern correctly fails closed under `set -euo pipefail` rather than aborting silently | passed |
+
+Reviewability budget: not evaluated — single-file, ~70-line net addition to
+an existing 443-line script, trivially within any derived Low-band review
+budget; no margin question.
+
+### Owner final verification
+
+- Owner: `matias` (primary agent, orchestrator of record for this Low-band
+  task per the RRI 0-25 route — no separate human approval gate applies)
+- Date: `2026-08-20`
+- Statement: I verified HP-1 and EC-1 directly against a real, freshly
+  rebuilt Docker image (not a structural-only review) — confirmed
+  `contract worker` and `run worker` both pass end-to-end through the real
+  harness script, independently reproduced every HP-1/EC-1 check outside
+  the harness with matching results, and independently confirmed the
+  negative path (missing image) fails closed with a clear error instead of
+  a silent `set -e` abort. I confirmed `contract_worker()` stayed
+  static-only (no Docker daemon calls), matching the existing
+  `contract_api`/`contract_gateway`/`contract_migration` convention, and
+  that EC-1 is a single combined `docker run` invocation as required (not
+  split across two, which would have silently invalidated the test under
+  `--rm` ephemeral-container semantics). I confirmed no file outside the
+  declared writable path was touched (`git status --short` showed only
+  `scripts/test-production-images.sh` modified) and that the script remains
+  syntactically valid (`bash -n`) and the pre-existing `self-check` case is
+  unaffected. I also recorded, as an explicit note rather than omitting it,
+  that the first delegation attempt produced a real correctness defect
+  (dropped `main() {` line) caught before application, resolved through a
+  cross-delegated repair packet rather than a direct fix, consistent with
+  the Moderate-band cross-delegate-on-failure discipline applied here at
+  Low band as well.
+- Commands run: `python3 scripts/rri.py --touches
+  scripts/test-production-images.sh --cc 3 --D 1 --K 2 --P 0 --T 1 --A 0
+  --X 2`; `python3 scripts/delegate-low-rri.py <packet> --mode before-after
+  --target-path scripts/test-production-images.sh --before-file <before>
+  --allow-path scripts/test-production-images.sh --task-id S-230-T4j
+  --attempt 1 --rri 13 --no-think --temperature 0.1 --out <result>` (attempt
+  1, not applied); same command with `--attempt 2 --apply` (repair,
+  applied); `bash -n scripts/test-production-images.sh`; `bash
+  scripts/test-production-images.sh contract worker`; `docker build -t
+  dubbridge-worker-runner-t4i:test -f apps/worker-runner/Dockerfile .`;
+  `bash scripts/test-production-images.sh run worker`; `docker run --rm
+  --entrypoint /bin/sh dubbridge-worker-runner-t4i:test -c 'ls -la
+  /app/dubbridge-worker-runner'`; `docker run --rm --entrypoint ffmpeg
+  dubbridge-worker-runner-t4i:test -version`; `docker run --rm --entrypoint
+  ffprobe dubbridge-worker-runner-t4i:test -version`; `docker run --rm
+  --entrypoint /bin/sh dubbridge-worker-runner-t4i:test -c 'rm
+  /usr/bin/ffmpeg && ffmpeg -version'`; `DUBBRIDGE_WORKER_IMAGE_TAG=nonexistent-image-xyz:test
+  bash scripts/test-production-images.sh run worker`; `bash
+  scripts/test-production-images.sh contract self-check`; `git status
+  --short scripts/test-production-images.sh`.
 
 ### S-230-T4k: Worker ASR-bundle image
 
