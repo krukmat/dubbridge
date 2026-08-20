@@ -2455,7 +2455,13 @@ secret guard. Updated 2026-06-07 after `S-050` T0–T5 completion: the mobile ap
 implemented, tested, and reflected in the architecture/task status documents.
 Updated 2026-06-18 to add `S-125` HLS playback delivery and ADR-032 so prepared
 `.m3u8` packages are served through an explicit backend boundary instead of being
-hidden inside later publication work.
+hidden inside later publication work. Updated 2026-08-20 to track the Tiger Style
+adoption evaluation (`docs/proposals/tiger-style-adaptation-evaluation.md`) as a
+cross-cutting item pending owner resolution of its three decision points before any
+plan/task ledger is drafted. Updated 2026-08-20 to add cross-cutting item X27
+tracking the proposed-but-unapproved Gemma Push Reviewer role
+(`docs/plan/gemma-push-reviewer-role.md`, revision r2, 2026-08-19) as scheduled
+next-up work with no fixed date.
 
 ## Status legend
 - ✅ Done · 🟡 In progress · ⬜ Not started · 📄 Planned (plan exists, not built)
@@ -2761,6 +2767,8 @@ S-095 — live recorder (DEFERRED): ex-T3 recorder crate, ex-T4 jobs/storage,
 | **X24** | Define the voice-consent ledger and TTS precondition: append-only consent rows, evidence stored by reference (ADR-025 spirit), fail-closed gate before any TTS derivative; closes **X11** at the contract level | ✅ closed by ADR-028 (S-110-T0b, 2026-06-12); S-110-T1/T2 implemented it; `S-150-T0` ratified two-check runtime enforcement, while implementation remains pending behind S-150-T4/T5 |
 | **X-S-150-1** | Future voice-consent hardening: consent-proof evidence lifecycle, automated real-stack checks, speaker/voice-profile scope, expiry/revocation effects on existing derivatives, and provider-side material governance | `S-150-T8` future High-RRI parent; coordinate `X-S-110-2`, `X-S-110-3`, X20, and S-180. Non-blocking for S-150 T1-T7 and does not reopen X24/X11 unless an approved future ADR changes the contract. |
 | **X25** | Define and implement HLS playback delivery for prepared `.m3u8` manifests and segments without exposing raw object-store keys | ADR-032 created; implement as `S-125` before S-170/S-180 runtime consumers |
+| **X26** | Tiger Style adoption for the Rust/Python backend: evidence-based gap analysis complete (`docs/proposals/tiger-style-adaptation-evaluation.md`), 13 requirements (R1–R13) drafted. Blocked on three owner decision points before a plan/task ledger can be drafted: **D1** always-on production assertions in Rust (touches `crates/domain`/`ingestion`/`playback` broadly, not a localized patch), **D2** tightening clippy's `too_many_lines` from 100 toward ~70 lines, **D3** promoting opt-in Postgres/Redis/MinIO integration tests to mandatory CI. R13 (green-field Tiger-Style acceptance criteria for `translation-worker-py`/`tts-worker-py`) has no decision dependency and can be folded into S-150 `T4`–`T7` whenever that work unblocks, independent of D1–D3. | Owner sign-off on D1 (at minimum) required before `docs/plan/tiger-style-adaptation.md` is drafted; re-evaluate this item once resolved or if repo state drifts materially from the evaluation's evidence base |
+| **X27** | Gemma Push Reviewer role: post-pipeline advisory audit of the latest GitHub push (run metadata, job status, logs, annotations, artifacts), triaged into RRI-scored candidate tasks with pure-Low eligible incidents dispatched to Gemma Developer. Plan is drafted and audit-review ready (`docs/plan/gemma-push-reviewer-role.md`, revision r2, 2026-08-19) with its task ledger at `docs/tasks/gemma-push-reviewer-role.md`, but **not approved for implementation**. Precedent: `docs/adr/ADR-034-gemma-process-audit-and-reviewer-reconciliation.md`. Scheduled next-up, no fixed date. | Owner approval required before starting `docs/tasks/gemma-push-reviewer-role.md`; no blocking dependency identified |
 
 ## Known planning gaps
 
@@ -2808,6 +2816,24 @@ S-095 — live recorder (DEFERRED): ex-T3 recorder crate, ex-T4 jobs/storage,
   - **X-S-160-2:** ✅ closed 2026-06-13 (S-160-T8). E2E mock-gateway review/notification fixtures and Maestro review flow (`mobile/maestro/review.yaml`) authored and passing. BDD mapping rows (SC-REVIEW-1/2/3, SC-PUBLISH-1/2, SC-NOTIFY-1) closed with executable evidence.
   - **X-S-160-3:** open, now owned by `S-150-T6` — S-140 creates review tasks from real subtitle readiness and `S-140-T5b-a` added nullable `review_tasks.subtitle_artifact_id`, but it still enqueues `None` and cannot bind decisions to a regenerated translation/dub set. `S-150-T0` ratified a normalized exact-artifact/version binding; T6 must be decomposed (provisional RRI 71) and implemented before this item can close.
   - **X24 → X-S-110-1:** ✅ closed by ADR-028 (S-110-T0b). Voice-consent ledger + TTS fail-closed precondition fixed before S-110 implementation.
+- **Tiger Style adoption evaluation (X26, 2026-08-20).** The requirements-defining
+  report is complete and evidence-backed (`docs/proposals/tiger-style-adaptation-evaluation.md`),
+  but it is explicitly a precursor artifact, not a plan. It must be **re-evaluated**
+  before drafting `docs/plan/tiger-style-adaptation.md`: the owner needs to resolve
+  D1–D3, and since the underlying Rust/Python surfaces (especially `S-150`'s parked
+  `translation-worker-py`/`tts-worker-py`) keep changing, the evaluation's evidence
+  base (file:line citations, function-length inventory, dependency-pinning state)
+  should be spot-checked for drift rather than assumed still accurate at that point.
+- **Gemma Push Reviewer role (X27, plan drafted 2026-08-19, revision r2).** A
+  separate role from Gemma Reviewer code review: it audits the latest GitHub push
+  after the pipeline completes, collects run metadata/job status/logs/annotations/
+  artifacts, triages findings into RRI-scored candidate tasks, and dispatches pure
+  Low eligible incidents to the existing Gemma Developer role. The plan
+  (`docs/plan/gemma-push-reviewer-role.md`) is audit-review ready with its task
+  ledger (`docs/tasks/gemma-push-reviewer-role.md`) already covering the model
+  invocation contract, log-budget/redaction, quorum staging, and audit trail —
+  but status is `proposed`, not approved for implementation. Scheduled to work on
+  next, no fixed date; requires explicit owner approval before `T1` starts.
 - **S-200 mobile auth re-architecture (planned 2026-06-17, ADR-031 Proposed).** A
   platform directive adapts mobile auth to the FenixCRM reference flow at full
   fidelity: `apps/api` issues its own HS256 JWT, the gateway becomes a transparent
