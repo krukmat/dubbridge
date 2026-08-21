@@ -114,8 +114,30 @@ evidence` for that record.
   touches `gemma_local.py`'s shared `build_chat_payload` and affects three
   consumer scripts) once prioritized — not scoped or estimated here.
 
+## Status update (2026-08-21)
+
+Still open — none of the remediations above have been implemented. Verified on
+2026-08-21: no `/no_think` directive exists anywhere in `scripts/`, and every
+local role still relies solely on the API-level `think` flag
+(`scripts/gemma_local.py:172`).
+
+Two corrections from `docs/audit/2026-08-21-muse-glimmer-role-fitness-review.md`:
+
+- The memory-binding remediation bullet is **resolved** — `DEFAULT_REVIEW_MODEL`
+  is confirmed `muse-glimmer:30b-q4_K_M` (`scripts/gemma_local.py:32`) and the
+  agent memory now records that.
+- This defect is **more consequential than described here**. The `no usable
+  review passes` path (`scripts/gemma-code-review.py:652-659`) returns `3`
+  without writing `--out`, which lands directly on the stale-result fail-open in
+  `Makefile:118-131` (that audit § D1). The two compose: this model's
+  characteristic failure can silently mint a `PASS` receipt sourced from the
+  previous task's review. Fixing the Makefile (change **C1**) is therefore
+  higher priority than fixing the think flag (change **C4**).
+
 ## Related
 
+- `docs/audit/2026-08-21-muse-glimmer-role-fitness-review.md` — role-fitness
+  measurement and the five review-pipeline defects this incident feeds into
 - `docs/tasks/local-role-prompt-canonicalization.md` § LRPC-2
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Mandatory workflow before
   implementing (Step 0, local resource-recovery protocol), § Gemma Reviewer /

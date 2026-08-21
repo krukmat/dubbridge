@@ -8,8 +8,11 @@ PEER_REVIEW_TASK_ID  ?=
 PEER_REVIEW_ARTIFACT ?= /tmp/dubbridge-peer-review.json
 PEER_REVIEW_BASE     ?= HEAD
 GEMMA_REVIEW_BASE   ?= HEAD
-GEMMA_REVIEW_RESULT ?= /tmp/dubbridge-gemma-review.json
 GEMMA_REVIEW_TASK_ID ?=
+# Task-scoped by default so a stale result from a different task id can never
+# be mistaken for the current review (GEG-2a / defect D1). Explicit override
+# still wins because command-line assignments outrank Makefile '?=' defaults.
+GEMMA_REVIEW_RESULT ?= $(if $(GEMMA_REVIEW_TASK_ID),/tmp/dubbridge-gemma-review-$(GEMMA_REVIEW_TASK_ID).json,/tmp/dubbridge-gemma-review.json)
 GEMMA_EVIDENCE_DIR   ?= docs/audit/gemma-evidence
 REVIEW_PATHS         ?=
 GOLDEN_SET_MODEL     ?= gemma4:26b-a4b-it-qat
@@ -113,19 +116,32 @@ qa-gemma-review:
 	if [ -z "$$code_changes" ]; then \
 		echo "[gemma-review] no code changes vs $(GEMMA_REVIEW_BASE); skipped"; exit 0; \
 	fi; \
+	: "AC3 asserts the stale result IS gone, not that removal was attempted -- rm's own status is ignored on purpose; absence is the post-condition."; \
+	rm -f "$(GEMMA_REVIEW_RESULT)" 2>/dev/null || true; \
+	if [ -e "$(GEMMA_REVIEW_RESULT)" ]; then \
+		echo "[gemma-review] could not clear stale result at $(GEMMA_REVIEW_RESULT); aborting rather than risk reusing it" >&2; \
+		exit 1; \
+	fi; \
+	review_status=0; \
 	{ echo "# Gemma Reviewer packet (base: $(GEMMA_REVIEW_BASE))"; echo ""; \
 	  git diff $(GEMMA_REVIEW_BASE) -- $(REVIEW_PATHS); } \
-	| python3 scripts/gemma-code-review.py --out "$(GEMMA_REVIEW_RESULT)" - \
-	&& echo "[gemma-review] result written to $(GEMMA_REVIEW_RESULT)"; \
+	| python3 scripts/gemma-code-review.py --out "$(GEMMA_REVIEW_RESULT)" - || review_status=$$?; \
+	if [ "$$review_status" != "0" ]; then \
+		echo "[gemma-review] review command failed (exit $$review_status); aborting before receipt, no stale result reused" >&2; \
+		exit $$review_status; \
+	fi; \
+	echo "[gemma-review] result written to $(GEMMA_REVIEW_RESULT)"; \
 	findings_status=0; \
 	python3 scripts/parse-review-findings.py "$(GEMMA_REVIEW_RESULT)" || findings_status=$$?; \
 	if [ -n "$(GEMMA_REVIEW_TASK_ID)" ]; then \
 		mkdir -p "$(GEMMA_EVIDENCE_DIR)"; \
 		verdict="PASS"; [ "$$findings_status" != "0" ] && verdict="FINDINGS-ACKED"; \
+		reviewer=$$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('model') or 'unknown-reviewer')" "$(GEMMA_REVIEW_RESULT)" 2>/dev/null || echo "unknown-reviewer"); \
+		changed_paths_json=$$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(json.dumps(d.get('changed_paths') or []))" "$(GEMMA_REVIEW_RESULT)" 2>/dev/null || echo "[]"); \
 		commit_sha=$$(git rev-parse HEAD); \
 		timestamp=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
-		printf '{"task_id":"%s","commit_sha":"%s","reviewer":"gemma","verdict":"%s","timestamp":"%s"}\n' \
-			"$(GEMMA_REVIEW_TASK_ID)" "$$commit_sha" "$$verdict" "$$timestamp" \
+		printf '{"task_id":"%s","commit_sha":"%s","reviewer":"%s","verdict":"%s","timestamp":"%s","changed_paths":%s}\n' \
+			"$(GEMMA_REVIEW_TASK_ID)" "$$commit_sha" "$$reviewer" "$$verdict" "$$timestamp" "$$changed_paths_json" \
 			> "$(GEMMA_EVIDENCE_DIR)/$(GEMMA_REVIEW_TASK_ID).json"; \
 		echo "[gemma-review] receipt written to $(GEMMA_EVIDENCE_DIR)/$(GEMMA_REVIEW_TASK_ID).json"; \
 	fi; \
@@ -197,10 +213,12 @@ qa-peer-workflow-review:
 		mkdir -p "$(GEMMA_EVIDENCE_DIR)"; \
 		verdict=$$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); v=d.get('verdict','unknown'); print('PASS' if v == 'pass' else 'FINDINGS-ACKED')" "$(PEER_REVIEW_ARTIFACT)" 2>/dev/null || echo "FINDINGS-ACKED"); \
 		reviewer=$$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('reviewer') or d.get('model') or 'peer')" "$(PEER_REVIEW_ARTIFACT)" 2>/dev/null || echo "peer"); \
+		changed_paths_json=$$(git diff --name-only "$(PEER_REVIEW_BASE)" -- $(REVIEW_PATHS) 2>/dev/null \
+			| python3 -c "import json,sys; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))" 2>/dev/null || echo "[]"); \
 		commit_sha=$$(git rev-parse HEAD); \
 		timestamp=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
-		printf '{"task_id":"%s","commit_sha":"%s","reviewer":"%s","verdict":"%s","timestamp":"%s"}\n' \
-			"$(PEER_REVIEW_TASK_ID)" "$$commit_sha" "$$reviewer" "$$verdict" "$$timestamp" \
+		printf '{"task_id":"%s","commit_sha":"%s","reviewer":"%s","verdict":"%s","timestamp":"%s","changed_paths":%s}\n' \
+			"$(PEER_REVIEW_TASK_ID)" "$$commit_sha" "$$reviewer" "$$verdict" "$$timestamp" "$$changed_paths_json" \
 			> "$(GEMMA_EVIDENCE_DIR)/$(PEER_REVIEW_TASK_ID).json"; \
 		echo "[peer-review] receipt written to $(GEMMA_EVIDENCE_DIR)/$(PEER_REVIEW_TASK_ID).json"; \
 	fi; \

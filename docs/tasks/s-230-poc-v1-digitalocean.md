@@ -3409,6 +3409,40 @@ correct diff before being accepted. Muse Glimmer was not exhausted through
 its own retry/failure path per policy — this was a user-directed interrupt,
 recorded here rather than treated as a silent chain skip.
 
+**Root cause update (2026-08-21):** no longer "not fully isolated" and not a
+race. `docs/audit/2026-08-21-muse-glimmer-role-fitness-review.md` § D1
+identifies it as a deterministic control-flow defect in `Makefile:118-131`:
+`gemma-code-review.py` writes `--out` only on success, the recipe continues
+past a failed/interrupted run because of the trailing `;`, and
+`parse-review-findings.py` then reads the previous task's file at the fixed
+unscoped `/tmp/dubbridge-gemma-review.json` path and exits `0` — minting a
+`PASS` receipt for the current task ID. Reproduced empirically. Proposed fix
+is tracked as change **C1** in that audit.
+
+**Fix landed (2026-08-21):** C1 shipped as **GEG-2a**
+(`docs/tasks/gemma-evidence-artifact-gate.md`, RRI 38 Moderate, `[x] Done`).
+`qa-gemma-review` now captures the review command's exit status and aborts
+before `parse-review-findings.py` on any non-zero result, defaults
+`GEMMA_REVIEW_RESULT` to a task-scoped path, and refuses to proceed unless a
+pre-existing result is verifiably gone. The exact scenario above is locked by
+`scripts/gemma_review_makefile_test.py::QaGemmaReviewMakefileTarget::test_ec1_no_usable_passes_with_stale_result_aborts_no_receipt`,
+which seeds a valid stale result at the task path and asserts no receipt is
+minted; the user-interrupt shape specifically is locked by
+`test_ec2_interrupted_review_mints_no_receipt`, which raises a real `SIGINT`
+mid-run. Companion fixes GEG-2b (receipts name the model that actually ran)
+and GEG-2c (closure gate validates `verdict`/`reviewer`/`changed_paths`) landed
+in the same pass.
+
+**This receipt is not retroactively repaired, and that is deliberate.**
+`docs/audit/gemma-evidence/S-230-T4l.json` is pre-cutover
+(`2026-08-21T08:10:58Z` < `2026-08-21T10:00:00Z`), so GEG-2c grandfathers it;
+and re-minted today it would still pass, because GEG-2c asserts a *bound*
+`changed_paths`, not the *correct* one. Note also that the contaminated
+`changed_paths` lived in the result JSON, never in the receipt — the committed
+receipt has no such key at all. Backfilling the T4a–T4k receipts by re-running
+those reviews is audit change **C5**, still open and deliberately sequenced
+after GEG-2a/2b so it does not reproduce D1/D2 at volume.
+
 ### Reflection log (applied to Gemma's output, per the RRI 0-25 route)
 
 **Pass 1**

@@ -565,6 +565,7 @@ def main():
         content = gemma_local.stream_result_content(stream_result)
         usage = gemma_local.stream_result_usage(stream_result)
         result = parse_review_response(content, changed_paths)
+        result["model"] = selected_model
 
         if args.out:
             gemma_local.write_result(result, args.out)
@@ -659,6 +660,7 @@ def main():
         return 3
 
     aggregate = reconcile(succeeded, changed_paths)
+    aggregate["model"] = selected_model
     aggregate["passes_run"] = args.passes
     aggregate["passes_succeeded"] = len(succeeded)
 

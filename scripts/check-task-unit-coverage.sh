@@ -192,6 +192,14 @@ section_predates_cutover() {
 # fails the gate — silence is not a pass.
 OVERRIDES_LEDGER="docs/audit/gemma-review-overrides.md"
 
+# GEG-2c (defects D3/R4): receipts written before this UTC timestamp predate
+# the `changed_paths` field, `verdict`/`reviewer` value checks. Grandfathered
+# like GEG-1e's cutover, but keyed off the receipt's own `timestamp` field
+# (not the section's Done-date) since it's the receipt artifact that gains
+# the new content, independent of when the section prose was written.
+CHANGED_PATHS_CUTOVER_TIMESTAMP="2026-08-21T10:00:00Z"
+KNOWN_VERDICTS="PASS FINDINGS-ACKED BLOCKED"
+
 extract_task_id() {
   local section_title="$1"
   printf '%s\n' "$section_title" | awk '{print $1}' | sed 's/:$//'
@@ -216,8 +224,15 @@ validate_review_artifact_line() {
 
   local receipt_task_id
   local receipt_commit_sha
+  local receipt_verdict
+  local receipt_reviewer
+  local receipt_timestamp
+  local receipt_changed_paths_count
   receipt_task_id="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('task_id',''))" "$receipt_path" 2>/dev/null || true)"
   receipt_commit_sha="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('commit_sha',''))" "$receipt_path" 2>/dev/null || true)"
+  receipt_verdict="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('verdict',''))" "$receipt_path" 2>/dev/null || true)"
+  receipt_reviewer="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('reviewer',''))" "$receipt_path" 2>/dev/null || true)"
+  receipt_timestamp="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('timestamp',''))" "$receipt_path" 2>/dev/null || true)"
 
   if [[ "$receipt_task_id" != "$artifact_task_id" ]]; then
     add_violation "$task_file: $section_title: Review artifact task_id '$receipt_task_id' does not match section '$artifact_task_id'"
@@ -229,6 +244,42 @@ validate_review_artifact_line() {
     add_violation "$task_file: $section_title: Review artifact commit_sha '$receipt_commit_sha' is not a valid commit object"
   elif ! git merge-base --is-ancestor "$receipt_commit_sha" HEAD 2>/dev/null && [[ "$receipt_commit_sha" != "$(git rev-parse HEAD 2>/dev/null)" ]]; then
     add_violation "$task_file: $section_title: Review artifact commit_sha '$receipt_commit_sha' is not reachable from reviewed history"
+  fi
+
+  # GEG-2c (defect D3): a fabricated or misattributed receipt (D1/D2) could
+  # still carry a matching task_id and reachable commit_sha; verdict/reviewer
+  # content checks close that gap.
+  if [[ -z "$receipt_verdict" ]]; then
+    add_violation "$task_file: $section_title: Review artifact missing verdict"
+  elif [[ ! " $KNOWN_VERDICTS " == *" $receipt_verdict "* ]]; then
+    add_violation "$task_file: $section_title: Review artifact verdict '$receipt_verdict' is not one of: $KNOWN_VERDICTS"
+  fi
+
+  if [[ -z "$receipt_reviewer" ]]; then
+    add_violation "$task_file: $section_title: Review artifact missing reviewer"
+  fi
+
+  # changed_paths (GEG-2c / risk R4): grandfathered by the receipt's own
+  # timestamp, not the section's Done-date — see CHANGED_PATHS_CUTOVER_TIMESTAMP
+  # above for why. Presence-and-non-emptiness only: it proves a real diff was
+  # bound to this receipt, not set-equality against a task's declared scope
+  # (no single canonical, parseable "expected paths" source exists across the
+  # ledger corpus today). This proves a real diff was bound to the receipt; it
+  # does NOT prove the right diff was — D1's containment is the qa-gemma-review
+  # fail-close, not this check. Full rationale, including why the S-230-T4l
+  # receipt still passes: docs/tasks/gemma-evidence-artifact-gate.md § GEG-2c
+  # § Design decision.
+  #
+  # An absent timestamp deliberately falls through to the strict check rather
+  # than being grandfathered: an unstamped receipt is not evidence of age.
+  # String comparison is safe for fixed-width ISO-8601 Z stamps — they diverge
+  # at a digit position before any punctuation collation could matter.
+  if [[ -n "$receipt_timestamp" ]] && [[ "$receipt_timestamp" < "$CHANGED_PATHS_CUTOVER_TIMESTAMP" ]]; then
+    return
+  fi
+  receipt_changed_paths_count="$(python3 -c "import json,sys; v=json.load(open(sys.argv[1])).get('changed_paths'); print(len(v) if isinstance(v, list) else -1)" "$receipt_path" 2>/dev/null || echo -1)"
+  if [[ "$receipt_changed_paths_count" -le 0 ]]; then
+    add_violation "$task_file: $section_title: Review artifact missing a non-empty changed_paths list"
   fi
 }
 

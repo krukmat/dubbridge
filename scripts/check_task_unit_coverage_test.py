@@ -197,6 +197,121 @@ class TaskUnitCoverageEvidenceGate(unittest.TestCase):
             result.stdout + result.stderr,
         )
 
+    # -- GEG-2c: verdict / reviewer / changed_paths content checks ----------
+
+    def test_missing_verdict_fails(self):
+        self.write_corpus(section("T-NOVERDICT", "- Review artifact: docs/audit/gemma-evidence/T-NOVERDICT.json"))
+        self.write_ledger()
+        self.commit_all()
+        sha = self.head_sha()
+        self.write(
+            "docs/audit/gemma-evidence/T-NOVERDICT.json",
+            f'{{"task_id":"T-NOVERDICT","commit_sha":"{sha}","reviewer":"gemma","timestamp":"2026-08-21T11:00:00Z"}}',
+        )
+
+        result = self.check_gate()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("missing verdict", result.stdout)
+
+    def test_invalid_verdict_value_fails(self):
+        self.write_corpus(section("T-BADVERDICT", "- Review artifact: docs/audit/gemma-evidence/T-BADVERDICT.json"))
+        self.write_ledger()
+        self.commit_all()
+        sha = self.head_sha()
+        self.write(
+            "docs/audit/gemma-evidence/T-BADVERDICT.json",
+            f'{{"task_id":"T-BADVERDICT","commit_sha":"{sha}","reviewer":"gemma",'
+            '"verdict":"TOTALLY-FINE","timestamp":"2026-08-21T11:00:00Z"}',
+        )
+
+        result = self.check_gate()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("is not one of: PASS FINDINGS-ACKED BLOCKED", result.stdout)
+
+    def test_missing_reviewer_fails(self):
+        self.write_corpus(section("T-NOREVIEWER", "- Review artifact: docs/audit/gemma-evidence/T-NOREVIEWER.json"))
+        self.write_ledger()
+        self.commit_all()
+        sha = self.head_sha()
+        self.write(
+            "docs/audit/gemma-evidence/T-NOREVIEWER.json",
+            f'{{"task_id":"T-NOREVIEWER","commit_sha":"{sha}","reviewer":"",'
+            '"verdict":"PASS","timestamp":"2026-08-21T11:00:00Z"}',
+        )
+
+        result = self.check_gate()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("missing reviewer", result.stdout)
+
+    def test_post_cutover_receipt_with_changed_paths_passes(self):
+        self.write_corpus(section("T-CPGOOD", "- Review artifact: docs/audit/gemma-evidence/T-CPGOOD.json"))
+        self.write_ledger()
+        self.commit_all()
+        sha = self.head_sha()
+        self.write(
+            "docs/audit/gemma-evidence/T-CPGOOD.json",
+            f'{{"task_id":"T-CPGOOD","commit_sha":"{sha}","reviewer":"gemma","verdict":"PASS",'
+            '"timestamp":"2026-08-21T11:00:00Z","changed_paths":["Makefile"]}',
+        )
+
+        result = self.check_gate()
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_post_cutover_receipt_missing_changed_paths_fails(self):
+        self.write_corpus(section("T-CPMISSING", "- Review artifact: docs/audit/gemma-evidence/T-CPMISSING.json"))
+        self.write_ledger()
+        self.commit_all()
+        sha = self.head_sha()
+        self.write(
+            "docs/audit/gemma-evidence/T-CPMISSING.json",
+            f'{{"task_id":"T-CPMISSING","commit_sha":"{sha}","reviewer":"gemma","verdict":"PASS",'
+            '"timestamp":"2026-08-21T11:00:00Z"}',
+        )
+
+        result = self.check_gate()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("missing a non-empty changed_paths list", result.stdout)
+
+    def test_post_cutover_receipt_empty_changed_paths_fails(self):
+        self.write_corpus(section("T-CPEMPTY", "- Review artifact: docs/audit/gemma-evidence/T-CPEMPTY.json"))
+        self.write_ledger()
+        self.commit_all()
+        sha = self.head_sha()
+        self.write(
+            "docs/audit/gemma-evidence/T-CPEMPTY.json",
+            f'{{"task_id":"T-CPEMPTY","commit_sha":"{sha}","reviewer":"gemma","verdict":"PASS",'
+            '"timestamp":"2026-08-21T11:00:00Z","changed_paths":[]}',
+        )
+
+        result = self.check_gate()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("missing a non-empty changed_paths list", result.stdout)
+
+    def test_pre_cutover_receipt_without_changed_paths_still_passes(self):
+        # Grandfathered by the receipt's own timestamp (GEG-1-era receipts
+        # predate the changed_paths field entirely) — this replays the shape
+        # of the real S-230-T4l incident receipt: pre-cutover, no
+        # changed_paths key, and must NOT be newly failed by GEG-2c.
+        self.write_corpus(section("T-CPOLD", "- Review artifact: docs/audit/gemma-evidence/T-CPOLD.json"))
+        self.write_ledger()
+        self.commit_all()
+        sha = self.head_sha()
+        self.write(
+            "docs/audit/gemma-evidence/T-CPOLD.json",
+            f'{{"task_id":"T-CPOLD","commit_sha":"{sha}","reviewer":"gemma","verdict":"PASS",'
+            '"timestamp":"2026-08-21T08:10:58Z"}',
+        )
+
+        result = self.check_gate()
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_no_evidence_at_all_fails(self):
         self.write_corpus(section("T-NOEVID", ""))
         self.write_ledger()

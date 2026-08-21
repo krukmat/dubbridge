@@ -744,5 +744,55 @@ class MultiPassCliAudit(unittest.TestCase):
         self.assertNotIn("consensus_count", r)
 
 
+class ResolvedModelRecordedInResult(unittest.TestCase):
+    """GEG-2b: the receipt's `reviewer` is extracted from this field, so the
+    written result must name the model that actually ran — including when
+    `resolve_model_with_fallback` returned the fallback rather than the
+    requested model. Before this, the aggregate carried no model at all and
+    the Makefile hardcoded `"gemma"` (defect D2)."""
+
+    def _run(self, passes, resolved_model, requested_model=None):
+        response = _mod.gemma_local.StreamChatResult(
+            content="STATUS: PASS\nSUMMARY: ok",
+            usage=_mod.gemma_local.StreamUsage(response_tokens=5),
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            out_path = os.path.join(tmp, "result.json")
+            packet_file = os.path.join(tmp, "packet.md")
+            with open(packet_file, "w") as f:
+                f.write(_packet())
+
+            argv = [_SCRIPT, packet_file, "--out", out_path, "--passes", str(passes)]
+            if requested_model:
+                argv += ["--model", requested_model]
+            with patch("sys.argv", argv), \
+                 patch.object(_mod.gemma_local, "resolve_model_with_fallback",
+                              return_value=resolved_model), \
+                 patch.object(_mod.gemma_local, "stream_chat", return_value=response), \
+                 patch.object(_mod.gemma_local, "append_audit_log", side_effect=lambda r: None):
+                _mod.main()
+
+            with open(out_path) as f:
+                return json.load(f)
+
+    def test_single_pass_result_records_resolved_model(self):
+        result = self._run(1, "gemma4:26b-a4b-it-qat")
+        self.assertEqual(result["model"], "gemma4:26b-a4b-it-qat")
+
+    def test_multipass_aggregate_records_resolved_model(self):
+        aggregate = self._run(3, "gemma4:26b-a4b-it-qat")
+        self.assertEqual(aggregate["model"], "gemma4:26b-a4b-it-qat")
+
+    def test_result_records_fallback_model_not_requested_model(self):
+        # HP-2: requested muse-glimmer, Ollama only had the fallback installed.
+        result = self._run(1, "gemma4:26b-a4b-it-qat", requested_model="muse-glimmer:30b-q4_K_M")
+        self.assertEqual(result["model"], "gemma4:26b-a4b-it-qat")
+        self.assertNotEqual(result["model"], "muse-glimmer:30b-q4_K_M")
+
+    def test_multipass_aggregate_records_fallback_model(self):
+        aggregate = self._run(3, "gemma4:26b-a4b-it-qat", requested_model="muse-glimmer:30b-q4_K_M")
+        self.assertEqual(aggregate["model"], "gemma4:26b-a4b-it-qat")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
