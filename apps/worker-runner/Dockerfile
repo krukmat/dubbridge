@@ -16,6 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libssl3 \
     ffmpeg \
+    python3 \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
 # Create application directory
@@ -29,6 +31,13 @@ COPY config/ /app/config/
 
 # Set config directory path (DUBBRIDGE_ENV is NOT set here - supplied at runtime)
 ENV DUBBRIDGE_CONFIG_DIR=/app/config
+
+COPY workers/asr-worker-py/requirements.txt /app/asr_worker/requirements.txt
+RUN pip3 install --no-cache-dir --break-system-packages -r /app/asr_worker/requirements.txt
+COPY workers/asr-worker-py/main.py /app/asr_worker/main.py
+ENV DUBBRIDGE_ASR_WORKER_PATH=/app/asr_worker/main.py
+ENV DUBBRIDGE_ASR_WORKER_PYTHON=python3
+ENV ASR_MODEL_SIZE=small
 
 # Run as PID 1
 ENTRYPOINT ["/app/dubbridge-worker-runner"]

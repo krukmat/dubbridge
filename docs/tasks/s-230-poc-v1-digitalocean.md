@@ -62,14 +62,14 @@ ledger.
 | T4a | Production-image test harness | development/test | S (RRI 15 Low) | T3 | [x] Done |
 | T4b | API production image | development/config | S (RRI 18 Low) | T4a | [x] Done (structural cert) |
 | T4c | API image contract tests | development/test | S (RRI 17 Low) | T4b | [x] Done |
-| T4d | Gateway production image | development/config | S (RRI 18 Low) | T4a | [ ] Planned |
-| T4e | Gateway image contract tests | development/test | S (RRI 16 Low) | T4d | [ ] Planned |
+| T4d | Gateway production image | development/config | S (RRI 18 Low) | T4a | [x] Done — 2026-08-17 |
+| T4e | Gateway image contract tests | development/test | S (RRI 21 Low) | T4d | [x] Done |
 | T4f | Migration production image | development/config | S (RRI 13 Low) | T4a, T2 | [x] Done — 2026-08-20 |
-| T4g | Migration image contract tests | development/test | S (RRI 20 Low) | T4f | [ ] Planned |
+| T4g | Migration image contract tests | development/test | S (RRI 20 Low) | T4f | [x] Done — 2026-08-20 |
 | T4h | Exact ASR dependency lock | development/config | S (RRI 7 Low) | T4a | [x] Done — 2026-08-20 |
 | T4i | Worker native-runtime image | development/config | S (RRI 13 Low) | T4a, T4h | [x] Done — 2026-08-20 |
-| T4j | Worker native-runtime contract tests | development/test | S (RRI 21 Low) | T4i | [ ] Planned |
-| T4k | Worker ASR-bundle image | development/config | S (RRI 21 Low) | T4j | [ ] Planned |
+| T4j | Worker native-runtime contract tests | development/test | S (RRI 13 Low) | T4i | [x] Done — 2026-08-20 |
+| T4k | Worker ASR-bundle image | development/config | S (RRI 13 Low) | T4j | [x] Done — 2026-08-21 |
 | T4l | Worker ASR-bundle contract tests | development/test | S (RRI 24 Low) | T4k | [ ] Planned |
 | T4m | Translation-bundle image (conditional) | development/config | S (RRI 21 Low) | T4l, T3b | [ ] Conditional |
 | T4n | Translation-bundle contract tests (conditional) | development/test | S (RRI 24 Low) | T4m | [ ] Conditional |
@@ -3033,10 +3033,14 @@ budget; no margin question.
 ### S-230-T4k: Worker ASR-bundle image
 
 **Type:** development/config
-**Effort:** S — RRI 21 Low
+**Effort:** S — RRI 13 Low (recomputed at task-presentation time via
+`scripts/rri.py`; corrects the ledger's provisional RRI 21 estimate, same
+band, no gate change)
 **Depends on:** S-230-T4j
-**Status:** [ ] Planned
-**Writable path:** `apps/worker-runner/Dockerfile`
+**Status:** [x] Done — 2026-08-21
+**Writable path:** `apps/worker-runner/Dockerfile` (planned); widened during
+execution to also include `workers/asr-worker-py/requirements.txt` — see
+`### Scope-widening note` below.
 
 Extend the worker image with Python, the ASR worker, and its exact
 dependencies; set the two `DUBBRIDGE_ASR_WORKER_*` paths to locations that
@@ -3051,6 +3055,232 @@ artifact; Muse phase reviews; build and protocol transcripts;
 `pip freeze --all`; image size; HP/EC certification; owner verification.
 Status artifact: this ledger. Stop before translation bundling or
 cross-service smoke.
+
+**RRI:** 13 (Low). `python3 scripts/rri.py --touches
+apps/worker-runner/Dockerfile --cc 2 --D 1 --K 2 --P 0 --T 1 --A 0 --X 2` —
+single-file additive Dockerfile edit matching an existing bundling pattern
+(the standalone `workers/asr-worker-py/Dockerfile`), no anchor-rubric match,
+no penalties. Base value 13 -> band Low -> local delegation route (ledger's
+original planning estimate was 21, same band, no route change).
+
+**Ollama restart + local-stack precheck:** performed once for this task ID
+(`S-230-T4k`) — prior server PID `76448` killed; the Ollama.app supervisor
+auto-relaunched a new server, new PID `76584` confirmed listening on
+`11434`. Warm-up probes at production `num_ctx=65536`/`num_predict=4096`,
+`think=false`: `muse-glimmer:30b-q4_K_M` -> `done_reason: stop`, 18-char
+content (`{"status":"ready"}`); `gemma4:26b-a4b-it-qat` -> `done_reason:
+stop`, 18-char content (`{"status":"ready"}`). Both models in the RRI 0-25
+chain passed cleanly; no resource-recovery protocol needed.
+
+**Task-analysis review (Phase 1):** the delegation packet was independently
+reviewed by Muse Glimmer before being sent to the local implementer, on both
+the original packet and the attempt-2 repair packet (see below) after it was
+materially revised — each got its own PASS.
+
+Task-analysis review: muse-glimmer (inline, not persisted as a separate
+artifact file — packet review transcript captured in this section) - PASS
+
+**Implementation routing evidence:** local delegation via
+`scripts/delegate-low-rri.py --mode before-after --target-path
+apps/worker-runner/Dockerfile`, model `qwen3.8:27b-mlx` (default
+`DUBBRIDGE_LOW_RRI_MODEL`).
+
+- **Attempt 1** (packet: additive instructions, before-file = original
+  34-line Dockerfile): phase-1 PASS from Muse Glimmer on the packet, but the
+  model's returned patch failed independent review before application —
+  fabricated sha256 digests on both `FROM` lines (values not matching the
+  real base-image digests), a rewritten builder stage
+  (`COPY Cargo.toml Cargo.lock ./` + `COPY src ./src` in place of
+  `COPY . /usr/src/app` + `-p dubbridge-worker-runner`, which would break
+  the Cargo workspace's path-dependency resolution across crates), and a
+  dropped `AS runtime` stage name. **Not applied** — `git status --short`
+  confirmed the working tree stayed clean after attempt 1.
+- **Repair (attempt 2):** cross-delegate-on-failure discipline applied at
+  Low band — an explicit repair packet enumerating each attempt-1 defect and
+  restricting the model to two additive insertion points only (the apt
+  package list, and after the existing `DUBBRIDGE_CONFIG_DIR` block) was
+  independently phase-1-reviewed (Muse Glimmer PASS on the revised packet,
+  a new verdict distinct from attempt 1's packet review) before
+  re-delegation to the same local model. The returned patch preserved both
+  base-image digests, the builder stage, and the `AS runtime` name
+  byte-for-byte; applied via `--apply`. One cosmetic double-space before
+  `&& rm -rf /var/lib/apt/lists/*` was fixed directly as a mechanical
+  lint-driven refactor of already-verified logic (no behavior change),
+  matching the narrow direct-edit exception in
+  `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Post-repair-budget Low-band
+  decomposition`. 2/2 repair budget used within limit (attempt 2 succeeded,
+  no further escalation needed).
+
+### Scope-widening note
+
+Building the image and executing HP-1 surfaced a real, pre-existing defect
+outside the originally planned `Writable path`: `faster-whisper==1.1.0`
+imports `requests` directly inside its own code
+(`faster_whisper/utils.py:8`), but `workers/asr-worker-py/requirements.txt`
+only pinned `faster-whisper==1.1.0` and left `huggingface-hub` unpinned,
+which today resolves to `1.28.0` — a version that no longer carries
+`requests` as its own transitive dependency (it uses `httpx` internally).
+The result was `ModuleNotFoundError: No module named 'requests'` on
+`import faster_whisper`, reproduced identically in the pre-existing
+standalone `workers/asr-worker-py/Dockerfile` build (unrelated to this
+task's changes), confirming the defect predates T4k and is not something
+this task's Dockerfile edit introduced. Per an explicit user decision
+during this task, the `Writable path` was widened by one file
+(`workers/asr-worker-py/requirements.txt`) to add `requests==2.34.2` —
+verified via `pip3 install --dry-run` inside the built image to confirm a
+clean, non-conflicting resolution — because HP-1 could not otherwise be
+certified at all. Recorded here rather than silently expanding scope
+undocumented.
+
+### HP-1 / EC-1 evidence
+
+- **HP-1:** `docker build -t dubbridge-worker-runner-t4k:test -f
+  apps/worker-runner/Dockerfile .` succeeded; inside the built image,
+  `python3` resolves to `/usr/bin/python3`, `/app/asr_worker/main.py` exists
+  (3141 bytes), `DUBBRIDGE_ASR_WORKER_PATH=/app/asr_worker/main.py` resolves
+  `is_file()` true, `DUBBRIDGE_ASR_WORKER_PYTHON=python3`, default
+  `ASR_MODEL_SIZE=small` confirmed via `os.environ.get(...)` inside the
+  image without any override, `import faster_whisper` and
+  `from faster_whisper import WhisperModel` both succeed after the
+  `requests` fix, `pip3 show faster-whisper` reports `Version: 1.1.0`
+  exactly. Full protocol round-trip: piping a valid-shaped JSON request
+  (`{"job_id":"...", "audio_uri":"file:///tmp/dummy.wav", ...}` against a
+  synthetically generated silent WAV) through `python3 /app/asr_worker/
+  main.py` returns a well-formed JSON response on stdout with exit 0 for
+  the happy-path protocol shape (verified via the `audio_not_found` and
+  successful-parse branches of `main.py`; full transcription is not
+  exercised because it requires network access to download Whisper model
+  weights, unavailable in the build sandbox — HP-1's scope per the task
+  definition is protocol/dependency resolution end-to-end, not a live
+  transcription run).
+- **EC-1:** `docker run --rm -i -e
+  ASR_MODEL_SIZE=not-a-real-invalid-model-xyz --entrypoint /bin/sh
+  dubbridge-worker-runner-t4k:test` piping a request against a real
+  (dummy, silent) WAV file through `python3 /app/asr_worker/main.py`
+  returns `{"error_code": "transcription_failed", "message": "Invalid
+  model size 'not-a-real-invalid-model-xyz', expected one of: tiny.en,
+  tiny, base.en, base, small.en, small, medium.en, medium, large-v1,
+  large-v2, large-v3, large, distil-large-v2, distil-medium.en,
+  distil-small.en, distil-large-v3, large-v3-turbo, turbo"}` with exit
+  code 1 — confirmed via direct exit-code capture into a file, not through
+  a chained `echo` that could mask `$?`. Never silently substitutes
+  `large-v3` and never returns a false-ready/exit-0 result.
+- **Regression check:** `bash scripts/test-production-images.sh contract
+  worker` (T4i/T4j's existing check) still passes unchanged;
+  `/app/dubbridge-worker-runner` remains present and executable
+  (`-rwxr-xr-x`, 17631264 bytes) inside the extended image.
+- **Image size:** `dubbridge-worker-runner-t4k:test` = 1.28GB vs. T4i's
+  `dubbridge-worker-runner-t4i:test` = 729MB — a +551MB delta from the
+  Python runtime, pip, and the faster-whisper dependency tree (ctranslate2,
+  onnxruntime, tokenizers, huggingface-hub, requests, etc.).
+- **`pip freeze --all`:** `faster-whisper==1.1.0`, `requests==2.34.2`,
+  `huggingface_hub==1.28.0`, `ctranslate2==4.8.1`, `onnxruntime==1.29.0`,
+  `tokenizers==0.23.1`, `av==18.1.0`, `numpy==2.4.6`, plus their own
+  transitive dependencies (full list captured in the build transcript for
+  this task).
+
+### Gemma Reviewer evidence
+
+- Model: `muse-glimmer:30b-q4_K_M` (`DEFAULT_REVIEW_MODEL` for the RRI 0-25
+  chain's primary reviewer)
+- Command: `GEMMA_REVIEW_TASK_ID=S-230-T4k REVIEW_PATHS="apps/worker-runner/Dockerfile
+  workers/asr-worker-py/requirements.txt" make qa-gemma-review`
+- Passes run / usable: `3/3`
+- Aggregate status: `PASS`
+- Consensus findings: `0` | Pass-specific: `0` | Disagreement: `0`
+- Artifacts: `/tmp/dubbridge-gemma-review.json` (aggregate),
+  `/tmp/dubbridge-gemma-review.pass{1,2,3}.json` (per-pass, not persisted
+  in-repo); receipt at `docs/audit/gemma-evidence/S-230-T4k.json`
+- Isolated adjudicator: `not triggered` — trigger: n/a (primary reviewer
+  produced a usable 3/3 aggregate)
+- D14 provider route: `n/a` — reason: D14 not triggered
+- disposition_divergence: `null`
+- Primary-agent disposition: no findings to disposition; diff independently
+  re-verified against the applied Dockerfile and requirements.txt content
+  before accepting the PASS verdict
+- Review artifact: docs/audit/gemma-evidence/S-230-T4k.json
+
+Code-solution review: muse-glimmer docs/audit/gemma-evidence/S-230-T4k.json - PASS
+
+### Reflection log (applied to Muse Glimmer's Phase 2 output, per the RRI 0-25 route)
+
+- **Draft verdict:** Muse Glimmer's 3/3-pass aggregate reported `status:
+  pass`, zero findings across consensus/pass-specific/disagreement buckets.
+- **Critique findings:** independently re-checked whether "no findings" was
+  itself plausible given the diff's small size (10 lines across two files)
+  and the fact that both HP-1 and EC-1 had already been verified against a
+  real built image before the review ran — no logical-correctness gap
+  found; the one real defect in this task (missing `requests` pin) was
+  already caught and fixed by direct build/run verification *before* the
+  Gemma pass, not something the reviewer needed to catch. Confirmed the
+  reviewer's summary line ("Dockerfile adds Python runtime and ASR worker
+  assets with explicit env vars; requirements pin added") accurately
+  describes the actual diff content, not a generic restatement.
+- **Revisions applied:** none needed — no issues found in Draft or Critique.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | Python 3 + `main.py` + exact `faster-whisper==1.1.0` + both `DUBBRIDGE_ASR_WORKER_*` env vars + default `ASR_MODEL_SIZE=small` all resolve inside the built image, and a valid-shaped protocol request round-trips through `main.py` | Manual evidence-backed verification against the real built image (`docker build` + `docker run` transcripts in `### HP-1 / EC-1 evidence` above) — this task's own acceptance contract is image-build/runtime evidence, not a Rust/Python unit test; T4l (dependent task) codifies this as a repeatable `scripts/test-production-images.sh` harness case | passed |
+| EC-1 | Edge case | an invalid `ASR_MODEL_SIZE` fails closed with a visible `transcription_failed` error and exit 1, never falling back to `large-v3` or a false-ready result | Manual evidence-backed verification against the real built image (`### HP-1 / EC-1 evidence` above); T4l codifies this as a repeatable harness case | passed |
+
+Reviewability budget: not evaluated — 10-line net addition across two
+files, trivially within any derived Low-band review budget; no margin
+question.
+
+### Owner final verification
+
+- Owner: `matias` (primary agent, orchestrator of record for this Low-band
+  task per the RRI 0-25 route — no separate human approval gate applies;
+  the scope-widening to `workers/asr-worker-py/requirements.txt` was
+  explicitly authorized by the human user mid-task via `AskUserQuestion`
+  before being acted on)
+- Date: `2026-08-21`
+- Statement: I verified HP-1 and EC-1 directly against a real, freshly
+  built Docker image (not a structural-only review) — confirmed Python 3,
+  the ASR worker source, both `DUBBRIDGE_ASR_WORKER_*` env vars, and the
+  default `ASR_MODEL_SIZE=small` all resolve inside the image; confirmed
+  `import faster_whisper` succeeds at exactly version `1.1.0`; confirmed an
+  invalid model size fails closed with exit 1 and a clear
+  `transcription_failed` error rather than silently substituting
+  `large-v3` or returning a false-ready result. I independently discovered,
+  diagnosed, and fixed a real pre-existing dependency gap (`requests`
+  missing from `workers/asr-worker-py/requirements.txt`) that blocked HP-1
+  outright, confirmed it was not introduced by this task by reproducing the
+  identical failure against the unmodified standalone
+  `workers/asr-worker-py/Dockerfile`, and got explicit human authorization
+  before widening the writable-path scope to fix it. I confirmed the
+  attempt-1 local-delegation output was correctly rejected before
+  application (fabricated image digests, a rewritten builder stage that
+  would have broken the Cargo workspace build, a dropped stage name) and
+  that the repair (attempt 2) preserved every byte of content outside the
+  two authorized additive insertion points. I confirmed
+  `bash scripts/test-production-images.sh contract worker` (T4i/T4j's
+  existing check) still passes unchanged and the Rust binary remains
+  present and executable in the extended image. I confirmed no file outside
+  the (widened, explicitly authorized) writable paths was touched
+  (`git status --short` showed only `apps/worker-runner/Dockerfile`,
+  `workers/asr-worker-py/requirements.txt`, and this ledger modified).
+- Commands run: `python3 scripts/rri.py --touches
+  apps/worker-runner/Dockerfile --cc 2 --D 1 --K 2 --P 0 --T 1 --A 0 --X 2`;
+  `python3 scripts/delegate-low-rri.py <packet> --mode before-after
+  --target-path apps/worker-runner/Dockerfile --before-file <before>
+  --allow-path apps/worker-runner/Dockerfile --task-id S-230-T4k --attempt 1
+  --rri 13 --no-think --temperature 0.1 --out <result>` (attempt 1, not
+  applied); same command with `--attempt 2 --apply` (repair, applied);
+  `docker build -t dubbridge-worker-runner-t4k:test -f
+  apps/worker-runner/Dockerfile .`; `docker run --rm --entrypoint /bin/sh
+  dubbridge-worker-runner-t4k:test -c '...'` (HP-1 env/import checks);
+  `docker run --rm -i -e ASR_MODEL_SIZE=not-a-real-invalid-model-xyz
+  --entrypoint /bin/sh dubbridge-worker-runner-t4k:test -c '...'` (EC-1);
+  `bash scripts/test-production-images.sh contract worker`; `docker images
+  dubbridge-worker-runner-t4k:test --format "{{.Size}}"`; `docker run --rm
+  --entrypoint /bin/sh dubbridge-worker-runner-t4k:test -c 'pip3 freeze
+  --all'`; `GEMMA_REVIEW_TASK_ID=S-230-T4k
+  REVIEW_PATHS="apps/worker-runner/Dockerfile
+  workers/asr-worker-py/requirements.txt" make qa-gemma-review`; `git status
+  --short`.
 
 ### S-230-T4l: Worker ASR-bundle contract tests
 
