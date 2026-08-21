@@ -3,7 +3,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # Case registry - bash 3.2 compatible (no associative arrays)
-CASE_LIST="self-check api gateway migration worker"
+CASE_LIST="self-check api gateway migration worker asr"
 
 # Cleanup machinery
 TEMP_DIR=""
@@ -471,6 +471,100 @@ run_worker() {
     fi
 
     echo "Run check passed for worker"
+    return 0
+}
+
+contract_asr() {
+    echo "Contract check for asr case"
+    if [ ! -f "apps/worker-runner/Dockerfile" ]; then
+        echo "ERROR: apps/worker-runner/Dockerfile not found" >&2
+        return 1
+    fi
+    if ! grep -q 'faster-whisper==1.1.0' "workers/asr-worker-py/requirements.txt"; then
+        echo "ERROR: faster-whisper==1.1.0 pin not found in workers/asr-worker-py/requirements.txt" >&2
+        return 1
+    fi
+    if ! grep -q 'ENV DUBBRIDGE_ASR_WORKER_PATH=' "apps/worker-runner/Dockerfile"; then
+        echo "ERROR: DUBBRIDGE_ASR_WORKER_PATH env var not found in Dockerfile" >&2
+        return 1
+    fi
+    if ! grep -q 'ENV DUBBRIDGE_ASR_WORKER_PYTHON=' "apps/worker-runner/Dockerfile"; then
+        echo "ERROR: DUBBRIDGE_ASR_WORKER_PYTHON env var not found in Dockerfile" >&2
+        return 1
+    fi
+    if ! grep -q 'ENV ASR_MODEL_SIZE=small' "apps/worker-runner/Dockerfile"; then
+        echo "ERROR: default ASR_MODEL_SIZE=small not found in Dockerfile" >&2
+        return 1
+    fi
+    echo "Contract check passed for asr"
+    return 0
+}
+
+run_asr() {
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "ERROR: docker not found on PATH" >&2
+        return 1
+    fi
+
+    asr_image="${DUBBRIDGE_ASR_WORKER_IMAGE_TAG:-dubbridge-worker-runner-t4k:test}"
+
+    # Generate a real (silent) WAV inside the container first — main.py
+    # checks os.path.exists() before touching ASR_MODEL_SIZE, so a
+    # nonexistent path would short-circuit both HP-1 and EC-1 on
+    # audio_not_found before the behavior under test ever runs.
+    gen_wav='python3 -c "
+import struct, wave
+with wave.open(\"/tmp/t4l-silence.wav\", \"wb\") as w:
+    w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000)
+    w.writeframes(struct.pack(\"<8000h\", *([0] * 8000)))
+"'
+
+    # HP-1: dependency and protocol resolution end to end (no live
+    # transcription — that needs network access to fetch model weights,
+    # unavailable in this harness; matches T4k's HP-1 evidence scope).
+    # Confirming dependency resolution via direct imports/version pin is a
+    # deliberately narrower check than a real transcription pass.
+    hp1_exit=0
+    hp1_output=$(docker run --rm --entrypoint /bin/sh "$asr_image" -c "
+        set -e
+        python3 -c 'import faster_whisper' &&
+        python3 -c 'from faster_whisper import WhisperModel' &&
+        test -f \"\$DUBBRIDGE_ASR_WORKER_PATH\" &&
+        [ \"\$DUBBRIDGE_ASR_WORKER_PYTHON\" = python3 ] &&
+        pip3 show faster-whisper | grep -q '^Version: 1.1.0\$' &&
+        $gen_wav &&
+        echo '{\"job_id\":\"t4l-hp1\",\"audio_uri\":\"file:///tmp/t4l-silence.wav\"}' | python3 \"\$DUBBRIDGE_ASR_WORKER_PATH\"
+    " 2>&1) || hp1_exit=$?
+    if [ "$hp1_exit" -ne 0 ]; then
+        echo "ERROR: HP-1 FAILED: dependency/protocol resolution check failed" >&2
+        echo "$hp1_output" >&2
+        return 1
+    fi
+    if ! echo "$hp1_output" | grep -q '"status": "ok"'; then
+        echo "ERROR: HP-1 FAILED: no successful protocol response in output" >&2
+        echo "$hp1_output" >&2
+        return 1
+    fi
+
+    # EC-1: invalid ASR_MODEL_SIZE must fail closed, never fall back to
+    # large-v3 or return a false-ready result.
+    ec1_exit=0
+    ec1_output=$(docker run --rm -e ASR_MODEL_SIZE=not-a-real-invalid-model-xyz --entrypoint /bin/sh "$asr_image" -c "
+        $gen_wav &&
+        echo '{\"job_id\":\"t4l-ec1\",\"audio_uri\":\"file:///tmp/t4l-silence.wav\"}' | python3 \"\$DUBBRIDGE_ASR_WORKER_PATH\"
+    " 2>&1) || ec1_exit=$?
+    if [ "$ec1_exit" -eq 0 ]; then
+        echo "ERROR: EC-1 FAILED: invocation succeeded with an invalid ASR_MODEL_SIZE" >&2
+        echo "$ec1_output" >&2
+        return 1
+    fi
+    if ! echo "$ec1_output" | grep -q '"error_code": "transcription_failed"'; then
+        echo "ERROR: EC-1 FAILED: expected transcription_failed error_code not found" >&2
+        echo "$ec1_output" >&2
+        return 1
+    fi
+
+    echo "Run check passed for asr"
     return 0
 }
 

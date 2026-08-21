@@ -70,7 +70,7 @@ ledger.
 | T4i | Worker native-runtime image | development/config | S (RRI 13 Low) | T4a, T4h | [x] Done — 2026-08-20 |
 | T4j | Worker native-runtime contract tests | development/test | S (RRI 13 Low) | T4i | [x] Done — 2026-08-20 |
 | T4k | Worker ASR-bundle image | development/config | S (RRI 13 Low) | T4j | [x] Done — 2026-08-21 |
-| T4l | Worker ASR-bundle contract tests | development/test | S (RRI 24 Low) | T4k | [ ] Planned |
+| T4l | Worker ASR-bundle contract tests | development/test | S (RRI 12 Low) | T4k | [x] Done — 2026-08-21 |
 | T4m | Translation-bundle image (conditional) | development/config | S (RRI 21 Low) | T4l, T3b | [ ] Conditional |
 | T4n | Translation-bundle contract tests (conditional) | development/test | S (RRI 24 Low) | T4m | [ ] Conditional |
 | T4o | Full local image-pipeline contract | development/test | S (RRI 25 Low) | T4c, T4e, T4g, T4l; T4n if executed (contract-verified images) | [ ] Planned |
@@ -3285,9 +3285,11 @@ question.
 ### S-230-T4l: Worker ASR-bundle contract tests
 
 **Type:** development/test
-**Effort:** S — RRI 24 Low
+**Effort:** S — RRI 12 Low (recomputed at task-presentation time via
+`scripts/rri.py`; corrects the ledger's provisional RRI 24 estimate, same
+band, no gate change)
 **Depends on:** S-230-T4k
-**Status:** [ ] Planned
+**Status:** [x] Done — 2026-08-21
 **Writable path:** `scripts/test-production-images.sh`
 
 Add ASR-bundle cases that codify T4k's manual evidence as a repeatable harness
@@ -3301,6 +3303,195 @@ false-ready result (matching T4k's EC-1 transcript). Evidence: RRI artifact;
 Muse phase reviews; harness tests executed against the real T4k image; HP/EC
 certification; owner verification. Status artifact: this ledger. Stop before
 modifying `apps/worker-runner/Dockerfile` or translation bundling.
+
+**Route:** RRI 0-25 Low band — no full approval card. Direct primary-agent
+implementation (new test-case pair mirroring the existing `worker` case
+pattern in the same file; not a narrow mechanical patch eligible for Qwen
+Developer delegation).
+
+Task-analysis review: n/a - RRI 0-25, no phase-1 gate before direct execution
+
+### Implementation
+
+Added a new `asr` case (`contract_asr`/`run_asr`) to
+`scripts/test-production-images.sh`, following the existing `worker` case's
+structure (image-tag override via `DUBBRIDGE_ASR_WORKER_IMAGE_TAG`, default
+`dubbridge-worker-runner-t4k:test`):
+
+- `contract_asr`: static check that `apps/worker-runner/Dockerfile` and
+  `workers/asr-worker-py/requirements.txt` declare the exact
+  `faster-whisper==1.1.0` pin, both `DUBBRIDGE_ASR_WORKER_*` env vars, and
+  the default `ASR_MODEL_SIZE=small`.
+- `run_asr`: generates a real (silent) WAV inside the container first —
+  `main.py` checks `os.path.exists()` before touching `ASR_MODEL_SIZE`, so a
+  nonexistent audio path would short-circuit both HP-1 and EC-1 on
+  `audio_not_found` before the behavior under test ever ran. HP-1 pipes a
+  valid-shaped request through `main.py` and asserts `"status": "ok"`.
+  EC-1 sets `ASR_MODEL_SIZE=not-a-real-invalid-model-xyz` and asserts exit 1
+  with `error_code: transcription_failed`.
+
+### HP-1 / EC-1 evidence
+
+- **Image:** `dubbridge-worker-runner-t4k:test` was not cached locally
+  (only T4i's image was); rebuilt via `docker build -t
+  dubbridge-worker-runner-t4k:test -f apps/worker-runner/Dockerfile .` —
+  succeeded, 1.28GB, matching T4k's recorded evidence exactly.
+- **Contract check:** `bash scripts/test-production-images.sh contract asr`
+  → `Contract check passed for asr`.
+- **HP-1:** direct `docker run` against the built image confirmed
+  `pip3 show faster-whisper` reports exactly `Version: 1.1.0`; a
+  synthetically generated silent WAV piped as a valid-shaped JSON request
+  through `python3 /app/asr_worker/main.py` returned
+  `{"job_id": "t4l-hp1", "transcript_uri": "...", "alignment_uri": "...",
+  "status": "ok"}` with exit 0.
+- **EC-1:** same setup with `ASR_MODEL_SIZE=not-a-real-invalid-model-xyz`
+  returned exit 1 with `{"job_id": "t4l-ec1", "error_code":
+  "transcription_failed", "message": "Invalid model size
+  'not-a-real-invalid-model-xyz', expected one of: tiny.en, tiny, base.en,
+  base, small.en, small, medium.en, medium, large-v1, large-v2, large-v3,
+  large, distil-large-v2, distil-medium.en, distil-small.en,
+  distil-large-v3, large-v3-turbo, turbo"}` — matches T4k's original manual
+  evidence verbatim, confirming the harness case reproduces it.
+- **Full harness run:** `bash scripts/test-production-images.sh run asr` →
+  `Run check passed for asr`.
+- **Regression check:** `contract self-check/worker/api/gateway/migration`
+  all still pass unchanged.
+- **Scope:** `git status --short` showed only
+  `scripts/test-production-images.sh` modified.
+- **Ollama restart:** confirmed new PID (32499, replacing prior 54977) and
+  a listening endpoint (`lsof -iTCP:11434 -sTCP:LISTEN`) before the first
+  local-model call for this task; warm-up probe against
+  `muse-glimmer:30b-q4_K_M` at `num_ctx=65536`/`num_predict=256` returned
+  `done_reason: stop` with non-empty content.
+
+### Gemma Reviewer evidence
+
+- Model: `gemma4:26b-a4b-it-qat` (band's intermediate-fallback binding;
+  Muse Glimmer's run was terminated by the user before completing — see
+  disposition note below)
+- Command: `GEMMA_REVIEW_TASK_ID=S-230-T4l REVIEW_PATHS="scripts/test-production-images.sh" DUBBRIDGE_REVIEW_MODEL=gemma4:26b-a4b-it-qat DUBBRIDGE_REVIEW_PASSES=1 make qa-gemma-review`
+- Passes run / usable: `1/1`
+- Aggregate status: `FINDINGS` (1 minor, non-blocking per
+  `parse-review-findings.py`'s exit-0 rule for minor/nit-only findings)
+- Consensus findings: n/a (single-pass mode) | Pass-specific: n/a | Disagreement: n/a
+- Artifacts: `/tmp/dubbridge-gemma-review.json`; receipt at
+  `docs/audit/gemma-evidence/S-230-T4l.json`
+- Isolated adjudicator: `not triggered` — trigger: n/a (Gemma produced a
+  usable single-pass result with only a minor finding)
+- D14 provider route: `n/a` — reason: D14 not triggered
+- disposition_divergence: `null`
+- Primary-agent disposition: **accepted-follow-up** — finding flagged the
+  hardcoded `dubbridge-worker-runner-t4k:test` fallback in `run_asr` for
+  `DUBBRIDGE_ASR_WORKER_IMAGE_TAG`. This is the same pattern already used by
+  the sibling `run_worker` (`DUBBRIDGE_WORKER_IMAGE_TAG:-...-t4i:test`) and
+  `run_migration` (`DUBBRIDGE_CLI_IMAGE_TAG:-...:t4f-test`) cases in the
+  same file — pre-existing harness convention, not a defect introduced by
+  this task. Fixing it in isolation for only the `asr` case would be
+  inconsistent scope creep; left as-is, consistent with the rest of the
+  script.
+
+Code-solution review: gemma docs/audit/gemma-evidence/S-230-T4l.json - PASS
+
+**Fallback-chain note (process irregularity, recorded for audit):** the
+initial Muse Glimmer run (band's primary reviewer) was started
+(`DUBBRIDGE_REVIEW_PASSES=1`, backgrounded) but was manually terminated by
+the user before completing, at their explicit request, after judging the
+default 3-pass/30B-model wait excessive; they then asked to switch to
+Gemma. A stale receipt from that interrupted run was found written to
+`docs/audit/gemma-evidence/S-230-T4l.json` containing content from an
+unrelated prior task's diff (T4k's `Dockerfile`/`requirements.txt` paths,
+not T4l's `scripts/test-production-images.sh`) — root cause not fully
+isolated (suspected stale/overlapping process writing to the shared fixed
+`/tmp/dubbridge-gemma-review.json` path), but the contaminated file and
+receipt were identified via `changed_paths` mismatch, deleted, and the
+Gemma run below was executed clean and independently verified against the
+correct diff before being accepted. Muse Glimmer was not exhausted through
+its own retry/failure path per policy — this was a user-directed interrupt,
+recorded here rather than treated as a silent chain skip.
+
+### Reflection log (applied to Gemma's output, per the RRI 0-25 route)
+
+**Pass 1**
+
+- **Draft verdict:** Gemma's single-pass result reported `status: findings`
+  with one minor, non-blocking finding about the hardcoded image-tag
+  fallback in `run_asr`.
+- **Critique findings:** independently re-verified the finding is accurate
+  (the fallback is real and matches the code) but re-checked whether it
+  represents a genuine defect specific to this task versus an existing
+  repo-wide convention — confirmed via direct inspection that
+  `run_worker`/`run_migration` use the identical fallback pattern already,
+  so flagging only `run_asr` would be inconsistent. Also independently
+  re-verified HP-1/EC-1 against the real built image before accepting the
+  review's summary, rather than trusting the review's characterization
+  alone.
+- **Revisions applied:** none needed — finding disposed as accepted-follow-up,
+  consistent with existing harness convention; no code change required for
+  this task's scope.
+
+**Pass 2**
+
+- **Draft verdict:** harness case implementation stable; contract, HP-1,
+  EC-1, and regression checks all pass against the real T4k image.
+- **Critique findings:** re-read `run_asr` as if reviewing someone else's
+  code — checked for boundary/error-handling gaps: the WAV-generation step
+  (`gen_wav`) is unconditionally chained with `&&` before both HP-1 and
+  EC-1 invocations, so a WAV-generation failure surfaces as a general
+  command failure rather than a silently-passed check; confirmed the EC-1
+  assertion specifically greps for `transcription_failed` (not just any
+  `error_code`), so it would correctly fail if `main.py`'s behavior ever
+  regressed to a generic error path instead of the specific fail-closed one
+  under test. No coverage gaps found against the two approved HP/EC cases.
+- **Revisions applied:** none needed — no issues found.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | Python 3 + `main.py` + exact `faster-whisper==1.1.0` + both `DUBBRIDGE_ASR_WORKER_*` env vars + default `ASR_MODEL_SIZE=small` all resolve inside the T4k image, and a valid-shaped protocol request round-trips through `main.py` | `scripts/test-production-images.sh::run_asr` (HP-1 block) executed against the real `dubbridge-worker-runner-t4k:test` image — `bash scripts/test-production-images.sh run asr` | passed |
+| EC-1 | Edge case | an invalid `ASR_MODEL_SIZE` fails closed with a visible `transcription_failed` error and exit 1, never falling back to `large-v3` or a false-ready result | `scripts/test-production-images.sh::run_asr` (EC-1 block) executed against the real `dubbridge-worker-runner-t4k:test` image — `bash scripts/test-production-images.sh run asr` | passed |
+
+Reviewability budget: not evaluated — single-file, single-case addition
+(~85 lines), trivially within any derived Low-band review budget; no
+margin question.
+
+### Owner final verification
+
+- Owner: `matias` (primary agent, orchestrator of record for this Low-band
+  task per the RRI 0-25 route — no separate human approval gate applies)
+- Date: `2026-08-21`
+- Statement: I verified HP-1 and EC-1 directly against the real,
+  freshly-rebuilt T4k image (not a structural-only check) — confirmed the
+  new `run_asr` harness case reproduces T4k's original manual evidence
+  verbatim (exact `faster-whisper==1.1.0`, protocol round-trip returning
+  `status: ok` for HP-1, exact `transcription_failed` message with exit 1
+  for EC-1). I confirmed no regression in the pre-existing `self-check`,
+  `worker`, `api`, `gateway`, and `migration` cases, and that only
+  `scripts/test-production-images.sh` was modified. I independently
+  detected and remediated a review-evidence contamination incident before
+  accepting any receipt as valid — a stale/mismatched
+  `docs/audit/gemma-evidence/S-230-T4l.json` (content from an unrelated
+  prior task's diff) was found via `changed_paths` mismatch, deleted, and
+  replaced with a receipt from a clean, independently-verified run against
+  the correct diff. I confirmed the accepted Gemma finding (hardcoded
+  image-tag fallback) matches a pre-existing convention already used by two
+  sibling cases in the same file, not a defect introduced by this task.
+- Commands run: `python3 scripts/rri.py --touches
+  scripts/test-production-images.sh --cc 3 --D 1 --K 2 --P 0 --T 1 --A 0
+  --X 1`; `bash -n scripts/test-production-images.sh`; `bash
+  scripts/test-production-images.sh contract asr`; `bash
+  scripts/test-production-images.sh contract worker`; `docker build -t
+  dubbridge-worker-runner-t4k:test -f apps/worker-runner/Dockerfile .`;
+  `docker images dubbridge-worker-runner-t4k:test --format "{{.Size}}"`;
+  `bash scripts/test-production-images.sh run asr`; `bash
+  scripts/test-production-images.sh contract self-check`; `bash
+  scripts/test-production-images.sh contract api`; `bash
+  scripts/test-production-images.sh contract gateway`; `bash
+  scripts/test-production-images.sh contract migration`; `git status
+  --short`; `GEMMA_REVIEW_TASK_ID=S-230-T4l
+  REVIEW_PATHS="scripts/test-production-images.sh"
+  DUBBRIDGE_REVIEW_MODEL=gemma4:26b-a4b-it-qat DUBBRIDGE_REVIEW_PASSES=1
+  make qa-gemma-review`.
 
 ### S-230-T4m: Translation-bundle image (conditional)
 
