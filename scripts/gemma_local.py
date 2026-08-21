@@ -42,6 +42,17 @@ DEFAULT_THINK = False
 
 TRUTHY_ENV_VALUES = {"1", "true", "TRUE", "yes", "YES", "on", "ON"}
 
+# C4 (docs/audit/2026-08-19-muse-glimmer-think-flag-not-honored.md): the
+# Ollama API-level "think" field is not honored by every model. Confirmed by
+# direct bisection that muse-glimmer:30b-q4_K_M consumes its full num_predict
+# budget on invisible reasoning and returns done_reason:"length" with empty
+# content even when think=False. A text-level "/no_think" directive prepended
+# to the system prompt is the only remedy that has been empirically verified
+# against the real model. Scoped to the specific model(s) confirmed to need
+# it, not applied blindly to every model.
+THINK_DIRECTIVE_MODELS = {"muse-glimmer:30b-q4_K_M"}
+THINK_DIRECTIVE_TEXT = "/no_think"
+
 
 @dataclass(frozen=True)
 class StreamUsage:
@@ -66,6 +77,20 @@ class GemmaWallTimeout(RuntimeError):
     def __init__(self, wall):
         super().__init__(f"Gemma wall timeout after {wall}s total")
         self.exit_code = 124
+
+
+class GemmaThinkOverrunError(RuntimeError):
+    """done_reason:"length" with empty content: the model spent its entire
+    num_predict budget on unsuppressed internal reasoning, not on truncated
+    real output. Distinct from the generic length-cutoff RuntimeError, which
+    still applies when content is non-empty (a genuinely truncated answer)."""
+
+    def __init__(self, model):
+        super().__init__(
+            f"{model}: response cut by token limit with empty content "
+            "(think directive not honored)"
+        )
+        self.model = model
 
 
 def bool_from_env(name, default=False):
@@ -166,6 +191,9 @@ def build_chat_payload(
     think,
 ):
     effective_num_predict = resolve_num_predict(model, num_predict)
+    effective_system_prompt = system_prompt
+    if not think and model in THINK_DIRECTIVE_MODELS:
+        effective_system_prompt = f"{THINK_DIRECTIVE_TEXT}\n{system_prompt}"
     return {
         "model": model,
         "stream": True,
@@ -179,7 +207,7 @@ def build_chat_payload(
         "messages": [
             {
                 "role": "system",
-                "content": system_prompt,
+                "content": effective_system_prompt,
             },
             {
                 "role": "user",
@@ -292,6 +320,8 @@ def stream_chat(url, payload, idle_timeout, max_wall, progress_label="delegate")
                         done_reason=chunk.get("done_reason"),
                     )
                     if chunk.get("done_reason") == "length":
+                        if not "".join(content_parts):
+                            raise GemmaThinkOverrunError(payload.get("model"))
                         raise RuntimeError(
                             "response cut by token limit; output may be truncated"
                         )

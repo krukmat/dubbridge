@@ -380,6 +380,51 @@ def _pass_artifact_path(out_path, k):
     return f"{stem}.pass{k}{ext}"
 
 
+def _run_review_pass(args, payload, changed_paths, k):
+    """Run one review pass (with its one format-retry attempt).
+
+    Returns (status, result, usage) where status is "ok", "fail", or
+    "think_overrun" (C4: done_reason:"length" with empty content — the model's
+    think directive was not honored, distinct from a genuine content
+    truncation, which stays classified "fail" like any other failed pass).
+    """
+    format_retry_used = False
+    for attempt in range(2):
+        try:
+            stream_result = gemma_local.stream_chat(
+                gemma_local.endpoint(args.host, "/api/chat"),
+                payload,
+                idle_timeout=args.idle_timeout,
+                max_wall=args.max_wall,
+                progress_label=f"review pass {k}/{args.passes}" + (" (retry)" if attempt else ""),
+            )
+            usage = gemma_local.stream_result_usage(stream_result)
+            content = gemma_local.stream_result_content(stream_result)
+            result = parse_review_response(content, changed_paths)
+            if format_retry_used:
+                result["format_retry"] = True
+            if args.out:
+                pass_out = _pass_artifact_path(args.out, k)
+                gemma_local.write_result(result, pass_out)
+                print(f"[review] pass {k} written to {pass_out}", file=sys.stderr)
+            return "ok", result, usage
+        except gemma_local.GemmaThinkOverrunError as exc:
+            print(f"[review] pass {k} think overrun: {exc}", file=sys.stderr)
+            return "think_overrun", None, None
+        except RuntimeError as exc:
+            msg = str(exc)
+            if attempt == 0 and "STATUS PASS cannot include findings" in msg:
+                print(f"[review] pass {k} format error (STATUS PASS + findings), retrying: {exc}", file=sys.stderr)
+                format_retry_used = True
+                continue
+            print(f"[review] pass {k} failed: {exc}", file=sys.stderr)
+            return "fail", None, None
+        except (gemma_local.GemmaIdleTimeout, gemma_local.GemmaWallTimeout) as exc:
+            print(f"[review] pass {k} failed: {exc}", file=sys.stderr)
+            return "fail", None, None
+    return "fail", None, None
+
+
 def _empty_reconciliation():
     return {
         "consensus": [],
@@ -615,46 +660,18 @@ def main():
     usage_results = []
     per_call_packet_tokens = gemma_local.estimate_payload_tokens(payload)
     for k in range(1, args.passes + 1):
-        format_retry_used = False
-        for attempt in range(2):
-            try:
-                stream_result = gemma_local.stream_chat(
-                    gemma_local.endpoint(args.host, "/api/chat"),
-                    payload,
-                    idle_timeout=args.idle_timeout,
-                    max_wall=args.max_wall,
-                    progress_label=f"review pass {k}/{args.passes}" + (" (retry)" if attempt else ""),
-                )
-                usage_results.append(gemma_local.stream_result_usage(stream_result))
-                content = gemma_local.stream_result_content(stream_result)
-                result = parse_review_response(content, changed_paths)
-                if format_retry_used:
-                    result["format_retry"] = True
-                if args.out:
-                    pass_out = _pass_artifact_path(args.out, k)
-                    gemma_local.write_result(result, pass_out)
-                    print(f"[review] pass {k} written to {pass_out}", file=sys.stderr)
-                pass_results.append(("ok", result))
-                break
-            except RuntimeError as exc:
-                msg = str(exc)
-                if attempt == 0 and "STATUS PASS cannot include findings" in msg:
-                    print(f"[review] pass {k} format error (STATUS PASS + findings), retrying: {exc}", file=sys.stderr)
-                    format_retry_used = True
-                    continue
-                print(f"[review] pass {k} failed: {exc}", file=sys.stderr)
-                pass_results.append(("fail", None))
-                break
-            except (gemma_local.GemmaIdleTimeout, gemma_local.GemmaWallTimeout) as exc:
-                print(f"[review] pass {k} failed: {exc}", file=sys.stderr)
-                pass_results.append(("fail", None))
-                break
+        status, result, usage = _run_review_pass(args, payload, changed_paths, k)
+        if usage is not None:
+            usage_results.append(usage)
+        pass_results.append((status, result))
 
     succeeded = [r for status, r in pass_results if status == "ok"]
+    think_overrun_count = sum(1 for status, _ in pass_results if status == "think_overrun")
     all_format_warnings = [w for _, r in pass_results if r for w in r.get("format_warnings") or []]
     if not succeeded:
         print(
-            f"[review] no usable review passes ({len(succeeded)}/{args.passes} parsed)",
+            f"[review] no usable review passes ({len(succeeded)}/{args.passes} parsed, "
+            f"{think_overrun_count} think-overrun)",
             file=sys.stderr,
         )
         return 3
@@ -700,6 +717,7 @@ def main():
         "format_warnings": all_format_warnings or None,
         "passes_run": aggregate["passes_run"],
         "passes_succeeded": aggregate["passes_succeeded"],
+        "think_overrun_count": think_overrun_count,
         "consensus_count": rec.get("consensus_count", 0),
         "pass_specific_count": rec.get("pass_specific_count", 0),
         "severity_inconsistent_count": rec.get("severity_inconsistent_count", 0),

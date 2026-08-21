@@ -1,0 +1,99 @@
+[c4-verify] tokens: 1 elapsed: 43s
+[c4-verify] tokens: 2 elapsed: 43s
+[c4-verify] tokens: 3 elapsed: 43s
+[c4-verify] tokens: 4 elapsed: 43s
+[c4-verify] tokens: 5 elapsed: 43s
+[c4-verify] tokens: 6 elapsed: 44s
+[c4-verify] tokens: 7 elapsed: 44s
+[c4-verify] tokens: 8 elapsed: 44s
+[c4-verify] tokens: 9 elapsed: 44s
+[c4-verify] tokens: 10 elapsed: 44s
+[c4-verify] tokens: 11 elapsed: 44s
+[c4-verify] tokens: 12 elapsed: 44s
+[c4-verify] tokens: 13 elapsed: 44s
+[c4-verify] tokens: 14 elapsed: 45s
+[c4-verify] tokens: 15 elapsed: 45s
+[c4-verify] tokens: 16 elapsed: 45s
+[c4-verify] tokens: 17 elapsed: 45s
+[c4-verify] tokens: 18 elapsed: 45s
+[c4-verify] tokens: 19 elapsed: 45s
+[c4-verify] tokens: 20 elapsed: 45s
+[c4-verify] tokens: 21 elapsed: 46s
+[c4-verify] tokens: 22 elapsed: 46s
+[c4-verify] tokens: 23 elapsed: 46s
+[c4-verify] tokens: 24 elapsed: 46s
+[c4-verify] tokens: 25 elapsed: 46s
+[c4-verify] tokens: 26 elapsed: 46s
+[c4-verify] tokens: 27 elapsed: 46s
+[c4-verify] tokens: 28 elapsed: 46s
+[c4-verify] tokens: 29 elapsed: 47s
+[c4-verify] tokens: 30 elapsed: 47s
+[c4-verify] tokens: 31 elapsed: 47s
+[c4-verify] tokens: 32 elapsed: 47s
+[c4-verify] tokens: 33 elapsed: 47s
+[c4-verify] tokens: 34 elapsed: 47s
+[c4-verify] tokens: 35 elapsed: 47s
+[c4-verify] tokens: 36 elapsed: 48s
+[c4-verify] tokens: 37 elapsed: 48s
+[c4-verify] tokens: 38 elapsed: 48s
+[c4-verify] tokens: 39 elapsed: 48s
+[c4-verify] tokens: 40 elapsed: 48s
+[c4-verify] tokens: 41 elapsed: 48s
+[c4-verify] tokens: 42 elapsed: 48s
+[c4-verify] tokens: 43 elapsed: 49s
+[c4-verify] tokens: 44 elapsed: 49s
+[c4-verify] tokens: 45 elapsed: 49s
+[c4-verify] tokens: 46 elapsed: 49s
+[c4-verify] tokens: 47 elapsed: 49s
+[c4-verify] tokens: 48 elapsed: 49s
+[c4-verify] tokens: 49 elapsed: 49s
+[c4-verify] tokens: 50 elapsed: 50s
+[c4-verify] tokens: 51 elapsed: 50s
+[c4-verify] tokens: 52 elapsed: 50s
+[c4-verify] tokens: 53 elapsed: 50s
+[c4-verify] tokens: 54 elapsed: 50s
+[c4-verify] tokens: 55 elapsed: 50s
+[c4-verify] tokens: 56 elapsed: 50s
+[c4-verify] tokens: 57 elapsed: 50s
+[c4-verify] tokens: 58 elapsed: 51s
+[c4-verify] tokens: 59 elapsed: 51s
+[c4-verify] tokens: 60 elapsed: 51s
+[c4-verify] tokens: 61 elapsed: 51s
+[c4-verify] tokens: 62 elapsed: 51s
+[c4-verify] tokens: 63 elapsed: 51s
+[c4-verify] tokens: 64 elapsed: 51s
+[c4-verify] tokens: 65 elapsed: 52s
+[c4-verify] tokens: 66 elapsed: 52s
+[c4-verify] tokens: 67 elapsed: 52s
+[c4-verify] tokens: 68 elapsed: 52s
+[c4-verify] tokens: 69 elapsed: 52s
+[c4-verify] tokens: 70 elapsed: 52s
+[c4-verify] tokens: 71 elapsed: 52s
+[c4-verify] tokens: 72 elapsed: 52s
+[c4-verify] tokens: 73 elapsed: 53s
+[c4-verify] tokens: 74 elapsed: 53s
+[c4-verify] tokens: 75 elapsed: 53s
+[c4-verify] tokens: 76 elapsed: 53s
+[c4-verify] tokens: 77 elapsed: 53s
+[c4-verify] tokens: 78 elapsed: 53s
+[c4-verify] tokens: 79 elapsed: 53s
+[c4-verify] tokens: 80 elapsed: 54s
+[c4-verify] tokens: 81 elapsed: 54s
+[c4-verify] tokens: 82 elapsed: 54s
+[c4-verify] tokens: 83 elapsed: 54s
+[c4-verify] tokens: 84 elapsed: 54s
+[c4-verify] tokens: 85 elapsed: 54s
+[c4-verify] tokens: 86 elapsed: 54s
+[c4-verify] tokens: 87 elapsed: 55s
+[c4-verify] tokens: 88 elapsed: 55s
+effective system prompt starts with directive: True
+estimated packet tokens: 1307
+SUCCESS done_reason: stop
+content length: 403
+content preview: STATUS: BLOCKED
+SUMMARY: Diff inserts hundreds of no-op pass statements into scripts/gemma_local.py with no functional context
+=== FINDING START ===
+SEVERITY: blocking
+FILE: scripts/gemma_local.py
+LINE: 1
+DESCRIPTION: Massive insertion of bare pass statements corrupts file structure, provides no fun

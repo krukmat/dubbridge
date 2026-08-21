@@ -135,6 +135,47 @@ class Payload(unittest.TestCase):
         self.assertEqual(gemma_local.sum_measured_tokens([2, 3]), 5)
         self.assertIsNone(gemma_local.sum_measured_tokens([2, None]))
 
+    def test_think_directive_prepended_for_muse_glimmer_when_think_false(self):
+        # HP-1: muse-glimmer + think=False -> directive prepended.
+        payload = gemma_local.build_chat_payload(
+            model="muse-glimmer:30b-q4_K_M",
+            system_prompt="system prompt",
+            packet="packet",
+            num_ctx=8192,
+            num_predict=2048,
+            temperature=0.1,
+            think=False,
+        )
+        self.assertTrue(
+            payload["messages"][0]["content"].startswith(gemma_local.THINK_DIRECTIVE_TEXT)
+        )
+        self.assertIn("system prompt", payload["messages"][0]["content"])
+
+    def test_think_directive_not_prepended_for_other_models(self):
+        # HP-2: other model + think=False -> system prompt unchanged.
+        payload = gemma_local.build_chat_payload(
+            model="gemma4:26b-a4b-it-qat",
+            system_prompt="system prompt",
+            packet="packet",
+            num_ctx=8192,
+            num_predict=2048,
+            temperature=0.1,
+            think=False,
+        )
+        self.assertEqual(payload["messages"][0]["content"], "system prompt")
+
+    def test_think_directive_not_prepended_when_think_true(self):
+        payload = gemma_local.build_chat_payload(
+            model="muse-glimmer:30b-q4_K_M",
+            system_prompt="system prompt",
+            packet="packet",
+            num_ctx=8192,
+            num_predict=2048,
+            temperature=0.1,
+            think=True,
+        )
+        self.assertEqual(payload["messages"][0]["content"], "system prompt")
+
 
 class ModelAvailability(unittest.TestCase):
     def test_ensure_model_available_accepts_installed_default(self):
@@ -410,12 +451,27 @@ class StreamChat(unittest.TestCase):
         self.assertEqual(result.usage.response_tokens, 7)
         self.assertEqual(result.usage.prompt_tokens, 11)
 
-    def test_stream_chat_rejects_length_done_reason(self):
-        response = _FakeResponse([_chunk(done=True, done_reason="length")])
+    def test_stream_chat_rejects_length_done_reason_with_content(self):
+        # EC-2: non-empty content cut by the token limit is a genuine
+        # truncation and must stay the generic RuntimeError, not be
+        # reclassified as a think-overrun.
+        response = _FakeResponse([_chunk("partial answer", done=True, done_reason="length")])
         with patch("urllib.request.urlopen", return_value=response):
             with self.assertRaises(RuntimeError) as ctx:
-                gemma_local.stream_chat("http://host/api/chat", {}, 60, 900)
+                gemma_local.stream_chat("http://host/api/chat", {"model": "m"}, 60, 900)
+        self.assertNotIsInstance(ctx.exception, gemma_local.GemmaThinkOverrunError)
         self.assertIn("token limit", str(ctx.exception))
+
+    def test_stream_chat_length_done_reason_with_empty_content_is_think_overrun(self):
+        # EC-1: done_reason:"length" with empty content is the think-overrun
+        # class (C4), distinct from a genuinely truncated non-empty answer.
+        response = _FakeResponse([_chunk(done=True, done_reason="length")])
+        with patch("urllib.request.urlopen", return_value=response):
+            with self.assertRaises(gemma_local.GemmaThinkOverrunError) as ctx:
+                gemma_local.stream_chat(
+                    "http://host/api/chat", {"model": "muse-glimmer:30b-q4_K_M"}, 60, 900
+                )
+        self.assertEqual(ctx.exception.model, "muse-glimmer:30b-q4_K_M")
 
     def test_stream_result_helpers_accept_legacy_string(self):
         self.assertEqual(gemma_local.stream_result_content("hello"), "hello")

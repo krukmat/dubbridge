@@ -608,6 +608,28 @@ class MultiPassCli(unittest.TestCase):
         self.assertEqual(agg["reconciliation"]["consensus_count"], 1)
         self.assertEqual(agg["reconciliation"]["pass_specific_count"], 0)
 
+    def test_think_overrun_pass_excluded_but_others_succeed(self):
+        # EC-1: a think-overrun pass does not count as succeeded, but does
+        # not block the other passes from producing a usable aggregate.
+        ec, agg, _ = self._run_multi([
+            "STATUS: PASS\nSUMMARY: ok",
+            _mod.gemma_local.GemmaThinkOverrunError("muse-glimmer:30b-q4_K_M"),
+            "STATUS: PASS\nSUMMARY: ok",
+        ])
+        self.assertEqual(ec, 0)
+        self.assertIsNotNone(agg)
+        self.assertEqual(agg["passes_succeeded"], 2)
+        self.assertEqual(agg["passes_run"], 3)
+
+    def test_all_think_overrun_fails_no_aggregate(self):
+        ec, agg, _ = self._run_multi([
+            _mod.gemma_local.GemmaThinkOverrunError("muse-glimmer:30b-q4_K_M"),
+            _mod.gemma_local.GemmaThinkOverrunError("muse-glimmer:30b-q4_K_M"),
+            _mod.gemma_local.GemmaThinkOverrunError("muse-glimmer:30b-q4_K_M"),
+        ])
+        self.assertNotEqual(ec, 0)
+        self.assertIsNone(agg)
+
 
 # ---------------------------------------------------------------------------
 # MultiPassCliAudit — verify append_audit_log is called with D12 fields
@@ -721,6 +743,16 @@ class MultiPassCliAudit(unittest.TestCase):
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0]["consensus_count"], 1)
         self.assertEqual(records[0]["pass_specific_count"], 0)
+
+    def test_think_overrun_count_recorded_in_audit_record(self):
+        records = self._run_audit([
+            "STATUS: PASS\nSUMMARY: ok",
+            _mod.gemma_local.GemmaThinkOverrunError("muse-glimmer:30b-q4_K_M"),
+            "STATUS: PASS\nSUMMARY: ok",
+        ])
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["think_overrun_count"], 1)
+        self.assertEqual(records[0]["passes_succeeded"], 2)
 
     def test_passes_1_audit_has_no_d12_fields(self):
         """--passes 1 (T3 path) must not include D12 fields in the audit record."""

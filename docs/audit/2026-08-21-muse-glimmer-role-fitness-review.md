@@ -275,7 +275,7 @@ band column is an unverified estimate for sequencing only.
 | **C1** | Make `qa-gemma-review` fail closed: abort before `parse-review-findings.py` when the review command fails; scope `GEMMA_REVIEW_RESULT` per task ID; delete/ignore any pre-existing result before invoking | `Makefile` | Low | ✅ landed 2026-08-21 as **GEG-2a** (RRI 38, Moderate) |
 | **C2** | Record the resolved reviewer model in the aggregate result JSON, then extract it for the receipt instead of hardcoding `gemma` | `scripts/gemma-code-review.py`, `Makefile` | Low–Moderate | ✅ landed 2026-08-21 as **GEG-2b** (RRI 34, Moderate) |
 | **C3** | Extend the closure validator to check `verdict`, `reviewer`, and `changed_paths` scope intersection | `scripts/check-task-unit-coverage.sh` | Moderate | ✅ landed 2026-08-21 as **GEG-2c** (RRI 52, Med-high) — **narrowed**, see below |
-| **C4** | Implement the think-flag remedy: model-specific textual `/no_think` prepend + a distinct, logged failure class for `done_reason:length` with empty content (do not merge it into the generic "unavailable" bucket) | `scripts/gemma_local.py`, `scripts/gemma-code-review.py` | Moderate | ⬜ open |
+| **C4** | Implement the think-flag remedy: model-specific textual `/no_think` prepend + a distinct, logged failure class for `done_reason:length` with empty content (do not merge it into the generic "unavailable" bucket) | `scripts/gemma_local.py`, `scripts/gemma-code-review.py` | Moderate | ✅ landed 2026-08-21 (RRI 40, Moderate) — see `docs/audit/2026-08-19-muse-glimmer-think-flag-not-honored.md` § Scoped task: C4 |
 | **C5** | Add `Behavioral coverage contract: unit-v1` to the S-230 ledger and backfill the missing T4 receipts, or record typed overrides | `docs/tasks/s-230-poc-v1-digitalocean.md`, `docs/audit/gemma-evidence/` | Low (docs) | ⬜ open — owner chose the **re-run** route over typed overrides; deliberately sequenced *after* C1/C2, since backfilling before them would reproduce D1/D2 at volume |
 | **C6** | Require the evidence block to state when a review ran on a **trimmed/reduced packet**, so a degraded `PASS` is distinguishable from a full-coverage one | `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` | Low (docs) | ⬜ open |
 | **C7** | Widen the coverage gate's test-reference regex beyond `.rs::` so Python/shell development tasks can satisfy it; match the `Review artifact:` line with or without markdown bold; match a `Statement:` wrapped across lines; anchor marker detection to a real declaration line instead of a bare substring grep (defect **D6**) | `scripts/check-task-unit-coverage.sh`, `scripts/check_task_unit_coverage_test.py`, `docs/policies/RRI_POLICY.md` | Moderate | ⬜ open |
@@ -338,12 +338,16 @@ would misbehave identically behind any reviewer model. Swapping the binding
 would leave that untouched while discarding a reviewer that works 78% of the
 time.
 
-Revisit the binding **after C1 and C4 land**, when the failure rate can be
-measured against a pipeline that reports honestly. If the empty-response rate
-stays materially above ~20% after the `/no_think` fix, that is the point at
-which re-binding becomes the evidence-backed call — and the rollback trigger in
-`AGENT_WORKFLOW_GUIDE.md § Handoff prompt format` (escalation rate `> 40%` over
-a rolling 20-task window) is the existing policy hook for it.
+**C1 and C4 have both now landed (2026-08-21).** This revisit is open —
+measure the failure rate against the repaired pipeline going forward. If the
+empty-response rate stays materially above ~20% after the `/no_think` fix,
+that is the point at which re-binding becomes the evidence-backed call — and
+the rollback trigger in `AGENT_WORKFLOW_GUIDE.md § Handoff prompt format`
+(escalation rate `> 40%` over a rolling 20-task window) is the existing
+policy hook for it. No occurrences observed yet post-fix; the sample size so
+far is limited to C4's own phase-2 review run (§ 4 above), which completed
+3/3 passes with no think-overrun. Continue observing before drawing a
+conclusion — one clean run is not sufficient evidence either way.
 
 One caveat on the recommendation's own confidence: `S-230-T4e`/`T4g` show that
 some recorded `PASS` verdicts rest on trimmed packets, so the true
