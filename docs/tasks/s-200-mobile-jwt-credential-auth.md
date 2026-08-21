@@ -2093,6 +2093,87 @@ This cleanup also isolated the dead legacy implementation from the active crate:
 - the on-disk legacy files remain available as historical code, but they are no
   longer part of the active gateway module graph
 
+**Update (S-230-GW-CLEANUP, 2026-08-21):** the on-disk legacy files noted above were
+deleted, closing the gap against `T5`'s own acceptance criterion ("no dead code left
+behind"). Removed: `apps/gateway/src/auth/{oauth_client,login,logout,pending,handoff,
+mobile_session}.rs`, `apps/gateway/src/session/{mod,store}.rs`,
+`apps/gateway/src/{cookie,cookie_ext}.rs` (10 files, 3309 lines). Verified zero live
+references before deletion (`grep` across `apps/gateway/src` and `apps/gateway/tests`,
+`cargo check -p dubbridge-gateway --tests`); `cargo check --workspace`,
+`cargo test -p dubbridge-gateway` (26/26 passing, same count as pre-deletion baseline),
+`cargo fmt --check`, and `cargo clippy -D warnings` all pass clean after deletion.
+Cross-boundary check requested during review: `grep` across `mobile/src` (TypeScript)
+found no reference to any retired route the deleted files exposed (`GET /auth/login`
+OAuth-redirect, `/auth/callback`, `/oauth/token`, `/auth/logout`, `mobile-session`,
+`handoff`) — the only mobile call is `POST /auth/login`, served by the still-active
+`apps/gateway/src/auth/relay.rs`. A repo-wide `grep --include="*.rs" .` (not scoped to
+`apps/gateway`) found the same three test-function-name-only hits as the gateway-scoped
+grep, confirming no other Rust crate in the workspace referenced the deleted modules.
+
+##### S-230-GW-CLEANUP closure record
+
+**Task:** S-230-GW-CLEANUP — Remove orphaned pre-ADR-031 gateway source files
+**RRI:** 47 → Med-high (anchor-rubric path floor on `apps/gateway/src/auth`; actual
+cyclomatic complexity C=0, deletion-only, no logic touched)
+
+###### Peer Reviewer evidence
+
+- Task-analysis review (Phase 1): `gemma` `/private/tmp/claude-501/-Users-matias-dubbridge/b9a85f37-cd5a-4629-b49c-944c9c18e13c/scratchpad/gw-cleanup-p1-response.json` - PASS (2 minor findings, both affirming plan safety; no blocking issues)
+- Code-solution review (Phase 2): `gemma` `/private/tmp/claude-501/-Users-matias-dubbridge/b9a85f37-cd5a-4629-b49c-944c9c18e13c/scratchpad/gw-cleanup-p2-response.json` - PASS (0 findings)
+- Muse Glimmer fallback: not triggered — reason: Gemma responded with usable PASS on both phases
+- D14 fallback: not triggered — reason: Gemma available and usable on both phases
+- D14 provider route: n/a
+- disposition_divergence: null
+- Primary-agent disposition: accepted both PASS verdicts as-is; no findings required repair
+
+###### Reflection log
+
+Required passes: 3 (`47` → `Med-high`)
+
+**Pass 1**
+- Draft verdict: 10 files deleted via `git rm`, `session/` dir auto-removed; diff scope
+  verified via `git diff --cached --stat` against the approved file list.
+- Critique findings: none — diff matched the approved scope exactly (10 files, 3309
+  deletions, 0 additions, no other file touched).
+- Revisions applied: none
+
+**Pass 2**
+- Draft verdict: crate-level gates (`cargo check`, `check --tests`, `fmt --check`,
+  `clippy -D warnings`, `test`) all pass for `dubbridge-gateway`.
+- Critique findings: crate-level verification alone doesn't rule out cross-crate
+  references elsewhere in the workspace.
+- Revisions applied: ran `cargo check --workspace`, confirming no other crate
+  (`apps/api`, `apps/cli`, `apps/worker-runner`, `crates/*`) referenced the deleted
+  modules.
+
+**Pass 3**
+- Draft verdict: implementation verified; status-artifact sync still outstanding.
+- Critique findings: the `T5`/`T5e` closure record needed an explicit update pointing
+  to this cleanup to actually close the "no dead code left behind" gap it had left
+  open; a follow-up question during review also surfaced that verification had not
+  explicitly covered `mobile/` (TypeScript) or a repo-wide (non-gateway-scoped) Rust
+  grep.
+- Revisions applied: added the update note above; ran and recorded the `mobile/src`
+  grep and the repo-wide `--include="*.rs" .` grep, both zero live references.
+
+###### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | crate compiles clean after deletion | `cargo check -p dubbridge-gateway` / `cargo check -p dubbridge-gateway --tests` (command-level verification; deletion-only diff has no new function to unit-test) | passed |
+| HP-2 | Happy path | no test coverage lost | `cargo test -p dubbridge-gateway` — 26/26 passing, identical to pre-deletion baseline (13+8+3+2) | passed |
+| EC-1 | Edge case | no dangling reference to removed modules | repo-wide `grep --include="*.rs" .` and `mobile/src` grep, both zero live references (only 3 test-function-name string hits, unrelated to module linkage) | passed |
+
+###### Owner final verification
+
+- Owner: `matias`
+- Date: `2026-08-21`
+- Statement: I verified every happy path and edge case defined for this task has
+  test/command evidence that replicates the expected behavior, including an
+  additional cross-boundary check (mobile TypeScript + repo-wide Rust grep) requested
+  during review before closure.
+- Commands run: `cargo check -p dubbridge-gateway`, `cargo check -p dubbridge-gateway --tests`, `cargo check --workspace`, `cargo test -p dubbridge-gateway`, `cargo fmt -p dubbridge-gateway --check`, `cargo clippy -p dubbridge-gateway -- -D warnings`, `grep -rn ... apps/gateway/src apps/gateway/tests`, `grep -rn ... mobile/src`, `grep -rn --include="*.rs" .`
+
 #### Reflection log
 
 Required passes: 3 (`46` → `Med-high`)
