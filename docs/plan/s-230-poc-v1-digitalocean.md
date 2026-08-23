@@ -369,7 +369,19 @@ original gap list and are both blocking.
 | `S-070` production identity hardening (JWKS, key rotation) | ADR-031/S-200 inverted this: `apps/api/src/routes/auth.rs:22`–`23` serves `/auth/login` and `/auth/register`; credentials are bcrypt (`crates/auth/src/credentials.rs:1`) and tokens are self-issued HS256 with algorithm pinning (`crates/auth/src/issuer.rs:79`). There is no external IdP for JWKS to discover. | **Not needed.** The roadmap's "S-070 (JWKS) remains recommended before production device login" note predates ADR-031 and is stale. |
 | `S-090` platform ingest | No platform router is mounted: `apps/api/src/lib.rs:30`–`38` merges only auth, compliance, ingestion, notifications, playback, review and workspace. `S-090-C4`–`C7` are deferred and no `/ingests/platform` route exists. | **Not needed.** Zero runtime surface. |
 | `S-095` live recording | Same — no recording routes are mounted; the recorder work is ex-T3–T8, deferred. | **Not needed.** |
-| `S-150` translation and dubbing | `apps/worker-runner/src/main.rs:105`–`109` registers exactly three workers (preparation, transcription, subtitle). No translation worker, no fan-out call in the runtime path, and no translation or dubbing UI anywhere under `mobile/src`. | **Not needed.** Parking it leaves no dangling runtime edge. |
+| `S-150` translation and dubbing | `apps/worker-runner/src/main.rs:105`–`109` registers exactly three workers (preparation, transcription, subtitle); no translation worker, no dubbing UI anywhere under `mobile/src`. | **Not needed** for the core POC path. |
+
+> **Update, 2026-08-23 (post `S-150-T2c-vi-a`).** The runtime-evidence cell
+> above is stale as originally written: the subtitle worker now dispatches a
+> `fan_out_localization` call onto `RedisTranslationJobQueue` after readiness
+> (`apps/worker-runner/src/subtitle_runtime.rs`), replacing the legacy
+> `review_enqueue` path — see `docs/tasks/s-150-translation-dubbing.md` §
+> S-150-T2c-vi-a. This is the reopened `S-230-T3b` parallel track (children 1–2
+> of 6 done: `T2c-v`, `T2c-vi-a`), not a change to this section's original
+> verdict: no translation *worker* is registered yet (`T3b`/`T3c` remain
+> pending), so nothing downstream unblocks — see `S-230-T3b` §"Downstream
+> coupling" for the specific conditional gates (`T4m`/`T4n`, T5's env-var
+> bullet, T6's smoke-assertion bullet) that still require `T3b`/`T3c` done.
 
 Secondary findings from the same review. None is blocking, but the owner
 promoted the first two into planned work on 2026-08-16 — they are written up as
