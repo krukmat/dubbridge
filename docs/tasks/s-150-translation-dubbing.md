@@ -3392,12 +3392,21 @@ Required passes: 3 (`47` → `Med-high`)
 ## S-150-T2c-vi-b: Delete the dead legacy review module and sync S-140 BDD
 
 **Type:** development/docs synchronization
-**Effort:** M (provisional RRI 31 — Moderate; recompute before presentation)
+**Effort:** S (RRI 24 — Low, recomputed 2026-08-23 via `scripts/rri.py`; supersedes
+the prior provisional `M`/31 estimate)
 **Decomposed from:** S-150-T2c-vi
-**Depends on:** S-150-T2c-vi-a
-**Status:** [ ] Planned — approval pending
+**Depends on:** S-150-T2c-vi-a (status: [x] Done, 2026-08-23)
+**Status:** [ ] Planned — Low band (RRI 24): no full HITL approval presentation
+required; phase-1 task-analysis review complete (D14, `PASS`, see below)
 
-**RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
+**RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md` (original
+decomposition estimate); recomputed final score command: `python3 scripts/rri.py
+--touches apps/worker-runner/src/review_enqueue.rs --touches
+apps/worker-runner/src/main.rs --touches docs/bdd/README.md --touches
+docs/bdd/s-140-subtitle-generation.feature --touches
+docs/plan/s-140-subtitle-generation.md --touches
+docs/tasks/s-140-subtitle-generation.md --cc 1 --D 2 --K 1 --P 1 --T 1 --A 0 --X 3
+--platform dubbridge` → Final RRI 24, band Low (0-25), no penalties.
 
 **Happy paths considered:**
 
@@ -3411,13 +3420,20 @@ Required passes: 3 (`47` → `Med-high`)
 
 **Acceptance criteria:** Delete `apps/worker-runner/src/review_enqueue.rs`, remove
 its module registration, and synchronize the S-140 feature/mapping plus materially
-stale S-140 task/plan wording. Preserve ADR-030's requirement that future complete
-artifact sets enter the single review/publication gate through T6.
+stale S-140 task/plan wording. Repair the now-dangling
+`review_enqueue.rs::prepare_review_post_ready_enqueues_review_task_with_expected_identity`
+test-evidence citation in `docs/bdd/README.md`'s `S140_HP2` row (D14 phase-1
+finding). Preserve ADR-030's requirement that future complete artifact sets enter
+the single review/publication gate through T6.
 
 **Files expected to change:** deletion of
 `apps/worker-runner/src/review_enqueue.rs`, `apps/worker-runner/src/main.rs`,
-`docs/bdd/README.md`, `docs/bdd/s-140-subtitle-generation.feature`, and only the
-materially stale S-140 plan/task sections.
+`docs/bdd/README.md`, `docs/bdd/s-140-subtitle-generation.feature`, only the
+materially stale (present-tense) S-140 plan/task sections, and — per D14 phase-1
+review — confirm whether `docs/plan/s-150-translation-dubbing.md` and
+`docs/plan/roadmap.md` need any edit (named in "Status artifacts affected" below
+but omitted from the original file list; likely no present-tense stale claim
+exists there, but this must be checked, not assumed).
 
 **Evidence to emit:** Exact RRI, phase reviews, dead-reference search, BDD/doc QA,
 focused compile/tests, Reflection log, unit coverage certification, and owner
@@ -3427,6 +3443,33 @@ verification.
 plan/task ledger, and canonical BDD mapping.
 
 **Stop condition:** Stop after docs/status synchronization. Do not start T3a.
+
+### Phase 1 — Task-analysis review
+
+Local Ollama (Muse Glimmer primary, Gemma intermediate — the RRI 0-25 chain) is
+unavailable in this remote execution environment (no `ollama` binary, no listener
+on `:11434`); both hops of the chain are unusable before any attempt, so review
+routed directly to the mandatory D14 fallback per
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer / Muse Glimmer Reviewer
+§ Availability`.
+
+- Reviewer: `d14` (context-isolated subagent, Balanced tier)
+- D14 provider route: `same-provider-degraded` — reason: no cross-provider (Codex)
+  CLI available in this session to attempt first; recorded as degraded per
+  `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Context-isolated adjudicator (D14)`
+- Packet: task ID, HP-1/EC-1, acceptance criteria, files-expected-to-change,
+  stop condition, and independently pre-verified facts (dead-reference grep,
+  file line counts, current stale BDD wording) — no implementation transcript
+- Verdict: `PASS`
+- Findings (non-blocking, folded into this entry): (1) "Status artifacts
+  affected" named two files omitted from "Files expected to change" — added
+  above as a check item; (2) ledger `Effort`/RRI was stale — corrected above;
+  (3) `docs/bdd/README.md`'s `S140_HP2` row cites a test that will be deleted —
+  added to acceptance criteria above as an explicit repair.
+- disposition_divergence: `none` — all three findings accepted as stated, no
+  disagreement to reconcile.
+
+`Task-analysis review: d14 (inline, this entry) - PASS`
 
 ---
 
