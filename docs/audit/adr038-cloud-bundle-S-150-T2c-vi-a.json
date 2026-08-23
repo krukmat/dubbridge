@@ -1,0 +1,186 @@
+# Escalation packet: `S-150-T2c-vi-a`
+
+## 1. Task spec + RRI table
+
+Task ID: `S-150-T2c-vi-a`
+
+Spec:
+
+Replace the legacy prepare_review_post_ready call in dispatch_post_ready (apps/worker-runner/src/subtitle_runtime.rs) with the already-built durable fan_out_localization service (apps/worker-runner/src/translation_fanout.rs, from T2c-iv-c), and enqueue each returned TranslationJob onto the already-built RedisTranslationJobQueue (from T2c-v). Wire the Redis translation backend into WorkerRuntime alongside the existing three (Preparation/Transcription/Subtitle), mirroring the identical connect() pattern in main.rs. Persist per-job acknowledgement/failure via translation_dispatch_acknowledge / translation_dispatch_enqueue_failure (crates/db/src/translation_delivery_repo.rs, from T2c-iii). One target's queue failure must not abort or discard sibling dispatches, and must not create a legacy review row (review_enqueue module deletion itself is out of scope, deferred to T2c-vi-b).
+
+RRI table:
+
+MISSING
+
+## 2. Plan
+
+docs/plan/s-150-translation-dubbing.md
+
+## 3. Allowed paths
+
+- `apps/worker-runner/src/subtitle_runtime.rs`
+- `apps/worker-runner/src/subtitle_runtime_tests.rs`
+- `apps/worker-runner/src/main.rs`
+- `apps/worker-runner/src/runner_topology_tests.rs`
+
+## 4. Full diff
+
+MISSING
+
+## 5. Commands executed with output
+
+MISSING
+
+## 6. Test results
+
+MISSING
+
+## 7. Per-attempt summaries
+
+- Final status: `None`.
+
+## 8. Acceptance tests
+
+- `HP-1: subtitle readiness fans out to every eligible target, enqueues each exact translation job onto RedisTranslationJobQueue, and acknowledges each successful dispatch identity via translation_dispatch_acknowledge.`
+- `EC-1: one translation-queue failure (e.g. unreachable Redis for that call) marks only that dispatch enqueue_failed via translation_dispatch_enqueue_failure and preserves sibling outcomes; no legacy review task is created.`
+
+
+## 9. Refinement artifact (Qwen27)
+
+{
+  "error": null,
+  "finished_at": "2026-08-23T17:37:10.763931Z",
+  "generation": {
+    "created_at": "2026-08-23T17:37:10.734541Z",
+    "done": true,
+    "eval_count": 632,
+    "eval_duration": 84742677000,
+    "load_duration": 6250707292,
+    "prompt_eval_count": 1397,
+    "prompt_eval_duration": 8010610000,
+    "think_disabled": true,
+    "thinking_present": false,
+    "thinking_sha256": null,
+    "total_duration": 99024916250
+  },
+  "model": {
+    "expected_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "resolved_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "tag": "muse-glimmer:30b-q4_K_M"
+  },
+  "packet": {
+    "expected_sha256": "ade165db7af85947cf1777923be6183acb53efef873e073b1e8e7c3f4e92ef49",
+    "path": ".agent/adr038-packet-S-150-T2c-vi-a.json",
+    "sha256": "ade165db7af85947cf1777923be6183acb53efef873e073b1e8e7c3f4e92ef49"
+  },
+  "profile": "med-high-refinement-v1",
+  "prompt": {
+    "profile": "med-high-refinement-v1",
+    "sha256": "8752a27250978bfe7d29b47e540bc255c512d9d0dc087089e8ac39382e666300",
+    "version": "med-high-refinement-prompt-v1"
+  },
+  "response": {
+    "raw_text_sha256": "4d01623428b07f88babd11f511391da4dc5d0129841f463fe4512c05c4d60ef9",
+    "validated": {
+      "acceptance_tests": [
+        "HP-1: subtitle readiness fans out to every eligible target, enqueues each exact translation job onto RedisTranslationJobQueue, and acknowledges each successful dispatch identity via translation_dispatch_acknowledge.",
+        "EC-1: one translation-queue failure marks only that dispatch enqueue_failed via translation_dispatch_enqueue_failure and preserves sibling outcomes; no legacy review task is created."
+      ],
+      "claims": [
+        {
+          "label": "SUPPORTED",
+          "statement": "fan_out_localization already built and calls persist_translation_delivery internally"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "WorkerRuntime::connect already builds three RedisXJobQueue backends"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "dispatch_post_ready currently uses route lookup and prepare_review_post_ready"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Idempotency is guaranteed upstream by persist_translation_delivery"
+        }
+      ],
+      "excluded_scope": [
+        "Delete review_enqueue module or its registration",
+        "Re-persist delivery intent inside runtime",
+        "Start T3a/T3b/T3c provider work",
+        "Modify source code outside allowed_paths"
+      ],
+      "implementation_steps": [
+        "Update dispatch_post_ready in subtitle_runtime.rs to call fan_out_localization and iterate jobs",
+        "Add translation backend Arc<RedisXJobQueue> in WorkerRuntime::connect in main.rs",
+        "Enqueue jobs with per-target try/catch to isolate failures",
+        "Persist ack on success and enqueue_failed on error using translation_delivery_repo"
+      ],
+      "refined_scope": [
+        "Replace prepare_review_post_ready call in dispatch_post_ready with fan_out_localization",
+        "Enqueue each returned TranslationJob via RedisTranslationJobQueue",
+        "Persist per-job ack via translation_dispatch_acknowledge and failure via translation_dispatch_enqueue_failure",
+        "Wire Redis translation backend into WorkerRuntime.connect mirroring existing backends"
+      ],
+      "risks": [
+        "Dead route/target_language lookup remains causing logic divergence",
+        "Idempotency confusion if delivery re-persisted in runtime",
+        "Queue failure not isolated leading to partial fan-out loss"
+      ],
+      "route_recommendation": "GO_LOCAL",
+      "stop_conditions": [
+        "Runtime and topology tests pass",
+        "No deletion of review_enqueue.rs or module registration",
+        "No work started on T3a/T3b/T3c"
+      ],
+      "summary": "Wire fan_out_localization into subtitle post-ready dispatch and enqueue TranslationJobs onto existing RedisTranslationJobQueue with per-target ack/failure persistence.",
+      "unknowns": [
+        "Exact signature of fan_out_localization inputs/outputs in current build",
+        "Whether translation_dispatch_acknowledge expects generation_request_id from job"
+      ]
+    }
+  },
+  "runtime": {
+    "num_ctx": 65536,
+    "num_predict": 4096,
+    "ollama_url": "http://127.0.0.1:11434",
+    "temperature": 0.0,
+    "timeout_seconds": 300.0
+  },
+  "schema_version": "adr037-local-architect-artifact-v1",
+  "started_at": "2026-08-23T17:35:31.696501Z",
+  "status": "ok",
+  "success": true
+}
+
+
+## 10. Primary route receipt
+
+{
+  "card_hash": "ade165db7af85947cf1777923be6183acb53efef873e073b1e8e7c3f4e92ef49",
+  "decision": "CLOUD_REQUIRED",
+  "primary_id": "claude-code-orchestrator",
+  "rationale": "ADR-038 Med-high band: every refinement result, including Muse Glimmer's GO_LOCAL advisory, escalates to the cloud takeover model with the full evidence bundle -- there is no whole-task local repair budget at this band. The receipt may only downgrade the recommended route, never upgrade past what the band mandates; the band already mandates cloud for the whole task regardless of the GO_LOCAL advisory. No ADR-040 per-module split applies here: all four allowed_paths are interdependent runtime wiring (subtitle_runtime.rs, its tests, main.rs backend registration, topology tests), not a disjoint clean partition.",
+  "refinement_artifact_sha256": "df879b48b531773994f3fa107834d990f5923fdd2df5a709af93d956d8ba0e64",
+  "timestamp": "2026-08-23T17:40:00Z"
+}
+
+
+## 11. Effective limits
+
+MISSING
+
+
+## 12. Stop reason and hashes
+
+Stop reason: `cloud_required`
+
+Card hash: `ade165db7af85947cf1777923be6183acb53efef873e073b1e8e7c3f4e92ef49`
+
+Refinement artifact SHA-256: `df879b48b531773994f3fa107834d990f5923fdd2df5a709af93d956d8ba0e64`
+
+Runner model: `MISSING`
+
+Runner status: `MISSING`
+
+Elapsed: `0.0s`

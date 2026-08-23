@@ -1,0 +1,24 @@
+{
+  "changed_paths": [
+    "apps/worker-runner/src/main.rs",
+    "apps/worker-runner/src/runner_topology_tests.rs",
+    "apps/worker-runner/src/subtitle_runtime.rs",
+    "apps/worker-runner/src/subtitle_runtime_tests.rs",
+    "crates/db/src/preparation_repo.rs"
+  ],
+  "findings": [
+    {
+      "detail": "The `dispatch_post_ready` function takes `word_alignment_parent_artifact_id` as a `uuid::Uuid`. While functional, it is more consistent with the rest of the domain logic to pass the `ArtifactId` type to maintain strong typing.",
+      "line": 113,
+      "path": "apps/worker-runner/src/subtitle_runtime.rs",
+      "scope": "in-scope",
+      "severity": "minor",
+      "suggestion": "Change parameter type to `dubbridge_domain::artifact::ArtifactId`."
+    }
+  ],
+  "format_warnings": [
+    "STATUS PASS with findings coerced to FINDINGS"
+  ],
+  "status": "findings",
+  "summary": "The implementation correctly implements the localization fan-out pattern, replacing the legacy review task creation with a durable `translation_dispatch_outbox` mechanism. The per-target isolation in `enqueue_translation_job` ensures that a failure to enqueue one language does not abort the entire subtitle job or prevent other languages from being enqueued. The `FailingTranslationJobQueue` test case (EC-1) successfully verifies that enqueue failures are recorded as `enqueue_failed` in Postgres without failing the parent subtitle job. The incidental fix in `preparation_repo.rs` is a necessary correctness fix for the `runner_topology_tests` to pass."
+}

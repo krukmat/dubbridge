@@ -14,8 +14,8 @@ use apalis::prelude::{
 };
 use dubbridge_db::create_pool;
 use dubbridge_jobs::{
-    RedisPreparationJobQueue, RedisSubtitleJobQueue, RedisTranscriptionJobQueue, SubtitleJobQueue,
-    TranscriptionJobQueue,
+    RedisPreparationJobQueue, RedisSubtitleJobQueue, RedisTranscriptionJobQueue,
+    RedisTranslationJobQueue, SubtitleJobQueue, TranscriptionJobQueue, TranslationJobQueue,
 };
 use dubbridge_providers::{AsrWorkerClient, SubprocessAsrWorkerClient};
 use dubbridge_storage::StorageAdapter;
@@ -28,6 +28,10 @@ mod preparation_media_executor;
 mod preparation_runtime;
 #[cfg(test)]
 mod preparation_runtime_tests;
+// Superseded by translation_fanout::fan_out_localization (S-150-T2c-vi-a);
+// no caller remains. Left in place, unused, for S-150-T2c-vi-b to delete
+// together with its BDD/doc sync -- out of this task's scope.
+#[allow(dead_code)]
 mod review_enqueue;
 #[cfg(test)]
 mod runner_topology_tests;
@@ -49,6 +53,7 @@ type SharedPreparationExecutor = Arc<dyn PreparationExecutor>;
 type SharedAsrWorkerClient = Arc<dyn AsrWorkerClient>;
 type SharedTranscriptionQueue = Arc<dyn TranscriptionJobQueue>;
 type SharedSubtitleQueue = Arc<dyn SubtitleJobQueue>;
+type SharedTranslationQueue = Arc<dyn TranslationJobQueue>;
 
 struct WorkerRuntime {
     worker_concurrency: usize,
@@ -59,8 +64,14 @@ struct WorkerRuntime {
     preparation_backend: Arc<RedisPreparationJobQueue>,
     transcription_backend: Arc<RedisTranscriptionJobQueue>,
     subtitle_backend: Arc<RedisSubtitleJobQueue>,
+    // Not yet consumed by a worker (no translation runtime exists until
+    // S-150-T3c); kept for connect-time parity with the other three
+    // backends and to let a future translation worker attach via .backend().
+    #[allow(dead_code)]
+    translation_backend: Arc<RedisTranslationJobQueue>,
     transcription_enqueue: SharedTranscriptionQueue,
     subtitle_enqueue: SharedSubtitleQueue,
+    translation_enqueue: SharedTranslationQueue,
 }
 
 impl WorkerRuntime {
@@ -87,6 +98,11 @@ impl WorkerRuntime {
                 .await
                 .context("failed to connect subtitle Redis queue")?,
         );
+        let translation_backend = Arc::new(
+            RedisTranslationJobQueue::connect(&config.redis_url)
+                .await
+                .context("failed to connect translation Redis queue")?,
+        );
 
         Ok(Self {
             worker_concurrency: config.worker_concurrency,
@@ -99,6 +115,8 @@ impl WorkerRuntime {
             transcription_backend,
             subtitle_enqueue: subtitle_backend.clone(),
             subtitle_backend,
+            translation_enqueue: translation_backend.clone(),
+            translation_backend,
         })
     }
 
@@ -148,6 +166,7 @@ impl WorkerRuntime {
                 .concurrency(self.worker_concurrency)
                 .data(self.pool.clone())
                 .data(self.storage.clone())
+                .data(self.translation_enqueue.clone())
                 .backend(self.subtitle_backend.backend())
                 .build_fn(run_subtitle_job),
         )
@@ -320,10 +339,11 @@ async fn run_subtitle_job(
     job: dubbridge_jobs::SubtitleJob,
     pool: Data<sqlx::PgPool>,
     storage: Data<SharedStorage>,
+    translation_queue: Data<SharedTranslationQueue>,
     worker: Worker<WorkerContext>,
 ) -> anyhow::Result<()> {
     guard_worker_shutdown(&worker, "subtitle")?;
-    subtitle_runtime::process_subtitle_job(&pool, storage.as_ref(), job).await
+    subtitle_runtime::process_subtitle_job(&pool, storage.as_ref(), &**translation_queue, job).await
 }
 
 fn guard_worker_shutdown(worker: &Worker<WorkerContext>, queue_name: &str) -> anyhow::Result<()> {

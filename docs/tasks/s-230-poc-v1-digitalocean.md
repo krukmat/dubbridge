@@ -1186,7 +1186,7 @@ approval does not pre-approve them):**
 | Order | Task ID | What it does | RRI | Band |
 |---|---|---|---|---|
 | 1 | `S-150-T2c-v` | Redis translation-queue adapter | ~~50~~ 41 (rerun) | Med-high — **Done 2026-08-23** |
-| 2 | `S-150-T2c-vi-a` | Wire `fan_out_localization` into the subtitle runtime, replacing `prepare_review_post_ready` | 51 | Med-high |
+| 2 | `S-150-T2c-vi-a` | Wire `fan_out_localization` into the subtitle runtime, replacing `prepare_review_post_ready` | ~~51~~ 47 (rerun) | Med-high — **Done 2026-08-23** |
 | 3 | `S-150-T2c-vi-b` | Delete the dead legacy review module, sync S-140 BDD | 31 | Moderate |
 | 4 | `S-150-T3a` | Typed translation provider/subprocess contract | 42 | Med-high |
 | 5 | `S-150-T3b` | Functional Python translation worker | 44 | Med-high |
@@ -1215,7 +1215,9 @@ partitioning, no pub/sub. Full option analysis:
 `docs/audit/s-150-t2c-v-redis-topic-decision.md`. Child 1 (`S-150-T2c-v`) is
 **done** (2026-08-23; full closure record at
 `docs/tasks/s-150-translation-dubbing.md` § S-150-T2c-v). Child 2
-(`S-150-T2c-vi-a`) is next.
+(`S-150-T2c-vi-a`) is **done** (2026-08-23; full closure record at
+`docs/tasks/s-150-translation-dubbing.md` § S-150-T2c-vi-a). Child 3
+(`S-150-T2c-vi-b`) is next.
 
 **Happy paths considered:**
 
@@ -1311,7 +1313,7 @@ define, not this task's.
 
 ```mermaid
 flowchart TD
-    T2CV["1 . S-150-T2c-v<br/>Redis adapter . RRI 41 . DONE"] --> T2CVIA["2 . S-150-T2c-vi-a<br/>Runtime fan-out . RRI 51"]
+    T2CV["1 . S-150-T2c-v<br/>Redis adapter . RRI 41 . DONE"] --> T2CVIA["2 . S-150-T2c-vi-a<br/>Runtime fan-out . RRI 47 . DONE"]
     T2CVIA --> T2CVIB["3 . S-150-T2c-vi-b<br/>Cleanup + BDD sync . RRI 31"]
     T2CVIB --> T3A["4 . S-150-T3a<br/>Provider contract . RRI 42"]
     T3A --> T3Bc["5 . S-150-T3b<br/>Python worker . RRI 44"]

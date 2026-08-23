@@ -1,0 +1,54 @@
+{
+  "changed_paths": [
+    "apps/worker-runner/src/main.rs",
+    "apps/worker-runner/src/runner_topology_tests.rs",
+    "apps/worker-runner/src/subtitle_runtime.rs",
+    "apps/worker-runner/src/subtitle_runtime_tests.rs",
+    "crates/db/src/preparation_repo.rs"
+  ],
+  "findings": [
+    {
+      "detail": "The incidental fix for `parse_kind` is bundled into this task. While it is a minimal correctness fix required for the included tests to pass, it technically deviates from the task's original scope.",
+      "line": 26,
+      "path": "crates/db/src/preparation_repo.rs",
+      "scope": "in-scope",
+      "severity": "minor",
+      "suggestion": "None required; the fix is necessary for the provided test suite to be valid."
+    }
+  ],
+  "model": "gemma4:26b-a4b-it-qat",
+  "passes_run": 3,
+  "passes_succeeded": 3,
+  "reconciliation": {
+    "consensus": [
+      {
+        "detail": "The incidental fix for `parse_kind` is bundled into this task. While it is a minimal correctness fix required for the included tests to pass, it technically deviates from the task's original scope.",
+        "line": 26,
+        "path": "crates/db/src/preparation_repo.rs",
+        "scope": "in-scope",
+        "severity": "minor",
+        "suggestion": "None required; the fix is necessary for the provided test suite to be valid."
+      }
+    ],
+    "consensus_count": 1,
+    "likely_false_positive": [],
+    "likely_false_positive_count": 0,
+    "location_inconsistent": [],
+    "location_inconsistent_count": 0,
+    "pass_specific": [
+      {
+        "detail": "The `dispatch_post_ready` function takes `word_alignment_parent_artifact_id` as a `uuid::Uuid`. While functional, it is more consistent with the rest of the domain logic to pass the `ArtifactId` type to maintain strong typing.",
+        "line": 113,
+        "path": "apps/worker-runner/src/subtitle_runtime.rs",
+        "scope": "in-scope",
+        "severity": "minor",
+        "suggestion": "Change parameter type to `dubbridge_domain::artifact::ArtifactId`."
+      }
+    ],
+    "pass_specific_count": 1,
+    "severity_inconsistent": [],
+    "severity_inconsistent_count": 0
+  },
+  "status": "findings",
+  "summary": "The implementation correctly implements the localization fan-out pattern, replacing the legacy review task creation with a durable `translation_dispatch_outbox` mechanism. The per-target isolation in `enqueue_translation_job` ensures that a failure to enqueue one language does not abort the entire subtitle job or prevent other languages from being enqueued. The `FailingTranslationJobQueue` in tests successfully verifies EC-1 (failure isolation and error persistence). The incidental fix in `preparation_repo.rs` is a necessary correctness fix for the `runner_topology_tests` to pass."
+}

@@ -20,6 +20,7 @@ fn parse_kind(s: &str) -> Result<ArtifactKind, DbError> {
         "hls_segment" => Ok(ArtifactKind::HlsSegment),
         "transcript_text" => Ok(ArtifactKind::TranscriptText),
         "word_alignment" => Ok(ArtifactKind::WordAlignment),
+        "subtitle" => Ok(ArtifactKind::Subtitle),
         other => Err(DbError::UnknownStoredValue {
             field: "artifact_records.kind",
             value: other.to_owned(),

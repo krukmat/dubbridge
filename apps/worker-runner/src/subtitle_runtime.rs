@@ -1,9 +1,11 @@
+use dubbridge_jobs::TranslationJobQueue;
 use dubbridge_providers::SegmentationProvider;
 
 #[allow(dead_code)]
 pub(crate) async fn process_subtitle_envelope(
     pool: &sqlx::PgPool,
     storage: &(dyn dubbridge_storage::StorageAdapter + Send + Sync),
+    translation_queue: &(dyn TranslationJobQueue + Send + Sync),
     envelope: dubbridge_jobs::JobEnvelope<dubbridge_jobs::SubtitleJob>,
 ) -> anyhow::Result<()> {
     if envelope.job_type != dubbridge_jobs::SubtitleJob::JOB_TYPE {
@@ -14,18 +16,19 @@ pub(crate) async fn process_subtitle_envelope(
         );
     }
 
-    process_subtitle_job(pool, storage, envelope.payload).await
+    process_subtitle_job(pool, storage, translation_queue, envelope.payload).await
 }
 
 #[allow(dead_code)]
 pub(crate) async fn process_subtitle_job(
     pool: &sqlx::PgPool,
     storage: &(dyn dubbridge_storage::StorageAdapter + Send + Sync),
+    translation_queue: &(dyn TranslationJobQueue + Send + Sync),
     job: dubbridge_jobs::SubtitleJob,
 ) -> anyhow::Result<()> {
     let asset_id = dubbridge_domain::asset::AssetId(job.asset_id);
 
-    let result = process_subtitle_job_inner(pool, storage, &job).await;
+    let result = process_subtitle_job_inner(pool, storage, translation_queue, &job).await;
     if let Err(error) = result {
         let detail = format!("{error:#}");
         let _ = dubbridge_db::subtitle_repo::upsert_subtitle_status(
@@ -44,6 +47,7 @@ pub(crate) async fn process_subtitle_job(
 async fn process_subtitle_job_inner(
     pool: &sqlx::PgPool,
     storage: &(dyn dubbridge_storage::StorageAdapter + Send + Sync),
+    translation_queue: &(dyn TranslationJobQueue + Send + Sync),
     job: &dubbridge_jobs::SubtitleJob,
 ) -> anyhow::Result<()> {
     let asset_id = dubbridge_domain::asset::AssetId(job.asset_id);
@@ -105,7 +109,7 @@ async fn process_subtitle_job_inner(
         anyhow::bail!("subtitle readiness evidence incomplete after Ready status write");
     }
 
-    dispatch_post_ready(pool, asset_id, job).await?;
+    dispatch_post_ready(pool, asset_id, translation_queue, alignment_artifact.id).await?;
 
     Ok(())
 }
@@ -113,21 +117,103 @@ async fn process_subtitle_job_inner(
 async fn dispatch_post_ready(
     pool: &sqlx::PgPool,
     asset_id: dubbridge_domain::asset::AssetId,
-    job: &dubbridge_jobs::SubtitleJob,
+    translation_queue: &(dyn TranslationJobQueue + Send + Sync),
+    word_alignment_parent_artifact_id: uuid::Uuid,
 ) -> anyhow::Result<()> {
-    let Some(route) =
-        dubbridge_db::target_language_repo::get_asset_subtitle_route(pool, asset_id).await?
-    else {
-        return Ok(());
-    };
-    crate::review_enqueue::prepare_review_post_ready(
+    let jobs = crate::translation_fanout::fan_out_localization(
         pool,
         asset_id,
-        dubbridge_domain::workspace::ProjectId(job.project_id),
-        &route.target_language,
+        word_alignment_parent_artifact_id,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("localization fan-out failed: {e}"))?;
+
+    for job in jobs {
+        enqueue_translation_job(pool, translation_queue, &job).await;
+    }
+
+    Ok(())
+}
+
+/// Enqueue one translation job, isolating this target's failure from its
+/// siblings: a queue error is recorded via `translation_dispatch_enqueue_failure`
+/// and logged, never propagated, so one unreachable-Redis target cannot abort
+/// the fan-out loop or discard already-enqueued sibling dispatches.
+async fn enqueue_translation_job(
+    pool: &sqlx::PgPool,
+    translation_queue: &(dyn TranslationJobQueue + Send + Sync),
+    job: &dubbridge_jobs::TranslationJob,
+) {
+    match translation_queue.enqueue(job.clone()).await {
+        Ok(()) => record_translation_dispatch_acknowledged(pool, job).await,
+        Err(error) => record_translation_dispatch_enqueue_failed(pool, job, &error).await,
+    }
+}
+
+async fn record_translation_dispatch_acknowledged(
+    pool: &sqlx::PgPool,
+    job: &dubbridge_jobs::TranslationJob,
+) {
+    let ack = dubbridge_db::translation_delivery_repo::translation_dispatch_acknowledge(
+        pool,
+        dubbridge_db::translation_delivery_repo::TranslationDispatchAcknowledgementInput {
+            project_id: dubbridge_domain::workspace::ProjectId(job.project_id),
+            asset_id: dubbridge_domain::asset::AssetId(job.asset_id),
+            target_language_id: job.target_language_id,
+            generation_request_id: job.generation_request_id,
+        },
     )
     .await;
-    Ok(())
+    if let Err(error) = ack {
+        tracing::warn!(
+            ?error,
+            asset_id = %job.asset_id,
+            target_language_id = %job.target_language_id,
+            "failed to acknowledge enqueued translation dispatch"
+        );
+    }
+}
+
+async fn record_translation_dispatch_enqueue_failed(
+    pool: &sqlx::PgPool,
+    job: &dubbridge_jobs::TranslationJob,
+    error: &dubbridge_jobs::QueueError,
+) {
+    tracing::warn!(
+        ?error,
+        asset_id = %job.asset_id,
+        target_language_id = %job.target_language_id,
+        "failed to enqueue translation job; marking dispatch enqueue_failed"
+    );
+    let mark = dubbridge_db::translation_delivery_repo::translation_dispatch_enqueue_failure(
+        pool,
+        dubbridge_db::translation_delivery_repo::TranslationDispatchFailureInput {
+            project_id: dubbridge_domain::workspace::ProjectId(job.project_id),
+            asset_id: dubbridge_domain::asset::AssetId(job.asset_id),
+            target_language_id: job.target_language_id,
+            generation_request_id: job.generation_request_id,
+            error_detail: format!("{error:#}"),
+        },
+    )
+    .await;
+    warn_on_enqueue_failure_record_error(job, mark);
+}
+
+fn warn_on_enqueue_failure_record_error(
+    job: &dubbridge_jobs::TranslationJob,
+    mark: Result<
+        dubbridge_db::translation_delivery_repo::TranslationDispatchFailureResult,
+        dubbridge_db::error::DbError,
+    >,
+) {
+    if let Err(db_error) = mark {
+        tracing::warn!(
+            ?db_error,
+            asset_id = %job.asset_id,
+            target_language_id = %job.target_language_id,
+            "failed to record translation dispatch enqueue failure"
+        );
+    }
 }
 
 use crate::subtitle_alignment::{RawAlignmentFile, raw_words_to_provider};

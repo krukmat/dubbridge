@@ -2,15 +2,29 @@ use std::env;
 
 use crate::subtitle_alignment::{RawWord, raw_words_to_provider};
 use crate::subtitle_runtime::{process_subtitle_envelope, process_subtitle_job};
+use async_trait::async_trait;
 use dubbridge_db::{artifact_repo, preparation_repo, subtitle_repo};
 use dubbridge_domain::{
     artifact::{ArtifactKind, ArtifactRecord, DerivedArtifact, SubtitleStatus},
     workspace::{OrgId, Organization, Project, ProjectId, TargetLanguage},
 };
-use dubbridge_jobs::JobEnvelope;
+use dubbridge_jobs::{InMemoryTranslationJobQueue, JobEnvelope, QueueError, TranslationJobQueue};
 use dubbridge_storage::{LocalFsAdapter, StorageAdapter};
 use time::OffsetDateTime;
 use uuid::Uuid;
+
+/// A `TranslationJobQueue` that always fails, for exercising EC-1 (one
+/// target's enqueue failure must be isolated, marked `enqueue_failed`, and
+/// must not create a legacy review row or abort the fan-out loop).
+#[derive(Default)]
+struct FailingTranslationJobQueue;
+
+#[async_trait]
+impl TranslationJobQueue for FailingTranslationJobQueue {
+    async fn enqueue(&self, _job: dubbridge_jobs::TranslationJob) -> Result<(), QueueError> {
+        Err(QueueError::Unavailable("simulated redis outage".into()))
+    }
+}
 
 async fn setup_pool() -> Option<sqlx::PgPool> {
     let url = env::var("DUBBRIDGE_DATABASE_URL").ok()?;
@@ -163,8 +177,9 @@ async fn process_subtitle_job_marks_ready_and_stores_artifact_on_success() {
         .expect("set pending");
     let project_id = insert_project_with_targets(&pool, asset_id, "en", &["es"]).await;
 
+    let translation_queue = InMemoryTranslationJobQueue::default();
     let job = dubbridge_jobs::SubtitleJob::new(asset_id.0, project_id.0);
-    process_subtitle_job(&pool, &storage, job)
+    process_subtitle_job(&pool, &storage, &translation_queue, job)
         .await
         .expect("process subtitle job");
 
@@ -179,16 +194,25 @@ async fn process_subtitle_job_marks_ready_and_stores_artifact_on_success() {
         .expect("readiness");
     assert!(ready);
 
-    // Verify review_tasks row was enqueued
+    // HP-1: fan-out enqueues one translation job for the one configured target
+    let queued = translation_queue.queued_jobs();
+    assert_eq!(
+        queued.len(),
+        1,
+        "exactly one translation job should be enqueued for the one configured target"
+    );
+    assert_eq!(queued[0].project_id, project_id.0);
+    assert_eq!(queued[0].asset_id, asset_id.0);
+
+    // No legacy review_tasks row should have been created
     let review_rows: Vec<uuid::Uuid> =
         sqlx::query_scalar("SELECT id FROM review_tasks ORDER BY id")
             .fetch_all(&pool)
             .await
             .expect("get review tasks");
-    assert_eq!(
-        review_rows.len(),
-        1,
-        "exactly one review_task should be enqueued on success"
+    assert!(
+        review_rows.is_empty(),
+        "no legacy review_task should be created by localization fan-out"
     );
 
     // Verify stored subtitle deserializes to 1 segment with expected joined text
@@ -198,6 +222,97 @@ async fn process_subtitle_job_marks_ready_and_stores_artifact_on_success() {
         serde_json::from_slice(&stored_bytes).expect("parse subtitle");
     assert_eq!(segments.len(), 1);
     assert_eq!(segments[0].text, "Hello world");
+}
+
+/// EC-1: an unreachable translation queue must not fail the subtitle job or
+/// abort the fan-out loop -- the dispatch is durably recorded as
+/// `enqueue_failed` (not silently dropped, not left `pending`), and no
+/// legacy `review_tasks` row is created.
+#[tokio::test]
+async fn process_subtitle_job_marks_dispatch_enqueue_failed_when_queue_unavailable() {
+    let Some(pool) = setup_pool().await else {
+        return;
+    };
+
+    let asset_id = insert_asset(&pool).await;
+    let source = insert_source_artifact(&pool, asset_id).await;
+    let storage_workspace = tempfile::TempDir::new().expect("storage workspace");
+    let storage = LocalFsAdapter::new(storage_workspace.path());
+
+    let alignment = DerivedArtifact::new(
+        asset_id,
+        source.id,
+        ArtifactKind::WordAlignment,
+        "words/alignment.json".into(),
+        "application/json".into(),
+        128,
+        "alignsum".into(),
+    );
+    preparation_repo::insert_derived_artifact(&pool, &alignment)
+        .await
+        .expect("insert alignment artifact");
+
+    let alignment_json = br#"{"words":[{"word":"Hello","start":0.0,"end":1.0},{"word":"world","start":1.5,"end":2.5}]}"#.to_vec();
+    storage
+        .put("words/alignment.json", alignment_json)
+        .await
+        .expect("store alignment json");
+
+    subtitle_repo::upsert_subtitle_status(&pool, asset_id, SubtitleStatus::Pending, None)
+        .await
+        .expect("set pending");
+    let project_id = insert_project_with_targets(&pool, asset_id, "en", &["es"]).await;
+
+    let translation_queue = FailingTranslationJobQueue;
+    let job = dubbridge_jobs::SubtitleJob::new(asset_id.0, project_id.0);
+
+    // The subtitle job itself must still succeed: enqueue failure is isolated
+    // to the translation dispatch, not propagated as a subtitle-job failure.
+    process_subtitle_job(&pool, &storage, &translation_queue, job)
+        .await
+        .expect("subtitle job must succeed even when translation enqueue fails");
+
+    let status = subtitle_repo::get_subtitle_status(&pool, asset_id)
+        .await
+        .expect("get status")
+        .expect("status row");
+    assert_eq!(status.status, SubtitleStatus::Ready);
+
+    let dispatch_rows: Vec<(String, Option<String>)> = sqlx::query_as(
+        "SELECT delivery_state, error_detail FROM translation_dispatch_outbox \
+         WHERE project_id = $1 AND asset_id = $2",
+    )
+    .bind(project_id.0)
+    .bind(asset_id.0)
+    .fetch_all(&pool)
+    .await
+    .expect("fetch dispatch rows");
+
+    assert_eq!(
+        dispatch_rows.len(),
+        1,
+        "the one configured target language should have a dispatch row"
+    );
+    assert_eq!(dispatch_rows[0].0, "enqueue_failed");
+    assert!(
+        dispatch_rows[0]
+            .1
+            .as_deref()
+            .unwrap_or("")
+            .contains("simulated redis outage"),
+        "error_detail should carry the queue error"
+    );
+
+    // No legacy review_tasks row should have been created either.
+    let review_rows: Vec<uuid::Uuid> =
+        sqlx::query_scalar("SELECT id FROM review_tasks ORDER BY id")
+            .fetch_all(&pool)
+            .await
+            .expect("get review tasks");
+    assert!(
+        review_rows.is_empty(),
+        "no legacy review_task should be created when translation enqueue fails"
+    );
 }
 
 #[tokio::test]
@@ -217,7 +332,8 @@ async fn process_subtitle_job_fails_when_alignment_missing() {
     let job = dubbridge_jobs::SubtitleJob::new(asset_id.0, Uuid::new_v4());
     let storage_workspace = tempfile::TempDir::new().unwrap();
     let storage = LocalFsAdapter::new(storage_workspace.path());
-    let err = process_subtitle_job(&pool, &storage, job)
+    let translation_queue = InMemoryTranslationJobQueue::default();
+    let err = process_subtitle_job(&pool, &storage, &translation_queue, job)
         .await
         .expect_err("missing alignment must fail the job");
 
@@ -282,7 +398,8 @@ async fn process_subtitle_job_fails_closed_on_invalid_segmentation_output() {
     insert_project_with_targets(&pool, asset_id, "en", &["es"]).await;
 
     let job = dubbridge_jobs::SubtitleJob::new(asset_id.0, Uuid::new_v4());
-    let err = process_subtitle_job(&pool, &storage, job)
+    let translation_queue = InMemoryTranslationJobQueue::default();
+    let err = process_subtitle_job(&pool, &storage, &translation_queue, job)
         .await
         .expect_err("segmentation must fail on overlapping timing");
 
@@ -326,9 +443,11 @@ async fn process_subtitle_envelope_rejects_wrong_job_type() {
 
     let asset_id = insert_asset(&pool).await;
 
+    let translation_queue = InMemoryTranslationJobQueue::default();
     let err = process_subtitle_envelope(
         &pool,
         &LocalFsAdapter::new(tempfile::TempDir::new().unwrap().path()),
+        &translation_queue,
         JobEnvelope::new(
             "media_preparation",
             dubbridge_jobs::SubtitleJob::new(asset_id.0, Uuid::new_v4()),
@@ -357,7 +476,8 @@ async fn process_subtitle_review_tasks_no_row_on_failure() {
     let job = dubbridge_jobs::SubtitleJob::new(asset_id.0, Uuid::new_v4());
     let storage_workspace = tempfile::TempDir::new().unwrap();
     let storage = LocalFsAdapter::new(storage_workspace.path());
-    let err = process_subtitle_job(&pool, &storage, job)
+    let translation_queue = InMemoryTranslationJobQueue::default();
+    let err = process_subtitle_job(&pool, &storage, &translation_queue, job)
         .await
         .expect_err("missing alignment must fail the job");
 

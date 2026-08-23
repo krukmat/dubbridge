@@ -26,6 +26,7 @@ use dubbridge_domain::{
 };
 use dubbridge_jobs::{
     PreparationJob, RedisPreparationJobQueue, RedisSubtitleJobQueue, RedisTranscriptionJobQueue,
+    RedisTranslationJobQueue,
 };
 use dubbridge_providers::{AsrOutput, StubAsrWorkerClient};
 use dubbridge_storage::{LocalFsAdapter, StorageAdapter};
@@ -41,8 +42,8 @@ use uuid::Uuid;
 use crate::preparation_runtime::{HlsPackageOutput, HlsSegmentOutput, PreparationExecutor};
 use crate::{
     SharedAsrWorkerClient, SharedPreparationExecutor, SharedStorage, SharedSubtitleQueue,
-    SharedTranscriptionQueue, WorkerRuntime, guard_worker_shutdown, resolve_asr_worker_path,
-    run_monitor_with_signal, wait_for_shutdown_signal,
+    SharedTranscriptionQueue, SharedTranslationQueue, WorkerRuntime, guard_worker_shutdown,
+    resolve_asr_worker_path, run_monitor_with_signal, wait_for_shutdown_signal,
 };
 
 #[tokio::test]
@@ -337,6 +338,11 @@ async fn redis_monitor_wires_preparation_transcription_and_subtitle_workers() {
             .await
             .expect("connect subtitle backend"),
     );
+    let translation_backend = Arc::new(
+        RedisTranslationJobQueue::connect(&redis_url)
+            .await
+            .expect("connect translation backend"),
+    );
 
     let runtime = WorkerRuntime {
         worker_concurrency: 2,
@@ -347,8 +353,10 @@ async fn redis_monitor_wires_preparation_transcription_and_subtitle_workers() {
         preparation_backend: preparation_backend.clone(),
         transcription_backend: transcription_backend.clone(),
         subtitle_backend: subtitle_backend.clone(),
+        translation_backend: translation_backend.clone(),
         transcription_enqueue: transcription_backend.clone() as SharedTranscriptionQueue,
         subtitle_enqueue: subtitle_backend.clone() as SharedSubtitleQueue,
+        translation_enqueue: translation_backend.clone() as SharedTranslationQueue,
     };
 
     preparation_backend
@@ -383,13 +391,36 @@ async fn redis_monitor_wires_preparation_transcription_and_subtitle_workers() {
         .expect("subtitle status row");
     assert_eq!(subtitle_status.status, SubtitleStatus::Ready);
 
+    // HP-1: localization fan-out replaces the legacy review-enqueue call --
+    // no review_tasks row is created by the subtitle worker's post-ready dispatch.
     let review_task_count: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM review_tasks WHERE project_id = $1")
             .bind(project_id.0)
             .fetch_one(&pool)
             .await
             .expect("count review tasks");
-    assert_eq!(review_task_count, 1);
+    assert_eq!(
+        review_task_count, 0,
+        "localization fan-out must not create a legacy review task"
+    );
+
+    // HP-1: the one configured target language ("es") was acknowledged as
+    // dispatched -- durable evidence the translation job was actually
+    // enqueued onto RedisTranslationJobQueue and its dispatch persisted,
+    // not merely attempted.
+    let acknowledged_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM translation_dispatch_outbox \
+         WHERE project_id = $1 AND asset_id = $2 AND delivery_state = 'acknowledged'",
+    )
+    .bind(project_id.0)
+    .bind(asset_id.0)
+    .fetch_one(&pool)
+    .await
+    .expect("count acknowledged translation dispatches");
+    assert_eq!(
+        acknowledged_count, 1,
+        "the one configured target language's translation dispatch should be acknowledged"
+    );
 
     let derived = preparation_repo::list_derived_artifacts(&pool, asset_id)
         .await

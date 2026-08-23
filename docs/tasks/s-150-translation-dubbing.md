@@ -3187,10 +3187,11 @@ T2c-vi-b; do not start T3a until both children close.
 ## S-150-T2c-vi-a: Integrate localization fan-out into subtitle runtime
 
 **Type:** development
-**Effort:** L (provisional RRI 51 — Med-high; recompute before presentation)
+**Effort:** L (RRI 47 — Med-high, computed via `scripts/rri.py`)
 **Decomposed from:** S-150-T2c-vi
 **Depends on:** S-150-T2c-iv-c, S-150-T2c-v
-**Status:** [ ] Planned — approval pending
+**Status:** [x] Done (2026-08-23)
+**RRI:** 47
 
 > **Note (2026-08-15):** `apps/worker-runner/src/subtitle_runtime.rs` already
 > carries a transitional compatibility patch (see T2c-iv-a's "Workspace-compile
@@ -3234,6 +3235,157 @@ verification.
 
 **Stop condition:** Stop after runtime/topology tests; do not delete the legacy
 module or start provider execution.
+
+### Implementation routing evidence (ADR-038)
+
+- Muse Glimmer advisory refinement: `route_recommendation: "GO_LOCAL"`,
+  model `muse-glimmer:30b-q4_K_M` (digest
+  `de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1`), packet
+  `.agent/adr038-packet-S-150-T2c-vi-a.json` (sha256
+  `ade165db7af85947cf1777923be6183acb53efef873e073b1e8e7c3f4e92ef49`).
+  Artifact: `docs/audit/adr038-refinement-S-150-T2c-vi-a.json` (canonical-JSON
+  sha256 `df879b48b531773994f3fa107834d990f5923fdd2df5a709af93d956d8ba0e64`).
+- Primary hash-bound route receipt: **downgraded** `GO_LOCAL` →
+  `CLOUD_REQUIRED` (ADR-038 route receipts may only downgrade, never
+  upgrade). Rationale: Med-high band has no whole-task local repair budget;
+  every result escalates to the cloud takeover model with the full evidence
+  bundle. Artifact: `.agent/primary-receipt-S-150-T2c-vi-a.json`.
+- `med_high_gate.py`: `CLOUD_REQUIRED` confirmed.
+- ADR-039 fallback selection: **preauthorized** via `AskUserQuestion` —
+  model `claude-sonnet-5`, effort `high`, selected by "owner (matias, via
+  AskUserQuestion 2026-08-23)". Cloud evidence bundle:
+  `docs/audit/adr038-cloud-bundle-S-150-T2c-vi-a.json` +
+  `.fallback-selection.json` (packet sha256
+  `5f614103a0650afdecf85542b2d4ce2ab8a139b88b49ea1f2dcaf952572e3a6c`, status
+  `fallback_authorized`).
+- Implementer: `claude-sonnet-5` (this session), per the preauthorized
+  fallback selection above.
+
+### Incidental fix disclosure
+
+While verifying this task's own HP-1/EC-1 evidence end-to-end,
+`runner_topology_tests::redis_monitor_wires_preparation_transcription_and_subtitle_workers`
+failed with `UnknownStoredValue { field: "artifact_records.kind", value:
+"subtitle" }` — a **pre-existing bug**, confirmed via `git stash` to
+reproduce identically on unmodified `main` (not a regression introduced by
+this task). Root cause: `crates/db/src/preparation_repo.rs::parse_kind` is
+missing the `"subtitle" => Ok(ArtifactKind::Subtitle)` match arm that a
+separate, duplicate `parse_kind` in `crates/db/src/artifact_repo.rs` already
+has. Since this task's own topology test exercises `list_derived_artifacts`
+over an asset carrying a `Subtitle`-kind artifact, the one-line fix is
+included in this task's diff (outside the original `allowed_paths`) rather
+than left silently broken or masked by reverting the test assertion. Gemma
+phase-2 review flagged this as an in-scope `minor` finding (scope deviation,
+no suggested change) — see Peer Reviewer evidence below.
+
+### Reflection log
+
+Required passes: 3 (`47` → `Med-high`)
+
+#### Pass 1 — contract
+
+- **Draft verdict:** `dispatch_post_ready` rewritten to call
+  `translation_fanout::fan_out_localization` and dispatch each job through
+  `TranslationJobQueue`; `RedisTranslationJobQueue` connected in
+  `WorkerRuntime::connect()` and threaded via apalis `Data<>` to
+  `run_subtitle_job`; legacy `review_enqueue` module disconnected and marked
+  `#[allow(dead_code)]`.
+- **Critique findings:** HP-1 confirmed by test and direct Postgres/Redis
+  verification. EC-1 (per-target enqueue-failure isolation) had **zero**
+  unit test coverage — flagged independently by Gemma phase-1 review and by
+  coverage measurement (`subtitle_runtime.rs` at 76.41%, missed lines
+  177–210 corresponding exactly to the untested failure path).
+- **Revisions applied:** added `FailingTranslationJobQueue` test mock and
+  `process_subtitle_job_marks_dispatch_enqueue_failed_when_queue_unavailable`,
+  asserting the subtitle job still succeeds, `translation_dispatch_outbox`
+  is marked `enqueue_failed` with the real `QueueError` detail preserved,
+  and `review_tasks` stays empty.
+
+#### Pass 2 — failure boundaries
+
+- **Draft verdict:** reviewed remaining failure boundaries beyond the
+  primary EC-1 case: DB-write failure on `translation_dispatch_acknowledge`/
+  `translation_dispatch_enqueue_failure` themselves, and multi-target
+  partial-failure isolation.
+- **Critique findings:** a DB write failure after a successful/failed Redis
+  enqueue only logs via `tracing::warn!` — this is an unscoped
+  second-order infra failure, not a defined HP-#/EC-#, and forcing it would
+  require injecting a broken pool; left untested by design, consistent with
+  the task's own acceptance criteria. Per-target isolation for 2+ targets is
+  already structurally guaranteed (`for` loop with no early-return `?`) and
+  already covered at the fan-out layer by
+  `translation_fanout_tests::ec1_partial_claim_leaves_other_target_working`;
+  a third mock re-proving the same structural property at the runtime layer
+  would be redundant against this task's own EC-1 definition.
+- **Revisions applied:** none — existing coverage judged sufficient against
+  the task's acceptance criteria.
+
+#### Pass 3 — coverage and regression check
+
+- **Draft verdict:** confirmed no other caller of
+  `dispatch_post_ready`/`process_subtitle_job` broke under the new
+  signature, and that the incidental `preparation_repo.rs` fix is disclosed,
+  not hidden.
+- **Critique findings:** all 4 test call sites of
+  `process_subtitle_job`/`process_subtitle_envelope` updated; `main.rs`
+  wiring and `runner_topology_tests.rs` real-Redis/Postgres wiring both
+  verified green. `subtitle_runtime.rs` coverage: 96.67% lines (180 lines, 6
+  missed) — exceeds the 90% gate.
+- **Revisions applied:** none — see Incidental fix disclosure above for the
+  `preparation_repo.rs` change, documented rather than folded in silently.
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma` (`gemma4:26b-a4b-it-qat`, RRI 26–55 primary per
+  `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review`)
+- Command: `DUBBRIDGE_REVIEW_MODEL=gemma4:26b-a4b-it-qat python3
+  scripts/gemma-code-review.py .agent/s-150-t2c-vi-a-phase2-packet.txt
+  --passes 3 --task-id S-150-T2c-vi-a --out
+  docs/audit/gemma-evidence/S-150-T2c-vi-a-phase2.json`
+- Artifact: `docs/audit/gemma-evidence/S-150-T2c-vi-a-phase2.json` (3/3
+  passes succeeded; per-pass artifacts `.pass1.json`–`.pass3.json`)
+- Verdict: `FINDINGS` (no `blocking` findings)
+- Findings:
+  - **Consensus, minor** — the incidental `preparation_repo.rs` fix
+    deviates from the task's original scope; no suggested change (reviewer
+    itself notes it's necessary for the included tests to pass). **Accepted
+    as documented** — see Incidental fix disclosure above.
+  - **Pass-specific, minor** — suggests `dispatch_post_ready`'s
+    `word_alignment_parent_artifact_id: uuid::Uuid` parameter should be a
+    strongly-typed `ArtifactId`. **Rejected as false positive**: no
+    `ArtifactId` newtype exists in `crates/domain/src/artifact.rs` —
+    `DerivedArtifact.id` itself is a plain `Uuid`; introducing a new
+    domain-wide newtype is out of this task's scope and not an existing
+    codebase pattern.
+- Muse Glimmer fallback: not triggered — reason: Gemma produced a usable
+  3/3-pass consolidated result.
+- D14 fallback: not triggered — reason: n/a.
+- D14 provider route: n/a.
+- disposition_divergence: `none`.
+- Primary-agent disposition: 1 finding accepted (documented, no code
+  change needed per reviewer's own note), 1 finding rejected as false
+  positive (no existing type to migrate to).
+
+`Code-solution review: gemma docs/audit/gemma-evidence/S-150-T2c-vi-a-phase2.json - PASS`
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | subtitle readiness fans out and enqueues one translation job per configured target, acknowledged durably, no legacy review row | `apps/worker-runner/src/subtitle_runtime_tests.rs::process_subtitle_job_marks_ready_and_stores_artifact_on_success`; `apps/worker-runner/src/runner_topology_tests.rs::redis_monitor_wires_preparation_transcription_and_subtitle_workers` | passed |
+| EC-1 | Edge case | translation-queue enqueue failure marks that dispatch `enqueue_failed` with error detail preserved, subtitle job still succeeds, no legacy review row | `apps/worker-runner/src/subtitle_runtime_tests.rs::process_subtitle_job_marks_dispatch_enqueue_failed_when_queue_unavailable` | passed |
+
+### Owner final verification
+
+- Owner: matias
+- Date: 2026-08-23
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
+- Commands run: `DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@localhost:5432/dubbridge cargo test -p dubbridge-worker-runner subtitle_runtime_tests -- --test-threads=1`; `DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@localhost:5432/dubbridge cargo test -p dubbridge-worker-runner runner_topology_tests -- --test-threads=1`; `cargo clippy -p dubbridge-worker-runner --all-targets -- -D warnings`; `cargo fmt --check -p dubbridge-worker-runner`
+
+`Task-analysis review: gemma docs/audit/gemma-evidence/S-150-T2c-vi-a-phase1.json - PASS`
+`Code-solution review: gemma docs/audit/gemma-evidence/S-150-T2c-vi-a-phase2.json - PASS`
+
+- Review artifact: `docs/audit/gemma-evidence/S-150-T2c-vi-a.json`
 
 ---
 

@@ -1,0 +1,24 @@
+{
+  "changed_paths": [
+    "apps/worker-runner/src/main.rs",
+    "apps/worker-runner/src/runner_topology_tests.rs",
+    "apps/worker-runner/src/subtitle_runtime.rs",
+    "apps/worker-runner/src/subtitle_runtime_tests.rs",
+    "crates/db/src/preparation_repo.rs"
+  ],
+  "findings": [
+    {
+      "detail": "The incidental fix for `parse_kind` is bundled into this PR. While it is a minimal correctness fix, it technically falls outside the primary scope of the subtitle worker refactor.",
+      "line": 26,
+      "path": "crates/db/src/preparation_repo.rs",
+      "scope": "in-scope",
+      "severity": "minor",
+      "suggestion": "None required, as the fix is necessary for the included tests to pass."
+    }
+  ],
+  "format_warnings": [
+    "STATUS PASS with findings coerced to FINDINGS"
+  ],
+  "status": "findings",
+  "summary": "The implementation correctly implements the localization fan-out pattern, replacing the legacy review task creation with a durable `translation_dispatch_outbox` record. The per-target isolation in `enqueue_translation_job` ensures that a failure to enqueue one language does not abort the entire subtitle job or prevent other languages from being enqueued. The `FailingTranslationJobQueue` in tests successfully verifies that `enqueue_failed` is recorded in Postgres and that the subtitle job itself completes successfully (fail-open for the subtitle job, but fail-closed for the specific translation target). The incidental fix in `preparation_repo.rs` is a necessary correctness fix for the `runner_topology_tests` to pass."
+}
