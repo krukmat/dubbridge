@@ -1,0 +1,108 @@
+{
+  "error": null,
+  "finished_at": "2026-08-23T21:46:55.440058Z",
+  "generation": {
+    "created_at": "2026-08-23T21:46:55.433195Z",
+    "done": true,
+    "eval_count": 656,
+    "eval_duration": 92037613000,
+    "load_duration": 4177667,
+    "prompt_eval_count": 1416,
+    "prompt_eval_duration": 9073855000,
+    "think_disabled": true,
+    "thinking_present": false,
+    "thinking_sha256": null,
+    "total_duration": 101111699709
+  },
+  "model": {
+    "expected_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "resolved_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "tag": "muse-glimmer:30b-q4_K_M"
+  },
+  "packet": {
+    "expected_sha256": "ba847286f67c586baced6465531a36c2603c8247cfa1638ec29da1a006cbee1c",
+    "path": "docs/audit/gemma-evidence/S-150-T3b-medhigh-packet.json",
+    "sha256": "ba847286f67c586baced6465531a36c2603c8247cfa1638ec29da1a006cbee1c"
+  },
+  "profile": "med-high-refinement-v1",
+  "prompt": {
+    "profile": "med-high-refinement-v1",
+    "sha256": "f695364ae6c7a29f73400a27a02fc7281edd974d5f3feebf15c2c5a15fafbee6",
+    "version": "med-high-refinement-prompt-v1"
+  },
+  "response": {
+    "raw_text_sha256": "c53787d20c832f35fe485c51cf1b54986cb2cd538079d2e9d2d04ff3d901a6b9",
+    "validated": {
+      "acceptance_tests": [
+        "Happy path with valid input produces translated segments with preserved ids/timing",
+        "Fake provider forced error returns error envelope and non-zero exit",
+        "Malformed JSON returns typed error envelope without partial success",
+        "Env var selection switches between fake and real provider paths"
+      ],
+      "claims": [
+        {
+          "label": "SUPPORTED",
+          "statement": "Scope is bounded to six named files in workers/translation-worker-py"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Worker must mirror asr-worker-py stdin/stdout contract"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Real provider is unnamed in approved packet"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Credentials must be read only from injected environment variables"
+        }
+      ],
+      "excluded_scope": [
+        "No Rust code changes",
+        "No schema shape changes",
+        "No persistence or readiness transition",
+        "No TTS/dubbing code"
+      ],
+      "implementation_steps": [
+        "Define provider abstraction with fake and real stubs selected by env var",
+        "Parse stdin JSON, validate schema_version=1 and required fields, echo segment_id/start_ms/end_ms unchanged",
+        "On success write output JSON to stdout and exit 0, on error write error envelope and exit non-zero",
+        "Add requirements.txt only if real provider needs dependency"
+      ],
+      "refined_scope": [
+        "Create workers/translation-worker-py/main.py with stdin/stdout contract mirroring asr-worker-py",
+        "Implement env-driven provider selection between deterministic fake and real provider placeholder",
+        "Update Dockerfile and README to document provider env vars and mark T3b landed",
+        "Add tests/__init__.py and tests/test_worker.py using fake provider only"
+      ],
+      "risks": [
+        "Choosing a real provider may require new secrets management decision X20",
+        "Hardcoding credentials or logging them would violate acceptance criteria",
+        "Provider error handling must not leak partial output"
+      ],
+      "route_recommendation": "CLOUD_REQUIRED",
+      "stop_conditions": [
+        "Provider choice remains unspecified",
+        "Secrets management decision X20 not resolved if new provider requires it",
+        "Any schema shape change proposed"
+      ],
+      "summary": "Provider choice is unspecified and credentials handling must be bounded to injected env vars only. Cannot safely select a real provider without a decision on secrets management and dependency.",
+      "unknowns": [
+        "Concrete real translation provider to implement",
+        "Exact env var names for provider selection and credentials",
+        "Whether chosen real provider needs additional dependencies"
+      ]
+    }
+  },
+  "runtime": {
+    "num_ctx": 8192,
+    "num_predict": 4096,
+    "ollama_url": "http://127.0.0.1:11434",
+    "temperature": 0.0,
+    "timeout_seconds": 400.0
+  },
+  "schema_version": "adr037-local-architect-artifact-v1",
+  "started_at": "2026-08-23T21:45:14.283761Z",
+  "status": "ok",
+  "success": true
+}

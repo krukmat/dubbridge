@@ -1,9 +1,32 @@
 # Translation Worker Contract
 
 This directory holds the JSON contract for the subtitle translation worker
-(the real Python implementation lands in `S-150-T3b`; this contract and its
-Rust typed client, `crates/providers/src/translation.rs`, land in
-`S-150-T3a`).
+and its Python implementation (`main.py`). The contract and the Rust typed
+client, `crates/providers/src/translation.rs`, landed in `S-150-T3a`; the
+functional worker (`main.py`, provider abstraction, tests) landed in
+`S-150-T3b`.
+
+## Provider selection (`S-150-T3b`)
+
+`main.py` selects its translation provider from `DUBBRIDGE_TRANSLATION_PROVIDER`:
+
+- `fake` (default): deterministic, no network call. Used by the test suite
+  (`tests/test_worker.py`) only -- never a real translation.
+- `http`: posts `{source_language, target_language, texts: [...]}` as JSON to
+  `DUBBRIDGE_TRANSLATION_API_URL` with an `Authorization: Bearer
+  <DUBBRIDGE_TRANSLATION_API_KEY>` header, and expects back
+  `{"translations": [...]}` (one string per input text, same order).
+  Credentials are read only from these injected environment variables --
+  never hardcoded, never logged, never echoed into the output/error
+  envelope. `DUBBRIDGE_TRANSLATION_API_URL`/`_API_KEY` point at whatever
+  concrete real translation API an operator configures; no specific vendor
+  is baked into this worker, consistent with the fail-closed, environment-
+  explicit configuration principle (ADR-026).
+- No `requirements.txt` is needed: the `http` provider uses only the Python
+  standard library (`urllib`), so this worker has zero third-party runtime
+  dependencies. This is a deliberate minimal choice -- selecting a real
+  provider requiring a vendor SDK (or new secrets-storage machinery, see X20)
+  is a separate future decision, not made by this task.
 
 ## Contract shape (D3, `schema_version: 1`)
 

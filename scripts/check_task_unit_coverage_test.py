@@ -129,6 +129,87 @@ class TaskUnitCoverageEvidenceGate(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_python_worker_test_reference_passes(self):
+        (self.root / "workers" / "example-worker-py" / "tests").mkdir(parents=True)
+        (self.root / "workers" / "example-worker-py" / "tests" / "test_worker.py").write_text(
+            "def test_case():\n    pass\n", encoding="utf-8"
+        )
+        py_evidence_table = (
+            "| Case ID | Type | Behavior | Unit test evidence | Result |\n"
+            "|---|---|---|---|---|\n"
+            "| HP-1 | Happy path | something | "
+            "`workers/example-worker-py/tests/test_worker.py::test_case` | passed |\n"
+            "| EC-1 | Edge case | something | "
+            "`workers/example-worker-py/tests/test_worker.py::test_case` | passed |\n"
+        )
+        self.write_corpus(
+            "## T-PY\n\n"
+            "- **Status:** [x] Done — 2026-07-22\n"
+            "- **Type:** development\n"
+            "- **RRI:** 30\n\n"
+            "### Happy paths considered\n"
+            "- HP-1: something\n\n"
+            "### Edge cases considered\n"
+            "- EC-1: something\n\n"
+            "### Unit coverage certification\n\n"
+            f"{py_evidence_table}\n"
+            f"{OWNER_BLOCK}\n"
+            f"{REFLECTION_BLOCK}\n"
+            "- Review artifact: docs/audit/gemma-evidence/T-PY.json\n"
+        )
+        self.write_ledger()
+        self.commit_all()
+        sha = self.head_sha()
+        self.write(
+            "docs/audit/gemma-evidence/T-PY.json",
+            f'{{"task_id":"T-PY","commit_sha":"{sha}","reviewer":"gemma","verdict":"PASS","timestamp":"2026-07-22T00:00:00Z"}}',
+        )
+
+        result = self.check_gate()
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_python_worker_test_reference_missing_function_fails(self):
+        (self.root / "workers" / "example-worker-py" / "tests").mkdir(parents=True)
+        (self.root / "workers" / "example-worker-py" / "tests" / "test_worker.py").write_text(
+            "def test_other():\n    pass\n", encoding="utf-8"
+        )
+        py_evidence_table = (
+            "| Case ID | Type | Behavior | Unit test evidence | Result |\n"
+            "|---|---|---|---|---|\n"
+            "| HP-1 | Happy path | something | "
+            "`workers/example-worker-py/tests/test_worker.py::test_missing` | passed |\n"
+            "| EC-1 | Edge case | something | "
+            "`workers/example-worker-py/tests/test_worker.py::test_missing` | passed |\n"
+        )
+        self.write_corpus(
+            "## T-PYMISS\n\n"
+            "- **Status:** [x] Done — 2026-07-22\n"
+            "- **Type:** development\n"
+            "- **RRI:** 30\n\n"
+            "### Happy paths considered\n"
+            "- HP-1: something\n\n"
+            "### Edge cases considered\n"
+            "- EC-1: something\n\n"
+            "### Unit coverage certification\n\n"
+            f"{py_evidence_table}\n"
+            f"{OWNER_BLOCK}\n"
+            f"{REFLECTION_BLOCK}\n"
+            "- Review artifact: docs/audit/gemma-evidence/T-PYMISS.json\n"
+        )
+        self.write_ledger()
+        self.commit_all()
+        sha = self.head_sha()
+        self.write(
+            "docs/audit/gemma-evidence/T-PYMISS.json",
+            f'{{"task_id":"T-PYMISS","commit_sha":"{sha}","reviewer":"gemma","verdict":"PASS","timestamp":"2026-07-22T00:00:00Z"}}',
+        )
+
+        result = self.check_gate()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("missing test function", result.stdout)
+
     def test_mismatched_task_id_fails(self):
         self.write_corpus(section("T-MISMATCH", "- Review artifact: docs/audit/gemma-evidence/T-MISMATCH.json"))
         self.write_ledger()

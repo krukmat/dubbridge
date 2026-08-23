@@ -1189,7 +1189,7 @@ approval does not pre-approve them):**
 | 2 | `S-150-T2c-vi-a` | Wire `fan_out_localization` into the subtitle runtime, replacing `prepare_review_post_ready` | ~~51~~ 47 (rerun) | Med-high — **Done 2026-08-23** |
 | 3 | `S-150-T2c-vi-b` | Delete the dead legacy review module, sync S-140 BDD | 31 | Moderate — **Done 2026-08-23** |
 | 4 | `S-150-T3a` | Typed translation provider/subprocess contract | ~~42~~ 41 (rerun) | Med-high — **Done 2026-08-23** |
-| 5 | `S-150-T3b` | Functional Python translation worker | 44 | Med-high |
+| 5 | `S-150-T3b` | Functional Python translation worker | ~~44~~ 50 (rerun) | Med-high — **Done 2026-08-23** |
 | 6 | `S-150-T3c` | Rust translation runtime persistence + readiness transition | 53 | Med-high |
 
 Every Med-high child routes cloud-only under ADR-038 (Muse Glimmer refinement
@@ -1221,7 +1221,12 @@ partitioning, no pub/sub. Full option analysis:
 `docs/tasks/s-150-translation-dubbing.md` § S-150-T2c-vi-b). Child 4
 (`S-150-T3a`) is **done** (2026-08-23; RRI 41, full closure record at
 `docs/tasks/s-150-translation-dubbing.md` § S-150-T3a). Child 5
-(`S-150-T3b`) is next.
+(`S-150-T3b`) is **done** (2026-08-23; RRI 50, full closure record at
+`docs/tasks/s-150-translation-dubbing.md` § S-150-T3b). No real translation
+provider vendor was selected — the worker's `http` provider is a
+vendor-neutral, stdlib-only (`urllib`) generic JSON endpoint, deferring the
+concrete-vendor and X20 secrets-storage decisions; see that closure record's
+"Provider choice" note. Child 6 (`S-150-T3c`) is next.
 
 **Happy paths considered:**
 

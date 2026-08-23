@@ -343,8 +343,8 @@ inference from project age, row presence, or feature timing is allowed.
 | T2c-vi | Runtime cutover and legacy review retirement | development parent | Complex surface | Decomposed into T2c-vi-a/b; both children done, closing this parent. |
 | T2c-vi-a | Integrate localization fan-out into subtitle runtime | development | 47 / L Med-high (computed) | Done 2026-08-23. |
 | T2c-vi-b | Delete dead legacy review module and sync S-140 BDD | development/docs | 31 / M Moderate (computed) | Done 2026-08-23. |
-| T3a | Translation provider/subprocess contract | development | 42 / L | Med-high |
-| T3b | Functional translation worker | development | 44 / L | Med-high |
+| T3a | Translation provider/subprocess contract | development | 41 / L Med-high (rerun 2026-08-23; supersedes prior 42 estimate) | Done 2026-08-23; ADR-038 cloud takeover (`claude-sonnet-5`/thinking-on, ADR-039 human-select), Gemma phase-1 PASS / Muse Glimmer phase-2 fallback PASS (0 findings), 3 Reflection passes, 41 tests. Full record: `docs/tasks/s-150-translation-dubbing.md` § S-150-T3a. |
+| T3b | Functional translation worker | development | 50 / L Med-high (rerun 2026-08-23; supersedes prior 44 estimate) | Done 2026-08-23; ADR-038 cloud takeover (`claude-sonnet-5`/thinking-on, ADR-039 human-select; Muse Glimmer advisory `CLOUD_REQUIRED`), Gemma phase-1/phase-2 PASS (phase-2: 6 minor findings, 1 fixed/5 dispositioned no-change), 3 Reflection passes, 20/20 tests, 99% line coverage. Real provider vendor deferred (vendor-neutral stdlib-only `http` provider); see closure "Provider choice" note. Full record: `docs/tasks/s-150-translation-dubbing.md` § S-150-T3b. |
 | T3c | Translation runtime persistence and readiness | development | 53 / L | Med-high |
 | T4 | Amend ADR-028 with app-neutral consent ownership and decompose TTS | ADR/planning | 26 / M | Recompute; must precede T5 |
 | T5 | TTS/dubbing implementation parent | development parent | 68–70 / L | Mandatory decomposition before implementation |

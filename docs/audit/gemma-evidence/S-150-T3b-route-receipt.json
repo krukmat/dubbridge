@@ -1,0 +1,17 @@
+{
+  "task_id": "S-150-T3b",
+  "card_hash": "ba847286f67c586baced6465531a36c2603c8247cfa1638ec29da1a006cbee1c",
+  "refinement_artifact_sha256": "4afae2eb6fb3940c582922d4eadaeb181c20d74783018b8655a92317452d9b63",
+  "primary_receipt": {
+    "card_hash": "ba847286f67c586baced6465531a36c2603c8247cfa1638ec29da1a006cbee1c",
+    "refinement_artifact_sha256": "4afae2eb6fb3940c582922d4eadaeb181c20d74783018b8655a92317452d9b63",
+    "decision": "CLOUD_REQUIRED",
+    "primary_id": "claude-code-sonnet-5",
+    "timestamp": "2026-08-23T21:50:00Z",
+    "rationale": "Muse Glimmer's own advisory already recommended CLOUD_REQUIRED (real provider unspecified, X20 secrets-management risk). Independent of that, ADR-038 gives Med-high no whole-task local-repair budget, and this task is a single cohesive worker module (6 files, one directory), not an ADR-040-qualified disjoint multi-file split -- so the primary receipt would hold CLOUD_REQUIRED even had the advisory said GO_LOCAL. No upgrade to GO_LOCAL is being attempted."
+  },
+  "gate_decision": {
+    "route": "CLOUD_REQUIRED",
+    "reason": "Muse Glimmer recommended CLOUD_REQUIRED; the primary cannot upgrade this to local."
+  }
+}

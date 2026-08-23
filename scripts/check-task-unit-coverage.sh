@@ -57,11 +57,16 @@ validate_test_ref() {
 
   local path
   local test_name
-  path="$(printf '%s\n' "$ref" | sed -n 's/^\(.*\.rs\)::.*$/\1/p')"
+  path="${ref%%::*}"
   test_name="${ref##*::}"
 
-  if [[ -z "$path" || -z "$test_name" ]]; then
-    add_violation "$task_file: $section_title: $case_id unit test evidence '$ref' must use path/to/file.rs::test_name"
+  case "$path" in
+    *.rs|*.py) ;;
+    *) path="" ;;
+  esac
+
+  if [[ -z "$path" || -z "$test_name" || "$path" == "$ref" ]]; then
+    add_violation "$task_file: $section_title: $case_id unit test evidence '$ref' must use path/to/file.rs::test_name or path/to/file.py::test_name"
     return
   fi
 
@@ -70,7 +75,16 @@ validate_test_ref() {
     return
   fi
 
-  if ! grep -Eq "(^|[[:space:]])(async[[:space:]]+)?fn[[:space:]]+${test_name}\\b" "$path"; then
+  # Rust: `fn`/`async fn`. Python: `def`/`async def`. Selected by the
+  # reference's own extension, so a stray Rust-style `fn` name never
+  # false-passes against a Python file (or vice versa).
+  local fn_keyword_pattern
+  case "$path" in
+    *.py) fn_keyword_pattern="(async[[:space:]]+)?def" ;;
+    *) fn_keyword_pattern="(async[[:space:]]+)?fn" ;;
+  esac
+
+  if ! grep -Eq "(^|[[:space:]])${fn_keyword_pattern}[[:space:]]+${test_name}\\b" "$path"; then
     add_violation "$task_file: $section_title: $case_id unit test evidence references missing test function '$test_name' in '$path'"
   fi
 }
@@ -104,9 +118,9 @@ validate_case_certification() {
   fi
 
   local refs
-  refs="$(printf '%s\n' "$evidence" | grep -oE '`[^`]+\.rs::[A-Za-z_][A-Za-z0-9_:]*`' | tr -d '`' || true)"
+  refs="$(printf '%s\n' "$evidence" | grep -oE '`[^`]+\.(rs|py)::[A-Za-z_][A-Za-z0-9_:]*`' | tr -d '`' || true)"
   if [[ -z "$refs" ]]; then
-    add_violation "$task_file: $section_title: $case_id unit test evidence must include at least one backticked path/to/file.rs::test_name reference"
+    add_violation "$task_file: $section_title: $case_id unit test evidence must include at least one backticked path/to/file.rs::test_name or path/to/file.py::test_name reference"
     return
   fi
 

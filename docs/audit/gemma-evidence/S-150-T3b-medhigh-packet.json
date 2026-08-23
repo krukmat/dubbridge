@@ -1,0 +1,39 @@
+{
+  "task_id": "S-150-T3b",
+  "objective": "Implement the Python stdin/stdout translation worker (workers/translation-worker-py/main.py) behind a configurable provider abstraction, matching the already-shipped D3 envelope contract (S-150-T3a, done): input/output/error JSON schemas plus crates/providers/src/translation.rs's SubprocessTranslationWorkerClient. This task ships the real (or a minimal real-option) Python process; T3c (Rust persistence/readiness) depends on this and is out of scope here.",
+  "precedent": "workers/asr-worker-py/main.py already implements the identical stdin/stdout subprocess contract shape for ASR: parse job_id + required fields from stdin JSON, run the actual work, write result JSON to stdout on success (exit 0), or {job_id, error_code, message} on failure (exit 1). T3b should mirror this structure, substituting a translation provider for faster-whisper, and adding a provider-selection seam (env-driven) that ASR's worker does not need.",
+  "design_constraint_d3": "TranslationWorkerInput/Output (workers/translation-worker-py/*.schema.json, additionalProperties:false) fix schema_version:1, job_id, source_language, target_language, and an ordered segments[] array. Each segment carries segment_id, start_ms, end_ms (all three must be echoed back byte-identical from input to output -- the worker never mints or mutates them) plus source_text (input) and translated_text (output, new). Error envelope is {job_id, error_code, message}, no segments field, non-zero exit.",
+  "approved_scope": [
+    "workers/translation-worker-py/main.py (new)",
+    "workers/translation-worker-py/requirements.txt (new, only if the chosen real provider needs a dependency)",
+    "workers/translation-worker-py/Dockerfile (update from the current one-line placeholder)",
+    "workers/translation-worker-py/README.md (update: mark T3b landed, document the provider env vars)",
+    "workers/translation-worker-py/tests/__init__.py (new)",
+    "workers/translation-worker-py/tests/test_worker.py (new)"
+  ],
+  "excluded_scope": [
+    "Any Rust code (crates/providers/src/translation.rs is already done and frozen unless a genuine contract defect is found)",
+    "Rust persistence / readiness transition (S-150-T3c, depends on this task)",
+    "Any TTS/dubbing code (S-150-T4 through T7, frozen)",
+    "Any change to the JSON schema files' required/type shape (only README prose may be updated)"
+  ],
+  "happy_paths": [
+    "HP-1: valid versioned input (schema_version=1, job_id, source_language, target_language, segments[]) produces exactly one translated segment per source segment, with segment_id/start_ms/end_ms preserved unchanged and translated_text populated, status: ok."
+  ],
+  "edge_cases": [
+    "EC-1: provider failure (fake-provider forced error in tests, or a real provider error such as an unreachable/erroring API) emits the error-schema payload {job_id, error_code, message} and exits non-zero -- no partial success output.",
+    "EC-2: unsupported language or invalid source payload (malformed JSON, missing required field) produces no success artifact -- typed error only, mirroring workers/asr-worker-py's parse_input/emit_error pattern."
+  ],
+  "acceptance_criteria": [
+    "Implement the Python stdin/stdout worker behind a configurable provider: an env-selected deterministic fake provider used by the test suite, and a real provider path selected by a different env value.",
+    "Model/provider credentials are read only from injected environment variables -- never hardcoded, never logged.",
+    "The test suite uses the deterministic fake provider only; it must not make a live network call.",
+    "Non-zero exit, malformed JSON, missing output, or provider error is always signaled via the typed error envelope, never a partial success payload."
+  ],
+  "hard_exclusions_check": "Not auth/security, not rights/consent/governance invariants, not schema/migrations/release cuts, not an unresolved ADR decision. Scope is bounded to 6 named files in one worker directory, structurally mirroring an already-operational precedent (workers/asr-worker-py) -- no ADR-038 hard-exclusion trigger applies on its face; flag if a chosen real provider would require a new secrets-management decision (X20, still open) rather than reusing the existing injected-env-var pattern.",
+  "open_provider_choice": "The task's acceptance criteria intentionally leave the concrete real translation provider unnamed ('configurable provider'). The user was asked before approval whether they had a preference and did not specify one, so a minimal real option should be chosen and the choice recorded as part of this evidence bundle rather than left implicit.",
+  "rri": {
+    "band": "Med-high",
+    "score": 50
+  }
+}
