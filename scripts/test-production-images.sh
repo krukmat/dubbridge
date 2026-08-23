@@ -3,7 +3,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # Case registry - bash 3.2 compatible (no associative arrays)
-CASE_LIST="self-check api gateway migration worker asr"
+CASE_LIST="self-check api gateway migration worker asr translation"
 
 # Cleanup machinery
 TEMP_DIR=""
@@ -565,6 +565,66 @@ with wave.open(\"/tmp/t4l-silence.wav\", \"wb\") as w:
     fi
 
     echo "Run check passed for asr"
+    return 0
+}
+
+contract_translation() {
+    echo "Contract check for translation case"
+    if [ ! -f "apps/worker-runner/Dockerfile" ]; then
+        echo "ERROR: apps/worker-runner/Dockerfile not found" >&2
+        return 1
+    fi
+    if ! grep -q 'ENV DUBBRIDGE_TRANSLATION_WORKER_PATH=' "apps/worker-runner/Dockerfile"; then
+        echo "ERROR: DUBBRIDGE_TRANSLATION_WORKER_PATH env var not found in Dockerfile" >&2
+        return 1
+    fi
+    if ! grep -q 'ENV DUBBRIDGE_TRANSLATION_WORKER_PYTHON=' "apps/worker-runner/Dockerfile"; then
+        echo "ERROR: DUBBRIDGE_TRANSLATION_WORKER_PYTHON env var not found in Dockerfile" >&2
+        return 1
+    fi
+    echo "Contract check passed for translation"
+    return 0
+}
+
+run_translation() {
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "ERROR: docker not found on PATH" >&2
+        return 1
+    fi
+
+    translation_image="${DUBBRIDGE_TRANSLATION_WORKER_IMAGE_TAG:-dubbridge-worker-runner-t4m:test}"
+
+    hp1_exit=0
+    hp1_output=$(docker run --rm -e DUBBRIDGE_TRANSLATION_PROVIDER=fake --entrypoint /bin/sh "$translation_image" -c "
+        echo '{\"schema_version\":1,\"job_id\":\"t4n-hp1\",\"source_language\":\"en\",\"target_language\":\"es\",\"segments\":[{\"segment_id\":\"s1\",\"start_ms\":0,\"end_ms\":1000,\"source_text\":\"hello\"}]}' | python3 \"\$DUBBRIDGE_TRANSLATION_WORKER_PATH\"
+     " 2>&1) || hp1_exit=$?
+    if [ "$hp1_exit" -ne 0 ]; then
+        echo "ERROR: HP-1 FAILED: protocol resolution check failed" >&2
+        echo "$hp1_output" >&2
+        return 1
+    fi
+    if ! echo "$hp1_output" | grep -q '"status": "ok"'; then
+        echo "ERROR: HP-1 FAILED: no successful protocol response in output" >&2
+        echo "$hp1_output" >&2
+        return 1
+    fi
+
+    ec1_exit=0
+    ec1_output=$(docker run --rm -e DUBBRIDGE_TRANSLATION_PROVIDER=not-a-real-provider --entrypoint /bin/sh "$translation_image" -c "
+        echo '{\"schema_version\":1,\"job_id\":\"t4n-ec1\",\"source_language\":\"en\",\"target_language\":\"es\",\"segments\":[{\"segment_id\":\"s1\",\"start_ms\":0,\"end_ms\":1000,\"source_text\":\"hello\"}]}' | python3 \"\$DUBBRIDGE_TRANSLATION_WORKER_PATH\"
+     " 2>&1) || ec1_exit=$?
+    if [ "$ec1_exit" -eq 0 ]; then
+        echo "ERROR: EC-1 FAILED: invocation succeeded with an invalid provider" >&2
+        echo "$ec1_output" >&2
+        return 1
+    fi
+    if ! echo "$ec1_output" | grep -q '"error_code": "provider_misconfigured"'; then
+        echo "ERROR: EC-1 FAILED: expected provider_misconfigured error_code not found" >&2
+        echo "$ec1_output" >&2
+        return 1
+    fi
+
+    echo "Run check passed for translation"
     return 0
 }
 

@@ -39,5 +39,9 @@ ENV DUBBRIDGE_ASR_WORKER_PATH=/app/asr_worker/main.py
 ENV DUBBRIDGE_ASR_WORKER_PYTHON=python3
 ENV ASR_MODEL_SIZE=small
 
+COPY workers/translation-worker-py/main.py /app/translation_worker/main.py
+ENV DUBBRIDGE_TRANSLATION_WORKER_PATH=/app/translation_worker/main.py
+ENV DUBBRIDGE_TRANSLATION_WORKER_PYTHON=python3
+
 # Run as PID 1
 ENTRYPOINT ["/app/dubbridge-worker-runner"]
