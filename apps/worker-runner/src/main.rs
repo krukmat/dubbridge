@@ -28,11 +28,6 @@ mod preparation_media_executor;
 mod preparation_runtime;
 #[cfg(test)]
 mod preparation_runtime_tests;
-// Superseded by translation_fanout::fan_out_localization (S-150-T2c-vi-a);
-// no caller remains. Left in place, unused, for S-150-T2c-vi-b to delete
-// together with its BDD/doc sync -- out of this task's scope.
-#[allow(dead_code)]
-mod review_enqueue;
 #[cfg(test)]
 mod runner_topology_tests;
 mod subtitle_alignment;

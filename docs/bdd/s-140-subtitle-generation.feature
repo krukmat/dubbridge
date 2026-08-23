@@ -6,8 +6,9 @@ title: "S-140 Subtitle Generation"
 Feature: Subtitle generation processing
   As the subtitle-generation pipeline,
   I want a ready transcription to produce a canonical subtitle artifact and
-  enqueue human review through the existing review gate
-  So that downstream review can consume real subtitle outputs without bypassing
+  fan out a localization job per configured target language
+  So that downstream translation can consume real subtitle outputs, with human
+  review remaining the eventual gate over the complete artifact set before
   ADR-030's publication workflow.
 
   Scenario: S140_HP1 Ready transcription enqueues exactly one subtitle job
@@ -17,13 +18,13 @@ Feature: Subtitle generation processing
     Then the system should enqueue exactly one subtitle job for "video_01"
     And the job should target the deterministic first target-language route
 
-  Scenario: S140_HP2 Successful subtitle processing persists subtitle output and enqueues review
+  Scenario: S140_HP2 Successful subtitle processing persists subtitle output and fans out localization
     Given an asset "video_02" has a ready word-alignment artifact
     And subtitle segmentation succeeds for "video_02"
     When the worker-runner processes the subtitle job for "video_02"
     Then the system should persist one "subtitle" derived artifact for "video_02"
     And the subtitle status for "video_02" should become "READY"
-    And the system should enqueue exactly one review task through the existing review-task path
+    And the system should fan out exactly one localization job per configured target language for "video_02"
 
   Scenario: S140_EC1 Missing alignment fails closed without creating review work
     Given an asset "video_03" has no word-alignment artifact
