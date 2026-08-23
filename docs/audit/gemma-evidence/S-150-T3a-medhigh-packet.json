@@ -1,0 +1,38 @@
+{
+  "acceptance_criteria": [
+    "Extract a focused provider module if required by the 500-line local read gate.",
+    "Update schemas before runtime code depends on them.",
+    "Test the contract without a real translation model."
+  ],
+  "approved_scope": [
+    "crates/providers/src/translation.rs (new module, mirrors AsrWorkerClient/SubprocessAsrWorkerClient pattern already in crates/providers/src/lib.rs)",
+    "workers/translation-worker-py/input.schema.json",
+    "workers/translation-worker-py/output.schema.json",
+    "workers/translation-worker-py/error.schema.json",
+    "workers/translation-worker-py/README.md"
+  ],
+  "design_constraint_d3": "TranslatedSubtitle is JSON with schema_version: 1, source and target BCP-47 language tags, and ordered segments containing stable segment_id, start_ms, end_ms, source_text, translated_text. Translation must preserve the Rust input adapter's segment IDs and the S-140 timing. Current S-140 runtime serializes a bare Vec<SubtitleSegment> (timing/text only, no envelope). The Rust input adapter must derive a stable segment_id from (subtitle_artifact_id, zero_based_ordinal), resolve source language from the localization unit, validate timing/order, and emit the versioned translation-worker input -- without mutating the immutable S-140 artifact.",
+  "edge_cases": [
+    "EC-1: missing, duplicated, reordered-without-identity, or timing-mutated segments are rejected before persistence.",
+    "EC-2: non-zero exit, malformed JSON, missing output file, or non-file URI returns a typed provider error.",
+    "EC-3: a legacy S-140 array with invalid/overlapping timing or an unresolved source language is rejected before worker dispatch."
+  ],
+  "excluded_scope": [
+    "Real Python translation worker implementation (S-150-T3b)",
+    "Rust persistence / readiness transition (S-150-T3c)",
+    "Any TTS/dubbing code (S-150-T4 through T7, frozen)"
+  ],
+  "happy_paths": [
+    "HP-1: typed client sends a versioned source subtitle, receives translated payload preserving every segment_id and timing boundary.",
+    "HP-2: JSON schemas reject extra fields (additionalProperties: false) and express the D3 envelope.",
+    "HP-3: current S-140 bare Vec<SubtitleSegment> is normalized with deterministic IDs from (subtitle_artifact_id, zero_based_ordinal) plus resolved source language, without rewriting the source artifact."
+  ],
+  "hard_exclusions_check": "Not auth/security, not rights/consent/governance invariants, not schema/migrations/release cuts, not an unresolved ADR decision, scope is bounded to 6 named files -- no ADR-038 hard-exclusion trigger applies.",
+  "objective": "Build a typed Rust translation-provider subprocess client and versioned JSON schema contract (D3) that a future Python worker (T3b) will implement. This task ships deterministic stub-backed tests only -- no live translation model, no real Python worker process.",
+  "precedent": "crates/providers/src/lib.rs already implements an analogous pattern for ASR (AsrWorkerClient trait, SubprocessAsrWorkerClient with spawn/timeout/parse-error handling, StubAsrWorkerClient for tests). T3a should mirror this structure for translation rather than inventing a new pattern.",
+  "rri": {
+    "band": "Med-high",
+    "score": 41
+  },
+  "task_id": "S-150-T3a"
+}

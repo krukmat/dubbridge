@@ -3630,9 +3630,18 @@ Required passes: 2 (`31` → `Moderate`)
 ## S-150-T3a: Translation provider/subprocess contract
 
 **Type:** development
-**Effort:** L (provisional RRI 42 — Med-high; recompute before presentation)
-**Depends on:** S-150-T2c
-**Status:** [ ] Planned
+**Effort:** L (RRI 41 — Med-high, computed via `scripts/rri.py`)
+**Depends on:** S-150-T2c-vi-b
+**Status:** [x] Done (2026-08-23)
+**RRI:** 41
+
+**RRI evidence:** `python3 scripts/rri.py --platform dubbridge --touches
+crates/providers/src/translation.rs --touches crates/providers/src/lib.rs --touches
+workers/translation-worker-py/input.schema.json --touches
+workers/translation-worker-py/output.schema.json --touches
+workers/translation-worker-py/error.schema.json --touches
+workers/translation-worker-py/README.md --cc 13 --D 2 --K 2 --P 2 --T 2 --A 2 --X 1`
+→ Final RRI 41 → Med-high.
 
 **Happy paths considered:**
 
@@ -3669,6 +3678,120 @@ unit coverage certification, and owner verification.
 schema contract with deterministic stubs; stop before the real Python worker/runtime.
 
 **Stop condition:** Stop after provider/schema tests. Do not start T3b.
+
+### ADR-038 Med-high routing evidence
+
+- Muse Glimmer advisory refinement (`med-high-refinement-v1` profile):
+  `route_recommendation: GO_LOCAL` — `docs/audit/gemma-evidence/S-150-T3a-medhigh-refinement.json`
+  (packet: `docs/audit/gemma-evidence/S-150-T3a-medhigh-packet.json`).
+- Primary hash-bound route receipt: **downgraded to `CLOUD_REQUIRED`**
+  (downgrade permitted, upgrade never permitted) — reason: Med-high carries no
+  whole-task local-repair budget, and this task is a single cohesive contract, not
+  an ADR-040-qualified disjoint multi-file split —
+  `docs/audit/gemma-evidence/S-150-T3a-route-receipt.json`. Gate result via
+  `scripts/local-agent/med_high_gate.py::evaluate_route`: `route=CLOUD_REQUIRED`.
+- ADR-039 fallback selection: `human-select`, authorized —
+  `docs/audit/gemma-evidence/S-150-T3a-fallback-selection.json`. Selected by the
+  owner (interactive `AskUserQuestion`, 2026-08-23): `claude-sonnet-5`,
+  reasoning `thinking-on`. Implementation proceeded in-session on Claude Sonnet 5
+  rather than a separate cloud handoff.
+
+### Reflection log
+
+Required passes: 3 (RRI 41 → Med-high)
+
+#### Pass 1
+
+- **Draft verdict:** Implemented `translation.rs` mirroring
+  `AsrWorkerClient`/`SubprocessAsrWorkerClient`, updated input/output schemas to
+  the D3 envelope, updated the worker README.
+- **Critique findings:** `cargo fmt` reformatted 3 test call sites (line-width
+  only, no logic change).
+- **Revisions applied:** ran `cargo fmt -p dubbridge-providers`.
+
+#### Pass 2
+
+- **Draft verdict:** 36 tests passing, clippy/fmt clean, workspace compiles.
+- **Critique findings:** (1) EC-1's literal "duplicated" segment case had no
+  explicit test, though the existing overlap check structurally catches an exact
+  duplicate; (2) HP-2's "schemas reject extra fields" claim was untested against
+  the actual JSON Schema files — only `json.load` parse-checked, no `jsonschema`
+  library available locally — and the Rust structs alone do not enforce
+  `additionalProperties: false` (that is the schema file's job, not the struct's).
+- **Revisions applied:** added `normalize_rejects_exact_duplicate_segment`; added
+  `translation_{input,output,error}_serializes_with_exact_schema_field_names` plus
+  `translation_input_rejects_unknown_fields_on_deserialize`, the last one
+  documenting explicitly that extra-field rejection is enforced by the schema
+  file, not the Rust struct.
+
+#### Pass 3
+
+- **Draft verdict:** 41 tests passing, `cargo clippy -D warnings` clean,
+  `cargo fmt --check` clean, `cargo check --workspace` clean.
+- **Critique findings:** none — every HP-1/HP-2/HP-3/EC-1/EC-2/EC-3 has at least
+  one dedicated test; module stays focused
+  (`crates/providers/src/translation.rs`); no persistence, no real Python worker,
+  no TTS/dubbing code touched, matching the stop condition.
+- **Revisions applied:** none needed.
+
+### Peer Reviewer evidence
+
+- Reviewer: `muse-glimmer` (fallback; see below)
+- Command: `GEMMA_REVIEW_TASK_ID=S-150-T3a REVIEW_PATHS="crates/providers/src/translation.rs crates/providers/src/lib.rs workers/translation-worker-py" DUBBRIDGE_REVIEW_MODEL=muse-glimmer:30b-q4_K_M make qa-gemma-review`
+- Artifact: `docs/audit/gemma-evidence/S-150-T3a.json`
+- Verdict: `PASS`
+- Findings: none (3/3 passes, no blocking or minor findings)
+- Muse Glimmer fallback: `triggered` — reason: Gemma (`gemma4:26b-a4b-it-qat`)
+  failed twice consecutively with `missing SUMMARY header` / 0-of-3 parseable
+  passes on the correctly-scoped packet (see process note below); one immediate
+  retry against Gemma repeated the same failure class, triggering the fallback
+  to Muse Glimmer per § Gemma Reviewer Availability.
+- D14 fallback: not triggered — reason: Muse Glimmer produced a usable 3/3-pass
+  result on the first attempt.
+- D14 provider route: n/a.
+- disposition_divergence: `none`.
+- Primary-agent disposition: an earlier, **incorrectly-scoped** Gemma phase-2 run
+  (before `crates/providers/src/translation.rs` was staged — the file was
+  untracked, so plain `git diff` omitted it) surfaced 2 minor findings
+  recommending `source_language`/`target_language` be dropped from the output
+  envelope as redundant with the input. **Rejected**: D3
+  (`docs/plan/s-150-translation-dubbing.md`) explicitly specifies
+  `TranslatedSubtitle` carries "source and target BCP-47 language tags" in its
+  own envelope — the schema is implementing a ratified design decision, not an
+  arbitrary addition. No code change made. The corrected, fully-scoped review
+  (this section) returned zero findings.
+
+**Process note (self-caught defect, not a review finding):** the first
+`REVIEW_PATHS`-scoped `make qa-gemma-review` invocation silently omitted
+`crates/providers/src/translation.rs` — the module containing all of the new
+normalization/subprocess-client logic — because the file was untracked at that
+point and `git diff <base>` does not surface untracked files. Caught before
+accepting that run's `PASS` as authoritative; the file was `git add`-staged and
+the review re-run in full. Recorded here so the same gap doesn't recur silently
+on a future task with new (not just modified) files under `REVIEW_PATHS`.
+
+`Task-analysis review: gemma docs/audit/gemma-evidence/S-150-T3a-phase1.json - PASS`
+`Code-solution review: muse-glimmer docs/audit/gemma-evidence/S-150-T3a.json - PASS`
+
+- Review artifact: docs/audit/gemma-evidence/S-150-T3a.json
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | typed client sends versioned input, receives translated payload preserving segment_id and timing | `crates/providers/src/translation.rs::translation::tests::stub_ok_preserves_segment_id_and_timing` | passed |
+| HP-2 | Happy path | schemas express D3 envelope with exact field names (verified via struct/schema field-name parity) | `crates/providers/src/translation.rs::translation::tests::translation_input_serializes_with_exact_schema_field_names`; `::translation_output_serializes_with_exact_schema_field_names`; `::translation_error_serializes_with_exact_schema_field_names` | passed |
+| HP-3 | Happy path | legacy S-140 array normalized with deterministic `(subtitle_artifact_id, ordinal)` IDs, source text unmutated | `crates/providers/src/translation.rs::translation::tests::normalize_derives_deterministic_segment_ids_from_ordinal`; `::normalize_does_not_mutate_source_text` | passed |
+| EC-1 | Edge case | missing/duplicated/reordered-without-identity/timing-mutated segments rejected | `crates/providers/src/translation.rs::translation::tests::normalize_rejects_empty_segment_list`; `::normalize_rejects_exact_duplicate_segment`; `::normalize_rejects_reordered_without_identity`; `::normalize_rejects_overlapping_timing`; `::normalize_rejects_end_before_or_equal_start` | passed |
+| EC-2 | Edge case | non-zero exit, malformed JSON, missing output → typed provider error | `crates/providers/src/translation.rs::translation::tests::subprocess_client_returns_spawn_failed_for_nonexistent_binary`; `::subprocess_client_returns_error_on_nonzero_exit_with_json`; `::subprocess_client_returns_unknown_error_on_malformed_json_exit`; `::subprocess_client_returns_output_parse_failed_on_malformed_success_json`; `::subprocess_client_timeout_kills_and_returns_error` | passed |
+| EC-3 | Edge case | invalid/overlapping timing or unresolved (empty) source language rejected before dispatch | `crates/providers/src/translation.rs::translation::tests::normalize_rejects_empty_source_language`; `::normalize_rejects_empty_target_language`; `::normalize_rejects_end_before_or_equal_start`; `::normalize_rejects_overlapping_timing` | passed |
+
+### Owner final verification
+
+- Owner: matias
+- Date: 2026-08-23
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
+- Commands run: `cargo test -p dubbridge-providers`; `cargo clippy -p dubbridge-providers --all-targets -- -D warnings`; `cargo fmt --check -p dubbridge-providers`; `cargo check --workspace`; `python3 -c "import json; [json.load(open(f)) for f in ['workers/translation-worker-py/input.schema.json','workers/translation-worker-py/output.schema.json','workers/translation-worker-py/error.schema.json']]"`; `GEMMA_REVIEW_TASK_ID=S-150-T3a REVIEW_PATHS="crates/providers/src/translation.rs crates/providers/src/lib.rs workers/translation-worker-py" DUBBRIDGE_REVIEW_MODEL=muse-glimmer:30b-q4_K_M make qa-gemma-review`
 
 ---
 

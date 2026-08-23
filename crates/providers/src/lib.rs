@@ -2,6 +2,8 @@ use std::{io::Write, process::Stdio, time::Duration};
 
 use serde::{Deserialize, Serialize};
 
+pub mod translation;
+
 /// Input passed to the ASR subprocess via stdin (matches workers/asr-worker-py/input.schema.json).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AsrInput {

@@ -1,0 +1,17 @@
+{
+  "task_id": "S-150-T3a",
+  "card_hash": "42176a36bfb67d5cbd2629ac5f70caa5457fcd5ee68914bdaba7577d6b294dab",
+  "refinement_artifact_sha256": "6ee03ab1ef40fd8491104351100515cb662a5e8dd42dd32bb7867ad14e78ce9b",
+  "primary_receipt": {
+    "card_hash": "42176a36bfb67d5cbd2629ac5f70caa5457fcd5ee68914bdaba7577d6b294dab",
+    "refinement_artifact_sha256": "6ee03ab1ef40fd8491104351100515cb662a5e8dd42dd32bb7867ad14e78ce9b",
+    "decision": "CLOUD_REQUIRED",
+    "primary_id": "claude-code-sonnet-5",
+    "timestamp": "2026-08-23T21:03:24Z",
+    "rationale": "ADR-038: every Med-high result, including Muse Glimmer's GO_LOCAL advisory, escalates to cloud takeover -- Med-high carries no whole-task local-repair budget, and this task is a single cohesive contract, not an ADR-040-qualified disjoint multi-file split."
+  },
+  "gate_decision": {
+    "route": "CLOUD_REQUIRED",
+    "reason": "Primary receipt downgraded GO_LOCAL to cloud."
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "error": null,
+  "finished_at": "2026-08-23T21:02:43.166511Z",
+  "generation": {
+    "created_at": "2026-08-23T21:02:43.133247Z",
+    "done": true,
+    "eval_count": 766,
+    "eval_duration": 106868947000,
+    "load_duration": 6130712792,
+    "prompt_eval_count": 1125,
+    "prompt_eval_duration": 6458966000,
+    "think_disabled": true,
+    "thinking_present": false,
+    "thinking_sha256": null,
+    "total_duration": 119484998958
+  },
+  "model": {
+    "expected_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "resolved_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "tag": "muse-glimmer:30b-q4_K_M"
+  },
+  "packet": {
+    "expected_sha256": "42176a36bfb67d5cbd2629ac5f70caa5457fcd5ee68914bdaba7577d6b294dab",
+    "path": "/tmp/t3a_medhigh_packet.json",
+    "sha256": "42176a36bfb67d5cbd2629ac5f70caa5457fcd5ee68914bdaba7577d6b294dab"
+  },
+  "profile": "med-high-refinement-v1",
+  "prompt": {
+    "profile": "med-high-refinement-v1",
+    "sha256": "eddcd4cf7e8c2bdf01b039600476b5b0ec3611d67dbbaabac496ac37dafc237e",
+    "version": "med-high-refinement-prompt-v1"
+  },
+  "response": {
+    "raw_text_sha256": "ff578fe83ac429470d64a6af8c72bb271a85f5cafef3dc47cd2543aebf527090",
+    "validated": {
+      "acceptance_tests": [
+        "Stub client returns versioned payload preserving segment_id and S-140 timing",
+        "Schemas reject extra fields and enforce schema_version 1 envelope",
+        "Input adapter rejects missing/duplicated/reordered segments before dispatch",
+        "Error schema covers non-zero exit, malformed JSON, missing output, non-file URI",
+        "Legacy bare Vec<SubtitleSegment> normalized without mutating source artifact",
+        "Tests run without real translation model or Python process"
+      ],
+      "claims": [
+        {
+          "label": "SUPPORTED",
+          "statement": "Approved scope is limited to six named files"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Design must preserve Rust input adapter segment IDs and S-140 timing"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Task ships deterministic stub-backed tests only, no live model"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Precedent pattern is AsrWorkerClient in crates/providers/src/lib.rs"
+        }
+      ],
+      "excluded_scope": [
+        "Real Python translation worker implementation S-150-T3b",
+        "Rust persistence / readiness transition S-150-T3c",
+        "TTS/dubbing code S-150-T4 through T7"
+      ],
+      "implementation_steps": [
+        "Create translation.rs with TranslationWorkerClient trait and Subprocess/Stub impls",
+        "Derive stable segment_id from subtitle_artifact_id and zero_based_ordinal in input adapter",
+        "Update input/output/error schemas with additionalProperties false and D3 envelope",
+        "Add README documenting versioned contract and stub usage",
+        "Add unit tests using StubTranslationWorkerClient, no live model",
+        "Ensure schemas validated before runtime code depends on them"
+      ],
+      "refined_scope": [
+        "crates/providers/src/translation.rs new module mirroring AsrWorkerClient pattern",
+        "workers/translation-worker-py/input.schema.json versioned envelope with segment_id and timing",
+        "workers/translation-worker-py/output.schema.json TranslatedSubtitle schema_version 1",
+        "workers/translation-worker-py/error.schema.json typed provider errors",
+        "workers/translation-worker-py/README.md contract description"
+      ],
+      "risks": [
+        "500-line local read gate may force module split beyond approved file",
+        "Segment ID derivation assumptions may conflict with future persistence layer",
+        "Schema changes could break downstream T3b expectations"
+      ],
+      "route_recommendation": "GO_LOCAL",
+      "stop_conditions": [
+        "Schema validation fails or additionalProperties not enforced",
+        "Stub tests require real Python worker",
+        "Scope expands to persistence or TTS code",
+        "Segment ID derivation mutates S-140 artifact"
+      ],
+      "summary": "Scope is bounded to six named files and mirrors existing ASR provider pattern. Schemas must be updated before runtime code and tests must use stubs only.",
+      "unknowns": [
+        "Exact field names for localization unit source language resolution",
+        "Timeout and spawn parameters for subprocess client",
+        "Whether translation.rs must stay under 500 lines with existing lib.rs"
+      ]
+    }
+  },
+  "runtime": {
+    "num_ctx": 16384,
+    "num_predict": 4096,
+    "ollama_url": "http://127.0.0.1:11434",
+    "temperature": 0.0,
+    "timeout_seconds": 300.0
+  },
+  "schema_version": "adr037-local-architect-artifact-v1",
+  "started_at": "2026-08-23T21:00:43.635363Z",
+  "status": "ok",
+  "success": true
+}

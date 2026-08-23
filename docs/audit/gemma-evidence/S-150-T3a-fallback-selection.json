@@ -1,0 +1,19 @@
+{
+  "schema": "fallback-selection-v1",
+  "task_id": "S-150-T3a",
+  "bound_to": {
+    "card_hash": "42176a36bfb67d5cbd2629ac5f70caa5457fcd5ee68914bdaba7577d6b294dab",
+    "refinement_artifact_sha256": "6ee03ab1ef40fd8491104351100515cb662a5e8dd42dd32bb7867ad14e78ce9b",
+    "gate_decision": {
+      "route": "CLOUD_REQUIRED",
+      "reason": "Primary receipt downgraded GO_LOCAL to cloud."
+    }
+  },
+  "selector": "human-select",
+  "selected_by": "matias (interactive AskUserQuestion, session 2026-08-23)",
+  "selected_model": "claude-sonnet-5",
+  "selected_reasoning_effort": "thinking-on",
+  "timestamp": "2026-08-23T21:10:34Z",
+  "status": "authorized",
+  "artifact_sha256": "d4e64c409430f3058cfa65913d1f8de790010e52f73c0a8c8dc355392e06a12a"
+}

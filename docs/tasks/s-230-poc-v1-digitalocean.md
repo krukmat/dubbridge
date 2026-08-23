@@ -1187,8 +1187,8 @@ approval does not pre-approve them):**
 |---|---|---|---|---|
 | 1 | `S-150-T2c-v` | Redis translation-queue adapter | ~~50~~ 41 (rerun) | Med-high — **Done 2026-08-23** |
 | 2 | `S-150-T2c-vi-a` | Wire `fan_out_localization` into the subtitle runtime, replacing `prepare_review_post_ready` | ~~51~~ 47 (rerun) | Med-high — **Done 2026-08-23** |
-| 3 | `S-150-T2c-vi-b` | Delete the dead legacy review module, sync S-140 BDD | 31 | Moderate |
-| 4 | `S-150-T3a` | Typed translation provider/subprocess contract | 42 | Med-high |
+| 3 | `S-150-T2c-vi-b` | Delete the dead legacy review module, sync S-140 BDD | 31 | Moderate — **Done 2026-08-23** |
+| 4 | `S-150-T3a` | Typed translation provider/subprocess contract | ~~42~~ 41 (rerun) | Med-high — **Done 2026-08-23** |
 | 5 | `S-150-T3b` | Functional Python translation worker | 44 | Med-high |
 | 6 | `S-150-T3c` | Rust translation runtime persistence + readiness transition | 53 | Med-high |
 
@@ -1217,7 +1217,11 @@ partitioning, no pub/sub. Full option analysis:
 `docs/tasks/s-150-translation-dubbing.md` § S-150-T2c-v). Child 2
 (`S-150-T2c-vi-a`) is **done** (2026-08-23; full closure record at
 `docs/tasks/s-150-translation-dubbing.md` § S-150-T2c-vi-a). Child 3
-(`S-150-T2c-vi-b`) is next.
+(`S-150-T2c-vi-b`) is **done** (2026-08-23; full closure record at
+`docs/tasks/s-150-translation-dubbing.md` § S-150-T2c-vi-b). Child 4
+(`S-150-T3a`) is **done** (2026-08-23; RRI 41, full closure record at
+`docs/tasks/s-150-translation-dubbing.md` § S-150-T3a). Child 5
+(`S-150-T3b`) is next.
 
 **Happy paths considered:**
 
@@ -1314,8 +1318,8 @@ define, not this task's.
 ```mermaid
 flowchart TD
     T2CV["1 . S-150-T2c-v<br/>Redis adapter . RRI 41 . DONE"] --> T2CVIA["2 . S-150-T2c-vi-a<br/>Runtime fan-out . RRI 47 . DONE"]
-    T2CVIA --> T2CVIB["3 . S-150-T2c-vi-b<br/>Cleanup + BDD sync . RRI 31"]
-    T2CVIB --> T3A["4 . S-150-T3a<br/>Provider contract . RRI 42"]
+    T2CVIA --> T2CVIB["3 . S-150-T2c-vi-b<br/>Cleanup + BDD sync . RRI 31 . DONE"]
+    T2CVIB --> T3A["4 . S-150-T3a<br/>Provider contract . RRI 41 . DONE"]
     T3A --> T3Bc["5 . S-150-T3b<br/>Python worker . RRI 44"]
     T3Bc --> T3C["6 . S-150-T3c<br/>Persistence + readiness . RRI 53"]
 
