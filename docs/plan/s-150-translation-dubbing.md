@@ -31,9 +31,19 @@ slice: S-150
 > S-230 POC (2026-08-16, second-pass scope amendment) reopened T2c-v through
 > T3c for this slice, tracked and sequenced as `S-230-T3b`
 > (`docs/tasks/s-230-poc-v1-digitalocean.md`); T4 onward (TTS/dubbing) stays
-> parked. T2c-v itself still carries its own separate, unresolved
-> "Redis-topic decision" parking note, independent of the S-230 question — do
-> not resume it without the owner also reopening that topic. The
+> parked. T2c-v's separate "Redis-topic decision" parking note was
+> **resolved** (2026-08-21, owner-confirmed): T2c-v uses a single flat
+> `apalis-redis` namespace (`TranslationJob::JOB_TYPE =
+> "translation_generation"`, already committed at
+> `crates/jobs/src/subtitle_job.rs:50` by T2c-iv-c), mirroring the existing
+> `RedisPreparationJobQueue`/`RedisTranscriptionJobQueue`/
+> `RedisSubtitleJobQueue` pattern (`define_redis_job_queue!` in
+> `crates/jobs/src/lib.rs`) exactly — no per-target-language partitioning and
+> no pub/sub transport. Full option analysis and rationale:
+> `docs/audit/s-150-t2c-v-redis-topic-decision.md`. **T2c-v is now complete**
+> (2026-08-23): `RedisTranslationJobQueue` implemented via ADR-038 cloud
+> takeover (`claude-sonnet-5`/high); `S-150-T2c-vi-a` is next in the S-230-T3b
+> chain. The
 > plan-review conditions recorded for this slice remain in
 > force, especially deterministic
 > initial generation-request identity, migration parity, review cutover, and
@@ -323,7 +333,7 @@ inference from project age, row presence, or feature timing is allowed.
 | T2c-iv-a | Retire the legacy SubtitleJob payload contract | development | 40 / M Moderate | Contract cutover implemented 2026-08-13 (two-file `jobs` scope; Gemma phase-2 PASS); worker producer cutover closed via T2c-iv-b 2026-08-15; runtime integration remains sequenced in T2c-vi-a. Workspace-compile compatibility patch added 2026-08-15 in `subtitle_enqueue.rs`/`subtitle_runtime.rs` to keep `cargo check --workspace` green; the `subtitle_runtime.rs` half is still not a substitute for T2c-vi-a's own closure (see T2c-iv-a ledger entry). |
 | T2c-iv-b | Cut subtitle producer over to the single contract | development | 32 / M Moderate | Done 2026-08-15; zero-diff formal closure of the 2026-08-15 compat patch — local-first `qwen3.6:35b-a3b` run confirmed no further edit needed, real-Postgres test run (5/5 passed), Gemma phase-1/phase-2 review (phase-2: FINDINGS-ACKED, 1 pre-existing out-of-scope minor finding). |
 | T2c-iv-c | Durable localization fan-out service | development | 39 / M Moderate (corrected from provisional 49/L Med-high) | Done 2026-08-16; whole-task local-agent route (`qwen3.6:35b-a3b`) exhausted its 2-attempt repair budget (missing module registration/import path; stub degradation under real-error pressure; `budget_exhausted`). Per an owner directive to maximize local-model usage and keep the cloud role orchestration-only, the remainder was decomposed into three Low-band (RRI 0-25) subtasks delegated to local Nemotron via `scripts/delegate-low-rri.py`, with a small number of individually-diagnosed one/two-line type fixes applied directly only when the before-after delegation tooling itself (not the model) failed to produce a usable diff. Real-Postgres HP-1/EC-1 tests 2/2 passed, full crate 57/57 no regressions, Gemma phase-2 PASS with 0 findings. See `docs/tasks/s-150-translation-dubbing.md` for full evidence. |
-| T2c-v | Redis translation queue adapter | development | 50 / L Med-high | Depends on T2c-i/iii/iv-c (now done); reopened for the S-230 POC (2026-08-16, second pass) as `S-230-T3b` child 1 — but still separately parked pending its own unresolved Redis-topic decision; confirm that with the owner before resuming. |
+| T2c-v | Redis translation queue adapter | development | 41 / L Med-high (rerun 2026-08-23; supersedes prior 50 estimate) | Done 2026-08-23; ADR-038 cloud takeover (`claude-sonnet-5`/high, ADR-039 human-select), Gemma phase-1/phase-2 PASS, 3 Reflection passes, 27/27 tests (19 deterministic + 8 live-Redis), coverage improved 59.28% -> 66.32% on `lib.rs`. Full record: `docs/tasks/s-150-translation-dubbing.md` § S-150-T2c-v. |
 | T2c-vi | Runtime cutover and legacy review retirement | development parent | Complex surface | Decomposed into T2c-vi-a/b; not executable. |
 | T2c-vi-a | Integrate localization fan-out into subtitle runtime | development | provisional 51 / L Med-high | Depends on T2c-iv-c/v; approval pending. |
 | T2c-vi-b | Delete dead legacy review module and sync S-140 BDD | development/docs | provisional 31 / M Moderate | Depends on T2c-vi-a; approval pending. |

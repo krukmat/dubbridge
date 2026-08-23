@@ -22,11 +22,10 @@ ledger.
   recommendation against it (`docs/plan/s-230-poc-v1-digitalocean.md` § "The
   market-audience gap, examined"). TTS/dubbed audio (`S-150-T4` through `T7`)
   remains out of scope and blocked on ADR-028; it is not reopened by any task
-  here. `S-150-T2c-v` also carries its own separate, still-unresolved
-  "Redis-topic decision" parking note (`docs/plan/s-150-translation-dubbing.md`
-  line 31) — this scope amendment authorizes presenting/implementing the chain
-  under S-230, it does not itself resolve that separate parking condition;
-  confirm it with the owner before `S-230-T3b`'s first child task starts.
+  here. `S-150-T2c-v` carried its own separate "Redis-topic decision" parking
+  note (`docs/plan/s-150-translation-dubbing.md` line 31), resolved by the
+  owner 2026-08-21 (`docs/audit/s-150-t2c-v-redis-topic-decision.md`); the
+  task itself is done as of 2026-08-23.
 - No new application technology. PostgreSQL, Redis, S3-compatible storage,
   ffmpeg, and Python/faster-whisper are all pre-existing dependencies.
 - Every RRI must be computed with `scripts/rri.py` before the task is presented;
@@ -1186,7 +1185,7 @@ approval does not pre-approve them):**
 
 | Order | Task ID | What it does | RRI | Band |
 |---|---|---|---|---|
-| 1 | `S-150-T2c-v` | Redis translation-queue adapter | 50 | Med-high |
+| 1 | `S-150-T2c-v` | Redis translation-queue adapter | ~~50~~ 41 (rerun) | Med-high — **Done 2026-08-23** |
 | 2 | `S-150-T2c-vi-a` | Wire `fan_out_localization` into the subtitle runtime, replacing `prepare_review_post_ready` | 51 | Med-high |
 | 3 | `S-150-T2c-vi-b` | Delete the dead legacy review module, sync S-140 BDD | 31 | Moderate |
 | 4 | `S-150-T3a` | Typed translation provider/subprocess contract | 42 | Med-high |
@@ -1204,12 +1203,19 @@ owner verification — this parent adds no exemption from any of that.
 scope for S-230. This chain produces translated subtitle text only. Do not
 implement T4/T5/T6/T7 under this task or this slice.
 
-**Blocking precondition not resolved by this amendment:** `S-150-T2c-v`
-carries its own, separate "parked pending a Redis-topic decision" note
-(`docs/plan/s-150-translation-dubbing.md:31`, `:322`) that predates and is
-independent of the S-230 scope freeze. This task authorizes presenting and
-implementing the chain under S-230; it does not itself reopen that Redis-topic
-decision. Confirm that separately with the owner before starting child 1.
+**Blocking precondition — resolved 2026-08-21:** `S-150-T2c-v` carried its
+own, separate "parked pending a Redis-topic decision" note
+(`docs/plan/s-150-translation-dubbing.md:31`, `:333`) that predated and was
+independent of the S-230 scope freeze. Owner-confirmed resolution: single
+flat `apalis-redis` namespace, mirroring the three existing
+`define_redis_job_queue!` queues exactly, using the already-committed
+`TranslationJob::JOB_TYPE = "translation_generation"`
+(`crates/jobs/src/subtitle_job.rs:50`) — no per-target-language
+partitioning, no pub/sub. Full option analysis:
+`docs/audit/s-150-t2c-v-redis-topic-decision.md`. Child 1 (`S-150-T2c-v`) is
+**done** (2026-08-23; full closure record at
+`docs/tasks/s-150-translation-dubbing.md` § S-150-T2c-v). Child 2
+(`S-150-T2c-vi-a`) is next.
 
 **Happy paths considered:**
 
@@ -1305,7 +1311,7 @@ define, not this task's.
 
 ```mermaid
 flowchart TD
-    T2CV["1 . S-150-T2c-v<br/>Redis adapter . RRI 50"] --> T2CVIA["2 . S-150-T2c-vi-a<br/>Runtime fan-out . RRI 51"]
+    T2CV["1 . S-150-T2c-v<br/>Redis adapter . RRI 41 . DONE"] --> T2CVIA["2 . S-150-T2c-vi-a<br/>Runtime fan-out . RRI 51"]
     T2CVIA --> T2CVIB["3 . S-150-T2c-vi-b<br/>Cleanup + BDD sync . RRI 31"]
     T2CVIB --> T3A["4 . S-150-T3a<br/>Provider contract . RRI 42"]
     T3A --> T3Bc["5 . S-150-T3b<br/>Python worker . RRI 44"]

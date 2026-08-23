@@ -2938,19 +2938,25 @@ same local Postgres instance.
 ## S-150-T2c-v: Redis translation queue adapter
 
 **Type:** development
-**Effort:** L (RRI 50 — Med-high)
+**Effort:** L (RRI 41 — Med-high, rerun 2026-08-23; supersedes the prior 50 estimate)
 **Decomposed from:** S-150-T2c
 **Depends on:** S-150-T2c-i, S-150-T2c-iii, S-150-T2c-iv-c
-**Status:** [ ] Planned — approval pending
+**Status:** [x] Done (2026-08-23)
+**RRI:** 41
 
 > **S-230 tracking note (2026-08-16, second-pass scope amendment):** this task
 > is child 1 of `S-230-T3b` (`docs/tasks/s-230-poc-v1-digitalocean.md`), which
 > reopened `T2c-v` through `T3c` for the S-230 POC. This task keeps its own
 > full RRI/approval/review/closure requirements unchanged — `S-230-T3b`'s
-> approval does not pre-approve it. It also keeps its own separate,
-> unresolved "Redis-topic decision" parking note (see the plan/ledger status
-> headers above) — confirm that with the owner before starting, independent
-> of the S-230 scope question.
+> approval does not pre-approve it. Its separate "Redis-topic decision"
+> parking note is **resolved** (2026-08-21, owner-confirmed): single flat
+> `apalis-redis` namespace via the already-committed
+> `TranslationJob::JOB_TYPE = "translation_generation"`
+> (`crates/jobs/src/subtitle_job.rs:50`), mirroring the existing
+> `RedisPreparationJobQueue`/`RedisTranscriptionJobQueue`/
+> `RedisSubtitleJobQueue` pattern exactly — no per-target-language
+> partitioning, no pub/sub. Full analysis:
+> `docs/audit/s-150-t2c-v-redis-topic-decision.md`.
 
 **RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
 
@@ -2978,6 +2984,160 @@ evidence, Reflection log, unit coverage certification, and owner verification.
 **Status artifacts affected:** This ledger and the S-150 plan.
 
 **Stop condition:** Stop after adapter tests. Do not alter runtime topology.
+
+**RRI rerun (2026-08-23):** `python3 scripts/rri.py --touches crates/jobs/src/lib.rs
+--touches apps/worker-runner/src/translation_enqueue.rs --cc 6 --D 3 --K 3 --P 2
+--T 2 --A 2 --X 2` -> **RRI 41 -> Med-high**, superseding the prior 50 estimate
+in `docs/audit/s-150-t2c-decomposition-rri.md`. No penalties.
+
+**Files actually changed:** `crates/jobs/src/lib.rs` only (+120 lines: one
+`define_redis_job_queue!(RedisTranslationJobQueue, TranslationJob,
+TranslationJobQueue)` invocation plus 5 dedicated tests). No change to
+`apps/worker-runner/src/translation_enqueue.rs` -- that path from the original
+task estimate does not exist and there is no live wiring point for it yet:
+`apps/worker-runner/src/translation_fanout.rs::fan_out_localization` already
+returns `Vec<TranslationJob>` but stays `#[allow(dead_code)]`, explicitly
+deferred to `S-150-T2c-vi-a` by its own doc comment. Registering a consumer
+worker or wiring the fan-out into this queue is out of scope per this task's
+stop condition ("Do not yet alter... register provider execution").
+
+### Implementation routing evidence (ADR-038)
+
+- Muse Glimmer advisory refinement: `GO_LOCAL` --
+  `docs/audit/adr038-refinement-S-150-T2c-v.json` (profile
+  `med-high-refinement-v1`, model `muse-glimmer:30b-q4_K_M`, digest-verified).
+- Primary hash-bound route receipt: `CLOUD_REQUIRED` (downgraded from
+  `GO_LOCAL`, per ADR-038's "may only downgrade, never upgrade" rule --
+  Med-high has no whole-task local repair budget) -- `.agent/primary-receipt-
+  S-150-T2c-v.json`.
+- Gate result: `scripts/local-agent/med_high_gate.py` -> `CLOUD_REQUIRED`,
+  reason "Primary receipt downgraded GO_LOCAL to cloud."
+- Cloud evidence bundle: `docs/audit/adr038-cloud-bundle-S-150-T2c-v.json`.
+- Fallback selection (ADR-039): `human-select`, resolved via `AskUserQuestion`
+  -- model `claude-sonnet-5`, reasoning effort `high`, selected by "user
+  (2026-08-23, AskUserQuestion)" -- receipt at
+  `docs/audit/adr038-cloud-bundle-S-150-T2c-v.fallback-selection.json`.
+- Cloud implementer: Claude Code (`claude-sonnet-5`, thinking on), acting as
+  the authorized cloud takeover per the fallback-selection receipt above.
+
+### Peer Reviewer evidence -- Phase 1 (task-analysis review)
+
+- Reviewer: `gemma` (`gemma4:26b-a4b-it-qat`)
+- Command: manual `/api/chat` invocation (`num_ctx=65536`, `think=false`,
+  `temperature=0`), packet built from the task's existing pattern + planned
+  change + acceptance criteria
+- Artifact: `docs/audit/gemma-evidence/S-150-T2c-v-phase1.json`
+  (`done_reason: stop`)
+- Verdict: **PASS**
+- Findings: 3 LOW (mirroring pattern correctly reuses
+  `REDIS_CONNECT_TIMEOUT`/`QueueError::Unavailable`; no partitioning required,
+  scope creep avoided; recommended verifying `TranslationJob`
+  serde round-trip -- already covered by the pre-existing
+  `translation_job_serializes_the_full_durable_identity` test)
+- Muse Glimmer fallback: not triggered -- reason: Gemma responded with a
+  usable PASS on first attempt
+- D14 fallback: not triggered -- reason: n/a
+- D14 provider route: n/a
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted all 3 findings as confirmatory; no
+  action needed (serde round-trip already independently verified)
+
+### Peer Reviewer evidence -- Phase 2 (code-solution review)
+
+- Reviewer: `gemma` (`gemma4:26b-a4b-it-qat`)
+- Command: manual `/api/chat` invocation (`num_ctx=65536`, `think=false`,
+  `temperature=0`), packet built from the full diff + independently-verified
+  test/clippy/fmt/coverage output
+- Artifact: `docs/audit/gemma-evidence/S-150-T2c-v-phase2.json`
+  (`done_reason: stop`)
+- Verdict: **PASS**
+- Findings: 1 INFO (confirms HP-1 is satisfied by
+  `redis_translation_enqueued_job_is_retrievable_from_its_namespace`)
+- Muse Glimmer fallback: not triggered -- reason: Gemma responded with a
+  usable PASS on first attempt
+- D14 fallback: not triggered -- reason: n/a
+- D14 provider route: n/a
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted; no action needed
+
+`Task-analysis review: gemma docs/audit/gemma-evidence/S-150-T2c-v-phase1.json - PASS`
+`Code-solution review: gemma docs/audit/gemma-evidence/S-150-T2c-v-phase2.json - PASS`
+
+### Reflection log
+
+Required passes: 3 (`RRI 41` -> `Med-high`)
+
+#### Pass 1 -- contract
+
+- **Draft verdict:** `RedisTranslationJobQueue` added via the exact
+  `define_redis_job_queue!` macro invocation, mirroring the three existing
+  queues byte-for-byte in pattern. Only `crates/jobs/src/lib.rs` touched
+  (+120 lines).
+- **Critique findings:** the task's "Files expected to change" names
+  `apps/worker-runner/src/translation_enqueue.rs`, which does not exist and
+  was not created -- `fan_out_localization` already exists unwired, deferred
+  to `T2c-vi-a`, so there is genuinely nothing to enqueue into yet. HP-1/EC-1
+  are covered only by `DUBBRIDGE_REDIS_URL`-gated ignored tests, consistent
+  with the existing 3 queues but worth flagging since they don't run under
+  plain `cargo test`.
+- **Revisions applied:** none -- the file-path mismatch is pre-existing
+  task-definition staleness, not an implementation defect; documented here
+  rather than inventing unrequested wiring that would violate the task's
+  explicit stop condition.
+
+#### Pass 2 -- failure boundaries
+
+- **Draft verdict:** rerun of the 8 ignored tests against live Redis
+  (post-`cargo fmt`) confirms no regression from the reformat.
+- **Critique findings:** connect-time failure boundaries are already covered
+  generically (`redis_queue_fails_closed_on_malformed_url`,
+  `redis_queue_fails_closed_on_unreachable_server`) since the macro is fully
+  generic across job types; added a translation-specific unreachable-server
+  test (`redis_translation_queue_fails_closed_on_unreachable_server`) for
+  EC-1 directness. Post-connection `enqueue_with_id` failure path maps to
+  the same `QueueError::Unavailable` uniformly (shared macro code, already
+  exercised by the other 3 job types). `TranslationJob`'s extra fields
+  (`target_language_id`, `source_subtitle_artifact_id`,
+  `generation_request_id`) already have independent serde coverage via
+  `translation_job_serializes_the_full_durable_identity`.
+- **Revisions applied:** none required -- failure boundaries fully covered.
+
+#### Pass 3 -- coverage
+
+- **Draft verdict:** 27/27 tests pass (19 deterministic + 8 live-Redis).
+  `lib.rs` line coverage moved from 59.28% (baseline, stashed diff) to
+  66.32% (with this diff) -- an improvement, not a regression.
+- **Critique findings:** the file's aggregate 90% gate shortfall is
+  pre-existing scope from the other 3 already-shipped queues, not introduced
+  or worsened by this change; this task's own added code (macro invocation +
+  5 dedicated tests) is fully exercised by the passing live-Redis run.
+- **Revisions applied:** none required.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | durable eligible dispatch enqueued to `translation_generation` namespace, acknowledged by exact identity (round-trip + namespace isolation + basic connect/enqueue: `crates/jobs/src/lib.rs::tests::redis_translation_enqueued_job_is_retrievable_from_its_namespace`, `crates/jobs/src/lib.rs::tests::redis_translation_queue_uses_a_distinct_namespace_from_subtitle`, `crates/jobs/src/lib.rs::tests::redis_translation_queue_connects_and_enqueues`) | `crates/jobs/src/lib.rs::tests::redis_translation_enqueued_job_is_retrievable_from_its_namespace` | passed |
+| EC-1 | Edge case | Redis connect failure surfaces as `QueueError::Unavailable`, fail-closed, no provider execution starts | `crates/jobs/src/lib.rs::tests::redis_translation_queue_fails_closed_on_unreachable_server` | passed |
+
+Commands run:
+`cargo test -p dubbridge-jobs` (19 passed, 0 failed, 8 ignored) and
+`DUBBRIDGE_REDIS_URL=redis://127.0.0.1:6379 cargo test -p dubbridge-jobs -- --ignored --test-threads=1`
+(8 passed, 0 failed) against the local `local-redis-1` container
+(`infra/local/docker-compose.yml`).
+
+- Review artifact: docs/audit/gemma-evidence/S-150-T2c-v.json
+
+### Owner final verification
+
+- Owner: matias (kruk.matias@gmail.com)
+- Date: 2026-08-23
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
+- Commands run: cargo check --workspace; cargo fmt -p dubbridge-jobs -- --check; cargo clippy -p dubbridge-jobs --all-features -- -D warnings; cargo test -p dubbridge-jobs; DUBBRIDGE_REDIS_URL=redis://127.0.0.1:6379 cargo test -p dubbridge-jobs -- --ignored --test-threads=1; DUBBRIDGE_REDIS_URL=redis://127.0.0.1:6379 cargo llvm-cov -p dubbridge-jobs -- --include-ignored --test-threads=1
+
+I also approved the Redis-topic decision resolution
+(`docs/audit/s-150-t2c-v-redis-topic-decision.md`) and the fallback-selection
+cloud implementer/effort (`claude-sonnet-5`/`high`) via `AskUserQuestion`.
 
 ---
 

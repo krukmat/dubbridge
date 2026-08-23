@@ -1,0 +1,104 @@
+{
+  "error": null,
+  "finished_at": "2026-08-23T16:21:20.499676Z",
+  "generation": {
+    "created_at": "2026-08-23T16:21:20.480882Z",
+    "done": true,
+    "eval_count": 683,
+    "eval_duration": 89016401000,
+    "load_duration": 5605567958,
+    "prompt_eval_count": 1309,
+    "prompt_eval_duration": 7821286000,
+    "think_disabled": true,
+    "thinking_present": false,
+    "thinking_sha256": null,
+    "total_duration": 102464373750
+  },
+  "model": {
+    "expected_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "resolved_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "tag": "muse-glimmer:30b-q4_K_M"
+  },
+  "packet": {
+    "expected_sha256": "035ba2df25c3641afb41f52d0ad90533793c4f137ea00b598562a70e2daadcc2",
+    "path": ".agent/adr038-packet-S-150-T2c-v.json",
+    "sha256": "035ba2df25c3641afb41f52d0ad90533793c4f137ea00b598562a70e2daadcc2"
+  },
+  "profile": "med-high-refinement-v1",
+  "prompt": {
+    "profile": "med-high-refinement-v1",
+    "sha256": "2338e80a6fd54d45f4ed814e1ab96cb10b564a01981c7972756f9c2e53ad848a",
+    "version": "med-high-refinement-prompt-v1"
+  },
+  "response": {
+    "raw_text_sha256": "257306792d430690d784dc460280b2140588ce241bd179ea00ae1808928e465f",
+    "validated": {
+      "acceptance_tests": [
+        "HP-1 enqueue to translation_generation namespace with task id round-trip.",
+        "EC-1 Redis unreachable surfaces QueueError::Unavailable, records enqueue_failed, no provider start."
+      ],
+      "claims": [
+        {
+          "label": "SUPPORTED",
+          "statement": "Phase1 review verdict is PASS"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Redis topic decision resolved 2026-08-21"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Allowed paths are crates/jobs/src/lib.rs and apps/worker-runner/src/translation_enqueue.rs"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "TranslationJob already defines JOB_TYPE = translation_generation"
+        }
+      ],
+      "excluded_scope": [
+        "Subtitle runtime changes",
+        "Provider execution or subprocess invocation",
+        "Per-target-language namespace partitioning",
+        "Pub/sub transport",
+        "S-150 review row changes"
+      ],
+      "implementation_steps": [
+        "Insert macro invocation for TranslationJob in crates/jobs/src/lib.rs.",
+        "Update translation_enqueue.rs to construct and use RedisTranslationJobQueue with REDIS_CONNECT_TIMEOUT.",
+        "Add unit/integration tests verifying task id round-trip and QueueError::Unavailable on Redis unreachable.",
+        "Ensure namespace is translation_generation and JOB_TYPE constant is used."
+      ],
+      "refined_scope": [
+        "Add define_redis_job_queue!(RedisTranslationJobQueue, TranslationJob, TranslationJobQueue) in crates/jobs/src/lib.rs after existing invocations.",
+        "Wire RedisTranslationJobQueue in apps/worker-runner/src/translation_enqueue.rs analogously to other queues.",
+        "Add focused tests for HP-1 enqueue round-trip and EC-1 enqueue failure handling."
+      ],
+      "risks": [
+        "Macro drift if pattern changes in lib.rs.",
+        "Redis connectivity assumptions differ from existing jobs."
+      ],
+      "route_recommendation": "GO_LOCAL",
+      "stop_conditions": [
+        "Change touches files outside allowed_paths.",
+        "Scope expands to partitioning or pub/sub.",
+        "Acceptance criteria cannot be verified with bounded tests."
+      ],
+      "summary": "Scope is bounded to two files and mirrors existing define_redis_job_queue pattern. Phase1 review passed and Redis topic decision is resolved.",
+      "unknowns": [
+        "Exact wiring details in translation_enqueue.rs not provided in packet.",
+        "Test harness availability for Redis failure simulation."
+      ]
+    }
+  },
+  "runtime": {
+    "num_ctx": 65536,
+    "num_predict": 4096,
+    "ollama_url": "http://127.0.0.1:11434",
+    "temperature": 0.0,
+    "timeout_seconds": 300.0
+  },
+  "schema_version": "adr037-local-architect-artifact-v1",
+  "started_at": "2026-08-23T16:19:38.002382Z",
+  "status": "ok",
+  "success": true
+}

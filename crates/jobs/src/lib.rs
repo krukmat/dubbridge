@@ -226,6 +226,11 @@ define_redis_job_queue!(
     TranscriptionJobQueue
 );
 define_redis_job_queue!(RedisSubtitleJobQueue, SubtitleJob, SubtitleJobQueue);
+define_redis_job_queue!(
+    RedisTranslationJobQueue,
+    TranslationJob,
+    TranslationJobQueue
+);
 
 pub fn default_queue() -> &'static str {
     "dubbridge.default"
@@ -357,6 +362,23 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires DUBBRIDGE_REDIS_URL; run explicitly via qa-test-redis"]
+    async fn redis_translation_queue_connects_and_enqueues() {
+        let url = redis_url_for_test();
+        let queue = RedisTranslationJobQueue::connect(&url)
+            .await
+            .expect("redis connect");
+        let job = TranslationJob::new(
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+        );
+        assert!(queue.enqueue(job).await.is_ok());
+    }
+
+    #[tokio::test]
     async fn redis_queue_fails_closed_on_malformed_url() {
         // Deterministic and infra-free: a URL with no redis:// scheme cannot
         // even be parsed into connection info, so connect must reject it.
@@ -377,6 +399,27 @@ mod tests {
         let outcome = tokio::time::timeout(
             REDIS_CONNECT_TIMEOUT + Duration::from_secs(10),
             RedisPreparationJobQueue::connect("redis://127.0.0.1:1"),
+        )
+        .await
+        .expect("connect to an unreachable server hung past its own timeout");
+
+        assert!(
+            matches!(outcome, Err(QueueError::Unavailable(_))),
+            "expected QueueError::Unavailable for an unreachable server"
+        );
+    }
+
+    #[tokio::test]
+    async fn redis_translation_queue_fails_closed_on_unreachable_server() {
+        use std::time::Duration;
+
+        // EC-1: an enqueue-time Redis failure must surface as
+        // QueueError::Unavailable rather than hang or panic, so the caller
+        // (translation dispatch persistence) can record only that dispatch's
+        // enqueue_failed state without ever starting provider execution.
+        let outcome = tokio::time::timeout(
+            REDIS_CONNECT_TIMEOUT + Duration::from_secs(10),
+            RedisTranslationJobQueue::connect("redis://127.0.0.1:1"),
         )
         .await
         .expect("connect to an unreachable server hung past its own timeout");
@@ -443,6 +486,83 @@ mod tests {
         assert!(
             cross.is_err(),
             "preparation job leaked into the subtitle namespace"
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DUBBRIDGE_REDIS_URL; run explicitly via qa-test-redis"]
+    async fn redis_translation_enqueued_job_is_retrievable_from_its_namespace() {
+        use apalis::prelude::Storage;
+
+        // HP-1: a durable eligible dispatch is enqueued to the dedicated
+        // translation namespace and then acknowledged with its exact
+        // identity -- proven here by round-tripping the task id back out of
+        // an independent connection into the same translation_generation
+        // namespace, exactly as a consuming apalis worker would.
+        let url = redis_url_for_test();
+
+        let queue = RedisTranslationJobQueue::connect(&url)
+            .await
+            .expect("translation connect");
+        let job = TranslationJob::new(
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+        );
+        let task_id = queue.enqueue_with_id(job.clone()).await.expect("enqueue");
+
+        let conn = apalis_redis::connect(url.as_str())
+            .await
+            .expect("probe connect");
+        let config = apalis_redis::Config::default().set_namespace(TranslationJob::JOB_TYPE);
+        let mut probe: apalis_redis::RedisStorage<TranslationJob> =
+            apalis_redis::RedisStorage::new_with_config(conn, config);
+
+        let fetched = probe.fetch_by_id(&task_id).await.expect("fetch");
+        let fetched = fetched.expect("job present in its own namespace");
+        assert_eq!(fetched.args, job);
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DUBBRIDGE_REDIS_URL; run explicitly via qa-test-redis"]
+    async fn redis_translation_queue_uses_a_distinct_namespace_from_subtitle() {
+        use apalis::prelude::Storage;
+
+        assert_ne!(TranslationJob::JOB_TYPE, SubtitleJob::JOB_TYPE);
+        assert_ne!(TranslationJob::JOB_TYPE, PreparationJob::JOB_TYPE);
+        assert_ne!(TranslationJob::JOB_TYPE, TranscriptionJob::JOB_TYPE);
+
+        let url = redis_url_for_test();
+
+        let translation_queue = RedisTranslationJobQueue::connect(&url)
+            .await
+            .expect("translation connect");
+        let job = TranslationJob::new(
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+        );
+        let task_id = translation_queue
+            .enqueue_with_id(job)
+            .await
+            .expect("enqueue");
+
+        // The subtitle namespace must not see the translation job.
+        let conn = apalis_redis::connect(url.as_str())
+            .await
+            .expect("probe connect");
+        let config = apalis_redis::Config::default().set_namespace(SubtitleJob::JOB_TYPE);
+        let mut other: apalis_redis::RedisStorage<SubtitleJob> =
+            apalis_redis::RedisStorage::new_with_config(conn, config);
+
+        let cross = other.fetch_by_id(&task_id).await;
+        assert!(
+            cross.is_err(),
+            "translation job leaked into the subtitle namespace"
         );
     }
 }

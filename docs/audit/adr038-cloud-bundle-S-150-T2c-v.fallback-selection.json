@@ -1,0 +1,30 @@
+{
+  "authorization_receipt": {
+    "authorized_at": "2026-08-23T16:21:38.898547Z",
+    "packet_sha256": "d6a0350c1118d322db418aef6d00c206a3ff9b233d70b24d4cfc0c338813ac9e",
+    "phase": "implementation",
+    "receipt_sha256": "78002fc1c038bfaa1a2b68413afe9b6f605352cd00648434a2727fbd16737c4b",
+    "role": "cloud-implementer",
+    "schema_version": "fallback-selection-v1",
+    "selected_by": "user (2026-08-23, AskUserQuestion)",
+    "selected_model": "claude-sonnet-5",
+    "selected_reasoning_effort": "high",
+    "selection_mode": "human-select",
+    "task_id": "S-150-T2c-v"
+  },
+  "packet_sha256": "d6a0350c1118d322db418aef6d00c206a3ff9b233d70b24d4cfc0c338813ac9e",
+  "phase": "implementation",
+  "recommended_model": "gpt-5.6-sol",
+  "recommended_reasoning_effort": "high",
+  "role": "cloud-implementer",
+  "rri": 41,
+  "schema_version": "fallback-selection-v1",
+  "selected_by": "user (2026-08-23, AskUserQuestion)",
+  "selected_model": "claude-sonnet-5",
+  "selected_reasoning_effort": "high",
+  "selection_mode": "human-select",
+  "status": "fallback_authorized",
+  "task_id": "S-150-T2c-v",
+  "trigger": "cloud_required",
+  "trigger_kind": "capability-risk"
+}
