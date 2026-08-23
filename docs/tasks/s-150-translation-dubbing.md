@@ -3392,12 +3392,18 @@ Required passes: 3 (`47` → `Med-high`)
 ## S-150-T2c-vi-b: Delete the dead legacy review module and sync S-140 BDD
 
 **Type:** development/docs synchronization
-**Effort:** M (provisional RRI 31 — Moderate; recompute before presentation)
+**Effort:** M (RRI 31 — Moderate, reconfirmed live via `scripts/rri.py` at
+presentation time, identical to the provisional decomposition score)
 **Decomposed from:** S-150-T2c-vi
 **Depends on:** S-150-T2c-vi-a
-**Status:** [ ] Planned — approval pending
+**Status:** [x] Done (2026-08-23)
+**RRI:** 31
 
-**RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md`
+**RRI evidence:** `docs/audit/s-150-t2c-decomposition-rri.md` (row `T2c-vi-b`);
+reconfirmed live: `python3 scripts/rri.py --platform dubbridge --touches
+apps/worker-runner/src/review_enqueue.rs --touches apps/worker-runner/src/main.rs
+--touches docs/bdd/README.md --touches docs/bdd/s-140-subtitle-generation.feature
+--cc 2 --T 2 --A 1 --X 1 --D 2 --K 2 --P 3` → Final RRI 31 → Moderate.
 
 **Happy paths considered:**
 
@@ -3427,6 +3433,197 @@ verification.
 plan/task ledger, and canonical BDD mapping.
 
 **Stop condition:** Stop after docs/status synchronization. Do not start T3a.
+
+### Scope note: S-140 task/plan ledgers left unchanged
+
+`docs/tasks/s-140-subtitle-generation.md` and `docs/plan/s-140-subtitle-generation.md`
+were checked for materially stale `review_enqueue`/`prepare_review_post_ready`
+wording. Every occurrence in the task ledger is a dated historical closure record
+for already-completed, already-merged work (T5a's implementation evidence, T5b-a's
+files-changed list) — legitimate provenance, not an active/forward-looking claim
+about current runtime behavior. `docs/plan/s-140-subtitle-generation.md` has zero
+occurrences. Editing the historical closure records would corrupt the audit trail
+they exist to preserve, so neither file was touched. `docs/tasks/s-230-poc-v1-digitalocean.md`
+and `docs/plan/s-230-poc-v1-digitalocean.md` cite `review_enqueue.rs` for a separate,
+not-yet-started, droppable task (`S-230-T8`); that task's own rescoping against this
+outcome is deferred to whoever picks it up, per this task's own out-of-scope boundary
+(Gemma phase-1 review confirmed this scope, see Peer Reviewer evidence below).
+
+### Implementation routing evidence
+
+- Local-first attempt (Moderate band, `scripts/local-agent/run_local_task.py`,
+  `qwen3.8:27b-mlx`, disposable worktree `.agent/worktrees/s-150-t2c-vi-b-local`):
+  **2/2 repair attempts exhausted**, both `status: aborted`, `reason:
+  malformed_tool_call_repeated`.
+  - Attempt 1 (`.agent/local-run-S-150-T2c-vi-b.json`): the model repeatedly
+    emitted `\'` (backslash-escaped single quote) inside JSON string content —
+    invalid JSON escape syntax — when reproducing an anchor/replacement
+    containing the apostrophe in "this task's scope" (from the `main.rs`
+    comment being deleted). Root cause was the task-card spec text itself
+    supplying an apostrophe-containing anchor to `apply_patch`.
+  - Attempt 2, after revising the card to instruct `write_file` with the full
+    `main.rs` content and explicit apostrophe-avoidance guidance
+    (`.agent/local-run-S-150-T2c-vi-b-attempt2.json`): still aborted — one
+    turn prefaced JSON with prose ("I'll start by..."), and two `write_file`
+    turns truncated/malformed mid-generation around char ~12,600 of the
+    escaped-JSON `main.rs` reproduction; one turn also reverted to
+    `apply_patch` with the same apostrophe anchor despite the instruction to
+    avoid it. The worktree stayed clean (`git status --short` empty) after
+    both aborts — the boundary held, no partial/corrupt writes escaped.
+  - Both packet revisions received their own phase-1-equivalent scrutiny
+    (the underlying task scope was already Gemma-phase-1-PASSed; the second
+    packet's apostrophe-avoidance fix was a card-text correction, not a
+    re-scoping, so no new phase-1 pass was triggered — consistent with
+    `AGENT_WORKFLOW_GUIDE.md § Per-task discipline`, which requires a new
+    phase-1 pass only for a materially revised interface contract/criterion,
+    not a delegation-packet wording fix for a tooling escaping defect).
+- Per `AGENT_WORKFLOW_GUIDE.md § Post-repair-budget Low-band decomposition`
+  and `HITL_AUTONOMY_POLICY.md` (same section): on 2/2 exhaustion, decomposed
+  the remaining work into scored Low-band (RRI 0–25) subtasks via
+  `scripts/delegate-low-rri.py`, orchestrator-only authorship (diagnose,
+  split, dispatch, review, assemble — no direct substantive authorship):
+  - **Low-1** (`main.rs` mod-line + comment deletion): RRI 16 (`--cc 1 --T 1
+    --A 1 --X 1 --D 1 --K 1 --P 2`) — dispatched via `delegate-low-rri.py
+    --mode before-after` with a small, apostrophe-free 5-line anchor (the
+    lesson from both local-agent aborts). Applied cleanly on the first
+    attempt (`.../scratchpad/low1-result.json`); left one stray blank line,
+    which the orchestrator removed directly under the **mechanical
+    lint-driven refactor** exception (whitespace-only tidy of an
+    already-verified-correct deletion, no behavior change).
+  - `review_enqueue.rs` deletion: not delegated — a `git rm` of a file whose
+    content is untouched by the task (the acceptance criterion is "delete
+    the file," not "author a change to it") is a mechanical repo operation,
+    not code authorship requiring model delegation.
+  - The two BDD doc edits (`docs/bdd/README.md` row, `docs/bdd/s-140-subtitle-generation.feature`
+    scenario) were authored directly by the orchestrator rather than
+    delegated: RRI 18 (`--cc 1 --T 1 --A 1 --X 1 --D 1 --K 1 --P 2`), a
+    Markdown/Gherkin wording change requiring exact new-content precision
+    (specific test-name citations already independently verified against
+    the real source, specific new-row format) with negligible mechanical
+    risk and no code-authorship judgment call — the task's own phase-1
+    Gemma review had already confirmed the intended replacement wording's
+    shape. This is a bounded, explicitly recorded direct-edit deviation from
+    the decomposition route's own preference for delegation; it does not
+    change RRI, band, reviewer, or Reflection count, and every resulting
+    line was independently verified against phase-2 Gemma review below (0
+    findings) plus `make qa-docs` (pass) and `git diff` inspection.
+- No cloud escalation was needed — the Low-band decomposition route
+  succeeded for all four remaining units of work.
+
+### Reflection log
+
+Required passes: 2 (`31` → `Moderate`)
+
+#### Pass 1 — contract
+
+- **Draft verdict:** `review_enqueue.rs` deleted; `main.rs` mod registration
+  and comment removed; `docs/bdd/README.md` row `S140_HP2` retargeted to
+  fan-out with real, verified test-name citations, plus new row `S140_EC3`
+  for the enqueue-failure-isolation behavior; `docs/bdd/s-140-subtitle-generation.feature`
+  Feature description and `S140_HP2` scenario reworded to fan-out, `EC1`/`EC2`
+  left untouched.
+- **Critique findings:** HP-1 confirmed — BDD now describes readiness →
+  fan-out with executable mappings to `subtitle_runtime_tests.rs::process_subtitle_job_marks_ready_and_stores_artifact_on_success`
+  and `runner_topology_tests.rs::redis_monitor_wires_preparation_transcription_and_subtitle_workers`,
+  both real, currently-passing tests (verified by name against the actual
+  test source before citing them, not assumed). EC-1 confirmed — `grep -rn
+  review_enqueue` across `.rs`/`.md`/`.feature` files after the change
+  returns only the confirmed-benign docstring analogy in
+  `subtitle_enqueue.rs:410-411` (already reviewed and accepted by Gemma
+  phase-1); no module, test, task, or active plan statement claims a
+  null-bound legacy review row is created.
+- **Revisions applied:** none — both cases satisfied on the first
+  implementation pass.
+
+#### Pass 2 — coverage and regression check
+
+- **Draft verdict:** ran the full `dubbridge-worker-runner` test suite
+  (not just the two directly-touched test files) to check for any caller
+  or reference the deletion might have broken elsewhere.
+- **Critique findings:** `cargo test -p dubbridge-worker-runner --all-targets`
+  — 53/53 pass, 0 regressions, including `translation_fanout_tests` (the
+  T2c-vi-a/T2c-iv-c fan-out logic this task's BDD wording now points to) and
+  the previously-flagged `redis_monitor_wires_preparation_transcription_and_subtitle_workers`
+  (confirmed already fixed by T2c-vi-a, not reopened by this deletion).
+  `cargo fmt --check` and `cargo clippy -- -D warnings` both clean. `make
+  qa-docs` (doc consistency, task-unit-coverage, roadmap-drift, OKF
+  frontmatter) all pass. The official `make qa-gemma-review` phase-2 run
+  (see Peer Reviewer evidence) raised 2 minor findings asking to confirm no
+  other crate/app depended on the deleted `review_enqueue` module — answered
+  with a whole-workspace `cargo check --workspace` (not just
+  `dubbridge-worker-runner`), which compiled clean.
+- **Revisions applied:** none — no regression found; both phase-2 findings
+  verified negative, no code change required.
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma` (`gemma4:26b-a4b-it-qat`, RRI 26–55 primary per
+  `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review`)
+- Phase 1 command: `DUBBRIDGE_REVIEW_MODEL=gemma4:26b-a4b-it-qat python3
+  scripts/gemma-code-review.py .../t2c-vi-b-phase1-packet.txt --passes 1
+  --task-id S-150-T2c-vi-b-phase1 --out docs/audit/gemma-evidence/S-150-T2c-vi-b-phase1.json`
+- Phase 1 artifact: `docs/audit/gemma-evidence/S-150-T2c-vi-b-phase1.json`
+- Phase 1 verdict: `PASS` (status coerced from "PASS with findings" to
+  `findings`; 1 minor/out-of-scope finding — `subtitle_enqueue.rs:411`
+  docstring analogy, no action required, confirmed above)
+- Phase 2 command (official, via the reusable Makefile target, run inside the
+  worktree against the real diff): `GEMMA_REVIEW_TASK_ID=S-150-T2c-vi-b
+  GEMMA_REVIEW_BASE=HEAD REVIEW_PATHS="apps/worker-runner/src/main.rs
+  docs/bdd/README.md docs/bdd/s-140-subtitle-generation.feature"
+  DUBBRIDGE_REVIEW_MODEL=gemma4:26b-a4b-it-qat make qa-gemma-review`
+- Phase 2 receipt (GEG-1 contract): `docs/audit/gemma-evidence/S-150-T2c-vi-b.json`
+  — `verdict: PASS`, `commit_sha: 0e76879e88b6f861cb644b3e2ad3cfc2673a83fa`
+  (reachable HEAD at review time)
+- Phase 2 raw result: `docs/audit/gemma-evidence/S-150-T2c-vi-b-official-result.json`
+  (3/3 passes succeeded, `status: findings`)
+- Findings (2, both minor, same underlying question, both about
+  `apps/worker-runner/src/main.rs:31-32`): "ensure no other module in the
+  crate relies on `review_enqueue` as a public dependency" (consensus) and
+  the pass-specific restatement of the same question. **Verified, not
+  assumed:** `grep -rn review_enqueue . --include='*.rs'` across the whole
+  repo returns only the confirmed-benign docstring analogy at
+  `subtitle_enqueue.rs:411` (already reviewed and accepted by Gemma
+  phase-1); `cargo check --workspace` (all crates/apps, not just
+  `dubbridge-worker-runner`) compiles clean with no unresolved-module or
+  missing-item errors. Both findings **accepted as valid questions,
+  answered negative** — no other module depended on it, confirmed by
+  reproducible commands, not by assertion.
+- An earlier, superseded phase-2 pass (`docs/audit/gemma-evidence/S-150-T2c-vi-b-phase2.json`)
+  was run by invoking `scripts/gemma-code-review.py` directly against a
+  manually-assembled packet rather than through `make qa-gemma-review`'s
+  real-diff path; it returned 0 findings and no GEG-1 receipt was emitted
+  for it. The official `make qa-gemma-review` run above is authoritative for
+  this task's phase-2 review-artifact receipt; the manual pass is retained
+  as an additional independent confirmation, not the artifact of record.
+- Muse Glimmer fallback: not triggered — reason: Gemma produced usable
+  results both phases.
+- D14 fallback: not triggered — reason: n/a.
+- D14 provider route: n/a.
+- disposition_divergence: `none`.
+- Primary-agent disposition: phase-1's single minor finding
+  accepted-as-documented (no code change); phase-2's 2 minor findings
+  accepted as valid questions, verified negative with reproducible
+  commands (whole-workspace `cargo check` + repo-wide grep), no code
+  change needed.
+
+`Task-analysis review: gemma docs/audit/gemma-evidence/S-150-T2c-vi-b-phase1.json - PASS`
+`Code-solution review: gemma docs/audit/gemma-evidence/S-150-T2c-vi-b.json - PASS`
+
+- Review artifact: docs/audit/gemma-evidence/S-150-T2c-vi-b.json
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | canonical BDD describes subtitle readiness → localization fan-out with executable mappings to real, passing tests | `apps/worker-runner/src/subtitle_runtime_tests.rs::process_subtitle_job_marks_ready_and_stores_artifact_on_success`; `apps/worker-runner/src/runner_topology_tests.rs::redis_monitor_wires_preparation_transcription_and_subtitle_workers` | passed |
+| EC-1 | Edge case | no runtime module, test, task, or active plan statement claims subtitle readiness creates a null-bound legacy review row | `apps/worker-runner/src/subtitle_runtime_tests.rs::process_subtitle_job_marks_dispatch_enqueue_failed_when_queue_unavailable` (proves the replacement fan-out path fails closed per-dispatch without any review-row side effect); confirmed via `grep -rn review_enqueue` returning only the reviewed-and-accepted docstring analogy, no functional reference | passed |
+
+### Owner final verification
+
+- Owner: matias
+- Date: 2026-08-23
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
+- Commands run: `DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@localhost:5432/dubbridge cargo test -p dubbridge-worker-runner subtitle_runtime_tests -- --test-threads=1`; `DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@localhost:5432/dubbridge cargo test -p dubbridge-worker-runner runner_topology_tests -- --test-threads=1`; `cargo test -p dubbridge-worker-runner --all-targets`; `cargo clippy -p dubbridge-worker-runner --all-targets -- -D warnings`; `cargo fmt --check -p dubbridge-worker-runner`; `make qa-docs`
 
 ---
 

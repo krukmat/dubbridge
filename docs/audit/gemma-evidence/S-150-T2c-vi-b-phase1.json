@@ -1,0 +1,19 @@
+{
+  "changed_paths": [],
+  "findings": [
+    {
+      "detail": "Docstring uses `review_enqueue.rs` as a design-pattern analogy. While not a functional dependency, removing the module makes the analogy \"historical\" rather than \"current-state\".",
+      "line": 411,
+      "path": "apps/worker-runner/src/subtitle_enqueue.rs",
+      "scope": "out-of-scope",
+      "severity": "minor",
+      "suggestion": "No action required unless the analogy becomes confusing; current scope is sufficient."
+    }
+  ],
+  "format_warnings": [
+    "STATUS PASS with findings coerced to FINDINGS"
+  ],
+  "model": "gemma4:26b-a4b-it-qat",
+  "status": "findings",
+  "summary": "The scope is well-formed and the acceptance criteria are internally consistent. The HP-1/EC-1 pair effectively validates the removal of the legacy side-effect while ensuring the new localization fan-out is correctly documented. The exclusion of S-230 files is correct to prevent scope creep. Regarding the question on `apps/worker-runner/src/subtitle_enqueue.rs:411`, since it is a design-pattern analogy in a test docstring and not a functional dependency, leaving it as-is is acceptable to avoid unnecessary churn, provided the analogy remains conceptually sound."
+}

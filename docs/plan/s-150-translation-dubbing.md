@@ -43,8 +43,13 @@ slice: S-150
 > `docs/audit/s-150-t2c-v-redis-topic-decision.md`. **T2c-v is now complete**
 > (2026-08-23): `RedisTranslationJobQueue` implemented via ADR-038 cloud
 > takeover (`claude-sonnet-5`/high). **T2c-vi-a is now complete** (2026-08-23,
-> RRI 47 Med-high, same ADR-038 cloud takeover route); `S-150-T2c-vi-b` is
-> next. The
+> RRI 47 Med-high, same ADR-038 cloud takeover route). **T2c-vi-b is now
+> complete** (2026-08-23, RRI 31 Moderate; local-agent 2/2 repair-budget
+> exhaustion routed to Low-band decomposition per
+> `AGENT_WORKFLOW_GUIDE.md § Post-repair-budget Low-band decomposition`,
+> Gemma phase-1/phase-2 both PASS with 0 findings), closing the `T2c-vi`
+> parent and the full `T2c` decomposition chain (`T2c-i` through `T2c-vi-b`).
+> `S-150-T3a` is next, gated on its own approval. The
 > plan-review conditions recorded for this slice remain in
 > force, especially deterministic
 > initial generation-request identity, migration parity, review cutover, and
@@ -335,9 +340,9 @@ inference from project age, row presence, or feature timing is allowed.
 | T2c-iv-b | Cut subtitle producer over to the single contract | development | 32 / M Moderate | Done 2026-08-15; zero-diff formal closure of the 2026-08-15 compat patch — local-first `qwen3.6:35b-a3b` run confirmed no further edit needed, real-Postgres test run (5/5 passed), Gemma phase-1/phase-2 review (phase-2: FINDINGS-ACKED, 1 pre-existing out-of-scope minor finding). |
 | T2c-iv-c | Durable localization fan-out service | development | 39 / M Moderate (corrected from provisional 49/L Med-high) | Done 2026-08-16; whole-task local-agent route (`qwen3.6:35b-a3b`) exhausted its 2-attempt repair budget (missing module registration/import path; stub degradation under real-error pressure; `budget_exhausted`). Per an owner directive to maximize local-model usage and keep the cloud role orchestration-only, the remainder was decomposed into three Low-band (RRI 0-25) subtasks delegated to local Nemotron via `scripts/delegate-low-rri.py`, with a small number of individually-diagnosed one/two-line type fixes applied directly only when the before-after delegation tooling itself (not the model) failed to produce a usable diff. Real-Postgres HP-1/EC-1 tests 2/2 passed, full crate 57/57 no regressions, Gemma phase-2 PASS with 0 findings. See `docs/tasks/s-150-translation-dubbing.md` for full evidence. |
 | T2c-v | Redis translation queue adapter | development | 41 / L Med-high (rerun 2026-08-23; supersedes prior 50 estimate) | Done 2026-08-23; ADR-038 cloud takeover (`claude-sonnet-5`/high, ADR-039 human-select), Gemma phase-1/phase-2 PASS, 3 Reflection passes, 27/27 tests (19 deterministic + 8 live-Redis), coverage improved 59.28% -> 66.32% on `lib.rs`. Full record: `docs/tasks/s-150-translation-dubbing.md` § S-150-T2c-v. |
-| T2c-vi | Runtime cutover and legacy review retirement | development parent | Complex surface | Decomposed into T2c-vi-a/b; not executable. |
+| T2c-vi | Runtime cutover and legacy review retirement | development parent | Complex surface | Decomposed into T2c-vi-a/b; both children done, closing this parent. |
 | T2c-vi-a | Integrate localization fan-out into subtitle runtime | development | 47 / L Med-high (computed) | Done 2026-08-23. |
-| T2c-vi-b | Delete dead legacy review module and sync S-140 BDD | development/docs | provisional 31 / M Moderate | Depends on T2c-vi-a; approval pending. |
+| T2c-vi-b | Delete dead legacy review module and sync S-140 BDD | development/docs | 31 / M Moderate (computed) | Done 2026-08-23. |
 | T3a | Translation provider/subprocess contract | development | 42 / L | Med-high |
 | T3b | Functional translation worker | development | 44 / L | Med-high |
 | T3c | Translation runtime persistence and readiness | development | 53 / L | Med-high |

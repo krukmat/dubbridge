@@ -1,0 +1,11 @@
+{
+  "changed_paths": [
+    "apps/worker-runner/src/main.rs",
+    "docs/bdd/README.md",
+    "docs/bdd/s-140-subtitle-generation.feature"
+  ],
+  "findings": [],
+  "format_warnings": [],
+  "status": "pass",
+  "summary": "The diff correctly removes the legacy `review_enqueue` module and its registration in `main.rs`. The BDD documentation (README.md and the feature file) has been successfully synchronized to reflect the new \"subtitle readiness -> localization fan-out\" flow, replacing the deprecated \"subtitle readiness -> review-task enqueue\" logic. The new EC-3 scenario correctly captures the fail-closed behavior regarding translation dispatch failures, ensuring no legacy review rows are created. The wording in the feature file accurately aligns with the implementation of `fan_out_localization` as the successor to the deleted review enqueueing logic."
+}

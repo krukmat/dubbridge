@@ -1,0 +1,11 @@
+{
+  "changed_paths": [
+    "apps/worker-runner/src/main.rs",
+    "docs/bdd/README.md",
+    "docs/bdd/s-140-subtitle-generation.feature"
+  ],
+  "findings": [],
+  "format_warnings": [],
+  "status": "pass",
+  "summary": "The diff successfully removes the legacy `review_enqueue` module and its registration in `main.rs`. The BDD documentation (README.md and the feature file) has been updated to reflect the shift from \"enqueue review task\" to \"fan out localization job,\" aligning with the new architecture where human review is a downstream gate for complete artifact sets (ADR-030) rather than a direct consequence of subtitle readiness. The addition of S140_EC3 correctly documents the fail-closed behavior regarding translation queue failures."
+}
