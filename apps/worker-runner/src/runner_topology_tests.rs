@@ -28,6 +28,9 @@ use dubbridge_jobs::{
     PreparationJob, RedisPreparationJobQueue, RedisSubtitleJobQueue, RedisTranscriptionJobQueue,
     RedisTranslationJobQueue,
 };
+use dubbridge_providers::translation::{
+    StubTranslationWorkerClient, TRANSLATION_SCHEMA_VERSION, TranslationOutput,
+};
 use dubbridge_providers::{AsrOutput, StubAsrWorkerClient};
 use dubbridge_storage::{LocalFsAdapter, StorageAdapter};
 use sqlx::PgPool;
@@ -42,8 +45,9 @@ use uuid::Uuid;
 use crate::preparation_runtime::{HlsPackageOutput, HlsSegmentOutput, PreparationExecutor};
 use crate::{
     SharedAsrWorkerClient, SharedPreparationExecutor, SharedStorage, SharedSubtitleQueue,
-    SharedTranscriptionQueue, SharedTranslationQueue, WorkerRuntime, guard_worker_shutdown,
-    resolve_asr_worker_path, run_monitor_with_signal, wait_for_shutdown_signal,
+    SharedTranscriptionQueue, SharedTranslationQueue, SharedTranslationWorkerClient, WorkerRuntime,
+    guard_worker_shutdown, resolve_asr_worker_path, run_monitor_with_signal,
+    wait_for_shutdown_signal,
 };
 
 #[tokio::test]
@@ -350,6 +354,14 @@ async fn redis_monitor_wires_preparation_transcription_and_subtitle_workers() {
         storage: shared_storage,
         preparation_executor: Arc::new(FakePreparationExecutor) as SharedPreparationExecutor,
         asr_client: Arc::new(StubAsrWorkerClient::ok(asr_output)) as SharedAsrWorkerClient,
+        translation_client: Arc::new(StubTranslationWorkerClient::ok(TranslationOutput {
+            schema_version: TRANSLATION_SCHEMA_VERSION,
+            job_id: "unused-in-this-topology-test".into(),
+            source_language: "en".into(),
+            target_language: "es".into(),
+            segments: vec![],
+            status: "ok".into(),
+        })) as SharedTranslationWorkerClient,
         preparation_backend: preparation_backend.clone(),
         transcription_backend: transcription_backend.clone(),
         subtitle_backend: subtitle_backend.clone(),

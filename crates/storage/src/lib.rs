@@ -80,6 +80,10 @@ pub fn subtitle_key(asset_id: &str) -> String {
     format!("subtitles/{asset_id}/subtitle.json")
 }
 
+pub fn translated_subtitle_key(asset_id: &str, target_language_id: &str) -> String {
+    format!("subtitles/{asset_id}/translations/{target_language_id}/subtitle.json")
+}
+
 pub fn hls_segment_key(asset_id: &str, filename: &str) -> String {
     let safe = sanitize_filename(match filename.trim() {
         "" => "segment.ts",
@@ -234,6 +238,33 @@ mod tests {
     fn subtitle_and_transcript_keys_differ() {
         let id = "asset-456";
         assert_ne!(subtitle_key(id), transcript_key(id));
+    }
+
+    // S-150-T3c: translated-subtitle storage key contract
+    #[test]
+    fn translated_subtitle_key_format() {
+        assert_eq!(
+            translated_subtitle_key("asset-123", "lang-es"),
+            "subtitles/asset-123/translations/lang-es/subtitle.json"
+        );
+    }
+
+    #[test]
+    fn translated_subtitle_key_differs_by_target_language() {
+        let asset_id = "asset-456";
+        assert_ne!(
+            translated_subtitle_key(asset_id, "lang-es"),
+            translated_subtitle_key(asset_id, "lang-fr")
+        );
+    }
+
+    #[test]
+    fn translated_subtitle_key_differs_from_source_subtitle_key() {
+        let asset_id = "asset-789";
+        assert_ne!(
+            translated_subtitle_key(asset_id, "lang-es"),
+            subtitle_key(asset_id)
+        );
     }
 
     #[test]

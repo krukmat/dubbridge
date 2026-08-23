@@ -1,0 +1,30 @@
+{
+  "changed_paths": [],
+  "findings": [],
+  "model": "muse-glimmer:30b-q4_K_M",
+  "passes_run": 3,
+  "passes_succeeded": 2,
+  "reconciliation": {
+    "consensus": [],
+    "consensus_count": 0,
+    "likely_false_positive": [
+      {
+        "detail": "No diff/patch or changed file contents were provided in the submission packet; review requires concrete changes to assess against S-150-T3c scope and design constraints.",
+        "line": 1,
+        "path": "repo/",
+        "scope": "out-of-scope",
+        "severity": "blocking",
+        "suggestion": "Provide the actual diff for apps/worker-runner/src/translation_runtime.rs, apps/worker-runner/src/main.rs, crates/storage/src/lib.rs and associated tests so review can be performed."
+      }
+    ],
+    "likely_false_positive_count": 1,
+    "location_inconsistent": [],
+    "location_inconsistent_count": 0,
+    "pass_specific": [],
+    "pass_specific_count": 0,
+    "severity_inconsistent": [],
+    "severity_inconsistent_count": 0
+  },
+  "status": "pass",
+  "summary": "No reviewable diff or findings provided in the packet; task scope is bounded to new worker-runner module and wiring mirroring existing transcription_runtime precedent with frozen contracts."
+}

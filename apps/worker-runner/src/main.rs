@@ -17,6 +17,9 @@ use dubbridge_jobs::{
     RedisPreparationJobQueue, RedisSubtitleJobQueue, RedisTranscriptionJobQueue,
     RedisTranslationJobQueue, SubtitleJobQueue, TranscriptionJobQueue, TranslationJobQueue,
 };
+use dubbridge_providers::translation::{
+    SubprocessTranslationWorkerClient, TranslationWorkerClient,
+};
 use dubbridge_providers::{AsrWorkerClient, SubprocessAsrWorkerClient};
 use dubbridge_storage::StorageAdapter;
 use preparation_media_executor::SubprocessPreparationExecutor;
@@ -39,13 +42,16 @@ mod transcription_runtime;
 mod translation_fanout;
 #[cfg(test)]
 mod translation_fanout_tests;
+mod translation_runtime;
 
 const ASR_WORKER_RELATIVE_PATH: &str = "workers/asr-worker-py/main.py";
+const TRANSLATION_WORKER_RELATIVE_PATH: &str = "workers/translation-worker-py/main.py";
 const WORKER_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(10);
 
 type SharedStorage = Arc<dyn StorageAdapter>;
 type SharedPreparationExecutor = Arc<dyn PreparationExecutor>;
 type SharedAsrWorkerClient = Arc<dyn AsrWorkerClient>;
+type SharedTranslationWorkerClient = Arc<dyn TranslationWorkerClient>;
 type SharedTranscriptionQueue = Arc<dyn TranscriptionJobQueue>;
 type SharedSubtitleQueue = Arc<dyn SubtitleJobQueue>;
 type SharedTranslationQueue = Arc<dyn TranslationJobQueue>;
@@ -56,13 +62,10 @@ struct WorkerRuntime {
     storage: SharedStorage,
     preparation_executor: SharedPreparationExecutor,
     asr_client: SharedAsrWorkerClient,
+    translation_client: SharedTranslationWorkerClient,
     preparation_backend: Arc<RedisPreparationJobQueue>,
     transcription_backend: Arc<RedisTranscriptionJobQueue>,
     subtitle_backend: Arc<RedisSubtitleJobQueue>,
-    // Not yet consumed by a worker (no translation runtime exists until
-    // S-150-T3c); kept for connect-time parity with the other three
-    // backends and to let a future translation worker attach via .backend().
-    #[allow(dead_code)]
     translation_backend: Arc<RedisTranslationJobQueue>,
     transcription_enqueue: SharedTranscriptionQueue,
     subtitle_enqueue: SharedSubtitleQueue,
@@ -105,6 +108,9 @@ impl WorkerRuntime {
             storage: Arc::from(storage),
             preparation_executor: Arc::new(SubprocessPreparationExecutor),
             asr_client: Arc::new(SubprocessAsrWorkerClient::new(asr_worker_command()?)),
+            translation_client: Arc::new(SubprocessTranslationWorkerClient::new(
+                translation_worker_command()?,
+            )),
             preparation_backend,
             transcription_enqueue: transcription_backend.clone(),
             transcription_backend,
@@ -119,7 +125,8 @@ impl WorkerRuntime {
         let monitor = Monitor::new();
         let monitor = self.register_preparation_worker(monitor);
         let monitor = self.register_transcription_worker(monitor);
-        self.register_subtitle_worker(monitor)
+        let monitor = self.register_subtitle_worker(monitor);
+        self.register_translation_worker(monitor)
     }
 
     async fn run_with_signal<S>(&self, signal: S) -> io::Result<()>
@@ -164,6 +171,18 @@ impl WorkerRuntime {
                 .data(self.translation_enqueue.clone())
                 .backend(self.subtitle_backend.backend())
                 .build_fn(run_subtitle_job),
+        )
+    }
+
+    fn register_translation_worker(&self, monitor: Monitor) -> Monitor {
+        monitor.register(
+            WorkerBuilder::new("worker-runner-translation")
+                .concurrency(self.worker_concurrency)
+                .data(self.pool.clone())
+                .data(self.storage.clone())
+                .data(self.translation_client.clone())
+                .backend(self.translation_backend.backend())
+                .build_fn(run_translation_job),
         )
     }
 }
@@ -248,6 +267,68 @@ fn validate_asr_worker_path(path: PathBuf, source: &str) -> anyhow::Result<PathB
 
     anyhow::bail!(
         "ASR worker script not found via {source}: {}",
+        path.display()
+    );
+}
+
+fn translation_worker_command() -> anyhow::Result<Vec<String>> {
+    let python = resolve_translation_worker_python()?;
+    let worker_path = resolve_translation_worker_path(
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+        env::var_os("DUBBRIDGE_TRANSLATION_WORKER_PATH").map(PathBuf::from),
+        env::current_exe().ok(),
+    )?;
+    Ok(vec![python, worker_path.display().to_string()])
+}
+
+fn resolve_translation_worker_path(
+    manifest_dir: &Path,
+    override_path: Option<PathBuf>,
+    current_exe: Option<PathBuf>,
+) -> anyhow::Result<PathBuf> {
+    if let Some(path) = override_path {
+        return validate_translation_worker_path(path, "DUBBRIDGE_TRANSLATION_WORKER_PATH");
+    }
+
+    let candidate = {
+        find_translation_worker_path(current_exe.as_deref())
+            .or_else(|| find_translation_worker_path(Some(manifest_dir)))
+            .unwrap_or_else(|| {
+                manifest_dir
+                    .join("../../")
+                    .join(TRANSLATION_WORKER_RELATIVE_PATH)
+            })
+    };
+
+    validate_translation_worker_path(candidate, "discovered fallback path")
+}
+
+fn find_translation_worker_path(start: Option<&Path>) -> Option<PathBuf> {
+    start.and_then(|path| {
+        path.ancestors().find_map(|ancestor| {
+            let candidate = ancestor.join(TRANSLATION_WORKER_RELATIVE_PATH);
+            candidate.is_file().then_some(candidate)
+        })
+    })
+}
+
+fn resolve_translation_worker_python() -> anyhow::Result<String> {
+    let python =
+        env::var("DUBBRIDGE_TRANSLATION_WORKER_PYTHON").unwrap_or_else(|_| "python3".to_string());
+    let python = python.trim();
+    if python.is_empty() {
+        anyhow::bail!("DUBBRIDGE_TRANSLATION_WORKER_PYTHON must not be empty");
+    }
+    Ok(python.to_string())
+}
+
+fn validate_translation_worker_path(path: PathBuf, source: &str) -> anyhow::Result<PathBuf> {
+    if path.is_file() {
+        return Ok(path);
+    }
+
+    anyhow::bail!(
+        "translation worker script not found via {source}: {}",
         path.display()
     );
 }
@@ -339,6 +420,23 @@ async fn run_subtitle_job(
 ) -> anyhow::Result<()> {
     guard_worker_shutdown(&worker, "subtitle")?;
     subtitle_runtime::process_subtitle_job(&pool, storage.as_ref(), &**translation_queue, job).await
+}
+
+async fn run_translation_job(
+    job: dubbridge_jobs::TranslationJob,
+    pool: Data<sqlx::PgPool>,
+    storage: Data<SharedStorage>,
+    translation_client: Data<SharedTranslationWorkerClient>,
+    worker: Worker<WorkerContext>,
+) -> anyhow::Result<()> {
+    guard_worker_shutdown(&worker, "translation")?;
+    translation_runtime::process_translation_job(
+        &pool,
+        storage.as_ref(),
+        &**translation_client,
+        job,
+    )
+    .await
 }
 
 fn guard_worker_shutdown(worker: &Worker<WorkerContext>, queue_name: &str) -> anyhow::Result<()> {

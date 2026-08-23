@@ -1,0 +1,26 @@
+{
+  "changed_paths": [
+    "apps/worker-runner/src/main.rs",
+    "apps/worker-runner/src/runner_topology_tests.rs",
+    "apps/worker-runner/src/translation_runtime.rs",
+    "apps/worker-runner/src/translation_runtime_tests.rs",
+    "crates/db/src/preparation_repo.rs",
+    "crates/db/src/translation_repo.rs",
+    "crates/storage/src/lib.rs"
+  ],
+  "findings": [
+    {
+      "detail": "The `process_translation_job` function catches errors and calls `mark_translation_failed`, but it does not distinguish between transient errors (e.g., network timeout) and permanent errors (e.g., invalid data). While the current implementation is safe, a distinction could allow for more sophisticated retry logic in the future.",
+      "line": 115,
+      "path": "apps/worker-runner/src/translation_runtime.rs",
+      "scope": "in-scope",
+      "severity": "minor",
+      "suggestion": "Consider categorizing errors into `Retryable` and `Fatal` to inform the job queueing strategy."
+    }
+  ],
+  "format_warnings": [
+    "STATUS PASS with findings coerced to FINDINGS"
+  ],
+  "status": "findings",
+  "summary": "The implementation of the translation runtime and its associated persistence/storage layers is robust. It correctly implements the required generation-scoped identity guards to prevent stale job overwrites (EC-2), uses language-scoped storage keys to prevent collisions (HP-1), and provides a mechanism for recording failure details (EC-1). The addition of missing `ArtifactKind` variants in `preparation_repo.rs` resolves a critical fail-closed gap. All acceptance criteria are met and verified by the provided test suite."
+}

@@ -1,0 +1,26 @@
+{
+  "changed_paths": [
+    "apps/worker-runner/src/main.rs",
+    "apps/worker-runner/src/runner_topology_tests.rs",
+    "apps/worker-runner/src/translation_runtime.rs",
+    "apps/worker-runner/src/translation_runtime_tests.rs",
+    "crates/db/src/preparation_repo.rs",
+    "crates/db/src/translation_repo.rs",
+    "crates/storage/src/lib.rs"
+  ],
+  "findings": [
+    {
+      "detail": "The `normalize_legacy_segments` function is called with `job.source_subtitle_artifact_id.to_string()` and `job.generation_request_id.to_string()`. While functional, passing UUIDs as strings for normalization logic might be slightly less efficient than passing the UUID types directly if the underlying API supports it, though this is a minor performance consideration.",
+      "line": 113,
+      "path": "apps/worker-runner/src/translation_runtime.rs",
+      "scope": "in-scope",
+      "severity": "minor",
+      "suggestion": "None required; current implementation is correct."
+    }
+  ],
+  "format_warnings": [
+    "STATUS PASS with findings coerced to FINDINGS"
+  ],
+  "status": "findings",
+  "summary": "The implementation of the translation runtime and its associated persistence/storage logic is robust. It correctly implements the required generation-scoped identity guards to prevent stale job overwrites (EC-2), uses language-scoped storage keys to prevent collisions (HP-1), and ensures worker-local URIs are not persisted (EC-3). The addition of `mark_translation_failed` with the same identity guard as `promote_translation_ready` satisfies EC-1. All acceptance criteria are met and verified by the provided test suite."
+}

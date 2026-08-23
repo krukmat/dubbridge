@@ -1,0 +1,26 @@
+{
+  "changed_paths": [
+    "apps/worker-runner/src/main.rs",
+    "apps/worker-runner/src/runner_topology_tests.rs",
+    "apps/worker-runner/src/translation_runtime.rs",
+    "apps/worker-runner/src/translation_runtime_tests.rs",
+    "crates/db/src/preparation_repo.rs",
+    "crates/db/src/translation_repo.rs",
+    "crates/storage/src/lib.rs"
+  ],
+  "findings": [
+    {
+      "detail": "The `process_translation_job` function catches errors from `process_translation_job_inner` and attempts to mark the translation as failed in the DB. However, if `mark_translation_failed` itself fails (e.g., due to a DB connection issue), the original error is returned, but the failure state is not persisted. While this is a secondary failure, it's worth noting.",
+      "line": 118,
+      "path": "apps/worker-runner/src/translation_runtime.rs",
+      "scope": "in-scope",
+      "severity": "minor",
+      "suggestion": "Consider logging the error from `mark_translation_failed` rather than silently ignoring it, or ensure the caller handles the case where the failure record itself fails to persist."
+    }
+  ],
+  "format_warnings": [
+    "STATUS PASS with findings coerced to FINDINGS"
+  ],
+  "status": "findings",
+  "summary": "The implementation of the translation runtime and its associated persistence/storage logic is robust. It correctly implements the generation-scoped identity guards required to prevent stale job overwrites (EC-2), uses language-scoped storage keys to prevent collisions (HP-1), and provides a mechanism for recording failure details (EC-1). The addition of missing `ArtifactKind` variants in `preparation_repo.rs` resolves a significant fail-closed gap. All acceptance criteria are met and verified by the provided test suite."
+}

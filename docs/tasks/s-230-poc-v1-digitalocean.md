@@ -1190,7 +1190,7 @@ approval does not pre-approve them):**
 | 3 | `S-150-T2c-vi-b` | Delete the dead legacy review module, sync S-140 BDD | 31 | Moderate — **Done 2026-08-23** |
 | 4 | `S-150-T3a` | Typed translation provider/subprocess contract | ~~42~~ 41 (rerun) | Med-high — **Done 2026-08-23** |
 | 5 | `S-150-T3b` | Functional Python translation worker | ~~44~~ 50 (rerun) | Med-high — **Done 2026-08-23** |
-| 6 | `S-150-T3c` | Rust translation runtime persistence + readiness transition | 53 | Med-high |
+| 6 | `S-150-T3c` | Rust translation runtime persistence + readiness transition | 52 | Med-high — **Done 2026-08-24** |
 
 Every Med-high child routes cloud-only under ADR-038 (Muse Glimmer refinement
 -> primary receipt -> cloud takeover, no local repair attempts); `T2c-vi-b` is
@@ -1226,7 +1226,15 @@ partitioning, no pub/sub. Full option analysis:
 provider vendor was selected — the worker's `http` provider is a
 vendor-neutral, stdlib-only (`urllib`) generic JSON endpoint, deferring the
 concrete-vendor and X20 secrets-storage decisions; see that closure record's
-"Provider choice" note. Child 6 (`S-150-T3c`) is next.
+"Provider choice" note. Child 6 (`S-150-T3c`) is **done** (2026-08-24; RRI
+52, full closure record at `docs/tasks/s-150-translation-dubbing.md` §
+S-150-T3c) — **all 6/6 children of this reopened chain are now complete.**
+`S-150-T3c` registered the fourth worker-runner Monitor worker and defines
+the downstream-coupling env var names: `DUBBRIDGE_TRANSLATION_WORKER_PATH`
+and `DUBBRIDGE_TRANSLATION_WORKER_PYTHON`, mirroring
+`DUBBRIDGE_ASR_WORKER_PATH`/`DUBBRIDGE_ASR_WORKER_PYTHON` exactly. `S-230-T4`/
+`T5`/`T6`/`T8b` conditional-on-`S-230-T3b` work may now proceed using these
+names.
 
 **Happy paths considered:**
 
@@ -1287,36 +1295,36 @@ tasks' `Depends on` fields, since `T3b` may still be in progress when they run:
 
 - **`S-230-T4` (production images):** the worker-runner image must also bundle
   `workers/translation-worker-py` and its dependencies, mirroring the existing
-  ffmpeg/Python/faster-whisper bundling for ASR, with whatever
-  path/interpreter env vars `S-150-T3c` defines for it (mirroring
-  `DUBBRIDGE_ASR_WORKER_PATH`/`DUBBRIDGE_ASR_WORKER_PYTHON`). If `T3b`'s
-  children are not yet done when `T4` builds its image, `T4` proceeds without
-  the translation worker and a follow-up image rebuild is needed once they
-  close — this is now recorded as a known follow-up, not a silent gap.
+  ffmpeg/Python/faster-whisper bundling for ASR, with
+  `DUBBRIDGE_TRANSLATION_WORKER_PATH`/`DUBBRIDGE_TRANSLATION_WORKER_PYTHON`
+  (defined by `S-150-T3c`, done 2026-08-24, mirroring
+  `DUBBRIDGE_ASR_WORKER_PATH`/`DUBBRIDGE_ASR_WORKER_PYTHON` exactly). All 6/6
+  children of this chain are now done, so `T4` may proceed with the
+  translation worker bundled from the start — no follow-up rebuild needed.
 - **`S-230-T5` (descriptor + secret boundary):** the environment template must
   add whichever `DUBBRIDGE_*` variable(s) `S-150-T3b`'s configurable provider
   needs for real (non-fake) credentials, the same way T5 already carries
   `S-230-T7c`'s JWT-expiry decision without owning it. T5 owns only carrying
-  the variable; `T3b`'s children define its name and requirement.
-- **`S-230-T6` (deploy + smoke):** if the translation worker is present in the
-  deployed image by the time of the smoke run, the runbook additionally
-  asserts a translated-subtitle artifact on observed downstream state (same
-  "never a 2xx alone" standard T6 already applies to every other stage); if
-  not present, T6 proceeds exactly as originally scoped and T9 records the gap.
+  the variable; `T3b`'s `http` provider is vendor-neutral (stdlib `urllib`),
+  so no concrete vendor credential variable exists yet — see `T3b`'s closure
+  "Provider choice" note.
+- **`S-230-T6` (deploy + smoke):** the translation worker is present in the
+  chain now that all 6/6 children are done, so the runbook should assert a
+  translated-subtitle artifact on observed downstream state (same "never a
+  2xx alone" standard T6 already applies to every other stage).
 - **`S-230-T8b` (translated subtitle visible in review, added 2026-08-16):**
   producing and persisting a translated artifact (this task's own acceptance
   criteria) is **not** the same as a human being able to see it. `T8b` is the
   task that actually closes that gap — it is a separate, double-conditional
   task (depends on both this task and `T8`), not a bullet on an existing task,
   because it needs its own read endpoint and mobile rendering work. Without
-  `T8b`, a fully-closed `T3b` still leaves the translated artifact invisible
+  `T8b`, a fully-closed chain still leaves the translated artifact invisible
   to any reviewer, which undercuts this task's own stated objective.
 
-Whoever executes `S-150-T3c` (the last child, which defines the actual
-worker-path env var names) must update this section and the tasks above with
-the concrete variable names once they are fixed — this section names the
-coupling now so it isn't discovered late, but the exact names are `T3c`'s to
-define, not this task's.
+**Resolved 2026-08-24:** `S-150-T3c` (the last child) defined the actual
+worker-path env var names —
+`DUBBRIDGE_TRANSLATION_WORKER_PATH`/`DUBBRIDGE_TRANSLATION_WORKER_PYTHON` —
+and this section now carries them.
 
 **Technical-scope diagram — child sequence and downstream coupling:**
 
@@ -1325,12 +1333,12 @@ flowchart TD
     T2CV["1 . S-150-T2c-v<br/>Redis adapter . RRI 41 . DONE"] --> T2CVIA["2 . S-150-T2c-vi-a<br/>Runtime fan-out . RRI 47 . DONE"]
     T2CVIA --> T2CVIB["3 . S-150-T2c-vi-b<br/>Cleanup + BDD sync . RRI 31 . DONE"]
     T2CVIB --> T3A["4 . S-150-T3a<br/>Provider contract . RRI 41 . DONE"]
-    T3A --> T3Bc["5 . S-150-T3b<br/>Python worker . RRI 44"]
-    T3Bc --> T3C["6 . S-150-T3c<br/>Persistence + readiness . RRI 53"]
+    T3A --> T3Bc["5 . S-150-T3b<br/>Python worker . RRI 50 . DONE"]
+    T3Bc --> T3C["6 . S-150-T3c<br/>Persistence + readiness . RRI 52 . DONE"]
 
-    T3C -. "if done: bundle worker" .-> T4["S-230-T4<br/>production images"]
-    T3C -. "if done: add credential var" .-> T5["S-230-T5<br/>descriptor + secrets"]
-    T3C -. "if done: assert translated subtitle" .-> T6["S-230-T6<br/>deploy + smoke"]
+    T3C -. "bundle worker" .-> T4["S-230-T4<br/>production images"]
+    T3C -. "add credential var" .-> T5["S-230-T5<br/>descriptor + secrets"]
+    T3C -. "assert translated subtitle" .-> T6["S-230-T6<br/>deploy + smoke"]
     T3C --> T8b["S-230-T8b<br/>visible in review"]
     T8["S-230-T8<br/>subtitle in review"] --> T8b
 

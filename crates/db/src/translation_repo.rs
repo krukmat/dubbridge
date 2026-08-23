@@ -499,6 +499,47 @@ pub async fn promote_translation_ready(
     status_from_row(row)
 }
 
+/// Mark the current generation's translation as failed, recording `error_detail`.
+///
+/// Scoped to `current_generation_request_id` exactly like `promote_translation_ready`:
+/// a stale/replayed generation's failure can never clobber a newer generation's
+/// in-progress or ready state. Returns `DbError::Conflict` when the row's current
+/// generation no longer matches (superseded by a later claim in the meantime).
+pub async fn mark_translation_failed(
+    pool: &PgPool,
+    project_id: ProjectId,
+    asset_id: AssetId,
+    target_language_id: Uuid,
+    generation_request_id: Uuid,
+    error_detail: &str,
+) -> Result<TranslationStatusSnapshot, DbError> {
+    let row = sqlx::query_as::<_, TranslationStatusRow>(
+        r#"
+        UPDATE asset_translation_status
+        SET status = 'failed',
+            error_detail = $5,
+            updated_at = now()
+        WHERE project_id = $1
+          AND asset_id = $2
+          AND target_language_id = $3
+          AND current_generation_request_id = $4
+        RETURNING project_id, asset_id, target_language_id, status, error_detail, updated_at,
+                  current_generation_request_id, current_source_artifact_id, current_translated_subtitle_artifact_id
+        "#,
+    )
+    .bind(project_id.0)
+    .bind(asset_id.0)
+    .bind(target_language_id)
+    .bind(generation_request_id)
+    .bind(error_detail)
+    .fetch_optional(pool)
+    .await
+    .map_err(DbError::QueryFailed)?
+    .ok_or(DbError::Conflict)?;
+
+    status_from_row(row)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

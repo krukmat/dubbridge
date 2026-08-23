@@ -4015,9 +4015,9 @@ injected environment only":
 ## S-150-T3c: Translation runtime persistence and readiness
 
 **Type:** development
-**Effort:** L (provisional RRI 53 — Med-high; recompute before presentation)
+**Effort:** L (final RRI 52 — Med-high, 46-55 sub-band)
 **Depends on:** S-150-T3b
-**Status:** [ ] Planned
+**Status:** [x] Done
 
 **Happy paths considered:**
 
@@ -4047,6 +4047,205 @@ Reflection log, unit coverage, real storage/Postgres tests, and owner verificati
 lineage, and readiness; stop before consent/TTS work.
 
 **Stop condition:** Stop after translation runtime closure. Do not start T4.
+
+### RRI
+
+`python3 scripts/rri.py --touches apps/worker-runner/src/main.rs --touches apps/worker-runner/src/runner_topology_tests.rs --touches apps/worker-runner/src/translation_runtime.rs --touches apps/worker-runner/src/translation_runtime_tests.rs --touches crates/db/src/preparation_repo.rs --touches crates/db/src/translation_repo.rs --touches crates/storage/src/lib.rs --cc 12 --D 3 --K 3 --P 3 --T 2 --A 3 --X 2`
+
+**RRI:** 52 → Med-high (46-55 sub-band). Per ADR-038 (as amended by
+Amendment 3, 2026-08-23, adopted earlier in this same session), RRI 46-55 is
+unaffected by the amendment and remains cloud-only. Implementation route:
+ADR-038 Muse Glimmer advisory refinement (`GO_LOCAL`, technical-capability
+signal only — `docs/audit/gemma-evidence/S-150-T3c-medhigh-refinement.json`)
+→ primary hash-bound route receipt
+(`docs/audit/gemma-evidence/S-150-T3c-route-receipt.json`) → cloud takeover
+per the unchanged 46-55 sub-band rule → **Claude Sonnet 5, thinking on,
+in-session** (owner-confirmed via interactive selection, 2026-08-23).
+
+### Implementation summary
+
+New `apps/worker-runner/src/translation_runtime.rs` mirrors
+`transcription_runtime.rs`'s control flow: load source subtitle bytes from
+storage → resolve source/target language via
+`target_language_repo::list_target_languages` → normalize via
+`normalize_legacy_segments` → invoke `TranslationWorkerClient` → store
+translated bytes under a new generation/target-language-scoped storage key
+(`translated_subtitle_key`, `crates/storage/src/lib.rs`) →
+`translation_repo::insert_translated_subtitle_artifact` →
+`translation_repo::promote_translation_ready` → re-verify
+`get_translation_readiness_evidence().is_ready()`. `apps/worker-runner/src/main.rs`
+registers the fourth Monitor worker (`worker-runner-translation`) with
+`DUBBRIDGE_TRANSLATION_WORKER_PATH`/`DUBBRIDGE_TRANSLATION_WORKER_PYTHON`
+env-var resolution mirroring the ASR worker's convention exactly (closes the
+S-230-T3b downstream-coupling note: these are the concrete env var names
+S-230-T4/T5/T6 must propagate).
+
+Two genuine pre-existing defects were found and fixed within scope (frozen
+contracts may be changed "unless a genuine defect is found," per this task's
+approved scope note):
+
+- `crates/db/src/translation_repo.rs` had no function to record a `failed`
+  status with `error_detail` — only an `in_progress` writer (private) and a
+  `ready` writer (`promote_translation_ready`) existed, leaving EC-1
+  unsatisfiable with frozen primitives alone. Added
+  `mark_translation_failed`, scoped to `current_generation_request_id`
+  exactly like `promote_translation_ready`, so a stale/superseded
+  generation's failure write can never clobber a newer generation's state.
+- `crates/db/src/preparation_repo.rs`'s local `parse_kind` (a pre-T1c-era
+  fail-closed enumeration) was missing `translated_subtitle`,
+  `dubbed_audio_segment`, `dubbing_manifest`, and `dubbed_audio` — all valid
+  `ArtifactKind` domain variants already added by earlier S-150 tasks. This
+  surfaced as a real failure once the translation worker began writing
+  `translated_subtitle` rows end-to-end
+  (`runner_topology_tests::redis_monitor_wires_preparation_transcription_and_subtitle_workers`
+  failed with `UnknownStoredValue` before the fix). Fixed by adding all four
+  missing arms.
+
+### Reflection log
+
+Required passes: 3 (RRI 52 → Med-high)
+
+#### Pass 1
+
+- **Draft verdict:** `translation_runtime.rs` mirrors the ASR precedent;
+  `main.rs` wires the worker; `translated_subtitle_key` added;
+  `mark_translation_failed` added to satisfy EC-1; `preparation_repo::parse_kind`
+  fixed. All 6 new tests pass; full crate suites pass; fmt/clippy clean.
+- **Critique findings:** `job_id` passed to `normalize_legacy_segments` uses
+  `generation_request_id.to_string()` — worth confirming intent;
+  `resolve_languages` does a full project-scoped list scan rather than a
+  targeted lookup (no `get_by_id` repo function exists); the
+  `preparation_repo` fix is a genuine, narrowly-scoped, test-covered defect
+  fix within declared scope.
+- **Revisions applied:** none — implementation correct and scoped as
+  reviewed; the list-scan is an acceptable minor inefficiency given small
+  per-project target-language counts and no existing targeted-lookup
+  primitive.
+
+#### Pass 2
+
+- **Draft verdict:** re-read focusing on failure boundaries and unintended
+  side effects.
+- **Critique findings:** `mark_translation_failed`'s WHERE clause correctly
+  scopes to `current_generation_request_id`, mirroring
+  `promote_translation_ready`'s identity guard — a stale job's failure write
+  cannot clobber a newer generation's state either. `store_translated_subtitle_artifact`
+  writes to storage before the DB insert (an orphan-on-DB-failure risk if
+  the insert then fails) — this exactly mirrors `transcription_runtime.rs`'s
+  established store-then-insert ordering, handled by periodic reconciliation
+  per `docs/architecture.md`, not a new defect. `promote_and_verify_ready`'s
+  double readiness check mirrors `ensure_transcription_ready`'s intentional
+  defense-in-depth re-verification pattern.
+- **Revisions applied:** none — ordering and failure handling match
+  established codebase precedent and are adequately tested via
+  `process_translation_job_marks_failed_on_worker_error`.
+
+#### Pass 3
+
+- **Draft verdict:** final pass checking test coverage completeness and
+  scanning the full diff before Phase 2 review.
+- **Critique findings:** all touched/created files match the approved
+  scope plus the two justified genuine-defect fixes; every HP-1/EC-1/EC-2/EC-3
+  case maps to at least one passing test; `runner_topology_tests.rs`'s test
+  name (`redis_monitor_wires_preparation_transcription_and_subtitle_workers`)
+  is now stale (translation worker also runs and is exercised) but renaming
+  it is a cosmetic change outside this task's narrowly approved scope.
+- **Revisions applied:** none — deliberately left the test-name staleness
+  as a documented, out-of-scope cosmetic note rather than expanding scope
+  unilaterally.
+
+#### Post-Phase-2 disposition (Gemma findings)
+
+Phase 2 review (`gemma4:26b-a4b-it-qat`, 3/3 passes) returned `FINDINGS`, 3
+minor findings, none consensus/blocking:
+
+1. UUID-to-string conversion in `normalize_legacy_segments` call —
+   **rejected, no code change**: the function's contract takes `&str` by
+   design; no behavior or efficiency defect.
+2. No transient/permanent error classification on translation failure —
+   **rejected, no code change**: EC-1's acceptance criterion is "non-Ready
+   with error detail," which is satisfied; retry classification is a
+   legitimate future enhancement outside this task's acceptance criteria.
+3. Secondary failure of `mark_translation_failed` itself is silently
+   discarded (`let _ = ...`) — **accepted and fixed**: changed to log via
+   `tracing::warn!` on secondary failure, matching the observability bar
+   elsewhere in this module. Re-verified: `cargo check`, `cargo fmt --check`,
+   `cargo clippy --all-targets -- -D warnings` all clean; the 6
+   `translation_runtime` tests still pass after the change.
+
+### Peer Reviewer evidence
+
+**Phase 1 (task-analysis):**
+
+- Reviewer: `muse-glimmer` (Gemma primary hit a structural format mismatch —
+  its reviewer script's finding parser expects diff line numbers, which
+  don't exist pre-implementation; fell back per chain)
+- Command: manual `scripts/gemma-code-review.py` invocation against the
+  frozen ADR-038 scope/acceptance packet (no diff existed yet)
+- Artifact: `docs/audit/gemma-evidence/S-150-T3c-phase1-review.json`
+- Verdict: `PASS` (2/3 passes usable; one `likely_false_positive` correctly
+  noting no diff existed yet — a structural observation, not a scope defect)
+- Gemma primary: `not usable` — reason: `invalid review response: LINE must
+  be an integer` on all 3 passes (phase-1/no-diff packet mismatch with the
+  diff-line-number-oriented finding parser)
+- Muse Glimmer fallback: `triggered` — reason: Gemma primary unusable per
+  above; Muse Glimmer produced a usable 2/3-pass aggregate
+- D14 fallback: `not triggered` — reason: Muse Glimmer fallback produced a
+  usable result
+- disposition_divergence: `none`
+
+**Phase 2 (code-solution):**
+
+- Reviewer: `gemma`
+- Command: manual `scripts/gemma-code-review.py --model gemma4:26b-a4b-it-qat`
+  invocation against the full staged diff plus acceptance-criteria header
+- Artifact: `docs/audit/gemma-evidence/S-150-T3c-phase2-review.json`
+- Verdict: `PASS` (findings acknowledged, none blocking)
+- Findings: 3 minor (0 consensus, 0 blocking) — see Reflection log
+  post-Phase-2 disposition; 1 accepted and fixed, 2 rejected with reasoning.
+- Muse Glimmer fallback: `not triggered` — reason: Gemma produced a usable
+  3/3-pass result on the first attempt.
+- D14 fallback: `not triggered` — reason: Gemma available and usable.
+- D14 provider route: n/a.
+- disposition_divergence: `none`.
+- Primary-agent disposition: 1 finding accepted and fixed (secondary-failure
+  logging), 2 rejected with reasoning (see Reflection log).
+
+`Task-analysis review: muse-glimmer docs/audit/gemma-evidence/S-150-T3c-phase1-review.json - PASS`
+`Code-solution review: gemma docs/audit/gemma-evidence/S-150-T3c-phase2-review.json - PASS`
+
+- Review artifact: docs/audit/gemma-evidence/S-150-T3c.json (GEG-1 receipt;
+  full per-pass consolidated findings at
+  docs/audit/gemma-evidence/S-150-T3c-phase2-review.json)
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | valid worker result stored under scoped key, checksummed, marks unit Ready | `apps/worker-runner/src/translation_runtime_tests.rs::process_translation_job_marks_ready_and_stores_scoped_artifact` | passed |
+| HP-1 (sibling isolation) | Happy path | sibling target languages for the same asset are unaffected | `apps/worker-runner/src/translation_runtime_tests.rs::process_translation_job_leaves_sibling_target_language_untouched` | passed |
+| EC-1 | Edge case | worker failure leaves the unit non-Ready with observable error detail | `apps/worker-runner/src/translation_runtime_tests.rs::process_translation_job_marks_failed_on_worker_error` | passed |
+| EC-2 | Edge case | stale/replayed generation cannot overwrite current Ready state | `apps/worker-runner/src/translation_runtime_tests.rs::process_translation_job_rejects_stale_generation_after_ready` | passed |
+| EC-3 | Edge case | worker-local URI never persisted as canonical storage_key | `apps/worker-runner/src/translation_runtime_tests.rs::process_translation_job_never_persists_worker_local_uri_as_storage_key` | passed |
+| — | Boundary | envelope rejects mismatched job type | `apps/worker-runner/src/translation_runtime_tests.rs::process_translation_envelope_rejects_wrong_job_type` | passed |
+| — | Regression | `translated_subtitle_key` format, per-target-language uniqueness, source/translated distinctness | `crates/storage/src/lib.rs::tests::translated_subtitle_key_format`, `::translated_subtitle_key_differs_by_target_language`, `::translated_subtitle_key_differs_from_source_subtitle_key` | passed |
+| — | Regression | `mark_translation_failed` compiles and integrates with existing `translation_repo` status parsing | covered transitively by `process_translation_job_marks_failed_on_worker_error` (real Postgres) | passed |
+| — | Regression | `preparation_repo::parse_kind` recognizes all localization/dubbing `ArtifactKind` variants (genuine defect fix) | `crates/db/src/preparation_repo.rs::tests::parse_kind_all_localization_and_dubbing_variants` | passed |
+| — | Regression | end-to-end Redis-backed topology: preparation → transcription → subtitle → translation workers all wired and consuming | `apps/worker-runner/src/runner_topology_tests.rs::redis_monitor_wires_preparation_transcription_and_subtitle_workers` | passed |
+
+Full suite: `cargo test -p dubbridge-worker-runner -p dubbridge-storage -p
+dubbridge-db -- --test-threads=1` → 194 passed, 0 failed (real Postgres +
+Redis, `DUBBRIDGE_DATABASE_URL`/`DUBBRIDGE_REDIS_URL` set to the local
+Docker Compose infra). `cargo fmt --check` and `cargo clippy -p
+dubbridge-worker-runner -p dubbridge-storage -p dubbridge-db --all-targets
+-- -D warnings` both clean.
+
+### Owner final verification
+
+- Owner: matias
+- Date: 2026-08-24
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
+- Commands run: `DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@localhost:5432/dubbridge DUBBRIDGE_REDIS_URL=redis://localhost:6379 cargo test -p dubbridge-worker-runner -p dubbridge-storage -p dubbridge-db -- --test-threads=1`; `cargo fmt --check`; `cargo clippy -p dubbridge-worker-runner -p dubbridge-storage -p dubbridge-db --all-targets -- -D warnings`
 
 ---
 

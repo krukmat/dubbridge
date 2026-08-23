@@ -21,6 +21,10 @@ fn parse_kind(s: &str) -> Result<ArtifactKind, DbError> {
         "transcript_text" => Ok(ArtifactKind::TranscriptText),
         "word_alignment" => Ok(ArtifactKind::WordAlignment),
         "subtitle" => Ok(ArtifactKind::Subtitle),
+        "translated_subtitle" => Ok(ArtifactKind::TranslatedSubtitle),
+        "dubbed_audio_segment" => Ok(ArtifactKind::DubbedAudioSegment),
+        "dubbing_manifest" => Ok(ArtifactKind::DubbingManifest),
+        "dubbed_audio" => Ok(ArtifactKind::DubbedAudio),
         other => Err(DbError::UnknownStoredValue {
             field: "artifact_records.kind",
             value: other.to_owned(),
@@ -368,6 +372,29 @@ mod tests {
         assert!(matches!(
             parse_kind("original_media"),
             Ok(ArtifactKind::OriginalMedia)
+        ));
+    }
+
+    // S-150-T3c: parse_kind previously rejected localization/dubbing artifact
+    // kinds already present in the domain enum, failing closed on legitimate
+    // production data once the translation worker started writing rows.
+    #[test]
+    fn parse_kind_all_localization_and_dubbing_variants() {
+        assert!(matches!(
+            parse_kind("translated_subtitle"),
+            Ok(ArtifactKind::TranslatedSubtitle)
+        ));
+        assert!(matches!(
+            parse_kind("dubbed_audio_segment"),
+            Ok(ArtifactKind::DubbedAudioSegment)
+        ));
+        assert!(matches!(
+            parse_kind("dubbing_manifest"),
+            Ok(ArtifactKind::DubbingManifest)
+        ));
+        assert!(matches!(
+            parse_kind("dubbed_audio"),
+            Ok(ArtifactKind::DubbedAudio)
         ));
     }
 

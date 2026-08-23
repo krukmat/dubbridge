@@ -1,0 +1,7 @@
+{
+  "changed_paths": [],
+  "findings": [],
+  "format_warnings": [],
+  "status": "pass",
+  "summary": "No reviewable diff or findings provided in the packet; task scope is bounded to new worker-runner module and wiring mirroring existing transcription_runtime precedent with frozen contracts."
+}
