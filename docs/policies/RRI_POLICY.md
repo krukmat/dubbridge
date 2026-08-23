@@ -190,7 +190,7 @@ band — never derive one output from another (e.g. do not infer capability from
 |---|---|---|---|---|---|---|---|---|
 | **0–25** | Low | **S** | Primary agent or Local Qwen Developer via Ollama | Primary agent or Local Qwen Developer via Ollama | Off | Muse Glimmer†† | Muse Glimmer Reviewer†† | **Low-band handling:** do not present the full task for approval; use local Qwen Developer only for eligible simple code patches, otherwise execute directly with the primary agent. |
 | **26–40** | Moderate | **M** | Balanced | Balanced | Off | Gemma†† | Gemma Reviewer†† | Confirm tests exist in the affected area. **Implementation route:** local-first via `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL`; after 2/2 repairs, decompose remaining work into scored Low-band subtasks before the concrete task-card cloud takeover is considered as last resort. A ≥2-file task with heterogeneous per-module CC may instead use ADR-040 per-module split routing — see § Per-module complexity-split routing below. |
-| **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Gemma†† | Gemma Reviewer†† | Plan + explicit acceptance criteria required before approval. **Implementation route (ADR-038):** Muse Glimmer advisory refinement → primary hash-bound route receipt → cloud takeover with the full evidence bundle. A `GO_LOCAL` advisory result is recorded but never launches a local developer, **except** for modules independently qualifying under ADR-040 per-module split routing (Amendment 2) — see § Per-module complexity-split routing below. Review/approval rigor unchanged — 3 Reflection passes and this HITL gate still apply; phase-2 (and phase-1 when it applies) reviewer is Gemma, not the cross-vendor peer. |
+| **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Gemma†† | Gemma Reviewer†† | Plan + explicit acceptance criteria required before approval. **Implementation route (ADR-038):** Muse Glimmer advisory refinement → primary hash-bound route receipt → **RRI 46–55:** cloud takeover with the full evidence bundle; a `GO_LOCAL` advisory result is recorded but never launches a local developer, **except** for modules independently qualifying under ADR-040 per-module split routing (Amendment 2). **RRI 41–45 (Amendment 3):** a `GO_LOCAL` result instead routes to the same local-first path as Moderate (2-attempt repair budget); `CLOUD_REQUIRED` still escalates to cloud. See § Per-module complexity-split routing and § Med-high Architect-refined single-attempt handling below. Review/approval rigor unchanged for both sub-bands — 3 Reflection passes and this HITL gate still apply; phase-2 (and phase-1 when it applies) reviewer is Gemma, not the cross-vendor peer. |
 | **56–70** | Complex | **L** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Plan first. **Decompose into subtasks before implementation.** Human reviews the plan. |
 | **71–85** | High | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Characterization tests + explicit acceptance criteria + human reviews the **diff** (not just the plan). **Decomposition remains mandatory.** |
 | **86–100** | Very high | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Do not implement directly. Produce an ADR + risk analysis + decompose into subtasks. |
@@ -280,11 +280,14 @@ edited authorized Rust files in isolation and executes the operator-authored
 acceptance commands itself (see
 `docs/plan/local-agent-simple-editing.md`).
 
-Med-high (41–55) remains cloud-only. ADR-038's Muse-Glimmer refinement and
+Med-high 46–55 remains cloud-only. ADR-038's Muse-Glimmer refinement and
 hash-bound receipt remain evidence gates, but their result never starts a local
-developer. The band-resolved independent reviewer remains mandatory, 3
-Reflection passes still apply, and the RRI 41+ human approval gate still fires
-before implementation starts.
+developer there. Med-high 41–45 is the exception (ADR-038 Amendment 3,
+2026-08-23): a `GO_LOCAL` result starts a local developer via this same
+`run_local_task.py` runner, exactly as Moderate. The band-resolved
+independent reviewer remains mandatory in both sub-bands, 3 Reflection
+passes still apply, and the RRI 41+ human approval gate still fires before
+implementation starts.
 
 Thinking mode: activate for Balanced→Premium and above when the task requires
 multi-step reasoning that cannot be validated incrementally. Do **not** activate
@@ -431,19 +434,24 @@ implementer.
 ### Med-high Architect-refined single-attempt handling
 
 For final **RRI 41–55**, implementation does **not** use Moderate's direct
-local-first route. ADR-038 defines a fail-closed,
-evidence-bearing gate instead:
+local-first route for the whole band uniformly. ADR-038 defines a
+fail-closed, evidence-bearing gate; **RRI 46–55** routes every result to
+cloud, while **RRI 41–45** (ADR-038 Amendment 3, 2026-08-23) routes a
+`GO_LOCAL` result to the same local-first path as Moderate:
 
 ```text
 approved Med-high card
   -> Muse Glimmer (muse-glimmer:30b-q4_K_M) advisory refinement: GO_LOCAL | CLOUD_REQUIRED
   -> primary agent hash-bound route receipt (may downgrade GO_LOCAL to cloud;
      may NEVER upgrade CLOUD_REQUIRED to local)
-  -> GO_LOCAL is recorded as policy-excluded; no local developer starts
-  -> Codex or Claude with
-     the full ADR-038 §5 evidence bundle (task capsule, refinement artifact,
-     primary receipt, effective limits, transcript/checkpoint, partial diff,
-     commands/tests run, stop reason, hashes, model identity, elapsed time)
+  -> RRI 46-55: GO_LOCAL is recorded as policy-excluded; no local developer starts;
+     Codex or Claude take over with the full ADR-038 §5 evidence bundle
+     (task capsule, refinement artifact, primary receipt, effective limits,
+     transcript/checkpoint, partial diff, commands/tests run, stop reason,
+     hashes, model identity, elapsed time)
+  -> RRI 41-45: GO_LOCAL routes to scripts/local-agent/run_local_task.py
+     (same 2-attempt budget as Moderate); CLOUD_REQUIRED still escalates to
+     cloud with the same evidence bundle as 46-55
 ```
 
 Implementation surfaces:
@@ -454,11 +462,15 @@ Implementation surfaces:
   the primary receipt, card/capsule hash binding, exact model tag/digest, and
   the Med-high RRI band, then applies the fail-closed route rules.
 - `scripts/local-agent/run_med_high_task.py` emits the complete evidence bundle
-  (via `escalation_packet.py`) for every Med-high decision, including an
-  otherwise-valid `GO_LOCAL` decision.
+  (via `escalation_packet.py`) for every RRI 46–55 decision and every RRI
+  41–45 `CLOUD_REQUIRED` decision.
+- `scripts/local-agent/run_local_task.py` handles an RRI 41–45 `GO_LOCAL`
+  decision exactly as it handles Moderate.
 
-There is no local attempt or repair at this band. The refinement/receipt path
-is retained as evidence only, and every outcome routes to cloud.
+For **RRI 46–55** there is no local attempt or repair; the refinement/receipt
+path is retained as evidence only, and every outcome routes to cloud. For
+**RRI 41–45**, a `GO_LOCAL` result creates a real local implementation
+attempt with its own 2-attempt repair budget, mirroring Moderate exactly.
 
 The approval path is **not** relaxed: 3 Reflection passes apply, and
 the RRI 41+ human approval gate (plan + explicit acceptance criteria before

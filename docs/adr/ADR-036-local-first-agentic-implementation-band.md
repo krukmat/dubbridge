@@ -568,6 +568,12 @@ receipt continue to produce routing evidence, but a `GO_LOCAL` result no longer
 authorizes or starts a local implementation process. Complex and XL bands remain
 cloud-only under the existing RRI policy.
 
+**Superseded in part by ADR-038 Amendment 3 (2026-08-23):** the Med-high
+sentence above described the whole 41–55 band as of this amendment's date.
+ADR-038 Amendment 3 reopened local-first routing for the 41–45 sub-band on a
+`GO_LOCAL` result; 46–55 remains cloud-only exactly as stated here. See
+ADR-038 for the current operative rule.
+
 **Consequence:** `DUBBRIDGE_LOW_RRI_MODEL` and
 `DUBBRIDGE_LOCAL_AGENT_MODEL` both default to
 `nemotron-3.5-lightning:30b-a3b-q4_K_M` in their respective S and M lanes. A

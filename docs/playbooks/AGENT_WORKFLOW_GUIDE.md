@@ -25,14 +25,18 @@ governs: "all agent-facing workflow decisions in the repository"
 
 | Role | Binding |
 |---|---|
-| Local implementer, RRI 0–40 | `qwen3.8:27b-mlx` |
+| Local implementer, RRI 0–45 | `qwen3.8:27b-mlx` |
 | RRI 0–25 reviewer chain (phases 1 and 2) | `muse-glimmer:30b-q4_K_M` → `gemma4:26b-a4b-it-qat` → D14 |
 | RRI 26–55 reviewer chain (phases 1 and 2) | `gemma4:26b-a4b-it-qat` → `muse-glimmer:30b-q4_K_M` → D14 |
 | Local Architect / Complex Analyst | `muse-glimmer:30b-q4_K_M` — advisory-only (ADR-037), never a phase-1/phase-2 reviewer in any band |
 
-RRI 41–55, Complex, and XL are cloud-only for implementation: the ADR-038
+RRI 46–55, Complex, and XL are cloud-only for implementation: the ADR-038
 refinement and receipt run as routing evidence, but a `GO_LOCAL` result never
-starts a local developer.
+starts a local developer. **RRI 41–45 is the exception (ADR-038 Amendment
+3, 2026-08-23):** a `GO_LOCAL` refinement/receipt result routes the whole
+task through the same Moderate local-first path as RRI 26–40 (§ Local-first
+and Architect-refined implementation routing below), not to cloud. A
+`CLOUD_REQUIRED` result in 41–45 still routes directly to cloud, unchanged.
 
 ## Mandatory workflow before implementing
 
@@ -122,9 +126,13 @@ starts a local developer.
      approval, then route through the **ADR-038 Architect-refined
      single-attempt gate**: Muse Glimmer advisory refinement (`GO_LOCAL` |
      `CLOUD_REQUIRED`) → primary hash-bound route receipt (may downgrade,
-     never upgrade) → every result, including `GO_LOCAL`, produces the
-     concrete Codex/Claude cloud-takeover packet from Step 2 with the full
-     evidence bundle.
+     never upgrade). For **RRI 46–55**, every result, including `GO_LOCAL`,
+     produces the concrete Codex/Claude cloud-takeover packet from Step 2
+     with the full evidence bundle. For **RRI 41–45** (ADR-038 Amendment 3,
+     2026-08-23), a `GO_LOCAL` result instead routes the whole task through
+     the same local-first path as 26–40 Moderate (`run_local_task.py`, 2
+     evidence-backed repair attempts, then Low-band decomposition before
+     cloud as last resort); `CLOUD_REQUIRED` still routes directly to cloud.
    - **56+** — show the plan and tasks and wait for explicit approval before
      starting implementation, even if a plan was approved in a prior
      session; implementation stays on the cloud path (Premium tier) and
@@ -395,9 +403,11 @@ remaining work into scored Low-band subtasks; cloud is the last resort when
 that route cannot proceed.
 
 **Med-high (41–55):** ADR-038 is its fail-closed, evidence-bearing
-refinement/receipt gate; implementation is cloud-only **for the whole task**
+refinement/receipt gate. **RRI 46–55** is cloud-only **for the whole task**
 except a module independently qualified under ADR-040 per-module split
-routing (below):
+routing (below). **RRI 41–45** (ADR-038 Amendment 3, 2026-08-23) is the
+exception: a `GO_LOCAL` result routes the whole task through the same
+local-first path as 26–40 Moderate instead of cloud.
 
 ```mermaid
 flowchart LR
@@ -405,15 +415,19 @@ flowchart LR
     Glimmer -->|GO_LOCAL or CLOUD_REQUIRED| Receipt["Primary hash-bound\nroute receipt"]
     Receipt -->|"downgrade allowed;\nupgrade never allowed"| Gate{"med_high_gate.py\nboth sides GO_LOCAL?"}
     Gate -->|CLOUD_REQUIRED| Cloud["Resolved Codex / Claude takeover model\n+ full ADR-038 S5 evidence bundle"]
-    Gate -->|GO_LOCAL, policy excluded| Cloud
+    Gate -->|"GO_LOCAL, RRI 46-55\n(policy excluded)"| Cloud
+    Gate -->|"GO_LOCAL, RRI 41-45"| LocalFirst["Moderate local-first path\nrun_local_task.py, 2 repair attempts"]
 ```
 
 Implementation surfaces: `scripts/local-architect/run_analysis.py`
 (`med-high-refinement-v1` profile) for the Muse Glimmer artifact,
 `scripts/local-agent/med_high_gate.py` for the fail-closed route decision,
 `scripts/local-agent/run_med_high_task.py` for automatic cloud-evidence-bundle
-emission on every result. No whole-task local attempt/repair at this band —
-the only local authoring surface is an ADR-040-qualified module.
+emission on every `CLOUD_REQUIRED` or 46–55 `GO_LOCAL` result. For **RRI
+41–45**, a `GO_LOCAL` result instead hands off to
+`scripts/local-agent/run_local_task.py` exactly as Moderate does — no
+whole-task local attempt/repair applies to 46–55 outside an ADR-040-qualified
+module.
 
 Both sub-bands keep the band-resolved independent reviewer, 3 Reflection
 passes, and the RRI 26+/41+ human approval gate.
@@ -431,8 +445,11 @@ stays available as the fallback of last resort, not the default.
 
 An ADR-040-qualified local module tramo follows its own two-attempt local
 budget and may use this decomposition route for remaining module work. A
-Med-high whole-task `GO_LOCAL` advisory never starts a local developer and
-never creates a whole-task local repair budget.
+**46–55** Med-high whole-task `GO_LOCAL` advisory never starts a local
+developer and never creates a whole-task local repair budget. **RRI 41–45**
+(ADR-038 Amendment 3) is the exception: a `GO_LOCAL` result there does start
+a whole-task local attempt under the Moderate route, including this same
+post-repair-budget decomposition step on 2/2 exhaustion.
 
 A direct orchestrator edit is permitted only in two narrow, explicitly
 recorded cases: (1) a **documented tooling-failure exception** — the local
@@ -614,7 +631,8 @@ preserve any task-local pin until an approved change replaces it.
 Local-first position for 0–55 is set by § Model and thinking-mode selection
 and § Local-first and Architect-refined implementation routing above (Qwen
 Developer for eligible Low patches; `qwen3.8:27b-mlx` local-first for
-Moderate; ADR-038 cloud-only for Med-high); 56+ has no local-first position.
+Moderate; ADR-038 cloud-only for Med-high 46–55, local-first for Med-high
+41–45 per ADR-038 Amendment 3); 56+ has no local-first position.
 Classify the takeover cause before choosing the model: **operational-only**
 means the local service/binding/process/machine is unavailable with no
 evidence the task itself is harder than scored (don't spend Premium capacity
@@ -876,11 +894,12 @@ independent review, coverage, and closure remain later orchestrator-owned
 phases and do not rewrite the DEV result. A success audit records scope,
 acceptance/verification results, edit metrics, implementer model, and the
 signature. Use at most **2** evidence-backed local repair attempts for
-Moderate (26–40); Med-high (41–55) is cloud-only after its ADR-038 evidence
-gate. If the local runner/model is unavailable, the repair budget is
-exhausted, or the task violates the scope boundary, escalate with the
-relevant ADR-036/ADR-038 evidence packet to the concrete cloud-takeover model
-in the task card. Med-high tasks still go through the band-resolved
+Moderate (26–40) and for Med-high 41–45 on a `GO_LOCAL` result (ADR-038
+Amendment 3); Med-high 46–55 is cloud-only after its ADR-038 evidence gate.
+If the local runner/model is unavailable, the repair budget is exhausted, or
+the task violates the scope boundary, escalate with the relevant
+ADR-036/ADR-038 evidence packet to the concrete cloud-takeover model in the
+task card. Med-high tasks still go through the band-resolved
 independent review (phases 1 and 2) and 3 Reflection passes regardless of
 authoring location.
 

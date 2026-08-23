@@ -258,6 +258,87 @@ refinement/receipt evidence requirement (§2, §5), and the Amendment 1
 policy-exclusion of `GO_LOCAL` for every module `ADR-040` does not
 independently qualify for local routing.
 
+## Amendment 3 (2026-08-23): Reopen local-first for the low sub-band (RRI 41-45)
+
+**Reason:** owner directive during S-150-T3c presentation
+(`docs/tasks/s-150-translation-dubbing.md` § S-150-T3c), given directly by the
+DubBridge owner as final authority over this workflow policy. The owner was
+shown, and explicitly acknowledged, that this reopens the exact whole-task
+local-attempt path Amendment 1 (2026-08-12) disabled after a real RRI 55
+session stalled at turn 23 without producing a patch, and confirmed the
+reopening anyway for the narrower 41-45 sub-band. This amendment is a
+permanent policy change ("de ahora en más"), not a one-off waiver for a single
+task.
+
+**Changes to Amendment 1 (2026-08-12: Med-high local execution disabled):**
+Amendment 1's rule — that a `GO_LOCAL` refinement/receipt result is
+policy-excluded from starting a local developer, and every Med-high task
+routes to cloud — now applies only to **RRI 46-55**. For **RRI 41-45**, a
+`GO_LOCAL` refinement/receipt result routes the whole task through the
+Moderate local-first path (`docs/playbooks/AGENT_WORKFLOW_GUIDE.md §
+Local-first and Architect-refined implementation routing (RRI 26-55)` and
+`docs/policies/HITL_AUTONOMY_POLICY.md § Local-first implementation (RRI
+26-40 Moderate)`), including:
+
+- `scripts/local-agent/run_local_task.py` in a disposable worktree, primary
+  agent as orchestrator of record;
+- at most 2 evidence-backed local repair attempts;
+- on 2/2 exhaustion, the default next step is `docs/playbooks/
+  AGENT_WORKFLOW_GUIDE.md § Post-repair-budget Low-band decomposition` —
+  decompose the remaining work into scored Low-band (RRI 0-25) subtasks and
+  keep authoring local via `scripts/delegate-low-rri.py`, primary agent as
+  orchestrator only (diagnosing, splitting, dispatching, reviewing,
+  assembling — never authoring substantive logic directly);
+- cloud escalation (this ADR's existing cloud-takeover packet, § Preserve
+  evidence during cloud escalation) remains the fallback of last resort if
+  and only if that decomposition route itself cannot proceed — never the
+  default next step after repair-budget exhaustion.
+
+A `CLOUD_REQUIRED` result in the 41-45 sub-band is unaffected: it still routes
+directly to cloud per §§2-3, with no local attempt, exactly as the rest of
+Med-high.
+
+**§4 (Define "one local round" precisely) does not apply to a 41-45
+local-first attempt.** §4's 8-turn/300-second/zero-repair budget continues to
+govern only the 46-55 sub-band's now-narrower cloud-only rule (there is no
+local attempt to bound in 46-55) and the ADR-040 module tramo (Amendment 2).
+The 41-45 sub-band instead uses the Moderate local-first runner's own budget
+(2 evidence-backed repair attempts, then decomposition) — a materially
+different, less time-bounded mechanism than §4's single-session cutoff. This
+reintroduces, for a narrower RRI window, exactly the risk profile
+(potentially long-running local sessions before escalation) that motivated
+Amendment 1; the owner accepted this tradeoff explicitly for 41-45 while
+requiring it not extend to 46-55.
+
+**§6 (Exclude high-confidence surfaces from `GO_LOCAL`) is unchanged and
+fully applies to 41-45.** The primary must still choose cloud regardless of
+Muse Glimmer's recommendation for auth/security, rights/consent/governance
+invariants, schema/migrations/release cuts, an unresolved ADR decision, or
+unbounded scope — this amendment only changes what happens *after* a
+genuine, hard-exclusion-clean `GO_LOCAL` result in the 41-45 sub-band.
+
+**§7 (Keep review and approval rigor unchanged) is unaffected.** The
+band-resolved reviewer (Gemma primary, Muse Glimmer intermediate, D14 final
+per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review`), 3
+Reflection passes, the RRI 41+ human approval gate, owner verification, and
+status synchronization all continue to apply to the whole 41-55 range
+unchanged — this amendment affects only *who authors the code*, never the
+review/approval chain.
+
+**Interaction with Amendment 2 (ADR-040 per-module split):** unaffected.
+Amendment 2's per-module tramo remains available to a 46-55 task whose
+`allowed_paths` qualify, exactly as before. A 41-45 task now has two
+available local-authoring mechanisms — whole-task local-first (this
+amendment) or, if its files happen to also satisfy ADR-040's heterogeneous-
+complexity trigger, a per-module split — the orchestrator selects whichever
+applies; this amendment does not require evaluating ADR-040 first.
+
+**Not changed by this amendment:** the fail-closed route authority (§3), the
+refinement/receipt evidence requirement (§2, §5), the hard exclusions (§6),
+review/approval rigor (§7), and the Amendment 2 per-module exception for
+46-55. `S-150-T3c` itself (final RRI 50, in the unchanged 46-55 sub-band)
+remains cloud-only under this ADR exactly as before this amendment.
+
 ## Related
 
 - `docs/adr/ADR-036-local-first-agentic-implementation-band.md`

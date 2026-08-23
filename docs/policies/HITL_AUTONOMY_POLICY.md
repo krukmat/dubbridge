@@ -76,8 +76,11 @@ state active penalties explicitly in the delegation packet and final report.
 
 The **26–40 Moderate** approval gate is standard (present and wait for
 explicit approval); the band's exception is only its default implementation
-route. **41–55 Med-high does not use this route** — see § Med-high
-Architect-refined single-attempt gate below.
+route. **Med-high 46–55 does not use this route** — see § Med-high
+Architect-refined single-attempt gate below. **Med-high 41–45 does use this
+route** on a `GO_LOCAL` result (ADR-038 Amendment 3, 2026-08-23) — its
+approval gate, review chain, and Reflection count stay Med-high's own;
+only the implementation-authoring mechanics follow this section.
 
 Default Moderate path: `scripts/local-agent/run_local_task.py` in a
 disposable git worktree, primary agent as orchestrator of record, at most
@@ -89,9 +92,11 @@ separate approved cloud-takeover condition. Full route and rollback triggers:
 `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Local-first and Architect-refined
 implementation routing (RRI 26–55)` and § Handoff prompt format.
 
-Med-high has no whole-task repair attempt, **except** a module qualified
-under ADR-040 per-module split routing (below), whose local tramo uses this
-section's 2-attempt budget regardless of the containing task's band.
+Med-high 46–55 has no whole-task repair attempt, **except** a module
+qualified under ADR-040 per-module split routing (below), whose local tramo
+uses this section's 2-attempt budget regardless of the containing task's
+band. Med-high 41–45 is the exception: a `GO_LOCAL` result gives it the
+same whole-task 2-attempt budget as Moderate (ADR-038 Amendment 3).
 
 ## Post-repair-budget Low-band decomposition
 
@@ -104,8 +109,11 @@ escalation stays the fallback of last resort, not the default.
 
 An ADR-040-qualified local module follows its own two-attempt local budget and
 may use this decomposition route for its remaining module work. A Med-high
-whole-task `GO_LOCAL` advisory is policy-excluded from local implementation;
-it never creates a local repair budget.
+46–55 whole-task `GO_LOCAL` advisory is policy-excluded from local
+implementation; it never creates a local repair budget. A Med-high 41–45
+whole-task `GO_LOCAL` advisory (ADR-038 Amendment 3) is not excluded — it
+creates a local repair budget exactly like Moderate, including this
+post-repair-budget decomposition step on 2/2 exhaustion.
 
 Full 9-step route (budget confirmation, diagnosis, decomposition, delegation
 via `scripts/delegate-low-rri.py`, patch review, the two narrow direct-edit
@@ -128,14 +136,18 @@ standard; band-resolved independent review (phases 1 and 2) and 3 Reflection
 passes apply.
 
 Route: Muse Glimmer advisory refinement (`GO_LOCAL`|`CLOUD_REQUIRED`) →
-primary agent's hash-bound route receipt (may downgrade, never upgrade) →
-every result (including `GO_LOCAL`) escalates to the cloud takeover model
-with the full ADR-038 §5 evidence bundle — **except** a module qualified
-under ADR-040 per-module split routing (below). Hard exclusions from
-`GO_LOCAL` regardless of Muse Glimmer's recommendation: auth/security,
-rights/consent/governance invariants, schema/migrations/release cuts,
-unresolved ADR decisions, unbounded scope (ADR-038 §6). Full route,
-implementation surfaces, evidence bundle:
+primary agent's hash-bound route receipt (may downgrade, never upgrade). For
+**RRI 46–55**, every result (including `GO_LOCAL`) escalates to the cloud
+takeover model with the full ADR-038 §5 evidence bundle — **except** a
+module qualified under ADR-040 per-module split routing (below). For **RRI
+41–45** (ADR-038 Amendment 3, 2026-08-23), a `GO_LOCAL` result instead
+routes the whole task through the Moderate local-first path (§ Local-first
+implementation above) — `CLOUD_REQUIRED` still escalates to cloud in both
+sub-bands. Hard exclusions from `GO_LOCAL` regardless of Muse Glimmer's
+recommendation, unchanged for both sub-bands: auth/security, rights/consent/
+governance invariants, schema/migrations/release cuts, unresolved ADR
+decisions, unbounded scope (ADR-038 §6). Full route, implementation
+surfaces, evidence bundle:
 `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Local-first and Architect-refined
 implementation routing (RRI 26–55)` and ADR-038.
 

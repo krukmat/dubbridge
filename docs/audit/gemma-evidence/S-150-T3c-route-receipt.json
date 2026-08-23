@@ -1,0 +1,10 @@
+{
+  "task_id": "S-150-T3c",
+  "card_hash": "dcf2f64844ed7f0048cb7006b3f7e3d6f1c2a4c8dd8e3d83b49c292989d53c25",
+  "refinement_artifact_sha256": "a5c88f4419dc22402ed092afa9faae489ac3ecddfdb76393abde0cdecec386f9",
+  "decision": "GO_LOCAL",
+  "primary_id": "claude-code-sonnet-5",
+  "timestamp": "2026-08-23T22:20:00Z",
+  "rationale": "Muse Glimmer's advisory recommended GO_LOCAL: scope is bounded worker-runner glue mirroring the operational transcription_runtime precedent, all persistence/subprocess/schema contracts are frozen from prior done tasks (T1c-ii/T3a/T3b), no ADR-038 hard exclusion applies (not auth/security/consent/governance/schema/migration/unresolved-ADR). No downgrade to CLOUD_REQUIRED is warranted on independent review -- this is a single cohesive worker-runner module (one new file + wiring in main.rs + one storage helper), not an ADR-040-qualified disjoint multi-file split. However per docs/playbooks/AGENT_WORKFLOW_GUIDE.md, Med-high (41-55) has no whole-task local-repair budget regardless of route recommendation, except an ADR-040-qualified module tramo (not applicable here) -- every result, including GO_LOCAL, still produces the concrete cloud-takeover packet with full ADR-038 S5 evidence per the route table's unconditional row for this band.",
+  "gate_decision_note": "This receipt records the primary agent's GO_LOCAL/CLOUD_REQUIRED technical route judgment per ADR-038 s.2. Per docs/playbooks/AGENT_WORKFLOW_GUIDE.md's Med-high routing table, this technical GO_LOCAL result does not create a whole-task local implementation attempt -- the cloud-takeover packet in the task card's routing table is produced unconditionally for this band, GO_LOCAL included."
+}
