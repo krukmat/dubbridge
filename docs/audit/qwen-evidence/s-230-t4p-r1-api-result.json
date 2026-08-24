@@ -1,0 +1,14 @@
+{
+  "after_block": "    docker run -d --rm --network \"$test_network\" -p 8090:8080 \\\n          -e DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@postgres:5432/dubbridge \\\n          -e DUBBRIDGE_REDIS_URL=redis://redis:6379 \\\n          -e DUBBRIDGE_STORAGE__ENDPOINT_URL=http://minio:9000 \\\n          -e DUBBRIDGE_ENV=local \\\n          -e DUBBRIDGE_STORAGE__ACCESS_KEY_ID=dubbridge \\\n          -e DUBBRIDGE_STORAGE__SECRET_ACCESS_KEY=dubbridge123 \\\n          -e DUBBRIDGE_STORAGE__REGION=us-east-1 \\\n          -e DUBBRIDGE_STORAGE__BACKEND=s3 \\\n          -e DUBBRIDGE_STORAGE__BUCKET=dubbridge-local \\\n          --name dubbridge-api-full-pipeline-test \\\n          \"$api_image\"",
+  "apply_result": "applied",
+  "path": "scripts/test-production-images.sh",
+  "risk_notes": [
+    "Low. Changes are limited to local test configuration."
+  ],
+  "status": "patch",
+  "summary": "Updated API container environment variables in test-production-images.sh to use DUBBRIDGE_STORAGE__ prefixed keys and S3 backend.",
+  "test_commands": [
+    "grep -n \"DUBBRIDGE_STORAGE__ACCESS_KEY_ID\" scripts/test-production-images.sh"
+  ],
+  "unified_diff": "diff --git a/scripts/test-production-images.sh b/scripts/test-production-images.sh\nindex 19591b6..2823aa5\n--- a/scripts/test-production-images.sh\n+++ b/scripts/test-production-images.sh\n@@ -686,17 +686,17 @@ run_full-pipeline() {\n     trap cleanup_full_pipeline RETURN\n \n     docker run -d --rm --network \"$test_network\" -p 8090:8080 \\\n-         -e DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@postgres:5432/dubbridge \\\n-         -e DUBBRIDGE_REDIS_URL=redis://redis:6379 \\\n-         -e DUBBRIDGE_STORAGE__ENDPOINT_URL=http://minio:9000 \\\n-         -e DUBBRIDGE_ENV=local \\\n-         -e AWS_ACCESS_KEY_ID=dubbridge \\\n-         -e AWS_SECRET_ACCESS_KEY=dubbridge123 \\\n-         -e AWS_REGION=us-east-1 \\\n-         -e DUBBRIDGE_STORAGE__BACKEND=local_fs \\\n-         -e DUBBRIDGE_STORAGE__BUCKET=dubbridge-local \\\n-         --name dubbridge-api-full-pipeline-test \\\n-         \"$api_image\"\n+          -e DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@postgres:5432/dubbridge \\\n+          -e DUBBRIDGE_REDIS_URL=redis://redis:6379 \\\n+          -e DUBBRIDGE_STORAGE__ENDPOINT_URL=http://minio:9000 \\\n+          -e DUBBRIDGE_ENV=local \\\n+          -e DUBBRIDGE_STORAGE__ACCESS_KEY_ID=dubbridge \\\n+          -e DUBBRIDGE_STORAGE__SECRET_ACCESS_KEY=dubbridge123 \\\n+          -e DUBBRIDGE_STORAGE__REGION=us-east-1 \\\n+          -e DUBBRIDGE_STORAGE__BACKEND=s3 \\\n+          -e DUBBRIDGE_STORAGE__BUCKET=dubbridge-local \\\n+          --name dubbridge-api-full-pipeline-test \\\n+          \"$api_image\"\n \n     api_live_ok=0\n     for i in $(seq 1 30); do\n"
+}

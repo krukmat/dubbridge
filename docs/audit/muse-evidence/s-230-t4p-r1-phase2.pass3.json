@@ -1,0 +1,9 @@
+{
+  "changed_paths": [
+    "scripts/test-production-images.sh"
+  ],
+  "findings": [],
+  "format_warnings": [],
+  "status": "pass",
+  "summary": "run_full-pipeline now configures both API and worker containers to use the local MinIO S3 adapter with shared bucket dubbridge-local; env vars migrated from AWS_* to DUBBRIDGE_STORAGE__* and BACKEND switched from local_fs to s3. Stopped-dependency negative test already verified non-zero exit."
+}

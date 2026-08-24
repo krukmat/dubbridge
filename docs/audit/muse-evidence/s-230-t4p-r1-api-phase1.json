@@ -1,0 +1,39 @@
+{
+  "changed_paths": [],
+  "findings": [
+    {
+      "detail": "No diff or file content supplied to validate the exact block replacement and substitutions",
+      "line": 688,
+      "path": "repo/scripts/test-production-images.sh",
+      "scope": "out-of-scope",
+      "severity": "blocking",
+      "suggestion": "Provide the actual diff/patch for the target file so the change can be reviewed"
+    }
+  ],
+  "model": "muse-glimmer:30b-q4_K_M",
+  "passes_run": 3,
+  "passes_succeeded": 3,
+  "reconciliation": {
+    "consensus": [
+      {
+        "detail": "No diff or file content supplied to validate the exact block replacement and substitutions",
+        "line": 688,
+        "path": "repo/scripts/test-production-images.sh",
+        "scope": "out-of-scope",
+        "severity": "blocking",
+        "suggestion": "Provide the actual diff/patch for the target file so the change can be reviewed"
+      }
+    ],
+    "consensus_count": 1,
+    "likely_false_positive": [],
+    "likely_false_positive_count": 0,
+    "location_inconsistent": [],
+    "location_inconsistent_count": 0,
+    "pass_specific": [],
+    "pass_specific_count": 0,
+    "severity_inconsistent": [],
+    "severity_inconsistent_count": 0
+  },
+  "status": "blocked",
+  "summary": "Packet does not contain a reviewable diff or file context for scripts/test-production-images.sh:688; cannot verify the requested API container block replacement"
+}

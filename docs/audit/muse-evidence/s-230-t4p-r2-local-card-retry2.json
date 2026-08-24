@@ -1,0 +1,12 @@
+{
+  "task_id": "S-230-T4p-R2",
+  "rri": 33,
+  "band": "Moderate",
+  "allowed_paths": ["scripts/lib/full-pipeline.sh"],
+  "acceptance_tests": [
+    "bash -n scripts/lib/full-pipeline.sh",
+    "bash scripts/test-production-images.sh contract full-pipeline",
+    "DUBBRIDGE_WORKER_IMAGE_TAG=dubbridge-worker-runner-t4p:evidence bash scripts/test-production-images.sh run full-pipeline"
+  ],
+  "spec": "Implement only scripts/lib/full-pipeline.sh. For your first tool call, use write_file, never apply_patch, with path scripts/lib/full-pipeline.sh and content containing the complete replacement file. Preserve all existing functions and behavior except the sequence described here. After that successful write_file call, use finish. Preserve API start and health checks. Move worker startup, its existing S3/MinIO environment, its 3-second wait, and running-state check from before registration to immediately after a successful asset-to-project link. After register, parse token and camelCase workspaceId, validate workspaceId as a UUID, POST /orgs/${workspace_id}/projects with bearer auth and JSON {name:t4o-full-pipeline-project,asset_ids:[]}, parse and validate response id as project_id, then PUT /orgs/${workspace_id}/projects/${project_id}/target-languages with bearer auth and JSON {source_lang:en-US,target_languages:[es-ES]}. Use guarded JSON extraction: failed HTTP requests, malformed or empty JSON, invalid UUIDs, or a language response lacking en-US/es-ES must print a precise ERROR and return 1 before worker startup without printing the token. Preserve ingest, rights, finalize, and asset UUID validation. Then POST /orgs/${workspace_id}/projects/${project_id}/assets with bearer auth and JSON {asset_id:${asset_id}}; require response assets to contain asset_id or return 1 before worker startup. Keep polling, re-finalization rejection, and RETURN cleanup unchanged. Do not edit another path. The complete authorized file is already supplied; return its full revised contents in write_file rather than attempting a quoted patch."
+}

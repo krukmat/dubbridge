@@ -1,0 +1,88 @@
+{
+  "finished_at": "2026-08-24T14:00:00Z",
+  "reason": "malformed_tool_call_repeated",
+  "status": "aborted",
+  "task_id": "S-230-T4p-R2",
+  "transcript": [
+    {
+      "raw": {
+        "tool_calls": [
+          {
+            "function": {
+              "arguments": {
+                "anchor": "    token=$(echo \"$register_output\" | python3 -c 'import json,sys; print(json.load(sys.stdin)[",
+                "path": "scripts/lib/full-pipeline.sh"
+              },
+              "name": "apply_patch"
+            }
+          }
+        ]
+      },
+      "role": "assistant"
+    },
+    {
+      "error": "missing required argument 'replacement'",
+      "event": "malformed_tool_call"
+    },
+    {
+      "raw": {
+        "tool_calls": [
+          {
+            "function": {
+              "arguments": {
+                "anchor": "    token=$(echo \"$register_output\" | python3 -c 'import json,sys; print(json.load(sys.stdin)['\", \"replacement\": ",
+                "path": "scripts/lib/full-pipeline.sh"
+              },
+              "name": "apply_patch"
+            }
+          }
+        ]
+      },
+      "role": "assistant"
+    },
+    {
+      "error": "missing required argument 'replacement'",
+      "event": "malformed_tool_call"
+    },
+    {
+      "raw": {
+        "tool_calls": [
+          {
+            "function": {
+              "arguments": {
+                "anchor": "    token=$(echo \"$register_output\" | python3 -c 'import json,sys; print(json.load(sys.stdin)['\"', \"replacement\": \"    token=$(echo \"$register_output\" | python3 -c 'import json,sys; print(json.load(sys.stdin)['\"\"\"', extrae='{\"extract\": \"token\"}')\"}}]}, ",
+                "path": "scripts/lib/full-pipeline.sh"
+              },
+              "name": "apply_patch"
+            }
+          }
+        ]
+      },
+      "role": "assistant"
+    },
+    {
+      "error": "missing required argument 'replacement'",
+      "event": "malformed_tool_call"
+    },
+    {
+      "raw": {
+        "tool_calls": [
+          {
+            "function": {
+              "arguments": {
+                "anchor": "    token=$(echo \"$register_output\" | python3 -c 'import json,sys; print(json.load(sys.stdin)[",
+                "path": "scripts/lib/full-pipeline.sh"
+              },
+              "name": "apply_patch"
+            }
+          }
+        ]
+      },
+      "role": "assistant"
+    },
+    {
+      "error": "missing required argument 'replacement'",
+      "event": "malformed_tool_call"
+    }
+  ]
+}

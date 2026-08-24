@@ -1,0 +1,14 @@
+{
+  "after_block": "    docker run -d --rm --network \"$test_network\" \\\n          -e DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@postgres:5432/dubbridge \\\n          -e DUBBRIDGE_REDIS_URL=redis://redis:6379 \\\n          -e DUBBRIDGE_STORAGE__ENDPOINT_URL=http://minio:9000 \\\n          -e DUBBRIDGE_ENV=local \\\n          -e DUBBRIDGE_STORAGE__ACCESS_KEY_ID=dubbridge \\\n          -e DUBBRIDGE_STORAGE__SECRET_ACCESS_KEY=dubbridge123 \\\n          -e DUBBRIDGE_STORAGE__REGION=us-east-1 \\\n          -e DUBBRIDGE_STORAGE__BACKEND=s3 \\\n          -e DUBBRIDGE_STORAGE__BUCKET=dubbridge-local \\\n          --name dubbridge-worker-full-pipeline-test \\\n          \"$worker_image\"",
+  "apply_result": "applied",
+  "path": "scripts/test-production-images.sh",
+  "risk_notes": [
+    "Low. Changes are limited to local test configuration for MinIO integration."
+  ],
+  "status": "patch",
+  "summary": "Updated worker container environment variables in scripts/test-production-images.sh to use DUBBRIDGE_STORAGE__ prefixed keys and s3 backend.",
+  "test_commands": [
+    "grep -n \"DUBBRIDGE_STORAGE__ACCESS_KEY_ID\" scripts/test-production-images.sh"
+  ],
+  "unified_diff": "diff --git a/scripts/test-production-images.sh b/scripts/test-production-images.sh\nindex 2823aa5..10b9345\n--- a/scripts/test-production-images.sh\n+++ b/scripts/test-production-images.sh\n@@ -725,17 +725,17 @@ run_full-pipeline() {\n     fi\n \n     docker run -d --rm --network \"$test_network\" \\\n-         -e DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@postgres:5432/dubbridge \\\n-         -e DUBBRIDGE_REDIS_URL=redis://redis:6379 \\\n-         -e DUBBRIDGE_STORAGE__ENDPOINT_URL=http://minio:9000 \\\n-         -e DUBBRIDGE_ENV=local \\\n-         -e AWS_ACCESS_KEY_ID=dubbridge \\\n-         -e AWS_SECRET_ACCESS_KEY=dubbridge123 \\\n-         -e AWS_REGION=us-east-1 \\\n-         -e DUBBRIDGE_STORAGE__BACKEND=local_fs \\\n-         -e DUBBRIDGE_STORAGE__BUCKET=dubbridge-local \\\n-         --name dubbridge-worker-full-pipeline-test \\\n-         \"$worker_image\"\n+          -e DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@postgres:5432/dubbridge \\\n+          -e DUBBRIDGE_REDIS_URL=redis://redis:6379 \\\n+          -e DUBBRIDGE_STORAGE__ENDPOINT_URL=http://minio:9000 \\\n+          -e DUBBRIDGE_ENV=local \\\n+          -e DUBBRIDGE_STORAGE__ACCESS_KEY_ID=dubbridge \\\n+          -e DUBBRIDGE_STORAGE__SECRET_ACCESS_KEY=dubbridge123 \\\n+          -e DUBBRIDGE_STORAGE__REGION=us-east-1 \\\n+          -e DUBBRIDGE_STORAGE__BACKEND=s3 \\\n+          -e DUBBRIDGE_STORAGE__BUCKET=dubbridge-local \\\n+          --name dubbridge-worker-full-pipeline-test \\\n+          \"$worker_image\"\n \n     sleep 3\n     worker_running=$(docker inspect -f '{{.State.Running}}' dubbridge-worker-full-pipeline-test 2>/dev/null)\n"
+}

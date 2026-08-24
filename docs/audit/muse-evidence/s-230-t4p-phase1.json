@@ -1,0 +1,21 @@
+{
+  "changed_paths": [],
+  "findings": [],
+  "model": "muse-glimmer:30b-q4_K_M",
+  "passes_run": 3,
+  "passes_succeeded": 1,
+  "reconciliation": {
+    "consensus": [],
+    "consensus_count": 0,
+    "likely_false_positive": [],
+    "likely_false_positive_count": 0,
+    "location_inconsistent": [],
+    "location_inconsistent_count": 0,
+    "pass_specific": [],
+    "pass_specific_count": 0,
+    "severity_inconsistent": [],
+    "severity_inconsistent_count": 0
+  },
+  "status": "pass",
+  "summary": "Packet scope, dependencies, hard boundaries and acceptance evidence requirements are consistent with frozen scope for S-230-T4p. No missing constraints, unsafe scope expansion, absent acceptance evidence, or dependency mistakes identified."
+}

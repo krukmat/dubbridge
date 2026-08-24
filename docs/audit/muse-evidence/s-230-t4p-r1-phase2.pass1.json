@@ -1,0 +1,9 @@
+{
+  "changed_paths": [
+    "scripts/test-production-images.sh"
+  ],
+  "findings": [],
+  "format_warnings": [],
+  "status": "pass",
+  "summary": "run_full-pipeline now configures both API and worker containers to use the local MinIO S3 adapter with shared bucket dubbridge-local; env vars migrated from generic AWS_* to DUBBRIDGE_STORAGE__* and BACKEND set to s3. Stopped-dependency negative run verified non-zero exit. Storage-only change meets HP-1; transcription precondition failure is out of scope."
+}

@@ -1,0 +1,53 @@
+    docker run -d --rm --network "$test_network" -p 8090:8080 \
+         -e DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@postgres:5432/dubbridge \
+         -e DUBBRIDGE_REDIS_URL=redis://redis:6379 \
+         -e DUBBRIDGE_STORAGE__ENDPOINT_URL=http://minio:9000 \
+         -e DUBBRIDGE_ENV=local \
+         -e AWS_ACCESS_KEY_ID=dubbridge \
+         -e AWS_SECRET_ACCESS_KEY=dubbridge123 \
+         -e AWS_REGION=us-east-1 \
+         -e DUBBRIDGE_STORAGE__BACKEND=local_fs \
+         -e DUBBRIDGE_STORAGE__BUCKET=dubbridge-local \
+         --name dubbridge-api-full-pipeline-test \
+         "$api_image"
+
+    api_live_ok=0
+    for i in $(seq 1 30); do
+        if curl -sf -o /dev/null http://localhost:8090/health/live; then
+            api_live_ok=1
+            break
+        fi
+        sleep 1
+    done
+    if [ "$api_live_ok" -ne 1 ]; then
+        echo "ERROR: api /health/live did not become ready within timeout" >&2
+        return 1
+    fi
+
+    api_ready_ok=0
+    for i in $(seq 1 30); do
+        if curl -sf -o /dev/null http://localhost:8090/health/ready; then
+            api_ready_ok=1
+            break
+        fi
+        sleep 1
+    done
+    if [ "$api_ready_ok" -ne 1 ]; then
+        echo "ERROR: api /health/ready did not become ready within timeout" >&2
+        return 1
+    fi
+
+    docker run -d --rm --network "$test_network" \
+         -e DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@postgres:5432/dubbridge \
+         -e DUBBRIDGE_REDIS_URL=redis://redis:6379 \
+         -e DUBBRIDGE_STORAGE__ENDPOINT_URL=http://minio:9000 \
+         -e DUBBRIDGE_ENV=local \
+         -e AWS_ACCESS_KEY_ID=dubbridge \
+         -e AWS_SECRET_ACCESS_KEY=dubbridge123 \
+         -e AWS_REGION=us-east-1 \
+         -e DUBBRIDGE_STORAGE__BACKEND=local_fs \
+         -e DUBBRIDGE_STORAGE__BUCKET=dubbridge-local \
+         --name dubbridge-worker-full-pipeline-test \
+         "$worker_image"
+
+    sleep 3

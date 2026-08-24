@@ -1,0 +1,9 @@
+{
+  "changed_paths": [
+    "scripts/test-production-images.sh"
+  ],
+  "findings": [],
+  "format_warnings": [],
+  "status": "pass",
+  "summary": "The run_full-pipeline change switches both API and worker containers from local_fs/AWS_* vars to the DUBBRIDGE_STORAGE__* S3 adapter pointing at http://minio:9000 with bucket dubbridge-local. This satisfies HP-1 for shared MinIO storage. EC-1 negative run and script checks already passed per packet."
+}

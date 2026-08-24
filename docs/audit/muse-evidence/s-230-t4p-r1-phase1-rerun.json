@@ -1,0 +1,23 @@
+{
+  "changed_paths": [
+    "scripts/test-production-images.sh"
+  ],
+  "findings": [],
+  "model": "muse-glimmer:30b-q4_K_M",
+  "passes_run": 3,
+  "passes_succeeded": 3,
+  "reconciliation": {
+    "consensus": [],
+    "consensus_count": 0,
+    "likely_false_positive": [],
+    "likely_false_positive_count": 0,
+    "location_inconsistent": [],
+    "location_inconsistent_count": 0,
+    "pass_specific": [],
+    "pass_specific_count": 0,
+    "severity_inconsistent": [],
+    "severity_inconsistent_count": 0
+  },
+  "status": "pass",
+  "summary": "The bounded change correctly switches both API and worker containers in run_full-pipeline to shared S3 MinIO via DUBBRIDGE_STORAGE__BACKEND=s3 with common endpoint http://minio:9000 and bucket dubbridge-local, maps credentials to Figment nested StorageSettings variables, and removes the redundant AWS_* aliases. No application code, production descriptor, or other harness elements are touched."
+}

@@ -143,8 +143,12 @@ GENERATION_TOKEN_BUDGET = 8192
 # to nemotron-3.5-lightning:30b-a3b-q4_K_M. This ceiling has not been
 # re-measured against either binding. Owner directive, 2026-08-12, sets the
 # Moderate/M operational ceiling to 64K: enough room for multi-turn tool
-# history and full-file reads without the 90K KV-cache allocation.
-MODEL_CONTEXT_TOKENS = 65536
+# history and full-file reads without the 90K KV-cache allocation. Lowered
+# to 32K per owner directive, 2026-08-24: nemotron-3.5-lightning is memory-
+# constrained on this host, and 32K keeps the KV-cache allocation smaller
+# while still covering this runner's multi-turn tool history and full-file
+# reads for the workspace's task sizes.
+MODEL_CONTEXT_TOKENS = 32768
 
 # TOOL_CALLING_SYSTEM_PROMPT and TOOL_CALL_JSON_SCHEMA moved to cli.py in
 # LRPC-0b (chat-transport/tool-contract concerns, alongside build_live_chat_fn

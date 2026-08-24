@@ -1,0 +1,16 @@
+{
+  "changed_paths": [],
+  "findings": [
+    {
+      "detail": "No diff or file content supplied to validate the exact block replacement and substitutions",
+      "line": 688,
+      "path": "repo/scripts/test-production-images.sh",
+      "scope": "out-of-scope",
+      "severity": "blocking",
+      "suggestion": "Provide the actual diff/patch for the target file so the change can be reviewed"
+    }
+  ],
+  "format_warnings": [],
+  "status": "blocked",
+  "summary": "Packet does not contain a reviewable diff or file context for scripts/test-production-images.sh:688; cannot verify the requested API container block replacement"
+}

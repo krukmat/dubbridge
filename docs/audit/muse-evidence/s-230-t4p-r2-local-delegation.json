@@ -1,0 +1,59 @@
+{
+  "fallback_selection": {
+    "packet_sha256": "c91068de1f6ca2bbdcbc50165a1a2cacc9395b7538f7eec63abf4b58f31a7c73",
+    "phase": "implementation",
+    "recommended_model": "gpt-5.6-terra",
+    "recommended_reasoning_effort": "medium",
+    "role": "cloud-implementer",
+    "rri": 33,
+    "schema_version": "fallback-selection-v1",
+    "selected_by": null,
+    "selected_model": null,
+    "selected_reasoning_effort": null,
+    "selection_mode": "human-select",
+    "status": "awaiting_fallback_selection",
+    "task_id": "S-230-T4p-R2",
+    "trigger": "Gemma idle timeout after 180s without a token",
+    "trigger_kind": "operational-only"
+  },
+  "fallback_selection_artifact": "/Users/matias/dubbridge/docs/audit/muse-evidence/s-230-t4p-r2-local-delegation.fallback-selection.json",
+  "finished_at": "2026-08-24T13:46:40Z",
+  "reason": "Gemma idle timeout after 180s without a token",
+  "status": "transport_error",
+  "task_id": "S-230-T4p-R2",
+  "terminal_attempt_packet": {
+    "counters_used": {
+      "repair_attempts": 0,
+      "test_attempts": 0,
+      "total_turns": 0
+    },
+    "effective_limits": {
+      "band": "Moderate",
+      "local_execution_allowed": true,
+      "max_repair_attempts": 2,
+      "max_total_turns": 30,
+      "required_model": null
+    },
+    "final_test_result": null,
+    "implementer_model": "nemotron-3.5-lightning:30b-a3b-q4_K_M",
+    "phase": "implementation",
+    "rri": 33,
+    "task_id": "S-230-T4p-R2",
+    "terminal_reason": "Gemma idle timeout after 180s without a token",
+    "terminal_status": "transport_error",
+    "terminal_transcript": [
+      {
+        "error": "Gemma idle timeout after 180s without a token",
+        "event": "transport_error"
+      }
+    ],
+    "trigger": "Gemma idle timeout after 180s without a token",
+    "trigger_kind": "operational-only"
+  },
+  "transcript": [
+    {
+      "error": "Gemma idle timeout after 180s without a token",
+      "event": "transport_error"
+    }
+  ]
+}

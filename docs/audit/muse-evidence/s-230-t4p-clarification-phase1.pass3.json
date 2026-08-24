@@ -1,0 +1,16 @@
+{
+  "changed_paths": [],
+  "findings": [
+    {
+      "detail": "Review requires a supplied packet and diff to inspect; none present in the submission.",
+      "line": 1,
+      "path": "repo/",
+      "scope": "out-of-scope",
+      "severity": "blocking",
+      "suggestion": "Provide the review packet and diff for Gemma Reviewer evaluation."
+    }
+  ],
+  "format_warnings": [],
+  "status": "blocked",
+  "summary": "No reviewable packet or diff supplied; only a clarification task description was provided."
+}

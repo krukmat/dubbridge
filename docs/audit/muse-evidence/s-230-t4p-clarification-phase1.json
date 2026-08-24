@@ -1,0 +1,39 @@
+{
+  "changed_paths": [],
+  "findings": [
+    {
+      "detail": "Review requires a supplied packet and diff to inspect; none present in the submission.",
+      "line": 1,
+      "path": "repo/",
+      "scope": "out-of-scope",
+      "severity": "blocking",
+      "suggestion": "Provide the review packet and diff for Gemma Reviewer evaluation."
+    }
+  ],
+  "model": "muse-glimmer:30b-q4_K_M",
+  "passes_run": 3,
+  "passes_succeeded": 3,
+  "reconciliation": {
+    "consensus": [
+      {
+        "detail": "Review requires a supplied packet and diff to inspect; none present in the submission.",
+        "line": 1,
+        "path": "repo/",
+        "scope": "out-of-scope",
+        "severity": "blocking",
+        "suggestion": "Provide the review packet and diff for Gemma Reviewer evaluation."
+      }
+    ],
+    "consensus_count": 1,
+    "likely_false_positive": [],
+    "likely_false_positive_count": 0,
+    "location_inconsistent": [],
+    "location_inconsistent_count": 0,
+    "pass_specific": [],
+    "pass_specific_count": 0,
+    "severity_inconsistent": [],
+    "severity_inconsistent_count": 0
+  },
+  "status": "blocked",
+  "summary": "No reviewable packet or diff supplied; only a clarification task description was provided."
+}

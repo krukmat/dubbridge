@@ -1,0 +1,17 @@
+{
+  "packet_sha256": "c91068de1f6ca2bbdcbc50165a1a2cacc9395b7538f7eec63abf4b58f31a7c73",
+  "phase": "implementation",
+  "recommended_model": "gpt-5.6-terra",
+  "recommended_reasoning_effort": "medium",
+  "role": "cloud-implementer",
+  "rri": 33,
+  "schema_version": "fallback-selection-v1",
+  "selected_by": null,
+  "selected_model": null,
+  "selected_reasoning_effort": null,
+  "selection_mode": "human-select",
+  "status": "awaiting_fallback_selection",
+  "task_id": "S-230-T4p-R2",
+  "trigger": "Gemma idle timeout after 180s without a token",
+  "trigger_kind": "operational-only"
+}

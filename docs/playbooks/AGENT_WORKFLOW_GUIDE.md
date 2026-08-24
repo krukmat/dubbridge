@@ -47,8 +47,11 @@ and Architect-refined implementation routing below), not to cloud. A
    endpoint (`pgrep -fl ollama`, `lsof -iTCP:11434 -sTCP:LISTEN`), then
    warm-test every model the task's band will use with a review-style
    JSON-only prompt at production `num_predict`/`num_ctx` (`65536` for Low/S
-   and Moderate roles; the configured reviewer context otherwise), confirming
-   `done_reason: "stop"` with non-empty content. Treat empty `content` on any
+   Qwen roles; `32768` for Moderate nemotron roles, lowered 2026-08-24 for
+   host memory constraints — see `scripts/local-agent/run_local_task.py`
+   `MODEL_CONTEXT_TOKENS`; the configured reviewer context otherwise),
+   confirming `done_reason: "stop"` with non-empty content. Treat empty
+   `content` on any
    terminal reason as a capacity symptom, not a stall — enter the
    resource-recovery protocol below rather than retrying unchanged.
    - One restart per repository task ID; retries, repairs, and later local

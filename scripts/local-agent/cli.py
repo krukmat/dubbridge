@@ -31,8 +31,9 @@ from session_loop import BoundaryViolation, MalformedToolCall, run_loop
 # module-level defaults. Duplicated here rather than imported to avoid the
 # circular import (run_local_task.py already does `import cli`); both sides
 # are the same ADR-036 local-implementer defaults, not two independent
-# guesses.
-_DEFAULT_MODEL_CONTEXT_TOKENS = 65536
+# guesses. Lowered to 32K alongside run_local_task.py per owner directive,
+# 2026-08-24 (nemotron memory constraint) — keep both constants in sync.
+_DEFAULT_MODEL_CONTEXT_TOKENS = 32768
 _DEFAULT_GENERATION_TOKEN_BUDGET = 8192
 
 # Output-format contract local to this script's tool-call transport: no

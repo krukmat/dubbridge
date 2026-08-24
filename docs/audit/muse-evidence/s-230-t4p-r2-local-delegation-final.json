@@ -1,0 +1,98 @@
+{
+  "effective_limits": {
+    "band": "Moderate",
+    "local_execution_allowed": true,
+    "max_repair_attempts": 2,
+    "max_total_turns": 30,
+    "required_model": null
+  },
+  "max_turns": 30,
+  "status": "in_progress",
+  "task_id": "S-230-T4p-R2",
+  "transcript": [
+    {
+      "raw": {
+        "tool_calls": [
+          {
+            "function": {
+              "arguments": {
+                "content": "# Full-pipeline case for scripts/test-production-images.sh.\n# This module intentionally relies on the parent harness for strict mode,\n# TEMP_DIR, case dispatch, and process-wide cleanup.\n\ncontract_full-pipeline() {\n    echo \"Contract check for full-pipeline case\"\n    if [ ! -f \"apps/api/Dockerfile\" ]; then\n        echo \"ERROR: apps/api/Dockerfile not found\" >&2\n        return 1\n    fi\n    if [ ! -f \"apps/worker-runner/Dockerfile\" ]; then\n        echo \"ERROR: apps/worker-runner/Dockerfile not found\" >&2\n        return 1\n    fi\n    if ! grep -q 'ENTRYPOINT \\[\"/app/dubbridge-api\"\\]\" apps/api/Dockerfile; then\n        echo \"ERROR: ENTRYPOINT [\"/app/dubbridge-api\"] not found in apps/api/Dockerfile\" >&2\n        return 1\n    fi\n    if ! grep -q 'ENTRYPOINT \\[\"/app/dubbridge-worker-runner\"\\]\" apps/worker-runner/Dockerfile; then\n        echo \"ERROR: ENTRYPOINT [\"/app/dubbridge-worker-runner\"] not found in apps/worker-runner/Dockerfile\" >&2\n        return 1\n    fi\n    echo \"Contract check passed for full-pipeline\"\n    return 0\n}\n\nrun_full-pipeline() {\n    echo \"Run check for full-pipeline case\"\n    if ! command -v docker >/dev/null 2>&1; then\n        echo \"ERROR: docker not found on PATH\" >&2\n        return 1\n    fi\n    if ! command -v curl >/dev/null 2>&1; then\n        echo \"ERROR: curl not found on PATH\" >&2\n        return 1\n    fi\n    if ! command -v python3 >/dev/null 2>&1; then\n        echo \"ERROR: python3 not found on PATH\" >&2\n        return 1\n    fi\n\n    dep_container=\"${DUBBRIDGE_TEST_DEPENDENCY_CONTAINER:-local-postgres-1}\"\n    dep_running=$(docker inspect -f '{{.State.Running}}' \"$dep_container\" 2>/dev/null) ; if [ \"$dep_running\" != \"true\" ]; then echo \"ERROR: dependency container '$dep_container' is not running \u2014 bring up infra/local/docker-compose.yml first\" >&2; return 1; fi\n    test_network=$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{end}}' \"$dep_container\" 2>/dev/null | head -n 1)\n    if [ -z \"$test_network\" ]; then\n        echo \"ERROR: could not resolve network for dependency container '$dep_container'\" >&2\n        return 1\n    fi\n\n    api_image=\"${DUBBRIDGE_API_IMAGE_TAG:-dubbridge-api-t4c:test}\"\n    worker_image=\"${DUBBRIDGE_WORKER_IMAGE_TAG:-dubbridge-worker-runner-t4i:test}\"\n\n     # \\(\\| true\\) on each step: under \\( -e \\), a failure inside a RETURN trap\n     # \\(e.g. stopping a --rm container that already self-removed\\) would abort\n     # the whole script and clobber the real exit status of run_full-pipeline().\n    cleanup_full_pipeline() {\n        docker stop dubbridge-worker-full-pipeline-test >/dev/null 2>&1 || true\n        docker stop dubbridge-api-full-pipeline-test >/dev/null 2>&1 || true\n     }\n     trap cleanup_full_pipeline RETURN\n\n    docker run -d --rm --network \"$test_network\" -p 8090:8080 \\\n         -e DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@postgres:5432/dubbridge \\\n         -e DUBBRIDGE_REDIS_URL=redis://redis:6379 \\\n         -e DUBBRIDGE_STORAGE__ENDPOINT_URL=http://minio:9000 \\\n         -e DUBBRIDGE_ENV=local \\\n         -e DUBBRIDGE_STORAGE__ACCESS_KEY_ID=dubbridge \\\n         -e DUBBRIDGE_STORAGE__SECRET_ACCESS_KEY=dubbridge123 \\\n         -e DUBBRIDGE_STORAGE__REGION=us-east-1 \\\n         -e DUBBRIDGE_STORAGE__BACKEND=s3 \\\n         -e DUBBRIDGE_STORAGE__BUCKET=dubbridge-local \\\n         --name dubbridge-api-full-pipeline-test \\\n         \"$api_image\"\n\n    api_live_ok=0\n    for i in $(seq 1 30); do\n        if curl -sf -o /dev/null http://localhost:8090/health/live; then\n            api_live_ok=1\n            break\n        fi\n        sleep 1\n    done\n    if [ \"$api_live_ok\" -ne 1 ]; then\n        echo \"ERROR: api /health/live did not become ready within timeout\" >&2\n        return 1\n    fi\n\n    api_ready_ok=0\n    for i in $(seq 1 30); do\n        if curl -sf -o /dev/null http://localhost:8090/health/ready; then\n            api_ready_ok=1\n            break\n        fi\n        sleep 1\n    done\n    if [ \"$api_ready_ok\" -ne 1 ]; then\n        echo \"ERROR: api /health/ready did not become ready within timeout\" >&2\n        return 1\n    fi\n\n    docker run -d --rm --network \"$test_network\" \\\n         -e DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@postgres:5432/dubbridge \\\n         -e DUBBRIDGE_REDIS_URL=redis://redis:6379 \\\n         -e DUBBRIDGE_STORAGE__ENDPOINT_URL=http://minio:9000 \\\n         -e DUBBRIDGE_ENV=local \\\n         -e DUBBRIDGE_STORAGE__ACCESS_KEY_ID=dubbridge \\\n         -e DUBBRIDGE_STORAGE__SECRET_ACCESS_KEY=dubbridge123 \\\n         -e DUBBRIDGE_STORAGE__REGION=us-east-1 \\\n         -e DUBBRIDGE_STORAGE__BACKEND=s3 \\\n         -e DUBBRIDGE_STORAGE__BUCKET=dubbridge-local \\\n         --name dubbridge-worker-full-pipeline-test \\\n         \"$worker_image\"\n\n    sleep 3\n    worker_running=$(docker inspect -f '{{.State.Running}}' dubbridge-worker-full-pipeline-test 2>/dev/null)\n    if [ \"$worker_running\" != \"true\" ]; then\n        echo \"ERROR: worker-runner container did not stay running\" >&2\n        return 1\n    fi\n\n    email=\"t4o-$(date +%s)@example.com\"\n    register_output=$(curl -sf -X POST http://localhost:8090/auth/register \\\n         -H \"Content-Type: application/json\" \\\n         -d \"{\\\"email\\\":\\\"${email}\\\",\\\"password\\\":\\\"t4o-password-1\\\",\\\"workspaceName\\\":\\\"t4o-workspace\\\"}\") || {\n        echo \"ERROR: HP-1 FAILED: auth/register did not return success\" >&2\n        return 1\n     }\n    token=$(echo \"$register_output\" | python3 -c 'import json,sys; print(json.load(sys.stdin)[\"token\"])')\n    if [ -z \"$token\" ]; then\n        echo \"ERROR: HP-1 FAILED: could not extract bearer token from register response\" >&2\n        echo \"$register_output\" >&2\n        return 1\n    fi\n\n    fixture_wav=\"${TEMP_DIR:-/tmp}/t4o-fixture.wav\"\n    python3 -c \"\nimport struct, wave\nwith wave.open('${fixture_wav}', 'wb') as w:\n    w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000)\n    w.writeframes(struct.pack('<8000h', *([0] * 8000)))\n\"\n\n    ingest_output=$(curl -sf -X POST http://localhost:8090/ingest \\\n         -H \"Authorization: Bearer ${token}\" \\\n         -F \"file=@${fixture_wav}\" \\\n         -F \"title=t4o-full-pipeline-fixture\") || {\n        echo \"ERROR: HP-1 FAILED: POST /ingest did not return success\" >&2\n        return 1\n     }\n    ingest_token=$(echo \"$ingest_output\" | python3 -c 'import json,sys; print(json.load(sys.stdin)[\"ingest_token\"])')\n    if [ -z \"$ingest_token\" ]; then\n        echo \"ERROR: HP-1 FAILED: could not extract ingest_token from ingest response\" >&2\n        echo \"$ingest_output\" >&2\n        return 1\n    fi\n\n    rights_output=$(curl -sf -X POST \"http://localhost:8090/ingest/${ingest_token}/rights\" \\\n         -H \"Authorization: Bearer ${token}\" \\\n         -H \"Content-Type: application/json\" \\\n         -d '{\"owner\":\"t4o-test-owner\",\"license_type\":\"all_rights_reserved\",\"source_type\":\"direct_upload\",\"proof_reference\":\"t4o-full-pipeline-test\"}') || {\n        echo \"ERROR: HP-1 FAILED: POST /ingest/{token}/rights did not return success\" >&2\n        return 1\n     }\n    if ! echo \"$rights_output\" | grep -q \"rights_recorded\"; then\n        echo \"ERROR: HP-1 FAILED: rights submission did not report rights_recorded\" >&2\n        echo \"$rights_output\" >&2\n        return 1\n    fi\n\n    finalize_output=$(curl -sf -X POST \"http://localhost:8090/ingest/${ingest_token}/finalize\" \\\n         -H \"Authorization: Bearer ${token}\") || {\n        echo \"ERROR: HP-1 FAILED: POST /ingest/{token}/finalize did not return success\" >&2\n        return 1\n     }\n    asset_id=$(echo \"$finalize_output\" | python3 -c 'import json,sys; print(json.load(sys.stdin)[\"id\"])')\n    if [ -z \"$asset_id\" ]; then\n        echo \"ERROR: HP-1 FAILED: could not extract asset id from finalize response\" >&2\n        echo \"$finalize_output\" >&2\n        return 1\n    fi\n    if ! echo \"$asset_id\" | grep -qE '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then\n        echo \"ERROR: HP-1 FAILED: asset id from finalize response is not a well-formed UUID\" >&2\n        echo \"$finalize_output\" >&2\n        return 1\n    fi\n\n    transcription_status=\"\"\n    for i in $(seq 1 60); do\n        transcription_status=$(docker exec \"$dep_container\" psql -U dubbridge -d dubbridge -tAc \"SELECT status FROM asset_transcription_status WHERE asset_id = '${asset_id}';\" 2>/dev/null | tr -d '[:space:]')\n        if [ \"$transcription_status\" = \"ready\" ] || [ \"$transcription_status\" = \"failed\" ]; then\n            break\n        fi\n        sleep 2\n    done\n\n    if [ \"$transcription_status\" != \"ready\" ]; then\n        echo \"ERROR: HP-1 FAILED: asset_transcription_status did not reach 'ready' within timeout (last observed: '${transcription_status}')\" >&2\n        return 1\n    fi\n\n     # EC-1: finalize an already-finalized ingest token must fail, not silently succeed\n    ec1_exit=0\n    ec1_output=$(curl -sf -X POST \"http://localhost:8090/ingest/${ingest_token}/finalize\" \\\n         -H \"Authorization: Bearer ${token}\" 2>&1) || ec1_exit=$?\n    if [ \"$ec1_exit\" -eq 0 ]; then\n        echo \"ERROR: EC-1 FAILED: re-finalizing an already-finalized ingest token succeeded\" >&2\n        echo \"$ec1_output\" >&2\n        return 1\n    fi\n\n    echo \"Run check passed for full-pipeline\"\n    return 0\n}\n",
+                "path": "scripts/lib/full-pipeline.sh",
+                "truncate": false
+              },
+              "name": "write_file"
+            }
+          }
+        ]
+      },
+      "role": "assistant"
+    },
+    {
+      "event": "tool_result",
+      "result": {
+        "byte_count": 9163,
+        "created": false,
+        "line_count": 213,
+        "ok": true,
+        "path": "scripts/lib/full-pipeline.sh",
+        "tool": "write_file"
+      }
+    },
+    {
+      "raw": {
+        "tool_calls": [
+          {
+            "function": {
+              "arguments": {},
+              "name": "finish"
+            }
+          }
+        ]
+      },
+      "role": "assistant"
+    },
+    {
+      "event": "tool_result",
+      "result": {
+        "ok": true,
+        "tool": "finish"
+      }
+    },
+    {
+      "event": "scope_check",
+      "has_diff": true,
+      "in_scope": true,
+      "offending_paths": []
+    },
+    {
+      "event": "format_result",
+      "result": {
+        "formatted_paths": [],
+        "output": "no edited Rust files",
+        "passed": true
+      }
+    },
+    {
+      "event": "test_result",
+      "result": {
+        "commands": [
+          {
+            "argv": [
+              "bash",
+              "-n",
+              "scripts/lib/full-pipeline.sh"
+            ],
+            "ok": false,
+            "returncode": 2,
+            "stderr": "scripts/lib/full-pipeline.sh: line 138: syntax error near unexpected token `('\nscripts/lib/full-pipeline.sh: line 138: `with wave.open('${fixture_wav}', 'wb') as w:'\n",
+            "stdout": "",
+            "tool": "run_command"
+          }
+        ],
+        "output": "$ bash -n scripts/lib/full-pipeline.sh\n(exit 2)\n\nscripts/lib/full-pipeline.sh: line 138: syntax error near unexpected token `('\nscripts/lib/full-pipeline.sh: line 138: `with wave.open('${fixture_wav}', 'wb') as w:'\n",
+        "passed": false
+      }
+    }
+  ],
+  "turn": 2
+}

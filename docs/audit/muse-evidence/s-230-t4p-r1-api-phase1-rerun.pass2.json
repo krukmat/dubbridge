@@ -1,0 +1,7 @@
+{
+  "changed_paths": [],
+  "findings": [],
+  "format_warnings": [],
+  "status": "pass",
+  "summary": "Diff matches requested env var renames and backend change for the API container block only; no other lines, containers, or configurations are altered."
+}

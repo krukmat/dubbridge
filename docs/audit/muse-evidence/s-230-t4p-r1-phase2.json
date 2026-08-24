@@ -1,0 +1,23 @@
+{
+  "changed_paths": [
+    "scripts/test-production-images.sh"
+  ],
+  "findings": [],
+  "model": "muse-glimmer:30b-q4_K_M",
+  "passes_run": 3,
+  "passes_succeeded": 3,
+  "reconciliation": {
+    "consensus": [],
+    "consensus_count": 0,
+    "likely_false_positive": [],
+    "likely_false_positive_count": 0,
+    "location_inconsistent": [],
+    "location_inconsistent_count": 0,
+    "pass_specific": [],
+    "pass_specific_count": 0,
+    "severity_inconsistent": [],
+    "severity_inconsistent_count": 0
+  },
+  "status": "pass",
+  "summary": "run_full-pipeline now configures both API and worker containers to use the local MinIO S3 adapter with shared bucket dubbridge-local; env vars migrated from generic AWS_* to DUBBRIDGE_STORAGE__* and BACKEND set to s3. Stopped-dependency negative run verified non-zero exit. Storage-only change meets HP-1; transcription precondition failure is out of scope."
+}
