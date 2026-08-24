@@ -145,7 +145,7 @@ non-trivial one: `apps/worker-runner` shells out to `ffprobe`/`ffmpeg`
 (`apps/worker-runner/src/main.rs:184-227`), so Rust binary, ffmpeg, Python, and
 faster-whisper must coexist in one image.
 
-**Execution decomposition (owner direction, 2026-08-17):** the original T4
+**Execution decomposition and closure:** the original T4
 whole-task score was RRI 47 Med-high, which would require cloud implementation.
 Because no Codex cloud tokens are available for that route, T4 is now a
 non-executable parent over 17 independently-scored Low/S children (`T4a`–`T4q`,
@@ -154,7 +154,11 @@ test-contract children precede Dockerfile children; the primary orchestrator
 runs the final operational smoke and status closeout. Full scores and commands:
 `docs/audit/s-230-t4-low-rri-decomposition.md`. This changes authorship and
 sequencing only: the aggregate image, reproducibility, readiness, migration,
-ASR, and local-pipeline acceptance contract is unchanged.
+ASR, and local-pipeline acceptance contract is unchanged. **T4 closed on
+2026-08-24:** all applicable children, including the T3b-triggered translation
+children T4m/T4n, are Done; T4p recorded a successful full local pipeline,
+migration evidence, degraded-dependency rejection, and cleanup. T5 is now the
+next pending dependency.
 
 ### G5 — No production deployment descriptor (blocking)
 
@@ -621,9 +625,9 @@ flowchart LR
     T1b["T1b ✓ API queue to Redis<br/>apps/api state + main"] --> T4
     T2["T2 ✓ migration runner<br/>apps/cli"] --> T4
     T3["T3 ✓ real readiness probe<br/>apps/api, apps/gateway"] --> T4A
-    T4A["T4a–T4o Low/S<br/>tests + image patches"] --> T4P["T4p local evidence"]
-    T4P --> T4Q["T4q parent closeout"]
-    T4Q --> T5["T5 DO descriptor + secrets"]
+    T4A["T4a–T4o Low/S<br/>tests + image patches ✓"] --> T4P["T4p local evidence ✓"]
+    T4P --> T4Q["T4q parent closeout ✓"]
+    T4Q --> T5["T5 DO descriptor + secrets (pending)"]
     T5 --> T6["T6 deploy + E2E smoke"]
     T6 --> T7["T7 mobile build vs DO"]
     T6 --> T8["T8 subtitle visible in review (optional)"]

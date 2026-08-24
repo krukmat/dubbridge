@@ -57,7 +57,7 @@ ledger.
 | T2 | Migration runner in the production path | development | M (recomputed, RRI 28 Moderate) | T0 | [x] Done |
 | T3 | Real readiness probes for api and gateway | development | M | T0 | [x] Done 2026-08-17 |
 | T3b | Cross-language subtitle translation pipeline (S-150 reopening) | development parent | XL | T0 | [x] Done — 6/6 children complete 2026-08-24 |
-| T4 | Production container images (non-executable parent) | development parent | 17 Low/S children | T1, T1b, T2, T3 | [ ] Decomposed — execute T4a–T4q |
+| T4 | Production container images (non-executable parent) | development parent | 17 Low/S children | T1, T1b, T2, T3 | [x] Done — aggregate closed by T4q, 2026-08-24 |
 | T4a | Production-image test harness | development/test | S (RRI 15 Low) | T3 | [x] Done |
 | T4b | API production image | development/config | S (RRI 18 Low) | T4a | [x] Done (structural cert) |
 | T4c | API image contract tests | development/test | S (RRI 17 Low) | T4b | [x] Done |
@@ -74,7 +74,7 @@ ledger.
 | T4n | Translation-bundle contract tests (conditional) | development/test | S (RRI 24 Low) | T4m | [x] Done — 2026-08-24 |
 | T4o | Full local image-pipeline contract | development/test | S (RRI 24 Low) | T4c, T4e, T4g, T4l; T4n if executed (contract-verified images) | [x] Done — 2026-08-24 |
 | T4p | Execute and record local image evidence | operational/evidence | S (RRI 19 Low) | T4o | [x] Done — 2026-08-24 |
-| T4q | T4 parent closeout and status sync | docs-only | S (RRI 10 Low) | T4p; T4n if executed | [ ] Planned |
+| T4q | T4 parent closeout and status sync | docs-only | S (RRI 10 Low) | T4p; T4n if executed | [x] Done — 2026-08-24 |
 | T5 | Production deployment descriptor and secret boundary | config-only | M | T4q | [ ] Planned |
 | T6 | First deploy and end-to-end smoke on Digital Ocean | operational | L | T5 | [ ] Planned |
 | T7 | Mobile POC build against the deployed backend | development/ops | M | T6 | [ ] Planned |
@@ -1382,7 +1382,7 @@ first. Do not start TTS/dubbing work under this task.
 **Type:** development parent (not executable as written)
 **Effort:** aggregate of 17 independently-scored Low/S children
 **Depends on:** S-230-T1, S-230-T1b, S-230-T2, S-230-T3
-**Status:** [ ] Decomposed 2026-08-17 — execute `S-230-T4a` through `T4q`
+**Status:** [x] Done — aggregate closed by S-230-T4q, 2026-08-24
 
 **Historical whole-task RRI:** 47 — Med-high (41–55), no penalties. Evidence:
 `docs/audit/s-230-t4-rri.md`. This route is superseded before implementation by
@@ -1450,6 +1450,14 @@ approval card.
 `T4m`/`T4n` execute only if `S-150-T3b` and `S-150-T3c` are done before
 worker-image integration. Otherwise `T4p` records the follow-up image rebuild as
 debt and `T4q` may close the parent without those conditional children.
+
+**Aggregate closure (2026-08-24):** all 17 children are Done. The conditional
+translation path fired because `S-230-T3b` closed before worker-image
+integration; `T4m` and `T4n` are Done, so no translation rebuild debt remains.
+`T4p` records successful live local-pipeline evidence (HP-1), degraded
+dependency rejection (EC-1), standalone migration evidence, and container
+cleanup in `docs/audit/s-230-t4-local-image-evidence.md`. The T4 aggregate is
+therefore closed and T5 is unblocked to begin under its own task gate.
 
 **Problem (plan G4):** Dockerfiles exist only for the Python workers. The
 worker-runner image is the hard one: it shells out to `ffprobe`/`ffmpeg` and
@@ -4219,7 +4227,7 @@ Required passes: 2 (RRI 33 → Moderate)
 **Type:** docs-only
 **Effort:** S — RRI 10 Low
 **Depends on:** S-230-T4p; T4n only when its condition fired
-**Status:** [ ] Planned
+**Status:** [x] Done — 2026-08-24
 **Writable paths:** this ledger, `docs/plan/s-230-poc-v1-digitalocean.md`,
 `docs/plan/roadmap.md`
 
@@ -4230,6 +4238,21 @@ documents agree on the same T4 state. **EC-1:** any open mandatory child or
 missing evidence keeps T4 and T5 blocked. Evidence: `make qa-docs` and
 `git diff --check`. Phase reviews, Reflection, and unit certification are `n/a`
 for this docs-only closeout; do not alter implementation files or start T5.
+
+### Closeout record
+
+- **Dependency check:** T4a–T4p are Done. The conditional T4m/T4n branch fired
+  and both are Done; no child was skipped and no rebuild debt remains.
+- **Evidence check:** `docs/audit/s-230-t4-local-image-evidence.md` records the
+  passing live pipeline, degraded-dependency rejection, migration run, and no
+  residual containers. The per-child phase-review and execution artifacts remain
+  linked from their respective ledger entries.
+- **Status synchronization:** this ledger, the S-230 plan, and the roadmap now
+  record T4/T4q Done and T5 as the next pending task.
+- **Task-analysis review:** n/a — docs-only closeout, exempt under the workflow
+  guide.
+- **Code-solution review:** n/a — docs-only closeout, exempt under the workflow
+  guide.
 
 ---
 
