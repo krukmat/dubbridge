@@ -25,7 +25,8 @@ governs: "all agent-facing workflow decisions in the repository"
 
 | Role | Binding |
 |---|---|
-| Local implementer, RRI 0–45 | `qwen3.8:27b-mlx` |
+| Local implementer, RRI 0–25 | `qwen3.8:27b-mlx` |
+| Local implementer, RRI 26–45 and ADR-040 local tramos in RRI 46–55 | `nemotron-3.5-lightning:30b-a3b-q4_K_M` |
 | RRI 0–25 reviewer chain (phases 1 and 2) | `muse-glimmer:30b-q4_K_M` → `gemma4:26b-a4b-it-qat` → D14 |
 | RRI 26–55 reviewer chain (phases 1 and 2) | `gemma4:26b-a4b-it-qat` → `muse-glimmer:30b-q4_K_M` → D14 |
 | Local Architect / Complex Analyst | `muse-glimmer:30b-q4_K_M` — advisory-only (ADR-037), never a phase-1/phase-2 reviewer in any band |
@@ -118,7 +119,8 @@ and Architect-refined implementation routing below), not to cloud. A
    - **26–40 Moderate** — show the plan and tasks, wait for explicit
      approval, then implement local-first via
      `scripts/local-agent/run_local_task.py` in a disposable worktree
-     (`DUBBRIDGE_LOCAL_AGENT_MODEL`, default `qwen3.8:27b-mlx`), at most 2
+     (`DUBBRIDGE_LOCAL_AGENT_MODEL`, default
+     `nemotron-3.5-lightning:30b-a3b-q4_K_M`), at most 2
      evidence-backed local repair attempts. On 2/2 exhaustion, decompose the
      remaining work into scored Low-band subtasks before considering the
      cloud-takeover model resolved in Step 2 as last resort.
@@ -870,7 +872,8 @@ For **RRI 26–40 local-first implementation** (Moderate), use
 primary agent remains orchestrator of record — owning the task card,
 `allowed_paths`, verification commands, Reflection passes, closure, and
 final accept/reject judgment. The local implementer resolves from
-`DUBBRIDGE_LOCAL_AGENT_MODEL` (default `qwen3.8:27b-mlx`), receives the
+`DUBBRIDGE_LOCAL_AGENT_MODEL` (default
+`nemotron-3.5-lightning:30b-a3b-q4_K_M`), receives the
 complete authorized file contents up front, and cannot read files or run
 processes itself.
 

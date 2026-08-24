@@ -2415,19 +2415,19 @@ class T7cB2ScopeCheckGate(unittest.TestCase):
 class ResolveEffectiveLimitsTest(unittest.TestCase):
     """ADR-038 T3: band-aware limit resolution, offline / no worktree needed."""
 
-    def test_hp1_med_high_band_string_resolves_tight_limits(self):
-        card = rlt.TaskCard("t", "spec", [], [], band="Med-high")
+    def test_hp1_rri_41_45_resolves_moderate_budget_with_nemotron_pin(self):
+        card = rlt.TaskCard("t", "spec", [], [], band="Med-high", rri=43)
         limits = rlt.resolve_effective_limits(card)
         self.assertEqual(limits.band, "Med-high")
-        self.assertEqual(limits.max_total_turns, 8)
-        self.assertEqual(limits.max_repair_attempts, 0)
+        self.assertEqual(limits.max_total_turns, 30)
+        self.assertEqual(limits.max_repair_attempts, 2)
         self.assertEqual(limits.required_model, "nemotron-3.5-lightning:30b-a3b-q4_K_M")
 
-    def test_hp1b_med_high_rri_without_band_resolves_tight_limits(self):
-        card = rlt.TaskCard("t", "spec", [], [], rri=47)
+    def test_hp1b_med_high_rri_without_band_resolves_moderate_budget(self):
+        card = rlt.TaskCard("t", "spec", [], [], rri=43)
         limits = rlt.resolve_effective_limits(card)
-        self.assertEqual(limits.max_total_turns, 8)
-        self.assertEqual(limits.max_repair_attempts, 0)
+        self.assertEqual(limits.max_total_turns, 30)
+        self.assertEqual(limits.max_repair_attempts, 2)
 
     def test_hp2_moderate_band_keeps_original_defaults(self):
         card = rlt.TaskCard("t", "spec", [], [], band="Moderate", rri=30)
@@ -2455,29 +2455,38 @@ class ResolveEffectiveLimitsTest(unittest.TestCase):
         limits = rlt.resolve_effective_limits(card)
         self.assertEqual(limits.max_total_turns, rlt.MAX_TOTAL_TURNS)
 
-    def test_ec1c_rri_at_exact_med_high_lower_boundary_is_inclusive(self):
+    def test_ec1c_rri_at_exact_med_high_lower_boundary_is_local(self):
         card = rlt.TaskCard("t", "spec", [], [], rri=41)
         limits = rlt.resolve_effective_limits(card)
-        self.assertEqual(limits.max_total_turns, 8)
-        self.assertEqual(limits.max_repair_attempts, 0)
+        self.assertEqual(limits.max_total_turns, 30)
+        self.assertEqual(limits.max_repair_attempts, 2)
+        self.assertTrue(limits.local_execution_allowed)
 
-    def test_ec1d_rri_at_exact_med_high_upper_boundary_is_inclusive(self):
+    def test_ec1d_rri_at_exact_med_high_upper_boundary_is_cloud_only(self):
         card = rlt.TaskCard("t", "spec", [], [], rri=55)
         limits = rlt.resolve_effective_limits(card)
-        self.assertEqual(limits.max_total_turns, 8)
-        self.assertEqual(limits.max_repair_attempts, 0)
+        self.assertFalse(limits.local_execution_allowed)
 
 
 class ParseArgsModelDefaultTest(unittest.TestCase):
     """ADR-036 Amendment 6: --model / DUBBRIDGE_LOCAL_AGENT_MODEL resolution."""
 
-    def test_hp1_no_override_resolves_qwen_default(self):
+    def test_hp1_no_override_defers_default_until_the_card_is_loaded(self):
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("DUBBRIDGE_LOCAL_AGENT_MODEL", None)
             args = rlt.parse_args(
                 ["--card", "card.json", "--worktree", ".", "--out", "result.json"]
             )
-        self.assertEqual(args.model, "qwen3.8:27b-mlx")
+        self.assertIsNone(args.model)
+
+    def test_hp1b_card_resolved_defaults_keep_low_qwen_and_move_moderate_to_nemotron(self):
+        low = rlt.TaskCard("low", "spec", [], [], rri=25)
+        moderate = rlt.TaskCard("moderate", "spec", [], [], rri=26)
+        self.assertEqual(rlt.default_local_agent_model(low), "qwen3.8:27b-mlx")
+        self.assertEqual(
+            rlt.default_local_agent_model(moderate),
+            "nemotron-3.5-lightning:30b-a3b-q4_K_M",
+        )
 
     def test_ec1_explicit_flag_overrides_the_new_default(self):
         args = rlt.parse_args([
@@ -2512,13 +2521,13 @@ class ParseArgsModelDefaultTest(unittest.TestCase):
 
 
 class MedHighRunnerLimitsIntegrationTest(unittest.TestCase):
-    """ADR-038 T3: the Med-high budget enforced end-to-end through main()/run_loop."""
+    """ADR-038 Amendment 3: the 41-45 split is enforced end-to-end."""
 
-    def test_hp1_med_high_card_can_succeed_within_eight_turns(self):
+    def test_hp1_rri_41_45_card_uses_nemotron_and_can_succeed(self):
         with tempfile.TemporaryDirectory() as tmp:
             worktree = os.path.join(tmp, "worktree")
             _git_init_worktree(worktree)
-            card_path = _make_card(tmp, rri=47, band="Med-high")
+            card_path = _make_card(tmp, rri=43, band="Med-high")
             out_path = os.path.join(tmp, "transcript.json")
 
             chat = ChatSequencer(_write_and_finish("hello.txt", "hi"))
@@ -2538,54 +2547,21 @@ class MedHighRunnerLimitsIntegrationTest(unittest.TestCase):
                 transcript = json.load(f)
             self.assertEqual(transcript["status"], "success")
 
-    def test_ec1_ninth_turn_is_never_invoked_for_a_med_high_card(self):
+    def test_ec1_rri_41_45_card_keeps_the_moderate_turn_budget(self):
+        card = rlt.TaskCard("t", "spec", [], [], rri=43, band="Med-high")
+        limits = rlt.resolve_effective_limits(card)
+        self.assertEqual(limits.max_total_turns, rlt.MAX_TOTAL_TURNS)
+        self.assertEqual(limits.max_repair_attempts, rlt.MAX_REPAIR_ATTEMPTS)
+
+    def test_ec1b_rri_46_55_card_is_rejected_before_any_local_turn(self):
         with tempfile.TemporaryDirectory() as tmp:
             worktree = os.path.join(tmp, "worktree")
             _git_init_worktree(worktree)
             card_path = _make_card(tmp, rri=47, band="Med-high")
             out_path = os.path.join(tmp, "transcript.json")
 
-            # 9 read_file calls: a Med-high session must be cut off at turn 8,
-            # so chat_fn's 9th scripted response must never be consumed.
-            chat = ChatSequencer(
-                [_tool_call("read_file", {"path": "hello.txt"})] * 9
-            )
-            unused_tests = lambda wt: self.fail(
-                "acceptance tests must not run when the turn budget is exhausted"
-            )
-            with open(os.path.join(worktree, "hello.txt"), "w", encoding="utf-8") as f:
-                f.write("hi")
-            _git(worktree, "add", "-A")
-            _git(worktree, "commit", "-q", "-m", "seed")
-
-            exit_code = rlt.main(
-                [
-                    "--card", card_path, "--worktree", worktree, "--out", out_path,
-                    "--model", "nemotron-3.5-lightning:30b-a3b-q4_K_M",
-                ],
-                chat_fn=chat,
-                test_runner=unused_tests,
-            )
-
-            self.assertNotEqual(exit_code, 0)
-            self.assertEqual(chat.calls, 8)
-            with open(out_path, encoding="utf-8") as f:
-                transcript = json.load(f)
-            self.assertEqual(transcript["status"], "budget_exhausted")
-            self.assertEqual(transcript["reason"], "total_turns_exhausted")
-
-    def test_ec1b_first_failed_acceptance_run_ends_a_med_high_session_without_repair(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            worktree = os.path.join(tmp, "worktree")
-            _git_init_worktree(worktree)
-            card_path = _make_card(tmp, rri=47, band="Med-high")
-            out_path = os.path.join(tmp, "transcript.json")
-
-            # Only one finish response scripted: a repair turn (which Moderate
-            # would grant) would raise IndexError on ChatSequencer, proving no
-            # repair message was ever sent for a Med-high card.
-            chat = ChatSequencer(_write_and_finish("hello.txt", "hi"))
-            failing_tests = lambda wt: {"passed": False, "output": "assertion failed"}
+            chat = lambda messages: self.fail("cloud-only card must not invoke the model")
+            failing_tests = lambda wt: self.fail("cloud-only card must not run tests")
 
             exit_code = rlt.main(
                 [
@@ -2599,15 +2575,13 @@ class MedHighRunnerLimitsIntegrationTest(unittest.TestCase):
             self.assertNotEqual(exit_code, 0)
             with open(out_path, encoding="utf-8") as f:
                 transcript = json.load(f)
-            self.assertEqual(transcript["status"], "budget_exhausted")
-            self.assertEqual(transcript["reason"], "repair_attempts_exhausted")
-            self.assertEqual(transcript["attempts"], 0)
+            self.assertEqual(transcript["status"], "local_execution_rejected")
 
     def test_ec2_model_substitution_for_med_high_card_fails_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
             worktree = os.path.join(tmp, "worktree")
             _git_init_worktree(worktree)
-            card_path = _make_card(tmp, rri=47, band="Med-high")
+            card_path = _make_card(tmp, rri=43, band="Med-high")
             out_path = os.path.join(tmp, "transcript.json")
 
             unused_chat = lambda messages: self.fail(

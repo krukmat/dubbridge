@@ -262,7 +262,7 @@ def run_loop(
             ),
         },
         # Some locally-served backends (confirmed: the MLX runtime behind
-        # qwen3.8:27b-mlx, the current DUBBRIDGE_LOCAL_AGENT_MODEL binding)
+        # the band-resolved DUBBRIDGE_LOCAL_AGENT_MODEL binding)
         # reject a system-only /api/chat request with "no user query found
         # in messages" (HTTP 500) instead of degrading gracefully. GGUF
         # backends tolerate a system-only first turn, so this kickoff

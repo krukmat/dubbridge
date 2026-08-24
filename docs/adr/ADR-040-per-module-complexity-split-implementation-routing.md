@@ -129,7 +129,7 @@ inter-module boundary instead of the whole task.
 
 | Module class | Route |
 |---|---|
-| C ≤ 1, no hard exclusion | Local: `scripts/local-agent/run_local_task.py`, `DUBBRIDGE_LOCAL_AGENT_MODEL` (default `qwen3.6:35b-a3b`), `allowed_paths` restricted to exactly that module's files |
+| C ≤ 1, no hard exclusion | Local: `scripts/local-agent/run_local_task.py`, `DUBBRIDGE_LOCAL_AGENT_MODEL` (default `nemotron-3.5-lightning:30b-a3b-q4_K_M` for RRI 26–55 local tramos; Low remains Qwen), `allowed_paths` restricted to exactly that module's files |
 | C ≥ 2, or hard-excluded | Cloud: the band's already-resolved cloud model (Moderate: `gpt-5.6-terra` at `medium`, or `claude-sonnet-5`; Med-high: `gpt-5.6-sol` at `high`, or `claude-sonnet-5`) |
 
 ### 8. Repair budgets

@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Med-high cloud-handoff supervisor and evidence bundle (ADR-038 T4).
+"""Med-high route supervisor and cloud-handoff evidence bundle (ADR-038 T4).
 
-Owns the Med-high cloud-handoff evidence required by ADR-038. Owner directive
-2026-08-12 limits the local developer to Low/S and Moderate/M, so a valid
-Med-high `GO_LOCAL` advisory is recorded as policy-excluded and never launches
-`run_local_task.py`.
+RRI 41-45 may launch the Moderate local-first runner after a valid GO_LOCAL
+receipt; RRI 46-55 remains cloud-only. This module owns that distinction and
+the cloud evidence bundle for every non-success route.
 
 This module never edits code and never re-implements the runner's own turn
 loop, model binding, or repair budget -- that enforcement lives in
@@ -41,6 +40,7 @@ ROUTE_GO_LOCAL = med_high_gate.ROUTE_GO_LOCAL
 ROUTE_CLOUD_REQUIRED = med_high_gate.ROUTE_CLOUD_REQUIRED
 
 STATUS_SUCCESS = "success"
+MED_HIGH_LOCAL_RRI_MAX = 45
 
 
 @dataclass(frozen=True)
@@ -634,12 +634,7 @@ def supervise(
     fallback_selected_by: str | None = None,
     fallback_selection_artifact: str | None = None,
 ) -> SupervisorResult:
-    """Validate the Med-high route and emit its cloud handoff bundle.
-
-    The refinement/receipt gate remains authoritative evidence. Local execution
-    is policy-excluded for this band, including an otherwise-valid GO_LOCAL
-    result, so this entry point never launches the local runner.
-    """
+    """Apply the ADR-038 receipt route and enforce its RRI split."""
     bundle_kwargs = dict(
         bundle_out_path=bundle_out_path, card_path=card_path, out_path=out_path,
         refinement_artifact_path=refinement_artifact_path,
@@ -668,12 +663,45 @@ def supervise(
     else:
         result = None
 
+    if result is None and decision.route == ROUTE_CLOUD_REQUIRED:
+        result = _pre_launch_bundle(
+            **bundle_kwargs,
+            stop_reason="cloud_required", status="cloud_required", reason=decision.reason,
+        )
+
+    if result is None and rri <= MED_HIGH_LOCAL_RRI_MAX:
+        launch_outcome = run_supervised_runner(
+            card_path=card_path, worktree=worktree, out_path=out_path,
+            model=MED_HIGH_RUNNER_MODEL, wall_clock_seconds=wall_clock_seconds,
+            popen_fn=popen_fn, python_executable=python_executable,
+        )
+        elapsed_s = launch_outcome.get("elapsed_s", 0.0)
+        runner_value, runner_shape_failure_reason = _read_runner_out(out_path)
+        runner_result = (
+            {"status": "transcript_shape_invalid", "reason": runner_shape_failure_reason}
+            if runner_shape_failure_reason is not None else runner_value
+        )
+        if (
+            launch_outcome["status"] == "runner_exited"
+            and runner_result is not None
+            and runner_result.get("status") == STATUS_SUCCESS
+        ):
+            return SupervisorResult(
+                status=STATUS_SUCCESS, route=ROUTE_GO_LOCAL,
+                reason="RRI 41-45 Med-high session succeeded within the Moderate budget.",
+                runner_result=runner_result, bundle_path=None, elapsed_s=elapsed_s,
+            )
+        result = _post_launch_bundle(
+            **bundle_kwargs, launch_outcome=launch_outcome,
+            runner_result=runner_result, elapsed_s=elapsed_s,
+        )
+
     if result is None:
         if decision.route == ROUTE_GO_LOCAL:
             stop_reason = "policy_excluded_local_execution"
             reason = (
-                "Med-high local execution is disabled: the owner limits the "
-                "local developer to Low/S and Moderate/M."
+                "RRI 46-55 Med-high local execution is cloud-only, even after "
+                "a GO_LOCAL advisory."
             )
         else:
             stop_reason = "cloud_required"

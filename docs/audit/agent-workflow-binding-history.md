@@ -26,6 +26,7 @@ trail. Adding a row here is part of the same change that alters a rule.
 | 2026-08-11 | RRI 26–55 phase-1/phase-2 reviewer | `qwen3.6:27b-q4_K_M` | Gemma (`gemma4:26b-a4b-it-qat`) reverts to this role, Muse Glimmer intermediate fallback | Retires the 2026-07-21 override; Qwen cannot simultaneously implement and independently review the same band (ADR-036 §5) |
 | 2026-08-11 | Local Architect / Complex Analyst (ADR-037) | `qwen3.6:27b-q4_K_M` | `muse-glimmer:30b-q4_K_M` | ADR-037 Amendment 1; role no longer doubles as a phase-1/phase-2 reviewer in any band |
 | 2026-08-16 (ADR-036 Amendments 3/4/7) | RRI 0–25 and RRI 26–40 local implementer | `nemotron-3.5-lightning:30b-a3b-q4_K_M` | `qwen3.8:27b-mlx` | Both bands share one implementer model family |
+| 2026-08-24 | RRI 26–40, RRI 41–45 after `GO_LOCAL`, and ADR-040 local tramos | `qwen3.8:27b-mlx` | `nemotron-3.5-lightning:30b-a3b-q4_K_M` | Owner-authorized routing correction; Low remains Qwen and RRI 46–55 whole-task routing remains cloud-only |
 
 ## Routing and process directives
 

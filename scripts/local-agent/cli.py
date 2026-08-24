@@ -251,10 +251,11 @@ def parse_args(argv, *, default_num_ctx, default_num_predict):
     )
     parser.add_argument(
         "--model",
-        default=os.environ.get(
-            "DUBBRIDGE_LOCAL_AGENT_MODEL", "qwen3.8:27b-mlx"
+        default=os.environ.get("DUBBRIDGE_LOCAL_AGENT_MODEL"),
+        help=(
+            "Local implementer model tag. When omitted, the task band selects "
+            "the ADR-036 binding after the card is loaded."
         ),
-        help="Local implementer model tag (ADR-036 binding).",
     )
     parser.add_argument(
         "--idle-timeout",
@@ -309,6 +310,7 @@ def main(
     tool_calling_system_prompt=TOOL_CALLING_SYSTEM_PROMPT,
     default_num_ctx,
     default_num_predict,
+    default_local_agent_model,
 ):
     args = parse_args(
         argv, default_num_ctx=default_num_ctx, default_num_predict=default_num_predict
@@ -316,6 +318,23 @@ def main(
     card = load_card(args.card, task_card_cls)
     boundary = boundary or build_default_boundary(args.worktree, card)
     limits = resolve_effective_limits(card)
+    if args.model is None:
+        args.model = limits.required_model or default_local_agent_model(card)
+    if not limits.local_execution_allowed:
+        result = {
+            "status": "local_execution_rejected",
+            "reason": "RRI 46-55 Med-high cards are cloud-only for whole-task execution.",
+            "transcript": [],
+            "task_id": card.task_id,
+            "finished_at": datetime.datetime.now(datetime.timezone.utc).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            ),
+        }
+        gemma_local.write_result(result, args.out)
+        gemma_local.append_audit_log(
+            build_audit_record(card, result, args.model, 0.0, effective_limits=limits)
+        )
+        return 1
     for flag, value in (("--num-ctx", args.num_ctx), ("--num-predict", args.num_predict)):
         if value <= 0:
             raise ValueError(f"{flag} must be greater than zero")

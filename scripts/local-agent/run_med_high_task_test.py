@@ -6,6 +6,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import med_high_gate
@@ -929,6 +930,31 @@ class SuperviseIntegrationTest(unittest.TestCase):
         _write_json(p_path, receipt)
         return r_path, p_path
 
+    def test_hp1_rri_41_45_go_local_launches_nemotron_runner(self):
+        card_path = _card(self.tmp.name)
+        out_path = os.path.join(self.tmp.name, "out.json")
+        bundle_path = os.path.join(self.tmp.name, "bundle.md")
+        r_path, p_path = self._write_gate_inputs("GO_LOCAL", "GO_LOCAL")
+        _write_json(out_path, {"status": "success", "task_id": "T-MEDHIGH-1"})
+
+        with patch.object(
+            _MOD, "run_supervised_runner",
+            return_value={"status": "runner_exited", "elapsed_s": 1.0, "returncode": 0},
+        ) as runner:
+            result = _MOD.supervise(
+                card_path=card_path, worktree=self.tmp.name, out_path=out_path,
+                bundle_out_path=bundle_path, refinement_artifact_path=r_path,
+                primary_receipt_path=p_path, card_hash=CARD_HASH, rri=43,
+            )
+
+        self.assertEqual(result.status, "success")
+        self.assertEqual(result.route, med_high_gate.ROUTE_GO_LOCAL)
+        self.assertIsNone(result.bundle_path)
+        self.assertEqual(
+            runner.call_args.kwargs["model"],
+            "nemotron-3.5-lightning:30b-a3b-q4_K_M",
+        )
+
     def test_hp1_go_local_is_policy_excluded_and_never_launches_runner(self):
         card_path = _card(self.tmp.name)
         out_path = os.path.join(self.tmp.name, "out.json")
@@ -950,7 +976,7 @@ class SuperviseIntegrationTest(unittest.TestCase):
         self.assertEqual(result.status, "cloud_required")
         self.assertEqual(result.route, med_high_gate.ROUTE_CLOUD_REQUIRED)
         self.assertTrue(os.path.isfile(bundle_path))
-        self.assertIn("Med-high local execution is disabled", result.reason)
+        self.assertIn("RRI 46-55 Med-high local execution is cloud-only", result.reason)
         self.assertEqual(result.fallback_selection["status"], "awaiting_fallback_selection")
         self.assertIsNone(result.cloud_instruction)
         self.assertEqual(launched_argv, [])

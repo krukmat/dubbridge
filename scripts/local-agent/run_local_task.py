@@ -115,18 +115,17 @@ DEFAULT_IDLE_TIMEOUT_SECONDS = 180
 DEFAULT_MAX_WALL_SECONDS = 1800
 COMMAND_TIMEOUT_SECONDS = session_loop.COMMAND_TIMEOUT_SECONDS
 
-# ADR-038 T3: Med-high (RRI 41-55) forces a materially tighter budget than
-# the Moderate default above -- one session, 8 turns, zero repairs, and the
-# exact nemotron-3.5-lightning:30b-a3b-q4_K_M binding (ADR-036 Amendment 3) --
-# because ADR-038's whole premise is that an unbounded Med-high local attempt
-# (a real RRI 55 session ran to turn 23 without a patch) must fail closed to
-# cloud quickly instead of stalling.
+# ADR-038 Amendment 3 permits a whole-task local route only for RRI 41-45
+# after a GO_LOCAL receipt. It uses the Moderate 30-turn/two-repair budget
+# but requires the Nemotron binding. RRI 46-55 remains cloud-only here; the
+# supervisor is the route authority and this runner rejects direct bypasses.
 MED_HIGH_BAND_LABEL = "Med-high"
-MED_HIGH_MAX_TOTAL_TURNS = 8
-MED_HIGH_MAX_REPAIR_ATTEMPTS = 0
 MED_HIGH_REQUIRED_MODEL = "nemotron-3.5-lightning:30b-a3b-q4_K_M"
 MED_HIGH_RRI_MIN = 41
+MED_HIGH_LOCAL_RRI_MAX = 45
 MED_HIGH_RRI_MAX = 55
+LOW_RRI_MAX = 25
+LOW_REQUIRED_MODEL = "qwen3.8:27b-mlx"
 # Output-token budget per turn. write_file/apply_patch have no size
 # cap (see runner_file_tools.py), so a turn can legitimately need to emit a
 # large "content"/"replacement" string; 4096 is comfortably above any file in
@@ -232,11 +231,15 @@ class EffectiveLimits:
     the Med-high range is tightened, per ADR-038 T3.
     """
 
-    def __init__(self, band, max_total_turns, max_repair_attempts, required_model):
+    def __init__(
+        self, band, max_total_turns, max_repair_attempts, required_model,
+        local_execution_allowed=True,
+    ):
         self.band = band
         self.max_total_turns = max_total_turns
         self.max_repair_attempts = max_repair_attempts
         self.required_model = required_model
+        self.local_execution_allowed = local_execution_allowed
 
     def as_dict(self):
         return {
@@ -244,6 +247,7 @@ class EffectiveLimits:
             "max_total_turns": self.max_total_turns,
             "max_repair_attempts": self.max_repair_attempts,
             "required_model": self.required_model,
+            "local_execution_allowed": self.local_execution_allowed,
         }
 
 
@@ -257,17 +261,56 @@ def _is_med_high(card):
     return False
 
 
+def _rri(card):
+    value = getattr(card, "rri", None)
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return int(value)
+    return None
+
+
+def _is_architect_refined_local(card):
+    rri = _rri(card)
+    return rri is not None and MED_HIGH_RRI_MIN <= rri <= MED_HIGH_LOCAL_RRI_MAX
+
+
+def _is_cloud_only_med_high(card):
+    rri = _rri(card)
+    return rri is not None and MED_HIGH_LOCAL_RRI_MAX < rri <= MED_HIGH_RRI_MAX
+
+
+def default_local_agent_model(card):
+    """Resolve the default only after reading the task card.
+
+    Low cards retain Qwen. Moderate cards and ADR-038's permitted 41-45
+    GO_LOCAL route use Nemotron; callers can still request an explicit model,
+    subject to the Med-high exact-binding check below.
+    """
+    rri = _rri(card)
+    if rri is not None and rri <= LOW_RRI_MAX:
+        return LOW_REQUIRED_MODEL
+    return MED_HIGH_REQUIRED_MODEL
+
+
 def resolve_effective_limits(card):
-    """Band-aware limits (ADR-038 T3). Moderate keeps the original
-    30-turn/two-repair runner behavior exactly; Med-high forces 8 turns,
-    zero repairs, and the exact nemotron-3.5-lightning:30b-a3b-q4_K_M binding
-    (ADR-036 Amendment 3)."""
-    if _is_med_high(card):
+    """Resolve the permitted whole-task local route's limits.
+
+    Moderate and a receipt-authorized RRI 41-45 card share the 30-turn,
+    two-repair budget. The latter additionally pins the Nemotron tag.
+    """
+    if _is_architect_refined_local(card):
         return EffectiveLimits(
             band=MED_HIGH_BAND_LABEL,
-            max_total_turns=MED_HIGH_MAX_TOTAL_TURNS,
-            max_repair_attempts=MED_HIGH_MAX_REPAIR_ATTEMPTS,
+            max_total_turns=MAX_TOTAL_TURNS,
+            max_repair_attempts=MAX_REPAIR_ATTEMPTS,
             required_model=MED_HIGH_REQUIRED_MODEL,
+        )
+    if _is_cloud_only_med_high(card):
+        return EffectiveLimits(
+            band=MED_HIGH_BAND_LABEL,
+            max_total_turns=MAX_TOTAL_TURNS,
+            max_repair_attempts=MAX_REPAIR_ATTEMPTS,
+            required_model=MED_HIGH_REQUIRED_MODEL,
+            local_execution_allowed=False,
         )
     return EffectiveLimits(
         band=getattr(card, "band", None),
@@ -408,6 +451,7 @@ def main(
         tool_calling_system_prompt=TOOL_CALLING_SYSTEM_PROMPT,
         default_num_ctx=MODEL_CONTEXT_TOKENS,
         default_num_predict=GENERATION_TOKEN_BUDGET,
+        default_local_agent_model=default_local_agent_model,
     )
 
 
