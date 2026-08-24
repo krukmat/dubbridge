@@ -15,7 +15,7 @@ Roadmap phases use a single canonical `S-xxx` identifier. Older `S0`/`P*`/`T*`
 labels remain as legacy aliases in source plans and historical task ledgers until
 those files are renamed, but new roadmap references should use `S-xxx`.
 
-Last consolidated 2026-08-20. This file intentionally keeps only current status,
+Last consolidated 2026-08-24. This file intentionally keeps only current status,
 dependencies, and links — full consolidation changelog, design rationale, and
 detailed per-slice history live in `docs/audit/roadmap-history.md`.
 
@@ -186,7 +186,7 @@ captured above under Governing principles and ADR-025/ADR-026.
 | **X-S-150-1** | Future voice-consent hardening: consent-proof evidence lifecycle, automated real-stack checks, speaker/voice-profile scope, expiry/revocation effects on existing derivatives, and provider-side material governance | `S-150-T8` future High-RRI parent; coordinate `X-S-110-2`, `X-S-110-3`, X20, and S-180. Non-blocking for S-150 T1-T7 and does not reopen X24/X11 unless an approved future ADR changes the contract. |
 | **X25** | Define and implement HLS playback delivery for prepared `.m3u8` manifests and segments without exposing raw object-store keys | ADR-032 created; implemented as `S-125` |
 | **X26** | Tiger Style adoption for the Rust/Python backend: evidence-based gap analysis complete (`docs/proposals/tiger-style-adaptation-evaluation.md`, R1–R13). Blocked on three owner decision points (D1 always-on Rust assertions, D2 clippy `too_many_lines` tightening, D3 mandatory Postgres/Redis/MinIO CI) before a plan/task ledger is drafted; R13 can fold into S-150 `T4`–`T7` independently of D1–D3. | Owner sign-off on D1 (at minimum) required before `docs/plan/tiger-style-adaptation.md` is drafted; re-evaluate if repo state drifts materially from the evaluation's evidence base. Full detail: `docs/audit/roadmap-history.md`. |
-| **X27** | Gemma Push Reviewer role: post-pipeline advisory audit of the latest GitHub push, triaged into RRI-scored candidate tasks with pure-Low eligible incidents dispatched to Gemma Developer. Plan + task ledger drafted (`docs/plan/gemma-push-reviewer-role.md` r2, `docs/tasks/gemma-push-reviewer-role.md`), not approved for implementation. Precedent: ADR-034. | Owner approval required before `T1` starts; no blocking dependency identified |
+| **X27** | 🟡 Gemma Push Reviewer remediation: a baseline is deployed, but the 2026-08-24 audit reopened T1/T1B/T2/T3/T4/T5/T7 because real quorum, model-visible/redacted evidence, fail-closed RRI planning, durable work-item follow-through, bounded Low repair, frontier/HITL handoff, and trusted/idempotent publication are incomplete. r5 rescored the aggregate at RRI 96 and decomposed it into T12-T19. Proposed ADR-042 separates evaluator, deterministic controller, implementer, and acceptor; it keeps pure-Low fixes phase-1/phase-2 reviewed and binds D14/frontier routes to HITL + ADR-039 selection. | Owner decides ADR-042/T11 first. No runtime remediation is approved; after acceptance, present and approve each T12-T19 task separately. `docs/plan/gemma-push-reviewer-role.md` r5, `docs/tasks/gemma-push-reviewer-role.md`, ADR-034/039/042. |
 
 ## Known planning gaps
 

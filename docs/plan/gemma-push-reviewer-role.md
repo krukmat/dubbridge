@@ -1,36 +1,89 @@
 ---
 type: Plan
 title: "Plan: Gemma Push Reviewer Role"
-status: proposed
+status: remediation-proposed
 supersedes: ""
+governed_by:
+  - ADR-034
+  - ADR-039
 ---
 # Plan: Gemma Push Reviewer Role
 
-> **Status:** Proposed - audit-review ready, not approved for implementation.
+> **Status:** Baseline implemented with material gaps; remediation r5 proposed,
+> not approved for implementation.
 > **Tasks ledger:** `docs/tasks/gemma-push-reviewer-role.md`
 > **Related precedent:** `docs/adr/ADR-034-gemma-process-audit-and-reviewer-reconciliation.md`
+> **Proposed decision:**
+> `docs/adr/ADR-042-push-review-remediation-controller-and-escalation-lifecycle.md`
 > **Related playbooks:** `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`,
 > `docs/playbooks/LOW_RRI_LOCAL_MODEL_HANDOFF.md`
-> **Revision:** r2 (2026-06-25) - adds D11 model-call configuration, the Model
-> Invocation Contract, D12 log-budget/redaction, D6a two-quorum-stages, D13 audit
-> trail, and the `in_review` development lifecycle; see "Revision r2 Change Log".
-> Changed sections are marked "(added r2)".
+> **Revision:** r5 (2026-08-24) - reconciles the shipped baseline with the
+> implementation audit, introduces the remediation controller, durable work-item
+> lifecycle, bounded Low fix lane, frontier/human handoff, and trusted publisher.
 
 ## Objective
 
-Add a **Gemma Push Reviewer** role that audits the latest GitHub push **after the
-GitHub pipeline has executed**, collects the available run metadata, job status,
-logs, annotations, and artifacts, then triages any findings into auditable
-candidate tasks. It computes each candidate's RRI through the canonical
-`scripts/rri.py` calculator, dispatches pure Low eligible incidents to the
-existing Gemma Developer role, and produces daily-ready reports that downstream
-agents can inspect before applying, reviewing, deferring, or escalating work.
+Repair and complete the existing **Gemma Push Reviewer layer** so it can audit
+the latest GitHub push **after the GitHub pipeline has executed**, evaluate a
+complete evidence packet through a real multi-pass quorum, and turn supported
+findings into durable, auditable remediation work items.
+
+The layer must be able to plan a bounded fix, compute canonical RRI through
+`scripts/rri.py`, produce a reviewed patch artifact for eligible pure Low work,
+or hand the exact approved packet to a selected frontier agent or human. It must
+never let the evaluator approve its own plan or patch, silently invoke cloud
+work, write unreviewed fixes to the reviewed branch, or lose unresolved items at
+daily rollover.
 
 This is a separate role from **Gemma Reviewer** code review. It has its own
 push-audit prompt, parser, result schema, and quorum. It may dispatch to the
 existing **Gemma Developer** role only for pure Low simple patch incidents. It
 does not replace the primary agent, the deployer, human approval gates, the
 post-development review decision, or the RRI calculator.
+
+The r5 design also makes an implementation boundary explicit: **Gemma Push
+Reviewer is only the evaluator**. Deterministic repository code owns evidence
+validation, RRI invocation, planning/state transitions, and routing; Qwen or an
+explicitly selected frontier agent owns patch authorship; the primary agent or
+human owner owns approval, acceptance, and closure.
+
+## Current Implementation Verdict (2026-08-24)
+
+The baseline is present in `scripts/gemma-push-review.py`, its tests, the
+self-hosted workflow, committed reports, and daily integration. Therefore the
+old `proposed / not implemented` status was false. The baseline is **not ready to
+close**, because the audit found these material gaps:
+
+1. **Quorum is simulated, not executed.** Runtime performs one generation,
+   exposes no `--passes` surface, and hard-codes `passes_run: 1`,
+   `passes_succeeded: 1`, `quorum: met`.
+2. **Evidence is incomplete or invisible to the model.** Annotation collection
+   returns no annotation text; failed logs are duplicated per job without the D12
+   tail budget; artifact downloads are absent; the packet carries paths/counts
+   rather than the evidence text required to support a finding.
+3. **RRI planning is not fail-closed.** Missing proposal values default to zero,
+   malformed values can terminate the audit, and confidence/provenance are not
+   enforced before canonical scoring.
+4. **Findings can disappear.** `observe` findings are excluded from rendered
+   candidates; blocked audits and non-Low rows are not durable open items; live
+   reports can say `findings` while rendering no actionable row.
+5. **Local dispatch has a dead end.** It has no bounded repair, labels a no-patch
+   failure `in_review`, and leaves later agents with non-durable local paths.
+6. **Audit and validation evidence are overstated.** Audit records omit failed
+   invocations and quorum detail; historical reports show only one-pass runs;
+   T7 did not validate 3/3, degraded 2/3, or quorum failure.
+7. **The workflow trust boundary is too broad.** A reviewed branch SHA can
+   supply executable repository code to a write-capable self-hosted job;
+   publication is vulnerable to rerun duplication and branch races.
+8. **Status documents and tests drifted.** T1-T7 were marked Done while the plan
+   and roadmap stayed unapproved; the ops test currently fails because it makes
+   a workflow-global `continue-on-error` assertion that an unrelated Antares step
+   now violates.
+
+T1, T1B, T2, T3, T4, T5, and T7 are reopened by r5. Their historical completion
+evidence is retained, but it is no longer sufficient closure evidence. T8 is
+superseded by the decomposed r5 remediation tasks; T9 was superseded by the
+completed LRPC-3 prompt-canonicalization work.
 
 ## Why This Slice
 
@@ -76,6 +129,17 @@ the code-review role and its wrapper are not reused as the Push Reviewer.
   and close.
 - Governance documentation that states the role's authority and RRI source of
   truth.
+- A deterministic remediation controller that validates evidence/RRI inputs,
+  creates approval-ready candidate plans, and persists one work item per finding
+  or whole-audit blocker.
+- A bounded pure-Low lane with phase-1 packet review, one diagnosable repair
+  attempt, patch-artifact output, phase-2 review handoff, and explicit
+  no-patch/patch-ready states.
+- A frontier/human handoff that carries the exact plan/evidence packet, preserves
+  the RRI 26+ HITL gate, and requires an ADR-039 `fallback-selection-v1` receipt
+  before D14 or a cloud implementer is invoked.
+- Trusted-base workflow execution, read/write job separation, least privilege,
+  deterministic report/work-item keys, and idempotent publication.
 
 ### Excluded
 
@@ -91,6 +155,15 @@ the code-review role and its wrapper are not reused as the Push Reviewer.
 - Committing raw local prompt logs from `logs/gemma-audit/`.
 - Auto-fixing Med-high, Complex, High, or Very high findings.
 - Changing the existing Gemma Reviewer code-review role.
+- Letting the Push Reviewer approve its own candidate plan, review its own patch,
+  or close a remediation work item.
+- Directly committing a generated patch to `main` from the push-audit job.
+- Invoking a frontier implementer without both the RRI/HITL approval evidence and
+  a packet-bound ADR-039 fallback-selection receipt.
+- Treating missing evidence, invalid RRI inputs, a blocked model response, or a
+  single diagnostic pass as a normal successful audit.
+- Executing repository scripts from an arbitrary reviewed branch/SHA with a
+  write-capable token on the self-hosted runner.
 
 ## Design Decisions
 
@@ -417,49 +490,145 @@ the Gemma audit log; canonical RRI evidence lives in the report artifacts (D2,
 Artifact Schema), not the audit trail. `--dry-run` and `--collect-only` emit no
 audit record because no model invocation occurs.
 
+### D14 - Evidence Completeness Is a Typed Gate (added r5)
+
+The controller records completeness separately for run metadata, jobs, step
+summaries, annotations, failed-log tails, artifacts, and diff. Counts and paths
+do not substitute for the model-visible redacted text needed to support a
+finding. Each class is `complete`, `partial`, `unavailable`, or `not_applicable`,
+with truncation and redaction metadata.
+
+Missing required evidence cannot produce a normal `PASS`. The audit becomes
+`evidence_partial` or `blocked`, and a durable work item is emitted when a human
+or agent must recover evidence or evaluate the run manually. Secret-redaction is
+shared and applied before model use, local persistence, or committed Markdown.
+
+### D15 - Candidate Planning and RRI Validation Are Controller-Owned (added r5)
+
+After grounding, the controller creates a candidate plan with evidence
+references, bounded acceptance criteria, `HP-#`/`EC-#` examples, allowed paths,
+verification intent, and stop conditions. The model may propose these values;
+the controller validates them before they become executable input.
+
+Every RRI input is typed, range-checked, and labeled with provenance and
+confidence. Objective values are measured. Missing, malformed, or unsupported
+values route the item to `needs_planning`/`awaiting_human`; they never default to
+zero. Only `scripts/rri.py --json` produces `canonical_rri`.
+
+### D16 - Durable Remediation Work-Item State (added r5)
+
+Every grounded finding, ungrounded observation needing disposition, or
+whole-audit blocker receives one deterministic work-item artifact under a
+committed report-owned namespace. Reports and daily rows are projections of that
+state, not the source of truth. Reruns update the same key idempotently.
+
+Minimum invariants:
+
+- `in_review`/`patch_ready` requires a patch path and digest;
+- no-patch failures use `blocked` or `needs_retry`;
+- unresolved items carry forward across daily rollover;
+- `closed` and `dismissed` require actor, timestamp, reason, and evidence;
+- every attempt, review receipt, approval, fallback selection, and disposition
+  remains reconstructable from `push-<sha>-F###`.
+
+### D17 - Pure-Low Implementation Is Bounded (added r5)
+
+Pure Low remains the only automatic implementation lane. Before the first
+delegation and before any materially revised repair packet, the Low-band phase-1
+review chain must return `PASS`. The controller permits one initial Qwen
+Developer attempt and at most one evidence-backed repair for a diagnosable
+failure. Scope/editorial/security/high-impact refusals are hard stops, not repair
+candidates.
+
+The lane produces a patch artifact in an isolated/disposable worktree and then
+routes it to phase-2 review and primary-agent/human acceptance. It does not
+commit or push the patch from the audit workflow, and it cannot close the item.
+
+### D18 - Frontier/Human Handoff Is Approval- and Receipt-Bound (added r5)
+
+Low work that cannot remain local and every RRI 26+ item receives a complete
+handoff packet. RRI 26+ stays `awaiting_approval` until the normal Compact
+Approval Task Card/HITL gate is satisfied. If D14 or a frontier implementer is
+needed, the controller emits the ADR-039 `fallback-selection-v1` artifact bound
+to the exact packet.
+
+An unattended run may proceed only with complete matching `preauthorized`
+selection fields. Otherwise it stops at `awaiting_fallback_selection` and
+surfaces the packet to a human. D14 stays read-only; selection of D14 never
+authorizes cloud implementation.
+
+### D19 - Trusted Workflow and Idempotent Publisher (added r5)
+
+The reviewed SHA is data. A write-capable publisher executes controller code
+from the trusted default branch only. Read-only audit/patch generation is split
+from publication, privileges are minimized per job, arbitrary branch/PR SHAs are
+excluded from the write route, and third-party Actions are pinned to immutable
+revisions.
+
+Report/work-item keys are deterministic. Publication uses a concurrency group,
+detects already-published items, and handles a moving default branch without
+overwriting unrelated work or producing duplicate daily rows.
+
+### D20 - Acceptance and Closure Stay External to the Evaluator (added r5)
+
+The evaluator may report `PASS` for the push audit, but only the acceptor can
+close a remediation work item. Closure requires the band's phase-2 review,
+verification, required coverage/reflection evidence, disposition of every model
+finding, and synchronization of plan/task/roadmap/daily status artifacts.
+
+The final validation must exercise 3/3 quorum, degraded 2/3, quorum failure,
+evidence partial, successful and failed local dispatch, one bounded repair,
+Moderate+ approval handoff, missing fallback selection, idempotent rerun, and an
+untrusted-branch workflow event.
+
 ## Architecture
 
 ```mermaid
 flowchart TD
-    GH["Latest GitHub push"] --> CI["GitHub pipeline\ncompleted run"]
-    CI --> COL["run metadata + logs + artifacts"]
-    COL --> W["gemma-push-review.py"]
-    W --> P["push-audit packet\nGitHub evidence + diff"]
-    P --> R["dedicated push-audit quorum\n3 passes + reconciliation"]
-    R --> A["push-audit aggregate"]
-    A --> C["candidate task normalizer"]
-    C --> I["RRI input proposal\nmodel-assisted, audited"]
-    I --> RRI["scripts/rri.py --json\ncanonical score"]
-    RRI --> ROUTE["routing decision"]
-    ROUTE -->|pure Low| GD["Gemma Developer\nscripts/delegate-low-rri.py"]
-    GD --> DEV["development report\nreview required"]
-    ROUTE -->|not pure Low| MD["daily non-Gemma report"]
-    DEV --> MD
-    ROUTE --> RAW["logs/gemma-push-review/..."]
-    MD --> SUM["docs/reports/push-review/..."]
-    SUM --> D["daily agents review\nissues + optimizations + HITL"]
-    D --> DEP["deployer / primary agent"]
+    GH["Completed GitHub run + reviewed SHA as data"] --> COL["Read-only evidence collector\nmetadata + annotations + log tails + artifact manifest"]
+    COL --> RED["Shared redaction + completeness gate"]
+    RED --> EVAL["Gemma Push Reviewer\n3 independent passes"]
+    EVAL --> REC["Shared deterministic reconciliation"]
+    REC --> CTRL["Remediation controller\nground + plan + scripts/rri.py + state"]
+    CTRL --> ITEM["Durable work item\npush-SHA-F###"]
+    ITEM -->|pure Low + phase-1 PASS| LOCAL["Qwen Developer\n1 attempt + 1 bounded repair"]
+    LOCAL --> PATCH["Patch artifact\nphase-2 review + acceptance pending"]
+    ITEM -->|RRI 26+| APPROVAL["HITL approval-ready packet"]
+    ITEM -->|local exhausted / D14 needed| SELECT["ADR-039 fallback-selection-v1"]
+    APPROVAL --> SELECT
+    SELECT -->|authorized receipt| FRONTIER["Selected frontier agent\nscoped implementer or read-only D14"]
+    SELECT -->|missing selection| HUMAN["Human queue"]
+    PATCH --> ACCEPT["Primary agent / human acceptor"]
+    FRONTIER --> ACCEPT
+    HUMAN --> ACCEPT
+    ITEM --> DAILY["Idempotent report + daily projection"]
+    ACCEPT --> DAILY
 ```
 
 ## Data Flow
 
-1. Resolve the latest completed GitHub push pipeline run.
-2. Collect run metadata, job status, annotations, logs, and artifacts.
-3. Resolve before/after SHAs and build the push diff from GitHub-backed state.
-4. Build a push-audit packet from the evidence bundle and diff.
-5. Run the dedicated push-audit triple quorum.
-6. If quorum succeeds, normalize reconciled findings.
-7. If quorum fails, emit a blocked report and prepare fallback adjudicator input.
-8. For each candidate, prepare measured RRI inputs.
-9. Run `scripts/rri.py --json`.
-10. Classify pure Low eligibility from canonical RRI and delegation gates.
-11. Dispatch pure Low candidates to Gemma Developer.
-12. Write a development report for every delegated patch.
-13. Route all non-pure-Low candidates to daily non-Gemma review.
-14. Write raw JSON plus Markdown summary, and append the per-run
-    `role: "push-reviewer"` audit record (D13).
-15. Daily agents review the summary, verify delegated development reports, and
-    confirm non-Low incidents were properly deferred.
+1. Resolve an allow-listed completed GitHub run; treat its SHA as evidence data.
+2. Collect metadata, jobs, annotations, budgeted failed-log tails, artifact
+   manifest/content where allowed, and the GitHub-backed diff.
+3. Redact all text and emit the per-class evidence-completeness matrix.
+4. Build one bounded push-audit packet containing the evidence the model must
+   evaluate, not only paths/counts.
+5. Run three fresh-context passes and reconcile every usable/failed pass.
+6. Emit a durable whole-audit blocker if evidence or quorum is insufficient.
+7. Ground each finding/observation and create a stable `push-<sha>-F###` item.
+8. Build the bounded candidate plan and validate RRI inputs/provenance.
+9. Invoke `scripts/rri.py --json`; route invalid/uncertain input to planning or
+   human review, never to a zero-filled Low score.
+10. Persist the work item before any implementation or escalation side effect.
+11. For pure Low: phase-1 review -> Qwen attempt -> optional one repair -> patch
+    artifact -> phase-2 review/acceptance handoff.
+12. For RRI 26+: emit the approval-ready packet and wait for HITL approval.
+13. For a frontier/D14 route: emit and validate the packet-bound ADR-039 receipt;
+    invoke only the selected role/effort after authorization.
+14. Project all non-terminal state into the Markdown report and daily ledger.
+15. Publish idempotently from trusted default-branch controller code, append the
+    audit record for success or failure, and preserve unresolved items until an
+    acceptor records disposition.
 
 ## Model Invocation Contract (added r2)
 
@@ -525,6 +694,8 @@ Top-level raw artifact:
     "passes_succeeded": 3,
     "quorum": "met",
     "degraded": false,
+    "mode": "normal_quorum",
+    "evidence_completeness": {},
     "aggregate_path": "..."
   },
   "candidates": [],
@@ -579,6 +750,21 @@ Candidate artifact:
     "band": {"label": "Low"},
     "raw": {}
   },
+  "planning": {
+    "acceptance_criteria": [],
+    "happy_paths": [],
+    "edge_cases": [],
+    "allowed_paths": ["scripts/example.py"],
+    "verification_intent": [],
+    "stop_conditions": []
+  },
+  "work_item": {
+    "state": "scored",
+    "attempts": [],
+    "approval_receipt": null,
+    "fallback_selection_receipt": null,
+    "disposition": null
+  },
   "pure_low_eligible": true,
   "routing": "gemma-developer-dispatch",
   "developer_dispatch": {
@@ -586,12 +772,18 @@ Candidate artifact:
     "result_path": "logs/gemma-push-review/.../developer/F001-result.json",
     "development_report_path": "logs/gemma-push-review/.../developer/F001-development.json",
     "post_development_review_required": true,
-    "review_status": "in_review|accepted|changes_requested",
+    "review_status": "not_applicable|in_review|accepted|changes_requested",
+    "patch_digest": null,
     "review_method": "gemma-code-review-triple-quorum",
     "review_orchestrator": "non-gemma-agent"
   }
 }
 ```
+
+The full work-item schema is versioned separately from the report aggregate.
+`in_review` is invalid while `patch_digest` is null. Whole-audit blockers use the
+same lifecycle but omit candidate path/RRI fields that cannot be established;
+they remain durable and route to evidence recovery or human evaluation.
 
 ## Governance Invariants
 
@@ -607,6 +799,18 @@ Candidate artifact:
   or a pending/unavailable report has been written.
 - Missing Ollama, missing model, or quorum failure never makes the review silently
   disappear; it produces an explicit blocked/degraded report.
+- A normal push audit requires at least two usable independent passes; a one-pass
+  diagnostic cannot report normal quorum.
+- Missing or invalid RRI inputs never default to zero or enter the pure-Low lane.
+- Every actionable observation and whole-audit blocker has a durable non-terminal
+  work item until an acceptor records disposition.
+- `in_review` is reserved for an existing patch with a recorded digest.
+- Every delegation packet receives the band's phase-1 review; every patch remains
+  subject to phase-2 review and acceptor-owned closure.
+- RRI 26+ implementation requires HITL approval, and frontier/D14 invocation
+  requires a matching ADR-039 selection receipt.
+- The reviewed SHA is never executed as controller code by a write-capable
+  self-hosted publisher.
 - Raw prompt logs stay local and git-ignored.
 - Code-review artifacts and Push Reviewer artifacts remain separate.
 - Every real push-audit run writes a `role: "push-reviewer"` ADR-034 audit
@@ -625,48 +829,59 @@ Candidate artifact:
 | Build | `Makefile` | add `qa-gemma-push-review` |
 | GitHub workflow | `.github/workflows/push-review.yml` | self-hosted `workflow_run` after primary CI |
 | Reports | `docs/reports/push-review/` | Markdown summaries for daily review |
+| Durable work items | `docs/reports/push-review/items/` | one idempotent, versioned state artifact per finding/blocker |
+| Fallback selection | `scripts/fallback_selection.py` | reused for packet-bound D14/frontier authorization; no new selection protocol |
+| Publisher | `scripts/push_review_commit.py` | trusted-base, idempotent publication and concurrency recovery |
+| Publisher tests | `scripts/push_review_commit_test.py`, `scripts/gemma_push_ops_test.py` | trust-boundary, rerun, and race regression coverage |
 | Docs | `docs/gemma-local-improve.md` | active role summary |
 | Workflow docs | `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` | daily consumption and authority boundary |
 | Daily docs | `docs/daily/README.md`, `docs/daily/TEMPLATE.md` | report review convention |
 
 ## Slice RRI
 
-Computed with:
+The original baseline was scored RRI 66. The r5 remediation program is rescored
+against the actual cross-cutting scope:
 
 ```bash
 python3 scripts/rri.py \
+  --cc 40 --T 2 --A 1 --X 4 --D 4 --K 4 --P 4 \
   --touches scripts/gemma-push-review.py \
   --touches scripts/gemma_push_review_test.py \
-  --touches Makefile \
+  --touches scripts/gemma_local.py \
+  --touches scripts/gemma-code-review.py \
+  --touches scripts/push_review_commit.py \
+  --touches .github/workflows/push-review.yml \
+  --touches docs/daily/README.md \
   --touches docs/playbooks/AGENT_WORKFLOW_GUIDE.md \
-  --touches docs/daily/TEMPLATE.md \
-  --cc 28 --D 4 --K 4 --P 2 --T 2 --A 1 --X 4 \
-  --penalty arch_decision
+  --penalty arch_decision --penalty auth_security
 ```
 
 Result:
 
 | Variable | Score | Evidence | Confidence |
 |---|---|---|---|
-| C cyclomatic | 3 | raw CC 28 -> score 3 | High |
-| F files | 2 | 5 primary files | High |
-| D domain | 4 | agent orchestration / local model workflow | High |
-| T coverage | 2 | new wrapper with focused Python tests | High |
-| A ambiguity | 1 | proposed plan and task ledger define scope | High |
-| K coupling | 4 | GitHub Actions/API logs, Gemma wrapper, RRI, daily docs | High |
-| P impact | 2 | advisory developer workflow impact | High |
-| X context | 4 | GitHub pipeline, logs/artifacts, scripts, policies, daily | High |
+| C cyclomatic | 4 | estimated aggregate raw CC 40 | High |
+| F files | 3 | 8 primary files | High |
+| D domain | 4 | model/workflow and escalation orchestration | High |
+| T coverage | 2 | focused tests exist but omit the live contracts | High |
+| A ambiguity | 1 | r5 plan and decomposed ledger bound the work | High |
+| K coupling | 4 | GitHub, Ollama, RRI, local developer, fallback and daily state | High |
+| P impact | 4 | self-hosted permissions, write publication and agent authorization | High |
+| X context | 4 | several workflow/script/policy/report surfaces | High |
 
-**Base value:** 54  
-**Penalty:** `arch_decision` (+12)  
-**Final RRI:** 66 -> Complex (56-70) -> Effort L -> Premium tier -> thinking On
+**Base value:** 64
 
-Because the slice is Complex, implementation must proceed only after plan review
-and approval, and only through the decomposed tasks in the task ledger.
+**Penalties:** `arch_decision` (+12), `auth_security` (+10), automatic
+`complex_and_domain` (+10)
 
-> r2 note: the RRI inputs above pre-date the T1B model-invocation task and the
-> D11/D12 additions. Recompute the slice RRI before implementation; the band is
-> expected to stay Complex but `K`/`X` may rise.
+**Final RRI:** 96 -> Very high (86-100) -> Effort XL -> Premium tier -> thinking On
+
+No single RRI-96 implementation is permitted. ADR-042 must be accepted first,
+then the work proceeds only through the individually scored T12-T19 tasks in the
+ledger. Each RRI 26+ task requires its own Compact Approval Task Card v2,
+phase-1 review, explicit approval, implementation route, phase-2 review, and
+closure evidence. The documentation-only r5 rebaseline is T10 and does not
+authorize any runtime change.
 
 ## Verification Strategy
 
@@ -678,6 +893,13 @@ and approval, and only through the decomposed tasks in the task ledger.
 - one live local run against an explicit completed GitHub Actions run ID,
   recorded in
   `docs/evaluations/gemma-push-reviewer-live-test.md`
+- contract scenarios: 3/3 quorum, degraded 2/3, fewer-than-two blocked,
+  single-pass diagnostic labeling, partial evidence, invalid RRI proposal,
+  observe-finding persistence, successful/failed/repaired local dispatch,
+  Moderate+ approval wait, missing/authorized fallback selection, idempotent
+  publisher rerun, branch allow-list, and publication race recovery.
+- security fixtures proving log/annotation/artifact secrets are redacted before
+  the packet, local durable item, or committed report is written.
 
 ## Revision r2 Change Log
 
@@ -715,7 +937,7 @@ Changes in this revision are marked "(added r2)" at their headings:
   surface. T1B gives the invocation an owning task; D11 and the Model Invocation
   Contract give it config and a contract.
 
-## Revision r3 Note (2026-08-17, proposed — not yet approved)
+## Revision r3 Note (2026-08-17, superseded by r5 decomposition)
 
 A functioning review of T3/T4 in production (`docs/reports/push-review/`,
 `docs/daily/2026-08-15.md` through `2026-08-17.md`) found that findings
@@ -723,11 +945,11 @@ reach a markdown report and then dead-end: pure-Low dispatch failures get no
 repair attempt and are mislabeled `review_status: "in_review"`, and
 Moderate+/blocked findings depend on a manual daily "cierre" transcription
 into the Issues ledger that is not happening (3/3 days checked show an empty
-§5 Issues ledger despite open push-review rows). Full diagnosis and proposed
-fix: `docs/tasks/gemma-push-reviewer-role.md` § T8 (proposed, RRI 55 ->
-Med-high, not yet approved for implementation).
+§5 Issues ledger despite open push-review rows). The diagnosis remains in
+`docs/tasks/gemma-push-reviewer-role.md` § T8; r5 supersedes that single task
+with T15-T17.
 
-## Revision r4 Note (2026-08-19, proposed — Low RRI, not yet applied)
+## Revision r4 Note (2026-08-19, superseded by completed LRPC-3)
 
 Unrelated to push-review routing (r3/T8): while grounding a separate
 discussion about canonicalizing local-role system prompts
@@ -739,29 +961,41 @@ drifted from its canonical source in `AGENT_WORKFLOW_GUIDE.md` — missing
 Filed here as the same failure class T8 diagnosed for push-review routing
 (governance text silently drifting, unnoticed until a live-behavior read),
 not because it touches push-review code — D1a's separation between the two
-Gemma roles is otherwise unaffected. Full diagnosis and fix:
-`docs/tasks/gemma-push-reviewer-role.md` § T9 (RRI 23 -> Low, execute-ready).
+Gemma roles is otherwise unaffected. The diagnosis remains in § T9 for history;
+completed LRPC-3 now extracts the canonical clause through
+`scripts/local-agent/prompt_builder.py`, so the manual one-sentence task must not
+be executed.
+
+## Revision r5 Change Log (2026-08-24)
+
+- Reconciled the plan with the shipped baseline and reopened T1, T1B, T2, T3,
+  T4, T5, and T7 where runtime evidence does not meet their acceptance criteria.
+- Added the audit verdict and D14-D20: typed evidence completeness, validated
+  planning/RRI inputs, durable work-item state, bounded Low implementation,
+  ADR-039 frontier/human handoff, trusted publisher, and acceptor-owned closure.
+- Proposed ADR-042 because the aggregate remediation is RRI 96 and changes
+  durable authority, state, and self-hosted trust boundaries.
+- Replaced the report-only flow with evaluator -> deterministic controller ->
+  local/frontier/human route -> independent review -> acceptor lifecycle.
+- Superseded T8 with decomposed T13-T17 work and T9 with completed LRPC-3.
+- Added explicit validation cases for real quorum, partial evidence, durable
+  carry-forward, bounded repair, fallback selection, and workflow idempotency.
 
 ## Open Approval Items
 
-- [ ] Approve the role authority boundary: audit/dispatch only, no direct
-      auto-approval.
-- [ ] Approve the separation from Gemma Reviewer/code-review semantics.
-- [ ] Approve pure Low dispatch to the existing Gemma Developer role.
-- [ ] Approve the required development report before any post-patch review.
-- [ ] Approve GitHub pipeline metadata/log collection as the Push Reviewer input
-      boundary.
-- [ ] Approve `scripts/rri.py` as the only final RRI source in push-review reports.
-- [ ] Approve local raw artifacts plus optional committed Markdown summaries.
-- [ ] Approve automatic self-hosted `workflow_run` integration, with no
-      GitHub-hosted Ollama dependency.
-- [ ] Approve daily agent responsibility to review deferred complexity findings.
-- [ ] Approve the model-call configuration surface and `DUBBRIDGE_PUSH_REVIEW_*`
-      env namespace (D11).
-- [ ] Approve the push-audit response contract and its dedicated parser, separate
-      from the code-review parser.
-- [ ] Approve promoting the deterministic quorum reconciler into a shared module
-      reused by both Gemma roles.
-- [ ] Approve the CI-log byte budget and packet-level secret redaction (D12).
-- [ ] Approve the `role: "push-reviewer"` audit-trail record and the
-      `push-<sha>-F###` task_id correlation across dispatch and review (D13).
+The original list remained unchecked while the baseline was implemented, so it
+is retained in git history as evidence of approval drift rather than treated as
+retroactive authorization. r5 has these forward-looking decisions:
+
+- [ ] Accept ADR-042's four-authority split and durable work-item lifecycle.
+- [ ] Approve real three-pass evaluation plus the evidence completeness/redaction
+      gate; one-pass mode remains diagnostic only.
+- [ ] Approve the pure-Low lane: phase-1 review, one initial attempt, one bounded
+      repair, patch artifact only, phase-2 review and external acceptance.
+- [ ] Approve approval-ready Moderate+ handoffs and ADR-039-bound D14/frontier
+      selection; no silent frontier invocation.
+- [ ] Approve trusted-default-branch controller execution, read/write separation,
+      least privilege, branch allow-list, and idempotent publication.
+- [ ] Approve the decomposed T12-T19 remediation sequence. Each task still needs
+      its own current RRI, phase-1 artifact, Compact Approval Task Card v2, and
+      explicit execution approval.
