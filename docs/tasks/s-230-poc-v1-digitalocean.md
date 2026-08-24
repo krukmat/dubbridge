@@ -75,7 +75,11 @@ ledger.
 | T4o | Full local image-pipeline contract | development/test | S (RRI 24 Low) | T4c, T4e, T4g, T4l; T4n if executed (contract-verified images) | [x] Done — 2026-08-24 |
 | T4p | Execute and record local image evidence | operational/evidence | S (RRI 19 Low) | T4o | [x] Done — 2026-08-24 |
 | T4q | T4 parent closeout and status sync | docs-only | S (RRI 10 Low) | T4p; T4n if executed | [x] Done — 2026-08-24 |
-| T5 | Production deployment descriptor and secret boundary | config-only | M | T4q | [ ] Planned |
+| T5 | Production deployment descriptor and secret boundary (non-executable parent) | config-only parent | XL (RRI 71 High; decomposition required) | T4q | Approved 2026-08-24 — blocked: owner hostname pending |
+| T5a | Freeze production inputs and child contracts | planning/config | M (RRI 38 Moderate) | T4q | [ ] Approved 2026-08-24 — blocked on owner action (public hostname/subdomain) |
+| T5b | Production profile and environment/secret template | config-only | L (provisional RRI 49 Med-high) | T5a | [ ] Blocked — owner hostname |
+| T5c | Production Compose and TLS reverse proxy | config-only | M (provisional RRI 35 Moderate) | T5b | [ ] Blocked — owner hostname |
+| T5d | Local descriptor evidence and aggregate status sync | operational/docs | M (provisional RRI 27 Moderate) | T5c | [ ] Blocked — owner hostname (transitive via T5c) |
 | T6 | First deploy and end-to-end smoke on Digital Ocean | operational | L | T5 | [ ] Planned |
 | T7 | Mobile POC build against the deployed backend | development/ops | M | T6 | [ ] Planned |
 | T7b | Mobile registration screen | development | M | T7 | [ ] Planned — droppable (first) |
@@ -4256,12 +4260,29 @@ for this docs-only closeout; do not alter implementation files or start T5.
 
 ---
 
-## S-230-T5: Production deployment descriptor and secret boundary
+## S-230-T5: Production deployment descriptor and secret boundary (non-executable parent)
 
-**Type:** config-only
-**Effort:** M
+**Type:** config-only parent
+**Effort:** XL — RRI 71 High
 **Depends on:** S-230-T4q (which closes the S-230-T4 parent)
-**Status:** [ ] Planned
+**Status:** Approved 2026-08-24 — non-executable parent; blocked 2026-08-24 —
+T5a approved but its public-hostname input remains an owner action pending
+(see T5a "Blocked — next action"); T5b, T5c, and T5d (transitively, via their
+`Depends on` chain) cannot start until it resolves.
+
+**Parent approval:** owner `matias` approved the RRI 71 parent and mandatory
+T5a–T5d decomposition in-session on 2026-08-24. This approval does not waive
+the per-child presentation/approval gates and did not authorize runtime edits,
+container execution, or Digital Ocean actions.
+
+**RRI evidence:** `docs/audit/s-230-t5-rri.md`. The aggregate touches eight
+expected files and crosses the production auth/secret boundary, so
+`scripts/rri.py` returned 71 (High). The RRI >= 56 gate makes this parent
+non-executable: implementation is split across T5a–T5d, and each child must be
+recomputed and presented under its own gate before execution.
+
+**Task-analysis review:** n/a — config-only parent; exempt under the workflow
+guide. No local model was invoked for presentation.
 
 **Problem (plan G5, G6):** `S-030` Phase 3 is deferred, so no production
 descriptor exists; `config/production.toml` holds `*.example` placeholders and
@@ -4296,6 +4317,11 @@ there is no `.env.example` at the repository root.
 - The same auth set is applied to **all three services**, since `apps/api`,
   `apps/gateway` and `apps/worker-runner` each call `AppConfig::load()` and each
   fails closed at boot on a partial set.
+- The shared template also carries
+  `DUBBRIDGE_GATEWAY__OAUTH__CLIENT_SECRET`: although ADR-031 made the gateway a
+  transparent bearer relay, the current production validator still rejects a
+  missing legacy OAuth client secret whenever `[gateway.oauth]` is present.
+  Removing that dead validation/config surface is T9 debt, not T5 scope.
 - `DUBBRIDGE_AUTH__JWT_EXPIRY_HOURS` is set explicitly rather than left to the
   24-hour serde default (`crates/config/src/lib.rs:146`), because there is no
   refresh path. The chosen value and its rationale are recorded by `S-230-T7c`,
@@ -4322,6 +4348,186 @@ and X21 wording; ADR-026 implementation references if the secret boundary moves.
 template, and real `config/production.toml` values. Commit no secrets.
 
 **Stop condition:** Stop after a local dry-run of the descriptor. Do not deploy.
+
+### Mandatory child decomposition
+
+| Child | Frozen scope | Expected paths | Provisional RRI |
+|---|---|---|---|
+| `S-230-T5a` | Freeze proxy choice, DO region/endpoint, public hostname, globally unique Spaces bucket, POC upload ceiling, JWT lifetime, and translation-provider mode; resolve the T7c ordering mismatch without mobile work | `docs/tasks/s-230-poc-v1-digitalocean.md`, `docs/plan/s-230-poc-v1-digitalocean.md` | 38 Moderate |
+| `S-230-T5b` | Author only the committed non-secret production profile, exhaustive env template, and parity documentation; include nested auth/storage vars, the legacy gateway OAuth secret placeholder, and translation `http` provider URL/key placeholders; commit no secret | `.env.example`, `config/production.toml`, `config/README.md` | 49 Med-high |
+| `S-230-T5c` | Author only the production Compose descriptor and Caddy TLS/reverse-proxy config; Redis remains on-droplet, migration is one-shot, and app startup waits for migration success | `infra/production/docker-compose.yml`, `infra/production/Caddyfile` | 35 Moderate |
+| `S-230-T5d` | Run `docker compose config`, the bounded local-infrastructure dry-run, and secret/diff checks; record evidence and synchronize T5/S-030/X21 status without provisioning or deploying | this ledger, the linked plan, `docs/plan/roadmap.md` | 27 Moderate |
+
+The child scores are presentation-time estimates only. Each child reruns
+`scripts/rri.py`; the actual report and approval card control if a score changes.
+
+### S-230-T5a: Freeze production inputs and child contracts
+
+**Type:** planning/config
+**Effort:** M — RRI 38 Moderate
+**Depends on:** S-230-T4q
+**Status:** [ ] Approved 2026-08-24 — blocked on owner action (public hostname/subdomain)
+
+**RRI evidence:** `docs/audit/s-230-t5a-rri.md` — final RRI 38 Moderate.
+
+**Task-analysis review:** n/a — planning/config-only task; exempt under the
+workflow guide. No Ollama-backed role is invoked for presentation.
+
+**Acceptance criteria:**
+
+- Freeze one TLS proxy (`Caddy` proposed), one Digital Ocean region/Spaces
+  endpoint (`ams3` / `https://ams3.digitaloceanspaces.com` proposed), the exact
+  public hostname, and the globally unique Spaces bucket name before runtime
+  config is authored. The owner must supply the latter two values; the suggested
+  bucket convention is `dubbridge-poc-v1-<account-slug>`.
+- Freeze an explicit POC upload ceiling (`100 MiB` proposed) below the API's
+  500 MiB hard limit, with the gateway-buffering rationale recorded.
+- Freeze `DUBBRIDGE_AUTH__JWT_EXPIRY_HOURS` (`8` proposed) and record that T7c
+  consumes this value later for mobile hydration behavior; T5a resolves the
+  current ledger ordering mismatch without implementing T7c.
+- Freeze translation as `http` for the deployed POC and carry
+  `DUBBRIDGE_TRANSLATION_API_URL`/`DUBBRIDGE_TRANSLATION_API_KEY` as injected
+  placeholders; no vendor selection or credential value is committed.
+
+**Approved input table (owner decision 2026-08-24):**
+
+| Input | Frozen value | Status |
+|---|---|---|
+| TLS proxy | `Caddy` | Frozen — contingent on a resolvable hostname (see below) |
+| DO region / Spaces endpoint | `ams3` / `https://ams3.digitaloceanspaces.com` | Frozen |
+| Spaces bucket name | `dubbridge-poc-v1` (no account-slug suffix; owner confirmed globally-unique as-is) | Frozen |
+| POC upload ceiling | `100 MiB` | Frozen |
+| `DUBBRIDGE_AUTH__JWT_EXPIRY_HOURS` | `8` | Frozen |
+| Translation provider mode | `http`, with `DUBBRIDGE_TRANSLATION_API_URL`/`DUBBRIDGE_TRANSLATION_API_KEY` as injected placeholders only | Frozen |
+| Public hostname | *(none)* | **Blocked** — owner rejected IP-only/no-TLS and self-signed TLS; owner will obtain a real subdomain before this value is frozen. Caddy's automatic Let's Encrypt TLS requires a resolvable public hostname, so this also gates the TLS proxy freeze above. |
+
+**Recomputed child RRI:** not yet performed — T5b/T5c/T5d each rerun
+`scripts/rri.py` independently at their own presentation time per the parent
+table's note ("child scores are presentation-time estimates only"); no input
+frozen above changes their provisional C/D/K/P/T/A/X scoring, so no
+recomputation is triggered by this partial freeze.
+
+**Evidence to emit:** approved input table and recomputed child RRIs.
+
+**Status artifacts affected:** this ledger and the linked S-230 plan.
+
+**Handoff prompt:** Freeze only deployment inputs and child contracts. Do not
+author Compose, Caddy, TOML, or env files.
+
+**Stop condition:** Stop when every non-secret deploy input has an owner-approved
+value. Do not create Digital Ocean resources.
+
+**Blocked — next action:** owner (`matias`) to acquire a real public subdomain
+for the POC droplet. T5a cannot close `[x] Done`, and T5b/T5c (which consume
+the hostname for `config/production.toml` and the `Caddyfile`) cannot start,
+until that value is supplied. No further agent action is possible on this
+input without it.
+
+### S-230-T5b: Production profile and environment/secret template
+
+**Type:** config-only
+**Effort:** L — provisional RRI 49 Med-high
+**Depends on:** S-230-T5a
+**Status:** [ ] Blocked 2026-08-24 — cannot start: T5a's public hostname is
+unresolved (owner action pending, see T5a "Blocked — next action"). This task's
+own acceptance criteria require writing the public-routing values into
+`config/production.toml`, and the hostname is one of them.
+
+**Acceptance criteria:**
+
+- `.env.example` enumerates every required production variable with placeholders
+  only, including nested storage/auth names, JWT expiry, the legacy gateway OAuth
+  client secret, and translation provider URL/key variables.
+- `config/production.toml` contains the T5a-approved non-secret Digital Ocean and
+  public-routing values; `config/README.md` matches the effective
+  `AppConfig::load()` double-underscore contract.
+- The same shared environment contract can boot api, gateway, worker-runner, and
+  the migration job without committing a real secret.
+
+**Evidence to emit:** config-load/parity checks and a secret-pattern scan.
+
+**Status artifacts affected:** this ledger and `config/README.md`.
+
+**Blocked — next action:** owner (`matias`) to acquire a real public subdomain
+(T5a's open item). This task cannot start until T5a's hostname row moves from
+Blocked to Frozen — every other T5a input (Caddy, `ams3`, `dubbridge-poc-v1`,
+100 MiB, 8h JWT, `http` translation mode) is already frozen and available for
+this task to consume once unblocked.
+
+**Handoff prompt:** Implement only the production profile and environment
+contract. Commit placeholders, never credentials.
+
+**Stop condition:** Stop before authoring the production descriptor.
+
+### S-230-T5c: Production Compose and TLS reverse proxy
+
+**Type:** config-only
+**Effort:** M — provisional RRI 35 Moderate
+**Depends on:** S-230-T5b
+**Status:** [ ] Blocked 2026-08-24 — cannot start: transitively blocked on
+T5a's unresolved public hostname (owner action pending) via its direct
+dependency on T5b, and this task's own `Caddyfile` acceptance criterion
+names the approved hostname directly.
+
+**Acceptance criteria:**
+
+- `infra/production/docker-compose.yml` composes Caddy, gateway, api,
+  worker-runner, Redis, and the one-shot migration image; no PostgreSQL or
+  object-storage container is added.
+- Migration success gates api, gateway, and worker startup; Redis has a health
+  gate; only Caddy exposes public HTTP/HTTPS ports.
+- `infra/production/Caddyfile` declares the approved hostname, automatic TLS,
+  proxying to gateway, and the approved request-body ceiling.
+
+**Evidence to emit:** `docker compose config` output using placeholder values.
+
+**Status artifacts affected:** this ledger.
+
+**Blocked — next action:** same owner action as T5a/T5b — a real public
+subdomain. This task additionally cannot start before T5b closes (its own
+`Depends on`), so it is blocked on both counts until the hostname is
+supplied.
+
+**Handoff prompt:** Implement only production Compose and Caddy wiring. Do not
+start the stack or deploy.
+
+**Stop condition:** Stop after the descriptor renders successfully.
+
+### S-230-T5d: Local descriptor evidence and aggregate status sync
+
+**Type:** operational/docs
+**Effort:** M — provisional RRI 27 Moderate
+**Depends on:** S-230-T5c
+**Status:** [ ] Blocked 2026-08-24 — cannot start: transitively blocked on
+T5a's unresolved public hostname (owner action pending) via its direct
+dependency on T5c, which is itself blocked on T5b for the same reason. This
+task's own scope (dry-run of the production descriptor, secret scan) needs a
+descriptor that T5b/T5c have not yet produced.
+
+**Acceptance criteria:**
+
+- The production descriptor passes structural rendering and a bounded dry-run
+  against local dependencies; the migration exits successfully and all three
+  long-running binaries pass their startup/readiness checks.
+- Secret scanning confirms no real credential was added, and `git diff --check`
+  plus documentation QA pass.
+- T5/T5a–T5d, the S-230 plan, roadmap S-030 Phase 3/X21 wording, and ADR-026
+  implementation references are synchronized as materially applicable.
+
+**Evidence to emit:** exact commands/transcript, readiness results, secret scan,
+and status diff.
+
+**Blocked — next action:** same owner action as T5a/T5b/T5c — a real public
+subdomain. Unblocks automatically once T5c closes.
+
+**Status artifacts affected:** this ledger, the linked plan, roadmap, and
+ADR-026 references only if the boundary changed.
+
+**Handoff prompt:** Execute and record the local-only validation, then close the
+aggregate consistently. Do not provision or deploy.
+
+**Stop condition:** Stop after local evidence and status synchronization. T6 is
+separate and remains unstarted.
 
 ---
 
