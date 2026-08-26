@@ -627,7 +627,7 @@ flowchart LR
     T3["T3 ✓ real readiness probe<br/>apps/api, apps/gateway"] --> T4A
     T4A["T4a–T4o Low/S<br/>tests + image patches ✓"] --> T4P["T4p local evidence ✓"]
     T4P --> T4Q["T4q parent closeout ✓"]
-    T4Q --> T5["T5 DO descriptor + secrets<br/>T5a approved 2026-08-24, blocked on<br/>owner hostname; T5b/T5c/T5d all blocked"]
+    T4Q --> T5["T5 DO descriptor + secrets<br/>T5a ✓ done 2026-08-26, hostname frozen<br/>(poc.iotforce.es); T5b ✓ done 2026-08-27; T5c/T5d queued"]
     T5 --> T6["T6 deploy + E2E smoke"]
     T6 --> T7["T7 mobile build vs DO"]
     T6 --> T8["T8 subtitle visible in review (optional)"]
@@ -675,7 +675,7 @@ make failures loud; T1b is what makes success possible.
 | 2 | T1b API preparation queue bound to Redis; T2 migration runner | **Pipeline actually dispatches**; fresh DB can be schema'd |
 | 3 | T3 real readiness probes | Broken deploys fail visibly |
 | 4–5 | T4a–T4q Low/S chain: test contracts, four images, local evidence, closeout | Images build and run locally without cloud authoring |
-| 5–6 | T5 DO descriptor, secrets boundary, env example — T5a approved 2026-08-24 (Caddy, `ams3`, `dubbridge-poc-v1`, 100 MiB, 8h JWT, `http` translation mode frozen); blocked on owner acquiring a public subdomain before T5b/T5c can start | Deployable artifact exists |
+| 5–6 | T5 DO descriptor, secrets boundary, env example — T5a done 2026-08-26 (Caddy, `ams3`, `dubbridge-poc-v1`, 100 MiB, 8h JWT, `http` translation mode, and hostname `poc.iotforce.es` all frozen); T5b done 2026-08-27; T5c/T5d sequentially queued behind it | Deployable artifact exists |
 | 6–7 | T6 provision, deploy, E2E smoke with a real video | **Backend live on DO** |
 | 8 | T7 mobile build against the deployed URL; T7c session lifetime + expiry | **POC usable end to end** |
 | 9 | T8 subtitle visible in review; T7b registration screen; or buffer | Demo quality |

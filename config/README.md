@@ -42,12 +42,34 @@ For structured settings, `AppConfig::load()` uses `__` as the nesting separator,
 | `storage.endpoint_url` | — | — | — | — | `DUBBRIDGE_STORAGE_ENDPOINT_URL` |
 | `observability.log_format` | — | `pretty` | `json` | `json` | `DUBBRIDGE_OBSERVABILITY_LOG_FORMAT` |
 | `observability.filter` | `info` | — | — | — | `DUBBRIDGE_OBSERVABILITY_FILTER` |
-| `auth.issuer` | — | — (optional) | — (secret) | — (secret) | `DUBBRIDGE_AUTH__ISSUER` |
-| `auth.audience` | — | — (optional) | — (secret) | — (secret) | `DUBBRIDGE_AUTH__AUDIENCE` |
-| `auth.rsa_public_key_path` | — | — (optional) | — (secret) | — (secret) | `DUBBRIDGE_AUTH__RSA_PUBLIC_KEY_PATH` |
+| `auth.issuer` | — | — (optional) | — (secret) | `https://poc.iotforce.es` | `DUBBRIDGE_AUTH__ISSUER` |
+| `auth.audience` | — | — (optional) | — (secret) | `dubbridge-api` | `DUBBRIDGE_AUTH__AUDIENCE` |
+| `auth.rsa_public_key_path` | — | — (optional) | — (secret) | `unused-legacy-field-hs256-only` (dead field, see note) | `DUBBRIDGE_AUTH__RSA_PUBLIC_KEY_PATH` |
 | `auth.jwt_secret` | — | — (optional) | — (secret) | — (secret) | `DUBBRIDGE_AUTH__JWT_SECRET` |
-| `auth.jwt_expiry_hours` | — | — (optional, default `24`) | — (secret/profile) | — (secret/profile) | `DUBBRIDGE_AUTH__JWT_EXPIRY_HOURS` |
-| `auth.clock_skew_leeway_seconds` | — | — | — | — | `DUBBRIDGE_AUTH__CLOCK_SKEW_LEEWAY_SECONDS` |
+| `auth.jwt_expiry_hours` | — | — (optional, default `24`) | — (secret/profile) | `8` (S-230-T5a frozen) | `DUBBRIDGE_AUTH__JWT_EXPIRY_HOURS` |
+| `auth.clock_skew_leeway_seconds` | — | — | — | `30` | `DUBBRIDGE_AUTH__CLOCK_SKEW_LEEWAY_SECONDS` |
+| `storage.access_key_id` | — | — | — (secret) | — (secret) | `DUBBRIDGE_STORAGE__ACCESS_KEY_ID` (double underscore; nested under `[storage]`) |
+| `storage.secret_access_key` | — | — | — (secret) | — (secret) | `DUBBRIDGE_STORAGE__SECRET_ACCESS_KEY` (double underscore; nested under `[storage]`) |
+| `gateway.oauth.client_secret` | — | — (optional) | — (secret) | — (secret) | `DUBBRIDGE_GATEWAY__OAUTH__CLIENT_SECRET` |
+| translation provider (worker, not `AppConfig`) | — | `fake` | — | `http` (S-230-T5a frozen) | `DUBBRIDGE_TRANSLATION_PROVIDER` |
+| translation API URL/key (worker, not `AppConfig`) | — | — | — (secret) | — (secret) | `DUBBRIDGE_TRANSLATION_API_URL` / `DUBBRIDGE_TRANSLATION_API_KEY` |
+
+**`auth.rsa_public_key_path` is a dead field:** structurally required by
+`AuthSettings` but functionally unused since auth became HS256-only
+(ADR-031/S-200, `crates/auth/src/issuer.rs`). `production.toml` sets a fixed
+placeholder string rather than a real key path; removing this field entirely
+is deferred cleanup, not S-230-T5b scope.
+
+**Vars read outside `AppConfig`/figment:** `DUBBRIDGE_TRANSLATION_PROVIDER`,
+`DUBBRIDGE_TRANSLATION_API_URL`, and `DUBBRIDGE_TRANSLATION_API_KEY` are read
+directly via `os.environ` by `workers/translation-worker-py/main.py` — they
+share the `DUBBRIDGE_` prefix by convention only and are never passed through
+figment's `__` nesting. Similarly, `crates/config/src/lib.rs`'s deprecated
+`AppConfig::from_env()` (Task 4 removal pending) reads single-underscore
+names (`DUBBRIDGE_AUTH_ISSUER`, `DUBBRIDGE_STORAGE_ACCESS_KEY_ID`, etc.) that
+look adjacent to the double-underscore names above but are dead for the
+`AppConfig::load()` production boot path every service actually uses — do
+not set the single-underscore forms expecting them to reach production.
 
 ## DATABASE_URL alias rule (ADR-026 §2, F2)
 

@@ -2,6 +2,12 @@
 # Secrets (database_url, redis_url, auth credentials) are injected via
 # DUBBRIDGE_* env vars and must never appear in this file (ADR-026, Decision 4).
 #
+# S-230-T5a froze: DO region ams3, Spaces bucket dubbridge-poc-v1, POC upload
+# ceiling 100 MiB (enforced at the API layer, not here), JWT expiry 8h,
+# translation provider mode `http`, public hostname poc.iotforce.es. The
+# hostname's Caddy/TLS-proxy wiring and any per-service subdomain/path
+# routing behind it are S-230-T5c/T6 scope, not this file.
+#
 # NOTE: This profile is configuration-valid once representative secrets are injected.
 # Runtime behavior for the `s3` selector still lands in later phases when
 # `build_adapter` and observability wiring consume these settings.
@@ -11,24 +17,35 @@ env = "production"
 [storage]
 backend = "s3"
 base_path = ""
-bucket = "dubbridge-production"
-endpoint = "https://nyc3.digitaloceanspaces.com"
-region = "nyc3"
+bucket = "dubbridge-poc-v1"
+endpoint = "https://ams3.digitaloceanspaces.com"
+region = "ams3"
 
 [observability]
 log_format = "json"
 filter = "info"
 
+[auth]
+issuer = "https://poc.iotforce.es"
+audience = "dubbridge-api"
+# Structurally required by AuthSettings but functionally unused: auth has
+# been HS256-only since ADR-031/S-200 (crates/auth/src/issuer.rs); no RSA key
+# is loaded from this path at runtime. Kept as a fixed placeholder pending
+# the field's removal, not a real key location.
+rsa_public_key_path = "unused-legacy-field-hs256-only"
+jwt_expiry_hours = 8
+clock_skew_leeway_seconds = 30
+
 [gateway]
 port = 8081
-upstream_api_base_url = "https://api.dubbridge.example"
-mobile_return_uris = ["dubbridge://auth/callback", "https://mobile.dubbridge.example/auth/callback"]
+upstream_api_base_url = "https://poc.iotforce.es"
+mobile_return_uris = ["dubbridge://auth/callback", "https://poc.iotforce.es/auth/callback"]
 
 [gateway.oauth]
-authorization_url = "https://auth.dubbridge.example/oauth/authorize"
-token_url = "https://auth.dubbridge.example/oauth/token"
+authorization_url = "https://poc.iotforce.es/oauth/authorize"
+token_url = "https://poc.iotforce.es/oauth/token"
 client_id = "dubbridge-web"
-redirect_url = "https://gateway.dubbridge.example/auth/callback"
+redirect_url = "https://poc.iotforce.es/gateway/auth/callback"
 
 [gateway.session]
 cookie_name = "dubbridge_session"

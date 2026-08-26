@@ -75,11 +75,11 @@ ledger.
 | T4o | Full local image-pipeline contract | development/test | S (RRI 24 Low) | T4c, T4e, T4g, T4l; T4n if executed (contract-verified images) | [x] Done — 2026-08-24 |
 | T4p | Execute and record local image evidence | operational/evidence | S (RRI 19 Low) | T4o | [x] Done — 2026-08-24 |
 | T4q | T4 parent closeout and status sync | docs-only | S (RRI 10 Low) | T4p; T4n if executed | [x] Done — 2026-08-24 |
-| T5 | Production deployment descriptor and secret boundary (non-executable parent) | config-only parent | XL (RRI 71 High; decomposition required) | T4q | Approved 2026-08-24 — blocked: owner hostname pending |
-| T5a | Freeze production inputs and child contracts | planning/config | M (RRI 38 Moderate) | T4q | [ ] Approved 2026-08-24 — blocked on owner action (public hostname/subdomain) |
-| T5b | Production profile and environment/secret template | config-only | L (provisional RRI 49 Med-high) | T5a | [ ] Blocked — owner hostname |
-| T5c | Production Compose and TLS reverse proxy | config-only | M (provisional RRI 35 Moderate) | T5b | [ ] Blocked — owner hostname |
-| T5d | Local descriptor evidence and aggregate status sync | operational/docs | M (provisional RRI 27 Moderate) | T5c | [ ] Blocked — owner hostname (transitive via T5c) |
+| T5 | Production deployment descriptor and secret boundary (non-executable parent) | config-only parent | XL (RRI 71 High; decomposition required) | T4q | 🟡 in progress — T5a and T5b Done; T5c/T5d remain |
+| T5a | Freeze production inputs and child contracts | planning/config | M (RRI 38 Moderate) | T4q | [x] Done 2026-08-26 — owner supplied public hostname; all inputs frozen |
+| T5b | Production profile and environment/secret template | config-only | M (RRI 27 Moderate, corrected 2026-08-27) | T5a | [x] Done 2026-08-27 — Claude Sonnet 5 direct; Gemma Reviewer PASS 0 findings; owner-verified |
+| T5c | Production Compose and TLS reverse proxy | config-only | M (provisional RRI 35 Moderate) | T5b | [ ] Not started — unblocked, T5b closed |
+| T5d | Local descriptor evidence and aggregate status sync | operational/docs | M (provisional RRI 27 Moderate) | T5c | [ ] Blocked — transitive via T5c |
 | T6 | First deploy and end-to-end smoke on Digital Ocean | operational | L | T5 | [ ] Planned |
 | T7 | Mobile POC build against the deployed backend | development/ops | M | T6 | [ ] Planned |
 | T7b | Mobile registration screen | development | M | T7 | [ ] Planned — droppable (first) |
@@ -4265,10 +4265,9 @@ for this docs-only closeout; do not alter implementation files or start T5.
 **Type:** config-only parent
 **Effort:** XL — RRI 71 High
 **Depends on:** S-230-T4q (which closes the S-230-T4 parent)
-**Status:** Approved 2026-08-24 — non-executable parent; blocked 2026-08-24 —
-T5a approved but its public-hostname input remains an owner action pending
-(see T5a "Blocked — next action"); T5b, T5c, and T5d (transitively, via their
-`Depends on` chain) cannot start until it resolves.
+**Status:** Approved 2026-08-24 — non-executable parent; 🟡 in progress —
+T5a Done 2026-08-26, T5b Done 2026-08-27; T5c and T5d remain (T5c unblocked,
+T5d transitively blocked on T5c via its `Depends on` chain).
 
 **Parent approval:** owner `matias` approved the RRI 71 parent and mandatory
 T5a–T5d decomposition in-session on 2026-08-24. This approval does not waive
@@ -4366,7 +4365,7 @@ The child scores are presentation-time estimates only. Each child reruns
 **Type:** planning/config
 **Effort:** M — RRI 38 Moderate
 **Depends on:** S-230-T4q
-**Status:** [ ] Approved 2026-08-24 — blocked on owner action (public hostname/subdomain)
+**Status:** [x] Done 2026-08-26 — owner supplied public hostname; all inputs frozen
 
 **RRI evidence:** `docs/audit/s-230-t5a-rri.md` — final RRI 38 Moderate.
 
@@ -4393,13 +4392,13 @@ workflow guide. No Ollama-backed role is invoked for presentation.
 
 | Input | Frozen value | Status |
 |---|---|---|
-| TLS proxy | `Caddy` | Frozen — contingent on a resolvable hostname (see below) |
+| TLS proxy | `Caddy` | Frozen — hostname resolves (see below), contingency satisfied |
 | DO region / Spaces endpoint | `ams3` / `https://ams3.digitaloceanspaces.com` | Frozen |
 | Spaces bucket name | `dubbridge-poc-v1` (no account-slug suffix; owner confirmed globally-unique as-is) | Frozen |
 | POC upload ceiling | `100 MiB` | Frozen |
 | `DUBBRIDGE_AUTH__JWT_EXPIRY_HOURS` | `8` | Frozen |
 | Translation provider mode | `http`, with `DUBBRIDGE_TRANSLATION_API_URL`/`DUBBRIDGE_TRANSLATION_API_KEY` as injected placeholders only | Frozen |
-| Public hostname | *(none)* | **Blocked** — owner rejected IP-only/no-TLS and self-signed TLS; owner will obtain a real subdomain before this value is frozen. Caddy's automatic Let's Encrypt TLS requires a resolvable public hostname, so this also gates the TLS proxy freeze above. |
+| Public hostname | `poc.iotforce.es` | Frozen 2026-08-26 — owner-registered `A` record resolves to the production droplet (`46.101.217.151`, confirmed via `dig`). Unblocks the Caddy TLS-proxy freeze above (contingent condition satisfied). |
 
 **Recomputed child RRI:** not yet performed — T5b/T5c/T5d each rerun
 `scripts/rri.py` independently at their own presentation time per the parent
@@ -4417,57 +4416,330 @@ author Compose, Caddy, TOML, or env files.
 **Stop condition:** Stop when every non-secret deploy input has an owner-approved
 value. Do not create Digital Ocean resources.
 
-**Blocked — next action:** owner (`matias`) to acquire a real public subdomain
-for the POC droplet. T5a cannot close `[x] Done`, and T5b/T5c (which consume
-the hostname for `config/production.toml` and the `Caddyfile`) cannot start,
-until that value is supplied. No further agent action is possible on this
-input without it.
+**Resolved 2026-08-26:** owner (`matias`) supplied the public hostname
+(`poc.iotforce.es`, `A` record → `46.101.217.151`, verified via `dig`) and
+reported the droplet as provisioned. Every T5a input is now frozen; T5b is
+unblocked to start.
+
+**Owner action checklist (manual, outside the repo; recorded 2026-08-26):**
+
+1. **Domain** — acquire or reuse a domain; pick a subdomain for the POC
+   (e.g. `poc.<domain>`). Report the chosen hostname to unblock this task —
+   the DNS record does not need to exist yet, only the decided name.
+2. **Digital Ocean account** — create/activate account, add a payment
+   method, upload an SSH key (Settings → Security → SSH Keys) for T6
+   droplet access.
+3. **Droplet (created in T6, may be provisioned early)** — region `ams3`
+   (frozen above, matches the Spaces bucket region); size >= 8GB RAM (plan
+   risk table: `faster-whisper` `ASR_MODEL_SIZE=small` needs this floor to
+   avoid droplet OOM); Ubuntu LTS, Docker Marketplace image recommended.
+4. **DNS** — once the droplet has a public IP, create an `A` record
+   `<chosen-hostname> -> <droplet IP>` at the domain's DNS provider; verify
+   propagation (`dig`/`nslookup`) before T6's Caddy/Let's Encrypt step,
+   which requires the hostname to already resolve.
+5. **Spaces bucket** — create `dubbridge-poc-v1` in `ams3` (frozen above);
+   generate a Spaces access key + secret (injected as env vars, never
+   committed).
+6. **Managed PostgreSQL** — create a cluster in `ams3`; save the connection
+   string as an injected secret.
+
+Not needed yet: TLS certificates (Caddy issues them automatically once DNS
+resolves), translation provider credentials (frozen as injected
+placeholders in `http` mode), or any manual Docker install beyond the
+Marketplace image.
 
 ### S-230-T5b: Production profile and environment/secret template
 
 **Type:** config-only
-**Effort:** L — provisional RRI 49 Med-high
+**Effort:** M — RRI 27 Moderate, recomputed 2026-08-27
 **Depends on:** S-230-T5a
-**Status:** [ ] Blocked 2026-08-24 — cannot start: T5a's public hostname is
-unresolved (owner action pending, see T5a "Blocked — next action"). This task's
-own acceptance criteria require writing the public-routing values into
-`config/production.toml`, and the hostname is one of them.
+**Status:** 🟡 presented 2026-08-27 — awaiting approval; not started.
 
-**Acceptance criteria:**
+**RRI evidence:** `docs/audit/s-230-t5b-rri.md`. **Correction on the same
+day:** the first 2026-08-27 recompute manually applied the `auth_security`
+penalty and raised D/K/P to 3, reasoning that the task "defines" the
+production secret boundary; that landed at RRI 59 Complex and triggered the
+unconditional ≥56 decomposition gate. On review, that reasoning did not hold:
+`auth_security`'s own auto-detection condition requires an anchor-rubric P
+floor ≥4 (auth/audit/rights/secrets paths), but the anchor rubric row for
+these exact files (`config/*.toml` with env-wiring logic, `config/README.md`)
+floors D/P/K at **1**, not 4 — the rubric's own instruction is to score above
+the floor only when "the specific change within the path" warrants it, not
+because the subject matter is conceptually adjacent to auth. The corrected,
+floor-anchored run (`C=1 D=2 K=1 P=1 T=1 A=1 X=2`, no penalty; D kept one
+point above floor for the documented double-underscore/single-underscore
+legacy-reader trap) gives **RRI 27, Moderate** — no decomposition gate
+applies. Both runs are kept in the audit file for the record; 27 is the
+value this task card uses.
 
-- `.env.example` enumerates every required production variable with placeholders
-  only, including nested storage/auth names, JWT expiry, the legacy gateway OAuth
-  client secret, and translation provider URL/key variables.
-- `config/production.toml` contains the T5a-approved non-secret Digital Ocean and
-  public-routing values; `config/README.md` matches the effective
-  `AppConfig::load()` double-underscore contract.
-- The same shared environment contract can boot api, gateway, worker-runner, and
-  the migration job without committing a real secret.
+**Task-analysis review:** n/a — config-only task, exempt under the workflow
+guide.
 
-**Evidence to emit:** config-load/parity checks and a secret-pattern scan.
+**Owner instruction (2026-08-27):** given this task authors the production
+auth/secret-boundary surface, no local model is used for implementation
+(not Qwen Developer, not the Moderate-band `run_local_task.py` local-first
+default). This is a task-local routing override, not a policy change — RRI
+27 Moderate would otherwise default to local-first. Implementation is Claude
+Sonnet 5 direct (escalate to Opus 5 only on stall/failure).
+
+**Implementation units (engineering choice, not an RRI-mandated split):** the
+owner asked to keep the work as three small, independently reviewable
+deliverables rather than one large diff — matching the Reviewability budget
+gate's general guidance to split an oversized change into smaller units. This
+is presentation/delivery structure only: one RRI, one approval, one
+Reflection log (2 passes), one Gemma Reviewer pass, one closure record.
+
+1. **`.env.example`** — enumerate every `DUBBRIDGE_*` variable
+   `AppConfig::load()` reads as a placeholder only: the five double-underscore
+   auth vars (`DUBBRIDGE_AUTH__ISSUER`, `DUBBRIDGE_AUTH__AUDIENCE`,
+   `DUBBRIDGE_AUTH__RSA_PUBLIC_KEY_PATH`, `DUBBRIDGE_AUTH__JWT_SECRET`,
+   `DUBBRIDGE_AUTH__CLOCK_SKEW_LEEWAY_SECONDS`), storage/gateway nested names,
+   `DUBBRIDGE_GATEWAY__OAUTH__CLIENT_SECRET`, and
+   `DUBBRIDGE_TRANSLATION_API_URL`/`DUBBRIDGE_TRANSLATION_API_KEY`. A comment
+   records that the single-underscore legacy `AuthSettings::from_env()`
+   variants (`crates/config/src/lib.rs:361`–`382`) are dead reads.
+2. **`config/production.toml`** — the T5a-frozen non-secret values exactly:
+   DO region/endpoint `ams3` / `https://ams3.digitaloceanspaces.com`, Spaces
+   bucket `dubbridge-poc-v1`, POC upload ceiling `100 MiB`,
+   `DUBBRIDGE_AUTH__JWT_EXPIRY_HOURS = 8`, translation mode `http`, public
+   hostname `poc.iotforce.es`. No `[auth]` block is omitted
+   (`crates/config/src/lib.rs:196`–`200`).
+3. **`config/README.md` + verification`** — parity documentation against the
+   effective `AppConfig::load()` contract, then the config-load/parity check
+   and secret-pattern scan across api/gateway/worker-runner/migration.
+
+**Acceptance criteria (`HP`/`EC` apply to the task as a whole):**
+
+- Every required production variable is present in `.env.example` with a
+  placeholder only; no real secret value is committed anywhere.
+- `config/production.toml` carries the T5a-approved non-secret values and a
+  complete `[auth]` block.
+- `config/README.md` matches the effective double-underscore contract.
+- **HP-1:** all three services plus the migration job boot from the same
+  shared environment contract using only placeholder/injected values.
+- **EC-1:** removing any one of the five double-underscore auth vars, or the
+  `[auth]` block, makes `AppConfig::validate()` fail closed in a
+  production-like environment.
+- **EC-2:** a secret-pattern scan against `.env.example` and
+  `config/production.toml` reports zero matches.
+
+**Evidence to emit:** config-load smoke test(s) across all three services,
+the secret-pattern scan output, and the `docker compose config`-equivalent
+parity check.
 
 **Status artifacts affected:** this ledger and `config/README.md`.
 
-**Blocked — next action:** owner (`matias`) to acquire a real public subdomain
-(T5a's open item). This task cannot start until T5a's hostname row moves from
-Blocked to Frozen — every other T5a input (Caddy, `ams3`, `dubbridge-poc-v1`,
-100 MiB, 8h JWT, `http` translation mode) is already frozen and available for
-this task to consume once unblocked.
-
 **Handoff prompt:** Implement only the production profile and environment
-contract. Commit placeholders, never credentials.
+contract, as the three units above. Commit placeholders, never credentials.
 
-**Stop condition:** Stop before authoring the production descriptor.
+**Stop condition:** Stop after the config-load smoke tests and secret-pattern
+scan pass. Do not author `infra/production/docker-compose.yml` or
+`infra/production/Caddyfile` (T5c scope).
+
+**Antares Security-Specialist Advisor (refinement touchpoint):** skipped —
+touched paths (`config/production.toml`, `.env.example`, `.gitignore`,
+`config/README.md`, `crates/config/src/lib.rs`) match none of the three
+current watchlist entries (`scripts/antares/cwe_watchlist.py`: CWE-89 scoped
+to `crates/db/`, CWE-306 to `apps/api/`, CWE-22 to `crates/storage/`). No
+task-relevant CWE hypothesis exists; not a generic sweep.
+
+**Implementation (Claude Sonnet 5 direct, per owner routing instruction):**
+
+1. `.env.example` (new file) — every `DUBBRIDGE_*` var `AppConfig::load()`
+   reads as an env-injected secret (`DATABASE_URL`, `REDIS_URL`,
+   `STORAGE__ACCESS_KEY_ID`/`SECRET_ACCESS_KEY`, `AUTH__JWT_SECRET`,
+   `GATEWAY__OAUTH__CLIENT_SECRET`), plus the flat
+   `DUBBRIDGE_TRANSLATION_PROVIDER`/`API_URL`/`API_KEY` vars the Python
+   translation worker reads directly (not part of `AppConfig`/figment).
+   Non-secret auth fields (`issuer`, `audience`, `rsa_public_key_path`,
+   `jwt_expiry_hours`, `clock_skew_leeway_seconds`) were moved to
+   `production.toml`'s `[auth]` block instead of being env-injected, since
+   they are not secrets — only `DUBBRIDGE_AUTH__JWT_SECRET` remains here.
+   Explicit comments warn against the dead single-underscore
+   `AppConfig::from_env()` reader names (`crates/config/src/lib.rs:429-449`)
+   and the dead single-underscore storage names
+   (`crates/config/src/lib.rs:260-267`), both of which look adjacent to the
+   real double-underscore names but are never read by `AppConfig::load()`.
+2. `config/production.toml` — added the previously-missing `[auth]` block
+   (`crates/config/src/lib.rs:196-200` requires it for
+   `AppConfig::validate()` to accept the profile in a production-like
+   environment) and applied the T5a-frozen values: `storage.bucket =
+   dubbridge-poc-v1`, `storage.region = ams3`, `storage.endpoint =
+   https://ams3.digitaloceanspaces.com`, `auth.jwt_expiry_hours = 8`, and the
+   public hostname `poc.iotforce.es` wired into `auth.issuer` and the
+   gateway's `upstream_api_base_url`/OAuth URLs (Caddy/TLS/per-service
+   routing behind that hostname stays T5c/T6 scope, not touched here).
+   `auth.rsa_public_key_path` is documented as a structurally-required but
+   functionally-dead field (auth has been HS256-only since ADR-031/S-200;
+   `crates/auth/src/issuer.rs`) rather than a fabricated real key path.
+3. `config/README.md` — extended the variable × environment parity table
+   with the frozen production values, the two figment-nested secret rows
+   that were missing (`storage.access_key_id`/`secret_access_key`,
+   `gateway.oauth.client_secret`), the translation-worker vars (called out
+   as read outside `AppConfig`/figment), and a note on the dead
+   `rsa_public_key_path` field and the dead single-underscore legacy names.
+
+**Defect found and fixed in the same pass (`.gitignore`):** the repo's
+`.env.*` ignore rule (`. gitignore:6`) blanket-matched `.env.example` itself,
+which would have silently kept the very file this task delivers out of
+version control — contradicting `config/README.md`'s own pre-existing rule
+("If it is a secret, add a `<REPLACE_ME>` entry to `/.env.example`"), which
+already assumed the file was tracked. Added `!.env.example` immediately
+after the `.env.*` rule. This is a minimal, in-scope correction: without it,
+Unit 1 of this task would not exist from version control's point of view.
+
+**Evidence emitted:**
+
+- `cargo test -p dubbridge-config`: 50/50 passed, including new test
+  `app_config_load_production_profile_needs_only_secrets_from_env`
+  (`crates/config/src/lib.rs`), which loads the real `config/production.toml`
+  with only the six env-injected secrets from `.env.example` and asserts the
+  non-secret `[auth]` fields deserialize from TOML alone (HP-1).
+- `cargo test` (full workspace): all crates pass, 0 failures.
+- `cargo fmt --all -- --check` and `cargo clippy --workspace --all-targets
+  --all-features -- -D warnings`: both clean (one pre-existing unrelated
+  `apalis-redis` future-incompat notice, not from this change).
+- Binary boot parity across all four `AppConfig::load()` consumers
+  (`apps/api`, `apps/gateway`, `apps/worker-runner`, `apps/cli`), each run
+  with `DUBBRIDGE_ENV=production` and only the six secrets from
+  `.env.example` injected, no other override: `dubbridge-cli` and
+  `dubbridge-worker-runner` passed config load/validate and failed only at
+  the expected next boundary (unreachable fake DB hostname);
+  `dubbridge-gateway` passed config load/validate and stayed running
+  (bound and serving) for >90s with no error output before being stopped.
+  This is real-process evidence for HP-1 beyond the unit test.
+- `bash scripts/check-config-secrets.sh config/production.toml`: "Config
+  profiles contain no secret-looking keys" (pass).
+- `bash scripts/check-config-secrets.sh .env.example`: reports 4
+  secret-looking **key names** (`DUBBRIDGE_STORAGE__SECRET_ACCESS_KEY`,
+  `DUBBRIDGE_AUTH__JWT_SECRET`, `DUBBRIDGE_GATEWAY__OAUTH__CLIENT_SECRET`,
+  `DUBBRIDGE_TRANSLATION_API_KEY`) — expected and correct: this script's
+  key-name heuristic is designed for `config/*.toml`, where a secret-shaped
+  *key* is itself a violation; `.env.example`'s entire purpose is to name
+  secret env vars as placeholders. EC-2's actual requirement (zero
+  committed secret **values**) was verified by manual inspection: every
+  value in `.env.example` is either `REPLACE_ME` or a frozen non-secret
+  literal (`production`, `8`, `30`, `http`,
+  `unused-legacy-field-hs256-only`) — see `.env.example` lines 16-59.
+- `make qa-docs`: all sub-checks pass (doc consistency, task-unit-coverage,
+  roadmap drift, OKF frontmatter).
+
+**Status artifacts affected:** this ledger (this section) and
+`config/README.md` (parity table, updated in the same pass).
+
+### Gemma Reviewer evidence
+
+- Model: `gemma4:26b-a4b-it-qat` (RRI 26-55 chain primary; resolved via
+  `DUBBRIDGE_REVIEW_MODEL=gemma4:26b-a4b-it-qat`, overriding
+  `scripts/gemma_local.py`'s `DEFAULT_REVIEW_MODEL` constant
+  `muse-glimmer:30b-q4_K_M`, which is the Low-band primary, not Moderate's)
+- Command: `DUBBRIDGE_REVIEW_MODEL=gemma4:26b-a4b-it-qat python3
+  scripts/gemma-code-review.py --out
+  /tmp/dubbridge-gemma-review-S-230-T5b.json -` (packet: diff of
+  `.env.example`, `.gitignore`, `config/production.toml`,
+  `config/README.md`, `crates/config/src/lib.rs` vs `HEAD`)
+- Passes run / usable: `3/3`
+- Aggregate status: `PASS`
+- Consensus findings: `0` | Pass-specific: `0` | Disagreement: `0`
+- Artifacts: `/tmp/dubbridge-gemma-review-S-230-T5b.json`,
+  `/tmp/dubbridge-gemma-review-S-230-T5b.pass{1,2,3}.json`
+- Isolated adjudicator: `not triggered` — trigger: n/a, primary reviewer
+  produced a usable aggregate on the first attempt
+- D14 provider route: `n/a`
+- disposition_divergence: `null`
+- Primary-agent disposition: no findings to disposition; reviewer's summary
+  independently confirmed against the diff (secret/non-secret separation,
+  double-underscore nesting correctness, dead-field documentation)
+- Review artifact: `docs/audit/gemma-evidence/S-230-T5b.json`
+
+### Reflection log
+
+Required passes: 2 (`27` → `Moderate`)
+
+#### Pass 1
+
+- **Draft verdict:** `.env.example`, `config/production.toml` `[auth]` block
+  + T5a-frozen values, `config/README.md` parity update, and a new
+  `dubbridge-config` unit test drafted to satisfy HP-1/EC-1/EC-2.
+- **Critique findings:**
+  - `.env.example` used single-underscore
+    `DUBBRIDGE_STORAGE_ACCESS_KEY_ID`/`SECRET_ACCESS_KEY`, but
+    `AppConfig::load()`'s figment layer only reads the double-underscore
+    `DUBBRIDGE_STORAGE__ACCESS_KEY_ID`/`SECRET_ACCESS_KEY` — the drafted
+    template would have silently failed to inject storage credentials into
+    the real production boot path.
+  - `production.toml`'s `[auth].rsa_public_key_path` was drafted as a
+    fabricated real-looking PEM path, implying RSA key material is loaded
+    at runtime, when auth has been HS256-only since ADR-031/S-200 and the
+    field is structurally required but functionally dead.
+  - EC-1's ledger wording ("removing any one of the five double-underscore
+    auth vars... makes `AppConfig::validate()` fail closed") needed
+    verification against actual code, not assumed true — confirmed
+    `jwt_secret` absence is enforced fail-closed at `apps/api`'s
+    `resolve_jwt_secret` (bootstrap), not inside
+    `crates/config::AppConfig::validate()` itself; the other four are now
+    non-`Option` TOML-sourced fields whose removal is a schema
+    deserialization failure via `AppConfig::load()`.
+- **Revisions applied:** corrected the two storage var names to
+  double-underscore with an explanatory comment; replaced the fabricated
+  PEM path with an explicit `unused-legacy-field-hs256-only` marker and a
+  code comment; documented the real jwt_secret fail-closed boundary
+  location in the ledger and `config/README.md` instead of leaving the
+  original claim unverified.
+
+#### Pass 2
+
+- **Draft verdict:** all three units complete, new unit test passing,
+  `.gitignore` defect discovered (blanket `.env.*` rule silently excluded
+  `.env.example` from version control) and fixed with `!.env.example`; full
+  workspace test suite, fmt, and clippy all clean; real-process boot parity
+  verified across all four `AppConfig::load()` consumers.
+- **Critique findings:** stale/inaccurate prose in `.env.example`'s header
+  comment (leftover reference to now-corrected storage var names; overclaim
+  that "every value below is a PLACEHOLDER" when `DUBBRIDGE_ENV` and
+  `DUBBRIDGE_TRANSLATION_PROVIDER` are frozen non-secret values, not
+  placeholders). No further functional defects found; Gemma Reviewer's
+  independent pass (3/3, 0 findings) corroborated the secret/non-secret
+  separation and double-underscore correctness.
+- **Revisions applied:** rewrote the header comment for accuracy
+  (placeholder claim scoped to `REPLACE_ME` values only, non-secret frozen
+  values called out separately); no other changes needed.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | all three services + migration job boot from the same shared environment contract using only placeholder/injected values | `crates/config/src/lib.rs::tests::app_config_load_production_profile_needs_only_secrets_from_env` | passed |
+| EC-1 | Edge case | removing a required auth field (schema-required TOML fields) or the whole `[auth]` block fails `AppConfig::validate()`/`load()` closed in production-like environments; `jwt_secret` absence fails closed at API bootstrap | `crates/config/src/lib.rs::tests::app_config_validate_rejects_missing_auth_in_production`, `crates/config/src/lib.rs::tests::app_config_load_runs_validate_for_production_profile`, `apps/api/src/main.rs::tests::build_verifier_fails_closed_without_jwt_secret_in_production_like_env` | passed |
+| EC-2 | Edge case | secret-pattern scan against `.env.example` and `config/production.toml` reports zero committed secret **values** | manual inspection evidence recorded above (`bash scripts/check-config-secrets.sh` run against both files; `config/production.toml` reports zero secret-looking keys, `.env.example`'s 4 flagged keys are expected placeholder-holding names with only `REPLACE_ME`/frozen-non-secret values, verified line-by-line) | passed |
+
+### Owner final verification
+
+- Owner: `matias`
+- Date: `2026-08-27`
+- Statement: Owner reviewed the implementation summary, evidence, and
+  Gemma Reviewer result presented for S-230-T5b and confirmed approval
+  ("aprobado") to close the task.
+- Commands run (agent-executed, owner-confirmed): `cargo test -p
+  dubbridge-config`, `cargo test -p dubbridge-config -p dubbridge-api`,
+  `cargo test` (full workspace), `cargo fmt --all -- --check`, `cargo
+  clippy --workspace --all-targets --all-features -- -D warnings`, `bash
+  scripts/check-config-secrets.sh config/production.toml`, `bash
+  scripts/check-config-secrets.sh .env.example`, `make qa-docs`,
+  `DUBBRIDGE_REVIEW_MODEL=gemma4:26b-a4b-it-qat python3
+  scripts/gemma-code-review.py --out
+  /tmp/dubbridge-gemma-review-S-230-T5b.json -`.
+
+**Status: [x] Done — 2026-08-27.**
 
 ### S-230-T5c: Production Compose and TLS reverse proxy
 
 **Type:** config-only
 **Effort:** M — provisional RRI 35 Moderate
 **Depends on:** S-230-T5b
-**Status:** [ ] Blocked 2026-08-24 — cannot start: transitively blocked on
-T5a's unresolved public hostname (owner action pending) via its direct
-dependency on T5b, and this task's own `Caddyfile` acceptance criterion
-names the approved hostname directly.
+**Status:** [ ] Not started 2026-08-27 — unblocked: T5b (RRI 27 Moderate)
+closed Done 2026-08-27. `poc.iotforce.es` is frozen and available for this
+task's `Caddyfile` criterion.
 
 **Acceptance criteria:**
 
@@ -4483,10 +4755,8 @@ names the approved hostname directly.
 
 **Status artifacts affected:** this ledger.
 
-**Blocked — next action:** same owner action as T5a/T5b — a real public
-subdomain. This task additionally cannot start before T5b closes (its own
-`Depends on`), so it is blocked on both counts until the hostname is
-supplied.
+**Blocked — next action:** none — T5b closed 2026-08-27; this task is
+unblocked.
 
 **Handoff prompt:** Implement only production Compose and Caddy wiring. Do not
 start the stack or deploy.
@@ -4498,11 +4768,10 @@ start the stack or deploy.
 **Type:** operational/docs
 **Effort:** M — provisional RRI 27 Moderate
 **Depends on:** S-230-T5c
-**Status:** [ ] Blocked 2026-08-24 — cannot start: transitively blocked on
-T5a's unresolved public hostname (owner action pending) via its direct
-dependency on T5c, which is itself blocked on T5b for the same reason. This
-task's own scope (dry-run of the production descriptor, secret scan) needs a
-descriptor that T5b/T5c have not yet produced.
+**Status:** [ ] Blocked 2026-08-26 — cannot start: direct dependency on T5c,
+which is itself blocked on T5b (see T5c). T5a's hostname blocker is resolved;
+this task's own scope (dry-run of the production descriptor, secret scan)
+still needs a descriptor that T5b/T5c have not yet produced.
 
 **Acceptance criteria:**
 
@@ -4517,8 +4786,8 @@ descriptor that T5b/T5c have not yet produced.
 **Evidence to emit:** exact commands/transcript, readiness results, secret scan,
 and status diff.
 
-**Blocked — next action:** same owner action as T5a/T5b/T5c — a real public
-subdomain. Unblocks automatically once T5c closes.
+**Blocked — next action:** none from the owner. Unblocks automatically once
+T5c closes.
 
 **Status artifacts affected:** this ledger, the linked plan, roadmap, and
 ADR-026 references only if the boundary changed.

@@ -126,10 +126,24 @@ Plan: `docs/plan/h1-governance-atomicity-hardening.md`
 | **S-210** | Mobile product experience (dashboard, ergonomics, media-first) | S-115, S-190, S-160, S-127 | ✅ done — Home became a live dashboard, bottom action bars landed, and screenshot-backed polish closed the post-S-190 audit | `docs/plan/s-210-mobile-product-experience.md`, `docs/tasks/s-210-mobile-product-experience.md` |
 | **S-215** | Mobile streaming-style organization & continuity pass | S-210, S-125, S-160 | ✅ done — continuity-led Home, library IA, media-first detail/review context, and palette recalibration delivered | `docs/plan/s-215-mobile-streaming-organization-pass.md`, `docs/tasks/s-215-mobile-streaming-organization-pass.md` |
 | **S-220** | Mobile dark theme — Netflix-style dark canvas | S-215 | ✅ done — dark canvas `#141414` + Netflix-red `#E50914` accent shipped; WCAG AA certified | `docs/plan/s-220-mobile-dark-theme.md`, `docs/tasks/s-220-mobile-dark-theme.md` |
-| **S-230** | POC v1 deployment (Digital Ocean): production images, migration runner, S3/Spaces credential wiring, real readiness probes, production deployment descriptor, first deploy + end-to-end smoke | S-010, S-030 Phase 3, S-080, S-120, S-125, S-130, S-140, S-160, S-200 | 🟡 in progress — T0–T4 are **done** as of 2026-08-24. `T3b` closed its 6/6 reopened S-150 subtitle-translation children; all 17 T4 children (`T4a`–`T4q`) are closed, including the T3b-triggered `T4m`/`T4n` translation bundle path. T4p's live Docker pipeline passed HP-1 (exit 0, `asset_transcription_status = ready`) and EC-1; migration evidence and cleanup were recorded, and T4q closed the parent/status sync. `T5`–`T9` remain pending. `T5a` (child contract freeze) was approved
-2026-08-24 with all inputs frozen except the public hostname, which needs
-owner action (acquiring a real subdomain); `T5b`/`T5c`/`T5d` are blocked
-transitively until it resolves. Deployment-enablement slice: makes the already-closed pipeline publicly runnable on a Digital Ocean droplet; adds no new technology beyond Redis (already in use). Full history incl. gap findings G10–G13: `docs/audit/roadmap-history.md` § S-230. | `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md` |
+| **S-230** | POC v1 deployment (Digital Ocean): production images, migration runner, S3/Spaces credential wiring, real readiness probes, production deployment descriptor, first deploy + end-to-end smoke | S-010, S-030 Phase 3, S-080, S-120, S-125, S-130, S-140, S-160, S-200 | 🟡 in progress — T0–T4 are **done** as of 2026-08-24. `T3b` closed its 6/6 reopened S-150 subtitle-translation children; all 17 T4 children (`T4a`–`T4q`) are closed, including the T3b-triggered `T4m`/`T4n` translation bundle path. T4p's live Docker pipeline passed HP-1 (exit 0, `asset_transcription_status = ready`) and EC-1; migration evidence and cleanup were recorded, and T4q closed the parent/status sync. `T5`–`T9` remain pending. `T5a` (child contract freeze) closed **Done 2026-08-26** — owner
+supplied the public hostname (`poc.iotforce.es`, DNS-verified) and all seven
+frozen inputs. `T5b`'s first 2026-08-27 recompute (RRI 59 Complex, triggering
+the unconditional RRI ≥ 56 decomposition gate into `T5b-i`/`T5b-ii`/`T5b-iii`)
+was retracted the same day as miscalibrated — it manually forced the
+`auth_security` penalty and raised D/K/P above the ADR-026 anchor-rubric
+floor without the rubric's own file-anchored basis for doing so. The
+corrected, floor-anchored recompute landed at **RRI 27 Moderate** as a single
+task, no decomposition triggered (`docs/audit/s-230-t5b-rri.md`). Approved
+and implemented 2026-08-27 (Claude Sonnet 5 direct, per owner routing
+override citing production auth/secret-boundary criticality — no local
+model): added `production.toml`'s missing `[auth]` block plus the T5a-frozen
+values, authored `.env.example`, extended `config/README.md`'s parity table,
+and fixed a `.gitignore` defect (`.env.*` was blanket-excluding
+`.env.example` itself). Gemma Reviewer (`gemma4:26b-a4b-it-qat`, RRI 26-55
+chain primary) passed 3/3 with 0 findings; owner verified and closed
+**Done 2026-08-27**. `T5c` is unblocked; `T5d` remains transitively blocked
+on `T5c`. Deployment-enablement slice: makes the already-closed pipeline publicly runnable on a Digital Ocean droplet; adds no new technology beyond Redis (already in use). Full history incl. gap findings G10–G13: `docs/audit/roadmap-history.md` § S-230. | `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md`, `docs/audit/s-230-t5b-rri.md` |
 
 `S-040` must be planned before building a first-party browser, operator-console, or
 mobile auth flow; it does not block S-080 or S-090.

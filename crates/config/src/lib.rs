@@ -1208,6 +1208,55 @@ mod tests {
         );
     }
 
+    // --- S-230-T5b: .env.example parity — production.toml's own [auth] block
+    // must be sufficient without env overrides for issuer/audience/
+    // rsa_public_key_path/jwt_expiry_hours/clock_skew_leeway_seconds; only
+    // secrets are injected, matching the exact double-underscore names
+    // committed in /.env.example (HP-1).
+    #[test]
+    fn app_config_load_production_profile_needs_only_secrets_from_env() {
+        let config_dir = fixtures_dir();
+        temp_env::with_vars(
+            [
+                ("DUBBRIDGE_ENV", Some("production")),
+                ("DUBBRIDGE_CONFIG_DIR", Some(config_dir.as_str())),
+                (
+                    "DUBBRIDGE_DATABASE_URL",
+                    Some("postgres://user:pass@prod-db.example.com:5432/dubbridge"),
+                ),
+                (
+                    "DUBBRIDGE_REDIS_URL",
+                    Some("redis://prod-redis.example.com:6379"),
+                ),
+                ("DUBBRIDGE_STORAGE__ACCESS_KEY_ID", Some("prod-access-key")),
+                (
+                    "DUBBRIDGE_STORAGE__SECRET_ACCESS_KEY",
+                    Some("prod-secret-key"),
+                ),
+                ("DUBBRIDGE_AUTH__JWT_SECRET", Some("prod-jwt-secret")),
+                (
+                    "DUBBRIDGE_GATEWAY__OAUTH__CLIENT_SECRET",
+                    Some("prod-gateway-secret"),
+                ),
+                ("DUBBRIDGE_TRANSLATION_PROVIDER", None::<&str>),
+            ],
+            || {
+                let cfg = AppConfig::load()
+                    .expect("production profile should load from TOML [auth] alone plus secrets");
+                let auth = cfg
+                    .auth
+                    .expect("auth settings should deserialize from TOML");
+                assert_eq!(auth.issuer, "https://poc.iotforce.es");
+                assert_eq!(auth.audience, "dubbridge-api");
+                assert_eq!(auth.jwt_expiry_hours, 8);
+                assert_eq!(auth.clock_skew_leeway_seconds, 30);
+                assert_eq!(auth.jwt_secret.as_deref(), Some("prod-jwt-secret"));
+                assert_eq!(cfg.storage.bucket, "dubbridge-poc-v1");
+                assert_eq!(cfg.storage.region.as_deref(), Some("ams3"));
+            },
+        );
+    }
+
     // --- T1-T3: AppConfig::from_env defaults — kept until Task 4 removes from_env ---
 
     #[test]
