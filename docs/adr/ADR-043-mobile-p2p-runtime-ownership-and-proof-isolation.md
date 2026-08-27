@@ -237,10 +237,12 @@ until a concrete product requirement demonstrates it is necessary.
    composition-root ownership while the P0 oracle still guards parity.
 3. P1.F3a.1 — migrated the diagnostic ping to the new boundary and transferred
    characterization cases while retaining the P0 scaffold as an oracle.
-   Automated verification passed on 2026-08-27; owner final verification is
-   pending before retirement.
+   Closed PASS after repository-owner verification on 2026-08-27.
 4. P1.F3a.2 — after parity passes, delete the P0 probe/custom RPC/inline
-   worklet and prove the retained development harness on Android.
+   worklet and prove the retained development harness on Android. Closed
+   PASS on 2026-08-27; source-level deletion and verification (typecheck,
+   lint, full Jest) complete via owner-directed Low-band decomposition, see
+   `docs/audit/mvp0-p2p-p1-f3a2-decomposition.md`.
 5. P1.F3b — remove obsolete P0 config/script entries and audit every P0-added
    direct dependency/build setting against a live consumer or native A/B proof.
 6. P1.A1 — Corestore/Hyperdrive dependency and bundle smoke proof.
@@ -256,8 +258,10 @@ Current implementation evidence:
 `docs/audit/mvp0-p2p-p1-f1-implementation.md`,
 `docs/audit/mvp0-p2p-p1-f2-implementation.md` (F2 closed PASS after owner
 verification on 2026-08-27), and
-`docs/audit/mvp0-p2p-p1-f3a1-implementation.md` (F3a.1 owner verification
-pending).
+`docs/audit/mvp0-p2p-p1-f3a1-implementation.md` (F3a.1 closed PASS after
+owner verification on 2026-08-27), and
+`docs/audit/mvp0-p2p-p1-f3a2-decomposition.md` (F3a.2 closed PASS on
+2026-08-27 via owner-directed Low-band decomposition).
 
 ## References
 

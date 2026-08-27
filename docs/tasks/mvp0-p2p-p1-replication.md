@@ -18,9 +18,14 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 > implemented, and closed PASS after owner verification on 2026-08-27. P1.F2
 > was separately approved, implemented, and closed PASS after owner verification
 > on 2026-08-27. The owner approved the required decomposition of the former
-> executable P1.F3a on 2026-08-27: P1.F3a.1 (parity migration) is now the next
-> gated child; P1.F3a.2 (retirement) follows only after it passes. Neither
-> child has source-execution authorization.
+> executable P1.F3a on 2026-08-27: P1.F3a.1 (parity migration) was approved,
+> implemented, and closed PASS after owner verification on 2026-08-27.
+> P1.F3a.2 (retirement) was implemented via owner-directed Low-band
+> decomposition and closed PASS/Done on 2026-08-27; see
+> `docs/audit/mvp0-p2p-p1-f3a2-decomposition.md` for the full subtask
+> execution log. P1.F3b is the next gated child; it has no source-execution
+> authorization until its own current RRI, approval card, and phase-1 review
+> are presented and approved.
 
 ## Task map
 
@@ -30,9 +35,9 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 | P1.F1 | Reproducible worklet bundle + versioned RPC contract | PASS — owner verified 2026-08-27 | Revised P1 + ADR-043 approval — satisfied 2026-08-27 |
 | P1.F2 | Mobile service ownership + composition | PASS — owner verified 2026-08-27 | P1.F1 PASS — satisfied 2026-08-27 |
 | P1.F3a | P0 runtime-scaffold migration + retirement (planning parent) | Decomposed — no direct source execution | P1.F2 PASS |
-| P1.F3a.1 | P0 characterization migration | Implementation verified — owner final verification pending | P1.F2 PASS |
-| P1.F3a.2 | P0 runtime-scaffold retirement | Deferred — needs current RRI/card/approval | P1.F3a.1 PASS |
-| P1.F3b | P0 config/dependency cleanup | Deferred — needs current RRI/card/approval | P1.F3a.2 PASS |
+| P1.F3a.1 | P0 characterization migration | PASS — owner verified 2026-08-27 | P1.F2 PASS |
+| P1.F3a.2 | P0 runtime-scaffold retirement | PASS — Done 2026-08-27 | P1.F3a.1 PASS — satisfied 2026-08-27 |
+| P1.F3b | P0 config/dependency cleanup | Deferred — needs current RRI/card/approval | P1.F3a.2 PASS — satisfied 2026-08-27 |
 | P1.A1 | Hyperdrive/Corestore Android bundle smoke proof | Deferred — needs current RRI/card/approval | P1.F3b PASS |
 | P1.A2 | Transient seed lifecycle + residue cleanup | Deferred — needs current RRI/card/approval | P1.A1 PASS |
 | P1.B1 | Isolated Hyperswarm replication transport | Deferred — needs current RRI/card/approval | P1.A2 PASS |
@@ -300,9 +305,9 @@ explicit approval are recorded.
 
 ### P1.F3a.1 — P0 characterization migration
 
-- **Status:** Implementation verified on 2026-08-27; owner final verification
-  is pending. The RRI/card and in-session owner approval are recorded in the
-  F3a.1 audit artifacts.
+- **Status:** Closed PASS after repository-owner verification on 2026-08-27.
+  The RRI/card and in-session owner approval are recorded in the F3a.1 audit
+  artifacts.
 - **Allowed paths:** `mobile/App.tsx`,
   `mobile/src/p2p/development/P2PDevelopmentHarness.tsx`,
   `mobile/__tests__/p2p/p2p-development-harness.test.ts`, and F3a.1 evidence only. The
@@ -343,13 +348,39 @@ owner final verification remain mandatory.
 
 `docs/audit/mvp0-p2p-p1-f3a1-implementation.md` records all three Reflection
 passes, the P0 behavioral map/inventory, 100% direct harness line coverage,
-and passing focused/typecheck/lint/full-Jest verification. Owner final
-verification is pending; do not begin P1.F3a.2.
+and passing focused/typecheck/lint/full-Jest verification.
+
+### Owner final verification
+
+- **Owner:** Matias (repository owner)
+- **Date:** 2026-08-27
+- **Statement:** I verified every happy path and edge case defined for
+  P1.F3a.1 has unit test evidence that replicates the expected behavior. I
+  independently re-verified (not just re-read) the F3a.1 implementation
+  evidence: all six declared P0 file SHA-256 checksums match the current
+  working tree exactly (no diff), `npm run typecheck` and `npm run lint`
+  pass, and the three focused suites (`p2p-development-harness.test.ts`,
+  `bare-bridge.test.ts`, `p2p-provider.test.tsx`) pass 17/17. This confirms
+  P1.F3a.1 PASS and authorizes presenting P1.F3a.2.
+- **Commands run:** `shasum -a 256` on the six declared P0 files; `npm run
+  typecheck`; `npm run lint`; `npx jest __tests__/p2p/p2p-development-harness.test.ts
+  __tests__/p2p/bare-bridge.test.ts __tests__/p2p/p2p-provider.test.tsx --runInBand`.
 
 ### P1.F3a.2 — P0 runtime-scaffold retirement
 
-- **Status:** Deferred until P1.F3a.1 PASS; requires a current RRI, Compact
-  Approval Task Card v2, phase-1 review, and explicit approval.
+- **Status:** [x] Done — 2026-08-27. Implemented via Low-band decomposition
+  (owner-directed, per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` §
+  Post-repair-budget Low-band decomposition, applied proactively) into four
+  RRI 0-25 subtasks (F3a.2-i/ii/iii/iv). Deleted `bare-worklet.ts`,
+  `bare-protocol.ts`, `bare-bridge.ts`, `AndroidBareRuntimeProbe.tsx`,
+  `bare-bridge.test.ts`, `p2p-provider.test.tsx`. Verified: `npm run
+  typecheck` clean, `npm run lint` clean, `npx jest --runInBand` 24/24
+  suites / 262/262 tests passing, including the ADR-043 boundary suite
+  (`__tests__/p2p/`: 3 suites, 27 tests). Full execution log:
+  `docs/audit/mvp0-p2p-p1-f3a2-decomposition.md`. Whole-task record
+  retained: `docs/audit/mvp0-p2p-p1-f3a2-rri.md` (RRI 29 Moderate,
+  superseded for implementation-routing purposes only by the
+  decomposition).
 - **Allowed paths:** the four retired P0 source files under `mobile/src/p2p/`,
   `mobile/__tests__/p2p/bare-bridge.test.ts`,
   `mobile/__tests__/p2p/p2p-provider.test.tsx`, and F3a.2 evidence only.

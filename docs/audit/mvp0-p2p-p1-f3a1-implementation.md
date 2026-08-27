@@ -3,7 +3,7 @@ type: Audit
 title: "MVP0-P2P P1.F3a.1 implementation evidence"
 task: P1.F3a.1
 date: 2026-08-27
-status: awaiting_owner_verification
+status: owner_verified_pass
 ---
 
 # MVP0-P2P P1.F3a.1 — implementation evidence
@@ -92,5 +92,10 @@ console warnings in unrelated tests; all tests passed.
 
 ## Owner verification
 
-Pending. P1.F3a.2 must not be presented or started until the repository owner
-confirms this F3a.1 result as PASS.
+Confirmed PASS by the repository owner (Matias) on 2026-08-27, after
+independent re-verification: all six declared P0 SHA-256 checksums matched
+the working tree with no diff, `npm run typecheck`/`npm run lint` passed, and
+the three focused suites passed 17/17. Full statement and commands recorded
+in `docs/tasks/mvp0-p2p-p1-replication.md` § P1.F3a.1 Owner final
+verification. P1.F3a.2 is now authorized to be presented for its own
+current RRI, approval card, and phase-1 review.
