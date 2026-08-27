@@ -1,19 +1,22 @@
 import { useEffect } from "react";
 import { Platform } from "react-native";
 
-import { BareBridge } from "./bare-bridge";
+import { useP2PService } from "./P2PProvider";
 
 export function AndroidBareRuntimeProbe({ enabled }: { enabled: boolean }) {
+  const service = useP2PService();
+
   useEffect(() => {
     if (!enabled || Platform.OS !== "android") return;
 
-    const bridge = new BareBridge();
     let released = false;
 
     void (async () => {
       try {
-        await bridge.initialize();
-        const result = await bridge.ping();
+        await service.initialize();
+        if (released) return;
+        const result = await service.ping();
+        if (released) return;
         console.warn(`[Bare runtime probe] ping=${result}`);
       } catch (error) {
         const message = error instanceof Error ? error.message : "unknown Bare runtime failure";
@@ -21,7 +24,7 @@ export function AndroidBareRuntimeProbe({ enabled }: { enabled: boolean }) {
       } finally {
         if (!released) {
           try {
-            await bridge.shutdown();
+            await service.shutdown();
             console.warn("[Bare runtime probe] shutdown=complete");
           } catch (error) {
             const message = error instanceof Error ? error.message : "unknown Bare runtime shutdown failure";
@@ -33,9 +36,12 @@ export function AndroidBareRuntimeProbe({ enabled }: { enabled: boolean }) {
 
     return () => {
       released = true;
-      void bridge.shutdown();
+      void service.shutdown().catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : "unknown Bare runtime shutdown failure";
+        console.error(`[Bare runtime probe] ${message}`);
+      });
     };
-  }, [enabled]);
+  }, [enabled, service]);
 
   return null;
 }

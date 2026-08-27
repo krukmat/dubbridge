@@ -1,0 +1,53 @@
+{
+  "task_id": "P1.F2",
+  "title": "Mobile service ownership and composition",
+  "rri": 55,
+  "band": "Med-high",
+  "approved_at": "2026-08-27",
+  "approved_scope": [
+    "Compose App.tsx as AuthProvider -> P2PProvider -> RootNavigator and retain the explicit P0 diagnostic oracle.",
+    "Add one inert, framework-independent BareRuntimeClient -> P2PService boundary with typed lifecycle errors and subscribable snapshots.",
+    "Modify only the ten frozen source/test paths and P1.F2 evidence/status artifacts listed by the approved card."
+  ],
+  "excluded_scope": [
+    "P0 source deletion, Hyperdrive, Corestore, Hyperswarm, discovery, networking, fixture storage, product API/UI, backend, HTTP/HLS, persistence/identity, and iOS.",
+    "Commits, pushes, deployment, or any external write."
+  ],
+  "allowed_paths": [
+    "mobile/App.tsx",
+    "mobile/src/navigation/RootNavigator.tsx",
+    "mobile/src/p2p/AndroidBareRuntimeProbe.tsx",
+    "mobile/src/p2p/bare-bridge.ts",
+    "mobile/src/p2p/runtime/BareRuntimeClient.ts",
+    "mobile/src/p2p/P2PService.ts",
+    "mobile/src/p2p/P2PProvider.tsx",
+    "mobile/__tests__/p2p/bare-bridge.test.ts",
+    "mobile/__tests__/p2p/p2p-service.test.ts",
+    "mobile/__tests__/p2p/p2p-provider.test.tsx"
+  ],
+  "acceptance": [
+    "HP-F2: App.tsx composes AuthProvider -> P2PProvider -> RootNavigator, and the explicit P0 diagnostic calls initialize -> ping -> shutdown through the stable service boundary.",
+    "EC-F2: mounting, rerendering, navigation, and auth-route changes do not auto-start, duplicate, or leak a runtime; invalid lifecycle calls remain typed.",
+    "RootNavigator creates neither auth nor P2P provider; normal mounting is network-inert; focused P0/client/service/provider tests, typecheck, lint, full Jest, three Reflection passes, coverage certification, owner verification, and status synchronization pass."
+  ],
+  "constraints": [
+    "P2PProvider owns one stable P2PService; P2PService owns one product BareRuntimeClient; neither service nor navigator depends on React routes.",
+    "Use an external-store subscription boundary for status consumers; do not start network activity merely because the provider mounts.",
+    "Keep the P0 source in place as a characterization oracle until separately gated P1.F3a; proof commands may not enter the product service API.",
+    "Stop and return to scoring/review/approval if any edit or behavior escapes the frozen P1.F2 boundary."
+  ],
+  "verification": [
+    "cd mobile && npm test -- --runInBand __tests__/p2p/bare-bridge.test.ts __tests__/p2p/p2p-service.test.ts __tests__/p2p/p2p-provider.test.tsx",
+    "cd mobile && npm run typecheck",
+    "cd mobile && npm run lint",
+    "cd mobile && npm test -- --runInBand"
+  ],
+  "references": [
+    "docs/audit/mvp0-p2p-p1-f2-approval-card.md",
+    "docs/audit/mvp0-p2p-p1-f2-rri.md",
+    "docs/tasks/mvp0-p2p-p1-replication.md",
+    "docs/plan/mvp0-p2p-p1-replication.md",
+    "docs/adr/ADR-043-mobile-p2p-runtime-ownership-and-proof-isolation.md",
+    "docs/adr/ADR-038-med-high-architect-refined-single-attempt.md"
+  ]
+}

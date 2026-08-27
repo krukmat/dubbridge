@@ -16,9 +16,9 @@ parent_task: P1
 > Revised P1 and ADR-043 were approved by the repository owner on 2026-08-27.
 > The parent approval authorizes child preparation/presentation only. P1.F1 was
 > separately approved, implemented, and closed PASS after owner verification on
-> 2026-08-27 within its frozen packaging/protocol scope. P1.F2 is the next gated
-> child and may be prepared/presented; no P2P network activity or later-child
-> source execution has started.
+> 2026-08-27 within its frozen packaging/protocol scope. P1.F2 was separately
+> approved, implemented, and closed PASS after owner verification on 2026-08-27.
+> No P2P network activity or later-child source execution has started.
 
 ## Objective
 
@@ -99,6 +99,8 @@ explicit approval before source edits:
    and composition-root ownership; make `RootNavigator` navigation-only and
    run the P0 oracle against the new seam. No P2P network activity or P0 source
    deletion yet.
+   Closed PASS after owner verification on 2026-08-27. P1.F3a remains deferred
+   until its own current RRI, approval card, and explicit approval.
 3. **P1.F3a — P0 runtime-scaffold migration and retirement.** Move the bounded
    diagnostic ping and characterization cases to the new development harness,
    then delete `AndroidBareRuntimeProbe`, the custom bridge/protocol, inline

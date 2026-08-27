@@ -1,7 +1,9 @@
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 
 import { createGatewayClient } from "../src/api/client";
+import { AuthProvider } from "../src/auth/AuthProvider";
 import { RootNavigator } from "../src/navigation/RootNavigator";
+import { P2PProvider } from "../src/p2p/P2PProvider";
 import {
   clearAuthSession,
   loadAuthSession,
@@ -44,6 +46,8 @@ jest.mock("../src/api/client", () => ({
 jest.mock("../src/push/registerPush", () => ({
   registerPush: jest.fn().mockResolvedValue(undefined),
 }));
+
+jest.mock("react-native-bare-kit", () => ({ Worklet: class Worklet {} }));
 
 jest.mock("expo-notifications", () => ({
   addNotificationResponseReceivedListener: jest.fn(() => ({
@@ -140,7 +144,13 @@ describe("mobile auth flow integration", () => {
   });
 
   it("HP-1 + HP-2 + EC-1: bearer login reaches home and asset detail without any browser handoff", async () => {
-    const view = await render(<RootNavigator />);
+    const view = await render(
+      <AuthProvider>
+        <P2PProvider>
+          <RootNavigator />
+        </P2PProvider>
+      </AuthProvider>,
+    );
 
     await waitFor(() => {
       expect(view.getByTestId("login-email-input")).toBeTruthy();

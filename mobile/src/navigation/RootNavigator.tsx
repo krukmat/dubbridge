@@ -4,7 +4,7 @@ import { createNativeStackNavigator, type NativeStackScreenProps } from "@react-
 import * as Notifications from "expo-notifications";
 
 import { createGatewayClient } from "../api/client";
-import { AuthProvider, useAuth } from "../auth/AuthProvider";
+import { useAuth } from "../auth/AuthProvider";
 import { color } from "../theme";
 import { readRuntimeConfig } from "../config/env";
 import { AssetDetailScreen } from "../screens/AssetDetailScreen";
@@ -430,9 +430,5 @@ function navigateToReviewInbox(
 }
 
 export function RootNavigator() {
-  return (
-    <AuthProvider>
-      <RootNavigatorContent />
-    </AuthProvider>
-  );
+  return <RootNavigatorContent />;
 }

@@ -15,9 +15,10 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 > Earlier P1/P1.A approvals are superseded before source execution. The owner
 > approved revised P1 and accepted ADR-043 on 2026-08-27. That decision
 > authorizes child preparation/presentation only. P1.F1 was separately approved,
-> implemented, and closed PASS after owner verification on 2026-08-27. P1.F2 is
-> the next gated child and may be prepared/presented; its source execution is not
-> authorized.
+> implemented, and closed PASS after owner verification on 2026-08-27. P1.F2
+> was separately approved, implemented, and closed PASS after owner verification
+> on 2026-08-27. P1.F3a is the next gated child and may be prepared/presented;
+> its source execution is not authorized.
 
 ## Task map
 
@@ -25,7 +26,7 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 |---|---|---|---|
 | P1 | Maintainable mobile P2P foundation + replication proof (planning parent) | APPROVED 2026-08-27 — RRI 94; decomposed; no direct source execution | P0 PASS |
 | P1.F1 | Reproducible worklet bundle + versioned RPC contract | PASS — owner verified 2026-08-27 | Revised P1 + ADR-043 approval — satisfied 2026-08-27 |
-| P1.F2 | Mobile service ownership + composition | Next gated child — preparation/presentation allowed; needs current RRI/card/approval before source execution | P1.F1 PASS — satisfied 2026-08-27 |
+| P1.F2 | Mobile service ownership + composition | PASS — owner verified 2026-08-27 | P1.F1 PASS — satisfied 2026-08-27 |
 | P1.F3a | P0 runtime-scaffold migration + retirement | Deferred — needs current RRI/card/approval | P1.F2 PASS |
 | P1.F3b | P0 config/dependency cleanup | Deferred — needs current RRI/card/approval | P1.F3a PASS |
 | P1.A1 | Hyperdrive/Corestore Android bundle smoke proof | Deferred — needs current RRI/card/approval | P1.F3b PASS |
@@ -42,8 +43,8 @@ at `docs/audit/mvp0-p2p-p1a-approval-card.md` and
 
 - **Status:** Revised planning parent approved 2026-08-27 with ADR-043 accepted.
   The previous approval remains superseded by the material architecture/scope
-  change. P1.F1 is closed PASS; P1.F2 is next but no later-child source work is
-  authorized.
+  change. P1.F1 and P1.F2 are closed PASS; P1.F3a is next but no later-child
+  source work is authorized.
 - **Type:** Very-high development/architecture parent; decomposed before
   implementation.
 - **Complexity / Effort / RRI:** Very high / XL / 94. Full report:
@@ -211,15 +212,21 @@ is closed and P1.F2's dependency is satisfied.
 
 ## P1.F2 — Mobile service ownership and composition
 
-- **Status:** Next gated child; P1.F1 dependency satisfied on 2026-08-27.
-  Preparation/presentation is allowed; source execution requires a current
-  RRI/card and explicit approval.
-- **Effort / prospective RRI:** L / 55 Med-high. Recompute at presentation.
+- **Status:** Closed PASS after repository-owner verification on 2026-08-27.
+- **Effort / RRI:** L / 55 Med-high. Full report:
+  `docs/audit/mvp0-p2p-p1-f2-rri.md`; approval card:
+  `docs/audit/mvp0-p2p-p1-f2-approval-card.md`.
 - **Allowed paths:** `mobile/App.tsx`, `mobile/src/navigation/RootNavigator.tsx`,
   the existing P0 probe/bridge, `mobile/src/p2p/runtime/BareRuntimeClient.ts`,
   `mobile/src/p2p/P2PService.ts`, `mobile/src/p2p/P2PProvider.tsx`, focused P2P
   tests `bare-bridge.test.ts`, `p2p-service.test.ts`, and
   `p2p-provider.test.tsx`, and F2 evidence only.
+- **Verification companion:** the owner explicitly authorized `P1.F2.V`, a
+  separate low-band, test-only adjustment to
+  `mobile/__tests__/mobile.auth-flow.test.tsx` so the existing integration test
+  mounts the required provider composition. Its RRI is 22 and its scope does
+  not expand F2's frozen implementation package:
+  `docs/audit/mvp0-p2p-p1-f2v-rri.md`.
 - **Objective:** make the app composition root own auth/P2P providers and give
   product code one inert service/runtime boundary outside navigation while the
   P0 oracle remains available for migration comparison.
@@ -238,6 +245,43 @@ is closed and P1.F2's dependency is satisfied.
 - **Handoff prompt:** `P1.F2 — implement ADR-043 composition and service
   ownership, prove parity through the existing P0 oracle, and stop before P0
   retirement, Hyperdrive, or network behavior.`
+
+### Task-analysis review
+
+Task-analysis review: gemma
+`docs/audit/mvp0-p2p-p1-f2-phase1-review.md` - PASS
+
+- **Reviewer:** local `gemma4:26b-a4b-it-qat`; 3/3 usable reduced-profile
+  passes, no findings.
+- **Fallbacks:** Muse Glimmer not triggered; D14 not triggered. The prior
+  MVP0-P2P review exception is not invoked for P1.F2.
+
+### Code-solution review
+
+Code-solution review: gemma
+`docs/audit/mvp0-p2p-p1-f2-phase2-review-remediation.json` - PASS
+
+- The first review found an asynchronous lifecycle race; its remediation and
+  the final three-pass disposition are recorded in
+  `docs/audit/mvp0-p2p-p1-f2-implementation.md`.
+
+### Reflection log
+
+Required passes: 3 (`55` → `Med-high`). Complete Draft → Critique → Revise
+records are in `docs/audit/mvp0-p2p-p1-f2-implementation.md`.
+
+### Unit coverage certification
+
+HP-F2/EC-F2 and the owner-authorized test-only P1.F2.V companion are mapped
+to passing unit/integration evidence in
+`docs/audit/mvp0-p2p-p1-f2-implementation.md` (direct scope coverage: 98.37%
+lines).
+
+### Owner final verification
+
+The repository owner confirmed final verification on 2026-08-27. P1.F2 is
+closed PASS. Do not begin P1.F3a until its current RRI, approval card, and
+explicit approval are recorded.
 
 ## P1.F3a — P0 runtime-scaffold migration and retirement
 

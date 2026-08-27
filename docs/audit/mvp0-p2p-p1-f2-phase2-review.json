@@ -1,0 +1,76 @@
+{
+  "changed_paths": [
+    "mobile/App.tsx",
+    "mobile/__tests__/mobile.auth-flow.test.tsx",
+    "mobile/src/navigation/RootNavigator.tsx",
+    "mobile/src/p2p/AndroidBareRuntimeProbe.tsx"
+  ],
+  "findings": [
+    {
+      "detail": "The async IIFE in useEffect does not check if the service is already initialized or if the component has unmounted before calling `service.initialize()`. If the probe mounts/unmounts rapidly, multiple initialization calls may overlap.",
+      "line": 24,
+      "path": "mobile/src/p2p/AndroidBareRuntimeProbe.tsx",
+      "scope": "in-scope",
+      "severity": "major",
+      "suggestion": "Implement an 'isInitializing' guard in P2PService or check service state before calling initialize."
+    },
+    {
+      "detail": "The cleanup function calls `service.shutdown()` without checking if the `ping()` or `initialize()` calls from the async IIFE have completed. This violates the requirement that shutdown during an in-flight handshake must not revive a stopped runtime, as the `finally` block in the async IIFE might execute after the component has unmounted and the service has been destroyed.",
+      "line": 34,
+      "path": "mobile/src/p2p/AndroidBareRuntimeProbe.tsx",
+      "scope": "in-scope",
+      "severity": "major",
+      "suggestion": "Use an AbortController or a local 'isMounted' flag to ensure the `finally` block does not attempt to interact with a service that is already in a shutdown state."
+    },
+    {
+      "detail": "The dependency array includes `service`. If `P2PProvider` provides a new service instance on every render (instead of a stable memoized instance), this will cause the probe to re-initialize and re-shutdown on every render.",
+      "line": 38,
+      "path": "mobile/src/p2p/AndroidBareRuntimeProbe.tsx",
+      "scope": "in-scope",
+      "severity": "minor",
+      "suggestion": "Ensure P2PProvider provides a stable service reference via useMemo or useRef."
+    }
+  ],
+  "model": "gemma4:26b-a4b-it-qat",
+  "passes_run": 3,
+  "passes_succeeded": 3,
+  "reconciliation": {
+    "consensus": [
+      {
+        "detail": "The async IIFE in useEffect does not check if the service is already initialized or if the component has unmounted before calling `service.initialize()`. If the probe mounts/unmounts rapidly, multiple initialization calls may overlap.",
+        "line": 24,
+        "path": "mobile/src/p2p/AndroidBareRuntimeProbe.tsx",
+        "scope": "in-scope",
+        "severity": "major",
+        "suggestion": "Implement an 'isInitializing' guard in P2PService or check service state before calling initialize."
+      },
+      {
+        "detail": "The cleanup function calls `service.shutdown()` without checking if the `ping()` or `initialize()` calls from the async IIFE have completed. This violates the requirement that shutdown during an in-flight handshake must not revive a stopped runtime, as the `finally` block in the async IIFE might execute after the component has unmounted and the service has been destroyed.",
+        "line": 34,
+        "path": "mobile/src/p2p/AndroidBareRuntimeProbe.tsx",
+        "scope": "in-scope",
+        "severity": "major",
+        "suggestion": "Use an AbortController or a local 'isMounted' flag to ensure the `finally` block does not attempt to interact with a service that is already in a shutdown state."
+      },
+      {
+        "detail": "The dependency array includes `service`. If `P2PProvider` provides a new service instance on every render (instead of a stable memoized instance), this will cause the probe to re-initialize and re-shutdown on every render.",
+        "line": 38,
+        "path": "mobile/src/p2p/AndroidBareRuntimeProbe.tsx",
+        "scope": "in-scope",
+        "severity": "minor",
+        "suggestion": "Ensure P2PProvider provides a stable service reference via useMemo or useRef."
+      }
+    ],
+    "consensus_count": 3,
+    "likely_false_positive": [],
+    "likely_false_positive_count": 0,
+    "location_inconsistent": [],
+    "location_inconsistent_count": 0,
+    "pass_specific": [],
+    "pass_specific_count": 0,
+    "severity_inconsistent": [],
+    "severity_inconsistent_count": 0
+  },
+  "status": "findings",
+  "summary": "The implementation correctly moves provider ownership to App.tsx and removes the redundant AuthProvider from RootNavigator. However, the AndroidBareRuntimeProbe introduces a race condition where the service might be shut down while a ping is in flight, and it lacks a guard to prevent re-initialization if the service is already active."
+}

@@ -247,7 +247,9 @@ Each child receives a current RRI, approval card, and explicit approval before
 source edits.
 
 Current implementation evidence:
-`docs/audit/mvp0-p2p-p1-f1-implementation.md`.
+`docs/audit/mvp0-p2p-p1-f1-implementation.md` and
+`docs/audit/mvp0-p2p-p1-f2-implementation.md` (F2 closed PASS after owner
+verification on 2026-08-27).
 
 ## References
 
