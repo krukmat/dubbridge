@@ -144,6 +144,7 @@ and fixed a `.gitignore` defect (`.env.*` was blanket-excluding
 chain primary) passed 3/3 with 0 findings; owner verified and closed
 **Done 2026-08-27**. `T5c` is unblocked; `T5d` remains transitively blocked
 on `T5c`. Deployment-enablement slice: makes the already-closed pipeline publicly runnable on a Digital Ocean droplet; adds no new technology beyond Redis (already in use). Full history incl. gap findings G10–G13: `docs/audit/roadmap-history.md` § S-230. | `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md`, `docs/audit/s-230-t5b-rri.md` |
+| **MVP0-P2P** | P2P-first invited playback: gated Bare compatibility, encrypted publication, invite control plane, verified local package playback, and no-HTTP-fallback certification | S-120, S-125, S-127, S-160; requires a new audience-delivery ADR before P2 | 🟡 P0 closed — Android-only Bare worklet build/runtime proof, coverage, and owner verification passed. P1's isolated replication proof is planned and awaits its own approval; iPhone/iOS remains deferred. No product P2P code or architecture decision has been accepted. | `docs/plan/mvp0-p2p-first.md`, `docs/tasks/mvp0-p2p-first.md`, `docs/audit/mvp0-p2p-p0-native-preflight.md`, `p2p-mvp/` |
 
 `S-040` must be planned before building a first-party browser, operator-console, or
 mobile auth flow; it does not block S-080 or S-090.

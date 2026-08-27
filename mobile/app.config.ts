@@ -11,7 +11,19 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: "com.dubbridge.mobile",
   },
-  plugins: ["expo-status-bar", "expo-web-browser"],
+  plugins: [
+    "expo-status-bar",
+    "expo-web-browser",
+    [
+      "expo-build-properties",
+      {
+        android: {
+          minSdkVersion: 31,
+          useLegacyPackaging: true,
+        },
+      },
+    ],
+  ],
   extra: {
     dubbridgeEnv: process.env.DUBBRIDGE_ENV ?? "local",
     gatewayBaseUrl:
@@ -19,5 +31,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       process.env.DUBBRIDGE_GATEWAY_URL ??
       "http://10.0.2.2:8081",
     e2eEnabled: process.env.EXPO_PUBLIC_E2E_ENABLED === "true",
+    bareRuntimeProbe: process.env.EXPO_PUBLIC_BARE_RUNTIME_PROBE === "true",
   },
 });
