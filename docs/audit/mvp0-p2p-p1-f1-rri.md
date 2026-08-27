@@ -82,7 +82,7 @@ secret, authorization, SQL, API-handler, or `crates/storage` contract.
 ## Post-implementation recomputation
 
 After implementation, the highest ESLint-enforced function complexity remains
-`10` and focused coverage provides strong task-specific tests (`92.24%` line
+`10` and focused coverage provides strong task-specific tests (`91.52%` line
 coverage across `protocol.ts` and `worklet.ts`). Re-running the same frozen
 seven-path command with `T=0` produced:
 

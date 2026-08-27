@@ -13,8 +13,9 @@ slice: MVP0-P2P
 > the repository owner on 2026-08-27. A maintainability review materially
 > replanned P1 on 2026-08-27; the repository owner then approved revised P1 and
 > accepted ADR-043. The earlier P1/P1.A approval route remains superseded. P1.F1
-> was separately approved and implemented with automated acceptance PASS on
-> 2026-08-27; owner final verification is pending and no later child is authorized.
+> was separately approved, implemented, and closed PASS after owner verification
+> on 2026-08-27. P1.F2 may now be prepared/presented but its source execution is
+> not authorized.
 > iPhone/iOS support is explicitly deferred by the repository owner.
 
 ## Objective

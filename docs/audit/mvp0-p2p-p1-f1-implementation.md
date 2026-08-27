@@ -2,7 +2,7 @@
 type: Audit
 title: "MVP0-P2P P1.F1 implementation evidence"
 task: P1.F1
-status: pending_owner_verification
+status: closed_pass
 date: 2026-08-27
 ---
 
@@ -10,9 +10,9 @@ date: 2026-08-27
 
 ## Result
 
-Implementation and automated acceptance are **PASS**. Final task closure is
-pending the repository owner's verification of this exact result; P1.F2 remains
-unauthorized.
+Implementation, automated acceptance, and repository-owner verification are
+**PASS**. P1.F1 closed on 2026-08-27. P1.F2 may now be prepared and presented,
+but its source execution remains unauthorized until its own current gate passes.
 
 ## Implementation routing evidence
 
@@ -103,8 +103,8 @@ Required passes: 3 (`54` → Med-high)
   malformed/version/capability/redaction/channel/ack cases; final line coverage
   is `91.52%`, and the full 252-test mobile suite passes.
 
-## Remaining checkpoint
+## Closure
 
-The repository owner must verify this exact evidence before P1.F1 is marked PASS.
-That verification will authorize preparation/presentation of P1.F2 only; it will
-not authorize P1.F2 source execution.
+Matias, repository owner, verified this exact published evidence and directed
+P1.F1 closure on 2026-08-27. The task is **PASS**. This satisfies only P1.F2's
+dependency; it does not authorize P1.F2 source execution.

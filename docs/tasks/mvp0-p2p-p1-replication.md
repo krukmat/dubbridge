@@ -14,17 +14,18 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 > **Status:** The 2026-08-27 maintainability review materially replanned P1.
 > Earlier P1/P1.A approvals are superseded before source execution. The owner
 > approved revised P1 and accepted ADR-043 on 2026-08-27. That decision
-> authorizes child preparation/presentation only. P1.F1 was separately approved
-> and implemented with automated acceptance PASS on 2026-08-27; owner final
-> verification is pending and no later child is authorized.
+> authorizes child preparation/presentation only. P1.F1 was separately approved,
+> implemented, and closed PASS after owner verification on 2026-08-27. P1.F2 is
+> the next gated child and may be prepared/presented; its source execution is not
+> authorized.
 
 ## Task map
 
 | ID | Title | Status | Depends on |
 |---|---|---|---|
 | P1 | Maintainable mobile P2P foundation + replication proof (planning parent) | APPROVED 2026-08-27 — RRI 94; decomposed; no direct source execution | P0 PASS |
-| P1.F1 | Reproducible worklet bundle + versioned RPC contract | IMPLEMENTED — automated acceptance PASS; awaiting owner verification | Revised P1 + ADR-043 approval — satisfied 2026-08-27 |
-| P1.F2 | Mobile service ownership + composition | Deferred — needs current RRI/card/approval | P1.F1 PASS |
+| P1.F1 | Reproducible worklet bundle + versioned RPC contract | PASS — owner verified 2026-08-27 | Revised P1 + ADR-043 approval — satisfied 2026-08-27 |
+| P1.F2 | Mobile service ownership + composition | Next gated child — preparation/presentation allowed; needs current RRI/card/approval before source execution | P1.F1 PASS — satisfied 2026-08-27 |
 | P1.F3a | P0 runtime-scaffold migration + retirement | Deferred — needs current RRI/card/approval | P1.F2 PASS |
 | P1.F3b | P0 config/dependency cleanup | Deferred — needs current RRI/card/approval | P1.F3a PASS |
 | P1.A1 | Hyperdrive/Corestore Android bundle smoke proof | Deferred — needs current RRI/card/approval | P1.F3b PASS |
@@ -41,7 +42,8 @@ at `docs/audit/mvp0-p2p-p1a-approval-card.md` and
 
 - **Status:** Revised planning parent approved 2026-08-27 with ADR-043 accepted.
   The previous approval remains superseded by the material architecture/scope
-  change; no implementation started and no child source work is authorized.
+  change. P1.F1 is closed PASS; P1.F2 is next but no later-child source work is
+  authorized.
 - **Type:** Very-high development/architecture parent; decomposed before
   implementation.
 - **Complexity / Effort / RRI:** Very high / XL / 94. Full report:
@@ -136,8 +138,8 @@ explicit owner-directed MVP0-P2P exception;
 
 ## P1.F1 — Reproducible worklet bundle and versioned RPC contract
 
-- **Status:** Implemented with automated acceptance PASS on 2026-08-27; awaiting
-  repository-owner final verification before PASS. Parent/ADR gate satisfied.
+- **Status:** PASS — implementation, automated acceptance, and repository-owner
+  verification completed on 2026-08-27. Parent/ADR gate satisfied.
 - **Effort / RRI:** L / 54 Med-high. Full report:
   `docs/audit/mvp0-p2p-p1-f1-rri.md`.
 - **Allowed paths:** `mobile/package.json`, `mobile/package-lock.json`,
@@ -176,8 +178,8 @@ exception; `docs/audit/mvp0-p2p-review-exception.md`.
 
 `docs/audit/mvp0-p2p-p1-f1-implementation.md` records the ADR-038 route,
 dependency/bundle digests, exact verification output, and the three complete
-Reflection passes. Automated acceptance is PASS; P1.F2 remains blocked on owner
-verification and P1.F1 PASS.
+Reflection passes. Automated acceptance and owner verification are PASS; P1.F1
+is closed and P1.F2's dependency is satisfied.
 
 ### Unit coverage certification
 
@@ -189,15 +191,29 @@ verification and P1.F1 PASS.
 ### Owner final verification
 
 - **Owner:** Matias (repository owner)
-- **Date:** pending
-- **Statement:** Pending owner verification of the implemented P1.F1 evidence;
-  the approval granted before implementation is not reused as closure approval.
-- **Commands run:** pending owner verification; Codex's exact passing commands
-  are recorded in `docs/audit/mvp0-p2p-p1-f1-implementation.md`.
+- **Date:** 2026-08-27
+- **Statement:** After receiving the published workflow/evidence report, the
+  owner explicitly directed Codex to verify that P1.F1 was fully closed so work
+  could proceed to F2. The owner accepts the HP-F1/EC-F1 certification, automated
+  evidence, phase-2 override, and published commit `8fa5b5a` as P1.F1 PASS.
+- **Commands run:** `cd mobile && npm run build:bare-worklet`; `cd mobile && npm
+  run check:bare-worklet`; `cd mobile && npm test -- --runInBand
+  --runTestsByPath __tests__/p2p/runtime-protocol.test.ts`; `cd mobile && npm
+  test -- --runInBand --runTestsByPath __tests__/p2p/runtime-protocol.test.ts
+  --coverage --collectCoverageFrom='src/p2p/runtime/protocol.ts'
+  --collectCoverageFrom='src/p2p/runtime/worklet.ts'`; `cd mobile && npm run
+  typecheck`; `cd mobile && npm run lint`; `cd mobile && npm test --
+  --runInBand`; `python3 scripts/check-maintainability.py --base
+  origin/feature/p2p-mvp-core`; `make qa-docs`; `git diff --check`; `git
+  rev-parse HEAD`; `git rev-parse origin/feature/p2p-mvp-core` — all relevant
+  gates PASS and both revisions resolved to
+  `8fa5b5a7f2d406da26028b2933901e87dc25153a` before closure edits.
 
 ## P1.F2 — Mobile service ownership and composition
 
-- **Status:** Deferred until P1.F1 PASS; requires current RRI/card/approval.
+- **Status:** Next gated child; P1.F1 dependency satisfied on 2026-08-27.
+  Preparation/presentation is allowed; source execution requires a current
+  RRI/card and explicit approval.
 - **Effort / prospective RRI:** L / 55 Med-high. Recompute at presentation.
 - **Allowed paths:** `mobile/App.tsx`, `mobile/src/navigation/RootNavigator.tsx`,
   the existing P0 probe/bridge, `mobile/src/p2p/runtime/BareRuntimeClient.ts`,

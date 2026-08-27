@@ -15,9 +15,10 @@ parent_task: P1
 > earlier P1 approval and P1.A card are superseded before source execution.
 > Revised P1 and ADR-043 were approved by the repository owner on 2026-08-27.
 > The parent approval authorizes child preparation/presentation only. P1.F1 was
-> separately approved and implemented with automated acceptance PASS on
-> 2026-08-27 within its frozen packaging/protocol scope. Owner final verification
-> is pending; no P2P network activity or later child has started.
+> separately approved, implemented, and closed PASS after owner verification on
+> 2026-08-27 within its frozen packaging/protocol scope. P1.F2 is the next gated
+> child and may be prepared/presented; no P2P network activity or later-child
+> source execution has started.
 
 ## Objective
 
@@ -91,8 +92,8 @@ explicit approval before source edits:
    deterministic `bare-pack` pipeline, `bare-rpc`, handshake/validators, typed
    failures, global fatal handlers, and suspend/resume protocol. No Hyperdrive,
    app composition, or network.
-   Implemented with automated acceptance PASS on 2026-08-27; awaiting owner
-   verification before the child is closed and P1.F2 may be presented.
+   Closed PASS after owner verification on 2026-08-27. P1.F2's dependency is
+   satisfied; F2 still needs its current RRI/card/approval before source work.
 2. **P1.F2 — Mobile service ownership and composition.** Add
    `BareRuntimeClient`, `P2PService`, `P2PProvider`, external-store snapshots,
    and composition-root ownership; make `RootNavigator` navigation-only and

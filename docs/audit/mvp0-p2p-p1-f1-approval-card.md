@@ -2,7 +2,7 @@
 type: Audit
 title: "MVP0-P2P P1.F1 reproducible worklet bundle and versioned RPC contract"
 task: P1.F1
-status: implemented_pending_owner_verification
+status: closed_pass
 date: 2026-08-27
 ---
 
@@ -10,7 +10,7 @@ date: 2026-08-27
 
 ## 1. Decision header
 
-`P1.F1 — Reproducible worklet bundle + versioned RPC contract | IMPLEMENTED; awaiting owner verification | RRI 54 → 42 Med-high | Effort L | ADR-038 CLOUD_REQUIRED → gpt-5.6-sol/high`
+`P1.F1 — Reproducible worklet bundle + versioned RPC contract | CLOSED PASS; owner verified 2026-08-27 | RRI 54 → 42 Med-high | Effort L | ADR-038 CLOUD_REQUIRED → gpt-5.6-sol/high`
 
 | Routing | Resolved value |
 |---|---|
@@ -59,7 +59,7 @@ Approval was given by Matias, repository owner, in the current session on
 | Implement | Muse Glimmer advisor → Codex receipt → selected cloud implementer | Restart Ollama + precheck before the advisory. Invalid/stale refinement fails to `CLOUD_REQUIRED`; material scope change returns to RRI/review/approval. |
 | Reflect and verify | Codex | Three full Draft → Critique → Revise passes: reproducible bundle → protocol/lifecycle failure boundaries → regression/coverage; run focused/full checks. |
 | Phase 2 review | Owner-directed `REVIEW-OVERRIDE` | Waived only at F1 closure; tests, coverage and owner verification remain mandatory. |
-| Close | Codex + owner | Close only after evidence/status sync and owner verification; then P1.F2 may be prepared, not implemented. |
+| Close | Codex + owner | PASS on 2026-08-27 after evidence/status sync and owner verification; P1.F2 may be prepared/presented, not implemented. |
 
 Task-analysis review: REVIEW-OVERRIDE — explicit owner-directed MVP0-P2P
 exception; `docs/audit/mvp0-p2p-review-exception.md`.
@@ -104,3 +104,8 @@ not authorize P1.F2, Hyperdrive, networking, P0 deletion, or P2.
 
 Approved 2026-08-27. Execution may proceed only within this card's frozen P1.F1
 boundary; no later P1 child is authorized.
+
+Closed PASS on 2026-08-27 after the repository owner verified the published
+implementation evidence. This closure satisfies P1.F2's dependency only; P1.F2
+still requires a current RRI, approval card, and explicit approval before source
+execution.

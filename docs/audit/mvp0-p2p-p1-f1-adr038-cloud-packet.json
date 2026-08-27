@@ -1,7 +1,7 @@
 {
   "schema_version": "adr038-cloud-takeover-packet-v1",
   "task_id": "P1.F1",
-  "status": "implemented_acceptance_pass_pending_owner_verification",
+  "status": "closed_pass",
   "rri": 54,
   "selected_implementer": {
     "model": "gpt-5.6-sol",
