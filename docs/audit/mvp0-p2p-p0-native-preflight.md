@@ -85,3 +85,19 @@ no P0 product or security risk; address it separately from this bounded spike.
 The repository owner accepted the Android development-build evidence and the
 Android-only scope on 2026-08-27. P0 is closed. P1 still requires its separately
 approved task card and dependency check before implementation.
+
+## Follow-up — renamed by P1.F3b (2026-08-27)
+
+The commands recorded above are the P0 history as executed and are left
+unchanged. The diagnostic entry points they use have since been renamed by
+P1.F3b; use the current names when reproducing this preflight:
+
+| P0 (above) | Current |
+|---|---|
+| `EXPO_PUBLIC_BARE_RUNTIME_PROBE=true` | `EXPO_PUBLIC_P2P_DEV_HARNESS=true` |
+| `npm run android:bare-probe` | `npm run android:p2p-dev` |
+| `AndroidBareRuntimeProbe` (retired by P1.F3a.2) | `P2PDevelopmentHarness` |
+
+P1.F3b's own Android build/ping proof is still outstanding and is folded into
+roadmap X28's hardware verification pass. See
+`docs/audit/mvp0-p2p-p1-f3b-implementation.md`.

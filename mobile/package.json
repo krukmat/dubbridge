@@ -6,7 +6,7 @@
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
-    "android:bare-probe": "EXPO_PUBLIC_BARE_RUNTIME_PROBE=true expo run:android",
+    "android:p2p-dev": "EXPO_PUBLIC_P2P_DEV_HARNESS=true expo run:android",
     "build:bare-worklet": "node scripts/build-bare-worklet.mjs",
     "check:bare-worklet": "node scripts/build-bare-worklet.mjs --check",
     "ios": "expo run:ios",

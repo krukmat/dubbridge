@@ -37,7 +37,7 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 | P1.F3a | P0 runtime-scaffold migration + retirement (planning parent) | Decomposed — no direct source execution | P1.F2 PASS |
 | P1.F3a.1 | P0 characterization migration | PASS — owner verified 2026-08-27 | P1.F2 PASS |
 | P1.F3a.2 | P0 runtime-scaffold retirement | PASS — Done 2026-08-27 | P1.F3a.1 PASS — satisfied 2026-08-27 |
-| P1.F3b | P0 config/dependency cleanup | Deferred — needs current RRI/card/approval | P1.F3a.2 PASS — satisfied 2026-08-27 |
+| P1.F3b | P0 config/dependency cleanup | Implemented + audited 2026-08-27 — blocked on Android device proof (X28) | P1.F3a.2 PASS — satisfied 2026-08-27 |
 | P1.A1 | Hyperdrive/Corestore Android bundle smoke proof | Deferred — needs current RRI/card/approval | P1.F3b PASS |
 | P1.A2 | Transient seed lifecycle + residue cleanup | Deferred — needs current RRI/card/approval | P1.A1 PASS |
 | P1.B1 | Isolated Hyperswarm replication transport | Deferred — needs current RRI/card/approval | P1.A2 PASS |
@@ -406,8 +406,24 @@ and passing focused/typecheck/lint/full-Jest verification.
 
 ## P1.F3b — P0 config/dependency cleanup
 
-- **Status:** Deferred until P1.F3a.2 PASS; requires current RRI/card/approval.
-- **Effort / prospective RRI:** M / 30 Moderate. Recompute at presentation.
+- **Status:** Implemented and audited 2026-08-27; **not PASS** — blocked on the
+  two Android device-dependent criteria (full build/ping, and the executed
+  `useLegacyPackaging` native A/B), folded into roadmap X28's hardware
+  verification pass. Rename delivered and verified; the dependency/build audit
+  concluded **retain** for every contested item, so nothing was removed and
+  `mobile/package-lock.json` is unchanged. Notably `react-native-b4a` was
+  retained despite having zero JS imports: it is a `peerOptional` of `b4a`,
+  selected by `b4a`'s `react-native` export condition and wired by autolinking,
+  so removal would have degraded the RPC data path **silently** — exactly what
+  EC-F3b forbids. Two files outside `allowed_paths` were mechanically forced
+  (`mobile/App.tsx` as the renamed key's sole consumer;
+  `mobile/src/p2p/runtime/worklet.bundle.js` because `bare-pack --linked`
+  embeds `mobile/package.json` verbatim). Full evidence:
+  `docs/audit/mvp0-p2p-p1-f3b-implementation.md`.
+- **Effort / RRI:** prospective `M / 30 Moderate`; **measured 24 Low**
+  (`docs/audit/mvp0-p2p-p1-f3b-rri.md`) — the audit's retain-everything result
+  reduced the diff to renames plus one regenerated artifact. Owner directed
+  direct execution without a card.
 - **Allowed paths:** `mobile/package.json`, `mobile/package-lock.json`,
   `mobile/app.config.ts`, and F3b evidence only.
 - **Objective:** remove obsolete P0 flag/script entries and prove every retained

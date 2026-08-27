@@ -137,6 +137,24 @@ Cross-cutting obligations `X28`. This intentionally leaves P1.F3a.2's
 device-proof criterion (part of EC-F3a.2/HP-F3a.2) open while every other
 acceptance criterion is closed — see § Closure status below.
 
+**Extended 2026-08-27 by P1.F3b:** the same hardware pass now also needs to
+discharge P1.F3b's two device-dependent items, folded into this `X28` handoff
+rather than opening a second one (see
+`docs/audit/mvp0-p2p-p1-f3b-implementation.md` § 6):
+
+- **HP-F3b build/ping.** F3b renamed the harness's diagnostic entry points
+  (`npm run android:bare-probe` → `npm run android:p2p-dev`;
+  `EXPO_PUBLIC_BARE_RUNTIME_PROBE` → `EXPO_PUBLIC_P2P_DEV_HARNESS`). Step 2
+  below must use the **current** command/flag names, and the ping proof
+  additionally confirms the rename itself wires correctly end-to-end, not
+  only that the harness's logic works.
+- **`useLegacyPackaging` native A/B.** F3b's audit retained
+  `useLegacyPackaging: true` on static mechanism proof only (`react-native-
+  bare-kit` ships prebuilt Bare native addons as jniLibs, and the flag
+  controls whether they are extracted to disk for dynamic loading) — the
+  ledger's required executed on/off comparison was never run. Add it as its
+  own step during the same pass (see step 5 below).
+
 **Handoff, to run whenever the general verification pass happens:**
 
 1. Build and install the mobile app on a physical Android device (or an
@@ -144,15 +162,26 @@ acceptance criterion is closed — see § Closure status below.
    underlying runtime works there — confirm before relying on it as a
    substitute for physical hardware).
 2. Mount the app with the `P2PDevelopmentHarness`'s explicit development
-   flag enabled (same flag gated in
+   flag enabled — `npm run android:p2p-dev` /
+   `EXPO_PUBLIC_P2P_DEV_HARNESS=true` (post-F3b naming; same flag gated in
    `__tests__/p2p/p2p-development-harness.test.ts`'s "initializes, pings,
    and shuts down" case).
 3. Observe a real `initialize → ping → shutdown` cycle complete
-   successfully end-to-end on-device (matching HP-F3a.2), with no crash, no
-   unhandled exception, and no leaked worklet process after shutdown.
+   successfully end-to-end on-device (matching HP-F3a.2 and HP-F3b), with no
+   crash, no unhandled exception, and no leaked worklet process after
+   shutdown.
 4. Record the device model/OS version, exact steps taken, and the observed
    result (pass/fail with logs) back into this file's subtask table and this
-   section, then close `X28` in `docs/plan/roadmap.md`.
+   section.
+5. Separately, build once with `useLegacyPackaging: true` (current) and once
+   with it removed/`false`, on the same device; confirm whether the Bare
+   native addons (`libbare-buffer`, `libbare-os`, `libbare-inspect`,
+   `libbare-structured-clone`, `libbare-subprocess`) load successfully in
+   each case. Record the result in
+   `docs/audit/mvp0-p2p-p1-f3b-implementation.md` § 2.3.
+6. Close `X28` in `docs/plan/roadmap.md` and update P1.F3b's status in
+   `docs/tasks/mvp0-p2p-p1-replication.md` from "implemented + audited" to
+   PASS once both proofs land.
 
 ## Closure status
 

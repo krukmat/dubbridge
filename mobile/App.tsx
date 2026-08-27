@@ -10,7 +10,8 @@ import { P2PDevelopmentHarness } from "./src/p2p/development/P2PDevelopmentHarne
 import { P2PProvider } from "./src/p2p/P2PProvider";
 import { AuthProvider } from "./src/auth/AuthProvider";
 
-const bareRuntimeProbeEnabled = Constants.expoConfig?.extra?.bareRuntimeProbe === true;
+const p2pDevelopmentHarnessEnabled =
+  Constants.expoConfig?.extra?.p2pDevelopmentHarness === true;
 
 export default function App() {
   return (
@@ -18,7 +19,7 @@ export default function App() {
       <StatusBar style="dark" />
       <AuthProvider>
         <P2PProvider>
-          <P2PDevelopmentHarness enabled={bareRuntimeProbeEnabled} />
+          <P2PDevelopmentHarness enabled={p2pDevelopmentHarnessEnabled} />
           <RootNavigator />
         </P2PProvider>
       </AuthProvider>

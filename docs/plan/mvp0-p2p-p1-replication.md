@@ -113,7 +113,10 @@ explicit approval before source edits:
 5. **P1.F3b — P0 config/dependency cleanup.** Remove the old probe flag/script;
    keep each P0-added direct dependency and Android build setting only when the
    new runtime imports it or an Android A/B proof requires it. Preserve P0 audit
-   documents.
+   documents. **Implemented and audited 2026-08-27, not yet PASS** — the rename
+   is delivered and verified, the audit retained every contested dependency and
+   flag on evidence, and the remaining Android build/ping plus
+   `useLegacyPackaging` native A/B are folded into X28.
 6. **P1.A1 — Hyperdrive/Corestore Android bundle smoke proof.** Add compatible
    storage dependencies and prove an empty transient drive can open/close in the
    packaged Android worklet without discovery.
@@ -141,7 +144,7 @@ backend.
 |---|---|---|
 | Retain as history | P0 audit report, native proof, closure/handoff evidence | Keep: they are the factual feasibility record. |
 | Retain with direct consumer | `react-native-bare-kit`; Android `minSdkVersion: 31` | Keep while ADR-043's Bare runtime requires them. |
-| Provisional, evidence required | `b4a`, `react-native-b4a`, `@types/b4a`, `useLegacyPackaging`, and their Expo config support | F3b retains each only with an import/consumer or Android A/B proof; otherwise removes it and updates the lockfile. |
+| Resolved 2026-08-27 — all retained | `b4a`, `react-native-b4a`, `@types/b4a`, `useLegacyPackaging`, and their Expo config support | F3b's audit proved a live consumer for each, so none was removed and the lockfile is unchanged. `react-native-b4a` is a `peerOptional` of `b4a` selected by its `react-native` export condition and wired by autolinking — invisible to import grep, and its removal degrades the RPC path silently. `useLegacyPackaging` rests on static mechanism proof (bare-kit ships Bare addons as jniLibs); the executed native A/B is still outstanding under X28. `docs/audit/mvp0-p2p-p1-f3b-implementation.md` § 2. |
 | Retire after parity | `AndroidBareRuntimeProbe`, custom bridge/protocol, inline worklet, probe wiring, and P0 bridge test | F3a.1 first migrates every ping/error characterization to the ADR-043 seam; F3a.2 then deletes the duplicate scaffold. |
 | Disposable local output | ignored `mobile/android` prebuild output | Reproducible and not tracked; it may be removed separately with owner approval, never as proof/history deletion. |
 

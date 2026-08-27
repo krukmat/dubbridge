@@ -108,15 +108,20 @@ sessions from a factory and is invoked only by an explicit development harness.
 It is not exposed through the product `P2PService` API and is never enabled by
 default.
 
-The P0 probe is retained only as a characterization oracle until the new runtime
-and service reproduce `initialize → ping → shutdown`. P1.F3a.1 implements this
-replacement in `P2PDevelopmentHarness` with automated verification pending
-owner final verification. It is then retired in
-explicit cleanup children: the probe, custom bridge/protocol, inline worklet,
-obsolete tests, flag, and script are deleted or replaced. Historical audit
-evidence remains. Dependencies and Android build settings survive only with a
-documented consumer or a native A/B proof; the Bare Kit runtime itself remains
-because it is the selected runtime boundary.
+The P0 probe was retained only as a characterization oracle until the new
+runtime and service reproduced `initialize → ping → shutdown`. P1.F3a.1
+implemented this replacement in `P2PDevelopmentHarness`, closed PASS after
+owner verification on 2026-08-27. P1.F3a.2 then retired the P0 scaffold:
+the probe, custom bridge/protocol, inline worklet, and obsolete tests were
+deleted, closed Done on 2026-08-27. P1.F3b then audited every P0-added
+dependency and Android build setting against a documented consumer or native
+A/B proof — implemented and audited 2026-08-27, but not yet PASS: the audit
+concluded every contested item (`b4a`, `react-native-b4a`, `@types/b4a`,
+`useLegacyPackaging`) has a live consumer, so none was removed, while the
+Android build/ping proof and the `useLegacyPackaging` native A/B remain
+outstanding under roadmap `X28`. Historical audit evidence remains for all
+three children. The Bare Kit runtime itself remains because it is the
+selected runtime boundary.
 
 ### 6. Use transient filesystem storage with verifiable cleanup
 
@@ -245,6 +250,12 @@ until a concrete product requirement demonstrates it is necessary.
    `docs/audit/mvp0-p2p-p1-f3a2-decomposition.md`.
 5. P1.F3b — remove obsolete P0 config/script entries and audit every P0-added
    direct dependency/build setting against a live consumer or native A/B proof.
+   Implemented and audited 2026-08-27; renamed the diagnostic flag/script and
+   retained every contested dependency/setting on documented-consumer
+   evidence — nothing qualified for removal. Not yet PASS: the Android
+   build/ping proof and the executed `useLegacyPackaging` native A/B remain
+   outstanding under roadmap `X28`. See
+   `docs/audit/mvp0-p2p-p1-f3b-implementation.md`.
 6. P1.A1 — Corestore/Hyperdrive dependency and bundle smoke proof.
 7. P1.A2 — run-scoped transient seed storage, cleanup, and janitor proof.
 8. P1.B1 — isolated Hyperswarm discovery/replication transport.
@@ -259,9 +270,11 @@ Current implementation evidence:
 `docs/audit/mvp0-p2p-p1-f2-implementation.md` (F2 closed PASS after owner
 verification on 2026-08-27), and
 `docs/audit/mvp0-p2p-p1-f3a1-implementation.md` (F3a.1 closed PASS after
-owner verification on 2026-08-27), and
+owner verification on 2026-08-27),
 `docs/audit/mvp0-p2p-p1-f3a2-decomposition.md` (F3a.2 closed PASS on
-2026-08-27 via owner-directed Low-band decomposition).
+2026-08-27 via owner-directed Low-band decomposition), and
+`docs/audit/mvp0-p2p-p1-f3b-implementation.md` (F3b implemented and audited
+2026-08-27; device-dependent proofs outstanding under `X28`).
 
 ## References
 
