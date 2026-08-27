@@ -10,8 +10,11 @@ plan: docs/plan/mvp0-p2p-first.md
 
 > **Plan:** `docs/plan/mvp0-p2p-first.md`.
 > **External taskpack:** `p2p-mvp/taskpacks/P0.zip` through `P7.zip`.
-> **Current task:** P0 is closed. P1 is planned and requires its own approval
-> before implementation. The external package is untracked input, so its
+> **Current task:** P0 is closed. P1 was materially replanned for a maintainable
+> mobile/runtime boundary; revised P1 and ADR-043 were approved on 2026-08-27.
+> P1.F1 is next and still requires its own RRI/card/approval; no P1 child source
+> work is authorized. The external package
+> is untracked input, so its
 > state/handoff files are evidence but not substitutes for this ledger.
 
 ## Task map
@@ -19,7 +22,7 @@ plan: docs/plan/mvp0-p2p-first.md
 | ID | Title | Status | Depends on |
 |---|---|---|---|
 | P0 | Bare / Expo / React Native compatibility spike | PASS — Android-only; owner verified 2026-08-27 | — |
-| P1 | P2P core replication spike | Planned — awaiting P1 approval | P0 PASS |
+| P1 | Maintainable mobile P2P foundation + replication proof | Parent approved and ADR-043 accepted 2026-08-27; P1.F1 next, no child source execution | P0 PASS |
 | P2 | Encrypted P2P publication after S-120 | Pending | P1 PASS; approved ADR |
 | P3 | Invite, claim, and content-key envelope | Pending | P2 PASS; approved key contract |
 | P4 | Mobile package sync and verification | Pending | P3 PASS |
@@ -168,10 +171,17 @@ The following tasks stay unpresented until their dependency evidence exists. The
 external taskpacks are useful input, but the detailed ledger entries, RRI reports,
 and approval cards must be created at activation time.
 
-- **P1:** detailed plan/task ledger and approval card:
+- **P1:** the earlier approved topology was superseded before source execution.
+  Revised P1 first establishes composition-root/provider/service/runtime
+  ownership, reproducible versioned RPC, lifecycle handling, and transient
+  storage cleanup; it migrates P0 characterization before deleting its temporary
+  probe/bridge scaffold and separately audits P0 config/dependencies; only then
+  does its isolated proof runner perform replication.
+  Detailed plan/task ledger and revised approval card:
   `docs/plan/mvp0-p2p-p1-replication.md`,
   `docs/tasks/mvp0-p2p-p1-replication.md`, and
-  `docs/audit/mvp0-p2p-p1-approval-card.md`.
+  `docs/audit/mvp0-p2p-p1-approval-card.md`; accepted architecture:
+  `docs/adr/ADR-043-mobile-p2p-runtime-ownership-and-proof-isolation.md`.
 - **P2:** HP: prepared HLS produces a ciphertext-only publication and durable
   publication state; EC: publication failure never exposes an asset as P2P-ready.
 - **P3:** HP: an eligible invite is claimed idempotently by one viewer; EC: raw

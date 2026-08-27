@@ -46,6 +46,7 @@ operational surfaces from planned ones. Delivery sequence lives in
 | Environment separation + reproducible container runtime wiring | Operational | S-030, ADR-026 |
 | First-party session gateway (transparent JWT relay) | Operational | S-040, ADR-031 |
 | First-party mobile client (React Native + Expo) | Canonical, sole authenticated product surface | S-050/S-105, ADR-029/031 |
+| Mobile P2P runtime boundary | Accepted architecture; implementation pending, no product P2P runtime active | MVP0-P2P P1, ADR-043 |
 
 Human review runtime (S-170) and publication runtime (S-180) have no plan/task
 ledger yet.
@@ -78,6 +79,19 @@ ledger yet.
 
 ### Planned
 
+- `mobile/src/p2p/` (MVP0-P2P P1, accepted ADR-043): the app composition root,
+  above `RootNavigator`, owns `AuthProvider` and a `P2PProvider`. The provider
+  owns a framework-independent `P2PService`, which owns one product
+  `BareRuntimeClient`/worklet and remains network-inert until an explicit future
+  command. Reproducibly packaged, versioned `bare-rpc` communication and explicit
+  fatal/suspend/resume handling form the runtime seam. P1's two-worklet
+  seed/client topology stays isolated in a development-only proof runner and
+  uses verifiably deleted cache storage; it is not the product topology. The P0
+  probe/custom bridge is retained only as a characterization oracle, then
+  retired after migrated parity in P1.F3a; P1.F3b separately removes or proves
+  each related config/dependency setting. ADR-043 and the revised P1 parent were
+  approved on 2026-08-27; this boundary remains non-operational until its
+  separately approved children are implemented and verified.
 - `crates/connectors` (primary S-090, ADR-025): per-platform integrations behind a
   `PlatformConnector` trait. For owner-authorized download (content owner grants
   scoped access to their own YouTube/Vimeo account), it resolves ownership/metadata

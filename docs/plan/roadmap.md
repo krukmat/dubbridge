@@ -15,7 +15,7 @@ Roadmap phases use a single canonical `S-xxx` identifier. Older `S0`/`P*`/`T*`
 labels remain as legacy aliases in source plans and historical task ledgers until
 those files are renamed, but new roadmap references should use `S-xxx`.
 
-Last consolidated 2026-08-24. This file intentionally keeps only current status,
+Last consolidated 2026-08-27. This file intentionally keeps only current status,
 dependencies, and links — full consolidation changelog, design rationale, and
 detailed per-slice history live in `docs/audit/roadmap-history.md`.
 
@@ -144,7 +144,7 @@ and fixed a `.gitignore` defect (`.env.*` was blanket-excluding
 chain primary) passed 3/3 with 0 findings; owner verified and closed
 **Done 2026-08-27**. `T5c` is unblocked; `T5d` remains transitively blocked
 on `T5c`. Deployment-enablement slice: makes the already-closed pipeline publicly runnable on a Digital Ocean droplet; adds no new technology beyond Redis (already in use). Full history incl. gap findings G10–G13: `docs/audit/roadmap-history.md` § S-230. | `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md`, `docs/audit/s-230-t5b-rri.md` |
-| **MVP0-P2P** | P2P-first invited playback: gated Bare compatibility, encrypted publication, invite control plane, verified local package playback, and no-HTTP-fallback certification | S-120, S-125, S-127, S-160; requires a new audience-delivery ADR before P2 | 🟡 P0 closed — Android-only Bare worklet build/runtime proof, coverage, and owner verification passed. P1's isolated replication proof is planned and awaits its own approval; iPhone/iOS remains deferred. No product P2P code or architecture decision has been accepted. | `docs/plan/mvp0-p2p-first.md`, `docs/tasks/mvp0-p2p-first.md`, `docs/audit/mvp0-p2p-p0-native-preflight.md`, `p2p-mvp/` |
+| **MVP0-P2P** | P2P-first invited playback: maintainable mobile/Bare runtime foundation, isolated replication proof, encrypted publication, invite control plane, verified local package playback, and no-HTTP-fallback certification | S-120, S-125, S-127, S-160; accepted ADR-043 + separately approved P1 children before source work; separate audience-delivery ADR before P2 | 🟡 P0 closed — Android-only Bare worklet build/runtime proof passed. Revised P1 (RRI 94) and ADR-043 were approved on 2026-08-27; the approval accepts app-level provider/service ownership, one product worklet, reproducible versioned RPC, lifecycle handling, a proof-only two-session runner, and verifiably deleted cache storage. P1.F1 is next and requires its own current RRI/card/approval; no P1 child source work has started. The temporary P0 probe/bridge scaffold stays only as a characterization oracle until P1.F3a parity, then is retired; config/dependency residue is audited in P1.F3b. Earlier P1/P1.A approval routes remain superseded. iPhone/iOS remains deferred and no product P2P runtime is active. | `docs/plan/mvp0-p2p-first.md`, `docs/tasks/mvp0-p2p-first.md`, `docs/plan/mvp0-p2p-p1-replication.md`, `docs/tasks/mvp0-p2p-p1-replication.md`, `docs/adr/ADR-043-mobile-p2p-runtime-ownership-and-proof-isolation.md`, `p2p-mvp/` |
 
 `S-040` must be planned before building a first-party browser, operator-console, or
 mobile auth flow; it does not block S-080 or S-090.
