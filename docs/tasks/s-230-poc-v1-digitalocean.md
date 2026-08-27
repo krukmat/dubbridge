@@ -75,11 +75,11 @@ ledger.
 | T4o | Full local image-pipeline contract | development/test | S (RRI 24 Low) | T4c, T4e, T4g, T4l; T4n if executed (contract-verified images) | [x] Done — 2026-08-24 |
 | T4p | Execute and record local image evidence | operational/evidence | S (RRI 19 Low) | T4o | [x] Done — 2026-08-24 |
 | T4q | T4 parent closeout and status sync | docs-only | S (RRI 10 Low) | T4p; T4n if executed | [x] Done — 2026-08-24 |
-| T5 | Production deployment descriptor and secret boundary (non-executable parent) | config-only parent | XL (RRI 71 High; decomposition required) | T4q | 🟡 in progress — T5a, T5b, T5c Done; T5d remains |
+| T5 | Production deployment descriptor and secret boundary (non-executable parent) | config-only parent | XL (RRI 71 High; decomposition required) | T4q | [x] Done 2026-08-27 — T5a, T5b, T5c, T5d all Done |
 | T5a | Freeze production inputs and child contracts | planning/config | M (RRI 38 Moderate) | T4q | [x] Done 2026-08-26 — owner supplied public hostname; all inputs frozen |
 | T5b | Production profile and environment/secret template | config-only | M (RRI 27 Moderate, corrected 2026-08-27) | T5a | [x] Done 2026-08-27 — Claude Sonnet 5 direct; Gemma Reviewer PASS 0 findings; owner-verified |
 | T5c | Production Compose and TLS reverse proxy | config-only | M (RRI 26 Moderate, recomputed 2026-08-27) | T5b | [x] Done 2026-08-27 — Claude Sonnet 5 direct (owner override); Gemma Reviewer PASS 0 findings both phases; owner-verified |
-| T5d | Local descriptor evidence and aggregate status sync | operational/docs | M (provisional RRI 27 Moderate) | T5c | [ ] Not started — unblocked, T5c closed |
+| T5d | Local descriptor evidence and aggregate status sync | operational/docs | S (RRI 22 Low, recomputed 2026-08-27) | T5c | [x] Done 2026-08-27 — structural render + fail-closed guard evidence; owner-verified |
 | T6 | First deploy and end-to-end smoke on Digital Ocean | operational | L | T5 | [ ] Planned |
 | T7 | Mobile POC build against the deployed backend | development/ops | M | T6 | [ ] Planned |
 | T7b | Mobile registration screen | development | M | T7 | [ ] Planned — droppable (first) |
@@ -4870,36 +4870,100 @@ unstarted tasks.
 ### S-230-T5d: Local descriptor evidence and aggregate status sync
 
 **Type:** operational/docs
-**Effort:** M — provisional RRI 27 Moderate
+**Effort:** S — RRI 22 Low (recomputed 2026-08-27; ledger's provisional
+estimate was 27 Moderate)
 **Depends on:** S-230-T5c
-**Status:** [ ] Not started 2026-08-27 — unblocked: T5c closed Done
-2026-08-27 (owner-verified). `infra/production/docker-compose.yml` and
-`infra/production/Caddyfile` exist and are available for this task's
-dry-run scope.
+**Status:** [x] Done 2026-08-27 — owner-verified
 
-**Acceptance criteria:**
+**RRI evidence:** `scripts/rri.py --touches infra/production/docker-compose.yml
+--touches infra/production/Caddyfile --touches
+docs/tasks/s-230-poc-v1-digitalocean.md --touches
+docs/plan/s-230-poc-v1-digitalocean.md --touches docs/plan/roadmap.md --cc 3
+--D 2 --K 1 --P 1 --T 1 --A 1 --X 1` → base 22, no penalties, final **RRI 22
+→ Low (0–25)**. Main drivers: F=2 (5 touched files); all other variables at
+rubric floor (operational/docs task, no cyclomatic complexity). Presented as
+a compact Low-band card on explicit user request (task-analysis review is
+exempt for Low band per the workflow guide).
 
-- The production descriptor passes structural rendering and a bounded dry-run
-  against local dependencies; the migration exits successfully and all three
-  long-running binaries pass their startup/readiness checks.
-- Secret scanning confirms no real credential was added, and `git diff --check`
-  plus documentation QA pass.
-- T5/T5a–T5d, the S-230 plan, roadmap S-030 Phase 3/X21 wording, and ADR-026
-  implementation references are synchronized as materially applicable.
+**Task-analysis review:** n/a — RRI 0–25 Low band; no Gemma/Muse Glimmer
+chain triggered for presentation-time review.
 
-**Evidence to emit:** exact commands/transcript, readiness results, secret scan,
-and status diff.
+**Acceptance criteria — scope note:** the original acceptance language
+("bounded local-infrastructure dry-run... migration exits successfully and
+all three long-running binaries pass their startup/readiness checks")
+assumed a literal boot of the production descriptor
+(`DUBBRIDGE_ENV=production`) against local Postgres/Redis/MinIO. This is
+**architecturally impossible without violating ADR-026**:
+`AppConfig::validate()` (`crates/config/src/lib.rs:194-208`) fail-closed
+rejects `localhost`/`127.0.0.1` database/redis URLs and `local_fs` storage
+whenever `env.is_production_like()` — by design, not a gap. Local
+development and testing already run exclusively under
+`DUBBRIDGE_ENV=local` against `config/local.toml` and
+`infra/local/docker-compose.yml`; the production profile
+(`config/production.toml`) is only ever booted against real DO
+infrastructure, validated for real in **T6**. Rescoped and confirmed with
+the owner mid-execution (2026-08-27): T5d validates the **descriptor's own
+correctness** (structure, dependency graph, and the fail-closed guard's
+behavior), not a literal local boot of the production environment.
 
-**Blocked — next action:** none from the owner. Unblocked — ready to start.
+- HP-1: `docker-compose -f infra/production/docker-compose.yml config`
+  renders successfully against a template `.env` (from `.env.example`) →
+  structurally valid descriptor confirmed.
+- HP-2 (rescoped): the ADR-026 fail-closed guard actually rejects
+  localhost/local_fs when `DUBBRIDGE_ENV=production` is forced — proven via
+  the existing `AppConfig::validate()` test suite rather than a literal
+  boot attempt that the guard is designed to prevent. Full image-boot
+  readiness against real infrastructure remains T6's scope.
+- EC-1: secret scanning confirms no real credential was added; `git diff
+  --check` and `make qa-docs` pass clean.
 
-**Status artifacts affected:** this ledger, the linked plan, roadmap, and
-ADR-026 references only if the boundary changed.
+**Evidence emitted:**
 
-**Handoff prompt:** Execute and record the local-only validation, then close the
-aggregate consistently. Do not provision or deploy.
+- `docker-compose -f infra/production/docker-compose.yml config` (run from
+  a template `.env` copied from `.env.example`, never committed —
+  `.gitignore:5` already excludes `.env`) rendered all six services
+  (`caddy`, `redis`, `migration`, `api`, `gateway`, `worker-runner`) with
+  correct `depends_on`/`condition` wiring and no errors.
+- `cargo test -p dubbridge-config app_config_validate_rejects` — 16/16
+  passed, confirming the fail-closed guard rejects localhost DB/Redis
+  URLs, `local_fs` storage, missing auth, and malformed S3 config under
+  production-like environments.
+- Secret scan (`grep` for placeholder vs. real-looking credential patterns
+  across `infra/production/`) — only `REPLACE_ME` placeholders found, no
+  real secret.
+- `git diff --check` — clean (exit 0).
+- `make qa-docs` — all five sub-checks passed (doc consistency, task unit
+  coverage, task completion evidence, roadmap drift, OKF frontmatter).
+- Docker image builds for the four production Dockerfiles
+  (`apps/api`, `apps/gateway`, `apps/worker-runner`, `apps/cli`) were
+  attempted but killed mid-build at the owner's explicit direction (local
+  machine load) — **not** used as closing evidence; the fail-closed guard
+  tests plus structural render were accepted as sufficient by the owner in
+  place of full image-boot evidence.
 
-**Stop condition:** Stop after local evidence and status synchronization. T6 is
-separate and remains unstarted.
+**Status artifacts affected:** this ledger (T5/T5a–T5d summary row and this
+section — synced), `docs/plan/s-230-poc-v1-digitalocean.md` (T5/T5d rows —
+synced below), `docs/plan/roadmap.md` (S-230 status line — synced below).
+No ADR-026 implementation-reference change: the secret/config boundary
+itself did not move: this task only ran validation.
+
+### Owner final verification
+
+- Owner: `matias`
+- Date: `2026-08-27`
+- Statement: I clarified the local/production environment-testing model
+  (local always uses `config/local.toml`, production only boots against
+  real DO infra, per ADR-026's fail-closed guard) and approved closing the
+  dry-run with structural-render + fail-closed-guard evidence rather than
+  a full image-boot smoke test, after stopping the in-progress image
+  builds due to local machine load.
+- Commands run (by the primary agent, owner-directed): `docker-compose -f
+  infra/production/docker-compose.yml config`; `cargo test -p
+  dubbridge-config app_config_validate_rejects`; `git diff --check`; `make
+  qa-docs`.
+
+**Stop condition met:** local evidence recorded, status synchronized. T6
+(first deploy) remains a separate, unstarted task.
 
 ---
 

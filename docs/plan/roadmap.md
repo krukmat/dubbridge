@@ -142,8 +142,18 @@ values, authored `.env.example`, extended `config/README.md`'s parity table,
 and fixed a `.gitignore` defect (`.env.*` was blanket-excluding
 `.env.example` itself). Gemma Reviewer (`gemma4:26b-a4b-it-qat`, RRI 26-55
 chain primary) passed 3/3 with 0 findings; owner verified and closed
-**Done 2026-08-27**. `T5c` is unblocked; `T5d` remains transitively blocked
-on `T5c`. Deployment-enablement slice: makes the already-closed pipeline publicly runnable on a Digital Ocean droplet; adds no new technology beyond Redis (already in use). Full history incl. gap findings G10–G13: `docs/audit/roadmap-history.md` § S-230. | `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md`, `docs/audit/s-230-t5b-rri.md` |
+**Done 2026-08-27**. `T5c` (production Compose + Caddy TLS descriptor)
+closed **Done 2026-08-27** — Claude Sonnet 5 direct (owner routing
+override), Gemma Reviewer PASS 0 findings both phases, owner-verified.
+`T5d` (local descriptor evidence + aggregate status sync) recomputed at
+**RRI 22 Low** (ledger's provisional estimate was 27 Moderate) and closed
+**Done 2026-08-27** — structural `docker-compose config` render plus the
+16/16-passing `AppConfig::validate()` fail-closed guard suite were accepted
+as dry-run evidence in place of a literal production-environment local
+boot, which is architecturally precluded by ADR-026's own localhost/
+local-fs rejection; full image-boot readiness remains T6's scope against
+real DO infrastructure. **T5 (parent) is now closed** — all four children
+(T5a–T5d) done. `T6` (first deploy) is next, unstarted. Deployment-enablement slice: makes the already-closed pipeline publicly runnable on a Digital Ocean droplet; adds no new technology beyond Redis (already in use). Full history incl. gap findings G10–G13: `docs/audit/roadmap-history.md` § S-230. | `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md`, `docs/audit/s-230-t5b-rri.md` |
 
 `S-040` must be planned before building a first-party browser, operator-console, or
 mobile auth flow; it does not block S-080 or S-090.
