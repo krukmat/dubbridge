@@ -12,8 +12,9 @@ plan: docs/plan/mvp0-p2p-first.md
 > **External taskpack:** `p2p-mvp/taskpacks/P0.zip` through `P7.zip`.
 > **Current task:** P0 is closed. P1 was materially replanned for a maintainable
 > mobile/runtime boundary; revised P1 and ADR-043 were approved on 2026-08-27.
-> P1.F1 is next and still requires its own RRI/card/approval; no P1 child source
-> work is authorized. The external package
+> P1.F1 was separately approved and implemented with automated acceptance PASS
+> on 2026-08-27; owner final verification is pending and no later child is
+> authorized. The external package
 > is untracked input, so its
 > state/handoff files are evidence but not substitutes for this ledger.
 
@@ -22,7 +23,7 @@ plan: docs/plan/mvp0-p2p-first.md
 | ID | Title | Status | Depends on |
 |---|---|---|---|
 | P0 | Bare / Expo / React Native compatibility spike | PASS — Android-only; owner verified 2026-08-27 | — |
-| P1 | Maintainable mobile P2P foundation + replication proof | Parent approved and ADR-043 accepted 2026-08-27; P1.F1 next, no child source execution | P0 PASS |
+| P1 | Maintainable mobile P2P foundation + replication proof | Parent approved; P1.F1 implemented/automated PASS pending owner verification; later children deferred | P0 PASS |
 | P2 | Encrypted P2P publication after S-120 | Pending | P1 PASS; approved ADR |
 | P3 | Invite, claim, and content-key envelope | Pending | P2 PASS; approved key contract |
 | P4 | Mobile package sync and verification | Pending | P3 PASS |

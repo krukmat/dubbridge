@@ -1,0 +1,10 @@
+{
+  "task_id": "P1.F1",
+  "card_hash": "aa91e285585bcf215eaa5b86b33c9049d6b7a01b4ce32dc58de92d99ba722599",
+  "refinement_artifact_sha256": "1c0ef28e705196e0638ae07eea386c7da7559769c45100bb0ee52be1f31b8980",
+  "decision": "CLOUD_REQUIRED",
+  "primary_id": "codex-gpt-5.6-sol",
+  "timestamp": "2026-08-27T14:49:51Z",
+  "rationale": "Muse Glimmer returned a valid packet- and model-bound CLOUD_REQUIRED recommendation because exact bare-pack/bare-rpc versions and APIs plus the deterministic drift-check mechanics require capability validation against the repository and installed ecosystem. The primary may not upgrade that result to local. RRI 54 is also in the 46-55 cloud-only whole-task range. The approved capability/risk branch selects gpt-5.6-sol at high reasoning effort.",
+  "gate_decision_note": "The receipt binds the exact refinement artifact canonical hash and frozen task-packet byte hash. med_high_gate.py must return CLOUD_REQUIRED for this pair."
+}

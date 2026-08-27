@@ -1,0 +1,117 @@
+{
+  "error": null,
+  "finished_at": "2026-08-27T14:49:32.753519Z",
+  "generation": {
+    "created_at": "2026-08-27T14:49:32.474563Z",
+    "done": true,
+    "eval_count": 740,
+    "eval_duration": 184740571000,
+    "load_duration": 27762417,
+    "prompt_eval_count": 1100,
+    "prompt_eval_duration": 15171753000,
+    "think_disabled": true,
+    "thinking_present": false,
+    "thinking_sha256": null,
+    "total_duration": 200427651458
+  },
+  "model": {
+    "expected_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "resolved_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "tag": "muse-glimmer:30b-q4_K_M"
+  },
+  "packet": {
+    "expected_sha256": "aa91e285585bcf215eaa5b86b33c9049d6b7a01b4ce32dc58de92d99ba722599",
+    "path": "docs/audit/mvp0-p2p-p1-f1-adr038-packet.json",
+    "sha256": "aa91e285585bcf215eaa5b86b33c9049d6b7a01b4ce32dc58de92d99ba722599"
+  },
+  "profile": "med-high-refinement-v1",
+  "prompt": {
+    "profile": "med-high-refinement-v1",
+    "sha256": "3bac547291f78317a9c0250664dffcda4ac9bcc8b1f83ba99292213e65b15b19",
+    "version": "med-high-refinement-prompt-v1"
+  },
+  "response": {
+    "raw_text_sha256": "a1ea8ed02641c2e35b089f9e509d624f514d13e3055644d33d98bf941062df3b",
+    "validated": {
+      "acceptance_tests": [
+        "npm run build:bare-worklet produces deterministic bundle with digest",
+        "npm run check:bare-worklet detects drift and unsupported version",
+        "runtime-protocol.test.ts passes in runInBand",
+        "typecheck and lint pass without modifying P0 scaffold",
+        "Handshake returns capabilities and preserves bounded ping and clean shutdown"
+      ],
+      "claims": [
+        {
+          "label": "SUPPORTED",
+          "statement": "Approved scope limits modifications to seven frozen paths"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Acceptance requires deterministic bundle generation and compatible handshake"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Coverage certification and owner verification are required by acceptance"
+        },
+        {
+          "label": "UNKNOWN",
+          "statement": "Implementation can be completed without external writes"
+        }
+      ],
+      "excluded_scope": [
+        "App or provider composition and RootNavigator changes",
+        "Hyperdrive, Corestore, Hyperswarm, discovery, networking",
+        "Commits, pushes, deployment, or external writes",
+        "P0 scaffold deletion and later P1 child work",
+        "Any path outside seven frozen source/test paths"
+      ],
+      "implementation_steps": [
+        "Verify allowed paths exist and are unchanged",
+        "Add bare-pack and bare-rpc to package.json with lockfile update",
+        "Implement deterministic build script with digest output",
+        "Implement versioned protocol with runtime validation and handshake",
+        "Add bounded ping, fatal receipt, suspend/resume, timeout and clean shutdown",
+        "Add typed redacted error handling and drift-check command"
+      ],
+      "refined_scope": [
+        "Add bare-pack and bare-rpc dependencies via mobile/package.json and mobile/package-lock.json",
+        "Implement deterministic worklet build via mobile/scripts/build-bare-worklet.mjs",
+        "Add typed versioned host/worklet protocol in mobile/src/p2p/runtime/protocol.ts",
+        "Add runtime validators and lifecycle handling in mobile/src/p2p/runtime/worklet.ts",
+        "Update worklet bundle output mobile/src/p2p/runtime/worklet.bundle.js",
+        "Maintain test coverage in mobile/__tests__/p2p/runtime-protocol.test.ts"
+      ],
+      "risks": [
+        "Dependency addition may require paths outside frozen set",
+        "Drift-check command may need artifacts beyond allowed paths",
+        "Coverage certification and owner verification may need external evidence",
+        "Implementation may require behavior outside P1.F1 boundary triggering stop condition"
+      ],
+      "route_recommendation": "CLOUD_REQUIRED",
+      "stop_conditions": [
+        "Requirement to edit path outside seven allowed paths",
+        "Need to modify P0 characterization scaffold",
+        "Need to perform commits, pushes, or deployment",
+        "Need to implement Hyperdrive, Corestore, Hyperswarm, or networking"
+      ],
+      "summary": "Evidence is incomplete for deterministic bundle generation and versioned RPC contract within frozen paths. Material unknowns remain on dependency installation and drift-check command scope.",
+      "unknowns": [
+        "Exact bare-pack/bare-rpc versions and API surface",
+        "Current content of allowed files and existing protocol implementation",
+        "Definition of P1.F1 evidence/status artifacts and recording mechanism",
+        "Scope of drift-check command and digest recording"
+      ]
+    }
+  },
+  "runtime": {
+    "num_ctx": 8192,
+    "num_predict": 4096,
+    "ollama_url": "http://127.0.0.1:11434",
+    "temperature": 0.0,
+    "timeout_seconds": 240.0
+  },
+  "schema_version": "adr037-local-architect-artifact-v1",
+  "started_at": "2026-08-27T14:46:11.382505Z",
+  "status": "ok",
+  "success": true
+}

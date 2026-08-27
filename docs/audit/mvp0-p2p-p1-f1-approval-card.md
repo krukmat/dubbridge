@@ -2,7 +2,7 @@
 type: Audit
 title: "MVP0-P2P P1.F1 reproducible worklet bundle and versioned RPC contract"
 task: P1.F1
-status: awaiting_approval
+status: implemented_pending_owner_verification
 date: 2026-08-27
 ---
 
@@ -10,7 +10,7 @@ date: 2026-08-27
 
 ## 1. Decision header
 
-`P1.F1 — Reproducible worklet bundle + versioned RPC contract | awaiting approval | RRI 54 Med-high | Effort L | ADR-038 refinement then cloud implementation`
+`P1.F1 — Reproducible worklet bundle + versioned RPC contract | IMPLEMENTED; awaiting owner verification | RRI 54 → 42 Med-high | Effort L | ADR-038 CLOUD_REQUIRED → gpt-5.6-sol/high`
 
 | Routing | Resolved value |
 |---|---|
@@ -23,6 +23,9 @@ date: 2026-08-27
 | RRI | 54 → Med-high; no penalties; three Reflection passes. |
 | Main drivers | Android/Bare packaging and lifecycle D4, coupled host/worklet boundary K4, absent focused coverage T4, seven-file surface F3. |
 | Full evidence | `docs/audit/mvp0-p2p-p1-f1-rri.md` and `docs/tasks/mvp0-p2p-p1-replication.md` § P1.F1. |
+
+Approval was given by Matias, repository owner, in the current session on
+2026-08-27. It authorizes only the frozen P1.F1 paths and route recorded here.
 
 ## 2. Scope and acceptance
 
@@ -99,4 +102,5 @@ Approving P1.F1 authorizes only its frozen seven-file source/test scope plus F1
 evidence/status updates through the card's ADR-038-selected cloud route. It does
 not authorize P1.F2, Hyperdrive, networking, P0 deletion, or P2.
 
-Execution has not started. Approve this task to proceed.
+Approved 2026-08-27. Execution may proceed only within this card's frozen P1.F1
+boundary; no later P1 child is authorized.

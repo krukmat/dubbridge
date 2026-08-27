@@ -78,3 +78,18 @@ The following is the unmodified Markdown output emitted by `scripts/rri.py`:
 `ANTARES-SKIP`: no task-relevant CWE hypothesis exists on the T3a watchlist.
 F1 changes a local packaging/protocol/lifecycle seam and introduces no auth,
 secret, authorization, SQL, API-handler, or `crates/storage` contract.
+
+## Post-implementation recomputation
+
+After implementation, the highest ESLint-enforced function complexity remains
+`10` and focused coverage provides strong task-specific tests (`92.24%` line
+coverage across `protocol.ts` and `worklet.ts`). Re-running the same frozen
+seven-path command with `T=0` produced:
+
+- C1, F3, D4, T0, A0, K4, P3, X3;
+- base/final RRI `42`, Med-high, Effort L, no penalties, no decomposition.
+
+The implementation therefore remains inside the approved band and route. The
+pre-implementation RRI 54 remains the approval/Reflection authority; the lower
+post-implementation value records that the formerly absent focused coverage now
+exists.

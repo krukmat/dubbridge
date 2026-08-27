@@ -230,6 +230,8 @@ until a concrete product requirement demonstrates it is necessary.
 ## Implementation sequence
 
 1. P1.F1 — reproducible worklet bundle and versioned `bare-rpc` contract.
+   Implemented with automated acceptance PASS on 2026-08-27; owner final
+   verification remains pending before child closure.
 2. P1.F2 — `BareRuntimeClient`, `P2PService`, `P2PProvider`, and
    composition-root ownership while the P0 oracle still guards parity.
 3. P1.F3a — migrate the diagnostic ping to the new boundary, transfer its
@@ -244,6 +246,9 @@ until a concrete product requirement demonstrates it is necessary.
 
 Each child receives a current RRI, approval card, and explicit approval before
 source edits.
+
+Current implementation evidence:
+`docs/audit/mvp0-p2p-p1-f1-implementation.md`.
 
 ## References
 

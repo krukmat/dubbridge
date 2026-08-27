@@ -12,8 +12,9 @@ slice: MVP0-P2P
 > **Status:** P0 is closed with an Android-only compatibility PASS accepted by
 > the repository owner on 2026-08-27. A maintainability review materially
 > replanned P1 on 2026-08-27; the repository owner then approved revised P1 and
-> accepted ADR-043. The earlier P1/P1.A approval route remains superseded, P1.F1
-> is the next separately gated child, and no P1 source work is authorized yet.
+> accepted ADR-043. The earlier P1/P1.A approval route remains superseded. P1.F1
+> was separately approved and implemented with automated acceptance PASS on
+> 2026-08-27; owner final verification is pending and no later child is authorized.
 > iPhone/iOS support is explicitly deferred by the repository owner.
 
 ## Objective

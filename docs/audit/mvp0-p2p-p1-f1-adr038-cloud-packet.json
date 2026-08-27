@@ -1,0 +1,47 @@
+{
+  "schema_version": "adr038-cloud-takeover-packet-v1",
+  "task_id": "P1.F1",
+  "status": "implemented_acceptance_pass_pending_owner_verification",
+  "rri": 54,
+  "selected_implementer": {
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "high",
+    "route": "approved ADR-038 capability-or-risk branch"
+  },
+  "route_reason": "CLOUD_REQUIRED: Muse Glimmer identified unresolved dependency/API and deterministic drift-check mechanics; the primary cannot upgrade the result to local.",
+  "immutable_evidence": {
+    "task_packet": "docs/audit/mvp0-p2p-p1-f1-adr038-packet.json",
+    "task_packet_sha256": "aa91e285585bcf215eaa5b86b33c9049d6b7a01b4ce32dc58de92d99ba722599",
+    "refinement_artifact": "docs/audit/mvp0-p2p-p1-f1-adr038-refinement.json",
+    "refinement_artifact_canonical_sha256": "1c0ef28e705196e0638ae07eea386c7da7559769c45100bb0ee52be1f31b8980",
+    "route_receipt": "docs/audit/mvp0-p2p-p1-f1-adr038-route-receipt.json",
+    "rri": "docs/audit/mvp0-p2p-p1-f1-rri.md",
+    "approval_card": "docs/audit/mvp0-p2p-p1-f1-approval-card.md",
+    "review_exception": "docs/audit/mvp0-p2p-review-exception.md",
+    "ollama_precheck": "docs/audit/mvp0-p2p-p1-f1-ollama-precheck.md"
+  },
+  "scope": {
+    "in": [
+      "The exact seven allowed source/test paths in the immutable task packet",
+      "Deterministic bare-pack build and drift check",
+      "Typed versioned bare-rpc application protocol with handshake, bounded ping, fatal/lifecycle handling, timeout, and clean shutdown",
+      "P1.F1 evidence and governing status synchronization"
+    ],
+    "out": [
+      "P1.F2 or later child implementation, app/provider composition, P0 deletion, Hyperdrive/Corestore/Hyperswarm/networking/storage, product UI/API, backend, HTTP/HLS, and iOS",
+      "Commits, pushes, deployments, and external writes"
+    ]
+  },
+  "acceptance": [
+    "Deterministic build and drift-check commands pass and dependency/bundle digests are recorded",
+    "HP-F1 compatible handshake, capabilities, bounded ping, and clean shutdown pass focused unit tests",
+    "EC-F1 drift, version, payload, timeout, fatal, lifecycle, and pending-work cleanup cases fail typed and redacted",
+    "Typecheck, lint, focused/full Jest, three Reflections, coverage certification, owner verification, and status sync pass"
+  ],
+  "stop_conditions": [
+    "Any required source edit falls outside the seven allowed paths",
+    "P0 scaffold modification or later-child behavior becomes necessary",
+    "A dependency or runtime contract cannot be verified within the approved boundary",
+    "A required verification failure remains unresolved"
+  ]
+}

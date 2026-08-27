@@ -14,15 +14,16 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 > **Status:** The 2026-08-27 maintainability review materially replanned P1.
 > Earlier P1/P1.A approvals are superseded before source execution. The owner
 > approved revised P1 and accepted ADR-043 on 2026-08-27. That decision
-> authorizes child preparation/presentation only; P1.F1 is next and no child
-> source execution is authorized yet.
+> authorizes child preparation/presentation only. P1.F1 was separately approved
+> and implemented with automated acceptance PASS on 2026-08-27; owner final
+> verification is pending and no later child is authorized.
 
 ## Task map
 
 | ID | Title | Status | Depends on |
 |---|---|---|---|
 | P1 | Maintainable mobile P2P foundation + replication proof (planning parent) | APPROVED 2026-08-27 — RRI 94; decomposed; no direct source execution | P0 PASS |
-| P1.F1 | Reproducible worklet bundle + versioned RPC contract | Awaiting approval — RRI 54 Med-high; no source execution | Revised P1 + ADR-043 approval — satisfied 2026-08-27 |
+| P1.F1 | Reproducible worklet bundle + versioned RPC contract | IMPLEMENTED — automated acceptance PASS; awaiting owner verification | Revised P1 + ADR-043 approval — satisfied 2026-08-27 |
 | P1.F2 | Mobile service ownership + composition | Deferred — needs current RRI/card/approval | P1.F1 PASS |
 | P1.F3a | P0 runtime-scaffold migration + retirement | Deferred — needs current RRI/card/approval | P1.F2 PASS |
 | P1.F3b | P0 config/dependency cleanup | Deferred — needs current RRI/card/approval | P1.F3a PASS |
@@ -135,8 +136,8 @@ explicit owner-directed MVP0-P2P exception;
 
 ## P1.F1 — Reproducible worklet bundle and versioned RPC contract
 
-- **Status:** Awaiting explicit current-session approval; no source execution is
-  authorized. Parent/ADR gate satisfied 2026-08-27.
+- **Status:** Implemented with automated acceptance PASS on 2026-08-27; awaiting
+  repository-owner final verification before PASS. Parent/ADR gate satisfied.
 - **Effort / RRI:** L / 54 Med-high. Full report:
   `docs/audit/mvp0-p2p-p1-f1-rri.md`.
 - **Allowed paths:** `mobile/package.json`, `mobile/package-lock.json`,
@@ -160,6 +161,39 @@ explicit owner-directed MVP0-P2P exception;
 - **Handoff prompt:** `P1.F1 — implement only the approved worklet packaging and
   versioned RPC contract; preserve P0 ping and stop before mobile composition or
   Hyperdrive.`
+
+### Code-solution review
+
+Code-solution review: REVIEW-OVERRIDE — explicit owner-directed MVP0-P2P
+exception; `docs/audit/mvp0-p2p-review-exception.md`.
+
+- REVIEW-OVERRIDE: urgency — explicit owner-directed MVP0-P2P exception.
+- Waiver-by: Matias, repository owner
+- Scope-note: skips only P1.F1 phase-2 peer review; tests, coverage, Reflection,
+  scope checks, and owner final verification remain mandatory.
+
+### Implementation evidence
+
+`docs/audit/mvp0-p2p-p1-f1-implementation.md` records the ADR-038 route,
+dependency/bundle digests, exact verification output, and the three complete
+Reflection passes. Automated acceptance is PASS; P1.F2 remains blocked on owner
+verification and P1.F1 PASS.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-F1 | Happy path | deterministic bundle plus compatible handshake/capabilities, bounded ping, lifecycle events, and clean shutdown | `mobile/__tests__/p2p/runtime-protocol.test.ts::HP-F1 builds the committed worklet bundle deterministically`; `mobile/__tests__/p2p/runtime-protocol.test.ts::HP-F1 negotiates capabilities, pings, and shuts down without pending work`; `mobile/__tests__/p2p/runtime-protocol.test.ts::HP-F1 carries requests and lifecycle events through bare-rpc`; `mobile/__tests__/p2p/runtime-protocol.test.ts::HP-F1 worklet replies to handshake/ping/shutdown and emits suspend/resume` | passed |
+| EC-F1 | Edge case | drift, version/payload/capability errors, timeout/channel closure, invalid lifecycle, fatal exceptions/rejections, redaction, and pending cleanup fail closed | `mobile/__tests__/p2p/runtime-protocol.test.ts::EC-F1 rejects unsupported versions and malformed payloads with typed errors`; `mobile/__tests__/p2p/runtime-protocol.test.ts::EC-F1 rejects incomplete capabilities and redacts remote failure details`; `mobile/__tests__/p2p/runtime-protocol.test.ts::EC-F1 times out, closes the channel, and clears pending work`; `mobile/__tests__/p2p/runtime-protocol.test.ts::EC-F1 validates lifecycle events and rejects invalid states`; `mobile/__tests__/p2p/runtime-protocol.test.ts::EC-F1 emits a redacted fatal receipt`; `mobile/__tests__/p2p/runtime-protocol.test.ts::EC-F1 returns typed errors for unsupported worklet requests` | passed |
+
+### Owner final verification
+
+- **Owner:** Matias (repository owner)
+- **Date:** pending
+- **Statement:** Pending owner verification of the implemented P1.F1 evidence;
+  the approval granted before implementation is not reused as closure approval.
+- **Commands run:** pending owner verification; Codex's exact passing commands
+  are recorded in `docs/audit/mvp0-p2p-p1-f1-implementation.md`.
 
 ## P1.F2 — Mobile service ownership and composition
 

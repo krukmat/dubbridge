@@ -46,7 +46,7 @@ operational surfaces from planned ones. Delivery sequence lives in
 | Environment separation + reproducible container runtime wiring | Operational | S-030, ADR-026 |
 | First-party session gateway (transparent JWT relay) | Operational | S-040, ADR-031 |
 | First-party mobile client (React Native + Expo) | Canonical, sole authenticated product surface | S-050/S-105, ADR-029/031 |
-| Mobile P2P runtime boundary | Accepted architecture; implementation pending, no product P2P runtime active | MVP0-P2P P1, ADR-043 |
+| Mobile P2P runtime boundary | P1.F1 packaging/protocol implemented, automated PASS pending owner verification; no product P2P runtime active | MVP0-P2P P1, ADR-043 |
 
 Human review runtime (S-170) and publication runtime (S-180) have no plan/task
 ledger yet.
@@ -90,8 +90,10 @@ ledger yet.
   probe/custom bridge is retained only as a characterization oracle, then
   retired after migrated parity in P1.F3a; P1.F3b separately removes or proves
   each related config/dependency setting. ADR-043 and the revised P1 parent were
-  approved on 2026-08-27; this boundary remains non-operational until its
-  separately approved children are implemented and verified.
+  approved on 2026-08-27. P1.F1 now implements the reproducible bundle and
+  versioned/fail-closed RPC seam with automated acceptance PASS, pending owner
+  verification. Composition, product runtime ownership, storage, replication,
+  and network behavior remain unimplemented, so this boundary is non-operational.
 - `crates/connectors` (primary S-090, ADR-025): per-platform integrations behind a
   `PlatformConnector` trait. For owner-authorized download (content owner grants
   scoped access to their own YouTube/Vimeo account), it resolves ownership/metadata
