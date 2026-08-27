@@ -87,8 +87,9 @@ ledger yet.
   fatal/suspend/resume handling form the runtime seam. P1's two-worklet
   seed/client topology stays isolated in a development-only proof runner and
   uses verifiably deleted cache storage; it is not the product topology. The P0
-  probe/custom bridge is retained only as a characterization oracle, then
-  retired after migrated parity in P1.F3a; P1.F3b separately removes or proves
+  probe/custom bridge is retained as the unchanged oracle while F3a.1's
+  `P2PDevelopmentHarness` carries the replacement bounded lifecycle (owner
+  verification pending), then retired in P1.F3a.2; P1.F3b separately removes or proves
   each related config/dependency setting. ADR-043 and the revised P1 parent were
   approved on 2026-08-27. P1.F1 now implements the reproducible bundle and
   versioned/fail-closed RPC seam and closed PASS after owner verification.

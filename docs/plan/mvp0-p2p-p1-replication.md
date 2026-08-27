@@ -18,7 +18,9 @@ parent_task: P1
 > separately approved, implemented, and closed PASS after owner verification on
 > 2026-08-27 within its frozen packaging/protocol scope. P1.F2 was separately
 > approved, implemented, and closed PASS after owner verification on 2026-08-27.
-> No P2P network activity or later-child source execution has started.
+> P1.F3a.1 is implemented and automated verification has passed; owner final
+> verification remains pending before P1.F3a.2 may be prepared. No P2P network
+> activity or later-child source execution has started.
 
 ## Objective
 
@@ -73,7 +75,7 @@ evidence; it does not publish a DubBridge asset or create a product data plane.
 | `mobile/src/p2p/P2PService.ts` | Framework-independent product-facing runtime facade | React, routes, Hyperdrive proof topology |
 | `mobile/src/p2p/runtime/*` | One product runtime, bundled worklet, versioned RPC, fatal/suspend/resume lifecycle | Product authorization or persistence policy |
 | `mobile/src/p2p/proof/*` | Two-session seed/client proof runner and transient-storage lifecycle | Product service API or normal startup |
-| P0 spike source/config | Characterization oracle until F3a/F3b retire it after parity | Permanent duplicate runtime/protocol/harness |
+| P0 spike source/config | Characterization oracle through F3a.1; F3a.2 retires runtime code after parity and F3b cleans config/dependencies | Permanent duplicate runtime/protocol/harness |
 | `mobile/scripts/build-bare-worklet.mjs` | Deterministic bundle generation/drift verification | Runtime business logic |
 | `mobile/__tests__/p2p/*` | Protocol, lifecycle, composition, storage, replication, and cleanup evidence | End-to-end product playback |
 
@@ -99,34 +101,39 @@ explicit approval before source edits:
    and composition-root ownership; make `RootNavigator` navigation-only and
    run the P0 oracle against the new seam. No P2P network activity or P0 source
    deletion yet.
-   Closed PASS after owner verification on 2026-08-27. P1.F3a remains deferred
-   until its own current RRI, approval card, and explicit approval.
-3. **P1.F3a — P0 runtime-scaffold migration and retirement.** Move the bounded
-   diagnostic ping and characterization cases to the new development harness,
-   then delete `AndroidBareRuntimeProbe`, the custom bridge/protocol, inline
-   worklet, and obsolete test.
-4. **P1.F3b — P0 config/dependency cleanup.** Remove the old probe flag/script;
+   Closed PASS after owner verification on 2026-08-27. P1.F3a.1 remains
+   deferred until its own current RRI, approval card, and explicit approval.
+3. **P1.F3a.1 — P0 characterization migration.** Move the bounded diagnostic
+   ping and every characterization case to the new development harness while
+   retaining the P0 source unchanged as an oracle. Implementation verification
+   passed on 2026-08-27; owner final verification is pending.
+4. **P1.F3a.2 — P0 runtime-scaffold retirement.** After F3a.1 passes, delete
+   `AndroidBareRuntimeProbe`, the custom bridge/protocol, inline worklet, and
+   superseded tests; prove the replacement harness on physical Android.
+5. **P1.F3b — P0 config/dependency cleanup.** Remove the old probe flag/script;
    keep each P0-added direct dependency and Android build setting only when the
    new runtime imports it or an Android A/B proof requires it. Preserve P0 audit
    documents.
-5. **P1.A1 — Hyperdrive/Corestore Android bundle smoke proof.** Add compatible
+6. **P1.A1 — Hyperdrive/Corestore Android bundle smoke proof.** Add compatible
    storage dependencies and prove an empty transient drive can open/close in the
    packaged Android worklet without discovery.
-6. **P1.A2 — Transient seed lifecycle and residue cleanup.** Generate the
+7. **P1.A2 — Transient seed lifecycle and residue cleanup.** Generate the
    synthetic fixture, write/hash it using a run-scoped cache directory, close
    handles, delete/verify absence, and clean abandoned proof directories.
-7. **P1.B1 — Isolated Hyperswarm replication transport.** Use a proof-only
+8. **P1.B1 — Isolated Hyperswarm replication transport.** Use a proof-only
    runtime factory for seed/client sessions; discover and replicate the complete
    fixture without exposing proof commands through `P2PService`.
-8. **P1.B2 — Verification, reconnect, and fail-closed witness.** Verify SHA-256,
+9. **P1.B2 — Verification, reconnect, and fail-closed witness.** Verify SHA-256,
    exercise one bounded reconnect, distinguish runtime/operation state, redact
    evidence, and require complete resource/storage teardown before PASS.
 
-The current F1 score is 54; remaining child scores are planning estimates (F2 55, F3a
-43, F3b 30, A1 40, A2 47, B1 55, B2 55). They demonstrate a plausible ≤55
-split but are not
-authorization; each remaining child is recalculated from its frozen paths immediately before
-presentation. None may start P2 or alter the backend.
+The current F1 score is 54; F2 closed at 55. The former F3a estimate of 43 was
+its base score and did not include the mandatory refactor-and-behavior penalty.
+It was therefore divided, with owner approval, into F3a.1 and F3a.2; each must
+be recalculated from its frozen paths immediately before presentation. The
+remaining planning estimates (F3b 30, A1 40, A2 47, B1 55, B2 55) demonstrate
+a plausible ≤55 split but are not authorization. None may start P2 or alter the
+backend.
 
 ## P0 retirement contract
 
@@ -135,7 +142,7 @@ presentation. None may start P2 or alter the backend.
 | Retain as history | P0 audit report, native proof, closure/handoff evidence | Keep: they are the factual feasibility record. |
 | Retain with direct consumer | `react-native-bare-kit`; Android `minSdkVersion: 31` | Keep while ADR-043's Bare runtime requires them. |
 | Provisional, evidence required | `b4a`, `react-native-b4a`, `@types/b4a`, `useLegacyPackaging`, and their Expo config support | F3b retains each only with an import/consumer or Android A/B proof; otherwise removes it and updates the lockfile. |
-| Retire after parity | `AndroidBareRuntimeProbe`, custom bridge/protocol, inline worklet, probe wiring, and P0 bridge test | F3a first migrates every ping/error characterization to the ADR-043 seam, then deletes the duplicate scaffold. |
+| Retire after parity | `AndroidBareRuntimeProbe`, custom bridge/protocol, inline worklet, probe wiring, and P0 bridge test | F3a.1 first migrates every ping/error characterization to the ADR-043 seam; F3a.2 then deletes the duplicate scaffold. |
 | Disposable local output | ignored `mobile/android` prebuild output | Reproducible and not tracked; it may be removed separately with owner approval, never as proof/history deletion. |
 
 ## Verification strategy

@@ -6,7 +6,7 @@ import {
 } from "react-native-safe-area-context";
 
 import { RootNavigator } from "./src/navigation/RootNavigator";
-import { AndroidBareRuntimeProbe } from "./src/p2p/AndroidBareRuntimeProbe";
+import { P2PDevelopmentHarness } from "./src/p2p/development/P2PDevelopmentHarness";
 import { P2PProvider } from "./src/p2p/P2PProvider";
 import { AuthProvider } from "./src/auth/AuthProvider";
 
@@ -18,7 +18,7 @@ export default function App() {
       <StatusBar style="dark" />
       <AuthProvider>
         <P2PProvider>
-          <AndroidBareRuntimeProbe enabled={bareRuntimeProbeEnabled} />
+          <P2PDevelopmentHarness enabled={bareRuntimeProbeEnabled} />
           <RootNavigator />
         </P2PProvider>
       </AuthProvider>

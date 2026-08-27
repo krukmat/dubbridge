@@ -17,8 +17,10 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 > authorizes child preparation/presentation only. P1.F1 was separately approved,
 > implemented, and closed PASS after owner verification on 2026-08-27. P1.F2
 > was separately approved, implemented, and closed PASS after owner verification
-> on 2026-08-27. P1.F3a is the next gated child and may be prepared/presented;
-> its source execution is not authorized.
+> on 2026-08-27. The owner approved the required decomposition of the former
+> executable P1.F3a on 2026-08-27: P1.F3a.1 (parity migration) is now the next
+> gated child; P1.F3a.2 (retirement) follows only after it passes. Neither
+> child has source-execution authorization.
 
 ## Task map
 
@@ -27,8 +29,10 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 | P1 | Maintainable mobile P2P foundation + replication proof (planning parent) | APPROVED 2026-08-27 — RRI 94; decomposed; no direct source execution | P0 PASS |
 | P1.F1 | Reproducible worklet bundle + versioned RPC contract | PASS — owner verified 2026-08-27 | Revised P1 + ADR-043 approval — satisfied 2026-08-27 |
 | P1.F2 | Mobile service ownership + composition | PASS — owner verified 2026-08-27 | P1.F1 PASS — satisfied 2026-08-27 |
-| P1.F3a | P0 runtime-scaffold migration + retirement | Deferred — needs current RRI/card/approval | P1.F2 PASS |
-| P1.F3b | P0 config/dependency cleanup | Deferred — needs current RRI/card/approval | P1.F3a PASS |
+| P1.F3a | P0 runtime-scaffold migration + retirement (planning parent) | Decomposed — no direct source execution | P1.F2 PASS |
+| P1.F3a.1 | P0 characterization migration | Implementation verified — owner final verification pending | P1.F2 PASS |
+| P1.F3a.2 | P0 runtime-scaffold retirement | Deferred — needs current RRI/card/approval | P1.F3a.1 PASS |
+| P1.F3b | P0 config/dependency cleanup | Deferred — needs current RRI/card/approval | P1.F3a.2 PASS |
 | P1.A1 | Hyperdrive/Corestore Android bundle smoke proof | Deferred — needs current RRI/card/approval | P1.F3b PASS |
 | P1.A2 | Transient seed lifecycle + residue cleanup | Deferred — needs current RRI/card/approval | P1.A1 PASS |
 | P1.B1 | Isolated Hyperswarm replication transport | Deferred — needs current RRI/card/approval | P1.A2 PASS |
@@ -43,8 +47,8 @@ at `docs/audit/mvp0-p2p-p1a-approval-card.md` and
 
 - **Status:** Revised planning parent approved 2026-08-27 with ADR-043 accepted.
   The previous approval remains superseded by the material architecture/scope
-  change. P1.F1 and P1.F2 are closed PASS; P1.F3a is next but no later-child
-  source work is authorized.
+  change. P1.F1 and P1.F2 are closed PASS; P1.F3a is a planning parent and
+  P1.F3a.1 is next, but no later-child source work is authorized.
 - **Type:** Very-high development/architecture parent; decomposed before
   implementation.
 - **Complexity / Effort / RRI:** Very high / XL / 94. Full report:
@@ -130,11 +134,11 @@ explicit owner-directed MVP0-P2P exception;
 
 1. Revised parent approval accepted ADR-043 and this decomposition on
    2026-08-27; it authorizes child preparation only.
-2. Score, present, approve, implement, and close P1.F1 → P1.F2 → P1.F3a →
-   P1.F3b → P1.A1 → P1.A2 → P1.B1 → P1.B2 in order. Do not edit source for a
-   child before its own approval and do not start the next child before
-   PASS/status sync.
-3. Close P1 only after all eight children, five parent Reflection passes, coverage
+2. Score, present, approve, implement, and close P1.F1 → P1.F2 → P1.F3a.1 →
+   P1.F3a.2 → P1.F3b → P1.A1 → P1.A2 → P1.B1 → P1.B2 in order. Do not edit
+   source for a child before its own approval and do not start the next child
+   before PASS/status sync.
+3. Close P1 only after all nine executable children, five parent Reflection passes, coverage
    certification, owner final verification, and status synchronization pass.
 
 ## P1.F1 — Reproducible worklet bundle and versioned RPC contract
@@ -280,39 +284,98 @@ lines).
 ### Owner final verification
 
 The repository owner confirmed final verification on 2026-08-27. P1.F2 is
-closed PASS. Do not begin P1.F3a until its current RRI, approval card, and
+closed PASS. Do not begin P1.F3a.1 until its current RRI, approval card, and
 explicit approval are recorded.
 
-## P1.F3a — P0 runtime-scaffold migration and retirement
+## P1.F3a — P0 runtime-scaffold migration and retirement (planning parent)
 
-- **Status:** Deferred until P1.F2 PASS; requires current RRI/card/approval.
-- **Effort / prospective RRI:** L / 43 Med-high. Recompute at presentation.
-- **Allowed paths:** `mobile/App.tsx`, the four existing P0 files under
-  `mobile/src/p2p/`, `mobile/src/p2p/development/P2PDevelopmentHarness.tsx`,
+- **Status:** Decomposed by owner approval on 2026-08-27. The prior prospective
+  RRI 43 was the base score; the mandatory `refactor_and_behavior` penalty
+  makes the combined scope RRI 51 and requires this split. P1.F3a itself
+  authorizes no source work.
+- **Objective:** preserve the P0 characterization contract in a replacement
+  harness before separately retiring the obsolete runtime scaffold.
+- **Dependency:** P1.F2 PASS — satisfied. P1.F3a.1 must PASS before P1.F3a.2
+  can be presented.
+
+### P1.F3a.1 — P0 characterization migration
+
+- **Status:** Implementation verified on 2026-08-27; owner final verification
+  is pending. The RRI/card and in-session owner approval are recorded in the
+  F3a.1 audit artifacts.
+- **Allowed paths:** `mobile/App.tsx`,
+  `mobile/src/p2p/development/P2PDevelopmentHarness.tsx`,
+  `mobile/__tests__/p2p/p2p-development-harness.test.ts`, and F3a.1 evidence only. The
+  P0 probe, bridge, protocol, inline worklet, and their existing tests remain
+  unchanged as the parity oracle.
+- **Objective:** make the development-only harness exercise the ADR-043
+  `BareRuntimeClient` path and transfer every P0 characterization case without
+  retiring any P0 source.
+- **HP-F3a.1:** the new harness, when explicitly enabled, completes bounded
+  `initialize → ping → shutdown` through the existing service/runtime seam;
+  the P0 oracle still passes unchanged.
+- **EC-F3a.1:** malformed/remote replies, startup release, and late/closed
+  operations are asserted as the replacement protocol's typed, redacted
+  failure classes; an unmapped P0 case or a duplicate active owner fails the
+  task.
+- **Acceptance:** record a P0-to-ADR-043 behavioral map before retirement;
+  keep all P0 files byte-for-byte unchanged; only the new harness is wired in
+  `App.tsx`; no network or product API is added; focused migration tests,
+  typecheck, lint, and full Jest pass.
+- **Evidence to emit:** current RRI/card/route receipt, characterization map,
+  unchanged-P0 inventory, focused-test output, and checks.
+- **Status artifacts affected:** this ledger, P1 plan, ADR-043 implementation
+  references, and F3a.1 audit artifacts.
+- **Handoff prompt:** `P1.F3a.1 — move every P0 behavior into the ADR-043
+  development harness while leaving the P0 scaffold untouched as an oracle;
+  stop before any deletion or config cleanup.`
+
+#### Review and verification
+
+Task-analysis review: REVIEW-OVERRIDE
+`docs/audit/mvp0-p2p-review-exception.md` — explicit owner-directed MVP0-P2P
+exception; the unavailable local chain is recorded in
+`docs/audit/mvp0-p2p-p1-f3a1-phase1-review.md`.
+
+Code-solution review: REVIEW-OVERRIDE
+`docs/audit/mvp0-p2p-review-exception.md` — tests, coverage, scope checks, and
+owner final verification remain mandatory.
+
+`docs/audit/mvp0-p2p-p1-f3a1-implementation.md` records all three Reflection
+passes, the P0 behavioral map/inventory, 100% direct harness line coverage,
+and passing focused/typecheck/lint/full-Jest verification. Owner final
+verification is pending; do not begin P1.F3a.2.
+
+### P1.F3a.2 — P0 runtime-scaffold retirement
+
+- **Status:** Deferred until P1.F3a.1 PASS; requires a current RRI, Compact
+  Approval Task Card v2, phase-1 review, and explicit approval.
+- **Allowed paths:** the four retired P0 source files under `mobile/src/p2p/`,
   `mobile/__tests__/p2p/bare-bridge.test.ts`,
-  `mobile/__tests__/p2p/p0-migration.test.ts`, and F3a evidence.
-- **Objective:** transfer the P0 ping/error characterization to the ADR-043
-  runtime and delete the obsolete probe, custom RPC bridge/protocol, inline
-  worklet, and superseded test implementation.
-- **HP-F3a:** the new development harness proves the same bounded
-  `initialize → ping → shutdown` behavior through `BareRuntimeClient` after all
-  old runtime source is gone.
-- **EC-F3a:** a parity mismatch, missing migrated failure case, stale import, or
-  duplicate runtime owner blocks deletion/closure and leaves P0 files intact.
-- **Acceptance:** tests move before deletion; no tracked import references the
-  retired files; exactly one diagnostic/runtime path remains; typecheck, lint,
-  Jest, and Android ping pass after deletion. P0 audit documents are untouched.
+  `mobile/__tests__/p2p/p2p-provider.test.tsx`, and F3a.2 evidence only.
+- **Objective:** delete the obsolete probe, custom bridge/protocol, inline
+  worklet, and superseded tests after the independent migration evidence is
+  PASS.
+- **HP-F3a.2:** the retained development harness proves the same bounded
+  lifecycle after every P0 runtime source file has gone.
+- **EC-F3a.2:** a stale import, duplicate runtime owner, missing migration
+  evidence, or failed Android ping blocks deletion/closure.
+- **Acceptance:** remove every tracked source/test import of retired symbols;
+  leave P0 audit history untouched; retain exactly one diagnostic/runtime path;
+  typecheck, lint, focused/full Jest, and a new physical Android ping proof
+  pass after deletion. `bareRuntimeProbe` configuration/script cleanup remains
+  exclusively P1.F3b.
 - **Evidence to emit:** current RRI/card/route receipt, before/after reference
-  inventory, migrated HP/EC map, deletion manifest, checks and Android proof.
-- **Status artifacts affected:** this ledger, P1 plan/card, ADR-043 implementation
-  references, and child audit artifacts.
-- **Handoff prompt:** `P1.F3a — transfer every P0 characterization case to the
-  ADR-043 runtime, then retire only the obsolete tracked runtime scaffold; keep
-  audit history and stop if parity is incomplete.`
+  inventory, F3a.1 parity map, deletion manifest, checks, and Android proof.
+- **Status artifacts affected:** this ledger, P1 plan, ADR-043 implementation
+  references, and F3a.2 audit artifacts.
+- **Handoff prompt:** `P1.F3a.2 — after P1.F3a.1 PASS, retire only the tracked
+  P0 runtime scaffold and superseded tests; preserve audit history and stop if
+  any import, parity condition, or Android proof is incomplete.`
 
 ## P1.F3b — P0 config/dependency cleanup
 
-- **Status:** Deferred until P1.F3a PASS; requires current RRI/card/approval.
+- **Status:** Deferred until P1.F3a.2 PASS; requires current RRI/card/approval.
 - **Effort / prospective RRI:** M / 30 Moderate. Recompute at presentation.
 - **Allowed paths:** `mobile/package.json`, `mobile/package-lock.json`,
   `mobile/app.config.ts`, and F3b evidence only.
@@ -451,8 +514,8 @@ HP/EC and parent HP-1/HP-2/HP-3/EC-1/EC-2 maps to passing unit tests.
 
 ## Owner final verification
 
-**Pending completion of P1.F1, P1.F2, P1.F3a, P1.F3b, P1.A1, P1.A2, P1.B1,
-and P1.B2.**
+**Pending completion of P1.F1, P1.F2, P1.F3a.1, P1.F3a.2, P1.F3b, P1.A1,
+P1.A2, P1.B1, and P1.B2.**
 
 ## Handoff prompt
 

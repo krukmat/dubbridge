@@ -109,7 +109,9 @@ It is not exposed through the product `P2PService` API and is never enabled by
 default.
 
 The P0 probe is retained only as a characterization oracle until the new runtime
-and service reproduce `initialize → ping → shutdown`. It is then retired in
+and service reproduce `initialize → ping → shutdown`. P1.F3a.1 implements this
+replacement in `P2PDevelopmentHarness` with automated verification pending
+owner final verification. It is then retired in
 explicit cleanup children: the probe, custom bridge/protocol, inline worklet,
 obsolete tests, flag, and script are deleted or replaced. Historical audit
 evidence remains. Dependencies and Android build settings survive only with a
@@ -233,23 +235,29 @@ until a concrete product requirement demonstrates it is necessary.
    Closed PASS after repository-owner verification on 2026-08-27.
 2. P1.F2 — `BareRuntimeClient`, `P2PService`, `P2PProvider`, and
    composition-root ownership while the P0 oracle still guards parity.
-3. P1.F3a — migrate the diagnostic ping to the new boundary, transfer its
-   characterization cases, and delete the P0 probe/custom RPC/inline worklet.
-4. P1.F3b — remove obsolete P0 config/script entries and audit every P0-added
+3. P1.F3a.1 — migrated the diagnostic ping to the new boundary and transferred
+   characterization cases while retaining the P0 scaffold as an oracle.
+   Automated verification passed on 2026-08-27; owner final verification is
+   pending before retirement.
+4. P1.F3a.2 — after parity passes, delete the P0 probe/custom RPC/inline
+   worklet and prove the retained development harness on Android.
+5. P1.F3b — remove obsolete P0 config/script entries and audit every P0-added
    direct dependency/build setting against a live consumer or native A/B proof.
-5. P1.A1 — Corestore/Hyperdrive dependency and bundle smoke proof.
-6. P1.A2 — run-scoped transient seed storage, cleanup, and janitor proof.
-7. P1.B1 — isolated Hyperswarm discovery/replication transport.
-8. P1.B2 — SHA-256 verification, bounded reconnect, fail-closed evidence, and
+6. P1.A1 — Corestore/Hyperdrive dependency and bundle smoke proof.
+7. P1.A2 — run-scoped transient seed storage, cleanup, and janitor proof.
+8. P1.B1 — isolated Hyperswarm discovery/replication transport.
+9. P1.B2 — SHA-256 verification, bounded reconnect, fail-closed evidence, and
    complete teardown.
 
 Each child receives a current RRI, approval card, and explicit approval before
 source edits.
 
 Current implementation evidence:
-`docs/audit/mvp0-p2p-p1-f1-implementation.md` and
+`docs/audit/mvp0-p2p-p1-f1-implementation.md`,
 `docs/audit/mvp0-p2p-p1-f2-implementation.md` (F2 closed PASS after owner
-verification on 2026-08-27).
+verification on 2026-08-27), and
+`docs/audit/mvp0-p2p-p1-f3a1-implementation.md` (F3a.1 owner verification
+pending).
 
 ## References
 
