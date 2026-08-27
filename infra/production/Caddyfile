@@ -1,0 +1,14 @@
+# PRODUCTION TLS REVERSE PROXY (S-230-T5c)
+# Hostname frozen by S-230-T5a: poc.iotforce.es (DNS-verified). Caddy
+# provisions and renews TLS automatically for this domain and proxies all
+# traffic to the gateway relay (ADR-031) — the sole public entry point;
+# api and worker-runner are never directly reachable from outside the
+# Compose network.
+
+poc.iotforce.es {
+	request_body {
+		max_size 100MiB
+	}
+
+	reverse_proxy gateway:8081
+}

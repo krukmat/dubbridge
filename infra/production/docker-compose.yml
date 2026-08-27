@@ -1,0 +1,95 @@
+# PRODUCTION DEPLOYMENT DESCRIPTOR (S-230-T5c)
+# DigitalOcean POC v1. PostgreSQL and object storage are external DO managed
+# services (Spaces) — never containers here. This file is the production
+# counterpart to infra/local/docker-compose.yml, which is local
+# infrastructure only and must never be used as a deployment descriptor
+# (ADR-026). Every secret is injected via `.env` (see .env.example); no
+# secret value is ever hardcoded here.
+#
+# S-230-T5a froze: Caddy as the TLS reverse proxy, DO region ams3, Spaces
+# bucket dubbridge-poc-v1, hostname poc.iotforce.es, on-droplet Redis
+# (no managed Redis for the POC), one-shot migration via apps/cli/Dockerfile.
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      gateway:
+        condition: service_started
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  migration:
+    build:
+      context: ../..
+      dockerfile: apps/cli/Dockerfile
+    env_file:
+      - ../../.env
+    environment:
+      DUBBRIDGE_ENV: production
+
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    environment:
+      DUBBRIDGE_ENV: production
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  gateway:
+    build:
+      context: ../..
+      dockerfile: apps/gateway/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    environment:
+      DUBBRIDGE_ENV: production
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+      api:
+        condition: service_started
+
+  worker-runner:
+    build:
+      context: ../..
+      dockerfile: apps/worker-runner/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    environment:
+      DUBBRIDGE_ENV: production
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+volumes:
+  redis-data:
+  caddy-data:
+  caddy-config:
