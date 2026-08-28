@@ -1,5 +1,5 @@
 import b4a from "b4a";
-import RPC = require("bare-rpc");
+import RPC from "bare-rpc";
 
 export const RUNTIME_PROTOCOL_VERSION = 1 as const;
 export const RUNTIME_CAPABILITIES = [

@@ -38,8 +38,12 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 | P1.F3a.1 | P0 characterization migration | PASS — owner verified 2026-08-27 | P1.F2 PASS |
 | P1.F3a.2 | P0 runtime-scaffold retirement | PASS — Done 2026-08-27 | P1.F3a.1 PASS — satisfied 2026-08-27 |
 | P1.F3b | P0 config/dependency cleanup | Implemented + audited 2026-08-27 — blocked on Android device proof (X28) | P1.F3a.2 PASS — satisfied 2026-08-27 |
-| P1.A1 | Hyperdrive/Corestore Android bundle smoke proof | Deferred — needs current RRI/card/approval | P1.F3b PASS |
-| P1.A2 | Transient seed lifecycle + residue cleanup | Deferred — needs current RRI/card/approval | P1.A1 PASS |
+| P1.A1 | Hyperdrive/Corestore Android bundle smoke proof (planning parent) | Decomposed 2026-08-28 — no direct source execution | P1.F3b PASS |
+| P1.A1a | Add Corestore/Hyperdrive deps + bundle check | PASS — Done 2026-08-28 | P1.F3b PASS |
+| P1.A1b | Transient drive open/close logic (HP-A1) | Ready — needs its own approval/delegation | P1.A1a PASS — satisfied 2026-08-28 |
+| P1.A1c | Typed error handling (EC-A1) | Blocked | P1.A1b PASS |
+| P1.A1d | Tests + evidence + closure | Blocked | P1.A1c PASS |
+| P1.A2 | Transient seed lifecycle + residue cleanup | Deferred — needs current RRI/card/approval | P1.A1d PASS |
 | P1.B1 | Isolated Hyperswarm replication transport | Deferred — needs current RRI/card/approval | P1.A2 PASS |
 | P1.B2 | Verification, reconnect + fail-closed witness | Deferred — needs current RRI/card/approval | P1.B1 PASS |
 
@@ -140,10 +144,13 @@ explicit owner-directed MVP0-P2P exception;
 1. Revised parent approval accepted ADR-043 and this decomposition on
    2026-08-27; it authorizes child preparation only.
 2. Score, present, approve, implement, and close P1.F1 → P1.F2 → P1.F3a.1 →
-   P1.F3a.2 → P1.F3b → P1.A1 → P1.A2 → P1.B1 → P1.B2 in order. Do not edit
-   source for a child before its own approval and do not start the next child
-   before PASS/status sync.
-3. Close P1 only after all nine executable children, five parent Reflection passes, coverage
+   P1.F3a.2 → P1.F3b → (P1.A1a → P1.A1b → P1.A1c → P1.A1d) → P1.A2 → P1.B1 →
+   P1.B2 in order. P1.A1 was decomposed 2026-08-28 into four Low-band
+   children at the owner's request; do not edit source for a child before its
+   own approval/delegation and do not start the next child before PASS/status
+   sync.
+3. Close P1 only after all executable children (including all four P1.A1
+   children), five parent Reflection passes, coverage
    certification, owner final verification, and status synchronization pass.
 
 ## P1.F1 — Reproducible worklet bundle and versioned RPC contract
@@ -445,28 +452,145 @@ and passing focused/typecheck/lint/full-Jest verification.
   unjustified direct dependency/build flag; retain only evidence-backed native
   foundations and do not touch audit history.`
 
-## P1.A1 — Hyperdrive/Corestore Android bundle smoke proof
+### P1.F3b-fix-1 — `protocol.ts` import-syntax fix
 
-- **Status:** Deferred until P1.F3b PASS; requires current RRI/card/approval.
-- **Effort / prospective RRI:** M / 40 Moderate. Recompute at presentation.
-- **Allowed paths:** `mobile/package.json`, `mobile/package-lock.json`, the
-  packaged runtime worklet, `mobile/__tests__/p2p/hyperdrive-smoke.test.ts`, and
-  A1 evidence.
-- **Objective:** prove compatible Corestore/Hyperdrive dependencies can bundle,
-  open an empty transient drive on Android, close it, and perform no discovery.
-- **HP-A1:** a validated temporary path opens Corestore/Hyperdrive and returns a
-  redacted capability receipt before clean close.
+- **Status:** `[x] Done 2026-08-28.` Emulator access (`fenix_t7`, Android 34)
+  became available and exposed a real Metro-bundling blocker:
+  `mobile/src/p2p/runtime/protocol.ts:2` used TypeScript import-equals syntax
+  (`import RPC = require("bare-rpc");`), which Metro/Babel cannot transform.
+  Changed to `import RPC from "bare-rpc";` — safe because `esModuleInterop` is
+  active and `bare-rpc` ends `export = RPC`. The committed
+  `worklet.bundle.js` drifted (it embeds a transpiled copy of `protocol.ts`)
+  and was regenerated. Owner directed direct execution without a card.
+- **Effort / RRI:** `S / 17 Low` — single-line import-syntax change plus a
+  regenerated build artifact. Below the RRI 26 approval gate and below the
+  RRI 26 Reflection-log threshold.
+- **Allowed paths:** `mobile/src/p2p/runtime/protocol.ts`,
+  `mobile/src/p2p/runtime/worklet.bundle.js`.
+- **HP-fix-1:** the fixed import compiles and the RPC contract still
+  handshakes, pings, and shuts down cleanly; the regenerated bundle matches a
+  deterministic rebuild.
+- **EC-fix-1:** the changed import yields a usable `RPC` value at runtime, not
+  an interop-broken namespace object; typed errors still raised on malformed
+  payloads.
+- **Verification:** `npm run typecheck` clean; `npx jest __tests__/p2p/`
+  27/27 passed; `npm run check:bare-worklet` no drift
+  (`sha256=3e199894…9654`); Metro rebuild bundles with no `SyntaxError`.
+- **Not closed by this fix:** the on-device `initialize → ping → shutdown`
+  run still fails, root-caused to a confirmed upstream `bare-module@6.3.2`
+  bundle-evaluation-order defect (fixed upstream in `6.4.0`; no
+  `react-native-bare-kit` release has picked it up). A minimal,
+  dependency-free bundle reproduces the identical crash, ruling out this
+  repository's source as the cause. The self-built `libbare-kit.so`
+  workaround was evaluated and rejected by the owner on 2026-08-28. Both
+  remain tracked in roadmap **X28**, not here.
+- **Closure evidence:** `docs/audit/mvp0-p2p-p1-f3b-implementation.md`
+  §§ 9, 10 (review override, unit coverage certification, owner final
+  verification).
+
+## P1.A1 — Hyperdrive/Corestore Android bundle smoke proof (planning parent)
+
+- **Status:** Decomposed 2026-08-28 into Low-band (RRI 0-25) children below, at
+  the owner's explicit request. No direct source execution under this parent
+  ID — see `P1.A1a`-`P1.A1d`.
+- **Objective (unchanged, inherited by children):** prove compatible
+  Corestore/Hyperdrive dependencies can bundle, open an empty transient drive
+  on Android, close it, and perform no discovery — a bundling/dependency
+  smoke proof, not a runtime execution proof (device runtime remains blocked
+  by the unrelated upstream `bare-module@6.3.2` defect, tracked as X28).
+- **Task-analysis review (parent-level, before decomposition):** gemma
+  (`gemma4:26b-a4b-it-qat`, 3/3 passes) - PASS. Findings (2 consensus minor,
+  0 blocking), incorporated into every child's acceptance criteria below:
+  1. "redacted capability receipt" was ambiguous — bounded to `capability` +
+     `schema_version` fields only (P1.A1b).
+  2. Risk of conflating the X28 transport defect with a bundling test
+     failure — any failure attributable to X28 must be classified
+     `Environment/Blocked`, not a test failure (P1.A1c).
+  3. (likely-false-positive, adopted anyway as good practice) "invalid path"
+     EC case must run through a local-only/stubbed filesystem driver, never
+     triggering network/Hyperswarm code (P1.A1c).
+  4. (likely-false-positive) receipt schema ambiguity for automated
+     assertions — same fix as #1.
+- **Sequencing:** P1.A1a -> P1.A1b -> P1.A1c -> P1.A1d, in order. P1.A2
+  depends on P1.A1d PASS (all four children PASS), not on this parent ID
+  directly.
+
+### P1.A1a — Add Corestore/Hyperdrive dependencies + bundle check
+
+- **Status:** PASS — Done 2026-08-28. Full evidence:
+  `docs/audit/mvp0-p2p-p1-a1-implementation.md` § P1.A1a.
+- **Effort / RRI:** S / 14 Low.
+- **Allowed paths:** `mobile/package.json`, `mobile/package-lock.json`.
+- **Objective:** pin compatible Corestore/Hyperdrive dependency versions; no
+  new logic. `npm run check:bare-worklet` and `npm run typecheck` must stay
+  clean after the dependency add.
+- **HP-A1a:** dependency versions resolve, install cleanly, and the existing
+  worklet bundle check reports no drift.
+- **EC-A1a:** an incompatible/unresolvable version pin fails `npm install`
+  loudly (no silent partial lockfile state).
+- **Evidence to emit:** exact resolved versions, `npm run check:bare-worklet`
+  output, `npm run typecheck` output.
+- **Handoff prompt:** `P1.A1a — add only Corestore/Hyperdrive to
+  mobile/package.json + package-lock.json; no new source logic; confirm
+  check:bare-worklet and typecheck stay clean.`
+
+### P1.A1b — Transient drive open/close logic (HP-A1)
+
+- **Status:** Unblocked — P1.A1a PASS satisfied 2026-08-28. Needs its own
+  RRI/approval before source execution.
+- **Effort / RRI:** S / 25 Low.
+- **Allowed paths:** the packaged runtime worklet (`mobile/src/p2p/runtime/**`).
+- **Objective:** open an empty transient Hyperdrive/Corestore drive strictly
+  below the proof cache root, return a capability receipt, close
+  deterministically.
+- **HP-A1:** a validated temporary path opens Corestore/Hyperdrive and
+  returns a capability receipt bounded to exactly `capability` (non-null) and
+  `schema_version` fields — no other fields, to keep the assertion
+  deterministic (Gemma finding #1/#4) — before clean close.
+- **Acceptance:** drive opens only below the proof cache root; closes
+  deterministically; creates no Hyperswarm/discovery/product persistence.
+- **Evidence to emit:** HP-A1 proof log, exact bundle/version record.
+- **Handoff prompt:** `P1.A1b — implement open/close for a transient
+  Hyperdrive/Corestore drive below the proof cache root; return only
+  {capability, schema_version} on success; no network/Hyperswarm code.`
+
+### P1.A1c — Typed error handling (EC-A1)
+
+- **Status:** Blocked on P1.A1b PASS.
+- **Effort / RRI:** S / 23 Low.
+- **Allowed paths:** the packaged runtime worklet (`mobile/src/p2p/runtime/**`).
+- **Objective:** typed, fail-closed error handling for dependency load,
+  bundle, invalid-path, open, and close failures.
 - **EC-A1:** dependency load, bundle, invalid path, open, or close failure is
-  typed and cannot report drive readiness.
-- **Acceptance:** exact versions and bundle result are recorded; the drive opens
-  only below the proof cache root, closes deterministically, and creates no
-  Hyperswarm/discovery/product persistence.
-- **Evidence to emit:** current RRI/card, dependency/bundle proof, HP-A1/EC-A1
-  tests, Android smoke log, checks, Reflection/coverage/owner proof.
-- **Status artifacts affected:** this ledger, P1 plan/card, and child audit
-  artifacts.
-- **Handoff prompt:** `P1.A1 — add only the compatible Hyperdrive/Corestore
-  Android smoke boundary; no fixture write, Hyperswarm, or product cache.`
+  typed and cannot report drive readiness. The invalid-path case is exercised
+  through a local-only/stubbed filesystem driver — verified to trigger no
+  network/Hyperswarm code path (Gemma finding #3). Any failure attributable
+  to the X28 upstream transport/worklet execution defect is classified
+  `Environment/Blocked`, not a test failure (Gemma finding #2).
+- **Evidence to emit:** EC-A1 proof log covering each typed failure mode.
+- **Handoff prompt:** `P1.A1c — add typed fail-closed error handling for
+  Hyperdrive/Corestore load/bundle/open/close failures; invalid-path case via
+  a local-only stub driver only; classify X28-attributable failures as
+  Environment/Blocked, never a test failure.`
+
+### P1.A1d — Tests + evidence + closure
+
+- **Status:** Blocked on P1.A1c PASS.
+- **Effort / RRI:** S / 10 Low.
+- **Allowed paths:** `mobile/__tests__/p2p/hyperdrive-smoke.test.ts` (new),
+  `docs/audit/mvp0-p2p-p1-a1-implementation.md` (new).
+- **Objective:** certify HP-A1/EC-A1 with Jest coverage and close the P1.A1
+  chain.
+- **Acceptance:** `hyperdrive-smoke.test.ts` exercises HP-A1 and every EC-A1
+  typed-failure branch; unit coverage certification maps each to a passing
+  test; owner final verification recorded.
+- **Evidence to emit:** test run output, unit coverage certification table,
+  owner final verification block.
+- **Status artifacts affected:** this ledger (mark P1.A1a-d PASS/Done, parent
+  P1.A1 Done), `docs/plan/mvp0-p2p-p1-replication.md`, roadmap MVP0-P2P row.
+- **Handoff prompt:** `P1.A1d — add hyperdrive-smoke.test.ts covering HP-A1
+  and every EC-A1 branch; write the P1.A1 evidence doc; certify coverage and
+  record owner verification.`
 
 ## P1.A2 — Transient seed lifecycle and residue cleanup
 
