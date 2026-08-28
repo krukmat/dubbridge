@@ -17,6 +17,14 @@ slice: MVP0-P2P
 > on 2026-08-27. P1.F2 may now be prepared/presented but its source execution is
 > not authorized.
 > iPhone/iOS support is explicitly deferred by the repository owner.
+> **Planning gap:** `P2`–`P7` have no plan file yet — see
+> `docs/plan/roadmap.md` § Known planning gaps for the tracked gap. Their
+> design inputs are transcribed in `docs/plan/mvp0-p2p-design-inputs.md` and
+> their scope/HP/EC summaries in `docs/tasks/mvp0-p2p-first.md` § Deferred
+> task acceptance summaries, so they can be analyzed without the external
+> package; the audience-delivery ADR required by design decision 9 below is
+> drafted as `docs/adr/ADR-044-p2p-audience-delivery-boundary.md`
+> (**Proposed** — `P2` stays unpresentable until it is accepted).
 
 ## Objective
 
@@ -70,7 +78,8 @@ package → loopback HLS → the existing `VideoPlayer`.
 9. ADR-032 remains authoritative for present review playback. Before P2P invite
    delivery can be implemented, an ADR must define the new audience boundary:
    backend authorization and audit stay authoritative while P2P transports only
-   ciphertext.
+   ciphertext. Drafted as ADR-044 (`Proposed`); its § Open questions 1–3 must
+   be resolved and the ADR accepted before `P2` may be presented.
 10. P2P publication is ciphertext-only. Raw invitation tokens, plaintext content
    keys, JWT signing material, and device private keys must never be persisted or
    logged. Key/envelope design is a prerequisite for P3, not an assumption.
@@ -136,13 +145,19 @@ sessions close and their run-scoped cache paths are verified absent.
 
 - `docs/tasks/mvp0-p2p-first.md`
 - this plan
+- `docs/plan/mvp0-p2p-design-inputs.md` — transcribed P2–P7 design inputs
 - `docs/plan/roadmap.md` — synchronized with P1's architecture reapproval gate
-- `docs/architecture.md`, `docs/adr/README.md`, and accepted ADR-043
+- `docs/architecture.md`, `docs/adr/README.md`, accepted ADR-043, and
+  proposed ADR-044
 - `p2p-mvp/RUN_STATE.json` and the P0 handoff required by the external package
 
 ## Deferred decisions
 
-- P2P audience-delivery ADR and ADR-032 relationship.
+Every item below is now carried as a numbered open question in ADR-044
+(`Proposed`), with the phase each one blocks; this list stays here as the
+plan-level index.
+
+- P2P audience-delivery ADR and ADR-032 relationship — ADR-044 open question 1.
 - Persistent product cache, device identity, sign-out wipe, and background
   execution requirements beyond P1's transient foreground proof.
 - Publication/outbox schema and recovery semantics.
