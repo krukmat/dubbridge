@@ -148,8 +148,9 @@ on `T5c`. Deployment-enablement slice: makes the already-closed pipeline publicl
 
 > **MVP0-P2P update (2026-08-30):** `P1.A1b.0` (RRI 10 Low,
 > documentation/contract only) closed PASS, freezing the host-to-Bare
-> storage/RPC boundary. `P1.A1b` is next for a fresh phase-1 review and approval
-> at RRI 50 Med-high; it has not started source execution.
+> storage/RPC boundary. `P1.A1b` closed PASS at RRI 50 Med-high with focused
+> checks passing and an explicit owner waiver for its residual no-action
+> phase-2 finding; see its forced-closure record.
 
 `S-040` must be planned before building a first-party browser, operator-console, or
 mobile auth flow; it does not block S-080 or S-090.

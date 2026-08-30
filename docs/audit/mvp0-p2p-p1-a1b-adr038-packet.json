@@ -1,0 +1,48 @@
+{
+  "task_id": "P1.A1b",
+  "title": "Transient drive open/close logic",
+  "rri": 50,
+  "band": "Med-high",
+  "approved_at": "2026-08-30",
+  "approved_scope": [
+    "Create a proof-only runtime factory that derives a run-scoped Expo cache URI from a generated validated runId and passes it unchanged as the sole Bare worklet argument.",
+    "Add the versioned OPEN_CLOSE_TRANSIENT_DRIVE command that opens an empty Corestore/Hyperdrive drive, closes it with drive.close(), and returns the exact two-field capability receipt.",
+    "Modify only the five source/test paths named in the approved card plus P1.A1b evidence and status artifacts."
+  ],
+  "excluded_scope": [
+    "Hyperswarm, discovery, replication, product P2PService APIs, persistence, cleanup/janitor logic, direct bare-fs dependency, filesystem-path logging/RPC/receipts, iOS, commits, pushes, deployment, and external writes."
+  ],
+  "allowed_paths": [
+    "mobile/src/p2p/proof/P1ProofRuntimeFactory.ts",
+    "mobile/src/p2p/runtime/protocol.ts",
+    "mobile/src/p2p/runtime/worklet.ts",
+    "mobile/src/p2p/runtime/worklet.bundle.js",
+    "mobile/__tests__/p2p/runtime-protocol.test.ts"
+  ],
+  "acceptance": [
+    "HP-A1: a valid generated runId creates new Directory(Paths.cache, dubbridge-p2p, proofs, runId).uri; the sole URI reaches Bare.argv[0], and OPEN_CLOSE_TRANSIENT_DRIVE returns exactly { capability: transient-hyperdrive-corestore, schema_version: 1 } after drive.close().",
+    "EC-A1b: invalid runId or missing/non-file URI returns redacted PROOF_STORAGE_CONFIG_INVALID before Corestore/Hyperdrive creation or any network activity.",
+    "Focused Jest, npm run check:bare-worklet, typecheck, lint, three Reflection passes, phase-2 review, coverage certification, owner verification, and status synchronization pass."
+  ],
+  "constraints": [
+    "The URI is host-derived and only startup data: never an RPC field, receipt, log, or product API parameter.",
+    "Corestore/Hyperdrive own storage access; do not add direct bare-fs dependency. Normal close is drive.close(); store.close() is only for failure before a drive exists.",
+    "No storage handle or network behavior occurs on invalid bootstrap configuration.",
+    "Stop and return to scoring/review/approval if any edit or behavior escapes the frozen P1.A1b boundary."
+  ],
+  "verification": [
+    "cd mobile && npm test -- --runInBand __tests__/p2p/runtime-protocol.test.ts",
+    "cd mobile && npm run check:bare-worklet",
+    "cd mobile && npm run typecheck",
+    "cd mobile && npm run lint"
+  ],
+  "references": [
+    "docs/audit/mvp0-p2p-p1-a1b-approval-card.md",
+    "docs/audit/mvp0-p2p-p1-a1b-rri-v2.md",
+    "docs/audit/mvp0-p2p-p1-a1b-storage-contract.md",
+    "docs/tasks/mvp0-p2p-p1-replication.md",
+    "docs/plan/mvp0-p2p-p1-replication.md",
+    "docs/adr/ADR-043-mobile-p2p-runtime-ownership-and-proof-isolation.md",
+    "docs/adr/ADR-038-med-high-architect-refined-single-attempt.md"
+  ]
+}

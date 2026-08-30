@@ -17,12 +17,23 @@ import {
   encodeProtocolValue, type RuntimeRpcPort,
 } from "../../src/p2p/runtime/protocol";
 import { installRuntimeWorklet } from "../../src/p2p/runtime/worklet";
+let { ProofStorageConfigError, proofStorageUri, startProofWorklet } =
+  require("../../src/p2p/proof/P1ProofRuntimeFactory");
 
-const mobileRoot = path.resolve(__dirname, "../..");
+jest.mock("expo-file-system", () => ({
+  Paths: { cache: "file:///cache" },
+  Directory: class Directory {
+    uri: string;
+    constructor(...parts: string[]) { this.uri = `${parts.join("/")}/`; }
+  },
+}));
 
-function versioned(payload: Record<string, unknown>): Record<string, unknown> {
-  return { protocolVersion: RUNTIME_PROTOCOL_VERSION, ...payload };
-}
+jest.mock("react-native-bare-kit", () => ({ Worklet: class Worklet {} }));
+
+let mobileRoot = path.resolve(__dirname, "../..");
+
+let versioned = (payload: Record<string, unknown>): Record<string, unknown> =>
+  ({ protocolVersion: RUNTIME_PROTOCOL_VERSION, ...payload });
 
 function response(result: unknown): Uint8Array {
   return encodeProtocolValue(versioned({ ok: true, result }));
@@ -88,13 +99,14 @@ function duplexPair(): [MemoryDuplex, MemoryDuplex] {
   return [left, right];
 }
 
-function workletHarness() {
+function workletHarness(argv?: string[]) {
   const listeners = new Map<RuntimeEventName, (...args: unknown[]) => void>();
   const replies: Array<Record<string, unknown>> = [];
   const events: Array<{ command: number; value: Record<string, unknown> }> = [];
   let requestHandler: ((request: { command: number; data: Uint8Array; reply(data: string): void }) => void) | undefined;
   const ipc = { end: jest.fn() };
   const runtime = {
+    argv,
     version: "1.2.3-test",
     on: (event: RuntimeEventName, listener: (...args: unknown[]) => void) => listeners.set(event, listener),
   };
@@ -121,6 +133,30 @@ function workletHarness() {
 }
 
 describe("P1.F1 runtime protocol", () => {
+  it("HP-A1 passes only the host-derived proof URI as the worklet argument", () => {
+    let start = jest.fn();
+    const worklet = startProofWorklet("proofrun1", () => ({ start }));
+
+    expect(worklet).toEqual({ start });
+    expect(proofStorageUri("proofrun1")).toBe("file:///cache/dubbridge-p2p/proofs/proofrun1/");
+    expect(start).toHaveBeenCalledWith(
+      "/dubbridge-p2p-proof.worklet",
+      expect.any(String),
+      ["file:///cache/dubbridge-p2p/proofs/proofrun1/"],
+    );
+  });
+
+  it("EC-A1b rejects invalid proof configuration before storage is required", async () => {
+    expect(() => proofStorageUri("UPPERCASE")).toThrow(ProofStorageConfigError);
+    const harness = workletHarness();
+    harness.request(RUNTIME_COMMAND.OPEN_CLOSE_TRANSIENT_DRIVE);
+    await Promise.resolve();
+    expect(harness.replies).toEqual([
+      expect.objectContaining({ ok: false, error: expect.objectContaining({
+        code: "REMOTE_FAILURE", message: "PROOF_STORAGE_CONFIG_INVALID",
+      }) }),
+    ]);
+  });
   it("HP-F1 builds the committed worklet bundle deterministically", () => {
     execFileSync(process.execPath, ["scripts/build-bare-worklet.mjs", "--check"], {
       cwd: mobileRoot,

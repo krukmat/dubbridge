@@ -41,7 +41,7 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 | P1.A1 | Hyperdrive/Corestore Android bundle smoke proof (planning parent) | Decomposed 2026-08-28 — no direct source execution | P1.F3b PASS |
 | P1.A1a | Add Corestore/Hyperdrive deps + bundle check | PASS — Done 2026-08-28 | P1.F3b PASS |
 | P1.A1b.0 | Proof-storage contract preflight | PASS — Done 2026-08-30 | P1.A1a PASS — satisfied 2026-08-28 |
-| P1.A1b | Transient drive open/close logic (HP-A1) | Ready — RRI 50 Med-high; needs phase-1/card/approval | P1.A1b.0 PASS — satisfied 2026-08-30 |
+| P1.A1b | Transient drive open/close logic (HP-A1) | PASS — owner waiver recorded 2026-08-30 | P1.A1b.0 PASS — satisfied 2026-08-30 |
 | P1.A1c | Typed error handling (EC-A1) | Blocked | P1.A1b PASS |
 | P1.A1d | Tests + evidence + closure | Blocked | P1.A1c PASS |
 | P1.A2 | Transient seed lifecycle + residue cleanup | Deferred — needs current RRI/card/approval | P1.A1d PASS |
@@ -583,9 +583,8 @@ and passing focused/typecheck/lint/full-Jest verification.
 
 ### P1.A1b — Transient drive open/close logic (HP-A1)
 
-- **Status:** Ready — P1.A1b.0 PASS satisfied 2026-08-30. It still requires a
-  fresh phase-1 PASS, Compact Approval Task Card v2, and explicit approval
-  before source execution.
+- **Status:** PASS — owner waiver recorded 2026-08-30 for the no-action
+  phase-2 finding; see `docs/audit/mvp0-p2p-p1-a1b-forced-closure.md`.
 - **Effort / RRI:** L / 50 Med-high. Full report:
   `docs/audit/mvp0-p2p-p1-a1b-rri-v2.md`. The former S / 25 estimate and
   blocked RRI 53 assessment are historical only.
@@ -629,6 +628,34 @@ and passing focused/typecheck/lint/full-Jest verification.
   host-created cache URI only through Bare argv, return exactly the two-field
   receipt, and add no network, product API, direct bare-fs dependency, or
   persistence.`
+
+### Closure record — 2026-08-30
+
+- **Task-analysis review:** gemma
+  `docs/audit/mvp0-p2p-p1-a1b-phase1-review-v2.md` - PASS.
+- **Code-solution review:** gemma `/tmp/p1-a1b-phase2-remediation.json` -
+  BLOCKED, waived explicitly by Matias on 2026-08-30. The sole residual finding
+  specifies “None required” and concerns deliberate preservation of the
+  original failure during secondary cleanup; P1.A1c owns granular taxonomy.
+- **Waiver:** Matias, repository owner — close P1.A1b despite that formal
+  no-action phase-2 finding.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-A1 | Happy path | Host derives the run URI and passes it solely as Bare startup args. | `mobile/__tests__/p2p/runtime-protocol.test.ts::HP-A1 passes only the host-derived proof URI as the worklet argument` | passed |
+| EC-A1b | Edge case | Invalid host/worklet configuration fails before storage is required. | `mobile/__tests__/p2p/runtime-protocol.test.ts::EC-A1b rejects invalid proof configuration before storage is required` | passed |
+
+### Owner final verification
+
+- **Owner:** Matias, repository owner.
+- **Date:** 2026-08-30.
+- **Statement:** Owner waived the remaining no-action phase-2 review finding
+  and authorized closure after the recorded focused verification.
+- **Commands run:** `npm run build:bare-worklet`; `npm run typecheck`; `npm
+  test -- --runInBand __tests__/p2p/runtime-protocol.test.ts`; `npm run lint`;
+  `npm run check:bare-worklet`.
 
 ### P1.A1c — Typed error handling (EC-A1)
 

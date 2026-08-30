@@ -2,7 +2,7 @@
 type: Audit
 title: "RRI evidence — MVP0-P2P P1.A1b, contract-frozen scope"
 task: P1.A1b
-status: ready_for_phase_1_review
+status: awaiting_approval
 supersedes: docs/audit/mvp0-p2p-p1-a1b-rri.md
 date: 2026-08-30
 ---

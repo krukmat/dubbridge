@@ -5,6 +5,7 @@ import {
   RUNTIME_COMMAND,
   RUNTIME_PROTOCOL_VERSION,
   RuntimeProtocolError,
+  TRANSIENT_DRIVE_RECEIPT,
   decodeRequestPayload,
   type RuntimeFatalCode, type RuntimeProtocolErrorCode,
 } from "./protocol";
@@ -14,7 +15,42 @@ interface WorkletRuntime {
   on(event: "suspend" | "resume", listener: () => void): void;
   on(event: "uncaughtException", listener: (error: unknown) => void): void;
   on(event: "unhandledRejection", listener: (reason: unknown) => void): void;
+  argv?: string[];
 }
+
+let proofStorageUri = (runtime: WorkletRuntime): string => {
+  let uri = runtime.argv?.[0];
+  if (typeof uri !== "string" || !uri.startsWith("file:") || uri.length <= "file:".length) {
+    throw new RuntimeProtocolError("REMOTE_FAILURE", "PROOF_STORAGE_CONFIG_INVALID");
+  }
+  return uri;
+};
+
+let openCloseTransientDrive = async (runtime: WorkletRuntime): Promise<typeof TRANSIENT_DRIVE_RECEIPT> => {
+  let storageUri = proofStorageUri(runtime);
+  let Corestore = require("corestore") as new (storage: string) => { close(): Promise<void> };
+  let Hyperdrive = require("hyperdrive") as new (store: { close(): Promise<void> }) => {
+    ready(): Promise<void>;
+    close(): Promise<void>;
+  };
+  let store: { close(): Promise<void> } | undefined;
+  let drive: { ready(): Promise<void>; close(): Promise<void> } | undefined;
+  try {
+    store = new Corestore(storageUri);
+    drive = new Hyperdrive(store);
+    await drive.ready();
+    await drive.close();
+    return TRANSIENT_DRIVE_RECEIPT;
+  } catch (error) {
+    try {
+      if (drive) await drive.close();
+      else if (store) await store.close();
+    } catch {
+      // Preserve the original open/ready failure; P1.A1c owns granular close taxonomy.
+    }
+    throw error;
+  }
+};
 
 interface WorkletIpc {
   end(): void;
@@ -55,11 +91,11 @@ function safeReply(request: IncomingRequest, payload: string, closeOnce: () => v
   }
 }
 
-function handleRequest(
+async function handleRequest(
   runtime: WorkletRuntime,
   request: IncomingRequest,
   closeOnce: () => void,
-): void {
+): Promise<void> {
   try {
     decodeRequestPayload(request.data);
     if (request.command === RUNTIME_COMMAND.HANDSHAKE) {
@@ -82,6 +118,10 @@ function handleRequest(
     if (request.command === RUNTIME_COMMAND.SHUTDOWN) {
       safeReply(request, success("stopped"), closeOnce);
       closeOnce();
+      return;
+    }
+    if (request.command === RUNTIME_COMMAND.OPEN_CLOSE_TRANSIENT_DRIVE) {
+      safeReply(request, success(await openCloseTransientDrive(runtime)), closeOnce);
       return;
     }
     safeReply(request, failure("INVALID_PAYLOAD", "Runtime command is not supported"), closeOnce);

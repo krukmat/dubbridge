@@ -16,6 +16,7 @@ export const RUNTIME_COMMAND = {
   SHUTDOWN: 3,
   LIFECYCLE_EVENT: 4,
   FATAL_EVENT: 5,
+  OPEN_CLOSE_TRANSIENT_DRIVE: 6,
 } as const;
 
 export type RuntimeCapability = (typeof RUNTIME_CAPABILITIES)[number];
@@ -27,6 +28,11 @@ export type RuntimeProtocolErrorCode =
   | "RPC_TIMEOUT"
   | "INVALID_LIFECYCLE"
   | "CHANNEL_CLOSED";
+
+export const TRANSIENT_DRIVE_RECEIPT = {
+  capability: "transient-hyperdrive-corestore",
+  schema_version: 1,
+} as const;
 
 export interface RuntimeHandshake {
   protocolVersion: typeof RUNTIME_PROTOCOL_VERSION;

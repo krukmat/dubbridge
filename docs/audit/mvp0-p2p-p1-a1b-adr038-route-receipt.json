@@ -1,0 +1,10 @@
+{
+  "task_id": "P1.A1b",
+  "card_hash": "8c7f792dc1b698b4b8cb135d62e93233d27550099667a1cc00bd7e08077f816f",
+  "refinement_artifact_sha256": "def4a0d6b01b1e5bd99d2fb638c55e9d0d6e25fb9ebbcbe6bb8e52bea1ea8c02",
+  "decision": "CLOUD_REQUIRED",
+  "primary_id": "codex-gpt-5.6-sol",
+  "timestamp": "2026-08-30T13:55:00Z",
+  "rationale": "Muse Glimmer returned a valid CLOUD_REQUIRED advisory because the source-level factory/worklet implementation and test seams remain unknown in the frozen packet. The primary preserves that decision. Independently, RRI 50 lies in ADR-038's 46-55 cloud-only whole-task sub-band; no ADR-040 per-module split was approved or evaluated as eligible. The frozen scope remains intact and the capability/risk cloud route is gpt-5.6-sol at high reasoning effort.",
+  "gate_decision_note": "The receipt binds the immutable P1.A1b ADR-038 packet and exact Muse refinement artifact. med_high_gate.py must return CLOUD_REQUIRED; local whole-task implementation is not permitted."
+}

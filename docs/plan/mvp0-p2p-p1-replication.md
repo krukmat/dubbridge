@@ -124,7 +124,9 @@ explicit approval before source edits:
      2026-08-30. It froze the host-to-Bare cache-root representation, storage
      import ownership, RPC/receipt schema, typed configuration failure, and test
      surface at `docs/audit/mvp0-p2p-p1-a1b-storage-contract.md`. P1.A1b is now
-     RRI 50 Med-high and requires its own new phase-1 review/card/approval.
+     RRI 50 Med-high and closed PASS on 2026-08-30 with an explicit owner
+     waiver for the residual no-action phase-2 finding. See
+     `docs/audit/mvp0-p2p-p1-a1b-forced-closure.md`.
 7. **P1.A2 — Transient seed lifecycle and residue cleanup.** Generate the
    synthetic fixture, write/hash it using a run-scoped cache directory, close
    handles, delete/verify absence, and clean abandoned proof directories.
