@@ -17,6 +17,28 @@ interface TransientDrive {
   close(): Promise<void>;
 }
 
+export async function openStoreAndDrive<
+  Store extends { close(): Promise<void> },
+  Drive extends { ready(): Promise<void>; close(): Promise<void> },
+>(
+  Corestore: new (storage: string) => Store,
+  Hyperdrive: new (store: Store) => Drive,
+  storageUri: string,
+  handles: { store?: Store; drive?: Drive },
+): Promise<void> {
+  handles.store = new Corestore(storageUri);
+  handles.drive = new Hyperdrive(handles.store);
+  await handles.drive.ready();
+}
+
+export async function closeStoreOrDrive(
+  drive: { close(): Promise<void> } | undefined,
+  store: { close(): Promise<void> } | undefined,
+): Promise<void> {
+  if (drive) await drive.close();
+  else if (store) await store.close();
+}
+
 interface TransientDriveDependencies {
   Corestore: new (storage: string) => TransientDriveStore;
   Hyperdrive: new (store: TransientDriveStore) => TransientDrive;
@@ -84,17 +106,13 @@ export function configureTransientDriveDependenciesForTest(
 
 export async function openCloseTransientDrive(runtime: WorkletRuntime): Promise<typeof TRANSIENT_DRIVE_RECEIPT> {
   const storageUri = proofStorageUri(runtime);
-  let store: TransientDriveStore | undefined;
-  let drive: TransientDrive | undefined;
+  const handles: { store?: TransientDriveStore; drive?: TransientDrive } = {};
   try {
     const { Corestore, Hyperdrive } = loadTransientDriveDependencies();
-    store = new Corestore(storageUri);
-    drive = new Hyperdrive(store);
-    await drive.ready();
+    await openStoreAndDrive(Corestore, Hyperdrive, storageUri, handles);
   } catch (error) {
     try {
-      if (drive) await drive.close();
-      else if (store) await store.close();
+      await closeStoreOrDrive(handles.drive, handles.store);
     } catch {
       throw new RuntimeProtocolError("TRANSIENT_DRIVE_CLOSE_FAILED", "Transient drive could not be closed");
     }
@@ -102,7 +120,7 @@ export async function openCloseTransientDrive(runtime: WorkletRuntime): Promise<
     throw new RuntimeProtocolError("TRANSIENT_DRIVE_OPEN_FAILED", "Transient drive could not be opened");
   }
   try {
-    await drive.close();
+    await handles.drive!.close();
   } catch {
     throw new RuntimeProtocolError("TRANSIENT_DRIVE_CLOSE_FAILED", "Transient drive could not be closed");
   }

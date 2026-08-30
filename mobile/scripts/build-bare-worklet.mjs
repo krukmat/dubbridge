@@ -12,6 +12,7 @@ const outputPath = path.join(runtimeRoot, "worklet.bundle.js");
 const sourcePaths = [
   path.join(runtimeRoot, "protocol.ts"),
   path.join(runtimeRoot, "transient-drive.ts"),
+  path.join(runtimeRoot, "transient-seed.ts"),
   path.join(runtimeRoot, "worklet.ts"),
 ];
 const isCheck = process.argv.slice(2).includes("--check");

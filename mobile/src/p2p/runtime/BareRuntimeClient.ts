@@ -1,12 +1,8 @@
 import { Worklet } from "react-native-bare-kit";
 
 import RUNTIME_WORKLET_SOURCE from "./worklet.bundle.js";
-import {
-  BareRpcPort,
-  RuntimeProtocolClient,
-  RuntimeProtocolError,
-  type RuntimeHandshake,
-} from "./protocol";
+import { RuntimeProtocolError, type RuntimeHandshake } from "./protocol";
+import { BareRpcPort, RuntimeProtocolClient } from "./runtime-client";
 
 export type BareRuntimeState = "stopped" | "starting" | "ready" | "failed";
 

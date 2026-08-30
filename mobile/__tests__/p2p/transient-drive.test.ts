@@ -23,8 +23,9 @@ async function requestTransientDrive(
   harness: ReturnType<typeof workletHarness>,
 ): Promise<void> {
   harness.request(RUNTIME_COMMAND.OPEN_CLOSE_TRANSIENT_DRIVE);
-  await Promise.resolve();
-  await Promise.resolve();
+  for (let tick = 0; tick < 8; tick += 1) {
+    await Promise.resolve();
+  }
 }
 
 describe("P1.A1 transient drive lifecycle", () => {

@@ -6,16 +6,15 @@ import path from "node:path";
 import RPC = require("bare-rpc");
 
 import {
-  BareRpcPort,
   RUNTIME_CAPABILITIES,
   RUNTIME_COMMAND,
   RUNTIME_PROTOCOL_VERSION,
-  RuntimeProtocolClient,
   RuntimeProtocolError,
   decodeRequestPayload,
   decodeRuntimeEvent,
   encodeProtocolValue, type RuntimeRpcPort,
 } from "../../src/p2p/runtime/protocol";
+import { BareRpcPort, RuntimeProtocolClient } from "../../src/p2p/runtime/runtime-client";
 import { versioned, workletHarness } from "../../test-utils/worklet-harness";
 
 jest.mock("react-native-bare-kit", () => ({ Worklet: class Worklet {} }));

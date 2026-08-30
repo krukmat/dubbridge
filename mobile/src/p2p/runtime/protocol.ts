@@ -1,5 +1,4 @@
 import b4a from "b4a";
-import RPC from "bare-rpc";
 
 export const RUNTIME_PROTOCOL_VERSION = 1 as const;
 export const RUNTIME_CAPABILITIES = [
@@ -17,6 +16,7 @@ export const RUNTIME_COMMAND = {
   LIFECYCLE_EVENT: 4,
   FATAL_EVENT: 5,
   OPEN_CLOSE_TRANSIENT_DRIVE: 6,
+  SEED_WRITE_HASH_DELETE: 7,
 } as const;
 
 export type RuntimeCapability = (typeof RUNTIME_CAPABILITIES)[number];
@@ -32,12 +32,24 @@ export type RuntimeProtocolErrorCode =
   | "TRANSIENT_DRIVE_DEPENDENCY_LOAD_FAILED"
   | "TRANSIENT_DRIVE_BUNDLE_INVALID"
   | "TRANSIENT_DRIVE_OPEN_FAILED"
-  | "TRANSIENT_DRIVE_CLOSE_FAILED";
+  | "TRANSIENT_DRIVE_CLOSE_FAILED"
+  | "SEED_WRITE_FAILED"
+  | "SEED_HASH_FAILED"
+  | "SEED_CLOSE_FAILED"
+  | "SEED_DELETE_FAILED"
+  | "SEED_VERIFY_FAILED";
 
 export const TRANSIENT_DRIVE_RECEIPT = {
   capability: "transient-hyperdrive-corestore",
   schema_version: 1,
 } as const;
+
+export interface SeedWriteHashDeleteReceipt {
+  capability: "seed-write-hash-delete";
+  schema_version: 1;
+  byte_count: number;
+  sha256: string;
+}
 
 export interface RuntimeHandshake {
   protocolVersion: typeof RUNTIME_PROTOCOL_VERSION;
@@ -85,9 +97,14 @@ const REDACTED_ERROR_MESSAGE: Record<RuntimeProtocolErrorCode, string> = {
   TRANSIENT_DRIVE_BUNDLE_INVALID: "Transient drive bundle is invalid",
   TRANSIENT_DRIVE_OPEN_FAILED: "Transient drive could not be opened",
   TRANSIENT_DRIVE_CLOSE_FAILED: "Transient drive could not be closed",
+  SEED_WRITE_FAILED: "Seed fixture could not be written",
+  SEED_HASH_FAILED: "Seed fixture could not be hashed",
+  SEED_CLOSE_FAILED: "Seed drive could not be closed",
+  SEED_DELETE_FAILED: "Seed run directory could not be deleted",
+  SEED_VERIFY_FAILED: "Seed run directory deletion could not be verified",
 };
 
-class RuntimeCodec {
+export class RuntimeCodec {
   static isRecord(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === "object" && !Array.isArray(value);
   }
@@ -234,105 +251,3 @@ export const {
   decodeHandshake: decodeHandshakeResult,
   decodeEvent: decodeRuntimeEvent,
 } = RuntimeCodec;
-
-export class BareRpcPort implements RuntimeRpcPort {
-  private readonly rpc: RPC;
-
-  constructor(
-    private readonly stream: ConstructorParameters<typeof RPC>[0],
-    onEvent: (event: RuntimeEvent) => void = () => undefined,
-    onProtocolError: (error: RuntimeProtocolError) => void = () => undefined,
-  ) {
-    this.rpc = new RPC(stream, (request) => {
-      if (request.command !== RUNTIME_COMMAND.LIFECYCLE_EVENT && request.command !== RUNTIME_COMMAND.FATAL_EVENT) {
-        return;
-      }
-      try {
-        onEvent(decodeRuntimeEvent(request.data));
-      } catch (error) {
-        onProtocolError(
-          error instanceof RuntimeProtocolError
-            ? error
-            : new RuntimeProtocolError("INVALID_LIFECYCLE", "Runtime event could not be decoded"),
-        );
-      }
-    });
-  }
-
-  get idle(): boolean {
-    return this.rpc.idle;
-  }
-
-  request(command: number, payload: string): Promise<Uint8Array | string | null> {
-    return this.sendRequest(this.rpc.request(command), payload);
-  }
-
-  private sendRequest(
-    request: ReturnType<RPC["request"]>,
-    payload: string,
-  ): Promise<Uint8Array | string | null> {
-    request.send(payload);
-    return request.reply("utf8") as Promise<Uint8Array | string | null>;
-  }
-
-  close(error: Error): void {
-    this.stream.destroy(error);
-  }
-}
-
-export class RuntimeProtocolClient {
-  private pendingCount = 0;
-
-  constructor(
-    private readonly port: RuntimeRpcPort,
-    private readonly timeoutMs = 5_000,
-  ) {}
-
-  get idle(): boolean {
-    return this.pendingCount === 0 && this.port.idle;
-  }
-
-  async handshake(): Promise<RuntimeHandshake> {
-    return decodeHandshakeResult(await this.call(RUNTIME_COMMAND.HANDSHAKE));
-  }
-
-  async ping(): Promise<"pong"> {
-    if ((await this.call(RUNTIME_COMMAND.PING)) !== "pong") {
-      throw new RuntimeProtocolError("INVALID_PAYLOAD", "Runtime ping reply is invalid");
-    }
-    return "pong";
-  }
-
-  async shutdown(): Promise<void> {
-    if ((await this.call(RUNTIME_COMMAND.SHUTDOWN)) !== "stopped") {
-      throw new RuntimeProtocolError("INVALID_PAYLOAD", "Runtime shutdown reply is invalid");
-    }
-  }
-
-  private async call(command: number): Promise<unknown> {
-    this.pendingCount += 1;
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-
-    try {
-      return RuntimeCodec.successResult(
-        decodeResponseEnvelope(
-          await Promise.race([
-            this.port.request(command, JSON.stringify({ protocolVersion: RUNTIME_PROTOCOL_VERSION })),
-            new Promise<never>((_, reject) => {
-              timeout = setTimeout(() => {
-                this.port.close(new RuntimeProtocolError("RPC_TIMEOUT", "Runtime request timed out"));
-                reject(new RuntimeProtocolError("RPC_TIMEOUT", "Runtime request timed out"));
-              }, this.timeoutMs);
-            }),
-          ]),
-        ),
-      );
-    } catch (error) {
-      if (error instanceof RuntimeProtocolError) throw error;
-      throw new RuntimeProtocolError("CHANNEL_CLOSED", "Runtime channel closed before replying");
-    } finally {
-      if (timeout !== undefined) clearTimeout(timeout);
-      this.pendingCount -= 1;
-    }
-  }
-}

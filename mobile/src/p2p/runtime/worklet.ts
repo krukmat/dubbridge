@@ -5,12 +5,13 @@ import {
   RUNTIME_COMMAND,
   RUNTIME_PROTOCOL_VERSION,
   RuntimeProtocolError,
-  decodeRequestPayload,
-  type RuntimeFatalCode, type RuntimeProtocolErrorCode,
+  decodeRequestPayload, type RuntimeFatalCode, type RuntimeProtocolErrorCode,
 } from "./protocol";
 import { openCloseTransientDrive, type WorkletRuntime } from "./transient-drive";
+import { writeHashSeed } from "./transient-seed";
 
 export { configureTransientDriveDependenciesForTest } from "./transient-drive";
+export { configureSeedDependenciesForTest } from "./transient-seed";
 
 interface WorkletIpc {
   end(): void;
@@ -82,6 +83,10 @@ async function handleRequest(
     }
     if (request.command === RUNTIME_COMMAND.OPEN_CLOSE_TRANSIENT_DRIVE) {
       safeReply(request, success(await openCloseTransientDrive(runtime)), closeOnce);
+      return;
+    }
+    if (request.command === RUNTIME_COMMAND.SEED_WRITE_HASH_DELETE) {
+      safeReply(request, success(await writeHashSeed(runtime)), closeOnce);
       return;
     }
     safeReply(request, failure("INVALID_PAYLOAD", "Runtime command is not supported"), closeOnce);
