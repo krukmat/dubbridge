@@ -1,0 +1,71 @@
+{
+  "changed_paths": [],
+  "findings": [
+    {
+      "detail": "The specification fails to freeze the RPC command schema and the receipt structure, leaving the interface between the worklet and the host undefined.",
+      "line": 1,
+      "path": "task-analysis-packet",
+      "scope": "out-of-scope",
+      "severity": "blocking",
+      "suggestion": "Define the exact JSON-RPC method name and the structure of the returned capability/schema_version object."
+    },
+    {
+      "detail": "The \"proof cache root\" is referenced as a requirement for path validation but its source of truth (environment variable, config, or hardcoded path) is not specified.",
+      "line": 1,
+      "path": "task-analysis-packet",
+      "scope": "out-of-scope",
+      "severity": "major",
+      "suggestion": "Explicitly define the trusted source for the root path to prevent directory traversal attacks."
+    },
+    {
+      "detail": "Error handling and cleanup semantics are undefined. It is unclear if a failure during `close()` results in a fatal protocol error or a silent failure.",
+      "line": 1,
+      "path": "task-analysis-packet",
+      "scope": "out-of-scope",
+      "severity": "minor",
+      "suggestion": "Define the error state machine for the open/close lifecycle and the expected error codes."
+    }
+  ],
+  "model": "gemma4:26b-a4b-it-qat",
+  "passes_run": 3,
+  "passes_succeeded": 3,
+  "reconciliation": {
+    "consensus": [
+      {
+        "detail": "The specification fails to freeze the RPC command schema and the receipt structure, leaving the interface between the worklet and the host undefined.",
+        "line": 1,
+        "path": "task-analysis-packet",
+        "scope": "out-of-scope",
+        "severity": "blocking",
+        "suggestion": "Define the exact JSON-RPC method name and the structure of the returned capability/schema_version object."
+      },
+      {
+        "detail": "The \"proof cache root\" is referenced as a requirement for path validation but its source of truth (environment variable, config, or hardcoded path) is not specified.",
+        "line": 1,
+        "path": "task-analysis-packet",
+        "scope": "out-of-scope",
+        "severity": "major",
+        "suggestion": "Explicitly define the trusted source for the root path to prevent directory traversal attacks."
+      },
+      {
+        "detail": "Error handling and cleanup semantics are undefined. It is unclear if a failure during `close()` results in a fatal protocol error or a silent failure.",
+        "line": 1,
+        "path": "task-analysis-packet",
+        "scope": "out-of-scope",
+        "severity": "minor",
+        "suggestion": "Define the error state machine for the open/close lifecycle and the expected error codes."
+      }
+    ],
+    "consensus_count": 3,
+    "likely_false_positive": [],
+    "likely_false_positive_count": 0,
+    "location_inconsistent": [],
+    "location_inconsistent_count": 0,
+    "pass_specific": [],
+    "pass_specific_count": 0,
+    "severity_inconsistent": [],
+    "severity_inconsistent_count": 0
+  },
+  "status": "findings",
+  "summary": "The task specification is currently insufficient for a Med-high approval card. It lacks the necessary technical constraints and formal definitions required to prevent scope creep or security vulnerabilities during implementation."
+}

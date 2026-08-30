@@ -15,8 +15,11 @@ Task-analysis review: gemma
 
 Gemma ran two usable passes, both returning `FINDINGS` with the same blocking
 conclusion: P1.A1b is not sufficiently specified for a Med-high approval card.
-The local result receipts are `scratchpad/p1-a1b-phase1-result.pass1.json` and
-`scratchpad/p1-a1b-phase1-result.pass2.json`.
+The local result receipts are
+`docs/audit/mvp0-p2p-p1-a1b-phase1-review.pass1.json` and
+`docs/audit/mvp0-p2p-p1-a1b-phase1-review.pass2.json` (preserved from the
+session scratchpad after this commit; the reviewed packet is
+`docs/audit/mvp0-p2p-p1-a1b-phase1-packet.md`).
 
 ## Blocking finding
 
