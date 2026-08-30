@@ -339,6 +339,15 @@ impl StorageSettings {
 
 impl GatewaySettings {
     fn validate(&self, production_like: bool) -> Result<(), ConfigError> {
+        self.validate_required_fields()?;
+        if production_like {
+            self.validate_production_constraints()?;
+        }
+        Ok(())
+    }
+
+    /// Presence/non-empty checks that apply in every environment.
+    fn validate_required_fields(&self) -> Result<(), ConfigError> {
         if self.upstream_api_base_url.trim().is_empty() {
             return Err(ConfigError::Validation(
                 "gateway.upstream_api_base_url is required".to_string(),
@@ -397,26 +406,31 @@ impl GatewaySettings {
             ));
         }
 
-        if production_like && self.oauth.client_secret.is_none() {
+        Ok(())
+    }
+
+    /// Checks that apply only in staging/production (ADR-026, Decision 3).
+    fn validate_production_constraints(&self) -> Result<(), ConfigError> {
+        if self.oauth.client_secret.is_none() {
             return Err(ConfigError::Validation(
                 "gateway.oauth.client_secret is required in production-like environments"
                     .to_string(),
             ));
         }
 
-        if production_like && AppConfig::is_local_address_url(&self.upstream_api_base_url) {
+        if AppConfig::is_local_address_url(&self.upstream_api_base_url) {
             return Err(ConfigError::Validation(
                 "gateway.upstream_api_base_url must not target localhost or 127.0.0.1 in production-like environments".to_string(),
             ));
         }
 
-        if production_like && AppConfig::is_local_address_url(&self.oauth.authorization_url) {
+        if AppConfig::is_local_address_url(&self.oauth.authorization_url) {
             return Err(ConfigError::Validation(
                 "gateway.oauth.authorization_url must not target localhost or 127.0.0.1 in production-like environments".to_string(),
             ));
         }
 
-        if production_like && AppConfig::is_local_address_url(&self.oauth.token_url) {
+        if AppConfig::is_local_address_url(&self.oauth.token_url) {
             return Err(ConfigError::Validation(
                 "gateway.oauth.token_url must not target localhost or 127.0.0.1 in production-like environments".to_string(),
             ));

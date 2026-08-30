@@ -37,7 +37,15 @@ use crate::{
 };
 
 pub fn router(pool: PgPool, verifier: SharedTokenVerifier) -> Router<Arc<AppState>> {
-    let global_write_routes = Router::new()
+    Router::new()
+        .merge(global_write_routes(&verifier))
+        .merge(global_read_routes(&verifier))
+        .merge(org_write_routes(&pool, &verifier))
+        .merge(org_read_routes(&pool, &verifier))
+}
+
+fn global_write_routes(verifier: &SharedTokenVerifier) -> Router<Arc<AppState>> {
+    Router::new()
         .route("/orgs", post(create_org))
         .route_layer(middleware::from_fn_with_state(
             Arc::<str>::from("workspaces:write"),
@@ -46,9 +54,11 @@ pub fn router(pool: PgPool, verifier: SharedTokenVerifier) -> Router<Arc<AppStat
         .route_layer(middleware::from_fn_with_state(
             verifier.clone(),
             authenticate_bearer,
-        ));
+        ))
+}
 
-    let global_read_routes = Router::new()
+fn global_read_routes(verifier: &SharedTokenVerifier) -> Router<Arc<AppState>> {
+    Router::new()
         .route("/orgs", get(list_orgs))
         .route_layer(middleware::from_fn_with_state(
             Arc::<str>::from("workspaces:read"),
@@ -57,9 +67,11 @@ pub fn router(pool: PgPool, verifier: SharedTokenVerifier) -> Router<Arc<AppStat
         .route_layer(middleware::from_fn_with_state(
             verifier.clone(),
             authenticate_bearer,
-        ));
+        ))
+}
 
-    let org_write_routes = Router::new()
+fn org_write_routes(pool: &PgPool, verifier: &SharedTokenVerifier) -> Router<Arc<AppState>> {
+    Router::new()
         .route("/orgs/{org_id}/members", post(add_member))
         .route("/orgs/{org_id}/projects", post(create_project))
         .route(
@@ -85,9 +97,11 @@ pub fn router(pool: PgPool, verifier: SharedTokenVerifier) -> Router<Arc<AppStat
         .route_layer(middleware::from_fn_with_state(
             verifier.clone(),
             authenticate_bearer,
-        ));
+        ))
+}
 
-    let org_read_routes = Router::new()
+fn org_read_routes(pool: &PgPool, verifier: &SharedTokenVerifier) -> Router<Arc<AppState>> {
+    Router::new()
         .route("/orgs/{org_id}/members", get(list_members))
         .route("/orgs/{org_id}/projects", get(list_projects))
         .route(
@@ -102,21 +116,18 @@ pub fn router(pool: PgPool, verifier: SharedTokenVerifier) -> Router<Arc<AppStat
             OrgRole::Viewer,
             require_org_member,
         ))
-        .route_layer(middleware::from_fn_with_state(pool, resolve_org_membership))
+        .route_layer(middleware::from_fn_with_state(
+            pool.clone(),
+            resolve_org_membership,
+        ))
         .route_layer(middleware::from_fn_with_state(
             Arc::<str>::from("workspaces:read"),
             require_scope,
         ))
         .route_layer(middleware::from_fn_with_state(
-            verifier,
+            verifier.clone(),
             authenticate_bearer,
-        ));
-
-    Router::new()
-        .merge(global_write_routes)
-        .merge(global_read_routes)
-        .merge(org_write_routes)
-        .merge(org_read_routes)
+        ))
 }
 
 #[derive(Debug, Deserialize)]

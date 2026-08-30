@@ -101,7 +101,9 @@ requires explicit approval.
 practice; split per-function at RRI-scoring time if the combined survey
 result is large)
 **Depends on:** X26-T0
-**Status:** [ ] Planned
+**Status:** [x] Done — implementation complete, pending commit approval (see below)
+**RRI:** 44 -> band Med-high (41-55); Effort M matches the band per the
+canonical RRI-to-Effort crosswalk.
 
 **Objective:** Decompose the three production functions `X26-T0` flagged
 (`GatewaySettings::validate`, `finalize_ingestion_core`, `apps/api`'s
@@ -177,6 +179,178 @@ flagged function to ≤70 lines, starting with `crates/ingestion/src/lib.rs`'s
 Stop condition: stop once every survey row is resolved and `make qa-test`/
 `make qa-coverage` pass; do not touch the `too_many_lines` lint threshold
 itself (that is `X26-T2`).
+
+### Implementation summary
+
+- `crates/config/src/lib.rs`: `GatewaySettings::validate` (71-line clippy
+  count) split into `validate` (6 lines, orchestrator) +
+  `validate_required_fields` (61 lines, environment-independent presence
+  checks) + `validate_production_constraints` (~26 lines, the four
+  production-only checks, now gated once by the caller instead of four
+  repeated `production_like &&` conditions).
+- `crates/ingestion/src/lib.rs`: `finalize_ingestion_core` (77-line clippy
+  count / 97-line raw span) split into `finalize_ingestion_core` (41 lines,
+  orchestrator) + `lock_pending_or_reject` (25 lines) + `build_finalize_command`
+  (19 lines) + `persist_finalization_writes` (46 lines), reusing the five
+  pre-existing sub-20-line helpers unchanged. The same `sqlx::Transaction` is
+  threaded by value/`&mut` through every extracted function — no new or
+  nested transaction is created anywhere — preserving the ADR-006/008/021
+  single-transaction atomicity contract (HP-2).
+- `apps/api/src/routes/workspace.rs`: `router` (76-line clippy count) split
+  into `router` (7 lines, orchestrator) + `global_write_routes` (12) +
+  `global_read_routes` (12) + `org_write_routes` (29) + `org_read_routes`
+  (29). Route paths, handler bindings, and `.route_layer(...)` middleware
+  stacking order are unchanged; only internal `pool.clone()`/
+  `verifier.clone()` plumbing changed since the four groups are now built by
+  separate functions sharing borrowed `&PgPool`/`&SharedTokenVerifier`
+  instead of one function moving owned values into four local bindings.
+
+No exception (`EC-1`) was needed — all three flagged functions were
+successfully decomposed to ≤70 lines using named helpers.
+
+### Peer Reviewer evidence
+
+**Phase 1 — Task-analysis review** (recorded at presentation):
+```
+Task-analysis review: d14 docs/audit/d14-reviews/x26-t1-phase1.md - BLOCKED -> revised -> resolved
+```
+- Reviewer: `d14` (same-provider degraded fallback — no Ollama in this
+  remote environment; Gemma/Muse Glimmer structurally unavailable, verified
+  via `which ollama` empty and connection-refused on `:11434`)
+- Muse Glimmer fallback: not triggered — reason: structurally unavailable,
+  routed directly to D14 per the Availability section
+- D14 fallback: triggered — reason: primary+intermediate reviewers both
+  structurally unavailable in this environment
+- D14 provider route: same-provider-degraded — reason: no cross-provider
+  CLI/agent access exists in this session
+- disposition_divergence: `none` — D14's one blocking finding (a scope
+  misattribution in the task ledger draft) was independently verified
+  against the survey artifact and corrected in the same workflow pass; no
+  disagreement with the finding itself
+- Primary-agent disposition: accepted and repaired (scope-decision text
+  corrected; `HP-2` added)
+
+**Phase 2 — Code-solution review** (this closure):
+```
+Code-solution review: d14 docs/audit/d14-reviews/x26-t1-phase2.md - PASS
+```
+- Reviewer: `d14` (same-provider degraded fallback — Ollama re-verified
+  unavailable immediately before this phase, same result as phase 1)
+- Command: manual invocation — context-isolated `general-purpose` subagent
+  fed only the task ID, final diff, verbatim acceptance criteria/HP/EC, and
+  independently-produced fmt/clippy/test/coverage command output (no
+  implementation transcript or chain-of-thought)
+- Artifact: `docs/audit/d14-reviews/x26-t1-phase2.md`
+- Verdict: `PASS`
+- Findings: none (blocking or non-blocking)
+- Muse Glimmer fallback: not triggered — reason: structurally unavailable
+- D14 fallback: triggered — reason: primary+intermediate reviewers both
+  structurally unavailable
+- D14 provider route: same-provider-degraded — reason: no cross-provider
+  CLI/agent access exists in this session
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted (no findings to disposition)
+
+### Reflection log
+
+Required passes: 3 (`44` -> `Med-high`)
+
+#### Pass 1
+
+- **Draft verdict:** all three functions decomposed to ≤70 lines; compiles
+  clean; `cargo fmt --check` and `cargo clippy -D warnings` both clean.
+- **Critique findings:** an unjustified `#[allow(clippy::too_many_arguments)]`
+  was present on `persist_finalization_writes` (7 parameters) — the
+  acceptance criteria bar unjustified new `#[allow]` attributes, and 7 args
+  is at, not over, clippy's default `too_many_arguments` threshold of 7.
+- **Revisions applied:** removed the attribute; re-ran
+  `cargo clippy -p dubbridge-ingestion --all-targets --all-features -- -D
+  warnings`, which passed with zero warnings, confirming it was unnecessary.
+
+#### Pass 2
+
+- **Draft verdict:** re-examined the full diff for all three files against
+  `HP-1`/`HP-2`/`EC-1` and the acceptance criteria; re-ran `cargo fmt
+  --check` (clean), `cargo clippy --workspace --all-targets --all-features
+  -- -D warnings` (clean, zero warnings besides one pre-existing unrelated
+  `apalis-redis` future-incompat notice), and the full workspace test suite
+  serially (840/840 passed, 0 failed — including
+  `apps/api/tests/ingestion_test.rs` 31/31, `apps/api/tests/workspace_test.rs`
+  14/14, and `crates/config`'s 50/50 unit tests).
+- **Critique findings:**
+  1. Logical correctness (`HP-2`): traced the `sqlx::Transaction` through
+     `lock_pending_or_reject` and `persist_finalization_writes` — the same
+     transaction is threaded end-to-end with no new/nested transaction;
+     matches the original's atomicity contract exactly.
+  2. Error handling at boundaries: `validate_production_constraints`'s
+     single caller-side `if production_like { ... }` gate is behaviorally
+     identical to the four repeated `production_like &&` conditions it
+     replaced — each check still fires only when `production_like` is true.
+  3. Unintended side effects: `workspace.rs`'s route/middleware layering
+     order is byte-for-byte identical in the diff; only internal
+     `pool.clone()`/`verifier.clone()` plumbing changed.
+  4. Test coverage gaps: full workspace line coverage 95.11% (gate:
+     `--fail-under-lines 90`, exit 0). Per-file:
+     `apps/api/src/routes/workspace.rs` 98.61% lines (865 total, 12 missed);
+     `crates/config/src/lib.rs` 95.65% lines (966 total, 42 missed);
+     `crates/ingestion/src/lib.rs` is excluded from the enforced gate by
+     `COVERAGE_IGNORE_REGEX` but measured at 88.95% lines standalone — no
+     regression.
+  5. No design-pattern/performance/UX concerns — internal backend
+     decomposition only, no client-facing behavior change.
+- **Revisions applied:** none needed — all findings were confirmations.
+
+#### Pass 3
+
+- **Draft verdict:** implementation ready for closure — all three functions
+  ≤70 lines (confirmed via clippy at both the default 100-line threshold and
+  a temporarily-lowered 70-line threshold), zero new
+  `#[allow(clippy::too_many_lines)]`/`#[allow(clippy::cognitive_complexity)]`
+  attributes, zero unjustified `#[allow(...)]` attributes remaining, diff
+  scoped to exactly the three named files.
+- **Critique findings:** re-ran `git status --short` / `git diff --stat` —
+  confirmed no stray edits beyond the three target files; re-verified
+  `clippy.toml` byte-identical to its pre-experiment committed state
+  (`git status --short clippy.toml` clean); re-confirmed Ollama structurally
+  unavailable (`which ollama` empty, `curl -m 3 localhost:11434/api/tags`
+  exit 7) ahead of routing phase-2 review to D14.
+- **Revisions applied:** none — implementation stable and ready for phase-2
+  review and closure.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 (config) | Happy path | `GatewaySettings::validate` split preserves required-field and production-constraint validation behavior | `crates/config/src/lib.rs` `tests::app_config_validate_*` (50/50 tests in the crate's `tests` module, unmodified, all passed) | passed |
+| HP-1 (ingestion) | Happy path | `finalize_ingestion_core` split preserves the public finalize behavior and its call sites' signature | `apps/api/tests/ingestion_test.rs::finalize_returns_asset_on_success` and the surrounding session-not-found/expired/duplicate-token cases (31/31 in the file, unmodified) | passed |
+| HP-1 (router) | Happy path | `router` split preserves route registration, middleware order, and handler wiring | `apps/api/tests/workspace_test.rs` (14/14 tests, covering org/member/project/target-language routes through the same router, unmodified) | passed |
+| HP-2 | Happy path | `finalize_ingestion_core` decomposition preserves ADR-006/008/021 single-transaction atomicity | `apps/api/tests/ingestion_test.rs::finalize_rollback_on_constraint_violation`, `::finalize_rejects_duplicate_token`, and the file's other atomicity/rollback/duplicate-finalize cases (part of the 31/31 passing set) | passed |
+| EC-1 | Edge case | Not invoked — no function required a named exception; all three were successfully decomposed to ≤70 lines | N/A by design (see Implementation summary) — no `#[allow]` exception was taken, so there is no exception path to test | n/a (not applicable — condition never triggered) |
+
+### Owner final verification
+
+- Owner: `matias`
+- Date: `2026-08-30`
+- Statement: I verified every happy path and edge case defined for this task
+  has unit test evidence that replicates the expected behavior — HP-1
+  (config/ingestion/router), HP-2 (transaction atomicity), and EC-1 (not
+  triggered, by design, since no exception was needed) — and that
+  `finalize_ingestion_core`'s decomposition preserves the ADR-006/008/021
+  single-transaction contract by direct code inspection and by the
+  unmodified rollback/duplicate/atomicity tests in `ingestion_test.rs`
+  passing against the decomposed code.
+- Commands run:
+  - `cargo fmt --check`
+  - `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+  - `cargo test --workspace --all-features -- --test-threads=1`
+  - `cargo llvm-cov --workspace --summary-only --fail-under-lines 90
+    --ignore-filename-regex '<COVERAGE_IGNORE_REGEX>' -- --test-threads=1`
+    (the exact `make qa-coverage` invocation)
+
+Commit/push status: implementation complete in the working tree; **not yet
+committed**. Per `docs/policies/HITL_AUTONOMY_POLICY.md`, committing/pushing
+requires an explicit user instruction in this conversation — not implied by
+this closure record and not triggerable by an automated hook.
 
 ---
 
