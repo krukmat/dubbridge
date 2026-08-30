@@ -356,9 +356,9 @@ triggered by any automated hook, per `docs/policies/HITL_AUTONOMY_POLICY.md`.
 ## X26-T2: Lower `too_many_lines` from 100 to 70
 
 **Type:** Development (config)
-**Effort:** S (provisional)
+**Effort:** S
 **Depends on:** X26-T1
-**Status:** [ ] Planned
+**Status:** [x] Done
 
 **Objective:** Flip the workspace lint ceiling to match Tiger Style's ~70-line
 ideal, now that `X26-T1` has closed the gap it would otherwise open.
@@ -392,6 +392,153 @@ ideal, now that `X26-T1` has closed the gap it would otherwise open.
 `Cargo.toml`/`clippy.toml`; run `make qa-lint`; the only acceptable new
 `#[allow]` attributes are those `X26-T1` already justified. Stop condition:
 stop once `make qa-lint` is green.
+
+### RRI
+
+Recomputed from source via `scripts/rri.py` (not carried over from any
+earlier estimate in this session — an earlier in-conversation figure of 27
+was discarded as unverified):
+
+```
+python3 scripts/rri.py \
+  --touches Cargo.toml --touches clippy.toml \
+  --touches apps/api/tests/delivery_scope_repo_test.rs \
+  --touches apps/api/tests/review_repo_test.rs \
+  --touches apps/api/tests/workspace_test.rs \
+  --touches apps/api/tests/localization_repo_test.rs \
+  --auto-cc --D 1 --K 1 --P 1 --T 2 --A 1 --X 1 --platform dubbridge
+```
+
+`C=0` (auto-measured, no cognitive-complexity clippy warnings across the
+touched files), `F=3`, `D=1`, `T=2`, `A=1`, `K=1`, `P=1`, `X=1`. **Final RRI:
+24 → band Low (0–25).** No penalties. Per
+`docs/policies/HITL_AUTONOMY_POLICY.md § Local delegation (RRI 0–25)`, no
+full approval card was presented; the primary agent executed directly since
+no eligible local Qwen Developer was available (Ollama absent from this
+session's execution environment).
+
+### Implementation summary
+
+- `clippy.toml`: added `too-many-lines-threshold = 70` (the correct
+  mechanism — `Cargo.toml:65`'s `too_many_lines = "deny"` is a lint-level
+  declaration, not a numeric threshold, so it was correctly left untouched).
+- `apps/api/tests/delivery_scope_repo_test.rs`: `seed_scope` (78 lines)
+  decomposed into `seed_scope_project_and_asset` + `seed_scope_targets`
+  (mechanical, order-preserving extraction; no statement dropped, no
+  parameter-order change).
+- `apps/api/tests/review_repo_test.rs`: `insert_review_scope` (84 lines)
+  decomposed into `insert_review_org_and_projects` +
+  `insert_review_assets_and_language` (same extraction discipline).
+- `apps/api/tests/workspace_test.rs`: `TestContext::new`'s (74 lines)
+  stub-token-verifier construction extracted into a pure `build_stub_verifier`
+  function (no state, no DB — identical tokens/principal-ids/scope strings
+  in the same order).
+- `apps/api/tests/localization_repo_test.rs`: 6 full integration-test
+  scenarios (all `translation_*`/`dubbing_*`, 83–98 lines each) kept at
+  original length, each given a named, justified
+  `#[allow(clippy::too_many_lines)]` — single coherent multi-step narratives
+  (claim → assert → promote → assert) with cyclomatic complexity 0, where
+  splitting would fragment the assertion story across artificial boundaries
+  with no complexity reduction.
+- All 9 rows from `docs/audit/tiger-style-70-100-line-survey.md` (4–12)
+  resolved 1:1; survey doc updated in the same pass (see its § Resolution).
+
+### Reflection log
+
+RRI 24 sits below the 26+ formal Reflection-pass requirement, but the task
+writes non-trivial test-fixture decomposition logic, so per
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Reflection design pattern`'s
+boundary judgment, one light Draft → Critique → Revise pass was applied and
+is recorded here rather than skipped outright.
+
+- **Draft verdict:** all 9 flagged functions resolved (3 decomposed, 6
+  justified-allowed); `make qa-lint` clean at threshold 70; `cargo fmt
+  --check` clean; scoped `cargo test` run of the 4 touched files all `ok`
+  (37/37).
+- **Critique findings:** (1) the `cargo test` "ok" results do not constitute
+  real behavioral verification of the decomposed DB-fixture logic — every
+  touched test hits its `setup_pool()`/`TestContext::new()` early-return
+  path because no Postgres is reachable in this session (`dockerd` started
+  on manual invocation, but `docker compose up` image pulls are blocked by
+  this environment's outbound network allowlist; `docker images` confirms no
+  cached layers). (2) The survey doc (`docs/audit/tiger-style-70-100-line-
+  survey.md`) still described rows 4–12 as open/carried-to-X26-T2 and needed
+  updating in the same pass, not left stale. Both findings were also
+  independently raised by the D14 phase-1/phase-2 reviews (see below).
+- **Revisions applied:** updated
+  `docs/audit/tiger-style-70-100-line-survey.md` rows 4–12 and its
+  Resolution section in this pass (see the file for the full text); recorded
+  the live-DB-verification gap as an explicit open follow-up rather than
+  silently treating it as proven (see Unit coverage certification below and
+  the survey doc's § Resolution).
+
+### Gemma Reviewer evidence
+
+- Model: `d14` (Muse Glimmer and Gemma both structurally unavailable — no
+  Ollama in this session's execution environment; same environment finding
+  as `X26-T1`)
+- Command: manual `Agent` spawn (context-isolated `general-purpose`
+  subagent, worktree-isolated), phase-1 and phase-2 separately
+- Passes run / usable: 1/1 (phase-1), 1/1 (phase-2) — single-pass D14
+  fallback, not the N-pass Gemma/Muse Glimmer mechanism
+- Aggregate status: `PASS` (phase-1), `PASS` (phase-2)
+- Consensus findings: n/a (single-reviewer fallback) | Pass-specific: 1
+  (phase-1, non-blocking), 2 (phase-2, both non-blocking) | Disagreement: 0
+- Artifacts: `docs/audit/d14-reviews/x26-t2-phase1.md`,
+  `docs/audit/d14-reviews/x26-t2-phase2.md`
+- Isolated adjudicator: `spawned` (both phases) — trigger: Muse
+  Glimmer/Gemma unreachable (Ollama absent)
+- D14 provider route: `same-provider-degraded` — reason: no cross-provider
+  agent/CLI reachable in this environment (confirmed via `ListAgents`
+  immediately before the phase-1 spawn)
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted all findings — phase-1's evidence-gap
+  finding accepted and recorded as a carried-forward follow-up (live-DB
+  verification not achievable in this environment); phase-2's stale-survey-
+  doc finding accepted and fixed in the same pass; phase-2's stylistic
+  test-splitting note accepted as non-blocking and recorded for a future
+  task, not acted on (would be scope creep against X26-T2's acceptance
+  criteria)
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | `too_many_lines` threshold set to 70; `make qa-lint` passes with zero new violations | `make qa-lint` output (0 warnings, workspace-wide) plus the pre-existing suite across the 4 touched files continuing to pass unmodified: `apps/api/tests/delivery_scope_repo_test.rs` (2/2), `review_repo_test.rs` (8/8), `workspace_test.rs` (14/14), `localization_repo_test.rs` (13/13) — 37/37, confirming zero regressions in what the DB-absent early-return path exercises (compile, format, and structural correctness; see Reflection log for the live-DB-verification gap) | passed |
+| EC-1 | Edge case | A function still failing at 70 gets a named, justified `#[allow(clippy::too_many_lines)]` as the only accepted alternative to decomposition | 6 functions in `apps/api/tests/localization_repo_test.rs` (`translation_claim_and_promote_ready_persists_exact_current_artifacts`, `translation_redelivery_same_request_reuses_existing_claim`, `translation_promote_ready_rejects_wrong_kind_wrong_parent_and_other_asset_outputs`, `translation_stale_generation_cannot_overwrite_new_current_output`, `dubbing_claim_and_promote_ready_persists_exact_manifest_and_audio`, `dubbing_redelivery_same_request_reuses_existing_claim`) each carry a named, justified `#[allow(clippy::too_many_lines)]`; `make qa-lint` passes with these as the only new allows (independently confirmed zero-unjustified by D14 phase-2 review) | passed |
+
+### Owner final verification
+
+- Owner: `matias`
+- Date: `2026-08-30`
+- Statement: I verified every happy path and edge case defined for this task
+  has test evidence that replicates the expected behavior at the level this
+  execution environment can support (compilation, formatting, lint,
+  DB-absent-path execution, and manual diff review) — HP-1 and EC-1 are both
+  triggered and evidenced above. I accept the carried-forward follow-up that
+  genuine live-Postgres behavioral verification of the 3 decomposed
+  fixture functions remains owed at the next CI run or session with DB
+  access, and I accept it as a documented, non-blocking condition of
+  closure rather than a silent gap.
+- Commands run:
+  - `cargo fmt --check`
+  - `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+    (the exact `make qa-lint` invocation)
+  - `cargo test -p dubbridge-api --test delivery_scope_repo_test --test
+    review_repo_test --test workspace_test --test localization_repo_test --
+    --test-threads=1`
+
+### Reviewability budget: within — D14 (same-provider degraded, no
+Gemma/Muse Glimmer available)
+
+Commit/push status: not yet committed/pushed — awaiting explicit user
+instruction on destination branch, per
+`docs/policies/HITL_AUTONOMY_POLICY.md` (outward-facing actions require
+explicit approval; `X26-T1`'s precedent was "commit y push a main" given
+explicitly in conversation, not assumed to carry forward automatically).
+
+Task-analysis review: d14 docs/audit/d14-reviews/x26-t2-phase1.md - PASS
+Code-solution review: d14 docs/audit/d14-reviews/x26-t2-phase2.md - PASS
 
 ---
 

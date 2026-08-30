@@ -48,6 +48,51 @@ impl TokenVerifier for StubTokenVerifier {
     }
 }
 
+fn build_stub_verifier(
+    admin_id: Uuid,
+    viewer_id: Uuid,
+    workspace_write_token: &str,
+    workspace_read_token: &str,
+    assets_only_token: &str,
+    viewer_write_token: &str,
+) -> SharedTokenVerifier {
+    Arc::new(
+        StubTokenVerifier::default()
+            .with_token(
+                workspace_write_token,
+                Ok(AuthenticatedPrincipal::new(
+                    admin_id,
+                    ["workspaces:read", "workspaces:write"]
+                        .into_iter()
+                        .map(str::to_string),
+                )),
+            )
+            .with_token(
+                workspace_read_token,
+                Ok(AuthenticatedPrincipal::new(
+                    admin_id,
+                    ["workspaces:read"].into_iter().map(str::to_string),
+                )),
+            )
+            .with_token(
+                assets_only_token,
+                Ok(AuthenticatedPrincipal::new(
+                    admin_id,
+                    ["assets:ingest"].into_iter().map(str::to_string),
+                )),
+            )
+            .with_token(
+                viewer_write_token,
+                Ok(AuthenticatedPrincipal::new(
+                    viewer_id,
+                    ["workspaces:read", "workspaces:write"]
+                        .into_iter()
+                        .map(str::to_string),
+                )),
+            ),
+    )
+}
+
 struct TestContext {
     pool: PgPool,
     _storage_dir: Arc<TempDir>,
@@ -86,40 +131,13 @@ impl TestContext {
         let assets_only_token = "assets-only-token".to_string();
         let viewer_write_token = "viewer-write-token".to_string();
 
-        let verifier: SharedTokenVerifier = Arc::new(
-            StubTokenVerifier::default()
-                .with_token(
-                    &workspace_write_token,
-                    Ok(AuthenticatedPrincipal::new(
-                        admin_id,
-                        ["workspaces:read", "workspaces:write"]
-                            .into_iter()
-                            .map(str::to_string),
-                    )),
-                )
-                .with_token(
-                    &workspace_read_token,
-                    Ok(AuthenticatedPrincipal::new(
-                        admin_id,
-                        ["workspaces:read"].into_iter().map(str::to_string),
-                    )),
-                )
-                .with_token(
-                    &assets_only_token,
-                    Ok(AuthenticatedPrincipal::new(
-                        admin_id,
-                        ["assets:ingest"].into_iter().map(str::to_string),
-                    )),
-                )
-                .with_token(
-                    &viewer_write_token,
-                    Ok(AuthenticatedPrincipal::new(
-                        viewer_id,
-                        ["workspaces:read", "workspaces:write"]
-                            .into_iter()
-                            .map(str::to_string),
-                    )),
-                ),
+        let verifier = build_stub_verifier(
+            admin_id,
+            viewer_id,
+            &workspace_write_token,
+            &workspace_read_token,
+            &assets_only_token,
+            &viewer_write_token,
         );
 
         let config = dubbridge_config::AppConfig::from_env();

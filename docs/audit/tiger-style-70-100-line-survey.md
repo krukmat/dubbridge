@@ -47,28 +47,48 @@ ingestion/src/lib.rs:48-145`, 97 lines).
 | 1 | `crates/config/src/lib.rs:341` | `GatewaySettings::validate` | 71 | production | **Resolved by X26-T1** — decomposed into `validate` (6 lines) + `validate_required_fields` (61) + `validate_production_constraints` (~26) |
 | 2 | `crates/ingestion/src/lib.rs:48` | `finalize_ingestion_core` (raw span 48-144, 97 lines — see Method) | 77 | production | **Resolved by X26-T1** — decomposed into `finalize_ingestion_core` (41) + `lock_pending_or_reject` (25) + `build_finalize_command` (19) + `persist_finalization_writes` (46), threading the same `sqlx::Transaction` throughout (ADR-006/008/021 atomicity preserved) |
 | 3 | `apps/api/src/routes/workspace.rs:39` | `router` | 76 | production | **Resolved by X26-T1** — decomposed into `router` (7) + `global_write_routes` (12) + `global_read_routes` (12) + `org_write_routes` (29) + `org_read_routes` (29) |
-| 4 | `apps/api/tests/delivery_scope_repo_test.rs:31` | `seed_scope` | 78 | test helper | Out of scope for `X26-T1` — carried to `X26-T2` |
-| 5 | `apps/api/tests/review_repo_test.rs:37` | `insert_review_scope` | 84 | test helper | Out of scope for `X26-T1` — carried to `X26-T2` |
-| 6 | `apps/api/tests/workspace_test.rs:66` | `TestContext::new` | 74 | test helper | Out of scope for `X26-T1` — carried to `X26-T2` |
-| 7 | `apps/api/tests/localization_repo_test.rs:267` | `translation_claim_and_promote_ready_persists_exact_current_artifacts` | 88 | test | Out of scope for `X26-T1` — carried to `X26-T2` |
-| 8 | `apps/api/tests/localization_repo_test.rs:368` | `translation_redelivery_same_request_reuses_existing_claim` | 83 | test | Out of scope for `X26-T1` — carried to `X26-T2` |
-| 9 | `apps/api/tests/localization_repo_test.rs:512` | `translation_promote_ready_rejects_wrong_kind_wrong_parent_and_other_asset_outputs` | 87 | test | Out of scope for `X26-T1` — carried to `X26-T2` |
-| 10 | `apps/api/tests/localization_repo_test.rs:683` | `translation_stale_generation_cannot_overwrite_new_current_output` | 84 | test | Out of scope for `X26-T1` — carried to `X26-T2` |
-| 11 | `apps/api/tests/localization_repo_test.rs:779` | `dubbing_claim_and_promote_ready_persists_exact_manifest_and_audio` | 98 | test | Out of scope for `X26-T1` — carried to `X26-T2` |
-| 12 | `apps/api/tests/localization_repo_test.rs:892` | `dubbing_redelivery_same_request_reuses_existing_claim` | 89 | test | Out of scope for `X26-T1` — carried to `X26-T2` |
+| 4 | `apps/api/tests/delivery_scope_repo_test.rs:31` | `seed_scope` | 78 | test helper | **Resolved by X26-T2** — decomposed into `seed_scope_project_and_asset` + `seed_scope_targets` (mechanical, order-preserving extraction) |
+| 5 | `apps/api/tests/review_repo_test.rs:37` | `insert_review_scope` | 84 | test helper | **Resolved by X26-T2** — decomposed into `insert_review_org_and_projects` + `insert_review_assets_and_language` (mechanical, order-preserving extraction) |
+| 6 | `apps/api/tests/workspace_test.rs:66` | `TestContext::new` | 74 | test helper | **Resolved by X26-T2** — stub-token-verifier construction extracted into `build_stub_verifier` (pure builder, no state) |
+| 7 | `apps/api/tests/localization_repo_test.rs:267` | `translation_claim_and_promote_ready_persists_exact_current_artifacts` | 88 | test | **Resolved by X26-T2** — kept as one scenario, justified `#[allow(clippy::too_many_lines)]` (single linear claim→assert→promote→assert narrative, CC 0) |
+| 8 | `apps/api/tests/localization_repo_test.rs:368` | `translation_redelivery_same_request_reuses_existing_claim` | 83 | test | **Resolved by X26-T2** — justified `#[allow(clippy::too_many_lines)]` (same rationale as row 7) |
+| 9 | `apps/api/tests/localization_repo_test.rs:512` | `translation_promote_ready_rejects_wrong_kind_wrong_parent_and_other_asset_outputs` | 87 | test | **Resolved by X26-T2** — justified `#[allow(clippy::too_many_lines)]`; phase-2 D14 review flagged this one as a plausible future candidate for splitting into 2-3 `#[tokio::test]` cases (independent negative-case matrix) instead of suppression — non-blocking stylistic note, not acted on in this task |
+| 10 | `apps/api/tests/localization_repo_test.rs:683` | `translation_stale_generation_cannot_overwrite_new_current_output` | 84 | test | **Resolved by X26-T2** — justified `#[allow(clippy::too_many_lines)]` (same rationale as row 7) |
+| 11 | `apps/api/tests/localization_repo_test.rs:779` | `dubbing_claim_and_promote_ready_persists_exact_manifest_and_audio` | 98 | test | **Resolved by X26-T2** — justified `#[allow(clippy::too_many_lines)]` (same rationale as row 7) |
+| 12 | `apps/api/tests/localization_repo_test.rs:892` | `dubbing_redelivery_same_request_reuses_existing_claim` | 89 | test | **Resolved by X26-T2** — justified `#[allow(clippy::too_many_lines)]` (same rationale as row 7) |
 
 12 functions total: **3 production**, **9 test** (1 test helper counted
 separately from the 8 `#[tokio::test]` integration tests above it — see row
 5/6 vs. rows 7-12).
 
-## Resolution (X26-T1, 2026-08-30)
+## Resolution (X26-T1 + X26-T2, 2026-08-30)
 
 Rows 1-3 (production) closed by `X26-T1` — see
 `docs/tasks/tiger-style-adaptation.md` § `X26-T1` for the full closure record
 (diff, Reflection log, phase-1/phase-2 D14 review artifacts, unit coverage
-certification, owner verification). Rows 4-12 (test code) remain open,
-explicitly carried forward as `X26-T2`'s responsibility per `X26-T1`'s Scope
-decision.
+certification, owner verification).
+
+Rows 4-12 (test code) closed by `X26-T2` — see
+`docs/tasks/tiger-style-adaptation.md` § `X26-T2` for the full closure record
+(RRI 24 recompute, D14 phase-1/phase-2 review artifacts, `make qa-lint`
+before/after, unit coverage certification, owner verification). All 12 rows
+are now resolved; `clippy.toml`'s `too-many-lines-threshold` is set to 70
+workspace-wide with zero unjustified `#[allow(clippy::too_many_lines)]`
+attributes.
+
+**Open follow-up (not blocking, carried in `X26-T2`'s closure record):** the
+3 decomposed test-fixture functions (rows 4-6) were verified by
+compilation, `cargo fmt`, `cargo clippy`, and manual line-by-line diff
+review only — this execution environment has no reachable Postgres
+(`DUBBRIDGE_DATABASE_URL` unset, Docker image pulls blocked by the outbound
+network allowlist), so every touched integration test hit its
+`setup_pool()`/`TestContext::new()` early-return path and never exercised
+the decomposed DB-writing logic at runtime. Genuine behavioral verification
+of insert order, bind-parameter order, and token-mapping fidelity for
+`seed_scope_project_and_asset`/`seed_scope_targets`,
+`insert_review_org_and_projects`/`insert_review_assets_and_language`, and
+`build_stub_verifier` is still owed at the next CI run or session with live
+Postgres access.
 
 ## Notes for X26-T1
 

@@ -10,3 +10,7 @@ allow-expect-in-tests = true
 # SRP gate threshold for cognitive_complexity (deny in Cargo.toml).
 # McCabe-equivalent ceiling: functions above this must be decomposed.
 cognitive-complexity-threshold = 15
+
+# Tiger Style line-count ceiling (deny in Cargo.toml), lowered from the
+# clippy default of 100 per X26-T2 (docs/tasks/tiger-style-adaptation.md).
+too-many-lines-threshold = 70

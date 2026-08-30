@@ -28,7 +28,7 @@ struct Scope {
     targets: Vec<TargetLanguage>,
 }
 
-async fn seed_scope(pool: &PgPool, codes: &[&str]) -> Scope {
+async fn seed_scope_project_and_asset(pool: &PgPool) -> (ProjectId, AssetId) {
     let project_id = ProjectId::new();
     let asset_id = AssetId::new();
     let org_id = Uuid::new_v4();
@@ -64,6 +64,14 @@ async fn seed_scope(pool: &PgPool, codes: &[&str]) -> Scope {
         .await
         .expect("insert project_assets");
 
+    (project_id, asset_id)
+}
+
+async fn seed_scope_targets(
+    pool: &PgPool,
+    project_id: ProjectId,
+    codes: &[&str],
+) -> Vec<TargetLanguage> {
     let mut targets = Vec::new();
     for (index, code) in codes.iter().enumerate() {
         let lang_id = Uuid::new_v4();
@@ -81,6 +89,12 @@ async fn seed_scope(pool: &PgPool, codes: &[&str]) -> Scope {
             .expect("insert target language");
         targets.push(target);
     }
+    targets
+}
+
+async fn seed_scope(pool: &PgPool, codes: &[&str]) -> Scope {
+    let (project_id, asset_id) = seed_scope_project_and_asset(pool).await;
+    let targets = seed_scope_targets(pool, project_id, codes).await;
 
     let original = ArtifactRecord::new_original(
         asset_id,

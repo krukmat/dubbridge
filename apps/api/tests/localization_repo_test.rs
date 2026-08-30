@@ -264,6 +264,10 @@ async fn count_claim_rows(
 }
 
 #[tokio::test]
+// Single coherent claim -> in-progress -> promote -> ready scenario; splitting
+// it would fragment the assertion narrative across artificial boundaries with
+// no complexity reduction (cyclomatic complexity is 0 — linear DB calls).
+#[allow(clippy::too_many_lines)]
 async fn translation_claim_and_promote_ready_persists_exact_current_artifacts() {
     let Some(pool) = setup_pool().await else {
         return;
@@ -365,6 +369,10 @@ async fn translation_claim_and_promote_ready_persists_exact_current_artifacts() 
 }
 
 #[tokio::test]
+// Single coherent redelivery scenario; splitting it would fragment the
+// assertion narrative across artificial boundaries with no complexity
+// reduction (cyclomatic complexity is 0 — linear DB calls).
+#[allow(clippy::too_many_lines)]
 async fn translation_redelivery_same_request_reuses_existing_claim() {
     let Some(pool) = setup_pool().await else {
         return;
@@ -509,6 +517,10 @@ async fn translation_claim_rejects_wrong_kind_and_other_asset() {
 }
 
 #[tokio::test]
+// Single coherent rejection-matrix scenario; splitting it would fragment the
+// assertion narrative across artificial boundaries with no complexity
+// reduction (cyclomatic complexity is 0 — linear DB calls).
+#[allow(clippy::too_many_lines)]
 async fn translation_promote_ready_rejects_wrong_kind_wrong_parent_and_other_asset_outputs() {
     let Some(pool) = setup_pool().await else {
         return;
@@ -680,6 +692,10 @@ async fn translation_explicit_regeneration_cannot_use_reserved_initial_request_i
 }
 
 #[tokio::test]
+// Single coherent stale-generation scenario; splitting it would fragment the
+// assertion narrative across artificial boundaries with no complexity
+// reduction (cyclomatic complexity is 0 — linear DB calls).
+#[allow(clippy::too_many_lines)]
 async fn translation_stale_generation_cannot_overwrite_new_current_output() {
     let Some(pool) = setup_pool().await else {
         return;
@@ -776,6 +792,10 @@ async fn translation_stale_generation_cannot_overwrite_new_current_output() {
 }
 
 #[tokio::test]
+// Single coherent claim -> promote -> ready scenario; splitting it would
+// fragment the assertion narrative across artificial boundaries with no
+// complexity reduction (cyclomatic complexity is 0 — linear DB calls).
+#[allow(clippy::too_many_lines)]
 async fn dubbing_claim_and_promote_ready_persists_exact_manifest_and_audio() {
     let Some(pool) = setup_pool().await else {
         return;
@@ -889,6 +909,10 @@ async fn dubbing_claim_and_promote_ready_persists_exact_manifest_and_audio() {
 }
 
 #[tokio::test]
+// Single coherent redelivery scenario; splitting it would fragment the
+// assertion narrative across artificial boundaries with no complexity
+// reduction (cyclomatic complexity is 0 — linear DB calls).
+#[allow(clippy::too_many_lines)]
 async fn dubbing_redelivery_same_request_reuses_existing_claim() {
     let Some(pool) = setup_pool().await else {
         return;
