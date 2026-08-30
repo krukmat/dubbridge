@@ -1,22 +1,39 @@
 import type { createExpoFileSystemMock } from '../../test-utils/expo-file-system-mock';
 
 jest.mock('expo-file-system', () => {
-  const { createExpoFileSystemMock: mockFactory } = require('../../test-utils/expo-file-system-mock');
+  const { createExpoFileSystemMock: mockFactory } = require(
+    '../../test-utils/expo-file-system-mock',
+  );
   return mockFactory();
 });
 
-import { TransientStorageError, isWithinProofRoot, deleteProofRunDirectory, listAbandonedProofRuns } from '../../src/p2p/proof/transient-storage';
+import {
+  TransientStorageError,
+  isWithinProofRoot,
+  deleteProofRunDirectory,
+  listAbandonedProofRuns,
+} from '../../src/p2p/proof/transient-storage';
 
 const mockFs: ReturnType<typeof createExpoFileSystemMock> = jest.requireMock('expo-file-system');
+
+const PROOFS_DIR = ['dubbridge-p2p', 'proofs'] as const;
+
+function proofRunDir(runId: string) {
+  return new mockFs.Directory(mockFs.Paths.cache, ...PROOFS_DIR, runId);
+}
+
+function proofsParentDir() {
+  return new mockFs.Directory(mockFs.Paths.cache, ...PROOFS_DIR);
+}
 
 describe('transient-storage', () => {
   beforeEach(() => {
     mockFs.__reset();
   });
 
-  test('HP: deleteProofRunDirectory on a directory that exists deletes it and resolves without throwing', async () => {
+  test('HP: delete on an existing dir removes it and resolves', async () => {
     const runId = 'abc12345';
-    const dir = new mockFs.Directory(mockFs.Paths.cache, 'dubbridge-p2p', 'proofs', runId);
+    const dir = proofRunDir(runId);
     dir.exists = true;
     dir.deleteFn = () => {
       dir.exists = false;
@@ -26,16 +43,16 @@ describe('transient-storage', () => {
     expect(dir.exists).toBe(false);
   });
 
-  test('HP: listAbandonedProofRuns returns only run-id-shaped directory names older than the age bound', async () => {
-    const parentDir = new mockFs.Directory(mockFs.Paths.cache, 'dubbridge-p2p', 'proofs');
+  test('HP: listAbandonedProofRuns returns only stale run-id dirs', async () => {
+    const parentDir = proofsParentDir();
     parentDir.exists = true;
 
     const oldRunId = 'oldrun123';
     const freshRunId = 'freshrun123';
-    const oldDir = new mockFs.Directory(mockFs.Paths.cache, 'dubbridge-p2p', 'proofs', oldRunId);
-    const freshDir = new mockFs.Directory(mockFs.Paths.cache, 'dubbridge-p2p', 'proofs', freshRunId);
-    const nonRunIdDir = new mockFs.Directory(mockFs.Paths.cache, 'dubbridge-p2p', 'proofs', 'invalid');
-    const fileEntry = new mockFs.File(mockFs.Paths.cache, 'dubbridge-p2p', 'proofs', 'file.txt');
+    const oldDir = proofRunDir(oldRunId);
+    const freshDir = proofRunDir(freshRunId);
+    const nonRunIdDir = proofRunDir('invalid');
+    const fileEntry = new mockFs.File(mockFs.Paths.cache, ...PROOFS_DIR, 'file.txt');
 
     oldDir.infoFn = () => ({ modificationTime: 500 });
     freshDir.infoFn = () => ({ modificationTime: 5000 });
@@ -52,35 +69,41 @@ describe('transient-storage', () => {
     expect(result.length).toBe(1);
   });
 
-  test('EC: deleteProofRunDirectory with a runId that fails the regex throws TransientStorageError with code "TRANSIENT_STORAGE_PATH_INVALID"', async () => {
+  test('EC: delete with an invalid runId throws PATH_INVALID', async () => {
     await expect(deleteProofRunDirectory('invalid')).rejects.toThrow(TransientStorageError);
-    await expect(deleteProofRunDirectory('invalid')).rejects.toMatchObject({ code: 'TRANSIENT_STORAGE_PATH_INVALID' });
+    await expect(deleteProofRunDirectory('invalid')).rejects.toMatchObject({
+      code: 'TRANSIENT_STORAGE_PATH_INVALID',
+    });
   });
 
-  test('EC: deleteProofRunDirectory on a directory whose .exists is false throws TransientStorageError with code "TRANSIENT_STORAGE_NOT_FOUND"', async () => {
+  test('EC: delete on a dir whose .exists is false throws NOT_FOUND', async () => {
     const runId = 'abc12345';
-    const dir = new mockFs.Directory(mockFs.Paths.cache, 'dubbridge-p2p', 'proofs', runId);
+    const dir = proofRunDir(runId);
     dir.exists = false;
 
     await expect(deleteProofRunDirectory(runId)).rejects.toThrow(TransientStorageError);
-    await expect(deleteProofRunDirectory(runId)).rejects.toMatchObject({ code: 'TRANSIENT_STORAGE_NOT_FOUND' });
+    await expect(deleteProofRunDirectory(runId)).rejects.toMatchObject({
+      code: 'TRANSIENT_STORAGE_NOT_FOUND',
+    });
   });
 
-  test('EC: if the mocked .delete() throws, deleteProofRunDirectory throws TransientStorageError with code "TRANSIENT_STORAGE_DELETE_FAILED"', async () => {
+  test('EC: if the mocked .delete() throws, delete throws DELETE_FAILED', async () => {
     const runId = 'abc12345';
-    const dir = new mockFs.Directory(mockFs.Paths.cache, 'dubbridge-p2p', 'proofs', runId);
+    const dir = proofRunDir(runId);
     dir.exists = true;
     dir.deleteFn = () => {
       throw new Error('Delete failed');
     };
 
     await expect(deleteProofRunDirectory(runId)).rejects.toThrow(TransientStorageError);
-    await expect(deleteProofRunDirectory(runId)).rejects.toMatchObject({ code: 'TRANSIENT_STORAGE_DELETE_FAILED' });
+    await expect(deleteProofRunDirectory(runId)).rejects.toMatchObject({
+      code: 'TRANSIENT_STORAGE_DELETE_FAILED',
+    });
   });
 
-  test('EC: if .delete() succeeds but .exists is still true afterward, deleteProofRunDirectory throws TransientStorageError with code "TRANSIENT_STORAGE_VERIFY_FAILED"', async () => {
+  test('EC: if .delete() succeeds but .exists stays true, delete throws VERIFY_FAILED', async () => {
     const runId = 'abc12345';
-    const dir = new mockFs.Directory(mockFs.Paths.cache, 'dubbridge-p2p', 'proofs', runId);
+    const dir = proofRunDir(runId);
     dir.exists = true;
     dir.deleteFn = () => {
       // Simulate delete not actually removing the directory
@@ -88,22 +111,25 @@ describe('transient-storage', () => {
     };
 
     await expect(deleteProofRunDirectory(runId)).rejects.toThrow(TransientStorageError);
-    await expect(deleteProofRunDirectory(runId)).rejects.toMatchObject({ code: 'TRANSIENT_STORAGE_VERIFY_FAILED' });
+    await expect(deleteProofRunDirectory(runId)).rejects.toMatchObject({
+      code: 'TRANSIENT_STORAGE_VERIFY_FAILED',
+    });
   });
 
-  test('EC: isWithinProofRoot rejects a URI containing .., a URI for a different runId, and a URI entirely outside the proofs directory; accepts the exact proof-root URI and a nested path under it', () => {
+  test('EC: isWithinProofRoot rejects traversal, other runs, and paths outside proofs', () => {
     const runId = 'abc12345';
-    const proofRoot = new mockFs.Directory(mockFs.Paths.cache, 'dubbridge-p2p', 'proofs', runId).uri;
+    const proofRoot = proofRunDir(runId).uri;
+    const otherRunRoot = proofRunDir('different').uri;
 
     expect(isWithinProofRoot(proofRoot, runId)).toBe(true);
     expect(isWithinProofRoot(proofRoot + '/nested/file.txt', runId)).toBe(true);
     expect(isWithinProofRoot(proofRoot + '/../other', runId)).toBe(false);
-    expect(isWithinProofRoot(new mockFs.Directory(mockFs.Paths.cache, 'dubbridge-p2p', 'proofs', 'different').uri, runId)).toBe(false);
+    expect(isWithinProofRoot(otherRunRoot, runId)).toBe(false);
     expect(isWithinProofRoot(mockFs.Paths.cache + '/other/path', runId)).toBe(false);
   });
 
-  test('EC: listAbandonedProofRuns returns [] without calling .list() when the parent directory\'s .exists is false', async () => {
-    const parentDir = new mockFs.Directory(mockFs.Paths.cache, 'dubbridge-p2p', 'proofs');
+  test("EC: listAbandonedProofRuns returns [] without listing when parent doesn't exist", async () => {
+    const parentDir = proofsParentDir();
     parentDir.exists = false;
     parentDir.listFn = () => {
       throw new Error('list() should not be called');
