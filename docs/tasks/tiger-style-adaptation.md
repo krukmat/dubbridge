@@ -103,14 +103,45 @@ result is large)
 **Depends on:** X26-T0
 **Status:** [ ] Planned
 
-**Objective:** Decompose every function `X26-T0` flagged (starting with
-`finalize_ingestion_core`) to ≤70 lines each, preserving existing behavior and
-test coverage, so `X26-T2` can flip the lint threshold without breaking CI.
+**Objective:** Decompose the three production functions `X26-T0` flagged
+(`GatewaySettings::validate`, `finalize_ingestion_core`, `apps/api`'s
+`router`) to ≤70 lines each, preserving existing behavior and test coverage,
+so `X26-T2` can flip the lint threshold without breaking CI on production
+code.
+
+**Scope decision (resolved at presentation, 2026-08-30 — corrects an earlier
+misstatement):** This task covers **only the 3 production-code rows** from
+the `X26-T0` survey table (rows 1–3: `GatewaySettings::validate`,
+`finalize_ingestion_core`, `router`). The 9 test-code rows (rows 4–12) are
+**explicitly out of scope for this task** — but this is a scope decision made
+now, by the agent presenting this card, not a fact already settled by
+`X26-T0`'s survey. The survey's own "Open question" section left this
+undecided and flagged it as a question "for whoever presents `X26-T1` for
+approval" — an earlier draft of this entry incorrectly stated the survey had
+already excluded the test rows; that was inaccurate and is corrected here.
+Rationale for excluding tests from this task's scope: they are test-fixture/
+integration-test bodies (long for legitimate multi-step setup reasons), not
+production-code Tiger Style is primarily targeting, and decomposing them
+risks fragmenting test readability for marginal benefit.
+**Consequence for `X26-T2`:** `clippy.toml`'s `too-many-lines-threshold` is
+workspace-wide and does not distinguish test code, so `X26-T2` flipping the
+threshold to 70 will still flag all 9 test rows (each already measured at
+70–98 lines in the `X26-T0` survey). `X26-T2`'s task entry below is amended
+with an explicit acceptance criterion requiring those 9 rows to be resolved
+(decomposed or given a named, justified `#[allow(clippy::too_many_lines)]`)
+before it can close — this task does not silently leave that gap for `X26-T2`
+to discover.
 
 **Happy paths considered:**
 - **HP-1:** A flagged function is split into named helper functions ≤70 lines
   each; the original call site's public signature and behavior are unchanged;
   existing tests for that function pass unmodified.
+- **HP-2:** `finalize_ingestion_core`'s decomposition preserves the ADR-006/
+  ADR-008/ADR-021 single-transaction atomicity contract (rights validation,
+  asset/rights/artifact/audit inserts, and pending-row deletion still commit
+  or roll back together as one PostgreSQL transaction) — proven by the
+  existing `apps/api/tests/ingestion_test.rs` rollback/duplicate-finalize/
+  atomicity tests passing unmodified against the decomposed code.
 
 **Edge cases considered:**
 - **EC-1:** A function whose logic genuinely cannot be cleanly split without
@@ -118,12 +149,17 @@ test coverage, so `X26-T2` can flip the lint threshold without breaking CI.
   documented as a named exception with justification, not silently `#[allow]`ed.
 
 **Acceptance criteria:**
-- Every function in the `X26-T0` survey table is either decomposed to ≤70
+- Each of the 3 in-scope production functions is either decomposed to ≤70
   lines or recorded as a named, justified exception.
 - `finalize_ingestion_core` is decomposed to ≤70 lines using or extending its
-  existing five sub-70-line helpers.
+  existing five sub-70-line helpers (`begin_tx`, `commit_and_fetch`,
+  `insert_artifact_or_reject`, `emit_duplicate_rejection`,
+  `is_unique_violation`), without altering its single-transaction atomicity
+  contract.
 - `make qa-test` and `make qa-coverage` pass unchanged in outcome (same tests
-  pass; coverage does not regress below the 90% gate).
+  pass, including `apps/api/tests/ingestion_test.rs`'s rollback/duplicate/
+  atomicity cases and `apps/api/tests/workspace_test.rs`; coverage does not
+  regress below the 90% gate).
 - No new `#[allow(clippy::too_many_lines)]` or `#[allow(clippy::
   cognitive_complexity)]` introduced without a recorded justification.
 
@@ -131,7 +167,8 @@ test coverage, so `X26-T2` can flip the lint threshold without breaking CI.
 before/after line counts per flagged function.
 
 **Status artifacts affected:** this task ledger, `X26-T0`'s survey artifact
-(mark each row resolved).
+(mark rows 1–3 resolved; rows 4–12 explicitly noted as out of scope for this
+task, carried forward to `X26-T2`).
 
 **Agent handoff prompt:** Using `X26-T0`'s survey table, decompose each
 flagged function to ≤70 lines, starting with `crates/ingestion/src/lib.rs`'s
@@ -168,6 +205,11 @@ ideal, now that `X26-T1` has closed the gap it would otherwise open.
 - `make qa-lint` passes.
 - Zero unjustified new `#[allow]` attributes (every one traces to an
   `X26-T1`-recorded exception).
+- The 9 test-code rows `X26-T1` explicitly left out of scope (see `X26-T1`'s
+  Scope decision) are resolved before this task closes: each is either
+  decomposed to ≤70 lines or given its own named, justified
+  `#[allow(clippy::too_many_lines)]`. This task may not flip the threshold
+  and leave those 9 functions failing `make qa-lint` unaddressed.
 
 **Evidence to emit:** `make qa-lint` output before/after.
 
