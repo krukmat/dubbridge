@@ -1,0 +1,36 @@
+{
+  "error": {
+    "code": "timeout",
+    "message": "http://127.0.0.1:11434/api/generate did not respond within 120.0s."
+  },
+  "finished_at": "2026-08-30T19:08:19.775699Z",
+  "generation": null,
+  "model": {
+    "expected_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "resolved_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "tag": "muse-glimmer:30b-q4_K_M"
+  },
+  "packet": {
+    "expected_sha256": "7c22e2a5a5abf1910592a9a9d106a32f8266a569a24c2da970b89933ea828f68",
+    "path": "docs/audit/mvp0-p2p-p1-a2-adr038-packet.json",
+    "sha256": "7c22e2a5a5abf1910592a9a9d106a32f8266a569a24c2da970b89933ea828f68"
+  },
+  "profile": "med-high-refinement-v1",
+  "prompt": {
+    "profile": "med-high-refinement-v1",
+    "sha256": "b00233870418a508048204fb25ba31374b5105a4663528f30016be3e014053c3",
+    "version": "med-high-refinement-prompt-v1"
+  },
+  "response": null,
+  "runtime": {
+    "num_ctx": 8192,
+    "num_predict": 1024,
+    "ollama_url": "http://127.0.0.1:11434",
+    "temperature": 0.0,
+    "timeout_seconds": 120.0
+  },
+  "schema_version": "adr037-local-architect-artifact-v1",
+  "started_at": "2026-08-30T19:06:19.672127Z",
+  "status": "failed",
+  "success": false
+}
