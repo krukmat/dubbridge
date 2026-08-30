@@ -40,7 +40,8 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 | P1.F3b | P0 config/dependency cleanup | Implemented + audited 2026-08-27 — blocked on Android device proof (X28) | P1.F3a.2 PASS — satisfied 2026-08-27 |
 | P1.A1 | Hyperdrive/Corestore Android bundle smoke proof (planning parent) | Decomposed 2026-08-28 — no direct source execution | P1.F3b PASS |
 | P1.A1a | Add Corestore/Hyperdrive deps + bundle check | PASS — Done 2026-08-28 | P1.F3b PASS |
-| P1.A1b | Transient drive open/close logic (HP-A1) | Ready — needs its own approval/delegation | P1.A1a PASS — satisfied 2026-08-28 |
+| P1.A1b.0 | Proof-storage contract preflight | PASS — Done 2026-08-30 | P1.A1a PASS — satisfied 2026-08-28 |
+| P1.A1b | Transient drive open/close logic (HP-A1) | Ready — RRI 50 Med-high; needs phase-1/card/approval | P1.A1b.0 PASS — satisfied 2026-08-30 |
 | P1.A1c | Typed error handling (EC-A1) | Blocked | P1.A1b PASS |
 | P1.A1d | Tests + evidence + closure | Blocked | P1.A1c PASS |
 | P1.A2 | Transient seed lifecycle + residue cleanup | Deferred — needs current RRI/card/approval | P1.A1d PASS |
@@ -144,10 +145,10 @@ explicit owner-directed MVP0-P2P exception;
 1. Revised parent approval accepted ADR-043 and this decomposition on
    2026-08-27; it authorizes child preparation only.
 2. Score, present, approve, implement, and close P1.F1 → P1.F2 → P1.F3a.1 →
-   P1.F3a.2 → P1.F3b → (P1.A1a → P1.A1b → P1.A1c → P1.A1d) → P1.A2 → P1.B1 →
-   P1.B2 in order. P1.A1 was decomposed 2026-08-28 into four Low-band
-   children at the owner's request; do not edit source for a child before its
-   own approval/delegation and do not start the next child before PASS/status
+   P1.F3a.2 → P1.F3b → (P1.A1a → P1.A1b.0 → P1.A1b → P1.A1c → P1.A1d) → P1.A2 → P1.B1 →
+   P1.B2 in order. P1.A1 has four executable children plus the closed
+   documentation-only P1.A1b.0 preflight. Do not edit source for a child before
+   its own approval/delegation and do not start the next child before PASS/status
    sync.
 3. Close P1 only after all executable children (including all four P1.A1
    children), five parent Reflection passes, coverage
@@ -490,9 +491,10 @@ and passing focused/typecheck/lint/full-Jest verification.
 
 ## P1.A1 — Hyperdrive/Corestore Android bundle smoke proof (planning parent)
 
-- **Status:** Decomposed 2026-08-28 into Low-band (RRI 0-25) children below, at
-  the owner's explicit request. No direct source execution under this parent
-  ID — see `P1.A1a`-`P1.A1d`.
+- **Status:** Decomposed 2026-08-28 at the owner's explicit request. The
+  documentation-only P1.A1b.0 preflight closed PASS on 2026-08-30; it raised
+  P1.A1b's executable scope to RRI 50 Med-high. No direct source execution
+  under this parent ID — see `P1.A1a`-`P1.A1d` and P1.A1b.0.
 - **Objective (unchanged, inherited by children):** prove compatible
   Corestore/Hyperdrive dependencies can bundle, open an empty transient drive
   on Android, close it, and perform no discovery — a bundling/dependency
@@ -511,7 +513,7 @@ and passing focused/typecheck/lint/full-Jest verification.
      triggering network/Hyperswarm code (P1.A1c).
   4. (likely-false-positive) receipt schema ambiguity for automated
      assertions — same fix as #1.
-- **Sequencing:** P1.A1a -> P1.A1b -> P1.A1c -> P1.A1d, in order. P1.A2
+- **Sequencing:** P1.A1a -> P1.A1b.0 -> P1.A1b -> P1.A1c -> P1.A1d, in order. P1.A2
   depends on P1.A1d PASS (all four children PASS), not on this parent ID
   directly.
 
@@ -534,25 +536,99 @@ and passing focused/typecheck/lint/full-Jest verification.
   mobile/package.json + package-lock.json; no new source logic; confirm
   check:bare-worklet and typecheck stay clean.`
 
+### P1.A1b.0 — Proof-storage contract preflight
+
+- **Status:** PASS — Done 2026-08-30. It froze the contract in
+  `docs/audit/mvp0-p2p-p1-a1b-storage-contract.md` and superseded P1.A1b's
+  preliminary RRI 53 with its final presentation-time RRI 50.
+- **Effort / RRI:** S / 10 Low. Full report:
+  `docs/audit/mvp0-p2p-p1-a1b-preflight-rri.md`.
+- **Allowed paths:** `docs/tasks/mvp0-p2p-p1-replication.md`,
+  `docs/plan/mvp0-p2p-p1-replication.md`,
+  `docs/plan/roadmap.md`, and P1.A1b audit artifacts only. No `mobile/`
+  source, package, lockfile, generated bundle, Android, or device changes.
+- **Objective:** turn the P1.A1b phase-1 blockers into one ADR-043-aligned,
+  implementation-ready storage/RPC contract without opening a drive or starting
+  network activity.
+- **HP-A1b.0:** the contract identifies the authoritative host-side proof-cache
+  root, its representation at the Bare boundary, the exact RPC request/response
+  schema, direct storage-import/dependency ownership, and close/failure order.
+- **EC-A1b.0:** reject any proposal that accepts a caller-controlled root,
+  relies on an undocumented transitive `bare-fs` import, exposes a product P2P
+  API, starts Hyperswarm/discovery, creates durable storage, or treats X28 as a
+  source-test failure.
+- **Acceptance:**
+  1. Record a bounded source-of-truth and validation rule for a single
+     `Paths.cache/dubbridge-p2p/proofs/<run-id>` child, including URI-versus-
+     native-path handling at the host/Bare boundary.
+  2. Freeze the P1.A1b command name, request schema, exactly-two-field success
+     receipt (`capability`, `schema_version`), typed error surface, and close
+     ordering; neither key material nor filesystem paths may appear in receipts.
+  3. Record whether `bare-fs` must become a direct dependency; if it does, add a
+     separate dependency-only child before P1.A1b rather than silently widening
+     it.
+  4. Amend P1.A1b's allowed paths and HP/EC/test evidence to the resulting
+     minimal, testable source surface, then recalculate its RRI and require a
+     new phase-1 PASS.
+- **Evidence to emit:** installed package/version evidence, a frozen contract
+  record, revised downstream task scope, and the replacement P1.A1b RRI/phase-1
+  artifacts.
+- **Status artifacts affected:** this ledger, the P1 plan, roadmap, and
+  `docs/audit/mvp0-p2p-p1-a1b-*.md`.
+- **Task-analysis review:** n/a — documentation/contract-only task.
+- **Code-solution review:** n/a — documentation/contract-only task.
+- **Handoff prompt:** `P1.A1b.0 — resolve and record the proof-storage and RPC
+  contract for P1.A1b only; do not edit mobile source or dependencies, start a
+  drive, or add network behavior.`
+
 ### P1.A1b — Transient drive open/close logic (HP-A1)
 
-- **Status:** Unblocked — P1.A1a PASS satisfied 2026-08-28. Needs its own
-  RRI/approval before source execution.
-- **Effort / RRI:** S / 25 Low.
-- **Allowed paths:** the packaged runtime worklet (`mobile/src/p2p/runtime/**`).
-- **Objective:** open an empty transient Hyperdrive/Corestore drive strictly
-  below the proof cache root, return a capability receipt, close
-  deterministically.
-- **HP-A1:** a validated temporary path opens Corestore/Hyperdrive and
-  returns a capability receipt bounded to exactly `capability` (non-null) and
-  `schema_version` fields — no other fields, to keep the assertion
-  deterministic (Gemma finding #1/#4) — before clean close.
-- **Acceptance:** drive opens only below the proof cache root; closes
-  deterministically; creates no Hyperswarm/discovery/product persistence.
-- **Evidence to emit:** HP-A1 proof log, exact bundle/version record.
-- **Handoff prompt:** `P1.A1b — implement open/close for a transient
-  Hyperdrive/Corestore drive below the proof cache root; return only
-  {capability, schema_version} on success; no network/Hyperswarm code.`
+- **Status:** Ready — P1.A1b.0 PASS satisfied 2026-08-30. It still requires a
+  fresh phase-1 PASS, Compact Approval Task Card v2, and explicit approval
+  before source execution.
+- **Effort / RRI:** L / 50 Med-high. Full report:
+  `docs/audit/mvp0-p2p-p1-a1b-rri-v2.md`. The former S / 25 estimate and
+  blocked RRI 53 assessment are historical only.
+- **Allowed paths:** `mobile/src/p2p/proof/P1ProofRuntimeFactory.ts` (new),
+  `mobile/src/p2p/runtime/protocol.ts`, `mobile/src/p2p/runtime/worklet.ts`,
+  `mobile/src/p2p/runtime/worklet.bundle.js`, and
+  `mobile/__tests__/p2p/runtime-protocol.test.ts` only.
+- **Objective:** use an explicit proof-only runtime factory to pass one
+  host-derived cache-directory URI as immutable worklet bootstrap data, then
+  open and deterministically close an empty Hyperdrive/Corestore drive without
+  discovery or a product-facing API.
+- **HP-A1:** the factory derives `new Directory(Paths.cache,
+  "dubbridge-p2p", "proofs", runId).uri` from a validated generated `runId`,
+  starts a proof worklet with that URI as `Bare.argv[0]`, and the new
+  `OPEN_CLOSE_TRANSIENT_DRIVE` RPC command returns exactly
+  `{ capability: "transient-hyperdrive-corestore", schema_version: 1 }` after
+  `drive.close()` succeeds.
+- **EC-A1b:** an invalid `runId` or missing/non-`file:` bootstrap URI fails
+  closed with `PROOF_STORAGE_CONFIG_INVALID` before Corestore/Hyperdrive opens;
+  it does not create a worklet storage handle, Hyperswarm/discovery activity,
+  product persistence, or a product P2P command.
+- **Acceptance:**
+  1. The URI is created host-side and passed unchanged only in the worklet's
+     start arguments; no RPC payload, receipt, log, or product API contains a
+     filesystem path.
+  2. The worklet imports only Corestore/Hyperdrive for storage; it adds no direct
+     application dependency on `bare-fs`. The bundle check must prove their
+     existing Bare `fs` mapping resolves.
+  3. `drive.close()` is the sole normal close operation because Hyperdrive closes
+     its Corestore; `store.close()` is used only when construction fails before a
+     drive exists. Errors remain redacted; P1.A1c owns later granular
+     dependency/open/close error taxonomy.
+  4. Focused unit tests cover the exact startup arguments/receipt and the invalid
+     configuration boundary; `npm run check:bare-worklet`, typecheck, lint, and
+     the focused P2P Jest suite stay clean.
+- **Evidence to emit:** HP-A1 proof log with no path/key material, exact
+  Corestore/Hyperdrive/bundle versions, bundle resolution/check output, focused
+  tests, and phase-2/coverage/owner evidence at closure.
+- **Handoff prompt:** `P1.A1b — add only the proof runtime factory and the
+  versioned open/close command defined in the P1.A1b storage contract. Pass the
+  host-created cache URI only through Bare argv, return exactly the two-field
+  receipt, and add no network, product API, direct bare-fs dependency, or
+  persistence.`
 
 ### P1.A1c — Typed error handling (EC-A1)
 

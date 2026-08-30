@@ -120,6 +120,11 @@ explicit approval before source edits:
 6. **P1.A1 — Hyperdrive/Corestore Android bundle smoke proof.** Add compatible
    storage dependencies and prove an empty transient drive can open/close in the
    packaged Android worklet without discovery.
+   - **P1.A1b.0 — Proof-storage contract preflight.** Closed PASS on
+     2026-08-30. It froze the host-to-Bare cache-root representation, storage
+     import ownership, RPC/receipt schema, typed configuration failure, and test
+     surface at `docs/audit/mvp0-p2p-p1-a1b-storage-contract.md`. P1.A1b is now
+     RRI 50 Med-high and requires its own new phase-1 review/card/approval.
 7. **P1.A2 — Transient seed lifecycle and residue cleanup.** Generate the
    synthetic fixture, write/hash it using a run-scoped cache directory, close
    handles, delete/verify absence, and clean abandoned proof directories.
