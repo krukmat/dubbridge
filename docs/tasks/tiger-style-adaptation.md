@@ -37,7 +37,7 @@ T12               (independent — docs-only, no code dependency)
 **Type:** Mechanical / analysis
 **Effort:** S (provisional)
 **Depends on:** none
-**Status:** [x] Done — artifact created, pending commit approval (see below)
+**Status:** [x] Done — artifact created, committed and pushed to `main` at `40a47ac`
 **RRI:** 0 -> band Low (0-25); `python3 scripts/rri.py --C 0 --T 0 --A 0 --X 0
 --D 0 --K 0 --P 0 --touches docs/audit/tiger-style-70-100-line-survey.md
 --platform dubbridge`. No anchor-rubric floor matched (no governed crate
@@ -101,7 +101,7 @@ requires explicit approval.
 practice; split per-function at RRI-scoring time if the combined survey
 result is large)
 **Depends on:** X26-T0
-**Status:** [x] Done — implementation complete, pending commit approval (see below)
+**Status:** [x] Done — implementation complete, committed and pushed to `main` at `40a47ac`
 **RRI:** 44 -> band Med-high (41-55); Effort M matches the band per the
 canonical RRI-to-Effort crosswalk.
 
@@ -347,10 +347,9 @@ Required passes: 3 (`44` -> `Med-high`)
     --ignore-filename-regex '<COVERAGE_IGNORE_REGEX>' -- --test-threads=1`
     (the exact `make qa-coverage` invocation)
 
-Commit/push status: implementation complete in the working tree; **not yet
-committed**. Per `docs/policies/HITL_AUTONOMY_POLICY.md`, committing/pushing
-requires an explicit user instruction in this conversation — not implied by
-this closure record and not triggerable by an automated hook.
+Commit/push status: committed and pushed to `main` at `40a47ac`, per explicit
+user instruction ("commit y push a main") in this conversation — not
+triggered by any automated hook, per `docs/policies/HITL_AUTONOMY_POLICY.md`.
 
 ---
 
