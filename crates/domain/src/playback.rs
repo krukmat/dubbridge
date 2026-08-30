@@ -167,7 +167,35 @@ impl PlaybackGrant {
     /// Evaluate the grant against a caller-supplied `now`. Returns `true` only
     /// when the grant is `Active` and has not yet reached its expiry.
     pub fn is_valid_at(&self, now: OffsetDateTime) -> bool {
-        self.status == GrantStatus::Active && now < self.expires_at
+        // Precondition (X26-T3b HP-1, Tiger Style D1): any grant reaching this
+        // check — whether freshly built by `new()` or loaded back from
+        // persistence, which bypasses `new()`'s Result-typed rejection —
+        // must already satisfy the structural ordering `new()` enforces for
+        // caller-supplied timestamps. This is a programmer invariant on an
+        // already-constructed value, not a re-check of external input, so it
+        // stays an `assert!`, not a `Result`.
+        assert!(
+            self.expires_at > self.issued_at,
+            "PlaybackGrant::is_valid_at precondition violated: expires_at ({:?}) \
+             is not strictly after issued_at ({:?}) for grant {:?}",
+            self.expires_at,
+            self.issued_at,
+            self.id
+        );
+
+        let valid = self.status == GrantStatus::Active && now < self.expires_at;
+
+        // Postcondition (X26-T3b EC-1, negative space): a grant that is not
+        // `Active` must never be reported valid, regardless of `expires_at`.
+        assert!(
+            self.status == GrantStatus::Active || !valid,
+            "PlaybackGrant::is_valid_at postcondition violated: non-Active grant {:?} \
+             (status {:?}) was computed as valid",
+            self.id,
+            self.status
+        );
+
+        valid
     }
 }
 

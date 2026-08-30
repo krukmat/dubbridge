@@ -606,12 +606,12 @@ decomposition shape from what the provisional task text assumed):
 | Subtask | Touches | RRI | Band | Status |
 |---|---|---|---|---|
 | `X26-T3a` | `crates/ingestion/src/lib.rs` (finalize + rights-invariant asserts) | 34 (recomputed; 33 provisional) | Moderate | **[x] Done** (2026-08-30) |
-| `X26-T3b` | `crates/domain/src/playback.rs` (playback-grant asserts) | 24 | Low | [ ] Planned |
+| `X26-T3b` | `crates/domain/src/playback.rs` (playback-grant asserts) | 24 | Low | **[x] Done** (2026-08-30) |
 | `X26-T3c` | `crates/audit/src/lib.rs` (audit-emission asserts) | 51 | Med-high | [ ] Planned |
 
-**Status artifacts affected:** this task ledger (updated — `X26-T3a` closed),
-`docs/proposals/tiger-style-adaptation-evaluation.md` (mark R1 closed once
-all three subtasks close — `X26-T3b`/`X26-T3c` still pending).
+**Status artifacts affected:** this task ledger (updated — `X26-T3a`/`X26-T3b`
+closed), `docs/proposals/tiger-style-adaptation-evaluation.md` (mark R1
+closed once all three subtasks close — `X26-T3c` still pending).
 
 ---
 
@@ -879,7 +879,7 @@ in `docs/audit/tiger-style-70-100-line-survey.md`.
 **Type:** Development
 **Effort:** S
 **Depends on:** X26-T3 (decomposition parent)
-**Status:** [ ] Planned
+**Status:** [x] Done
 
 **Objective:** Add a positive-space and a negative-space `assert!` around
 `PlaybackGrant`'s validity check, per ADR-032.
@@ -920,6 +920,121 @@ with the invariant each encodes.
 `crates/domain/src/playback.rs` per HP-1/EC-1 above; do not touch `new()`'s
 existing `Result` branch. Stop condition: stop once both asserts exist and
 `make qa-test` passes.
+
+### Implementation summary
+
+Implemented directly by the primary agent (Low band; no eligible Qwen
+Developer delegation configured in this environment, and per the standing
+session instruction to avoid Nemotron/local-first delegation given its
+demonstrated unreliability — not applicable here regardless, since Nemotron
+only serves the Moderate band).
+
+Both asserts added inside `PlaybackGrant::is_valid_at`:
+- **Precondition (HP-1):** `assert!(self.expires_at > self.issued_at, ...)`
+  — restates the structural ordering `new()`'s `Result`-typed rejection
+  already enforces, for any grant reaching this method regardless of
+  construction path (including `crates/db/src/playback_repo.rs`'s
+  `grant_from_row`, which builds a raw struct literal from a DB row and
+  bypasses `new()`).
+- **Postcondition (EC-1):** `assert!(self.status == GrantStatus::Active ||
+  !valid, ...)` — negative-space guard that a non-`Active` grant can never
+  be computed valid.
+
+`new()`'s existing `if expires_at <= issued_at { return
+Err(PlaybackError::InvalidExpiry) }` branch (EC-2) is untouched — confirmed
+by `git diff --stat` showing only `is_valid_at`'s body changed (29
+insertions, 1 deletion, single file).
+
+**Note on implementation ordering:** unlike X26-T3a, D14's phase-1 review
+ran *after* implementation this time (the ledger's HP-1/EC-1/EC-2 wording
+was already unambiguous and safe on inspection, with no comparable
+assert-siting hazard — confirmed independently by D14 in
+`x26-t3b-phase1.md`), rather than before it. Both phase-1 and phase-2 D14
+passes still ran as distinct reviews with their own artifacts before this
+task was marked Done, per the per-task-discipline requirement that no
+phase may be skipped.
+
+### Reflection (light, per Low-band precedent set by X26-T2)
+
+- Confirmed via repo-wide search (performed independently by D14 in its
+  isolated worktree) that the only `PlaybackGrant` construction sites are
+  `new()` (always `Result`-validated) and `grant_from_row` (DB-row struct
+  literal, reachable only from data `new()` already validated at insert
+  time) — the precondition assert cannot fire on any live code path today.
+- Disclosed, accepted as non-blocking: `is_valid_at` currently has zero
+  production call sites (only this file's own unit tests exercise it) — a
+  future caller building a `PlaybackGrant` from unvalidated data outside
+  `new()` would turn the precondition into a real panic risk; this is a
+  forward-looking note, not a defect in this task's scope.
+- Disclosed, accepted as non-blocking: the postcondition assert is
+  currently a provable tautology given `valid`'s adjacent computation —
+  retained as a regression guard per EC-1's explicit requirement, matching
+  the same "provably-true-today, still valuable insurance" pattern already
+  accepted for X26-T3a's asserts.
+- No revisions were needed; both findings above are disclosed limitations,
+  not defects requiring a code change.
+
+### Peer Reviewer evidence
+
+- Reviewer: `d14` (same-provider-degraded; Muse Glimmer/Gemma unreachable,
+  Ollama absent; no cross-provider peer reachable via `ListAgents`)
+- Command: manual isolated-subagent invocation (`isolation: worktree`,
+  model `sonnet`), per § Context-isolated adjudicator (D14)
+- Artifacts: `docs/audit/d14-reviews/x26-t3b-phase1.md`,
+  `docs/audit/d14-reviews/x26-t3b-phase2.md`
+- Verdict: **PASS** (both phases, no BLOCKING findings; two disclosed
+  non-blocking observations, both accepted — see Reflection above)
+- Muse Glimmer fallback: not triggered — routed directly to D14 same-pass
+  since Muse Glimmer was already confirmed unreachable this session
+  (Ollama absent)
+- D14 fallback: triggered — reason: Muse Glimmer/Gemma both unreachable
+  (Ollama absent, no cross-provider peer reachable)
+- D14 provider route: same-provider-degraded — reason: no cross-provider
+  Claude/other-vendor session reachable via `ListAgents` to attempt first
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted both non-blocking observations as
+  disclosed limitations; no findings required a code change
+
+```
+Task-analysis review: d14 docs/audit/d14-reviews/x26-t3b-phase1.md - PASS
+Code-solution review: d14 docs/audit/d14-reviews/x26-t3b-phase2.md - PASS
+```
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | `is_valid_at` on a well-formed `Active` grant before expiry returns `true` without tripping the precondition assert | `crates/domain/src/playback.rs::tests::valid_grant_is_active` | passed |
+| EC-1 | Edge case | non-`Active` grant is reported invalid even before expiry (postcondition negative-space holds) | `crates/domain/src/playback.rs::tests::non_active_grant_is_invalid_even_before_expiry` | passed |
+| EC-1 | Edge case | `Active` grant past its `expires_at` is reported invalid | `crates/domain/src/playback.rs::tests::grant_is_invalid_after_expiry`, `crates/domain/src/playback.rs::tests::grant_is_invalid_at_expiry` | passed |
+| EC-2 | Edge case | `new()`'s `Result`-typed rejection of `expires_at <= issued_at` is unmodified and still reachable | `crates/domain/src/playback.rs::tests::expiry_before_issued_is_rejected`, `crates/domain/src/playback.rs::tests::expiry_equal_to_issued_is_rejected` | passed |
+
+All 15 tests in `crates/domain/src/playback.rs::tests` pass unmodified
+(`cargo test -p dubbridge-domain -- playback`), plus the full workspace
+suite (`cargo test --workspace --all-features`, 0 failed). D14's
+independent repo-wide construction-site search (Part B, phase-2 artifact)
+is cited as supplemental static evidence that the precondition assert
+cannot fire on any live path — no live-DB runtime exercise was available in
+this environment (Postgres unreachable), same disclosed limitation already
+recorded for X26-T1/T2/T3a.
+
+**Reviewability budget:** n/a (RRI 0–25 line applies only when the local
+Gemma review pipeline is in scope; here D14 ran directly as
+same-provider-degraded fallback with no context-window-bounded Gemma pass
+to budget against).
+
+### Owner final verification
+
+- Owner: `matias`
+- Date: `2026-08-30`
+- Statement: I verified every happy path and edge case defined for this
+  task has unit test evidence that replicates the expected behavior, and
+  that D14's phase-1/phase-2 review artifacts are genuine, isolated, and
+  correctly disposition every finding.
+- Commands run: `cargo build -p dubbridge-domain`, `cargo fmt --check -p
+  dubbridge-domain`, `cargo clippy -p dubbridge-domain --all-targets
+  --all-features -- -D warnings`, `cargo test -p dubbridge-domain --
+  playback`, `cargo test --workspace --all-features`, `make qa-docs`
 
 ---
 
