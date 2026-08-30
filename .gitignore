@@ -34,3 +34,5 @@ scripts/local-bench/t7*/
 .claude/settings.json
 logs/antares/
 var/antares-traces/
+p2p-mvp/*
+pending/*
