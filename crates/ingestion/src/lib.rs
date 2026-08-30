@@ -104,7 +104,21 @@ async fn lock_pending_or_reject<'a>(
     IngestionServiceError,
 > {
     match dubbridge_db::pending_ingestion_repo::lock_for_finalize(&mut tx, ingest_token).await? {
-        Some(record) => Ok((tx, record)),
+        Some(record) => {
+            // Postcondition (X26-T3a, Tiger Style D1): the row this query locked
+            // must be the one keyed by the requested token. `lock_for_finalize`'s
+            // WHERE clause is the only source of the mapping — a mismatch here
+            // would mean a query bug, not attacker-reachable input, so this is a
+            // programmer invariant, not a `Result`-typed recoverable condition.
+            assert!(
+                record.ingest_token == ingest_token,
+                "lock_pending_or_reject postcondition violated: locked pending row's \
+                 ingest_token ({}) does not match the requested ingest_token ({})",
+                record.ingest_token,
+                ingest_token
+            );
+            Ok((tx, record))
+        }
         None => {
             let already_done =
                 dubbridge_db::artifact_repo::exists_for_token_tx(&mut tx, ingest_token).await?;
@@ -153,6 +167,20 @@ async fn persist_finalization_writes(
     artifact_kind: ArtifactKind,
     uploader_id: Uuid,
 ) -> Result<Asset, IngestionServiceError> {
+    // Precondition (X26-T3a, Tiger Style D1): by the time this helper runs, the
+    // caller (`finalize_ingestion_core`, via `build_finalize_command`) has
+    // already run `FinalizeIngestionCommand::validate` to `Ok` on this exact
+    // `rights_basis`, which fail-closed-rejects an empty owner/proof_reference
+    // (ADR-008). This restates that already-checked invariant for whoever reads
+    // or modifies this function next — it is not a re-validation of
+    // externally-reachable input, so it stays an `assert!`, not a `Result`.
+    assert!(
+        !rights_basis.owner.trim().is_empty() && !rights_basis.proof_reference.trim().is_empty(),
+        "persist_finalization_writes precondition violated: rights_basis owner/proof_reference \
+         must already be non-empty (FinalizeIngestionCommand::validate should have rejected this \
+         upstream, ADR-008)"
+    );
+
     let asset =
         dubbridge_domain::asset::Asset::new_pending(command.asset_title.clone(), uploader_id);
 

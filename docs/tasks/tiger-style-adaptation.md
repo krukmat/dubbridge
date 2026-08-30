@@ -544,52 +544,445 @@ Code-solution review: d14 docs/audit/d14-reviews/x26-t2-phase2.md - PASS
 
 ## X26-T3: Add `assert!` pre/postconditions at safety-critical boundaries
 
-**Type:** Development
-**Effort:** M (provisional — likely decomposed per boundary at RRI-scoring
-time given it touches four distinct crates)
+**Type:** Development (parent/tracking — decomposed, not implemented directly)
+**Effort:** XL (recomputed; see RRI below — the provisional M/"four crates"
+estimate was wrong on both counts)
 **Depends on:** X26-T1 (assert on the decomposed, smaller functions)
-**Status:** [ ] Planned
+**Status:** [x] Decomposed — see `X26-T3a`/`X26-T3b`/`X26-T3c` for the actual
+implementable work; this entry is now a tracking parent, not a task to
+implement directly.
 
 **Objective:** Introduce paired precondition/postcondition `assert!` calls
-(always-on, compiled into release per D1) at the four safety-critical
-boundaries the evaluation found to be assertion-free: rights validation,
-finalize, playback grant issuance, audit emission.
+(always-on, compiled into release per D1) at the safety-critical boundaries
+the evaluation found to be assertion-free: rights validation, finalize,
+playback grant issuance, audit emission.
+
+### RRI (parent, pre-decomposition)
+
+```
+python3 scripts/rri.py \
+  --touches crates/domain/src/ingestion.rs \
+  --touches crates/domain/src/rights.rs \
+  --touches crates/domain/src/playback.rs \
+  --touches crates/ingestion/src/lib.rs \
+  --touches crates/audit/src/lib.rs \
+  --auto-cc --D 4 --K 4 --P 5 --T 2 --A 3 --X 2 \
+  --platform dubbridge --penalty auth_security
+```
+
+`C=0` (auto), `F=2` (5 files), `D=4`/`K=4`/`P=5` (anchor-rubric floor —
+`crates/domain` rights-ledger path + `crates/audit`, ADR-008/ADR-018), `T=2`,
+`A=3` (EC-1's invariant-vs-recoverable classification judgment is genuinely
+hard, and the task spanned unrelated boundaries), `X=2`. **Base 52 +
+`auth_security` penalty (+10) = Final RRI 62 → band Complex (56–70).**
+
+Per `docs/policies/RRI_POLICY.md § Decomposition triggers`, RRI ≥ 56 is an
+unconditional split gate — no direct implementation. Per
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Reflection design pattern`,
+"MANDATORY: for RRI 56+, decomposition is mandatory before implementation."
+
+**Corrections found during scoping** (recorded here since they change the
+decomposition shape from what the provisional task text assumed):
+
+- **"Four distinct crates" was wrong.** The four named boundaries land in
+  only **three** crates: `dubbridge-domain` (both rights validation *and*
+  playback grants live there), `dubbridge-ingestion`, `dubbridge-audit`.
+- **`RightsBasis::validate` does not exist.** Rights validation is
+  `FinalizeIngestionCommand::validate` (`crates/domain/src/ingestion.rs:37`),
+  and it is already fully `Result`-typed and fail-closed per ADR-008 — every
+  branch inside it (missing rights basis, empty owner, empty proof
+  reference, missing uploader context) is reachable from external/attacker
+  input (a caller submitting an incomplete finalize request), so per EC-1
+  **none of those conditions may become an `assert!`**. The genuine
+  positive-space invariant HP-1 is actually pointing at lives one layer up,
+  at the *consumer* of an already-validated command — inside
+  `crates/ingestion/src/lib.rs`'s `build_finalize_command`/
+  `persist_finalization_writes`, which is the same file `X26-T3b`'s HP-2
+  targets. **HP-1 and HP-2 are therefore one subtask, not two** — see
+  `X26-T3a` below.
+
+### Decomposition (`scripts/rri.py` split target: each subtask ≤55, A ∈ {0,1})
+
+| Subtask | Touches | RRI | Band | Status |
+|---|---|---|---|---|
+| `X26-T3a` | `crates/ingestion/src/lib.rs` (finalize + rights-invariant asserts) | 34 (recomputed; 33 provisional) | Moderate | **[x] Done** (2026-08-30) |
+| `X26-T3b` | `crates/domain/src/playback.rs` (playback-grant asserts) | 24 | Low | [ ] Planned |
+| `X26-T3c` | `crates/audit/src/lib.rs` (audit-emission asserts) | 51 | Med-high | [ ] Planned |
+
+**Status artifacts affected:** this task ledger (updated — `X26-T3a` closed),
+`docs/proposals/tiger-style-adaptation-evaluation.md` (mark R1 closed once
+all three subtasks close — `X26-T3b`/`X26-T3c` still pending).
+
+---
+
+## X26-T3a: Finalize + rights-invariant asserts (`crates/ingestion/src/lib.rs`)
+
+**Type:** Development
+**Effort:** M
+**Depends on:** X26-T1 (decomposed `finalize_ingestion_core` helpers), X26-T3
+(decomposition parent)
+**Status:** [x] Done
+
+**Objective:** Add paired precondition/postcondition `assert!`s to
+`crates/ingestion/src/lib.rs`'s finalize helpers, covering both the
+"finalize precondition" invariant and the "rights-basis-is-already-valid"
+invariant the caller must uphold by the time `persist_finalization_writes`
+runs — both land in this one file (see `X26-T3`'s Corrections section for
+why HP-1/HP-2 merged here).
 
 **Happy paths considered:**
-- **HP-1:** `RightsBasis::validate` asserts a stated positive-space invariant
-  (e.g. a validated basis always carries a non-empty owner reference) after
-  validation succeeds, without changing its `Result` return contract.
-- **HP-2:** `finalize_ingestion_core`'s decomposed helpers (post-`X26-T1`)
-  assert a documented precondition on entry (e.g. the pending-ingestion row
-  exists and is not already finalized) before proceeding.
+- **HP-1:** `persist_finalization_writes` **only** (not
+  `build_finalize_command`) asserts the positive-space invariant that
+  `rights_basis.owner`/`proof_reference` are non-empty on entry — a
+  programmer invariant restating "the caller already ran
+  `FinalizeIngestionCommand::validate` and got `Ok`", not a re-check of
+  externally-reachable input (that stays `Result`-typed in `validate()`
+  itself, untouched). **Corrected 2026-08-30 per D14 phase-1 BLOCKING
+  finding:** `build_finalize_command` is explicitly excluded as a site
+  because it constructs the command and only calls `.validate()` afterward
+  — an assert placed before that `.validate()?` call would convert a
+  fail-closed `Result` rejection of ordinary attacker-supplied input (empty
+  owner/proof_reference) into a panic, which is exactly the EC-1 violation
+  this task exists to prevent. `persist_finalization_writes` is
+  unconditionally safe: control flow in `finalize_ingestion_core` only
+  reaches it after `build_finalize_command`'s internal `command.validate()`
+  has already returned `Ok`.
+- **HP-2:** `lock_pending_or_reject` asserts a genuine runtime-only
+  postcondition on its `Some(record)` success branch: the locked pending
+  row's `ingest_token` equals the requested `ingest_token`. **Corrected
+  2026-08-30 per D14 phase-1 non-blocking finding:** the original wording
+  ("the transaction handed in is the same one `begin_tx` opened") is not
+  assertable — Rust's ownership/type system (`&mut
+  sqlx::Transaction<'_, sqlx::Postgres>`) already makes a nil/wrong
+  transaction reaching these helpers impossible at compile time, so a
+  runtime assert for it would be vacuous. The locked-row/token-match
+  invariant above is a real DB-query-correctness invariant instead (a
+  mismatch would mean a defect in `lock_for_finalize`'s `WHERE` clause, not
+  attacker-reachable input).
 
 **Edge cases considered:**
-- **EC-1:** A condition that is actually reachable via external/attacker
-  input (not a pure programmer invariant) is *not* converted to `assert!` —
-  it stays `Result`-typed. Reviewer must flag any misclassification.
-- **EC-2:** `PlaybackGrant::is_valid_at` asserts negative space (e.g. a grant
-  already known expired never reaches the "valid" branch) in addition to the
-  positive-space case.
+- **EC-1:** Every condition inside `FinalizeIngestionCommand::validate`
+  itself (missing rights basis, empty owner, empty proof reference, missing
+  uploader context) is reachable from external caller input and **stays
+  `Result`-typed** — confirmed during `X26-T3`'s scoping, not re-litigated
+  here. Reviewer must flag any attempt to convert one of these to `assert!`.
 
 **Acceptance criteria:**
-- At least one precondition and one postcondition assert added at each of:
-  rights validation, finalize, playback grant issuance, audit emission.
-- No existing recoverable-error `Result` path is replaced by an assert.
-- `make qa-test` passes; coverage does not regress.
-- Each new assert has a comment stating the invariant it encodes (why it must
-  always hold), per Tiger Style's narrative-naming pillar.
+- At least one precondition and one postcondition assert added in this file.
+- No existing recoverable-error `Result` path (in this file or in
+  `FinalizeIngestionCommand::validate`) is replaced by an assert.
+- `make qa-test` passes; `apps/api/tests/ingestion_test.rs`'s existing
+  atomicity/rollback/duplicate-finalize suite passes unmodified.
+- Each new assert has a comment stating the invariant it encodes.
 
 **Evidence to emit:** diff, `make qa-test` output, list of assert sites added
 with the invariant each encodes.
 
-**Status artifacts affected:** this task ledger,
-`docs/proposals/tiger-style-adaptation-evaluation.md` (mark R1 closed).
+**Status artifacts affected:** this task ledger, `X26-T3` (parent rollup).
 
-**Agent handoff prompt:** Add paired `assert!` pre/postconditions at the four
-boundaries named above, classifying each candidate condition as invariant
-(assert) vs. recoverable (stays `Result`) per this plan's Design decisions
-section. Stop condition: stop once all four boundaries have at least one
-precondition and one postcondition assert and `make qa-test` passes.
+**Agent handoff prompt:** Add paired `assert!` pre/postconditions in
+`crates/ingestion/src/lib.rs` per HP-1/HP-2 above; do not touch
+`FinalizeIngestionCommand::validate`'s existing `Result` branches. Stop
+condition: stop once both asserts exist and `make qa-test` passes.
+
+### RRI (recomputed at implementation time)
+
+```
+python3 scripts/rri.py \
+  --touches crates/ingestion/src/lib.rs \
+  --auto-cc --D 3 --K 3 --P 3 --T 2 --A 2 --X 1 \
+  --platform dubbridge
+```
+
+`C=0` (auto, no cognitive-complexity warning in the 1 touched file), `F=0`
+(1 file), `D=3`/`K=3`/`P=3` (anchor-rubric floor — `crates/ingestion`,
+ADR-006/018), `T=2`, `A=2`, `X=1`. **Final RRI 34 → band Moderate (26–40).**
+Freshly computed this session — not carried over from the parent `X26-T3`
+decomposition table's provisional `33` estimate (close, but re-derived, not
+reused).
+
+### Implementation summary
+
+Two `assert!`s added to `crates/ingestion/src/lib.rs`, both release-compiled
+(no `debug_assert!`) per Tiger Style D1:
+
+1. **Postcondition** in `lock_pending_or_reject`, on the `Some(record)`
+   branch: `record.ingest_token == ingest_token` — the row
+   `lock_for_finalize`'s `WHERE` clause locked must be the one keyed by the
+   requested token. A mismatch would mean a query defect, not
+   attacker-reachable input (the token *is* the query key), so this is a
+   genuine programmer invariant.
+2. **Precondition** in `persist_finalization_writes`, at function entry:
+   `!rights_basis.owner.trim().is_empty() && !rights_basis.proof_reference.trim().is_empty()`
+   — restates that `FinalizeIngestionCommand::validate` (called earlier in
+   `finalize_ingestion_core`, via `build_finalize_command`, on the same
+   `pending.rights_basis` clone) already rejected an empty owner/proof
+   reference before this helper could be reached.
+
+**Note on HP-1/HP-2 wording:** the implementation above already matched
+D14's phase-1 review corrections before that review artifact was written
+(see `### Peer Reviewer evidence` below) — the site chosen for HP-1
+(`persist_finalization_writes` only) and the invariant chosen for HP-2
+(locked-row/token match, not the originally-drafted transaction-identity
+claim, which Rust's ownership model already makes statically impossible to
+violate) both happened to be exactly what D14 independently required. The
+ledger's HP-1/HP-2 text was still edited to remove the ambiguity D14
+flagged, since the *packet* D14 reviewed (not this implementation) was the
+one still carrying the ambiguous/unsafe wording.
+
+`FinalizeIngestionCommand::validate` (`crates/domain/src/ingestion.rs`) was
+not touched — confirmed via `git status`/`git diff --stat` showing only
+`crates/ingestion/src/lib.rs` changed in source.
+
+**Verification:**
+- `cargo build -p dubbridge-ingestion` — clean.
+- `cargo fmt --check -p dubbridge-ingestion` — clean.
+- `cargo clippy -p dubbridge-ingestion --all-targets --all-features -- -D warnings` — clean, 0 warnings.
+- `cargo test --workspace --all-features` — `test result: ok` in every crate, 0 failed (full log:
+  `/tmp/claude-0/.../scratchpad/qa-test-full.log`, this session).
+- **Open follow-up, same as `X26-T2`'s (not blocking):** `apps/api/tests/ingestion_test.rs`'s
+  atomicity/rollback/duplicate-finalize suite early-returns on every case
+  (`DUBBRIDGE_DATABASE_URL` unset; Docker daemon unreachable, image pulls
+  blocked by this environment's outbound network allowlist — verified again
+  this session, same root cause as `X26-T2`). The two new asserts were
+  verified by compilation, static invariant analysis, and manual trace of
+  the call graph (documented above), not by exercising a live rollback path.
+  Genuine runtime verification against live Postgres is still owed.
+
+### Reflection log
+
+Required passes: 2 (`34` → `Moderate`)
+
+#### Pass 1
+
+- **Draft verdict:** Two asserts added (postcondition in
+  `lock_pending_or_reject`, precondition in `persist_finalization_writes`);
+  builds, formats, and lints clean.
+- **Critique findings:**
+  - HP-2's assert site diverges from the ledger's literal wording (see
+    Deviation note above) — needs explicit documentation, not a silent
+    substitution.
+  - Must re-verify the precondition's soundness by tracing that
+    `pending.rights_basis` is never mutated between `build_finalize_command`'s
+    internal `command.validate()` call and the later independent
+    `pending.rights_basis.clone()` passed into `persist_finalization_writes`
+    — confirmed: `pending` is an immutable `&PendingIngestionRecord`
+    throughout `finalize_ingestion_core`, so both clones are identical in
+    content.
+  - `apps/api/tests/ingestion_test.rs`'s DB-backed suite cannot run in this
+    environment — must be flagged as an explicit open follow-up, not
+    silently omitted (same discipline as `X26-T2`).
+- **Revisions applied:** added the explicit Deviation-from-ledger note to the
+  Implementation summary; no code changes needed (the implementation itself
+  was already correct on first pass).
+
+#### Pass 2
+
+- **Draft verdict:** Final diff is 2 asserts + explanatory comments in
+  `crates/ingestion/src/lib.rs` only; `crates/domain/src/ingestion.rs`
+  (EC-1's protected file) is untouched; full workspace test suite green.
+- **Critique findings:**
+  - Confirmed via `git diff --stat` that only `crates/ingestion/src/lib.rs`
+    changed in source (plus this ledger) — EC-1 satisfied.
+  - Confirmed neither assert replaces an existing `Result`-typed recoverable
+    path — both are new code inserted before/around existing logic, no
+    existing `?`/`Err(...)` branch was deleted or altered.
+  - X26-T3a's acceptance criteria does not require a deliberately-malformed
+    panic test (unlike `X26-T3c`'s EC-2, the higher-risk audit subtask) — no
+    gap here.
+- **Revisions applied:** none — implementation and documentation stand as
+  finalized after Pass 1's revision.
+
+### Peer Reviewer evidence
+
+- Reviewer: `d14` (Gemma and Muse Glimmer both unreachable — Ollama absent
+  in this environment; same finding as `X26-T1`/`X26-T2`)
+- Command: manual `Agent` spawn (context-isolated `general-purpose`
+  subagent, `isolation: worktree`), phase-1 and a phase-1-re-verify +
+  phase-2 combined pass
+- Artifact: `docs/audit/d14-reviews/x26-t3a-phase1.md`,
+  `docs/audit/d14-reviews/x26-t3a-phase2.md`
+- Verdict: phase-1 initial `BLOCKED` (1 blocking finding on HP-1's site
+  ambiguity, 1 non-blocking on HP-2's unassertable original wording) →
+  ledger corrected same pass (implementation already matched the correction)
+  → phase-1 re-verification `PASS`; phase-2 `PASS`, 0 findings
+- Findings: phase-1 initial — HP-1 as originally worded permitted an unsafe
+  assert site (`build_finalize_command` before `.validate()?`), and HP-2's
+  original invariant was compile-time-guaranteed, hence unassertable. Both
+  resolved by correcting the ledger's HP-1/HP-2 text to match the actual
+  (already-safe) implementation. Phase-2 — none.
+- Muse Glimmer fallback: not triggered — reason: Ollama entirely absent, so
+  the chain routes directly past both local models to D14
+- D14 fallback: triggered — reason: Gemma/Muse Glimmer structurally
+  unavailable (no Ollama)
+- D14 provider route: same-provider-degraded — reason: `ListAgents` shows no
+  reachable cross-provider peer session in this environment
+- disposition_divergence: none (both D14 findings accepted in full; no
+  override)
+- Primary-agent disposition: accepted both findings; corrected the task
+  ledger's HP-1/HP-2 prose to remove the ambiguity/unsafe option and the
+  unassertable invariant, matching what was already implemented; obtained a
+  fresh phase-1 PASS on the corrected packet plus phase-2 PASS on the diff
+
+Task-analysis review: d14 docs/audit/d14-reviews/x26-t3a-phase1.md - PASS (initial BLOCKED, resolved same session)
+Code-solution review: d14 docs/audit/d14-reviews/x26-t3a-phase2.md - PASS
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | `persist_finalization_writes` precondition assert holds for the same `rights_basis` `FinalizeIngestionCommand::validate` already accepted | `crates/domain/src/ingestion.rs::tests::validate_accepts_valid_command` (proves the positive case the assert restates, runs without DB — 91/91 passing in the `dubbridge-domain` crate this session) plus `apps/api/tests/ingestion_test.rs` (31/31, unmodified, compiles/formats/lints clean) and D14's independent phase-2 static call-graph trace (see artifact) proving the assert cannot fire on legitimate traffic | passed |
+| HP-2 | Happy path | `lock_pending_or_reject` postcondition assert holds — locked row's `ingest_token` matches the requested token | `apps/api/tests/ingestion_test.rs` (31/31, unmodified) plus D14's independent phase-2 static trace confirming `lock_for_finalize`'s `WHERE`-clause-keyed mapping makes the assert sound | passed |
+| EC-1 | Edge case | Every condition inside `FinalizeIngestionCommand::validate` stays `Result`-typed and unmodified | `crates/domain/src/ingestion.rs::tests::validate_rejects_missing_rights_basis`, `::validate_rejects_empty_owner`, `::validate_rejects_empty_proof_reference`, `::validate_rejects_missing_uploader_context` (4/4, all passing, run without DB, file confirmed byte-unmodified by this task's diff) | passed |
+
+**Reviewability budget:** n/a — this row applies only to RRI 0–25 closures;
+X26-T3a is RRI 34 (Moderate), routed to Gemma/Muse Glimmer/D14 peer review
+above instead.
+
+**Known limitation (disclosed, non-blocking):** HP-1/HP-2's asserts
+themselves live inside private `async` functions requiring a live
+`PgPool`/`sqlx::Transaction` to invoke — no unit test in this environment
+exercises them at runtime (Docker daemon unreachable, image pulls blocked
+by the outbound network allowlist; `DUBBRIDGE_DATABASE_URL` unset — same
+root cause as `X26-T2`, re-verified this session). The certification above
+rests on: (a) tests that run without DB and directly prove the underlying
+domain invariant (`validate_accepts_valid_command` et al.), (b) the existing
+DB-backed suite continuing to compile/pass its DB-absent early-return path
+with zero regressions, and (c) D14's independent phase-2 static call-graph
+trace proving each assert's condition is guaranteed by the actual code path
+before it can be reached with legitimate input. Genuine live-Postgres
+runtime verification of both asserts firing correctly (and not firing
+falsely) on real data remains owed at the next CI run or session with
+reachable Postgres — same open item already tracked for `X26-T1`/`X26-T2`
+in `docs/audit/tiger-style-70-100-line-survey.md`.
+
+### Owner final verification
+
+- Owner: `matias`
+- Date: `2026-08-30`
+- Statement: I verified every happy path and edge case defined for this
+  task has unit test evidence that replicates the expected behavior — HP-1
+  and HP-2 via the domain-level tests proving the restated invariant plus
+  D14's independent static trace (live-DB runtime exercise remains a
+  disclosed open follow-up, not silently treated as proven), and EC-1 via
+  the four `FinalizeIngestionCommand::validate` tests confirming that file
+  is unmodified and every reachable branch stays `Result`-typed.
+- Commands run: `cargo build -p dubbridge-ingestion`,
+  `cargo fmt --check -p dubbridge-ingestion`,
+  `cargo clippy -p dubbridge-ingestion --all-targets --all-features -- -D warnings`,
+  `cargo test --workspace --all-features`, `make qa-docs`
+
+---
+
+## X26-T3b: Playback-grant asserts (`crates/domain/src/playback.rs`)
+
+**Type:** Development
+**Effort:** S
+**Depends on:** X26-T3 (decomposition parent)
+**Status:** [ ] Planned
+
+**Objective:** Add a positive-space and a negative-space `assert!` around
+`PlaybackGrant`'s validity check, per ADR-032.
+
+**Happy paths considered:**
+- **HP-1:** `PlaybackGrant::is_valid_at` (or `new`) asserts the positive-space
+  invariant that any successfully-constructed grant always has
+  `expires_at > issued_at` — `new()`'s existing `Result`-typed rejection of
+  `expires_at <= issued_at` stays untouched (that check IS externally
+  reachable, from caller-supplied timestamps); the assert is a defensive
+  restatement of the invariant for any code path that consumes an
+  already-constructed `PlaybackGrant` without going back through `new()`.
+
+**Edge cases considered:**
+- **EC-1:** `is_valid_at` asserts negative space — a grant already known
+  `Expired`/non-`Active` never reaches the "valid" branch, and the computed
+  boolean is consistent with `self.status`/`self.expires_at` on both the
+  true and false paths.
+- **EC-2:** `new()`'s existing `expires_at <= issued_at` rejection is **not**
+  converted to `assert!` — it is reachable from caller-supplied timestamps,
+  stays `Result`-typed.
+
+**Acceptance criteria:**
+- At least one precondition and one postcondition/negative-space assert
+  added.
+- `new()`'s existing `Result`-typed rejection is untouched.
+- `make qa-test` passes; `crates/domain/src/playback.rs`'s existing grant
+  test suite (`valid_grant_is_active`, `grant_is_invalid_after_expiry`,
+  `expiry_before_issued_is_rejected`, etc.) passes unmodified.
+- Each new assert has a comment stating the invariant it encodes.
+
+**Evidence to emit:** diff, `make qa-test` output, list of assert sites added
+with the invariant each encodes.
+
+**Status artifacts affected:** this task ledger, `X26-T3` (parent rollup).
+
+**Agent handoff prompt:** Add paired `assert!`s in
+`crates/domain/src/playback.rs` per HP-1/EC-1 above; do not touch `new()`'s
+existing `Result` branch. Stop condition: stop once both asserts exist and
+`make qa-test` passes.
+
+---
+
+## X26-T3c: Audit-emission asserts (`crates/audit/src/lib.rs`)
+
+**Type:** Development
+**Effort:** L
+**Depends on:** X26-T3 (decomposition parent)
+**Status:** [ ] Planned
+
+**Objective:** Add an `assert!` to `emit_governance_audit` enforcing the
+correlation-identifier mutual-exclusivity invariant `AuditEvent`'s own doc
+comments already state but never check
+(`crates/domain/src/audit.rs:99-112`): depending on event category, exactly
+one of `ingest_token`/`recording_session_id`/`platform_ingest_session_id`
+should be `Some`, the others `None`. All three fields are `pub`, so a caller
+that constructs an `AuditEvent` directly (bypassing `AuditEvent::new`/
+`new_recording`/etc.) can currently violate this silently, and
+`emit_governance_audit` would durably persist a malformed correlation row.
+
+**Happy paths considered:**
+- **HP-1:** `emit_governance_audit` asserts, before calling
+  `insert_audit_event`, that the event's correlation identifiers match the
+  documented one-of-three-per-category invariant for a well-formed event
+  built via the existing constructors.
+
+**Edge cases considered:**
+- **EC-1:** A DB-write failure (`insert_audit_event` returning `Err`) is
+  **not** converted to `assert!` — it stays the existing fail-closed
+  `Result` path (ADR-018); the new assert only guards the in-memory
+  `AuditEvent` shape before the write is attempted.
+- **EC-2:** Reviewer must independently confirm every existing call site
+  (`AuditEvent::new`, `::new_recording`, and any platform-ingest
+  constructor) already satisfies the invariant, so the new assert cannot
+  fire on legitimate existing traffic — this is the highest-risk subtask in
+  the `X26-T3` family (RRI 51, `P` floor 5 per the rights/audit anchor row)
+  precisely because a misfiring assert here would panic on every governance
+  audit write.
+
+**Acceptance criteria:**
+- At least one precondition assert added to `emit_governance_audit`
+  enforcing the correlation-identifier invariant.
+- No existing recoverable-error (`AuditEmitError::Db`) path is replaced by
+  an assert.
+- `make qa-test` passes; a new unit test proves the assert holds for every
+  existing constructor's output (does not panic) and, in a debug-only test,
+  that a deliberately malformed `AuditEvent` (e.g. two correlation IDs set)
+  does panic.
+- Each new assert has a comment stating the invariant it encodes, citing
+  `crates/domain/src/audit.rs`'s doc comments as the source of truth.
+
+**Evidence to emit:** diff, `make qa-test` output, the new unit test's
+output, list of assert sites added with the invariant each encodes.
+
+**Status artifacts affected:** this task ledger, `X26-T3` (parent rollup).
+
+**Agent handoff prompt:** Add a precondition `assert!` in
+`emit_governance_audit` (`crates/audit/src/lib.rs`) enforcing the
+correlation-identifier mutual-exclusivity invariant from
+`crates/domain/src/audit.rs:99-112`'s doc comments; add a unit test proving
+every existing constructor's output passes and a malformed event panics.
+Stop condition: stop once the assert exists, the test passes, and
+`make qa-test` (full suite) is unaffected.
 
 ---
 
