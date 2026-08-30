@@ -37,7 +37,16 @@ T12               (independent — docs-only, no code dependency)
 **Type:** Mechanical / analysis
 **Effort:** S (provisional)
 **Depends on:** none
-**Status:** [ ] Planned
+**Status:** [x] Done — artifact created, pending commit approval (see below)
+**RRI:** 0 -> band Low (0-25); `python3 scripts/rri.py --C 0 --T 0 --A 0 --X 0
+--D 0 --K 0 --P 0 --touches docs/audit/tiger-style-70-100-line-survey.md
+--platform dubbridge`. No anchor-rubric floor matched (no governed crate
+touched); no full approval card required per
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` (Low band, mechanical/analysis work
+stays with the primary agent, not delegated).
+**Task-analysis review:** n/a - mechanical survey, no source/production code
+changes (exempt per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Band-routed
+peer review).
 
 **Objective:** Enumerate every function currently between 70 and 100 lines
 across the Rust workspace, so Phase 1's decomposition work (`X26-T1`) and the
@@ -66,6 +75,22 @@ after the table is committed.
 
 **Stop condition:** Stop once the survey artifact is committed. Do not begin
 decomposing any function.
+
+**Result:** 12 functions found at clippy's 70-line `too_many_lines` ceiling
+(3 production, 9 test) — table, method, and reproduction command at
+`docs/audit/tiger-style-70-100-line-survey.md`. `finalize_ingestion_core`
+appears as required (77 lines by clippy's count / 97 by raw file span,
+both recorded — see that artifact's Method section for why they differ).
+No source file was modified: the survey reused the workspace's own
+`clippy::too_many_lines` lint via a temporary `clippy.toml` threshold
+(70) and a command-line lint-level override, then reverted `clippy.toml`
+to its committed state before this entry was written (verified via `git
+diff`/`git status`, zero pending diff on `clippy.toml`). Open scoping
+question for `X26-T1` recorded in the survey artifact: whether the 9
+test-code rows are in that task's decomposition scope. The survey artifact
+itself is created but not yet `git commit`-ed — committing requires your
+explicit approval per `docs/policies/HITL_AUTONOMY_POLICY.md` § Always
+requires explicit approval.
 
 ---
 
