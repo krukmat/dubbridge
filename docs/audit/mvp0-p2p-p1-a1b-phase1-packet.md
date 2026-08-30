@@ -1,3 +1,12 @@
+---
+type: Audit
+title: "MVP0-P2P P1.A1b phase-1 task-analysis packet"
+task: P1.A1b
+phase: task-analysis
+status: reviewed
+date: 2026-08-30
+---
+
 # Phase-1 task-analysis packet — P1.A1b
 
 Review this task for presentability only. Do not propose or write a patch.

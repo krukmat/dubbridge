@@ -1,5 +1,5 @@
 ---
-type: LocalPrecheck
+type: Audit
 task: P1.A2
 role: phase-1-reviewer
 status: pass
