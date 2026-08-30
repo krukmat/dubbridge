@@ -2,15 +2,15 @@
 type: Audit
 title: "MVP0-P2P P1.A1 implementation evidence"
 task: P1.A1
-date: 2026-08-28
-status: in_progress_p1a1a_done
+date: 2026-08-30
+status: pass
 ---
 
 # MVP0-P2P P1.A1 — implementation evidence
 
 **Task:** `docs/tasks/mvp0-p2p-p1-replication.md` § P1.A1 — Hyperdrive/Corestore
-Android bundle smoke proof (planning parent, decomposed 2026-08-28 into four
-Low-band children at owner request).
+Android bundle smoke proof (planning parent, decomposed on 2026-08-28 into
+P1.A1a, P1.A1b.0, P1.A1b, P1.A1c, and the evidence-only P1.A1d closure).
 
 **Parent RRI:** 38 Moderate (`scripts/rri.py --touches mobile/package.json
 --touches mobile/package-lock.json --touches mobile/src/p2p/runtime --touches
@@ -29,7 +29,10 @@ mobile/__tests__/p2p/hyperdrive-smoke.test.ts --C 2 --D 2 --K 2 --P 2 --T 2
    through a local-only/stubbed filesystem driver.
 4. (likely-false-positive) same receipt-schema ambiguity as #1.
 
-This document accumulates evidence per child as each closes.
+This document accumulates evidence per child as each closes. P1.A1a, P1.A1b.0,
+P1.A1b, P1.A1c, and P1.A1d are PASS. This is a bundle and isolated-test proof
+only: X28 continues to block an on-device Bare-runtime execution claim, so this
+record does not represent a physical Android runtime PASS.
 
 ## P1.A1a — Add Corestore/Hyperdrive dependencies + bundle check
 
@@ -143,3 +146,84 @@ evidence.
   typecheck`, `npx jest __tests__/p2p/`
 
 **Status: P1.A1a — PASS / Done 2026-08-28.**
+
+## P1.A1b.0 — Proof-storage contract preflight
+
+**Status: PASS / Done 2026-08-30.** The frozen host-to-Bare cache-root, RPC,
+receipt, and failure contract is recorded in
+`docs/audit/mvp0-p2p-p1-a1b-storage-contract.md`. It authorized no source,
+dependency, bundle, Android, device, network, or storage action.
+
+## P1.A1b — Transient drive open/close logic
+
+**Status: PASS / Done 2026-08-30.** Its focused verification, coverage
+certification, and owner waiver for the sole no-action phase-2 finding are
+recorded in `docs/audit/mvp0-p2p-p1-a1b-forced-closure.md` and the P1 ledger.
+
+## P1.A1c — Typed error handling and coverage
+
+**Status: PASS / Done 2026-08-30.** The implementation record at
+`docs/audit/mvp0-p2p-p1-a1c-implementation.md` contains the Moderate-band
+routing, independent reviews, focused and full Jest verification, coverage
+certification, and child-level owner verification.
+
+## P1.A1d — Evidence and parent-closure record
+
+### Pre-task record
+
+- **RRI:** 10 Low. Recomputed with
+  `python3 scripts/rri.py --platform rn --cc 1 --touches docs/audit/mvp0-p2p-p1-a1-implementation.md --touches docs/tasks/mvp0-p2p-p1-replication.md --touches docs/plan/mvp0-p2p-p1-replication.md --touches docs/plan/roadmap.md --D 0 --K 1 --P 0 --T 0 --A 0 --X 2`.
+- **Route:** direct primary-agent documentation/status synchronization. Local
+  Qwen delegation is inapplicable to documentation and task-ledger work.
+- **Task-analysis review:** n/a — documentation/task-ledger/plan-only task.
+- **Code-solution review:** n/a — documentation/task-ledger/plan-only task.
+
+### Focused verification
+
+Run on 2026-08-30:
+
+```text
+cd mobile && npm test -- --runInBand --coverage __tests__/p2p/runtime-protocol.test.ts
+PASS __tests__/p2p/runtime-protocol.test.ts
+Test Suites: 1 passed, 1 total
+Tests:       20 passed, 20 total
+```
+
+Focused coverage: `runtime/` 90.74% lines; `protocol.ts` 91.66%, `worklet.ts`
+89.88%, and generated `worklet.bundle.js` 100%. The `proof/` aggregate is not
+the P1.A1c source surface; its 70.58% line figure includes unrelated factory
+branches not exercised by this focused protocol/worklet test.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-A1 | Happy path | The host passes only its derived proof URI in the worklet arguments. | `runtime-protocol.test.ts::HP-A1 passes only the host-derived proof URI as the worklet argument` | passed |
+| HP-A1 | Happy path | A ready then close sequence returns only the frozen two-field receipt. | `runtime-protocol.test.ts::HP-A1 preserves the two-field receipt after ready then close` | passed |
+| EC-A1 | Edge case | Invalid bootstrap configuration is rejected before storage load or network activity. | `runtime-protocol.test.ts::EC-A1b rejects invalid proof configuration before storage is required` | passed |
+| EC-A1 | Edge case | Dependency-load and malformed-bundle failures are typed and redacted. | `runtime-protocol.test.ts::EC-A1 returns a redacted typed error for dependency load failure`; `… bundle validation failure` | passed |
+| EC-A1 | Edge case | Open/ready and partial-construction cleanup failures are typed and redacted. | `runtime-protocol.test.ts::EC-A1 returns a redacted typed error for open failure`; `… partial close failure` | passed |
+| EC-A1 | Edge case | A drive-close failure is typed/redacted and does not directly close the drive-owned Corestore. | `runtime-protocol.test.ts::EC-A1 returns a close error without directly closing a drive-owned Corestore` | passed |
+
+### Parent-chain disposition
+
+P1.A1a, P1.A1b.0, P1.A1b, and P1.A1c are PASS with the linked child evidence
+above. P1.A1d has no source or test changes and independently re-ran the
+focused HP-A1/EC-A1 suite. The repository owner explicitly approved this
+parent-chain certification in this session; P1.A1 is PASS and P1.A2 may now be
+prepared for its own current RRI, card, and approval gate.
+
+### Owner final verification
+
+- **Owner:** Matias, repository owner.
+- **Date:** 2026-08-30.
+- **Statement:** Matias approved the presented P1.A1a-d certification in this
+  session, authorizing P1.A1 PASS and P1.A2's progression to its own planning
+  and approval gate.
+- **Commands run:** `cd mobile && npm test -- --runInBand --coverage
+  __tests__/p2p/runtime-protocol.test.ts`; `make qa-docs`; `git diff --check`.
+
+**Status: P1.A1d — PASS / Done 2026-08-30.**
+
+**Status: P1.A1 — PASS / Done 2026-08-30 (bundle/isolated-test scope; X28
+remains an Android-runtime environment blocker).**

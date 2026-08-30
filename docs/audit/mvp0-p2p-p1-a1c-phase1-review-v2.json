@@ -1,0 +1,21 @@
+{
+  "changed_paths": [],
+  "findings": [],
+  "model": "gemma4:26b-a4b-it-qat",
+  "passes_run": 3,
+  "passes_succeeded": 3,
+  "reconciliation": {
+    "consensus": [],
+    "consensus_count": 0,
+    "likely_false_positive": [],
+    "likely_false_positive_count": 0,
+    "location_inconsistent": [],
+    "location_inconsistent_count": 0,
+    "pass_specific": [],
+    "pass_specific_count": 0,
+    "severity_inconsistent": [],
+    "severity_inconsistent_count": 0
+  },
+  "status": "pass",
+  "summary": "The task scope is well-defined, strictly adhering to the \"fail-closed\" and \"redacted error\" requirements. The boundary correctly excludes network/product dependencies and focuses on protocol-level error handling and test coverage. The distinction between source-test failure and upstream transport defects is clearly established."
+}

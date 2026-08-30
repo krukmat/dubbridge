@@ -16,7 +16,10 @@ import {
   decodeRuntimeEvent,
   encodeProtocolValue, type RuntimeRpcPort,
 } from "../../src/p2p/runtime/protocol";
-import { installRuntimeWorklet } from "../../src/p2p/runtime/worklet";
+import {
+  configureTransientDriveDependenciesForTest,
+  installRuntimeWorklet,
+} from "../../src/p2p/runtime/worklet";
 let { ProofStorageConfigError, proofStorageUri, startProofWorklet } =
   require("../../src/p2p/proof/P1ProofRuntimeFactory");
 
@@ -132,6 +135,14 @@ function workletHarness(argv?: string[]) {
   return { events, ipc, listeners, replies, request };
 }
 
+async function requestTransientDrive(
+  harness: ReturnType<typeof workletHarness>,
+): Promise<void> {
+  harness.request(RUNTIME_COMMAND.OPEN_CLOSE_TRANSIENT_DRIVE);
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 describe("P1.F1 runtime protocol", () => {
   it("HP-A1 passes only the host-derived proof URI as the worklet argument", () => {
     let start = jest.fn();
@@ -148,14 +159,96 @@ describe("P1.F1 runtime protocol", () => {
 
   it("EC-A1b rejects invalid proof configuration before storage is required", async () => {
     expect(() => proofStorageUri("UPPERCASE")).toThrow(ProofStorageConfigError);
+    const load = jest.fn();
+    const restore = configureTransientDriveDependenciesForTest(load);
     const harness = workletHarness();
     harness.request(RUNTIME_COMMAND.OPEN_CLOSE_TRANSIENT_DRIVE);
     await Promise.resolve();
-    expect(harness.replies).toEqual([
-      expect.objectContaining({ ok: false, error: expect.objectContaining({
-        code: "REMOTE_FAILURE", message: "PROOF_STORAGE_CONFIG_INVALID",
-      }) }),
-    ]);
+    await Promise.resolve();
+    expect(harness.replies).toEqual([expect.objectContaining({
+      ok: false,
+      error: expect.objectContaining({ code: "PROOF_STORAGE_CONFIG_INVALID" }),
+    })]);
+    expect(load).not.toHaveBeenCalled();
+    expect(readFileSync(path.join(mobileRoot, "src/p2p/runtime/worklet.ts"), "utf8").toLowerCase()).not.toContain("hyperswarm");
+    restore();
+  });
+
+  it.each([
+    [
+      "dependency load",
+      () => { throw new Error("missing native module"); },
+      "TRANSIENT_DRIVE_DEPENDENCY_LOAD_FAILED",
+    ],
+    [
+      "bundle validation",
+      () => ({ Corestore: null, Hyperdrive: null }),
+      "TRANSIENT_DRIVE_BUNDLE_INVALID",
+    ],
+    [
+      "open",
+      () => ({
+        Corestore: class { async close() {} },
+        Hyperdrive: class { async ready() { throw new Error("raw storage path"); } async close() {} },
+      }),
+      "TRANSIENT_DRIVE_OPEN_FAILED",
+    ],
+    [
+      "partial close",
+      () => ({
+        Corestore: class { async close() { throw new Error("raw storage path"); } },
+        Hyperdrive: class { constructor() { throw new Error("open failed"); } },
+      }),
+      "TRANSIENT_DRIVE_CLOSE_FAILED",
+    ],
+  ] as const)("EC-A1 returns a redacted typed error for %s failure", async (_caseName, load, code) => {
+    const restore = configureTransientDriveDependenciesForTest(load);
+    const harness = workletHarness(["file:///cache/dubbridge-p2p/proofs/proofrun1/"]);
+
+    await requestTransientDrive(harness);
+
+    expect(harness.replies).toEqual([expect.objectContaining({
+      ok: false,
+      error: { code, message: expect.any(String) },
+    })]);
+    expect(harness.replies[0].error).toEqual({ code, message: expect.any(String) });
+    expect(JSON.stringify(harness.replies)).not.toContain("raw storage path");
+    restore();
+  });
+
+  it("EC-A1 returns a close error without directly closing a drive-owned Corestore", async () => {
+    const storeClose = jest.fn();
+    const restore = configureTransientDriveDependenciesForTest(() => ({
+      Corestore: class { async close() { storeClose(); } },
+      Hyperdrive: class { async ready() {} async close() { throw new Error("raw storage path"); } },
+    }));
+    const harness = workletHarness(["file:///cache/dubbridge-p2p/proofs/proofrun1/"]);
+
+    await requestTransientDrive(harness);
+
+    expect(harness.replies).toEqual([expect.objectContaining({
+      ok: false,
+      error: { code: "TRANSIENT_DRIVE_CLOSE_FAILED", message: expect.any(String) },
+    })]);
+    expect(storeClose).not.toHaveBeenCalled();
+    expect(JSON.stringify(harness.replies)).not.toContain("raw storage path");
+    restore();
+  });
+
+  it("HP-A1 preserves the two-field receipt after ready then close", async () => {
+    const restore = configureTransientDriveDependenciesForTest(() => ({
+      Corestore: class { async close() {} },
+      Hyperdrive: class { async ready() {} async close() {} },
+    }));
+    const harness = workletHarness(["file:///cache/dubbridge-p2p/proofs/proofrun1/"]);
+
+    await requestTransientDrive(harness);
+
+    expect(harness.replies).toEqual([expect.objectContaining({
+      ok: true,
+      result: { capability: "transient-hyperdrive-corestore", schema_version: 1 },
+    })]);
+    restore();
   });
   it("HP-F1 builds the committed worklet bundle deterministically", () => {
     execFileSync(process.execPath, ["scripts/build-bare-worklet.mjs", "--check"], {

@@ -27,7 +27,12 @@ export type RuntimeProtocolErrorCode =
   | "REMOTE_FAILURE"
   | "RPC_TIMEOUT"
   | "INVALID_LIFECYCLE"
-  | "CHANNEL_CLOSED";
+  | "CHANNEL_CLOSED"
+  | "PROOF_STORAGE_CONFIG_INVALID"
+  | "TRANSIENT_DRIVE_DEPENDENCY_LOAD_FAILED"
+  | "TRANSIENT_DRIVE_BUNDLE_INVALID"
+  | "TRANSIENT_DRIVE_OPEN_FAILED"
+  | "TRANSIENT_DRIVE_CLOSE_FAILED";
 
 export const TRANSIENT_DRIVE_RECEIPT = {
   capability: "transient-hyperdrive-corestore",
@@ -75,6 +80,11 @@ const REDACTED_ERROR_MESSAGE: Record<RuntimeProtocolErrorCode, string> = {
   RPC_TIMEOUT: "Runtime request timed out",
   INVALID_LIFECYCLE: "Runtime lifecycle event is invalid",
   CHANNEL_CLOSED: "Runtime channel closed before replying",
+  PROOF_STORAGE_CONFIG_INVALID: "Proof storage configuration is invalid",
+  TRANSIENT_DRIVE_DEPENDENCY_LOAD_FAILED: "Transient drive dependency could not be loaded",
+  TRANSIENT_DRIVE_BUNDLE_INVALID: "Transient drive bundle is invalid",
+  TRANSIENT_DRIVE_OPEN_FAILED: "Transient drive could not be opened",
+  TRANSIENT_DRIVE_CLOSE_FAILED: "Transient drive could not be closed",
 };
 
 class RuntimeCodec {

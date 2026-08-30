@@ -38,13 +38,13 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 | P1.F3a.1 | P0 characterization migration | PASS — owner verified 2026-08-27 | P1.F2 PASS |
 | P1.F3a.2 | P0 runtime-scaffold retirement | PASS — Done 2026-08-27 | P1.F3a.1 PASS — satisfied 2026-08-27 |
 | P1.F3b | P0 config/dependency cleanup | Implemented + audited 2026-08-27 — blocked on Android device proof (X28) | P1.F3a.2 PASS — satisfied 2026-08-27 |
-| P1.A1 | Hyperdrive/Corestore Android bundle smoke proof (planning parent) | Decomposed 2026-08-28 — no direct source execution | P1.F3b PASS |
+| P1.A1 | Hyperdrive/Corestore Android bundle smoke proof (planning parent) | PASS — Done 2026-08-30; bundle/isolated-test scope | P1.F3b PASS |
 | P1.A1a | Add Corestore/Hyperdrive deps + bundle check | PASS — Done 2026-08-28 | P1.F3b PASS |
 | P1.A1b.0 | Proof-storage contract preflight | PASS — Done 2026-08-30 | P1.A1a PASS — satisfied 2026-08-28 |
 | P1.A1b | Transient drive open/close logic (HP-A1) | PASS — owner waiver recorded 2026-08-30 | P1.A1b.0 PASS — satisfied 2026-08-30 |
-| P1.A1c | Typed error handling (EC-A1) | Blocked | P1.A1b PASS |
-| P1.A1d | Tests + evidence + closure | Blocked | P1.A1c PASS |
-| P1.A2 | Transient seed lifecycle + residue cleanup | Deferred — needs current RRI/card/approval | P1.A1d PASS |
+| P1.A1c | Typed error handling + coverage (EC-A1) | PASS — owner verified 2026-08-30; RRI 28 Moderate | P1.A1b PASS — satisfied 2026-08-30 |
+| P1.A1d | Evidence + closure | PASS — Done 2026-08-30 | P1.A1c PASS — satisfied 2026-08-30 |
+| P1.A2 | Transient seed lifecycle + residue cleanup | Awaiting approval — RRI 46 Med-high; phase-1 PASS/card recorded 2026-08-30 | P1.A1d PASS — satisfied 2026-08-30 |
 | P1.B1 | Isolated Hyperswarm replication transport | Deferred — needs current RRI/card/approval | P1.A2 PASS |
 | P1.B2 | Verification, reconnect + fail-closed witness | Deferred — needs current RRI/card/approval | P1.B1 PASS |
 
@@ -491,10 +491,12 @@ and passing focused/typecheck/lint/full-Jest verification.
 
 ## P1.A1 — Hyperdrive/Corestore Android bundle smoke proof (planning parent)
 
-- **Status:** Decomposed 2026-08-28 at the owner's explicit request. The
-  documentation-only P1.A1b.0 preflight closed PASS on 2026-08-30; it raised
-  P1.A1b's executable scope to RRI 50 Med-high. No direct source execution
-  under this parent ID — see `P1.A1a`-`P1.A1d` and P1.A1b.0.
+- **Status:** PASS — Done 2026-08-30 after repository-owner final
+  verification. The documentation-only P1.A1b.0 preflight closed PASS on
+  2026-08-30; it raised P1.A1b's executable scope to RRI 50 Med-high. No
+  direct source execution occurred under this parent ID — see `P1.A1a`-`P1.A1d`
+  and P1.A1b.0. P1.A2 is unblocked only to its own current RRI/card/approval
+  preparation; it has no source-execution authorization.
 - **Objective (unchanged, inherited by children):** prove compatible
   Corestore/Hyperdrive dependencies can bundle, open an empty transient drive
   on Android, close it, and perform no discovery — a bundling/dependency
@@ -657,11 +659,18 @@ and passing focused/typecheck/lint/full-Jest verification.
   test -- --runInBand __tests__/p2p/runtime-protocol.test.ts`; `npm run lint`;
   `npm run check:bare-worklet`.
 
-### P1.A1c — Typed error handling (EC-A1)
+### P1.A1c — Typed error handling + coverage (EC-A1)
 
-- **Status:** Blocked on P1.A1b PASS.
-- **Effort / RRI:** S / 23 Low.
-- **Allowed paths:** the packaged runtime worklet (`mobile/src/p2p/runtime/**`).
+- **Status:** PASS — owner verified 2026-08-30. P1.A1b PASS satisfied the
+  dependency on 2026-08-30. Full evidence:
+  `docs/audit/mvp0-p2p-p1-a1c-implementation.md`.
+- **Effort / RRI:** M / 28 Moderate. The historical `S / 23 Low` estimate
+  omitted the shared protocol, generated bundle, and this task's mandatory
+  unit-test coverage.
+- **Allowed paths:** `mobile/src/p2p/runtime/worklet.ts`,
+  `mobile/src/p2p/runtime/protocol.ts`,
+  `mobile/src/p2p/runtime/worklet.bundle.js`, and
+  `mobile/__tests__/p2p/runtime-protocol.test.ts`.
 - **Objective:** typed, fail-closed error handling for dependency load,
   bundle, invalid-path, open, and close failures.
 - **EC-A1:** dependency load, bundle, invalid path, open, or close failure is
@@ -670,38 +679,91 @@ and passing focused/typecheck/lint/full-Jest verification.
   network/Hyperswarm code path (Gemma finding #3). Any failure attributable
   to the X28 upstream transport/worklet execution defect is classified
   `Environment/Blocked`, not a test failure (Gemma finding #2).
-- **Evidence to emit:** EC-A1 proof log covering each typed failure mode.
+- **Evidence to emit:** EC-A1 proof log and focused Jest coverage covering
+  each typed failure mode; bundle build/check, typecheck, and lint output.
+- **Status artifacts affected:** this ledger, the P1 plan, P1.A1c audit
+  artifacts, and P1.A1d's evidence/closure handoff.
 - **Handoff prompt:** `P1.A1c — add typed fail-closed error handling for
   Hyperdrive/Corestore load/bundle/open/close failures; invalid-path case via
   a local-only stub driver only; classify X28-attributable failures as
-  Environment/Blocked, never a test failure.`
+  Environment/Blocked, never a test failure. Add the focused EC-A1 coverage
+  in runtime-protocol.test.ts and stop before P1.A1d evidence closure.`
 
-### P1.A1d — Tests + evidence + closure
+### Task-analysis review
 
-- **Status:** Blocked on P1.A1c PASS.
+Task-analysis review: gemma
+`docs/audit/mvp0-p2p-p1-a1c-phase1-review-v2.json` - PASS
+
+### Code-solution review
+
+Code-solution review: gemma
+`docs/audit/mvp0-p2p-p1-a1c-phase2-review-remediation-retry.json` - PASS
+
+The re-review had two clean passes. Its one isolated minor observation states
+“None required”; the explicit disposition and added ownership regression test
+are recorded in `docs/audit/mvp0-p2p-p1-a1c-phase2-remediation.md`.
+
+### Implementation evidence
+
+`docs/audit/mvp0-p2p-p1-a1c-implementation.md` records the cloud fallback
+receipt, two Reflection passes, HP-A1/EC-A1 coverage certification, focused
+and full Jest results, and owner final verification.
+
+### P1.A1d — Evidence + closure
+
+- **Status:** PASS — Done 2026-08-30 after explicit repository-owner final
+  verification. P1.A1c PASS satisfied the dependency; P1.A1d re-ran and
+  consolidated the focused evidence without changing source or tests. No
+  source, test, dependency, bundle, Android, device, storage, or network work
+  belongs to this task.
 - **Effort / RRI:** S / 10 Low.
-- **Allowed paths:** `mobile/__tests__/p2p/hyperdrive-smoke.test.ts` (new),
-  `docs/audit/mvp0-p2p-p1-a1-implementation.md` (new).
-- **Objective:** certify HP-A1/EC-A1 with Jest coverage and close the P1.A1
-  chain.
-- **Acceptance:** `hyperdrive-smoke.test.ts` exercises HP-A1 and every EC-A1
-  typed-failure branch; unit coverage certification maps each to a passing
-  test; owner final verification recorded.
+- **Allowed paths:** `docs/audit/mvp0-p2p-p1-a1-implementation.md` (existing
+  parent evidence record), this ledger, `docs/plan/mvp0-p2p-p1-replication.md`,
+  and `docs/plan/roadmap.md`. These four documentation/status artifacts are the
+  complete closure surface; the earlier one-file allowance conflicted with the
+  required status synchronization below.
+- **Objective:** record P1.A1's already-executed focused Jest coverage,
+  certification, and owner verification, then close the P1.A1 chain.
+- **Acceptance:** the P1.A1c-focused runtime-protocol tests exercise HP-A1
+  and every EC-A1 typed-failure branch; unit coverage certification maps each
+  to a passing test; owner final verification is recorded.
 - **Evidence to emit:** test run output, unit coverage certification table,
   owner final verification block.
 - **Status artifacts affected:** this ledger (mark P1.A1a-d PASS/Done, parent
   P1.A1 Done), `docs/plan/mvp0-p2p-p1-replication.md`, roadmap MVP0-P2P row.
-- **Handoff prompt:** `P1.A1d — add hyperdrive-smoke.test.ts covering HP-A1
-  and every EC-A1 branch; write the P1.A1 evidence doc; certify coverage and
-  record owner verification.`
+- **Handoff prompt:** `P1.A1d — write the P1.A1 evidence doc from the
+  already-passing P1.A1c focused Jest coverage; certify coverage and record
+  owner verification. Do not edit source or tests.`
+
+### Pre-task record
+
+- **RRI:** 10 Low. Recomputed with `scripts/rri.py` over the four allowed
+  documentation/status artifacts (`C=0`, `F=2`, `D=0`, `T=0`, `A=0`, `K=1`,
+  `P=0`, `X=2`; no penalties).
+- **Execution route:** direct primary-agent documentation update. Low-band
+  Qwen delegation is inapplicable because this task is documentation and
+  task-ledger/status synchronization, not a simple code patch.
+- **Task-analysis review:** n/a — documentation/task-ledger/plan-only task.
+- **Code-solution review:** n/a — documentation/task-ledger/plan-only task.
+- **Owner final verification:** Matias explicitly approved the assembled
+  P1.A1a-d HP-A1/EC-A1 certification in this session on 2026-08-30. P1.A1d
+  and P1.A1 are PASS; P1.A2 is unblocked only for its own presentation gate.
 
 ## P1.A2 — Transient seed lifecycle and residue cleanup
 
-- **Status:** Deferred until P1.A1 PASS; requires current RRI/card/approval.
-- **Effort / prospective RRI:** L / 47 Med-high. Recompute at presentation.
-- **Allowed paths:** the packaged runtime worklet,
-  `mobile/src/p2p/proof/transient-storage.ts`,
-  `mobile/src/p2p/proof/P1SeedProofRunner.ts`,
+- **Status:** Awaiting approval — P1.A1d PASS satisfied the dependency on
+  2026-08-30. Current RRI, phase-1 review, and Compact Approval Task Card v2
+  are recorded at `docs/audit/mvp0-p2p-p1-a2-rri.md`,
+  `docs/audit/mvp0-p2p-p1-a2-phase1-review.json`, and
+  `docs/audit/mvp0-p2p-p1-a2-approval-card.md`. No source execution is
+  authorized until the current-session approval checkpoint passes.
+- **Effort / RRI:** L / 46 Med-high.
+- **Allowed paths:** `mobile/src/p2p/runtime/worklet.ts`,
+  `mobile/src/p2p/runtime/protocol.ts`, generated
+  `mobile/src/p2p/runtime/worklet.bundle.js`,
+  `mobile/src/p2p/proof/P1ProofRuntimeFactory.ts`, new
+  `mobile/src/p2p/proof/transient-storage.ts`, new
+  `mobile/src/p2p/proof/P1SeedProofRunner.ts`, new
   `mobile/__tests__/p2p/transient-seed.test.ts`, and A2 evidence.
 - **Objective:** write/hash a deterministic synthetic fixture in run-scoped
   cache storage and prove close-before-delete, absence, and crash-residue cleanup.
@@ -718,6 +780,11 @@ and passing focused/typecheck/lint/full-Jest verification.
   artifacts.
 - **Handoff prompt:** `P1.A2 — implement only transient synthetic seed storage,
   verified cleanup, and bounded janitor behavior; stop before Hyperswarm.`
+
+### Task-analysis review
+
+Task-analysis review: gemma
+`docs/audit/mvp0-p2p-p1-a2-phase1-review.json` - PASS
 
 ## P1.B1 — Isolated Hyperswarm replication transport
 

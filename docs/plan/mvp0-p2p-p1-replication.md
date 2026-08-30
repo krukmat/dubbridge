@@ -19,8 +19,10 @@ parent_task: P1
 > 2026-08-27 within its frozen packaging/protocol scope. P1.F2 was separately
 > approved, implemented, and closed PASS after owner verification on 2026-08-27.
 > P1.F3a.1 is implemented and automated verification has passed; owner final
-> verification remains pending before P1.F3a.2 may be prepared. No P2P network
-> activity or later-child source execution has started.
+> verification remains pending before P1.F3a.2 may be prepared. P1.A2 has a
+> current RRI 46 Med-high, phase-1 PASS, and approval card on 2026-08-30; it
+> awaits its own explicit owner approval. No P2P network activity or later-child
+> source execution has started.
 
 ## Objective
 
@@ -127,9 +129,18 @@ explicit approval before source edits:
      RRI 50 Med-high and closed PASS on 2026-08-30 with an explicit owner
      waiver for the residual no-action phase-2 finding. See
      `docs/audit/mvp0-p2p-p1-a1b-forced-closure.md`.
+   - **P1.A1c / P1.A1d — Typed-failure coverage and closure evidence.** P1.A1c
+     closed PASS at RRI 28 Moderate on 2026-08-30. P1.A1d has re-run and
+     consolidated the focused HP-A1/EC-A1 Jest evidence in
+     `docs/audit/mvp0-p2p-p1-a1-implementation.md`; the repository owner
+     verified P1.A1 PASS on 2026-08-30, unblocking P1.A2 for its own current
+     RRI/card/approval preparation. The record is a bundle/isolated-test proof,
+     not an Android-runtime execution claim while X28 remains open.
 7. **P1.A2 — Transient seed lifecycle and residue cleanup.** Generate the
    synthetic fixture, write/hash it using a run-scoped cache directory, close
    handles, delete/verify absence, and clean abandoned proof directories.
+   RRI 46 Med-high phase-1/card preparation is PASS; source execution awaits
+   the child-specific owner approval.
 8. **P1.B1 — Isolated Hyperswarm replication transport.** Use a proof-only
    runtime factory for seed/client sessions; discover and replicate the complete
    fixture without exposing proof commands through `P2PService`.
