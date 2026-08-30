@@ -9,7 +9,11 @@ import ts from "typescript";
 const mobileRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const runtimeRoot = path.join(mobileRoot, "src", "p2p", "runtime");
 const outputPath = path.join(runtimeRoot, "worklet.bundle.js");
-const sourcePaths = [path.join(runtimeRoot, "protocol.ts"), path.join(runtimeRoot, "worklet.ts")];
+const sourcePaths = [
+  path.join(runtimeRoot, "protocol.ts"),
+  path.join(runtimeRoot, "transient-drive.ts"),
+  path.join(runtimeRoot, "worklet.ts"),
+];
 const isCheck = process.argv.slice(2).includes("--check");
 
 function sha256(value) {
