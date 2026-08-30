@@ -408,19 +408,25 @@ remaining work into scored Low-band subtasks; cloud is the last resort when
 that route cannot proceed.
 
 **Med-high (41–55):** ADR-038 is its fail-closed, evidence-bearing
-refinement/receipt gate. **RRI 46–55** is cloud-only **for the whole task**
-except a module independently qualified under ADR-040 per-module split
-routing (below). **RRI 41–45** (ADR-038 Amendment 3, 2026-08-23) is the
-exception: a `GO_LOCAL` result routes the whole task through the same
-local-first path as 26–40 Moderate instead of cloud.
+refinement/receipt gate. **RRI 46–55** never starts a whole-task local
+developer — except a module independently qualified under ADR-040
+per-module split routing (below) — but before its cloud-takeover packet is
+emitted, ADR-038 Amendment 4 (2026-08-30) requires the same Low-band
+decomposition attempt as Moderate (§ Post-repair-budget Low-band
+decomposition below), escalating to cloud only for the residue that itself
+scores above Low. **RRI 41–45** (ADR-038 Amendment 3, 2026-08-23) is a
+further exception: a `GO_LOCAL` result routes the whole task through the
+same local-first path as 26–40 Moderate instead of cloud.
 
 ```mermaid
 flowchart LR
     Card["Approved Med-high card\n(RRI 41-55)"] --> Glimmer["Muse Glimmer advisory refinement\nmuse-glimmer:30b-q4_K_M"]
     Glimmer -->|GO_LOCAL or CLOUD_REQUIRED| Receipt["Primary hash-bound\nroute receipt"]
     Receipt -->|"downgrade allowed;\nupgrade never allowed"| Gate{"med_high_gate.py\nboth sides GO_LOCAL?"}
-    Gate -->|CLOUD_REQUIRED| Cloud["Resolved Codex / Claude takeover model\n+ full ADR-038 S5 evidence bundle"]
-    Gate -->|"GO_LOCAL, RRI 46-55\n(policy excluded)"| Cloud
+    Gate -->|CLOUD_REQUIRED| Decompose46["46-55: attempt Low-band\ndecomposition first (Amendment 4)"]
+    Gate -->|"GO_LOCAL, RRI 46-55\n(no whole-task local attempt)"| Decompose46
+    Decompose46 -->|"residue scores Moderate+"| Cloud["Resolved Codex / Claude takeover model\n+ full ADR-038 S5 evidence bundle"]
+    Decompose46 -->|"Low-band subtasks"| DelegateLow["delegate-low-rri.py\norchestrator-only authorship"]
     Gate -->|"GO_LOCAL, RRI 41-45"| LocalFirst["Moderate local-first path\nrun_local_task.py, 2 repair attempts"]
 ```
 
@@ -428,7 +434,8 @@ Implementation surfaces: `scripts/local-architect/run_analysis.py`
 (`med-high-refinement-v1` profile) for the Muse Glimmer artifact,
 `scripts/local-agent/med_high_gate.py` for the fail-closed route decision,
 `scripts/local-agent/run_med_high_task.py` for automatic cloud-evidence-bundle
-emission on every `CLOUD_REQUIRED` or 46–55 `GO_LOCAL` result. For **RRI
+emission on every `CLOUD_REQUIRED` or 46–55 `GO_LOCAL` result that survives
+the Amendment 4 decomposition attempt with cloud-eligible residue. For **RRI
 41–45**, a `GO_LOCAL` result instead hands off to
 `scripts/local-agent/run_local_task.py` exactly as Moderate does — no
 whole-task local attempt/repair applies to 46–55 outside an ADR-040-qualified
@@ -449,12 +456,22 @@ assembling, never authoring substantive logic directly. Cloud escalation
 stays available as the fallback of last resort, not the default.
 
 An ADR-040-qualified local module tramo follows its own two-attempt local
-budget and may use this decomposition route for remaining module work. A
-**46–55** Med-high whole-task `GO_LOCAL` advisory never starts a local
-developer and never creates a whole-task local repair budget. **RRI 41–45**
-(ADR-038 Amendment 3) is the exception: a `GO_LOCAL` result there does start
-a whole-task local attempt under the Moderate route, including this same
-post-repair-budget decomposition step on 2/2 exhaustion.
+budget and may use this decomposition route for remaining module work. **RRI
+41–45** (ADR-038 Amendment 3) starts a whole-task local attempt under the
+Moderate route, including this same post-repair-budget decomposition step on
+2/2 exhaustion.
+
+**RRI 46–55** never gets a whole-task local repair budget (Amendment 1) —
+but per **ADR-038 Amendment 4 (2026-08-30)**, the same decomposition
+mechanism still applies as the step *before* the cloud-takeover packet on
+any 46–55 `GO_LOCAL`/`CLOUD_REQUIRED` result: decompose the remaining scope
+into candidate subtasks, score each with `scripts/rri.py`, dispatch every
+RRI 0–25 candidate via `scripts/delegate-low-rri.py`, and route only the
+above-Low residue (or a hard-excluded surface per § Med-high hard exclusions)
+to cloud. This is not a whole-task local attempt and does not reopen
+Amendment 1's single-session budget — it is orchestrator-only decomposition
+and delegation of independently-scored Low subtasks, exactly as Moderate's
+own post-repair-budget step.
 
 A direct orchestrator edit is permitted only in two narrow, explicitly
 recorded cases: (1) a **documented tooling-failure exception** — the local

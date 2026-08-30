@@ -339,6 +339,84 @@ review/approval rigor (§7), and the Amendment 2 per-module exception for
 46-55. `S-150-T3c` itself (final RRI 50, in the unchanged 46-55 sub-band)
 remains cloud-only under this ADR exactly as before this amendment.
 
+## Amendment 4 (2026-08-30): Low-band decomposition before cloud takeover in 46-55
+
+**Reason:** owner directive during P1.A2 presentation
+(`docs/tasks/mvp0-p2p-p1-replication.md` § P1.A2), given directly by the
+DubBridge owner as final authority over this workflow policy: when Amendment
+1's whole-task cloud-only rule applies, or the Moderate/41-45 local-first
+repair budget is exhausted, the orchestrator must first attempt to increase
+local participation by decomposing the remaining work into scored Low-band
+(RRI 0-25) subtasks via `scripts/delegate-low-rri.py`, escalating to cloud
+only for the residue that itself scores Moderate or higher. This is a
+generalization of `§ Post-repair-budget Low-band decomposition` (already the
+default for Moderate/41-45 in
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md`/`docs/policies/
+HITL_AUTONOMY_POLICY.md`) to the 46-55 sub-band's cloud-only trigger.
+
+**Changes to Amendment 1 (2026-08-12: Med-high local execution disabled):**
+Amendment 1's rule stands unchanged in substance — a `GO_LOCAL`
+refinement/receipt result never starts a **whole-task** local developer in
+46-55, and §4's 8-turn/300-second/zero-repair budget for a single Med-high
+local round is not reopened. What changes is what happens **between** that
+exclusion firing and the cloud-takeover packet being emitted: the
+orchestrator must attempt Low-band decomposition of the task's remaining
+scope first.
+
+**Mechanism:**
+
+1. On a 46-55 `GO_LOCAL` or `CLOUD_REQUIRED` result (or on Moderate/41-45
+   local-first repair-budget exhaustion carrying a residual scope still in
+   46-55), the orchestrator decomposes the approved task's remaining
+   implementation into candidate subtasks scoped to the smallest coherent
+   file/behavior unit it can identify from the approved `allowed_paths` and
+   acceptance criteria.
+2. Each candidate subtask is scored independently with `scripts/rri.py`.
+   Subtasks scoring RRI 0-25 are dispatched via `scripts/delegate-low-rri.py`
+   (`--mode full-file` for new files, `--mode before-after` for small edits),
+   primary agent as orchestrator only — diagnosing, splitting, dispatching,
+   reviewing, and assembling, never authoring substantive logic directly.
+3. Any candidate subtask that does not score RRI 0-25 (Moderate, Med-high, or
+   higher) is **not** forced into artificial decomposition to fit Low — it
+   routes to this ADR's existing cloud-takeover packet (§ Preserve evidence
+   during cloud escalation) on its own, carrying its own RRI and evidence.
+4. Cloud is the fallback of last resort only for: (a) subtasks that
+   themselves score above Low, and (b) any Low-band subtask whose delegation
+   attempt fails its bounded repair cycle. It is never the default first
+   response to the 46-55 exclusion firing.
+
+**§6 (Exclude high-confidence surfaces from `GO_LOCAL`) is not weakened by
+this amendment.** A candidate subtask touching an excluded surface
+(auth/security, rights/consent/governance invariants, schema/migrations, an
+unresolved ADR decision, or unbounded scope) is never Low-band eligible
+regardless of its measured RRI — it routes cloud exactly as the whole task
+would have.
+
+**§7 (Keep review and approval rigor unchanged) is unaffected.** The
+containing task's band-resolved reviewer (Gemma primary, Muse Glimmer
+intermediate, D14 final), 3 Reflection passes, the RRI 41+ human approval
+gate, owner verification, and status synchronization continue to evaluate
+the final unified diff as a whole. No additional per-subtask approval is
+required once the containing task is already HITL-approved — this amendment
+changes only who authors the remaining code, never RRI, band, reviewer,
+Reflection count, or the approval gate. A `### Implementation routing
+evidence` block recording the decomposition attempt (including a `no
+decomposition possible` result and its reason, when applicable) is required
+in the closure record, per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md §
+Post-repair-budget Low-band decomposition`.
+
+**Interaction with Amendment 2 (ADR-040 per-module split) and Amendment 3
+(41-45 local-first):** unaffected and evaluated first when applicable.
+ADR-040's per-module split and Amendment 3's 41-45 local-first path remain
+available exactly as before; this amendment applies only once those routes
+do not apply or are exhausted, as the step before — not instead of — the
+existing cloud-takeover packet.
+
+**Not changed by this amendment:** the fail-closed route authority (§3), the
+refinement/receipt evidence requirement (§2, §5), the hard exclusions (§6),
+review/approval rigor (§7), and Amendment 1's prohibition on a whole-task
+local developer in 46-55.
+
 ## Related
 
 - `docs/adr/ADR-036-local-first-agentic-implementation-band.md`

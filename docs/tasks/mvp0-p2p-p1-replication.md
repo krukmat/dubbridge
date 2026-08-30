@@ -751,12 +751,17 @@ and full Jest results, and owner final verification.
 
 ## P1.A2 — Transient seed lifecycle and residue cleanup
 
-- **Status:** Awaiting approval — P1.A1d PASS satisfied the dependency on
-  2026-08-30. Current RRI, phase-1 review, and Compact Approval Task Card v2
-  are recorded at `docs/audit/mvp0-p2p-p1-a2-rri.md`,
-  `docs/audit/mvp0-p2p-p1-a2-phase1-review.json`, and
-  `docs/audit/mvp0-p2p-p1-a2-approval-card.md`. No source execution is
-  authorized until the current-session approval checkpoint passes.
+- **Status:** Approved 2026-08-30 (Matias, current session). ADR-038 Muse
+  Glimmer refinement retried after an Ollama-down operational failure
+  (`docs/audit/mvp0-p2p-p1-a2-adr038-refinement.json`, `route_recommendation:
+  GO_LOCAL`), downgraded to `CLOUD_REQUIRED` by the primary receipt per
+  Amendment 1 (`docs/audit/mvp0-p2p-p1-a2-primary-receipt.json`,
+  `med_high_gate.py` route `CLOUD_REQUIRED`). Per ADR-038 Amendment 4
+  (2026-08-30), Low-band decomposition was attempted before cloud takeover:
+  see `### Implementation routing evidence` below. Current RRI, phase-1
+  review, and Compact Approval Task Card v2 are recorded at
+  `docs/audit/mvp0-p2p-p1-a2-rri.md`, `docs/audit/mvp0-p2p-p1-a2-phase1-review.json`,
+  and `docs/audit/mvp0-p2p-p1-a2-approval-card.md`.
 - **Effort / RRI:** L / 46 Med-high.
 - **Allowed paths:** `mobile/src/p2p/runtime/worklet.ts`,
   `mobile/src/p2p/runtime/protocol.ts`, generated
@@ -785,6 +790,33 @@ and full Jest results, and owner final verification.
 
 Task-analysis review: gemma
 `docs/audit/mvp0-p2p-p1-a2-phase1-review.json` - PASS
+
+### Implementation routing evidence
+
+Per ADR-038 Amendment 4 (2026-08-30): before invoking the cloud-takeover
+packet on the 46-55 `CLOUD_REQUIRED` route, the remaining P1.A2 scope was
+decomposed into four candidate subtasks and each independently scored with
+`scripts/rri.py`:
+
+| Candidate | Files | RRI | Band | Route |
+|---|---|---:|---|---|
+| A2-1 | `mobile/src/p2p/proof/transient-storage.ts` (new) | 21 | Low | Delegated via `scripts/delegate-low-rri.py` |
+| A2-2 | `mobile/src/p2p/proof/P1SeedProofRunner.ts` (new) | 26 | Moderate | Cloud (does not qualify for Low) |
+| A2-3 | `mobile/__tests__/p2p/transient-seed.test.ts` (new) | 7 | Low | Delegated via `scripts/delegate-low-rri.py` |
+| A2-4 | `mobile/src/p2p/runtime/worklet.ts`, `protocol.ts`, `worklet.bundle.js`, `mobile/src/p2p/proof/P1ProofRuntimeFactory.ts` | 31 | Moderate | Cloud (does not qualify for Low) |
+
+A2-2 and A2-4 were not forced into artificial Low-band decomposition —
+their D/K scores reflect genuine crash-residue-cleanup and Hyperdrive/Bare
+RPC-seam domain complexity, not inflation. Per Amendment 4 §6, no candidate
+touches a hard-exclusion surface (auth/security, rights/consent/governance,
+schema/migrations, unresolved ADR, unbounded scope), so none is forced to
+cloud on that basis either — A2-2/A2-4 route cloud purely on their own
+measured RRI.
+
+- ADR-038 refinement: `docs/audit/mvp0-p2p-p1-a2-adr038-refinement.json` (retried after Ollama-down operational failure; `route_recommendation: GO_LOCAL`)
+- Primary receipt (downgrade to `CLOUD_REQUIRED` per Amendment 1): `docs/audit/mvp0-p2p-p1-a2-primary-receipt.json`
+- Gate decision: `med_high_gate.py` → `{"route": "CLOUD_REQUIRED", "reason": "Primary receipt downgraded GO_LOCAL to cloud."}`
+- Decomposition outcome: 2/4 candidates qualify Low (delegated), 2/4 remain Moderate and route to the cloud-takeover packet
 
 ## P1.B1 — Isolated Hyperswarm replication transport
 

@@ -110,10 +110,23 @@ escalation stays the fallback of last resort, not the default.
 An ADR-040-qualified local module follows its own two-attempt local budget and
 may use this decomposition route for its remaining module work. A Med-high
 46–55 whole-task `GO_LOCAL` advisory is policy-excluded from local
-implementation; it never creates a local repair budget. A Med-high 41–45
-whole-task `GO_LOCAL` advisory (ADR-038 Amendment 3) is not excluded — it
-creates a local repair budget exactly like Moderate, including this
+implementation; it never creates a whole-task local repair budget. A Med-high
+41–45 whole-task `GO_LOCAL` advisory (ADR-038 Amendment 3) is not excluded —
+it creates a local repair budget exactly like Moderate, including this
 post-repair-budget decomposition step on 2/2 exhaustion.
+
+**46–55 also runs this decomposition step (ADR-038 Amendment 4,
+2026-08-30).** Because 46–55 has no whole-task repair budget to exhaust, the
+trigger is instead any 46–55 `GO_LOCAL` or `CLOUD_REQUIRED` result: before
+emitting the cloud-takeover packet, the orchestrator decomposes the
+remaining scope into candidate subtasks, scores each independently with
+`scripts/rri.py`, dispatches every RRI 0–25 candidate via
+`scripts/delegate-low-rri.py`, and routes only the above-Low residue (or any
+subtask touching a § Med-high hard-exclusion surface) to cloud. This does
+not reopen a whole-task local attempt in 46–55 and does not weaken Amendment
+1 — it only inserts the same Low-band-maximization step Moderate already
+uses, applied to 46–55's cloud-only trigger instead of a repair-budget
+exhaustion.
 
 Full 9-step route (budget confirmation, diagnosis, decomposition, delegation
 via `scripts/delegate-low-rri.py`, patch review, the two narrow direct-edit
@@ -137,7 +150,9 @@ passes apply.
 
 Route: Muse Glimmer advisory refinement (`GO_LOCAL`|`CLOUD_REQUIRED`) →
 primary agent's hash-bound route receipt (may downgrade, never upgrade). For
-**RRI 46–55**, every result (including `GO_LOCAL`) escalates to the cloud
+**RRI 46–55**, every result (including `GO_LOCAL`) first goes through the
+Amendment 4 Low-band decomposition attempt above (§ Post-repair-budget
+Low-band decomposition), then escalates any above-Low residue to the cloud
 takeover model with the full ADR-038 §5 evidence bundle — **except** a
 module qualified under ADR-040 per-module split routing (below). For **RRI
 41–45** (ADR-038 Amendment 3, 2026-08-23), a `GO_LOCAL` result instead

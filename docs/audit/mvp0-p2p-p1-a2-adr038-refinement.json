@@ -1,10 +1,19 @@
 {
-  "error": {
-    "code": "timeout",
-    "message": "http://127.0.0.1:11434/api/generate did not respond within 120.0s."
+  "error": null,
+  "finished_at": "2026-08-30T21:00:07.490183Z",
+  "generation": {
+    "created_at": "2026-08-30T21:00:07.484295Z",
+    "done": true,
+    "eval_count": 607,
+    "eval_duration": 86166520000,
+    "load_duration": 2283083,
+    "prompt_eval_count": 966,
+    "prompt_eval_duration": 6127211000,
+    "think_disabled": true,
+    "thinking_present": false,
+    "thinking_sha256": null,
+    "total_duration": 92308467250
   },
-  "finished_at": "2026-08-30T19:08:19.775699Z",
-  "generation": null,
   "model": {
     "expected_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
     "resolved_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
@@ -21,16 +30,79 @@
     "sha256": "b00233870418a508048204fb25ba31374b5105a4663528f30016be3e014053c3",
     "version": "med-high-refinement-prompt-v1"
   },
-  "response": null,
+  "response": {
+    "raw_text_sha256": "fba26abdbd613337368142ab19c8ee886bf7a3e83267e7fe59b0b220973f377f",
+    "validated": {
+      "acceptance_tests": [
+        "Jest transient-seed test validates HP-A2 deterministic write hash receipt and verified deletion",
+        "Jest test validates EC-A2 fail-closed on foreign path and janitor eligibility",
+        "npm run build:bare-worklet and check:bare-worklet succeed",
+        "npm run typecheck lint and full mobile Jest pass"
+      ],
+      "claims": [
+        {
+          "label": "SUPPORTED",
+          "statement": "X28 remains Android Bare-runtime blocker from bare-module@6.3.2"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Allowed paths are limited to mobile/src/p2p/runtime and proof files"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Receipt must reveal byte count and SHA-256 only"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "No Hyperswarm discovery replication introduced"
+        }
+      ],
+      "excluded_scope": [
+        "Hyperswarm discovery replication",
+        "P2PService product startup",
+        "User media keys HTTP iOS",
+        "Android X28 remediation"
+      ],
+      "implementation_steps": [
+        "Update transient-storage.ts to enforce allowed path and close-before-delete with existence verification",
+        "Modify P1ProofRuntimeFactory and P1SeedProofRunner to produce redacted receipt",
+        "Add bounded janitor logic in worklet/protocol with fail-closed on traversal/foreign path",
+        "Update worklet.bundle.js build artifacts via build:bare-worklet"
+      ],
+      "refined_scope": [
+        "Deterministic fixture write/hash in single proof run dir under Paths.cache/dubbridge-p2p/proofs/<run-id>",
+        "Receipt emits byte count and SHA-256 only, no URI/keys/content/errors",
+        "Close handles before delete and verify absence",
+        "Bounded janitor deletes only marked stale runs below proof root, fail closed on errors"
+      ],
+      "risks": [
+        "X28 Android blocker remains unresolved and must not be claimed fixed",
+        "Cleanup failure could be misinterpreted as PASS",
+        "Path traversal could allow out-of-scope deletion"
+      ],
+      "route_recommendation": "GO_LOCAL",
+      "stop_conditions": [
+        "Receipt leaks URI/keys/content/errors",
+        "Directory not verified absent after delete",
+        "Janitor deletes outside proof root",
+        "X28 remediation claimed"
+      ],
+      "summary": "Implement proof-only deterministic synthetic seed storage with redacted receipt and bounded janitor within allowed paths. No discovery, replication or product state changes.",
+      "unknowns": [
+        "Exact stale-run marking protocol for janitor",
+        "Current implementation of Bare.argv[0] file URI passing"
+      ]
+    }
+  },
   "runtime": {
     "num_ctx": 8192,
     "num_predict": 1024,
     "ollama_url": "http://127.0.0.1:11434",
     "temperature": 0.0,
-    "timeout_seconds": 120.0
+    "timeout_seconds": 180.0
   },
   "schema_version": "adr037-local-architect-artifact-v1",
-  "started_at": "2026-08-30T19:06:19.672127Z",
-  "status": "failed",
-  "success": false
+  "started_at": "2026-08-30T20:58:35.166815Z",
+  "status": "ok",
+  "success": true
 }

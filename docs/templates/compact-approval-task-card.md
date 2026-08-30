@@ -16,7 +16,7 @@ and RRI evidence in the linked task ledger or RRI artifact.
 |---|---|
 | Orchestrator | `<agent and recommended model>` |
 | Primary implementation | `<resolved local or cloud implementer and route>` |
-| Cloud takeover | `<RRI 26-55: repair-budget exhaustion defaults to § Post-repair-budget Low-band decomposition (delegate-low-rri.py, orchestrator-only authorship) before cloud; name that step, then the last-resort trigger -> concrete model/reasoning effort. RRI 56+: trigger -> concrete model/reasoning effort directly. Use n/a only when cloud cannot take control>` |
+| Cloud takeover | `<RRI 26-55: repair-budget exhaustion (26-45) or a GO_LOCAL/CLOUD_REQUIRED result with no whole-task local attempt (46-55) defaults to § Post-repair-budget Low-band decomposition (delegate-low-rri.py, orchestrator-only authorship) before cloud; name that step, then the last-resort trigger -> concrete model/reasoning effort for the above-Low residue. RRI 56+: trigger -> concrete model/reasoning effort directly. Use n/a only when cloud cannot take control>` |
 | Fallback selection | `<human-select | preauthorized | n/a>; receipt/artifact and resume condition>` |
 | RRI | `<score> -> <band>; gates: <list>; penalties: <none/list>` |
 | Main drivers | `<two or three dominant RRI factors>` |
@@ -47,7 +47,7 @@ never replaces the HITL gate or changes the selected role.
 | Analyze and scope | `<primary orchestrator>` | Compute RRI, freeze scope, and prepare the card |
 | Phase 1 review | `<resolved reviewer>` | Must PASS; fallback `<chain>` |
 | Approval | `<human approver>` | Required for RRI 26+ unless explicitly waived |
-| Implement | `<resolved implementer>` | Work only in scope; RRI 26-55: repair-budget exhaustion -> decompose into Low-band subtasks first (orchestrator-only authorship, § Post-repair-budget Low-band decomposition), cloud only as last resort; RRI 56+: cloud takeover `<trigger -> concrete model/effort>` |
+| Implement | `<resolved implementer>` | Work only in scope; RRI 26-55: repair-budget exhaustion (26-45) or no whole-task local attempt (46-55) -> decompose into Low-band subtasks first (orchestrator-only authorship, § Post-repair-budget Low-band decomposition), cloud only as last resort for above-Low residue; RRI 56+: cloud takeover `<trigger -> concrete model/effort>` |
 | Reflect and verify | `<primary orchestrator>` | `<N>` passes; run `<checks>` |
 | Phase 2 review | `<resolved reviewer>` | Must PASS; fallback `<chain>` |
 | Close | `<primary orchestrator>` | Emit evidence and synchronize status artifacts |
