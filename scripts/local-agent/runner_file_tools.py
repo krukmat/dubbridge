@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
-"""Bounded editing tools for the local runner.
+"""Bounded file primitives for the local runner.
 
-Deliberately simple. There is no language server, no symbol lookup, and no
-line/byte budget: the local implementer has a very large context window (the
-S-140 pilot target is ~14k tokens against a 262k-token model), so it can read
-the file it must edit and rewrite or patch it directly. The only edit-time
-safety kept from the earlier semantic tools is the filesystem hardening
-(``O_NOFOLLOW`` on every open, atomic overwrite via a temp file + rename) and
-the "anchor must match exactly once" rule, which stops a blind patch from
-silently editing the wrong occurrence.
+This module owns checked source reads plus the small write/patch tool surface.
+Context selection is owned by ``ContextProvider``; ``preload_context()`` remains
+only as the behavior-compatible implementation used by ``LegacyContextProvider``
+and as the source fallback when graph-guided retrieval is unavailable.
 
-Boundary enforcement stays owned by the injected ``boundary``; this module
-checks every path before reading or mutating it. It also builds the initial
-card context from the same checked paths so the model receives the complete
-authorized working set without repository exploration.
+Filesystem hardening stays here (``O_NOFOLLOW`` on every open, atomic overwrite
+via a temp file + rename) together with the "anchor must match exactly once"
+rule. Boundary enforcement remains owned by the injected ``boundary`` and every
+read or mutation passes through that existing capability check.
 """
 
 import os
@@ -47,10 +43,11 @@ class RunnerFileTools:
     def preload_context(self, allowed_paths):
         """Return complete contents for every file authorized by the card.
 
-        Existing directory capabilities are expanded recursively without
-        following directory symlinks. Missing exact paths are represented so
-        the model knows it may create them. Every resulting file still passes
-        through the boundary before it is opened.
+        This is the legacy/fallback context path. Existing directory
+        capabilities are expanded recursively without following directory
+        symlinks. Missing exact paths are represented so the model knows it may
+        create them. Every resulting file still passes through the boundary
+        before it is opened.
         """
         entries = []
         for path in allowed_paths:
@@ -109,73 +106,80 @@ class RunnerFileTools:
             "path": path,
             "ok": True,
             "created": created,
-            "line_count": self._line_count(content),
-            "byte_count": len(content.encode("utf-8")),
         }
 
     def _apply_patch(self, arguments):
         path = self._require(arguments, "path")
         anchor = self._require(arguments, "anchor")
-        replacement = self._require(arguments, "replacement")
-        content = self._read_existing(path)
-        matches = content.count(anchor)
-        if matches != 1:
+        replacement = arguments.get("replacement", "")
+        if not anchor:
+            raise self._malformed_error("apply_patch anchor must be non-empty")
+
+        original = self._read_existing(path)
+        occurrences = original.count(anchor)
+        if occurrences != 1:
             raise self._malformed_error(
-                f"apply_patch: anchor for {path!r} matched {matches} locations; require exactly 1"
+                f"apply_patch anchor must match exactly once in {path!r}; "
+                f"matched {occurrences} times"
             )
-        updated = content.replace(anchor, replacement, 1)
+        updated = original.replace(anchor, replacement, 1)
         target = os.path.join(self._worktree_dir, path)
         self._write_nofollow(target, path, updated)
         self._edited_paths.add(os.path.normpath(path))
-        return {
-            "tool": "apply_patch",
-            "path": path,
-            "ok": True,
-            "anchor_matches": 1,
-            "line_count": self._line_count(replacement),
-            "byte_count": len(replacement.encode("utf-8")),
-        }
-
-    def replace_from_runner(self, path, content):
-        """Write operator-produced content through the same path boundary."""
-        self._boundary.check_write(path)
-        target = os.path.join(self._worktree_dir, path)
-        self._write_nofollow(target, path, content)
+        return {"tool": "apply_patch", "path": path, "ok": True}
 
     def _read_existing(self, path):
         self._boundary.check_write(path)
         target = os.path.join(self._worktree_dir, path)
+        if not os.path.exists(target):
+            raise self._malformed_error(f"path does not exist: {path!r}")
+        if os.path.isdir(target):
+            raise self._malformed_error(f"path is a directory: {path!r}")
         try:
-            fd = os.open(target, os.O_RDONLY | os.O_NOFOLLOW)
-            with os.fdopen(fd, "r", encoding="utf-8", errors="replace") as handle:
-                return handle.read()
-        except FileNotFoundError as exc:
-            raise self._malformed_error(f"file not found in worktree: {path!r}") from exc
-        except IsADirectoryError as exc:
-            raise self._malformed_error(f"path is a directory, not a file: {path!r}") from exc
+            fd = os.open(target, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
         except OSError as exc:
-            raise self._boundary_error(f"read rejected: {path!r} ({exc})") from exc
+            raise self._boundary_error(f"refused to open {path!r}: {exc}") from exc
+        try:
+            with os.fdopen(fd, "r", encoding="utf-8") as handle:
+                return handle.read()
+        except UnicodeDecodeError as exc:
+            raise self._boundary_error(f"refused non-UTF-8 source file {path!r}") from exc
 
     def _write_nofollow(self, target, path, content):
-        # O_NOFOLLOW so a pre-planted symlink at `target` cannot redirect the
-        # write outside the worktree. os.O_TRUNC gives create-or-overwrite in a
-        # single open; the earlier tools split create (O_EXCL) from overwrite,
-        # but the simple contract allows both through one path.
+        if not isinstance(content, str):
+            raise self._malformed_error(f"content must be a string for {path!r}")
+        if os.path.lexists(target) and os.path.islink(target):
+            raise self._boundary_error(f"refused symlink write: {path!r}")
+        directory = os.path.dirname(target) or self._worktree_dir
+        basename = os.path.basename(target)
+        temp_name = f".{basename}.local-agent-tmp-{os.getpid()}"
+        temp_path = os.path.join(directory, temp_name)
+        fd = None
         try:
             fd = os.open(
-                target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW
+                temp_path,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
+                0o600,
             )
             with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                fd = None
                 handle.write(content)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temp_path, target)
         except OSError as exc:
-            raise self._boundary_error(
-                f"write rejected at open time: {path!r} ({exc})"
-            ) from exc
-
-    def _line_count(self, content):
-        return 0 if not content else content.count("\n") + (0 if content.endswith("\n") else 1)
+            raise self._boundary_error(f"refused to write {path!r}: {exc}") from exc
+        finally:
+            if fd is not None:
+                os.close(fd)
+            try:
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
+            except OSError:
+                pass
 
     def _require(self, arguments, key):
-        if key not in arguments:
-            raise self._malformed_error(f"missing required argument {key!r}")
-        return arguments[key]
+        value = arguments.get(key)
+        if not isinstance(value, str):
+            raise self._malformed_error(f"{key} must be a string")
+        return value
