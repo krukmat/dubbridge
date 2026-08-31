@@ -64,10 +64,17 @@ class FakeFileTools:
 class FakeAdapter:
     backend_name = "fake-ckg"
 
-    def discover(self, task_text, worktree_dir):
+    def __init__(self):
+        self.discovery_calls = []
+
+    def discover(self, task_text, worktree_dir, *, force_refresh=False):
+        self.discovery_calls.append(
+            {"task_text": task_text, "force_refresh": force_refresh}
+        )
+        anchors = extract_task_anchors(task_text)
         return {
             "project": "dubbridge",
-            "anchors": extract_task_anchors(task_text),
+            "anchors": anchors,
             "candidates": rank_candidates(
                 [
                     GraphCandidate(
@@ -79,7 +86,7 @@ class FakeAdapter:
                         relation="CALLS",
                     ),
                 ],
-                extract_task_anchors(task_text),
+                anchors,
             ),
         }
 
@@ -95,7 +102,7 @@ class PartialAdapter(FakeAdapter):
 class BrokenAdapter:
     backend_name = "broken"
 
-    def discover(self, task_text, worktree_dir):
+    def discover(self, task_text, worktree_dir, *, force_refresh=False):
         raise RuntimeError("backend unavailable")
 
 
@@ -179,6 +186,28 @@ class ContextProviderTests(unittest.TestCase):
             self.assertNotIn("external_fn", rendered)
             self.assertEqual(manifest["selection"][0]["context_source"], "worktree")
             self.assertEqual(manifest["scope_gaps"][0]["path"], "src/external.rs")
+
+    def test_retrieval_includes_acceptance_text_as_anchor_input(self):
+        with tempfile.TemporaryDirectory() as root:
+            adapter = FakeAdapter()
+            provider, _tools = self._provider(root, adapter)
+            provider.render_initial()
+            self.assertIn("cargo test -p target", adapter.discovery_calls[0]["task_text"])
+
+    def test_repair_refresh_requests_graph_reindex(self):
+        with tempfile.TemporaryDirectory() as root:
+            adapter = FakeAdapter()
+            provider, tools = self._provider(root, adapter)
+            provider.render_initial()
+            tools.contents["src/target.rs"] = "fn target_fn() { /* repaired */ }\n"
+            with open(
+                os.path.join(root, "src", "target.rs"), "w", encoding="utf-8"
+            ) as handle:
+                handle.write(tools.contents["src/target.rs"])
+            rendered = provider.render_refresh("acceptance_failure")
+            self.assertIn("repaired", rendered)
+            self.assertFalse(adapter.discovery_calls[0]["force_refresh"])
+            self.assertTrue(adapter.discovery_calls[1]["force_refresh"])
 
     def test_partial_coverage_falls_back_to_legacy(self):
         with tempfile.TemporaryDirectory() as root:
