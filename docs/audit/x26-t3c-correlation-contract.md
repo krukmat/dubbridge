@@ -13,22 +13,22 @@ The audit-event contract is **family-specific**, not â€œexactly one identifierâ€
 for every row. A recording event always has a `recording_session_id` and may
 also have an `ingest_token`; all other correlation families are exclusive, and
 several governance families intentionally have none. The platform-ingest
-identifier is created in the domain but is not persistently mapped, so an
-always-on audit-boundary assertion claiming durable platform correlation is
-blocked until that gap is resolved by separately scoped work.
+identifier is now persisted and rehydrated by the audit DB adapter as part of
+`X26-T3c-d`, resolving the blocker originally recorded by this matrix before
+the always-on audit-boundary assertion is enabled.
 
 ## Source-backed matrix
 
 | Event-kind family | Variants | Constructor and permitted correlation shape | Existing construction sites | `audit_events` persistence disposition |
 |---|---|---|---|---|
-| Ingestion | `IngestionFinalized`, `IngestionRejectedMissingRights`, `IngestionRejectedMissingUploaderContext`, `IngestionRejectedDuplicateToken` | `AuditEvent::new` (`crates/domain/src/audit.rs:115-132`): `ingest_token=Some`, `recording_session_id=None`, `platform_ingest_session_id=None`. | `apps/api/src/routes/ingestion.rs:376`, `crates/ingestion/src/lib.rs:208,271`; constructor unit test `crates/domain/src/audit.rs:280`. | Persisted and read: both DB insert variants bind `event.ingest_token`; select/row mapping reads `ingest_token` (`crates/db/src/audit_repo.rs:80-119,135-150`). |
-| Recording | `RecordingSessionCreated`, `RecordingRejectedMissingRights`, `RecordingCaptureStarted`, `RecordingRecorded`, `RecordingFailed`, `RecordingBridgedToAsset` | `AuditEvent::new_recording` (`crates/domain/src/audit.rs:134-152`): `recording_session_id=Some`; `ingest_token` is deliberately `Option<Uuid>`; platform ID is absent. **Combined recording+ingest is valid** when the call site has allocated an ingest token. | The only current construction is the constructor unit test at `crates/domain/src/audit.rs:266`; repository search found no production `new_recording` caller. | Both nullable `ingest_token` and `recording_session_id` are persisted/read (`0009_alter_audit_events_for_recording.sql`; `crates/db/src/audit_repo.rs:80-150`). No database check constrains their combination. |
-| Platform ingest | `PlatformIngestSessionCreated`, `PlatformIngestRejectedMissingRights`, `PlatformIngestDownloadStarted`, `PlatformIngestDownloaded`, `PlatformIngestFailed`, `PlatformIngestBridgedToAsset` | `AuditEvent::new_platform_ingest` (`crates/domain/src/audit.rs:154-171`): platform ID `Some`; ingest and recording IDs absent. | The only current construction is the constructor unit test at `crates/domain/src/audit.rs:291`; repository search found no production `new_platform_ingest` caller. | **Persistence blocker:** no migration adds `platform_ingest_session_id`; DB inserts/selects omit it and `row_to_event` deliberately reconstructs it as `None` (`crates/db/src/audit_repo.rs:61-72,80-150`). |
-| Workspace | `OrgCreated`, `OrgMemberAdded`, `ProjectCreated` | `AuditEvent::new_workspace_event` (`crates/domain/src/audit.rs:174-187`): all three correlation IDs absent. | `apps/api/src/routes/workspace.rs:147,194,242`; unit test `crates/domain/src/audit.rs:336`. | Persisted as nullable ingestion/recording fields; no correlation ID is expected. |
-| Consent | `ConsentGranted`, `ConsentRevoked`, `ConsentCheckDenied` | `AuditEvent::new_consent` (`crates/domain/src/audit.rs:189-205`): all three correlation IDs absent; `asset_id=Some`. | `apps/api/src/consent_gate.rs:79,126`, `apps/api/src/dto/compliance.rs:133`, `apps/api/src/routes/compliance_tests.rs:87`, `apps/api/tests/compliance_test.rs:133,143,185`; unit test `crates/domain/src/audit.rs:480`. | Persisted with no correlation ID; this is intentional governance-audit shape. |
-| Review and publication | `ReviewApproved`, `ReviewRejected`, `PublicationSucceeded`, `PublicationRefused` | `AuditEvent::new_review_event` (`crates/domain/src/audit.rs:207-223`): all three correlation IDs absent; `asset_id=Some`. | `apps/api/src/review_gate.rs:142,162,186`; unit test `crates/domain/src/audit.rs:497`. | Persisted with no correlation ID; this is intentional governance-audit shape. |
-| Playback | `PlaybackGrantIssued`, `PlaybackGrantRefused` | `AuditEvent::new_playback_event` (`crates/domain/src/audit.rs:225-241`): all three correlation IDs absent; `asset_id=Some`. | `apps/api/src/playback_service.rs:360`, `apps/api/src/playback_audit.rs:16`; unit test `crates/domain/src/audit.rs:529`. | Persisted with no correlation ID; this is intentional governance-audit shape. |
-| Authentication | `AuthLoginSucceeded`, `AuthLoginFailed`, `AuthRegistered` | `AuditEvent::new_auth_event` (`crates/domain/src/audit.rs:243-255`): all three correlation IDs absent. | `apps/api/src/routes/auth.rs:105`; unit test `crates/domain/src/audit.rs:512`. | Persisted with no correlation ID; this is intentional governance-audit shape. |
+| Ingestion | `IngestionFinalized`, `IngestionRejectedMissingRights`, `IngestionRejectedMissingUploaderContext`, `IngestionRejectedDuplicateToken` | `AuditEvent::new`: `ingest_token=Some`, `recording_session_id=None`, `platform_ingest_session_id=None`. | `apps/api/src/routes/ingestion.rs`, `crates/ingestion/src/lib.rs`; constructor unit tests under `crates/domain/src/audit/tests.rs`. | Persisted and read: both DB insert variants bind `event.ingest_token`; select/row mapping reads `ingest_token`. |
+| Recording | `RecordingSessionCreated`, `RecordingRejectedMissingRights`, `RecordingCaptureStarted`, `RecordingRecorded`, `RecordingFailed`, `RecordingBridgedToAsset` | `AuditEvent::new_recording`: `recording_session_id=Some`; `ingest_token` is deliberately `Option<Uuid>`; platform ID is absent. **Combined recording+ingest is valid** when the call site has allocated an ingest token. | Current construction sites are covered by the constructor/unit-test surface. | Both nullable `ingest_token` and `recording_session_id` are persisted/read (`0009_alter_audit_events_for_recording.sql`; `crates/db/src/audit_repo.rs`). No database check constrains their combination. |
+| Platform ingest | `PlatformIngestSessionCreated`, `PlatformIngestRejectedMissingRights`, `PlatformIngestDownloadStarted`, `PlatformIngestDownloaded`, `PlatformIngestFailed`, `PlatformIngestBridgedToAsset` | `AuditEvent::new_platform_ingest`: platform ID `Some`; ingest and recording IDs absent. | Current construction is covered by the constructor/unit-test surface. | **Resolved in X26-T3c-d:** `0030_add_platform_ingest_correlation_to_audit_events.sql` adds the nullable UUID column; both audit insert variants bind it and row mapping rehydrates it. |
+| Workspace | `OrgCreated`, `OrgMemberAdded`, `ProjectCreated` | `AuditEvent::new_workspace_event`: all three correlation IDs absent. | `apps/api/src/routes/workspace.rs`; unit tests under `crates/domain/src/audit/tests.rs`. | Persisted with nullable correlation columns; no correlation ID is expected. |
+| Consent | `ConsentGranted`, `ConsentRevoked`, `ConsentCheckDenied` | `AuditEvent::new_consent`: all three correlation IDs absent; `asset_id=Some`. | Consent gate/compliance call sites plus unit tests. | Persisted with no correlation ID; this is intentional governance-audit shape. |
+| Review and publication | `ReviewApproved`, `ReviewRejected`, `PublicationSucceeded`, `PublicationRefused` | `AuditEvent::new_review_event`: all three correlation IDs absent; `asset_id=Some`. | `apps/api/src/review_gate.rs`; unit tests. | Persisted with no correlation ID; this is intentional governance-audit shape. |
+| Playback | `PlaybackGrantIssued`, `PlaybackGrantRefused` | `AuditEvent::new_playback_event`: all three correlation IDs absent; `asset_id=Some`. | Playback service/audit call sites plus unit tests. | Persisted with no correlation ID; this is intentional governance-audit shape. |
+| Authentication | `AuthLoginSucceeded`, `AuthLoginFailed`, `AuthRegistered` | `AuditEvent::new_auth_event`: all three correlation IDs absent. | `apps/api/src/routes/auth.rs`; unit tests. | Persisted with no correlation ID; this is intentional governance-audit shape. |
 
 ## Reproduction searches
 
@@ -42,20 +42,19 @@ rg -n "AuditEvent::new_(workspace_event|consent|review_event|playback_event|auth
 rg -n "platform_ingest_session_id" infra/migrations crates/db apps crates --glob '*.rs' --glob '*.sql'
 ```
 
-The first four searches identify every direct constructor occurrence as of this
-matrix. The last search returns the domain field and DB's explicit `None`, but
-no migration, insert column/bind, or select column for the platform identifier.
+The first four searches identify the constructor families. After X26-T3c-d,
+the final search also returns migration `0030`, both audit insert bindings,
+the select projection, and `row_to_event` rehydration, so the former platform
+persistence blocker is no longer present.
 
 ## Downstream disposition
 
-- `X26-T3c-b1` may enforce the ingestion-only shape.
-- `X26-T3c-b2` may enforce a mandatory recording ID while preserving the
-  optional ingest-token combination.
-- `X26-T3c-c1` may enforce the in-memory platform-only shape, but must name
-  its non-durability in test comments.
-- `X26-T3c-c2` and `X26-T3c-c3` may enforce their intentional no-correlation
+- `X26-T3c-b1` enforces the ingestion-only shape.
+- `X26-T3c-b2` enforces a mandatory recording ID while preserving the optional
+  ingest-token combination.
+- `X26-T3c-c1` enforces the platform-only in-memory shape; X26-T3c-d now makes
+  that correlation durable as well.
+- `X26-T3c-c2` and `X26-T3c-c3` enforce their intentional no-correlation
   shapes.
-- `X26-T3c-d` is **blocked**: do not add an audit-boundary assertion until a
-  separately authorized persistence decision either maps
-  `platform_ingest_session_id` through schema/DB reads and writes or removes
-  the unsupported platform event contract.
+- `X26-T3c-d` may enforce the family-specific audit-boundary assertion because
+  the only persistence blocker identified by this matrix has been resolved.
