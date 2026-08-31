@@ -18,11 +18,19 @@ parent_task: P1
 > separately approved, implemented, and closed PASS after owner verification on
 > 2026-08-27 within its frozen packaging/protocol scope. P1.F2 was separately
 > approved, implemented, and closed PASS after owner verification on 2026-08-27.
-> P1.F3a.1 is implemented and automated verification has passed; owner final
-> verification remains pending before P1.F3a.2 may be prepared. P1.A2 has a
-> current RRI 46 Med-high, phase-1 PASS, and approval card on 2026-08-30; it
-> awaits its own explicit owner approval. No P2P network activity or later-child
-> source execution has started.
+> P1.F3a.1, P1.F3a.2, P1.F3b, P1.A1 (all four children), and P1.A2 are closed
+> PASS/Done. **P1.B1 closed `[x] Done` 2026-08-31 via retrospective
+> closure** — its Hyperswarm discovery/replication implementation had
+> already landed on `feature/p2p-mvp-core` before the task ledger reflected
+> any approval; this session reconstructed the RRI report, implementation
+> record, Reflection log, and coverage certification against the code as
+> delivered and disclosed a governance gap (post-implementation RRI 59
+> Complex crossed the decomposition-before-implementation threshold without
+> a prospective re-gate), which the owner reviewed and accepted as a
+> one-time retrospective disposition — see
+> `docs/audit/mvp0-p2p-p1-b1-implementation.md`. P1.B2 is next, gated on its
+> own current RRI/card/approval and on closing the byte-count/hash
+> verification and direct unit-coverage items P1.B1 carried forward.
 
 ## Objective
 

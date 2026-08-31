@@ -23,9 +23,18 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 > P1.F3a.2 (retirement) was implemented via owner-directed Low-band
 > decomposition and closed PASS/Done on 2026-08-27; see
 > `docs/audit/mvp0-p2p-p1-f3a2-decomposition.md` for the full subtask
-> execution log. P1.F3b is the next gated child; it has no source-execution
-> authorization until its own current RRI, approval card, and phase-1 review
-> are presented and approved.
+> execution log. P1.F3b through P1.A2 are closed PASS/Done (see the task map
+> below for each child's status and audit link). **P1.B1 closed `[x] Done`
+> 2026-08-31 via retrospective closure** — its implementation had already
+> landed on this branch before the ledger was updated; see
+> `docs/audit/mvp0-p2p-p1-b1-implementation.md` § Governance gap for a
+> disclosed and owner-accepted RRI-band gate gap (post-implementation RRI 59
+> Complex vs. the stale 55 Med-high prospective estimate). P1.B2 is the next
+> gated child; it has no source-execution authorization until its own
+> current RRI, approval card, and phase-1 review are presented and
+> approved, and must additionally close the two items P1.B1 carried
+> forward (byte-count/hash verification, direct `transient-replication*.ts`
+> unit coverage).
 
 ## Task map
 
@@ -45,8 +54,20 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 | P1.A1c | Typed error handling + coverage (EC-A1) | PASS — owner verified 2026-08-30; RRI 28 Moderate | P1.A1b PASS — satisfied 2026-08-30 |
 | P1.A1d | Evidence + closure | PASS — Done 2026-08-30 | P1.A1c PASS — satisfied 2026-08-30 |
 | P1.A2 | Transient seed lifecycle + residue cleanup | PASS — Done 2026-08-31; owner verified; RRI 46 Med-high | P1.A1d PASS — satisfied 2026-08-30 |
-| P1.B1 | Isolated Hyperswarm replication transport | Deferred — needs current RRI/card/approval | P1.A2 PASS — satisfied 2026-08-31 |
-| P1.B2 | Verification, reconnect + fail-closed witness | Deferred — needs current RRI/card/approval | P1.B1 PASS |
+| P1.B1 | Isolated Hyperswarm replication transport | PASS — Done 2026-08-31 (retrospective closure); RRI 59 Complex, governance gap disclosed and owner-accepted | P1.A2 PASS — satisfied 2026-08-31 |
+| P1.B2 | Verification, reconnect + fail-closed witness (planning parent) | Decomposed 2026-08-31 — parent-level RRI 56 Complex triggers mandatory decomposition; no direct source execution | P1.B1 PASS — satisfied 2026-08-31 |
+| P1.B2.a-0 | Byte-count instrumentation in `transient-replication.ts` (carried forward from P1.B1) | Awaiting approval — RRI 25 Low | none |
+| P1.B2.a-cov | Direct unit coverage for `transient-replication*.ts` (carried forward from P1.B1) | Awaiting approval — RRI 20 Low | none |
+| P1.B2.a-i | Digest-compare pure helper | Awaiting approval — RRI 22 Low | none |
+| P1.B2.a-ii-a | `drive.get()` raw read wrapper | Awaiting approval — RRI 22 Low | none |
+| P1.B2.a-ii-b | Read+compare glue, typed result | Awaiting approval — RRI 22 Low | P1.B2.a-i, P1.B2.a-ii-a PASS |
+| P1.B2.b | Reconnect budget counter (pure) | Awaiting approval — RRI 24 Low | none |
+| P1.B2.c-1 | Disconnect detection + budget-check decision | Awaiting approval — RRI 22 Low | P1.B2.b PASS |
+| P1.B2.c-2 | Re-invoke B1 `connectAndReplicate` on retry | Awaiting approval — RRI 20 Low | none |
+| P1.B2.d-i | Evidence redaction helper (pure) | Awaiting approval — RRI 20 Low | none |
+| P1.B2.d-ii | Dual-session teardown orchestration | Awaiting approval — RRI 22 Low | none |
+| P1.B2.e | Verdict/receipt type assembly (pure) | Awaiting approval — RRI 22 Low | none |
+| P1.B2.f | Final VERIFIED composition | Awaiting approval — RRI 22 Low; **owner-pinned to cloud/primary-agent authorship (task-local override), not Qwen local delegation** | P1.B2.a-0, a-ii-b, c-1, c-2, d-ii, e PASS |
 
 The former combined `P1.A — Ephemeral seed fixture and bundle boundary` planning
 parent and its A1/A2 interpretation are superseded. Historical artifacts remain
@@ -1018,12 +1039,48 @@ Required passes: 3 (`RRI 46` → `Med-high`)
 
 ## P1.B1 — Isolated Hyperswarm replication transport
 
-- **Status:** Unblocked — P1.A2 PASS (Done 2026-08-31); requires its own
-  current RRI/card/approval before implementation.
-- **Effort / prospective RRI:** L / 55 Med-high. Recompute at presentation.
+- **Status:** `[x] Done` — 2026-08-31, retrospective closure. The
+  implementation (commits `c977997`, `84fff3f`, `709f2e4`) had already
+  landed on this branch before this ledger row was ever updated from
+  "Deferred — needs current RRI/card/approval" — no RRI card, review
+  evidence, Reflection log, coverage certification, or owner verification
+  had been recorded. This session reconstructed the full closure record
+  against the code as delivered, independently re-ran every verification
+  command, and identified a real governance gap: the post-implementation
+  RRI is **59 Complex** (`docs/audit/mvp0-p2p-p1-b1-rri.md`), which
+  nominally requires decomposition and plan review before implementation —
+  a gate that was not satisfied prospectively. The owner reviewed and
+  accepted retrospective closure; see `docs/audit/mvp0-p2p-p1-b1-implementation.md`
+  § Governance gap and § Owner final verification for the full disposition.
+  Two open items are explicitly carried forward to **P1.B2**: the
+  `byte_count: 0` hardcode in `transient-replication.ts` (byte/hash
+  verification is P1.B2's own scope by design) and a direct unit-test
+  coverage gap for `transient-replication*.ts`'s connection/timeout logic
+  (currently exercised only through mocks at a higher layer).
+- **Effort / RRI:** L / 59 Complex (post-implementation, recomputed this
+  session; prior prospective estimate was 55 Med-high). Full report:
+  `docs/audit/mvp0-p2p-p1-b1-rri.md`.
 - **Allowed paths:** P2P dependency files, packaged runtime protocol/worklet,
   `mobile/src/p2p/proof/ReplicationProofRunner.ts`,
   `mobile/__tests__/p2p/hyperswarm-replication.test.ts`, and B1 evidence.
+  **Actual touched set at closure:** additionally includes
+  `mobile/src/p2p/runtime/transient-replication.ts` (new),
+  `mobile/src/p2p/runtime/transient-replication-dependencies.ts` (new),
+  `mobile/src/p2p/runtime/transient-replication-discovery.ts` (new),
+  `mobile/src/p2p/runtime/worklet-request-handler.ts` (new),
+  `mobile/src/p2p/runtime/protocol-codec.ts` (new),
+  `mobile/src/p2p/runtime/rethrow-as-protocol-error.ts` (new),
+  `mobile/src/p2p/runtime/runtime-client.ts`, `mobile/src/p2p/runtime/protocol.ts`,
+  `mobile/src/p2p/runtime/transient-drive.ts`,
+  `mobile/src/p2p/runtime/transient-drive-dependencies.ts` (new),
+  `mobile/src/p2p/proof/SeedProofRunner.ts`,
+  `mobile/src/p2p/proof/ProofRuntimeFactory.ts`,
+  `mobile/scripts/build-bare-worklet.mjs`,
+  `mobile/package.json`/`package-lock.json` — the six `(new)` runtime files
+  marked above beyond the originally-declared set are verified-mechanical
+  `make qa-maintainability` splits, not new behavioral scope (see
+  `docs/audit/mvp0-p2p-p1-b1-implementation.md` § Mechanical-split
+  verification).
 - **Objective:** create two proof-only runtime sessions through a factory and
   replicate the complete fixture over transient Hyperswarm discovery.
 - **HP-B1:** seed/client sessions discover, connect, replicate every byte, and
@@ -1033,8 +1090,15 @@ Required passes: 3 (`RRI 46` → `Med-high`)
 - **Acceptance:** discovery keys and fixture content are not logged/persisted;
   two sessions exist only inside the proof runner; normal provider mounting is
   inert; transport completion is not yet final P1 verification.
-- **Evidence to emit:** current RRI/card/route receipt, dependency proof,
-  HP-B1/EC-B1 tests, redacted Android transport log, checks and closure evidence.
+- **Evidence emitted:** `docs/audit/mvp0-p2p-p1-b1-rri.md`,
+  `docs/audit/mvp0-p2p-p1-b1-implementation.md` (implementation scope,
+  governance-gap disposition, HP-B1/EC-B1 mapping, Reflection log, coverage
+  certification, owner verification). **Not emitted:** a redacted Android
+  transport log — X28 (upstream `bare-module@6.3.2` bundle-evaluation-order
+  defect) continues to block any on-device Bare-runtime execution proof for
+  this entire P1 chain; this task's device-proof criterion is classified
+  `Environment/Blocked` under the same standing policy applied throughout
+  P1.A1/P1.A2, not a passed or failed test.
 - **Status artifacts affected:** this ledger, P1 plan/card, and child audit
   artifacts.
 - **Handoff prompt:** `P1.B1 — implement only proof-runner seed/client discovery
