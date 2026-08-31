@@ -53,3 +53,4 @@ trail. Adding a row here is part of the same change that alters a rule.
 | Path | Outcome | Reference |
 |---|---|---|
 | Local-agent Serena / semantic-tool editing surface | Never produced a successful edit; replaced by the `write_file` / `apply_patch` / `finish` tool contract | `docs/plan/local-agent-simple-editing.md` |
+| 2026-08-31 | Active local stack rebinding | Reviewer slots previously held by Muse Glimmer -> `gpt-oss:20b` (64K, medium reasoning); Local Architect / Complex Analyst -> `qwen3.6:27b-q4_K_M` (64K, think=false). Muse Glimmer retired from the active stack; historical rows retained. |

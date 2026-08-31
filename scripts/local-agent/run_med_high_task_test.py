@@ -72,7 +72,7 @@ MISSING
   "model": {{
     "expected_digest": "sha256:deadbeef",
     "resolved_digest": "sha256:deadbeef",
-    "tag": "muse-glimmer:30b-q4_K_M"
+    "tag": "gpt-oss:20b"
   }},
   "packet": {{
     "sha256": "{CARD_HASH}"

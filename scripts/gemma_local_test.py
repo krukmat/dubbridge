@@ -28,7 +28,7 @@ class SharedConfig(unittest.TestCase):
         # ADR-036 Amendment 2 (T4b): DEFAULT_REVIEW_MODEL must be Muse
         # Glimmer's own tag and must never clobber DEFAULT_MODEL/
         # DEFAULT_FALLBACK_MODEL, which stay Gemma for Gemma Developer.
-        self.assertEqual(gemma_local.DEFAULT_REVIEW_MODEL, "muse-glimmer:30b-q4_K_M")
+        self.assertEqual(gemma_local.DEFAULT_REVIEW_MODEL, "gpt-oss:20b")
         self.assertEqual(gemma_local.DEFAULT_MODEL, "gemma4:26b-a4b-it-qat")
         self.assertNotEqual(gemma_local.DEFAULT_REVIEW_MODEL, gemma_local.DEFAULT_MODEL)
 
@@ -135,24 +135,21 @@ class Payload(unittest.TestCase):
         self.assertEqual(gemma_local.sum_measured_tokens([2, 3]), 5)
         self.assertIsNone(gemma_local.sum_measured_tokens([2, None]))
 
-    def test_think_directive_prepended_for_muse_glimmer_when_think_false(self):
-        # HP-1: muse-glimmer + think=False -> directive prepended.
+    def test_gpt_oss_false_resolves_to_medium_without_text_directive(self):
         payload = gemma_local.build_chat_payload(
-            model="muse-glimmer:30b-q4_K_M",
+            model="gpt-oss:20b",
             system_prompt="system prompt",
             packet="packet",
-            num_ctx=8192,
+            num_ctx=65536,
             num_predict=2048,
-            temperature=0.1,
+            temperature=0.0,
             think=False,
         )
-        self.assertTrue(
-            payload["messages"][0]["content"].startswith(gemma_local.THINK_DIRECTIVE_TEXT)
-        )
-        self.assertIn("system prompt", payload["messages"][0]["content"])
+        self.assertEqual(payload["think"], "medium")
+        self.assertEqual(payload["messages"][0]["content"], "system prompt")
+        self.assertEqual(payload["keep_alive"], "1m")
 
-    def test_think_directive_not_prepended_for_other_models(self):
-        # HP-2: other model + think=False -> system prompt unchanged.
+    def test_other_model_keeps_boolean_think_false(self):
         payload = gemma_local.build_chat_payload(
             model="gemma4:26b-a4b-it-qat",
             system_prompt="system prompt",
@@ -162,18 +159,21 @@ class Payload(unittest.TestCase):
             temperature=0.1,
             think=False,
         )
+        self.assertFalse(payload["think"])
         self.assertEqual(payload["messages"][0]["content"], "system prompt")
+        self.assertEqual(payload["keep_alive"], "10m")
 
-    def test_think_directive_not_prepended_when_think_true(self):
+    def test_gpt_oss_explicit_high_reasoning_is_preserved(self):
         payload = gemma_local.build_chat_payload(
-            model="muse-glimmer:30b-q4_K_M",
+            model="gpt-oss:20b",
             system_prompt="system prompt",
             packet="packet",
-            num_ctx=8192,
+            num_ctx=65536,
             num_predict=2048,
-            temperature=0.1,
-            think=True,
+            temperature=0.0,
+            think="high",
         )
+        self.assertEqual(payload["think"], "high")
         self.assertEqual(payload["messages"][0]["content"], "system prompt")
 
 
@@ -469,9 +469,9 @@ class StreamChat(unittest.TestCase):
         with patch("urllib.request.urlopen", return_value=response):
             with self.assertRaises(gemma_local.GemmaThinkOverrunError) as ctx:
                 gemma_local.stream_chat(
-                    "http://host/api/chat", {"model": "muse-glimmer:30b-q4_K_M"}, 60, 900
+                    "http://host/api/chat", {"model": "gpt-oss:20b"}, 60, 900
                 )
-        self.assertEqual(ctx.exception.model, "muse-glimmer:30b-q4_K_M")
+        self.assertEqual(ctx.exception.model, "gpt-oss:20b")
 
     def test_stream_result_helpers_accept_legacy_string(self):
         self.assertEqual(gemma_local.stream_result_content("hello"), "hello")

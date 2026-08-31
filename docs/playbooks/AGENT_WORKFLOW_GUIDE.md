@@ -27,9 +27,9 @@ governs: "all agent-facing workflow decisions in the repository"
 |---|---|
 | Local implementer, RRI 0–25 | `qwen3.8:27b-mlx` |
 | Local implementer, RRI 26–45 and ADR-040 local tramos in RRI 46–55 | `devstral-small-2:24b-instruct-2512-q4_K_M` |
-| RRI 0–25 reviewer chain (phases 1 and 2) | `muse-glimmer:30b-q4_K_M` → `gemma4:26b-a4b-it-qat` → D14 |
-| RRI 26–55 reviewer chain (phases 1 and 2) | `gemma4:26b-a4b-it-qat` → `muse-glimmer:30b-q4_K_M` → D14 |
-| Local Architect / Complex Analyst | `muse-glimmer:30b-q4_K_M` — advisory-only (ADR-037), never a phase-1/phase-2 reviewer in any band |
+| RRI 0–25 reviewer chain (phases 1 and 2) | `gpt-oss:20b` → `gemma4:26b-a4b-it-qat` → D14 |
+| RRI 26–55 reviewer chain (phases 1 and 2) | `gemma4:26b-a4b-it-qat` → `gpt-oss:20b` → D14 |
+| Local Architect / Complex Analyst | `qwen3.6:27b-q4_K_M` — advisory-only (ADR-037), never a phase-1/phase-2 reviewer in any band |
 
 RRI 46–55, Complex, and XL are cloud-only for implementation: the ADR-038
 refinement and receipt run as routing evidence, but a `GO_LOCAL` result never
@@ -128,7 +128,7 @@ and Architect-refined implementation routing below), not to cloud. A
      cloud-takeover model resolved in Step 2 as last resort.
    - **41–55 Med-high** — show the plan and tasks, wait for explicit
      approval, then route through the **ADR-038 Architect-refined
-     single-attempt gate**: Muse Glimmer advisory refinement (`GO_LOCAL` |
+     single-attempt gate**: Qwen3.6 27B advisory refinement (`GO_LOCAL` |
      `CLOUD_REQUIRED`) → primary hash-bound route receipt (may downgrade,
      never upgrade). For **RRI 46–55**, every result, including `GO_LOCAL`,
      produces the concrete Codex/Claude cloud-takeover packet from Step 2
@@ -291,7 +291,7 @@ generic role label), with status `pending`/`in_progress`/`blocked`/
   `Agent workflow` row — Analyze/scope, Phase 1 review, Approval, Implement,
   Reflect and verify, Phase 2 review, Close.
 - **RRI 0–25 (Low):** a reduced list matching applicable phases — e.g.
-  Analyze, Muse Glimmer/Gemma/D14 review, Implement (primary agent or Qwen Developer),
+  Analyze, GPT-OSS 20B/Gemma/D14 review, Implement (primary agent or Qwen Developer),
   Close.
 - **Docs/config/migration/ADR/plan/task-ledger/policy-only tasks:** a
   minimal list (1–3 entries); a genuinely single-step task may skip it
@@ -415,7 +415,7 @@ local-first path as 26–40 Moderate instead of cloud.
 
 ```mermaid
 flowchart LR
-    Card["Approved Med-high card\n(RRI 41-55)"] --> Glimmer["Muse Glimmer advisory refinement\nmuse-glimmer:30b-q4_K_M"]
+    Card["Approved Med-high card\n(RRI 41-55)"] --> Glimmer["Qwen3.6 27B advisory refinement\ngpt-oss:20b"]
     Glimmer -->|GO_LOCAL or CLOUD_REQUIRED| Receipt["Primary hash-bound\nroute receipt"]
     Receipt -->|"downgrade allowed;\nupgrade never allowed"| Gate{"med_high_gate.py\nboth sides GO_LOCAL?"}
     Gate -->|CLOUD_REQUIRED| Cloud["Resolved Codex / Claude takeover model\n+ full ADR-038 S5 evidence bundle"]
@@ -424,7 +424,7 @@ flowchart LR
 ```
 
 Implementation surfaces: `scripts/local-architect/run_analysis.py`
-(`med-high-refinement-v1` profile) for the Muse Glimmer artifact,
+(`med-high-refinement-v1` profile) for the GPT-OSS 20B artifact,
 `scripts/local-agent/med_high_gate.py` for the fail-closed route decision,
 `scripts/local-agent/run_med_high_task.py` for automatic cloud-evidence-bundle
 emission on every `CLOUD_REQUIRED` or 46–55 `GO_LOCAL` result. For **RRI
@@ -1009,19 +1009,19 @@ the task's RRI band and the review phase:
 
 | Review phase | RRI 0–25 (Low) | RRI 26–55 (Moderate + Med-high) | RRI 56+ (Complex+) |
 |---|---|---|---|
-| **Phase 1 — Task-analysis review** (before task-card presentation or delegation) | **Muse Glimmer** (advisory) | **Gemma** | **Cross-vendor peer** |
-| **Phase 2 — Code-solution review** (after implementation, before closure) | **Muse Glimmer Reviewer** (N-pass) | **Gemma Reviewer** (N-pass) | **Cross-vendor peer replaces Gemma** |
+| **Phase 1 — Task-analysis review** (before task-card presentation or delegation) | **GPT-OSS 20B** (advisory) | **Gemma** | **Cross-vendor peer** |
+| **Phase 2 — Code-solution review** (after implementation, before closure) | **GPT-OSS 20B Reviewer** (N-pass) | **Gemma Reviewer** (N-pass) | **Cross-vendor peer replaces Gemma** |
 
 Canonical chains — every other section names them by band instead of
 re-deriving them:
 
-- **RRI 0–25 chain:** `muse-glimmer:30b-q4_K_M` → `gemma4:26b-a4b-it-qat` → D14
-- **RRI 26–55 chain:** `gemma4:26b-a4b-it-qat` → `muse-glimmer:30b-q4_K_M` → D14
+- **RRI 0–25 chain:** `gpt-oss:20b` → `gemma4:26b-a4b-it-qat` → D14
+- **RRI 26–55 chain:** `gemma4:26b-a4b-it-qat` → `gpt-oss:20b` → D14
 - **RRI 56+ chain:** cross-vendor peer → D14
 
 D14 is the mandatory final fallback in every band; both local chains apply
 regardless of whether implementation stayed local or escalated to cloud. Retry
-discipline: § Gemma Reviewer / Muse Glimmer Reviewer § Availability; binding
+discipline: § Gemma Reviewer / GPT-OSS 20B Reviewer § Availability; binding
 rationale: `docs/policies/RRI_POLICY.md § Local pipeline phase-1/phase-2
 reviewer bindings`.
 
@@ -1051,8 +1051,8 @@ and closure report (phase 2). A docs/policy/config-only task records `n/a`
 with the exemption stated for phase 2.
 
 ```
-Task-analysis review: <gemma|muse-glimmer|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
-Code-solution review: <gemma|muse-glimmer|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
+Task-analysis review: <gemma|gpt-oss|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
+Code-solution review: <gemma|gpt-oss|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
 ```
 
 `<reviewer>` names whichever participant actually produced the verdict (the
@@ -1068,7 +1068,7 @@ the task blocked. Never downgrade silently to self-review.
   separate, additional check.
 - Each band's primary reviewer, intermediate fallback, and D14's mandatory
   final position are the chains above; both phases of a band use the same
-  chain. In RRI 56+ the cross-vendor peer **replaces** Gemma/Muse Glimmer —
+  chain. In RRI 56+ the cross-vendor peer **replaces** Gemma/GPT-OSS 20B —
   they do not both run.
 - The four existing development-task closure blocks (Step 1 reviewer/D14,
   Step 2 Reflection log, Step 3 coverage cert, Step 4 owner verification)
@@ -1082,9 +1082,9 @@ Until `scripts/peer-workflow-review.py` (PPR-2) and the Makefile target
 contract**: the caller must perform the review and record the two report
 lines. Hook enforcement is not active in PPR-1.
 
-## Gemma Reviewer / Muse Glimmer Reviewer
+## Gemma Reviewer / GPT-OSS 20B Reviewer
 
-**Gemma Reviewer** and **Muse Glimmer Reviewer** are read-only local model
+**Gemma Reviewer** and **GPT-OSS 20B Reviewer** are read-only local model
 roles sharing one mechanism (`scripts/gemma-code-review.py`, N sequential
 passes, consolidated findings). Which is primary in a given band, and the
 fallback order behind it, is resolved by § Band-routed peer review's chains.
@@ -1242,7 +1242,7 @@ JSON receipt when invoked with `GEMMA_REVIEW_TASK_ID=<task_id>`, at
 `docs/audit/gemma-evidence/<task_id>.json`:
 
 ```json
-{"task_id": "<task_id>", "commit_sha": "<sha>", "reviewer": "gemma|muse-glimmer|d14", "verdict": "PASS|FINDINGS-ACKED|...", "timestamp": "<ISO 8601>"}
+{"task_id": "<task_id>", "commit_sha": "<sha>", "reviewer": "gemma|gpt-oss|d14", "verdict": "PASS|FINDINGS-ACKED|...", "timestamp": "<ISO 8601>"}
 ```
 
 The completed task section must reference it:
@@ -1274,7 +1274,7 @@ evidence gate (artifact-or-override, all bands)`.
 
 ## Local Architect / Complex Analyst (ADR-037)
 
-**Local Architect / Complex Analyst** (`muse-glimmer:30b-q4_K_M` via Ollama,
+**Local Architect / Complex Analyst** (`gpt-oss:20b` via Ollama,
 per ADR-037) is a bounded, advisory-only role for architecture synthesis and
 complex causal analysis on a real work item, invoked before the primary
 agent authors the target ADR/plan/tasks. It is not an implementer, not a
@@ -1421,18 +1421,18 @@ config-only, migration-only, ADR, plan, task-ledger, or policy-only tasks.
 **Reviewer is determined by RRI band** (see `Band-routed peer review`
 above):
 
-#### Step 1-A — RRI 0–25 (Low): Muse Glimmer Reviewer / Gemma / D14
+#### Step 1-A — RRI 0–25 (Low): GPT-OSS 20B Reviewer / Gemma / D14
 
 ```
 [ ] 1a. Run `make qa-gemma-review`
-        - Muse Glimmer runs N sequential passes (default 3, env DUBBRIDGE_REVIEW_PASSES).
+        - GPT-OSS 20B runs N sequential passes (default 3, env DUBBRIDGE_REVIEW_PASSES).
         - Every parseable pass contributes to one consolidated developer-review
           packet; there is no quorum gate.
         - Wrapper classifies findings: consensus | pass-specific |
           severity-inconsistent | location-inconsistent | likely-false-positive.
         - One or more parseable passes produce a usable aggregate. Zero parseable
           passes, invalid output, stall, or unavailable model retries once against
-          Muse Glimmer, then falls back to Gemma with the same packet; `BLOCKED`
+          GPT-OSS 20B, then falls back to Gemma with the same packet; `BLOCKED`
           status on Gemma too routes to D14 fallback.
         - `make qa-gemma-review` automatically runs `parse-review-findings.py`
           after writing the result. If findings exist in ANY bucket (findings[],
@@ -1442,20 +1442,20 @@ above):
           Do NOT report "0 findings" without verifying the script exit code.
 
 [ ] 1b. Evaluate D14 trigger — spawn context-isolated subagent if ANY of:
-        - Muse Glimmer unavailable, stalled, returned invalid output, or
+        - GPT-OSS 20B unavailable, stalled, returned invalid output, or
           returned `BLOCKED`, **and** the Gemma fallback also failed the same
           way  ← mandatory
         Spawn per § Context-isolated adjudicator (D14). Output is advisory;
         record disposition_divergence.
 
 [ ] 1c. Record `### Gemma Reviewer evidence` block in the task entry
-        (`Model:` names whichever of Muse Glimmer/Gemma/D14 actually ran).
+        (`Model:` names whichever of GPT-OSS 20B/Gemma/D14 actually ran).
         For RRI 0–25 primary-agent tasks: record in the task entry.
         For RRI 0–25 delegated Qwen Developer tasks: record in the final report.
         Neither path may be skipped.
 ```
 
-#### Step 1-B — RRI 26–55 (Moderate + Med-high): Gemma / Muse Glimmer / D14
+#### Step 1-B — RRI 26–55 (Moderate + Med-high): Gemma / GPT-OSS 20B / D14
 
 ```
 [ ] 1d. Send the diff, task acceptance criteria, and any independently-
@@ -1465,26 +1465,26 @@ above):
         contract required — request a structured PASS/FINDINGS verdict with
         findings by severity.
 
-[ ] 1e. Evaluate Muse Glimmer fallback — route to Muse Glimmer
-        (`muse-glimmer:30b-q4_K_M`) if Gemma is unavailable, stalled, or
+[ ] 1e. Evaluate GPT-OSS 20B fallback — route to GPT-OSS 20B
+        (`gpt-oss:20b`) if Gemma is unavailable, stalled, or
         returns invalid/`BLOCKED` output. One retry against Gemma with the
         same packet first; if the retry also fails, send the same review
-        packet to Muse Glimmer instead.
+        packet to GPT-OSS 20B instead.
 
 [ ] 1f. Evaluate D14 fallback — spawn context-isolated subagent if:
-        - Gemma unavailable/stalled/invalid **and** Muse Glimmer also
+        - Gemma unavailable/stalled/invalid **and** GPT-OSS 20B also
           unavailable, stalled, or returns invalid/`BLOCKED` output.
         - If D14 is also unavailable: write a blocked-artifact record and stop.
           Never self-review. Report the task as blocked.
         Spawn per § Context-isolated adjudicator (D14). Output is advisory.
 
 [ ] 1g. Record `### Peer Reviewer evidence` block in the task entry:
-        - Reviewer: `<gemma|muse-glimmer|d14>`
+        - Reviewer: `<gemma|gpt-oss|d14>`
         - Command: `<exact command or manual invocation>`
         - Artifact: `<path to review artifact>`
         - Verdict: `PASS | BLOCKED`
         - Findings: `<summary or "none">`
-        - Muse Glimmer fallback: `triggered | not triggered` — reason: `<condition or n/a>`
+        - GPT-OSS 20B fallback: `triggered | not triggered` — reason: `<condition or n/a>`
         - D14 fallback: `triggered | not triggered` — reason: `<condition or n/a>`
         - D14 provider route: `cross-provider | same-provider-degraded | n/a` — reason: `<provider and failed cross-provider attempt, or n/a>`
         - disposition_divergence: `none | partial | full | null`
@@ -1494,8 +1494,8 @@ above):
 #### Step 1-C — RRI 56+ (Complex and above): cross-vendor peer / D14
 
 The cross-vendor peer **replaces Gemma** as the code-solution reviewer for
-this band (the Gemma/Muse Glimmer routing in Step 1-B applies only to
-26–55). Do not run Gemma Reviewer or Muse Glimmer Reviewer for RRI 56+; the
+this band (the Gemma/GPT-OSS 20B routing in Step 1-B applies only to
+26–55). Do not run Gemma Reviewer or GPT-OSS 20B Reviewer for RRI 56+; the
 peer is the mandatory path and D14 the mandatory fallback.
 
 ```
@@ -1514,13 +1514,13 @@ peer is the mandatory path and D14 the mandatory fallback.
 
 [ ] 1g. Record `### Peer Reviewer evidence` block in the task entry — same
         fields as Step 1-B's 1g, with `Reviewer: <codex|claude|d14>` and no
-        Muse Glimmer fallback line.
+        GPT-OSS 20B fallback line.
 ```
 
 Record the phase-2 report line in the closure report:
 
 ```
-Code-solution review: <gemma|muse-glimmer|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
+Code-solution review: <gemma|gpt-oss|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
 ```
 
 ### Step 2 — Reflection log (RRI 26+)

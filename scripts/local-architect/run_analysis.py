@@ -28,7 +28,7 @@ from prompt_builder import build_system_prompt  # noqa: E402
 # build_prompt() is called per-invocation with the real packet, not once at
 # import time -- but the boundary-clause budget check uses the same fixed
 # defaults regardless of the actual CLI num_ctx/num_predict for that reason.
-_BOUNDARY_BUDGET_NUM_CTX = 8192
+_BOUNDARY_BUDGET_NUM_CTX = 65536
 _BOUNDARY_BUDGET_NUM_PREDICT = 4096
 
 ARTIFACT_SCHEMA_VERSION = "adr037-local-architect-artifact-v1"
@@ -392,6 +392,7 @@ def run_analysis(
         "model": config.model_tag,
         "prompt": prompt,
         "stream": False,
+        "keep_alive": 0,
         # Disable interleaved reasoning so /api/generate returns the final
         # response without buffering an unbounded chain-of-thought first
         # (ADR-037 T4 timeout root cause). Ollama relocates any deliberation to
@@ -479,8 +480,8 @@ def parse_args() -> Config:
         "--model-tag",
         # ADR-037 Amendment 1 (T4b): the Local Architect / Complex Analyst
         # binding moved from qwen3.6:27b-q4_K_M (reassigned to the local
-        # implementer by ADR-036 Amendment 2) to Muse Glimmer.
-        default="muse-glimmer:30b-q4_K_M",
+        # implementer by ADR-036 Amendment 2) to Qwen3.6 27B.
+        default="qwen3.6:27b-q4_K_M",
         help="Exact Ollama model tag to verify and run.",
     )
     parser.add_argument(
@@ -489,7 +490,7 @@ def parse_args() -> Config:
         # exact digest of that same model tag, or the fail-closed
         # model_digest_mismatch check in run_analysis() rejects every
         # default-args invocation.
-        default="de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+        default="3a40c32f1450b8380412898385b0e00df5d6d2d801dd192ca1acb7e735cd050e",
         help="Expected Ollama digest for the exact model tag.",
     )
     parser.add_argument("--ollama-url", default="http://127.0.0.1:11434", help="Base URL for the local Ollama API.")
@@ -499,7 +500,7 @@ def parse_args() -> Config:
     parser.add_argument(
         "--num-ctx",
         type=int,
-        default=8192,
+        default=65536,
         help="Ollama context window size (prompt + response share this budget; "
         "Ollama's own default of 2048-4096 truncates schema-heavy responses).",
     )

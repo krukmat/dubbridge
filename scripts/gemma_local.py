@@ -22,14 +22,16 @@ DEFAULT_HOST = "http://localhost:11434"
 DEFAULT_MODEL = "gemma4:26b-a4b-it-qat"
 DEFAULT_FALLBACK_MODEL = "gemma4:26b-a4b-it-qat"
 # ADR-036 Amendment 2 / owner directive 2026-08-11: the RRI 0-25 primary
-# reviewer role (Gemma Reviewer / Muse Glimmer Reviewer) is Muse Glimmer,
+# reviewer role (Gemma Reviewer / GPT-OSS 20B Reviewer) is GPT-OSS 20B,
 # distinct from Gemma Developer's DEFAULT_MODEL above. Deliberately a
 # separate constant, not a repoint of DEFAULT_MODEL/DEFAULT_FALLBACK_MODEL --
 # those stay Gemma so Gemma Developer (patch delegation) is unaffected by
 # reviewer-role rebinding (plan Design decision 2). DEFAULT_FALLBACK_MODEL
-# doubles as this role's own "Muse Glimmer unavailable -> Gemma" intermediate
+# doubles as this role's own "GPT-OSS 20B unavailable -> Gemma" intermediate
 # fallback target, since it already holds Gemma's tag.
-DEFAULT_REVIEW_MODEL = "muse-glimmer:30b-q4_K_M"
+DEFAULT_REVIEW_MODEL = "gpt-oss:20b"
+DEFAULT_REVIEW_NUM_CTX = 65536
+DEFAULT_REVIEW_REASONING_EFFORT = "medium"
 DEFAULT_IDLE_TIMEOUT_SECONDS = 180
 DEFAULT_MAX_WALL_SECONDS = 900
 DEFAULT_NUM_CTX = 131072
@@ -42,15 +44,10 @@ DEFAULT_THINK = False
 
 TRUTHY_ENV_VALUES = {"1", "true", "TRUE", "yes", "YES", "on", "ON"}
 
-# C4 (docs/audit/2026-08-19-muse-glimmer-think-flag-not-honored.md): the
-# Ollama API-level "think" field is not honored by every model. Confirmed by
-# direct bisection that muse-glimmer:30b-q4_K_M consumes its full num_predict
-# budget on invisible reasoning and returns done_reason:"length" with empty
-# content even when think=False. A text-level "/no_think" directive prepended
-# to the system prompt is the only remedy that has been empirically verified
-# against the real model. Scoped to the specific model(s) confirmed to need
-# it, not applied blindly to every model.
-THINK_DIRECTIVE_MODELS = {"muse-glimmer:30b-q4_K_M"}
+# GPT-OSS uses Ollama native reasoning levels; the retired model-specific /no_think workaround is disabled.
+GPT_OSS_MODEL_PREFIX = "gpt-oss"
+GPT_OSS_REASONING_LEVELS = {"low", "medium", "high"}
+THINK_DIRECTIVE_MODELS = set()
 THINK_DIRECTIVE_TEXT = "/no_think"
 
 
@@ -122,6 +119,32 @@ def get_json(url, timeout):
         raise GemmaIdleTimeout(timeout) from exc
 
 
+def unload_model(host, model, timeout):
+    """Best-effort unload of one Ollama model before a large-model role switch."""
+    try:
+        payload = get_json(endpoint(host, "/api/ps"), timeout)
+        loaded = {
+            item.get("name") or item.get("model")
+            for item in payload.get("models", [])
+            if isinstance(item, dict)
+        }
+        if model not in loaded:
+            return False
+        data = json.dumps({"model": model, "keep_alive": 0, "stream": False}).encode("utf-8")
+        req = urllib.request.Request(
+            endpoint(host, "/api/generate"),
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            response.read()
+        return True
+    except Exception as exc:
+        print(f"[local-model] warning: could not unload {model!r}: {exc}", file=sys.stderr)
+        return False
+
+
 def _installed_model_names(host, timeout):
     tags = get_json(endpoint(host, "/api/tags"), timeout)
     return {item.get("name") for item in tags.get("models", [])}
@@ -180,6 +203,22 @@ def resolve_num_predict(model, num_predict):
     return MODEL_NUM_PREDICT_OVERRIDES.get(model, DEFAULT_NUM_PREDICT)
 
 
+def resolve_think_setting(model, think):
+    """Resolve Ollama thinking control without invalid GPT-OSS booleans."""
+    if isinstance(model, str) and model.startswith(GPT_OSS_MODEL_PREFIX):
+        if isinstance(think, str) and think in GPT_OSS_REASONING_LEVELS:
+            return think
+        return DEFAULT_REVIEW_REASONING_EFFORT
+    return think
+
+
+def resolve_keep_alive(model):
+    """Avoid long GPT-OSS residency on the 32 GB target host."""
+    if isinstance(model, str) and model.startswith(GPT_OSS_MODEL_PREFIX):
+        return "1m"
+    return "10m"
+
+
 def build_chat_payload(
     *,
     model,
@@ -197,8 +236,8 @@ def build_chat_payload(
     return {
         "model": model,
         "stream": True,
-        "think": think,
-        "keep_alive": "10m",
+        "think": resolve_think_setting(model, think),
+        "keep_alive": resolve_keep_alive(model),
         "options": {
             "temperature": temperature,
             "num_predict": effective_num_predict,

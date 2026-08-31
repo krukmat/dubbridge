@@ -16,8 +16,8 @@ from typing import Any
 
 MED_HIGH_PROFILE = "med-high-refinement-v1"
 # ADR-037 Amendment 1 (T4b): the Local Architect / Complex Analyst binding
-# moved from qwen3.6:27b-q4_K_M to Muse Glimmer.
-REQUIRED_MODEL_TAG = "muse-glimmer:30b-q4_K_M"
+# moved from qwen3.6:27b-q4_K_M to GPT-OSS 20B.
+REQUIRED_MODEL_TAG = "gpt-oss:20b"
 MED_HIGH_RRI_MIN = 41
 MED_HIGH_RRI_MAX = 55
 MED_HIGH_BAND_LABEL = "Med-high"
@@ -77,7 +77,7 @@ def validate_refinement_artifact(
     expected_card_hash: str,
     expected_model_tag: str = REQUIRED_MODEL_TAG,
 ) -> dict[str, Any]:
-    """Validate the Muse Glimmer med-high-refinement-v1 artifact in isolation.
+    """Validate the GPT-OSS 20B med-high-refinement-v1 artifact in isolation.
 
     Returns the validated `response.validated` payload on success. Raises
     GateError on any mismatch -- an unavailable, malformed, stale, or
@@ -179,7 +179,7 @@ def evaluate_route(
     """The single fail-closed entry point: validates both inputs and the RRI
     band, then applies the ADR-038 route rules.
 
-    - GATE-1: Muse Glimmer GO_LOCAL plus a matching primary GO_LOCAL receipt
+    - GATE-1: GPT-OSS 20B GO_LOCAL plus a matching primary GO_LOCAL receipt
       is eligible for local implementation.
     - GATE-2: the primary may downgrade GO_LOCAL to cloud.
     - GATE-3: CLOUD_REQUIRED, any mismatch, or missing evidence never starts
@@ -212,7 +212,7 @@ def evaluate_route(
     if architect_route == ROUTE_CLOUD_REQUIRED:
         return GateDecision(
             route=ROUTE_CLOUD_REQUIRED,
-            reason="Muse Glimmer recommended CLOUD_REQUIRED; the primary cannot upgrade this to local.",
+            reason="GPT-OSS 20B recommended CLOUD_REQUIRED; the primary cannot upgrade this to local.",
         )
     if primary_decision == ROUTE_CLOUD_REQUIRED:
         return GateDecision(
@@ -220,7 +220,7 @@ def evaluate_route(
             reason="Primary receipt downgraded GO_LOCAL to cloud.",
         )
     # Both sides independently GO_LOCAL.
-    return GateDecision(route=ROUTE_GO_LOCAL, reason="Muse Glimmer and primary both recommend GO_LOCAL.")
+    return GateDecision(route=ROUTE_GO_LOCAL, reason="GPT-OSS 20B and primary both recommend GO_LOCAL.")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -228,7 +228,7 @@ def main(argv: list[str] | None = None) -> int:
     from pathlib import Path
 
     parser = argparse.ArgumentParser(description="Evaluate the Med-high primary route gate.")
-    parser.add_argument("--refinement-artifact", required=True, help="Path to the Muse Glimmer refinement artifact JSON.")
+    parser.add_argument("--refinement-artifact", required=True, help="Path to the GPT-OSS 20B refinement artifact JSON.")
     parser.add_argument("--primary-receipt", required=True, help="Path to the primary route receipt JSON.")
     parser.add_argument("--card-hash", required=True, help="Expected approved-card SHA-256.")
     parser.add_argument("--rri", type=int, required=True, help="Final task RRI.")

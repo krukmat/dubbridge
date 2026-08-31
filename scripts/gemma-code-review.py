@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a read-only local Gemma code review over a pre-built packet.
+"""Run a read-only local code review over a pre-built packet.
 
 The caller builds the packet, including the diff to review. This wrapper owns
 only transport, contract parsing, out-of-scope labeling, and result writing.
@@ -37,7 +37,7 @@ PATCH_LIKE_PATTERNS = (
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Send a read-only code review packet to local Ollama/Gemma.",
+        description="Send a read-only code review packet to a local Ollama reviewer.",
     )
     parser.add_argument(
         "packet",
@@ -54,7 +54,7 @@ def parse_args():
         default=os.environ.get("DUBBRIDGE_REVIEW_MODEL", gemma_local.DEFAULT_REVIEW_MODEL),
         help=(
             "Review model; defaults to DUBBRIDGE_REVIEW_MODEL, then the "
-            "repo's Muse Glimmer reviewer default (ADR-036 Amendment 2, "
+            "repo's GPT-OSS 20B reviewer default (ADR-036 Amendment 2, "
             "owner directive 2026-08-11). Decoupled from "
             "DUBBRIDGE_LOW_RRI_MODEL, which is Gemma Developer's own env "
             "var and must not influence reviewer-role resolution."
@@ -97,7 +97,7 @@ def parse_args():
         default=int(
             os.environ.get(
                 "DUBBRIDGE_REVIEW_NUM_CTX",
-                os.environ.get("DUBBRIDGE_LOW_RRI_NUM_CTX", str(gemma_local.DEFAULT_NUM_CTX)),
+                os.environ.get("DUBBRIDGE_LOW_RRI_NUM_CTX", str(gemma_local.DEFAULT_REVIEW_NUM_CTX)),
             )
         ),
         help="Context window size for Ollama.",
@@ -186,8 +186,8 @@ def parse_args():
 
 def build_review_payload(model, packet, num_ctx, num_predict, temperature, think):
     output_format_text = (
-        "You are Gemma Reviewer for DubBridge. You are read-only.\n"
-        "Review the supplied packet and diff. Do not approve, modify files, "
+        "You are DubBridge Reviewer. You are read-only and evidence-bound.\n"
+        "Review only the supplied packet and diff. Every finding must cite supplied code evidence. Do not infer unseen files or behavior. If evidence is insufficient, omit the finding. Do not approve, modify files, "
         "emit patches, emit unified diffs, or output file bodies.\n"
         "Return ONLY tagged text in this exact shape:\n"
         "STATUS: PASS\n"
@@ -570,7 +570,7 @@ def main():
 
     selected_model = args.model
     if not args.dry_run:
-        # EC-3: Muse Glimmer unavailable/not-installed falls back to Gemma
+        # EC-3: GPT-OSS 20B unavailable/not-installed falls back to Gemma
         # next (DEFAULT_FALLBACK_MODEL already holds Gemma's tag), not
         # straight to D14.
         selected_model = gemma_local.resolve_model_with_fallback(

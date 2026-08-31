@@ -249,7 +249,7 @@ class CliBehavior(unittest.TestCase):
         r = self.run_cli("-", "--dry-run", stdin=_packet(), env=env)
         self.assertEqual(r.returncode, 0, r.stderr)
         payload = json.loads(r.stdout)
-        self.assertEqual(payload["model"], "muse-glimmer:30b-q4_K_M")
+        self.assertEqual(payload["model"], "gpt-oss:20b")
 
     def test_dry_run_falls_back_to_shared_default(self):
         env = os.environ.copy()
@@ -258,7 +258,7 @@ class CliBehavior(unittest.TestCase):
         r = self.run_cli("-", "--dry-run", stdin=_packet(), env=env)
         self.assertEqual(r.returncode, 0, r.stderr)
         payload = json.loads(r.stdout)
-        self.assertEqual(payload["model"], "muse-glimmer:30b-q4_K_M")
+        self.assertEqual(payload["model"], "gpt-oss:20b")
 
     def test_empty_packet_exits_1(self):
         r = self.run_cli("-", stdin=" \n")
@@ -269,7 +269,7 @@ class CliBehavior(unittest.TestCase):
         r = self.run_cli("-", "--dry-run", stdin=_packet())
         self.assertEqual(r.returncode, 0, r.stderr)
         payload = json.loads(r.stdout)
-        self.assertFalse(payload["think"])
+        self.assertEqual(payload["think"], "medium")
 
 
 # ---------------------------------------------------------------------------
@@ -613,7 +613,7 @@ class MultiPassCli(unittest.TestCase):
         # not block the other passes from producing a usable aggregate.
         ec, agg, _ = self._run_multi([
             "STATUS: PASS\nSUMMARY: ok",
-            _mod.gemma_local.GemmaThinkOverrunError("muse-glimmer:30b-q4_K_M"),
+            _mod.gemma_local.GemmaThinkOverrunError("gpt-oss:20b"),
             "STATUS: PASS\nSUMMARY: ok",
         ])
         self.assertEqual(ec, 0)
@@ -623,9 +623,9 @@ class MultiPassCli(unittest.TestCase):
 
     def test_all_think_overrun_fails_no_aggregate(self):
         ec, agg, _ = self._run_multi([
-            _mod.gemma_local.GemmaThinkOverrunError("muse-glimmer:30b-q4_K_M"),
-            _mod.gemma_local.GemmaThinkOverrunError("muse-glimmer:30b-q4_K_M"),
-            _mod.gemma_local.GemmaThinkOverrunError("muse-glimmer:30b-q4_K_M"),
+            _mod.gemma_local.GemmaThinkOverrunError("gpt-oss:20b"),
+            _mod.gemma_local.GemmaThinkOverrunError("gpt-oss:20b"),
+            _mod.gemma_local.GemmaThinkOverrunError("gpt-oss:20b"),
         ])
         self.assertNotEqual(ec, 0)
         self.assertIsNone(agg)
@@ -747,7 +747,7 @@ class MultiPassCliAudit(unittest.TestCase):
     def test_think_overrun_count_recorded_in_audit_record(self):
         records = self._run_audit([
             "STATUS: PASS\nSUMMARY: ok",
-            _mod.gemma_local.GemmaThinkOverrunError("muse-glimmer:30b-q4_K_M"),
+            _mod.gemma_local.GemmaThinkOverrunError("gpt-oss:20b"),
             "STATUS: PASS\nSUMMARY: ok",
         ])
         self.assertEqual(len(records), 1)
@@ -816,13 +816,13 @@ class ResolvedModelRecordedInResult(unittest.TestCase):
         self.assertEqual(aggregate["model"], "gemma4:26b-a4b-it-qat")
 
     def test_result_records_fallback_model_not_requested_model(self):
-        # HP-2: requested muse-glimmer, Ollama only had the fallback installed.
-        result = self._run(1, "gemma4:26b-a4b-it-qat", requested_model="muse-glimmer:30b-q4_K_M")
+        # HP-2: requested gpt-oss, Ollama only had the fallback installed.
+        result = self._run(1, "gemma4:26b-a4b-it-qat", requested_model="gpt-oss:20b")
         self.assertEqual(result["model"], "gemma4:26b-a4b-it-qat")
-        self.assertNotEqual(result["model"], "muse-glimmer:30b-q4_K_M")
+        self.assertNotEqual(result["model"], "gpt-oss:20b")
 
     def test_multipass_aggregate_records_fallback_model(self):
-        aggregate = self._run(3, "gemma4:26b-a4b-it-qat", requested_model="muse-glimmer:30b-q4_K_M")
+        aggregate = self._run(3, "gemma4:26b-a4b-it-qat", requested_model="gpt-oss:20b")
         self.assertEqual(aggregate["model"], "gemma4:26b-a4b-it-qat")
 
 

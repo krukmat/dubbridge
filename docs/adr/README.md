@@ -65,3 +65,4 @@ the divergence.
 
 The numbering gaps (ADR-001..005, 007, 009..017) are intentionally left open for
 decisions that predate or are unrelated to the slices currently in the repository.
+- [ADR-044 — Local reviewer and architect rebinding](ADR-044-local-model-reviewer-and-architect-rebinding.md) — Accepted 2026-08-31
