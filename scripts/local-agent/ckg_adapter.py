@@ -27,7 +27,7 @@ class GraphCandidate:
     start_line: int | None = None
     end_line: int | None = None
     priority: int = 5
-    reason: str = "semantic_candidate"
+    reason: str = "text_candidate"
     graph_revision: str | None = None
 
 
@@ -160,6 +160,7 @@ class CodebaseMemoryCLIAdapter:
         self.binary = binary
         self.timeout = timeout
         self._runner = runner or subprocess.run
+        self._projects_by_root = {}
 
     @property
     def backend_name(self):
@@ -195,28 +196,12 @@ class CodebaseMemoryCLIAdapter:
         except json.JSONDecodeError as exc:
             raise CKGAdapterError(f"CBM {tool} returned non-JSON output") from exc
 
-    def _base_repo_root(self, worktree_dir):
-        completed = subprocess.run(
-            [
-                "git",
-                "-C",
-                worktree_dir,
-                "rev-parse",
-                "--path-format=absolute",
-                "--git-common-dir",
-            ],
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=10,
-            check=False,
-        )
-        if completed.returncode != 0:
-            return os.path.abspath(worktree_dir)
-        common = completed.stdout.strip()
-        if os.path.basename(common) == ".git":
-            return os.path.dirname(common)
-        return os.path.abspath(worktree_dir)
+    @staticmethod
+    def _worktree_root(worktree_dir):
+        # Each linked worktree is a distinct source state. Index the exact
+        # checkout instead of redirecting to the shared/common Git directory;
+        # otherwise graph relationships can come from another branch.
+        return os.path.realpath(os.path.abspath(worktree_dir))
 
     def _project_for_root(self, root):
         payload = self._call("list_projects")
@@ -232,17 +217,31 @@ class CodebaseMemoryCLIAdapter:
                 return name
         return None
 
+    @staticmethod
+    def _project_from_index_payload(payload):
+        for item in _walk(payload):
+            for key in ("project", "project_name", "name"):
+                value = item.get(key)
+                if isinstance(value, str) and value:
+                    return value
+        return None
+
     def ensure_project(self, worktree_dir):
-        root = self._base_repo_root(worktree_dir)
-        project = self._project_for_root(root)
-        if project:
-            return project
-        self._call("index_repository", {"repo_path": root})
-        project = self._project_for_root(root)
+        root = self._worktree_root(worktree_dir)
+        cached = self._projects_by_root.get(root)
+        if cached:
+            return cached
+
+        # Re-index once at the start of each runner invocation. CBM's indexer is
+        # incremental, and this binds discovery to the actual disposable
+        # worktree instead of an arbitrary sibling checkout of the same repo.
+        payload = self._call("index_repository", {"repo_path": root})
+        project = self._project_from_index_payload(payload) or self._project_for_root(root)
         if not project:
             raise CKGAdapterError(
-                "CBM indexed repository but project could not be resolved"
+                "CBM indexed worktree but project could not be resolved"
             )
+        self._projects_by_root[root] = project
         return project
 
     def coverage(self, project, paths):
@@ -301,12 +300,14 @@ class CodebaseMemoryCLIAdapter:
             except CKGAdapterError:
                 pass
         if not candidates and task_text.strip():
+            # Prefer CBM's text/BM25 query as the low-priority anchor fallback.
+            # Semantic retrieval remains optional rather than authoritative.
             payload = self._call(
                 "search_graph",
-                {"project": project, "semantic_query": [task_text[:1200]], "limit": 10},
+                {"project": project, "query": task_text[:1200], "limit": 10},
             )
             candidates.extend(
-                _extract_candidates(payload, priority=5, reason="semantic_candidate")
+                _extract_candidates(payload, priority=5, reason="text_candidate")
             )
         return {
             "project": project,
