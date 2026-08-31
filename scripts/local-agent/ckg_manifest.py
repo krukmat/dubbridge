@@ -35,25 +35,46 @@ def _git(worktree_dir, *args):
     return completed.stdout
 
 
+def _hash_untracked_files(hasher, worktree_dir):
+    raw = _git(worktree_dir, "ls-files", "--others", "--exclude-standard", "-z")
+    if not raw:
+        return
+    root = os.path.realpath(worktree_dir)
+    for relative in sorted(path for path in raw.split("\0") if path):
+        hasher.update(b"\0UNTRACKED\0")
+        hasher.update(relative.encode("utf-8", errors="surrogateescape"))
+        absolute = os.path.realpath(os.path.join(root, relative))
+        try:
+            if os.path.commonpath((absolute, root)) != root or os.path.islink(
+                os.path.join(root, relative)
+            ):
+                hasher.update(b"\0UNREADABLE\0")
+                continue
+            with open(absolute, "rb") as handle:
+                while True:
+                    chunk = handle.read(65536)
+                    if not chunk:
+                        break
+                    hasher.update(chunk)
+        except (OSError, ValueError):
+            hasher.update(b"\0UNREADABLE\0")
+
+
 def derive_worktree_identity(worktree_dir):
     revision = _git(worktree_dir, "rev-parse", "HEAD")
     base_revision = revision.strip() if revision else None
     status = _git(worktree_dir, "status", "--porcelain=v1", "--untracked-files=all")
     diff = _git(worktree_dir, "diff", "--binary", "HEAD")
     staged = _git(worktree_dir, "diff", "--binary", "--cached", "HEAD")
-    payload = "\n".join(
-        [
-            base_revision or "",
-            status or "",
-            diff or "",
-            staged or "",
-        ]
-    ).encode("utf-8", errors="replace")
-    state_hash = hashlib.sha256(payload).hexdigest()
+    hasher = hashlib.sha256()
+    for value in (base_revision or "", status or "", diff or "", staged or ""):
+        hasher.update(value.encode("utf-8", errors="replace"))
+        hasher.update(b"\0")
+    _hash_untracked_files(hasher, worktree_dir)
     return WorktreeIdentity(
         base_revision=base_revision,
         dirty=bool(status and status.strip()),
-        state_hash=state_hash,
+        state_hash=hasher.hexdigest(),
     )
 
 
@@ -99,6 +120,8 @@ class CKGContextManifest:
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
         temp = f"{path}.tmp"
         with open(temp, "w", encoding="utf-8") as handle:
-            json.dump(self.as_dict(), handle, ensure_ascii=False, indent=2, sort_keys=True)
+            json.dump(
+                self.as_dict(), handle, ensure_ascii=False, indent=2, sort_keys=True
+            )
             handle.write("\n")
         os.replace(temp, path)
