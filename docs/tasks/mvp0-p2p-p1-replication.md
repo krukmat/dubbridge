@@ -63,7 +63,7 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 | P1.B2.a-ii-b | Read+compare glue, typed result | PASS — Done 2026-08-31; RRI 22 Low | P1.B2.a-i, P1.B2.a-ii-a PASS |
 | P1.B2.b | Reconnect budget counter (pure) | PASS — Done 2026-08-31; RRI 24 Low | none |
 | P1.B2.c-1 | Disconnect detection + budget-check decision | PASS — Done 2026-08-31; RRI 22 Low | P1.B2.b PASS |
-| P1.B2.c-2 | Re-invoke B1 `connectAndReplicate` on retry | Awaiting approval — RRI 20 Low | none |
+| P1.B2.c-2 | Re-invoke B1 `connectAndReplicate` on retry | PASS — Done 2026-08-31; RRI 20 Low | none |
 | P1.B2.d-i | Evidence redaction helper (pure) | Awaiting approval — RRI 20 Low | none |
 | P1.B2.d-ii | Dual-session teardown orchestration | Awaiting approval — RRI 22 Low | none |
 | P1.B2.e | Verdict/receipt type assembly (pure) | Awaiting approval — RRI 22 Low | none |
@@ -1599,10 +1599,12 @@ change), not local-model authorship substitutes.
 
 ### P1.B2.c-2 — Re-invoke B1 `connectAndReplicate` on retry
 
-- **Status:** Awaiting approval.
+- **Status:** PASS — Done 2026-08-31.
 - **Effort / RRI:** S / 20 Low.
 - **Allowed paths:** `mobile/src/p2p/runtime/transient-replication.ts`,
-  `mobile/__tests__/p2p/replication-retry.test.ts`.
+  `mobile/__tests__/p2p/replication-retry.test.ts`. Actual implementation
+  also added `mobile/src/p2p/runtime/replication-retry.ts` (see
+  Implementation note).
 - **Objective:** on a "retry" decision, re-invoke B1's already-tested
   `connectAndReplicate` against the same swarm/drive — no new discovery or
   connection logic, pure re-invocation wiring.
@@ -1613,6 +1615,108 @@ change), not local-model authorship substitutes.
 - **Evidence to emit:** unit tests for successful retry and second-failure.
 - **Handoff prompt:** `P1.B2.c-2 — call the existing connectAndReplicate
   again on retry only; do not modify its implementation.`
+
+**Implementation note:** `retryConnectAndReplicate` was first delegated
+in-place inside `transient-replication.ts` per the planned `Allowed paths`.
+That addition triggered a `qa-maintainability` declaration-count violation
+("22/23 exceeds budget of 20") — the file already sat at exactly the 20-line
+budget ceiling before this task, following the same gate this branch already
+split this exact file for twice (`c977997`, `84fff3f`). Following that
+established precedent, `retryConnectAndReplicate` was extracted into a new
+file `mobile/src/p2p/runtime/replication-retry.ts`, delegated as three
+ordered `--mode before-after`/`full-file` sub-packets (part 2: create the new
+file; part 1: delete the function from `transient-replication.ts`, replacing
+its exact trailing 7 lines with the single closing brace; part 3: update the
+new test file's import path to the new module) — the first combined 3-part
+packet was phase-1 **BLOCKED** (parts were not safely order-independent: an
+early revision deleted-then-referenced a not-yet-created file); the packet
+was revised to state an explicit mandatory dispatch order with a real
+single-brace replacement instead of a fragile empty-block delete, and the
+revised packet passed phase-1 with 0 findings (required re-review per
+`AGENT_WORKFLOW_GUIDE.md § Per-task discipline` for a materially revised
+packet). All three parts were dispatched in order and applied cleanly. The
+new test file also emitted a stray trailing `---` line (same class of model
+output artifact as `P1.B2.c-1`'s test file, not wrapper truncation), stripped
+as the documented mechanical/tooling-failure-exception direct edit.
+
+A `retryConnectAndReplicate` typed via `Parameters<typeof
+connectAndReplicate>`/`ReturnType<typeof connectAndReplicate>` (instead of
+repeating the 4-parameter signature) avoided a separate
+`qa-maintainability` repeated-line finding
+(`drive: ReplicableDrive` would otherwise recur 5x against a budget of 4).
+
+A broad `prettier --write` was briefly run across the whole
+`transient-replication.ts` file during this task's repair cycle "for house
+style." Prettier reformatted several **pre-existing, untouched** multi-import
+statements from `P1.B1` onto separate lines; since
+`scripts/check-maintainability.py` counts each wrapped `import`/`type` line
+separately, this inflated the file's counted declaration lines without any
+actual new declarations, reintroducing the same finding one file-extraction
+had just resolved. This was corrected by reverting the file to its
+already-committed, already-minimal post-extraction state (`git checkout --`)
+rather than hand-reverting specific formatting choices — the file has zero
+diff against its committed state; only the genuinely new files
+(`replication-retry.ts`, `replication-retry.test.ts`) constitute this task's
+diff. Both new files independently pass `prettier --check` as authored, so no
+formatting pass was needed on them either. This reaffirms
+`feedback_whitespace_not_a_discrepancy`: the resolution was to avoid
+out-of-scope reformatting of untouched code, not to adjudicate whether
+prettier's output was itself "correct."
+
+`replication-retry.ts` is not part of the Bare worklet's bundled source graph
+(only test files import it; `transient-replication.ts` no longer references
+it after the extraction), so `mobile/scripts/build-bare-worklet.mjs`
+`sourcePaths` required no change — confirmed via a clean rebuild
+(`node scripts/build-bare-worklet.mjs`) producing zero diff against the
+already-committed bundle.
+
+### Task-analysis review (phase 1)
+
+- Reviewer: `muse-glimmer:30b-q4_K_M`.
+- Original 3-part split packet: **BLOCKED** — parts not safely
+  order-independent.
+- Revised 3-part split packet (explicit mandatory dispatch order, real
+  single-brace replacement in part 1): PASS, 0 findings.
+- Verdict: **PASS**.
+
+### Code-solution review (phase 2)
+
+- Reviewer: `muse-glimmer:30b-q4_K_M`.
+- Command: `python3 scripts/gemma-code-review.py --task-id P1.B2.c-2 --out
+  <result.json> <packet.txt>` (3 sequential passes, default `--passes 3`).
+- Passes run / usable: `3/3`.
+- Aggregate status: **PASS**.
+- Consensus findings: `0` | Pass-specific: `0` | Disagreement: `0`.
+- Artifacts: scratchpad `c-2-phase2-result.json` +
+  `c-2-phase2-result.pass{1,2,3}.json` (not committed; local delegation
+  evidence per Low-band convention, consistent with `P1.B2.c-1`'s manual
+  review artifact handling).
+- `parse-review-findings.py` exit code: `0` (no findings in any bucket).
+- Findings: none.
+- Verdict: **PASS**.
+
+### Verification
+
+- `npx tsc --noEmit` — exit 0.
+- `npm run lint` (mobile) — 0 warnings.
+- `npx prettier --check` on both new files — clean.
+- `npx jest __tests__/p2p/` — 18/18 suites, 96/96 tests passed (includes
+  `runtime-protocol.test.ts`'s worklet-bundle drift check, confirming the
+  rebuilt bundle matches source).
+- `python3 scripts/check-maintainability.py` — passed.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-B2.c-2 | Happy path | retry re-establishes replication via existing `connectAndReplicate` | `mobile/__tests__/p2p/replication-retry.test.ts::HP-B2.c-2` | passed |
+| EC-B2.c-2 | Edge case | second failure during retry propagates `connectAndReplicate`'s existing typed error, not a new shape | `mobile/__tests__/p2p/replication-retry.test.ts::EC-B2.c-2` | passed |
+
+### Owner final verification
+
+- Pending — tracked at `P1.B2` parent closure per the pack's approved
+  batching (owner approved the full 12-task pack; per-task closure evidence
+  recorded here, final owner sign-off tracked at P1.B2 parent closure).
 
 ### P1.B2.d-i — Evidence redaction helper (pure)
 
