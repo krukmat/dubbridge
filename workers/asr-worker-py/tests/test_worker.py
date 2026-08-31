@@ -9,20 +9,27 @@ import os
 import sys
 import tempfile
 from io import StringIO
-from typing import Any, Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 
-def run_main(stdin_text: str, env: Optional[Dict[str, str]] = None) -> Tuple[int, dict]:
-    """Run main() with controlled stdin and capture stdout + exit code."""
-    # Re-import main each call so module-level state is fresh.
+def load_worker_module():
+    """Import the worker module with module-level state reset."""
     if "main" in sys.modules:
         del sys.modules["main"]
 
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    worker_path = os.path.join(os.path.dirname(__file__), "..")
+    if worker_path not in sys.path:
+        sys.path.insert(0, worker_path)
 
+    return importlib.import_module("main")
+
+
+def run_main(stdin_text: str, env: Optional[Dict[str, str]] = None) -> Tuple[int, dict]:
+    """Run main() with controlled stdin and capture stdout + exit code."""
+    worker_main = load_worker_module()
     captured_stdout = StringIO()
     exit_code = 0
 
@@ -30,18 +37,14 @@ def run_main(stdin_text: str, env: Optional[Dict[str, str]] = None) -> Tuple[int
         if env:
             with patch.dict(os.environ, env):
                 try:
-                    import main as worker_main
-
                     worker_main.main()
-                except SystemExit as e:
-                    exit_code = int(e.code) if e.code is not None else 0
+                except SystemExit as exc:
+                    exit_code = int(exc.code) if exc.code is not None else 0
         else:
             try:
-                import main as worker_main
-
                 worker_main.main()
-            except SystemExit as e:
-                exit_code = int(e.code) if e.code is not None else 0
+            except SystemExit as exc:
+                exit_code = int(exc.code) if exc.code is not None else 0
 
     output_text = captured_stdout.getvalue()
     try:
@@ -55,7 +58,6 @@ def run_main(stdin_text: str, env: Optional[Dict[str, str]] = None) -> Tuple[int
 def make_audio_file() -> str:
     """Write a minimal WAV file to a temp path and return its path."""
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-        # Minimal valid WAV header (44 bytes) with no audio data.
         f.write(b"RIFF\x24\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00")
         f.write(b"\x44\xac\x00\x00\x88\x58\x01\x00\x02\x00\x10\x00data\x00\x00\x00\x00")
         return f.name
@@ -65,12 +67,12 @@ def make_whisper_mock(words: Optional[list] = None) -> MagicMock:
     """Return a mocked WhisperModel that produces one segment with optional words."""
     word_objects = []
     if words:
-        for w in words:
-            wm = MagicMock()
-            wm.word = w["word"]
-            wm.start = w["start"]
-            wm.end = w["end"]
-            word_objects.append(wm)
+        for word_spec in words:
+            word = MagicMock()
+            word.word = word_spec["word"]
+            word.start = word_spec["start"]
+            word.end = word_spec["end"]
+            word_objects.append(word)
 
     segment = MagicMock()
     segment.text = "hello world"
@@ -78,14 +80,7 @@ def make_whisper_mock(words: Optional[list] = None) -> MagicMock:
 
     model_instance = MagicMock()
     model_instance.transcribe.return_value = ([segment], MagicMock())
-
-    model_class = MagicMock(return_value=model_instance)
-    return model_class
-
-
-# ---------------------------------------------------------------------------
-# EC-3: Invalid JSON on stdin
-# ---------------------------------------------------------------------------
+    return MagicMock(return_value=model_instance)
 
 
 def test_invalid_json_emits_error_and_exits_1():
@@ -95,9 +90,22 @@ def test_invalid_json_emits_error_and_exits_1():
     assert "JSON" in output["message"]
 
 
-# ---------------------------------------------------------------------------
-# EC-1: Audio file does not exist
-# ---------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    ("payload", "missing_field"),
+    [
+        ({"audio_uri": "file:///tmp/audio.wav", "language_hint": "en"}, "job_id"),
+        ({"job_id": "j-missing-audio", "language_hint": "en"}, "audio_uri"),
+        ({"job_id": "j-missing-language", "audio_uri": "file:///tmp/audio.wav"}, "language_hint"),
+    ],
+)
+def test_missing_required_field_raises_named_invalid_input(payload, missing_field):
+    worker_main = load_worker_module()
+
+    with pytest.raises(worker_main.InvalidInputError) as exc_info:
+        worker_main.parse_input(json.dumps(payload))
+
+    assert exc_info.value.error_code == "invalid_input"
+    assert missing_field in str(exc_info.value)
 
 
 def test_audio_not_found_emits_error_and_exits_1():
@@ -110,9 +118,14 @@ def test_audio_not_found_emits_error_and_exits_1():
     assert output["job_id"] == "j1"
 
 
-# ---------------------------------------------------------------------------
-# EC-2: faster-whisper raises during transcription
-# ---------------------------------------------------------------------------
+def test_audio_not_found_uses_named_exception():
+    worker_main = load_worker_module()
+
+    with pytest.raises(worker_main.AudioNotFoundError) as exc_info:
+        worker_main.require_audio_file("j-audio", "file:///nonexistent/audio.wav")
+
+    assert exc_info.value.error_code == "audio_not_found"
+    assert exc_info.value.job_id == "j-audio"
 
 
 def test_transcription_exception_emits_error_and_exits_1():
@@ -122,21 +135,30 @@ def test_transcription_exception_emits_error_and_exits_1():
             {"job_id": "j2", "audio_uri": f"file://{audio_path}", "language_hint": "en"}
         )
 
-        model_class = MagicMock(side_effect=RuntimeError("model load failed"))
+        model_class = make_whisper_mock()
+        model_class.return_value.transcribe.side_effect = RuntimeError("transcribe failed")
         with patch.dict("sys.modules", {"faster_whisper": MagicMock(WhisperModel=model_class)}):
             exit_code, output = run_main(inp)
 
         assert exit_code == 1
         assert output["error_code"] == "transcription_failed"
-        assert "model load failed" in output["message"]
+        assert "transcribe failed" in output["message"]
         assert output["job_id"] == "j2"
     finally:
         os.unlink(audio_path)
 
 
-# ---------------------------------------------------------------------------
-# HP-1 + HP-2: Successful transcription emits output schema and writes files
-# ---------------------------------------------------------------------------
+def test_transcription_runtime_error_uses_named_exception():
+    worker_main = load_worker_module()
+    model_class = make_whisper_mock()
+    model_class.return_value.transcribe.side_effect = RuntimeError("transcribe failed")
+
+    with patch.dict("sys.modules", {"faster_whisper": MagicMock(WhisperModel=model_class)}):
+        with pytest.raises(worker_main.TranscriptionError) as exc_info:
+            worker_main.transcribe_audio("j-transcribe", "/tmp/audio.wav", "en")
+
+    assert exc_info.value.error_code == "transcription_failed"
+    assert exc_info.value.job_id == "j-transcribe"
 
 
 def test_successful_transcription_emits_output_and_exits_0():
@@ -146,7 +168,10 @@ def test_successful_transcription_emits_output_and_exits_0():
             {"job_id": "j3", "audio_uri": f"file://{audio_path}", "language_hint": "en"}
         )
 
-        words = [{"word": "hello", "start": 0.0, "end": 0.5}, {"word": "world", "start": 0.6, "end": 1.0}]
+        words = [
+            {"word": "hello", "start": 0.0, "end": 0.5},
+            {"word": "world", "start": 0.6, "end": 1.0},
+        ]
         model_class = make_whisper_mock(words=words)
 
         with patch.dict("sys.modules", {"faster_whisper": MagicMock(WhisperModel=model_class)}):
@@ -159,9 +184,9 @@ def test_successful_transcription_emits_output_and_exits_0():
         transcript_path = output["transcript_uri"].removeprefix("file://")
         alignment_path = output["alignment_uri"].removeprefix("file://")
 
-        with open(transcript_path) as f:
+        with open(transcript_path, encoding="utf-8") as f:
             transcript = json.load(f)
-        with open(alignment_path) as f:
+        with open(alignment_path, encoding="utf-8") as f:
             alignment = json.load(f)
 
         assert "hello world" in transcript["text"]
@@ -171,16 +196,15 @@ def test_successful_transcription_emits_output_and_exits_0():
         os.unlink(audio_path)
 
 
-# ---------------------------------------------------------------------------
-# EC-4: Unknown language_hint is passed through without hard failure
-# ---------------------------------------------------------------------------
-
-
 def test_unknown_language_hint_does_not_fail():
     audio_path = make_audio_file()
     try:
         inp = json.dumps(
-            {"job_id": "j4", "audio_uri": f"file://{audio_path}", "language_hint": "xx-unknown"}
+            {
+                "job_id": "j4",
+                "audio_uri": f"file://{audio_path}",
+                "language_hint": "xx-unknown",
+            }
         )
 
         model_class = make_whisper_mock()
@@ -192,11 +216,6 @@ def test_unknown_language_hint_does_not_fail():
         assert call_kwargs.get("language") == "xx-unknown"
     finally:
         os.unlink(audio_path)
-
-
-# ---------------------------------------------------------------------------
-# Model size env var is respected
-# ---------------------------------------------------------------------------
 
 
 def test_model_size_env_var_is_used():
