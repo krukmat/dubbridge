@@ -52,6 +52,7 @@ doc gates).
 | [ADR-040](ADR-040-per-module-complexity-split-implementation-routing.md) | Per-module complexity-split implementation routing (RRI 26-55) | Accepted (amends ADR-036/ADR-038; agent workflow only) |
 | [ADR-041](ADR-041-pre-approval-med-high-decomposition-local-favoring-granularity.md) | Pre-approval Med-high task decomposition for local-favoring granularity | Proposed (amends RRI_POLICY.md § Decomposition triggers if accepted; agent workflow only) |
 | [ADR-042](ADR-042-push-review-remediation-controller-and-escalation-lifecycle.md) | Push-review remediation controller and bounded escalation lifecycle | Proposed (scope: X27; amends ADR-034/ADR-039 if accepted; agent workflow only) |
+| [ADR-043](ADR-043-devstral-local-implementer-binding.md) | Devstral Small 2 as the Moderate local implementer | Accepted (runtime binding and 128K context baseline) |
 
 ## Backfill note
 
