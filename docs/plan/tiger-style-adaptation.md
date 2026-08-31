@@ -182,6 +182,21 @@ dependency and can be drafted at any point.
   in `crates/jobs`, `crates/providers`, `crates/media`), closing the one bounds
   gap the evaluation found in an otherwise-strong pillar.
 
+  **Implementation note (2026-08-31):** T4 was consolidated and pushed to
+  `main` at `610d70240026dfe1b481c1a2bab7db01fa8de4b5`. The implementation
+  persists a durable attempt counter, enforces `MAX_TRANSLATION_DISPATCH_ATTEMPTS = 3`,
+  prevents scheduling after exhaustion, and persists terminal
+  `delivery_state = 'failed'`. Implementation-time incidents and deferred
+  controls are recorded in `docs/audit/x26-t4-implementation-incidents.md`.
+  That note also records one acceptance-criteria deviation requiring owner
+  review: retry exhaustion is durably recorded in the outbox but no new
+  ADR-018 `audit_events` row/event kind was introduced. This must not be
+  represented as fully satisfying the original "durably audited" wording
+  until the owner either accepts outbox durability as the intended contract
+  and amends the task wording, or authorizes a separately scored audit task.
+  `qa-docs` failures observed during the work were traced to historical S-150
+  review commit references and are not a T4 retry-cap code failure.
+
 ## Phase 4 — CI integration-test coverage (R12, D3, MinIO gap)
 
 - **T5.** Add a `minio` service container to the relevant CI job, add the
@@ -254,6 +269,8 @@ All against `workers/asr-worker-py/main.py` (95 lines) and its
 - `docs/proposals/tiger-style-adaptation-evaluation.md` — the requirements (R1–R13)
   and decision points (D1–D3) this plan sequences
 - `docs/tasks/tiger-style-adaptation.md` — the executable, RRI-scored task ledger
+- `docs/audit/x26-t4-implementation-incidents.md` — T4 implementation incidents,
+  deferred controls, and the unresolved ADR-018 acceptance-criteria deviation
 - `docs/plan/roadmap.md` — X26 cross-cutting item
 - `docs/plan/s-150-translation-dubbing.md`, `docs/tasks/s-150-translation-dubbing.md` — R13's landing point (T4–T7, still parked)
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`, `docs/policies/HITL_AUTONOMY_POLICY.md` — governing workflow and approval gates for every task below
