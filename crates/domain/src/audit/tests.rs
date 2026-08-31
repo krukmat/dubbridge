@@ -148,6 +148,82 @@ fn platform_ingest_correlation_requires_a_session_id_and_rejects_other_families(
     assert!(!event.has_valid_platform_ingest_correlation());
 }
 
+// HP-1: existing workspace constructors satisfy the no-correlation predicate.
+#[test]
+fn workspace_correlation_accepts_workspace_events_with_no_correlation_ids() {
+    for kind in [
+        AuditEventKind::OrgCreated,
+        AuditEventKind::OrgMemberAdded,
+        AuditEventKind::ProjectCreated,
+    ] {
+        let event = AuditEvent::new_workspace_event(kind, None);
+        assert!(event.has_valid_workspace_correlation());
+    }
+}
+
+// EC-1: adding any correlation identifier to a workspace event, or using a
+// non-workspace event kind, must independently reject the correlation.
+#[test]
+fn workspace_correlation_rejects_any_correlation_id_and_other_families() {
+    let mut event = AuditEvent::new_workspace_event(AuditEventKind::OrgCreated, None);
+    assert!(event.has_valid_workspace_correlation());
+
+    event.ingest_token = Some(Uuid::new_v4());
+    assert!(!event.has_valid_workspace_correlation());
+
+    event.ingest_token = None;
+    event.recording_session_id = Some(Uuid::new_v4());
+    assert!(!event.has_valid_workspace_correlation());
+
+    event.recording_session_id = None;
+    event.platform_ingest_session_id = Some(Uuid::new_v4());
+    assert!(!event.has_valid_workspace_correlation());
+
+    event.platform_ingest_session_id = None;
+    event.event_kind = AuditEventKind::ConsentGranted;
+    assert!(!event.has_valid_workspace_correlation());
+}
+
+// HP-1: existing consent constructors satisfy the no-correlation predicate.
+#[test]
+fn consent_correlation_accepts_consent_events_with_no_correlation_ids() {
+    use crate::asset::AssetId;
+    let asset_id = AssetId::new();
+    for kind in [
+        AuditEventKind::ConsentGranted,
+        AuditEventKind::ConsentRevoked,
+        AuditEventKind::ConsentCheckDenied,
+    ] {
+        let event = AuditEvent::new_consent(asset_id, kind, None);
+        assert!(event.has_valid_consent_correlation());
+    }
+}
+
+// EC-1: adding any correlation identifier to a consent event, or using a
+// non-consent event kind, must independently reject the correlation.
+#[test]
+fn consent_correlation_rejects_any_correlation_id_and_other_families() {
+    use crate::asset::AssetId;
+    let asset_id = AssetId::new();
+    let mut event = AuditEvent::new_consent(asset_id, AuditEventKind::ConsentGranted, None);
+    assert!(event.has_valid_consent_correlation());
+
+    event.ingest_token = Some(Uuid::new_v4());
+    assert!(!event.has_valid_consent_correlation());
+
+    event.ingest_token = None;
+    event.recording_session_id = Some(Uuid::new_v4());
+    assert!(!event.has_valid_consent_correlation());
+
+    event.recording_session_id = None;
+    event.platform_ingest_session_id = Some(Uuid::new_v4());
+    assert!(!event.has_valid_consent_correlation());
+
+    event.platform_ingest_session_id = None;
+    event.event_kind = AuditEventKind::OrgCreated;
+    assert!(!event.has_valid_consent_correlation());
+}
+
 #[test]
 fn audit_event_kind_display_platform_ingest_variants() {
     assert_eq!(

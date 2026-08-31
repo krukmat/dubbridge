@@ -72,6 +72,36 @@ impl AuditEvent {
             && self.recording_session_id.is_none()
     }
 
+    /// Returns whether a workspace audit event has no correlation IDs.
+    /// Workspace events do not carry ingest tokens, recording sessions, or
+    /// platform-ingest sessions.
+    /// This checks only the in-memory event shape.
+    pub fn has_valid_workspace_correlation(&self) -> bool {
+        matches!(
+            self.event_kind,
+            AuditEventKind::OrgCreated
+                | AuditEventKind::OrgMemberAdded
+                | AuditEventKind::ProjectCreated
+        ) && self.ingest_token.is_none()
+            && self.recording_session_id.is_none()
+            && self.platform_ingest_session_id.is_none()
+    }
+
+    /// Returns whether a consent audit event has no correlation IDs.
+    /// Consent events do not carry ingest tokens, recording sessions, or
+    /// platform-ingest sessions.
+    /// This checks only the in-memory event shape.
+    pub fn has_valid_consent_correlation(&self) -> bool {
+        matches!(
+            self.event_kind,
+            AuditEventKind::ConsentGranted
+                | AuditEventKind::ConsentRevoked
+                | AuditEventKind::ConsentCheckDenied
+        ) && self.ingest_token.is_none()
+            && self.recording_session_id.is_none()
+            && self.platform_ingest_session_id.is_none()
+    }
+
     /// Constructor for S1 ingestion events. Always sets `ingest_token`.
     pub fn new(
         asset_id: Option<AssetId>,
