@@ -15,6 +15,7 @@ const sourcePaths = [
   path.join(runtimeRoot, "rethrow-as-protocol-error.ts"),
   path.join(runtimeRoot, "transient-drive.ts"),
   path.join(runtimeRoot, "transient-drive-dependencies.ts"),
+  path.join(runtimeRoot, "byte-counter.ts"),
   path.join(runtimeRoot, "transient-replication-dependencies.ts"),
   path.join(runtimeRoot, "transient-replication-discovery.ts"),
   path.join(runtimeRoot, "transient-replication.ts"),

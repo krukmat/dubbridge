@@ -56,7 +56,7 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 | P1.A2 | Transient seed lifecycle + residue cleanup | PASS — Done 2026-08-31; owner verified; RRI 46 Med-high | P1.A1d PASS — satisfied 2026-08-30 |
 | P1.B1 | Isolated Hyperswarm replication transport | PASS — Done 2026-08-31 (retrospective closure); RRI 59 Complex, governance gap disclosed and owner-accepted | P1.A2 PASS — satisfied 2026-08-31 |
 | P1.B2 | Verification, reconnect + fail-closed witness (planning parent) | Decomposed 2026-08-31 — parent-level RRI 56 Complex triggers mandatory decomposition; no direct source execution | P1.B1 PASS — satisfied 2026-08-31 |
-| P1.B2.a-0 | Byte-count instrumentation in `transient-replication.ts` (carried forward from P1.B1) | Awaiting approval — RRI 25 Low | none |
+| P1.B2.a-0 | Byte-count instrumentation in `transient-replication.ts` (carried forward from P1.B1) | PASS — Done 2026-08-31; RRI 25 Low | none |
 | P1.B2.a-cov | Direct unit coverage for `transient-replication*.ts` (carried forward from P1.B1) | Awaiting approval — RRI 20 Low | none |
 | P1.B2.a-i | Digest-compare pure helper | Awaiting approval — RRI 22 Low | none |
 | P1.B2.a-ii-a | `drive.get()` raw read wrapper | Awaiting approval — RRI 22 Low | none |
@@ -1154,7 +1154,7 @@ Required passes: 3 (`RRI 46` → `Med-high`)
 
 ### P1.B2.a-0 — Byte-count instrumentation (carried forward from P1.B1)
 
-- **Status:** Awaiting approval.
+- **Status:** PASS — Done 2026-08-31.
 - **Effort / RRI:** S / 25 Low.
 - **Allowed paths:** `mobile/src/p2p/runtime/transient-replication.ts`,
   `mobile/__tests__/p2p/transient-replication-bytecount.test.ts`.
@@ -1169,6 +1169,38 @@ Required passes: 3 (`RRI 46` → `Med-high`)
 - **Handoff prompt:** `P1.B2.a-0 — instrument transient-replication.ts to
   count actual transferred bytes only; do not touch verification, reconnect,
   or teardown logic.`
+- **Implementation:** delegated to Qwen Developer (`qwen3.8:27b-mlx`,
+  `--mode full-file`) against a fully-specified contract (socket-level byte
+  counter, threaded through `replicateOverSocket` ->
+  `connectAndReplicate` -> `connectReplicateAndCancelOnTimeout` ->
+  `discoverAndReplicate`). Delegated output matched the contract exactly.
+  A `qa-maintainability` declaration-budget violation (21 lines vs. budget
+  20, caused by the two new interfaces/signatures) was fixed by the
+  orchestrator directly as a mechanical lint-driven extraction — moved
+  `ByteCounter`/`attachByteCounter` into a new `byte-counter.ts` file
+  (no logic change), mirroring P1.B1's own mechanical splits. Added to the
+  worklet source allowlist in `build-bare-worklet.mjs` and regenerated the
+  bundle.
+- **Task-analysis review (phase 1):** muse-glimmer (`muse-glimmer:30b-q4_K_M`)
+  - PASS, 0 findings, run against the delegation packet before dispatch.
+- **Code-solution review (phase 2):** muse-glimmer (`muse-glimmer:30b-q4_K_M`)
+  - PASS, 0 findings, run against the final diff (including the
+  maintainability-split extraction).
+- **Verification:** `cd mobile && npm run typecheck` exit 0; `npm run lint`
+  exit 0; `node scripts/build-bare-worklet.mjs --check` — bundle current;
+  `npx jest` (full mobile suite) — 31/31 suites, 302/302 tests passed;
+  `python3 scripts/check-maintainability.py` — gate passed.
+- **Unit coverage certification:**
+
+  | Case ID | Type | Behavior | Unit test evidence | Result |
+  |---|---|---|---|---|
+  | HP-B2.a-0 | Happy path | matching data-event chunks accumulate to the correct byte count | `mobile/__tests__/p2p/transient-replication-bytecount.test.ts::HP-B2.a-0` | passed |
+  | HP-B2.a-0 | Happy path | `replicateOverSocket` threads the counted bytes into its returned `getByteCount()` | `mobile/__tests__/p2p/transient-replication-bytecount.test.ts::HP-B2.a-0 (integration)` | passed |
+  | EC-B2.a-0 | Edge case | a socket with no `on` method never throws and reports `0` | `mobile/__tests__/p2p/transient-replication-bytecount.test.ts::EC-B2.a-0` | passed |
+
+- **Owner final verification:** pending (see P1.B2 pack execution note —
+  owner approved the full 12-task pack; per-task closure evidence recorded
+  here, final owner sign-off tracked at P1.B2 parent closure).
 
 ### P1.B2.a-cov — Direct unit coverage for `transient-replication*.ts` (carried forward from P1.B1)
 

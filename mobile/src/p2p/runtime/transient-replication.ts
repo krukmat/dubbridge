@@ -1,6 +1,7 @@
 import { RuntimeProtocolError, type DiscoverAndReplicateReceipt } from "./protocol";
 import { loadTransientReplicationDependencies } from "./transient-replication-dependencies";
 import { createAndJoinSwarm, awaitFirstConnection, type SwarmConnectionEvents } from "./transient-replication-discovery";
+import { attachByteCounter } from "./byte-counter";
 
 export interface ReplicableDrive {
   replicate(isInitiator: boolean): { destroy(): void };
@@ -8,13 +9,14 @@ export interface ReplicableDrive {
 
 export interface DuplexSocket {
   pipe(destination: unknown): unknown;
+  on?(event: "data", listener: (chunk: { length: number }) => void): unknown;
 }
 
 export function replicateOverSocket(
   drive: ReplicableDrive,
   socket: DuplexSocket,
   isInitiator: boolean,
-): { destroy(): void } {
+): { destroy(): void; getByteCount(): number } {
   let replicationStream: { destroy(): void };
   try {
     replicationStream = drive.replicate(isInitiator);
@@ -24,8 +26,9 @@ export function replicateOverSocket(
       "Replication transfer failed",
     );
   }
+  const counter = attachByteCounter(socket);
   (socket.pipe(replicationStream) as { pipe(destination: unknown): unknown }).pipe(socket);
-  return replicationStream;
+  return { destroy: () => replicationStream.destroy(), getByteCount: counter.getByteCount };
 }
 
 export interface CancellableTimeout<T> {
@@ -34,7 +37,7 @@ export interface CancellableTimeout<T> {
 }
 
 export function cancelReplicationOnTimeout(
-  replicationStream: { destroy(): void },
+  replicationStream: { destroy(): void; getByteCount(): number },
   timeoutMs: number,
 ): CancellableTimeout<never> {
   let timer: ReturnType<typeof setTimeout>;
@@ -60,7 +63,7 @@ export async function connectAndReplicate(
   connectTimeoutMs: number,
   drive: ReplicableDrive,
   isInitiator: boolean,
-): Promise<{ destroy(): void }> {
+): Promise<{ destroy(): void; getByteCount(): number }> {
   const { socket } = await awaitFirstConnection(swarm, connectTimeoutMs);
   return replicateOverSocket(drive, socket as DuplexSocket, isInitiator);
 }
@@ -72,7 +75,7 @@ export async function connectReplicateAndCancelOnTimeout(
   isInitiator: boolean,
   transferTimeoutMs: number,
   finishedSignal: Promise<void>,
-): Promise<{ destroy(): void }> {
+): Promise<{ destroy(): void; getByteCount(): number }> {
   const replicationStream = await connectAndReplicate(
     swarm,
     connectTimeoutMs,
@@ -98,7 +101,7 @@ export async function discoverAndReplicate(
 ): Promise<DiscoverAndReplicateReceipt> {
   const { Hyperswarm } = loadTransientReplicationDependencies();
   const { swarm } = createAndJoinSwarm(Hyperswarm, topic, role);
-  await connectReplicateAndCancelOnTimeout(
+  const result = await connectReplicateAndCancelOnTimeout(
     swarm as unknown as Parameters<typeof connectReplicateAndCancelOnTimeout>[0],
     30_000,
     drive,
@@ -110,6 +113,6 @@ export async function discoverAndReplicate(
     capability: "discover-and-replicate",
     schema_version: 1,
     role,
-    byte_count: 0,
+    byte_count: result.getByteCount(),
   };
 }
