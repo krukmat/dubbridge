@@ -28,6 +28,7 @@ const REDACTED_ERROR_MESSAGE: Record<RuntimeProtocolErrorCode, string> = {
   SEED_CLOSE_FAILED: "Seed drive could not be closed",
   SEED_DELETE_FAILED: "Seed run directory could not be deleted",
   SEED_VERIFY_FAILED: "Seed run directory deletion could not be verified",
+  DIGEST_COMPARE_FAILED: "Digest could not be computed for comparison",
   REPLICATION_DISCOVERY_FAILED: "Replication peer discovery failed",
   REPLICATION_CONNECT_FAILED: "Replication peer connection failed",
   REPLICATION_TRANSFER_FAILED: "Replication transfer failed",

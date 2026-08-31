@@ -58,7 +58,7 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 | P1.B2 | Verification, reconnect + fail-closed witness (planning parent) | Decomposed 2026-08-31 — parent-level RRI 56 Complex triggers mandatory decomposition; no direct source execution | P1.B1 PASS — satisfied 2026-08-31 |
 | P1.B2.a-0 | Byte-count instrumentation in `transient-replication.ts` (carried forward from P1.B1) | PASS — Done 2026-08-31; RRI 25 Low | none |
 | P1.B2.a-cov | Direct unit coverage for `transient-replication*.ts` (carried forward from P1.B1) | PASS — Done 2026-08-31; RRI 20 Low | none |
-| P1.B2.a-i | Digest-compare pure helper | Awaiting approval — RRI 22 Low | none |
+| P1.B2.a-i | Digest-compare pure helper | PASS — Done 2026-08-31; RRI 22 Low | none |
 | P1.B2.a-ii-a | `drive.get()` raw read wrapper | Awaiting approval — RRI 22 Low | none |
 | P1.B2.a-ii-b | Read+compare glue, typed result | Awaiting approval — RRI 22 Low | P1.B2.a-i, P1.B2.a-ii-a PASS |
 | P1.B2.b | Reconnect budget counter (pure) | Awaiting approval — RRI 24 Low | none |
@@ -1273,7 +1273,7 @@ Required passes: 3 (`RRI 46` → `Med-high`)
 
 ### P1.B2.a-i — Digest-compare pure helper
 
-- **Status:** Awaiting approval.
+- **Status:** PASS.
 - **Effort / RRI:** S / 22 Low.
 - **Allowed paths:** `mobile/src/p2p/runtime/digest-compare.ts` (new),
   `mobile/src/p2p/runtime/protocol.ts`,
@@ -1288,6 +1288,46 @@ Required passes: 3 (`RRI 46` → `Med-high`)
 - **Evidence to emit:** unit tests for match/mismatch/malformed-input.
 - **Handoff prompt:** `P1.B2.a-i — add a pure digest-compare helper only; no
   drive or network access; mirror transient-seed.ts's hashing pattern.`
+- **Implementation:** delegated to Qwen Developer (`qwen3.8:27b-mlx`,
+  `--mode full-file`, two new files: `digest-compare.ts`,
+  `digest-compare.test.ts`) against a contract mirroring
+  `transient-seed.ts::digestFixture`'s `createHash` dependency-injection
+  shape, with a new `DIGEST_COMPARE_FAILED` error code (added to
+  `protocol.ts`'s `RuntimeProtocolErrorCode` union by the orchestrator
+  directly — a one-line, exactly-anchored insertion the delegation packet
+  deliberately deferred, since `delegate-low-rri.py` supports either
+  `full-file` or `before-after` per call, not a mixed-mode response, and a
+  round-trip for a single trivial union-member insertion added no value).
+  `protocol-codec.ts`'s matching exhaustive `REDACTED_ERROR_MESSAGE` map
+  entry was added in the same orchestrator pass (TypeScript's `Record`
+  exhaustiveness check requires both together to compile). Delegated output
+  matched the contract exactly — pure function, no top-level `require`,
+  `createHash` injected as a parameter, all 3 required cases covered.
+  `protocol.ts` is a worklet source input (`build-bare-worklet.mjs`
+  `sourcePaths`), so the bundle was rebuilt and re-verified.
+- **Task-analysis review (phase 1):** muse-glimmer (`muse-glimmer:30b-q4_K_M`)
+  - PASS, 0 blocking findings (one non-blocking ordering-dependency note on
+    the deferred error-code addition, explicitly anticipated in the
+    packet), run against the delegation packet before dispatch.
+- **Code-solution review (phase 2):** muse-glimmer (`muse-glimmer:30b-q4_K_M`)
+  - PASS, 0 findings, run against the final diff (delegated files plus the
+    orchestrator's `protocol.ts`/`protocol-codec.ts` follow-up) plus
+    acceptance criteria and independently-verified command output.
+- **Verification:** `cd mobile && npx tsc --noEmit -p .` exit 0;
+  `node scripts/build-bare-worklet.mjs --check` — bundle current after
+  rebuild; `npx jest` (full mobile suite) — 34/34 suites, 318/318 tests
+  passed; `python3 scripts/check-maintainability.py` — gate passed.
+- **Unit coverage certification:**
+
+  | Case ID | Type | Behavior | Unit test evidence | Result |
+  |---|---|---|---|---|
+  | HP-B2.a-i | Happy path | matching bytes/digest returns `{ matched: true }` | `mobile/__tests__/p2p/digest-compare.test.ts::compareDigest > HP-B2.a-i` | passed |
+  | EC-B2.a-i | Edge case | mismatched bytes/digest returns `{ matched: false }`, does not throw | `mobile/__tests__/p2p/digest-compare.test.ts::compareDigest > EC-B2.a-i (mismatch)` | passed |
+  | EC-B2.a-i | Edge case | a failing hash operation throws `RuntimeProtocolError` with `code === "DIGEST_COMPARE_FAILED"` | `mobile/__tests__/p2p/digest-compare.test.ts::compareDigest > EC-B2.a-i (hash operation fails)` | passed |
+
+- **Owner final verification:** pending (see P1.B2 pack execution note —
+  owner approved the full 12-task pack; per-task closure evidence recorded
+  here, final owner sign-off tracked at P1.B2 parent closure).
 
 ### P1.B2.a-ii-a — `drive.get()` raw read wrapper
 
