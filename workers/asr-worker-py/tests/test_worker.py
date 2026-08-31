@@ -203,3 +203,39 @@ def test_model_size_env_var_is_used():
         assert call_args[0] == "base"
     finally:
         os.unlink(audio_path)
+
+
+def test_input_schema_rejects_additional_property():
+    audio_path = make_audio_file()
+    try:
+        payload = {
+            "job_id": "j-schema-input",
+            "audio_uri": f"file://{audio_path}",
+            "language_hint": "en",
+            "unexpected": True,
+        }
+        exit_code, output = run_main(json.dumps(payload))
+        assert exit_code == 1
+        assert output["error_code"] == "invalid_input"
+        assert "schema violation" in output["message"]
+    finally:
+        os.unlink(audio_path)
+
+
+def test_output_schema_rejects_missing_required_field():
+    worker_main = load_worker_module()
+    with pytest.raises(worker_main.OutputContractError) as exc_info:
+        worker_main.validate_output({"job_id": "j-schema-output", "status": "ok"})
+    assert exc_info.value.error_code == "output_schema_violation"
+
+
+def test_error_schema_rejects_extra_property():
+    worker_main = load_worker_module()
+    payload = {
+        "job_id": "j-schema-error",
+        "error_code": "invalid_input",
+        "message": "bad input",
+        "extra": "not allowed",
+    }
+    with pytest.raises(worker_main.ValidationError):
+        worker_main.ERROR_VALIDATOR.validate(payload)

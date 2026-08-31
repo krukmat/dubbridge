@@ -11,10 +11,25 @@ import os
 import signal
 import sys
 import tempfile
+from pathlib import Path
 from typing import Dict, List, NoReturn, Optional, Tuple
+
+from jsonschema import Draft202012Validator, ValidationError
 
 DEFAULT_TRANSCRIBE_TIMEOUT_SECONDS = 300.0
 DEFAULT_MAX_AUDIO_BYTES = 500 * 1024 * 1024
+SCHEMA_DIR = Path(__file__).resolve().parent
+
+
+def _load_schema(filename: str) -> dict:
+    with (SCHEMA_DIR / filename).open(encoding="utf-8") as schema_file:
+        return json.load(schema_file)
+
+
+INPUT_VALIDATOR = Draft202012Validator(_load_schema("input.schema.json"))
+OUTPUT_VALIDATOR = Draft202012Validator(_load_schema("output.schema.json"))
+ERROR_VALIDATOR = Draft202012Validator(_load_schema("error.schema.json"))
+
 WHISPER_LANGUAGE_CODES = frozenset(
     {
         "af", "am", "ar", "as", "az", "ba", "be", "bg", "bn", "bo", "br", "bs",
@@ -82,12 +97,20 @@ class WorkerConfigurationError(WorkerError):
     error_code = "configuration_error"
 
 
+class OutputContractError(WorkerError):
+    """Raised if the worker attempts to emit a success payload outside its schema."""
+
+    error_code = "output_schema_violation"
+
+
 class _TranscriptionDeadlineExceeded(TimeoutError):
     """Internal signal used to interrupt a model call that exceeded its deadline."""
 
 
 def emit_error(job_id: str, error_code: str, message: str) -> NoReturn:
-    json.dump({"job_id": job_id, "error_code": error_code, "message": message}, sys.stdout)
+    payload = {"job_id": job_id, "error_code": error_code, "message": message}
+    ERROR_VALIDATOR.validate(payload)
+    json.dump(payload, sys.stdout)
     sys.stdout.flush()
     sys.exit(1)
 
@@ -119,6 +142,11 @@ def parse_input(raw: str) -> Tuple[str, str, str]:
     language_hint = inp["language_hint"]
     if not isinstance(language_hint, str):
         raise InvalidInputError("field language_hint must be a string", job_id)
+
+    try:
+        INPUT_VALIDATOR.validate(inp)
+    except ValidationError as exc:
+        raise InvalidInputError(f"input schema violation: {exc.message}", job_id) from exc
 
     return job_id, audio_uri, language_hint
 
@@ -226,6 +254,17 @@ def transcribe_audio(
     return full_text_parts, word_timestamps
 
 
+
+def validate_output(payload: dict) -> dict:
+    """Validate the success payload immediately before emission."""
+    try:
+        OUTPUT_VALIDATOR.validate(payload)
+    except ValidationError as exc:
+        job_id = payload.get("job_id", "") if isinstance(payload, dict) else ""
+        raise OutputContractError(f"output schema violation: {exc.message}", job_id) from exc
+    return payload
+
+
 def main() -> None:
     try:
         job_id, audio_uri, language_hint = parse_input(sys.stdin.read())
@@ -250,6 +289,10 @@ def main() -> None:
         "alignment_uri": f"file://{alignment_path}",
         "status": "ok",
     }
+    try:
+        validate_output(result)
+    except WorkerError as exc:
+        emit_error(exc.job_id, exc.error_code, str(exc))
     json.dump(result, sys.stdout)
     sys.stdout.flush()
     sys.exit(0)
