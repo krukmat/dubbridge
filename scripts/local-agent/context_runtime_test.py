@@ -140,14 +140,35 @@ class RuntimeContextTests(unittest.TestCase):
         adapter = CodebaseMemoryCLIAdapter(binary="cbm", runner=runner)
         result = adapter._call(
             "search_graph",
-            {"project": "dubbridge", "semantic_query": ["playback"]},
+            {"project": "dubbridge", "query": "playback"},
         )
         self.assertEqual(result, {"results": []})
         argv, kwargs = calls[0]
         self.assertEqual(argv, ["cbm", "cli", "--json", "search_graph"])
         self.assertEqual(
             json.loads(kwargs["input"]),
-            {"project": "dubbridge", "semantic_query": ["playback"]},
+            {"project": "dubbridge", "query": "playback"},
+        )
+
+    def test_cbm_indexes_the_exact_task_worktree(self):
+        calls = []
+
+        def runner(argv, **kwargs):
+            calls.append((argv, kwargs))
+            tool = argv[-1]
+            if tool == "index_repository":
+                return Completed(stdout='{"project": "task-worktree"}')
+            return Completed(stdout='{"results": []}')
+
+        with tempfile.TemporaryDirectory() as root:
+            adapter = CodebaseMemoryCLIAdapter(binary="cbm", runner=runner)
+            project = adapter.ensure_project(root)
+
+        self.assertEqual(project, "task-worktree")
+        argv, kwargs = calls[0]
+        self.assertEqual(argv, ["cbm", "cli", "--json", "index_repository"])
+        self.assertEqual(
+            json.loads(kwargs["input"])["repo_path"], os.path.realpath(root)
         )
 
 
