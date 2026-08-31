@@ -23,7 +23,7 @@ class ContextProvider:
     def render_initial(self):
         raise NotImplementedError
 
-    def render_refresh(self, reason):
+    def render_refresh(self, reason, hints=None):
         raise NotImplementedError
 
     def manifest(self):
@@ -41,7 +41,7 @@ class LegacyContextProvider(ContextProvider):
     def render_initial(self):
         return self._render()
 
-    def render_refresh(self, reason):
+    def render_refresh(self, reason, hints=None):
         return self._render()
 
 
@@ -118,16 +118,30 @@ class CKGContextProvider(ContextProvider):
             for symbol in discovery["anchors"].get("symbols", [])
         ]
 
-    def _retrieval_text(self):
+    def _retrieval_text(self, repair_hints=None):
         acceptance = json.dumps(
             self.card.acceptance_tests, ensure_ascii=False, separators=(",", ":")
         )
-        return f"{self.card.spec}\n\nAcceptance criteria/tests:\n{acceptance}"
+        parts = [f"{self.card.spec}\n\nAcceptance criteria/tests:\n{acceptance}"]
+        if repair_hints:
+            edited_paths = repair_hints.get("edited_paths") or []
+            if edited_paths:
+                parts.append(
+                    "Repair edited paths:\n"
+                    + "\n".join(str(path) for path in edited_paths[:20])
+                )
+            diagnostic = repair_hints.get("diagnostic_summary") or ""
+            if diagnostic:
+                # Diagnostics are already deterministically compacted by the
+                # session loop. Bound once more before sending them to CBM so
+                # a custom caller cannot turn repair retrieval into a log dump.
+                parts.append("Repair diagnostics:\n" + str(diagnostic)[:6000])
+        return "\n\n".join(parts)
 
-    def _resolve(self, *, force_refresh=False):
+    def _resolve(self, *, force_refresh=False, repair_hints=None):
         identity = derive_worktree_identity(self.worktree_dir)
         discovery = self.adapter.discover(
-            self._retrieval_text(),
+            self._retrieval_text(repair_hints),
             self.worktree_dir,
             force_refresh=force_refresh,
         )
@@ -224,10 +238,18 @@ class CKGContextProvider(ContextProvider):
         self._last_render = self._resolve()
         return self._last_render
 
-    def render_refresh(self, reason):
-        self._last_render = self._resolve(force_refresh=True)
+    def render_refresh(self, reason, hints=None):
+        self._last_render = self._resolve(
+            force_refresh=True,
+            repair_hints=hints or {},
+        )
         if self._manifest:
             self._manifest.notes.append(f"refresh_reason={reason}")
+            edited_paths = (hints or {}).get("edited_paths") or []
+            if edited_paths:
+                self._manifest.notes.append(
+                    "repair_edited_paths=" + ",".join(str(path) for path in edited_paths[:20])
+                )
             if self.manifest_path:
                 self._manifest.write(self.manifest_path)
         return self._last_render
@@ -240,21 +262,21 @@ class FallbackContextProvider(ContextProvider):
         self.last_fallback_reason = None
         self._active = primary
 
-    def _call(self, method, *args):
+    def _call(self, method, *args, **kwargs):
         try:
-            value = getattr(self.primary, method)(*args)
+            value = getattr(self.primary, method)(*args, **kwargs)
             self._active = self.primary
             return value
         except (CKGAdapterError, OSError, ValueError, RuntimeError) as exc:
             self.last_fallback_reason = str(exc)
             self._active = self.fallback
-            return getattr(self.fallback, method)(*args)
+            return getattr(self.fallback, method)(*args, **kwargs)
 
     def render_initial(self):
         return self._call("render_initial")
 
-    def render_refresh(self, reason):
-        return self._call("render_refresh", reason)
+    def render_refresh(self, reason, hints=None):
+        return self._call("render_refresh", reason, hints=hints)
 
     def manifest(self):
         manifest = self.primary.manifest()
