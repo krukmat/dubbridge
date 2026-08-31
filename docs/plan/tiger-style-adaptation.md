@@ -207,6 +207,19 @@ dependency and can be drafted at any point.
   the `coverage` job for that coverage (avoid duplicating a Postgres service
   needlessly).
 
+  **Implementation note (2026-08-31):** T5 was implemented directly on `main`
+  at `45e94631631f2971c7fc63fd36effac4b82792af`. `Makefile` now exposes a
+  fail-closed `qa-test-s3` target, CI provisions a real MinIO service and bucket,
+  and the mandatory `s3-integration` job completed successfully with the real
+  S3 adapter round-trip test (`1 passed; 0 failed`). The `test` job also now
+  provisions Postgres so `make qa-test` exercises DB-backed tests instead of
+  silently self-skipping them. Controls discovered outside T5's S3 path are
+  intentionally not folded into this implementation: the Postgres-enabled
+  workspace test exposed auth-fixture collisions on `owner@example.com`, and
+  `qa-docs` remains blocked by historical S-150 review commit references.
+  Both incidents, their evidence, scope disposition, and follow-up guidance are
+  recorded in `docs/audit/x26-t5-implementation-incidents.md`.
+
 ## Phase 5 — Python complexity gate (R8)
 
 - **T6.** Add a `ruff` (with complexity rules) or `flake8` + `mccabe`
@@ -271,6 +284,8 @@ All against `workers/asr-worker-py/main.py` (95 lines) and its
 - `docs/tasks/tiger-style-adaptation.md` — the executable, RRI-scored task ledger
 - `docs/audit/x26-t4-implementation-incidents.md` — T4 implementation incidents,
   deferred controls, and the unresolved ADR-018 acceptance-criteria deviation
+- `docs/audit/x26-t5-implementation-incidents.md` — T5 CI/control incidents and
+  deferred follow-up discovered while making MinIO/S3 mandatory
 - `docs/plan/roadmap.md` — X26 cross-cutting item
 - `docs/plan/s-150-translation-dubbing.md`, `docs/tasks/s-150-translation-dubbing.md` — R13's landing point (T4–T7, still parked)
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`, `docs/policies/HITL_AUTONOMY_POLICY.md` — governing workflow and approval gates for every task below
