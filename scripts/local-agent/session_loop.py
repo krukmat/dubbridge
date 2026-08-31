@@ -462,6 +462,18 @@ def run_loop(
                 checkpoint_fn(transcript, total_turns)
             continue
 
+        if call.name in {"write_file", "apply_patch"} and result.get("ok"):
+            current_context = provider.render_current("edit_applied")
+            _replace_source_snapshot(
+                messages,
+                card=card,
+                file_tools=file_tools,
+                max_total_turns=max_total_turns,
+                tool_calling_system_prompt=tool_calling_system_prompt,
+                provider=provider,
+                source_context=current_context,
+            )
+
         messages.append({"role": "user", "content": compact["user"]})
         if checkpoint_fn is not None:
             checkpoint_fn(transcript, total_turns)
