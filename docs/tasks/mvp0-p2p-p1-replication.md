@@ -61,7 +61,7 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 | P1.B2.a-i | Digest-compare pure helper | PASS — Done 2026-08-31; RRI 22 Low | none |
 | P1.B2.a-ii-a | `drive.get()` raw read wrapper | PASS — Done 2026-08-31; RRI 22 Low | none |
 | P1.B2.a-ii-b | Read+compare glue, typed result | PASS — Done 2026-08-31; RRI 22 Low | P1.B2.a-i, P1.B2.a-ii-a PASS |
-| P1.B2.b | Reconnect budget counter (pure) | Awaiting approval — RRI 24 Low | none |
+| P1.B2.b | Reconnect budget counter (pure) | PASS — Done 2026-08-31; RRI 24 Low | none |
 | P1.B2.c-1 | Disconnect detection + budget-check decision | Awaiting approval — RRI 22 Low | P1.B2.b PASS |
 | P1.B2.c-2 | Re-invoke B1 `connectAndReplicate` on retry | Awaiting approval — RRI 20 Low | none |
 | P1.B2.d-i | Evidence redaction helper (pure) | Awaiting approval — RRI 20 Low | none |
@@ -1450,7 +1450,7 @@ Required passes: 3 (`RRI 46` → `Med-high`)
 
 ### P1.B2.b — Reconnect budget counter (pure)
 
-- **Status:** Awaiting approval.
+- **Status:** PASS.
 - **Effort / RRI:** S / 24 Low.
 - **Allowed paths:** `mobile/src/p2p/runtime/reconnect-budget.ts` (new),
   `mobile/src/p2p/runtime/protocol.ts`,
@@ -1465,6 +1465,45 @@ Required passes: 3 (`RRI 46` → `Med-high`)
   ordering.
 - **Handoff prompt:** `P1.B2.b — add a pure reconnect-budget counter only;
   no network or socket code.`
+- **Implementation:** `mobile/src/p2p/runtime/reconnect-budget.ts` (new) —
+  `createReconnectBudget(maxRetries)` and a pure `recordDisconnect(budget)`
+  returning `{ decision: "may-retry" | "exhausted", budget }` without
+  mutating its input; `usedRetries` only ever increases, so a budget that
+  has reported `"exhausted"` reports `"exhausted"` again on every later
+  call. `protocol.ts` was not touched — the objective is IO-free with no
+  failure path, so no `RuntimeProtocolError` code was needed; its presence
+  in `Allowed paths` went unused. Delegated to Qwen Developer
+  (`qwen3.8:27b-mlx`, `--mode full-file`, source + test file in one
+  packet). The first phase-1 review pass returned `BLOCKED` (medium: the
+  packet reused a single `EC-B2.b` case ID for two distinct scenarios —
+  zero-budget and exhaustion-ordering; low: the monotonicity invariant was
+  prose-only). The packet was revised — split into `EC-B2.b-1`
+  (zero-budget) / `EC-B2.b-2` (exhaustion ordering) with an explicit
+  monotonicity invariant paragraph — and re-reviewed as a fresh phase-1
+  pass before dispatch. Delegated output matched the revised contract
+  exactly on the first attempt.
+- **Task-analysis review (phase 1):** muse-glimmer (`muse-glimmer:30b-q4_K_M`)
+  - First pass: BLOCKED (duplicate case ID; prose-only invariant). Packet
+    revised per findings.
+  - Second pass (revised packet): PASS, 0 findings, run before dispatch.
+- **Code-solution review (phase 2):** muse-glimmer (`muse-glimmer:30b-q4_K_M`)
+  - PASS, 0 findings, run against the final diff plus acceptance criteria and
+    independently-verified command output.
+- **Verification:** `cd mobile && npx tsc --noEmit -p .` exit 0;
+  `npx jest __tests__/p2p/` — 16/16 suites, 92/92 tests passed;
+  `npm run lint` — 0 warnings; `python3 scripts/check-maintainability.py` —
+  gate passed.
+- **Unit coverage certification:**
+
+  | Case ID | Type | Behavior | Unit test evidence | Result |
+  |---|---|---|---|---|
+  | HP-B2.b | Happy path | the first disconnect within budget reports `"may-retry"` | `mobile/__tests__/p2p/reconnect-budget.test.ts::reconnect-budget > HP-B2.b` | passed |
+  | EC-B2.b-1 | Edge case | zero budget (`maxRetries: 0`) immediately returns `"exhausted"` | `mobile/__tests__/p2p/reconnect-budget.test.ts::reconnect-budget > EC-B2.b-1` | passed |
+  | EC-B2.b-2 | Edge case | exhaustion ordering: `"may-retry"` then `"exhausted"`, and stays `"exhausted"` on a further call with the already-exhausted budget | `mobile/__tests__/p2p/reconnect-budget.test.ts::reconnect-budget > EC-B2.b-2` | passed |
+
+- **Owner final verification:** pending (see P1.B2 pack execution note —
+  owner approved the full 12-task pack; per-task closure evidence recorded
+  here, final owner sign-off tracked at P1.B2 parent closure).
 
 ### P1.B2.c-1 — Disconnect detection + budget-check decision
 
