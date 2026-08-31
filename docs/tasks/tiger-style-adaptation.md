@@ -15,16 +15,16 @@ governed_by: [ADR-006, ADR-008, ADR-018, ADR-021, ADR-026]
 > task below has been RRI-scored via `scripts/rri.py` yet; `Effort` fields are
 > provisional estimates from the illustrative S/M/L/XL rubric
 > (`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Effort scale`), not the canonical
-> RRI-band mapping. Each task must be scored with `scripts/rri.py` immediately
-> before it is presented or delegated, per the mandatory workflow — the
-> provisional Effort here is planning input only and must be corrected to
-> match the computed band if they disagree.
+> RRI-band mapping. Completed entries record their implementation-time RRI.
+> Every remaining or revised executable task must be scored with
+> `scripts/rri.py` immediately before it is presented or delegated; a planning
+> target is never a substitute for that score.
 
 ## Ordering and dependencies
 
 ```
 T0 -> T1 -> T2
-T1 -> T3 -> T4
+T1 -> T3a/T3b done; T3c-a -> T3c-b1/b2/c1/c2/c3 -> T3c-d -> T4
 T5                (independent — CI/storage)
 T6 -> T7 -> T8 -> T9 -> T10 -> T11   (independent — Python ASR)
 T12               (independent — docs-only, no code dependency)
@@ -607,7 +607,7 @@ decomposition shape from what the provisional task text assumed):
 |---|---|---|---|---|
 | `X26-T3a` | `crates/ingestion/src/lib.rs` (finalize + rights-invariant asserts) | 34 (recomputed; 33 provisional) | Moderate | **[x] Done** (2026-08-30) |
 | `X26-T3b` | `crates/domain/src/playback.rs` (playback-grant asserts) | 24 | Low | **[x] Done** (2026-08-30) |
-| `X26-T3c` | `crates/audit/src/lib.rs` (audit-emission asserts) | 51 | Med-high | [ ] Planned |
+| `X26-T3c` | correlation-contract parent | n/a — decomposed | n/a | `T3c-a`, `b1`, `b2`, `c1`–`c3` Low targets; `T3c-d` has an RRI 42 floor |
 
 **Status artifacts affected:** this task ledger (updated — `X26-T3a`/`X26-T3b`
 closed), `docs/proposals/tiger-style-adaptation-evaluation.md` (mark R1
@@ -1038,66 +1038,368 @@ to budget against).
 
 ---
 
-## X26-T3c: Audit-emission asserts (`crates/audit/src/lib.rs`)
+## X26-T3c: Audit-emission correlation invariant (parent)
 
-**Type:** Development
-**Effort:** L
+**Type:** Development parent — do not execute directly
 **Depends on:** X26-T3 (decomposition parent)
-**Status:** [ ] Planned
+**Status:** Decomposed 2026-08-31 into `X26-T3c-a`, `X26-T3c-b1`,
+`X26-T3c-b2`, `X26-T3c-c1`–`c3`, and `X26-T3c-d`.
 
-**Objective:** Add an `assert!` to `emit_governance_audit` enforcing the
-correlation-identifier mutual-exclusivity invariant `AuditEvent`'s own doc
-comments already state but never check
-(`crates/domain/src/audit.rs:99-112`): depending on event category, exactly
-one of `ingest_token`/`recording_session_id`/`platform_ingest_session_id`
-should be `Some`, the others `None`. All three fields are `pub`, so a caller
-that constructs an `AuditEvent` directly (bypassing `AuditEvent::new`/
-`new_recording`/etc.) can currently violate this silently, and
-`emit_governance_audit` would durably persist a malformed correlation row.
+**Why this decomposition is necessary:** the former one-task wording assumed
+that every audit event has exactly one correlation identifier. That is not the
+current contract: workspace/consent/review/playback/auth events have none,
+`new_recording` explicitly accepts an optional `ingest_token`, and the DB
+adapter currently does not persist `platform_ingest_session_id`. The contract
+must be made explicit before an always-on assert can safely be added.
 
-**Happy paths considered:**
-- **HP-1:** `emit_governance_audit` asserts, before calling
-  `insert_audit_event`, that the event's correlation identifiers match the
-  documented one-of-three-per-category invariant for a well-formed event
-  built via the existing constructors.
+The first six child tasks are intentionally bounded to the domain model and
+are designed for the Low band. `X26-T3c-d` remains the narrow audit-boundary
+integration: the RRI anchor for any `crates/audit/**` change has D=4, K=4,
+P=5 plus the mandatory +10 governance penalty. Its mathematical minimum is
+RRI 42, so relabelling it Low would falsify the repository's RRI policy.
 
-**Edge cases considered:**
-- **EC-1:** A DB-write failure (`insert_audit_event` returning `Err`) is
-  **not** converted to `assert!` — it stays the existing fail-closed
-  `Result` path (ADR-018); the new assert only guards the in-memory
-  `AuditEvent` shape before the write is attempted.
-- **EC-2:** Reviewer must independently confirm every existing call site
-  (`AuditEvent::new`, `::new_recording`, and any platform-ingest
-  constructor) already satisfies the invariant, so the new assert cannot
-  fire on legitimate existing traffic — this is the highest-risk subtask in
-  the `X26-T3` family (RRI 51, `P` floor 5 per the rights/audit anchor row)
-  precisely because a misfiring assert here would panic on every governance
-  audit write.
+### X26-T3c-a: Record the correlation contract matrix
+
+**Type:** Analysis / docs-only
+**Effort:** S — Low (target)
+**Depends on:** X26-T3a, X26-T3b
+**Status:** [x] Done — correlation matrix recorded 2026-08-31
+
+**Objective:** Produce a source-backed matrix of every `AuditEventKind` family,
+its allowed correlation shape (none, ingest only, recording only, platform
+only, or an explicitly justified combined shape), and its persistence mapping.
 
 **Acceptance criteria:**
-- At least one precondition assert added to `emit_governance_audit`
-  enforcing the correlation-identifier invariant.
-- No existing recoverable-error (`AuditEmitError::Db`) path is replaced by
-  an assert.
-- `make qa-test` passes; a new unit test proves the assert holds for every
-  existing constructor's output (does not panic) and, in a debug-only test,
-  that a deliberately malformed `AuditEvent` (e.g. two correlation IDs set)
-  does panic.
-- Each new assert has a comment stating the invariant it encodes, citing
-  `crates/domain/src/audit.rs`'s doc comments as the source of truth.
+- The matrix cites the relevant `AuditEvent` constructor, all existing
+  constructor call sites, and the `audit_events` insert/read paths.
+- It explicitly resolves whether a recording event may carry both its
+  `recording_session_id` and an `ingest_token`.
+- It records the observed platform-ingest persistence gap as either a blocking
+  prerequisite or an intentionally out-of-scope defect; it must not be hidden
+  by a predicate that claims durable enforcement.
+- No production source file changes.
 
-**Evidence to emit:** diff, `make qa-test` output, the new unit test's
-output, list of assert sites added with the invariant each encodes.
+**Evidence to emit:** `docs/audit/x26-t3c-correlation-contract.md` with the
+matrix and reproduction searches.
 
-**Status artifacts affected:** this task ledger, `X26-T3` (parent rollup).
+**Status artifacts affected:** this ledger; `X26-T3c` parent.
 
-**Agent handoff prompt:** Add a precondition `assert!` in
-`emit_governance_audit` (`crates/audit/src/lib.rs`) enforcing the
-correlation-identifier mutual-exclusivity invariant from
-`crates/domain/src/audit.rs:99-112`'s doc comments; add a unit test proving
-every existing constructor's output passes and a malformed event panics.
-Stop condition: stop once the assert exists, the test passes, and
-`make qa-test` (full suite) is unaffected.
+**Agent handoff prompt:** Inspect the audit domain type, all constructors and
+the DB adapter; write the correlation contract matrix only. Do not change Rust
+code and do not infer that every event must have exactly one ID.
+
+**Result:** `docs/audit/x26-t3c-correlation-contract.md` records the allowed
+shape per event family and the reproduction searches. It confirms that recording
+events may hold both their required `recording_session_id` and an optional
+`ingest_token`, while workspace/consent/review/playback/auth events intentionally
+hold no correlation ID. It also records a blocking gap: the DB adapter and
+migrations do not persist or rehydrate `platform_ingest_session_id`; therefore
+`X26-T3c-d` cannot claim a durable invariant until separately authorized work
+resolves that gap.
+
+**Task-analysis review:** n/a - docs-only task exempt under
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Per-task discipline.
+
+### X26-T3c-b: Domain-predicate parent — do not execute directly
+
+**Status:** Decomposed into `X26-T3c-b1`, `X26-T3c-b2`, and `X26-T3c-c1`
+through `X26-T3c-c3`. Each child owns one event family, one small helper, and
+one bounded test group so its maximum CC remains within the Low-band target.
+
+### X26-T3c-b1: Ingestion correlation predicate
+
+**Type:** Development
+**Effort:** S — Low target; recompute RRI at presentation
+**Depends on:** X26-T3c-a
+**Status:** [x] Done — implemented directly by Codex on 2026-08-31 after the
+bounded Qwen route could not reach a usable terminal response. The owner then
+explicitly directed completion without further protocol time; the phase-2
+review is therefore recorded below as an urgency override, not as a PASS.
+
+**Objective:** Implement and test only the matrix-approved correlation shape
+for ingestion event kinds.
+
+**Happy paths considered:**
+- **HP-1:** `AuditEvent::new` produces an ingestion event accepted by the
+  ingestion predicate.
+
+**Edge cases considered:**
+- **EC-1:** An ingestion event without its required ingest token is rejected.
+
+**Acceptance criteria:**
+- Change only `crates/domain/src/audit.rs` (including its unit-test module).
+- The helper covers no non-ingestion event kind and has CC at most 5.
+- A focused valid and malformed unit test pass.
+
+**Evidence to emit:** exact RRI report and focused
+`cargo test -p dubbridge-domain audit` output.
+
+**Status artifacts affected:** this ledger; `X26-T3c` parent.
+
+**Agent handoff prompt:** Implement the approved ingestion-only predicate and
+two focused tests. Do not modify recording, platform, persistence, or audit
+emission code.
+
+### Implementation summary
+
+Added `AuditEvent::has_valid_ingestion_correlation` in
+`crates/domain/src/audit.rs`. It accepts only the four ingestion event kinds
+when `ingest_token` is present and both session IDs are absent. The change adds
+focused tests for the valid ingestion shape, missing-token/session-ID rejection,
+and rejection of a recording event; no constructor, persistence, or audit
+emission path changed.
+
+### Peer Reviewer evidence
+
+- REVIEW-OVERRIDE: urgency — the owner explicitly directed that the task be
+  completed without further protocol time after prolonged local-model attempts.
+- Waiver-by: matias
+- Phase 1: `muse-glimmer` PASS at
+  `docs/audit/local-delegation/x26-t3c-b1-phase1-review-attempt2.json`.
+- Phase 2: not run by owner waiver; no PASS is claimed.
+
+Task-analysis review: muse-glimmer
+`docs/audit/local-delegation/x26-t3c-b1-phase1-review-attempt2.json` - PASS
+
+Code-solution review: owner waiver — no artifact (urgency override recorded)
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | a well-formed ingestion event is accepted | `crates/domain/src/audit.rs::tests::audit_event_ingestion_sets_ingest_token_and_no_session_id` | passed |
+| EC-1 | Edge case | ingestion event without a token or with a recording session ID is rejected | `crates/domain/src/audit.rs::tests::ingestion_correlation_requires_a_token_and_no_session_ids` | passed |
+| Scope guard | Edge case | non-ingestion events are rejected | `crates/domain/src/audit.rs::tests::ingestion_correlation_rejects_non_ingestion_events` | passed |
+
+### Owner final verification
+
+- Owner: `matias`
+- Date: `2026-08-31`
+- Statement: The owner explicitly directed direct completion and accepted the
+  focused verification after the local-model protocol exceeded the available
+  operational budget. Independent phase-2 review was waived and is disclosed
+  above rather than represented as a pass.
+- Commands run: `cargo fmt --check`, `cargo test -p dubbridge-domain audit`
+
+### X26-T3c-b2: Recording correlation predicate
+
+**Type:** Development
+**Effort:** S — Low target; recompute RRI at presentation
+**Depends on:** X26-T3c-a
+**Status:** [x] Done — implemented directly by Codex on 2026-08-31 matching
+the presented task card's planned boundary exactly. Phase 1 (`muse-glimmer`)
+passed on the task card before implementation. The prior close cited a
+phase-2 urgency waiver even though the local stack was healthy at the time
+(the sibling phase-1 artifact from the same session shows Ollama/Muse
+responsive); that waiver has been superseded by a genuine phase-2 review run
+immediately after, which passed with 0 findings. The urgency override row in
+`docs/audit/gemma-review-overrides.md` for this task is superseded by this
+real PASS and should be read historically only.
+
+**Objective:** Implement and test only the matrix-approved correlation shape
+for recording event kinds.
+
+**Happy paths considered:**
+- **HP-1:** `AuditEvent::new_recording` produces an event accepted by the
+  recording predicate.
+
+**Edge cases considered:**
+- **EC-1:** A recording event without its required recording-session ID is
+  rejected; whether a paired ingest token is valid comes solely from T3c-a.
+
+**Acceptance criteria:**
+- Change only `crates/domain/src/audit.rs` (including its unit-test module).
+- The helper covers no non-recording event kind and has CC at most 5.
+- Do not guess the combined-shape rule: a missing T3c-a disposition blocks the
+  task.
+
+**Evidence to emit:** exact RRI report and focused
+`cargo test -p dubbridge-domain audit` output.
+
+**Status artifacts affected:** this ledger; `X26-T3c` parent.
+
+**Agent handoff prompt:** Implement the matrix-approved recording-only helper
+and tests; do not change any other event family.
+
+### Implementation summary
+
+Added `AuditEvent::has_valid_recording_correlation` in
+`crates/domain/src/audit.rs`. It accepts only the six recording event kinds
+when `recording_session_id` is present and the platform-ingest session ID is
+absent. In accordance with the T3c-a matrix, `ingest_token` remains optional.
+Focused tests cover the no-token and paired-token valid shapes, a missing
+recording-session ID, and a non-recording scope guard.
+
+### Peer Reviewer evidence
+
+- Reviewer: `muse-glimmer:30b-q4_K_M`
+- Phase 1: PASS —
+  `docs/audit/local-delegation/x26-t3c-b2-phase1-review.json`.
+- Phase 2: PASS, 0 findings —
+  `docs/audit/local-delegation/x26-t3c-b2-phase2-review.json` (restart
+  boundary: prior Ollama PID 88567 -> new PID 11104; production profile
+  `num_ctx=131072`, `num_predict=4096`, `think=false`).
+- Muse Glimmer fallback: not triggered — primary reviewer responded.
+- D14 fallback: not triggered — primary reviewer responded.
+- disposition_divergence: none
+
+Task-analysis review: muse-glimmer
+`docs/audit/local-delegation/x26-t3c-b2-phase1-review.json` - PASS
+
+Code-solution review: muse-glimmer
+`docs/audit/local-delegation/x26-t3c-b2-phase2-review.json` - PASS
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-1 | Happy path | recording event with no ingest token is accepted | `crates/domain/src/audit.rs::tests::audit_event_recording_round_trip_no_ingest_token` | passed |
+| HP-1 | Happy path | recording event with an optional paired ingest token is accepted | `crates/domain/src/audit.rs::tests::recording_correlation_accepts_an_optional_ingest_token` | passed |
+| EC-1 | Edge case | recording event without a recording-session ID is rejected | `crates/domain/src/audit.rs::tests::recording_correlation_requires_a_recording_id_and_rejects_other_families` | passed |
+| Scope guard | Edge case | ingestion event is rejected by the recording predicate | `crates/domain/src/audit.rs::tests::recording_correlation_requires_a_recording_id_and_rejects_other_families` | passed |
+
+### Owner final verification
+
+- Owner: `matias`
+- Date: `2026-08-31`
+- Statement: I verified every happy path and edge case defined for this task
+  has unit test evidence that replicates the expected behavior. The prior
+  close recorded a phase-2 urgency waiver; that gap has been closed with a
+  genuine independent phase-2 review (`muse-glimmer`, PASS, 0 findings) run
+  after a fresh per-task Ollama restart, superseding the waiver.
+- Commands run: `cargo fmt --check`, `cargo clippy -p dubbridge-domain --all-targets --all-features -- -D warnings`, `cargo test -p dubbridge-domain audit`
+
+### X26-T3c-c1: Platform-ingest correlation predicate
+
+**Type:** Development
+**Effort:** S — Low target; recompute RRI at presentation
+**Depends on:** X26-T3c-a
+**Status:** [ ] Planned
+
+**Objective:** Implement and test the platform-ingest correlation predicate,
+without changing the persistence adapter.
+
+**Happy paths considered:**
+- **HP-1:** `AuditEvent::new_platform_ingest` satisfies the platform predicate.
+
+**Edge cases considered:**
+- **EC-1:** A platform event without a platform-session ID is rejected.
+
+**Acceptance criteria:**
+- Change only `crates/domain/src/audit.rs` (including its unit-test module).
+- The helper has CC at most 5 and does not claim that DB persistence is fixed.
+- T3c-a's platform-persistence disposition remains visible in the test comment
+  or task result.
+
+**Evidence to emit:** exact RRI report and focused
+`cargo test -p dubbridge-domain audit` output.
+
+**Status artifacts affected:** this ledger; `X26-T3c` parent.
+
+**Agent handoff prompt:** Add only the platform family predicate and its two
+tests. Stop before editing the DB adapter or audit emitter.
+
+### X26-T3c-c2: Workspace and consent no-correlation predicate
+
+**Type:** Development
+**Effort:** S — Low target; recompute RRI at presentation
+**Depends on:** X26-T3c-a
+**Status:** [ ] Planned
+
+**Objective:** Implement and test the zero-correlation shape for workspace and
+consent event kinds.
+
+**Happy paths considered:**
+- **HP-1:** Existing workspace and consent constructors satisfy the
+  no-correlation predicate.
+
+**Edge cases considered:**
+- **EC-1:** Adding any correlation identifier to one of those events is
+  rejected.
+
+**Acceptance criteria:**
+- Change only `crates/domain/src/audit.rs` (including its unit-test module).
+- Keep workspace and consent classification in separate helpers, each with CC
+  at most 5.
+- No DB or audit-emitter edit.
+
+**Evidence to emit:** exact RRI report and focused
+`cargo test -p dubbridge-domain audit` output.
+
+**Status artifacts affected:** this ledger; `X26-T3c` parent.
+
+**Agent handoff prompt:** Implement only workspace/consent zero-correlation
+checks and focused valid/malformed tests.
+
+### X26-T3c-c3: Review, playback, and auth no-correlation predicate
+
+**Type:** Development
+**Effort:** S — Low target; recompute RRI at presentation
+**Depends on:** X26-T3c-a
+**Status:** [ ] Planned
+
+**Objective:** Implement and test separate zero-correlation predicates for
+review/publication, playback-grant, and auth event kinds.
+
+**Happy paths considered:**
+- **HP-1:** The three existing constructor families satisfy their respective
+  no-correlation predicates.
+
+**Edge cases considered:**
+- **EC-1:** An unexpected correlation ID is rejected for each family.
+
+**Acceptance criteria:**
+- Change only `crates/domain/src/audit.rs` (including its unit-test module).
+- Keep each family in a separate helper with CC at most 5.
+- No DB or audit-emitter edit.
+
+**Evidence to emit:** exact RRI report and focused
+`cargo test -p dubbridge-domain audit` output.
+
+**Status artifacts affected:** this ledger; `X26-T3c` parent.
+
+**Agent handoff prompt:** Implement only the three uncorrelated-family helpers
+and their focused tests; do not alter the emitter.
+
+### X26-T3c-d: Apply the validated predicate at the audit boundary
+
+**Type:** Development
+**Effort:** L — RRI floor Med-high, not delegable as Low
+**Depends on:** X26-T3c-b1, X26-T3c-b2, X26-T3c-c1, X26-T3c-c2, X26-T3c-c3,
+and a non-blocking T3c-a persistence disposition
+**Status:** [ ] Planned
+
+**Objective:** Add the single precondition `assert!` in
+`emit_governance_audit` immediately before `insert_audit_event`, using the
+domain predicates produced by T3c-b1/b2/c1/c2/c3.
+
+**Happy paths considered:**
+- **HP-1:** Every current constructor reaches the DB write without panicking
+  when it satisfies the approved matrix.
+
+**Edge cases considered:**
+- **EC-1:** A malformed in-memory event panics before a DB write; a real DB
+  error remains `AuditEmitError::Db` and is not converted to an assert.
+
+**Acceptance criteria:**
+- Exactly one boundary assertion uses the domain predicate and carries a
+  comment citing the T3c-a matrix.
+- A focused test covers each constructor family and a deliberately malformed
+  event; `make qa-test` passes.
+- If T3c-a found a platform persistence defect, do not make a false durability
+  claim: stop for a separately scored persistence task or an owner scope
+  decision.
+
+**Evidence to emit:** exact RRI report, diff, focused test output,
+`make qa-test` output, and the list of constructor families exercised.
+
+**Status artifacts affected:** this ledger; `X26-T3c`/`X26-T3` parents and
+the Tiger Style evaluation's R1 status.
+
+**Agent handoff prompt:** Wire the already-tested domain predicate into one
+precondition assert at the audit-emission boundary. Preserve the DB `Result`
+path. Stop and report blocked if the matrix identifies an unresolved durable
+persistence mismatch.
 
 ---
 

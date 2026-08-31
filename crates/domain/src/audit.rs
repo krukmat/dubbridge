@@ -112,6 +112,36 @@ pub struct AuditEvent {
 }
 
 impl AuditEvent {
+    /// Returns whether an ingestion audit event has its required correlation
+    /// token and no recording or platform-ingest session correlation.
+    pub fn has_valid_ingestion_correlation(&self) -> bool {
+        matches!(
+            self.event_kind,
+            AuditEventKind::IngestionFinalized
+                | AuditEventKind::IngestionRejectedMissingRights
+                | AuditEventKind::IngestionRejectedMissingUploaderContext
+                | AuditEventKind::IngestionRejectedDuplicateToken
+        ) && self.ingest_token.is_some()
+            && self.recording_session_id.is_none()
+            && self.platform_ingest_session_id.is_none()
+    }
+
+    /// Returns whether a recording audit event has its required recording
+    /// session correlation and no platform-ingest session correlation.
+    /// An ingest token remains optional for this event family.
+    pub fn has_valid_recording_correlation(&self) -> bool {
+        matches!(
+            self.event_kind,
+            AuditEventKind::RecordingSessionCreated
+                | AuditEventKind::RecordingRejectedMissingRights
+                | AuditEventKind::RecordingCaptureStarted
+                | AuditEventKind::RecordingRecorded
+                | AuditEventKind::RecordingFailed
+                | AuditEventKind::RecordingBridgedToAsset
+        ) && self.recording_session_id.is_some()
+            && self.platform_ingest_session_id.is_none()
+    }
+
     /// Constructor for S1 ingestion events. Always sets `ingest_token`.
     pub fn new(
         asset_id: Option<AssetId>,
@@ -274,6 +304,39 @@ mod tests {
         assert_eq!(event.recording_session_id, Some(session_id));
         assert!(event.platform_ingest_session_id.is_none());
         assert_eq!(event.event_kind, AuditEventKind::RecordingSessionCreated);
+        assert!(event.has_valid_recording_correlation());
+    }
+
+    #[test]
+    fn recording_correlation_accepts_an_optional_ingest_token() {
+        let event = AuditEvent::new_recording(
+            None,
+            AuditEventKind::RecordingRecorded,
+            Uuid::new_v4(),
+            Some(Uuid::new_v4()),
+            None,
+        );
+
+        assert!(event.has_valid_recording_correlation());
+    }
+
+    #[test]
+    fn recording_correlation_requires_a_recording_id_and_rejects_other_families() {
+        let session_id = Uuid::new_v4();
+        let mut event = AuditEvent::new_recording(
+            None,
+            AuditEventKind::RecordingFailed,
+            session_id,
+            None,
+            None,
+        );
+
+        event.recording_session_id = None;
+        assert!(!event.has_valid_recording_correlation());
+
+        event.recording_session_id = Some(session_id);
+        event.event_kind = AuditEventKind::IngestionFinalized;
+        assert!(!event.has_valid_recording_correlation());
     }
 
     #[test]
@@ -283,6 +346,33 @@ mod tests {
         assert_eq!(event.ingest_token, Some(token));
         assert!(event.recording_session_id.is_none());
         assert!(event.platform_ingest_session_id.is_none());
+        assert!(event.has_valid_ingestion_correlation());
+    }
+
+    #[test]
+    fn ingestion_correlation_requires_a_token_and_no_session_ids() {
+        let token = Uuid::new_v4();
+        let mut event = AuditEvent::new(None, AuditEventKind::IngestionFinalized, token, None);
+
+        event.ingest_token = None;
+        assert!(!event.has_valid_ingestion_correlation());
+
+        event.ingest_token = Some(token);
+        event.recording_session_id = Some(Uuid::new_v4());
+        assert!(!event.has_valid_ingestion_correlation());
+    }
+
+    #[test]
+    fn ingestion_correlation_rejects_non_ingestion_events() {
+        let event = AuditEvent::new_recording(
+            None,
+            AuditEventKind::RecordingSessionCreated,
+            Uuid::new_v4(),
+            Some(Uuid::new_v4()),
+            None,
+        );
+
+        assert!(!event.has_valid_ingestion_correlation());
     }
 
     #[test]

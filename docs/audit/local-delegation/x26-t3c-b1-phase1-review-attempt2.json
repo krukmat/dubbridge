@@ -1,0 +1,10 @@
+{
+  "changed_paths": [
+    "crates/domain/src/audit.rs"
+  ],
+  "findings": [],
+  "format_warnings": [],
+  "model": "muse-glimmer:30b-q4_K_M",
+  "status": "pass",
+  "summary": "The proposed addition is bounded to crates/domain/src/audit.rs, introduces only the read-only predicate has_valid_ingestion_correlation with the exact kind whitelist and correlation shape required, and does not alter constructors, persistence, emission or other event-family behavior. The existing tests are extended to cover the happy path, the recording guard, and the missing-token edge case, satisfying the stated acceptance examples HP-1, EC-1 and the scope guard."
+}

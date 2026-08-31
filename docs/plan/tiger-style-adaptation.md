@@ -108,8 +108,19 @@ Python's `-O` policy, no early unblocking of `translation-worker-py`/
 flowchart TD
     T0["T0: survey 70-100 line\nfunctions (workspace-wide)"] --> T1["T1: decompose flagged\nfunctions incl. finalize_ingestion_core"]
     T1 --> T2["T2: flip too_many_lines\n100 -> 70 (Cargo.toml)"]
-    T1 --> T3["T3: assert! pre/postconditions\nrights / finalize / playback / audit"]
-    T3 --> T4["T4: retry/attempt caps\ncrates/jobs, providers, media"]
+    T1 --> T3["T3: assert! pre/postconditions\nrights / finalize / playback"]
+    T3 --> T3ca["T3c-a: correlation contract matrix\nLow, docs-only"]
+    T3ca --> T3cb1["T3c-b1: ingestion\npredicate (Low target)"]
+    T3ca --> T3cb2["T3c-b2: recording\npredicate (Low target)"]
+    T3ca --> T3cc1["T3c-c1: platform\npredicate (Low target)"]
+    T3ca --> T3cc2["T3c-c2: workspace + consent\npredicates (Low target)"]
+    T3ca --> T3cc3["T3c-c3: review/playback/auth\npredicates (Low target)"]
+    T3cb1 --> T3cd["T3c-d: audit-boundary assert\nRRI floor 42"]
+    T3cb2 --> T3cd
+    T3cc1 --> T3cd
+    T3cc2 --> T3cd
+    T3cc3 --> T3cd
+    T3cd --> T4["T4: retry/attempt caps\ncrates/jobs, providers, media"]
     T5["T5: CI MinIO service +\nqa-test-s3 mandatory"]
     T6["T6: Python complexity gate\n(ruff/mccabe on workers/)"]
     T7["T7: ASR guard clauses\n+ narrow exceptions (R2/R3)"]
@@ -155,7 +166,14 @@ dependency and can be drafted at any point.
   finalize (`finalize_ingestion_core` and its decomposed helpers from T1),
   playback grant issuance (`PlaybackGrant::is_valid_at`), and audit emission.
   Each call site is classified explicitly as invariant (→ `assert!`) or
-  recoverable (→ stays `Result`) per the Design decisions above.
+  recoverable (→ stays `Result`) per the Design decisions above. The audit
+  portion is further decomposed in `X26-T3c-a`, `b1`, `b2`, and `c1`–`c3`: a
+  Low-band contract matrix and pure domain predicates precede the one
+  audit-boundary integration (`T3c-d`). The
+  latter cannot honestly be Low because `crates/audit/**` has the ADR-008/
+  ADR-018 RRI floor; it must not be relabelled merely because the final diff is
+  small. The matrix also gates assertion work on resolving the currently
+  unpersisted `platform_ingest_session_id` path.
 
 ## Phase 3 — Explicit bounds on retry/backoff (R4)
 
