@@ -1,4 +1,4 @@
-.PHONY: qa-fmt qa-lint qa-test qa-test-redis qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-docs-review qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review qa-golden-set show-codex-session-model install-hooks
+.PHONY: qa-fmt qa-lint qa-test qa-test-redis qa-test-s3 qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-docs-review qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review qa-golden-set show-codex-session-model install-hooks
 
 COVERAGE_MIN ?= 90
 PEER_REVIEW_RRI      ?= 22
@@ -35,6 +35,14 @@ qa-test-redis:
 		exit 1; \
 	fi
 	$(CARGO) test -p dubbridge-jobs --all-features redis_ -- --ignored --test-threads=1
+
+qa-test-s3:
+	@set -eu; \
+		: "$${DUBBRIDGE_STORAGE_TEST_ENDPOINT:?DUBBRIDGE_STORAGE_TEST_ENDPOINT must be set for qa-test-s3}"; \
+		: "$${DUBBRIDGE_STORAGE_TEST_ACCESS_KEY_ID:?DUBBRIDGE_STORAGE_TEST_ACCESS_KEY_ID must be set for qa-test-s3}"; \
+		: "$${DUBBRIDGE_STORAGE_TEST_SECRET_ACCESS_KEY:?DUBBRIDGE_STORAGE_TEST_SECRET_ACCESS_KEY must be set for qa-test-s3}"; \
+		: "$${DUBBRIDGE_STORAGE_TEST_BUCKET:?DUBBRIDGE_STORAGE_TEST_BUCKET must be set for qa-test-s3}"
+	$(CARGO) test -p dubbridge-storage --all-features s3_adapter_new_real_put_get_round_trip_against_s3_compatible_endpoint -- --ignored --test-threads=1
 
 qa-check:
 	$(CARGO) check --workspace --all-targets --all-features
