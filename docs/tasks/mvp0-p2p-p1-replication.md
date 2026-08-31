@@ -1105,33 +1105,288 @@ Required passes: 3 (`RRI 46` → `Med-high`)
   and complete replication; keep proof commands out of P2PService and stop before
   reconnect certification.`
 
-## P1.B2 — Verification, reconnect, and fail-closed witness
+## P1.B2 — Verification, reconnect, and fail-closed witness (planning parent)
 
-- **Status:** Deferred until P1.B1 PASS; requires current RRI/card/approval.
-- **Effort / prospective RRI:** L / 55 Med-high. Recompute at presentation.
-- **Allowed paths:** runtime protocol/client,
-  `mobile/src/p2p/proof/ReplicationProofRunner.ts`,
-  `mobile/__tests__/p2p/replication-witness.test.ts`, Android evidence, and
-  B2/P1 status artifacts.
-- **Objective:** turn transport completion into a trustworthy P1 verdict with
-  hash verification, one bounded reconnect, lifecycle/operation evidence, and
-  complete teardown.
-- **HP-B2:** after a bounded disconnect/rejoin, the client reads the complete
-  fixture, matches SHA-256, closes both sessions, deletes both run directories,
-  and only then emits VERIFIED.
-- **EC-B2:** digest mismatch, reconnect-budget exhaustion, suspend/resume failure,
-  malformed/fatal worklet result, or residual storage emits typed failure and
-  can never transition to VERIFIED.
-- **Acceptance:** runtime and operation state machines are distinct; evidence is
-  redacted and ordered; Android proof plus full mobile checks pass; P1 closes
-  only after coverage and owner verification.
-- **Evidence to emit:** current RRI/card/route receipt, HP-B2/EC-B2 tests,
-  Android lifecycle/digest/cleanup witness, checks, P1 handoff and status sync.
-- **Status artifacts affected:** this ledger, P1/general plans and task ledger,
-  roadmap, ADR-043 implementation references, `p2p-mvp/RUN_STATE.json`, and
+- **Status:** Decomposed 2026-08-31. Parent-level RRI recomputed at
+  presentation time as **56 → Complex (56-70)**, which triggers the mandatory
+  decomposition-before-implementation gate — no direct source execution
+  under this parent ID. Twelve children (`P1.B2.a-0` through `P1.B2.f`)
+  carry all executable scope; see the task map above and each child's entry
+  below. This decomposition additionally absorbs the two items P1.B1's
+  retrospective closure explicitly carried forward (see
+  `docs/audit/mvp0-p2p-p1-b1-implementation.md` § Known limitation carried
+  forward to P1.B2): byte-count instrumentation (`P1.B2.a-0`) and direct
+  `transient-replication*.ts` unit coverage (`P1.B2.a-cov`).
+- **RRI measurement note:** `--auto-cc` does not measure TS/JS in this repo;
+  `C` was agent-supplied from reading the actual B1 code
+  (`ReplicationProofRunner.ts`, `transient-replication.ts`), not from an
+  automated tool — confidence Low on `C`, High on the rest. Full computation
+  in this session's turn; not yet persisted as a standalone RRI artifact
+  (pending: `docs/audit/mvp0-p2p-p1-b2-rri.md`, see Evidence to emit).
+- **Objective (unchanged, inherited by children):** turn transport
+  completion into a trustworthy P1 verdict with hash verification, one
+  bounded reconnect, lifecycle/operation evidence, and complete teardown.
+- **HP-B2 (parent, decomposed across children):** after a bounded
+  disconnect/rejoin, the client reads the complete fixture, matches SHA-256,
+  closes both sessions, deletes both run directories, and only then emits
+  VERIFIED.
+- **EC-B2 (parent, decomposed across children):** digest mismatch,
+  reconnect-budget exhaustion, suspend/resume failure, malformed/fatal
+  worklet result, or residual storage emits typed failure and can never
+  transition to VERIFIED.
+- **Acceptance (parent):** runtime and operation state machines are
+  distinct; evidence is redacted and ordered; Android proof plus full mobile
+  checks pass; P1.B2 (and by extension P1) closes only after every child is
+  PASS and coverage/owner verification is complete.
+- **Sequencing:** `P1.B2.a-0`, `a-cov`, `a-i`, `a-ii-a`, `b`, `c-2`, `d-i`,
+  `d-ii`, `e` have no inter-dependencies and may be delegated in any order or
+  in parallel (distinct `allowed_paths` per child, see below). `a-ii-b`
+  depends on `a-i` + `a-ii-a`; `c-1` depends on `b`; `f` depends on
+  `a-ii-b`, `a-0`, `c-1`, `c-2`, `d-ii`, `e` and closes the parent.
+- **Evidence to emit:** this decomposition record, a persisted
+  `docs/audit/mvp0-p2p-p1-b2-rri.md`, each child's own RRI/evidence, and the
+  parent Reflection log (5 passes, below) once every child is PASS.
+- **Status artifacts affected:** this ledger, P1/general plan, roadmap,
+  ADR-043 implementation references, `p2p-mvp/RUN_STATE.json`, and
   `p2p-mvp/handoffs/P1.md` at P1 closure.
-- **Handoff prompt:** `P1.B2 — implement bounded reconnect, hash and cleanup
-  certification only; fail closed on every incomplete state and do not start P2.`
+- **Handoff prompt:** `P1.B2 — work only the currently approved child from
+  the task map; do not start another child or P2 without its own approval.`
+
+### P1.B2.a-0 — Byte-count instrumentation (carried forward from P1.B1)
+
+- **Status:** Awaiting approval.
+- **Effort / RRI:** S / 25 Low.
+- **Allowed paths:** `mobile/src/p2p/runtime/transient-replication.ts`,
+  `mobile/__tests__/p2p/transient-replication-bytecount.test.ts`.
+- **Objective:** replace the hardcoded `byte_count: 0` in
+  `discoverAndReplicate`'s returned receipt with the actual number of bytes
+  observed on the replication stream during the piped transfer.
+- **HP-B2.a-0:** a successful replication reports the true transferred byte
+  count, not `0`.
+- **EC-B2.a-0:** a zero-byte or failed transfer reports `0`/throws rather
+  than fabricating a nonzero count.
+- **Evidence to emit:** updated receipt shape, byte-count test evidence.
+- **Handoff prompt:** `P1.B2.a-0 — instrument transient-replication.ts to
+  count actual transferred bytes only; do not touch verification, reconnect,
+  or teardown logic.`
+
+### P1.B2.a-cov — Direct unit coverage for `transient-replication*.ts` (carried forward from P1.B1)
+
+- **Status:** Awaiting approval.
+- **Effort / RRI:** S / 20 Low.
+- **Allowed paths:** `mobile/__tests__/p2p/transient-replication.test.ts`,
+  `mobile/__tests__/p2p/transient-replication-discovery.test.ts`.
+- **Objective:** add direct unit tests for `transient-replication.ts` and
+  `transient-replication-discovery.ts` — currently exercised only indirectly
+  through `hyperswarm-replication.test.ts` (P1.B1's dual-session test), per
+  the P1.B1 closure record's carried-forward gap.
+- **HP-B2.a-cov:** `replicateOverSocket`, `cancelReplicationOnTimeout`,
+  `connectAndReplicate`, `connectReplicateAndCancelOnTimeout`,
+  `createAndJoinSwarm`, `awaitFirstConnection` each have a direct passing
+  test independent of the full dual-session integration test.
+- **EC-B2.a-cov:** each function's already-implemented failure path
+  (timeout, replicate-throw, connect-failure) has a direct test, not only
+  indirect coverage via the integration test.
+- **Evidence to emit:** new test files, coverage delta.
+- **Handoff prompt:** `P1.B2.a-cov — add direct unit tests only for the
+  named functions; no source changes to transient-replication*.ts itself.`
+
+### P1.B2.a-i — Digest-compare pure helper
+
+- **Status:** Awaiting approval.
+- **Effort / RRI:** S / 22 Low.
+- **Allowed paths:** `mobile/src/p2p/runtime/digest-compare.ts` (new),
+  `mobile/src/p2p/runtime/protocol.ts`,
+  `mobile/__tests__/p2p/digest-compare.test.ts`.
+- **Objective:** a pure function comparing raw bytes against an expected hex
+  SHA-256 digest (reusing the `bare-crypto createHash` pattern already
+  proven in `transient-seed.ts::digestFixture`), returning a typed
+  match/mismatch result — no drive/network IO.
+- **HP-B2.a-i:** matching bytes/digest returns a typed match result.
+- **EC-B2.a-i:** mismatched bytes/digest returns a typed mismatch result,
+  never throws for a mismatch (only for a malformed digest hash operation).
+- **Evidence to emit:** unit tests for match/mismatch/malformed-input.
+- **Handoff prompt:** `P1.B2.a-i — add a pure digest-compare helper only; no
+  drive or network access; mirror transient-seed.ts's hashing pattern.`
+
+### P1.B2.a-ii-a — `drive.get()` raw read wrapper
+
+- **Status:** Awaiting approval.
+- **Effort / RRI:** S / 22 Low.
+- **Allowed paths:** `mobile/src/p2p/runtime/transient-drive.ts`,
+  `mobile/__tests__/p2p/transient-drive-read.test.ts`.
+- **Objective:** extend `TransientDrive`/related interfaces with a `get(path)`
+  read method and a wrapper that returns the file's raw bytes from an
+  already-open drive handle, or a typed IO error — no comparison/decision
+  logic (that is `P1.B2.a-i`'s job).
+- **HP-B2.a-ii-a:** reading an existing path on an open drive returns its
+  raw bytes.
+- **EC-B2.a-ii-a:** a missing path or a closed/failed drive returns a typed
+  error, never partial/truncated bytes silently.
+- **Evidence to emit:** unit tests for present/missing/closed-drive cases.
+- **Handoff prompt:** `P1.B2.a-ii-a — add a raw drive-read wrapper only; do
+  not compare or hash the returned bytes.`
+
+### P1.B2.a-ii-b — Read+compare glue, typed result
+
+- **Status:** Awaiting approval.
+- **Effort / RRI:** S / 22 Low. Depends on `P1.B2.a-i`, `P1.B2.a-ii-a` PASS.
+- **Allowed paths:** `mobile/src/p2p/runtime/protocol.ts`,
+  `mobile/__tests__/p2p/replication-verify.test.ts`.
+- **Objective:** compose `a-ii-a`'s read with `a-i`'s compare into one typed
+  verify call: read the complete fixture back from the client's drive, hash
+  it, compare against the expected digest, and propagate a typed
+  match/mismatch/IO-error result.
+- **HP-B2.a-ii-b:** a byte-perfect replicated fixture verifies as a match.
+- **EC-B2.a-ii-b:** a corrupted/incomplete replica verifies as a typed
+  mismatch; a read failure propagates as a typed IO error, never silently as
+  a mismatch.
+- **Evidence to emit:** unit tests composing both dependencies; confirms
+  neither dependency's contract changed.
+- **Handoff prompt:** `P1.B2.a-ii-b — compose the existing read (a-ii-a) and
+  compare (a-i) helpers only; do not reimplement either.`
+
+### P1.B2.b — Reconnect budget counter (pure)
+
+- **Status:** Awaiting approval.
+- **Effort / RRI:** S / 24 Low.
+- **Allowed paths:** `mobile/src/p2p/runtime/reconnect-budget.ts` (new),
+  `mobile/src/p2p/runtime/protocol.ts`,
+  `mobile/__tests__/p2p/reconnect-budget.test.ts`.
+- **Objective:** a pure, isolated counter tracking a bounded reconnect
+  budget (e.g. max 1 retry) — no IO, no socket/swarm access, decides only
+  "may retry" vs "exhausted".
+- **HP-B2.b:** the first disconnect within budget reports "may retry".
+- **EC-B2.b:** exceeding the configured budget reports "exhausted" and never
+  reports "may retry" again for that session.
+- **Evidence to emit:** unit tests for budget=0, budget=1, and exhaustion
+  ordering.
+- **Handoff prompt:** `P1.B2.b — add a pure reconnect-budget counter only;
+  no network or socket code.`
+
+### P1.B2.c-1 — Disconnect detection + budget-check decision
+
+- **Status:** Awaiting approval.
+- **Effort / RRI:** S / 22 Low. Depends on `P1.B2.b` PASS.
+- **Allowed paths:** `mobile/src/p2p/runtime/transient-replication-discovery.ts`,
+  `mobile/__tests__/p2p/replication-disconnect.test.ts`.
+- **Objective:** listen for a disconnect/close event on the live swarm
+  connection established by B1's `createAndJoinSwarm`/`awaitFirstConnection`,
+  and call `P1.B2.b`'s budget counter to decide retry vs fail — no
+  reconnection IO itself (that is `P1.B2.c-2`'s job).
+- **HP-B2.c-1:** a disconnect within budget yields a "retry" decision.
+- **EC-B2.c-1:** a disconnect with exhausted budget yields a "fail" decision.
+- **Evidence to emit:** unit tests using a stubbed swarm/socket emitting
+  disconnect events.
+- **Handoff prompt:** `P1.B2.c-1 — wire disconnect detection to the existing
+  budget counter (b) only; do not perform the reconnect itself.`
+
+### P1.B2.c-2 — Re-invoke B1 `connectAndReplicate` on retry
+
+- **Status:** Awaiting approval.
+- **Effort / RRI:** S / 20 Low.
+- **Allowed paths:** `mobile/src/p2p/runtime/transient-replication.ts`,
+  `mobile/__tests__/p2p/replication-retry.test.ts`.
+- **Objective:** on a "retry" decision, re-invoke B1's already-tested
+  `connectAndReplicate` against the same swarm/drive — no new discovery or
+  connection logic, pure re-invocation wiring.
+- **HP-B2.c-2:** a retry successfully re-establishes replication using the
+  existing function.
+- **EC-B2.c-2:** a second failure during retry propagates the same typed
+  error `connectAndReplicate` already defines, not a new error shape.
+- **Evidence to emit:** unit tests for successful retry and second-failure.
+- **Handoff prompt:** `P1.B2.c-2 — call the existing connectAndReplicate
+  again on retry only; do not modify its implementation.`
+
+### P1.B2.d-i — Evidence redaction helper (pure)
+
+- **Status:** Awaiting approval.
+- **Effort / RRI:** S / 20 Low.
+- **Allowed paths:** `mobile/src/p2p/proof/replication-evidence.ts` (new),
+  `mobile/__tests__/p2p/replication-evidence.test.ts`.
+- **Objective:** a pure function stripping discovery keys and fixture
+  content from an evidence/log object before it can be emitted, consistent
+  with P1.B1's Acceptance ("discovery keys and fixture content are not
+  logged/persisted").
+- **HP-B2.d-i:** a sensitive field present in the input is absent from the
+  output.
+- **EC-B2.d-i:** a non-sensitive field is preserved unchanged.
+- **Evidence to emit:** unit tests for each redacted field.
+- **Handoff prompt:** `P1.B2.d-i — add a pure redaction helper only; no
+  logging call sites.`
+
+### P1.B2.d-ii — Dual-session teardown orchestration
+
+- **Status:** Awaiting approval.
+- **Effort / RRI:** S / 22 Low.
+- **Allowed paths:** `mobile/src/p2p/proof/ReplicationProofRunner.ts`,
+  `mobile/__tests__/p2p/replication-cleanup.test.ts`.
+- **Objective:** compose B1's already-tested `closeReplicationSession`
+  (dual-close via `Promise.allSettled`) with A2's already-tested
+  `deleteProofRunDirectory` (delete + verify-absence) for both the seed and
+  client run directories — no new close/delete logic, orchestration only.
+- **HP-B2.d-ii:** both sessions close and both run directories are deleted
+  and verified absent.
+- **EC-B2.d-ii:** a failure closing/deleting one side does not skip
+  attempting the other; both failures surface, none are swallowed.
+- **Evidence to emit:** unit tests for both-succeed and one-fails cases.
+- **Handoff prompt:** `P1.B2.d-ii — compose the existing close (B1) and
+  delete (A2) functions only; do not reimplement either.`
+
+### P1.B2.e — Verdict/receipt type assembly (pure)
+
+- **Status:** Awaiting approval.
+- **Effort / RRI:** S / 22 Low.
+- **Allowed paths:** `mobile/src/p2p/proof/replication-verdict.ts` (new),
+  `mobile/__tests__/p2p/replication-verdict.test.ts`.
+- **Objective:** define the `VERIFIED`/typed-failure verdict types and a
+  pure assembly function building one from its inputs (verify result,
+  reconnect outcome, teardown result) — no decision logic about *when* to
+  call it (that is `P1.B2.f`'s job), just type-safe construction.
+- **HP-B2.e:** given all-success inputs, assembles a `VERIFIED` verdict.
+- **EC-B2.e:** given any failing input, assembles the corresponding typed
+  failure verdict, never `VERIFIED`.
+- **Evidence to emit:** unit tests per input combination.
+- **Handoff prompt:** `P1.B2.e — add verdict types and a pure assembly
+  function only; no orchestration/sequencing logic.`
+
+### P1.B2.f — Final VERIFIED composition
+
+- **Status:** Awaiting approval. **Owner-pinned task-local override:** this
+  child is scoped to cloud/primary-agent authorship (Claude Sonnet 5 direct,
+  the acting orchestrator), not Qwen local patch delegation, despite its
+  measured RRI of 22 (Low). Rationale: `P1.B2.f` is the single function
+  deciding whether the parent's fail-closed invariant ("never VERIFIED
+  before complete read, digest equality, reconnect outcome, and teardown")
+  holds — a security-decision point, not a low-editorial-risk mechanical
+  patch, per `docs/policies/HITL_AUTONOMY_POLICY.md § Local delegation`'s
+  qualitative eligibility bar. The RRI number does not change; only the
+  authorship route is pinned. Recorded here per
+  `docs/policies/RRI_POLICY.md`'s rule that a task-local override must be
+  explicit, never silently applied.
+- **Effort / RRI:** S / 22 Low (task-local route override: primary
+  agent/cloud, not Qwen). Depends on `P1.B2.a-0`, `P1.B2.a-ii-b`,
+  `P1.B2.c-1`, `P1.B2.c-2`, `P1.B2.d-ii`, `P1.B2.e` PASS.
+- **Allowed paths:** `mobile/src/p2p/proof/ReplicationProofRunner.ts`,
+  `mobile/src/p2p/runtime/runtime-client.ts`,
+  `mobile/__tests__/p2p/replication-witness.test.ts`.
+- **Objective:** sequence the now-independently-tested pieces — verify
+  (`a-ii-b`), reconnect-if-needed (`c-1`/`c-2` under `b`'s budget), teardown
+  (`d-ii`, always, even on early failure) — and assemble the final verdict
+  (`e`'s types) so that `VERIFIED` is only ever produced after every
+  preceding step succeeds, closing both HP-B2 and EC-B2 at the parent level.
+- **HP-B2.f:** a byte-perfect replication with no disconnect (or one
+  successful bounded reconnect) closes both sessions, deletes both run
+  directories, and only then emits `VERIFIED`.
+- **EC-B2.f:** a digest mismatch, reconnect-budget exhaustion, or any
+  teardown failure emits the corresponding typed failure verdict and never
+  transitions to `VERIFIED`, regardless of ordering.
+- **Evidence to emit:** unit tests for the full ordering contract (including
+  a test asserting teardown runs even when verify fails early), Android
+  lifecycle/digest/cleanup witness, parent HP-B2/EC-B2 closure evidence.
+- **Handoff prompt (primary-agent/cloud, not delegated):** `P1.B2.f —
+  compose a-0/a-ii-b/c-1/c-2/d-ii/e in the documented order; never emit
+  VERIFIED before every step succeeds; this closes P1.B2's HP-B2/EC-B2.`
 
 ## Parent reflection plan
 
