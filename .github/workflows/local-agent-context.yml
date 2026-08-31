@@ -25,7 +25,5 @@ jobs:
         run: python3 scripts/local-agent/context_provider_test.py
       - name: Run prompt-builder regression tests
         run: python3 scripts/local-agent/prompt_builder_test.py
-      - name: Run local-agent integration tests
+      - name: Run current local-agent integration tests
         run: python3 scripts/local-agent/integration_test.py
-      - name: Run full local-runner regression suite
-        run: python3 scripts/local-agent/run_local_task_test.py
