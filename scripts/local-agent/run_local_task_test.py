@@ -1728,9 +1728,9 @@ class AttemptBundleEmission(unittest.TestCase):
         )
         self.assertEqual(bundle["outcome"], "success")
         self.assertEqual(bundle["capsule_hash"], self._CAPSULE_HASH)
-        # ADR-036 Amendment 3: implementer_id reflects the current binding
-        # (nemotron), independent of the model_tag string passed in.
-        self.assertEqual(bundle["implementer_id"], "nemotron")
+        # ADR-043: implementer_id reflects the current Devstral binding,
+        # independent of the legacy model_tag string passed into this fixture.
+        self.assertEqual(bundle["implementer_id"], "devstral")
 
     def test_hp2_two_attempt_repair_emits_two_bundles_same_capsule_hash(self):
         card = rlt.TaskCard(
@@ -2415,13 +2415,13 @@ class T7cB2ScopeCheckGate(unittest.TestCase):
 class ResolveEffectiveLimitsTest(unittest.TestCase):
     """ADR-038 T3: band-aware limit resolution, offline / no worktree needed."""
 
-    def test_hp1_rri_41_45_resolves_moderate_budget_with_nemotron_pin(self):
+    def test_hp1_rri_41_45_resolves_moderate_budget_with_devstral_pin(self):
         card = rlt.TaskCard("t", "spec", [], [], band="Med-high", rri=43)
         limits = rlt.resolve_effective_limits(card)
         self.assertEqual(limits.band, "Med-high")
         self.assertEqual(limits.max_total_turns, 30)
         self.assertEqual(limits.max_repair_attempts, 2)
-        self.assertEqual(limits.required_model, "nemotron-3.5-lightning:30b-a3b-q4_K_M")
+        self.assertEqual(limits.required_model, "devstral-small-2:24b-instruct-2512-q4_K_M")
 
     def test_hp1b_med_high_rri_without_band_resolves_moderate_budget(self):
         card = rlt.TaskCard("t", "spec", [], [], rri=43)
@@ -2479,13 +2479,13 @@ class ParseArgsModelDefaultTest(unittest.TestCase):
             )
         self.assertIsNone(args.model)
 
-    def test_hp1b_card_resolved_defaults_keep_low_qwen_and_move_moderate_to_nemotron(self):
+    def test_hp1b_card_resolved_defaults_keep_low_qwen_and_move_moderate_to_devstral(self):
         low = rlt.TaskCard("low", "spec", [], [], rri=25)
         moderate = rlt.TaskCard("moderate", "spec", [], [], rri=26)
         self.assertEqual(rlt.default_local_agent_model(low), "qwen3.8:27b-mlx")
         self.assertEqual(
             rlt.default_local_agent_model(moderate),
-            "nemotron-3.5-lightning:30b-a3b-q4_K_M",
+            "devstral-small-2:24b-instruct-2512-q4_K_M",
         )
 
     def test_ec1_explicit_flag_overrides_the_new_default(self):
@@ -2523,7 +2523,7 @@ class ParseArgsModelDefaultTest(unittest.TestCase):
 class MedHighRunnerLimitsIntegrationTest(unittest.TestCase):
     """ADR-038 Amendment 3: the 41-45 split is enforced end-to-end."""
 
-    def test_hp1_rri_41_45_card_uses_nemotron_and_can_succeed(self):
+    def test_hp1_rri_41_45_card_uses_devstral_and_can_succeed(self):
         with tempfile.TemporaryDirectory() as tmp:
             worktree = os.path.join(tmp, "worktree")
             _git_init_worktree(worktree)
@@ -2536,7 +2536,7 @@ class MedHighRunnerLimitsIntegrationTest(unittest.TestCase):
             exit_code = rlt.main(
                 [
                     "--card", card_path, "--worktree", worktree, "--out", out_path,
-                    "--model", "nemotron-3.5-lightning:30b-a3b-q4_K_M",
+                    "--model", "devstral-small-2:24b-instruct-2512-q4_K_M",
                 ],
                 chat_fn=chat,
                 test_runner=passing_tests,
@@ -2566,7 +2566,7 @@ class MedHighRunnerLimitsIntegrationTest(unittest.TestCase):
             exit_code = rlt.main(
                 [
                     "--card", card_path, "--worktree", worktree, "--out", out_path,
-                    "--model", "nemotron-3.5-lightning:30b-a3b-q4_K_M",
+                    "--model", "devstral-small-2:24b-instruct-2512-q4_K_M",
                 ],
                 chat_fn=chat,
                 test_runner=failing_tests,
