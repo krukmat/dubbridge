@@ -2,11 +2,11 @@
 
 ## Status
 
-Milestone 2 implementation: **complete on `feat/ckg-m2-multiturn`**, stacked on M1.
+Milestone 2 implementation: **complete on `feat/ckg-context-provider`**, consolidated with M1 for a single later merge to `main`.
 
 Dedicated validation passed (`local-agent-context` run 59 on code head `779d1429a90fbe1df0eaad8f0c8a6a5ab9b79dcd`). Real Ollama/CBM/model execution on the target Mac remains operator-local validation and is not claimed by this branch.
 
-No merge to `main` is part of this milestone.
+No merge to `main` has been performed.
 
 ## Objective
 
