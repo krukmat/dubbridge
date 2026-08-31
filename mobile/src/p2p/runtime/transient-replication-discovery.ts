@@ -1,4 +1,6 @@
 import { RuntimeProtocolError } from "./protocol";
+import type { ReconnectBudget } from "./reconnect-budget";
+import { recordDisconnect } from "./reconnect-budget";
 
 export interface JoinedSwarm {
   swarm: { on: Function; join: Function };
@@ -6,8 +8,14 @@ export interface JoinedSwarm {
 }
 
 export interface SwarmConnectionEvents {
-  on: (event: "connection", listener: (socket: unknown, peerInfo: unknown) => void) => void;
-  off: (event: "connection", listener: (socket: unknown, peerInfo: unknown) => void) => void;
+  on: (
+    event: "connection",
+    listener: (socket: unknown, peerInfo: unknown) => void,
+  ) => void;
+  off: (
+    event: "connection",
+    listener: (socket: unknown, peerInfo: unknown) => void,
+  ) => void;
 }
 
 export function createAndJoinSwarm(
@@ -16,10 +24,14 @@ export function createAndJoinSwarm(
   role: "seed" | "client",
 ): JoinedSwarm {
   const swarm = new Hyperswarm();
-  const discovery = (swarm as unknown as { join: (topic: Buffer, opts: { server: boolean; client: boolean }) => unknown }).join(
-    topic,
-    { server: role === "seed", client: role === "client" },
-  );
+  const discovery = (
+    swarm as unknown as {
+      join: (
+        topic: Buffer,
+        opts: { server: boolean; client: boolean },
+      ) => unknown;
+    }
+  ).join(topic, { server: role === "seed", client: role === "client" });
   return { swarm, discovery };
 }
 
@@ -49,4 +61,32 @@ export function awaitFirstConnection(
     }, timeoutMs);
     swarm.on("connection", onConnection);
   });
+}
+
+export interface DisconnectableSocket {
+  on: (event: "close" | "error", listener: (err?: unknown) => void) => void;
+}
+
+export type DisconnectOutcome = "retry" | "fail";
+
+export function watchForDisconnect(
+  socket: DisconnectableSocket,
+  budget: ReconnectBudget,
+  onDisconnect: (
+    outcome: DisconnectOutcome,
+    updatedBudget: ReconnectBudget,
+  ) => void,
+): void {
+  let handled = false;
+
+  const handler = () => {
+    if (handled) return;
+    handled = true;
+
+    const { decision, budget: updatedBudget } = recordDisconnect(budget);
+    onDisconnect(decision === "may-retry" ? "retry" : "fail", updatedBudget);
+  };
+
+  socket.on("close", handler);
+  socket.on("error", handler);
 }

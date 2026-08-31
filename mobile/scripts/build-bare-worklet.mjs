@@ -17,6 +17,7 @@ const sourcePaths = [
   path.join(runtimeRoot, "transient-drive-dependencies.ts"),
   path.join(runtimeRoot, "byte-counter.ts"),
   path.join(runtimeRoot, "transient-replication-dependencies.ts"),
+  path.join(runtimeRoot, "reconnect-budget.ts"),
   path.join(runtimeRoot, "transient-replication-discovery.ts"),
   path.join(runtimeRoot, "transient-replication.ts"),
   path.join(runtimeRoot, "transient-seed.ts"),

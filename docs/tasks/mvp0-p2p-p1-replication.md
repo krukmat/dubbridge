@@ -62,7 +62,7 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 | P1.B2.a-ii-a | `drive.get()` raw read wrapper | PASS — Done 2026-08-31; RRI 22 Low | none |
 | P1.B2.a-ii-b | Read+compare glue, typed result | PASS — Done 2026-08-31; RRI 22 Low | P1.B2.a-i, P1.B2.a-ii-a PASS |
 | P1.B2.b | Reconnect budget counter (pure) | PASS — Done 2026-08-31; RRI 24 Low | none |
-| P1.B2.c-1 | Disconnect detection + budget-check decision | Awaiting approval — RRI 22 Low | P1.B2.b PASS |
+| P1.B2.c-1 | Disconnect detection + budget-check decision | PASS — Done 2026-08-31; RRI 22 Low | P1.B2.b PASS |
 | P1.B2.c-2 | Re-invoke B1 `connectAndReplicate` on retry | Awaiting approval — RRI 20 Low | none |
 | P1.B2.d-i | Evidence redaction helper (pure) | Awaiting approval — RRI 20 Low | none |
 | P1.B2.d-ii | Dual-session teardown orchestration | Awaiting approval — RRI 22 Low | none |
@@ -1507,7 +1507,7 @@ Required passes: 3 (`RRI 46` → `Med-high`)
 
 ### P1.B2.c-1 — Disconnect detection + budget-check decision
 
-- **Status:** Awaiting approval.
+- **Status:** PASS — Done 2026-08-31.
 - **Effort / RRI:** S / 22 Low. Depends on `P1.B2.b` PASS.
 - **Allowed paths:** `mobile/src/p2p/runtime/transient-replication-discovery.ts`,
   `mobile/__tests__/p2p/replication-disconnect.test.ts`.
@@ -1521,6 +1521,81 @@ Required passes: 3 (`RRI 46` → `Med-high`)
   disconnect events.
 - **Handoff prompt:** `P1.B2.c-1 — wire disconnect detection to the existing
   budget counter (b) only; do not perform the reconnect itself.`
+
+**Implementation note:** the first delegation attempt used `--mode
+full-file` (as prior new-file subtasks did) but destructively rewrote the
+already-tested `createAndJoinSwarm`/`awaitFirstConnection` functions with
+placeholder logic — an unauthorized change outside `Allowed paths`' intent.
+The attempt was fully reverted (`git checkout --`) before any commit. The
+task was re-delegated as three small `--mode before-after`/`full-file`
+sub-packets, each independently phase-1-reviewed (PASS, 0 findings each):
+(1) a 1-line before-after adding the two new imports, (2) a 3-line
+before-after appending `watchForDisconnect` after the existing file's exact
+trailing block (`createAndJoinSwarm`/`awaitFirstConnection` reproduced
+byte-for-byte, confirmed unmodified in substance), (3) `full-file` for the
+brand-new test file (safe since there is no existing content to corrupt).
+The test-file delegation left one stray trailing `---` line (a model output
+artifact, not wrapper truncation — content otherwise fully correct); this
+was stripped as a documented mechanical/tooling-failure-exception direct
+edit, not local-model authorship. `prettier --write` was run on both edited
+files for house style (no logic change). `mobile/scripts/build-bare-worklet.mjs`
+`sourcePaths` was missing `reconnect-budget.ts`, which
+`transient-replication-discovery.ts` (already in `sourcePaths`) now
+imports — this broke the worklet bundle build (`runtime-protocol.test.ts`
+regressed from 12/12 passing to a hard build failure, confirmed via
+`git stash` bisection against the pre-task baseline). Added the missing
+`sourcePaths` entry (mechanical, one line, following the file's existing
+one-entry-per-dependency pattern) and reran
+`node scripts/build-bare-worklet.mjs` to regenerate `worklet.bundle.js` —
+both qualify as the two narrow permitted direct-edit exceptions (mechanical
+lint-driven formatting; mechanical config-list fix with no reviewed-logic
+change), not local-model authorship substitutes.
+
+### Task-analysis review (phase 1)
+
+- Reviewer: `muse-glimmer:30b-q4_K_M`.
+- Original single-packet (`--mode full-file`) version: PASS, 2 minor
+  findings (double-invocation guard needs an explicit mechanism; avoid an
+  inline `import("./reconnect-budget").ReconnectBudget` type expression) —
+  incorporated into the packet, but this packet was superseded before
+  dispatch by the 3-sub-packet split below (not itself dispatched).
+- Revised 3-sub-packet version (import-lines, append-block, test-file), each
+  reviewed independently: PASS, 0 findings each.
+- Verdict: **PASS**.
+
+### Code-solution review (phase 2)
+
+- Reviewer: `muse-glimmer:30b-q4_K_M`.
+- Command: manual Ollama `/api/chat` invocation against the merged diff
+  (`transient-replication-discovery.ts`, `replication-disconnect.test.ts`,
+  `build-bare-worklet.mjs` sourcePaths addition; generated
+  `worklet.bundle.js` excluded from the reviewed diff).
+- Findings: none.
+- Verdict: **PASS**.
+
+### Verification
+
+- `npx tsc --noEmit` — exit 0.
+- `npx jest __tests__/p2p/` — 17/17 suites, 94/94 tests passed (confirmed
+  the worklet-bundle regression was fixed; baseline bisection via
+  `git stash` confirmed 12/12 `runtime-protocol.test.ts` passed before this
+  task and failed immediately after the code edit, before the
+  `sourcePaths`/rebuild fix).
+- `npm run lint` (mobile) — 0 warnings.
+- `python3 scripts/check-maintainability.py` — passed.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-B2.c-1 | Happy path | disconnect within budget yields "retry" | `mobile/__tests__/p2p/replication-disconnect.test.ts::HP-B2.c-1` | passed |
+| EC-B2.c-1 | Edge case | disconnect with exhausted budget yields "fail" | `mobile/__tests__/p2p/replication-disconnect.test.ts::EC-B2.c-1` | passed |
+
+### Owner final verification
+
+- Pending — tracked at `P1.B2` parent closure per the pack's approved
+  batching (owner approved the full 12-task pack; per-task closure evidence
+  recorded here, final owner sign-off tracked at P1.B2 parent closure).
 
 ### P1.B2.c-2 — Re-invoke B1 `connectAndReplicate` on retry
 
