@@ -57,7 +57,7 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 | P1.B1 | Isolated Hyperswarm replication transport | PASS — Done 2026-08-31 (retrospective closure); RRI 59 Complex, governance gap disclosed and owner-accepted | P1.A2 PASS — satisfied 2026-08-31 |
 | P1.B2 | Verification, reconnect + fail-closed witness (planning parent) | Decomposed 2026-08-31 — parent-level RRI 56 Complex triggers mandatory decomposition; no direct source execution | P1.B1 PASS — satisfied 2026-08-31 |
 | P1.B2.a-0 | Byte-count instrumentation in `transient-replication.ts` (carried forward from P1.B1) | PASS — Done 2026-08-31; RRI 25 Low | none |
-| P1.B2.a-cov | Direct unit coverage for `transient-replication*.ts` (carried forward from P1.B1) | Awaiting approval — RRI 20 Low | none |
+| P1.B2.a-cov | Direct unit coverage for `transient-replication*.ts` (carried forward from P1.B1) | PASS — Done 2026-08-31; RRI 20 Low | none |
 | P1.B2.a-i | Digest-compare pure helper | Awaiting approval — RRI 22 Low | none |
 | P1.B2.a-ii-a | `drive.get()` raw read wrapper | Awaiting approval — RRI 22 Low | none |
 | P1.B2.a-ii-b | Read+compare glue, typed result | Awaiting approval — RRI 22 Low | P1.B2.a-i, P1.B2.a-ii-a PASS |
@@ -1204,7 +1204,7 @@ Required passes: 3 (`RRI 46` → `Med-high`)
 
 ### P1.B2.a-cov — Direct unit coverage for `transient-replication*.ts` (carried forward from P1.B1)
 
-- **Status:** Awaiting approval.
+- **Status:** PASS.
 - **Effort / RRI:** S / 20 Low.
 - **Allowed paths:** `mobile/__tests__/p2p/transient-replication.test.ts`,
   `mobile/__tests__/p2p/transient-replication-discovery.test.ts`.
@@ -1222,6 +1222,54 @@ Required passes: 3 (`RRI 46` → `Med-high`)
 - **Evidence to emit:** new test files, coverage delta.
 - **Handoff prompt:** `P1.B2.a-cov — add direct unit tests only for the
   named functions; no source changes to transient-replication*.ts itself.`
+- **Implementation:** delegated to Qwen Developer (`qwen3.8:27b-mlx`,
+  `--mode full-file`, two new files) against a fully-specified contract
+  naming both source files' complete contents, the repo's established
+  fake-timer test convention (`jest.useFakeTimers()` +
+  `jest.advanceTimersByTimeAsync`), and 13 required test cases (6 happy
+  path, 7 edge case, deliberately excluding `discoverAndReplicate` and
+  `replicateOverSocket`'s byte-count path — already covered by
+  `hyperswarm-replication.test.ts` and `transient-replication-bytecount
+  .test.ts` respectively, to avoid duplication). Delegated output covered
+  all 13 required cases (consolidated into nested `describe`/`it` blocks,
+  no dropped cases). One orchestrator fix: `tsc --noEmit` flagged
+  `new Promise(() => undefined)` inferring `Promise<unknown>` against the
+  `Promise<void>` `finishedSignal` parameter — added an explicit
+  `Promise<void>` type argument (mechanical type-annotation fix, no
+  behavior change).
+- **Task-analysis review (phase 1):** muse-glimmer (`muse-glimmer:30b-q4_K_M`)
+  - PASS, 0 blocking findings, run against the delegation packet before
+    dispatch.
+- **Code-solution review (phase 2):** muse-glimmer (`muse-glimmer:30b-q4_K_M`)
+  - PASS, 0 findings, run against the final diff plus acceptance criteria
+    and independently-verified command output.
+- **Verification:** `cd mobile && npx tsc --noEmit -p .` exit 0 (after the
+  type-annotation fix); `npx jest __tests__/p2p/` — 12/12 suites, 80/80
+  tests passed (including the two new files, 13/13); `npx jest` (full
+  mobile suite) — 33/33 suites, 315/315 tests passed;
+  `python3 scripts/check-maintainability.py` — gate passed (test-only
+  change, no declaration-budget impact).
+- **Unit coverage certification:**
+
+  | Case ID | Type | Behavior | Unit test evidence | Result |
+  |---|---|---|---|---|
+  | HP-B2.a-cov | Happy path | `replicateOverSocket` returns a working `destroy` and calls the drive with `isInitiator` | `mobile/__tests__/p2p/transient-replication.test.ts::replicateOverSocket > HP-B2.a-cov` | passed |
+  | EC-B2.a-cov | Edge case | `replicateOverSocket` wraps a `drive.replicate` throw into `RuntimeProtocolError("REPLICATION_TRANSFER_FAILED")` | `mobile/__tests__/p2p/transient-replication.test.ts::replicateOverSocket > EC-B2.a-cov` | passed |
+  | HP-B2.a-cov | Happy path | `cancelReplicationOnTimeout` — calling `cancel()` before the timer fires prevents `destroy` | `mobile/__tests__/p2p/transient-replication.test.ts::cancelReplicationOnTimeout > HP-B2.a-cov` | passed |
+  | EC-B2.a-cov | Edge case | `cancelReplicationOnTimeout` — timer firing calls `destroy` once and rejects with `RuntimeProtocolError` | `mobile/__tests__/p2p/transient-replication.test.ts::cancelReplicationOnTimeout > EC-B2.a-cov` | passed |
+  | HP-B2.a-cov | Happy path | `connectAndReplicate` resolves with a working `destroy` when the swarm connects immediately | `mobile/__tests__/p2p/transient-replication.test.ts::connectAndReplicate > HP-B2.a-cov` | passed |
+  | EC-B2.a-cov | Edge case | `connectAndReplicate` rejects with `RuntimeProtocolError("REPLICATION_CONNECT_FAILED")` on connect timeout | `mobile/__tests__/p2p/transient-replication.test.ts::connectAndReplicate > EC-B2.a-cov` | passed |
+  | HP-B2.a-cov | Happy path | `connectReplicateAndCancelOnTimeout` resolves once `finishedSignal` resolves | `mobile/__tests__/p2p/transient-replication.test.ts::connectReplicateAndCancelOnTimeout > HP-B2.a-cov` | passed |
+  | EC-B2.a-cov | Edge case | `connectReplicateAndCancelOnTimeout` rejects with `RuntimeProtocolError("REPLICATION_TRANSFER_FAILED")` on transfer timeout | `mobile/__tests__/p2p/transient-replication.test.ts::connectReplicateAndCancelOnTimeout > EC-B2.a-cov` | passed |
+  | HP-B2.a-cov | Happy path | `createAndJoinSwarm` calls `join` with `{ server: true, client: false }` for role `"seed"` | `mobile/__tests__/p2p/transient-replication-discovery.test.ts::createAndJoinSwarm > HP-B2.a-cov (seed)` | passed |
+  | HP-B2.a-cov | Happy path | `createAndJoinSwarm` calls `join` with `{ server: false, client: true }` for role `"client"` | `mobile/__tests__/p2p/transient-replication-discovery.test.ts::createAndJoinSwarm > HP-B2.a-cov (client)` | passed |
+  | HP-B2.a-cov | Happy path | `awaitFirstConnection` resolves `{ socket, peerInfo }` and calls `off` once when the connection event fires | `mobile/__tests__/p2p/transient-replication-discovery.test.ts::awaitFirstConnection > HP-B2.a-cov` | passed |
+  | EC-B2.a-cov | Edge case | `awaitFirstConnection` rejects with `RuntimeProtocolError("REPLICATION_CONNECT_FAILED")` on timeout and calls `off` once | `mobile/__tests__/p2p/transient-replication-discovery.test.ts::awaitFirstConnection > EC-B2.a-cov (timeout)` | passed |
+  | EC-B2.a-cov | Edge case | `awaitFirstConnection` — a late connection event after the promise already settled does not throw | `mobile/__tests__/p2p/transient-replication-discovery.test.ts::awaitFirstConnection > EC-B2.a-cov (late connection)` | passed |
+
+- **Owner final verification:** pending (see P1.B2 pack execution note —
+  owner approved the full 12-task pack; per-task closure evidence recorded
+  here, final owner sign-off tracked at P1.B2 parent closure).
 
 ### P1.B2.a-i — Digest-compare pure helper
 
