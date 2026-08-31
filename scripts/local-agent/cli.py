@@ -30,10 +30,10 @@ from session_loop import BoundaryViolation, MalformedToolCall, run_loop
 # Mirrors run_local_task.py's MODEL_CONTEXT_TOKENS / GENERATION_TOKEN_BUDGET
 # module-level defaults. Duplicated here rather than imported to avoid the
 # circular import (run_local_task.py already does `import cli`); both sides
-# are the same ADR-036 local-implementer defaults, not two independent
-# guesses. Lowered to 32K alongside run_local_task.py per owner directive,
-# 2026-08-24 (nemotron memory constraint) — keep both constants in sync.
-_DEFAULT_MODEL_CONTEXT_TOKENS = 32768
+# are the same local-implementer defaults, not two independent guesses.
+# Devstral Small 2 uses the owner-selected 128K normal context baseline; keep
+# both constants in sync.
+_DEFAULT_MODEL_CONTEXT_TOKENS = 131072
 _DEFAULT_GENERATION_TOKEN_BUDGET = 8192
 
 # Output-format contract local to this script's tool-call transport: no
@@ -351,10 +351,9 @@ def main(
 
     # ADR-038 T3 EC-2: a Med-high card must run under the exact required
     # model -- no silent substitution. This is a routing-evidence check, not
-    # a capability check: --model defaults to the same
-    # nemotron-3.5-lightning:30b-a3b-q4_K_M tag, so this only ever fires when
-    # a caller explicitly overrides --model for a card the gate (T2) already
-    # routed to Med-high local implementation.
+    # a capability check: --model defaults to the same Devstral Small 2 tag,
+    # so this only ever fires when a caller explicitly overrides --model for
+    # a card the gate (T2) already routed to Med-high local implementation.
     if limits.required_model and args.model != limits.required_model:
         result = {
             "status": "model_substitution_rejected",
