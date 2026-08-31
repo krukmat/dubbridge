@@ -168,7 +168,12 @@ class MultiTurnContextTests(unittest.TestCase):
         self.assertIn("error[E0308]", hints["diagnostic_summary"])
         # Raw failure remains in the audit transcript even though the repair
         # message contains only the deterministic summary.
-        self.assertIn(raw_failure, json.dumps(result["transcript"]))
+        raw_test_results = [
+            event["result"]
+            for event in result["transcript"]
+            if event.get("event") == "test_result" and not event["result"].get("passed")
+        ]
+        self.assertEqual(raw_test_results[0]["output"], raw_failure)
 
     def test_diagnostics_preserve_signal_and_bound_noise(self):
         result = {
