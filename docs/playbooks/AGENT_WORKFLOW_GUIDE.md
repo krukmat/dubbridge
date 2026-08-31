@@ -26,7 +26,7 @@ governs: "all agent-facing workflow decisions in the repository"
 | Role | Binding |
 |---|---|
 | Local implementer, RRI 0–25 | `qwen3.8:27b-mlx` |
-| Local implementer, RRI 26–45 and ADR-040 local tramos in RRI 46–55 | `nemotron-3.5-lightning:30b-a3b-q4_K_M` |
+| Local implementer, RRI 26–45 and ADR-040 local tramos in RRI 46–55 | `devstral-small-2:24b-instruct-2512-q4_K_M` |
 | RRI 0–25 reviewer chain (phases 1 and 2) | `muse-glimmer:30b-q4_K_M` → `gemma4:26b-a4b-it-qat` → D14 |
 | RRI 26–55 reviewer chain (phases 1 and 2) | `gemma4:26b-a4b-it-qat` → `muse-glimmer:30b-q4_K_M` → D14 |
 | Local Architect / Complex Analyst | `muse-glimmer:30b-q4_K_M` — advisory-only (ADR-037), never a phase-1/phase-2 reviewer in any band |
@@ -47,13 +47,12 @@ and Architect-refined implementation routing below), not to cloud. A
    endpoint (`pgrep -fl ollama`, `lsof -iTCP:11434 -sTCP:LISTEN`), then
    warm-test every model the task's band will use with a review-style
    JSON-only prompt at production `num_predict`/`num_ctx` (`65536` for Low/S
-   Qwen roles; `32768` for Moderate nemotron roles, lowered 2026-08-24 for
-   host memory constraints — see `scripts/local-agent/run_local_task.py`
-   `MODEL_CONTEXT_TOKENS`; the configured reviewer context otherwise),
-   confirming `done_reason: "stop"` with non-empty content. Treat empty
-   `content` on any
-   terminal reason as a capacity symptom, not a stall — enter the
-   resource-recovery protocol below rather than retrying unchanged.
+   Qwen roles; `131072` for Moderate Devstral roles — see
+   `scripts/local-agent/run_local_task.py` `MODEL_CONTEXT_TOKENS`; the
+   configured reviewer context otherwise), confirming `done_reason: "stop"`
+   with non-empty content. Treat empty `content` on any terminal reason as a
+   capacity symptom, not a stall — enter the resource-recovery protocol below
+   rather than retrying unchanged.
    - One restart per repository task ID; retries, repairs, and later local
      phases of the same task reuse it. Confirm no other task's local-model
      runner is active before restarting — wait for it or stop it under its
@@ -123,7 +122,7 @@ and Architect-refined implementation routing below), not to cloud. A
      approval, then implement local-first via
      `scripts/local-agent/run_local_task.py` in a disposable worktree
      (`DUBBRIDGE_LOCAL_AGENT_MODEL`, default
-     `nemotron-3.5-lightning:30b-a3b-q4_K_M`), at most 2
+     `devstral-small-2:24b-instruct-2512-q4_K_M`), at most 2
      evidence-backed local repair attempts. On 2/2 exhaustion, decompose the
      remaining work into scored Low-band subtasks before considering the
      cloud-takeover model resolved in Step 2 as last resort.
@@ -402,10 +401,10 @@ default `http://localhost:11434`).
 The **26–40 Moderate band** keeps Codex/Claude recommendations for
 orchestration/escalation but moves the default code-authoring surface local:
 `scripts/local-agent/run_local_task.py` (`DUBBRIDGE_LOCAL_AGENT_MODEL`,
-default `qwen3.8:27b-mlx`) inside a disposable worktree, at most 2
-evidence-backed local repair attempts. On 2/2 exhaustion, first decompose the
-remaining work into scored Low-band subtasks; cloud is the last resort when
-that route cannot proceed.
+default `devstral-small-2:24b-instruct-2512-q4_K_M`) inside a disposable
+worktree, at most 2 evidence-backed local repair attempts. On 2/2 exhaustion,
+first decompose the remaining work into scored Low-band subtasks; cloud is the
+last resort when that route cannot proceed.
 
 **Med-high (41–55):** ADR-038 is its fail-closed, evidence-bearing
 refinement/receipt gate. **RRI 46–55** is cloud-only **for the whole task**
@@ -635,9 +634,9 @@ preserve any task-local pin until an approved change replaces it.
 
 Local-first position for 0–55 is set by § Model and thinking-mode selection
 and § Local-first and Architect-refined implementation routing above (Qwen
-Developer for eligible Low patches; `qwen3.8:27b-mlx` local-first for
-Moderate; ADR-038 cloud-only for Med-high 46–55, local-first for Med-high
-41–45 per ADR-038 Amendment 3); 56+ has no local-first position.
+Developer for eligible Low patches; `devstral-small-2:24b-instruct-2512-q4_K_M`
+local-first for Moderate; ADR-038 cloud-only for Med-high 46–55, local-first
+for Med-high 41–45 per ADR-038 Amendment 3); 56+ has no local-first position.
 Classify the takeover cause before choosing the model: **operational-only**
 means the local service/binding/process/machine is unavailable with no
 evidence the task itself is harder than scored (don't spend Premium capacity
@@ -876,9 +875,9 @@ primary agent remains orchestrator of record — owning the task card,
 `allowed_paths`, verification commands, Reflection passes, closure, and
 final accept/reject judgment. The local implementer resolves from
 `DUBBRIDGE_LOCAL_AGENT_MODEL` (default
-`nemotron-3.5-lightning:30b-a3b-q4_K_M`), receives the
-complete authorized file contents up front, and cannot read files or run
-processes itself.
+`devstral-small-2:24b-instruct-2512-q4_K_M`), receives the complete
+authorized file contents up front, and cannot read files or run processes
+itself.
 
 The runner exposes a deliberately simple, card-bound tool contract —
 `write_file` (create or overwrite), `apply_patch` (single-unique-anchor
@@ -1249,7 +1248,7 @@ JSON receipt when invoked with `GEMMA_REVIEW_TASK_ID=<task_id>`, at
 The completed task section must reference it:
 
 ```md
-- Review artifact: docs/audit/gemma-evidence/<task_id>.json
+- Review artifact: docs/audit/gemma-evidence/<task-id>.json
 ```
 
 `scripts/check-task-unit-coverage.sh` checks the file exists, is valid JSON,
