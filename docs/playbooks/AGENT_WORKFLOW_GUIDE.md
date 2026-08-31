@@ -1120,6 +1120,14 @@ eligible simple code patches. It is bound to `qwen3.8:27b-mlx`; the shared
   final judgment.
 - Qwen-authored Low-RRI patches require an independent primary-agent review
   even when Gemma Reviewer also runs.
+- **Whitespace/formatting is not a finding.** When comparing a delegated
+  patch against its packet contract, or evaluating any phase-1/phase-2 diff,
+  differences limited to spacing, indentation, or line breaks are not a
+  discrepancy or finding on their own — only functional/behavioral deviation
+  from the contract or acceptance criteria is. This does not relax
+  `qa-fmt`/`prettier`/`eslint`/`rustfmt` or any other automated formatting
+  gate — those still run and still block on their own terms; it only scopes
+  what counts as reviewer/orchestrator judgment on top of them.
 
 The sentence above is the canonical source for the authority-boundary clause
 sent to Ollama as part of Gemma Reviewer's system prompt, mechanically
