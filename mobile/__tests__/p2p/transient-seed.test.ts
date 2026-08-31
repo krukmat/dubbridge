@@ -106,6 +106,31 @@ describe("P1.A2 seed write/hash/close", () => {
     restore();
   });
 
+  it("EC-A2 surfaces a close failure during error-path cleanup instead of masking it", async () => {
+    const restore = configureSeedDependenciesForTest(() =>
+      makeSeedDependencies({
+        put: async () => {
+          throw new Error("raw-fixture-detail-write");
+        },
+        close: async () => {
+          throw new Error("raw-fixture-detail-close");
+        },
+      }),
+    );
+    const harness = workletHarness(["file:///cache/dubbridge-p2p/proofs/proofrun1/"]);
+
+    await requestSeedWrite(harness);
+
+    expect(harness.replies).toEqual([
+      expect.objectContaining({
+        ok: false,
+        error: { code: "SEED_CLOSE_FAILED", message: expect.any(String) },
+      }),
+    ]);
+    expect(JSON.stringify(harness.replies)).not.toContain("raw-fixture-detail");
+    restore();
+  });
+
   it("EC-A2 returns a close error without leaking raw details", async () => {
     const restore = configureSeedDependenciesForTest(() =>
       makeSeedDependencies({

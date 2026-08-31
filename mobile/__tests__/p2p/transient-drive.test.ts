@@ -5,7 +5,7 @@ import { RUNTIME_COMMAND, RUNTIME_PROTOCOL_VERSION } from "../../src/p2p/runtime
 import { configureTransientDriveDependenciesForTest } from "../../src/p2p/runtime/worklet";
 import { workletHarness } from "../../test-utils/worklet-harness";
 let { ProofStorageConfigError, proofStorageUri, startProofWorklet } =
-  require("../../src/p2p/proof/P1ProofRuntimeFactory");
+  require("../../src/p2p/proof/ProofRuntimeFactory");
 
 jest.mock("expo-file-system", () => ({
   Paths: { cache: "file:///cache" },

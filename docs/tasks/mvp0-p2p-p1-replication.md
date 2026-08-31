@@ -590,7 +590,7 @@ and passing focused/typecheck/lint/full-Jest verification.
 - **Effort / RRI:** L / 50 Med-high. Full report:
   `docs/audit/mvp0-p2p-p1-a1b-rri-v2.md`. The former S / 25 estimate and
   blocked RRI 53 assessment are historical only.
-- **Allowed paths:** `mobile/src/p2p/proof/P1ProofRuntimeFactory.ts` (new),
+- **Allowed paths:** `mobile/src/p2p/proof/ProofRuntimeFactory.ts` (new),
   `mobile/src/p2p/runtime/protocol.ts`, `mobile/src/p2p/runtime/worklet.ts`,
   `mobile/src/p2p/runtime/worklet.bundle.js`, and
   `mobile/__tests__/p2p/runtime-protocol.test.ts` only.
@@ -763,13 +763,37 @@ and full Jest results, and owner final verification.
   `docs/audit/mvp0-p2p-p1-a2-rri.md`, `docs/audit/mvp0-p2p-p1-a2-phase1-review.json`,
   and `docs/audit/mvp0-p2p-p1-a2-approval-card.md`.
 - **Effort / RRI:** L / 46 Med-high.
-- **Allowed paths:** `mobile/src/p2p/runtime/worklet.ts`,
+- **Allowed paths (as approved):** `mobile/src/p2p/runtime/worklet.ts`,
   `mobile/src/p2p/runtime/protocol.ts`, generated
   `mobile/src/p2p/runtime/worklet.bundle.js`,
-  `mobile/src/p2p/proof/P1ProofRuntimeFactory.ts`, new
+  `mobile/src/p2p/proof/ProofRuntimeFactory.ts`, new
   `mobile/src/p2p/proof/transient-storage.ts`, new
-  `mobile/src/p2p/proof/P1SeedProofRunner.ts`, new
+  `mobile/src/p2p/proof/SeedProofRunner.ts`, new
   `mobile/__tests__/p2p/transient-seed.test.ts`, and A2 evidence.
+  **Actual touched set at closure** (corrected per the D14 phase-2 MAJOR
+  finding, `### Peer Reviewer evidence` below) additionally includes new
+  `mobile/src/p2p/runtime/runtime-client.ts`,
+  `mobile/src/p2p/runtime/transient-drive.ts`,
+  `mobile/src/p2p/runtime/BareRuntimeClient.ts`,
+  `mobile/scripts/build-bare-worklet.mjs`, `mobile/package.json`/
+  `package-lock.json`, `mobile/test-utils/expo-file-system-mock.ts`,
+  `mobile/test-utils/worklet-harness.ts`, new
+  `mobile/__tests__/p2p/SeedProofRunner.test.ts`, and their test files —
+  mechanical fallout of this session's user-directed further split of
+  `protocol.ts` and the shared A1 transient-drive module, not new
+  behavioral scope.
+
+  **Naming note:** the originally-approved names carried a `P1` phase
+  prefix (`P1ProofRuntimeFactory.ts`, `P1SeedProofRunner.ts`) inherited
+  from A1's existing module. Per explicit user request during closure, both
+  were renamed to drop the phase prefix (`ProofRuntimeFactory.ts`,
+  `SeedProofRunner.ts`, plus the corresponding test file) so the module
+  name reflects what it does rather than which roadmap phase created it.
+  No behavior changed; only file names, import paths, and one `describe`
+  block label were updated. Verified clean after rename: `npm run
+  typecheck` (exit 0), `npm run lint` (exit 0), `npx jest` (29/29 suites,
+  296/296 tests), `node scripts/build-bare-worklet.mjs --check` (no
+  drift — neither module was ever part of the worklet bundle).
 - **Objective:** write/hash a deterministic synthetic fixture in run-scoped
   cache storage and prove close-before-delete, absence, and crash-residue cleanup.
 - **HP-A2:** seed receipt returns byte count/SHA-256; shutdown closes handles,
@@ -801,9 +825,9 @@ decomposed into four candidate subtasks and each independently scored with
 | Candidate | Files | RRI | Band | Route |
 |---|---|---:|---|---|
 | A2-1 | `mobile/src/p2p/proof/transient-storage.ts` (new) | 21 | Low | Delegated via `scripts/delegate-low-rri.py` |
-| A2-2 | `mobile/src/p2p/proof/P1SeedProofRunner.ts` (new) | 26 | Moderate | Cloud (does not qualify for Low) |
+| A2-2 | `mobile/src/p2p/proof/SeedProofRunner.ts` (new) | 26 | Moderate | Cloud (does not qualify for Low) |
 | A2-3 | `mobile/__tests__/p2p/transient-seed.test.ts` (new) | 7 | Low | Delegated via `scripts/delegate-low-rri.py` |
-| A2-4 | `mobile/src/p2p/runtime/worklet.ts`, `protocol.ts`, `worklet.bundle.js`, `mobile/src/p2p/proof/P1ProofRuntimeFactory.ts` | 31 | Moderate | Cloud (does not qualify for Low) |
+| A2-4 | `mobile/src/p2p/runtime/worklet.ts`, `protocol.ts`, `worklet.bundle.js`, `mobile/src/p2p/proof/ProofRuntimeFactory.ts` | 31 | Moderate | Cloud (does not qualify for Low) |
 
 A2-2 and A2-4 were not forced into artificial Low-band decomposition —
 their D/K scores reflect genuine crash-residue-cleanup and Hyperdrive/Bare
@@ -817,6 +841,173 @@ measured RRI.
 - Primary receipt (downgrade to `CLOUD_REQUIRED` per Amendment 1): `docs/audit/mvp0-p2p-p1-a2-primary-receipt.json`
 - Gate decision: `med_high_gate.py` → `{"route": "CLOUD_REQUIRED", "reason": "Primary receipt downgraded GO_LOCAL to cloud."}`
 - Decomposition outcome: 2/4 candidates qualify Low (delegated), 2/4 remain Moderate and route to the cloud-takeover packet
+
+### Peer Reviewer evidence
+
+- Reviewer: `d14` (cross-provider, Codex)
+- Command: `codex exec --sandbox read-only --skip-git-repo-check <isolated adjudicator packet>`
+- Artifact: `docs/audit/mvp0-p2p-p1-a2-d14-phase2-review.log`,
+  disposition record `docs/audit/mvp0-p2p-p1-a2-d14-phase2-disposition.md`
+- Verdict: `FINDINGS` (3 BLOCKING, 2 MAJOR) — all dispositioned; see below
+- Findings: 3 BLOCKING repaired (traversal guard wired into
+  `runSeedProof`, error-path close failure no longer swallowed, janitor
+  made invocable via new `janitorAbandonedProofRuns`); 2 MAJOR — 1 repaired
+  (added `SeedProofRunner.test.ts`, 7 new tests), 1 accepted-follow-up
+  (allowed_paths drift from this session's user-directed `protocol.ts`
+  split, already covered by its own maintainability-gate pass and test
+  suite; ledger's allowed-paths list corrected below to reflect the actual
+  touched set)
+- Gemma fallback: `triggered` — reason: Gemma (`gemma4:26b-a4b-it-qat`)
+  produced 0/3 parseable passes on both the initial attempt and the
+  mandatory retry (`invalid review response: missing SUMMARY header` on
+  every pass)
+- Muse Glimmer fallback: `triggered` — reason: 0/3 passes, idle timeout
+  after 180s/token on every pass; resource-recovery protocol invoked
+  (`ollama stop`, confirmed host memory pressure via `vm_stat`), but the
+  real review packet (~17k est. tokens) does not fit the reduced
+  `num_ctx=16384` recovery profile (~15.5k tokens available for prompt),
+  so no bounded retry was attempted at reduced context — routed to D14
+  per policy rather than reviewing a truncated packet
+- D14 fallback: `triggered` — reason: both Gemma and Muse Glimmer
+  unavailable/unusable per above
+- D14 provider route: `cross-provider` — reason: caller=claude-code,
+  reviewer=codex (authenticated, no cross-provider failure)
+- disposition_divergence: `n/a` — no prior reconciled findings existed
+  (both local reviewers returned zero usable passes); D14 ran a
+  from-scratch review, not an adjudication of conflicting local findings
+- Primary-agent disposition: 3/3 BLOCKING repaired with code changes; 2/2
+  MAJOR dispositioned (1 repaired, 1 accepted-follow-up with reason
+  recorded per finding above)
+
+**Allowed paths correction (recorded per the accepted-follow-up finding
+above):** the diff also touches `mobile/src/p2p/runtime/runtime-client.ts`
+(new), `mobile/src/p2p/runtime/transient-drive.ts`,
+`mobile/src/p2p/runtime/BareRuntimeClient.ts`,
+`mobile/scripts/build-bare-worklet.mjs`, `mobile/package.json`/
+`package-lock.json`, and shared test utilities
+(`mobile/test-utils/expo-file-system-mock.ts`,
+`mobile/test-utils/worklet-harness.ts`) plus their test files — all
+mechanical consequences of this session's user-directed further split of
+`protocol.ts` (to pass `qa-maintainability`'s declaration-line budget) and
+the earlier A1 transient-drive lifecycle work sharing the same runtime
+directory, not new behavioral scope.
+
+### Reflection log
+
+Required passes: 3 (`RRI 46` → `Med-high`)
+
+#### Pass 1
+
+- **Focus:** Ownership direction and correctness against every HP-A2/EC-A2
+  case (parent Reflection plan pass 1/3 focus).
+- **Draft verdict:** Pre-D14 implementation (A2-1 through A2-4) passed its
+  own type/lint/test/bundle/maintainability checks, but D14's independent
+  review found 3 BLOCKING correctness gaps against the task's own EC-A2
+  acceptance criterion ("traversal/foreign path... is rejected... without
+  touching paths outside the proof root", "abandoned run is... janitored",
+  "cleanup failure makes the proof fail").
+- **Critique findings:**
+  - `isWithinProofRoot` (built in A2-1, specifically for this purpose) had
+    no production call site — EC-A2's traversal-rejection requirement was
+    implemented as a testable unit but never wired into the actual proof
+    flow.
+  - `writeHashSeed`'s error-path cleanup discarded a `closeSeedHandles`
+    failure via `.catch(() => undefined)`, directly violating "cleanup
+    failure makes the proof fail."
+  - `listAbandonedProofRuns` (A2-1) had no caller — the janitor half of
+    EC-A2 existed as a pure lister with no invocable cleanup entry point.
+- **Revisions applied:**
+  - `SeedProofRunner.runSeedProof` now validates the host-constructed run
+    root against `isWithinProofRoot` before starting the worklet, failing
+    closed with `PROOF_STORAGE_CONFIG_INVALID`.
+  - `transient-seed.ts`'s error-path cleanup now propagates a close
+    failure as `SEED_CLOSE_FAILED` instead of discarding it, matching the
+    established pattern in `transient-drive.ts`'s `openCloseTransientDrive`.
+  - Added `janitorAbandonedProofRuns(maxAgeMs, now?)` to
+    `SeedProofRunner.ts`: deletes every abandoned run reported by
+    `listAbandonedProofRuns`, tolerates an already-removed run, fails
+    closed on any other deletion error.
+
+#### Pass 2
+
+- **Focus:** Storage safety — every proof path is scoped, handles close
+  before deletion, abandoned runs are bounded, and residue prevents PASS
+  (parent Reflection plan pass 3/5 focus, directly applicable to A2).
+- **Draft verdict:** Post-Pass-1 code change reviewed against the same
+  storage-safety bar the parent P1 plan sets for the whole replication
+  proof, not just this task's own local acceptance criteria.
+- **Critique findings:**
+  - `janitorAbandonedProofRuns`'s bound is implicit — it relies entirely on
+    `listAbandonedProofRuns`'s own `RUN_ID` regex + age filter (already
+    covered by `transient-storage.test.ts`) plus the fixed proofs-root
+    path; no independent path check was added inside the janitor loop
+    itself. Confirmed acceptable: `deleteProofRunDirectory` re-validates
+    `RUN_ID` internally before constructing any path, so a defense-in-depth
+    check inside the janitor loop would be redundant, not a real gap.
+  - The new BLOCKING-finding fixes had no test coverage of their own before
+    this pass (D14 reviewed the pre-fix diff, not the fix).
+- **Revisions applied:**
+  - Added `mobile/__tests__/p2p/SeedProofRunner.test.ts` (7 tests): full
+    HP-A2 lifecycle (handshake → write → shutdown → delete → absence),
+    EC-A2 traversal rejection before any worklet start, EC-A2 delete
+    failure surfacing, EC-A2 port-close-on-write-failure, and 3 janitor
+    tests (deletes only stale runs, tolerates an already-gone run, fails
+    closed on a genuine delete error).
+  - Added a targeted `transient-seed.test.ts` case for the specific fixed
+    branch (close failure during error-path cleanup after a write
+    failure), since the existing close-failure test only covered the
+    success-path close.
+  - Found and fixed a test-authoring bug during this pass (not a source
+    bug): the janitor's "fails closed on delete error" test initially
+    never set `parentDir.listFn`, so it exercised an empty abandoned-run
+    list and passed for the wrong reason (nothing to delete, not "delete
+    failure propagates"). Root-caused via directed debug logging before
+    accepting the fix, consistent with this session's standing practice of
+    tracing every test failure to ground truth rather than adjusting
+    assertions to match observed behavior.
+
+#### Pass 3
+
+- **Focus:** Product-boundary protection and full regression — no asset,
+  key, or unrelated network/service behavior leaks in; every gate this
+  task's changes could affect stays green (parent Reflection plan pass 5/5
+  focus, adapted to confirm the fix set didn't regress anything else).
+- **Draft verdict:** All fixes applied and covered; running the complete
+  independent verification set the D14 packet declared, plus the full
+  suite, to confirm no regression outside A2's own scope.
+- **Critique findings:** None — `npm run typecheck`, `npm run lint`, the
+  full `npx jest` suite (not just `__tests__/p2p/`), the worklet-bundle
+  drift check, and `python3 scripts/check-maintainability.py` all pass
+  clean after the fixes; no other test file's behavior changed.
+- **Revisions applied:** none needed.
+  - `npm run typecheck` (mobile/): exit 0
+  - `npm run lint` (mobile/): exit 0
+  - `npx jest __tests__/p2p/`: 8/8 suites, 61/61 tests passed
+  - `npx jest` (full mobile suite): 29/29 suites, 296/296 tests passed
+  - `node scripts/build-bare-worklet.mjs --check`: no drift,
+    sha256=`32390ea97d9c17f37b97b0b478b19dc70e0498c5d06dc8ad135d10d4e2f5b1ef`
+  - `python3 scripts/check-maintainability.py`: Maintainability gate passed
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-A2 | Happy path | seed receipt returns byte count/SHA-256; shutdown closes handles, removes the exact run directory, and verifies absence | `mobile/__tests__/p2p/transient-seed.test.ts::HP-A2 preserves the seed receipt after write, hash, and close`; `mobile/__tests__/p2p/SeedProofRunner.test.ts::HP-A2 shutdown closes handles, removes the exact run directory, and verifies absence` | passed |
+| EC-A2 | Edge case | traversal/foreign path is rejected without touching paths outside the proof root | `mobile/__tests__/p2p/transient-storage.test.ts::EC: isWithinProofRoot rejects traversal, other runs, and paths outside proofs`; `mobile/__tests__/p2p/SeedProofRunner.test.ts::EC-A2 rejects a foreign/traversal run id before starting the worklet` | passed |
+| EC-A2 | Edge case | write/hash failure is rejected with a redacted typed error | `mobile/__tests__/p2p/transient-seed.test.ts::EC-A2 returns a redacted typed error for %s failure` (dependency load / put / hash, `it.each`) | passed |
+| EC-A2 | Edge case | close failure makes the proof fail (both success-path and error-path cleanup) | `mobile/__tests__/p2p/transient-seed.test.ts::EC-A2 returns a close error without leaking raw details`; `mobile/__tests__/p2p/transient-seed.test.ts::EC-A2 surfaces a close failure during error-path cleanup instead of masking it` | passed |
+| EC-A2 | Edge case | delete/verify failure after a successful proof surfaces a typed error | `mobile/__tests__/p2p/SeedProofRunner.test.ts::EC-A2 surfaces SEED_DELETE_FAILED without discarding the seed receipt work` | passed |
+| EC-A2 | Edge case | worklet port closes when handshake/write fails before delete | `mobile/__tests__/p2p/SeedProofRunner.test.ts::EC-A2 closes the worklet port when handshake/write fails` | passed |
+| EC-A2 | Edge case | abandoned run is janitored: only stale runs are deleted, an already-gone run doesn't fail the batch, a genuine delete error fails closed | `mobile/__tests__/p2p/SeedProofRunner.test.ts::EC-A2 deletes only stale run directories under the proof root`; `::EC-A2 does not fail the batch when an abandoned run is already gone`; `::EC-A2 fails closed when a stale run cannot be deleted` | passed |
+| EC-A2 | Edge case | abandoned-run listing is bounded by proof root, `RUN_ID` shape, and age | `mobile/__tests__/p2p/transient-storage.test.ts::HP: listAbandonedProofRuns returns only stale run-id dirs`; `::EC: listAbandonedProofRuns returns [] without listing when parent doesn't exist` | passed |
+
+### Owner final verification
+
+**Pending.** Implementation, D14 phase-2 review (BLOCKING findings
+repaired), 3-pass Reflection, and unit coverage certification are
+complete. Per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` Step 4, owner sign-off
+(name, date, verification statement, exact commands run) is required before
+this task may be marked `[x] Done`.
 
 ## P1.B1 — Isolated Hyperswarm replication transport
 

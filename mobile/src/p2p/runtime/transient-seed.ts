@@ -97,7 +97,11 @@ export async function writeHashSeed(runtime: WorkletRuntime): Promise<SeedWriteH
     }
     digest = digestFixture(createHash, fixture);
   } catch (error) {
-    await closeSeedHandles(handles.drive, handles.store).catch(() => undefined);
+    try {
+      await closeSeedHandles(handles.drive, handles.store);
+    } catch {
+      throw new RuntimeProtocolError("SEED_CLOSE_FAILED", "Seed drive could not be closed");
+    }
     if (error instanceof RuntimeProtocolError) throw error;
     throw new RuntimeProtocolError("SEED_WRITE_FAILED", "Seed fixture could not be written");
   }

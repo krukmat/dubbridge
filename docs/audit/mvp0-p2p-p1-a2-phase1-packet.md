@@ -21,9 +21,9 @@ abandoned marked proof runs.
 - `mobile/src/p2p/runtime/worklet.ts`
 - `mobile/src/p2p/runtime/protocol.ts`
 - generated `mobile/src/p2p/runtime/worklet.bundle.js`
-- `mobile/src/p2p/proof/P1ProofRuntimeFactory.ts`
+- `mobile/src/p2p/proof/ProofRuntimeFactory.ts`
 - new `mobile/src/p2p/proof/transient-storage.ts`
-- new `mobile/src/p2p/proof/P1SeedProofRunner.ts`
+- new `mobile/src/p2p/proof/SeedProofRunner.ts`
 - new `mobile/__tests__/p2p/transient-seed.test.ts`
 - P1.A2 audit/card evidence only
 

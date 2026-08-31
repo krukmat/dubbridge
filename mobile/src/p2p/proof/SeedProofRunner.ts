@@ -2,8 +2,13 @@ import type { Worklet } from "react-native-bare-kit";
 
 import { RuntimeProtocolError, type SeedWriteHashDeleteReceipt } from "../runtime/protocol";
 import { BareRpcPort, RuntimeProtocolClient } from "../runtime/runtime-client";
-import { deleteProofRunDirectory, TransientStorageError } from "./transient-storage";
-import { startProofWorklet } from "./P1ProofRuntimeFactory";
+import {
+  deleteProofRunDirectory,
+  isWithinProofRoot,
+  listAbandonedProofRuns,
+  TransientStorageError,
+} from "./transient-storage";
+import { proofStorageUri, startProofWorklet } from "./ProofRuntimeFactory";
 
 export type SeedProofOutcome = {
   receipt: SeedWriteHashDeleteReceipt;
@@ -15,6 +20,10 @@ export async function runSeedProof(
   timeoutMs = 5_000,
   createWorklet?: () => Pick<Worklet, "start" | "IPC">,
 ): Promise<SeedProofOutcome> {
+  const runRootUri = proofStorageUri(runId);
+  if (!isWithinProofRoot(runRootUri, runId)) {
+    throw new RuntimeProtocolError("PROOF_STORAGE_CONFIG_INVALID", "Proof storage configuration is invalid");
+  }
   const worklet = startProofWorklet(runId, createWorklet) as Pick<Worklet, "start" | "IPC">;
   const port = new BareRpcPort(worklet.IPC as never);
   const client = new RuntimeProtocolClient(port, timeoutMs);
@@ -44,4 +53,23 @@ export async function runSeedProof(
   }
 
   return { receipt, deleted: true };
+}
+
+export async function janitorAbandonedProofRuns(
+  maxAgeMs: number,
+  now?: () => number,
+): Promise<string[]> {
+  const abandoned = await listAbandonedProofRuns(maxAgeMs, now);
+  const removed: string[] = [];
+  for (const runId of abandoned) {
+    try {
+      await deleteProofRunDirectory(runId);
+      removed.push(runId);
+    } catch (error) {
+      if (!(error instanceof TransientStorageError) || error.code !== "TRANSIENT_STORAGE_NOT_FOUND") {
+        throw error;
+      }
+    }
+  }
+  return removed;
 }
