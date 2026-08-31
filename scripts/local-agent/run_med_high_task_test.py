@@ -930,7 +930,7 @@ class SuperviseIntegrationTest(unittest.TestCase):
         _write_json(p_path, receipt)
         return r_path, p_path
 
-    def test_hp1_rri_41_45_go_local_launches_nemotron_runner(self):
+    def test_hp1_rri_41_45_go_local_launches_devstral_runner(self):
         card_path = _card(self.tmp.name)
         out_path = os.path.join(self.tmp.name, "out.json")
         bundle_path = os.path.join(self.tmp.name, "bundle.md")
@@ -952,7 +952,7 @@ class SuperviseIntegrationTest(unittest.TestCase):
         self.assertIsNone(result.bundle_path)
         self.assertEqual(
             runner.call_args.kwargs["model"],
-            "nemotron-3.5-lightning:30b-a3b-q4_K_M",
+            "devstral-small-2:24b-instruct-2512-q4_K_M",
         )
 
     def test_hp1_go_local_is_policy_excluded_and_never_launches_runner(self):
@@ -1018,7 +1018,7 @@ class SuperviseIntegrationTest(unittest.TestCase):
         r_path, p_path = self._write_gate_inputs("CLOUD_REQUIRED", "GO_LOCAL")
 
         def fake_popen(argv, start_new_session=None):
-            self.fail("Qwen35 must not be launched when the route is CLOUD_REQUIRED")
+            self.fail("local runner must not be launched when the route is CLOUD_REQUIRED")
 
         result = _MOD.supervise(
             card_path=card_path, worktree=self.tmp.name, out_path=out_path,
