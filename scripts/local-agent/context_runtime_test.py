@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.dirname(HERE))
 
 import cli  # noqa: E402
 import run_local_task as rlt  # noqa: E402
-from ckg_adapter import CodebaseMemoryCLIAdapter  # noqa: E402
+from ckg_adapter import CKGAdapterError, CodebaseMemoryCLIAdapter  # noqa: E402
 from ckg_manifest import derive_worktree_identity  # noqa: E402
 
 
@@ -33,6 +33,15 @@ def _init_git_repo(root):
     )
     subprocess.run(
         ["git", "-C", root, "config", "user.name", "Test"], check=True
+    )
+
+
+def _mcp_envelope(payload, *, is_error=False):
+    return json.dumps(
+        {
+            "content": [{"type": "text", "text": json.dumps(payload)}],
+            "isError": is_error,
+        }
     )
 
 
@@ -130,12 +139,12 @@ class RuntimeContextTests(unittest.TestCase):
             self.assertEqual(first.base_revision, second.base_revision)
             self.assertNotEqual(first.state_hash, second.state_hash)
 
-    def test_cbm_one_shot_uses_json_stdin(self):
+    def test_cbm_one_shot_uses_json_stdin_and_unwraps_mcp_envelope(self):
         calls = []
 
         def runner(argv, **kwargs):
             calls.append((argv, kwargs))
-            return Completed(stdout='{"results": []}')
+            return Completed(stdout=_mcp_envelope({"results": []}))
 
         adapter = CodebaseMemoryCLIAdapter(binary="cbm", runner=runner)
         result = adapter._call(
@@ -150,6 +159,14 @@ class RuntimeContextTests(unittest.TestCase):
             {"project": "dubbridge", "query": "playback"},
         )
 
+    def test_cbm_error_envelope_fails_closed(self):
+        def runner(argv, **kwargs):
+            return Completed(stdout=_mcp_envelope({"message": "not indexed"}, is_error=True))
+
+        adapter = CodebaseMemoryCLIAdapter(binary="cbm", runner=runner)
+        with self.assertRaises(CKGAdapterError):
+            adapter._call("search_graph", {"project": "missing"})
+
     def test_cbm_indexes_the_exact_task_worktree(self):
         calls = []
 
@@ -157,19 +174,40 @@ class RuntimeContextTests(unittest.TestCase):
             calls.append((argv, kwargs))
             tool = argv[-1]
             if tool == "index_repository":
-                return Completed(stdout='{"project": "task-worktree"}')
-            return Completed(stdout='{"results": []}')
+                return Completed(stdout=_mcp_envelope({"project": "task-worktree"}))
+            return Completed(stdout=_mcp_envelope({"results": []}))
 
         with tempfile.TemporaryDirectory() as root:
+            expected_root = os.path.realpath(root)
             adapter = CodebaseMemoryCLIAdapter(binary="cbm", runner=runner)
             project = adapter.ensure_project(root)
 
         self.assertEqual(project, "task-worktree")
         argv, kwargs = calls[0]
         self.assertEqual(argv, ["cbm", "cli", "--json", "index_repository"])
-        self.assertEqual(
-            json.loads(kwargs["input"])["repo_path"], os.path.realpath(root)
-        )
+        self.assertEqual(json.loads(kwargs["input"])["repo_path"], expected_root)
+
+    def test_cbm_coverage_status_is_parsed_from_tool_payload(self):
+        responses = {
+            "check_index_coverage": _mcp_envelope(
+                {
+                    "paths": [
+                        {
+                            "path": "src/lib.rs",
+                            "status": "no_recorded_issue",
+                            "freshness": "current",
+                        }
+                    ]
+                }
+            )
+        }
+
+        def runner(argv, **kwargs):
+            return Completed(stdout=responses[argv[-1]])
+
+        adapter = CodebaseMemoryCLIAdapter(binary="cbm", runner=runner)
+        result = adapter.coverage("dubbridge", ["src/lib.rs"])
+        self.assertEqual(result["status"], "verified")
 
 
 if __name__ == "__main__":
