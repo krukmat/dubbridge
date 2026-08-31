@@ -8,8 +8,12 @@ import subprocess
 from dataclasses import dataclass, replace
 
 
-MINIMUM_GRAPH_LABELS = frozenset(("Module", "File", "Function", "Method", "Struct", "Enum", "Trait", "Test"))
-MINIMUM_GRAPH_RELATIONSHIPS = frozenset(("CONTAINS", "IMPORTS", "USES", "CALLS", "IMPLEMENTS", "REFERENCES", "TESTS"))
+MINIMUM_GRAPH_LABELS = frozenset(
+    ("Module", "File", "Function", "Method", "Struct", "Enum", "Trait", "Test")
+)
+MINIMUM_GRAPH_RELATIONSHIPS = frozenset(
+    ("CONTAINS", "IMPORTS", "USES", "CALLS", "IMPLEMENTS", "REFERENCES", "TESTS")
+)
 DEFAULT_TRACE_DEPTH = 1
 DEFAULT_COMMAND_TIMEOUT_SECONDS = 20
 
@@ -59,7 +63,9 @@ def _extract_candidates(value, *, priority, reason):
         symbol = item.get("name") or item.get("symbol") or item.get("qualified_name")
         label = item.get("label") or item.get("type") or item.get("kind")
         relation = item.get("relationship") or item.get("relation") or item.get("edge")
-        start = _safe_int(item.get("start_line") or item.get("line_start") or item.get("line"))
+        start = _safe_int(
+            item.get("start_line") or item.get("line_start") or item.get("line")
+        )
         end = _safe_int(item.get("end_line") or item.get("line_end"))
         key = (path, symbol, start, end)
         if key in seen:
@@ -83,7 +89,10 @@ def _extract_candidates(value, *, priority, reason):
 def extract_task_anchors(task_text):
     explicit_paths = []
     explicit_symbols = []
-    for match in re.finditer(r"(?<![\w.-])([A-Za-z0-9_./-]+\.(?:rs|py|toml|json|yaml|yml|md|ts|tsx|js|jsx))(?![\w.-])", task_text or ""):
+    for match in re.finditer(
+        r"(?<![\w.-])([A-Za-z0-9_./-]+\.(?:rs|py|toml|json|yaml|yml|md|ts|tsx|js|jsx))(?![\w.-])",
+        task_text or "",
+    ):
         path = match.group(1)
         if path not in explicit_paths:
             explicit_paths.append(path)
@@ -91,7 +100,9 @@ def extract_task_anchors(task_text):
         value = match.group(1)
         if "." not in value and value not in explicit_symbols:
             explicit_symbols.append(value)
-    for match in re.finditer(r"\b([A-Za-z_][A-Za-z0-9_]*::[A-Za-z0-9_:]+)\b", task_text or ""):
+    for match in re.finditer(
+        r"\b([A-Za-z_][A-Za-z0-9_]*::[A-Za-z0-9_:]+)\b", task_text or ""
+    ):
         value = match.group(1)
         if value not in explicit_symbols:
             explicit_symbols.append(value)
@@ -109,7 +120,13 @@ def rank_candidates(candidates, anchors):
             priority, reason = 0, "explicit_task_anchor"
         elif candidate.label and candidate.label.lower() == "test":
             priority, reason = min(priority, 1), "task_test"
-        elif candidate.relation and candidate.relation.upper() in {"CALLS", "USES", "IMPORTS", "IMPLEMENTS", "REFERENCES"}:
+        elif candidate.relation and candidate.relation.upper() in {
+            "CALLS",
+            "USES",
+            "IMPORTS",
+            "IMPLEMENTS",
+            "REFERENCES",
+        }:
             priority, reason = min(priority, 2), "direct_dependency"
         elif candidate.relation and candidate.relation.upper() in {"CALLED_BY", "CALLER"}:
             priority, reason = min(priority, 3), "direct_caller"
@@ -132,7 +149,14 @@ class CKGAdapterError(RuntimeError):
 
 
 class CodebaseMemoryCLIAdapter:
-    def __init__(self, binary="codebase-memory-mcp", timeout=DEFAULT_COMMAND_TIMEOUT_SECONDS, runner=None):
+    """One-shot CBM adapter. The model never receives this tool surface."""
+
+    def __init__(
+        self,
+        binary="codebase-memory-mcp",
+        timeout=DEFAULT_COMMAND_TIMEOUT_SECONDS,
+        runner=None,
+    ):
         self.binary = binary
         self.timeout = timeout
         self._runner = runner or subprocess.run
@@ -144,11 +168,16 @@ class CodebaseMemoryCLIAdapter:
     def available(self):
         return shutil.which(self.binary) is not None
 
-    def _call(self, tool, *flags):
-        argv = [self.binary, "cli", "--json", tool, *flags]
+    def _call(self, tool, arguments=None):
+        # CBM documents JSON-on-stdin for one-shot CLI tools. Using that form
+        # avoids coupling DubBridge to generated flag spelling, especially for
+        # array-valued fields such as semantic_query/paths.
+        argv = [self.binary, "cli", "--json", tool]
+        stdin = None if arguments is None else json.dumps(arguments, ensure_ascii=False)
         try:
             completed = self._runner(
                 argv,
+                input=stdin,
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -168,7 +197,14 @@ class CodebaseMemoryCLIAdapter:
 
     def _base_repo_root(self, worktree_dir):
         completed = subprocess.run(
-            ["git", "-C", worktree_dir, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            [
+                "git",
+                "-C",
+                worktree_dir,
+                "rev-parse",
+                "--path-format=absolute",
+                "--git-common-dir",
+            ],
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -188,7 +224,11 @@ class CodebaseMemoryCLIAdapter:
         for item in _walk(payload):
             path = item.get("path") or item.get("repo_path") or item.get("root")
             name = item.get("name") or item.get("project")
-            if isinstance(path, str) and isinstance(name, str) and os.path.realpath(path) == root_real:
+            if (
+                isinstance(path, str)
+                and isinstance(name, str)
+                and os.path.realpath(path) == root_real
+            ):
                 return name
         return None
 
@@ -197,21 +237,33 @@ class CodebaseMemoryCLIAdapter:
         project = self._project_for_root(root)
         if project:
             return project
-        self._call("index_repository", "--repo-path", root)
+        self._call("index_repository", {"repo_path": root})
         project = self._project_for_root(root)
         if not project:
-            raise CKGAdapterError("CBM indexed repository but project could not be resolved")
+            raise CKGAdapterError(
+                "CBM indexed repository but project could not be resolved"
+            )
         return project
 
     def coverage(self, project, paths):
         if not paths:
             return {"status": "unknown", "raw": {}}
-        flags = ["--project", project]
-        for path in paths:
-            flags.extend(["--path", path])
-        payload = self._call("check_index_coverage", *flags)
+        payload = self._call(
+            "check_index_coverage", {"project": project, "paths": list(paths)}
+        )
         text = json.dumps(payload, ensure_ascii=False).lower()
-        if any(term in text for term in ("stale", "partial", "skipped", "excluded", "unknown", "pending", "gap")):
+        if any(
+            term in text
+            for term in (
+                "stale",
+                "partial",
+                "skipped",
+                "excluded",
+                "unknown",
+                "pending",
+                "gap",
+            )
+        ):
             status = "partial"
         else:
             status = "verified"
@@ -222,24 +274,40 @@ class CodebaseMemoryCLIAdapter:
         anchors = extract_task_anchors(task_text)
         candidates = []
         for path in anchors["paths"]:
-            candidates.append(GraphCandidate(path=path, priority=0, reason="explicit_task_anchor"))
+            candidates.append(
+                GraphCandidate(path=path, priority=0, reason="explicit_task_anchor")
+            )
         for symbol in anchors["symbols"][:6]:
             payload = self._call(
-                "search_graph", "--project", project, "--name-pattern", re.escape(symbol), "--limit", "10"
+                "search_graph",
+                {"project": project, "name_pattern": re.escape(symbol), "limit": 10},
             )
-            candidates.extend(_extract_candidates(payload, priority=0, reason="explicit_task_anchor"))
+            candidates.extend(
+                _extract_candidates(payload, priority=0, reason="explicit_task_anchor")
+            )
             try:
                 trace = self._call(
-                    "trace_path", "--project", project, "--function-name", symbol, "--direction", "both", "--max-depth", str(DEFAULT_TRACE_DEPTH)
+                    "trace_path",
+                    {
+                        "project": project,
+                        "function_name": symbol,
+                        "direction": "both",
+                        "max_depth": DEFAULT_TRACE_DEPTH,
+                    },
                 )
-                candidates.extend(_extract_candidates(trace, priority=2, reason="direct_dependency"))
+                candidates.extend(
+                    _extract_candidates(trace, priority=2, reason="direct_dependency")
+                )
             except CKGAdapterError:
                 pass
         if not candidates and task_text.strip():
             payload = self._call(
-                "search_graph", "--project", project, "--semantic-query", task_text[:1200], "--limit", "10"
+                "search_graph",
+                {"project": project, "semantic_query": [task_text[:1200]], "limit": 10},
             )
-            candidates.extend(_extract_candidates(payload, priority=5, reason="semantic_candidate"))
+            candidates.extend(
+                _extract_candidates(payload, priority=5, reason="semantic_candidate")
+            )
         return {
             "project": project,
             "anchors": anchors,
