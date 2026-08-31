@@ -102,6 +102,50 @@ impl AuditEvent {
             && self.platform_ingest_session_id.is_none()
     }
 
+    /// Returns whether a review audit event has no correlation IDs.
+    /// Review events do not carry ingest tokens, recording sessions, or
+    /// platform-ingest sessions.
+    /// This checks only the in-memory event shape.
+    pub fn has_valid_review_correlation(&self) -> bool {
+        matches!(
+            self.event_kind,
+            AuditEventKind::ReviewApproved
+                | AuditEventKind::ReviewRejected
+                | AuditEventKind::PublicationSucceeded
+                | AuditEventKind::PublicationRefused
+        ) && self.ingest_token.is_none()
+            && self.recording_session_id.is_none()
+            && self.platform_ingest_session_id.is_none()
+    }
+
+    /// Returns whether a playback audit event has no correlation IDs.
+    /// Playback events do not carry ingest tokens, recording sessions, or
+    /// platform-ingest sessions.
+    /// This checks only the in-memory event shape.
+    pub fn has_valid_playback_correlation(&self) -> bool {
+        matches!(
+            self.event_kind,
+            AuditEventKind::PlaybackGrantIssued | AuditEventKind::PlaybackGrantRefused
+        ) && self.ingest_token.is_none()
+            && self.recording_session_id.is_none()
+            && self.platform_ingest_session_id.is_none()
+    }
+
+    /// Returns whether an auth audit event has no correlation IDs.
+    /// Auth events do not carry ingest tokens, recording sessions, or
+    /// platform-ingest sessions.
+    /// This checks only the in-memory event shape.
+    pub fn has_valid_auth_correlation(&self) -> bool {
+        matches!(
+            self.event_kind,
+            AuditEventKind::AuthLoginSucceeded
+                | AuditEventKind::AuthLoginFailed
+                | AuditEventKind::AuthRegistered
+        ) && self.ingest_token.is_none()
+            && self.recording_session_id.is_none()
+            && self.platform_ingest_session_id.is_none()
+    }
+
     /// Constructor for S1 ingestion events. Always sets `ingest_token`.
     pub fn new(
         asset_id: Option<AssetId>,

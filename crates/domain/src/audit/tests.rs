@@ -460,3 +460,120 @@ fn new_playback_event_sets_asset_id_and_no_correlation_ids() {
     assert_eq!(event.event_kind, AuditEventKind::PlaybackGrantIssued);
     assert_eq!(event.detail.as_deref(), Some("grant_id=demo"));
 }
+
+// HP-1: existing review/publication constructors satisfy the no-correlation predicate.
+#[test]
+fn review_correlation_accepts_review_events_with_no_correlation_ids() {
+    use crate::asset::AssetId;
+    let asset_id = AssetId::new();
+    for kind in [
+        AuditEventKind::ReviewApproved,
+        AuditEventKind::ReviewRejected,
+        AuditEventKind::PublicationSucceeded,
+        AuditEventKind::PublicationRefused,
+    ] {
+        let event = AuditEvent::new_review_event(asset_id, kind, None);
+        assert!(event.has_valid_review_correlation());
+    }
+}
+
+// EC-1: adding any correlation identifier to a review event, or using a
+// non-review event kind, must independently reject the correlation.
+#[test]
+fn review_correlation_rejects_any_correlation_id_and_other_families() {
+    use crate::asset::AssetId;
+    let asset_id = AssetId::new();
+    let mut event = AuditEvent::new_review_event(asset_id, AuditEventKind::ReviewApproved, None);
+    assert!(event.has_valid_review_correlation());
+
+    event.ingest_token = Some(Uuid::new_v4());
+    assert!(!event.has_valid_review_correlation());
+
+    event.ingest_token = None;
+    event.recording_session_id = Some(Uuid::new_v4());
+    assert!(!event.has_valid_review_correlation());
+
+    event.recording_session_id = None;
+    event.platform_ingest_session_id = Some(Uuid::new_v4());
+    assert!(!event.has_valid_review_correlation());
+
+    event.platform_ingest_session_id = None;
+    event.event_kind = AuditEventKind::OrgCreated;
+    assert!(!event.has_valid_review_correlation());
+}
+
+// HP-1: existing playback constructors satisfy the no-correlation predicate.
+#[test]
+fn playback_correlation_accepts_playback_events_with_no_correlation_ids() {
+    use crate::asset::AssetId;
+    let asset_id = AssetId::new();
+    for kind in [
+        AuditEventKind::PlaybackGrantIssued,
+        AuditEventKind::PlaybackGrantRefused,
+    ] {
+        let event = AuditEvent::new_playback_event(asset_id, kind, None);
+        assert!(event.has_valid_playback_correlation());
+    }
+}
+
+// EC-1: adding any correlation identifier to a playback event, or using a
+// non-playback event kind, must independently reject the correlation.
+#[test]
+fn playback_correlation_rejects_any_correlation_id_and_other_families() {
+    use crate::asset::AssetId;
+    let asset_id = AssetId::new();
+    let mut event =
+        AuditEvent::new_playback_event(asset_id, AuditEventKind::PlaybackGrantIssued, None);
+    assert!(event.has_valid_playback_correlation());
+
+    event.ingest_token = Some(Uuid::new_v4());
+    assert!(!event.has_valid_playback_correlation());
+
+    event.ingest_token = None;
+    event.recording_session_id = Some(Uuid::new_v4());
+    assert!(!event.has_valid_playback_correlation());
+
+    event.recording_session_id = None;
+    event.platform_ingest_session_id = Some(Uuid::new_v4());
+    assert!(!event.has_valid_playback_correlation());
+
+    event.platform_ingest_session_id = None;
+    event.event_kind = AuditEventKind::OrgCreated;
+    assert!(!event.has_valid_playback_correlation());
+}
+
+// HP-1: existing auth constructors satisfy the no-correlation predicate.
+#[test]
+fn auth_correlation_accepts_auth_events_with_no_correlation_ids() {
+    for kind in [
+        AuditEventKind::AuthLoginSucceeded,
+        AuditEventKind::AuthLoginFailed,
+        AuditEventKind::AuthRegistered,
+    ] {
+        let event = AuditEvent::new_auth_event(kind, None);
+        assert!(event.has_valid_auth_correlation());
+    }
+}
+
+// EC-1: adding any correlation identifier to an auth event, or using a
+// non-auth event kind, must independently reject the correlation.
+#[test]
+fn auth_correlation_rejects_any_correlation_id_and_other_families() {
+    let mut event = AuditEvent::new_auth_event(AuditEventKind::AuthLoginSucceeded, None);
+    assert!(event.has_valid_auth_correlation());
+
+    event.ingest_token = Some(Uuid::new_v4());
+    assert!(!event.has_valid_auth_correlation());
+
+    event.ingest_token = None;
+    event.recording_session_id = Some(Uuid::new_v4());
+    assert!(!event.has_valid_auth_correlation());
+
+    event.recording_session_id = None;
+    event.platform_ingest_session_id = Some(Uuid::new_v4());
+    assert!(!event.has_valid_auth_correlation());
+
+    event.platform_ingest_session_id = None;
+    event.event_kind = AuditEventKind::OrgCreated;
+    assert!(!event.has_valid_auth_correlation());
+}
