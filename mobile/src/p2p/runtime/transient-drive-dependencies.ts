@@ -1,4 +1,5 @@
 import { RuntimeProtocolError } from "./protocol";
+import { rethrowAsProtocolError } from "./rethrow-as-protocol-error";
 
 interface MinimalCloseable {
   close(): Promise<void>;
@@ -47,8 +48,8 @@ export function loadTransientDriveDependencies(): TransientDriveDependencies {
   try {
     return validateTransientDriveDependencies(transientDriveDependencies());
   } catch (error) {
-    if (error instanceof RuntimeProtocolError) throw error;
-    throw new RuntimeProtocolError(
+    rethrowAsProtocolError(
+      error,
       "TRANSIENT_DRIVE_DEPENDENCY_LOAD_FAILED",
       "Transient drive dependency could not be loaded",
     );

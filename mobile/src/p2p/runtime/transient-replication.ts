@@ -1,6 +1,6 @@
 import { RuntimeProtocolError, type DiscoverAndReplicateReceipt } from "./protocol";
 import { loadTransientReplicationDependencies } from "./transient-replication-dependencies";
-import { createAndJoinSwarm, awaitFirstConnection } from "./transient-replication-discovery";
+import { createAndJoinSwarm, awaitFirstConnection, type SwarmConnectionEvents } from "./transient-replication-discovery";
 
 export interface ReplicableDrive {
   replicate(isInitiator: boolean): { destroy(): void };
@@ -56,10 +56,7 @@ export function cancelReplicationOnTimeout(
 }
 
 export async function connectAndReplicate(
-  swarm: {
-    on: (event: "connection", listener: (socket: unknown, peerInfo: unknown) => void) => void;
-    off: (event: "connection", listener: (socket: unknown, peerInfo: unknown) => void) => void;
-  },
+  swarm: SwarmConnectionEvents,
   connectTimeoutMs: number,
   drive: ReplicableDrive,
   isInitiator: boolean,
@@ -69,10 +66,7 @@ export async function connectAndReplicate(
 }
 
 export async function connectReplicateAndCancelOnTimeout(
-  swarm: {
-    on: (event: "connection", listener: (socket: unknown, peerInfo: unknown) => void) => void;
-    off: (event: "connection", listener: (socket: unknown, peerInfo: unknown) => void) => void;
-  },
+  swarm: SwarmConnectionEvents,
   connectTimeoutMs: number,
   drive: ReplicableDrive,
   isInitiator: boolean,

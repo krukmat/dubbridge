@@ -5,6 +5,11 @@ export interface JoinedSwarm {
   discovery: unknown;
 }
 
+export interface SwarmConnectionEvents {
+  on: (event: "connection", listener: (socket: unknown, peerInfo: unknown) => void) => void;
+  off: (event: "connection", listener: (socket: unknown, peerInfo: unknown) => void) => void;
+}
+
 export function createAndJoinSwarm(
   Hyperswarm: new () => { join: Function; on: Function },
   topic: Buffer,
@@ -19,10 +24,7 @@ export function createAndJoinSwarm(
 }
 
 export function awaitFirstConnection(
-  swarm: {
-    on: (event: "connection", listener: (socket: unknown, peerInfo: unknown) => void) => void;
-    off: (event: "connection", listener: (socket: unknown, peerInfo: unknown) => void) => void;
-  },
+  swarm: SwarmConnectionEvents,
   timeoutMs: number,
 ): Promise<{ socket: unknown; peerInfo: unknown }> {
   return new Promise((resolve, reject) => {

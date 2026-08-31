@@ -12,6 +12,7 @@ const outputPath = path.join(runtimeRoot, "worklet.bundle.js");
 const sourcePaths = [
   path.join(runtimeRoot, "protocol.ts"),
   path.join(runtimeRoot, "protocol-codec.ts"),
+  path.join(runtimeRoot, "rethrow-as-protocol-error.ts"),
   path.join(runtimeRoot, "transient-drive.ts"),
   path.join(runtimeRoot, "transient-drive-dependencies.ts"),
   path.join(runtimeRoot, "transient-replication-dependencies.ts"),

@@ -1,4 +1,5 @@
 import { RuntimeProtocolError } from "./protocol";
+import { rethrowAsProtocolError } from "./rethrow-as-protocol-error";
 
 export interface TransientReplicationDependencies {
   Hyperswarm: new () => { join: Function; on: Function };
@@ -34,11 +35,7 @@ export function loadTransientReplicationDependencies(): TransientReplicationDepe
   try {
     return validateTransientReplicationDependencies(transientReplicationDependencies());
   } catch (error) {
-    if (error instanceof RuntimeProtocolError) throw error;
-    throw new RuntimeProtocolError(
-      "REPLICATION_DISCOVERY_FAILED",
-      "Replication peer discovery failed",
-    );
+    rethrowAsProtocolError(error, "REPLICATION_DISCOVERY_FAILED", "Replication peer discovery failed");
   }
 }
 
