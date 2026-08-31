@@ -81,7 +81,7 @@ mod tests {
     #[test]
     fn every_constructor_family_satisfies_the_audit_boundary_contract() {
         let asset_id = AssetId::new();
-        let events = vec![
+        let events = [
             AuditEvent::new(
                 Some(asset_id),
                 AuditEventKind::IngestionFinalized,
@@ -104,11 +104,7 @@ mod tests {
             AuditEvent::new_workspace_event(AuditEventKind::OrgCreated, None),
             AuditEvent::new_consent(asset_id, AuditEventKind::ConsentGranted, None),
             AuditEvent::new_review_event(asset_id, AuditEventKind::ReviewApproved, None),
-            AuditEvent::new_playback_event(
-                asset_id,
-                AuditEventKind::PlaybackGrantIssued,
-                None,
-            ),
+            AuditEvent::new_playback_event(asset_id, AuditEventKind::PlaybackGrantIssued, None),
             AuditEvent::new_auth_event(AuditEventKind::AuthLoginSucceeded, None),
         ];
 

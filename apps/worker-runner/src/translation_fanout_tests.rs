@@ -1,7 +1,12 @@
 use crate::translation_fanout::fan_out_localization;
+use dubbridge_db::translation_delivery_repo::{
+    MAX_TRANSLATION_DISPATCH_ATTEMPTS, TranslationDispatchFailureInput,
+    TranslationDispatchFailureResult, translation_dispatch_enqueue_failure,
+};
 use dubbridge_domain::artifact::{ArtifactKind, ArtifactRecord, DerivedArtifact};
 use dubbridge_domain::asset::AssetId;
 use dubbridge_domain::workspace::{ProjectId, TargetLanguage};
+use dubbridge_jobs::TranslationJob;
 use uuid::Uuid;
 
 async fn setup_pool_for_test() -> Option<sqlx::PgPool> {
@@ -13,7 +18,13 @@ async fn setup_pool_for_test() -> Option<sqlx::PgPool> {
         .run(&pool)
         .await
         .ok()?;
-    sqlx::query("TRUNCATE TABLE preparation_jobs, subtitle_jobs, transcription_jobs, translation_deliveries, translation_claims, artifact_records, project_assets, target_languages").execute(&pool).await.ok()?;
+    let truncate = sqlx::query("TRUNCATE TABLE assets, organizations RESTART IDENTITY CASCADE")
+        .execute(&pool)
+        .await;
+    assert!(
+        truncate.is_ok(),
+        "translation fanout fixture must clean the current schema when Postgres is available"
+    );
     Some(pool)
 }
 
@@ -115,6 +126,25 @@ async fn insert_word_alignment_and_subtitle(
     (alignment.id, subtitle.id)
 }
 
+async fn mark_enqueue_failure(
+    pool: &sqlx::PgPool,
+    job: &TranslationJob,
+    detail: &str,
+) -> Result<TranslationDispatchFailureResult, String> {
+    translation_dispatch_enqueue_failure(
+        pool,
+        TranslationDispatchFailureInput {
+            project_id: ProjectId(job.project_id),
+            asset_id: AssetId(job.asset_id),
+            target_language_id: job.target_language_id,
+            generation_request_id: job.generation_request_id,
+            error_detail: detail.to_string(),
+        },
+    )
+    .await
+    .map_err(|error| error.to_string())
+}
+
 #[tokio::test]
 async fn hp1_single_target_returns_one_translation_job() {
     let Some(pool) = setup_pool_for_test().await else {
@@ -189,4 +219,68 @@ async fn ec1_partial_claim_leaves_other_target_working() {
     let jobs = result.unwrap();
     assert_eq!(jobs.len(), 1);
     assert_eq!(jobs[0].target_language_id, de_id);
+}
+
+#[tokio::test]
+async fn retry_cap_allows_last_attempt_then_persists_terminal_failure() -> Result<(), String> {
+    let Some(pool) = setup_pool_for_test().await else {
+        return Ok(());
+    };
+    let asset_id = insert_asset_for_test(&pool).await;
+    insert_project_with_targets(&pool, asset_id, "en", &["fr"]).await;
+    let (alignment_id, _) = insert_word_alignment_and_subtitle(&pool, asset_id).await;
+
+    let first = fan_out_localization(&pool, asset_id, alignment_id).await?;
+    assert_eq!(first.len(), 1);
+    let job = first[0].clone();
+    assert_eq!(
+        mark_enqueue_failure(&pool, &job, "attempt-1 enqueue failed").await?,
+        TranslationDispatchFailureResult::Marked
+    );
+
+    let second = fan_out_localization(&pool, asset_id, alignment_id).await?;
+    assert_eq!(second.len(), 1);
+    assert_eq!(second[0], job);
+    assert_eq!(
+        mark_enqueue_failure(&pool, &job, "attempt-2 enqueue failed").await?,
+        TranslationDispatchFailureResult::Marked
+    );
+
+    let last_permitted = fan_out_localization(&pool, asset_id, alignment_id).await?;
+    assert_eq!(last_permitted.len(), 1);
+    assert_eq!(last_permitted[0], job);
+    assert_eq!(
+        mark_enqueue_failure(&pool, &job, "attempt-3 enqueue failed").await?,
+        TranslationDispatchFailureResult::Exhausted
+    );
+
+    let rejected = fan_out_localization(&pool, asset_id, alignment_id).await?;
+    assert!(
+        rejected.is_empty(),
+        "attempt after the cap must not be scheduled"
+    );
+
+    let row: (String, i32, Option<String>) = sqlx::query_as(
+        r#"
+        SELECT delivery_state, attempt_count, error_detail
+        FROM translation_dispatch_outbox
+        WHERE operation = 'translation'
+          AND project_id = $1
+          AND asset_id = $2
+          AND target_language_id = $3
+          AND generation_request_id = $4
+        "#,
+    )
+    .bind(job.project_id)
+    .bind(job.asset_id)
+    .bind(job.target_language_id)
+    .bind(job.generation_request_id)
+    .fetch_one(&pool)
+    .await
+    .map_err(|error| error.to_string())?;
+
+    assert_eq!(row.0, "failed");
+    assert_eq!(row.1, MAX_TRANSLATION_DISPATCH_ATTEMPTS);
+    assert_eq!(row.2.as_deref(), Some("attempt-3 enqueue failed"));
+    Ok(())
 }
