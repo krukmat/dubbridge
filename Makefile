@@ -1,4 +1,4 @@
-.PHONY: qa-fmt qa-lint qa-test qa-test-redis qa-test-s3 qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-docs-review qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review qa-golden-set show-codex-session-model install-hooks
+.PHONY: qa-fmt qa-lint qa-test qa-test-redis qa-test-s3 qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-python-complexity qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-docs-review qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review qa-golden-set show-codex-session-model install-hooks
 
 COVERAGE_MIN ?= 90
 PEER_REVIEW_RRI      ?= 22
@@ -19,6 +19,8 @@ GOLDEN_SET_MODEL     ?= gemma4:26b-a4b-it-qat
 GOLDEN_SET_RESULT    ?= /tmp/dubbridge-golden-set.json
 COVERAGE_IGNORE_REGEX ?= (apps/(api|cli|worker-runner)/src/(main|cleanup)\.rs|apps/api/src/(dto/ingestion|lib|routes/ingestion|state)\.rs|crates/(db|jobs|observability)/src/lib\.rs|crates/db/src/(artifact_repo|asset_repo|audit_repo|pending_ingestion_repo|rights_repo)\.rs|crates/(audit|ingestion)/src/lib\.rs)
 CARGO ?= $(if $(shell command -v cargo 2>/dev/null),$(shell command -v cargo),$(HOME)/.cargo/bin/cargo)
+PYTHON ?= python3
+RUFF_VERSION ?= 0.16.5
 
 qa-fmt:
 	$(CARGO) fmt --all -- --check
@@ -69,6 +71,13 @@ qa-build-release:
 qa-maintainability:
 	python3 scripts/check-maintainability.py
 
+qa-python-complexity:
+	@$(PYTHON) -c "import ruff" >/dev/null 2>&1 || { \
+		echo "ruff $(RUFF_VERSION) is required; install with: $(PYTHON) -m pip install ruff==$(RUFF_VERSION)" >&2; \
+		exit 1; \
+	}
+	$(PYTHON) -m ruff check workers --config ruff.toml
+
 # Pre-delegation reviewability budget: fail closed when added/changed code lines
 # exceed the budget derived from Gemma's context window, so a change handed to
 # the local reviewer/developer fits in-context. Documented escape: a
@@ -113,7 +122,7 @@ qa-rri:
 	python3 scripts/rri_test.py
 	python3 scripts/check_roadmap_drift_test.py
 
-qa-ci: qa-local qa-docs-review qa-rri qa-deny qa-config-secrets qa-roadmap-drift qa-maintainability qa-review-budget qa-mobile qa-coverage qa-build-release
+qa-ci: qa-local qa-docs-review qa-rri qa-deny qa-config-secrets qa-roadmap-drift qa-maintainability qa-python-complexity qa-review-budget qa-mobile qa-coverage qa-build-release
 
 qa-gemma-review:
 	@if [ "$${DUBBRIDGE_SKIP_GEMMA_REVIEW:-0}" = "1" ]; then \

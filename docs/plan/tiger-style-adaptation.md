@@ -227,6 +227,16 @@ dependency and can be drafted at any point.
   `tts-worker-py` gain real implementations — cheapest point to add per the
   evaluation.
 
+  **Implementation note (2026-08-31):** T6 is implemented on `main` with
+  pinned Ruff 0.16.5. `ruff.toml` restricts discovery to
+  `workers/*-py/**/*.py` and enforces McCabe complexity (`C901`), branch count
+  (`PLR0912`), statement count (`PLR0915`), and 120-column line length (`E501`).
+  `make qa-python-complexity` is fail-closed when Ruff is unavailable and is
+  included in the aggregate `qa-ci` target. CI has a dedicated Python 3.12
+  `python-complexity` job that installs exactly Ruff 0.16.5 and invokes the
+  Make target. Implementation evidence and scope rationale are recorded in
+  `docs/audit/x26-t6-implementation.md`.
+
 ## Phase 6 — ASR worker gap-closing (R2, R3, R5, R6, R9, R10, R11)
 
 All against `workers/asr-worker-py/main.py` (95 lines) and its
@@ -286,6 +296,8 @@ All against `workers/asr-worker-py/main.py` (95 lines) and its
   deferred controls, and the unresolved ADR-018 acceptance-criteria deviation
 - `docs/audit/x26-t5-implementation-incidents.md` — T5 CI/control incidents and
   deferred follow-up discovered while making MinIO/S3 mandatory
+- `docs/audit/x26-t6-implementation.md` — T6 Python worker complexity/length gate
+  implementation evidence and scope guard
 - `docs/plan/roadmap.md` — X26 cross-cutting item
 - `docs/plan/s-150-translation-dubbing.md`, `docs/tasks/s-150-translation-dubbing.md` — R13's landing point (T4–T7, still parked)
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`, `docs/policies/HITL_AUTONOMY_POLICY.md` — governing workflow and approval gates for every task below

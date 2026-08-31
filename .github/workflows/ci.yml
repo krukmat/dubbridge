@@ -157,6 +157,19 @@ jobs:
       - name: Reject generated-code bloat in backend/mobile diffs
         run: make qa-maintainability
 
+  python-complexity:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned Ruff
+        run: python -m pip install --disable-pip-version-check ruff==0.16.5
+      - name: Enforce Python worker complexity and length bounds
+        run: make qa-python-complexity PYTHON=python
+
   mobile:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
