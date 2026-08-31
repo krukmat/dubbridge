@@ -2,7 +2,9 @@
 
 ## Status
 
-Implementation branch: `feat/ckg-m2-multiturn` (stacked on M1).
+Milestone 2 implementation: **complete on `feat/ckg-m2-multiturn`**, stacked on M1.
+
+Dedicated validation passed (`local-agent-context` run 59 on code head `779d1429a90fbe1df0eaad8f0c8a6a5ab9b79dcd`). Real Ollama/CBM/model execution on the target Mac remains operator-local validation and is not claimed by this branch.
 
 No merge to `main` is part of this milestone.
 
@@ -28,7 +30,9 @@ Successful model actions are represented to later turns as compact action/result
 
 ### D3 — One current source snapshot
 
-The model-visible source snapshot lives in the system/task context. On a repair refresh, the current snapshot is replaced rather than appended. Previous source snapshots remain unnecessary because the worktree is authoritative.
+The model-visible source snapshot lives in the system/task context. After each successful edit, the existing selected source is re-read from the worktree and replaces the active snapshot without re-querying/re-indexing the graph. On formatter/acceptance repair, the graph is deliberately refreshed using repair hints and the active snapshot is replaced again.
+
+Previous source snapshots are not retained in model-visible history because the worktree is authoritative.
 
 ### D4 — Deterministic diagnostics
 
@@ -58,7 +62,7 @@ M2 reduces supplied context but does not change RRI, max turns, max repairs, acc
 
 ### HP-M2-1 — Large write does not replay generated source
 
-After a large `write_file`, later model turns contain a compact action/result summary and current source only through the active context snapshot, not the previous tool-call JSON payload.
+After a large `write_file`, later model turns contain a compact action/result summary. The current body is visible only through the single active worktree-backed source snapshot, not through the previous tool-call JSON payload.
 
 ### HP-M2-2 — Repair replaces source snapshot
 
@@ -79,6 +83,18 @@ A diagnostic mentioning a file outside `allowed_paths` may become a graph candid
 ### EC-M2-3 — CKG fallback remains usable
 
 If CKG refresh fails, the legacy provider still supplies the current authorized source snapshot; history/diagnostic compaction remains active.
+
+## Validation evidence
+
+The dedicated workflow passed all M2-relevant gates:
+
+- context-provider tests;
+- M2 multi-turn tests;
+- runtime/CBM contract tests;
+- prompt-builder regression tests;
+- current local-agent integration tests.
+
+The general repository `ci` remained queued when M2 was closed; no claim is made from that run.
 
 ## Validation boundary
 
