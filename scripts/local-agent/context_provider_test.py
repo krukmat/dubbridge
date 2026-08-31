@@ -3,15 +3,24 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
 
-from ckg_adapter import GraphCandidate, extract_task_anchors, rank_candidates
-from ckg_manifest import derive_worktree_identity
-from context_budget import derive_invocation_budget
-from context_provider import CKGContextProvider, FallbackContextProvider, LegacyContextProvider
-import ollama_lifecycle
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.dirname(HERE))
+
+from ckg_adapter import GraphCandidate, extract_task_anchors, rank_candidates  # noqa: E402
+from ckg_manifest import derive_worktree_identity  # noqa: E402
+from context_budget import derive_invocation_budget  # noqa: E402
+from context_provider import (  # noqa: E402
+    CKGContextProvider,
+    FallbackContextProvider,
+    LegacyContextProvider,
+)
+import ollama_lifecycle  # noqa: E402
 
 
 class Card:
@@ -38,7 +47,11 @@ class FakeFileTools:
 
     def preload_context(self, allowed_paths):
         return [
-            {"path": path, "missing": path not in self.contents, "content": self.contents.get(path)}
+            {
+                "path": path,
+                "missing": path not in self.contents,
+                "content": self.contents.get(path),
+            }
             for path in allowed_paths
         ]
 
@@ -57,7 +70,9 @@ class FakeAdapter:
             "anchors": extract_task_anchors(task_text),
             "candidates": rank_candidates(
                 [
-                    GraphCandidate(path="src/target.rs", symbol="target_fn", priority=5),
+                    GraphCandidate(
+                        path="src/target.rs", symbol="target_fn", priority=5
+                    ),
                     GraphCandidate(
                         path="src/external.rs",
                         symbol="external_fn",
@@ -70,6 +85,11 @@ class FakeAdapter:
 
     def coverage(self, project, paths):
         return {"status": "verified", "raw": {}}
+
+
+class PartialAdapter(FakeAdapter):
+    def coverage(self, project, paths):
+        return {"status": "partial", "raw": {"gaps": paths}}
 
 
 class BrokenAdapter:
@@ -107,13 +127,20 @@ class ContextProviderTests(unittest.TestCase):
     def test_worktree_state_hash_changes_without_head_change(self):
         with tempfile.TemporaryDirectory() as root:
             subprocess.run(["git", "init", "-q", root], check=True)
-            subprocess.run(["git", "-C", root, "config", "user.email", "test@example.com"], check=True)
-            subprocess.run(["git", "-C", root, "config", "user.name", "Test"], check=True)
+            subprocess.run(
+                ["git", "-C", root, "config", "user.email", "test@example.com"],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", root, "config", "user.name", "Test"], check=True
+            )
             path = os.path.join(root, "file.txt")
             with open(path, "w", encoding="utf-8") as handle:
                 handle.write("one\n")
             subprocess.run(["git", "-C", root, "add", "file.txt"], check=True)
-            subprocess.run(["git", "-C", root, "commit", "-qm", "initial"], check=True)
+            subprocess.run(
+                ["git", "-C", root, "commit", "-qm", "initial"], check=True
+            )
             clean = derive_worktree_identity(root)
             with open(path, "w", encoding="utf-8") as handle:
                 handle.write("two\n")
@@ -123,29 +150,46 @@ class ContextProviderTests(unittest.TestCase):
             self.assertTrue(dirty.dirty)
             self.assertNotEqual(clean.state_hash, dirty.state_hash)
 
+    def _provider(self, root, adapter):
+        current = "fn target_fn() { /* current worktree */ }\n"
+        os.makedirs(os.path.join(root, "src"), exist_ok=True)
+        with open(
+            os.path.join(root, "src", "target.rs"), "w", encoding="utf-8"
+        ) as handle:
+            handle.write(current)
+        tools = FakeFileTools({"src/target.rs": current})
+        provider = CKGContextProvider(
+            card=Card(),
+            worktree_dir=root,
+            boundary=FakeBoundary(),
+            file_tools=tools,
+            retrieval_budget_tokens=4096,
+            budget_details={"retrieval_budget_tokens": 4096},
+            adapter=adapter,
+            boundary_error=FakeBoundaryError,
+        )
+        return provider, tools
+
     def test_ckg_provider_filters_scope_and_uses_current_source(self):
         with tempfile.TemporaryDirectory() as root:
-            os.makedirs(os.path.join(root, "src"))
-            current = "fn target_fn() { /* current worktree */ }\n"
-            with open(os.path.join(root, "src", "target.rs"), "w", encoding="utf-8") as handle:
-                handle.write(current)
-            tools = FakeFileTools({"src/target.rs": current})
-            provider = CKGContextProvider(
-                card=Card(),
-                worktree_dir=root,
-                boundary=FakeBoundary(),
-                file_tools=tools,
-                retrieval_budget_tokens=4096,
-                budget_details={"retrieval_budget_tokens": 4096},
-                adapter=FakeAdapter(),
-                boundary_error=FakeBoundaryError,
-            )
+            provider, _tools = self._provider(root, FakeAdapter())
             rendered = provider.render_initial()
             manifest = provider.manifest()
             self.assertIn("current worktree", rendered)
             self.assertNotIn("external_fn", rendered)
             self.assertEqual(manifest["selection"][0]["context_source"], "worktree")
             self.assertEqual(manifest["scope_gaps"][0]["path"], "src/external.rs")
+
+    def test_partial_coverage_falls_back_to_legacy(self):
+        with tempfile.TemporaryDirectory() as root:
+            primary, tools = self._provider(root, PartialAdapter())
+            provider = FallbackContextProvider(
+                primary, LegacyContextProvider(Card(), tools)
+            )
+            rendered = provider.render_initial()
+            self.assertIn("current worktree", rendered)
+            self.assertIn("coverage is partial", provider.last_fallback_reason)
+            self.assertEqual(provider.manifest()["graph"]["coverage"], "partial")
 
     def test_backend_failure_falls_back_to_legacy(self):
         tools = FakeFileTools({"src/target.rs": "fn target_fn() {}\n"})
@@ -159,7 +203,9 @@ class ContextProviderTests(unittest.TestCase):
             adapter=BrokenAdapter(),
             boundary_error=FakeBoundaryError,
         )
-        provider = FallbackContextProvider(primary, LegacyContextProvider(Card(), tools))
+        provider = FallbackContextProvider(
+            primary, LegacyContextProvider(Card(), tools)
+        )
         rendered = provider.render_initial()
         self.assertIn("target_fn", rendered)
         self.assertEqual(provider.last_fallback_reason, "backend unavailable")
@@ -170,7 +216,9 @@ class ContextProviderTests(unittest.TestCase):
         response.__exit__.return_value = False
         response.read.return_value = b"{}"
         with mock.patch("urllib.request.urlopen", return_value=response) as urlopen:
-            self.assertTrue(ollama_lifecycle.unload_model("http://localhost:11434", "model"))
+            self.assertTrue(
+                ollama_lifecycle.unload_model("http://localhost:11434", "model")
+            )
         request = urlopen.call_args.args[0]
         self.assertIn(b'"keep_alive": 0', request.data)
 
