@@ -60,7 +60,7 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 | P1.B2.a-cov | Direct unit coverage for `transient-replication*.ts` (carried forward from P1.B1) | PASS — Done 2026-08-31; RRI 20 Low | none |
 | P1.B2.a-i | Digest-compare pure helper | PASS — Done 2026-08-31; RRI 22 Low | none |
 | P1.B2.a-ii-a | `drive.get()` raw read wrapper | PASS — Done 2026-08-31; RRI 22 Low | none |
-| P1.B2.a-ii-b | Read+compare glue, typed result | Awaiting approval — RRI 22 Low | P1.B2.a-i, P1.B2.a-ii-a PASS |
+| P1.B2.a-ii-b | Read+compare glue, typed result | PASS — Done 2026-08-31; RRI 22 Low | P1.B2.a-i, P1.B2.a-ii-a PASS |
 | P1.B2.b | Reconnect budget counter (pure) | Awaiting approval — RRI 24 Low | none |
 | P1.B2.c-1 | Disconnect detection + budget-check decision | Awaiting approval — RRI 22 Low | P1.B2.b PASS |
 | P1.B2.c-2 | Re-invoke B1 `connectAndReplicate` on retry | Awaiting approval — RRI 20 Low | none |
@@ -1396,7 +1396,7 @@ Required passes: 3 (`RRI 46` → `Med-high`)
 
 ### P1.B2.a-ii-b — Read+compare glue, typed result
 
-- **Status:** Awaiting approval.
+- **Status:** PASS.
 - **Effort / RRI:** S / 22 Low. Depends on `P1.B2.a-i`, `P1.B2.a-ii-a` PASS.
 - **Allowed paths:** `mobile/src/p2p/runtime/protocol.ts`,
   `mobile/__tests__/p2p/replication-verify.test.ts`.
@@ -1412,6 +1412,41 @@ Required passes: 3 (`RRI 46` → `Med-high`)
   neither dependency's contract changed.
 - **Handoff prompt:** `P1.B2.a-ii-b — compose the existing read (a-ii-a) and
   compare (a-i) helpers only; do not reimplement either.`
+- **Implementation:** the ledger's `Allowed paths` named only `protocol.ts`
+  and the test file, but the objective requires a new composing module — the
+  same situation as `P1.B2.a-i`, whose `Allowed paths` also omitted the new
+  `digest-compare.ts` it added. A new file
+  `mobile/src/p2p/runtime/replication-verify.ts` was added instead
+  (`protocol.ts` was not touched — no new error code was needed). Delegated
+  to Qwen Developer (`qwen3.8:27b-mlx`, `--mode full-file`, both the new
+  source file and `mobile/__tests__/p2p/replication-verify.test.ts` in one
+  packet): `verifyReplicatedFile(drive, createHash, path,
+  expectedHexDigest)` calls `readTransientDriveFile` then `compareDigest` in
+  sequence, letting either's `RuntimeProtocolError` propagate unchanged — no
+  new error codes, no wrapping, no reimplementation of either dependency.
+  Delegated output matched the contract exactly on the first attempt.
+  Neither new file is a `build-bare-worklet.mjs` `sourcePaths` entry (same
+  as `digest-compare.ts`), so no bundle rebuild was required.
+- **Task-analysis review (phase 1):** muse-glimmer (`muse-glimmer:30b-q4_K_M`)
+  - PASS, 0 findings, run against the delegation packet before dispatch.
+- **Code-solution review (phase 2):** muse-glimmer (`muse-glimmer:30b-q4_K_M`)
+  - PASS, 0 findings, run against the final diff plus acceptance criteria and
+    independently-verified command output.
+- **Verification:** `cd mobile && npx tsc --noEmit -p .` exit 0;
+  `npx jest __tests__/p2p/` — 15/15 suites, 89/89 tests passed;
+  `npm run lint` — 0 warnings; `python3 scripts/check-maintainability.py` —
+  gate passed.
+- **Unit coverage certification:**
+
+  | Case ID | Type | Behavior | Unit test evidence | Result |
+  |---|---|---|---|---|
+  | HP-B2.a-ii-b | Happy path | a byte-perfect replicated fixture verifies as a match | `mobile/__tests__/p2p/replication-verify.test.ts::verifyReplicatedFile > HP-B2.a-ii-b` | passed |
+  | EC-B2.a-ii-b | Edge case | a corrupted/incomplete replica verifies as a typed mismatch (`{ matched: false }`, no throw) | `mobile/__tests__/p2p/replication-verify.test.ts::verifyReplicatedFile > EC-B2.a-ii-b (mismatch)` | passed |
+  | EC-B2.a-ii-b | Edge case | a read failure propagates as `RuntimeProtocolError` with `code === "TRANSIENT_DRIVE_READ_FAILED"`, never a silent mismatch | `mobile/__tests__/p2p/replication-verify.test.ts::verifyReplicatedFile > EC-B2.a-ii-b (read failure)` | passed |
+
+- **Owner final verification:** pending (see P1.B2 pack execution note —
+  owner approved the full 12-task pack; per-task closure evidence recorded
+  here, final owner sign-off tracked at P1.B2 parent closure).
 
 ### P1.B2.b — Reconnect budget counter (pure)
 
