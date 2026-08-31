@@ -23,6 +23,9 @@ class ContextProvider:
     def render_initial(self):
         raise NotImplementedError
 
+    def render_current(self, reason=None):
+        raise NotImplementedError
+
     def render_refresh(self, reason, hints=None):
         raise NotImplementedError
 
@@ -39,6 +42,9 @@ class LegacyContextProvider(ContextProvider):
         return _render_entries(self.file_tools.preload_context(self.card.allowed_paths))
 
     def render_initial(self):
+        return self._render()
+
+    def render_current(self, reason=None):
         return self._render()
 
     def render_refresh(self, reason, hints=None):
@@ -71,6 +77,7 @@ class CKGContextProvider(ContextProvider):
         self._manifest = None
         self._last_render = None
         self._graph_state_hash = None
+        self._selected_candidates = []
 
     def manifest(self):
         return self._manifest.as_dict() if self._manifest else None
@@ -138,6 +145,29 @@ class CKGContextProvider(ContextProvider):
                 parts.append("Repair diagnostics:\n" + str(diagnostic)[:6000])
         return "\n\n".join(parts)
 
+    def _render_candidates(self, candidates):
+        entries = []
+        used_candidates = []
+        used_tokens = 0
+        for candidate in candidates:
+            try:
+                content, _context_source = self._current_source(candidate)
+            except (OSError, ValueError, RuntimeError):
+                continue
+            tokens = gemma_local.estimate_text_tokens(content)
+            if used_tokens + tokens > self.retrieval_budget_tokens:
+                continue
+            used_tokens += tokens
+            entries.append(
+                {"path": candidate.path, "missing": False, "content": content}
+            )
+            used_candidates.append(candidate)
+        if not entries:
+            raise CKGAdapterError(
+                "CKG produced no authorized context within retrieval budget"
+            )
+        return _render_entries(entries), used_candidates, used_tokens
+
     def _resolve(self, *, force_refresh=False, repair_hints=None):
         identity = derive_worktree_identity(self.worktree_dir)
         discovery = self.adapter.discover(
@@ -178,21 +208,11 @@ class CKGContextProvider(ContextProvider):
             raise CKGAdapterError(
                 f"CKG coverage is {coverage['status']}; use source fallback"
             )
-        entries = []
+
+        rendered, used_candidates, used_tokens = self._render_candidates(authorized)
         manifest_selection = []
-        used_tokens = 0
-        for candidate in authorized:
-            try:
-                content, context_source = self._current_source(candidate)
-            except (OSError, ValueError, RuntimeError):
-                continue
-            tokens = gemma_local.estimate_text_tokens(content)
-            if used_tokens + tokens > self.retrieval_budget_tokens:
-                continue
-            used_tokens += tokens
-            entries.append(
-                {"path": candidate.path, "missing": False, "content": content}
-            )
+        for candidate in used_candidates:
+            content, context_source = self._current_source(candidate)
             manifest_selection.append(
                 {
                     "path": candidate.path,
@@ -206,13 +226,11 @@ class CKGContextProvider(ContextProvider):
                     "priority": candidate.priority,
                     "context_source": context_source,
                     "source_sha256": source_sha256(content),
-                    "estimated_tokens": tokens,
+                    "estimated_tokens": gemma_local.estimate_text_tokens(content),
                 }
             )
-        if not entries:
-            raise CKGAdapterError(
-                "CKG produced no authorized context within retrieval budget"
-            )
+
+        self._selected_candidates = used_candidates
         manifest = CKGContextManifest(
             work_item_id=self.card.task_id,
             capsule_hash=getattr(self.card, "capsule_hash", None),
@@ -232,11 +250,23 @@ class CKGContextProvider(ContextProvider):
         self._manifest = manifest
         if self.manifest_path:
             manifest.write(self.manifest_path)
-        return _render_entries(entries)
+        return rendered
 
     def render_initial(self):
         self._last_render = self._resolve()
         return self._last_render
+
+    def render_current(self, reason=None):
+        """Re-read the current selected source without re-querying/re-indexing CKG."""
+        if not self._selected_candidates:
+            if self._last_render is not None:
+                return self._last_render
+            return self.render_initial()
+        rendered, _used_candidates, _used_tokens = self._render_candidates(
+            self._selected_candidates
+        )
+        self._last_render = rendered
+        return rendered
 
     def render_refresh(self, reason, hints=None):
         self._last_render = self._resolve(
@@ -275,7 +305,19 @@ class FallbackContextProvider(ContextProvider):
     def render_initial(self):
         return self._call("render_initial")
 
+    def render_current(self, reason=None):
+        # Preserve whichever provider is active. In particular, a legacy
+        # fallback should not retry CBM on every edit after the initial failure.
+        try:
+            return self._active.render_current(reason)
+        except (CKGAdapterError, OSError, ValueError, RuntimeError) as exc:
+            self.last_fallback_reason = str(exc)
+            self._active = self.fallback
+            return self.fallback.render_current(reason)
+
     def render_refresh(self, reason, hints=None):
+        # A repair is the deliberate retry/re-index point, so prefer primary
+        # again and retain the existing fail-safe fallback behavior.
         return self._call("render_refresh", reason, hints=hints)
 
     def manifest(self):
