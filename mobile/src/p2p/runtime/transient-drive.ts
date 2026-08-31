@@ -17,6 +17,7 @@ interface TransientDrive {
   ready(): Promise<void>;
   close(): Promise<void>;
   replicate(isInitiator: boolean): { destroy(): void };
+  get(path: string): Promise<Uint8Array | null>;
 }
 
 export async function openStoreAndDrive<
@@ -88,6 +89,22 @@ export async function openHeldTransientDrive(runtime: WorkletRuntime): Promise<T
     throw new RuntimeProtocolError("TRANSIENT_DRIVE_OPEN_FAILED", "Transient drive could not be opened");
   }
   return handles.drive!;
+}
+
+export async function readTransientDriveFile(
+  drive: { get(path: string): Promise<Uint8Array | null> },
+  path: string,
+): Promise<Uint8Array> {
+  let bytes: Uint8Array | null;
+  try {
+    bytes = await drive.get(path);
+  } catch {
+    throw new RuntimeProtocolError("TRANSIENT_DRIVE_READ_FAILED", "Transient drive read failed");
+  }
+  if (bytes === null) {
+    throw new RuntimeProtocolError("TRANSIENT_DRIVE_READ_FAILED", "Transient drive read failed");
+  }
+  return bytes;
 }
 
 export { configureTransientDriveDependenciesForTest } from "./transient-drive-dependencies";

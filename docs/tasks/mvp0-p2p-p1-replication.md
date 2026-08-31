@@ -59,7 +59,7 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 | P1.B2.a-0 | Byte-count instrumentation in `transient-replication.ts` (carried forward from P1.B1) | PASS — Done 2026-08-31; RRI 25 Low | none |
 | P1.B2.a-cov | Direct unit coverage for `transient-replication*.ts` (carried forward from P1.B1) | PASS — Done 2026-08-31; RRI 20 Low | none |
 | P1.B2.a-i | Digest-compare pure helper | PASS — Done 2026-08-31; RRI 22 Low | none |
-| P1.B2.a-ii-a | `drive.get()` raw read wrapper | Awaiting approval — RRI 22 Low | none |
+| P1.B2.a-ii-a | `drive.get()` raw read wrapper | PASS — Done 2026-08-31; RRI 22 Low | none |
 | P1.B2.a-ii-b | Read+compare glue, typed result | Awaiting approval — RRI 22 Low | P1.B2.a-i, P1.B2.a-ii-a PASS |
 | P1.B2.b | Reconnect budget counter (pure) | Awaiting approval — RRI 24 Low | none |
 | P1.B2.c-1 | Disconnect detection + budget-check decision | Awaiting approval — RRI 22 Low | P1.B2.b PASS |
@@ -1331,7 +1331,7 @@ Required passes: 3 (`RRI 46` → `Med-high`)
 
 ### P1.B2.a-ii-a — `drive.get()` raw read wrapper
 
-- **Status:** Awaiting approval.
+- **Status:** PASS.
 - **Effort / RRI:** S / 22 Low.
 - **Allowed paths:** `mobile/src/p2p/runtime/transient-drive.ts`,
   `mobile/__tests__/p2p/transient-drive-read.test.ts`.
@@ -1346,6 +1346,53 @@ Required passes: 3 (`RRI 46` → `Med-high`)
 - **Evidence to emit:** unit tests for present/missing/closed-drive cases.
 - **Handoff prompt:** `P1.B2.a-ii-a — add a raw drive-read wrapper only; do
   not compare or hash the returned bytes.`
+- **Implementation:** `get(path: string): Promise<Uint8Array | null>` added
+  to the `TransientDrive` interface directly by the orchestrator (one-line,
+  exactly-anchored insertion — same justified mechanical-edit class as
+  `P1.B2.a-i`'s error-code addition). The new
+  `readTransientDriveFile(drive, path)` wrapper function and the new
+  `mobile/__tests__/p2p/transient-drive-read.test.ts` file were delegated to
+  Qwen Developer (`qwen3.8:27b-mlx`): the wrapper via `--mode before-after`
+  (anchored on `openHeldTransientDrive`'s closing brace through the trailing
+  re-export line, with the exact BEFORE block embedded verbatim inside the
+  packet text after the tool's first response came back `BLOCKED` citing
+  missing file content — `delegate-low-rri.py`'s before-after system prompt
+  does not itself inject `--before-file` content into what the model sees,
+  confirming the known gap already on file; the packet revision required and
+  received its own fresh phase-1 pass before redispatch), the test file via
+  `--mode full-file`. A new `TRANSIENT_DRIVE_READ_FAILED` error code was
+  added to `protocol.ts`'s `RuntimeProtocolErrorCode` union and
+  `protocol-codec.ts`'s exhaustive `REDACTED_ERROR_MESSAGE` map, both by the
+  orchestrator directly (same mechanical-edit class, ahead of delegation so
+  the packet could reference the code as already existing).
+  `transient-drive.ts` and `protocol.ts` are both worklet source inputs
+  (`build-bare-worklet.mjs` `sourcePaths`), so the bundle was rebuilt and
+  re-verified after both edits.
+- **Task-analysis review (phase 1):** muse-glimmer (`muse-glimmer:30b-q4_K_M`)
+  - PASS, 0 findings, run against the revised before-after packet (with the
+    embedded BEFORE block) and the full-file test packet, each before its
+    own dispatch.
+- **Code-solution review (phase 2):** muse-glimmer (`muse-glimmer:30b-q4_K_M`)
+  - PASS, 0 findings, run against the final diff (`transient-drive.ts`,
+    `protocol.ts`, `protocol-codec.ts`, `transient-drive-read.test.ts`)
+    plus acceptance criteria and independently-verified command output.
+- **Verification:** `cd mobile && npx tsc --noEmit` exit 0;
+  `node scripts/build-bare-worklet.mjs --check` — bundle current after
+  rebuild (sha256=`2ee979b18b6c34328a6edd8e1bda66bd674a293d3c8ad4867fe5e05671fcb8dd`);
+  `npx jest __tests__/p2p/` — 14/14 suites, 86/86 tests passed;
+  `npm run lint` — 0 warnings; `python3 scripts/check-maintainability.py` —
+  gate passed.
+- **Unit coverage certification:**
+
+  | Case ID | Type | Behavior | Unit test evidence | Result |
+  |---|---|---|---|---|
+  | HP-B2.a-ii-a | Happy path | reading an existing path returns the raw bytes from `drive.get` | `mobile/__tests__/p2p/transient-drive-read.test.ts::readTransientDriveFile > HP-B2.a-ii-a` | passed |
+  | EC-B2.a-ii-a | Edge case | `drive.get` resolving `null` (missing path) throws `RuntimeProtocolError` with `code === "TRANSIENT_DRIVE_READ_FAILED"` | `mobile/__tests__/p2p/transient-drive-read.test.ts::readTransientDriveFile > EC-B2.a-ii-a (missing path)` | passed |
+  | EC-B2.a-ii-a | Edge case | `drive.get` rejecting/throwing throws `RuntimeProtocolError` with `code === "TRANSIENT_DRIVE_READ_FAILED"` | `mobile/__tests__/p2p/transient-drive-read.test.ts::readTransientDriveFile > EC-B2.a-ii-a (drive read fails)` | passed |
+
+- **Owner final verification:** pending (see P1.B2 pack execution note —
+  owner approved the full 12-task pack; per-task closure evidence recorded
+  here, final owner sign-off tracked at P1.B2 parent closure).
 
 ### P1.B2.a-ii-b — Read+compare glue, typed result
 
