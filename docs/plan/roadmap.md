@@ -154,9 +154,18 @@ on `T5c`. Deployment-enablement slice: makes the already-closed pipeline publicl
 > closed PASS after a Matias-selected cloud fallback, typed error coverage,
 > Phase-2 review, and owner verification. `P1.A1d` re-ran and consolidated the
 > P1.A1 focused Jest evidence; the owner verified P1.A1 PASS on 2026-08-30.
-> P1.A2 now has its current RRI 46 Med-high, phase-1 PASS, and Compact Approval
-> Task Card v2; it awaits its own explicit owner approval, and no later P1
-> source task has started.
+> P1.A2 (RRI 46 Med-high) was approved 2026-08-30 and implemented via
+> ADR-038 Amendment 4 Low-band decomposition (2/4 candidate subtasks
+> delegated Low, 2/4 routed cloud) plus a direct cloud-takeover tramo.
+> Phase-1 review: Gemma PASS. Phase-2 review: D14 (cross-provider, Codex)
+> found 3 BLOCKING + 2 MAJOR findings, all repaired or dispositioned as
+> accepted-follow-up. 3-pass Reflection and full unit coverage
+> certification are complete. Owner-verified and closed **Done 2026-08-31**
+> (`docs/tasks/mvp0-p2p-p1-replication.md` § P1.A2 § Owner final
+> verification). `P1.B1` (Isolated Hyperswarm replication transport,
+> prospective RRI 55 Med-high) is now unblocked and requires its own
+> current RRI/card/explicit owner approval before implementation starts —
+> no P1.B1 source work has begun.
 > This closure update supersedes the earlier baseline-row wording that P1.A1d
 > was awaiting owner verification.
 > The earlier decomposition summary's "Low-band children" wording is

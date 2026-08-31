@@ -1,4 +1,5 @@
 import { RuntimeProtocolError, TRANSIENT_DRIVE_RECEIPT } from "./protocol";
+import { loadTransientDriveDependencies } from "./transient-drive-dependencies";
 
 export interface WorkletRuntime {
   readonly version?: string;
@@ -15,6 +16,7 @@ interface TransientDriveStore {
 interface TransientDrive {
   ready(): Promise<void>;
   close(): Promise<void>;
+  replicate(isInitiator: boolean): { destroy(): void };
 }
 
 export async function openStoreAndDrive<
@@ -39,69 +41,12 @@ export async function closeStoreOrDrive(
   else if (store) await store.close();
 }
 
-interface TransientDriveDependencies {
-  Corestore: new (storage: string) => TransientDriveStore;
-  Hyperdrive: new (store: TransientDriveStore) => TransientDrive;
-}
-
 export function proofStorageUri(runtime: WorkletRuntime): string {
   const uri = runtime.argv?.[0];
   if (typeof uri !== "string" || !uri.startsWith("file:") || uri.length <= "file:".length) {
     throw new RuntimeProtocolError("PROOF_STORAGE_CONFIG_INVALID", "Proof storage configuration is invalid");
   }
   return uri;
-}
-
-let transientDriveDependencies = (): TransientDriveDependencies => {
-  let Corestore: unknown;
-  let Hyperdrive: unknown;
-  try {
-    Corestore = require("corestore");
-    Hyperdrive = require("hyperdrive");
-  } catch {
-    throw new RuntimeProtocolError(
-      "TRANSIENT_DRIVE_DEPENDENCY_LOAD_FAILED",
-      "Transient drive dependency could not be loaded",
-    );
-  }
-  return validateTransientDriveDependencies({
-    Corestore: Corestore as TransientDriveDependencies["Corestore"],
-    Hyperdrive: Hyperdrive as TransientDriveDependencies["Hyperdrive"],
-  });
-};
-
-function validateTransientDriveDependencies(value: unknown): TransientDriveDependencies {
-  if (
-    value === null ||
-    typeof value !== "object" ||
-    typeof (value as Partial<TransientDriveDependencies>).Corestore !== "function" ||
-    typeof (value as Partial<TransientDriveDependencies>).Hyperdrive !== "function"
-  ) {
-    throw new RuntimeProtocolError("TRANSIENT_DRIVE_BUNDLE_INVALID", "Transient drive bundle is invalid");
-  }
-  return value as TransientDriveDependencies;
-}
-
-function loadTransientDriveDependencies(): TransientDriveDependencies {
-  try {
-    return validateTransientDriveDependencies(transientDriveDependencies());
-  } catch (error) {
-    if (error instanceof RuntimeProtocolError) throw error;
-    throw new RuntimeProtocolError(
-      "TRANSIENT_DRIVE_DEPENDENCY_LOAD_FAILED",
-      "Transient drive dependency could not be loaded",
-    );
-  }
-}
-
-export function configureTransientDriveDependenciesForTest(
-  load: () => unknown,
-): () => void {
-  const previous = transientDriveDependencies;
-  transientDriveDependencies = () => load() as TransientDriveDependencies;
-  return () => {
-    transientDriveDependencies = previous;
-  };
 }
 
 export async function openCloseTransientDrive(runtime: WorkletRuntime): Promise<typeof TRANSIENT_DRIVE_RECEIPT> {
@@ -126,3 +71,23 @@ export async function openCloseTransientDrive(runtime: WorkletRuntime): Promise<
   }
   return TRANSIENT_DRIVE_RECEIPT;
 }
+
+export async function openHeldTransientDrive(runtime: WorkletRuntime): Promise<TransientDrive> {
+  const storageUri = proofStorageUri(runtime);
+  const handles: { store?: TransientDriveStore; drive?: TransientDrive } = {};
+  try {
+    const { Corestore, Hyperdrive } = loadTransientDriveDependencies();
+    await openStoreAndDrive(Corestore, Hyperdrive, storageUri, handles);
+  } catch (error) {
+    try {
+      await closeStoreOrDrive(handles.drive, handles.store);
+    } catch {
+      throw new RuntimeProtocolError("TRANSIENT_DRIVE_CLOSE_FAILED", "Transient drive could not be closed");
+    }
+    if (error instanceof RuntimeProtocolError) throw error;
+    throw new RuntimeProtocolError("TRANSIENT_DRIVE_OPEN_FAILED", "Transient drive could not be opened");
+  }
+  return handles.drive!;
+}
+
+export { configureTransientDriveDependenciesForTest } from "./transient-drive-dependencies";

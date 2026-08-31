@@ -8,6 +8,7 @@ import {
   decodeHandshakeResult,
   decodeResponseEnvelope,
   decodeRuntimeEvent,
+  type DiscoverAndReplicateReceipt,
   type RuntimeEvent,
   type RuntimeHandshake,
   type RuntimeRpcPort,
@@ -102,7 +103,24 @@ export class RuntimeProtocolClient {
     return result as SeedWriteHashDeleteReceipt;
   }
 
-  private async call(command: number): Promise<unknown> {
+  async discoverAndReplicate(topic: Buffer, role: "seed" | "client"): Promise<DiscoverAndReplicateReceipt> {
+    const result = await this.call(RUNTIME_COMMAND.DISCOVER_AND_REPLICATE, {
+      topic: topic.toString("hex"),
+      role,
+    });
+    if (
+      result === null ||
+      typeof result !== "object" ||
+      (result as Partial<DiscoverAndReplicateReceipt>).capability !== "discover-and-replicate" ||
+      (result as Partial<DiscoverAndReplicateReceipt>).role !== role ||
+      typeof (result as Partial<DiscoverAndReplicateReceipt>).byte_count !== "number"
+    ) {
+      throw new RuntimeProtocolError("INVALID_PAYLOAD", "Runtime discover-and-replicate reply is invalid");
+    }
+    return result as DiscoverAndReplicateReceipt;
+  }
+
+  private async call(command: number, extraPayload?: Record<string, unknown>): Promise<unknown> {
     this.pendingCount += 1;
     let timeout: ReturnType<typeof setTimeout> | undefined;
 
@@ -110,7 +128,10 @@ export class RuntimeProtocolClient {
       return RuntimeCodec.successResult(
         decodeResponseEnvelope(
           await Promise.race([
-            this.port.request(command, JSON.stringify({ protocolVersion: RUNTIME_PROTOCOL_VERSION })),
+            this.port.request(
+              command,
+              JSON.stringify({ protocolVersion: RUNTIME_PROTOCOL_VERSION, ...extraPayload }),
+            ),
             new Promise<never>((_, reject) => {
               timeout = setTimeout(() => {
                 this.port.close(new RuntimeProtocolError("RPC_TIMEOUT", "Runtime request timed out"));

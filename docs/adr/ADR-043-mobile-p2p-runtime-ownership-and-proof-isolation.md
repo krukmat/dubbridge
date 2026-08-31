@@ -103,7 +103,7 @@ Runtime lifecycle and per-operation progress are separate state machines:
 ### 5. Keep proof topology outside the product service API
 
 Normal mobile operation targets one Bare worklet. P1's seed/client topology is a
-diagnostic proof only. A `P1ReplicationProofRunner` obtains two isolated runtime
+diagnostic proof only. A `ReplicationProofRunner` obtains two isolated runtime
 sessions from a factory and is invoked only by an explicit development harness.
 It is not exposed through the product `P2PService` API and is never enabled by
 default.
@@ -151,7 +151,7 @@ flowchart LR
   PP --> DG{Development proof enabled?}
   DG -->|No| IDLE[No proof runtime]
   DG -->|Yes| DH[Explicit development harness]
-  DH --> PR[P1ReplicationProofRunner]
+  DH --> PR[ReplicationProofRunner]
   PR --> RF[Runtime factory]
   RF --> SW[Seed worklet]
   RF --> CW[Client worklet]

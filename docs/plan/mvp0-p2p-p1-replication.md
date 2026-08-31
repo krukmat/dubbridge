@@ -53,7 +53,7 @@ evidence; it does not publish a DubBridge asset or create a product data plane.
    resume as explicit protocol/lifecycle inputs. Runtime lifecycle and
    per-operation progress remain separate state machines.
 5. Normal product mobile targets one Bare worklet. P1's two-session seed/client
-   topology belongs only to `P1ReplicationProofRunner`, created through a
+   topology belongs only to `ReplicationProofRunner`, created through a
    runtime factory and invoked by an explicit development-only harness. Proof
    commands never enter the `P2PService` product API.
 6. Fixture bytes are synthetic and may be generated in memory. Hyperdrive/

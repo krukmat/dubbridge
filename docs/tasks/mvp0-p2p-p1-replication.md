@@ -44,8 +44,8 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 | P1.A1b | Transient drive open/close logic (HP-A1) | PASS — owner waiver recorded 2026-08-30 | P1.A1b.0 PASS — satisfied 2026-08-30 |
 | P1.A1c | Typed error handling + coverage (EC-A1) | PASS — owner verified 2026-08-30; RRI 28 Moderate | P1.A1b PASS — satisfied 2026-08-30 |
 | P1.A1d | Evidence + closure | PASS — Done 2026-08-30 | P1.A1c PASS — satisfied 2026-08-30 |
-| P1.A2 | Transient seed lifecycle + residue cleanup | Awaiting approval — RRI 46 Med-high; phase-1 PASS/card recorded 2026-08-30 | P1.A1d PASS — satisfied 2026-08-30 |
-| P1.B1 | Isolated Hyperswarm replication transport | Deferred — needs current RRI/card/approval | P1.A2 PASS |
+| P1.A2 | Transient seed lifecycle + residue cleanup | PASS — Done 2026-08-31; owner verified; RRI 46 Med-high | P1.A1d PASS — satisfied 2026-08-30 |
+| P1.B1 | Isolated Hyperswarm replication transport | Deferred — needs current RRI/card/approval | P1.A2 PASS — satisfied 2026-08-31 |
 | P1.B2 | Verification, reconnect + fail-closed witness | Deferred — needs current RRI/card/approval | P1.B1 PASS |
 
 The former combined `P1.A — Ephemeral seed fixture and bundle boundary` planning
@@ -1003,18 +1003,26 @@ Required passes: 3 (`RRI 46` → `Med-high`)
 
 ### Owner final verification
 
-**Pending.** Implementation, D14 phase-2 review (BLOCKING findings
-repaired), 3-pass Reflection, and unit coverage certification are
-complete. Per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` Step 4, owner sign-off
-(name, date, verification statement, exact commands run) is required before
-this task may be marked `[x] Done`.
+- Owner: `Matias`
+- Date: `2026-08-31`
+- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
+- Commands run:
+  - `cd mobile && npm run typecheck` — exit 0
+  - `cd mobile && npm run lint` — exit 0
+  - `cd mobile && npx jest __tests__/p2p/` — 8/8 suites, 61/61 tests passed
+  - `cd mobile && npx jest` — 29/29 suites, 296/296 tests passed
+  - `cd mobile && node scripts/build-bare-worklet.mjs --check` — no drift, sha256=`32390ea97d9c17f37b97b0b478b19dc70e0498c5d06dc8ad135d10d4e2f5b1ef`
+  - `python3 scripts/check-maintainability.py` — Maintainability gate passed
+
+**Status: `[x] Done`** — 2026-08-31.
 
 ## P1.B1 — Isolated Hyperswarm replication transport
 
-- **Status:** Deferred until P1.A2 PASS; requires current RRI/card/approval.
+- **Status:** Unblocked — P1.A2 PASS (Done 2026-08-31); requires its own
+  current RRI/card/approval before implementation.
 - **Effort / prospective RRI:** L / 55 Med-high. Recompute at presentation.
 - **Allowed paths:** P2P dependency files, packaged runtime protocol/worklet,
-  `mobile/src/p2p/proof/P1ReplicationProofRunner.ts`,
+  `mobile/src/p2p/proof/ReplicationProofRunner.ts`,
   `mobile/__tests__/p2p/hyperswarm-replication.test.ts`, and B1 evidence.
 - **Objective:** create two proof-only runtime sessions through a factory and
   replicate the complete fixture over transient Hyperswarm discovery.
@@ -1038,7 +1046,7 @@ this task may be marked `[x] Done`.
 - **Status:** Deferred until P1.B1 PASS; requires current RRI/card/approval.
 - **Effort / prospective RRI:** L / 55 Med-high. Recompute at presentation.
 - **Allowed paths:** runtime protocol/client,
-  `mobile/src/p2p/proof/P1ReplicationProofRunner.ts`,
+  `mobile/src/p2p/proof/ReplicationProofRunner.ts`,
   `mobile/__tests__/p2p/replication-witness.test.ts`, Android evidence, and
   B2/P1 status artifacts.
 - **Objective:** turn transport completion into a trustworthy P1 verdict with

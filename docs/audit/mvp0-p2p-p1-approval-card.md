@@ -47,7 +47,7 @@ capable broadly available model and recommends high effort as the default.
 - **Mobile connection:** `App.tsx` becomes a composition root, not a runtime
   decision tree. It mounts `AuthProvider` then `P2PProvider` around
   `RootNavigator`; the provider is inert until an explicit command. A separately
-  gated development harness may invoke `P1ReplicationProofRunner`, but the
+  gated development harness may invoke `ReplicationProofRunner`, but the
   runner and its two worklets are not part of `P2PService` or normal startup.
 - **Out of scope:** user media, keys/encryption, identity/persistence, invites,
   backend/API/database, HLS/HTTP, UI, availability node, and iPhone/iOS.
@@ -111,7 +111,7 @@ flowchart LR
   P2PP --> G{"Development proof<br/>explicitly enabled?"}
   G -->|No| IDLE["No proof runtime"]
   G -->|Yes| DEV["Explicit dev harness"]
-  DEV --> RUNNER["P1ReplicationProofRunner"]
+  DEV --> RUNNER["ReplicationProofRunner"]
   RUNNER --> FACTORY["Runtime factory"]
   FACTORY --> SEED["Seed session<br/>run-scoped cache"]
   FACTORY --> VIEWER["Client session<br/>run-scoped cache"]

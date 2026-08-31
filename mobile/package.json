@@ -35,6 +35,7 @@
     "expo-video": "^56.1.4",
     "expo-web-browser": "~56.0.5",
     "hyperdrive": "^13.3.3",
+    "hyperswarm": "^4.17.0",
     "react": "19.2.3",
     "react-native": "0.85.3",
     "react-native-b4a": "^0.1.0",
