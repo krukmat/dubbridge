@@ -12,7 +12,9 @@ import sys
 import gemma_local
 import scope_check
 from context_provider import LegacyContextProvider
+from diagnostics import repair_hints, summarize_failure
 from runner_file_tools import ALLOWED_TOOL_NAMES, RunnerFileTools
+from working_history import compact_history_event
 
 
 class BoundaryViolation(RuntimeError):
@@ -154,8 +156,11 @@ def build_initial_system_message(
     max_total_turns,
     tool_calling_system_prompt,
     context_provider=None,
+    source_context=None,
 ):
     provider = context_provider or LegacyContextProvider(card, file_tools)
+    if source_context is None:
+        source_context = provider.render_initial()
     return (
         tool_calling_system_prompt.replace("{MAX_TOTAL_TURNS}", str(max_total_turns))
         + "\n\nTask specification:\n"
@@ -165,7 +170,7 @@ def build_initial_system_message(
         + "\n\nRunner-controlled acceptance commands (not model tools):\n"
         + json.dumps(card.acceptance_tests, ensure_ascii=False, indent=2)
         + "\n\nAuthorized source context:\n"
-        + provider.render_initial()
+        + source_context
     )
 
 
@@ -174,6 +179,73 @@ def _attach_manifest(result, provider):
     if manifest is not None:
         result["ckg_context_manifest"] = manifest
     return result
+
+
+def _replace_source_snapshot(
+    messages,
+    *,
+    card,
+    file_tools,
+    max_total_turns,
+    tool_calling_system_prompt,
+    provider,
+    source_context,
+):
+    """Replace, rather than append, the model-visible source snapshot."""
+    messages[0]["content"] = build_initial_system_message(
+        card,
+        file_tools,
+        max_total_turns,
+        tool_calling_system_prompt,
+        context_provider=provider,
+        source_context=source_context,
+    )
+
+
+def _refresh_for_repair(
+    messages,
+    *,
+    reason,
+    result,
+    kind,
+    repair_attempt,
+    card,
+    file_tools,
+    max_total_turns,
+    tool_calling_system_prompt,
+    provider,
+    transcript,
+):
+    diagnostic = summarize_failure(result, kind)
+    hints = repair_hints(file_tools, diagnostic)
+    refreshed_context = provider.render_refresh(reason, hints=hints)
+    _replace_source_snapshot(
+        messages,
+        card=card,
+        file_tools=file_tools,
+        max_total_turns=max_total_turns,
+        tool_calling_system_prompt=tool_calling_system_prompt,
+        provider=provider,
+        source_context=refreshed_context,
+    )
+    transcript.append(
+        {
+            "event": "repair_diagnostic",
+            "kind": kind,
+            "summary": diagnostic,
+            "edited_paths": hints["edited_paths"],
+        }
+    )
+    messages.append(
+        {
+            "role": "user",
+            "content": (
+                f"Runner {kind} failed. Repair attempt {repair_attempt}.\n\n"
+                "Deterministic diagnostic summary:\n"
+                + diagnostic
+            ),
+        }
+    )
 
 
 def run_loop(
@@ -201,6 +273,7 @@ def run_loop(
     malformed_bounces = 0
     total_turns = 0
 
+    initial_context = provider.render_initial()
     messages = [
         {
             "role": "system",
@@ -210,6 +283,7 @@ def run_loop(
                 max_total_turns,
                 tool_calling_system_prompt,
                 context_provider=provider,
+                source_context=initial_context,
             ),
         },
         {"role": "user", "content": "Begin."},
@@ -260,8 +334,10 @@ def run_loop(
                 checkpoint_fn(transcript, total_turns)
             continue
 
+        # Full/raw model evidence stays lossless in the audit transcript. The
+        # model-visible message history is compacted only after the tool call
+        # has been parsed and applied successfully.
         transcript.append({"role": "assistant", "raw": response})
-        messages.append({"role": "assistant", "content": json.dumps(response)})
         try:
             call = parse_tool_call(response)
             result = apply_tool_call(call, worktree_dir, boundary, file_tools)
@@ -292,6 +368,8 @@ def run_loop(
 
         transcript.append({"event": "tool_result", "result": result})
         malformed_bounces = 0
+        compact = compact_history_event(call, result, file_tools=file_tools)
+        messages.append({"role": "assistant", "content": compact["assistant"]})
         print(
             f"[local-agent] turn {total_turns}/{max_total_turns} -> {call.name}",
             file=sys.stderr,
@@ -333,16 +411,18 @@ def run_loop(
                             provider,
                         )
                     repair_attempt += 1
-                    messages.append(
-                        {
-                            "role": "user",
-                            "content": (
-                                f"Runner formatting failed: {format_result['output']}. "
-                                f"Repair attempt {repair_attempt}.\n\n"
-                                "Current authorized source context:\n"
-                                + provider.render_refresh("formatter_failure")
-                            ),
-                        }
+                    _refresh_for_repair(
+                        messages,
+                        reason="formatter_failure",
+                        result=format_result,
+                        kind="formatter",
+                        repair_attempt=repair_attempt,
+                        card=card,
+                        file_tools=file_tools,
+                        max_total_turns=max_total_turns,
+                        tool_calling_system_prompt=tool_calling_system_prompt,
+                        provider=provider,
+                        transcript=transcript,
                     )
                     if checkpoint_fn is not None:
                         checkpoint_fn(transcript, total_turns)
@@ -365,23 +445,23 @@ def run_loop(
                     provider,
                 )
             repair_attempt += 1
-            messages.append(
-                {
-                    "role": "user",
-                    "content": (
-                        f"Acceptance failed: {test_result['output']}. "
-                        f"Repair attempt {repair_attempt}.\n\n"
-                        "Current authorized source context:\n"
-                        + provider.render_refresh("acceptance_failure")
-                    ),
-                }
+            _refresh_for_repair(
+                messages,
+                reason="acceptance_failure",
+                result=test_result,
+                kind="acceptance",
+                repair_attempt=repair_attempt,
+                card=card,
+                file_tools=file_tools,
+                max_total_turns=max_total_turns,
+                tool_calling_system_prompt=tool_calling_system_prompt,
+                provider=provider,
+                transcript=transcript,
             )
             if checkpoint_fn is not None:
                 checkpoint_fn(transcript, total_turns)
             continue
 
-        messages.append(
-            {"role": "user", "content": f"Tool result: {json.dumps(result)}"}
-        )
+        messages.append({"role": "user", "content": compact["user"]})
         if checkpoint_fn is not None:
             checkpoint_fn(transcript, total_turns)
