@@ -148,6 +148,33 @@ class CKGAdapterError(RuntimeError):
     pass
 
 
+def _unwrap_mcp_envelope(payload, tool):
+    """Return the tool's JSON payload from CBM's --json MCP envelope."""
+    if not isinstance(payload, dict):
+        return payload
+    if payload.get("isError") is True:
+        messages = []
+        for item in payload.get("content", []):
+            if isinstance(item, dict) and isinstance(item.get("text"), str):
+                messages.append(item["text"])
+        detail = "; ".join(messages) or "unknown MCP error"
+        raise CKGAdapterError(f"CBM {tool} returned an error: {detail}")
+    content = payload.get("content")
+    if not isinstance(content, list):
+        return payload
+    for item in content:
+        if not isinstance(item, dict):
+            continue
+        text = item.get("text")
+        if not isinstance(text, str):
+            continue
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            continue
+    return payload
+
+
 class CodebaseMemoryCLIAdapter:
     """One-shot CBM adapter. The model never receives this tool surface."""
 
@@ -170,9 +197,9 @@ class CodebaseMemoryCLIAdapter:
         return shutil.which(self.binary) is not None
 
     def _call(self, tool, arguments=None):
-        # CBM documents JSON-on-stdin for one-shot CLI tools. Using that form
-        # avoids coupling DubBridge to generated flag spelling, especially for
-        # array-valued fields such as semantic_query/paths.
+        # CBM documents JSON-on-stdin for one-shot CLI tools. --json returns
+        # the full MCP envelope, so unwrap its JSON text payload before the
+        # rest of DubBridge consumes it.
         argv = [self.binary, "cli", "--json", tool]
         stdin = None if arguments is None else json.dumps(arguments, ensure_ascii=False)
         try:
@@ -192,9 +219,10 @@ class CodebaseMemoryCLIAdapter:
                 f"CBM {tool} exited {completed.returncode}: {completed.stderr.strip()}"
             )
         try:
-            return json.loads(completed.stdout)
+            payload = json.loads(completed.stdout)
         except json.JSONDecodeError as exc:
             raise CKGAdapterError(f"CBM {tool} returned non-JSON output") from exc
+        return _unwrap_mcp_envelope(payload, tool)
 
     @staticmethod
     def _worktree_root(worktree_dir):
@@ -250,22 +278,32 @@ class CodebaseMemoryCLIAdapter:
         payload = self._call(
             "check_index_coverage", {"project": project, "paths": list(paths)}
         )
-        text = json.dumps(payload, ensure_ascii=False).lower()
-        if any(
-            term in text
-            for term in (
-                "stale",
-                "partial",
-                "skipped",
-                "excluded",
-                "unknown",
-                "pending",
-                "gap",
-            )
-        ):
-            status = "partial"
+        statuses = []
+        for item in _walk(payload):
+            value = item.get("status")
+            if isinstance(value, str):
+                statuses.append(value.lower())
+        safe_statuses = {"no_recorded_issue", "covered", "complete", "verified", "fresh"}
+        if statuses:
+            status = "verified" if all(value in safe_statuses for value in statuses) else "partial"
         else:
-            status = "verified"
+            text = json.dumps(payload, ensure_ascii=False).lower()
+            status = (
+                "partial"
+                if any(
+                    term in text
+                    for term in (
+                        "stale",
+                        "partial",
+                        "skipped",
+                        "excluded",
+                        "unknown",
+                        "pending",
+                        "gap",
+                    )
+                )
+                else "verified"
+            )
         return {"status": status, "raw": payload}
 
     def discover(self, task_text, worktree_dir):
