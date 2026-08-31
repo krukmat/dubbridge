@@ -1393,7 +1393,7 @@ verified byte-identical to its pre-delegation form after `cargo fmt`.
 ### Peer Reviewer evidence
 
 - Reviewer: `muse-glimmer:30b-q4_K_M`
-- Phase 1 (attempt 1 packet, prose-only BEFORE description): PASS, 0
+- Phase 1 (delegation packet, prose-only BEFORE description): PASS, 0
   findings — verdict evaluated a review harness that concatenated
   `packet.md` + `before.txt` for the reviewer, which did **not** match what
   `delegate-low-rri.py` actually sends to Qwen (packet.md alone); this
@@ -1569,7 +1569,7 @@ each; no penalties. No decomposition triggered.
   sent, per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`'s per-packet phase-1
   requirement — see Peer Reviewer evidence.
 - Reviewability budget: diff for `event.rs` + `tests.rs` well within the
-  derived RRI 0–25 budget — no `D14-OVERRIDE` needed.
+  derived RRI 0-25 budget — no `D14-OVERRIDE` needed.
 - Unit tests (`HP-1`/`EC-1` for both families) were added directly by the
   orchestrator after delegation, since the delegation packet scoped only
   the two predicate methods; this is not a repair attempt against the
@@ -1988,7 +1988,7 @@ once the cap is enforced, tested, and audited.
 **Type:** Development (CI/ops)
 **Effort:** M (provisional — CI-runner-availability risk)
 **Depends on:** none
-**Status:** [ ] Planned
+**Status:** [x] Done — implemented and pushed to `main` at `45e94631631f2971c7fc63fd36effac4b82792af`; CI S3 integration passed; implementation/control incidents are documented in `docs/audit/x26-t5-implementation-incidents.md` (documentation commit `55a5c4f8bf190ae82c73fbe38da95c3cea106c24`).
 
 **Objective:** Close the actual D3/R12 gap found on re-verification: the S3
 integration test in `crates/storage/src/s3.rs:182` is `#[ignore]`d, the
@@ -2030,6 +2030,22 @@ missing `DUBBRIDGE_STORAGE_TEST_*` env vars, mirroring `qa-test-redis`), add a
 MinIO service container to `.github/workflows/ci.yml`, and wire the job to run
 it unconditionally. Stop condition: stop once CI runs the S3 integration test
 to a passing result on a real MinIO service.
+
+### Implementation summary
+
+- `Makefile` now exposes fail-closed `qa-test-s3`, requiring the four
+  `DUBBRIDGE_STORAGE_TEST_*` variables before it runs the ignored real-S3 test.
+- `.github/workflows/ci.yml` provisions a MinIO service and creates the CI bucket
+  before invoking `make qa-test-s3` unconditionally in `s3-integration`.
+- The `test` job also provisions Postgres, so DB-backed workspace tests no longer
+  silently self-skip merely because the base test job lacks a database.
+- GitHub Actions evidence for the implementation commit shows the real adapter
+  round trip passing: `1 passed; 0 failed` in the `s3-integration` job.
+- Non-S3 control findings discovered during CI are intentionally deferred rather
+  than folded into T5: historical S-150 references break `qa-docs`, and enabling
+  Postgres in the base test job exposes auth fixture collisions on
+  `owner@example.com`. Full evidence and follow-up guidance are in
+  `docs/audit/x26-t5-implementation-incidents.md`.
 
 ---
 
@@ -2322,4 +2338,5 @@ the owner explicitly waives the requirement.
 - `docs/proposals/tiger-style-adaptation-evaluation.md` — R1–R13 source and
   D1–D3 resolutions
 - `docs/plan/roadmap.md` — X26 cross-cutting item
+- `docs/audit/x26-t5-implementation-incidents.md` — T5 implementation/control incidents and deferred follow-up
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`, `docs/policies/HITL_AUTONOMY_POLICY.md`
