@@ -70,13 +70,18 @@ class CKGContextProvider(ContextProvider):
         self.manifest_path = manifest_path
         self._manifest = None
         self._last_render = None
+        self._graph_state_hash = None
 
     def manifest(self):
         return self._manifest.as_dict() if self._manifest else None
 
     def _current_source(self, candidate):
         content = self.file_tools.read_checked(candidate.path)
-        if candidate.start_line and candidate.end_line and candidate.end_line >= candidate.start_line:
+        if (
+            candidate.start_line
+            and candidate.end_line
+            and candidate.end_line >= candidate.start_line
+        ):
             lines = content.splitlines(keepends=True)
             start = max(0, candidate.start_line - 1)
             end = min(len(lines), candidate.end_line)
@@ -103,32 +108,44 @@ class CKGContextProvider(ContextProvider):
             selected.append(candidate)
         return selected, gaps
 
+    @staticmethod
+    def _anchors(discovery):
+        return [
+            {"path": path, "reason": "explicit_task_anchor"}
+            for path in discovery["anchors"].get("paths", [])
+        ] + [
+            {"symbol": symbol, "reason": "explicit_task_anchor"}
+            for symbol in discovery["anchors"].get("symbols", [])
+        ]
+
     def _resolve(self):
         identity = derive_worktree_identity(self.worktree_dir)
         discovery = self.adapter.discover(self.card.spec, self.worktree_dir)
+        if self._graph_state_hash is None:
+            # discover() indexes the exact worktree before its first graph query.
+            self._graph_state_hash = identity.state_hash
         authorized, gaps = self._authorize(discovery["candidates"])
         coverage = self.adapter.coverage(
             discovery["project"], sorted({candidate.path for candidate in authorized})
         )
+        notes = []
+        if identity.state_hash != self._graph_state_hash:
+            notes.append(
+                "worktree changed after graph snapshot; current worktree source remains authoritative"
+            )
         if coverage["status"] != "verified":
             manifest = CKGContextManifest(
                 work_item_id=self.card.task_id,
                 capsule_hash=getattr(self.card, "capsule_hash", None),
                 source_state=identity,
                 backend=self.adapter.backend_name,
-                graph_revision=identity.base_revision,
+                graph_revision=self._graph_state_hash,
                 coverage=coverage["status"],
-                anchors=[
-                    {"path": path, "reason": "explicit_task_anchor"}
-                    for path in discovery["anchors"].get("paths", [])
-                ]
-                + [
-                    {"symbol": symbol, "reason": "explicit_task_anchor"}
-                    for symbol in discovery["anchors"].get("symbols", [])
-                ],
+                anchors=self._anchors(discovery),
                 scope_gaps=gaps,
                 budget=dict(self.budget_details),
-                notes=["graph coverage incomplete; legacy source fallback required"],
+                notes=notes
+                + ["graph coverage incomplete; legacy source fallback required"],
             )
             self._manifest = manifest
             if self.manifest_path:
@@ -148,12 +165,18 @@ class CKGContextProvider(ContextProvider):
             if used_tokens + tokens > self.retrieval_budget_tokens:
                 continue
             used_tokens += tokens
-            entries.append({"path": candidate.path, "missing": False, "content": content})
+            entries.append(
+                {"path": candidate.path, "missing": False, "content": content}
+            )
             manifest_selection.append(
                 {
                     "path": candidate.path,
                     "symbol": candidate.symbol,
-                    "mode": "region" if candidate.start_line and candidate.end_line else "body_or_file",
+                    "mode": (
+                        "region"
+                        if candidate.start_line and candidate.end_line
+                        else "body_or_file"
+                    ),
                     "reason": candidate.reason,
                     "priority": candidate.priority,
                     "context_source": context_source,
@@ -162,25 +185,24 @@ class CKGContextProvider(ContextProvider):
                 }
             )
         if not entries:
-            raise CKGAdapterError("CKG produced no authorized context within retrieval budget")
+            raise CKGAdapterError(
+                "CKG produced no authorized context within retrieval budget"
+            )
         manifest = CKGContextManifest(
             work_item_id=self.card.task_id,
             capsule_hash=getattr(self.card, "capsule_hash", None),
             source_state=identity,
             backend=self.adapter.backend_name,
-            graph_revision=identity.base_revision,
+            graph_revision=self._graph_state_hash,
             coverage=coverage["status"],
-            anchors=[
-                {"path": path, "reason": "explicit_task_anchor"}
-                for path in discovery["anchors"].get("paths", [])
-            ]
-            + [
-                {"symbol": symbol, "reason": "explicit_task_anchor"}
-                for symbol in discovery["anchors"].get("symbols", [])
-            ],
+            anchors=self._anchors(discovery),
             scope_gaps=gaps,
             selection=manifest_selection,
-            budget={**self.budget_details, "selected_context_tokens": used_tokens},
+            budget={
+                **self.budget_details,
+                "selected_context_tokens": used_tokens,
+            },
+            notes=notes,
         )
         self._manifest = manifest
         if self.manifest_path:
