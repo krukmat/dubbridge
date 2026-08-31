@@ -118,11 +118,22 @@ class CKGContextProvider(ContextProvider):
             for symbol in discovery["anchors"].get("symbols", [])
         ]
 
-    def _resolve(self):
+    def _retrieval_text(self):
+        acceptance = json.dumps(
+            self.card.acceptance_tests, ensure_ascii=False, separators=(",", ":")
+        )
+        return f"{self.card.spec}\n\nAcceptance criteria/tests:\n{acceptance}"
+
+    def _resolve(self, *, force_refresh=False):
         identity = derive_worktree_identity(self.worktree_dir)
-        discovery = self.adapter.discover(self.card.spec, self.worktree_dir)
-        if self._graph_state_hash is None:
-            # discover() indexes the exact worktree before its first graph query.
+        discovery = self.adapter.discover(
+            self._retrieval_text(),
+            self.worktree_dir,
+            force_refresh=force_refresh,
+        )
+        # discover() indexes the exact task worktree. After a repair mutation,
+        # force_refresh=True performs an incremental re-index before traversal.
+        if self._graph_state_hash is None or force_refresh:
             self._graph_state_hash = identity.state_hash
         authorized, gaps = self._authorize(discovery["candidates"])
         coverage = self.adapter.coverage(
@@ -214,7 +225,7 @@ class CKGContextProvider(ContextProvider):
         return self._last_render
 
     def render_refresh(self, reason):
-        self._last_render = self._resolve()
+        self._last_render = self._resolve(force_refresh=True)
         if self._manifest:
             self._manifest.notes.append(f"refresh_reason={reason}")
             if self.manifest_path:
