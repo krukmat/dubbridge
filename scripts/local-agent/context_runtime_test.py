@@ -26,9 +26,20 @@ class Completed:
         self.returncode = returncode
 
 
+def _init_git_repo(root):
+    subprocess.run(["git", "init", "-q", root], check=True)
+    subprocess.run(
+        ["git", "-C", root, "config", "user.email", "test@example.com"], check=True
+    )
+    subprocess.run(
+        ["git", "-C", root, "config", "user.name", "Test"], check=True
+    )
+
+
 class RuntimeContextTests(unittest.TestCase):
     def test_cli_builds_prompt_from_active_runtime_context_budget(self):
         with tempfile.TemporaryDirectory() as root:
+            _init_git_repo(root)
             card_path = os.path.join(root, "card.json")
             out_path = os.path.join(root, "out.json")
             target = os.path.join(root, "hello.txt")
@@ -44,6 +55,10 @@ class RuntimeContextTests(unittest.TestCase):
                     },
                     handle,
                 )
+            subprocess.run(["git", "-C", root, "add", "hello.txt", "card.json"], check=True)
+            subprocess.run(
+                ["git", "-C", root, "commit", "-qm", "initial"], check=True
+            )
 
             captured = {}
             real_builder = cli.build_tool_calling_system_prompt
@@ -55,7 +70,11 @@ class RuntimeContextTests(unittest.TestCase):
 
             def chat(messages):
                 captured["messages"] = messages
-                return {"tool_calls": [{"function": {"name": "finish", "arguments": {}}}]}
+                return {
+                    "tool_calls": [
+                        {"function": {"name": "finish", "arguments": {}}}
+                    ]
+                }
 
             with mock.patch.object(
                 cli, "build_tool_calling_system_prompt", side_effect=capture_builder
@@ -76,25 +95,24 @@ class RuntimeContextTests(unittest.TestCase):
                         "legacy",
                     ],
                     chat_fn=chat,
-                    test_runner=lambda _root: {"passed": True, "output": "", "commands": []},
+                    test_runner=lambda _root: {
+                        "passed": True,
+                        "output": "",
+                        "commands": [],
+                    },
                     boundary=rlt.NullBoundary(),
                 )
 
             self.assertEqual(exit_code, 0)
             self.assertEqual(captured["num_ctx"], 16384)
             self.assertEqual(captured["num_predict"], 4096)
-            self.assertIn("Authorized source context", captured["messages"][0]["content"])
+            self.assertIn(
+                "Authorized source context", captured["messages"][0]["content"]
+            )
 
     def test_worktree_hash_tracks_untracked_content_changes(self):
         with tempfile.TemporaryDirectory() as root:
-            subprocess.run(["git", "init", "-q", root], check=True)
-            subprocess.run(
-                ["git", "-C", root, "config", "user.email", "test@example.com"],
-                check=True,
-            )
-            subprocess.run(
-                ["git", "-C", root, "config", "user.name", "Test"], check=True
-            )
+            _init_git_repo(root)
             tracked = os.path.join(root, "tracked.txt")
             with open(tracked, "w", encoding="utf-8") as handle:
                 handle.write("tracked\n")
@@ -121,7 +139,8 @@ class RuntimeContextTests(unittest.TestCase):
 
         adapter = CodebaseMemoryCLIAdapter(binary="cbm", runner=runner)
         result = adapter._call(
-            "search_graph", {"project": "dubbridge", "semantic_query": ["playback"]}
+            "search_graph",
+            {"project": "dubbridge", "semantic_query": ["playback"]},
         )
         self.assertEqual(result, {"results": []})
         argv, kwargs = calls[0]
