@@ -254,15 +254,14 @@ class CodebaseMemoryCLIAdapter:
                     return value
         return None
 
-    def ensure_project(self, worktree_dir):
+    def ensure_project(self, worktree_dir, *, force_refresh=False):
         root = self._worktree_root(worktree_dir)
         cached = self._projects_by_root.get(root)
-        if cached:
+        if cached and not force_refresh:
             return cached
 
-        # Re-index once at the start of each runner invocation. CBM's indexer is
-        # incremental, and this binds discovery to the actual disposable
-        # worktree instead of an arbitrary sibling checkout of the same repo.
+        # CBM indexing is incremental. Refreshing the exact disposable worktree
+        # keeps graph topology aligned with edits before a repair-context pass.
         payload = self._call("index_repository", {"repo_path": root})
         project = self._project_from_index_payload(payload) or self._project_for_root(root)
         if not project:
@@ -306,8 +305,8 @@ class CodebaseMemoryCLIAdapter:
             )
         return {"status": status, "raw": payload}
 
-    def discover(self, task_text, worktree_dir):
-        project = self.ensure_project(worktree_dir)
+    def discover(self, task_text, worktree_dir, *, force_refresh=False):
+        project = self.ensure_project(worktree_dir, force_refresh=force_refresh)
         anchors = extract_task_anchors(task_text)
         candidates = []
         for path in anchors["paths"]:
