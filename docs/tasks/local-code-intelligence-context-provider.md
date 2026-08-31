@@ -150,6 +150,10 @@ Acceptance:
 
 Evidence: provider/runtime tests, manifest evidence, fallback state in runner output.
 
+## Handoff boundary
+
+When final remote CI is green, **no additional implementation remains on the remote side for milestone 1**. The next action is the operator-local smoke on the target Mac. Any defect found by that smoke becomes a follow-up against this branch/PR rather than an unverified claim in this ledger.
+
 ## Deferred follow-ups
 
 These are intentionally outside milestone 1 and are not blockers for this PR:
