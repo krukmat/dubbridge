@@ -34,7 +34,7 @@ import escalation_packet
 import med_high_gate
 
 MED_HIGH_WALL_CLOCK_SECONDS = 300
-MED_HIGH_RUNNER_MODEL = "nemotron-3.5-lightning:30b-a3b-q4_K_M"
+MED_HIGH_RUNNER_MODEL = "devstral-small-2:24b-instruct-2512-q4_K_M"
 POST_KILL_WAIT_SECONDS = 5
 ROUTE_GO_LOCAL = med_high_gate.ROUTE_GO_LOCAL
 ROUTE_CLOUD_REQUIRED = med_high_gate.ROUTE_CLOUD_REQUIRED
@@ -724,7 +724,7 @@ def parse_args(argv=None):
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Supervise the one bounded Med-high Qwen27 attempt and emit a cloud evidence bundle on any non-success route (ADR-038 T4).",
+        description="Supervise the bounded Med-high local attempt and emit a cloud evidence bundle on any non-success route (ADR-038 T4).",
     )
     parser.add_argument("--card", required=True)
     parser.add_argument("--worktree", required=True)
