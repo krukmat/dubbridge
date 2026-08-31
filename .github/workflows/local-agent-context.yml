@@ -23,6 +23,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run context-provider tests
         run: python3 scripts/local-agent/context_provider_test.py
+      - name: Run M2 multi-turn tests
+        run: python3 scripts/local-agent/multiturn_context_test.py
       - name: Run runtime/CBM contract tests
         run: python3 scripts/local-agent/context_runtime_test.py
       - name: Run prompt-builder regression tests
