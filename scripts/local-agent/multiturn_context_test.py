@@ -54,11 +54,19 @@ class FakeFileTools:
 
 
 class FakeProvider:
-    def __init__(self):
+    def __init__(self, file_tools=None):
+        self.file_tools = file_tools
         self.refresh_calls = []
+        self.current_calls = []
 
     def render_initial(self):
         return "SOURCE_INITIAL"
+
+    def render_current(self, reason=None):
+        self.current_calls.append(reason)
+        if self.file_tools is None:
+            return "SOURCE_CURRENT"
+        return "SOURCE_CURRENT\n" + self.file_tools.current
 
     def render_refresh(self, reason, hints=None):
         self.refresh_calls.append((reason, hints or {}))
@@ -80,6 +88,8 @@ class MultiTurnContextTests(unittest.TestCase):
     def _run(self, responses, test_runner, *, provider=None, file_tools=None):
         snapshots = []
         iterator = iter(responses)
+        tools = file_tools or FakeFileTools()
+        active_provider = provider or FakeProvider(tools)
 
         def chat_fn(messages):
             snapshots.append(json.loads(json.dumps(messages)))
@@ -93,29 +103,34 @@ class MultiTurnContextTests(unittest.TestCase):
                 test_runner,
                 ".",
                 FakeBoundary(),
-                file_tools or FakeFileTools(),
+                tools,
                 limits=Limits(),
-                context_provider=provider or FakeProvider(),
+                context_provider=active_provider,
                 resolve_effective_limits=lambda _card: Limits(),
                 max_malformed_bounces=3,
                 tool_calling_system_prompt="SYSTEM {MAX_TOTAL_TURNS}",
             )
-        return result, snapshots
+        return result, snapshots, active_provider
 
     def test_large_write_body_is_not_replayed_as_working_history(self):
         marker = "UNIQUE_GENERATED_BODY_" * 500
         response = tool_response(
             "write_file", {"path": "src/a.rs", "content": marker}
         )
-        result, snapshots = self._run(
+        result, snapshots, provider = self._run(
             [response, tool_response("finish")],
             lambda _root: {"passed": True, "output": "", "commands": []},
         )
         self.assertEqual(result["status"], "success")
-        second_turn = json.dumps(snapshots[1])
-        self.assertNotIn(marker, second_turn)
-        self.assertIn("ACTION: write_file", second_turn)
-        self.assertIn("CURRENT_SOURCE_SHA256", second_turn)
+        second = snapshots[1]
+        # The current worktree body remains available exactly through the
+        # replaceable source snapshot, not through replayed tool-call history.
+        self.assertIn(marker, second[0]["content"])
+        compact_history = json.dumps(second[1:])
+        self.assertNotIn(marker, compact_history)
+        self.assertIn("ACTION: write_file", compact_history)
+        self.assertIn("CURRENT_SOURCE_SHA256", compact_history)
+        self.assertEqual(provider.current_calls, ["edit_applied"])
         # The audit transcript remains lossless and therefore still contains
         # the original raw model tool payload.
         self.assertIn(marker, json.dumps(result["transcript"]))
@@ -147,7 +162,7 @@ class MultiTurnContextTests(unittest.TestCase):
                 }
             return {"passed": True, "output": "ok", "commands": []}
 
-        result, snapshots = self._run(
+        result, snapshots, _provider = self._run(
             [tool_response("finish"), tool_response("finish")],
             test_runner,
             provider=provider,
