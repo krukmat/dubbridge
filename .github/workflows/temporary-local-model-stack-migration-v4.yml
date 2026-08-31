@@ -22,10 +22,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          git show 9b83366de737733dfe7eb630b0b30a92349839c9:.github/workflows/temporary-local-model-stack-migration-v3.yml > /tmp/v3.yml
           python - <<'EXTRACT'
           from pathlib import Path
           import textwrap
-          source = Path('.github/workflows/temporary-local-model-stack-migration-v3.yml').read_text(encoding='utf-8')
+          source = Path('/tmp/v3.yml').read_text(encoding='utf-8')
           marker = "          python - <<'PY'\n"
           start = source.index(marker) + len(marker)
           end = source.index("\n          PY\n", start)
@@ -46,6 +47,29 @@ jobs:
           if old not in text:
               raise SystemExit('Low-band D14 mock anchor not found')
           path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Update GPT-OSS dry-run expectation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/gemma_code_review_test.py')
+          text = path.read_text(encoding='utf-8')
+          start = text.find('    def test_dry_run_think_false_by_default')
+          if start < 0:
+              raise SystemExit('dry-run think test anchor not found')
+          end = text.find('\n    def ', start + 5)
+          if end < 0:
+              end = len(text)
+          block = text[start:end]
+          old = '        self.assertFalse(payload["think"])'
+          if old not in block:
+              raise SystemExit('legacy think=False assertion not found in dry-run test')
+          block = block.replace(old, '        self.assertEqual(payload["think"], "medium")', 1)
+          text = text[:start] + block + text[end:]
+          path.write_text(text, encoding='utf-8')
           PY
 
       - name: Validate migration
