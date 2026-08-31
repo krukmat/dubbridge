@@ -210,7 +210,10 @@ def _transcribe_with_timeout(model, job_id: str, timeout_seconds: float, audio_p
     previous_handler = signal.signal(signal.SIGALRM, _deadline_handler)
     signal.setitimer(signal.ITIMER_REAL, timeout_seconds)
     try:
-        return model.transcribe(audio_path, language=language, word_timestamps=True)
+        segments, info = model.transcribe(audio_path, language=language, word_timestamps=True)
+        # faster-whisper performs the actual transcription while iterating its
+        # segment generator; materialize it before cancelling the deadline.
+        return list(segments), info
     except _TranscriptionDeadlineExceeded as exc:
         raise TranscriptionTimeoutError(
             f"transcription exceeded {timeout_seconds:g}s timeout", job_id
@@ -252,7 +255,6 @@ def transcribe_audio(
                     {"word": word.word.strip(), "start": word.start, "end": word.end}
                 )
     return full_text_parts, word_timestamps
-
 
 
 def validate_output(payload: dict) -> dict:
