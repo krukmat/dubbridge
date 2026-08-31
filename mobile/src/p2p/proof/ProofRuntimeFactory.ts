@@ -1,6 +1,7 @@
 import { Directory, Paths } from "expo-file-system";
 import { Worklet } from "react-native-bare-kit";
 
+import { BareRpcPort, RuntimeProtocolClient } from "../runtime/runtime-client";
 import RUNTIME_WORKLET_SOURCE from "../runtime/worklet.bundle.js";
 
 const RUN_ID = /^[a-z0-9]{8,64}$/;
@@ -31,4 +32,21 @@ export function startProofWorklet(runId: string, createWorklet: () => Pick<Workl
   const worklet = createWorklet();
   worklet.start(PROOF_WORKLET_FILENAME, RUNTIME_WORKLET_SOURCE, [uri]);
   return worklet;
+}
+
+export interface ProofSessionParts {
+  worklet: Pick<Worklet, "start" | "IPC">;
+  port: BareRpcPort;
+  client: RuntimeProtocolClient;
+}
+
+export function createProofSessionParts(
+  runId: string,
+  timeoutMs = 5_000,
+  createWorklet?: () => Pick<Worklet, "start" | "IPC">,
+): ProofSessionParts {
+  const worklet = startProofWorklet(runId, createWorklet) as Pick<Worklet, "start" | "IPC">;
+  const port = new BareRpcPort(worklet.IPC as never);
+  const client = new RuntimeProtocolClient(port, timeoutMs);
+  return { worklet, port, client };
 }

@@ -1,36 +1,20 @@
-import type { Worklet } from "react-native-bare-kit";
+import { createProofSessionParts, type ProofSessionParts } from "./ProofRuntimeFactory";
 
-import { BareRpcPort, RuntimeProtocolClient } from "../runtime/runtime-client";
-import { startProofWorklet } from "./ProofRuntimeFactory";
+export type ReplicationSession = ProofSessionParts;
 
-export interface ReplicationSession {
-  port: BareRpcPort;
-  client: RuntimeProtocolClient;
-  worklet: Pick<Worklet, "start" | "IPC">;
-}
-
-export function startReplicationSession(
-  runId: string,
-  timeoutMs = 5_000,
-  createWorklet?: () => Pick<Worklet, "start" | "IPC">,
-): ReplicationSession {
-  const worklet = startProofWorklet(runId, createWorklet) as Pick<Worklet, "start" | "IPC">;
-  const port = new BareRpcPort(worklet.IPC as never);
-  const client = new RuntimeProtocolClient(port, timeoutMs);
-  return { port, client, worklet };
-}
+export const startReplicationSession = createProofSessionParts;
 
 export async function closeReplicationSession(session: ReplicationSession): Promise<void> {
   try {
     await session.client.shutdown();
-   } catch {
-     // best-effort: fall through to closing the port regardless
-   }
+  } catch {
+    // best-effort: fall through to closing the port regardless
+  }
   try {
     session.port.close(new Error("Replication session closed"));
-   } catch {
-     // best-effort: this helper must never throw
-   }
+  } catch {
+    // best-effort: this helper must never throw
+  }
 }
 
 async function runOneSessionReplication(
@@ -47,15 +31,15 @@ export async function runDualSessionReplication(
   clientSession: ReplicationSession,
   topic: Buffer,
 ): Promise<
-   [
+  [
     PromiseSettledResult<Awaited<ReturnType<typeof runOneSessionReplication>>>,
     PromiseSettledResult<Awaited<ReturnType<typeof runOneSessionReplication>>>,
-   ]
+  ]
 > {
   return Promise.allSettled([
     runOneSessionReplication(seedSession, topic, "seed"),
     runOneSessionReplication(clientSession, topic, "client"),
-   ]);
+  ]);
 }
 
 export type DualSessionReplicationResult = Awaited<ReturnType<typeof runDualSessionReplication>>;

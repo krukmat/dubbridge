@@ -1,14 +1,11 @@
-import type { Worklet } from "react-native-bare-kit";
-
 import { RuntimeProtocolError, type SeedWriteHashDeleteReceipt } from "../runtime/protocol";
-import { BareRpcPort, RuntimeProtocolClient } from "../runtime/runtime-client";
 import {
   deleteProofRunDirectory,
   isWithinProofRoot,
   listAbandonedProofRuns,
   TransientStorageError,
 } from "./transient-storage";
-import { proofStorageUri, startProofWorklet } from "./ProofRuntimeFactory";
+import { proofStorageUri, createProofSessionParts } from "./ProofRuntimeFactory";
 
 export type SeedProofOutcome = {
   receipt: SeedWriteHashDeleteReceipt;
@@ -18,15 +15,13 @@ export type SeedProofOutcome = {
 export async function runSeedProof(
   runId: string,
   timeoutMs = 5_000,
-  createWorklet?: () => Pick<Worklet, "start" | "IPC">,
+  createWorklet?: Parameters<typeof createProofSessionParts>[2],
 ): Promise<SeedProofOutcome> {
   const runRootUri = proofStorageUri(runId);
   if (!isWithinProofRoot(runRootUri, runId)) {
     throw new RuntimeProtocolError("PROOF_STORAGE_CONFIG_INVALID", "Proof storage configuration is invalid");
   }
-  const worklet = startProofWorklet(runId, createWorklet) as Pick<Worklet, "start" | "IPC">;
-  const port = new BareRpcPort(worklet.IPC as never);
-  const client = new RuntimeProtocolClient(port, timeoutMs);
+  const { port, client } = createProofSessionParts(runId, timeoutMs, createWorklet);
 
   let receipt: SeedWriteHashDeleteReceipt;
   try {

@@ -14,6 +14,8 @@ const sourcePaths = [
   path.join(runtimeRoot, "protocol-codec.ts"),
   path.join(runtimeRoot, "transient-drive.ts"),
   path.join(runtimeRoot, "transient-drive-dependencies.ts"),
+  path.join(runtimeRoot, "transient-replication-dependencies.ts"),
+  path.join(runtimeRoot, "transient-replication-discovery.ts"),
   path.join(runtimeRoot, "transient-replication.ts"),
   path.join(runtimeRoot, "transient-seed.ts"),
   path.join(runtimeRoot, "worklet-request-handler.ts"),
