@@ -110,13 +110,39 @@ class CKGContextProvider(ContextProvider):
         coverage = self.adapter.coverage(
             discovery["project"], sorted({candidate.path for candidate in authorized})
         )
+        if coverage["status"] != "verified":
+            manifest = CKGContextManifest(
+                work_item_id=self.card.task_id,
+                capsule_hash=getattr(self.card, "capsule_hash", None),
+                source_state=identity,
+                backend=self.adapter.backend_name,
+                graph_revision=identity.base_revision,
+                coverage=coverage["status"],
+                anchors=[
+                    {"path": path, "reason": "explicit_task_anchor"}
+                    for path in discovery["anchors"].get("paths", [])
+                ]
+                + [
+                    {"symbol": symbol, "reason": "explicit_task_anchor"}
+                    for symbol in discovery["anchors"].get("symbols", [])
+                ],
+                scope_gaps=gaps,
+                budget=dict(self.budget_details),
+                notes=["graph coverage incomplete; legacy source fallback required"],
+            )
+            self._manifest = manifest
+            if self.manifest_path:
+                manifest.write(self.manifest_path)
+            raise CKGAdapterError(
+                f"CKG coverage is {coverage['status']}; use source fallback"
+            )
         entries = []
         manifest_selection = []
         used_tokens = 0
         for candidate in authorized:
             try:
                 content, context_source = self._current_source(candidate)
-            except Exception:
+            except (OSError, ValueError, RuntimeError):
                 continue
             tokens = gemma_local.estimate_text_tokens(content)
             if used_tokens + tokens > self.retrieval_budget_tokens:
@@ -156,8 +182,6 @@ class CKGContextProvider(ContextProvider):
             selection=manifest_selection,
             budget={**self.budget_details, "selected_context_tokens": used_tokens},
         )
-        if coverage["status"] != "verified":
-            manifest.notes.append("graph coverage partial; rendered source is current worktree source")
         self._manifest = manifest
         if self.manifest_path:
             manifest.write(self.manifest_path)
