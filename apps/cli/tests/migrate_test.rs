@@ -10,7 +10,7 @@ async fn connect() -> Option<PgPool> {
     Some(PgPool::connect(&url).await.expect("connect"))
 }
 
-// HP-1: against a reachable database, all 29 migration files apply and are
+// HP-1: against a reachable database, all 31 migration files apply and are
 // tracked in _sqlx_migrations.
 // HP-2: a second run against the same already-migrated database is a
 // no-op and still returns Ok.
@@ -31,8 +31,8 @@ async fn migrations_apply_and_are_idempotent_on_second_run() {
         .expect("query _sqlx_migrations count");
     let count: i64 = row.get("count");
     assert_eq!(
-        count, 29,
-        "expected exactly 29 applied migrations, found {count}"
+        count, 31,
+        "expected exactly 31 applied migrations, found {count}"
     );
 
     sqlx::migrate!("../../infra/migrations")

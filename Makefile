@@ -29,7 +29,7 @@ qa-lint:
 	$(CARGO) clippy --workspace --all-targets --all-features -- -D warnings
 
 qa-test:
-	$(CARGO) test --workspace --all-features
+	$(CARGO) test --workspace --all-features -- --test-threads=1
 
 qa-test-redis:
 	@if [ -z "$${DUBBRIDGE_REDIS_URL:-}" ]; then \
