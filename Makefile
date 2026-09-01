@@ -16,12 +16,12 @@ GEMMA_REVIEW_RESULT ?= $(if $(GEMMA_REVIEW_TASK_ID),/tmp/dubbridge-gemma-review-
 GEMMA_REVIEW_CONTEXT_METADATA ?= $(if $(GEMMA_REVIEW_TASK_ID),/tmp/dubbridge-review-context-$(GEMMA_REVIEW_TASK_ID).json,/tmp/dubbridge-review-context.json)
 GEMMA_EVIDENCE_DIR   ?= docs/audit/gemma-evidence
 REVIEW_PATHS         ?=
-# Optional task/acceptance source and read-authority scope for M3 local reviewer
-# enrichment. REVIEW_CONTEXT_ALLOWED_PATHS defaults to the same explicit pathspec
-# used for the diff; when empty, review_context.py falls back to changed paths.
+# Optional task/acceptance source and explicit read-authority scope for M3 local
+# reviewer enrichment. With no explicit REVIEW_CONTEXT_ALLOWED_PATHS, the local
+# reviewer may read only CKG-selected files contained in the current worktree.
 # Cross-vendor qa-peer-workflow-review deliberately does not use these variables.
 REVIEW_TASK_FILE     ?=
-REVIEW_CONTEXT_ALLOWED_PATHS ?= $(REVIEW_PATHS)
+REVIEW_CONTEXT_ALLOWED_PATHS ?=
 GOLDEN_SET_MODEL     ?= gemma4:26b-a4b-it-qat
 GOLDEN_SET_RESULT    ?= /tmp/dubbridge-golden-set.json
 COVERAGE_IGNORE_REGEX ?= (apps/(api|cli|worker-runner)/src/(main|cleanup)\.rs|apps/api/src/(dto/ingestion|lib|routes/ingestion|state)\.rs|crates/(db|jobs|observability)/src/lib\.rs|crates/db/src/(artifact_repo|asset_repo|audit_repo|pending_ingestion_repo|rights_repo)\.rs|crates/(audit|ingestion)/src/lib\.rs)
