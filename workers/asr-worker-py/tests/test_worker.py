@@ -163,6 +163,37 @@ def test_transcription_timeout_uses_distinct_error():
     assert exc_info.value.error_code == "transcription_timeout"
 
 
+def test_transcription_timeout_covers_slow_generator_iteration():
+    """Regression guard for the lazy-generator timeout fix.
+
+    faster-whisper returns its segment generator immediately from
+    transcribe(); the actual transcription work happens while iterating it.
+    A fast-returning transcribe() call paired with a slow-to-iterate
+    generator is the exact shape of the bug this guards against: if the
+    deadline alarm is cancelled before the generator is materialized (e.g.
+    list(segments) moved after the alarm cancel), this test would hang or
+    return without raising instead of timing out.
+    """
+    worker_main = load_worker_module()
+    model_class = make_whisper_mock()
+
+    def slow_segment_generator():
+        for _ in range(5):
+            time.sleep(0.05)
+            yield MagicMock(text="word", words=None)
+
+    def fast_transcribe(*_args, **_kwargs):
+        return (slow_segment_generator(), MagicMock())
+
+    model_class.return_value.transcribe.side_effect = fast_transcribe
+    with patch.dict("sys.modules", {"faster_whisper": MagicMock(WhisperModel=model_class)}), patch.dict(
+        os.environ, {"ASR_TRANSCRIBE_TIMEOUT_SECONDS": "0.05"}
+    ):
+        with pytest.raises(worker_main.TranscriptionTimeoutError) as exc_info:
+            worker_main.transcribe_audio("j-timeout-gen", "/tmp/audio.wav", "en")
+    assert exc_info.value.error_code == "transcription_timeout"
+
+
 def test_successful_transcription_emits_output_and_exits_0():
     audio_path = make_audio_file()
     try:
