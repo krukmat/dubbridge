@@ -1,7 +1,7 @@
 ---
 type: TaskList
 title: "Local Code Intelligence M3 — Reviewer Intelligence Tasks"
-status: active
+status: implemented-audit-pending
 description: "Ordered task ledger for local-only CKG-enriched reviewer packets."
 plan: docs/plan/local-code-intelligence-m3-reviewer-intelligence.md
 ---
@@ -12,170 +12,170 @@ Behavioral coverage contract: unit-v1
 
 ## Milestone status
 
-Status: **in progress on `feat/ckg-reviewer-intelligence`**.
+Status: **implementation complete; independent/local audit pending on `feat/ckg-reviewer-intelligence`**.
 
-Base: M1 + M2 merged to `main` by PR #6.
+Base: M1 + M2 merged to `main` by PR #6 (`f3adf34b5722890356d359892334812d66f9f453`).
 
-Task order and dependency chain:
+Deterministic code baseline: `086518312bb5b47adb97774473d5a6ae8b838f65`.
+
+Dedicated evidence: `local-agent-context` run **82** — success across M1, M2, M3, and existing Gemma reviewer regressions.
+
+Task chain:
 
 ```text
 M3-T1 -> M3-T2 -> M3-T3 -> M3-T4
 ```
 
+No task is marked repository-closure `[x] Done` yet because the independent/local review and real CBM/Ollama audit have not been executed in this environment.
+
 ## M3-T1 — Define deterministic review-packet contract
 
-Status: **in progress**
+Status: **implemented; deterministic validation passed**
 
 Effort: S
 
 Depends on: M1/M2 merged baseline and existing reviewer stack.
 
-Changes:
-- define a reusable packet builder that treats task acceptance + authoritative diff as mandatory content;
-- define optional CKG impact sections and machine-readable metadata;
-- define reviewer-budget behavior so optional graph context is dropped before mandatory content;
-- keep the builder model-agnostic and read-only.
+Implemented:
+- reusable `review-context-v1` packet builder;
+- mandatory authoritative diff and supplied acceptance material;
+- source-body-free machine-readable metadata;
+- optional CKG impact section using only the remainder reviewer budget;
+- whole-entry fit: optional impact is dropped rather than truncating mandatory review material;
+- explicit `acceptance_supplied` evidence when no task acceptance source is available.
 
-HP-1: acceptance text + a normal diff -> packet contains both unchanged plus a stable metadata/impact section.
+Happy paths considered:
+- HP-1: acceptance text + normal diff -> packet contains both unchanged plus stable metadata/impact sections.
 
-EC-1: optional impact context exceeds its budget -> impact entries are omitted/truncated by whole entry while acceptance + diff remain intact.
+Edge cases considered:
+- EC-1: optional impact exceeds remaining budget -> optional entries are omitted whole while diff + supplied acceptance remain complete.
 
-Acceptance:
-- deterministic unit tests for packet shape and budget priority;
-- no model call is required to build or validate the packet;
-- no reviewer routing changes.
+Unit evidence:
+- HP-1: `scripts/review_context_test.py::test_no_ckg_cli_is_deterministic_and_needs_no_backend` — passed in run 82.
+- EC-1: `scripts/review_context_test.py::test_mandatory_diff_and_acceptance_are_never_truncated_for_impact` and `scripts/review_context_test.py::test_optional_entries_are_fit_whole_inside_impact_budget` — passed in run 82.
 
-Evidence to emit:
-- `scripts/review_context_test.py` results;
-- exact packet metadata assertions.
-
-Status artifacts affected:
-- this ledger;
-- M3 plan if implementation reveals a contract change.
-
-Agent handoff prompt: implement the smallest deterministic packet abstraction that preserves mandatory acceptance/diff content and gives optional impact entries a bounded remainder budget. Do not change reviewer routing.
+Evidence emitted:
+- deterministic packet/metadata assertions in `scripts/review_context_test.py`;
+- `review-context-v1` metadata can be persisted via `--metadata-out` / `GEMMA_REVIEW_CONTEXT_METADATA`.
 
 ## M3-T2 — Add CKG depth-1 impact retrieval
 
-Status: **pending**
+Status: **implemented; deterministic validation passed**
 
 Effort: M
 
-Depends on: M3-T1; M1 `ckg_adapter.py` contracts.
+Depends on: M3-T1 and M1 `ckg_adapter.py`.
 
-Changes:
-- derive changed paths and lightweight changed-symbol anchors from the diff where practical;
-- query the existing CKG backend for direct related tests/callers/references/types/callees;
-- rank depth-1 impact candidates deterministically;
-- read current worktree source only after the candidate is permitted by the applicable task/path boundary;
-- record rejected/unreadable candidates as scope gaps without source bodies;
-- return a safe no-impact/fallback result when CBM is unavailable or coverage is insufficient.
+Implemented:
+- changed-path + lightweight changed-definition anchors derived from the authoritative diff;
+- existing `CodebaseMemoryCLIAdapter` reused at depth 1;
+- deterministic review ranking: changed-symbol region -> tests -> callers -> types/references -> dependencies;
+- coverage checked across changed paths plus discovered impact candidates;
+- source re-read from the current worktree rather than graph bodies;
+- worktree-contained read-only default, allowing unmodified callers/tests to be reviewed locally;
+- optional explicit task authority reuses `LocalAgentBoundary.check_path()`;
+- out-of-authority/unreadable candidates become source-body-free scope gaps;
+- CBM unavailable/partial coverage degrades to mandatory diff-based review.
 
-HP-1: changed implementation path/symbol with a directly related test -> related test is ranked into local review impact context.
+Happy paths considered:
+- HP-1: changed implementation symbol + related test -> related test is selected into local review context.
+- HP-2: caller and dependency candidates -> caller ranks ahead of lower-priority dependency context.
 
-HP-2: changed symbol with a direct caller -> caller is represented ahead of lower-priority callee/reference context when the budget is tight.
+Edge cases considered:
+- EC-1: explicit task authority rejects a graph-related path -> no source body is rendered; scope gap records the rejection.
+- EC-2: CBM unavailable or coverage partial -> enrichment falls back without breaking mandatory review material.
 
-EC-1: graph discovers a related path outside task authority -> path may be reported as a scope gap, but source body is absent.
-
-EC-2: CBM is unavailable/invalid -> impact retrieval reports fallback and packet construction continues.
-
-Acceptance:
-- unit tests cover ranking, authorization/scope-gap behavior and backend failure;
-- depth remains 1;
-- no second authorization matcher is introduced;
-- graph content is discovery metadata; current worktree remains source authority.
-
-Evidence to emit:
-- focused fake-adapter tests in `scripts/review_context_test.py`;
-- assertions proving unauthorized source is absent.
-
-Status artifacts affected:
-- this ledger;
-- M3 plan if adapter reuse requires a documented seam extraction.
-
-Agent handoff prompt: reuse the M1 adapter and authorization concepts to produce depth-1 review impact candidates. Preserve source authority and fail safely to an empty optional impact section.
+Unit evidence:
+- HP-1/HP-2: `scripts/review_context_test.py::test_depth_one_candidates_are_ranked_for_review_value` — passed in run 82.
+- HP-1 worktree authority: `scripts/review_context_test.py::test_default_worktree_scope_can_include_unmodified_related_source` — passed in run 82.
+- EC-1: `scripts/review_context_test.py::test_unauthorized_related_source_becomes_scope_gap_without_body` — passed in run 82.
+- EC-2: `scripts/review_context_test.py::test_unavailable_ckg_falls_back_to_mandatory_review_packet` and `scripts/review_context_test.py::test_partial_coverage_disables_optional_enrichment` — passed in run 82.
 
 ## M3-T3 — Integrate enrichment into the existing local reviewer
 
-Status: **pending**
+Status: **implemented; deterministic validation passed**
 
 Effort: M
 
-Depends on: M3-T2; existing `gemma-code-review.py` and Makefile review flow.
+Depends on: M3-T2 and existing `gemma-code-review.py`/Makefile flow.
 
-Changes:
-- feed the enriched packet to the existing local Gemma/Muse reviewer path;
-- provide the packet builder the diff, task/acceptance context when available, repository/worktree information, reviewer context budget, and optional boundary information;
-- preserve existing review response parsing, passes, receipts, finding disposition and D14 fallback;
-- keep cross-vendor/cloud peer packets on their current disclosure contract.
+Implemented:
+- `qa-gemma-review` creates the authoritative diff once and passes it through `scripts/review_context.py` before the existing reviewer wrapper;
+- optional `REVIEW_TASK_FILE` supplies acceptance/task context;
+- optional `REVIEW_CONTEXT_ALLOWED_PATHS` supplies an explicit task read boundary;
+- metadata output is task-scoped when `GEMMA_REVIEW_TASK_ID` is present;
+- existing `gemma-code-review.py` response parsing, multi-pass behavior, receipts and findings handling remain unchanged;
+- `qa-peer-workflow-review` is not routed through `review_context.py`, preserving the pre-M3 cross-vendor/cloud disclosure contract.
 
-HP-1: local code review with healthy CKG -> reviewer input contains mandatory diff/acceptance plus selected impact context.
+Happy paths considered:
+- HP-1: local reviewer target -> enriched packet reaches the existing reviewer and carries diff/task/context inputs.
 
-EC-1: local code review with unavailable CKG -> reviewer receives a valid diff-based packet and executes normally.
+Edge cases considered:
+- EC-1: CKG unavailable -> builder returns a valid mandatory packet and existing reviewer can proceed.
+- EC-2: cross-vendor target -> M3 review-context builder is not invoked and no selected CKG source is injected.
 
-EC-2: routing selects cross-vendor reviewer -> no CKG-selected source enrichment is injected into that packet.
+Unit/integration evidence:
+- HP-1: `scripts/review_context_makefile_test.py::test_local_gemma_target_enriches_packet_before_existing_reviewer` — passed in run 82.
+- EC-1: `scripts/review_context_test.py::test_unavailable_ckg_falls_back_to_mandatory_review_packet` — passed in run 82.
+- EC-2: `scripts/review_context_makefile_test.py::test_cross_vendor_peer_target_does_not_invoke_review_context` — passed in run 82.
+- existing `scripts/gemma_code_review_test.py` suite — passed in run 82.
 
-Acceptance:
-- existing reviewer unit tests remain green;
-- new integration tests assert local enrichment and cloud-path non-enrichment;
-- no changes to RRI band thresholds, reviewer identity, pass count or verdict semantics.
+## M3-T4 — Regression, fallback and milestone handoff
 
-Evidence to emit:
-- `gemma_code_review_test.py` / `peer_workflow_review_test.py` or narrower new unit evidence;
-- packet inspection proving local-only enrichment.
-
-Status artifacts affected:
-- this ledger;
-- M3 plan;
-- Makefile/workflow only if needed to expose deterministic inputs.
-
-Agent handoff prompt: integrate the packet builder at the caller boundary. Treat local reviewer enrichment as optional and keep cross-vendor packet construction unchanged.
-
-## M3-T4 — Regression, fallback and milestone closure
-
-Status: **pending**
+Status: **remote deterministic validation complete; independent/local audit pending**
 
 Effort: S
 
 Depends on: M3-T3.
 
-Changes:
-- add/finish focused M3 regression coverage;
-- run existing M1/M2 context-provider tests plus reviewer tests affected by the integration;
-- verify OKF/doc gates;
-- document any operator-local CBM/Ollama validation that remains intentionally outside remote evidence;
-- prepare branch for independent audit before merge.
+Implemented/verified:
+- M3 tests added to `.github/workflows/local-agent-context.yml`;
+- M1/M2 context regressions execute in the same job;
+- existing Gemma reviewer regression suite executes after M3 wiring tests;
+- run 82 at code baseline `086518312bb5b47adb97774473d5a6ae8b838f65` passed all dedicated steps;
+- general CI failures were compared against base `main@f3adf34b5722890356d359892334812d66f9f453`.
 
-HP-1: full M3 deterministic suite passes with the existing M1/M2 and reviewer contracts.
+Happy paths considered:
+- HP-1: full dedicated M1/M2/M3 + reviewer suite -> green at a single code baseline.
 
-EC-1: CKG unavailable -> review path remains usable and audit metadata explains fallback without changing review verdict semantics.
+Edge cases considered:
+- EC-1: CKG unavailable -> fallback metadata + mandatory reviewer packet remain usable.
+- EC-2: impact set exceeds configured budget -> mandatory review material remains intact and optional impact is bounded.
 
-EC-2: a large optional impact set -> packet remains within the configured impact budget while mandatory review material remains complete.
+Unit evidence:
+- HP-1: GitHub Actions `local-agent-context` run 82, including `context_provider_test.py`, `multiturn_context_test.py`, `context_runtime_test.py`, `prompt_builder_test.py`, `integration_test.py`, `review_context_test.py`, `review_context_makefile_test.py`, and `gemma_code_review_test.py` — passed.
+- EC-1: `scripts/review_context_test.py::test_unavailable_ckg_falls_back_to_mandatory_review_packet` — passed in run 82.
+- EC-2: `scripts/review_context_test.py::test_mandatory_diff_and_acceptance_are_never_truncated_for_impact` and `scripts/review_context_test.py::test_optional_entries_are_fit_whole_inside_impact_budget` — passed in run 82.
 
-Acceptance:
-- `make qa-okf-frontmatter` passes;
-- M1/M2 dedicated Python context tests remain green;
-- M3 review-context tests pass;
-- affected reviewer tests pass;
-- no new deterministic failure relative to `main` is left unexplained;
-- branch documentation is synchronized and ready for local audit.
+General CI attribution:
+- base `main@f3adf34b...` CI run 592 fails `test`, `qa-docs`, and `coverage`;
+- M3 branch general CI shows the same inherited gate classes;
+- `qa-docs` specifically fails because `actions/checkout@v4` uses `fetch-depth: 1` while existing S-150 review receipts reference historical commit objects unavailable in the shallow checkout;
+- this baseline problem is not modified as part of M3.
 
-Evidence to emit:
-- CI/workflow run IDs at final HEAD;
-- unit coverage certification below;
-- final changed-file list and known local-only validation boundary.
+Remaining local evidence before merge approval:
+- real `codebase-memory-mcp` discovery/coverage against a representative changed symbol;
+- inspect generated local packet and `review-context-v1` metadata;
+- prove an unmodified related test/caller is selected with the real backend;
+- exercise explicit `REVIEW_CONTEXT_ALLOWED_PATHS` rejection;
+- exercise CBM-unavailable fallback;
+- invoke the real local Gemma/Muse reviewer and confirm the packet remains reviewable within the configured context;
+- confirm cross-vendor review receives no M3 CKG source context.
 
-Status artifacts affected:
-- this ledger (`complete` when closure gates pass);
-- M3 plan (`complete` when closure gates pass);
-- audit entrypoint for M3 if needed for team handoff.
+## Remote verification summary
 
-Agent handoff prompt: close only after deterministic gates pass at the exact branch HEAD. Do not claim real CBM/Ollama execution unless it was actually run on the target environment.
+Code baseline: `086518312bb5b47adb97774473d5a6ae8b838f65`
 
-## Unit coverage certification
+Dedicated workflow: `local-agent-context` run 82 — **SUCCESS**.
 
-To be completed task-by-task with concrete test references and recorded pass evidence before milestone closure.
+Changed implementation surfaces at that baseline:
+- `.github/workflows/local-agent-context.yml`
+- `Makefile`
+- `scripts/review_context.py`
+- `scripts/review_context_test.py`
+- `scripts/review_context_makefile_test.py`
+- this M3 plan/task documentation.
 
-## Owner final verification
+## Closure boundary
 
-To be completed at final branch HEAD after implementation and deterministic validation.
+Remote implementation is complete. Repository task closure and merge approval remain intentionally pending until the independent/local review evidence is produced. No real CBM/Ollama execution is claimed here.
