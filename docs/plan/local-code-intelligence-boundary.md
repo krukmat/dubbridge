@@ -55,8 +55,10 @@ Context Receipt         Context Capsule
 - `scripts/code_intelligence/backend.py`
 - `scripts/code_intelligence/context_gateway.py`
 - `scripts/code_intelligence/context_gateway_test.py`
+- `scripts/code_intelligence/fixtures/audit-smoke-graph.json`
 - `scripts/code_intelligence/README.md`
 - `docs/schemas/context-receipt-v1.schema.json`
+- `docs/audit/local-code-intelligence-boundary-audit.md`
 - `docs/tasks/local-code-intelligence-boundary.md`
 - this plan
 
@@ -65,6 +67,8 @@ Context Receipt         Context Capsule
 - `backend.py` defines a narrow backend-neutral graph result contract and JSON fixture backend.
 - `context_gateway.py` consumes the backend contract and produces receipt/capsule JSON.
 - `context_gateway_test.py` certifies minimum-disclosure and fail-closed behavior.
+- `fixtures/audit-smoke-graph.json` supports reproducible black-box local audit runs.
+- `docs/audit/local-code-intelligence-boundary-audit.md` is the single audit/navigation entry point and defines mandatory smokes plus exploratory trust-boundary probes.
 - external CKG adapters can be added later without changing receipt/capsule semantics.
 
 ## RRI estimate
@@ -77,7 +81,19 @@ Rationale: a small Python tooling surface across several files, no production ru
 
 Implementation is complete for the scoped boundary. Local execution remains required before merge because the current orchestration container cannot resolve GitHub for a branch checkout and GitHub reported no CI run/status for the branch head.
 
-See `docs/tasks/local-code-intelligence-boundary.md` for the exact commands and behavioral test mapping.
+For audit/review, start at:
+
+`docs/audit/local-code-intelligence-boundary-audit.md`
+
+That entry point defines:
+
+- canonical/read-order navigation;
+- branch-scope/no-regression smoke;
+- executable smoke suite `S0`–`S8`;
+- exploratory probes `P1`–`P4` for freshness, classification trust, metadata disclosure, and pair-level atomicity;
+- required audit evidence and verdict format.
+
+See `docs/tasks/local-code-intelligence-boundary.md` for implementation status and behavioral unit-test mapping.
 
 ## Non-goals
 
