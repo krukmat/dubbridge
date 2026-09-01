@@ -18,7 +18,9 @@ Remote validation status:
 - runtime/CBM contract tests: implemented;
 - prompt-builder regression tests: included in the dedicated workflow;
 - current local-agent integration tests: included in the dedicated workflow;
-- GitHub CI: must be green at the final branch head before handoff.
+- dedicated `local-agent-context` workflow: must be green for the audited candidate;
+- candidate-specific repository gates, including OKF frontmatter: must pass;
+- general CI failures inherited unchanged from the exact `main` baseline must be attributed rather than misclassified as M1 regressions.
 
 Operator-local validation intentionally remains outside this milestone's remote evidence:
 - real `codebase-memory-mcp` binary on the target Mac;
@@ -159,7 +161,7 @@ Evidence: provider/runtime tests, manifest evidence, fallback state in runner ou
 
 ## Handoff boundary
 
-When final remote CI is green, **no additional implementation remains on the remote side for milestone 1**. The next action is the operator-local smoke on the target Mac. Any defect found by that smoke becomes a follow-up against this branch/PR rather than an unverified claim in this ledger.
+When the dedicated workflow and mandatory candidate-specific repository gates are green, and general-CI deltas have been attributed against the exact base SHA, **no additional remote implementation remains for milestone 1**. The next action is the operator-local smoke on the target Mac. Any defect found by that smoke becomes a follow-up against this branch/PR rather than an unverified claim in this ledger.
 
 ## Deferred follow-ups
 
