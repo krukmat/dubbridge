@@ -271,7 +271,8 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(DIFF, result.stdout)
         self.assertIn("must preserve behavior", result.stdout)
-        metadata_line = result.stdout.split("## Local CKG impact metadata\n", 1)[1].splitlines()[0]
+        metadata_section = result.stdout.split("## Local CKG impact metadata", 1)[1]
+        metadata_line = next(line for line in metadata_section.splitlines() if line.strip())
         metadata = json.loads(metadata_line)
         self.assertEqual(metadata["status"], "disabled")
         self.assertTrue(metadata["local_only"])
