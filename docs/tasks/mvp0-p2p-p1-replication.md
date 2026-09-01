@@ -66,7 +66,7 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 | P1.B2.c-2 | Re-invoke B1 `connectAndReplicate` on retry | PASS — Done 2026-08-31; RRI 20 Low | none |
 | P1.B2.d-i | Evidence redaction helper (pure) | PASS — Done 2026-09-01; RRI 13 Low | none |
 | P1.B2.d-ii | Dual-session teardown orchestration | PASS — Done 2026-09-01; RRI 13 Low | none |
-| P1.B2.e | Verdict/receipt type assembly (pure) | Awaiting approval — RRI 22 Low | none |
+| P1.B2.e | Verdict/receipt type assembly (pure) | PASS — Done 2026-09-01; RRI 16 Low | none |
 | P1.B2.f | Final VERIFIED composition | Awaiting approval — RRI 22 Low; **owner-pinned to cloud/primary-agent authorship (task-local override), not Qwen local delegation** | P1.B2.a-0, a-ii-b, c-1, c-2, d-ii, e PASS |
 
 The former combined `P1.A — Ephemeral seed fixture and bundle boundary` planning
@@ -1921,8 +1921,10 @@ local delegation evidence per Low-band convention) - PASS
 
 ### P1.B2.e — Verdict/receipt type assembly (pure)
 
-- **Status:** Awaiting approval.
-- **Effort / RRI:** S / 22 Low.
+- **Status:** PASS — Done 2026-09-01.
+- **Effort / RRI:** S / 16 Low (recomputed via `scripts/rri.py` at
+  presentation time, superseding the 22 prospective estimate; same band, no
+  gate change).
 - **Allowed paths:** `mobile/src/p2p/proof/replication-verdict.ts` (new),
   `mobile/__tests__/p2p/replication-verdict.test.ts`.
 - **Objective:** define the `VERIFIED`/typed-failure verdict types and a
@@ -1935,6 +1937,131 @@ local delegation evidence per Low-band convention) - PASS
 - **Evidence to emit:** unit tests per input combination.
 - **Handoff prompt:** `P1.B2.e — add verdict types and a pure assembly
   function only; no orchestration/sequencing logic.`
+
+**Implementation note:** delegated in one `--mode full-file` packet (new
+files, no existing content to corrupt) to `qwen3.8:27b-mlx` via
+`scripts/delegate-low-rri.py`. The packet gave the exact existing input
+contracts to compose (`DigestCompareResult` from `digest-compare.ts`,
+`ReconnectDecision` from `reconnect-budget.ts`, `TeardownSideResult`/
+`DualSessionTeardownResult` from `replication-teardown.ts`) plus the
+priority-ordered assembly rule and full required test-case list, so the
+model composed rather than guessed the contract. The model's raw output
+appended a literal `--- CONTENT ---` artifact line to the end of each file's
+content (a wrapper/format marker, not code) — stripped as the documented
+mechanical-tooling-failure direct-edit exception (no reviewed-logic change),
+mirroring prior tasks in this pack. `prettier --write` was run on the new
+source file for house style (collapsed a two-line union type to one line;
+no logic change) — the test file was already Prettier-clean.
+
+**Post-review maintainability fix:** the `git push` pre-push gate rejected
+the attempt-1 commit — `scripts/check-maintainability.py` flagged
+`const teardown: DualSessionTeardownResult = {` repeated 8 times (budget 6)
+in the original 8-independent-`it()`-blocks test file. Refactored the test
+file (only) into a single data-driven `it.each(cases)` table — same 8 case
+names/inputs/expected outputs/assertions, no dropped or renamed case, no
+production-code change. This is a mechanical, lint/gate-driven refactor of
+already-reviewed test structure, not new local-model authorship, but because
+it materially changed the reviewed packet it was sent back through its own
+phase-2 pass (attempt 2) rather than treated as a whitespace-only carry-over.
+
+### Task-analysis review (phase 1)
+
+- Reviewer: `muse-glimmer:30b-q4_K_M`.
+- Verdict: **PASS**, 0 findings.
+
+### Code-solution review (phase 2)
+
+- Reviewer: `muse-glimmer:30b-q4_K_M`.
+- Attempt 1 (pre-maintainability-fix): `python3 scripts/gemma-code-review.py
+  --task-id P1.B2.e --attempt 1 --model muse-glimmer:30b-q4_K_M --num-ctx
+  32768 --passes 3` — 3/3 passes run, 3/3 parsed, 0 consensus, 0
+  pass-specific findings. **PASS.**
+- Attempt 2 (post `it.each` maintainability refactor, materially revised
+  packet re-reviewed per policy): `python3 scripts/gemma-code-review.py
+  --task-id P1.B2.e --attempt 2 --model muse-glimmer:30b-q4_K_M --num-ctx
+  32768 --passes 3` — 3/3 passes run, 3/3 parsed, 0 consensus, 0
+  pass-specific findings. Summary: "Production code is unchanged from
+  previously reviewed PASS version... Test file refactor to it.each
+  preserves all 8 cases, inputs, expected outputs and assertions." **PASS.**
+- Findings: none (either attempt).
+- Verdict: **PASS**.
+
+### Reflection log
+
+Low-band: Reflection applied to the reviewer's output per
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Reflection design pattern`.
+
+- **Draft verdict:** implementation matches the packet contract exactly —
+  priority-ordered assembly (digest mismatch > reconnect exhausted >
+  teardown failure), pure function, no orchestration logic added.
+- **Critique findings:** none from the reviewer across either attempt
+  (0/0/0 each); own re-read confirmed the `--- CONTENT ---` trailing
+  artifact in the raw model output was a wrapper marker, independently
+  verified absent from the written files (`tsc`, prettier, and jest all
+  pass on the actual disk content). The push-time maintainability gate
+  caught a repeated-line budget violation in the test file's original
+  8-block structure that neither reviewer pass flagged (out of scope for a
+  correctness-focused code review) — own critique confirmed the `it.each`
+  refactor preserves every case/assertion before re-submitting for phase-2
+  attempt 2.
+- **Revisions applied:** documented mechanical artifact strip;
+  `prettier --write` formatting pass (whitespace only); `it.each` structural
+  refactor of the test file to satisfy the maintainability gate (verified
+  behavior-preserving via `tsc --noEmit` + full `p2p` jest suite rerun +
+  attempt-2 phase-2 re-review, all PASS).
+
+### Verification
+
+- `npx tsc --noEmit` (mobile) — exit 0.
+- `npx jest __tests__/p2p/` — 21/21 suites, 109/109 tests passed (includes 8
+  new tests in `replication-verdict.test.ts`, re-verified after the
+  `it.each` refactor).
+- `npm run lint` (mobile) — 0 warnings.
+- `npx prettier --check` — passed on both new files.
+- `python3 scripts/check-maintainability.py` — passed (after the `it.each`
+  refactor; failed on the original 8-block test structure at push time).
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-B2.e | Happy path | all-success inputs (no reconnect) yield `VERIFIED` | `mobile/__tests__/p2p/replication-verdict.test.ts::HP-B2.e: all-success inputs yield VERIFIED` | passed |
+| HP-B2.e | Happy path | all-success inputs with a successful reconnect yield `VERIFIED` | `mobile/__tests__/p2p/replication-verdict.test.ts::HP-B2.e: successful reconnect variant yields VERIFIED` | passed |
+| EC-B2.e | Edge case | digest mismatch yields `DIGEST_MISMATCH`, never `VERIFIED` | `mobile/__tests__/p2p/replication-verdict.test.ts::EC-B2.e: verify mismatch yields DIGEST_MISMATCH` | passed |
+| EC-B2.e | Edge case | reconnect budget exhausted yields `RECONNECT_EXHAUSTED` | `mobile/__tests__/p2p/replication-verdict.test.ts::EC-B2.e: reconnect exhausted yields RECONNECT_EXHAUSTED` | passed |
+| EC-B2.e | Edge case | teardown seed-only failure yields `TEARDOWN_FAILED` (`side: "seed"`) | `mobile/__tests__/p2p/replication-verdict.test.ts::EC-B2.e: teardown seed fails only yields TEARDOWN_FAILED seed` | passed |
+| EC-B2.e | Edge case | teardown client-only failure yields `TEARDOWN_FAILED` (`side: "client"`) | `mobile/__tests__/p2p/replication-verdict.test.ts::EC-B2.e: teardown client fails only yields TEARDOWN_FAILED client` | passed |
+| EC-B2.e | Edge case | teardown both-sides failure yields `TEARDOWN_FAILED` (`side: "both"`) | `mobile/__tests__/p2p/replication-verdict.test.ts::EC-B2.e: teardown both fail yields TEARDOWN_FAILED both` | passed |
+| EC-B2.e | Edge case | priority ordering: digest mismatch wins over a concurrent teardown failure | `mobile/__tests__/p2p/replication-verdict.test.ts::EC-B2.e: priority ordering - verify mismatch wins over teardown failure` | passed |
+
+### Gemma Reviewer evidence
+
+- Model: `muse-glimmer:30b-q4_K_M`
+- Command (attempt 1): `python3 scripts/gemma-code-review.py --task-id P1.B2.e --attempt 1 --model muse-glimmer:30b-q4_K_M --num-ctx 32768 --passes 3`
+- Command (attempt 2, post `it.each` maintainability refactor): `python3 scripts/gemma-code-review.py --task-id P1.B2.e --attempt 2 --model muse-glimmer:30b-q4_K_M --num-ctx 32768 --passes 3`
+- Passes run / usable: `3/3` (attempt 1), `3/3` (attempt 2)
+- Aggregate status: `PASS` (both attempts)
+- Consensus findings: `0` | Pass-specific: `0` | Disagreement: `0` (both attempts)
+- Artifacts: `/private/tmp/claude-501/-Users-matias-dubbridge/708655b1-7b84-4c47-9d9b-fdf3b180cb75/scratchpad/p1-b2-e-phase2-result.json` (attempt 1), `.../p1-b2-e-phase2-result-attempt2.json` (attempt 2) (not persisted under `docs/audit/` — see Review artifact note below)
+- Isolated adjudicator: `not triggered` — trigger: n/a (primary reviewer produced a usable PASS result both attempts)
+- D14 provider route: `n/a` — reason: D14 not triggered
+- disposition_divergence: `null`
+- Primary-agent disposition: accepted (0 findings to disposition, either attempt)
+
+### Review artifact receipt
+
+- REVIEW-OVERRIDE: not-applicable — review ran successfully (3/3 passes,
+  PASS) but this task ledger predates `GEMMA_REVIEW_TASK_ID`-based receipt
+  emission for this pack; result is recorded inline above instead of at
+  `docs/audit/gemma-evidence/P1.B2.e.json`, consistent with every other
+  `P1.B2.*` child in this pack.
+- Scope-note: same convention as `P1.B2.a-0` through `P1.B2.d-ii`.
+
+### Owner final verification
+
+- Pending — tracked at `P1.B2` parent closure per the pack's approved
+  batching (owner approved the full 12-task pack; per-task closure evidence
+  recorded here, final owner sign-off tracked at P1.B2 parent closure).
 
 ### P1.B2.f — Final VERIFIED composition
 
