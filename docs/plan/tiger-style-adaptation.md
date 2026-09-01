@@ -175,6 +175,15 @@ dependency and can be drafted at any point.
   small. The matrix also gates assertion work on resolving the currently
   unpersisted `platform_ingest_session_id` path.
 
+  **Implementation note (2026-08-31):** `T3c-d` was implemented and pushed to
+  `main` at `1fa4f9b42796ac1975b1f4bf8062641553f5d34a`. Migration
+  `infra/migrations/0030_add_platform_ingest_correlation_to_audit_events.sql`
+  persists `platform_ingest_session_id`; both `crates/db/src/audit_repo.rs`
+  insert paths and the row-mapping bind/rehydrate it; `crates/audit/src/lib.rs`
+  enforces the family-specific correlation-shape assertion from the
+  `X26-T3c-a` contract matrix for all `AuditEventKind` variants. Detail:
+  `docs/audit/x26-t3c-correlation-contract.md`.
+
 ## Phase 3 — Explicit bounds on retry/backoff (R4)
 
 - **T4.** Add explicit attempt/retry caps to the `Retryable` disposition path
@@ -261,6 +270,34 @@ All against `workers/asr-worker-py/main.py` (95 lines) and its
   test to replace the current 100%-mocked test suite's single point of
   unverified truth (R11).
 
+  **Implementation note (2026-08-31):** T7–T11 were implemented and pushed to
+  `main`. `workers/asr-worker-py/main.py` gained a named `WorkerError`
+  hierarchy with explicit guard clauses (T7,
+  `f166a55173ac119191ea189c3c2e9ea0c3ae4bd3`); an explicit
+  `ASR_TRANSCRIBE_TIMEOUT_SECONDS` deadline, `ASR_MAX_AUDIO_BYTES` bound, and a
+  Whisper language-code allowlist (T8, `bf5408e8396bf8c5d9967cece051a054ceaff5a4`);
+  runtime Draft 2020-12 JSON Schema enforcement on input/output/error payloads
+  via `jsonschema==4.26.0` (T9, `e267261d21a74906387b8652d7d689bf41bcb1e5`);
+  a compiled `requirements-lock.txt` installed with `pip install --no-deps`
+  plus `pip check` in `Dockerfile` (T10, `d16993f06d41316d4afcd754cbea312b57d5471b`);
+  and an opt-in real-model smoke test gated by
+  `DUBBRIDGE_ASR_REAL_MODEL_SMOKE=1` (T11, `2d01e90500e40c516cb819eefbe0ea727b40c643`).
+  T11 also corrected a real bug found while wiring the smoke path: T8's
+  timeout originally cancelled the deadline before faster-whisper's lazy
+  segment generator was iterated, so the deadline did not cover the actual
+  transcription work; `_transcribe_with_timeout` now materializes
+  `list(segments)` before cancelling the alarm. Verified independently on
+  2026-09-01: the 16-test mocked suite passes and `ruff check workers`
+  (pinned 0.16.5) reports no findings. One residual gap: the mocked
+  `test_transcription_timeout_uses_distinct_error` test simulates a slow
+  synchronous `transcribe()` call, not a fast-returning call with a
+  slow-to-iterate generator (the exact class of bug T11 fixed) — a
+  regression of that fix would not be caught by the default (non-opt-in)
+  test suite, only by the opt-in real-model smoke test. Evidence:
+  `docs/audit/x26-t7-implementation.md`, `x26-t7-implementation-incidents.md`,
+  `x26-t8-implementation.md`, `x26-t9-implementation.md`,
+  `x26-t10-implementation.md`, `x26-t11-implementation.md`.
+
 ## Phase 7 — S-150 forward-pointer (R13, docs-only)
 
 - **T12.** No code change. Record, as a docs-only task, that when S-150 `T4`
@@ -273,6 +310,14 @@ All against `workers/asr-worker-py/main.py` (95 lines) and its
   task does not argue for unblocking S-150 early and does not edit the S-150
   ledger; it is the durable record this plan exists for that requirement to be
   picked up correctly whenever S-150 resumes.
+
+  **Implementation note (2026-08-31):** T12 was closed via an owner wait-state
+  waiver (T12's own stop condition allows closure only when S-150 T4 resumes
+  or the owner explicitly waives the wait). S-150 T4 itself remains parked;
+  no S-150 product code, task ordering, or ADR-028 ownership decision changed.
+  The waiver does not waive the substantive Tiger Style requirements listed
+  above for T4's eventual decomposed children. Detail:
+  `docs/audit/x26-t12-forward-pointer-closure.md`.
 
 ## Evidence to emit / status artifacts affected
 
