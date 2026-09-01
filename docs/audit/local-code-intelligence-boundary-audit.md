@@ -1,5 +1,5 @@
 ---
-type: Audit Entry Point
+type: Audit
 title: "Local Code Intelligence Boundary — Audit Entry Point"
 branch: feature/local-code-intelligence-boundary
 status: ready_for_local_audit

@@ -1,5 +1,5 @@
 ---
-type: Tasks
+type: TaskList
 title: "Local Code Intelligence Boundary"
 status: ready_for_audit_pending_local_verification
 plan: docs/plan/local-code-intelligence-boundary.md
