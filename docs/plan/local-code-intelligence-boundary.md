@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: "Local Code Intelligence Boundary"
-status: active
+status: implemented_pending_local_verification
 branch: feature/local-code-intelligence-boundary
 ---
 
@@ -50,7 +50,7 @@ Context Receipt         Context Capsule
 7. RRI remains unchanged. Graph-derived impact may later be used as advisory evidence, but this slice does not alter routing thresholds or model bindings.
 8. Heavy local model execution and graph indexing must remain sequential on memory-constrained hosts; the code-intelligence layer itself must not require a resident LLM.
 
-## Affected files
+## Implemented surface
 
 - `scripts/code_intelligence/backend.py`
 - `scripts/code_intelligence/context_gateway.py`
@@ -72,6 +72,12 @@ Context Receipt         Context Capsule
 Pre-implementation estimate: **Moderate (~33)**.
 
 Rationale: a small Python tooling surface across several files, no production runtime or protected product boundary touched, but non-trivial context-selection and export policy behavior. The user's explicit instruction to implement this branch is treated as approval for this scoped plan. No RRI formula or routing policy changes are included.
+
+## Verification state
+
+Implementation is complete for the scoped boundary. Local execution remains required before merge because the current orchestration container cannot resolve GitHub for a branch checkout and GitHub reported no CI run/status for the branch head.
+
+See `docs/tasks/local-code-intelligence-boundary.md` for the exact commands and behavioral test mapping.
 
 ## Non-goals
 
