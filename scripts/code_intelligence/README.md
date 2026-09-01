@@ -104,6 +104,20 @@ The tests certify:
 - EC-3: cross-boundary/global architecture not exported to cloud;
 - EC-4: invalid CLI input leaves no successful output artifacts.
 
+## Audit entry point
+
+For local branch review, start at:
+
+`docs/audit/local-code-intelligence-boundary-audit.md`
+
+That document defines the required read order, branch-scope check, executable smoke suite (`S0`–`S8`), exploratory trust-boundary probes (`P1`–`P4`), evidence format, and merge interpretation.
+
+The reusable black-box fixture is:
+
+`scripts/code_intelligence/fixtures/audit-smoke-graph.json`
+
+The exploratory probes are intentional: they let an auditor evaluate current assumptions around graph freshness, backend classification trust, metadata disclosure, and pair-level artifact atomicity without pretending those assumptions are already enforced guarantees.
+
 ## Resource model
 
 The CKG is a preprocessing/orchestration layer. Prefer:
