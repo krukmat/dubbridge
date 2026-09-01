@@ -11,7 +11,7 @@ description: "M2 plan for bounded model-visible history, source snapshots, and d
 
 Milestone 2 implementation: **complete on `feat/ckg-context-provider`**, consolidated with M1 for a single later merge to `main`.
 
-Dedicated validation passed (`local-agent-context` run 59 on code head `779d1429a90fbe1df0eaad8f0c8a6a5ab9b79dcd`). Real Ollama/CBM/model execution on the target Mac remains operator-local validation and is not claimed by this branch.
+Consolidated remote validation passed (`local-agent-context` run 66 on implementation baseline `f687f94db6ea904c425cb5f77f5f678df3aa1431`). Real Ollama/CBM/model execution on the target Mac remains operator-local validation and is not claimed by this branch.
 
 No merge to `main` has been performed.
 
@@ -93,7 +93,7 @@ If CKG refresh fails, the legacy provider still supplies the current authorized 
 
 ## Validation evidence
 
-The dedicated workflow passed all M2-relevant gates:
+The dedicated workflow passed all M2-relevant gates on the consolidated M1 + M2 implementation baseline:
 
 - context-provider tests;
 - M2 multi-turn tests;
@@ -101,7 +101,7 @@ The dedicated workflow passed all M2-relevant gates:
 - prompt-builder regression tests;
 - current local-agent integration tests.
 
-The general repository `ci` remained queued when M2 was closed; no claim is made from that run.
+The general repository CI contains baseline failures inherited from `main`; final merge readiness is determined by regression attribution plus mandatory candidate-specific gates documented in the local merge audit entrypoint.
 
 ## Validation boundary
 
