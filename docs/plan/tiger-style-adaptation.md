@@ -108,8 +108,19 @@ Python's `-O` policy, no early unblocking of `translation-worker-py`/
 flowchart TD
     T0["T0: survey 70-100 line\nfunctions (workspace-wide)"] --> T1["T1: decompose flagged\nfunctions incl. finalize_ingestion_core"]
     T1 --> T2["T2: flip too_many_lines\n100 -> 70 (Cargo.toml)"]
-    T1 --> T3["T3: assert! pre/postconditions\nrights / finalize / playback / audit"]
-    T3 --> T4["T4: retry/attempt caps\ncrates/jobs, providers, media"]
+    T1 --> T3["T3: assert! pre/postconditions\nrights / finalize / playback"]
+    T3 --> T3ca["T3c-a: correlation contract matrix\nLow, docs-only"]
+    T3ca --> T3cb1["T3c-b1: ingestion\npredicate (Low target)"]
+    T3ca --> T3cb2["T3c-b2: recording\npredicate (Low target)"]
+    T3ca --> T3cc1["T3c-c1: platform\npredicate (Low target)"]
+    T3ca --> T3cc2["T3c-c2: workspace + consent\npredicates (Low target)"]
+    T3ca --> T3cc3["T3c-c3: review/playback/auth\npredicates (Low target)"]
+    T3cb1 --> T3cd["T3c-d: audit-boundary assert\nRRI floor 42"]
+    T3cb2 --> T3cd
+    T3cc1 --> T3cd
+    T3cc2 --> T3cd
+    T3cc3 --> T3cd
+    T3cd --> T4["T4: retry/attempt caps\ncrates/jobs, providers, media"]
     T5["T5: CI MinIO service +\nqa-test-s3 mandatory"]
     T6["T6: Python complexity gate\n(ruff/mccabe on workers/)"]
     T7["T7: ASR guard clauses\n+ narrow exceptions (R2/R3)"]
@@ -155,7 +166,23 @@ dependency and can be drafted at any point.
   finalize (`finalize_ingestion_core` and its decomposed helpers from T1),
   playback grant issuance (`PlaybackGrant::is_valid_at`), and audit emission.
   Each call site is classified explicitly as invariant (→ `assert!`) or
-  recoverable (→ stays `Result`) per the Design decisions above.
+  recoverable (→ stays `Result`) per the Design decisions above. The audit
+  portion is further decomposed in `X26-T3c-a`, `b1`, `b2`, and `c1`–`c3`: a
+  Low-band contract matrix and pure domain predicates precede the one
+  audit-boundary integration (`T3c-d`). The
+  latter cannot honestly be Low because `crates/audit/**` has the ADR-008/
+  ADR-018 RRI floor; it must not be relabelled merely because the final diff is
+  small. The matrix also gates assertion work on resolving the currently
+  unpersisted `platform_ingest_session_id` path.
+
+  **Implementation note (2026-08-31):** `T3c-d` was implemented and pushed to
+  `main` at `1fa4f9b42796ac1975b1f4bf8062641553f5d34a`. Migration
+  `infra/migrations/0030_add_platform_ingest_correlation_to_audit_events.sql`
+  persists `platform_ingest_session_id`; both `crates/db/src/audit_repo.rs`
+  insert paths and the row-mapping bind/rehydrate it; `crates/audit/src/lib.rs`
+  enforces the family-specific correlation-shape assertion from the
+  `X26-T3c-a` contract matrix for all `AuditEventKind` variants. Detail:
+  `docs/audit/x26-t3c-correlation-contract.md`.
 
 ## Phase 3 — Explicit bounds on retry/backoff (R4)
 
@@ -163,6 +190,21 @@ dependency and can be drafted at any point.
   (`apps/worker-runner/src/translation_fanout.rs:73-77` and any equivalent path
   in `crates/jobs`, `crates/providers`, `crates/media`), closing the one bounds
   gap the evaluation found in an otherwise-strong pillar.
+
+  **Implementation note (2026-08-31):** T4 was consolidated and pushed to
+  `main` at `610d70240026dfe1b481c1a2bab7db01fa8de4b5`. The implementation
+  persists a durable attempt counter, enforces `MAX_TRANSLATION_DISPATCH_ATTEMPTS = 3`,
+  prevents scheduling after exhaustion, and persists terminal
+  `delivery_state = 'failed'`. Implementation-time incidents and deferred
+  controls are recorded in `docs/audit/x26-t4-implementation-incidents.md`.
+  That note also records one acceptance-criteria deviation requiring owner
+  review: retry exhaustion is durably recorded in the outbox but no new
+  ADR-018 `audit_events` row/event kind was introduced. This must not be
+  represented as fully satisfying the original "durably audited" wording
+  until the owner either accepts outbox durability as the intended contract
+  and amends the task wording, or authorizes a separately scored audit task.
+  `qa-docs` failures observed during the work were traced to historical S-150
+  review commit references and are not a T4 retry-cap code failure.
 
 ## Phase 4 — CI integration-test coverage (R12, D3, MinIO gap)
 
@@ -174,12 +216,35 @@ dependency and can be drafted at any point.
   the `coverage` job for that coverage (avoid duplicating a Postgres service
   needlessly).
 
+  **Implementation note (2026-08-31):** T5 was implemented directly on `main`
+  at `45e94631631f2971c7fc63fd36effac4b82792af`. `Makefile` now exposes a
+  fail-closed `qa-test-s3` target, CI provisions a real MinIO service and bucket,
+  and the mandatory `s3-integration` job completed successfully with the real
+  S3 adapter round-trip test (`1 passed; 0 failed`). The `test` job also now
+  provisions Postgres so `make qa-test` exercises DB-backed tests instead of
+  silently self-skipping them. Controls discovered outside T5's S3 path are
+  intentionally not folded into this implementation: the Postgres-enabled
+  workspace test exposed auth-fixture collisions on `owner@example.com`, and
+  `qa-docs` remains blocked by historical S-150 review commit references.
+  Both incidents, their evidence, scope disposition, and follow-up guidance are
+  recorded in `docs/audit/x26-t5-implementation-incidents.md`.
+
 ## Phase 5 — Python complexity gate (R8)
 
 - **T6.** Add a `ruff` (with complexity rules) or `flake8` + `mccabe`
   configuration scoped to `workers/*-py`, before `translation-worker-py`/
   `tts-worker-py` gain real implementations — cheapest point to add per the
   evaluation.
+
+  **Implementation note (2026-08-31):** T6 is implemented on `main` with
+  pinned Ruff 0.16.5. `ruff.toml` restricts discovery to
+  `workers/*-py/**/*.py` and enforces McCabe complexity (`C901`), branch count
+  (`PLR0912`), statement count (`PLR0915`), and 120-column line length (`E501`).
+  `make qa-python-complexity` is fail-closed when Ruff is unavailable and is
+  included in the aggregate `qa-ci` target. CI has a dedicated Python 3.12
+  `python-complexity` job that installs exactly Ruff 0.16.5 and invokes the
+  Make target. Implementation evidence and scope rationale are recorded in
+  `docs/audit/x26-t6-implementation.md`.
 
 ## Phase 6 — ASR worker gap-closing (R2, R3, R5, R6, R9, R10, R11)
 
@@ -205,6 +270,34 @@ All against `workers/asr-worker-py/main.py` (95 lines) and its
   test to replace the current 100%-mocked test suite's single point of
   unverified truth (R11).
 
+  **Implementation note (2026-08-31):** T7–T11 were implemented and pushed to
+  `main`. `workers/asr-worker-py/main.py` gained a named `WorkerError`
+  hierarchy with explicit guard clauses (T7,
+  `f166a55173ac119191ea189c3c2e9ea0c3ae4bd3`); an explicit
+  `ASR_TRANSCRIBE_TIMEOUT_SECONDS` deadline, `ASR_MAX_AUDIO_BYTES` bound, and a
+  Whisper language-code allowlist (T8, `bf5408e8396bf8c5d9967cece051a054ceaff5a4`);
+  runtime Draft 2020-12 JSON Schema enforcement on input/output/error payloads
+  via `jsonschema==4.26.0` (T9, `e267261d21a74906387b8652d7d689bf41bcb1e5`);
+  a compiled `requirements-lock.txt` installed with `pip install --no-deps`
+  plus `pip check` in `Dockerfile` (T10, `d16993f06d41316d4afcd754cbea312b57d5471b`);
+  and an opt-in real-model smoke test gated by
+  `DUBBRIDGE_ASR_REAL_MODEL_SMOKE=1` (T11, `2d01e90500e40c516cb819eefbe0ea727b40c643`).
+  T11 also corrected a real bug found while wiring the smoke path: T8's
+  timeout originally cancelled the deadline before faster-whisper's lazy
+  segment generator was iterated, so the deadline did not cover the actual
+  transcription work; `_transcribe_with_timeout` now materializes
+  `list(segments)` before cancelling the alarm. Verified independently on
+  2026-09-01: the 16-test mocked suite passes and `ruff check workers`
+  (pinned 0.16.5) reports no findings. One residual gap: the mocked
+  `test_transcription_timeout_uses_distinct_error` test simulates a slow
+  synchronous `transcribe()` call, not a fast-returning call with a
+  slow-to-iterate generator (the exact class of bug T11 fixed) — a
+  regression of that fix would not be caught by the default (non-opt-in)
+  test suite, only by the opt-in real-model smoke test. Evidence:
+  `docs/audit/x26-t7-implementation.md`, `x26-t7-implementation-incidents.md`,
+  `x26-t8-implementation.md`, `x26-t9-implementation.md`,
+  `x26-t10-implementation.md`, `x26-t11-implementation.md`.
+
 ## Phase 7 — S-150 forward-pointer (R13, docs-only)
 
 - **T12.** No code change. Record, as a docs-only task, that when S-150 `T4`
@@ -217,6 +310,14 @@ All against `workers/asr-worker-py/main.py` (95 lines) and its
   task does not argue for unblocking S-150 early and does not edit the S-150
   ledger; it is the durable record this plan exists for that requirement to be
   picked up correctly whenever S-150 resumes.
+
+  **Implementation note (2026-08-31):** T12 was closed via an owner wait-state
+  waiver (T12's own stop condition allows closure only when S-150 T4 resumes
+  or the owner explicitly waives the wait). S-150 T4 itself remains parked;
+  no S-150 product code, task ordering, or ADR-028 ownership decision changed.
+  The waiver does not waive the substantive Tiger Style requirements listed
+  above for T4's eventual decomposed children. Detail:
+  `docs/audit/x26-t12-forward-pointer-closure.md`.
 
 ## Evidence to emit / status artifacts affected
 
@@ -236,6 +337,12 @@ All against `workers/asr-worker-py/main.py` (95 lines) and its
 - `docs/proposals/tiger-style-adaptation-evaluation.md` — the requirements (R1–R13)
   and decision points (D1–D3) this plan sequences
 - `docs/tasks/tiger-style-adaptation.md` — the executable, RRI-scored task ledger
+- `docs/audit/x26-t4-implementation-incidents.md` — T4 implementation incidents,
+  deferred controls, and the unresolved ADR-018 acceptance-criteria deviation
+- `docs/audit/x26-t5-implementation-incidents.md` — T5 CI/control incidents and
+  deferred follow-up discovered while making MinIO/S3 mandatory
+- `docs/audit/x26-t6-implementation.md` — T6 Python worker complexity/length gate
+  implementation evidence and scope guard
 - `docs/plan/roadmap.md` — X26 cross-cutting item
 - `docs/plan/s-150-translation-dubbing.md`, `docs/tasks/s-150-translation-dubbing.md` — R13's landing point (T4–T7, still parked)
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`, `docs/policies/HITL_AUTONOMY_POLICY.md` — governing workflow and approval gates for every task below

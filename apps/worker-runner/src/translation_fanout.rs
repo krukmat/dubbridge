@@ -70,12 +70,23 @@ pub async fn fan_out_localization(
 }
 
 /// Whether a delivery dispatch disposition means "queue delivery is due".
-fn dispatch_is_due(disposition: translation_delivery_repo::TranslationDispatchDisposition) -> bool {
-    matches!(
-        disposition,
-        translation_delivery_repo::TranslationDispatchDisposition::New
-            | translation_delivery_repo::TranslationDispatchDisposition::Retryable
-    )
+///
+/// Retry attempts are counted durably by `translation_dispatch_outbox`; this
+/// boundary still checks the named maximum so a malformed/inconsistent
+/// persistence result cannot schedule work beyond the Tiger Style ceiling.
+fn dispatch_is_due(
+    disposition: translation_delivery_repo::TranslationDispatchDisposition,
+    attempt_count: i32,
+) -> bool {
+    match disposition {
+        translation_delivery_repo::TranslationDispatchDisposition::New => true,
+        translation_delivery_repo::TranslationDispatchDisposition::Retryable => {
+            attempt_count <= translation_delivery_repo::MAX_TRANSLATION_DISPATCH_ATTEMPTS
+        }
+        translation_delivery_repo::TranslationDispatchDisposition::Active
+        | translation_delivery_repo::TranslationDispatchDisposition::Acknowledged
+        | translation_delivery_repo::TranslationDispatchDisposition::Exhausted => false,
+    }
 }
 
 fn log_persist_failure(
@@ -90,9 +101,9 @@ fn log_persist_failure(
 }
 
 /// Map one candidate's `persist_translation_delivery` outcome to an optional
-/// `TranslationJob` to enqueue. A dispatch already `Active`/`Acknowledged` is a
-/// no-op skip; an `Err` is logged and skipped so one target's persistence
-/// failure never aborts or discards sibling targets.
+/// `TranslationJob` to enqueue. A dispatch already `Active`/`Acknowledged` or
+/// terminally `Exhausted` is a no-op skip; an `Err` is logged and skipped so
+/// one target's persistence failure never aborts or discards sibling targets.
 fn job_for_delivery_outcome(
     outcome: Result<
         translation_delivery_repo::TranslationDeliveryPersistence,
@@ -112,7 +123,7 @@ fn job_for_delivery_outcome(
         }
     };
 
-    if !dispatch_is_due(persistence.dispatch) {
+    if !dispatch_is_due(persistence.dispatch, persistence.attempt_count) {
         debug!(
             "Skipping target {target_language_id}: dispatch is {:?}",
             persistence.dispatch
@@ -127,4 +138,22 @@ fn job_for_delivery_outcome(
         source_subtitle_artifact_id,
         generation_request_id,
     ))
+}
+
+#[cfg(test)]
+mod retry_cap_tests {
+    use super::*;
+
+    #[test]
+    fn retry_due_accepts_last_permitted_attempt_and_rejects_next() {
+        let max = translation_delivery_repo::MAX_TRANSLATION_DISPATCH_ATTEMPTS;
+        let retryable = translation_delivery_repo::TranslationDispatchDisposition::Retryable;
+
+        assert!(dispatch_is_due(retryable, max));
+        assert!(!dispatch_is_due(retryable, max + 1));
+        assert!(!dispatch_is_due(
+            translation_delivery_repo::TranslationDispatchDisposition::Exhausted,
+            max
+        ));
+    }
 }

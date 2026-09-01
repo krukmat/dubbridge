@@ -1,0 +1,1 @@
+{"task_id":"audit-rs-split","commit_sha":"ec3d383a682c4dc22c6b576bea978d2fb1dddd4e","reviewer":"muse-glimmer:30b-q4_K_M","verdict":"FINDINGS-ACKED","timestamp":"2026-08-31T14:51:04Z","changed_paths":["crates/domain/src/audit.rs"]}

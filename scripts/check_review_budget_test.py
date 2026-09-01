@@ -19,9 +19,9 @@ SPEC.loader.exec_module(gate)
 
 class DeriveBudgetTest(unittest.TestCase):
     def test_default_window_yields_reviewable_budget(self) -> None:
-        # 32768 ctx − 4096 predict − 1300 overhead = 27372 / 20 = 1368 lines.
+        # 131072 ctx − 4096 predict − 1300 overhead = 125676 / 20 = 6283 lines.
         with mock.patch.dict(gate.os.environ, {}, clear=True):
-            self.assertEqual(gate.derive_budget(), 1368)
+            self.assertEqual(gate.derive_budget(), 6283)
 
     def test_explicit_override_wins(self) -> None:
         with mock.patch.dict(gate.os.environ, {"DUBBRIDGE_REVIEW_MAX_DIFF_LINES": "200"}, clear=True):
@@ -41,14 +41,14 @@ class DeriveBudgetTest(unittest.TestCase):
 
     def test_non_integer_explicit_falls_back_to_derived(self) -> None:
         with mock.patch.dict(gate.os.environ, {"DUBBRIDGE_REVIEW_MAX_DIFF_LINES": "lots"}, clear=True):
-            self.assertEqual(gate.derive_budget(), 1368)
+            self.assertEqual(gate.derive_budget(), 6283)
 
     def test_packet_overhead_is_env_tunable(self) -> None:
         # Lower overhead → more usable tokens → larger budget.
         with mock.patch.dict(
             gate.os.environ, {"DUBBRIDGE_REVIEW_PACKET_OVERHEAD_TOKENS": "300"}, clear=True
         ):
-            self.assertEqual(gate.derive_budget(), (32768 - 4096 - 300) // gate.TOKENS_PER_DIFF_LINE)
+            self.assertEqual(gate.derive_budget(), (131072 - 4096 - 300) // gate.TOKENS_PER_DIFF_LINE)
 
 
 class MeasuredPacketOverheadTokensTest(unittest.TestCase):

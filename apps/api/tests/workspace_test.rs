@@ -639,8 +639,17 @@ async fn asset_subtitle_route_returns_none_without_target_languages() {
 }
 
 async fn migrate_and_reset(pool: &PgPool) {
-    // Fail-closed tests drop audit_events intentionally. If it's missing,
-    // remove its migration records so sqlx re-creates it.
+    // Always ensure the migration table and baseline schema exist first —
+    // this is idempotent and safe even on a fresh database with no
+    // `_sqlx_migrations` table yet.
+    sqlx::migrate!("../../infra/migrations")
+        .run(pool)
+        .await
+        .expect("migrations");
+
+    // Fail-closed tests drop audit_events intentionally. If it's missing
+    // after the baseline migrate, remove its migration records so sqlx
+    // re-creates it.
     let audit_exists: Option<i32> = sqlx::query_scalar(
         "SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='audit_events'",
     )
@@ -648,7 +657,7 @@ async fn migrate_and_reset(pool: &PgPool) {
     .await
     .unwrap_or(None);
     if audit_exists.is_none() {
-        sqlx::query("DELETE FROM _sqlx_migrations WHERE version IN (4, 9)")
+        sqlx::query("DELETE FROM _sqlx_migrations WHERE version IN (4, 9, 30)")
             .execute(pool)
             .await
             .expect("clear stale migration records");
