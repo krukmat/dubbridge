@@ -151,11 +151,12 @@ class ImpactRetrievalTests(unittest.TestCase):
                 path="src/lib.py", symbol="changed", label="Function", start_line=1, end_line=2
             ),
         ]
+        adapter = FakeAdapter(candidates)
         packet, metadata = rc.build_review_context(
             diff_text=DIFF,
             acceptance_text="tests must preserve changed() behavior",
             worktree=tmp.name,
-            adapter=FakeAdapter(candidates),
+            adapter=adapter,
             authorizer=lambda _path: None,
             num_ctx=32768,
             num_predict=1024,
@@ -174,8 +175,12 @@ class ImpactRetrievalTests(unittest.TestCase):
         self.assertIn("assert changed() == 2", packet)
         self.assertIn("return changed()", packet)
         self.assertEqual(metadata["status"], "enriched")
+        self.assertEqual(
+            adapter.coverage_calls[0][1],
+            ["src/lib.py", "src/dep.py", "src/caller.py", "tests/test_lib.py"],
+        )
 
-    def test_current_worktree_source_wins_over_graph_discovery_metadata(self):
+    def test_default_worktree_scope_can_include_unmodified_related_source(self):
         tmp, root = self._fixture()
         self.addCleanup(tmp.cleanup)
         (root / "tests" / "test_lib.py").write_text(
@@ -184,15 +189,16 @@ class ImpactRetrievalTests(unittest.TestCase):
         candidate = rc.GraphCandidate(
             path="tests/test_lib.py", symbol="test_changed", label="Test", relation="TESTS"
         )
-        packet, _metadata = rc.build_review_context(
+        packet, metadata = rc.build_review_context(
             diff_text=DIFF,
             worktree=tmp.name,
             adapter=FakeAdapter([candidate]),
-            authorizer=lambda _path: None,
             num_ctx=32768,
             num_predict=1024,
         )
         self.assertIn("CURRENT_WORKTREE_VALUE = 42", packet)
+        self.assertEqual(metadata["authority_mode"], "worktree_read_only")
+        self.assertEqual(metadata["selected"][0]["path"], "tests/test_lib.py")
 
     def test_unauthorized_related_source_becomes_scope_gap_without_body(self):
         tmp, root = self._fixture()
