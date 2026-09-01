@@ -1,3 +1,10 @@
+---
+type: TaskList
+title: "Local Code Intelligence M2 — Tasks"
+status: complete
+description: "M2 task ledger for compact model-visible multi-turn context."
+---
+
 # Local Code Intelligence M2 — Tasks
 
 Behavioral coverage contract: unit-v1 + integration-v1
