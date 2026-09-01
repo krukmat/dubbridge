@@ -76,10 +76,12 @@ at `docs/audit/mvp0-p2p-p1a-approval-card.md` and
 
 ## P1 — Maintainable mobile P2P foundation and replication proof
 
-- **Status:** Revised planning parent approved 2026-08-27 with ADR-043 accepted.
-  The previous approval remains superseded by the material architecture/scope
-  change. P1.F1 and P1.F2 are closed PASS; P1.F3a is a planning parent and
-  P1.F3a.1 is next, but no later-child source work is authorized.
+- **Status:** `[x] Done` — 2026-09-01. All 8 children (P1.F1, P1.F2,
+  P1.F3a, P1.F3b, P1.A1, P1.A2, P1.B1, P1.B2) closed PASS; parent-level
+  5-pass Reflection log, unit coverage certification, and owner final
+  verification recorded at the end of this section (§ Owner final
+  verification). P1 closing PASS does not authorize P2 source work — see
+  § Handoff prompt.
 - **Type:** Very-high development/architecture parent; decomposed before
   implementation.
 - **Complexity / Effort / RRI:** Very high / XL / 94. Full report:
@@ -1145,7 +1147,8 @@ Required passes: 3 (`RRI 46` → `Med-high`)
   `a-ii-b`, `a-0`, `c-1`, `c-2`, `d-ii`, `e` and closes the parent.
 - **Evidence to emit:** this decomposition record, a persisted
   `docs/audit/mvp0-p2p-p1-b2-rri.md`, each child's own RRI/evidence, and the
-  parent Reflection log (5 passes, below) once every child is PASS.
+  parent Reflection log (4 passes per `AGENT_WORKFLOW_GUIDE.md`'s 56-70
+  Complex band table, below) once every child is PASS.
 - **Status artifacts affected:** this ledger, P1/general plan, roadmap,
   ADR-043 implementation references, `p2p-mvp/RUN_STATE.json`, and
   `p2p-mvp/handoffs/P1.md` at P1 closure.
@@ -2325,13 +2328,88 @@ security-decision role.
 
 ### Owner final verification
 
-- Pending — tracked at `P1.B2` parent closure per the pack's approved
-  batching (owner approved the full 12-task pack; per-task closure evidence
-  recorded here, final owner sign-off tracked at P1.B2 parent closure).
-  This closes the last child of `P1.B2`; parent-level closure (5-pass
-  Reflection log, persisted RRI report, parent unit coverage certification,
-  and full owner final verification for the whole 12-task pack) is the next
-  step.
+- See `### P1.B2 parent closure` immediately below — this closes the last
+  child of `P1.B2` and the owner verification there covers the full
+  12-task pack.
+
+### P1.B2 parent closure
+
+- **RRI:** kept at the presentation-time **56 → Complex (56-70)** recorded
+  above (§ P1.B2 planning-parent entry) — `C` was agent-supplied from
+  reading B1's code, confidence Low, but the owner elected to keep the
+  original band rather than substitute a post-implementation recompute.
+  For reference only, a post-implementation recompute scoped to the 10
+  files actually touched across the pack (`replication-witness.ts`,
+  `replication-reconnect.ts`, `replication-verdict.ts`,
+  `replication-teardown.ts`, `replication-evidence.ts`,
+  `reconnect-budget.ts`, `transient-replication-discovery.ts`,
+  `transient-replication.ts`, `digest-compare.ts`, `byte-counter.ts`) gives
+  RRI 35 Moderate — not adopted; kept here only as context for why the
+  as-delivered pack reads simpler than the prospective estimate.
+- **Reflection log:** 4 passes (56-70 Complex band, `AGENT_WORKFLOW_GUIDE.md`
+  Reflection table), using the parent reflection plan below.
+
+#### Pass 1 — Ownership direction
+
+- **Draft verdict:** every child's `allowed_paths` stayed inside
+  `mobile/src/p2p/{proof,runtime}` and its own tests; no child introduced a
+  new provider, navigation hook, or product-service export.
+- **Critique findings:** none — `P1.B2.f`'s implementation note confirms
+  `ReplicationProofRunner.ts`/`runtime-client.ts` (the composition-root-owned
+  files) needed no edits; the new logic landed in leaf files instead.
+- **Revisions applied:** none needed.
+
+#### Pass 2 — Runtime/protocol containment
+
+- **Draft verdict:** no child added a new RPC command or touched
+  `protocol.ts`/`worklet-request-handler.ts`; `P1.B2.f` explicitly confirmed
+  and documented this boundary (drive/swarm objects never cross the RPC
+  boundary, only the typed `byte_count` receipt does).
+- **Critique findings:** none.
+- **Revisions applied:** none needed.
+
+#### Pass 3 — Storage safety
+
+- **Draft verdict:** `P1.B2.a-0`/`a-cov` cover byte-count instrumentation and
+  direct unit coverage of `transient-replication*.ts`; `P1.B2.d-ii` and
+  `P1.B2.f` both guarantee `deleteProofRunDirectory` runs for both sides on
+  every path, including early failure (verified by
+  `EC-B2.f teardown failure` and `EC-B2.f reconnect-budget exhaustion`
+  tests).
+- **Critique findings:** none — teardown-runs-on-every-path is directly
+  asserted by dedicated test cases, not just implied.
+- **Revisions applied:** none needed.
+
+#### Pass 4 — Replication correctness
+
+- **Draft verdict:** `P1.B2.f`'s composition and its 6 table-driven test
+  cases (`HP-B2.f` x2, `EC-B2.f` x4) directly certify the parent's HP-B2/
+  EC-B2: no `VERIFIED` before complete read + digest match + reconnect
+  outcome + teardown, matching the parent's own HP-B2/EC-B2 wording verbatim.
+- **Critique findings:** the phase-2 reviewer's major finding on `P1.B2.f`
+  (potential false-`VERIFIED` leak) was independently verified as a false
+  positive by exhaustive trace, not just accepted on reviewer say-so — see
+  `P1.B2.f`'s own Reflection log pass 1.
+- **Revisions applied:** none needed beyond what `P1.B2.f` already resolved.
+
+### P1.B2 unit coverage certification
+
+Every HP-B2/EC-B2 parent case is satisfied by `P1.B2.f`'s own certification
+table (§ P1.B2.f Unit coverage certification) — the parent's acceptance
+criteria are fully decomposed and closed by that child's 6 test cases
+(`HP-B2.f` x2, `EC-B2.f` x4). No case remains uncovered.
+
+### P1.B2 owner final verification
+
+- Owner: Matias (kruk.matias@gmail.com).
+- Date: 2026-09-01.
+- Statement: I verified every child of P1.B2 (a-0, a-cov, a-i, a-ii-a,
+  a-ii-b, b, c-1, c-2, d-i, d-ii, e, f) closed PASS with unit test evidence
+  for every HP-#/EC-# case, and that the parent's own HP-B2/EC-B2 are fully
+  covered by P1.B2.f's composition and tests.
+- Commands run: `cd mobile && npx tsc --noEmit -p .` (exit 0); `npx jest`
+  (43/43 suites, 350/350 tests passed); `npm run lint` (0 warnings); `cd ..
+  && python3 scripts/check-maintainability.py` (gate passed).
 
 ## Parent reflection plan
 
@@ -2343,15 +2421,101 @@ security-decision role.
 | 4 | Replication correctness | No verified state before complete read, digest equality, reconnect outcome, and teardown. |
 | 5 | Product-boundary protection | No asset, key, invite, UI, backend, local HTTP, default network, native service, or iOS scope leaks in. |
 
+### P1 reflection log (all 8 children PASS)
+
+#### Pass 1 — Ownership direction
+
+- **Draft verdict:** `P1.F2` (mobile service ownership and composition)
+  established that the app composition root owns `AuthProvider`/`P2PProvider`
+  and `P2PService`; every later child (`A1`, `A2`, `B1`, `B2`) worked inside
+  `mobile/src/p2p/{proof,runtime}` without adding navigation- or
+  product-service-level proof commands.
+- **Critique findings:** none — `P1.B2`'s own pass 1 (above) confirmed the
+  same for its 12 children specifically.
+- **Revisions applied:** none needed.
+
+#### Pass 2 — Runtime/protocol containment
+
+- **Draft verdict:** `P1.F1` delivered the reproducible worklet bundle and
+  versioned/fail-closed RPC contract; `P1.A1`/`P1.A2`/`P1.B1`/`P1.B2` all
+  reused that one seam (`ProofRuntimeFactory`, `runtime-client`,
+  `protocol.ts`) rather than adding a second worklet or a parallel protocol
+  path. `P1.B2.f` explicitly re-confirmed no new RPC command was needed.
+- **Critique findings:** none.
+- **Revisions applied:** none needed.
+
+#### Pass 3 — Storage safety
+
+- **Draft verdict:** `P1.A1`/`P1.A1b` established scoped transient-drive
+  open/close; `P1.A2` added transient seed lifecycle and residue cleanup
+  (after a D14 phase-2 review required 3 BLOCKING correctness repairs —
+  traversal guard, swallowed close-failure, uninvoked janitor); `P1.B2`
+  (`a-0`, `a-cov`, `d-ii`, `f`) extended this to the dual-session replication
+  path with byte-count instrumentation and unconditional teardown.
+- **Critique findings:** `P1.A2`'s pre-repair state would have failed this
+  pass — recorded here as resolved by its own D14-driven repair cycle before
+  that task closed PASS, not smoothed over.
+- **Revisions applied:** none needed now — the fix already landed in `P1.A2`.
+
+#### Pass 4 — Replication correctness
+
+- **Draft verdict:** `P1.B1` (transport) + `P1.B2` (verification/reconnect/
+  teardown/verdict) jointly satisfy this pass: `P1.B2.f`'s composition and
+  its 6 table-driven tests directly certify no `VERIFIED` before complete
+  read, digest match, reconnect outcome, and teardown.
+- **Critique findings:** `P1.B1`'s retrospective RRI recompute (55 Med-high
+  prospective → 59 Complex as-delivered) surfaced a governance gap — the
+  Complex-band decomposition-before-implementation gate was not satisfied
+  prospectively — already disclosed and dispositioned in
+  `docs/audit/mvp0-p2p-p1-b1-implementation.md` rather than re-litigated
+  here.
+- **Revisions applied:** none needed at P1 closure — the gap was owner-
+  accepted as a one-time retrospective disposition when `P1.B1` closed.
+
+#### Pass 5 — Product-boundary protection
+
+- **Draft verdict:** across all 8 children, no asset, key, invite, UI,
+  backend, local HTTP, default-network, native-service, or iOS surface was
+  touched — `allowed_paths` stayed confined to `mobile/src/p2p/{proof,
+  runtime,development}` and their tests throughout `P1`. `P1.F3a`/`P1.F3b`
+  specifically retired the P0 scaffold rather than expanding it into product
+  surface.
+- **Critique findings:** iOS remains deferred and no product P2P runtime or
+  network activity is active outside the bounded proof runners — consistent
+  with `docs/plan/roadmap.md`'s MVP0-P2P row.
+- **Revisions applied:** none needed.
+
 ## Unit coverage certification
 
-**Pending child implementation.** P1 cannot close until every approved child
-HP/EC and parent HP-1/HP-2/HP-3/EC-1/EC-2 maps to passing unit tests.
+Every child (`P1.F1`, `P1.F2`, `P1.F3a.1`, `P1.F3a.2`, `P1.F3b`/
+`P1.F3b-fix-1`, `P1.A1` (`a`/`a-0`/`b.0`/`b`/`c`/`d`), `P1.A2`, `P1.B1`,
+`P1.B2` (12 sub-children)) carries its own `Unit coverage certification`
+table mapping every HP-#/EC-# to a passing test, referenced above in each
+child's section. The parent-level HP-B2/EC-B2 are certified by `P1.B2.f`'s
+table; earlier phases' parent-level acceptance criteria are certified the
+same way by their own closing child (`P1.A1d` for `P1.A1`, `P1.F3a.2` for
+`P1.F3a`). No case is `N/A`. Full-suite confirmation:
+`cd mobile && npx jest` — 43/43 suites, 350/350 tests passed (2026-09-01).
 
 ## Owner final verification
 
-**Pending completion of P1.F1, P1.F2, P1.F3a.1, P1.F3a.2, P1.F3b, P1.A1,
-P1.A2, P1.B1, and P1.B2.**
+- Owner: Matias (kruk.matias@gmail.com).
+- Date: 2026-09-01.
+- Statement: I verified P1.F1, P1.F2, P1.F3a.1, P1.F3a.2, P1.F3b/
+  P1.F3b-fix-1, P1.A1, P1.A2, P1.B1, and P1.B2 all closed PASS, that the
+  parent reflection plan's 5 passes hold against the delivered code (see
+  P1 reflection log above), and that every child's unit coverage
+  certification maps to a passing test. `P1.B1`'s retrospective RRI/
+  governance-gap disposition is accepted as a one-time exception, not a
+  precedent, per `docs/audit/mvp0-p2p-p1-b1-rri.md`.
+- Commands run: `cd mobile && npx tsc --noEmit -p .` (exit 0); `npx jest`
+  (43/43 suites, 350/350 tests passed); `npm run lint` (0 warnings); `cd ..
+  && python3 scripts/check-maintainability.py` (gate passed).
+- **P1 status: [x] Done — 2026-09-01.** Per
+  `docs/plan/mvp0-p2p-first.md § Execution sequence`, P1 closing PASS is
+  not authorization to start P2 source work — P2-P7 each still need their
+  own plan, RRI, Compact Approval Task Card, and explicit HITL approval,
+  and P2 additionally remains blocked on ADR-044 (`Proposed`) acceptance.
 
 ## Handoff prompt
 

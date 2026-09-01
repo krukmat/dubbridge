@@ -46,7 +46,7 @@ operational surfaces from planned ones. Delivery sequence lives in
 | Environment separation + reproducible container runtime wiring | Operational | S-030, ADR-026 |
 | First-party session gateway (transparent JWT relay) | Operational | S-040, ADR-031 |
 | First-party mobile client (React Native + Expo) | Canonical, sole authenticated product surface | S-050/S-105, ADR-029/031 |
-| Mobile P2P runtime boundary | P1.F1 packaging/protocol closed PASS; P1.F2 ownership/composition remains gated and no product P2P runtime is active | MVP0-P2P P1, ADR-043 |
+| Mobile P2P runtime boundary | P1 closed `[x] Done` 2026-09-01 (all 8 children PASS: packaging/protocol, ownership/composition, storage, replication transport, and verification/reconnect/teardown); no product P2P runtime or network activity is active outside bounded proof runners | MVP0-P2P P1, ADR-043 |
 | P2P audience delivery (encrypted publication, invite/claim, verified sync, loopback playback) | Not started — ADR-044 is `Proposed`; its open questions block P2 | MVP0-P2P P2–P7, ADR-044 |
 
 Human review runtime (S-170) and publication runtime (S-180) have no plan/task
@@ -88,14 +88,17 @@ ledger yet.
   fatal/suspend/resume handling form the runtime seam. P1's two-worklet
   seed/client topology stays isolated in a development-only proof runner and
   uses verifiably deleted cache storage; it is not the product topology. The P0
-  probe/custom bridge is retained as the unchanged oracle while F3a.1's
-  `P2PDevelopmentHarness` carries the replacement bounded lifecycle (owner
-  verification pending), then retired in P1.F3a.2; P1.F3b separately removes or proves
-  each related config/dependency setting. ADR-043 and the revised P1 parent were
-  approved on 2026-08-27. P1.F1 now implements the reproducible bundle and
-  versioned/fail-closed RPC seam and closed PASS after owner verification.
-  Composition, product runtime ownership, storage, replication,
-  and network behavior remain unimplemented, so this boundary is non-operational.
+  probe/custom bridge was retained as the unchanged oracle through F3a.1's
+  `P2PDevelopmentHarness` (owner-verified), then retired in P1.F3a.2; P1.F3b
+  separately resolved each related config/dependency setting. ADR-043 and
+  the revised P1 parent were approved on 2026-08-27, and **P1 closed
+  `[x] Done` on 2026-09-01** — all 8 children (F1 packaging/RPC seam, F2
+  ownership/composition, F3a/F3b scaffold retirement, A1/A2 storage
+  lifecycle, B1 replication transport, B2 verification/reconnect/teardown)
+  are PASS. Composition, storage, and an isolated replication proof exist
+  and are unit-tested, but no product-facing P2P command, invite, or
+  network activity is wired to the app — this boundary remains
+  non-operational for end users pending P2–P7.
 - **P2P audience delivery** (MVP0-P2P P2–P7, ADR-044 `Proposed`): the
   control-plane/data-plane split in which `apps/api` stays the sole
   authorization authority while an encrypted P2P data plane — package
