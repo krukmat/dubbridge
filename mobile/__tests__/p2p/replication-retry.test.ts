@@ -3,12 +3,12 @@ import { RuntimeProtocolError } from "../../src/p2p/runtime/protocol";
 
 describe("retryConnectAndReplicate", () => {
   it("HP-B2.c-2: a retry successfully re-establishes replication using the existing function", async () => {
+    const fakeSocket = { pipe: jest.fn().mockReturnValue({ pipe: jest.fn() }) };
+    const fakePeerInfo = { id: "peer-1" };
     const destroyMock = jest.fn();
     const drive = {
       replicate: jest.fn().mockReturnValue({ destroy: destroyMock }),
     };
-    const fakeSocket = { pipe: jest.fn().mockReturnValue({ pipe: jest.fn() }) };
-    const fakePeerInfo = { id: "peer-1" };
 
     const swarm = {
       on: jest.fn(
