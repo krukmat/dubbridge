@@ -1,0 +1,18 @@
+# DubBridge local code-intelligence exclusions.
+# Source code remains authoritative; generated/runtime/sensitive paths stay out of the graph.
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.log
+target/
+node_modules/
+mobile/node_modules/
+dist/
+build/
+coverage/
+.agent/
+.cache/
+logs/
+tmp/
