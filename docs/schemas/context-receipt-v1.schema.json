@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dubbridge.local/schemas/context-receipt-v1.schema.json",
+  "title": "DubBridge Context Receipt v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "task",
+    "repository",
+    "target",
+    "anchors",
+    "impact",
+    "boundaries",
+    "governance",
+    "export",
+    "excluded",
+    "expansions",
+    "capsule_sha256",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema": {"const": "context-receipt-v1"},
+    "task": {
+      "type": "object",
+      "required": ["id", "description"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "repository": {
+      "type": "object",
+      "required": ["git_revision", "graph_revision"],
+      "properties": {
+        "git_revision": {"type": "string", "minLength": 1},
+        "graph_revision": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "target": {"enum": ["local", "cloud"]},
+    "anchors": {"type": "array", "items": {"type": "string"}},
+    "impact": {
+      "type": "object",
+      "required": ["files", "symbols", "tests"],
+      "properties": {
+        "files": {"type": "array", "items": {"type": "string"}},
+        "symbols": {"type": "array", "items": {"type": "string"}},
+        "tests": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "boundaries": {"type": "array", "items": {"type": "string"}},
+    "governance": {"type": "array", "items": {"type": "string"}},
+    "export": {"type": "object"},
+    "excluded": {"type": "object"},
+    "expansions": {"type": "array", "items": {"type": "object"}},
+    "capsule_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "receipt_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "additionalProperties": false
+}
