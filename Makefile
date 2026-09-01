@@ -13,8 +13,15 @@ GEMMA_REVIEW_TASK_ID ?=
 # be mistaken for the current review (GEG-2a / defect D1). Explicit override
 # still wins because command-line assignments outrank Makefile '?=' defaults.
 GEMMA_REVIEW_RESULT ?= $(if $(GEMMA_REVIEW_TASK_ID),/tmp/dubbridge-gemma-review-$(GEMMA_REVIEW_TASK_ID).json,/tmp/dubbridge-gemma-review.json)
+GEMMA_REVIEW_CONTEXT_METADATA ?= $(if $(GEMMA_REVIEW_TASK_ID),/tmp/dubbridge-review-context-$(GEMMA_REVIEW_TASK_ID).json,/tmp/dubbridge-review-context.json)
 GEMMA_EVIDENCE_DIR   ?= docs/audit/gemma-evidence
 REVIEW_PATHS         ?=
+# Optional task/acceptance source and read-authority scope for M3 local reviewer
+# enrichment. REVIEW_CONTEXT_ALLOWED_PATHS defaults to the same explicit pathspec
+# used for the diff; when empty, review_context.py falls back to changed paths.
+# Cross-vendor qa-peer-workflow-review deliberately does not use these variables.
+REVIEW_TASK_FILE     ?=
+REVIEW_CONTEXT_ALLOWED_PATHS ?= $(REVIEW_PATHS)
 GOLDEN_SET_MODEL     ?= gemma4:26b-a4b-it-qat
 GOLDEN_SET_RESULT    ?= /tmp/dubbridge-golden-set.json
 COVERAGE_IGNORE_REGEX ?= (apps/(api|cli|worker-runner)/src/(main|cleanup)\.rs|apps/api/src/(dto/ingestion|lib|routes/ingestion|state)\.rs|crates/(db|jobs|observability)/src/lib\.rs|crates/db/src/(artifact_repo|asset_repo|audit_repo|pending_ingestion_repo|rights_repo)\.rs|crates/(audit|ingestion)/src/lib\.rs)
@@ -140,9 +147,19 @@ qa-gemma-review:
 		exit 1; \
 	fi; \
 	review_status=0; \
-	{ echo "# Gemma Reviewer packet (base: $(GEMMA_REVIEW_BASE))"; echo ""; \
-	  git diff $(GEMMA_REVIEW_BASE) -- $(REVIEW_PATHS); } \
-	| python3 scripts/gemma-code-review.py --out "$(GEMMA_REVIEW_RESULT)" - || review_status=$$?; \
+	packet_file=$$(mktemp -t dubbridge-review-diff.XXXXXX); \
+	trap 'rm -f "$$packet_file"' EXIT HUP INT TERM; \
+	git diff $(GEMMA_REVIEW_BASE) -- $(REVIEW_PATHS) > "$$packet_file"; \
+	if [ -f scripts/review_context.py ]; then \
+		set -- python3 scripts/review_context.py "$$packet_file" --worktree . \
+			--task-id "$(GEMMA_REVIEW_TASK_ID)" --metadata-out "$(GEMMA_REVIEW_CONTEXT_METADATA)"; \
+		if [ -n "$(REVIEW_TASK_FILE)" ]; then set -- "$$@" --acceptance-file "$(REVIEW_TASK_FILE)"; fi; \
+		for review_path in $(REVIEW_CONTEXT_ALLOWED_PATHS); do set -- "$$@" --allowed-path "$$review_path"; done; \
+		"$$@" | python3 scripts/gemma-code-review.py --out "$(GEMMA_REVIEW_RESULT)" - || review_status=$$?; \
+	else \
+		{ echo "# Gemma Reviewer packet (base: $(GEMMA_REVIEW_BASE))"; echo ""; cat "$$packet_file"; } \
+		| python3 scripts/gemma-code-review.py --out "$(GEMMA_REVIEW_RESULT)" - || review_status=$$?; \
+	fi; \
 	if [ "$$review_status" != "0" ]; then \
 		echo "[gemma-review] review command failed (exit $$review_status); aborting before receipt, no stale result reused" >&2; \
 		exit $$review_status; \
