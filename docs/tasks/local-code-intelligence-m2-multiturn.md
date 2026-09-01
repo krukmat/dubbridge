@@ -9,9 +9,9 @@ description: "M2 task ledger for compact model-visible multi-turn context."
 
 Behavioral coverage contract: unit-v1 + integration-v1
 
-Milestone status: **complete on `feat/ckg-m2-multiturn`**.
+Milestone status: **complete on `feat/ckg-context-provider`**, consolidated with M1 for the final PR to `main`.
 
-Dedicated validation evidence: `local-agent-context` run 59 passed on code head `779d1429a90fbe1df0eaad8f0c8a6a5ab9b79dcd`.
+Consolidated validation evidence: `local-agent-context` run 66 passed on implementation baseline `f687f94db6ea904c425cb5f77f5f678df3aa1431`.
 
 ## T1 — Compact model-visible working history
 
@@ -84,8 +84,8 @@ Evidence:
 - runtime/CBM contract tests: passed;
 - prompt-builder regression tests: passed;
 - current local-agent integration tests: passed;
-- dedicated workflow: `local-agent-context` run 59, success.
+- consolidated dedicated workflow: `local-agent-context` run 66, success on `f687f94d...`.
 
-General repository `ci` was still queued when this ledger was closed; it is not used to claim additional M2-specific evidence.
+The general repository CI contains failures already present on the incorporated `main` baseline. Final merge readiness therefore uses exact-base regression attribution plus mandatory candidate-specific gates defined in `docs/audit/ckg-m1-m2-local-merge-audit.md`.
 
-No merge to `main` was performed.
+No merge to `main` has been performed.
