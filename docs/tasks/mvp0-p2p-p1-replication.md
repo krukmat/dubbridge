@@ -64,7 +64,7 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 | P1.B2.b | Reconnect budget counter (pure) | PASS — Done 2026-08-31; RRI 24 Low | none |
 | P1.B2.c-1 | Disconnect detection + budget-check decision | PASS — Done 2026-08-31; RRI 22 Low | P1.B2.b PASS |
 | P1.B2.c-2 | Re-invoke B1 `connectAndReplicate` on retry | PASS — Done 2026-08-31; RRI 20 Low | none |
-| P1.B2.d-i | Evidence redaction helper (pure) | Awaiting approval — RRI 20 Low | none |
+| P1.B2.d-i | Evidence redaction helper (pure) | PASS — Done 2026-09-01; RRI 13 Low | none |
 | P1.B2.d-ii | Dual-session teardown orchestration | Awaiting approval — RRI 22 Low | none |
 | P1.B2.e | Verdict/receipt type assembly (pure) | Awaiting approval — RRI 22 Low | none |
 | P1.B2.f | Final VERIFIED composition | Awaiting approval — RRI 22 Low; **owner-pinned to cloud/primary-agent authorship (task-local override), not Qwen local delegation** | P1.B2.a-0, a-ii-b, c-1, c-2, d-ii, e PASS |
@@ -1753,8 +1753,10 @@ directly rather than as a separate delegation packet.
 
 ### P1.B2.d-i — Evidence redaction helper (pure)
 
-- **Status:** Awaiting approval.
-- **Effort / RRI:** S / 20 Low.
+- **Status:** PASS — Done 2026-09-01.
+- **Effort / RRI:** S / 13 Low (recomputed with `scripts/rri.py` at
+  presentation time: `C=0, F=1, D=1, T=1, A=0, K=1, P=1, X=0`, no penalties;
+  supersedes the prospective `S / 20` estimate — banding unchanged).
 - **Allowed paths:** `mobile/src/p2p/proof/replication-evidence.ts` (new),
   `mobile/__tests__/p2p/replication-evidence.test.ts`.
 - **Objective:** a pure function stripping discovery keys and fixture
@@ -1767,6 +1769,69 @@ directly rather than as a separate delegation packet.
 - **Evidence to emit:** unit tests for each redacted field.
 - **Handoff prompt:** `P1.B2.d-i — add a pure redaction helper only; no
   logging call sites.`
+- **Implementation:** delegated to Qwen Developer (`qwen3.8:27b-mlx`,
+  `--mode full-file`, two new files) against a fully-specified contract
+  naming the exact frozen source content (`SENSITIVE_KEYS = ["topic",
+  "fixture", "fixtureContent", "discoveryKey"]`, redaction by key omission,
+  non-sensitive keys copied unchanged) and exact test names. The packet's
+  first phase-1 pass returned BLOCKED (ambiguous instruction letting the
+  test file's import path vary — conflicted with the "exact file contents"
+  contract); the packet was revised to give the import path verbatim and
+  name every required `it(...)` block exactly, then passed its own fresh
+  phase-1 review before dispatch, per `AGENT_WORKFLOW_GUIDE.md § Per-task
+  discipline`. Delegated output matched the revised contract exactly on the
+  first attempt — no repair cycle needed.
+- **Task-analysis review (phase 1):** muse-glimmer (`muse-glimmer:30b-q4_K_M`)
+  - First pass (original packet): BLOCKED — 1 blocking finding (ambiguous
+    test-file import-path instruction), 1 minor finding (unspecified exact
+    test names). Packet revised per both findings.
+  - Second pass (revised packet): PASS, 0 findings, run before dispatch.
+  - Verdict: **PASS**.
+
+### Code-solution review
+
+Code-solution review: muse-glimmer
+`/private/tmp/.../p1-b2-d-i-phase2-result.json` (scratchpad, not committed;
+local delegation evidence per Low-band convention) - PASS
+
+- Command: `python3 scripts/gemma-code-review.py --task-id P1.B2.d-i
+  --attempt 1 --model muse-glimmer:30b-q4_K_M --num-ctx 32768 --passes 3`,
+  run against the final diff (both new files) plus acceptance criteria and
+  independently-verified command output.
+- Passes run / usable: `3/3`.
+- Aggregate status: **PASS**.
+- Consensus findings: `0` | Pass-specific: `0` | Disagreement: `0`.
+- `parse-review-findings.py` exit code: `0` (no findings in any bucket).
+- Findings: none.
+
+### Verification
+
+- Per-task Ollama restart: killed and confirmed a new server PID (`92531`)
+  before this task's first local-model call; warm-up probes for both
+  `muse-glimmer:30b-q4_K_M` (`num_ctx=32768`) and `qwen3.8:27b-mlx`
+  (`num_ctx=65536`) returned `done_reason: "stop"` with non-empty content.
+- `cd mobile && npx tsc --noEmit -p .` — exit 0.
+- `cd mobile && npx jest __tests__/p2p/replication-evidence.test.ts
+  --runInBand` — 3/3 tests passed.
+- `cd mobile && npx jest __tests__/p2p/ --runInBand` (full P2P suite) —
+  19/19 suites, 99/99 tests passed.
+- `cd mobile && npm run lint` — 0 warnings.
+- `python3 scripts/check-maintainability.py --base
+  origin/feature/p2p-mvp-core` — passed.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-B2.d-i | Happy path | all four sensitive keys (`topic`, `fixture`, `fixtureContent`, `discoveryKey`), when present together with a non-sensitive key, are absent from the output | `mobile/__tests__/p2p/replication-evidence.test.ts::redactReplicationEvidence > HP-B2.d-i strips all four sensitive keys when present together` | passed |
+| EC-B2.d-i | Edge case | non-sensitive fields (`role`, `byte_count`, `capability`) are preserved unchanged | `mobile/__tests__/p2p/replication-evidence.test.ts::redactReplicationEvidence > EC-B2.d-i preserves non-sensitive fields unchanged` | passed |
+| EC-B2.d-i | Edge case | an empty input object returns an empty output object without throwing | `mobile/__tests__/p2p/replication-evidence.test.ts::redactReplicationEvidence > EC-B2.d-i returns an empty object for empty input` | passed |
+
+### Owner final verification
+
+- Pending — tracked at `P1.B2` parent closure per the pack's approved
+  batching (owner approved the full 12-task pack; per-task closure evidence
+  recorded here, final owner sign-off tracked at P1.B2 parent closure).
 
 ### P1.B2.d-ii — Dual-session teardown orchestration
 
