@@ -37,6 +37,14 @@ DEFAULT_NUM_PREDICT = 4096
 MODEL_NUM_PREDICT_OVERRIDES = {
     "gemma4:26b-a4b-it-qat": 8192,
 }
+# Owner directive 2026-08-31: muse-glimmer:30b-q4_K_M repeatedly saturated
+# host memory at the shared 131072 default (X26-T3c-c1, X26-T3c-c2 both hit
+# the empty-content capacity symptom in AGENT_WORKFLOW_GUIDE.md Step 0).
+# Scoped to this model only -- other reviewer/developer models keep the
+# shared default, which they have not been shown to need lowered.
+MODEL_NUM_CTX_OVERRIDES = {
+    "muse-glimmer:30b-q4_K_M": 32768,
+}
 DEFAULT_TEMPERATURE = 0.1
 DEFAULT_THINK = False
 
@@ -180,6 +188,17 @@ def resolve_num_predict(model, num_predict):
     return MODEL_NUM_PREDICT_OVERRIDES.get(model, DEFAULT_NUM_PREDICT)
 
 
+def resolve_num_ctx(model, num_ctx):
+    """Return the effective context window for a specific model.
+
+    Callers that pass a non-default value keep that explicit override. The
+    shared 131072 default stays unchanged for models without an override.
+    """
+    if num_ctx != DEFAULT_NUM_CTX:
+        return num_ctx
+    return MODEL_NUM_CTX_OVERRIDES.get(model, DEFAULT_NUM_CTX)
+
+
 def build_chat_payload(
     *,
     model,
@@ -191,6 +210,7 @@ def build_chat_payload(
     think,
 ):
     effective_num_predict = resolve_num_predict(model, num_predict)
+    effective_num_ctx = resolve_num_ctx(model, num_ctx)
     effective_system_prompt = system_prompt
     if not think and model in THINK_DIRECTIVE_MODELS:
         effective_system_prompt = f"{THINK_DIRECTIVE_TEXT}\n{system_prompt}"
@@ -202,7 +222,7 @@ def build_chat_payload(
         "options": {
             "temperature": temperature,
             "num_predict": effective_num_predict,
-            "num_ctx": num_ctx,
+            "num_ctx": effective_num_ctx,
         },
         "messages": [
             {

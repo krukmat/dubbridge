@@ -1,0 +1,14 @@
+required-version = "==0.16.5"
+target-version = "py312"
+line-length = 120
+include = ["workers/*-py/**/*.py"]
+
+[lint]
+select = ["C901", "E501", "PLR0912", "PLR0915"]
+
+[lint.mccabe]
+max-complexity = 15
+
+[lint.pylint]
+max-branches = 15
+max-statements = 50
