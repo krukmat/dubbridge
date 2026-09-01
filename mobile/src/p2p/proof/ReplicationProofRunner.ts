@@ -1,10 +1,15 @@
-import { createProofSessionParts, type ProofSessionParts } from "./ProofRuntimeFactory";
+import {
+  createProofSessionParts,
+  type ProofSessionParts,
+} from "./ProofRuntimeFactory";
 
 export type ReplicationSession = ProofSessionParts;
 
 export const startReplicationSession = createProofSessionParts;
 
-export async function closeReplicationSession(session: ReplicationSession): Promise<void> {
+export async function closeReplicationSession(
+  session: ReplicationSession,
+): Promise<void> {
   try {
     await session.client.shutdown();
   } catch {
@@ -42,7 +47,9 @@ export async function runDualSessionReplication(
   ]);
 }
 
-export type DualSessionReplicationResult = Awaited<ReturnType<typeof runDualSessionReplication>>;
+export type DualSessionReplicationResult = Awaited<
+  ReturnType<typeof runDualSessionReplication>
+>;
 
 export type ReplicationVerdict =
   | {
@@ -56,11 +63,16 @@ export function interpretDualSessionResult(
   results: DualSessionReplicationResult,
 ): ReplicationVerdict {
   const [seedResult, clientResult] = results;
-  if (seedResult.status === "fulfilled" && clientResult.status === "fulfilled") {
+  if (
+    seedResult.status === "fulfilled" &&
+    clientResult.status === "fulfilled"
+  ) {
     return { ok: true, seed: seedResult.value, client: clientResult.value };
   }
   const reason =
-    seedResult.status === "rejected" ? seedResult.reason : (clientResult as PromiseRejectedResult).reason;
+    seedResult.status === "rejected"
+      ? seedResult.reason
+      : (clientResult as PromiseRejectedResult).reason;
   return { ok: false, reason };
 }
 
@@ -69,7 +81,11 @@ export async function runAndReconcileDualSessionReplication(
   clientSession: ReplicationSession,
   topic: Buffer,
 ): Promise<ReplicationVerdict> {
-  const results = await runDualSessionReplication(seedSession, clientSession, topic);
+  const results = await runDualSessionReplication(
+    seedSession,
+    clientSession,
+    topic,
+  );
   const verdict = interpretDualSessionResult(results);
   if (!verdict.ok) {
     await Promise.allSettled([
