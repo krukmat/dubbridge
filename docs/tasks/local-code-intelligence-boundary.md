@@ -1,12 +1,26 @@
 ---
 type: Tasks
 title: "Local Code Intelligence Boundary"
-status: implemented_pending_local_verification
+status: ready_for_audit_pending_local_verification
 plan: docs/plan/local-code-intelligence-boundary.md
 behavioral_coverage_contract: unit-v1
 ---
 
 # Local Code Intelligence Boundary Tasks
+
+## Audit entry point
+
+Start local audit/review at:
+
+`docs/audit/local-code-intelligence-boundary-audit.md`
+
+That document is the single navigation point for the relevant docs, implementation files, mandatory smoke suite (`S0`–`S8`), exploratory probes (`P1`–`P4`), evidence format, and merge interpretation.
+
+The reusable black-box fixture is:
+
+`scripts/code_intelligence/fixtures/audit-smoke-graph.json`
+
+---
 
 ## T1 — Backend-neutral graph contract
 
@@ -78,18 +92,50 @@ Exposed the gateway as a small CLI usable from DubBridge Analyze/handoff phases 
 
 ## T4 — Verification and closure
 
-**Status:** pending local execution  
+**Status:** audit ready; pending local execution  
 **Effort:** S  
 **Depends on:** T1, T2, T3
 
 ### Verification completed from the orchestrator
-- Branch comparison: `feature/local-code-intelligence-boundary` is ahead of `main` and not behind at the comparison point.
-- Diff scope checked: only `docs/plan`, `docs/tasks`, `docs/schemas`, and `scripts/code_intelligence` are touched.
-- GitHub reported no CI statuses/workflow runs for the current branch head.
+- Branch scope was compared against `main`; implementation remains isolated to code-intelligence tooling/docs.
+- No production Rust/mobile/runtime path was intentionally changed.
+- GitHub reported no CI statuses/workflow runs for the branch head during implementation.
+- A dedicated audit entry point and reusable black-box fixture are committed for local verification.
 
-### Local verification required
+### Mandatory local audit smoke suite
 
-Run from a checkout of this branch:
+Run the full `S0`–`S8` sequence documented in:
+
+`docs/audit/local-code-intelligence-boundary-audit.md`
+
+At minimum it covers:
+
+| Smoke | Purpose |
+|---|---|
+| S0 | branch scope and no product/RRI regression |
+| S1 | Python compile + behavioral unit suite |
+| S2 | cloud CLI happy path and deny filtering |
+| S3 | local richer context while excluding explicit secret/runtime classes |
+| S4 | byte-level deterministic artifacts |
+| S5 | receipt/capsule SHA-256 integrity |
+| S6 | malformed graph payload fails closed with no success artifacts |
+| S7 | executable core remains model/vendor agnostic |
+| S8 | repository documentation QA |
+
+### Exploratory audit probes
+
+The same entry point documents non-automatic probes:
+
+- **P1:** stale `git_revision` / graph-to-checkout freshness enforcement;
+- **P2:** backend classification trust and deliberate misclassification;
+- **P3:** cloud metadata disclosure via unclassified `files` / `symbols` / related arrays;
+- **P4:** per-artifact versus pair-level atomicity.
+
+These probes are intentionally visible to the auditor. Their current behavior should be assessed against the intended DubBridge threat model rather than silently treated as already-enforced guarantees.
+
+### Minimal verification commands
+
+If the auditor wants the shortest baseline before the full smoke suite:
 
 ```bash
 python3 scripts/code_intelligence/context_gateway_test.py
@@ -99,8 +145,6 @@ python3 -m py_compile \
   scripts/code_intelligence/context_gateway_test.py
 make qa-docs
 ```
-
-If repository QA exposes additional Python/script checks for new tooling, run those as well before merge.
 
 ### Unit coverage certification — pending execution
 
@@ -116,3 +160,14 @@ If repository QA exposes additional Python/script checks for new tooling, run th
 ### Owner final verification
 
 Pending. The orchestrator attempted to clone the branch for execution, but the container could not resolve `github.com`; therefore no test is represented as passed without evidence.
+
+### Audit closure evidence expected
+
+Before merge, record:
+
+- branch/head and merge base reviewed;
+- `S0`–`S8` results;
+- observations for `P1`–`P4`;
+- any required fixes with reproducible evidence;
+- ADR recommendation (`required` / `not required yet`);
+- final verdict (`PASS`, `PASS WITH CONDITIONS`, or `BLOCK`).
