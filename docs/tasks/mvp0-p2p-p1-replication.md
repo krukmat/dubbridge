@@ -67,7 +67,7 @@ plan: docs/plan/mvp0-p2p-p1-replication.md
 | P1.B2.d-i | Evidence redaction helper (pure) | PASS — Done 2026-09-01; RRI 13 Low | none |
 | P1.B2.d-ii | Dual-session teardown orchestration | PASS — Done 2026-09-01; RRI 13 Low | none |
 | P1.B2.e | Verdict/receipt type assembly (pure) | PASS — Done 2026-09-01; RRI 16 Low | none |
-| P1.B2.f | Final VERIFIED composition | Awaiting approval — RRI 22 Low; **owner-pinned to cloud/primary-agent authorship (task-local override), not Qwen local delegation** | P1.B2.a-0, a-ii-b, c-1, c-2, d-ii, e PASS |
+| P1.B2.f | Final VERIFIED composition | PASS — Done 2026-09-01; RRI 19 Low; **owner-pinned to cloud/primary-agent authorship (task-local override), not Qwen local delegation** | P1.B2.a-0, a-ii-b, c-1, c-2, d-ii, e PASS |
 
 The former combined `P1.A — Ephemeral seed fixture and bundle boundary` planning
 parent and its A1/A2 interpretation are superseded. Historical artifacts remain
@@ -2065,20 +2065,21 @@ Low-band: Reflection applied to the reviewer's output per
 
 ### P1.B2.f — Final VERIFIED composition
 
-- **Status:** Awaiting approval. **Owner-pinned task-local override:** this
-  child is scoped to cloud/primary-agent authorship (Claude Sonnet 5 direct,
-  the acting orchestrator), not Qwen local patch delegation, despite its
-  measured RRI of 22 (Low). Rationale: `P1.B2.f` is the single function
-  deciding whether the parent's fail-closed invariant ("never VERIFIED
-  before complete read, digest equality, reconnect outcome, and teardown")
-  holds — a security-decision point, not a low-editorial-risk mechanical
-  patch, per `docs/policies/HITL_AUTONOMY_POLICY.md § Local delegation`'s
-  qualitative eligibility bar. The RRI number does not change; only the
-  authorship route is pinned. Recorded here per
-  `docs/policies/RRI_POLICY.md`'s rule that a task-local override must be
-  explicit, never silently applied.
-- **Effort / RRI:** S / 22 Low (task-local route override: primary
-  agent/cloud, not Qwen). Depends on `P1.B2.a-0`, `P1.B2.a-ii-b`,
+- **Status:** PASS — Done 2026-09-01. **Owner-pinned task-local override:**
+  this child is scoped to cloud/primary-agent authorship (Claude Sonnet 5
+  direct, the acting orchestrator), not Qwen local patch delegation, despite
+  its measured RRI of 19 (Low, recomputed — see below). Rationale:
+  `P1.B2.f` is the single function deciding whether the parent's fail-closed
+  invariant ("never VERIFIED before complete read, digest equality, reconnect
+  outcome, and teardown") holds — a security-decision point, not a
+  low-editorial-risk mechanical patch, per
+  `docs/policies/HITL_AUTONOMY_POLICY.md § Local delegation`'s qualitative
+  eligibility bar. Only the authorship route is pinned; the band, review
+  chain, and every other gate are unaffected.
+- **Effort / RRI:** S / 19 Low (recomputed via `scripts/rri.py`:
+  `C=1, F=2, D=1, T=1, A=0, K=1, P=1, X=0`, no penalties; superseding the
+  prospective S/22 estimate, banding unchanged). Task-local route override:
+  primary agent/cloud, not Qwen. Depends on `P1.B2.a-0`, `P1.B2.a-ii-b`,
   `P1.B2.c-1`, `P1.B2.c-2`, `P1.B2.d-ii`, `P1.B2.e` PASS.
 - **Allowed paths:** `mobile/src/p2p/proof/ReplicationProofRunner.ts`,
   `mobile/src/p2p/runtime/runtime-client.ts`,
@@ -2100,6 +2101,237 @@ Low-band: Reflection applied to the reviewer's output per
 - **Handoff prompt (primary-agent/cloud, not delegated):** `P1.B2.f —
   compose a-0/a-ii-b/c-1/c-2/d-ii/e in the documented order; never emit
   VERIFIED before every step succeeds; this closes P1.B2's HP-B2/EC-B2.`
+
+**Implementation note:** authored directly by the primary agent per the
+owner-pinned override (not delegated). Confirmed via a full read of the
+runtime/worklet layer (`worklet-request-handler.ts`,
+`transient-drive.ts`, `transient-replication.ts`, `protocol.ts`) that
+`a-ii-b`'s `verifyReplicatedFile` and `c-2`'s `retryConnectAndReplicate`
+both require a `drive`/`swarm` object that exists only inside the Bare
+worklet and never crosses the RPC boundary (only a typed `byte_count`
+receipt does; `worklet-request-handler.ts`'s `DISCOVER_AND_REPLICATE`
+handler calls only `discoverAndReplicate`, never `verifyReplicatedFile`).
+Neither `worklet-request-handler.ts` nor a new RPC command in `protocol.ts`
+is in this task's allowed paths, so the composition treats "retry" as
+re-invoking the existing RPC-level `runAndReconcileDualSessionReplication`
+(consistent with every other `P1.B2.*` child), and treats "verify" as an
+injected `() => Promise<DigestCompareResult>` dependency the caller
+supplies — exactly parallel to how `e`'s `assembleReplicationVerdict`
+already takes an already-computed `DigestCompareResult`. This scoping
+decision was itself put to phase-1 review before being treated as final
+(see below) and confirmed sound.
+
+`mobile/src/p2p/proof/ReplicationProofRunner.ts` and
+`mobile/src/p2p/runtime/runtime-client.ts` (both listed allowed paths)
+required no edits — the same "not every allowed path needs to be touched"
+pattern already established by `P1.B2.a-ii-b` (didn't touch `protocol.ts`).
+The new composition landed in two new files:
+`mobile/src/p2p/proof/replication-witness.ts` (`runReplicationProof`, the
+final verdict assembly) and `mobile/src/p2p/proof/replication-reconnect.ts`
+(`replicateWithOneReconnect`, extracted after a maintainability-gate
+violation — see below).
+
+**Push-time maintainability gate (two rounds).** Appending the composition
+directly into `ReplicationProofRunner.ts` first failed
+`scripts/check-maintainability.py` twice: a repeated `topic: Buffer`
+parameter line (5x, budget 4) and a declaration-count overrun (33 vs budget
+20, since `d-ii` had already grown that file close to the ceiling).
+Reverted `ReplicationProofRunner.ts` to its committed state (confirmed
+byte-identical via `git diff`) and moved the new composition into a new
+file `replication-witness.ts` instead — mirroring the `a-0`/`d-ii`
+file-split precedent. A second round then surfaced after the phase-2
+review's finding-driven fix (see below) added an explanatory comment,
+pushing `replication-witness.ts` itself to 21 declaration lines (budget
+20): fixed by extracting the unchanged `replicateWithOneReconnect` function
+into its own new file `replication-reconnect.ts` (pure extraction, no logic
+change). The test file separately hit the 40-line mobile-test declaration
+budget (55 vs 40) from six independent `it(...)` blocks each repeating
+similar setup boilerplate; restructured into a single `it.each(cases)`
+table (same pattern as `P1.B2.e`'s maintainability fix) with a per-case
+optional `extra` assertion callback for the handful of cases needing
+distinctive extra checks (retry counts, "verify not called", shutdown-call
+counts). Same 6 case names/scenarios/expected outputs, no case dropped, no
+assertion weakened — confirmed 6/6 green both before and after the
+restructure. Confirmed `mobile/scripts/build-bare-worklet.mjs`
+`sourcePaths` only pulls from `runtime/`, not `proof/` — no worklet rebuild
+required for any of the three new/changed `proof/`-directory files.
+
+**Phase-2 review finding and disposition (attempt 2, before the file
+split).** The first usable phase-2 pass (1/3 parsed; the other two idle
+timed out — a capacity symptom, not a logic issue) returned `status:
+findings` with one minor and one major finding:
+- *(minor, in-scope)* the reconnect decision `"may-retry"` was flagged as a
+  confusing name when reused to gate verification. Disposed as **accepted,
+  out-of-scope**: `ReconnectOutcome`/`ReconnectDecision` are owned by
+  `P1.B2.e`/`P1.B2.b` respectively, neither in this task's allowed paths.
+- *(major)* claimed the `{ matched: true }` sentinel passed to
+  `assembleReplicationVerdict` when replication never completed could let
+  `VERIFIED` be emitted despite incomplete replication, given
+  `assembleReplicationVerdict`'s digest-mismatch-before-reconnect-exhausted
+  check order. **Independently verified as a false positive** by exhaustive
+  trace: the sentinel is only ever passed when
+  `reconnect.attempted === true && reconnect.decision === "exhausted"`, and
+  `assembleReplicationVerdict`'s own reconnect-exhausted branch — checked
+  immediately after the (vacuously-false) digest check, using the same
+  `reconnect` value — always wins in that exact case, returning
+  `RECONNECT_EXHAUSTED`, never `VERIFIED`. The pre-existing
+  `EC-B2.f reconnect-budget exhaustion` test already exercised exactly this
+  path and asserted `RECONNECT_EXHAUSTED` (passing both before and after).
+  The underlying code-quality concern — a `matched: true` sentinel is a
+  landmine for a future refactor — was accepted as valid and addressed
+  defensively: the constant was renamed `VERIFY_NOT_ATTEMPTED` with an
+  explanatory comment proving why `VERIFIED` cannot be reached from that
+  path, citing `assembleReplicationVerdict`'s fixed check order. This
+  disposition (and the resulting rename/comment, which then triggered the
+  second maintainability-driven file split above) was itself re-verified by
+  the fresh attempt-3 phase-2 pass below, which explicitly confirmed the
+  sentinel's safety.
+
+### Task-analysis review (phase 1)
+
+- Reviewer: `muse-glimmer:30b-q4_K_M`.
+- Command: `python3 scripts/gemma-code-review.py --task-id P1.B2.f-phase1
+  --attempt 1 --model muse-glimmer:30b-q4_K_M --num-ctx 32768 --passes 3`
+  against a packet stating the objective, acceptance criteria, and the
+  verify/retry scoping decision (drive/swarm never cross the RPC boundary;
+  neither `worklet-request-handler.ts` nor a new RPC command is in scope).
+- Passes run / usable: `3/3`.
+- Findings: none.
+- Verdict: **PASS** — "Scoping decision is sound for the stated allowed
+  paths and compose-not-reimplement framing; verification and retry are
+  correctly kept at orchestration layer via injected verify callback and
+  re-invocation of existing RPC `runAndReconcileDualSessionReplication`,
+  avoiding out-of-scope RPC surface changes."
+
+### Code-solution review (phase 2)
+
+- Reviewer: `muse-glimmer:30b-q4_K_M`.
+- Attempt 1 (`--attempt 1`, first diff, appended directly into
+  `ReplicationProofRunner.ts`): **0/3 passes usable** — pass 3 returned an
+  unparseable `=== FINDING END` artifact, passes 1-2 likewise failed to
+  parse. Retried once against the same primary model per the availability
+  retry discipline.
+- Attempt 2 (`--attempt 2`, same diff, retry): **1/3 passes usable** (pass 1
+  parsed; passes 2-3 hit a 180s idle timeout — a capacity symptom).
+  `status: findings` — 1 minor + 1 major finding, disposed as above (minor
+  accepted out-of-scope; major independently verified as a false positive,
+  underlying concern addressed defensively).
+- Attempt 3 (`--attempt 3`, fresh diff after the sentinel rename/comment and
+  the file split into `replication-witness.ts` +
+  `replication-reconnect.ts`, required per `AGENT_WORKFLOW_GUIDE.md § Per-
+  task discipline`'s rule that a materially revised diff needs its own
+  review pass): **3/3 passes usable**, 0 findings.
+- Verdict: **PASS** — "The revised composition correctly sequences
+  replication with bounded reconnect, verification, and unconditional
+  teardown, and assembles the final verdict via
+  `assembleReplicationVerdict`. The `VERIFY_NOT_ATTEMPTED` sentinel is
+  safely used only when replication did not complete, and the defensive
+  comment documents why `VERIFIED` cannot be reached from that path. The
+  extraction of `replicateWithOneReconnect` resolves the declaration
+  budget, and the test suite is table-driven with identical coverage.
+  TypeScript, Jest, lint, prettier and maintainability checks all pass."
+
+### Reflection log
+
+Required passes: not mandatory at RRI 19 (below the RRI 26+ threshold), but
+applied per the RRI 25/26-boundary judgment clause given this task's
+security-decision role.
+
+#### Pass 1
+
+- **Draft verdict:** composition correctly sequences replicate → (bounded
+  reconnect) → verify → teardown → assemble verdict, with teardown
+  unconditional on every path.
+- **Critique findings:** the phase-2 reviewer's major finding (potential
+  false-`VERIFIED` leak via the incomplete-replication sentinel) required
+  independent verification rather than a summary dismissal, given this
+  task's fail-closed role.
+- **Revisions applied:** exhaustively traced `assembleReplicationVerdict`'s
+  check order against every call site of the sentinel; confirmed by static
+  trace and by the pre-existing `EC-B2.f reconnect-budget exhaustion` test
+  (which already asserted the correct outcome) that the finding's concrete
+  claim does not hold for this code. Renamed the sentinel and added a
+  comment recording the proof, rather than leaving the finding undisposed.
+
+#### Pass 2
+
+- **Draft verdict:** all acceptance criteria (`HP-B2.f`, `EC-B2.f`) are
+  covered by dedicated table cases; `tsc`, full mobile jest suite, lint,
+  prettier, and maintainability all pass; no worklet rebuild needed.
+- **Critique findings:** none — the maintainability-driven file split and
+  test restructure were mechanical (no logic change) and independently
+  re-verified by a fresh phase-2 pass (attempt 3) rather than assumed safe.
+- **Revisions applied:** none needed beyond what pass 1 already resolved.
+
+### Verification
+
+- Ollama restart (new PID `11899`, confirmed listening on `:11434`) +
+  warm-up probe for `muse-glimmer:30b-q4_K_M` (`done_reason: stop`,
+  non-empty content).
+- `cd mobile && npx tsc --noEmit -p .` — exit 0.
+- `npx jest __tests__/p2p/` — 22/22 suites, 115/115 tests passed.
+- `npx jest` (full mobile suite) — 43/43 suites, 350/350 tests passed.
+- `npm run lint` — 0 warnings.
+- `npx prettier --check` — passed on all three new/changed files.
+- `python3 scripts/check-maintainability.py` — gate passed (after the file
+  split above; failed twice before the split, with concrete violations
+  documented in the Implementation note).
+- Confirmed `mobile/scripts/build-bare-worklet.mjs` `sourcePaths` pulls only
+  from `runtime/`, not `proof/` — no worklet rebuild required.
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-B2.f | Happy path | a byte-perfect replication with no disconnect closes both sessions, deletes both run directories, and only then emits `VERIFIED` | `mobile/__tests__/p2p/replication-witness.test.ts::runReplicationProof > HP-B2.f no disconnect: emits VERIFIED only after digest match` | passed |
+| HP-B2.f | Happy path | a successful bounded reconnect (one retry within budget) closes both sessions, deletes both run directories, and emits `VERIFIED` | `mobile/__tests__/p2p/replication-witness.test.ts::runReplicationProof > HP-B2.f successful bounded reconnect: retries once within budget, then emits VERIFIED` | passed |
+| EC-B2.f | Edge case | a digest mismatch never transitions to `VERIFIED`, and teardown still runs | `mobile/__tests__/p2p/replication-witness.test.ts::runReplicationProof > EC-B2.f digest mismatch never transitions to VERIFIED, and teardown still runs` | passed |
+| EC-B2.f | Edge case | reconnect-budget exhaustion never transitions to `VERIFIED`, skips verify, and teardown still runs (early-failure teardown) | `mobile/__tests__/p2p/replication-witness.test.ts::runReplicationProof > EC-B2.f reconnect-budget exhaustion never transitions to VERIFIED, skips verify, and teardown still runs` | passed |
+| EC-B2.f | Edge case | a teardown failure never transitions to `VERIFIED` even when replication and verify succeed | `mobile/__tests__/p2p/replication-witness.test.ts::runReplicationProof > EC-B2.f teardown failure never transitions to VERIFIED even when replication and verify succeed` | passed |
+| EC-B2.f | Edge case | priority ordering: digest mismatch wins over a concurrent teardown failure, regardless of ordering | `mobile/__tests__/p2p/replication-witness.test.ts::runReplicationProof > EC-B2.f priority ordering: digest mismatch wins over a concurrent teardown failure` | passed |
+
+### Gemma Reviewer evidence
+
+- Model: `muse-glimmer:30b-q4_K_M`.
+- Command: `python3 scripts/gemma-code-review.py --task-id P1.B2.f --attempt
+  {1,2,3} --model muse-glimmer:30b-q4_K_M --num-ctx 32768 --passes 3`
+  (phase 2); `--task-id P1.B2.f-phase1 --attempt 1` (phase 1).
+- Passes run / usable: phase 1 `3/3`; phase 2 attempt 1 `3/0`, attempt 2
+  `3/1`, attempt 3 `3/3`.
+- Aggregate status: phase 1 `PASS`; phase 2 final (attempt 3) `PASS`.
+- Consensus findings: `0` | Pass-specific: `0` (attempt 3) | Disagreement:
+  `0`.
+- Artifacts: scratchpad `p1-b2-f-phase1-result.json`,
+  `p1-b2-f-phase2-result.json` (attempt 1, empty/unusable),
+  `p1-b2-f-phase2-result-retry.json` (attempt 2, 1 major + 1 minor
+  finding), `p1-b2-f-phase2-result-v3.json` (attempt 3, PASS) — not
+  committed; local delegation evidence per Low-band convention.
+- Isolated adjudicator: not triggered — a usable pass was obtained on the
+  primary model's own retry each time (phase 2 attempt 2, phase 2 attempt
+  3), so the Gemma/D14 fallback chain was never required.
+- disposition_divergence: `none`.
+- Primary-agent disposition: attempt 2's minor finding accepted as
+  out-of-scope (not fixed here); attempt 2's major finding independently
+  verified as a false positive on its concrete claim, with the underlying
+  code-quality concern accepted and fixed defensively (sentinel rename +
+  proof comment), re-verified PASS by attempt 3.
+
+### Review artifact receipt
+
+- REVIEW-OVERRIDE: not-applicable — same convention as `P1.B2.a-0` through
+  `P1.B2.e`; local Low-band review evidence recorded directly in this
+  section rather than as a committed `docs/audit/gemma-evidence/*.json`
+  receipt.
+
+### Owner final verification
+
+- Pending — tracked at `P1.B2` parent closure per the pack's approved
+  batching (owner approved the full 12-task pack; per-task closure evidence
+  recorded here, final owner sign-off tracked at P1.B2 parent closure).
+  This closes the last child of `P1.B2`; parent-level closure (5-pass
+  Reflection log, persisted RRI report, parent unit coverage certification,
+  and full owner final verification for the whole 12-task pack) is the next
+  step.
 
 ## Parent reflection plan
 
