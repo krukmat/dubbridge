@@ -4,8 +4,8 @@
 M3 changes only the packet producer for the existing local reviewer. The git diff
 and supplied acceptance text are mandatory and never truncated to make room for
 CKG context. Graph-selected source is local-only, optional, worktree-authoritative,
-and subject to the existing LocalAgentBoundary semantics when allowed paths are
-supplied.
+and constrained to the current worktree. When an explicit task allowed-path set is
+supplied, the existing LocalAgentBoundary applies before any related source is read.
 """
 
 from __future__ import annotations
@@ -192,7 +192,7 @@ def read_current_source(
     *,
     max_source_bytes: int = DEFAULT_MAX_SOURCE_BYTES,
 ) -> str:
-    """Read current worktree source after authority has already been checked."""
+    """Read current source from the review worktree, rejecting path escape/symlinks."""
     root = os.path.realpath(os.path.abspath(worktree))
     if os.path.isabs(candidate.path):
         raise ValueError("absolute graph path rejected")
@@ -222,8 +222,7 @@ def read_current_source(
 
 def build_task_authorizer(worktree: str, allowed_paths: list[str]) -> Callable[[str], None]:
     """Reuse the existing local-agent boundary; do not implement a second matcher."""
-    # Delayed import keeps the ordinary packet/test path lightweight and avoids
-    # importing the full local runner when tests inject an authorizer directly.
+    # Delayed import keeps the normal review path independent of the local runner.
     import boundary  # noqa: E402
 
     task_boundary = boundary.LocalAgentBoundary(worktree, allowed_paths, [])
@@ -313,8 +312,10 @@ def build_review_context(
     metadata = {
         "schema": SCHEMA,
         "local_only": True,
+        "authority_mode": "task_boundary" if allowed_paths or authorizer else "worktree_read_only",
         "status": "disabled" if not enable_ckg else "pending",
         "task_id": task_id or None,
+        "acceptance_supplied": bool(acceptance_text.strip()),
         "changed_paths": changed_paths,
         "changed_symbols": changed_symbols,
         "coverage": "unknown",
@@ -350,7 +351,13 @@ def build_review_context(
             worktree,
             force_refresh=True,
         )
-        coverage = adapter.coverage(discovery["project"], changed_paths)
+        candidate_paths = [
+            candidate.path
+            for candidate in discovery.get("candidates", [])
+            if isinstance(candidate.path, str) and candidate.path
+        ]
+        coverage_paths = list(dict.fromkeys(changed_paths + candidate_paths))
+        coverage = adapter.coverage(discovery["project"], coverage_paths)
         metadata["coverage"] = coverage.get("status", "unknown")
         if metadata["coverage"] != "verified":
             raise CKGAdapterError(
@@ -361,10 +368,9 @@ def build_review_context(
         metadata["fallback_reason"] = str(exc)
         return _assemble_packet(mandatory, metadata, []), metadata
 
-    effective_allowed = list(allowed_paths or changed_paths)
-    if authorizer is None:
+    if authorizer is None and allowed_paths:
         try:
-            authorizer = build_task_authorizer(worktree, effective_allowed)
+            authorizer = build_task_authorizer(worktree, list(allowed_paths))
         except (OSError, ValueError, RuntimeError) as exc:
             metadata["status"] = "fallback"
             metadata["fallback_reason"] = f"review boundary unavailable: {exc}"
@@ -375,17 +381,18 @@ def build_review_context(
     for candidate in rank_impact_candidates(discovery.get("candidates", []), changed_paths):
         if len(selected_blocks) >= max_entries:
             break
-        try:
-            authorizer(candidate.path)
-        except Exception as exc:  # boundary implementations use task-specific exception classes
-            gap = ScopeGap(
-                path=candidate.path,
-                symbol=candidate.symbol,
-                reason="outside_review_allowed_paths",
-                detail=str(exc),
-            )
-            metadata["scope_gaps"].append(asdict(gap))
-            continue
+        if authorizer is not None:
+            try:
+                authorizer(candidate.path)
+            except Exception as exc:  # task boundary uses its own exception class
+                gap = ScopeGap(
+                    path=candidate.path,
+                    symbol=candidate.symbol,
+                    reason="outside_review_allowed_paths",
+                    detail=str(exc),
+                )
+                metadata["scope_gaps"].append(asdict(gap))
+                continue
         try:
             content = read_current_source(worktree, candidate)
         except (OSError, ValueError, RuntimeError) as exc:
@@ -417,7 +424,7 @@ def build_review_context(
         metadata["selected"].append(asdict(selected))
 
     metadata["budget"]["selected_impact_tokens"] = selected_tokens
-    metadata["status"] = "enriched" if selected_blocks else "no_authorized_impact"
+    metadata["status"] = "enriched" if selected_blocks else "no_impact"
     return _assemble_packet(mandatory, metadata, selected_blocks), metadata
 
 
@@ -488,7 +495,15 @@ def parse_args(argv=None):
     acceptance = parser.add_mutually_exclusive_group()
     acceptance.add_argument("--acceptance-file")
     acceptance.add_argument("--acceptance-text")
-    parser.add_argument("--allowed-path", action="append", default=[])
+    parser.add_argument(
+        "--allowed-path",
+        action="append",
+        default=[],
+        help=(
+            "Optional explicit task read boundary. When omitted, the local reviewer may "
+            "read CKG-selected files contained in the current worktree."
+        ),
+    )
     parser.add_argument("--ckg-binary", default="codebase-memory-mcp")
     parser.add_argument("--num-ctx", type=int, default=default_ctx)
     parser.add_argument("--num-predict", type=int, default=default_predict)
