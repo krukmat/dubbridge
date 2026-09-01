@@ -78,7 +78,10 @@ class TaskUnitCoverageEvidenceGate(unittest.TestCase):
         self.tmp.cleanup()
 
     def run_cmd(self, *args, check=True):
-        result = subprocess.run(args, cwd=self.root, capture_output=True, text=True)
+        env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+        result = subprocess.run(
+            args, cwd=self.root, capture_output=True, text=True, env=env
+        )
         if check and result.returncode != 0:
             self.fail(f"{args} failed\nstdout={result.stdout}\nstderr={result.stderr}")
         return result
