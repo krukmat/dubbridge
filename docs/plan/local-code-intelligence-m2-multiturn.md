@@ -1,3 +1,10 @@
+---
+type: Plan
+title: "Local Code Intelligence — M2 Multi-turn Efficiency"
+status: complete
+description: "M2 plan for bounded model-visible history, source snapshots, and deterministic repair context."
+---
+
 # Local Code Intelligence — M2 Multi-turn Efficiency
 
 ## Status
