@@ -1906,7 +1906,7 @@ All 26 tests in `crates/domain/src/audit::tests` pass
 **Effort:** L — RRI floor Med-high, not delegable as Low
 **Depends on:** X26-T3c-b1, X26-T3c-b2, X26-T3c-c1, X26-T3c-c2, X26-T3c-c3,
 and a non-blocking T3c-a persistence disposition
-**Status:** [ ] Planned
+**Status:** [x] Done — implemented and pushed to `main` at `1fa4f9b42796ac1975b1f4bf8062641553f5d34a`; verified independently on 2026-09-01 (family-coverage check confirms all 31 `AuditEventKind` variants are covered with no gap). Detail: `docs/audit/x26-t3c-correlation-contract.md`.
 
 **Objective:** Add the single precondition `assert!` in
 `emit_governance_audit` immediately before `insert_audit_event`, using the
@@ -1948,7 +1948,7 @@ persistence mismatch.
 **Effort:** M (provisional)
 **Depends on:** X26-T3 (no code dependency; sequenced after Phase 2 in the
 plan for review-bandwidth reasons, can run in parallel if capacity allows)
-**Status:** [ ] Planned
+**Status:** [x] Done — implemented and pushed to `main` at `610d70240026dfe1b481c1a2bab7db01fa8de4b5`; verified independently on 2026-09-01 (retry-cap state machine traced end-to-end: exactly 3 attempts, no lost-counter or race path). Implementation/control incidents and one unresolved acceptance-criteria deviation (no new ADR-018 audit row on retry exhaustion — outbox terminal state serves as the only durable evidence) are recorded in `docs/audit/x26-t4-implementation-incidents.md` and require owner disposition.
 
 **Objective:** Close the one "explicit bounds" gap the evaluation found: the
 `Retryable` disposition path has no visible attempt ceiling.
@@ -1960,14 +1960,24 @@ plan for review-bandwidth reasons, can run in parallel if capacity allows)
 
 **Edge cases considered:**
 - **EC-1:** A job already at the maximum attempt count that fails again does
-  not re-enter the retry path; it is durably marked failed (ADR-018 audit row
-  emitted).
+  not re-enter the retry path; it is durably marked failed in
+  `translation_dispatch_outbox` (`delivery_state = 'failed'`).
 
 **Acceptance criteria:**
 - `apps/worker-runner/src/translation_fanout.rs`'s `Retryable` disposition
   path (and any equivalent in `crates/jobs`, `crates/providers`,
   `crates/media`) enforces a named, configured maximum attempt count.
-- Exceeding the cap is durably audited, not silently dropped.
+- Exceeding the cap is durably persisted, not silently dropped: the terminal
+  `translation_dispatch_outbox` row (`delivery_state = 'failed'`,
+  `attempt_count`, `error_detail`) is the accepted evidence for this
+  operational retry ceiling. This is an owner-ratified amendment
+  (2026-09-01) of the original wording, which called for a new ADR-018
+  `audit_events` row: ADR-018 is reserved for governance-significant events
+  (rights, consent, publication, auth — see `AuditEventKind`'s existing 31
+  variants), and a queue-retry ceiling is an operational failure, not a
+  governance decision. See `docs/audit/x26-t4-implementation-incidents.md`
+  §"Acceptance-criteria deviation to review" for the original deviation
+  record.
 
 **Evidence to emit:** diff, unit test proving the cap is enforced,
 `make qa-test` output.
@@ -2054,7 +2064,7 @@ to a passing result on a real MinIO service.
 **Type:** Development (tooling)
 **Effort:** S (provisional)
 **Depends on:** none
-**Status:** [ ] Planned
+**Status:** [x] Done — implemented and pushed to `main` at `4889d213d1a5ba0543c77938c3012871d1f501d3`; CI `python-complexity` job (run `33432812287`) passed with pinned Ruff 0.16.5. Verified independently on 2026-09-01: `ruff check workers` reports no findings. Detail: `docs/audit/x26-t6-implementation.md`.
 
 **Objective:** Add a complexity/length enforcement mechanism to the Python
 worker surface before `translation-worker-py`/`tts-worker-py` gain real code —
@@ -2093,7 +2103,7 @@ runs green via the new Makefile target.
 **Effort:** S (provisional)
 **Depends on:** X26-T6 (gate should exist before further worker edits, so new
 code is measured from the start)
-**Status:** [ ] Planned
+**Status:** [x] Done — implemented and pushed to `main` at `f166a55173ac119191ea189c3c2e9ea0c3ae4bd3`. Verified independently on 2026-09-01. Detail: `docs/audit/x26-t7-implementation.md`, `docs/audit/x26-t7-implementation-incidents.md`.
 
 **Objective:** Replace `dict.get()`-with-silent-defaults and the broad
 `except Exception` catch-all in `workers/asr-worker-py/main.py` with explicit
@@ -2138,7 +2148,7 @@ tests pass and the complexity gate is green.
 **Type:** Development
 **Effort:** S (provisional)
 **Depends on:** X26-T7
-**Status:** [ ] Planned
+**Status:** [x] Done — implemented and pushed to `main` at `bf5408e8396bf8c5d9967cece051a054ceaff5a4`. Verified independently on 2026-09-01. Detail: `docs/audit/x26-t8-implementation.md`.
 
 **Objective:** Add an explicit timeout and max-audio-duration/size bound
 around `WhisperModel(...).transcribe()`, and validate `language_hint` against
@@ -2179,7 +2189,7 @@ condition: stop once both bounds are enforced and tested.
 **Type:** Development
 **Effort:** S (provisional)
 **Depends on:** X26-T7
-**Status:** [ ] Planned
+**Status:** [x] Done — implemented and pushed to `main` at `e267261d21a74906387b8652d7d689bf41bcb1e5`. Verified independently on 2026-09-01 (16-test mocked suite passes with real `jsonschema==4.26.0`). Detail: `docs/audit/x26-t9-implementation.md`.
 
 **Objective:** Enforce `input.schema.json`/`output.schema.json`/
 `error.schema.json` at the process boundary at runtime, replacing the current
@@ -2218,7 +2228,7 @@ schemas are enforced and tested against at least one violating case each.
 **Type:** Development (dependency management)
 **Effort:** S (provisional)
 **Depends on:** none
-**Status:** [ ] Planned
+**Status:** [x] Done — implemented and pushed to `main` at `d16993f06d41316d4afcd754cbea312b57d5471b`. Not independently rebuilt (would require a Docker image build with network access); the lock file's pinned versions were spot-checked against PyPI on 2026-09-01. Detail: `docs/audit/x26-t10-implementation.md`.
 
 **Objective:** Lock `faster-whisper`'s transitive dependencies (numpy,
 ctranslate2, huggingface-hub, tokenizers, onnxruntime, av) so the Docker build
@@ -2255,7 +2265,7 @@ uses only pinned versions.
 **Type:** Development (test)
 **Effort:** M (provisional — model-download cost)
 **Depends on:** X26-T7, X26-T8, X26-T9 (exercises the hardened contract)
-**Status:** [ ] Planned
+**Status:** [x] Done — implemented and pushed to `main` at `2d01e90500e40c516cb819eefbe0ea727b40c643`. Fixed a real bug discovered while wiring the real-model path: T8's timeout cancelled the deadline before faster-whisper's lazy segment generator was iterated; `_transcribe_with_timeout` now materializes the segment list before cancelling. The opt-in smoke run itself was not executed (would download model weights); the mocked suite has no test that would catch a regression of this specific fix (see the Reflection note added to Phase 6 in `docs/plan/tiger-style-adaptation.md`). Detail: `docs/audit/x26-t11-implementation.md`.
 
 **Objective:** Add at least one checked-in, opt-in, real-audio/real-model
 smoke test, replacing the current 100%-mocked suite's single point of
@@ -2297,7 +2307,7 @@ explicitly enabled and is skipped (not silently ignored) otherwise.
 **Effort:** S (provisional; exempt from RRI-band approval gate per
 docs-only classification, but still recorded here for completeness)
 **Depends on:** none
-**Status:** [ ] Planned
+**Status:** [x] Done — closed 2026-08-31 via an owner wait-state waiver (documentation commit `a3aa481e5b2d78e7c56884e419871f2c9ed3603b`). S-150 T4 itself remains parked; no S-150 product code, task ordering, or ADR-028 decision changed. Detail: `docs/audit/x26-t12-forward-pointer-closure.md`.
 
 **Objective:** Record, durably, that when S-150 `T4` resumes (currently
 ADR/planning-only, blocked on the ADR-028 consent seam), its decomposed

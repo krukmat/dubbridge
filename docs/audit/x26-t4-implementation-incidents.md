@@ -1,5 +1,5 @@
 ---
-type: AuditNote
+type: Audit
 title: "X26-T4 implementation incidents and deferred controls"
 status: recorded
 task: X26-T4
@@ -114,7 +114,12 @@ therefore not fully satisfied. Owner review should either:
 2. create a separately scored task to add a governance/audit event if this
    retry exhaustion is deemed governance-significant.
 
-No claim is made here that this deviation has already been approved.
+**Resolved 2026-09-01:** owner selected option 1. `docs/tasks/tiger-style-
+adaptation.md`'s X26-T4 EC-1 and acceptance criteria were amended to name
+the `translation_dispatch_outbox` terminal row as the accepted evidence;
+option 2 (a new `AuditEventKind`) was explicitly declined. See
+`docs/audit/x26-verification-2026-09-01.md` open item 1 for the disposition
+trail.
 
 ## Deferred verification
 
