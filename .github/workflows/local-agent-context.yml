@@ -5,6 +5,12 @@ on:
     paths:
       - 'scripts/local-agent/**'
       - 'scripts/gemma_local.py'
+      - 'scripts/gemma-code-review.py'
+      - 'scripts/gemma_code_review_test.py'
+      - 'scripts/review_context.py'
+      - 'scripts/review_context_test.py'
+      - 'scripts/review_context_makefile_test.py'
+      - 'Makefile'
       - '.cbmignore'
       - 'docs/schemas/ckg-context-manifest-v1.yaml'
       - '.github/workflows/local-agent-context.yml'
@@ -12,6 +18,12 @@ on:
     paths:
       - 'scripts/local-agent/**'
       - 'scripts/gemma_local.py'
+      - 'scripts/gemma-code-review.py'
+      - 'scripts/gemma_code_review_test.py'
+      - 'scripts/review_context.py'
+      - 'scripts/review_context_test.py'
+      - 'scripts/review_context_makefile_test.py'
+      - 'Makefile'
       - '.cbmignore'
       - 'docs/schemas/ckg-context-manifest-v1.yaml'
       - '.github/workflows/local-agent-context.yml'
@@ -31,3 +43,9 @@ jobs:
         run: python3 scripts/local-agent/prompt_builder_test.py
       - name: Run current local-agent integration tests
         run: python3 scripts/local-agent/integration_test.py
+      - name: Run M3 review-context tests
+        run: python3 scripts/review_context_test.py
+      - name: Run M3 Makefile wiring tests
+        run: python3 scripts/review_context_makefile_test.py
+      - name: Run Gemma reviewer regression tests
+        run: python3 scripts/gemma_code_review_test.py
