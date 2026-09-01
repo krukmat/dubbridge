@@ -1,3 +1,10 @@
+---
+type: TaskList
+title: "Local Code Intelligence Context Provider — Tasks"
+status: complete
+description: "M1 task ledger for the local code intelligence context provider."
+---
+
 # Local Code Intelligence Context Provider — Tasks
 
 Behavioral coverage contract: unit-v1
