@@ -76,8 +76,13 @@ at `docs/audit/mvp0-p2p-p1a-approval-card.md` and
 
 ## P1 — Maintainable mobile P2P foundation and replication proof
 
-- **Status:** `[x] Done` — 2026-09-01. All 8 children (P1.F1, P1.F2,
-  P1.F3a, P1.F3b, P1.A1, P1.A2, P1.B1, P1.B2) closed PASS; parent-level
+- **Status:** `[x] Done` — 2026-09-01. 7/8 children closed PASS (P1.F1,
+  P1.F2, P1.F3a, P1.A1, P1.A2, P1.B1, P1.B2); **P1.F3b itself is `not PASS`**
+  (its dependency/build audit retained every contested item on evidence and
+  its device-proof criteria are deferred, non-blocking, into X28 — see its
+  own entry below), though its child `P1.F3b-fix-1` closed `[x] Done`. The
+  owner accepted P1.F3b's residual non-PASS status as non-blocking for P1
+  closure, consistent with the roadmap's X28 disposition. Parent-level
   5-pass Reflection log, unit coverage certification, and owner final
   verification recorded at the end of this section (§ Owner final
   verification). P1 closing PASS does not authorize P2 source work — see
@@ -2501,10 +2506,12 @@ same way by their own closing child (`P1.A1d` for `P1.A1`, `P1.F3a.2` for
 
 - Owner: Matias (kruk.matias@gmail.com).
 - Date: 2026-09-01.
-- Statement: I verified P1.F1, P1.F2, P1.F3a.1, P1.F3a.2, P1.F3b/
-  P1.F3b-fix-1, P1.A1, P1.A2, P1.B1, and P1.B2 all closed PASS, that the
-  parent reflection plan's 5 passes hold against the delivered code (see
-  P1 reflection log above), and that every child's unit coverage
+- Statement: I verified P1.F1, P1.F2, P1.F3a.1, P1.F3a.2, P1.F3b-fix-1,
+  P1.A1, P1.A2, P1.B1, and P1.B2 all closed PASS; P1.F3b itself remains
+  `not PASS` (device-proof criteria deferred, non-blocking, into X28) and I
+  accept that residual status as non-blocking for P1 closure. I verified
+  the parent reflection plan's 5 passes hold against the delivered code
+  (see P1 reflection log above), and that every child's unit coverage
   certification maps to a passing test. `P1.B1`'s retrospective RRI/
   governance-gap disposition is accepted as a one-time exception, not a
   precedent, per `docs/audit/mvp0-p2p-p1-b1-rri.md`.
