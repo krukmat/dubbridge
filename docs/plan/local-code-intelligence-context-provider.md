@@ -1,3 +1,10 @@
+---
+type: Plan
+title: "Local Code Intelligence Context Provider"
+status: complete
+description: "M1 plan for deterministic, authorized, budgeted local code context retrieval."
+---
+
 # Local Code Intelligence Context Provider
 
 ## Status
