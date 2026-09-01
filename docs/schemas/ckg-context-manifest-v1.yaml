@@ -1,0 +1,50 @@
+schema: ckg-context-manifest-v1
+
+task:
+  work_item_id: null
+  capsule_hash: null
+
+source_state:
+  base_revision: null
+  dirty: false
+  state_hash: null
+
+graph:
+  backend: null
+  graph_revision: null
+  coverage: unknown # verified | partial | unknown
+
+anchors: []
+# - path: crates/playback/src/grants.rs
+#   reason: explicit_task_anchor
+# - symbol: issue_playback_grant
+#   reason: explicit_task_anchor
+
+scope_gaps: []
+# - path: crates/auth/src/policy.rs
+#   symbol: validate_principal
+#   reason: outside_allowed_paths
+#   detail: path outside allowed_paths
+
+selection: []
+# - path: crates/playback/src/grants.rs
+#   symbol: issue_playback_grant
+#   mode: region # region | body_or_file
+#   reason: explicit_task_anchor
+#   priority: 0
+#   context_source: worktree
+#   source_sha256: null
+#   estimated_tokens: 0
+
+budget:
+  num_ctx: null
+  num_predict: null
+  fixed_prompt_tokens: null
+  task_tokens: null
+  acceptance_tokens: null
+  history_reserve_tokens: null
+  safety_margin_tokens: null
+  retrieval_budget_tokens: null
+  selected_context_tokens: null
+
+notes: []

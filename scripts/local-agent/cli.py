@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Argument parsing and process entry point for the local agentic runner.
-
-Extracted from run_local_task.py (LRPC-0b, Extract Module / Single
-Responsibility). Behavior-preserving: no logic changed from the original
-module.
-"""
+"""Argument parsing and process entry point for the local agentic runner."""
 
 from __future__ import annotations
 
@@ -22,25 +17,17 @@ from audit_record import (
     build_moderate_fallback_checkpoint,
     build_terminal_attempt_packet,
 )
+from context_budget import derive_invocation_budget
+from context_provider import CKGContextProvider, FallbackContextProvider, LegacyContextProvider
+from ollama_lifecycle import unload_model
 from prompt_builder import build_system_prompt
 from rust_toolchain import build_default_boundary, build_default_formatter
 from runner_file_tools import ALLOWED_TOOL_NAMES, RunnerFileTools
 from session_loop import BoundaryViolation, MalformedToolCall, run_loop
 
-# Mirrors run_local_task.py's MODEL_CONTEXT_TOKENS / GENERATION_TOKEN_BUDGET
-# module-level defaults. Duplicated here rather than imported to avoid the
-# circular import (run_local_task.py already does `import cli`); both sides
-# are the same local-implementer defaults, not two independent guesses.
-# Devstral Small 2 uses the owner-selected 128K normal context baseline; keep
-# both constants in sync.
 _DEFAULT_MODEL_CONTEXT_TOKENS = 131072
 _DEFAULT_GENERATION_TOKEN_BUDGET = 8192
 
-# Output-format contract local to this script's tool-call transport: no
-# canonical-doc source, so it is not sourced from prompt_anchors.py (LRPC-4,
-# docs/tasks/local-role-prompt-canonicalization.md). Only the boundary clause
-# above it (now supplied by build_system_prompt's "local_developer" anchor)
-# has a canonical source.
 _TOOL_CALLING_OUTPUT_FORMAT_TEXT = """\
 You are the bounded implementer for one fully specified task. The operator has \
 already selected the files, requirements, and acceptance commands. Do not \
@@ -49,9 +36,10 @@ explore the repository, choose a different design, or expand the task.
 This session has a hard budget of {MAX_TOTAL_TURNS} turns total. Prioritize \
 focused edits followed by `finish`.
 
-The complete contents of every authorized existing file are included below. \
-Use that supplied context directly. You do not inspect the repository or run \
-commands.
+The operator supplies the authorized source context needed for this task. It \
+may contain selected regions rather than every file under `allowed_paths`. Use \
+that supplied context directly. Do not infer that an omitted authorized file \
+is necessary or safe to modify, and do not inspect the repository or run commands.
 
 You act only by responding with a single JSON object \
 of the exact form:
@@ -72,9 +60,9 @@ with "replacement". Use this for a focused edit to a large file instead of rewri
 whole. If the anchor is not unique, use more surrounding text from the supplied context.
 - finish: arguments {}. Signals you believe the task is complete; this triggers the \
 runner-controlled formatter and acceptance tests. If they fail, you receive the \
-failure output plus refreshed authorized files and get a bounded repair turn.
+failure output plus refreshed authorized source context and get a bounded repair turn.
 
-Typical workflow: inspect the supplied authorized file contents, make the required \
+Typical workflow: inspect the supplied authorized source context, make the required \
 focused edits with apply_patch or write_file, then call finish. The runner alone \
 formats edited Rust files and runs the full operator-authored acceptance suite.
 
@@ -82,40 +70,21 @@ Call exactly one tool per turn. Only call finish once you believe the acceptance
 tests described in your task will pass.
 """
 
-# Prepended to every card's own spec as the system message. The model is not
-# given native tool-calling (see build_live_chat_fn's docstring) — it must be
-# told, in plain text, the exact JSON shape parse_tool_call() expects, or it
-# replies with ordinary prose and every turn is bounced as a malformed tool
-# call.
-#
-# The boundary clause (allowed_paths / boundary_violation) is now sourced
-# from prompt_anchors.ROLE_ANCHORS["local_developer"] via build_system_prompt
-# (LRPC-4), not hardcoded — closing the drift risk this plan was opened to
-# fix (docs/plan/local-role-prompt-canonicalization.md). Built once at
-# import time against this module's own defaults, matching this constant's
-# pre-existing module-level-string shape so every caller/test that reads
-# TOOL_CALLING_SYSTEM_PROMPT as a plain string keeps working unchanged.
-# PromptBudgetExceeded is intentionally not caught here: propagates uncaught
-# to any import-time failure, matching prompt_builder's own fail-closed
-# contract and LRPC-3's identical precedent for gemma-code-review.py.
-TOOL_CALLING_SYSTEM_PROMPT = build_system_prompt(
-    role="local_developer",
-    num_ctx=_DEFAULT_MODEL_CONTEXT_TOKENS,
-    num_predict=_DEFAULT_GENERATION_TOKEN_BUDGET,
-    output_format_text=_TOOL_CALLING_OUTPUT_FORMAT_TEXT,
+
+def build_tool_calling_system_prompt(num_ctx, num_predict):
+    return build_system_prompt(
+        role="local_developer",
+        num_ctx=num_ctx,
+        num_predict=num_predict,
+        output_format_text=_TOOL_CALLING_OUTPUT_FORMAT_TEXT,
+    )
+
+
+TOOL_CALLING_SYSTEM_PROMPT = build_tool_calling_system_prompt(
+    _DEFAULT_MODEL_CONTEXT_TOKENS,
+    _DEFAULT_GENERATION_TOKEN_BUDGET,
 )
 
-# Passed as Ollama's `format` request field (constrained/structured-output
-# decoding): confirmed via web research that small/medium local models
-# reliably drop or miscount braces in free-form deeply-nested tool-call JSON
-# (an Ollama-tracked qwen3 issue reports the identical symptom) — the fix
-# documented for this class of problem is schema-constrained decoding, which
-# makes malformed JSON impossible at the token level rather than merely less
-# likely via prompt wording. Deliberately loose on "arguments" (an open
-# object, not a per-tool shape): a stricter per-tool schema would need
-# oneOf/if-then-else, which isn't reliably supported by every constrained-
-# decoding backend, and per-tool argument validation (e.g. a missing "path")
-# is already handled by parse_tool_call/require_argument regardless.
 TOOL_CALL_JSON_SCHEMA = {
     "type": "object",
     "properties": {
@@ -129,10 +98,7 @@ TOOL_CALL_JSON_SCHEMA = {
                     "function": {
                         "type": "object",
                         "properties": {
-                            "name": {
-                                "type": "string",
-                                "enum": list(ALLOWED_TOOL_NAMES),
-                            },
+                            "name": {"type": "string", "enum": list(ALLOWED_TOOL_NAMES)},
                             "arguments": {"type": "object"},
                         },
                         "required": ["name", "arguments"],
@@ -156,28 +122,8 @@ def build_live_chat_fn(
     num_ctx,
     max_total_turns,
 ):
-    """Adapt gemma_local's single-shot stream_chat to this loop's per-turn chat_fn shape.
-
-    Each call is one /api/chat turn with the full running message list; Ollama
-    (like OpenAI-compatible chat APIs) is stateless per-request, so the whole
-    transcript is resent every turn.
-
-    This does NOT use Ollama's native tool-calling (`tools=[...]` request
-    field / native `tool_calls` response field) — the system prompt must
-    instruct the model to emit the `{"tool_calls": [...]}` JSON contract as
-    plain text content instead. Native tool-calling support and reliability
-    varies across locally-served models; the text-JSON contract is simpler to
-    validate and matches what `parse_tool_call` below expects either way.
-    """
     resolved_model = gemma_local.ensure_model_available(host, model, idle_timeout)
     url = gemma_local.endpoint(host, "/api/chat")
-    # Mutable across calls: each chat_fn(messages) invocation is exactly one
-    # run_loop turn, so counting calls here gives the live token-streaming
-    # progress line a "turn N/MAX_TOTAL_TURNS" label -- without it, a full
-    # write_file generation of a several-hundred-line file (confirmed live:
-    # ~3 minutes at local-model throughput) prints only a token count that
-    # resets to zero every turn, indistinguishable from a stalled process to
-    # an operator watching stderr.
     turn_counter = {"n": 0}
 
     def chat_fn(messages):
@@ -189,18 +135,7 @@ def build_live_chat_fn(
             "format": TOOL_CALL_JSON_SCHEMA,
             "keep_alive": "10m",
             "messages": messages,
-            "options": {
-                # Confirmed live (S-140-T2b-i pilot, 2026-07-22): with no
-                # explicit num_predict, Ollama's server-side default cut a
-                # real apply_patch tool call mid-JSON (done_reason="length")
-                # with ~14k tokens of file context in play — the model still
-                # had a large "replacement" string left to emit. write_file
-                # and apply_patch have no size cap in this tool contract, so the output
-                # budget must comfortably exceed one full file's worth of
-                # text, not just a short tool-call envelope.
-                "num_predict": num_predict,
-                "num_ctx": num_ctx,
-            },
+            "options": {"num_predict": num_predict, "num_ctx": num_ctx},
         }
         result = gemma_local.stream_chat(
             url,
@@ -213,10 +148,6 @@ def build_live_chat_fn(
         try:
             return json.loads(content)
         except json.JSONDecodeError as exc:
-            # D14 finding: without the raw content, the transcript records only
-            # the generic decode-error position, losing the actual model text
-            # that triggered the bounce — the exact signal an unattended run
-            # needs to diagnose why the model didn't follow the tool-call format.
             raise MalformedToolCall(
                 f"non-JSON model response: {exc}; raw content: {content!r}"
             ) from exc
@@ -240,7 +171,7 @@ def load_card(card_path, task_card_cls):
 
 def parse_args(argv, *, default_num_ctx, default_num_predict):
     parser = argparse.ArgumentParser(
-        description="Run a bounded local-agent draft/test/repair loop over a task card.",
+        description="Run a bounded local-agent draft/test/repair loop over a task card."
     )
     parser.add_argument("--card", required=True, help="Path to the task card JSON.")
     parser.add_argument("--worktree", required=True, help="Path to the isolated worktree.")
@@ -253,49 +184,63 @@ def parse_args(argv, *, default_num_ctx, default_num_predict):
     parser.add_argument(
         "--model",
         default=os.environ.get("DUBBRIDGE_LOCAL_AGENT_MODEL"),
-        help=(
-            "Local implementer model tag. When omitted, the task band selects "
-            "the ADR-036 binding after the card is loaded."
-        ),
+        help="Local implementer model tag. When omitted, the task band selects the binding.",
     )
-    parser.add_argument(
-        "--idle-timeout",
-        type=int,
-        default=180,
-        help="Seconds without a new token before treating the model as stalled.",
-    )
-    parser.add_argument(
-        "--max-wall",
-        type=int,
-        default=1800,
-        help="Maximum wall-clock seconds for a single chat turn.",
-    )
-    parser.add_argument(
-        "--num-ctx",
-        type=int,
-        default=default_num_ctx,
-        help=f"Ollama context window per turn; defaults to {default_num_ctx}.",
-    )
-    parser.add_argument(
-        "--num-predict",
-        type=int,
-        default=default_num_predict,
-        help=(
-            "Ollama generation-token budget per turn; defaults to "
-            f"{default_num_predict}."
-        ),
-    )
+    parser.add_argument("--idle-timeout", type=int, default=180)
+    parser.add_argument("--max-wall", type=int, default=1800)
+    parser.add_argument("--num-ctx", type=int, default=default_num_ctx)
+    parser.add_argument("--num-predict", type=int, default=default_num_predict)
     parser.add_argument(
         "--max-turns",
         type=int,
         default=None,
-        help=(
-            "Optional tighter session turn cap. It may not exceed the "
-            "band-resolved limit."
-        ),
+        help="Optional tighter session turn cap; may not exceed the band-resolved limit.",
+    )
+    parser.add_argument(
+        "--context-provider",
+        choices=("auto", "legacy"),
+        default=os.environ.get("DUBBRIDGE_CONTEXT_PROVIDER", "auto"),
+        help="Context source: auto tries local CKG then fails back to legacy preload.",
+    )
+    parser.add_argument(
+        "--ckg-manifest",
+        default=None,
+        help="Optional ckg-context-manifest-v1 output path; defaults beside --out.",
     )
     fallback_selection.add_cli_arguments(parser)
     return parser.parse_args(argv)
+
+
+def _context_provider_for(
+    args,
+    card,
+    boundary,
+    file_tools,
+    runtime_prompt,
+):
+    legacy = LegacyContextProvider(card, file_tools)
+    if args.context_provider == "legacy":
+        return legacy, None
+    budget = derive_invocation_budget(
+        num_ctx=args.num_ctx,
+        num_predict=args.num_predict,
+        system_prompt=runtime_prompt,
+        task_spec=card.spec,
+        allowed_paths=card.allowed_paths,
+        acceptance_tests=card.acceptance_tests,
+    )
+    manifest_path = args.ckg_manifest or f"{args.out}.ckg-context.json"
+    ckg = CKGContextProvider(
+        card=card,
+        worktree_dir=args.worktree,
+        boundary=boundary,
+        file_tools=file_tools,
+        retrieval_budget_tokens=budget.retrieval_budget_tokens,
+        budget_details=budget.as_dict(),
+        boundary_error=BoundaryViolation,
+        manifest_path=manifest_path,
+    )
+    return FallbackContextProvider(ckg, legacy), budget
 
 
 def main(
@@ -348,18 +293,11 @@ def main(
                 f"limit ({limits.max_total_turns})"
             )
         limits.max_total_turns = args.max_turns
-
-    # ADR-038 T3 EC-2: a Med-high card must run under the exact required
-    # model -- no silent substitution. This is a routing-evidence check, not
-    # a capability check: --model defaults to the same Devstral Small 2 tag,
-    # so this only ever fires when a caller explicitly overrides --model for
-    # a card the gate (T2) already routed to Med-high local implementation.
     if limits.required_model and args.model != limits.required_model:
         result = {
             "status": "model_substitution_rejected",
             "reason": (
-                f"Med-high card requires model {limits.required_model!r}, "
-                f"got {args.model!r}."
+                f"Med-high card requires model {limits.required_model!r}, got {args.model!r}."
             ),
             "transcript": [],
             "task_id": card.task_id,
@@ -368,19 +306,16 @@ def main(
             ),
         }
         gemma_local.write_result(result, args.out)
-        audit_record = build_audit_record(
-            card, result, args.model, 0.0, effective_limits=limits
+        gemma_local.append_audit_log(
+            build_audit_record(card, result, args.model, 0.0, effective_limits=limits)
         )
-        gemma_local.append_audit_log(audit_record)
         return 1
 
+    runtime_prompt = tool_calling_system_prompt
+    if tool_calling_system_prompt == TOOL_CALLING_SYSTEM_PROMPT:
+        runtime_prompt = build_tool_calling_system_prompt(args.num_ctx, args.num_predict)
+
     def checkpoint_fn(transcript, turn):
-        # Overwritten by the real terminal write_result() call below once
-        # run_loop returns. If the process is killed mid-session instead
-        # (SIGINT/SIGKILL during a slow local-model turn), this is what's
-        # left on disk -- previously nothing was, since write_result() only
-        # ran once, after run_loop returned; an interrupted run left zero
-        # trace in --out and zero rows in the audit log.
         gemma_local.write_result(
             {
                 "status": "in_progress",
@@ -394,6 +329,7 @@ def main(
         )
 
     session_start = datetime.datetime.now(datetime.timezone.utc)
+    owns_live_model = chat_fn is None
     chat_fn = chat_fn or build_live_chat_fn(
         args.host,
         args.model,
@@ -403,14 +339,16 @@ def main(
         num_ctx=args.num_ctx,
         max_total_turns=limits.max_total_turns,
     )
-    # The missing fallback (chat_fn and boundary above both had theirs): the
-    # CLI never injects test_runner, so without this it stayed None and every
-    # finish crashed with TypeError. See build_default_test_runner's docstring.
     test_runner = test_runner or build_default_test_runner(card, boundary)
     file_tools = RunnerFileTools(
         args.worktree, boundary, MalformedToolCall, BoundaryViolation
     )
     formatter_fn = build_default_formatter(card, boundary, file_tools)
+    context_provider, invocation_budget = _context_provider_for(
+        args, card, boundary, file_tools, runtime_prompt
+    )
+    result = None
+    unload_requested = False
     try:
         result = run_loop(
             card,
@@ -422,12 +360,15 @@ def main(
             checkpoint_fn=checkpoint_fn,
             limits=limits,
             formatter_fn=formatter_fn,
+            context_provider=context_provider,
             resolve_effective_limits=resolve_effective_limits,
             max_malformed_bounces=max_malformed_bounces,
-            tool_calling_system_prompt=tool_calling_system_prompt,
+            tool_calling_system_prompt=runtime_prompt,
         )
     finally:
         file_tools.close()
+        if owns_live_model:
+            unload_requested = unload_model(args.host, args.model)
     session_end = datetime.datetime.now(datetime.timezone.utc)
     elapsed_s = (session_end - session_start).total_seconds()
 
@@ -435,6 +376,12 @@ def main(
     result["finished_at"] = datetime.datetime.now(datetime.timezone.utc).strftime(
         "%Y-%m-%dT%H:%M:%SZ"
     )
+    result["model_unload_requested"] = unload_requested
+    if invocation_budget is not None:
+        result["invocation_budget"] = invocation_budget.as_dict()
+    if isinstance(context_provider, FallbackContextProvider) and context_provider.last_fallback_reason:
+        result["context_provider_fallback"] = context_provider.last_fallback_reason
+
     audit_record = build_audit_record(
         card, result, args.model, elapsed_s, effective_limits=limits
     )
@@ -472,16 +419,10 @@ def main(
         fallback_exit_code = 2
 
     gemma_local.write_result(result, args.out)
-
-    # Emitted for every exit path (success, aborted, budget_exhausted,
-    # boundary_violation, transport_error) — audit visibility must not
-    # depend on how the session ended.
     gemma_local.append_audit_log(audit_record)
-
-    # T2: additive alongside the ADR-034 audit record above -- one T1
-    # attempt bundle per repair attempt, appended to the same audit-log
-    # sink (append_audit_log is generic over the record shape it appends).
-    for bundle in build_attempt_bundles(card, result, args.model, session_start, session_end):
+    for bundle in build_attempt_bundles(
+        card, result, args.model, session_start, session_end
+    ):
         gemma_local.append_audit_log(bundle)
 
     if fallback_exit_code is not None:
