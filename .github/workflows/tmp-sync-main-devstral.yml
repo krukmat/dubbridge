@@ -1,0 +1,66 @@
+name: Temporary sync main into Devstral branch
+
+on:
+  push:
+    branches:
+      - feat/devstral-128k-migration
+
+permissions:
+  contents: write
+
+jobs:
+  merge-main:
+    if: github.event.head_commit.message == 'chore: trigger main resync'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/devstral-128k-migration
+          fetch-depth: 0
+
+      - name: Merge latest main and resolve bounded conflict
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+
+          set +e
+          git merge --no-ff --no-commit origin/main
+          merge_rc=$?
+          set -e
+
+          if [ "$merge_rc" -ne 0 ]; then
+            conflicts="$(git diff --name-only --diff-filter=U)"
+            echo "Conflicts detected:"
+            printf '%s\n' "$conflicts"
+
+            unexpected="$(printf '%s\n' "$conflicts" | grep -v '^scripts/local-agent/cli.py$' || true)"
+            if [ -n "$unexpected" ]; then
+              echo "Unexpected conflicts; refusing automatic resolution:"
+              printf '%s\n' "$unexpected"
+              exit 1
+            fi
+
+            git checkout --theirs scripts/local-agent/cli.py
+            git add scripts/local-agent/cli.py
+          fi
+
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/local-agent/cli.py')
+          text = path.read_text(encoding='utf-8')
+          old = '_DEFAULT_MODEL_CONTEXT_TOKENS = 32768'
+          new = '_DEFAULT_MODEL_CONTEXT_TOKENS = 131072'
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f'Expected exactly one {old!r}, found {count}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
+          git add scripts/local-agent/cli.py
+          git rm .github/workflows/tmp-sync-main-devstral.yml
+          git commit -m "merge: sync latest main into Devstral migration branch"
+          git push origin HEAD:feat/devstral-128k-migration
