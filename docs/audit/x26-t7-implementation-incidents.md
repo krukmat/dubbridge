@@ -1,3 +1,12 @@
+---
+type: Audit
+title: "X26-T7 implementation/control incidents"
+status: recorded
+related:
+   - docs/tasks/tiger-style-adaptation.md
+   - docs/audit/x26-t7-implementation.md
+---
+
 # X26-T7 implementation/control incidents
 
 ## Context

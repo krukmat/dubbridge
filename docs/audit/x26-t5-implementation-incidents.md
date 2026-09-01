@@ -1,5 +1,5 @@
 ---
-type: AuditNote
+type: Audit
 title: "X26-T5 implementation and CI incidents"
 status: recorded
 slice: tiger-style-adaptation

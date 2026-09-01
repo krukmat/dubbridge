@@ -1,3 +1,12 @@
+---
+type: Audit
+title: "X26-T12 — S-150 Tiger Style forward-pointer closure"
+status: recorded
+related:
+   - docs/tasks/tiger-style-adaptation.md
+   - docs/plan/s-150-translation-dubbing.md
+---
+
 # X26-T12 — S-150 Tiger Style forward-pointer closure
 
 Date: 2026-08-31

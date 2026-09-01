@@ -1,3 +1,11 @@
+---
+type: Audit
+title: "X26-T7 Implementation Evidence"
+status: recorded
+related:
+   - docs/tasks/tiger-style-adaptation.md
+---
+
 # X26-T7 Implementation Evidence
 
 ## Scope

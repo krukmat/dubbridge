@@ -1,3 +1,11 @@
+---
+type: Audit
+title: "X26-T8 implementation evidence and control notes"
+status: recorded
+related:
+   - docs/tasks/tiger-style-adaptation.md
+---
+
 # X26-T8 implementation evidence and control notes
 
 Date: 2026-08-31
