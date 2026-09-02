@@ -52,9 +52,46 @@
     },
     "boundaries": {"type": "array", "items": {"type": "string"}},
     "governance": {"type": "array", "items": {"type": "string"}},
-    "export": {"type": "object"},
+    "export": {
+      "type": "object",
+      "required": [
+        "files",
+        "symbols",
+        "tests",
+        "anchors",
+        "boundaries",
+        "governance",
+        "source_fragments"
+      ],
+      "properties": {
+        "files": {"type": "array", "items": {"type": "string"}},
+        "symbols": {"type": "array", "items": {"type": "string"}},
+        "tests": {"type": "array", "items": {"type": "string"}},
+        "anchors": {"type": "array", "items": {"type": "string"}},
+        "boundaries": {"type": "array", "items": {"type": "string"}},
+        "governance": {"type": "array", "items": {"type": "string"}},
+        "source_fragments": {"type": "array", "items": {"type": "object"}}
+      },
+      "additionalProperties": false
+    },
     "excluded": {"type": "object"},
-    "expansions": {"type": "array", "items": {"type": "object"}},
+    "expansions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["base_receipt_sha256", "reason", "decision", "added"],
+        "properties": {
+          "base_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "reason": {"type": "string", "minLength": 1},
+          "decision": {"enum": ["allow", "reduce", "deny"]},
+          "added": {"type": "object"}
+        },
+        "additionalProperties": false
+      }
+    },
     "capsule_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "receipt_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
   },
