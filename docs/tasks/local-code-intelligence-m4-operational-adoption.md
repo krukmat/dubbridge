@@ -1,30 +1,35 @@
 ---
 type: TaskList
 title: "Local Code Intelligence M4 — Operational Adoption"
-status: proposed
+status: hardening_implemented_pending_branch_local_qa
 plan: docs/plan/local-code-intelligence-m4-operational-adoption.md
 behavioral_coverage_contract: unit-v1
 ---
 
 # Local Code Intelligence M4 — Operational Adoption Tasks
 
-## Execution order
+## Execution state
 
 ```text
-M4-T0
-  |
-  +--> M4-T1 --+
-  |            |
-  +--> M4-T2 --+
+M3 CLOSED
+   |
+   v
+M4-T0  DONE
+   |
+   +--> M4-T1  IMPLEMENTED + unit verified
+   |
+   +--> M4-T2  IMPLEMENTED + unit verified
                |
                v
-            M4-T3
+            M4-T3  IMPLEMENTED + unit verified
                |
                v
-            M4-T4
+      branch-local S0-S10 QA  PENDING
+               |
+               v
+            M4-T4  NEXT
                |
         findings only
-               |
                v
             M4-T5
                |
@@ -32,205 +37,213 @@ M4-T0
             M4-T6
 ```
 
-T1/T2 are logically independent but should normally be executed sequentially because both change the gateway/policy surface.
+T1/T2 were executed sequentially on `feature/local-code-intelligence-boundary`; no separate M4 branch was created because M3 has not yet been merged into `main`.
 
 ---
 
 ## M4-T0 — Reconcile operational baseline
 
-**Status:** pending  
+**Status:** done  
 **Effort:** S  
 **Type:** docs/status only  
 **Depends on:** M3 closed
 
-Synchronize the branch documentation with the project's declared M3-closed state and identify the actual existing operational entry point used by Analyze/agent orchestration.
+### Result
 
-### Acceptance criteria
-- No document still implies that M3 itself must be reimplemented.
-- The actual Analyze/agent entry point consuming the boundary is named explicitly.
-- Any backend/adapter already selected by M3 is documented by interface/location, without making the core contract vendor-specific.
-- If the branch does not contain the M3 implementation itself, documentation says where the authoritative integration lives rather than inventing one.
+- M3 remains closed by project decision.
+- The existing operational Analyze/handoff entry point is explicitly documented as `scripts/code_intelligence/context_gateway.py`.
+- M3 closure does not imply a model-specific hook in `run_local_task.py`.
+- `JsonGraphBackend` remains the stable backend-neutral interchange contract in this branch.
 
-**Evidence to emit:** documentation diff and exact integration entry point.  
-**Status artifacts affected:** M4 plan/ledger, existing code-intelligence README/audit if stale.
-
-**Agent handoff:** Reconcile status only. Do not redesign or reopen M3.
+**Evidence:** `scripts/code_intelligence/README.md`, M4 plan.
 
 ---
 
 ## M4-T1 — Enforce graph freshness
 
-**Status:** pending  
+**Status:** implemented; unit verified; branch-local QA pending  
 **Effort:** S/M  
 **Type:** development  
 **Depends on:** T0
 
-Turn graph/repository revision binding from recorded provenance into an enforced operational invariant.
+### Implemented behavior
 
-### Design direction
-- Prefer an explicit expected repository revision supplied by the orchestrator/Analyze integration over hidden assumptions.
-- The gateway must compare the graph result revision against the expected operational baseline before producing consumable artifacts.
-- Fixture/audit usage may have an explicit test-only/manual escape path if necessary, but the normal agent path must be verified.
+- `build_artifacts()` requires `expected_git_revision`.
+- CLI requires `--expected-git-revision`.
+- Graph `git_revision` must equal the expected operational baseline before artifacts are produced.
+- Expansion additionally binds to the base receipt Git and graph revisions.
 
-### Acceptance criteria
-- Matching graph and expected repository revisions produce normal artifacts.
-- A stale/mismatched graph fails closed before a successful capsule/receipt pair is published.
-- The failure identifies expected versus received revision without leaking unrelated repository context.
-- Existing deterministic hashing remains stable for equivalent verified inputs.
+### Behavioral cases
 
-### Behavioral examples
-- **HP-41:** Analyze supplies revision `A`, graph was built from `A` -> gateway produces receipt/capsule.
-- **EC-41:** Analyze supplies revision `A`, backend returns graph revision bound to git revision `B` -> gateway rejects the result and produces no consumable success artifacts.
+- **HP-41:** expected revision `A` + graph revision bound to Git `A` -> receipt/capsule produced.
+- **EC-41:** expected revision `A` + graph built from Git `B` -> fail closed before success artifacts.
 
-**Evidence to emit:** unit tests for HP-41/EC-41 plus CLI smoke with a deliberate stale fixture.  
-**Status artifacts affected:** this ledger, M4 plan, code-intelligence README/audit, receipt schema only if contract fields change.
+### Unit coverage certification
 
-**Agent handoff:** Make freshness deterministic and testable. Do not make the graph authoritative over Git.
+| Case ID | Type | Unit test evidence | Result |
+|---|---|---|---|
+| HP-41 | Happy path | `scripts/code_intelligence/context_gateway_test.py::ContextGatewayTests::test_hp41_matching_revision_produces_artifacts` | passed in isolated exact-source run |
+| EC-41 | Edge case | `scripts/code_intelligence/context_gateway_test.py::ContextGatewayTests::test_ec41_stale_graph_is_rejected` | passed in isolated exact-source run |
 
 ---
 
 ## M4-T2 — Harden minimum disclosure beyond backend labels
 
-**Status:** pending  
+**Status:** implemented; unit verified; branch-local QA pending  
 **Effort:** M  
 **Type:** development  
-**Depends on:** T0; execute after T1 by default to minimize conflicts
+**Depends on:** T0; executed after T1
 
-Add defense-in-depth so cloud export does not rely solely on backend-provided classification and does not export unrelated metadata arrays wholesale.
+### Implemented behavior
 
-### Design direction
-- Preserve the backend-neutral graph contract.
-- Add a small deterministic gateway-side policy layer rather than a generic policy DSL.
-- Cloud metadata should be justified by allowed task-local evidence instead of copied wholesale from `anchors`, `files`, `symbols`, `tests`, `boundaries`, or governance arrays.
-- Add hard-deny handling for clearly unsafe repository/runtime/secret paths or values where deterministic detection is reliable.
-- Do not block legitimate cloud work merely because it touches a protected product boundary; the goal is minimum disclosure, not a blanket path ban.
+- Cloud `files`, `symbols`, `anchors`, `tests`, `boundaries`, and `governance` are minimized from allowed task-local evidence rather than copied wholesale.
+- Explicit secret/runtime classifications remain denied.
+- Deterministic defense-in-depth blocks clearly unsafe paths/content such as `.env*`, credential/private-key material, temporary/runtime roots, and selected secret markers even when mislabeled `task_local`.
+- Local remains richer than cloud while unsafe secret/runtime material stays denied.
+- No generic policy DSL was introduced.
 
-### Acceptance criteria
-- Cloud capsule excludes unrelated metadata that has no allowed task-local evidence.
-- Explicit secret/runtime records remain denied even if another backend field attempts to reference them.
-- A deliberately mislabeled obviously unsafe fixture is rejected or reduced by gateway-side defense-in-depth.
-- Local target remains richer than cloud while still excluding explicit secret/runtime data.
-- Policy behavior remains small, inspectable, deterministic, and unit-tested.
+### Behavioral cases
 
-### Behavioral examples
-- **HP-42:** task-local fragment/relationship references `crates/media/...` -> only the justified media file/symbol metadata is exported to cloud.
-- **EC-42:** backend includes unrelated auth/storage topology metadata while no allowed task-local evidence requires it -> cloud capsule omits it.
-- **EC-43:** a fixture deliberately labels an obviously secret/runtime path or value as `task_local` -> gateway defense-in-depth prevents export.
+- **HP-42:** task-local evidence for `crates/alpha/...` exports only justified alpha metadata to cloud.
+- **EC-42:** unrelated auth/topology metadata is omitted when no allowed evidence justifies it.
+- **EC-43:** a `.env.local` fragment containing a token marker and mislabeled `task_local` is still blocked.
 
-**Evidence to emit:** unit tests for HP-42/EC-42/EC-43 and before/after cloud capsule fixture comparison.  
-**Status artifacts affected:** this ledger, M4 plan, code-intelligence README/audit, receipt/capsule schema if metadata representation changes.
+### Unit coverage certification
 
-**Agent handoff:** Solve P2/P3 with the smallest deterministic policy surface that protects cloud export. Do not create a generic security-classification framework.
+| Case ID | Type | Unit test evidence | Result |
+|---|---|---|---|
+| HP-42 | Happy path | `scripts/code_intelligence/context_gateway_test.py::ContextGatewayTests::test_hp42_cloud_exports_only_justified_metadata` | passed in isolated exact-source run |
+| EC-42 | Edge case | `scripts/code_intelligence/context_gateway_test.py::ContextGatewayTests::test_ec42_unrelated_metadata_is_omitted_from_cloud` | passed in isolated exact-source run |
+| EC-43 | Edge case | `scripts/code_intelligence/context_gateway_test.py::ContextGatewayTests::test_ec43_mislabeled_unsafe_fragment_is_still_denied` | passed in isolated exact-source run |
+
+Additional regression: `ContextGatewayTests::test_local_target_remains_richer_than_cloud` passed.
 
 ---
 
 ## M4-T3 — Bounded context expansion
 
-**Status:** pending  
+**Status:** implemented; unit verified; branch-local QA pending  
 **Effort:** M  
 **Type:** development  
 **Depends on:** T1, T2
 
-Implement the explicit expansion path anticipated by the architecture and existing `expansions` receipt field.
+### Implemented behavior
 
-### Design direction
-- An agent requests additional context with a reason and reference to the prior receipt/capsule.
-- The request is evaluated locally against the current graph revision and the same export policy as the initial capsule.
-- The result is a new bounded artifact generation, not arbitrary graph traversal from the cloud side.
-- Preserve a verifiable link to the prior receipt (hash/reference) and record what was requested, allowed, reduced, or denied.
+Expansion is another local gateway evaluation. CLI supports:
 
-### Acceptance criteria
-- Valid expansion request against a current receipt can add newly allowed task-relevant context.
-- Expansion cannot bypass cloud deny/minimum-disclosure policy.
-- Expansion against a stale/mismatched base receipt is rejected.
-- Receipt history records the reason and decision without exposing denied content.
-- New artifacts are deterministic for equivalent inputs.
+```text
+--base-receipt <path>
+--expansion-reason <reason>
+```
 
-### Behavioral examples
-- **HP-43:** cloud agent lacks one adjacent task-local symbol and requests it with a concrete reason -> local gateway returns a new capsule containing only the approved expansion and records the decision.
-- **EC-44:** expansion requests global architecture/cross-boundary topology for convenience -> request is denied/reduced for cloud target.
-- **EC-45:** expansion references a receipt generated from a different repository/graph revision -> fail closed.
+Both must be supplied together.
 
-**Evidence to emit:** expansion unit tests, CLI/API smoke, receipt hash-chain/reference evidence.  
-**Status artifacts affected:** this ledger, M4 plan, receipt schema, code-intelligence README/audit.
+The base receipt must:
 
-**Agent handoff:** Implement bounded expansion as a local decision. Never expose a generic graph query surface to cloud agents.
+- verify its SHA-256;
+- use `context-receipt-v1`;
+- match target;
+- match expected/current Git revision;
+- match graph revision.
+
+The resulting receipt records the base receipt SHA, reason, decision (`allow`, `reduce`, `deny`), and added context delta. The same export policy applies to initial and expanded context.
+
+### Behavioral cases
+
+- **HP-43:** a new adjacent task-local helper under the same Git/graph revisions is added through bounded expansion.
+- **EC-44:** global-architecture context requested for convenience does not bypass cloud policy.
+- **EC-45:** expansion with a different graph revision fails closed.
+
+### Unit coverage certification
+
+| Case ID | Type | Unit test evidence | Result |
+|---|---|---|---|
+| HP-43 | Happy path | `scripts/code_intelligence/context_gateway_test.py::ExpansionTests::test_hp43_bounded_expansion_adds_allowed_context` | passed in isolated exact-source run |
+| EC-44 | Edge case | `scripts/code_intelligence/context_gateway_test.py::ExpansionTests::test_ec44_forbidden_expansion_cannot_bypass_cloud_policy` | passed in isolated exact-source run |
+| EC-45 | Edge case | `scripts/code_intelligence/context_gateway_test.py::ExpansionTests::test_ec45_expansion_with_different_graph_revision_fails_closed` | passed in isolated exact-source run |
+
+Schema evidence: `docs/schemas/context-receipt-v1.schema.json` now defines the expansion record shape.
+
+---
+
+## Verification evidence available now
+
+The orchestrator executed the exact new Python source content in an isolated temporary runtime:
+
+```text
+python3 context_gateway_test.py
+Ran 15 tests
+OK
+
+python3 -m py_compile backend.py context_gateway.py context_gateway_test.py
+exit 0
+```
+
+The Python environment emitted an unrelated artifact-tool startup warning; DubBridge commands still exited successfully.
+
+### Required branch-local verification before T4
+
+Run the audit S0–S10 sequence documented in:
+
+`docs/audit/local-code-intelligence-boundary-audit.md`
+
+Minimum baseline:
+
+```bash
+python3 scripts/code_intelligence/context_gateway_test.py
+python3 -m py_compile \
+  scripts/code_intelligence/backend.py \
+  scripts/code_intelligence/context_gateway.py \
+  scripts/code_intelligence/context_gateway_test.py
+make qa-docs
+```
+
+### Owner final verification
+
+Pending branch-local execution. Do not represent `make qa-docs` or full S0–S10 as passed until run from a checkout of this branch.
 
 ---
 
 ## M4-T4 — Operational use-and-adjust loop
 
-**Status:** pending  
+**Status:** next after branch-local QA  
 **Effort:** ongoing/S per adjustment  
 **Type:** operational  
-**Depends on:** T3
+**Depends on:** T3 + branch-local S0–S10 verification
 
-Use the M4 path during ordinary DubBridge work. Do not create synthetic benchmark tasks or an A/B evaluation program.
+Use the M4 path during ordinary DubBridge work. Do not create synthetic benchmark tasks or an A/B program.
 
 ### Acceptance criteria
-- Normal tasks consume the existing Analyze/CKG path rather than a special benchmark harness.
-- When initial context is sufficient, no expansion is requested merely for completeness.
-- When context is insufficient, bounded expansion is used instead of unrestricted repository exploration.
-- Only actionable friction is recorded: stale graph, missing relevant context, irrelevant context, policy over-blocking, policy under-blocking, host resource regression, or consumer artifact race.
-- Each recurring/material issue becomes a narrowly scoped T5 hardening task or is explicitly deferred with rationale.
+
+- normal tasks use the existing Analyze/CKG path;
+- sufficient initial context causes no unnecessary expansion;
+- missing context uses bounded expansion instead of unrestricted repository/graph exploration;
+- only actionable friction is recorded: stale graph, missing/irrelevant context, policy over/under-blocking, host pressure, or consumer artifact race;
+- recurring/material friction becomes a narrowly scoped T5 task or is explicitly deferred.
 
 ### Behavioral examples
-- **HP-44:** ordinary DubBridge task receives sufficient bounded context and proceeds through existing routing/review without additional repository discovery.
-- **HP-45:** ordinary task needs one additional adjacent symbol -> bounded expansion supplies it and work continues.
-- **EC-46:** agent attempts to treat the receipt/graph as authoritative over source/tests -> workflow requires source/test verification.
-- **EC-47:** a cloud consumer asks for broad architecture traversal -> request remains bounded/denied; no direct graph access is added.
 
-**Evidence to emit:** existing receipts/capsules plus concise friction note only when an adjustment is warranted.  
-**Status artifacts affected:** this ledger and any narrowly scoped T5 task created from real evidence.
-
-**Agent handoff:** Use the mechanism on real work. Do not optimize numbers; adjust only when actual friction is reproducible.
+- **HP-44:** ordinary task proceeds with the initial bounded capsule.
+- **HP-45:** one adjacent symbol is supplied through bounded expansion.
+- **EC-46:** graph/receipt is not treated as authoritative over source/tests.
+- **EC-47:** broad cloud architecture traversal remains denied/bounded.
 
 ---
 
-## M4-T5 — Evidence-backed hardening (conditional)
+## M4-T5 — Evidence-backed hardening
 
 **Status:** conditional  
-**Effort:** variable  
-**Type:** development only when triggered  
 **Depends on:** a concrete T4 finding
 
-Create one narrowly scoped task per reproducible operational issue. Do not pre-schedule speculative hardening.
+Create one narrowly scoped task per reproducible issue. Valid triggers include a pair-level artifact race, recurring export misclassification, freshness lifecycle race, repeated unnecessary expansion, or host pressure attributable to the code-intelligence lifecycle.
 
-### Allowed trigger examples
-- pair-level artifact race/crash recovery -> consider completion manifest/ready marker;
-- repeated false-positive/false-negative export classification -> refine deterministic policy;
-- recurring backend freshness race -> refine revision lifecycle;
-- repeated unnecessary context expansion -> adjust retrieval/selection heuristic;
-- measurable host pressure attributable to code-intelligence lifecycle -> adjust index/query unload sequencing.
-
-### Not valid triggers by themselves
-- desire for a dashboard;
-- desire for a generic policy DSL;
-- theoretical elegance;
-- adding Neo4j/GraphRAG;
-- automatic RRI changes without repeated real-task evidence.
-
-Each triggered T5 task must receive its own HP/EC examples, RRI computation, review route, acceptance criteria, and evidence before implementation.
+Dashboards, generic policy DSLs, Neo4j/GraphRAG, theoretical elegance, or automatic RRI changes are not valid triggers by themselves.
 
 ---
 
-## M4-T6 — Milestone closure and architecture decision
+## M4-T6 — Milestone closure
 
 **Status:** pending  
-**Effort:** S  
-**Type:** docs/status  
-**Depends on:** T4 and every triggered blocking T5 task
+**Depends on:** T4 and every blocking T5 task
 
-Close M4 after the operational contract is internally consistent and material findings are resolved or explicitly deferred.
-
-### Acceptance criteria
-- Plan, task ledger, audit entry point, schemas, and operator README agree on the operational contract.
-- M4 closure explicitly records deferred issues and why they are safe to defer.
-- Decide whether accumulated durability/cross-cutting impact now warrants a formal ADR.
-- RRI/model-routing remains unchanged unless a separate approved task changed it.
-- No product-runtime coupling was introduced.
-
-**Evidence to emit:** final M4 closure note and ADR recommendation (`required`, `amend existing`, or `not required yet`).  
-**Status artifacts affected:** this ledger, M4 plan, relevant audit/status docs.
-
-**Agent handoff:** Close the milestone without expanding scope. Any new architectural capability becomes a successor milestone/task, not hidden M4 cleanup.
+Close only when plan, ledger, audit, schema, and operator README agree; material findings are fixed/deferred with rationale; ADR need is decided; RRI/model routing remains unchanged unless separately approved; and no product-runtime coupling was introduced.
