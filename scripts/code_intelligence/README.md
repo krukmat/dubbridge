@@ -1,6 +1,16 @@
 # Local Code Intelligence Boundary
 
-This directory contains the model-agnostic boundary between a local code-knowledge-graph backend and DubBridge agents.
+This directory contains the model-agnostic boundary between a local code-knowledge-graph result and DubBridge agents.
+
+## Milestone state
+
+M3 is closed for this branch. The operational Analyze/handoff entry point is:
+
+`scripts/code_intelligence/context_gateway.py`
+
+M3 deliberately closes at this CLI boundary; it does **not** require a hard-coded hook inside `run_local_task.py` or any model-specific runner. The current stable backend interchange is `JsonGraphBackend` in `backend.py`, consuming local JSON graph results. A concrete CKG producer may remain external/local and replaceable without changing the gateway contract.
+
+M4 hardens and operationalizes that M3 path. It does not reopen model routing, RRI, or the Analyze architecture.
 
 ## Purpose
 
@@ -8,9 +18,10 @@ The tooling moves deterministic repository discovery out of the LLM where possib
 
 1. a local CKG/backend resolves task-relevant anchors, relationships, files, tests, boundaries, governance, and optional source fragments;
 2. the backend result is normalized through `backend.py`;
-3. `context_gateway.py` applies target-specific export policy;
+3. `context_gateway.py` verifies repository freshness and applies target-specific export policy;
 4. the gateway writes a `context-receipt.json` plus a bounded `context-capsule.json`;
-5. an existing local or cloud agent consumes the capsule.
+5. an existing local or cloud agent consumes the capsule;
+6. when more context is required, a new local graph result can be evaluated as a bounded expansion linked to the prior receipt.
 
 The source tree, tests, ADRs, and repository policies remain authoritative. Graph output is context-selection evidence, not proof of correctness.
 
@@ -19,15 +30,27 @@ The source tree, tests, ADRs, and repository policies remain authoritative. Grap
 `local` and `cloud` are different export targets.
 
 - `secret` and `runtime_data` fragments/relationships are denied for every target.
-- `cross_boundary` and `global_architecture` data are additionally denied for `cloud`.
-- cloud agents must not receive unrestricted MCP/graph traversal as a substitute for the gateway.
-- a local agent may receive richer structural relationships, but still receives no explicit secret/runtime-data records.
+- deterministic gateway deny rules also block clearly unsafe paths/content such as `.env*`, private-key material, temporary/runtime roots, and selected credential markers even when a backend mislabels them as `task_local`;
+- `cross_boundary` and `global_architecture` data are additionally denied for `cloud`;
+- cloud metadata is minimized from allowed task-local evidence rather than copied wholesale from backend arrays;
+- cloud agents must not receive unrestricted MCP/graph traversal as a substitute for the gateway;
+- a local agent may receive richer structural relationships and metadata, but still receives no explicit secret/runtime-data records.
 
-The current classification policy is intentionally small. Do not turn it into a generic policy DSL without evidence from real tasks that more complexity is necessary.
+The policy is intentionally small and deterministic. Do not turn it into a generic policy DSL without evidence from real tasks that more complexity is necessary.
 
-## Backend integration
+## Freshness invariant
 
-The first stable boundary is JSON, not a vendor SDK. An external local CKG adapter should emit a payload shaped like:
+The operational path requires the orchestrator/Analyze phase to provide the expected Git revision:
+
+`--expected-git-revision <sha>`
+
+The gateway compares that value with the backend result's `git_revision` before publishing artifacts. A mismatch fails closed and identifies expected versus received revision.
+
+`graph_revision` remains backend provenance for the initial request and becomes an enforced invariant for bounded expansion: an expansion must use the same Git and graph revision as its base receipt.
+
+## Backend interchange
+
+An external local CKG producer should emit a payload shaped like:
 
 ```json
 {
@@ -67,18 +90,20 @@ Supported classifications:
 - `secret`
 - `runtime_data`
 
-A later adapter can wrap `codebase-memory-mcp`, CodeGraph, or another local CKG without changing the gateway contract. Backend selection must have a separate supply-chain/network/telemetry review before being pinned into the workflow.
+The executable core remains independent of Nemotron, Qwen, Gemma, Claude, Codex, Ollama, or a specific CKG vendor.
 
-## CLI
+## Initial Analyze/handoff CLI
 
 Example from the repository root:
 
 ```bash
+HEAD_SHA="$(git rev-parse HEAD)"
 python3 scripts/code_intelligence/context_gateway.py \
   --task-id S-XYZ-T3 \
   --task "Change a bounded playback behavior" \
   --backend-json /tmp/dubbridge-graph-result.json \
   --target cloud \
+  --expected-git-revision "$HEAD_SHA" \
   --output-dir /tmp/dubbridge-context
 ```
 
@@ -87,36 +112,57 @@ Outputs:
 - `/tmp/dubbridge-context/context-receipt.json`
 - `/tmp/dubbridge-context/context-capsule.json`
 
-Use the gateway during the **Analyze** / handoff phase. Do not insert it into DubBridge product runtime.
+Use the gateway during the **Analyze / handoff** phase. Do not insert it into DubBridge product runtime.
+
+## Bounded expansion
+
+A cloud agent that lacks context does not receive a graph query interface. The local orchestrator resolves additional context into another backend JSON result and evaluates it through the same gateway:
+
+```bash
+python3 scripts/code_intelligence/context_gateway.py \
+  --task-id S-XYZ-T3 \
+  --task "Change a bounded playback behavior" \
+  --backend-json /tmp/dubbridge-expanded-graph-result.json \
+  --target cloud \
+  --expected-git-revision "$HEAD_SHA" \
+  --base-receipt /tmp/dubbridge-context/context-receipt.json \
+  --expansion-reason "Need the adjacent task-local helper used by the selected symbol" \
+  --output-dir /tmp/dubbridge-context-expanded
+```
+
+Expansion rules:
+
+- the base receipt hash must verify;
+- target, Git revision, and graph revision must match the base receipt;
+- the same minimum-disclosure policy is applied again;
+- the new receipt records the reason, base receipt hash, decision (`allow`, `reduce`, or `deny`), and added context;
+- denied content is never exposed merely because the request is an expansion.
 
 ## Tests
 
 ```bash
+python3 -m py_compile \
+  scripts/code_intelligence/backend.py \
+  scripts/code_intelligence/context_gateway.py \
+  scripts/code_intelligence/context_gateway_test.py
+
 python3 scripts/code_intelligence/context_gateway_test.py
 ```
 
-The tests certify:
-
-- HP-1: valid backend payload normalization;
-- EC-1: incomplete revision metadata fails closed;
-- HP-2: deterministic receipt/capsule generation;
-- EC-2: secret/runtime data never exported;
-- EC-3: cross-boundary/global architecture not exported to cloud;
-- EC-4: invalid CLI input leaves no successful output artifacts.
+The suite covers the original boundary behaviors plus M4 freshness, metadata minimization, defense-in-depth, and bounded expansion cases.
 
 ## Audit entry point
 
-For local branch review, start at:
+The original M1-M3 audit entry point remains:
 
 `docs/audit/local-code-intelligence-boundary-audit.md`
 
-That document defines the required read order, branch-scope check, executable smoke suite (`S0`–`S8`), exploratory trust-boundary probes (`P1`–`P4`), evidence format, and merge interpretation.
+M4 is tracked separately in:
 
-The reusable black-box fixture is:
+- `docs/plan/local-code-intelligence-m4-operational-adoption.md`
+- `docs/tasks/local-code-intelligence-m4-operational-adoption.md`
 
-`scripts/code_intelligence/fixtures/audit-smoke-graph.json`
-
-The exploratory probes are intentional: they let an auditor evaluate current assumptions around graph freshness, backend classification trust, metadata disclosure, and pair-level artifact atomicity without pretending those assumptions are already enforced guarantees.
+The earlier exploratory findings around stale graph handling and metadata disclosure are now promoted into M4 enforced behavior. Pair-level artifact atomicity remains conditional hardening: do not add transaction machinery unless normal operational use exposes a concrete consumer race/crash-recovery issue.
 
 ## Resource model
 
