@@ -1,12 +1,20 @@
 ---
 type: TaskList
 title: "Local Code Intelligence M4 — Operational Adoption"
-status: hardening_implemented_pending_branch_local_qa
+status: hardening_implemented_pending_pre_t4_audit
 plan: docs/plan/local-code-intelligence-m4-operational-adoption.md
 behavioral_coverage_contract: unit-v1
 ---
 
 # Local Code Intelligence M4 — Operational Adoption Tasks
+
+## Pre-T4 audit entry point
+
+Before starting M4-T4, run and record the dedicated readiness audit:
+
+`docs/audit/local-code-intelligence-m4-pre-t4-audit.md`
+
+That audit owns the mandatory S0-S10 branch-local sequence, readiness gates R0-R12, verdict vocabulary, and the operational handoff into T4. The older `docs/audit/local-code-intelligence-boundary-audit.md` remains M1-M3/background evidence and must not be used as a substitute for the M4 pre-T4 readiness verdict.
 
 ## Execution state
 
@@ -24,7 +32,9 @@ M4-T0  DONE
             M4-T3  IMPLEMENTED + unit verified
                |
                v
-      branch-local S0-S10 QA  PENDING
+      M4 pre-T4 audit S0-S10  PENDING
+               |
+        READY_FOR_T4 verdict
                |
                v
             M4-T4  NEXT
@@ -61,7 +71,7 @@ T1/T2 were executed sequentially on `feature/local-code-intelligence-boundary`; 
 
 ## M4-T1 — Enforce graph freshness
 
-**Status:** implemented; unit verified; branch-local QA pending  
+**Status:** implemented; unit verified; pre-T4 audit pending  
 **Effort:** S/M  
 **Type:** development  
 **Depends on:** T0
@@ -89,7 +99,7 @@ T1/T2 were executed sequentially on `feature/local-code-intelligence-boundary`; 
 
 ## M4-T2 — Harden minimum disclosure beyond backend labels
 
-**Status:** implemented; unit verified; branch-local QA pending  
+**Status:** implemented; unit verified; pre-T4 audit pending  
 **Effort:** M  
 **Type:** development  
 **Depends on:** T0; executed after T1
@@ -122,7 +132,7 @@ Additional regression: `ContextGatewayTests::test_local_target_remains_richer_th
 
 ## M4-T3 — Bounded context expansion
 
-**Status:** implemented; unit verified; branch-local QA pending  
+**Status:** implemented; unit verified; pre-T4 audit pending  
 **Effort:** M  
 **Type:** development  
 **Depends on:** T1, T2
@@ -162,7 +172,7 @@ The resulting receipt records the base receipt SHA, reason, decision (`allow`, `
 | EC-44 | Edge case | `scripts/code_intelligence/context_gateway_test.py::ExpansionTests::test_ec44_forbidden_expansion_cannot_bypass_cloud_policy` | passed in isolated exact-source run |
 | EC-45 | Edge case | `scripts/code_intelligence/context_gateway_test.py::ExpansionTests::test_ec45_expansion_with_different_graph_revision_fails_closed` | passed in isolated exact-source run |
 
-Schema evidence: `docs/schemas/context-receipt-v1.schema.json` now defines the expansion record shape.
+Schema evidence: `docs/schemas/context-receipt-v1.schema.json` defines the expansion record shape.
 
 ---
 
@@ -181,35 +191,40 @@ exit 0
 
 The Python environment emitted an unrelated artifact-tool startup warning; DubBridge commands still exited successfully.
 
-### Required branch-local verification before T4
+### Required pre-T4 branch-local audit
 
-Run the audit S0–S10 sequence documented in:
+Run the complete audit defined in:
 
-`docs/audit/local-code-intelligence-boundary-audit.md`
+`docs/audit/local-code-intelligence-m4-pre-t4-audit.md`
 
-Minimum baseline:
+It includes:
 
-```bash
-python3 scripts/code_intelligence/context_gateway_test.py
-python3 -m py_compile \
-  scripts/code_intelligence/backend.py \
-  scripts/code_intelligence/context_gateway.py \
-  scripts/code_intelligence/context_gateway_test.py
-make qa-docs
-```
+- S0-S1 branch identity, merge-base, scope, and no product/RRI drift;
+- S2 branch-local compile and behavioral unit suite;
+- S3-S4 fresh/stale graph enforcement;
+- S5-S6 cloud minimum disclosure, defense-in-depth, and local-richer safety;
+- S7 determinism and receipt/capsule integrity;
+- S8-S9 bounded expansion allow/deny/stale behavior;
+- S10 model/vendor independence plus `make qa-docs`;
+- readiness gates R0-R12;
+- final verdict and the exact handoff procedure into T4.
 
 ### Owner final verification
 
-Pending branch-local execution. Do not represent `make qa-docs` or full S0–S10 as passed until run from a checkout of this branch.
+Pending the dedicated pre-T4 audit. Do not represent branch-local QA, `make qa-docs`, or `READY_FOR_T4` as passed until that audit is executed from this branch checkout and its evidence is recorded.
 
 ---
 
 ## M4-T4 — Operational use-and-adjust loop
 
-**Status:** next after branch-local QA  
+**Status:** next only after `READY_FOR_T4` or acceptable `READY_FOR_T4_WITH_CONDITIONS` verdict  
 **Effort:** ongoing/S per adjustment  
 **Type:** operational  
-**Depends on:** T3 + branch-local S0–S10 verification
+**Depends on:** T3 + successful pre-T4 audit
+
+The operational execution contract is Section 9 of:
+
+`docs/audit/local-code-intelligence-m4-pre-t4-audit.md`
 
 Use the M4 path during ordinary DubBridge work. Do not create synthetic benchmark tasks or an A/B program.
 
@@ -218,8 +233,9 @@ Use the M4 path during ordinary DubBridge work. Do not create synthetic benchmar
 - normal tasks use the existing Analyze/CKG path;
 - sufficient initial context causes no unnecessary expansion;
 - missing context uses bounded expansion instead of unrestricted repository/graph exploration;
-- only actionable friction is recorded: stale graph, missing/irrelevant context, policy over/under-blocking, host pressure, or consumer artifact race;
-- recurring/material friction becomes a narrowly scoped T5 task or is explicitly deferred.
+- only actionable friction is recorded: stale graph, missing/irrelevant context, policy over/under-blocking, host pressure, artifact race, or graph/source mismatch;
+- recurring/material friction becomes a narrowly scoped T5 task or is explicitly deferred;
+- source/tests/ADRs/policies remain authoritative over graph-derived context.
 
 ### Behavioral examples
 
@@ -235,9 +251,11 @@ Use the M4 path during ordinary DubBridge work. Do not create synthetic benchmar
 **Status:** conditional  
 **Depends on:** a concrete T4 finding
 
-Create one narrowly scoped task per reproducible issue. Valid triggers include a pair-level artifact race, recurring export misclassification, freshness lifecycle race, repeated unnecessary expansion, or host pressure attributable to the code-intelligence lifecycle.
+Create one narrowly scoped task per reproducible issue. Valid triggers include unsafe/incorrect export behavior, pair-level artifact race, recurring export misclassification, freshness lifecycle race, repeated unnecessary expansion, or host pressure attributable to the code-intelligence lifecycle.
 
 Dashboards, generic policy DSLs, Neo4j/GraphRAG, theoretical elegance, or automatic RRI changes are not valid triggers by themselves.
+
+Every triggered development T5 receives its own RRI, HP/EC cases, review route, tests, and evidence.
 
 ---
 
@@ -246,4 +264,12 @@ Dashboards, generic policy DSLs, Neo4j/GraphRAG, theoretical elegance, or automa
 **Status:** pending  
 **Depends on:** T4 and every blocking T5 task
 
-Close only when plan, ledger, audit, schema, and operator README agree; material findings are fixed/deferred with rationale; ADR need is decided; RRI/model routing remains unchanged unless separately approved; and no product-runtime coupling was introduced.
+Close only when:
+
+- at least one ordinary DubBridge task has exercised the audited M4 path;
+- plan, ledger, audit, schema, and operator README agree;
+- material findings are fixed or deferred with rationale;
+- no unresolved blocking T5 remains;
+- ADR need is decided;
+- RRI/model routing remains unchanged unless separately approved; and
+- no product-runtime coupling was introduced.
