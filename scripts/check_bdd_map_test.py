@@ -97,6 +97,15 @@ class BddMapGateTests(unittest.TestCase):
         self.assertTrue(any("unmapped scenario" in error for error in errors))
         self.assertTrue(any("unknown scenario" in error for error in errors))
 
+    def test_missing_evidence_file_fails(self):
+        self.manifest([{
+            "scenario": "SC_HP1",
+            "tasks": ["T1"],
+            "evidence": ["tests/missing.py::test_missing"],
+        }])
+        errors = self.module.validate_repo(self.repo)
+        self.assertTrue(any("missing evidence file" in error for error in errors))
+
     def test_feature_cannot_be_its_own_evidence(self):
         self.manifest([{"scenario": "SC_HP1", "tasks": ["T1"], "evidence": ["docs/bdd/strict.feature"]}])
         errors = self.module.validate_repo(self.repo)
