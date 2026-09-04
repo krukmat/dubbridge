@@ -3,7 +3,7 @@ type: Audit
 title: "Local Code Intelligence M4 — Pre-T4 Readiness Audit"
 branch: feature/local-code-intelligence-boundary
 milestone: M4 Operational Adoption
-status: ready_for_local_audit
+status: executed_ready_for_t4
 ---
 
 # Local Code Intelligence M4 — Pre-T4 Readiness Audit
@@ -439,11 +439,18 @@ from pathlib import Path
 r = json.loads(Path('/tmp/dubbridge-m4-audit/expanded-out/context-receipt.json').read_text())
 c = json.loads(Path('/tmp/dubbridge-m4-audit/expanded-out/context-capsule.json').read_text())
 assert 'crates/playback/src/helper.rs' in c['files']
-assert r['expansions'][-1]['decision'] == 'allow'
+assert r['expansions'][-1]['decision'] == 'reduce'
 assert r['expansions'][-1]['reason'] == 'Need the adjacent playback helper'
+assert 'crates/playback/src/helper.rs' in r['expansions'][-1]['added']['files']
 print('S8 PASS')
 PY
 ```
+
+The committed smoke fixture already contains records that cloud policy
+excludes. The expansion therefore records the aggregate decision as `reduce`
+while still adding the justified task-local helper. HP-43's isolated unit
+fixture contains no pre-existing exclusions and continues to exercise the
+pure `allow` decision.
 
 ---
 

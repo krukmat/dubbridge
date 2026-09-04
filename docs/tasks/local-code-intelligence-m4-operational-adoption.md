@@ -1,7 +1,7 @@
 ---
 type: TaskList
 title: "Local Code Intelligence M4 — Operational Adoption"
-status: hardening_implemented_pending_pre_t4_audit
+status: ready_for_t4_operational_adoption
 plan: docs/plan/local-code-intelligence-m4-operational-adoption.md
 behavioral_coverage_contract: unit-v1
 ---
@@ -32,7 +32,7 @@ M4-T0  DONE
             M4-T3  IMPLEMENTED + unit verified
                |
                v
-      M4 pre-T4 audit S0-S10  PENDING
+      M4 pre-T4 audit S0-S10  PASS
                |
         READY_FOR_T4 verdict
                |
@@ -71,7 +71,7 @@ T1/T2 were executed sequentially on `feature/local-code-intelligence-boundary`; 
 
 ## M4-T1 — Enforce graph freshness
 
-**Status:** implemented; unit verified; pre-T4 audit pending  
+**Status:** implemented; unit verified; pre-T4 audit passed
 **Effort:** S/M  
 **Type:** development  
 **Depends on:** T0
@@ -99,7 +99,7 @@ T1/T2 were executed sequentially on `feature/local-code-intelligence-boundary`; 
 
 ## M4-T2 — Harden minimum disclosure beyond backend labels
 
-**Status:** implemented; unit verified; pre-T4 audit pending  
+**Status:** implemented; unit verified; pre-T4 audit passed
 **Effort:** M  
 **Type:** development  
 **Depends on:** T0; executed after T1
@@ -132,7 +132,7 @@ Additional regression: `ContextGatewayTests::test_local_target_remains_richer_th
 
 ## M4-T3 — Bounded context expansion
 
-**Status:** implemented; unit verified; pre-T4 audit pending  
+**Status:** implemented; unit verified; pre-T4 audit passed
 **Effort:** M  
 **Type:** development  
 **Depends on:** T1, T2
@@ -191,13 +191,18 @@ exit 0
 
 The Python environment emitted an unrelated artifact-tool startup warning; DubBridge commands still exited successfully.
 
-### Required pre-T4 branch-local audit
+### Pre-T4 branch-local audit result
 
-Run the complete audit defined in:
+The complete audit defined in:
 
 `docs/audit/local-code-intelligence-m4-pre-t4-audit.md`
 
-It includes:
+passed on 2026-09-05 at
+`19f5093901ed2b115a59af16c169b7e2a6613a88`. Recorded evidence:
+
+`docs/audit/local-code-intelligence-m4-pre-t4-audit-result.md`
+
+It covers:
 
 - S0-S1 branch identity, merge-base, scope, and no product/RRI drift;
 - S2 branch-local compile and behavioral unit suite;
@@ -209,15 +214,17 @@ It includes:
 - readiness gates R0-R12;
 - final verdict and the exact handoff procedure into T4.
 
-### Owner final verification
+### Audit final verification
 
-Pending the dedicated pre-T4 audit. Do not represent branch-local QA, `make qa-docs`, or `READY_FOR_T4` as passed until that audit is executed from this branch checkout and its evidence is recorded.
+Verdict: `READY_FOR_T4`. S0-S10, R0-R12, `make qa-docs`, and the
+supplementary repository script tests passed. T4 remains unstarted until the
+next ordinary DubBridge development task uses the audited path.
 
 ---
 
 ## M4-T4 — Operational use-and-adjust loop
 
-**Status:** next only after `READY_FOR_T4` or acceptable `READY_FOR_T4_WITH_CONDITIONS` verdict  
+**Status:** ready / next; not yet operationally exercised
 **Effort:** ongoing/S per adjustment  
 **Type:** operational  
 **Depends on:** T3 + successful pre-T4 audit

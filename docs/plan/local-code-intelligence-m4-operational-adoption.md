@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: "Local Code Intelligence M4 — Operational Adoption"
-status: hardening_implemented_pending_branch_local_qa
+status: ready_for_t4_operational_adoption
 branch: feature/local-code-intelligence-boundary
 predecessor: M3 closed
 ---
@@ -107,7 +107,8 @@ python3 -m py_compile backend.py context_gateway.py context_gateway_test.py -> e
 
 The environment emitted an unrelated internal Python/artifact-tool startup warning; process exit codes and DubBridge test results were successful.
 
-Repository-checkout verification still remains before T4 operational use:
+The repository-checkout S0-S10 audit passed on 2026-09-05 at
+`19f5093901ed2b115a59af16c169b7e2a6613a88`:
 
 ```bash
 python3 scripts/code_intelligence/context_gateway_test.py
@@ -118,7 +119,10 @@ python3 -m py_compile \
 make qa-docs
 ```
 
-Full local audit guidance is in `docs/audit/local-code-intelligence-boundary-audit.md` (S0–S10).
+The executable audit procedure is
+`docs/audit/local-code-intelligence-m4-pre-t4-audit.md`; the recorded result is
+`docs/audit/local-code-intelligence-m4-pre-t4-audit-result.md`. The verdict is
+`READY_FOR_T4`.
 
 ## Task dependency state
 
@@ -140,10 +144,10 @@ M4-T1 Freshness     M4-T2 Export hardening
       M4-T3 Bounded expansion           DONE
              |
              v
-      branch-local QA/audit             PENDING
+      branch-local QA/audit             PASS
              |
              v
-      M4-T4 Operational adoption        NEXT
+      M4-T4 Operational adoption        READY / NEXT
              |
         findings only
              v

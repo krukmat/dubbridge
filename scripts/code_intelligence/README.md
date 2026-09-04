@@ -161,6 +161,30 @@ M4 is tracked separately in:
 
 - `docs/plan/local-code-intelligence-m4-operational-adoption.md`
 - `docs/tasks/local-code-intelligence-m4-operational-adoption.md`
+- `docs/audit/local-code-intelligence-m4-pre-t4-audit.md` — executable S0-S10 procedure
+- `docs/audit/local-code-intelligence-m4-pre-t4-audit-result.md` — latest recorded result
+
+### Latest smoke result
+
+The complete M4 pre-T4 smoke sequence was executed from
+`feature/local-code-intelligence-boundary` on 2026-09-05 at
+`19f5093901ed2b115a59af16c169b7e2a6613a88`.
+
+| Coverage | Result |
+|---|---|
+| S0-S10 mandatory smokes | PASS |
+| Python behavioral suite | 15/15 PASS |
+| Stale Git and graph rejection | PASS, fail-closed with no success artifacts |
+| Cloud minimization and unsafe-content denial | PASS |
+| Determinism and receipt/capsule integrity | PASS |
+| Bounded expansion | PASS (`reduce` adds the justified helper; forbidden expansion is denied) |
+| `make qa-docs` | PASS |
+| Supplementary script QA | 24/24 task-coverage tests and 6/6 roadmap-drift tests PASS |
+
+Verdict: `READY_FOR_T4`. Consult the recorded audit result for the exact HEAD,
+merge base, hashes, expected rejection codes, findings, and R0-R12 gate
+summary. This authorizes the next ordinary task to exercise M4-T4; it does not
+claim that operational adoption has already occurred.
 
 The earlier exploratory findings around stale graph handling and metadata disclosure are now promoted into M4 enforced behavior. Pair-level artifact atomicity remains conditional hardening: do not add transaction machinery unless normal operational use exposes a concrete consumer race/crash-recovery issue.
 
