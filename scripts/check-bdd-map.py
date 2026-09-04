@@ -8,6 +8,8 @@ import sys
 from pathlib import Path
 
 SCENARIO_RE = re.compile(r"(?m)^\s*Scenario(?: Outline)?:\s+([A-Za-z0-9][A-Za-z0-9_-]*)\b")
+FEATURE_NAME_RE = re.compile(r"([A-Za-z0-9][A-Za-z0-9_.-]*\.feature)")
+DEV_FEATURE_RE = re.compile(r"docs/bdd/([A-Za-z0-9][A-Za-z0-9_.-]*\.feature)")
 
 
 def load_manifest(repo: Path) -> dict:
@@ -19,26 +21,62 @@ def evidence_path(ref: str) -> str:
     return ref.split("::", 1)[0].strip()
 
 
+def section(text: str, heading: str) -> str:
+    match = re.search(
+        rf"(?ms)^##\s+{re.escape(heading)}\s*$([\s\S]*?)(?=^##\s+|\Z)",
+        text,
+    )
+    return match.group(1) if match else ""
+
+
+def bdd_readme_inventory(repo: Path) -> set[str]:
+    text = (repo / "docs" / "bdd" / "README.md").read_text(encoding="utf-8")
+    block = section(text, "Canonical spec files")
+    return set(FEATURE_NAME_RE.findall(block))
+
+
+def development_reference_inventory(repo: Path) -> set[str]:
+    text = (repo / "DEVELOPMENT_REFERENCE.md").read_text(encoding="utf-8")
+    block = section(text, "Behavior specs (BDD)")
+    return set(DEV_FEATURE_RE.findall(block))
+
+
+def compare_inventory(label: str, observed: set[str], canonical: set[str]) -> list[str]:
+    errors: list[str] = []
+    missing = sorted(canonical - observed)
+    stale = sorted(observed - canonical)
+    if missing:
+        errors.append(f"{label} missing feature(s): {', '.join(missing)}")
+    if stale:
+        errors.append(f"{label} references non-canonical feature(s): {', '.join(stale)}")
+    return errors
+
+
 def validate_repo(repo: Path) -> list[str]:
     errors: list[str] = []
     manifest = load_manifest(repo)
     entries = manifest.get("features", [])
     declared = [entry.get("file", "") for entry in entries]
+    declared_set = set(declared)
     actual = sorted(path.name for path in (repo / "docs" / "bdd").glob("*.feature"))
+    actual_set = set(actual)
 
-    if len(declared) != len(set(declared)):
+    if len(declared) != len(declared_set):
         errors.append("behavior-map-v2.json contains duplicate feature entries")
-    if sorted(declared) != actual:
-        missing = sorted(set(actual) - set(declared))
-        stale = sorted(set(declared) - set(actual))
+    if declared_set != actual_set:
+        missing = sorted(actual_set - declared_set)
+        stale = sorted(declared_set - actual_set)
         if missing:
             errors.append(f"manifest missing feature(s): {', '.join(missing)}")
         if stale:
             errors.append(f"manifest references missing feature(s): {', '.join(stale)}")
 
+    errors.extend(compare_inventory("docs/bdd/README.md canonical inventory", bdd_readme_inventory(repo), declared_set))
+    errors.extend(compare_inventory("DEVELOPMENT_REFERENCE.md BDD inventory", development_reference_inventory(repo), declared_set))
+
     for entry in entries:
         file_name = entry.get("file", "")
-        if file_name not in actual:
+        if file_name not in actual_set:
             continue
         mode = entry.get("mode", "legacy")
         if mode not in {"legacy", "strict"}:
