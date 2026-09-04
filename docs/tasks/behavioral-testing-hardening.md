@@ -1,7 +1,7 @@
 ---
 type: TaskList
 title: "Tasks: Behavioral Testing Hardening"
-status: active
+status: complete
 plan: docs/plan/behavioral-testing-hardening.md
 Behavioral coverage contract: behavior-v2
 ---
@@ -82,7 +82,7 @@ Required passes: 2 (`30` → `Moderate`).
 
 ### Verification
 
-- `python3 scripts/check_behavioral_coverage_test.py` → 5/5 passed before integration; the suite is expanded by the subsequent closure-hardening change to cover layer, Reflection and owner-verification failures as well.
+- `python3 scripts/check_behavioral_coverage_test.py` → deterministic fixture suite passed before integration; the suite was subsequently expanded to cover layer, Reflection and owner-verification failures.
 - GitHub Actions run `33913058079`, job `qa-docs` → passed with the new deterministic gate in the `qa-docs` execution path.
 - Existing `fmt`, `clippy`, `roadmap-drift`, and `maintainability` jobs also passed on commit `5f4c27cb` while this task was being closed.
 
@@ -95,7 +95,7 @@ Required passes: 2 (`30` → `Moderate`).
 
 ## BTH-T2 — BDD traceability gate and S-120 normalization
 
-- **Status:** [~] In progress
+- **Status:** [x] Done — 2026-09-04
 - **Type:** development
 - **Effort:** M
 - **RRI:** 30 → Moderate
@@ -136,17 +136,47 @@ Add `qa-bdd-map` to detect BDD drift and repair the known S-120 inconsistencies 
 - `DEVELOPMENT_REFERENCE.md`;
 - this ledger.
 
-### Progress record
+### Reflection log
 
-- Added machine-readable `docs/bdd/behavior-map-v2.json` covering every current `.feature` and placing S-120 in strict mode while grandfathering the remaining historical specs.
-- Added `scripts/check-bdd-map.py` plus deterministic tests and integrated it into the `qa-docs` execution path.
-- Normalized S-120 with inline scenario IDs and executable many-to-many mappings; removed the stale management-console wording.
-- Synchronized the human inventories in `docs/bdd/README.md` and `DEVELOPMENT_REFERENCE.md` and extended the deterministic gate to reject future drift across either surface.
-- Remaining before closure: final `qa-docs` evidence on the inventory-parity version and the authoritative workflow wording alignment handled by BTH-T3.
+Required passes: 2 (`30` → `Moderate`).
+
+#### Pass 1
+
+- **Draft verdict:** a machine-readable BDD manifest plus a strict/legacy mode provides deterministic traceability without forcing historical backfill or a Gherkin execution framework.
+- **Critique findings:** validating only the manifest against `.feature` files would still allow the two human-facing inventories to drift; S-120 also cited its own specification as executable evidence.
+- **Revisions applied:** added parity checks for `docs/bdd/README.md` and `DEVELOPMENT_REFERENCE.md`, put S-120 in strict mode with stable inline IDs, and replaced specification references with executable test evidence.
+
+#### Pass 2
+
+- **Draft verdict:** valid, many-to-many, missing-inventory, unknown-scenario and self-referential mappings were covered by deterministic fixtures and `qa-docs` passed on `main`.
+- **Critique findings:** the validator implemented missing-evidence-path rejection but the fixture suite did not exercise that failure mode directly.
+- **Revisions applied:** added `test_missing_evidence_file_fails` and re-ran the integrated `qa-docs` job through GitHub Actions.
+
+### Behavioral coverage certification
+
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| HP-1 | Happy path | canonical strict mapping with existing executable evidence passes | unit | `scripts/check_bdd_map_test.py::test_valid_strict_mapping_passes`; `scripts/check_bdd_map_test.py::test_human_inventory_drift_fails` | passed |
+| HP-2 | Happy path | one scenario may map to multiple tasks and evidence items | unit | `scripts/check_bdd_map_test.py::test_many_to_many_tasks_and_evidence_passes` | passed |
+| EC-1 | Edge case | missing inventory, unknown scenario or missing evidence fails closed | unit | `scripts/check_bdd_map_test.py::test_missing_feature_inventory_fails`; `scripts/check_bdd_map_test.py::test_unknown_scenario_fails`; `scripts/check_bdd_map_test.py::test_missing_evidence_file_fails` | passed |
+| EC-2 | Edge case | a feature specification cannot certify itself as executable evidence | unit | `scripts/check_bdd_map_test.py::test_feature_cannot_be_its_own_evidence` | passed |
+
+### Verification
+
+- GitHub Actions run `33918043744`, job `qa-docs` → passed after the dedicated missing-evidence-path fixture landed.
+- The same run also passed `fmt`, `clippy`, `cargo-check`, mobile, S3 integration, dependency policy, roadmap drift, Python complexity, peer-workflow review and maintainability gates before this closure record was written.
+- `docs/bdd/behavior-map-v2.json` remains the machine-readable canonical inventory; strict S-120 mappings are checked against actual scenario IDs and evidence files.
+
+### Owner final verification
+
+- Owner: primary agent
+- Date: 2026-09-04
+- Statement: verified every BTH-T2 happy path and edge case has deterministic executable evidence and that the integrated BDD traceability gate passes in `qa-docs` on `main`.
+- Commands run: `make qa-docs` via GitHub Actions run `33918043744` / job `qa-docs`.
 
 ## BTH-T3 — Workflow semantics and coverage clarification
 
-- **Status:** [ ] Not started
+- **Status:** [x] Done — 2026-09-04
 - **Type:** docs / policy alignment
 - **Effort:** S
 - **RRI:** 18 → Low
@@ -163,5 +193,23 @@ Add `qa-bdd-map` to detect BDD drift and repair the known S-120 inconsistencies 
 ### Status artifacts affected
 
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`;
+- `docs/playbooks/BEHAVIORAL_TESTING_CONTRACT.md`;
 - `DEVELOPMENT_REFERENCE.md`;
 - this ledger.
+
+### Completion evidence
+
+- `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` is authoritative and now defines BDD, ATDD-style acceptance evidence and TDD as separate responsibilities; it defaults new development ledgers to `behavior-v2` while preserving legacy `unit-v1`.
+- The guide requires RED → fix → GREEN for reproducible defects and strongly prefers test-first for critical deterministic logic, with pragmatic exceptions for wiring/config/generated/purely visual changes.
+- The guide and `DEVELOPMENT_REFERENCE.md` describe the 90% threshold as the Rust workspace `cargo llvm-cov` gate with configured exclusions and keep mobile typecheck/lint/Jest as an independent gate.
+- `docs/playbooks/BEHAVIORAL_TESTING_CONTRACT.md` is a focused summary explicitly subordinate to the authoritative workflow guide; it no longer acts as a competing forward-contract exception.
+- No Cucumber, Behave, SpecFlow or equivalent BDD runner was introduced.
+- GitHub Actions run `33917808846`, job `qa-docs` → passed on the authoritative guide version; run `33918043744` subsequently passed `qa-docs` with the final BDD fixture set.
+
+## Closure
+
+Behavioral Testing Hardening is complete. DubBridge now has one converged testing model:
+
+`BDD behavior → ATDD-style HP/EC acceptance contract → implementation/TDD → tier-appropriate executable evidence → deterministic qa-docs/CI traceability`.
+
+Historical `unit-v1` ledgers remain valid and are not mass-migrated. New development work defaults to `behavior-v2`; `.feature` files remain specifications rather than requiring a new runtime BDD framework.
