@@ -1,0 +1,1 @@
+{"task_id":"okf-gitdir-leak-fix","commit_sha":"7d5a07183a796781f34ea7a6050f3ba4ff6025de","reviewer":"muse-glimmer:30b-q4_K_M","verdict":"PASS","timestamp":"2026-09-01T21:50:11Z","changed_paths":["scripts/check_roadmap_drift_test.py", "scripts/check_task_unit_coverage_test.py"]}
