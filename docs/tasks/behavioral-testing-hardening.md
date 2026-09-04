@@ -14,7 +14,7 @@ Owner approval: explicit in-session approval on 2026-09-04 to execute the review
 
 ## BTH-T1 — Cross-stack behavioral evidence contract
 
-- **Status:** [~] In progress
+- **Status:** [x] Done — 2026-09-04
 - **Type:** development
 - **Effort:** M
 - **RRI:** 30 → Moderate
@@ -55,9 +55,47 @@ Introduce `behavior-v2` as a backward-compatible behavioral evidence contract an
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`;
 - `DEVELOPMENT_REFERENCE.md`.
 
+### Reflection log
+
+Required passes: 2 (`30` → `Moderate`).
+
+#### Pass 1
+
+- **Draft verdict:** a separate `behavior-v2` validator avoids changing the legacy `unit-v1` parser and supports Rust, Python, Jest/TypeScript, Maestro YAML and shell evidence.
+- **Critique findings:** applying the new semantics inside `check-task-unit-coverage.sh` would risk silently changing grandfathered ledgers; evidence syntax also needed fail-closed file/type validation.
+- **Revisions applied:** implemented a separate validator, retained exact named-test checks for Rust/Python, and limited the contract to ledgers explicitly declaring `behavior-v2`.
+
+#### Pass 2
+
+- **Draft verdict:** deterministic fixture tests passed and the repository `qa-docs` GitHub Actions job passed with the new wrapper in the execution path.
+- **Critique findings:** in-progress tasks must not require closure certification and legacy `unit-v1` must continue through the pre-existing gate unchanged.
+- **Revisions applied:** the validator gates only completed development sections; the old script/test suite remains byte-for-byte available through the existing `qa-docs` path.
+
+### Behavioral coverage certification
+
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| HP-1 | Happy path | valid cross-stack behavior-v2 evidence passes | unit | `scripts/check_behavioral_coverage_test.py::test_valid_cross_stack_evidence_passes` | passed |
+| HP-2 | Happy path | legacy unit-v1 validation remains operational | unit | `scripts/check_task_unit_coverage_test.py::test_valid_review_artifact_passes` | passed |
+| EC-1 | Edge case | missing file or named test fails closed | unit | `scripts/check_behavioral_coverage_test.py::test_missing_evidence_file_fails_closed`; `scripts/check_behavioral_coverage_test.py::test_missing_python_function_fails_closed` | passed |
+| EC-2 | Edge case | completed task without an edge case fails closed | unit | `scripts/check_behavioral_coverage_test.py::test_missing_edge_case_fails_closed` | passed |
+
+### Verification
+
+- `python3 scripts/check_behavioral_coverage_test.py` → 5/5 passed before integration.
+- GitHub Actions run `33913058079`, job `qa-docs` → passed with the new deterministic gate in the `qa-docs` execution path.
+- Existing `fmt`, `clippy`, `roadmap-drift`, and `maintainability` jobs also passed on commit `5f4c27cb` while this task was being closed.
+
+### Owner final verification
+
+- Owner: primary agent
+- Date: 2026-09-04
+- Statement: verified every BTH-T1 happy path and edge case has deterministic test evidence and that the integrated GitHub `qa-docs` job passes on `main`.
+- Commands/evidence: `python3 scripts/check_behavioral_coverage_test.py`; GitHub Actions run `33913058079` / `qa-docs`.
+
 ## BTH-T2 — BDD traceability gate and S-120 normalization
 
-- **Status:** [ ] Not started
+- **Status:** [~] In progress
 - **Type:** development
 - **Effort:** M
 - **RRI:** 30 → Moderate
@@ -82,14 +120,14 @@ Add `qa-bdd-map` to detect BDD drift and repair the known S-120 inconsistencies 
 - `make qa-bdd-map` validates canonical feature inventory against `docs/bdd/*.feature`.
 - Scenario IDs in mapping rows resolve to scenario IDs present in their feature file.
 - `Executable Evidence` paths exist and do not point back to the `.feature` specification itself.
-- Mapping supports semicolon-separated many-to-many evidence references.
+- Mapping supports many-to-many task/evidence references.
 - S-120 scenarios receive stable inline IDs, concrete executable evidence, and architecture-neutral failure observability wording.
 - `DEVELOPMENT_REFERENCE.md` and `docs/bdd/README.md` expose the same canonical feature inventory.
 - `qa-bdd-map` is part of `qa-docs`.
 
 ### Evidence to emit
 
-- deterministic validator tests for valid, missing, and self-referential evidence mappings.
+- deterministic validator tests for valid, missing, many-to-many, and self-referential evidence mappings.
 
 ### Status artifacts affected
 
@@ -97,6 +135,13 @@ Add `qa-bdd-map` to detect BDD drift and repair the known S-120 inconsistencies 
 - `docs/bdd/s-120-media-preparation.feature`;
 - `DEVELOPMENT_REFERENCE.md`;
 - this ledger.
+
+### Progress record
+
+- Added machine-readable `docs/bdd/behavior-map-v2.json` covering every current `.feature` and placing S-120 in strict mode while grandfathering the remaining historical specs.
+- Added `scripts/check-bdd-map.py` plus deterministic tests and integrated it into the `qa-docs` execution path.
+- Normalized S-120 with inline scenario IDs and executable many-to-many mappings; removed the stale management-console wording.
+- Remaining before closure: reconcile the two human-readable inventory surfaces (`docs/bdd/README.md` and `DEVELOPMENT_REFERENCE.md`) and the authoritative workflow wording so the documented contract cannot diverge from the machine-enforced one.
 
 ## BTH-T3 — Workflow semantics and coverage clarification
 

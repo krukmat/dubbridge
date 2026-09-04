@@ -23,6 +23,7 @@ class BddMapGateTests(unittest.TestCase):
         (self.repo / "docs" / "bdd").mkdir(parents=True)
         (self.repo / "tests").mkdir()
         (self.repo / "tests" / "behavior.py").write_text("def test_behavior():\n    pass\n", encoding="utf-8")
+        (self.repo / "tests" / "behavior2.py").write_text("def test_behavior_two():\n    pass\n", encoding="utf-8")
         (self.repo / "docs" / "bdd" / "strict.feature").write_text(
             "Feature: strict\n  Scenario: SC_HP1 works\n    Given a state\n    Then it works\n", encoding="utf-8"
         )
@@ -47,6 +48,17 @@ class BddMapGateTests(unittest.TestCase):
 
     def test_valid_strict_mapping_passes(self):
         self.manifest()
+        self.assertEqual(self.module.validate_repo(self.repo), [])
+
+    def test_many_to_many_tasks_and_evidence_passes(self):
+        self.manifest([{
+            "scenario": "SC_HP1",
+            "tasks": ["T1", "T2", "T3"],
+            "evidence": [
+                "tests/behavior.py::test_behavior",
+                "tests/behavior2.py::test_behavior_two",
+            ],
+        }])
         self.assertEqual(self.module.validate_repo(self.repo), [])
 
     def test_missing_feature_inventory_fails(self):
