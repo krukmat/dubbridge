@@ -225,7 +225,9 @@ mod tests {
                 Err(_) => return None,
             };
 
-            let pool = PgPool::connect(&database_url)
+            let pool = sqlx::postgres::PgPoolOptions::new()
+                .max_connections(2)
+                .connect(&database_url)
                 .await
                 .expect("connect database");
             migrate_and_reset(&pool).await;
@@ -256,12 +258,16 @@ mod tests {
                 Err(_) => return None,
             };
 
-            let auth_pool = PgPool::connect(&database_url)
+            let auth_pool = sqlx::postgres::PgPoolOptions::new()
+                .max_connections(2)
+                .connect(&database_url)
                 .await
                 .expect("connect auth database");
             migrate_and_reset(&auth_pool).await;
 
-            let audit_pool = PgPool::connect(&database_url)
+            let audit_pool = sqlx::postgres::PgPoolOptions::new()
+                .max_connections(1)
+                .connect(&database_url)
                 .await
                 .expect("connect audit database");
             audit_pool.close().await;

@@ -32,7 +32,7 @@ decomposed implementation" below.
 | CIRF-T2 | Add `fetch-depth: 0` to `qa-docs` job checkout | 5 -> Low | S | Implemented, verified — pending owner sign-off | - |
 | CIRF-T3 | Serialize `qa-test` to eliminate shared-DB race (fast unblock) | 8 -> Low | S | Implemented, verified — pending owner sign-off | - |
 | CIRF-T4 | Remove shared TRUNCATE from every affected test-DB setup helper | 67 -> Complex (decomposed) | L | Done — all 15 files closed (14 originally-scoped + 1 owner-acknowledged post-approval addition) | T3 |
-| CIRF-T5 | Fix 5 racy tests in `apps/api/src/routes/auth.rs` under parallel execution (discovered validating T4), decomposed into 6 Low-band subtasks (T5-1..T5-4, T5-5a/b, T5-6a/b) | 30 -> Moderate (decomposed to Low per-subtask, each 13 -> Low) | M | Implemented, verified (8/8 `auth.rs` tests passing, 5/5 consecutive parallel runs) — pending owner sign-off | T4 |
+| CIRF-T5 | Fix 5 racy tests in `apps/api/src/routes/auth.rs` under parallel execution (discovered validating T4), decomposed into 6 Low-band subtasks (T5-1..T5-4, T5-5a/b, T5-6a/b) | 30 -> Moderate (decomposed to Low per-subtask, each 13 -> Low) | M | Done — 8/8 `auth.rs` tests passing, 5/5 consecutive parallel runs, owner sign-off 2026-09-05 | T4 |
 
 ---
 
@@ -635,8 +635,38 @@ is a **new, separate, pre-existing race** in `apps/api/src/routes/compliance_tes
 reproducible only under full-workspace parallel execution and passing both
 in isolation and when run with only its own module — i.e. it races against
 a test in a *different* module sharing the same database, not against
-itself. This is out of CIRF-T5's scope (`auth.rs` only) and is recorded here
-as a new finding for a future CIRF task, not fixed in this pass.
+itself. This was out of CIRF-T5's scope (`auth.rs` only) and was recorded as
+a new finding for a follow-up fix, applied directly the same day (2026-09-05,
+owner-authorized ad hoc fix, no separate task card) — see
+**CIRF-T5-addendum** below.
+
+### CIRF-T5-addendum — connection-pool exhaustion, not a data race
+
+Root-caused by direct inspection rather than repeated reproduction (the
+failure did not reproduce across 6 additional full-workspace runs, consistent
+with a timing/load-dependent resource issue rather than a logic defect):
+`list_audit_events_for_owned_asset` in `crates/db/src/audit_repo.rs` filters
+strictly by `asset_id` (unique per test via UUID) — genuinely race-free at
+the SQL level, ruling out a data-correctness bug. The actual cause is
+connection-pool exhaustion: `compliance_tests.rs::setup_pool` and
+`auth.rs`'s `TestContext::new`/`with_closed_audit_pool` each called
+`PgPool::connect` with no `max_connections` cap, defaulting to sqlx's 10 —
+with 7 tests in `compliance_tests.rs` and 6 in `auth.rs` running in parallel
+(each opening its own pool), that's up to 130 concurrent connections
+contending against Postgres, which can intermittently time out a `connect`
+or `migrate!().run()` call under load.
+
+**Fix applied directly** (mechanical, no behavior change to any test
+assertion): capped every raw `PgPool::connect` call in these two files via
+`sqlx::postgres::PgPoolOptions::new().max_connections(N)` — `2` for
+`compliance_tests.rs::setup_pool`, `2` for `auth.rs`'s `TestContext::new` and
+its `auth_pool`, `1` for `with_closed_audit_pool`'s `audit_pool` (immediately
+closed, never used for queries). Verified: `cargo build -p dubbridge-api
+--tests` clean; `cargo fmt --all -- --check` clean; `cargo clippy --workspace
+--all-targets --all-features -- -D warnings` clean; `cargo test --workspace
+--all-features` run 4 additional consecutive times with zero failures (a 5th
+run was cut short by an unrelated local command timeout, not a test
+failure).
 
 **New governance rule documented this session.** Mid-chain, indentation/
 whitespace drift from `before-after` mode's context-line retyping was
@@ -672,14 +702,20 @@ indentation/whitespace drift.
 
 ### Owner final verification
 
-- Owner: pending — implemented and independently verified by the
-  delegating agent (build, phase-1/phase-2 review, and 5x consecutive
-  parallel test runs); awaiting owner sign-off per standing workflow
+- Owner: `kruk.matias@gmail.com`
+- Date: 2026-09-05
+- Statement: I authorize closure of CIRF-T5. The implementation (T5-1
+  through T5-6b) was independently verified by the delegating agent —
+  build, phase-1/phase-2 Muse Glimmer review (all PASS 0 findings, one
+  correctly-caught BLOCKED on T5-5a's first packet, resolved), and 5
+  consecutive parallel `cargo test` runs with 8/8 `auth.rs` tests passing
+  every time. I reviewed the reported evidence and accept it as sufficient;
+  closing without a separate manual re-run.
 - Commands run: `cargo build -p dubbridge-api --tests`; `cargo fmt --package
   dubbridge-api`; `cargo test -p dubbridge-api --lib
   routes::auth::tests:: ` (5 consecutive runs, no `--test-threads=1`);
   `cargo test --workspace --all-features` (1 run, surfaced the unrelated
-  `compliance_tests.rs` finding above)
+  `compliance_tests.rs` finding, tracked separately)
 
 ## Related
 
