@@ -18,13 +18,6 @@ async fn setup_pool_for_test() -> Option<sqlx::PgPool> {
         .run(&pool)
         .await
         .ok()?;
-    let truncate = sqlx::query("TRUNCATE TABLE assets, organizations RESTART IDENTITY CASCADE")
-        .execute(&pool)
-        .await;
-    assert!(
-        truncate.is_ok(),
-        "translation fanout fixture must clean the current schema when Postgres is available"
-    );
     Some(pool)
 }
 
@@ -168,9 +161,9 @@ async fn hp1_single_target_returns_one_translation_job() {
 }
 
 #[tokio::test]
-async fn ec1_partial_claim_leaves_other_target_working() {
+async fn ec1_partial_claim_leaves_other_target_working() -> Result<(), String> {
     let Some(pool) = setup_pool_for_test().await else {
-        return;
+        return Ok(());
     };
     let asset_id = insert_asset_for_test(&pool).await;
     let project_id = insert_project_with_targets(&pool, asset_id, "en", &["fr", "de"]).await;
@@ -198,27 +191,31 @@ async fn ec1_partial_claim_leaves_other_target_working() {
         tx.rollback().await.unwrap();
     }
 
-    let mismatched_uuid = Uuid::new_v4();
-    dubbridge_db::translation_repo::claim_translation_generation(
+    let generation_request_id =
+        dubbridge_jobs::initial_translation_generation_request_id(subtitle_id);
+    let preclaimed = dubbridge_db::translation_delivery_repo::persist_translation_delivery(
         &pool,
-        dubbridge_db::translation_repo::TranslationClaimInput {
+        dubbridge_db::translation_delivery_repo::TranslationDeliveryInput {
             asset_id,
             project_id,
             target_language_id: fr_id,
-            generation_request_id: mismatched_uuid,
+            generation_request_id,
             source_subtitle_artifact_id: subtitle_id,
-            expected_initial_generation_request_id: mismatched_uuid,
+            expected_initial_generation_request_id: generation_request_id,
             mode: dubbridge_db::translation_repo::TranslationClaimMode::InitialDelivery,
         },
     )
     .await
-    .expect("Failed to pre-claim fr target");
+    .map_err(|error| error.to_string())?;
+    assert_eq!(
+        preclaimed.dispatch,
+        dubbridge_db::translation_delivery_repo::TranslationDispatchDisposition::New
+    );
 
-    let result = fan_out_localization(&pool, asset_id, alignment_id).await;
-    assert!(result.is_ok());
-    let jobs = result.unwrap();
+    let jobs = fan_out_localization(&pool, asset_id, alignment_id).await?;
     assert_eq!(jobs.len(), 1);
     assert_eq!(jobs[0].target_language_id, de_id);
+    Ok(())
 }
 
 #[tokio::test]

@@ -1330,11 +1330,11 @@ async fn cleanup_removes_expired_sessions() {
 // Invariant: exactly one request wins with 201; the other gets 409 CONFLICT;
 // exactly one artifact row exists regardless of scheduling.
 //
-// NOTE: this test requires serial execution. All integration tests share a DB and
-// call migrate_and_reset (which truncates all tables). Parallel runs can cause a
-// third test's truncation to race with this test's in-flight finalizations, yielding
-// a 500 instead of the expected 201. Run the suite with --test-threads=1 when using
-// a live DB. Verified passing in isolation: cargo test concurrent -- --test-threads=1.
+// NOTE: this test requires serial execution. All integration tests share a DB
+// and rely on unique per-test UUIDs for isolation (see CIRF-T4:
+// docs/tasks/ci-red-fixes-2026-09.md). Run the suite with --test-threads=1
+// when using a live DB. Verified passing in isolation: cargo test concurrent
+// -- --test-threads=1.
 #[tokio::test]
 async fn concurrent_duplicate_finalize_one_wins() {
     let Some(mut ctx) = TestContext::new().await else {
@@ -1829,12 +1829,6 @@ async fn migrate_and_reset(pool: &PgPool) {
         .run(pool)
         .await
         .expect("migrations");
-    sqlx::query(
-        "TRUNCATE TABLE pending_ingestions, audit_events, artifact_records, rights_records, assets RESTART IDENTITY CASCADE",
-    )
-    .execute(pool)
-    .await
-    .expect("truncate");
 }
 
 async fn install_pending_ingestion_insert_failure_trigger(pool: &PgPool) {

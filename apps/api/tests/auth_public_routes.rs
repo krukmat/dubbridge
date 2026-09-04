@@ -207,12 +207,6 @@ async fn migrate_and_reset(pool: &PgPool) {
         .run(pool)
         .await
         .expect("migrations");
-    sqlx::query(
-        "TRUNCATE TABLE user_account, organizations, assets, pending_ingestions, audit_events RESTART IDENTITY CASCADE",
-    )
-    .execute(pool)
-    .await
-    .expect("truncate auth/public route tables");
 }
 
 async fn count_accounts_by_email(pool: &PgPool, email: &str) -> i64 {

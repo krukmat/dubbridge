@@ -225,7 +225,9 @@ mod tests {
                 Err(_) => return None,
             };
 
-            let pool = PgPool::connect(&database_url)
+            let pool = sqlx::postgres::PgPoolOptions::new()
+                .max_connections(2)
+                .connect(&database_url)
                 .await
                 .expect("connect database");
             migrate_and_reset(&pool).await;
@@ -256,12 +258,16 @@ mod tests {
                 Err(_) => return None,
             };
 
-            let auth_pool = PgPool::connect(&database_url)
+            let auth_pool = sqlx::postgres::PgPoolOptions::new()
+                .max_connections(2)
+                .connect(&database_url)
                 .await
                 .expect("connect auth database");
             migrate_and_reset(&auth_pool).await;
 
-            let audit_pool = PgPool::connect(&database_url)
+            let audit_pool = sqlx::postgres::PgPoolOptions::new()
+                .max_connections(1)
+                .connect(&database_url)
                 .await
                 .expect("connect audit database");
             audit_pool.close().await;
@@ -302,17 +308,19 @@ mod tests {
 
         seed_account(
             &ctx.pool,
-            "owner@example.com",
+            "t5-1-login-success@example.com",
             "correct horse battery staple",
             "DubBridge",
         )
         .await;
 
+        let before_count = count_audit_events(&ctx.pool, "auth_login_succeeded").await;
+
         let response = send_json(
             &ctx.app,
             Method::POST,
             "/auth/login",
-            r#"{"email":"owner@example.com","password":"correct horse battery staple"}"#,
+            r#"{"email":"t5-1-login-success@example.com","password":"correct horse battery staple"}"#,
         )
         .await;
         let status = response.status();
@@ -326,7 +334,7 @@ mod tests {
         assert!(body["userId"].as_str().expect("user id").len() > 10);
         assert!(body["workspaceId"].as_str().expect("workspace id").len() > 10);
         assert_eq!(
-            count_audit_events(&ctx.pool, "auth_login_succeeded").await,
+            count_audit_events(&ctx.pool, "auth_login_succeeded").await - before_count,
             1
         );
         assert!(!detail.contains(body["token"].as_str().expect("token")));
@@ -341,19 +349,21 @@ mod tests {
 
         seed_account(
             &ctx.pool,
-            "owner@example.com",
+            "t5-2-login-failed@example.com",
             "correct horse battery staple",
             "DubBridge",
         )
         .await;
 
+        let before_count = count_audit_events(&ctx.pool, "auth_login_failed").await;
+
         let wrong_password = send_json(
-            &ctx.app,
+             &ctx.app,
             Method::POST,
-            "/auth/login",
-            r#"{"email":"owner@example.com","password":"definitely the wrong password"}"#,
-        )
-        .await;
+             "/auth/login",
+            r#"{"email":"t5-2-login-failed@example.com","password":"definitely the wrong password"}"#,
+         )
+         .await;
         let wrong_password_status = wrong_password.status();
         let wrong_password_body = json_body(wrong_password).await;
 
@@ -374,7 +384,10 @@ mod tests {
         assert_eq!(unknown_email_status, StatusCode::UNAUTHORIZED);
         assert_eq!(wrong_password_body, unknown_email_body);
         assert_eq!(wrong_password_body["error"], "invalid credentials");
-        assert_eq!(count_audit_events(&ctx.pool, "auth_login_failed").await, 2);
+        assert_eq!(
+            count_audit_events(&ctx.pool, "auth_login_failed").await - before_count,
+            2
+        );
         assert_eq!(detail, r#"{"outcome":"invalid_credentials"}"#);
     }
 
@@ -384,6 +397,9 @@ mod tests {
             eprintln!("skipping integration test: DUBBRIDGE_DATABASE_URL not set");
             return;
         };
+
+        let before_succeeded = count_audit_events(&ctx.pool, "auth_login_succeeded").await;
+        let before_failed = count_audit_events(&ctx.pool, "auth_login_failed").await;
 
         let response = send_json(
             &ctx.app,
@@ -398,10 +414,13 @@ mod tests {
         assert_eq!(status, StatusCode::BAD_REQUEST);
         assert_eq!(body["error"], "password is required");
         assert_eq!(
-            count_audit_events(&ctx.pool, "auth_login_succeeded").await,
+            count_audit_events(&ctx.pool, "auth_login_succeeded").await - before_succeeded,
             0
         );
-        assert_eq!(count_audit_events(&ctx.pool, "auth_login_failed").await, 0);
+        assert_eq!(
+            count_audit_events(&ctx.pool, "auth_login_failed").await - before_failed,
+            0
+        );
     }
 
     #[tokio::test]
@@ -413,19 +432,19 @@ mod tests {
 
         seed_account(
             &ctx.pool,
-            "owner@example.com",
+            "t5-4-audit-fail-closed@example.com",
             "correct horse battery staple",
             "DubBridge",
         )
         .await;
 
         let response = send_json(
-            &ctx.app,
+             &ctx.app,
             Method::POST,
-            "/auth/login",
-            r#"{"email":"owner@example.com","password":"correct horse battery staple"}"#,
-        )
-        .await;
+             "/auth/login",
+            r#"{"email":"t5-4-audit-fail-closed@example.com","password":"correct horse battery staple"}"#,
+         )
+         .await;
         let status = response.status();
         let body = json_body(response).await;
 
@@ -446,12 +465,12 @@ mod tests {
         };
 
         let response = send_json(
-            &ctx.app,
+             &ctx.app,
             Method::POST,
-            "/auth/register",
-            r#"{"email":"owner@example.com","password":"correct horse battery staple","workspaceName":"DubBridge"}"#,
-        )
-        .await;
+             "/auth/register",
+            r#"{"email":"t5-5-register-created@example.com","password":"correct horse battery staple","workspaceName":"DubBridge"}"#,
+         )
+         .await;
         let status = response.status();
         let body = json_body(response).await;
         let detail = latest_audit_detail(&ctx.pool, "auth_registered")
@@ -462,7 +481,10 @@ mod tests {
         assert!(body["token"].as_str().expect("token").len() > 20);
         assert!(body["userId"].as_str().expect("user id").len() > 10);
         assert!(body["workspaceId"].as_str().expect("workspace id").len() > 10);
-        assert_eq!(count_audit_events(&ctx.pool, "auth_registered").await, 1);
+        assert_eq!(
+            count_accounts_by_email(&ctx.pool, "t5-5-register-created@example.com").await,
+            1
+        );
         assert!(!detail.contains(body["token"].as_str().expect("token")));
     }
 
@@ -474,27 +496,30 @@ mod tests {
         };
 
         let first = send_json(
-            &ctx.app,
+             &ctx.app,
             Method::POST,
-            "/auth/register",
-            r#"{"email":"owner@example.com","password":"correct horse battery staple","workspaceName":"DubBridge"}"#,
-        )
-        .await;
+             "/auth/register",
+            r#"{"email":"t5-5b-register-conflict@example.com","password":"correct horse battery staple","workspaceName":"DubBridge"}"#,
+         )
+         .await;
         assert_eq!(first.status(), StatusCode::CREATED);
 
         let second = send_json(
-            &ctx.app,
+             &ctx.app,
             Method::POST,
-            "/auth/register",
-            r#"{"email":"owner@example.com","password":"correct horse battery staple","workspaceName":"DubBridge"}"#,
-        )
-        .await;
+             "/auth/register",
+            r#"{"email":"t5-5b-register-conflict@example.com","password":"correct horse battery staple","workspaceName":"DubBridge"}"#,
+         )
+         .await;
         let status = second.status();
         let body = json_body(second).await;
 
         assert_eq!(status, StatusCode::CONFLICT);
         assert_eq!(body["error"], "account already exists");
-        assert_eq!(count_audit_events(&ctx.pool, "auth_registered").await, 1);
+        assert_eq!(
+            count_accounts_by_email(&ctx.pool, "t5-5b-register-conflict@example.com").await,
+            1
+        );
     }
 
     #[tokio::test]
