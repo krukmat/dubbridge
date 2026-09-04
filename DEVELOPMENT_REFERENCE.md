@@ -186,7 +186,7 @@ The canonical sequencing map is [`docs/plan/roadmap.md`](docs/plan/roadmap.md): 
 
 - Phases use a single canonical `S-xxx` identifier (older `S0`/`P*`/`T*` labels remain as legacy aliases).
 - Status legend: ✅ Done · 🟡 In progress · ⬜ Not started · 📄 Planned (plan exists, not built).
-- Per-slice execution plans live in [`docs/plan/`](docs/plan/) as `s-nnn-*.md`; their task ledgers live in [`docs/tasks/`](docs/tasks/`).
+- Per-slice execution plans live in [`docs/plan/`](docs/plan/) as `s-nnn-*.md`; their task ledgers live in [`docs/tasks/`](docs/tasks/).
 
 Before implementing, locate your task in the roadmap, open its slice plan, then its task ledger. Roadmap ↔ ledger consistency is enforced by `make qa-roadmap-drift`.
 
