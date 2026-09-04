@@ -27,10 +27,27 @@ class BddMapGateTests(unittest.TestCase):
         (self.repo / "docs" / "bdd" / "strict.feature").write_text(
             "Feature: strict\n  Scenario: SC_HP1 works\n    Given a state\n    Then it works\n", encoding="utf-8"
         )
+        self.write_human_inventories(["strict.feature"])
         self.module = load_module(SCRIPT)
 
     def tearDown(self):
         self.tmp.cleanup()
+
+    def write_human_inventories(self, features):
+        readme_rows = "\n".join(f"- `{feature}`" for feature in features)
+        dev_rows = "\n".join(
+            f"| [`{feature}`](docs/bdd/{feature}) | fixture |" for feature in features
+        )
+        (self.repo / "docs" / "bdd" / "README.md").write_text(
+            f"# BDD Mapping\n\n## Canonical spec files\n\n{readme_rows}\n",
+            encoding="utf-8",
+        )
+        (self.repo / "DEVELOPMENT_REFERENCE.md").write_text(
+            "# Development Reference\n\n## Behavior specs (BDD)\n\n"
+            "| Feature | Scope |\n|---|---|\n"
+            f"{dev_rows}\n\n## Developer setup\n",
+            encoding="utf-8",
+        )
 
     def manifest(self, mappings=None):
         features = [{
@@ -66,6 +83,13 @@ class BddMapGateTests(unittest.TestCase):
         self.manifest()
         errors = self.module.validate_repo(self.repo)
         self.assertTrue(any("manifest missing feature" in error for error in errors))
+
+    def test_human_inventory_drift_fails(self):
+        self.manifest()
+        self.write_human_inventories([])
+        errors = self.module.validate_repo(self.repo)
+        self.assertTrue(any("README.md canonical inventory missing feature" in error for error in errors))
+        self.assertTrue(any("DEVELOPMENT_REFERENCE.md BDD inventory missing feature" in error for error in errors))
 
     def test_unknown_scenario_fails(self):
         self.manifest([{"scenario": "UNKNOWN", "tasks": ["T1"], "evidence": ["tests/behavior.py::test_behavior"]}])
