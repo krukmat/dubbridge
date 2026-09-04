@@ -6,11 +6,12 @@ status: active
 
 # Behavioral Testing Contract
 
-This playbook is the operational contract for TDD, ATDD-style acceptance evidence,
-and BDD traceability in DubBridge. `AGENT_WORKFLOW_GUIDE.md` remains the highest
-authority for the overall agent workflow; where it still names the legacy
-`unit-v1` contract, this document defines the forward contract implemented by
-the deterministic repository gates.
+This focused playbook summarizes the TDD, ATDD-style acceptance-evidence, and
+BDD traceability clauses defined authoritatively in
+`AGENT_WORKFLOW_GUIDE.md`. The workflow guide remains the highest authority;
+if this focused reference ever diverges from it, the guide wins. The
+deterministic repository gates implement the `behavior-v2` rules summarized
+below.
 
 ## One model, three responsibilities
 
