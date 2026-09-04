@@ -198,21 +198,26 @@ async fn ec1_partial_claim_leaves_other_target_working() {
         tx.rollback().await.unwrap();
     }
 
-    let mismatched_uuid = Uuid::new_v4();
-    dubbridge_db::translation_repo::claim_translation_generation(
+    let generation_request_id =
+        dubbridge_jobs::initial_translation_generation_request_id(subtitle_id);
+    let preclaimed = dubbridge_db::translation_delivery_repo::persist_translation_delivery(
         &pool,
-        dubbridge_db::translation_repo::TranslationClaimInput {
+        dubbridge_db::translation_delivery_repo::TranslationDeliveryInput {
             asset_id,
             project_id,
             target_language_id: fr_id,
-            generation_request_id: mismatched_uuid,
+            generation_request_id,
             source_subtitle_artifact_id: subtitle_id,
-            expected_initial_generation_request_id: mismatched_uuid,
+            expected_initial_generation_request_id: generation_request_id,
             mode: dubbridge_db::translation_repo::TranslationClaimMode::InitialDelivery,
         },
     )
     .await
-    .expect("Failed to pre-claim fr target");
+    .expect("Failed to pre-claim fr delivery");
+    assert_eq!(
+        preclaimed.dispatch,
+        dubbridge_db::translation_delivery_repo::TranslationDispatchDisposition::New
+    );
 
     let result = fan_out_localization(&pool, asset_id, alignment_id).await;
     assert!(result.is_ok());
