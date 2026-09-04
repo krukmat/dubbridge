@@ -8,6 +8,7 @@ from pathlib import Path
 
 MARKER = "Behavioral coverage contract: behavior-v2"
 SUPPORTED = {".rs", ".py", ".ts", ".tsx", ".js", ".jsx", ".yaml", ".yml", ".sh"}
+ALLOWED_LAYERS = {"unit", "component", "integration", "contract", "e2e"}
 SECTION_RE = re.compile(r"(?m)^##\s+(.+?)\s*$")
 REF_RE = re.compile(r"`([^`]+)`")
 
@@ -93,6 +94,60 @@ def validate_reference(repo: Path, ref: str) -> str | None:
     return None
 
 
+def section_rri(section: str) -> int | None:
+    match = re.search(r"(?im)^\s*-\s*\*\*RRI:\*\*\s*(\d+)\b", section)
+    return int(match.group(1)) if match else None
+
+
+def required_reflection_passes(rri: int) -> int:
+    if rri < 26:
+        return 0
+    if rri <= 40:
+        return 2
+    if rri <= 55:
+        return 3
+    return 4
+
+
+def validate_closure_sections(section: str, label: str) -> list[str]:
+    errors: list[str] = []
+    rri = section_rri(section)
+    if rri is None:
+        errors.append(f"{label}: completed development task must declare numeric RRI")
+    else:
+        required = required_reflection_passes(rri)
+        if required:
+            reflection = re.search(
+                r"(?ims)^###\s+Reflection log\s*$([\s\S]*?)(?=^###\s+|\Z)",
+                section,
+            )
+            if not reflection:
+                errors.append(f"{label}: missing Reflection log for RRI {rri}")
+            else:
+                match = re.search(r"Required passes:\s*(\d+)", reflection.group(1))
+                if not match or int(match.group(1)) < required:
+                    errors.append(f"{label}: Reflection log must declare at least {required} required passes for RRI {rri}")
+
+    owner = re.search(
+        r"(?ims)^###\s+Owner final verification\s*$([\s\S]*?)(?=^###\s+|\Z)",
+        section,
+    )
+    if not owner:
+        errors.append(f"{label}: missing Owner final verification")
+    else:
+        block = owner.group(1)
+        required_patterns = {
+            "Owner": r"(?im)^\s*-\s*Owner:\s*\S.+$",
+            "Date": r"(?im)^\s*-\s*Date:\s*\d{4}-\d{2}-\d{2}\s*$",
+            "Statement": r"(?im)^\s*-\s*Statement:\s*\S.+$",
+            "Commands run": r"(?im)^\s*-\s*Commands run:\s*\S.+$",
+        }
+        for field, pattern in required_patterns.items():
+            if not re.search(pattern, block):
+                errors.append(f"{label}: Owner final verification missing {field}")
+    return errors
+
+
 def validate_task_file(repo: Path, task_file: Path) -> list[str]:
     text = task_file.read_text(encoding="utf-8")
     if MARKER not in text:
@@ -102,34 +157,39 @@ def validate_task_file(repo: Path, task_file: Path) -> list[str]:
     for title, section in split_sections(text):
         if not is_completed_development(section):
             continue
+        label = f"{task_file}: {title}"
 
         hp = ids_under(section, "Happy paths considered", "HP")
         ec = ids_under(section, "Edge cases considered", "EC")
         if not hp:
-            errors.append(f"{task_file}: {title}: missing stable HP-# case")
+            errors.append(f"{label}: missing stable HP-# case")
         if not ec:
-            errors.append(f"{task_file}: {title}: missing stable EC-# case")
+            errors.append(f"{label}: missing stable EC-# case")
 
         rows = certification_rows(section)
         expected = hp | ec
         for case_id in sorted(expected):
             row = rows.get(case_id)
             if row is None:
-                errors.append(f"{task_file}: {title}: missing certification row for {case_id}")
+                errors.append(f"{label}: missing certification row for {case_id}")
                 continue
+            if row["layer"] not in ALLOWED_LAYERS:
+                errors.append(f"{label}: {case_id} layer '{row['layer']}' must be one of: {', '.join(sorted(ALLOWED_LAYERS))}")
             if row["result"] != "passed":
-                errors.append(f"{task_file}: {title}: {case_id} result must be 'passed'")
+                errors.append(f"{label}: {case_id} result must be 'passed'")
             refs = REF_RE.findall(row["evidence"])
             if not refs:
-                errors.append(f"{task_file}: {title}: {case_id} has no backticked executable evidence")
+                errors.append(f"{label}: {case_id} has no backticked executable evidence")
                 continue
             for ref in refs:
                 issue = validate_reference(repo, ref)
                 if issue:
-                    errors.append(f"{task_file}: {title}: {case_id}: {issue}")
+                    errors.append(f"{label}: {case_id}: {issue}")
 
         for case_id in sorted(set(rows) - expected):
-            errors.append(f"{task_file}: {title}: certification row {case_id} has no declared HP/EC case")
+            errors.append(f"{label}: certification row {case_id} has no declared HP/EC case")
+
+        errors.extend(validate_closure_sections(section, label))
     return errors
 
 

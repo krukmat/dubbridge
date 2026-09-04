@@ -82,7 +82,7 @@ Required passes: 2 (`30` → `Moderate`).
 
 ### Verification
 
-- `python3 scripts/check_behavioral_coverage_test.py` → 5/5 passed before integration.
+- `python3 scripts/check_behavioral_coverage_test.py` → 5/5 passed before integration; the suite is expanded by the subsequent closure-hardening change to cover layer, Reflection and owner-verification failures as well.
 - GitHub Actions run `33913058079`, job `qa-docs` → passed with the new deterministic gate in the `qa-docs` execution path.
 - Existing `fmt`, `clippy`, `roadmap-drift`, and `maintainability` jobs also passed on commit `5f4c27cb` while this task was being closed.
 
@@ -91,7 +91,7 @@ Required passes: 2 (`30` → `Moderate`).
 - Owner: primary agent
 - Date: 2026-09-04
 - Statement: verified every BTH-T1 happy path and edge case has deterministic test evidence and that the integrated GitHub `qa-docs` job passes on `main`.
-- Commands/evidence: `python3 scripts/check_behavioral_coverage_test.py`; GitHub Actions run `33913058079` / `qa-docs`.
+- Commands run: `python3 scripts/check_behavioral_coverage_test.py`; GitHub Actions run `33913058079` / `qa-docs`.
 
 ## BTH-T2 — BDD traceability gate and S-120 normalization
 
@@ -141,7 +141,8 @@ Add `qa-bdd-map` to detect BDD drift and repair the known S-120 inconsistencies 
 - Added machine-readable `docs/bdd/behavior-map-v2.json` covering every current `.feature` and placing S-120 in strict mode while grandfathering the remaining historical specs.
 - Added `scripts/check-bdd-map.py` plus deterministic tests and integrated it into the `qa-docs` execution path.
 - Normalized S-120 with inline scenario IDs and executable many-to-many mappings; removed the stale management-console wording.
-- Remaining before closure: reconcile the two human-readable inventory surfaces (`docs/bdd/README.md` and `DEVELOPMENT_REFERENCE.md`) and the authoritative workflow wording so the documented contract cannot diverge from the machine-enforced one.
+- Synchronized the human inventories in `docs/bdd/README.md` and `DEVELOPMENT_REFERENCE.md` and extended the deterministic gate to reject future drift across either surface.
+- Remaining before closure: final `qa-docs` evidence on the inventory-parity version and the authoritative workflow wording alignment handled by BTH-T3.
 
 ## BTH-T3 — Workflow semantics and coverage clarification
 
