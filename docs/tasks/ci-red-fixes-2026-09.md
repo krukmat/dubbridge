@@ -12,9 +12,17 @@ Plan: `docs/plan/ci-red-fixes-2026-09.md`. Root cause evidence:
 RRI calculations run 2026-09-01 with `scripts/rri.py`. T1-T3 are Low-band
 (0-25): no full approval presentation, eligible for local Qwen Developer
 delegation per `docs/policies/HITL_AUTONOMY_POLICY.md` (narrow, mechanical,
-single-file edits). T4 scored Med-high (41-55) and is **parked, not
-implemented under this ledger** — see its entry for why decomposition isn't
-sound yet.
+single-file edits). T4 was originally scored Med-high (41-55) and parked
+pending an owner decision on isolation strategy (see "Original parked
+entry" below for that record). The owner selected **unique-per-test seed
+data** (in practice: delete the shared `TRUNCATE ... RESTART IDENTITY
+CASCADE` call from every affected setup helper, since all tables use UUID
+primary keys — never SERIAL/IDENTITY — so `RESTART IDENTITY` is a no-op
+and every test already inserts its own uniquely-generated UUID rows) and
+approved the recalculated task card (RRI 67 -> Complex, decomposed into
+per-file subtasks per `docs/policies/RRI_POLICY.md`'s RRI >= 56
+decomposition gate). Status and per-file evidence: see "CIRF-T4 —
+decomposed implementation" below.
 
 ## Task summary
 
@@ -23,7 +31,8 @@ sound yet.
 | CIRF-T1 | Fix stale migration count in `migrate_test.rs` | 3 -> Low | S | Implemented, verified — pending owner sign-off | - |
 | CIRF-T2 | Add `fetch-depth: 0` to `qa-docs` job checkout | 5 -> Low | S | Implemented, verified — pending owner sign-off | - |
 | CIRF-T3 | Serialize `qa-test` to eliminate shared-DB race (fast unblock) | 8 -> Low | S | Implemented, verified — pending owner sign-off | - |
-| CIRF-T4 | (Parked) Durable per-test DB isolation redesign | 43 -> Med-high | L | Parked | T3 |
+| CIRF-T4 | Remove shared TRUNCATE from every affected test-DB setup helper | 67 -> Complex (decomposed) | L | Done — all 15 files closed (14 originally-scoped + 1 owner-acknowledged post-approval addition) | T3 |
+| CIRF-T5 | Fix 5 racy tests in `apps/api/src/routes/auth.rs` under parallel execution (discovered validating T4), decomposed into 6 Low-band subtasks (T5-1..T5-4, T5-5a/b, T5-6a/b) | 30 -> Moderate (decomposed to Low per-subtask, each 13 -> Low) | M | Implemented, verified (8/8 `auth.rs` tests passing, 5/5 consecutive parallel runs) — pending owner sign-off | T4 |
 
 ---
 
@@ -310,34 +319,34 @@ satisfied).
 
 ---
 
-## CIRF-T4 - (Parked) Durable per-test DB isolation redesign
+## CIRF-T4 — decomposed implementation
 
-- **Status:** Parked — not implemented under this ledger
+- **Status:** Done — all 15 files closed (14 originally-scoped + 1 found
+  during implementation and owner-acknowledged, `apps/api/tests/
+  notifications_api_test.rs`)
 - **Effort:** L
-- **RRI:** 43 -> Med-high (41-55)
-- **Depends on:** CIRF-T3 (only in the sense that T3 already resolves the
-  CI-blocking symptom, so T4 is optional hardening, not a blocker for
-  anything)
-- **Affected (if pursued):** `apps/api/src/routes/auth.rs`,
-  `apps/api/tests/workspace_test.rs`, and potentially other test files
-  sharing the same truncate-and-reseed pattern (not yet enumerated)
+- **RRI:** 67 -> Complex (decomposed per the RRI >= 56 mandatory
+  decomposition gate into 14 file-level subtasks: 13 Low-band via
+  `scripts/delegate-low-rri.py --mode before-after`, 1 Moderate-band
+  (`crates/db/src/user_account.rs`, RRI 29, floored by the `crates/db`
+  anchor rubric per ADR-006/018) via `scripts/local-agent/run_local_task.py`)
+- **Depends on:** CIRF-T3 (T3 already resolved the CI-blocking symptom;
+  this task is durable hardening, approved to proceed rather than staying
+  parked)
+- **Owner decision (approved):** unique-per-test seed data — in practice,
+  delete the shared `TRUNCATE TABLE ... RESTART IDENTITY CASCADE` call
+  from each setup helper. All affected tables use UUID primary keys (never
+  SERIAL/IDENTITY, confirmed against `infra/migrations/*.sql`), so
+  `RESTART IDENTITY` has no effect, and every test already inserts its own
+  uniquely-generated UUID rows — no reseeding logic needs to be added, only
+  the shared truncate removed.
 
-### Why this is not decomposed into Low subtasks
+### Original parked entry (superseded, kept for audit trail)
 
-Per `docs/policies/RRI_POLICY.md`'s anchor rubric, this task carries the
-`arch_decision` penalty (+12): the actual fix requires **choosing an
-isolation strategy** (per-test transaction with rollback, unique
-per-test seed data instead of shared truncate, or per-test schema) before
-any file can be edited. That choice is the substance of the task, not
-boilerplate around it — decomposing an unmade design decision into
-local-dev-executable Low-band subtasks would just relocate the same
-decision into whichever subtask happens to run first, not actually reduce
-its reasoning burden. Per
-`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Post-repair-budget Low-band
-decomposition, decomposition is a routing mechanism for **already-scoped**
-implementation work, not a substitute for a pending design decision.
-
-RRI computation (recorded for audit):
+This task was originally scored RRI 43 -> Med-high (41-55) and parked
+2026-09-01 pending an owner decision on isolation strategy, carrying the
+`arch_decision` penalty (+12) because choosing an isolation strategy was
+the substance of the task. Original RRI computation:
 
 ```
 python3 scripts/rri.py --touches apps/api/src/routes/auth.rs \
@@ -347,29 +356,330 @@ python3 scripts/rri.py --touches apps/api/src/routes/auth.rs \
 # Final RRI: 43 -> band Med-high (41-55)
 ```
 
-### What would unblock decomposition
+The two blockers named in that entry are now resolved: (1) the owner
+selected unique-per-test seed data (stated above) over transaction-rollback
+or per-test schema; (2) the repo-wide grep for the shared-truncate pattern
+was completed, enumerating the affected files below. With the design
+decision made, the recalculated task (touching all enumerated files as one
+unit) scored RRI 67 -> Complex, triggering the unconditional RRI >= 56
+decomposition gate rather than staying a single Med-high card; the owner
+approved the resulting per-file decomposition.
 
-1. Owner or primary-agent decision on isolation strategy (recommend:
-   unique-per-test seed data — email/workspace name derived from a
-   per-test UUID or the test's own name — over transaction-rollback, since
-   several of these tests assert on committed rows visible to a second
-   connection/handler call, which a wrapping transaction would complicate).
-2. A repo-wide grep for the same `TRUNCATE ... RESTART IDENTITY CASCADE`
-   shared-truncate pattern across `apps/api/tests/*.rs` and
-   `apps/**/src/**/tests` modules, to scope how many files actually need
-   the fix (not yet done — out of scope for this ledger).
-3. Once (1) and (2) are done, the actual per-file edits are very likely
-   each individually Low-band (single test-module edit, no cross-file
-   coupling) and decomposable via `scripts/delegate-low-rri.py` at that
-   point.
+### Enumerated files (grep: `TRUNCATE TABLE ... RESTART IDENTITY CASCADE` /
+`async fn migrate_and_reset` across `apps/**/*.rs` and `crates/**/*.rs`)
 
-### Recommendation
+| # | File | Band | Status |
+|---|---|---|---|
+| 1 | `apps/worker-runner/src/translation_fanout_tests.rs` | Low | Done |
+| 2 | `apps/worker-runner/src/subtitle_runtime_tests.rs` | Low | Done |
+| 3 | `apps/api/tests/review_api_test.rs` | Low | Done |
+| 4 | `apps/worker-runner/src/preparation_runtime_tests/support.rs` | Low | Done |
+| 5 | `apps/worker-runner/src/runner_topology_tests.rs` | Low | Done |
+| 6 | `apps/worker-runner/src/subtitle_enqueue.rs` | Low | Done |
+| 7 | `apps/worker-runner/src/transcription_runtime.rs` | Low | Done |
+| 8 | `apps/worker-runner/src/translation_runtime_tests.rs` | Low | Done |
+| 9 | `apps/api/tests/workspace_test.rs` | Low | Done |
+| 10 | `apps/api/tests/ingestion_test.rs` | Low | Done |
+| 11 | `apps/api/tests/support/mod.rs` | Low | Done |
+| 12 | `apps/api/tests/auth_public_routes.rs` | Low | Done |
+| 13 | `apps/api/src/routes/auth.rs` | Low | Done |
+| 14 | `crates/db/src/user_account.rs` | Moderate (RRI 29) | Done |
+| 15 | `apps/api/tests/notifications_api_test.rs` | Low (pattern-identical) | Done (found post-approval, owner acknowledged 2026-09-04 and approved delegation) |
 
-Do not implement now. CIRF-T3 already removes the CI-blocking symptom.
-Revisit this as a separate, explicitly-scoped follow-up task once an owner
-decision on isolation strategy is available — present as its own Med-high
-card (`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Med-high Architect-refined
-single-attempt gate) rather than folding it into this Low-band ledger.
+### Post-approval scope finding
+
+While delegating file 13, a fresh repo-wide grep (run to cross-check the
+enumerated list before touching the last two files) found
+`apps/api/tests/notifications_api_test.rs:634` also defines
+`migrate_and_reset` with the identical shared-`TRUNCATE` pattern
+(`notifications, push_tokens, publications, review_decisions,
+review_tasks, target_languages, project_assets, projects, org_members,
+organizations, pending_ingestions, audit_events, artifact_records,
+rights_records, assets`). `git log` confirms this file predates the
+current session (added by the S-160 notifications work, commits `c8e9d25`/
+`d945890`), so it was missed by the original enumeration pass, not
+introduced afterward. The fix is identical in kind to the 14 approved
+files (delete the shared TRUNCATE call, table already uses UUID PKs), so
+no new design decision is introduced. The owner explicitly acknowledged
+this additional scope on 2026-09-04 and approved delegating it under the
+same CIRF-T4 effort (see "File 15" below) rather than tracking it as a
+separate follow-up task.
+
+### File 15 (`apps/api/tests/notifications_api_test.rs`) — owner-acknowledged scope addition
+
+Delegated identically to files 1-13 via `scripts/delegate-low-rri.py
+--mode before-after` after the owner's explicit go-ahead. Phase 1 (Muse
+Glimmer, primary for 0-25) PASS 0 findings
+(`muse-glimmer:30b-q4_K_M`, `num_ctx=32768`, 15.7s). Delegation applied a
+27-line diff; `cargo fmt --package dubbridge-api` corrected minor
+continuation-line indentation (9 vs. 8 spaces) with no logic change —
+final diff:
+
+```diff
+     async fn migrate_and_reset(pool: &PgPool) {
+         sqlx::migrate!("../../infra/migrations")
+             .run(pool)
+             .await
+             .expect("migrations");
+-
+-    sqlx::query(
+-        "TRUNCATE TABLE notifications, push_tokens, publications, review_decisions, review_tasks, \
+-         target_languages, project_assets, projects, org_members, organizations, \
+-         pending_ingestions, audit_events, artifact_records, rights_records, assets \
+-         RESTART IDENTITY CASCADE",
+-    )
+-    .execute(pool)
+-    .await
+-    .expect("truncate tables");
+     }
+```
+
+Independently verified: `cargo build -p dubbridge-api --tests` exit 0
+(23.36s); confirmed via `git status --short` that the package-wide `cargo
+fmt` run touched only the 15 files already part of CIRF-T4 plus this
+ledger and `docs/plan/roadmap.md`, no unrelated file. Phase 2 (Muse
+Glimmer) PASS 0 findings (`num_ctx=32768`, 10.75s,
+`phase2-review-15.json`).
+
+### Muse Glimmer phase-1 false-positive (file 13)
+
+`muse-glimmer:30b-q4_K_M` returned `BLOCKED` twice (identical packet, then
+a revised packet with explicit `grep`-verified evidence of the `#[cfg(test)]
+mod tests` boundary) on the false claim that `apps/api/src/routes/auth.rs`
+does not contain a `migrate_and_reset` test helper. This was independently
+verified false (`grep -n "async fn migrate_and_reset"
+apps/api/src/routes/auth.rs` -> line 582, inside `mod tests` opened at line
+185/`#[cfg(test)]` at line 184). Per the RRI 0-25 review chain, the packet
+was sent to the intermediate fallback (`gemma4:26b-a4b-it-qat`), which
+returned `PASS` with findings consistent with the verified file content.
+Both Muse Glimmer `BLOCKED` verdicts and the Gemma `PASS` are recorded
+here per the disposition-divergence requirement; primary-agent disposition:
+accepted Gemma's verdict over Muse Glimmer's, based on independently
+reproduced `grep` evidence contradicting Muse Glimmer's factual claim.
+
+### File 14 (`crates/db/src/user_account.rs`) — anchor-rubric re-evaluation, then ADR-039 cloud fallback
+
+**Anchor-rubric re-evaluation.** Before delegating, the owner asked whether
+this Moderate (RRI 29) task should be split into Low-band sub-tasks like
+files 1-13. Re-running the RRI in isolation
+(`python3 scripts/rri.py --touches crates/db/src/user_account.rs --cc 1
+--D 1 --K 1 --P 1 --T 1 --A 1 --X 0`) confirmed the RRI 29 floor is driven
+entirely by the `crates/db` anchor-rubric row (D/K/P floor 3, ADR-006/018 —
+`docs/policies/RRI_POLICY.md` § DubBridge anchor rubric), not by the actual
+change complexity (a single mechanical deletion). The rubric text anchors
+the floor to the touched crate/path, with no carve-out for `#[cfg(test)]`
+code, and `apps/api` (where files 11-13 correctly scored Low) has no
+dedicated anchor-rubric row at all — so the Moderate/Low split between
+`crates/db` and `apps/api` files is a real, policy-documented distinction,
+not an inconsistency. Decision: keep RRI 29 Moderate, do not force a Low
+split or override the rubric floor.
+
+**Local-first attempt and ADR-039 fallback.** Phase 1 (Gemma, primary for
+26-55) ran on the task card and returned PASS, 0 findings
+(`gemma4:26b-a4b-it-qat`, `num_ctx=8192`, 12.7s,
+`phase1-review-14.json`). `scripts/local-agent/run_local_task.py` was then
+invoked against a disposable worktree
+(`.agent/worktrees/cirf-t4-14`); the local implementer
+(`nemotron-3.5-lightning:30b-a3b-q4_K_M`) hit a `transport_error` — "Gemma
+idle timeout after 180s without a token" — an operational failure, not a
+packet defect. `/api/ps` showed zero loaded models and ample free memory
+immediately after, so this was not the resource-saturation pattern seen
+elsewhere in this repo's history; the runner correctly emitted a
+`fallback-selection-v1` artifact in `awaiting_fallback_selection` (per
+ADR-039, no fallback may fire without a completed human selection).
+
+The owner was presented the operational-only takeover options
+(`gpt-5.6-terra`/`medium` per the Codex resolution table, or direct
+Claude Sonnet 5 authorship) and selected **`gpt-5.6-terra`/`medium`**
+(Codex CLI). The `fallback-selection-v1` artifact was completed
+accordingly (`selection_mode: human-select`, `status: selected`,
+`selected_by: owner, via interactive confirmation 2026-09-04`) before
+invocation.
+
+**Implementation.** Codex CLI (`codex exec --sandbox workspace-write`,
+resolved at `/Users/matias/.local/bin/codex` — see updated
+`reference_codex_cli_location` memory, the CLI's location on this machine
+has changed since it was last checked) applied exactly the required diff
+directly to the main working tree (not the disposable worktree, which was
+therefore removed unused):
+
+```diff
+         MIGRATOR.run(&pool).await.expect("migrations");
+-        sqlx::query("TRUNCATE TABLE user_account, organizations RESTART IDENTITY CASCADE")
+-            .execute(&pool)
+-            .await
+-            .expect("truncate auth tables");
+-
+         Some(pool)
+     }
+```
+
+No other file or function was touched. Independently verified (not just
+trusting Codex's own report): `cargo build -p dubbridge-db --tests` exit 0.
+
+**Phase 2 review.** Gemma (`gemma4:26b-a4b-it-qat`, `num_ctx=8192`, 8.9s)
+reviewed the actual diff plus independent build confirmation and returned
+PASS with three confirmatory (non-defect) findings — diff matches
+acceptance criteria exactly, `MIGRATOR.run`/`Some(pool)` unchanged, no
+other files touched (`phase2-review-14.json`).
+
+Note: Codex's own output additionally reported an internal
+same-provider-degraded "D14" pass as part of its own execution — this is
+Codex's internal process, not a substitute for DubBridge's band-routed
+Gemma phase-2 reviewer, which ran independently as recorded above.
+
+### Gemma Reviewer evidence (file 14)
+
+- Model: `gemma4:26b-a4b-it-qat` (band 26-55 primary; Moderate/Muse
+  Glimmer fallback not triggered)
+- Phase 1 (task-analysis, pre-delegation): PASS, 0 findings
+- Phase 2 (code-solution, post-implementation): PASS, 0 findings (all
+  three findings confirmatory)
+- Passes run / usable: 1/1 each phase
+- Isolated adjudicator (D14): not triggered on the DubBridge side (Gemma
+  responded `done_reason: stop` with valid JSON both phases); Codex
+  separately ran its own internal same-provider-degraded D14-equivalent,
+  noted above for transparency but not counted as this task's D14 fallback
+- disposition_divergence: n/a
+- Fallback selection: `human-select`, ADR-039 artifact at
+  `result-14.fallback-selection.json`, trigger `operational-only` (local
+  implementer idle timeout), selected `gpt-5.6-terra`/`medium` via Codex
+  CLI
+- Primary-agent disposition: accepted both verdicts; independently
+  reproduced the build result rather than trusting Codex's self-report
+
+## CIRF-T5 — fix 5 racy `apps/api/src/routes/auth.rs` tests under parallel execution
+
+**Discovered** while validating CIRF-T4's fix: a full `cargo test --workspace
+--all-features` run (deliberately without `--test-threads=1`) surfaced 5
+failing tests in `apps/api/src/routes/auth.rs`, racy for two independent
+reasons: (1) several tests share the literal seed/login/register email
+`"owner@example.com"`, causing account-uniqueness collisions across
+concurrently-running tests; (2) `count_audit_events`/`latest_audit_detail`
+filter only by `event_kind` (the `audit_events` table has no actor/email
+column — `infra/migrations/0004_create_audit_events.sql`), so an absolute
+count assertion races against any other concurrently-running test emitting
+the same event kind.
+
+**RRI and decomposition.** The whole-bundle fix scored RRI 30 (Moderate,
+`--D 3 --K 2 --P 2 --T 2 --A 2 --X 1`); a single-test-function-scoped edit
+scored RRI 13 (Low, `--D 1 --K 1 --P 1 --T 1 --A 1 --X 0`), confirmed via
+`scripts/rri.py`. Per the owner's instruction to subdivide into Low tasks and
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Post-repair-budget Low-band
+decomposition`, decomposed into independent Low-band subtasks, each
+delegated via `scripts/delegate-low-rri.py --mode before-after` (with the
+40-line BEFORE safety cap forcing two functions to split into `a`/`b`
+sub-packets), phase-1/phase-2 reviewed by `muse-glimmer:30b-q4_K_M`
+(RRI 0-25 chain primary).
+
+| Subtask | Function | Fix | Phase 1 | Phase 2 |
+|---|---|---|---|---|
+| T5-1 | `login_handler_returns_ok_and_emits_success_audit` | unique email + delta count | PASS 0 findings | PASS 0 findings |
+| T5-2 (2a+2b) | `login_handler_maps_wrong_password_and_unknown_email_to_same_unauthorized` | unique email + delta count (split: 45-line BEFORE exceeded cap) | PASS 0 findings (each) | PASS 0 findings (combined) |
+| T5-3 | `login_handler_maps_validation_errors_to_bad_request` | dual before/after delta counters (racy even without email collision) | PASS 0 findings | PASS 0 findings |
+| T5-4 | `login_handler_fails_closed_when_audit_persistence_fails` | unique email only (no count assertion) | PASS 0 findings | PASS 0 findings |
+| T5-5a | `register_handler_returns_created_and_emits_audit` | unique email + delta count | BLOCKED (packet-prose inconsistency) -> corrected -> PASS | see T5-6a (superseded) |
+| T5-5b | `register_handler_maps_duplicate_email_to_conflict` | unique email + delta count | PASS 0 findings | see T5-6b (superseded) |
+
+**T5-5a packet-inconsistency finding (real, not a false positive).** The
+first phase-1 review of T5-5a's packet correctly returned `BLOCKED`: the
+acceptance-criteria prose gave a single-line `assert_eq!` example that
+contradicted the Required AFTER block's correct multi-line formatting
+matching the file's existing style. Per
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Per-task discipline` (a materially
+revised packet needs its own fresh phase-1 pass), the prose was corrected
+to reference the AFTER block's own formatting instead of restating it, and
+phase-1 was re-run, returning PASS.
+
+**T5-1 scope-violation finding (real, caught by manual diff review).** T5-1's
+applied diff also deleted the shared `TRUNCATE` call from `migrate_and_reset`
+in `auth.rs` — not authorized by the packet's AFTER block and not part of
+CIRF-T4's file list. Caught via `git diff` inspection before phase-2 review;
+reverted with Edit, re-verified via `git diff` that only the intended
+function changed, and re-verified `cargo build -p dubbridge-api --tests`
+before proceeding.
+
+**Second-order collision discovered post-closure (T5-6).** After all of
+T5-1 through T5-5b were applied and phase-2-reviewed PASS, a real
+`cargo test --workspace --all-features` run (no `--test-threads=1`) still
+failed T5-5a and T5-5b against **each other**: both had been given their own
+unique email, but both still counted the same `event_kind = "auth_registered"`
+via the shared global `count_audit_events` helper, so one test's
+before/after snapshot window could straddle the other's registration
+(observed delta 2 instead of 1, reproduced 3/3 consecutive runs). Root
+cause: the delta pattern only isolates a test from *other* event kinds and
+*other* emails' registrations — two tests emitting the *same* kind
+concurrently still race, since neither snapshot is atomic relative to the
+other, and the schema has no actor/email column to filter by at the SQL
+level (confirmed against the migration; out of scope to add one).
+
+**T5-6 fix.** Replaced the racy global-count delta in both functions with
+the already-existing `count_accounts_by_email(pool, email)` helper, scoped
+to each test's own unique email — inherently race-free since no two tests
+share an email. Scored RRI 13 (Low, same profile as T5-1..T5-5), split into
+T5-6a/T5-6b (68-line combined BEFORE exceeded the 40-line cap). Both
+phase-1 and the combined phase-2 review (run against the current file state
+rather than the raw diff, to avoid confusing the reviewer with intermediate
+pre-T5-5 content) returned PASS, 0 findings.
+
+**Verification.** `cargo fmt --package dubbridge-api` run once after the
+full T5-1..T5-6b chain (per
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Indentation drift is not a
+delegation defect`, added this session — see below). `cargo test -p
+dubbridge-api --lib routes::auth::tests::` (no `--test-threads=1`): 8/8
+passing, 5/5 consecutive runs. Full `cargo test --workspace --all-features`:
+90/91 `dubbridge-api` tests passing — the one remaining failure
+(`routes::compliance::tests::get_audit_timeline_handler_returns_owned_events`)
+is a **new, separate, pre-existing race** in `apps/api/src/routes/compliance_tests.rs`
+(last touched by `7ceb503`, unrelated to CIRF-T4/T5's file list), confirmed
+reproducible only under full-workspace parallel execution and passing both
+in isolation and when run with only its own module — i.e. it races against
+a test in a *different* module sharing the same database, not against
+itself. This is out of CIRF-T5's scope (`auth.rs` only) and is recorded here
+as a new finding for a future CIRF task, not fixed in this pass.
+
+**New governance rule documented this session.** Mid-chain, indentation/
+whitespace drift from `before-after` mode's context-line retyping was
+observed (and, per explicit owner correction, must not be treated as a
+review finding, must not pause the delegation chain, and must not consume a
+repair attempt). Documented in
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Mandatory workflow before
+implementing` (new paragraph after the Qwen Developer delegation paragraph)
+as the canonical, repo-committed source, plus personal memory
+(`feedback_low_rri_ignore_indentation_drift`). All phase-1/phase-2 review
+prompts in this task explicitly instructed the reviewer to ignore
+indentation/whitespace drift.
+
+### Gemma Reviewer evidence (CIRF-T5, all subtasks)
+
+- Model: `muse-glimmer:30b-q4_K_M` (RRI 0-25 chain primary), `num_ctx=32768`
+- Phase 1 (task-analysis, pre-delegation): PASS 0 findings on 7/8 packets
+  (T5-1, T5-2a, T5-2b, T5-3, T5-4, T5-6a, T5-6b); T5-5a BLOCKED once on a
+  genuine packet-prose inconsistency, corrected, re-reviewed PASS
+- Phase 2 (code-solution, post-implementation): PASS 0 findings, all 5
+  review calls (T5-1; T5-2 combined; T5-3; T5-4; T5-5a+T5-5b+T5-6a+T5-6b
+  combined, reviewed against final file state)
+- Passes run / usable: 1/1 each phase, each packet
+- Isolated adjudicator (D14): not triggered — Muse Glimmer responded
+  `done_reason: stop` with valid JSON on every call (including the one
+  BLOCKED verdict, which was a correct finding, not an availability failure)
+- disposition_divergence: none
+- Primary-agent disposition: accepted all findings; T5-1's out-of-scope
+  TRUNCATE removal reverted; T5-5a's packet inconsistency corrected and
+  re-reviewed; T5-6 designed and delegated after independently reproducing
+  the T5-5a/T5-5b mutual race via real `cargo test` runs (not merely
+  inferred)
+
+### Owner final verification
+
+- Owner: pending — implemented and independently verified by the
+  delegating agent (build, phase-1/phase-2 review, and 5x consecutive
+  parallel test runs); awaiting owner sign-off per standing workflow
+- Commands run: `cargo build -p dubbridge-api --tests`; `cargo fmt --package
+  dubbridge-api`; `cargo test -p dubbridge-api --lib
+  routes::auth::tests:: ` (5 consecutive runs, no `--test-threads=1`);
+  `cargo test --workspace --all-features` (1 run, surfaced the unrelated
+  `compliance_tests.rs` finding above)
 
 ## Related
 

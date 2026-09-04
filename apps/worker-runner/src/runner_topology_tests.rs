@@ -505,15 +505,9 @@ async fn wait_for_end_to_end_ready(pool: PgPool, asset_id: AssetId) -> io::Resul
 async fn setup_pool(database_url: &str) -> PgPool {
     let pool = PgPool::connect(database_url).await.expect("connect");
     sqlx::migrate!("../../infra/migrations")
-        .run(&pool)
-        .await
-        .expect("migrations");
-    sqlx::query(
-        "TRUNCATE TABLE review_tasks, target_languages, project_assets, projects, org_members, organizations, pending_ingestions, audit_events, artifact_records, rights_records, assets, asset_preparation_status, asset_transcription_status, asset_subtitle_status RESTART IDENTITY CASCADE",
-    )
-    .execute(&pool)
-    .await
-    .expect("truncate");
+         .run(&pool)
+         .await
+         .expect("migrations");
     pool
 }
 

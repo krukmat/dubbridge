@@ -908,6 +908,16 @@ work. For harder Low-RRI attempts, the wrapper supports `--temperature`/
 `DUBBRIDGE_LOW_RRI_THINK`; keep thinking off by default (it can consume the
 token budget before the tagged response completes).
 
+**Indentation drift is not a delegation defect.** A `--mode before-after`
+diff can shift surrounding-line indentation by one or two spaces relative to
+the anchor (an artifact of the model retyping context lines). Do not pause a
+delegation chain to inspect or hand-correct this, do not flag it as a phase-1
+or phase-2 review finding, and do not spend a repair attempt on it — it is
+cosmetic, not a scope or correctness defect. Run `cargo fmt` once after the
+last sub-task in a chain touching the same file, not after each sub-task.
+This is the Low-RRI-delegation-specific case of the general rule that
+whitespace/formatting differences are never findings against a contract.
+
 For **RRI 26–40 local-first implementation** (Moderate), use
 `scripts/local-agent/run_local_task.py` in a disposable git worktree. The
 primary agent remains orchestrator of record — owning the task card,

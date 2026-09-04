@@ -156,17 +156,11 @@ mod tests {
         let url = std::env::var("DUBBRIDGE_DATABASE_URL").ok()?;
         let pool = PgPool::connect(&url).await.expect("connect");
         sqlx::migrate!("../../infra/migrations")
-            .run(&pool)
-            .await
-            .expect("migrations");
-        sqlx::query(
-            "TRUNCATE TABLE target_languages, project_assets, projects, org_members, organizations, pending_ingestions, audit_events, artifact_records, rights_records, assets, asset_preparation_status, asset_transcription_status, asset_subtitle_status RESTART IDENTITY CASCADE",
-        )
-        .execute(&pool)
-        .await
-        .expect("truncate");
+             .run(&pool)
+             .await
+             .expect("migrations");
         Some(pool)
-    }
+     }
 
     async fn insert_asset_for_test(pool: &PgPool) -> AssetId {
         let asset_id = dubbridge_domain::asset::AssetId::new();

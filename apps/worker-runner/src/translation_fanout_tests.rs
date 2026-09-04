@@ -18,13 +18,6 @@ async fn setup_pool_for_test() -> Option<sqlx::PgPool> {
         .run(&pool)
         .await
         .ok()?;
-    let truncate = sqlx::query("TRUNCATE TABLE assets, organizations RESTART IDENTITY CASCADE")
-        .execute(&pool)
-        .await;
-    assert!(
-        truncate.is_ok(),
-        "translation fanout fixture must clean the current schema when Postgres is available"
-    );
     Some(pool)
 }
 

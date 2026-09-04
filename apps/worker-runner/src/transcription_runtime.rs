@@ -279,17 +279,11 @@ mod tests {
         let url = env::var("DUBBRIDGE_DATABASE_URL").ok()?;
         let pool = PgPool::connect(&url).await.expect("connect");
         sqlx::migrate!("../../infra/migrations")
-            .run(&pool)
-            .await
-            .expect("migrations");
-        sqlx::query(
-            "TRUNCATE TABLE pending_ingestions, audit_events, artifact_records, rights_records, assets, asset_preparation_status, asset_transcription_status, asset_subtitle_status RESTART IDENTITY CASCADE",
-        )
-        .execute(&pool)
-        .await
-        .expect("truncate");
+             .run(&pool)
+             .await
+             .expect("migrations");
         Some(pool)
-    }
+     }
 
     async fn insert_asset(pool: &PgPool) -> AssetId {
         let asset_id = AssetId::new();

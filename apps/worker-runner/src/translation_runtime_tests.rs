@@ -12,15 +12,9 @@ async fn setup_pool() -> Option<PgPool> {
     let url = std::env::var("DUBBRIDGE_DATABASE_URL").ok()?;
     let pool = PgPool::connect(&url).await.expect("connect");
     sqlx::migrate!("../../infra/migrations")
-        .run(&pool)
-        .await
-        .expect("migrations");
-    sqlx::query(
-        "TRUNCATE TABLE translation_dispatch_outbox, localization_generation_claims, asset_translation_status, artifact_records, project_assets, target_languages, projects, organizations, assets RESTART IDENTITY CASCADE",
-    )
-    .execute(&pool)
-    .await
-    .expect("truncate");
+         .run(&pool)
+         .await
+         .expect("migrations");
     Some(pool)
 }
 
