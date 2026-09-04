@@ -39,6 +39,8 @@ Read these in order before changing anything. They are the authoritative rules f
 | 6 | [`docs/adr/`](docs/adr/) | The decisions that constrain implementation. |
 | 7 | [`docs/plan/roadmap.md`](docs/plan/roadmap.md) | Slice sequence and dependencies — where any task sits. |
 
+For development-task behavioral evidence, also read [`docs/playbooks/BEHAVIORAL_TESTING_CONTRACT.md`](docs/playbooks/BEHAVIORAL_TESTING_CONTRACT.md). It defines the repository's cross-stack `behavior-v2` evidence format and BDD traceability gate while the main workflow guide remains the authority for the surrounding task/RRI process.
+
 Mobile UI work has one additional required read: root [`DESIGN.md`](DESIGN.md), the agent-readable design intent that mirrors the shipped token system in [`mobile/src/theme/tokens.ts`](mobile/src/theme/tokens.ts).
 
 ---
@@ -184,7 +186,7 @@ The canonical sequencing map is [`docs/plan/roadmap.md`](docs/plan/roadmap.md): 
 
 - Phases use a single canonical `S-xxx` identifier (older `S0`/`P*`/`T*` labels remain as legacy aliases).
 - Status legend: ✅ Done · 🟡 In progress · ⬜ Not started · 📄 Planned (plan exists, not built).
-- Per-slice execution plans live in [`docs/plan/`](docs/plan/) as `s-nnn-*.md`; their task ledgers live in [`docs/tasks/`](docs/tasks/).
+- Per-slice execution plans live in [`docs/plan/`](docs/plan/) as `s-nnn-*.md`; their task ledgers live in [`docs/tasks/`](docs/tasks/`).
 
 Before implementing, locate your task in the roadmap, open its slice plan, then its task ledger. Roadmap ↔ ledger consistency is enforced by `make qa-roadmap-drift`.
 
@@ -192,20 +194,27 @@ Before implementing, locate your task in the roadmap, open its slice plan, then 
 
 ## Behavior specs (BDD)
 
-Canonical `.feature` specs live in [`docs/bdd/`](docs/bdd/) ([convention](docs/bdd/README.md)). Scenario IDs are stable and behavioral. Executable evidence for mobile flows may live in `mobile/maestro/` or mobile tests even when the canonical spec is here.
+Canonical `.feature` specs live in [`docs/bdd/`](docs/bdd/). The machine-readable inventory and strict/legacy migration state live in [`docs/bdd/behavior-map-v2.json`](docs/bdd/behavior-map-v2.json); that manifest, not a duplicated hand-maintained list, is the canonical inventory checked by `make qa-bdd-map`. The human mapping convention remains in [`docs/bdd/README.md`](docs/bdd/README.md).
+
+Scenario IDs are stable and behavioral for strict specs. Executable evidence may live at the cheapest appropriate layer: Rust/Python tests, Jest/TypeScript component tests, integration/contract tests, or Maestro/runner artifacts. One scenario may map to multiple tasks and evidence items.
+
+Current feature set:
 
 | Feature | Scope |
 |---------|-------|
+| [`p4-workspace.feature`](docs/bdd/p4-workspace.feature) | Workspace |
+| [`p6-compliance.feature`](docs/bdd/p6-compliance.feature) | Compliance |
 | [`s-050-mobile-client.feature`](docs/bdd/s-050-mobile-client.feature) | First-party mobile client |
 | [`s-055-maestro-suite.feature`](docs/bdd/s-055-maestro-suite.feature) | Maestro E2E visual suite |
 | [`s-060-mobile-asset-lifecycle.feature`](docs/bdd/s-060-mobile-asset-lifecycle.feature) | Mobile asset lifecycle |
 | [`s-120-media-preparation.feature`](docs/bdd/s-120-media-preparation.feature) | Media preparation |
 | [`s-125-hls-playback-delivery.feature`](docs/bdd/s-125-hls-playback-delivery.feature) | HLS playback delivery |
 | [`s-127-mobile-review-player.feature`](docs/bdd/s-127-mobile-review-player.feature) | Mobile review player |
+| [`s-130-asr-transcription.feature`](docs/bdd/s-130-asr-transcription.feature) | ASR transcription |
+| [`s-140-subtitle-generation.feature`](docs/bdd/s-140-subtitle-generation.feature) | Subtitle generation |
 | [`s-160-review.feature`](docs/bdd/s-160-review.feature) | Human review workflow |
 | [`s-200-mobile-auth.feature`](docs/bdd/s-200-mobile-auth.feature) | Mobile authentication |
 | [`s-210-mobile-product-experience.feature`](docs/bdd/s-210-mobile-product-experience.feature) | Mobile product experience |
-| [`p4-workspace.feature`](docs/bdd/p4-workspace.feature) · [`p6-compliance.feature`](docs/bdd/p6-compliance.feature) | Workspace · compliance |
 
 ---
 
@@ -321,21 +330,25 @@ Run `make qa-local` before committing. `make qa-ci` is the blocking baseline CI 
 | `make qa-lint` | `cargo clippy -D warnings` |
 | `make qa-test` | `cargo test --workspace --all-features` |
 | `make qa-deny` | dependency advisories and license policy |
-| `make qa-coverage` | 90% line coverage gate (llvm-cov, `--test-threads=1`) |
-| `make qa-docs` | doc consistency + task coverage + roadmap drift + OKF frontmatter (deterministic, no LLM) |
+| `make qa-coverage` | Rust-workspace 90% line-coverage gate using `cargo llvm-cov`, with the repository's configured filename exclusions |
+| `make qa-behavioral-coverage` | deterministic `behavior-v2` HP/EC executable-evidence validation across Rust, Python, JS/TS/Jest, YAML/Maestro and runner artifacts |
+| `make qa-bdd-map` | canonical BDD inventory + strict scenario/task/evidence traceability |
+| `make qa-docs` | doc consistency + legacy `unit-v1` task coverage + `behavior-v2` coverage + BDD mapping + roadmap drift + OKF frontmatter (deterministic, no LLM) |
 | `make qa-docs-review` | `qa-docs` + Gemma Reviewer pass (task closure / CI, not pre-push) |
 | `make qa-okf-frontmatter` | OKF frontmatter validator alone |
 | `make qa-roadmap-drift` | ledger ↔ roadmap consistency |
 | `make qa-maintainability` | `python3 scripts/check-maintainability.py` |
-| `make qa-mobile` | React Native typecheck + lint + Jest |
+| `make qa-mobile` | React Native typecheck + lint + Jest; separate from the Rust line-coverage threshold |
 | `make qa-build-release` | release build verification |
 | `make qa-ci` | Full CI mirror: all of the above |
+
+Line coverage and behavioral coverage answer different questions. The Rust 90% gate protects aggregate implementation coverage; `behavior-v2` asks whether each approved task behavior has executable evidence at the correct layer. Do not treat either metric as a substitute for the other.
 
 ---
 
 ## Knowledge format (OKF)
 
-Every file in [`docs/`](docs/) carries YAML frontmatter declaring a closed `type:` and a `status:` (ADR-033). Missing or invalid frontmatter blocks commits and CI.
+In-scope Markdown knowledge artifacts under [`docs/`](docs/) carry YAML frontmatter according to ADR-033 and the path/type vocabulary enforced by `scripts/check_okf_frontmatter.py`. Index READMEs, templates, daily notes, `.feature` specs, JSON manifests, and paths outside the validator's closed vocabulary are intentionally outside that particular frontmatter check.
 
 ```yaml
 ---
@@ -361,7 +374,7 @@ The closed `type` vocabulary and its location rules (authoritative: [`docs/knowl
 
 ```bash
 make qa-okf-frontmatter   # validator alone
-make qa-docs              # deterministic doc gate (includes OKF; no Gemma)
+make qa-docs              # deterministic doc + behavioral-evidence gate (no Gemma)
 make qa-docs-review       # qa-docs + Gemma Reviewer (task closure / CI)
 ```
 
@@ -369,7 +382,7 @@ make qa-docs-review       # qa-docs + Gemma Reviewer (task closure / CI)
 
 ## Agent workflow and RRI
 
-All development follows the mandatory `analyze → plan → tasks → approval → implement` workflow in [`docs/playbooks/AGENT_WORKFLOW_GUIDE.md`](docs/playbooks/AGENT_WORKFLOW_GUIDE.md) — the highest-authority source for agent-facing decisions. Approval rules are in [`docs/policies/HITL_AUTONOMY_POLICY.md`](docs/policies/HITL_AUTONOMY_POLICY.md).
+All development follows the mandatory `analyze → plan → tasks → approval → implement` workflow in [`docs/playbooks/AGENT_WORKFLOW_GUIDE.md`](docs/playbooks/AGENT_WORKFLOW_GUIDE.md) — the highest-authority source for agent-facing decisions. Approval rules are in [`docs/policies/HITL_AUTONOMY_POLICY.md`](docs/policies/HITL_AUTONOMY_POLICY.md). Cross-stack testing evidence and BDD traceability are defined in [`docs/playbooks/BEHAVIORAL_TESTING_CONTRACT.md`](docs/playbooks/BEHAVIORAL_TESTING_CONTRACT.md) and enforced by `qa-docs`.
 
 ### Required Reasoning Index (RRI)
 
@@ -409,9 +422,9 @@ docs/adr/           — architecture decision records
 docs/architecture.md— architecture overview
 docs/plan/          — roadmap + per-slice execution plans
 docs/tasks/         — per-slice task ledgers
-docs/bdd/           — behavior specs (.feature)
-docs/playbooks/     — workflow guides
+docs/bdd/           — behavior specs (.feature) + behavior-map-v2.json
+docs/playbooks/     — workflow guides and behavioral testing contract
 docs/policies/      — autonomy, RRI, and other policies
-scripts/            — rri.py, OKF + roadmap-drift + maintainability checks
+scripts/            — RRI, behavioral/BDD, OKF, roadmap-drift, maintainability checks
 mobile/             — React Native + Expo mobile client
 ```
