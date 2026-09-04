@@ -168,9 +168,9 @@ async fn hp1_single_target_returns_one_translation_job() {
 }
 
 #[tokio::test]
-async fn ec1_partial_claim_leaves_other_target_working() {
+async fn ec1_partial_claim_leaves_other_target_working() -> Result<(), String> {
     let Some(pool) = setup_pool_for_test().await else {
-        return;
+        return Ok(());
     };
     let asset_id = insert_asset_for_test(&pool).await;
     let project_id = insert_project_with_targets(&pool, asset_id, "en", &["fr", "de"]).await;
@@ -213,17 +213,16 @@ async fn ec1_partial_claim_leaves_other_target_working() {
         },
     )
     .await
-    .expect("Failed to pre-claim fr delivery");
+    .map_err(|error| error.to_string())?;
     assert_eq!(
         preclaimed.dispatch,
         dubbridge_db::translation_delivery_repo::TranslationDispatchDisposition::New
     );
 
-    let result = fan_out_localization(&pool, asset_id, alignment_id).await;
-    assert!(result.is_ok());
-    let jobs = result.unwrap();
+    let jobs = fan_out_localization(&pool, asset_id, alignment_id).await?;
     assert_eq!(jobs.len(), 1);
     assert_eq!(jobs[0].target_language_id, de_id);
+    Ok(())
 }
 
 #[tokio::test]
