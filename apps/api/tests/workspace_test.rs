@@ -48,6 +48,51 @@ impl TokenVerifier for StubTokenVerifier {
     }
 }
 
+fn build_stub_verifier(
+    admin_id: Uuid,
+    viewer_id: Uuid,
+    workspace_write_token: &str,
+    workspace_read_token: &str,
+    assets_only_token: &str,
+    viewer_write_token: &str,
+) -> SharedTokenVerifier {
+    Arc::new(
+        StubTokenVerifier::default()
+            .with_token(
+                workspace_write_token,
+                Ok(AuthenticatedPrincipal::new(
+                    admin_id,
+                    ["workspaces:read", "workspaces:write"]
+                        .into_iter()
+                        .map(str::to_string),
+                )),
+            )
+            .with_token(
+                workspace_read_token,
+                Ok(AuthenticatedPrincipal::new(
+                    admin_id,
+                    ["workspaces:read"].into_iter().map(str::to_string),
+                )),
+            )
+            .with_token(
+                assets_only_token,
+                Ok(AuthenticatedPrincipal::new(
+                    admin_id,
+                    ["assets:ingest"].into_iter().map(str::to_string),
+                )),
+            )
+            .with_token(
+                viewer_write_token,
+                Ok(AuthenticatedPrincipal::new(
+                    viewer_id,
+                    ["workspaces:read", "workspaces:write"]
+                        .into_iter()
+                        .map(str::to_string),
+                )),
+            ),
+    )
+}
+
 struct TestContext {
     pool: PgPool,
     _storage_dir: Arc<TempDir>,
@@ -86,40 +131,13 @@ impl TestContext {
         let assets_only_token = "assets-only-token".to_string();
         let viewer_write_token = "viewer-write-token".to_string();
 
-        let verifier: SharedTokenVerifier = Arc::new(
-            StubTokenVerifier::default()
-                .with_token(
-                    &workspace_write_token,
-                    Ok(AuthenticatedPrincipal::new(
-                        admin_id,
-                        ["workspaces:read", "workspaces:write"]
-                            .into_iter()
-                            .map(str::to_string),
-                    )),
-                )
-                .with_token(
-                    &workspace_read_token,
-                    Ok(AuthenticatedPrincipal::new(
-                        admin_id,
-                        ["workspaces:read"].into_iter().map(str::to_string),
-                    )),
-                )
-                .with_token(
-                    &assets_only_token,
-                    Ok(AuthenticatedPrincipal::new(
-                        admin_id,
-                        ["assets:ingest"].into_iter().map(str::to_string),
-                    )),
-                )
-                .with_token(
-                    &viewer_write_token,
-                    Ok(AuthenticatedPrincipal::new(
-                        viewer_id,
-                        ["workspaces:read", "workspaces:write"]
-                            .into_iter()
-                            .map(str::to_string),
-                    )),
-                ),
+        let verifier = build_stub_verifier(
+            admin_id,
+            viewer_id,
+            &workspace_write_token,
+            &workspace_read_token,
+            &assets_only_token,
+            &viewer_write_token,
         );
 
         let config = dubbridge_config::AppConfig::from_env();
@@ -621,8 +639,17 @@ async fn asset_subtitle_route_returns_none_without_target_languages() {
 }
 
 async fn migrate_and_reset(pool: &PgPool) {
-    // Fail-closed tests drop audit_events intentionally. If it's missing,
-    // remove its migration records so sqlx re-creates it.
+    // Always ensure the migration table and baseline schema exist first —
+    // this is idempotent and safe even on a fresh database with no
+    // `_sqlx_migrations` table yet.
+    sqlx::migrate!("../../infra/migrations")
+        .run(pool)
+        .await
+        .expect("migrations");
+
+    // Fail-closed tests drop audit_events intentionally. If it's missing
+    // after the baseline migrate, remove its migration records so sqlx
+    // re-creates it.
     let audit_exists: Option<i32> = sqlx::query_scalar(
         "SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='audit_events'",
     )
@@ -630,7 +657,7 @@ async fn migrate_and_reset(pool: &PgPool) {
     .await
     .unwrap_or(None);
     if audit_exists.is_none() {
-        sqlx::query("DELETE FROM _sqlx_migrations WHERE version IN (4, 9)")
+        sqlx::query("DELETE FROM _sqlx_migrations WHERE version IN (4, 9, 30)")
             .execute(pool)
             .await
             .expect("clear stale migration records");
@@ -640,12 +667,6 @@ async fn migrate_and_reset(pool: &PgPool) {
         .run(pool)
         .await
         .expect("migrations");
-    sqlx::query(
-        "TRUNCATE TABLE target_languages, project_assets, projects, org_members, organizations, pending_ingestions, audit_events, artifact_records, rights_records, assets RESTART IDENTITY CASCADE",
-    )
-    .execute(pool)
-    .await
-    .expect("truncate");
 }
 
 async fn insert_org_for_subject(

@@ -51,24 +51,8 @@ pub async fn finalize_ingestion_core(
     uploader_id: Uuid,
     artifact_kind: ArtifactKind,
 ) -> Result<Asset, IngestionServiceError> {
-    let mut tx = begin_tx(pool).await?;
-
-    // Lock the pending row (H1-T1). Distinguishes 409 vs 404 when not found.
-    let pending =
-        match dubbridge_db::pending_ingestion_repo::lock_for_finalize(&mut tx, ingest_token).await?
-        {
-            Some(record) => record,
-            None => {
-                let already_done =
-                    dubbridge_db::artifact_repo::exists_for_token_tx(&mut tx, ingest_token).await?;
-                drop(tx);
-                if already_done {
-                    emit_duplicate_rejection(pool, ingest_token).await?;
-                    return Err(IngestionServiceError::AlreadyFinalized);
-                }
-                return Err(IngestionServiceError::SessionNotFound);
-            }
-        };
+    let tx = begin_tx(pool).await?;
+    let (mut tx, pending) = lock_pending_or_reject(pool, tx, ingest_token).await?;
 
     if pending.expires_at < OffsetDateTime::now_utc() {
         return Err(IngestionServiceError::SessionExpired);
@@ -81,6 +65,80 @@ pub async fn finalize_ingestion_core(
         return Err(IngestionServiceError::AlreadyFinalized);
     }
 
+    let command = build_finalize_command(uploader_id, &pending, ingest_token)?;
+    let rights_basis = pending
+        .rights_basis
+        .clone()
+        .ok_or(IngestionServiceError::Validation(
+            IngestionError::MissingRightsBasis,
+        ))?;
+
+    let asset = persist_finalization_writes(
+        &mut tx,
+        &pending,
+        &command,
+        &rights_basis,
+        ingest_token,
+        artifact_kind,
+        uploader_id,
+    )
+    .await?;
+
+    commit_and_fetch(pool, tx, asset.id, ingest_token).await
+}
+
+/// Locks the pending row (H1-T1) inside `tx`, distinguishing 409 (already
+/// finalized) vs 404 (never existed) when the row is not found. Returns the
+/// still-open transaction alongside the locked record on success; on a
+/// missing row it drops `tx` itself (the duplicate-rejection audit write
+/// needs a free pool connection) and always returns an error.
+async fn lock_pending_or_reject<'a>(
+    pool: &PgPool,
+    mut tx: sqlx::Transaction<'a, sqlx::Postgres>,
+    ingest_token: Uuid,
+) -> Result<
+    (
+        sqlx::Transaction<'a, sqlx::Postgres>,
+        dubbridge_db::pending_ingestion_repo::PendingIngestionRecord,
+    ),
+    IngestionServiceError,
+> {
+    match dubbridge_db::pending_ingestion_repo::lock_for_finalize(&mut tx, ingest_token).await? {
+        Some(record) => {
+            // Postcondition (X26-T3a, Tiger Style D1): the row this query locked
+            // must be the one keyed by the requested token. `lock_for_finalize`'s
+            // WHERE clause is the only source of the mapping — a mismatch here
+            // would mean a query bug, not attacker-reachable input, so this is a
+            // programmer invariant, not a `Result`-typed recoverable condition.
+            assert!(
+                record.ingest_token == ingest_token,
+                "lock_pending_or_reject postcondition violated: locked pending row's \
+                 ingest_token ({}) does not match the requested ingest_token ({})",
+                record.ingest_token,
+                ingest_token
+            );
+            Ok((tx, record))
+        }
+        None => {
+            let already_done =
+                dubbridge_db::artifact_repo::exists_for_token_tx(&mut tx, ingest_token).await?;
+            drop(tx);
+            if already_done {
+                emit_duplicate_rejection(pool, ingest_token).await?;
+                return Err(IngestionServiceError::AlreadyFinalized);
+            }
+            Err(IngestionServiceError::SessionNotFound)
+        }
+    }
+}
+
+/// Builds and validates the `FinalizeIngestionCommand` for the locked pending
+/// row. Pure construction plus the command's own domain validation — no IO.
+fn build_finalize_command(
+    uploader_id: Uuid,
+    pending: &dubbridge_db::pending_ingestion_repo::PendingIngestionRecord,
+    ingest_token: Uuid,
+) -> Result<FinalizeIngestionCommand, IngestionServiceError> {
     let command = FinalizeIngestionCommand {
         ingest_token,
         uploader_id: Some(uploader_id),
@@ -93,20 +151,43 @@ pub async fn finalize_ingestion_core(
     command
         .validate()
         .map_err(IngestionServiceError::Validation)?;
+    Ok(command)
+}
 
-    let rights_basis = pending
-        .rights_basis
-        .clone()
-        .ok_or(IngestionServiceError::Validation(
-            IngestionError::MissingRightsBasis,
-        ))?;
+/// Writes the asset, rights record, artifact record, finalized status, audit
+/// event, and pending-row deletion inside the caller's still-open `tx`
+/// (H1-T1: all six writes commit or roll back together). Returns the newly
+/// created asset.
+async fn persist_finalization_writes(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    pending: &dubbridge_db::pending_ingestion_repo::PendingIngestionRecord,
+    command: &FinalizeIngestionCommand,
+    rights_basis: &dubbridge_domain::rights::RightsBasis,
+    ingest_token: Uuid,
+    artifact_kind: ArtifactKind,
+    uploader_id: Uuid,
+) -> Result<Asset, IngestionServiceError> {
+    // Precondition (X26-T3a, Tiger Style D1): by the time this helper runs, the
+    // caller (`finalize_ingestion_core`, via `build_finalize_command`) has
+    // already run `FinalizeIngestionCommand::validate` to `Ok` on this exact
+    // `rights_basis`, which fail-closed-rejects an empty owner/proof_reference
+    // (ADR-008). This restates that already-checked invariant for whoever reads
+    // or modifies this function next — it is not a re-validation of
+    // externally-reachable input, so it stays an `assert!`, not a `Result`.
+    assert!(
+        !rights_basis.owner.trim().is_empty() && !rights_basis.proof_reference.trim().is_empty(),
+        "persist_finalization_writes precondition violated: rights_basis owner/proof_reference \
+         must already be non-empty (FinalizeIngestionCommand::validate should have rejected this \
+         upstream, ADR-008)"
+    );
+
     let asset =
         dubbridge_domain::asset::Asset::new_pending(command.asset_title.clone(), uploader_id);
 
-    dubbridge_db::asset_repo::insert_asset_tx(&mut tx, &asset).await?;
+    dubbridge_db::asset_repo::insert_asset_tx(tx, &asset).await?;
 
-    let rights_record = RightsRecord::new(asset.id, &rights_basis);
-    dubbridge_db::rights_repo::insert_rights_record_tx(&mut tx, &rights_record).await?;
+    let rights_record = RightsRecord::new(asset.id, rights_basis);
+    dubbridge_db::rights_repo::insert_rights_record_tx(tx, &rights_record).await?;
 
     let artifact_record = ArtifactRecord {
         id: Uuid::new_v4(),
@@ -119,14 +200,10 @@ pub async fn finalize_ingestion_core(
         checksum: pending.checksum.clone(),
         created_at: OffsetDateTime::now_utc(),
     };
-    insert_artifact_or_reject(&mut tx, &artifact_record, ingest_token).await?;
+    insert_artifact_or_reject(tx, &artifact_record, ingest_token).await?;
 
-    dubbridge_db::asset_repo::update_asset_status_tx(
-        &mut tx,
-        asset.id,
-        &IngestionStatus::Finalized,
-    )
-    .await?;
+    dubbridge_db::asset_repo::update_asset_status_tx(tx, asset.id, &IngestionStatus::Finalized)
+        .await?;
 
     let audit_event = AuditEvent::new(
         Some(asset.id),
@@ -134,13 +211,12 @@ pub async fn finalize_ingestion_core(
         ingest_token,
         Some(format!("asset {} finalized", asset.id)),
     );
-    dubbridge_db::audit_repo::insert_audit_event_tx(&mut tx, &audit_event).await?;
+    dubbridge_db::audit_repo::insert_audit_event_tx(tx, &audit_event).await?;
 
     // Pending row deleted inside the transaction — cleanup cannot race this delete.
-    dubbridge_db::pending_ingestion_repo::delete_pending_ingestion_tx(&mut tx, ingest_token)
-        .await?;
+    dubbridge_db::pending_ingestion_repo::delete_pending_ingestion_tx(tx, ingest_token).await?;
 
-    commit_and_fetch(pool, tx, asset.id, ingest_token).await
+    Ok(asset)
 }
 
 async fn begin_tx(

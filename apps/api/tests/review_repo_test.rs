@@ -34,16 +34,14 @@ struct ReviewScope {
     other_reviewer_subject_id: Uuid,
 }
 
-async fn insert_review_scope(pool: &PgPool) -> ReviewScope {
-    let org_id = OrgId(Uuid::new_v4());
-    let project_id = ProjectId(Uuid::new_v4());
-    let other_project_id = ProjectId(Uuid::new_v4());
-    let asset_id = AssetId(Uuid::new_v4());
-    let other_asset_id = AssetId(Uuid::new_v4());
-    let target_language_id = Uuid::new_v4();
-    let reviewer_subject_id = Uuid::new_v4();
-    let other_reviewer_subject_id = Uuid::new_v4();
-
+async fn insert_review_org_and_projects(
+    pool: &PgPool,
+    org_id: OrgId,
+    project_id: ProjectId,
+    other_project_id: ProjectId,
+    reviewer_subject_id: Uuid,
+    other_reviewer_subject_id: Uuid,
+) {
     sqlx::query("INSERT INTO organizations (id, name) VALUES ($1, $2)")
         .bind(org_id.0)
         .bind("Repo Review Org")
@@ -76,7 +74,16 @@ async fn insert_review_scope(pool: &PgPool) -> ReviewScope {
         .execute(pool)
         .await
         .expect("insert second project");
+}
 
+async fn insert_review_assets_and_language(
+    pool: &PgPool,
+    project_id: ProjectId,
+    other_project_id: ProjectId,
+    asset_id: AssetId,
+    other_asset_id: AssetId,
+    target_language_id: Uuid,
+) {
     for (asset, title) in [
         (asset_id.0, "repo-review-asset"),
         (other_asset_id.0, "repo-review-other-asset"),
@@ -115,6 +122,37 @@ async fn insert_review_scope(pool: &PgPool) -> ReviewScope {
     .execute(pool)
     .await
     .expect("insert target language");
+}
+
+async fn insert_review_scope(pool: &PgPool) -> ReviewScope {
+    let org_id = OrgId(Uuid::new_v4());
+    let project_id = ProjectId(Uuid::new_v4());
+    let other_project_id = ProjectId(Uuid::new_v4());
+    let asset_id = AssetId(Uuid::new_v4());
+    let other_asset_id = AssetId(Uuid::new_v4());
+    let target_language_id = Uuid::new_v4();
+    let reviewer_subject_id = Uuid::new_v4();
+    let other_reviewer_subject_id = Uuid::new_v4();
+
+    insert_review_org_and_projects(
+        pool,
+        org_id,
+        project_id,
+        other_project_id,
+        reviewer_subject_id,
+        other_reviewer_subject_id,
+    )
+    .await;
+
+    insert_review_assets_and_language(
+        pool,
+        project_id,
+        other_project_id,
+        asset_id,
+        other_asset_id,
+        target_language_id,
+    )
+    .await;
 
     ReviewScope {
         org_id,

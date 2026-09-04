@@ -75,11 +75,11 @@ ledger.
 | T4o | Full local image-pipeline contract | development/test | S (RRI 24 Low) | T4c, T4e, T4g, T4l; T4n if executed (contract-verified images) | [x] Done — 2026-08-24 |
 | T4p | Execute and record local image evidence | operational/evidence | S (RRI 19 Low) | T4o | [x] Done — 2026-08-24 |
 | T4q | T4 parent closeout and status sync | docs-only | S (RRI 10 Low) | T4p; T4n if executed | [x] Done — 2026-08-24 |
-| T5 | Production deployment descriptor and secret boundary (non-executable parent) | config-only parent | XL (RRI 71 High; decomposition required) | T4q | 🟡 in progress — T5a and T5b Done; T5c/T5d remain |
+| T5 | Production deployment descriptor and secret boundary (non-executable parent) | config-only parent | XL (RRI 71 High; decomposition required) | T4q | [x] Done 2026-08-27 — T5a, T5b, T5c, T5d all Done |
 | T5a | Freeze production inputs and child contracts | planning/config | M (RRI 38 Moderate) | T4q | [x] Done 2026-08-26 — owner supplied public hostname; all inputs frozen |
 | T5b | Production profile and environment/secret template | config-only | M (RRI 27 Moderate, corrected 2026-08-27) | T5a | [x] Done 2026-08-27 — Claude Sonnet 5 direct; Gemma Reviewer PASS 0 findings; owner-verified |
-| T5c | Production Compose and TLS reverse proxy | config-only | M (provisional RRI 35 Moderate) | T5b | [ ] Not started — unblocked, T5b closed |
-| T5d | Local descriptor evidence and aggregate status sync | operational/docs | M (provisional RRI 27 Moderate) | T5c | [ ] Blocked — transitive via T5c |
+| T5c | Production Compose and TLS reverse proxy | config-only | M (RRI 26 Moderate, recomputed 2026-08-27) | T5b | [x] Done 2026-08-27 — Claude Sonnet 5 direct (owner override); Gemma Reviewer PASS 0 findings both phases; owner-verified |
+| T5d | Local descriptor evidence and aggregate status sync | operational/docs | S (RRI 22 Low, recomputed 2026-08-27) | T5c | [x] Done 2026-08-27 — structural render + fail-closed guard evidence; owner-verified |
 | T6 | First deploy and end-to-end smoke on Digital Ocean | operational | L | T5 | [ ] Planned |
 | T7 | Mobile POC build against the deployed backend | development/ops | M | T6 | [ ] Planned |
 | T7b | Mobile registration screen | development | M | T7 | [ ] Planned — droppable (first) |
@@ -4735,11 +4735,10 @@ Required passes: 2 (`27` → `Moderate`)
 ### S-230-T5c: Production Compose and TLS reverse proxy
 
 **Type:** config-only
-**Effort:** M — provisional RRI 35 Moderate
+**Effort:** M — RRI 26 Moderate (recomputed 2026-08-27; supersedes the
+provisional RRI 35 estimate, same band)
 **Depends on:** S-230-T5b
-**Status:** [ ] Not started 2026-08-27 — unblocked: T5b (RRI 27 Moderate)
-closed Done 2026-08-27. `poc.iotforce.es` is frozen and available for this
-task's `Caddyfile` criterion.
+**Status:** [x] Done 2026-08-27
 
 **Acceptance criteria:**
 
@@ -4755,48 +4754,216 @@ task's `Caddyfile` criterion.
 
 **Status artifacts affected:** this ledger.
 
-**Blocked — next action:** none — T5b closed 2026-08-27; this task is
-unblocked.
+**RRI:** `python3 scripts/rri.py --touches infra/production/docker-compose.yml
+--touches infra/production/Caddyfile --C 0 --D 2 --K 3 --P 3 --T 0 --A 1 --X 2
+--platform dubbridge` → 26 → Moderate. Drivers: K=3 (cross-service
+startup-order coupling: migration gate + Redis health gate across
+api/gateway/worker-runner), P=3 (first production public-TLS/network-exposure
+boundary for the POC — no anchor-rubric row matches `infra/production/**`
+directly; judgment applied per RRI_POLICY.md §DubBridge anchor rubric
+"no rubric match" path).
 
-**Handoff prompt:** Implement only production Compose and Caddy wiring. Do not
-start the stack or deploy.
+**Implementation routing:** Claude Sonnet 5 direct — owner routing override,
+2026-08-27, citing production public-TLS/network-exposure boundary
+criticality (same class of override as T5b's auth/secret-boundary override).
+Local-first (`run_local_task.py`) was the default per RRI 26–40 Moderate
+routing; the override was explicit and is recorded here, not inferred from
+"config-only" status (config-only alone does not change implementation
+routing — only RRI band does).
 
-**Stop condition:** Stop after the descriptor renders successfully.
+**Implementation:**
+
+1. `infra/production/docker-compose.yml` (new) — `caddy` (only service
+   publishing ports 80/443), `redis` (with `redis-cli ping` healthcheck),
+   `migration` (built from `apps/cli/Dockerfile`, no `restart` — one-shot),
+   `api`/`gateway`/`worker-runner` (each `depends_on: migration:
+   condition: service_completed_successfully`; `api`/`worker-runner` also
+   gate on `redis: condition: service_healthy`). All four long-running/
+   migration services use `env_file: ../../.env` (T5b's `.env.example`
+   contract) plus `DUBBRIDGE_ENV: production` — no hardcoded secret values.
+   No PostgreSQL/object-storage container (external DO managed services, per
+   T5a).
+2. `infra/production/Caddyfile` (new) — site block for `poc.iotforce.es`
+   (T5a-frozen hostname), `request_body { max_size 100MiB }`, `reverse_proxy
+   gateway:8081` (matches `config/production.toml`'s `[gateway] port =
+   8081`). Automatic TLS is Caddy's default behavior for a non-`http://`
+   site address — no explicit `tls` directive needed.
+
+**Defect found and fixed in the same pass (unit mismatch):** the first draft
+used `max_size 100MB` (Caddy/go-humanize parses `MB` as the *decimal*
+megabyte, 100,000,000 bytes). The T5a-frozen ceiling is **100 MiB** (binary
+mebibytes, 104,857,600 bytes) — a 4.86% discrepancy. Caught by the primary
+agent via `caddy adapt --config Caddyfile | grep max_size` (not by Gemma
+Reviewer, whose first pass returned PASS/0-findings against the `100MB`
+draft — see Reviewer evidence). Corrected to `max_size 100MiB`; re-verified
+`caddy adapt` output shows `"max_size":104857600`, exact byte match. Gemma
+Reviewer's second pass ran against the corrected file.
+
+**Verification (config-only — no unit-test-mapped coverage cert; command
+output is the evidence):**
+
+- `docker-compose -f infra/production/docker-compose.yml config` (standalone
+  `docker-compose` v5.1.4 — the `docker compose` v2 plugin was not installed
+  in this environment) with `.env.example` values placeholder-substituted →
+  exit 0. Confirms HP-1 (only `caddy` has a `ports:` key: 80, 443) and HP-2
+  (`api`/`gateway`/`worker-runner` all show
+  `depends_on.migration.condition: service_completed_successfully`; `redis`
+  shows the `healthcheck` block).
+- `docker run --rm caddy:2-alpine caddy validate --config Caddyfile` → "Valid
+  configuration"; log confirms `http.auto_https` added a TLS connection
+  policy and enabled automatic HTTP→HTTPS redirects for `poc.iotforce.es`.
+  Confirms EC-1 (hostname, automatic TLS, reverse-proxy target).
+- `docker run --rm caddy:2-alpine caddy adapt --config Caddyfile` → adapted
+  JSON shows `"handler":"request_body","max_size":104857600` and
+  `"handler":"reverse_proxy","upstreams":[{"dial":"gateway:8081"}]`.
+  Confirms EC-1's exact byte ceiling and proxy target.
+
+### Gemma Reviewer evidence
+
+- Model: `gemma4:26b-a4b-it-qat` (RRI 26–55 chain primary)
+- Command: manual `/api/chat` invocation (phase 1: pre-implementation scope
+  review, no diff yet; phase 2: post-implementation code-solution review) —
+  `make qa-gemma-review` targets diff-based review only, not applicable to
+  phase 1
+- Passes run / usable: 1/1 (phase 1), 2/2 (phase 2 — first pass against the
+  `100MB` draft, second pass against the `100MiB`-corrected file; both used
+  the single-pass form, not the N-pass consolidation contract)
+- Aggregate status: PASS (both phases, both files)
+- Consensus findings: 0 | Pass-specific: 0 | Disagreement: 0
+- Artifacts: `docs/audit/gemma-evidence/s-230-t5c-phase1.json`,
+  `docs/audit/gemma-evidence/s-230-t5c-phase2.json`
+- Isolated adjudicator (D14): not triggered — Gemma available and usable both
+  phases
+- D14 provider route: n/a
+- disposition_divergence: null
+- Primary-agent disposition: phase 1 findings — none to disposition. Phase 2
+  findings — none reported by Gemma in either pass; the `100MB`/`100MiB` unit
+  mismatch was caught independently by the primary agent via `caddy adapt`
+  cross-check before the second Gemma pass, not a Gemma finding. Recorded as
+  a primary-agent-caught defect, not a reviewer disagreement.
+
+Task-analysis review: gemma `docs/audit/gemma-evidence/s-230-t5c-phase1.json` - PASS
+Code-solution review: gemma `docs/audit/gemma-evidence/s-230-t5c-phase2.json` - PASS
+
+### Owner final verification
+
+- Owner: `matias`
+- Date: `2026-08-27`
+- Statement: I approved this task's routing override (cloud-direct instead
+  of local-first, given the production public-TLS boundary) and confirmed
+  the implemented result — `infra/production/docker-compose.yml` and
+  `infra/production/Caddyfile` against HP-1/HP-2/EC-1, including the
+  independently-verified `docker-compose config`/`caddy validate`/`caddy
+  adapt` command output and the caught-and-fixed MB/MiB unit defect.
+- Commands run (by the primary agent, owner-confirmed): `docker-compose -f
+  infra/production/docker-compose.yml config`; `docker run --rm caddy:2-alpine
+  caddy validate --config Caddyfile`; `docker run --rm caddy:2-alpine caddy
+  adapt --config Caddyfile`.
+
+**Status artifacts affected:** this ledger (T5/T5c/T5d rows and this
+section), T5d's blocked-status note (now unblocked).
+
+**Stop condition met:** descriptor renders successfully; task closed. T5d
+(local dry-run + status sync) and T6 (first deploy) remain separate,
+unstarted tasks.
 
 ### S-230-T5d: Local descriptor evidence and aggregate status sync
 
 **Type:** operational/docs
-**Effort:** M — provisional RRI 27 Moderate
+**Effort:** S — RRI 22 Low (recomputed 2026-08-27; ledger's provisional
+estimate was 27 Moderate)
 **Depends on:** S-230-T5c
-**Status:** [ ] Blocked 2026-08-26 — cannot start: direct dependency on T5c,
-which is itself blocked on T5b (see T5c). T5a's hostname blocker is resolved;
-this task's own scope (dry-run of the production descriptor, secret scan)
-still needs a descriptor that T5b/T5c have not yet produced.
+**Status:** [x] Done 2026-08-27 — owner-verified
 
-**Acceptance criteria:**
+**RRI evidence:** `scripts/rri.py --touches infra/production/docker-compose.yml
+--touches infra/production/Caddyfile --touches
+docs/tasks/s-230-poc-v1-digitalocean.md --touches
+docs/plan/s-230-poc-v1-digitalocean.md --touches docs/plan/roadmap.md --cc 3
+--D 2 --K 1 --P 1 --T 1 --A 1 --X 1` → base 22, no penalties, final **RRI 22
+→ Low (0–25)**. Main drivers: F=2 (5 touched files); all other variables at
+rubric floor (operational/docs task, no cyclomatic complexity). Presented as
+a compact Low-band card on explicit user request (task-analysis review is
+exempt for Low band per the workflow guide).
 
-- The production descriptor passes structural rendering and a bounded dry-run
-  against local dependencies; the migration exits successfully and all three
-  long-running binaries pass their startup/readiness checks.
-- Secret scanning confirms no real credential was added, and `git diff --check`
-  plus documentation QA pass.
-- T5/T5a–T5d, the S-230 plan, roadmap S-030 Phase 3/X21 wording, and ADR-026
-  implementation references are synchronized as materially applicable.
+**Task-analysis review:** n/a — RRI 0–25 Low band; no Gemma/Muse Glimmer
+chain triggered for presentation-time review.
 
-**Evidence to emit:** exact commands/transcript, readiness results, secret scan,
-and status diff.
+**Acceptance criteria — scope note:** the original acceptance language
+("bounded local-infrastructure dry-run... migration exits successfully and
+all three long-running binaries pass their startup/readiness checks")
+assumed a literal boot of the production descriptor
+(`DUBBRIDGE_ENV=production`) against local Postgres/Redis/MinIO. This is
+**architecturally impossible without violating ADR-026**:
+`AppConfig::validate()` (`crates/config/src/lib.rs:194-208`) fail-closed
+rejects `localhost`/`127.0.0.1` database/redis URLs and `local_fs` storage
+whenever `env.is_production_like()` — by design, not a gap. Local
+development and testing already run exclusively under
+`DUBBRIDGE_ENV=local` against `config/local.toml` and
+`infra/local/docker-compose.yml`; the production profile
+(`config/production.toml`) is only ever booted against real DO
+infrastructure, validated for real in **T6**. Rescoped and confirmed with
+the owner mid-execution (2026-08-27): T5d validates the **descriptor's own
+correctness** (structure, dependency graph, and the fail-closed guard's
+behavior), not a literal local boot of the production environment.
 
-**Blocked — next action:** none from the owner. Unblocks automatically once
-T5c closes.
+- HP-1: `docker-compose -f infra/production/docker-compose.yml config`
+  renders successfully against a template `.env` (from `.env.example`) →
+  structurally valid descriptor confirmed.
+- HP-2 (rescoped): the ADR-026 fail-closed guard actually rejects
+  localhost/local_fs when `DUBBRIDGE_ENV=production` is forced — proven via
+  the existing `AppConfig::validate()` test suite rather than a literal
+  boot attempt that the guard is designed to prevent. Full image-boot
+  readiness against real infrastructure remains T6's scope.
+- EC-1: secret scanning confirms no real credential was added; `git diff
+  --check` and `make qa-docs` pass clean.
 
-**Status artifacts affected:** this ledger, the linked plan, roadmap, and
-ADR-026 references only if the boundary changed.
+**Evidence emitted:**
 
-**Handoff prompt:** Execute and record the local-only validation, then close the
-aggregate consistently. Do not provision or deploy.
+- `docker-compose -f infra/production/docker-compose.yml config` (run from
+  a template `.env` copied from `.env.example`, never committed —
+  `.gitignore:5` already excludes `.env`) rendered all six services
+  (`caddy`, `redis`, `migration`, `api`, `gateway`, `worker-runner`) with
+  correct `depends_on`/`condition` wiring and no errors.
+- `cargo test -p dubbridge-config app_config_validate_rejects` — 16/16
+  passed, confirming the fail-closed guard rejects localhost DB/Redis
+  URLs, `local_fs` storage, missing auth, and malformed S3 config under
+  production-like environments.
+- Secret scan (`grep` for placeholder vs. real-looking credential patterns
+  across `infra/production/`) — only `REPLACE_ME` placeholders found, no
+  real secret.
+- `git diff --check` — clean (exit 0).
+- `make qa-docs` — all five sub-checks passed (doc consistency, task unit
+  coverage, task completion evidence, roadmap drift, OKF frontmatter).
+- Docker image builds for the four production Dockerfiles
+  (`apps/api`, `apps/gateway`, `apps/worker-runner`, `apps/cli`) were
+  attempted but killed mid-build at the owner's explicit direction (local
+  machine load) — **not** used as closing evidence; the fail-closed guard
+  tests plus structural render were accepted as sufficient by the owner in
+  place of full image-boot evidence.
 
-**Stop condition:** Stop after local evidence and status synchronization. T6 is
-separate and remains unstarted.
+**Status artifacts affected:** this ledger (T5/T5a–T5d summary row and this
+section — synced), `docs/plan/s-230-poc-v1-digitalocean.md` (T5/T5d rows —
+synced below), `docs/plan/roadmap.md` (S-230 status line — synced below).
+No ADR-026 implementation-reference change: the secret/config boundary
+itself did not move: this task only ran validation.
+
+### Owner final verification
+
+- Owner: `matias`
+- Date: `2026-08-27`
+- Statement: I clarified the local/production environment-testing model
+  (local always uses `config/local.toml`, production only boots against
+  real DO infra, per ADR-026's fail-closed guard) and approved closing the
+  dry-run with structural-render + fail-closed-guard evidence rather than
+  a full image-boot smoke test, after stopping the in-progress image
+  builds due to local machine load.
+- Commands run (by the primary agent, owner-directed): `docker-compose -f
+  infra/production/docker-compose.yml config`; `cargo test -p
+  dubbridge-config app_config_validate_rejects`; `git diff --check`; `make
+  qa-docs`.
+
+**Stop condition met:** local evidence recorded, status synchronized. T6
+(first deploy) remains a separate, unstarted task.
 
 ---
 

@@ -2,7 +2,7 @@
 type: Proposal
 title: "Tiger Style Adoption: Rust/Python Backend Evaluation"
 description: "Evidence-based gap analysis of TigerBeetle's Tiger Style coding standard against the current Rust workspace and Python worker implementations, defining requirements for a future adaptation plan."
-status: Proposed
+status: Accepted
 ---
 
 # Tiger Style Adoption: Rust/Python Backend Evaluation
@@ -298,6 +298,29 @@ direction — each is a real trade-off, not a default:
   workflow guide already treats similar infra-availability trade-offs as
   explicit exceptions elsewhere.
 
+## Decision resolution (owner sign-off, 2026-08-30)
+
+The owner resolved all three decision points during the `docs/plan/
+tiger-style-adaptation.md` drafting session:
+
+- **D1 → `assert!` always-on.** R1 is in scope at rights validation,
+  finalize, playback grant issuance, and audit emission. `debug_assert!` was
+  explicitly rejected — assertions must survive into release builds.
+- **D2 → lower `too_many_lines` to 70 now.** R7 is in scope. The owner
+  accepted the decomposition cost, including `finalize_ingestion_core`; the
+  plan still runs the 70–100 line survey first (`X26-T0`) to bound scope
+  before any decomposition or lint-threshold change.
+- **D3 → Postgres/Redis/MinIO integration tests mandatory in CI now.** R12 is
+  in scope. Re-verification while planning found Postgres- and Redis-backed
+  tests are **already** mandatory in CI (`.github/workflows/ci.yml`'s
+  `coverage` and `test` jobs respectively); the real remaining gap is
+  MinIO/S3, whose integration test is `#[ignore]`d
+  (`crates/storage/src/s3.rs:182`) behind a `qa-test-s3` Makefile target that
+  does not yet exist.
+
+Sequencing, module dependencies, and the executable task list are in
+`docs/plan/tiger-style-adaptation.md` and `docs/tasks/tiger-style-adaptation.md`.
+
 ## Non-goals
 
 - **No wholesale rewrite.** The Rust workspace already embodies most of Tiger
@@ -318,21 +341,25 @@ direction — each is a real trade-off, not a default:
 
 ## Next steps
 
-This report is input, not a plan. Formalizing it per
-`docs/playbooks/AGENT_WORKFLOW_GUIDE.md`'s Analyze → Plan → Tasks flow requires:
+This report was the input; it is no longer the plan itself. Per
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md`'s Analyze → Plan → Tasks flow:
 
-1. Owner resolution of decision points D1–D3 (at minimum D1, since it gates whether
-   R1 is in scope at all).
-2. A `docs/plan/tiger-style-adaptation.md` sequencing the in-scope requirements
-   against module boundaries and existing slice work (R13 in particular slots into
-   S-150 `T4`–`T7`, not a new slice).
-3. A `docs/tasks/tiger-style-adaptation.md` with one task per requirement, each
-   RRI-scored via `scripts/rri.py`, carrying its own `HP-#`/`EC-#` behavioral
-   examples per the task-definition contract, and routed through the normal
-   RRI-band approval/review gates before any code changes.
+1. ✅ **Done 2026-08-30** — Owner resolution of decision points D1–D3 (see
+   Decision resolution above).
+2. ✅ **Done 2026-08-30** — `docs/plan/tiger-style-adaptation.md` sequences the
+   in-scope requirements against module boundaries and existing slice work
+   (R13 slots into S-150 `T4`–`T7` via a forward-pointer task, not a new
+   slice).
+3. ✅ **Done 2026-08-30** — `docs/tasks/tiger-style-adaptation.md` (`X26-T0`–
+   `X26-T12`) has one task per requirement with `HP-#`/`EC-#` behavioral
+   examples. **Remaining:** each task still needs its own `scripts/rri.py`
+   score and its own RRI-band approval/review gate before any code change —
+   none of `X26-T0`–`X26-T11` has been implemented yet.
 
 ## Related documents
 
+- `docs/plan/tiger-style-adaptation.md` — the resulting application plan (post-D1–D3)
+- `docs/tasks/tiger-style-adaptation.md` — the executable, task-per-requirement ledger
 - `docs/architecture.md` — crate/app boundaries and delivery status cited throughout
 - `docs/python-exceptions.md` — the Python isolation boundary this evaluation respects
 - `docs/plan/roadmap.md` — S-150 `T4`–`T7` status for R13's green-field window

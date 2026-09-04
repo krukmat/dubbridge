@@ -19,6 +19,7 @@ struct AuditEventRow {
     detail: Option<String>,
     happened_at: OffsetDateTime,
     recording_session_id: Option<Uuid>,
+    platform_ingest_session_id: Option<Uuid>,
 }
 
 fn parse_event_kind(value: &str) -> Result<AuditEventKind, DbError> {
@@ -69,7 +70,7 @@ fn row_to_event(row: AuditEventRow) -> Result<AuditEvent, DbError> {
         event_kind: parse_event_kind(&row.event_kind)?,
         ingest_token: row.ingest_token,
         recording_session_id: row.recording_session_id,
-        platform_ingest_session_id: None,
+        platform_ingest_session_id: row.platform_ingest_session_id,
         detail: row.detail,
         happened_at: row.happened_at,
     })
@@ -83,8 +84,11 @@ pub async fn insert_audit_event_tx(
 ) -> Result<(), DbError> {
     sqlx::query(
         r#"
-        INSERT INTO audit_events (id, asset_id, event_kind, ingest_token, detail, happened_at, recording_session_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO audit_events (
+            id, asset_id, event_kind, ingest_token, detail, happened_at,
+            recording_session_id, platform_ingest_session_id
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         "#,
     )
     .bind(event.id)
@@ -94,6 +98,7 @@ pub async fn insert_audit_event_tx(
     .bind(&event.detail)
     .bind(event.happened_at)
     .bind(event.recording_session_id)
+    .bind(event.platform_ingest_session_id)
     .execute(&mut **tx)
     .await
     .map_err(DbError::QueryFailed)?;
@@ -103,8 +108,11 @@ pub async fn insert_audit_event_tx(
 pub async fn insert_audit_event(pool: &PgPool, event: &AuditEvent) -> Result<(), DbError> {
     sqlx::query(
         r#"
-        INSERT INTO audit_events (id, asset_id, event_kind, ingest_token, detail, happened_at, recording_session_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO audit_events (
+            id, asset_id, event_kind, ingest_token, detail, happened_at,
+            recording_session_id, platform_ingest_session_id
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         "#,
     )
     .bind(event.id)
@@ -114,6 +122,7 @@ pub async fn insert_audit_event(pool: &PgPool, event: &AuditEvent) -> Result<(),
     .bind(&event.detail)
     .bind(event.happened_at)
     .bind(event.recording_session_id)
+    .bind(event.platform_ingest_session_id)
     .execute(pool)
     .await
     .map_err(DbError::QueryFailed)?;
@@ -143,7 +152,8 @@ pub async fn list_audit_events_for_owned_asset(
 
     let rows = sqlx::query_as::<_, AuditEventRow>(
         r#"
-        SELECT id, asset_id, event_kind, ingest_token, detail, happened_at, recording_session_id
+        SELECT id, asset_id, event_kind, ingest_token, detail, happened_at,
+               recording_session_id, platform_ingest_session_id
         FROM audit_events
         WHERE asset_id = $1
         ORDER BY happened_at ASC, id ASC
@@ -214,6 +224,7 @@ mod tests {
             detail: Some("ok".to_string()),
             happened_at: OffsetDateTime::now_utc(),
             recording_session_id: Some(recording_session_id),
+            platform_ingest_session_id: None,
         };
 
         let event = row_to_event(row).expect("event");
@@ -221,6 +232,30 @@ mod tests {
         assert_eq!(event.event_kind, AuditEventKind::RecordingRecorded);
         assert_eq!(event.recording_session_id, Some(recording_session_id));
         assert!(event.platform_ingest_session_id.is_none());
+    }
+
+    #[test]
+    fn row_to_event_round_trips_platform_ingest_fields() {
+        let platform_ingest_session_id = Uuid::new_v4();
+        let row = AuditEventRow {
+            id: Uuid::new_v4(),
+            asset_id: None,
+            event_kind: "platform_ingest_downloaded".to_string(),
+            ingest_token: None,
+            detail: Some("download complete".to_string()),
+            happened_at: OffsetDateTime::now_utc(),
+            recording_session_id: None,
+            platform_ingest_session_id: Some(platform_ingest_session_id),
+        };
+
+        let event = row_to_event(row).expect("event");
+        assert_eq!(event.event_kind, AuditEventKind::PlatformIngestDownloaded);
+        assert_eq!(
+            event.platform_ingest_session_id,
+            Some(platform_ingest_session_id)
+        );
+        assert!(event.ingest_token.is_none());
+        assert!(event.recording_session_id.is_none());
     }
 
     #[test]
@@ -234,6 +269,7 @@ mod tests {
             detail: Some("reason=asset_not_ready".to_string()),
             happened_at: OffsetDateTime::now_utc(),
             recording_session_id: None,
+            platform_ingest_session_id: None,
         };
 
         let event = row_to_event(row).expect("event");

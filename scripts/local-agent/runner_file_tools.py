@@ -1,19 +1,14 @@
 #!/usr/bin/env python3
-"""Bounded editing tools for the local runner.
+"""Bounded file primitives for the local runner.
 
-Deliberately simple. There is no language server, no symbol lookup, and no
-line/byte budget: the local implementer has a very large context window (the
-S-140 pilot target is ~14k tokens against a 262k-token model), so it can read
-the file it must edit and rewrite or patch it directly. The only edit-time
-safety kept from the earlier semantic tools is the filesystem hardening
-(``O_NOFOLLOW`` on every open, atomic overwrite via a temp file + rename) and
-the "anchor must match exactly once" rule, which stops a blind patch from
-silently editing the wrong occurrence.
+This module owns checked source reads plus the small write/patch tool surface.
+Context selection is owned by ``ContextProvider``; ``preload_context()`` remains
+only as the behavior-compatible implementation used by ``LegacyContextProvider``
+and as the source fallback when graph-guided retrieval is unavailable.
 
-Boundary enforcement stays owned by the injected ``boundary``; this module
-checks every path before reading or mutating it. It also builds the initial
-card context from the same checked paths so the model receives the complete
-authorized working set without repository exploration.
+Filesystem hardening and the exact-one-anchor patch rule remain unchanged.
+Boundary enforcement stays owned by the injected ``boundary`` and every read
+or mutation passes through that existing capability check.
 """
 
 import os
@@ -47,10 +42,11 @@ class RunnerFileTools:
     def preload_context(self, allowed_paths):
         """Return complete contents for every file authorized by the card.
 
-        Existing directory capabilities are expanded recursively without
-        following directory symlinks. Missing exact paths are represented so
-        the model knows it may create them. Every resulting file still passes
-        through the boundary before it is opened.
+        This is the legacy/fallback context path. Existing directory
+        capabilities are expanded recursively without following directory
+        symlinks. Missing exact paths are represented so the model knows it may
+        create them. Every resulting file still passes through the boundary
+        before it is opened.
         """
         entries = []
         for path in allowed_paths:
@@ -159,8 +155,7 @@ class RunnerFileTools:
     def _write_nofollow(self, target, path, content):
         # O_NOFOLLOW so a pre-planted symlink at `target` cannot redirect the
         # write outside the worktree. os.O_TRUNC gives create-or-overwrite in a
-        # single open; the earlier tools split create (O_EXCL) from overwrite,
-        # but the simple contract allows both through one path.
+        # single open; the simple contract allows both through one path.
         try:
             fd = os.open(
                 target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW

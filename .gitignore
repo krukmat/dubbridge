@@ -35,4 +35,4 @@ scripts/local-bench/t7*/
 logs/antares/
 var/antares-traces/
 p2p-mvp/*
-pending/dubbridge_devstral_main_migration/*
+pending/*

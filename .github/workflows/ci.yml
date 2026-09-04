@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Run docs consistency gate
         run: make qa-docs
 
@@ -53,6 +55,19 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: dubbridge_test
+          POSTGRES_USER: dubbridge
+          POSTGRES_PASSWORD: dubbridge
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
       redis:
         image: redis:7
         ports:
@@ -63,6 +78,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
+      DUBBRIDGE_DATABASE_URL: postgresql://dubbridge:dubbridge@localhost:5432/dubbridge_test
       DUBBRIDGE_REDIS_URL: redis://127.0.0.1:6379/15
     steps:
       - uses: actions/checkout@v4
@@ -85,6 +101,39 @@ jobs:
           PY
       - name: Run Redis integration tests
         run: make qa-test-redis
+
+  s3-integration:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    services:
+      minio:
+        image: minio/minio:edge-cicd@sha256:29e8e51691d11e779468f275002779b221fd3902518d103e35c8a8bb2ef0f3ea
+        env:
+          MINIO_ROOT_USER: dubbridge
+          MINIO_ROOT_PASSWORD: dubbridge-minio-ci
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl --silent --fail http://localhost:9000/minio/health/live || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DUBBRIDGE_STORAGE_TEST_ENDPOINT: http://127.0.0.1:9000
+      DUBBRIDGE_STORAGE_TEST_ACCESS_KEY_ID: dubbridge
+      DUBBRIDGE_STORAGE_TEST_SECRET_ACCESS_KEY: dubbridge-minio-ci
+      DUBBRIDGE_STORAGE_TEST_BUCKET: dubbridge-ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Create S3 integration-test bucket
+        run: |
+          docker run --rm --network host --entrypoint /bin/sh \
+            minio/mc:RELEASE.2025-08-13T08-35-41Z \
+            -ec 'mc alias set ci http://127.0.0.1:9000 dubbridge dubbridge-minio-ci && mc mb --ignore-existing ci/dubbridge-ci'
+      - name: Run mandatory S3 integration test
+        run: make qa-test-s3
 
   cargo-check:
     if: github.event_name != 'schedule'
@@ -109,6 +158,19 @@ jobs:
           fetch-depth: 0
       - name: Reject generated-code bloat in backend/mobile diffs
         run: make qa-maintainability
+
+  python-complexity:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned Ruff
+        run: python -m pip install --disable-pip-version-check ruff==0.16.5
+      - name: Enforce Python worker complexity and length bounds
+        run: make qa-python-complexity PYTHON=python
 
   mobile:
     if: github.event_name != 'schedule'

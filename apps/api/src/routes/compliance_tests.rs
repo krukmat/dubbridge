@@ -36,7 +36,11 @@ impl dubbridge_auth::TokenVerifier for StubTokenVerifier {
 
 async fn setup_pool() -> Option<PgPool> {
     let url = env::var("DUBBRIDGE_DATABASE_URL").ok()?;
-    let pool = PgPool::connect(&url).await.expect("connect");
+    let pool = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(2)
+        .connect(&url)
+        .await
+        .expect("connect");
     sqlx::migrate!("../../infra/migrations")
         .run(&pool)
         .await

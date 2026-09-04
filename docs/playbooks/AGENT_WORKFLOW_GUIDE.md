@@ -171,11 +171,29 @@ and Architect-refined implementation routing below), not to cloud. A
   **Evidence to emit** and **Status artifacts affected** (see Step 3 above)
   named up front — these are execution-time outputs, not post-hoc closure
   notes.
-- A task ledger can opt into automated enforcement by declaring
-  `Behavioral coverage contract: unit-v1`. For ledgers with that marker,
-  `make qa-docs` rejects completed development tasks whose `HP-#`/`EC-#`
-  cases lack unit test evidence. Legacy completed tasks without the marker
-  are grandfathered until migrated.
+- **Behavioral testing semantics:** BDD defines stable externally observable
+  product/domain behavior; ATDD-style acceptance discipline is expressed by
+  acceptance criteria plus approved `HP-#`/`EC-#` examples and executable
+  evidence; TDD is the implementation technique used to drive code with
+  tests. Do not collapse these three responsibilities into one test layer.
+- New development ledgers default to
+  `Behavioral coverage contract: behavior-v2`. Under `behavior-v2`, every
+  completed `HP-#`/`EC-#` case must map to passing executable evidence at the
+  cheapest layer that genuinely proves the behavior: `unit`, `component`,
+  `integration`, `contract`, or `e2e`. The deterministic `make qa-docs` gate
+  validates the declared layer, evidence references, Reflection requirement,
+  and owner-verification structure; the referenced tests/runners remain
+  responsible for proving the behavior itself.
+- `Behavioral coverage contract: unit-v1` is the grandfathered legacy
+  contract. Its existing unit-evidence semantics and validator remain in
+  force for ledgers that already declare it. Do not mass-migrate completed
+  historical ledgers solely for consistency; migrate an active/touched
+  ledger only when the change materially benefits from cross-layer evidence.
+- Stable product/domain behavior that should survive implementation refactors
+  or cross subsystem boundaries belongs in canonical `docs/bdd/*.feature`
+  specifications and, for strict specs, in the machine-readable mapping
+  checked by `make qa-bdd-map`. Do not introduce Cucumber/Behave or another
+  BDD runner merely to execute `.feature` files.
 
 ## Per-task discipline
 
@@ -235,33 +253,40 @@ and Architect-refined implementation routing below), not to cloud. A
   evidence** (concrete files, functions, and tests, with a short explanation
   of what each demonstrates). Required only for development tasks; skip for
   docs/config/migration-only/planning tasks.
-- **Unit coverage certification:** before marking a development task `[x]
-  Done`, add a `Unit coverage certification` section mapping every approved
-  `HP-#`/`EC-#` case to at least one unit test reference
-  (`` `path/to/file.rs::test_name` ``) whose recorded result is `passed`.
-  `N/A` is not allowed for development-task cases — refactor until testable
-  or revise the task definition before closure.
+- **Behavioral coverage certification:** before marking a `behavior-v2`
+  development task `[x] Done`, add a `Behavioral coverage certification`
+  section mapping every approved `HP-#`/`EC-#` case to at least one passing
+  executable evidence reference and its test layer. Pure deterministic logic
+  should normally map to unit evidence; cross-boundary behavior may map to
+  component, integration, contract, or E2E evidence when that is the
+  cheapest layer that genuinely proves the behavior. `N/A` is not allowed
+  for development-task cases — revise the behavior/evidence contract before
+  closure if the case is not actually executable.
+- Legacy `unit-v1` ledgers retain their required `Unit coverage
+  certification` format and unit-test semantics; the legacy validator
+  remains authoritative for those ledgers.
 - The same completion record must include `Owner final verification` with
   owner, date, verification statement, and exact commands run. The owner
-  certifies each referenced unit test genuinely covers the claimed behavior;
-  the automated gate verifies structure and referenced-test existence.
+  certifies each referenced evidence item genuinely covers the claimed
+  behavior; the automated gate verifies structure and referenced-evidence
+  existence/selector rules, not semantic sufficiency.
 
-Required completion format for development tasks:
+Required completion format for new development tasks (`behavior-v2`):
 
 ```md
-### Unit coverage certification
+### Behavioral coverage certification
 
-| Case ID | Type | Behavior | Unit test evidence | Result |
-|---|---|---|---|---|
-| HP-1 | Happy path | valid input creates session | `apps/gateway/src/auth/login.rs::valid_login_creates_session` | passed |
-| EC-1 | Edge case | unknown state fails closed | `apps/gateway/src/auth/login.rs::unknown_state_returns_unauthorized` | passed |
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| HP-1 | Happy path | valid input creates session | integration | `apps/gateway/tests/auth.rs::valid_login_creates_session` | passed |
+| EC-1 | Edge case | unknown state fails closed | unit | `apps/gateway/src/auth/login.rs::unknown_state_returns_unauthorized` | passed |
 
 ### Owner final verification
 
 - Owner: `<name-or-handle>`
 - Date: `YYYY-MM-DD`
-- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
-- Commands run: `<exact test commands>`
+- Statement: I verified every happy path and edge case defined for this task has executable evidence at an appropriate layer that replicates the expected behavior.
+- Commands run: `<exact test/runner commands>`
 ```
 
 ## Live per-task phase todo list
@@ -318,7 +343,7 @@ generic role label), with status `pending`/`in_progress`/`blocked`/
 artifact, not a new approval or review gate. It never replaces the HITL
 approval checkpoint, the band-routed review chain, the Reflection log, or any
 other closure gate. `completed` still requires that phase's own evidence
-(review artifact, Reflection log, unit coverage cert, owner verification,
+(review artifact, Reflection log, behavioral coverage cert, owner verification,
 etc.) — the checklist records the step happened, not that it happened
 correctly.
 
@@ -814,12 +839,14 @@ acceptance criteria, happy paths, edge cases); **Critique** (re-read as if
 reviewing someone else's code — logical correctness against every `HP-#`/
 `EC-#`, error handling at boundaries, unintended side effects, applicable
 design patterns for performance/UX where user-facing, test coverage gaps
-against the 90% gate); **Revise** (apply concrete fixes, or state
-explicitly that none are needed); **Certify** (proceed to unit coverage
-certification only after every required pass has a complete loop recorded).
+against the applicable gates); **Revise** (apply concrete fixes, or state
+explicitly that none are needed); **Certify** (proceed to behavioral
+coverage certification only after every required pass has a complete loop
+recorded).
 
 Document passes in the task completion record as a `### Reflection log`
-section before `### Unit coverage certification`:
+section before `### Behavioral coverage certification` for `behavior-v2`
+ledgers (legacy `unit-v1` ledgers keep `### Unit coverage certification`):
 
 ```md
 ### Reflection log
@@ -847,19 +874,30 @@ judgment — if the task writes non-trivial logic, apply it.
 
 ## Testing and commit rules
 
-- TDD where practical: test first, implement, run tests.
-- Target at least **90% line coverage** for the implemented scope, enforced
-  as a quality gate, not reporting-only.
+- **TDD where practical.** For a reproducible defect, add the regression test
+  first, confirm it fails for the intended reason (RED), implement the fix,
+  then confirm it passes (GREEN). For deterministic critical logic — domain
+  invariants, authorization, rights/consent fail-closed gates, parsers,
+  routing/state machines and policy decisions — strongly prefer test-first
+  unless a concrete reason is recorded. Do not force test-first chronology
+  for wiring, trivial DTOs, migrations/config, generated glue, or purely
+  visual changes when another evidence layer is the correct proof.
+- The **90% line-coverage threshold is the Rust workspace gate** enforced by
+  `cargo llvm-cov` with the repository's configured filename exclusions. It
+  is a quality gate, not a claim that every stack has 90% line coverage.
+  Mobile is gated independently by typecheck, lint, and Jest; cross-stack
+  behavioral completion is enforced through `behavior-v2` evidence.
 - Prefer real backends over mocks.
 - **Do not commit if any test is broken.** Run all tests before commit and
   push.
-- Keep the automated coverage gate aligned with CI. If the required
-  threshold changes, update both this guide and `.github/workflows/ci.yml`
-  in the same change.
+- Keep the automated coverage gate aligned with CI. If the Rust threshold or
+  exclusions change, update this guide and the corresponding Makefile/CI
+  configuration in the same change.
 - The `.githooks/pre-push` hook enforces the fast deterministic Rust gates
   (`fmt`, `clippy`, `test`, `cargo check`) plus dependency-policy checks when
   Cargo manifests change; CI keeps the full blocking baseline including the
-  90% coverage gate. Enable with `git config core.hooksPath .githooks`.
+  Rust 90% coverage gate and the separate mobile gate. Enable with
+  `git config core.hooksPath .githooks`.
 - Ask for confirmation before deleting anything.
 
 ## Handoff prompt format
@@ -886,6 +924,16 @@ work. For harder Low-RRI attempts, the wrapper supports `--temperature`/
 `DUBBRIDGE_LOW_RRI_TEMPERATURE` and `--think`/`--no-think`/
 `DUBBRIDGE_LOW_RRI_THINK`; keep thinking off by default (it can consume the
 token budget before the tagged response completes).
+
+**Indentation drift is not a delegation defect.** A `--mode before-after`
+diff can shift surrounding-line indentation by one or two spaces relative to
+the anchor (an artifact of the model retyping context lines). Do not pause a
+delegation chain to inspect or hand-correct this, do not flag it as a phase-1
+or phase-2 review finding, and do not spend a repair attempt on it — it is
+cosmetic, not a scope or correctness defect. Run `cargo fmt` once after the
+last sub-task in a chain touching the same file, not after each sub-task.
+This is the Low-RRI-delegation-specific case of the general rule that
+whitespace/formatting differences are never findings against a contract.
 
 For **RRI 26–40 local-first implementation** (Moderate), use
 `scripts/local-agent/run_local_task.py` in a disposable git worktree. The
@@ -1089,9 +1137,10 @@ the task blocked. Never downgrade silently to self-review.
   chain. In RRI 56+ the cross-vendor peer **replaces** Gemma/Muse Glimmer —
   they do not both run.
 - The four existing development-task closure blocks (Step 1 reviewer/D14,
-  Step 2 Reflection log, Step 3 coverage cert, Step 4 owner verification)
-  are preserved; the band-resolved reviewer occupies the reviewer slot
-  inside Step 1, with D14 as the Step 1 fallback path in every band.
+  Step 2 Reflection log, Step 3 behavioral coverage cert, Step 4 owner
+  verification) are preserved; the band-resolved reviewer occupies the
+  reviewer slot inside Step 1, with D14 as the Step 1 fallback path in every
+  band.
 
 ### Enforcement note
 
@@ -1256,10 +1305,12 @@ Task completion records for Low/Moderate development tasks must include:
 `--passes 1` collapses to the single-pass form (no reconciliation fields, no
 per-pass artifacts). Run with `make qa-gemma-review` (local only; not
 required in GitHub-hosted CI until an Ollama-capable runner is available).
-For ledgers declaring `Behavioral coverage contract: unit-v1`, `make
-qa-docs` rejects completed sections omitting the `Reflection log` (RRI 26+)
-or both a `Review artifact:` line and a `REVIEW-OVERRIDE:` line at **every**
-RRI band.
+Legacy ledgers declaring `Behavioral coverage contract: unit-v1` retain the
+existing `check-task-unit-coverage.sh` review-artifact/override enforcement.
+For `behavior-v2`, `make qa-docs` enforces RRI-dependent Reflection and Owner
+final verification through `check-behavioral-coverage.py`; reviewer evidence
+remains governed by the band-routed workflow above rather than being
+misrepresented as unit-test evidence.
 
 ### Review artifact receipt and REVIEW-OVERRIDE lines (GEG-1)
 
@@ -1279,7 +1330,7 @@ The completed task section must reference it:
 
 `scripts/check-task-unit-coverage.sh` checks the file exists, is valid JSON,
 its `task_id` matches the section, and its `commit_sha` is reachable from
-the reviewed history.
+the reviewed history for legacy `unit-v1` ledgers.
 
 If no review ran (or none is applicable), use a typed override line instead
 — never both, never neither:
@@ -1292,10 +1343,10 @@ If no review ran (or none is applicable), use a typed override line instead
 ```
 
 Every `REVIEW-OVERRIDE:` line also needs a matching row in the append-only
-ledger `docs/audit/gemma-review-overrides.md` — the validator fails a
-section whose override has no ledger row, even with the companion field
-present. `urgency` overrides require a human `Waiver-by`; an agent may not
-self-issue one. Full contract: `docs/policies/RRI_POLICY.md § Review
+ledger `docs/audit/gemma-review-overrides.md` — the legacy validator fails a
+`unit-v1` section whose override has no ledger row, even with the companion
+field present. `urgency` overrides require a human `Waiver-by`; an agent may
+not self-issue one. Full contract: `docs/policies/RRI_POLICY.md § Review
 evidence gate (artifact-or-override, all bands)`.
 
 ## Local Architect / Complex Analyst (ADR-037)
@@ -1418,7 +1469,7 @@ code-review replacement, patch approver, or final RRI authority.
 
 A development task is not done until the closure gates for its band have
 been checked **in order** — evaluate the review gate first; do not start
-the closure summary with unit coverage certification or owner final
+the closure summary with behavioral coverage certification or owner final
 verification.
 
 **Applies to every development task regardless of RRI band**, including Low
@@ -1565,20 +1616,29 @@ there.
        cycle; record the disposition of each finding in the log.
 ```
 
-### Step 3 — Unit coverage certification (all development tasks)
+### Step 3 — Behavioral coverage certification (all new development tasks)
+
+For `behavior-v2` ledgers:
 
 ```
-[ ] 3. Record `### Unit coverage certification` block in the task entry.
-       - Table: Case ID | Type | Behavior | Unit test evidence | Result
-       - Every HP-# and EC-# must map to at least one passing test.
+[ ] 3. Record `### Behavioral coverage certification` block in the task entry.
+       - Table: Case ID | Type | Behavior | Layer | Executable evidence | Result
+       - Every HP-# and EC-# maps to at least one passing executable evidence item.
+       - Allowed layers: unit | component | integration | contract | e2e.
+       - Use the cheapest layer that genuinely proves the behavior.
        - `N/A` is not permitted for development-task happy paths or edge cases.
 ```
+
+For grandfathered `unit-v1` ledgers, retain the legacy `### Unit coverage
+certification` block and existing unit-test-only semantics.
 
 ### Step 4 — Owner final verification (all development tasks)
 
 ```
 [ ] 4. Record `### Owner final verification` block in the task entry.
        - Owner, date, statement, exact commands run.
+       - The owner verifies that each mapped evidence item genuinely proves
+         the claimed behavior at the declared layer.
 ```
 
 Only after all applicable steps above are checked may the task status be
@@ -1598,6 +1658,7 @@ flipped to `[x] Done` and the completion reported to the user.
 
 - `CLAUDE.md`, `AGENTS.md`, `README_AGENT_ORDER.md`
 - `DEVELOPMENT_REFERENCE.md` — developer entry point: architecture, ADR index, roadmap, BDD, setup, and QA gates
+- `docs/playbooks/BEHAVIORAL_TESTING_CONTRACT.md` — focused reference for the TDD / ATDD-style / BDD contract enforced here
 - `docs/policies/HITL_AUTONOMY_POLICY.md`
 - `docs/policies/RRI_POLICY.md` — RRI formula, anchor rubric, bands, and gates
 - `docs/adr/ADR-040-per-module-complexity-split-implementation-routing.md` — per-module complexity-split routing (RRI 26–55)

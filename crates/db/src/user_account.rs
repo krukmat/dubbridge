@@ -195,11 +195,6 @@ mod tests {
         };
 
         MIGRATOR.run(&pool).await.expect("migrations");
-        sqlx::query("TRUNCATE TABLE user_account, organizations RESTART IDENTITY CASCADE")
-            .execute(&pool)
-            .await
-            .expect("truncate auth tables");
-
         Some(pool)
     }
 
