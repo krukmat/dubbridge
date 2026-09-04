@@ -441,20 +441,12 @@ local-first path as 26–40 Moderate instead of cloud.
 
 ```mermaid
 flowchart LR
-    Card["Approved Med-high card\
-(RRI 41-55)"] --> Glimmer["Muse Glimmer advisory refinement\
-muse-glimmer:30b-q4_K_M"]
-    Glimmer -->|GO_LOCAL or CLOUD_REQUIRED| Receipt["Primary hash-bound\
-route receipt"]
-    Receipt -->|"downgrade allowed;\
-upgrade never allowed"| Gate{"med_high_gate.py\
-both sides GO_LOCAL?"}
-    Gate -->|CLOUD_REQUIRED| Cloud["Resolved Codex / Claude takeover model\
-+ full ADR-038 S5 evidence bundle"]
-    Gate -->|"GO_LOCAL, RRI 46-55\
-(policy excluded)"| Cloud
-    Gate -->|"GO_LOCAL, RRI 41-45"| LocalFirst["Moderate local-first path\
-run_local_task.py, 2 repair attempts"]
+    Card["Approved Med-high card\n(RRI 41-55)"] --> Glimmer["Muse Glimmer advisory refinement\nmuse-glimmer:30b-q4_K_M"]
+    Glimmer -->|GO_LOCAL or CLOUD_REQUIRED| Receipt["Primary hash-bound\nroute receipt"]
+    Receipt -->|"downgrade allowed;\nupgrade never allowed"| Gate{"med_high_gate.py\nboth sides GO_LOCAL?"}
+    Gate -->|CLOUD_REQUIRED| Cloud["Resolved Codex / Claude takeover model\n+ full ADR-038 S5 evidence bundle"]
+    Gate -->|"GO_LOCAL, RRI 46-55\n(policy excluded)"| Cloud
+    Gate -->|"GO_LOCAL, RRI 41-45"| LocalFirst["Moderate local-first path\nrun_local_task.py, 2 repair attempts"]
 ```
 
 Implementation surfaces: `scripts/local-architect/run_analysis.py`
@@ -518,24 +510,15 @@ Reflection count, or closure gates.
 
 ```mermaid
 flowchart TD
-    Card["Approved task, RRI 26-55\
->=2 files in allowed_paths"] --> CC["Measure per-file CC\
-(--auto-cc, existing C table)"]
-    CC --> Trigger{"Heterogeneous?\
->=1 module C>=2 AND >=1 module C<=1"}
-    Trigger -->|No| Whole["Route whole task per band\
-(ADR-036 Moderate / ADR-038 Med-high)"]
-    Trigger -->|Yes| Partition{"Clean disjoint\
-allowed_paths partition?"}
+    Card["Approved task, RRI 26-55\n>=2 files in allowed_paths"] --> CC["Measure per-file CC\n(--auto-cc, existing C table)"]
+    CC --> Trigger{"Heterogeneous?\n>=1 module C>=2 AND >=1 module C<=1"}
+    Trigger -->|No| Whole["Route whole task per band\n(ADR-036 Moderate / ADR-038 Med-high)"]
+    Trigger -->|Yes| Partition{"Clean disjoint\nallowed_paths partition?"}
     Partition -->|No| Whole
-    Partition -->|Yes| Freeze["Freeze interface contract\
-(module-split capsule)"]
-    Freeze --> Local["Local tramo: C<=1, not hard-excluded\
-run_local_task.py, 2 repair attempts"]
-    Freeze --> Cloud["Cloud tramo: C>=2 or hard-excluded\
-band cloud model, 1 attempt + 1 tier escalation"]
-    Local --> Merge["Integration gate:\
-full verification on merged diff"]
+    Partition -->|Yes| Freeze["Freeze interface contract\n(module-split capsule)"]
+    Freeze --> Local["Local tramo: C<=1, not hard-excluded\nrun_local_task.py, 2 repair attempts"]
+    Freeze --> Cloud["Cloud tramo: C>=2 or hard-excluded\nband cloud model, 1 attempt + 1 tier escalation"]
+    Local --> Merge["Integration gate:\nfull verification on merged diff"]
     Cloud --> Merge
     Merge -->|contract mismatch| Whole
     Merge -->|tramo-attributable failure| Repair["Bounded repair vs that tramo's own budget"]
