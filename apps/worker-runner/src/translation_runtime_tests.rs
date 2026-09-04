@@ -12,9 +12,9 @@ async fn setup_pool() -> Option<PgPool> {
     let url = std::env::var("DUBBRIDGE_DATABASE_URL").ok()?;
     let pool = PgPool::connect(&url).await.expect("connect");
     sqlx::migrate!("../../infra/migrations")
-         .run(&pool)
-         .await
-         .expect("migrations");
+        .run(&pool)
+        .await
+        .expect("migrations");
     Some(pool)
 }
 

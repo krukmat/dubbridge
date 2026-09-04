@@ -30,9 +30,9 @@ async fn setup_pool() -> Option<sqlx::PgPool> {
     let url = env::var("DUBBRIDGE_DATABASE_URL").ok()?;
     let pool = sqlx::PgPool::connect(&url).await.expect("connect");
     sqlx::migrate!("../../infra/migrations")
-         .run(&pool)
-         .await
-         .expect("migrations");
+        .run(&pool)
+        .await
+        .expect("migrations");
     Some(pool)
 }
 

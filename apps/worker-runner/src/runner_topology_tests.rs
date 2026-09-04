@@ -505,9 +505,9 @@ async fn wait_for_end_to_end_ready(pool: PgPool, asset_id: AssetId) -> io::Resul
 async fn setup_pool(database_url: &str) -> PgPool {
     let pool = PgPool::connect(database_url).await.expect("connect");
     sqlx::migrate!("../../infra/migrations")
-         .run(&pool)
-         .await
-         .expect("migrations");
+        .run(&pool)
+        .await
+        .expect("migrations");
     pool
 }
 
