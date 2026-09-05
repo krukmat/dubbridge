@@ -1,3 +1,11 @@
+---
+type: Audit
+title: "Compact Approval Task Card v2 — P2.T0"
+status: ready_for_approval
+slice: MVP0-P2P
+parent: P2.T0
+---
+
 # Compact Approval Task Card v2 — P2.T0
 
 ## 1. Decision header
