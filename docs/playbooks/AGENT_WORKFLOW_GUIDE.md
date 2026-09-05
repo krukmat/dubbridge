@@ -114,8 +114,17 @@ and Architect-refined implementation routing below), not to cloud. A
        packets, report sections);
      - **Status artifacts affected** — exact ledgers, plans, reports, ADR
        indexes, or downstream blocker docs to synchronize before closure.
+   - Before freezing or presenting executable task leaves, perform the
+     **honest Low-band maximization pass** defined below. Treat the original
+     outcome as the parent approval/review envelope, then prefer coherent,
+     independently verifiable RRI 0–25 / Effort S leaves wherever real seams
+     permit them.
 4. **Gate by RRI** — compute RRI with `scripts/rri.py`, then apply the
    band's approval gate and implementation route:
+   - Score both the parent outcome envelope and every proposed executable
+     leaf. The parent score continues to govern HITL approval, review
+     independence, Reflection count, and integrated closure; a Low leaf only
+     changes the bounded authoring route.
    - **0–25 Low** — skip the full human approval presentation. Use local Qwen
      Developer delegation through Ollama only for eligible simple code
      patches; otherwise execute directly as the primary agent.
@@ -468,6 +477,47 @@ module.
 
 Both sub-bands keep the band-resolved independent reviewer, 3 Reflection
 passes, and the RRI 26+/41+ human approval gate.
+
+#### Honest Low-band maximization before presentation
+
+Before an executable task set is frozen or presented, the orchestrator must
+make a good-faith, hardware-aware attempt to maximize **coherent RRI 0–25 /
+Effort S leaves**. Local development is the preferred implementation muscle:
+keep each leaf's context, allowed paths, behavior, and verification small
+enough for the Low-band route when the system has a real independent seam.
+
+The pass is mandatory even when the preliminary parent score is below the
+existing hard decomposition triggers. It proceeds as follows:
+
+1. Freeze the parent outcome, invariants, integration boundary, and
+   preliminary RRI before splitting.
+2. Split only at real behavioral, file-ownership, evidence, or decision
+   boundaries. Give every leaf its own objective, dependencies, allowed
+   paths, acceptance criteria, verification, evidence/status obligations,
+   and `scripts/rri.py` score.
+3. Prefer leaves with final RRI 0–25 / Effort S. For development leaves,
+   route eligible simple patches through the bounded local Qwen Developer
+   path; Low docs, planning, policy, ADR, and structure-heavy work remains
+   direct primary-agent work under the existing Low-band rule.
+4. Preserve architecture, security, governance, schema, and other owner
+   choices as explicit decision checkpoints. Evidence collection and option
+   comparison may be separate Low leaves; the agent must not relabel the
+   unresolved decision itself as mechanical work.
+5. Score assembly, integration, and status propagation as real work. Do not
+   inherit a child score, hide cross-leaf coupling, omit penalties, understate
+   context, split one invariant across unverifiable fragments, or create
+   documentation shells whose only purpose is to reach Low.
+6. Stop when another split would cease to be independently meaningful or
+   verifiable. Record `honest-low-max: residual` with the reason and route the
+   inseparable residue at its actual RRI band.
+
+When the parent envelope scores RRI 26+, its one approval checkpoint remains
+mandatory before any contained Low leaf starts. Approval covers the frozen
+leaf set but does not change the parent's band-resolved phase reviews or final
+unified/integrated verification. A later scope expansion or changed invariant
+requires recomputing both parent and affected leaves. This early pass
+generalizes, but does not replace, the recovery-time decomposition route
+below.
 
 #### Post-repair-budget Low-band decomposition
 

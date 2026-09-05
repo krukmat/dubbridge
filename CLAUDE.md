@@ -188,6 +188,14 @@ it in the approval card.
 
 ## Complexity And Model Defaults
 
+Before task presentation, score the coherent parent outcome and run the
+canonical workflow's honest Low-band maximization pass. Prefer real,
+independently verifiable RRI 0–25 / Effort S leaves so eligible bounded code
+patches can use the local developer within hardware limits. Do not suppress
+penalties, hide coupling/integration, or split invariants merely to lower a
+score. The parent band continues to govern HITL approval, review, Reflection,
+and integrated closure; inseparable residue retains its actual RRI.
+
 **When RRI has been computed**, the `Complexity` field in the task presentation must
 use the RRI band name — not the Effort-based mapping below:
 
@@ -220,7 +228,7 @@ workflow guide. Task-local model pins override these defaults until explicitly
 updated.
 
 For RRI 0–25 Low-band tasks, follow the repository workflow guide instead of
-these defaults: use local Gemma through Ollama only for eligible simple code
+these defaults: use local Qwen Developer through Ollama only for eligible simple code
 patches; otherwise handle the task directly and report as the orchestrator of
 record.
 

@@ -417,6 +417,69 @@ refinement/receipt evidence requirement (§2, §5), the hard exclusions (§6),
 review/approval rigor (§7), and Amendment 1's prohibition on a whole-task
 local developer in 46-55.
 
+## Amendment 5 (2026-09-05): honest Low-band maximization before presentation
+
+**Reason:** permanent owner directive given while redefining
+`docs/tasks/mvp0-p2p-adr044.md`: prioritize local development as the regular
+implementation muscle under constrained local hardware, and honestly maximize
+the subdivision of work into RRI 0-25 / Effort S tasks.
+
+Amendment 4's Low-band decomposition is generalized from a late routing step
+to a mandatory planning-time pass for every task set. Before presentation or
+direct execution, the orchestrator freezes and scores the coherent parent
+outcome, then searches for real behavioral, file-ownership, evidence, and
+decision seams. Each executable leaf is independently defined, verified, and
+scored, with RRI 0-25 / Effort S as the preferred target when that target is
+truthful.
+
+This amendment does **not** turn decomposition into an approval bypass. The
+parent outcome's preliminary RRI remains the approval and integrated-review
+envelope. A parent scoring RRI 26+ still requires its normal HITL checkpoint
+before any contained Low leaf begins, and its reviewer independence,
+Reflection count, unified verification, and closure evidence remain unchanged.
+Only bounded authorship is moved to the Low/local route.
+
+The following anti-gaming constraints are normative:
+
+1. Every leaf keeps honest variable scores and all applicable penalties, plus
+   explicit dependencies, allowed paths, acceptance criteria, verification,
+   evidence, and status synchronization.
+2. Unresolved architecture, auth/security, governance, schema, and product
+   decisions remain explicit owner checkpoints. Evidence gathering may be a
+   Low leaf; the decision itself is not relabeled as mechanical work.
+3. Assembly and integration receive their own RRI. Cross-leaf coupling,
+   context, or risk may not be hidden or inherited away.
+4. Splitting stops when the next fragment would not be independently
+   meaningful or verifiable. The residue is recorded as
+   `honest-low-max: residual` and follows its actual band.
+5. Low-band Qwen Developer eligibility remains limited to simple code patches;
+   Low docs, ADR, policy, planning, and structure-heavy work stays with the
+   primary agent.
+
+The authoritative procedure is
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Honest Low-band maximization before
+presentation`; RRI and approval consequences are mirrored in
+`docs/policies/RRI_POLICY.md` and
+`docs/policies/HITL_AUTONOMY_POLICY.md`.
+
+### Adoption evidence
+
+The owner explicitly authorized documenting this permanent rule and redefining
+the current task in the 2026-09-05 workflow turn. The decision-record unit was
+scored before editing:
+
+| Variable | C | F | D | T | A | K | P | X |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Score | 0 | 1 | 3 | 0 | 0 | 2 | 2 | 3 |
+
+Base 24 + `arch_decision` 12 = **RRI 36, Moderate, Effort M**. The owner's
+directive is the explicit bounded authorization for this docs/ADR/policy-only
+change. Phase-1 and phase-2 review are `n/a` under the workflow exemption.
+
+Propagation was then split into independently scored docs-only leaves: Guide
+RRI 23, RRI policy RRI 16, HITL policy RRI 16, bootstrap summaries RRI 15,
+and ADR044 task redefinition RRI 24. None invoked an Ollama-backed role.
+
 ## Related
 
 - `docs/adr/ADR-036-local-first-agentic-implementation-band.md`

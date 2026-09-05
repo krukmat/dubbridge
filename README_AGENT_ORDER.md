@@ -44,16 +44,20 @@ inputs.
    policy-only tasks normally qualify for that exemption.
 1. Analyze context, dependencies, and affected files.
 2. Ensure a `docs/plan/<name>.md` and `docs/tasks/<name>.md` exist (create if not).
-3. Compute RRI with `scripts/rri.py`; present the next task using the `AGENTS.md`
+3. Score the coherent parent outcome, then run the workflow guide's honest
+   Low-band maximization pass: prefer meaningful, independently verifiable
+   RRI 0–25 / Effort S leaves without hiding penalties, coupling, integration,
+   or unresolved decisions. The parent band keeps its approval/review gates.
+4. Compute RRI with `scripts/rri.py`; present the next task using the `AGENTS.md`
    presentation contract only when approval is required.
-4. If the computed RRI requires approval, wait for explicit approval (see the HITL
+5. If the computed RRI requires approval, wait for explicit approval (see the HITL
    policy). If the task is in the RRI 0–25 Low band (normally `Effort: S` under the
    canonical mapping), use local Qwen Developer delegation through Ollama only for eligible
    simple code patches; otherwise handle the task directly as the primary agent.
-5. Implement one task at a time, in order.
-6. Before implementation, identify any evidence/metrics the task must emit and any
+6. Implement one task at a time, in order.
+7. Before implementation, identify any evidence/metrics the task must emit and any
    status artifacts it must synchronize as part of execution.
-7. Verify (tests/checks), emit the named evidence, sync the named status artifacts,
+8. Verify (tests/checks), emit the named evidence, sync the named status artifacts,
    mark progress in the tasks document, report, and wait.
 
 ## Related

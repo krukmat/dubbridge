@@ -39,6 +39,28 @@ or replaces the band-routed review chain. Full authority boundary:
 Exceptions: the user explicitly says "proceed without asking" for a clearly
 bounded scope, or the computed RRI is 0–25 within the low-band rules below.
 
+## Parent envelope and honest Low-band maximization
+
+Before presentation, the orchestrator must attempt to decompose the frozen
+outcome into coherent, independently scored RRI 0–25 / Effort S leaves so
+local development can carry as much bounded implementation as the hardware
+honestly supports. This changes authorship granularity, not approval scope.
+
+If the coherent parent outcome scores RRI 26+, the human approves that parent
+envelope before any contained Low leaf starts. The parent's review chain,
+Reflection count, integrated verification, and scope boundary remain in force;
+the Low leaves do not independently waive them. No further approval is needed
+for a leaf already named inside the approved envelope, but changed invariants,
+new paths, or expanded behavior require recomputation and a new checkpoint when
+the parent gate demands one.
+
+The orchestrator must preserve unresolved architecture, security, governance,
+schema, or product choices as explicit human checkpoints. It must not suppress
+penalties, understate coupling/context, or fragment an invariant solely to move
+work below RRI 26. An inseparable residue keeps its actual band and normal HITL
+route. Full procedure: `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Honest
+Low-band maximization before presentation`.
+
 ## Per-task local-stack restart
 
 Every task invoking an Ollama-backed local role must restart Ollama once
