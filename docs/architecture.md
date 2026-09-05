@@ -47,7 +47,7 @@ operational surfaces from planned ones. Delivery sequence lives in
 | First-party session gateway (transparent JWT relay) | Operational | S-040, ADR-031 |
 | First-party mobile client (React Native + Expo) | Canonical, sole authenticated product surface | S-050/S-105, ADR-029/031 |
 | Mobile P2P runtime boundary | P1 closed `[x] Done` 2026-09-01 (7/8 children PASS: packaging/protocol, ownership/composition, storage, replication transport, verification/reconnect/teardown; P1.F3b itself stays `not PASS`, non-blocking, deferred into X28); no product P2P runtime or network activity is active outside bounded proof runners | MVP0-P2P P1, ADR-043 |
-| P2P audience delivery (encrypted publication, invite/claim, verified sync, loopback playback) | Not started — ADR-044 is `Proposed`; D1 selected `O3 parallel` and D2 selected `K1`; D3 and ADR acceptance still block P2 | MVP0-P2P P2–P7, ADR-044 |
+| P2P audience delivery (encrypted publication, invite/claim, verified sync, loopback playback) | Not started — ADR-044 is `Proposed`; D1 `O3 parallel`, D2 `K1`, and D3 `O4` are resolved; explicit D4 ADR acceptance still blocks P2 | MVP0-P2P P2–P7, ADR-044 |
 
 Human review runtime (S-170) and publication runtime (S-180) have no plan/task
 ledger yet.
@@ -103,18 +103,22 @@ ledger yet.
   non-operational for end users pending P2–P7.
 - **P2P audience delivery** (MVP0-P2P P2–P7, ADR-044 `Proposed`): the
   control-plane/data-plane split in which `apps/api` stays the sole
-  authorization authority while an encrypted P2P data plane — package
-  builder, publication/outbox state, an Availability Node seeding ciphertext
-  only, mobile Hyperdrive/Hyperswarm sync, and a loopback HLS gateway —
-  replaces server media transport for the certified invited-playback path.
-  ADR-032 remains authoritative for review playback and is not replaced.
-  ADR-044 D1 closed on 2026-09-05 with `O3 parallel`; D2 closed on the same
-  date with owner-selected `K1`: AES-256-GCM package encryption, server-wrapped
-  CK, HPKE P-256 device envelope, non-exportable Android Keystore key, no
-  external-hardware or StrongBox requirement, fail-closed capability handling,
-  and no silent K2 fallback. ADR-044 is still **not accepted**; D3 and the
-  remaining phase-specific questions block `P2`, so nothing in this boundary
-  exists in product code. Design inputs:
+  authorization authority while an encrypted P2P data plane — package builder,
+  durable publication state, an Availability Node seeding ciphertext only,
+  mobile Hyperdrive/Hyperswarm sync, and a loopback HLS gateway — replaces
+  server media transport for the certified invited-playback path. ADR-032
+  remains authoritative for review playback and is not replaced. ADR-044 D1
+  selected `O3 parallel`; D2 selected `K1` (AES-256-GCM package encryption,
+  server-wrapped CK, HPKE P-256 device envelope, non-exportable Android
+  Keystore key, no external hardware/StrongBox requirement, fail-closed
+  capability handling, no silent K2 fallback). D3 selected `O4`: PostgreSQL
+  publication state + transactional outbox are durable authority; queue usage
+  is an optional/replayable accelerator only; a PostgreSQL reconciler repairs
+  lost/stuck/unknown work; delivery is at-least-once/idempotent under one stable
+  logical publication/K1 lineage; and `P2P_READY` is separate from S-120 Ready
+  and written only after durable confirmation of the external publication.
+  ADR-044 is still **not accepted**; D4 acceptance blocks P2, so none of this
+  D2P publication path exists in product code. Design inputs:
   `docs/plan/mvp0-p2p-design-inputs.md`.
 - `crates/connectors` (primary S-090, ADR-025): per-platform integrations behind a
   `PlatformConnector` trait. For owner-authorized download (content owner grants
@@ -183,6 +187,10 @@ sub-case. Every intake mode must use the same fail-closed
   object-write/metadata-write divergence, and periodic reconciliation lists
   canonical `ingests/` keys, compares them against relational references, and deletes
   only planner-approved orphan candidates.
+- For future P2P publication, D3/O4 extends that cross-store discipline: a
+  transactional outbox captures durable publication intent in PostgreSQL before
+  external publication; queue delivery is optional and non-authoritative; a
+  reconciler uses authoritative PostgreSQL state to recover lost/unknown work.
 
 ## Prepared media and playback boundaries
 
