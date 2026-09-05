@@ -53,7 +53,7 @@ doc gates).
 | [ADR-041](ADR-041-pre-approval-med-high-decomposition-local-favoring-granularity.md) | Pre-approval Med-high task decomposition for local-favoring granularity | Proposed (amends RRI_POLICY.md § Decomposition triggers if accepted; agent workflow only) |
 | [ADR-042](ADR-042-push-review-remediation-controller-and-escalation-lifecycle.md) | Push-review remediation controller and bounded escalation lifecycle | Proposed (scope: X27; amends ADR-034/ADR-039 if accepted; agent workflow only) |
 | [ADR-043](ADR-043-mobile-p2p-runtime-ownership-and-proof-isolation.md) | Mobile P2P runtime ownership and proof isolation | Accepted (scope: MVP0-P2P P1; does not decide audience delivery) |
-| [ADR-044](ADR-044-p2p-audience-delivery-boundary.md) | P2P audience delivery boundary | Proposed (D1 `O3 parallel`, D2 `K1`, D3 `O4` resolved 2026-09-05; D4 acceptance still blocks P2; does not replace ADR-032) |
+| [ADR-044](ADR-044-p2p-audience-delivery-boundary.md) | P2P audience delivery boundary | Accepted 2026-09-05 (D1 `O3 parallel`, D2 `K1`, D3 `O4`; P2 still requires its own plan/RRI/HITL) |
 
 ## Backfill note
 
