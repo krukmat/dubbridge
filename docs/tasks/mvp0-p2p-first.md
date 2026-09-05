@@ -181,6 +181,11 @@ and approval cards must be created at activation time.
 > task (RRI, Compact Approval Task Card, complete HP/EC set) per the workflow
 > guide's Step 2/3. Track this gap in `docs/plan/roadmap.md` § Known planning
 > gaps until a plan file exists for P2.
+>
+> The first ADR-resolution envelope is now `ADR044-D1` in
+> `docs/tasks/mvp0-p2p-adr044.md`. It preserves the parent RRI 55 approval
+> gate while decomposing execution into four coherent Effort S leaves and an
+> explicit owner-selection checkpoint; ADR-044 remains `Proposed` throughout.
 
 Design inputs for every entry below — use cases, scope boundaries, global
 invariants, acceptance-gate definitions, the control/data-plane split, the
