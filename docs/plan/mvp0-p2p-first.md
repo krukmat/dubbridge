@@ -25,8 +25,9 @@ slice: MVP0-P2P
 > package; the audience-delivery ADR required by design decision 9 below is
 > drafted as `docs/adr/ADR-044-p2p-audience-delivery-boundary.md`
 > (**Proposed** — D1 grant composition closed on 2026-09-05 with
-> `O3 parallel`; D2 key/device envelope is next, and `P2` stays
-> unpresentable until the remaining decisions close and the ADR is accepted).
+> `O3 parallel`; D2 key/device envelope closed on 2026-09-05 with `K1`;
+> D3 publication/outbox semantics is next, and `P2` stays unpresentable until
+> D3 closes and the ADR is accepted).
 
 ## Objective
 
@@ -81,12 +82,15 @@ package → loopback HLS → the existing `VideoPlayer`.
    delivery can be implemented, an ADR must define the new audience boundary:
    backend authorization and audit stay authoritative while P2P transports only
    ciphertext. Drafted as ADR-044 (`Proposed`); question 1 closed on 2026-09-05
-   with `O3 parallel`, a distinct backend-owned audience authorization after a
-   valid invitation claim. Questions 2–3 must still be resolved and the ADR
-   accepted before `P2` may be presented.
+   with `O3 parallel`, and question 2 closed on 2026-09-05 with `K1` (AES-256-GCM
+   package encryption, server-wrapped CK, HPKE P-256 device envelope, non-exportable
+   Android Keystore private key, no external-hardware/StrongBox requirement, and
+   fail-closed capability handling with no silent K2 fallback). Question 3 must
+   still be resolved and the ADR accepted before `P2` may be presented.
 10. P2P publication is ciphertext-only. Raw invitation tokens, plaintext content
    keys, JWT signing material, and device private keys must never be persisted or
-   logged. Key/envelope design is a prerequisite for P3, not an assumption.
+   logged. The selected K1 contract is recorded in ADR-044 D2 and
+   `docs/audit/mvp0-p2p-adr044-d2-key-envelope.md`.
 11. The Availability Node, when planned, may seed ciphertext only; it must not
    receive PostgreSQL, JWT, signing-key, invitation, or plaintext content-key
    authority.
@@ -164,11 +168,13 @@ plan-level index. Resolved items remain listed to preserve the decision trail.
 - `[x]` P2P audience-delivery ADR and ADR-032 relationship — ADR-044 question
   1 resolved 2026-09-05 as `O3 parallel`; ADR-032 remains unchanged and a
   distinct backend-owned authorization gates wrapped-key release.
+- `[x]` Content-key algorithm, envelope format, device-key generation/storage,
+  and bounded revocation semantics — ADR-044 question 2 resolved 2026-09-05
+  as `K1`; full contract in `docs/audit/mvp0-p2p-adr044-d2-key-envelope.md`.
 - Persistent product cache, device identity, sign-out wipe, and background
   execution requirements beyond P1's transient foreground proof.
-- Publication/outbox schema and recovery semantics.
-- Content-key algorithm, envelope format, device-key generation/storage, and
-  revocation semantics — next ADR closure task `ADR044-D2`.
+- Publication/outbox schema and recovery semantics — next ADR closure task
+  `ADR044-D3`.
 - Availability Node deployment, authentication, observability, and operational
   ownership.
 - P2P certification profile that disables legacy HTTP media routes without
