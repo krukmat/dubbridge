@@ -15,7 +15,7 @@ Roadmap phases use a single canonical `S-xxx` identifier. Older `S0`/`P*`/`T*`
 labels remain as legacy aliases in source plans and historical task ledgers until
 those files are renamed, but new roadmap references should use `S-xxx`.
 
-Last consolidated 2026-08-27. This file intentionally keeps only current status,
+Last consolidated 2026-09-05. This file intentionally keeps only current status,
 dependencies, and links — full consolidation changelog, design rationale, and
 detailed per-slice history live in `docs/audit/roadmap-history.md`.
 
@@ -156,12 +156,13 @@ real DO infrastructure. **T5 (parent) is now closed** — all four children
 (T5a–T5d) done. `T6` (first deploy) is next, unstarted. Deployment-enablement slice: makes the already-closed pipeline publicly runnable on a Digital Ocean droplet; adds no new technology beyond Redis (already in use). Full history incl. gap findings G10–G13: `docs/audit/roadmap-history.md` § S-230. | `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md`, `docs/audit/s-230-t5b-rri.md` |
 | **MVP0-P2P** | P2P-first invited playback: maintainable mobile/Bare runtime foundation, isolated replication proof, encrypted publication, invite control plane, verified local package playback, and no-HTTP-fallback certification | S-120, S-125, S-127, S-160; accepted ADR-043 + separately approved P1 children before source work; separate audience-delivery ADR before P2 | 🟡 P0 and P1 closed — Android-only Bare worklet build/runtime proof passed; P1 closed `[x] Done` 2026-09-01 (7/8 children PASS; P1.F3b itself stays `not PASS`, non-blocking, deferred into X29 — see below). Revised P1 (RRI 94) and ADR-043 were approved on 2026-08-27. P1.F1, P1.F2, and P1.F3a.1 are closed PASS after owner verification; P1.F3a.2 closed Done 2026-08-27, retiring the P0 scaffold (`AndroidBareRuntimeProbe`, custom bridge/protocol, inline worklet) with `P2PDevelopmentHarness` as the sole diagnostic path. P1.F3b (RRI 24 Low) was implemented and audited 2026-08-27 but is **not PASS**: its dependency/build audit retained every contested item on evidence — notably `react-native-b4a`, which has zero JS imports yet is a `peerOptional` of `b4a` selected by `b4a`'s `react-native` export condition and wired by autolinking, so removing it would have degraded the RPC data path silently — leaving nothing to remove and the lockfile unchanged; its Android build/ping and the executed `useLegacyPackaging` native A/B are folded into X29. Its child `P1.F3b-fix-1` (RRI 17 Low) closed **Done 2026-08-28** — fixed a real Metro-bundling blocker in `mobile/src/p2p/runtime/protocol.ts` (TypeScript import-equals syntax) found once emulator access arrived, regenerated the drifted `worklet.bundle.js`, and certified coverage (27/27 P2P tests, typecheck clean, no bundle drift). It did **not** unblock the on-device run, which is root-caused to an upstream `bare-module@6.3.2` defect and stays in X29. P1.A1 (Hyperdrive/Corestore Android bundle smoke proof) was decomposed 2026-08-28 at owner request into four Low-band (RRI 0-25) children — `P1.A1a`-`P1.A1d` — after its parent-level Gemma phase-1 review passed 3/3 with 2 minor consensus findings, both incorporated into the children's acceptance criteria. `P1.A1a` (dependency add) closed PASS/Done 2026-08-28; P1.A1b, P1.A1c, and P1.A1d all closed PASS/Done 2026-08-30 after explicit owner verification, closing the P1.A1 parent. **P1.A2** (transient seed lifecycle + residue cleanup, RRI 46 Med-high) closed PASS/Done 2026-08-31 after a D14 cross-provider phase-2 review found and required repair of 3 BLOCKING correctness gaps (traversal guard, swallowed close-failure, uninvoked janitor) before owner verification. **P1.B1** (isolated Hyperswarm replication transport) closed `[x] Done` 2026-08-31 via **retrospective closure**: its implementation had already landed on `feature/p2p-mvp-core` before the task ledger was updated from "Deferred"; this session reconstructed the RRI report, implementation record, Reflection log, and coverage certification against the delivered code, independently re-ran all verification, and disclosed a real governance gap — the post-implementation RRI recomputes to **59 Complex** (crossing the decomposition-before-implementation threshold, driven mostly by a `many_files` penalty from mechanical maintainability-gate splits) against the stale 55 Med-high prospective estimate the work was actually authored under. The owner reviewed and accepted this as a one-time retrospective disposition, not a precedent (`docs/audit/mvp0-p2p-p1-b1-rri.md`, `docs/audit/mvp0-p2p-p1-b1-implementation.md`). Two items were explicitly carried forward to **P1.B2**: the transport layer's `byte_count: 0` hardcode (byte/hash verification is P1.B2's own designed scope) and a direct unit-test coverage gap for the Hyperswarm connection/timeout logic, currently exercised only through higher-layer mocks. **P1.B2** (verification, reconnect, and fail-closed witness; prospective RRI 56 Complex, decomposed before implementation into 12 children `a-0` through `f`) closed all 12 children PASS by 2026-09-01, closing with the prospective RRI kept as-is (a post-implementation recompute scoped to the 10 files actually touched gives RRI 35 Moderate, recorded as context only, not adopted). **P1 itself closed `[x] Done` on 2026-09-01**: 7/8 children (F1, F2, F3a, A1, A2, B1, B2) PASS, with P1.F3b's residual `not PASS`/X29 status accepted by the owner as non-blocking; parent-level 5-pass Reflection log against the original parent reflection plan, full unit coverage certification, and owner final verification recorded in `docs/tasks/mvp0-p2p-p1-replication.md` § Owner final verification. P1 closing PASS is **not** authorization to start P2 source work. iPhone/iOS remains deferred and no product P2P runtime or network activity is active outside these bounded proof runners. **P2–P7 still have no plan file**, but their design inputs and per-phase HP/EC scope were transcribed into canonical docs on 2026-08-28 (`docs/plan/mvp0-p2p-design-inputs.md`, expanded `docs/tasks/mvp0-p2p-first.md` § Deferred task acceptance summaries) and the required audience-delivery ADR is drafted as **ADR-044 (`Proposed`)** — `P2` stays unpresentable until it is accepted (see § Known planning gaps). | `docs/plan/mvp0-p2p-first.md`, `docs/tasks/mvp0-p2p-first.md`, `docs/plan/mvp0-p2p-design-inputs.md`, `docs/plan/mvp0-p2p-p1-replication.md`, `docs/tasks/mvp0-p2p-p1-replication.md`, `docs/adr/ADR-043-mobile-p2p-runtime-ownership-and-proof-isolation.md`, `docs/adr/ADR-044-p2p-audience-delivery-boundary.md`, `docs/audit/mvp0-p2p-p1-f1-implementation.md`, `docs/audit/mvp0-p2p-p1-f2-implementation.md`, `docs/audit/mvp0-p2p-p1-f3a1-implementation.md`, `docs/audit/mvp0-p2p-p1-f3b-implementation.md`, `docs/audit/mvp0-p2p-p1-b1-rri.md`, `docs/audit/mvp0-p2p-p1-b1-implementation.md`, `p2p-mvp/` |
 
-> **MVP0-P2P ADR-044 update (2026-09-05):** D1 grant composition closed
-> with owner-selected `O3 parallel`. A distinct backend-owned audience
-> authorization now follows a valid invitation claim and gates wrapped-key
-> release within the proposed decision; ADR-032 remains unchanged. D2
-> key/device envelope is next. ADR-044 remains `Proposed`, questions 2–3 and
-> acceptance still block P2, and no P2 source work is authorized.
+> **MVP0-P2P ADR-044 update (2026-09-05):** D1 grant composition closed with
+> owner-selected `O3 parallel`; D2 key/device envelope closed with owner-selected
+> `K1`; and D3 publication/outbox semantics closed with owner-selected `O4`
+> (transactional outbox as durable authority, queue as an optional accelerator,
+> and PostgreSQL reconciliation as the recovery safety net). ADR-032 remains
+> unchanged. ADR-044 remains `Proposed`; D4 acceptance is the next and only ADR
+> closure gate before P2 may be planned/presented. No P2 source work is authorized.
 >
 > **MVP0-P2P update (2026-08-30):** `P1.A1b.0` (RRI 10 Low,
 > documentation/contract only) closed PASS, freezing the host-to-Bare
@@ -269,16 +270,15 @@ captured above under Governing principles and ADR-025/ADR-026.
   carries per-phase objective, scope boundaries, and full HP/EC sets instead
   of one-liners — so P2–P7 can be analyzed and presented without opening the
   untracked external `p2p-mvp/` package. **Still missing:** a `docs/plan/`
-  file per phase, and acceptance of the audience-delivery ADR — drafted as
-  `docs/adr/ADR-044-p2p-audience-delivery-boundary.md` (`Proposed`). Its D1
-  grant-composition decision closed on 2026-09-05 as `O3 parallel`; D2
-  key/device envelope is next, while questions 2–3 and ADR acceptance still
-  block `P2` scope. P1 (or any of its children) reaching
-  PASS is **not** authorization to start P2 source work — each of P2–P7 still
-  needs its own plan, RRI, Compact Approval Task Card, and explicit HITL
-  approval per `docs/plan/mvp0-p2p-first.md` § Execution sequence. The
-  phase-1/phase-2 peer-review waiver in
-  `docs/audit/mvp0-p2p-review-exception.md` does not cover this planning gate.
+  file per phase and acceptance of the audience-delivery ADR. ADR-044 remains
+  `Proposed`, but D1 (`O3 parallel`), D2 (`K1`), and D3 (`O4`) are resolved as
+  of 2026-09-05. D4 acceptance is now the only ADR-044 closure gate blocking
+  P2 planning/presentation. P1 (or any of its children) reaching PASS is
+  **not** authorization to start P2 source work — each of P2–P7 still needs
+  its own plan, RRI, Compact Approval Task Card, and explicit HITL approval
+  per `docs/plan/mvp0-p2p-first.md` § Execution sequence. The phase-1/phase-2
+  peer-review waiver in `docs/audit/mvp0-p2p-review-exception.md` does not
+  cover this planning gate.
 - Full historical detail behind every closed gap above (the S-090 replan, X22–X24
   ADR closures, the S-200/ADR-031 mobile-auth decision, etc.):
   `docs/audit/roadmap-history.md`.
