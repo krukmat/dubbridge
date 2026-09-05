@@ -34,7 +34,9 @@ The unreduced P2 phase crosses storage, database, migrations, cryptographic key 
 
 Conservative planning score: **RRI 131 — Excessive — Effort XL**.
 
-No direct P2 source execution exists. P2 is decomposed into independently gated parents T0-T6. T0 is complete; **T1 is the next owner gate**.
+No direct P2 source execution exists. P2 is decomposed into independently gated parents T0-T6. T0 is complete. The original T1 parent scored **78 High / XL** and is now also **non-executable**; it was decomposed into T1a-T1f after the owner requested lower-complexity tasks.
+
+The next owner gate is **P2.T1a**.
 
 ## Architecture
 
@@ -43,7 +45,22 @@ S-120 HLS Ready
       |
       | existing pipeline remains complete / ASR may enqueue
       v
-P2.T1 durable publication identity + outbox intent (PostgreSQL)
+P2.T1a domain contract
+      |
+      v
+P2.T1b PostgreSQL schema
+      |
+      v
+P2.T1c atomic publication + outbox write
+      |
+      v
+P2.T1d read model / outstanding work
+      |
+      v
+P2.T1e guarded transitions / confirmation evidence
+      |
+      v
+P2.T1f persistence certification
       |
       v
 P2.T2 K1 encrypted package construction
@@ -84,19 +101,57 @@ Owner-approved contract:
 
 Evidence: `docs/audit/mvp0-p2p-p2-t0-selection.md`.
 
-### P2.T1 — durable publication identity + outbox foundation — NEXT OWNER GATE
+### P2.T1 — persistence parent — SUPERSEDED AS EXECUTABLE GATE
 
-Create only the P2P publication domain/persistence foundation:
+The former RRI-78 parent is now only a grouping container for six lower-RRI leaves. No source work is authorized under `P2.T1` directly.
 
-- stable logical publication/package identity and K1 lineage reference;
-- non-ready publication state machine following T0 semantics;
-- durable outbox intent created atomically with publication state;
-- repository operations needed to observe outstanding work and later claim/retry/reconcile/confirm transitions;
-- migration constraints preventing duplicate active logical publication or invalid direct Ready.
+Canonical decomposition: `docs/audit/mvp0-p2p-p2-t1-decomposition.md`.
 
-Expected bounded path envelope is a new P2 publication domain module, a new DB repository module, their crate exports, one new migration, focused domain/DB tests, and T1 documentation. Exact paths and exact RRI are frozen at the T1 execution presentation.
+#### P2.T1a — pure domain identity/state contract — NEXT OWNER GATE
 
-T1 does not include crypto, Availability Node source, mTLS transport implementation, queue/reconciler side effects, S-120 trigger integration, or P3 behavior.
+Planning **RRI 22 Low / Effort S**.
+
+Only pure Rust domain semantics:
+
+- stable logical publication identity;
+- stable K1 lineage reference;
+- T0 state model;
+- pure transition/readiness guards;
+- unit tests for lineage stability, unknown/reconciling behavior, invalid direct Ready, terminal/regressive transitions.
+
+No PostgreSQL, migration, repository, crypto, worker, queue, Availability Node, or S-120 source.
+
+Approval card: `docs/audit/mvp0-p2p-p2-t1a-approval-card.md`.
+
+#### P2.T1b — PostgreSQL schema + constraints
+
+Planning **RRI 32 Medium / Effort S/M**.
+
+Only one migration introducing the publication/outbox persistence structures and schema-level identity/lineage/readiness constraints. No Rust repository behavior.
+
+#### P2.T1c — atomic create/ensure + outbox write
+
+Planning **RRI 47 Medium-high / Effort M**.
+
+Only the minimal DB write repository path that creates/ensures the publication and initial outbox obligation in the same PostgreSQL transaction. No scans/transitions/dispatch.
+
+#### P2.T1d — read model / outstanding work
+
+Planning **RRI 36 Medium / Effort S/M**.
+
+Only read-side repository behavior for stable identity lookup and outstanding durable obligations. No mutation/claim/lease.
+
+#### P2.T1e — guarded transitions + confirmation persistence
+
+Planning **RRI 44 Medium-high / Effort M**.
+
+Only lifecycle state mutations, same-lineage confirmation evidence persistence, and the fail-closed durable Ready guard. No external calls.
+
+#### P2.T1f — persistence certification
+
+Planning **RRI 33 Medium / Effort M**.
+
+Only integration/negative evidence for atomicity, restart/re-read, duplicate create, invalid Ready, and secret-deny-list inspection. Defects reopen the responsible implementation leaf rather than expanding certification scope.
 
 ### P2.T2 — K1 package construction
 
@@ -170,14 +225,16 @@ Close P2 with executable evidence for all O4 crash windows and K1 confidentialit
 
 ## Verification strategy
 
-Every implementation parent must map its HP/EC cases to executable evidence under `behavior-v2`. P2 closure requires migration/repository integration tests, K1 crypto vectors, Availability Node contract tests, worker/outbox/reconciler integration tests, deterministic failure injection for all six D3 crash windows, audit persistence tests, S-120/ASR non-regression, and ciphertext inspection.
+Every implementation leaf must map its HP/EC cases to executable evidence under `behavior-v2`. P2 closure requires migration/repository integration tests, K1 crypto vectors, Availability Node contract tests, worker/outbox/reconciler integration tests, deterministic failure injection for all six D3 crash windows, audit persistence tests, S-120/ASR non-regression, and ciphertext inspection.
 
 ## Gates
 
 1. ADR-044 accepted — **satisfied 2026-09-05**.
 2. P2 parent planning/decomposition — **satisfied**.
 3. P2.T0 architecture/security contract — **PASS 2026-09-05 (`AN-R1 + AN-A1`)**.
-4. P2.T1 durable publication/outbox foundation — **next owner gate**.
-5. T2-T6 are independently scored/presented/approved after their dependencies pass.
-6. P2 closes only after T0-T6 PASS, integrated Reflection, coverage certification, status synchronization, and owner verification.
-7. P3 remains blocked until P2 PASS.
+4. Original P2.T1 High-band gate — **superseded/non-executable**.
+5. P2.T1a domain contract — **next owner gate**.
+6. T1b-T1f follow sequentially with independent exact-path RRI/HITL as required.
+7. T2-T6 are independently scored/presented/approved after their dependencies pass and may themselves be decomposed further.
+8. P2 closes only after T0, T1a-T1f, and T2-T6 PASS, integrated Reflection, coverage certification, status synchronization, and owner verification.
+9. P3 remains blocked until P2 PASS.
