@@ -25,13 +25,14 @@ record is `docs/adr/ADR-044-p2p-audience-delivery-boundary.md`.
 
 | Task | Objective | Status | Depends on |
 |---|---|---|---|
-| `ADR044-D1` | Parent envelope: resolve ADR-032 grant composition without delegating the architecture choice to an agent | Complete 2026-09-05; owner selected `O3 parallel`; S4/QA PASS | P1 PASS |
+| `ADR044-D1` | Parent envelope: resolve ADR-032 grant composition without delegating the architecture choice to an agent | Complete 2026-09-05; owner selected `O3 parallel`; S4/SYNC/QA PASS | P1 PASS |
 | `ADR044-D1-S1` | Extract frozen ADR-032 grant invariants and citations | Complete 2026-09-05; `make qa-docs` PASS | D1 approval satisfied 2026-09-05 |
 | `ADR044-D1-S2` | Extract frozen P2 audience/key-release constraints and comparison criteria | Complete 2026-09-05; `make qa-docs` PASS | S1 PASS |
 | `ADR044-D1-S3` | Populate the neutral three-option decision matrix and expose tradeoffs | Complete 2026-09-05; `make qa-docs` PASS | S2 PASS |
 | `ADR044-D1-OWNER` | Owner selects reuse, bypass, or parallel audience authorization | Complete 2026-09-05; `O3 parallel` selected | S3 PASS |
 | `ADR044-D1-S4` | Mechanically record the frozen owner selection in the audit record and ADR-044 | Complete 2026-09-05; `make qa-docs` PASS | D1-OWNER satisfied 2026-09-05 |
-| `ADR044-D2` | Resolve the content-key and device-envelope contract | Ready to define and score separately | D1-S4 PASS |
+| `ADR044-D1-SYNC` | Consolidate the resolved D1/O3 status across canonical plan, roadmap, task, architecture, and ADR index documents | Complete 2026-09-05; `make qa-docs` PASS | D1-S4 PASS |
+| `ADR044-D2` | Resolve the content-key and device-envelope contract | Ready to define and score separately | D1-SYNC PASS |
 | `ADR044-D3` | Resolve publication/outbox state and recovery semantics | Deferred; define and score separately | D2 |
 | `ADR044-D4` | Accept ADR-044 and propagate the accepted decision through canonical status documents | Deferred; define and score separately | D1-D3 plus any closure-blocking audit decision |
 
@@ -390,3 +391,41 @@ all leaves are ADR/task-ledger-only work with no source, schema, migration,
 configuration, or runtime behavior change. Integrated closure instead checked
 the selected boundary against every S1/S2 constraint, verified that ADR-032
 was untouched, and retained the parent Med-high approval envelope through S4.
+
+### D1 canonical-document consolidation
+
+Status: **complete** (`ADR044-D1-SYNC`) on 2026-09-05. The repository owner
+requested consolidation after a semantic audit found that the D1 ledger,
+audit, and ADR were current but the slice plan, roadmap, main slice ledger,
+architecture overview, and ADR index still described question 1 only at the
+pre-selection level.
+
+- **Effort/RRI:** S; **17 → Low** (six docs, no runtime behavior or new
+  architecture choice).
+- **Allowed paths:** this ledger, `docs/plan/mvp0-p2p-first.md`,
+  `docs/plan/roadmap.md`, `docs/tasks/mvp0-p2p-first.md`,
+  `docs/architecture.md`, and `docs/adr/README.md`.
+- **Result:** all six documents now state that D1 selected `O3 parallel`, D2
+  is next, ADR-044 remains `Proposed`, questions 2–3 and acceptance still
+  block P2, and no P2 source work is authorized.
+- **Honest Low-band maximization:** `honest-low-max: residual` — further
+  splitting would make the status propagation non-atomic and temporarily
+  contradictory; the coherent task already scores Low.
+- **Review/Reflection:** task-analysis review, code-solution review, and
+  formal development Reflection are `n/a` for docs/ADR/status-only work.
+- **Verification:** semantic cross-document inspection, `make qa-docs`,
+  `git diff --check`, and byte equality of `AGENTS.md`/
+  `AGENTS.override.md` — PASS.
+
+Canonical RRI command:
+
+```bash
+python3 scripts/rri.py \
+  --touches docs/tasks/mvp0-p2p-adr044.md \
+  --touches docs/plan/mvp0-p2p-first.md \
+  --touches docs/plan/roadmap.md \
+  --touches docs/tasks/mvp0-p2p-first.md \
+  --touches docs/architecture.md \
+  --touches docs/adr/README.md \
+  --C 0 --D 1 --K 2 --P 0 --T 0 --A 0 --X 2
+```

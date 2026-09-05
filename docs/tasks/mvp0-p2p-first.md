@@ -172,20 +172,21 @@ The following tasks stay unpresented until their dependency evidence exists. The
 external taskpacks are useful input, but the detailed ledger entries, RRI reports,
 and approval cards must be created at activation time.
 
-> **Next action when P1 closes:** P1 reaching PASS (all children — through
-> `P1.B2`) does **not** unlock P2 source work. Nothing below is a plan; each
-> is a one-line HP/EC placeholder. Before P2 can be presented: (a) draft the
-> P2P audience-delivery ADR required by `docs/plan/mvp0-p2p-first.md` §
-> Deferred decisions (design decision 9); (b) author
+> **Current ADR gate after P1 closure:** P1 reaching PASS (all children —
+> through `P1.B2`) does **not** unlock P2 source work. Nothing below is a
+> phase plan. ADR-044 D1 closed on 2026-09-05 with `O3 parallel`; before P2
+> can be presented: (a) resolve ADR044-D2/D3 and complete the ADR acceptance
+> gate; (b) author
 > `docs/plan/mvp0-p2p-p2-*.md` and expand this ledger's P2 entry to a full
 > task (RRI, Compact Approval Task Card, complete HP/EC set) per the workflow
 > guide's Step 2/3. Track this gap in `docs/plan/roadmap.md` § Known planning
 > gaps until a plan file exists for P2.
 >
-> The first ADR-resolution envelope is now `ADR044-D1` in
-> `docs/tasks/mvp0-p2p-adr044.md`. It preserves the parent RRI 55 approval
-> gate while decomposing execution into four coherent Effort S leaves and an
-> explicit owner-selection checkpoint; ADR-044 remains `Proposed` throughout.
+> The first ADR-resolution envelope, `ADR044-D1` in
+> `docs/tasks/mvp0-p2p-adr044.md`, is complete: its four Effort S leaves
+> preserved the parent RRI 55 gate, and the owner selected `O3 parallel`.
+> `ADR044-D2` (content-key/device envelope) is next. ADR-044 remains
+> `Proposed`; D1 completion is not P2 approval.
 
 Design inputs for every entry below — use cases, scope boundaries, global
 invariants, acceptance-gate definitions, the control/data-plane split, the
@@ -211,7 +212,8 @@ and revised approval card: `docs/plan/mvp0-p2p-p1-replication.md`,
 
 - **Gate / use case:** G2 / CU-01. **Blocked on:** P1 PASS **and** accepted
   ADR-044 (`docs/adr/ADR-044-p2p-audience-delivery-boundary.md` is
-  `Proposed`; open questions 1–3 block this task's scope).
+  `Proposed`; question 1 is resolved as `O3 parallel`, while questions 2–3
+  and ADR acceptance still block this task's scope).
 - **Objective:** turn an S-120-prepared HLS derivative into a ciphertext-only
   P2P package, publish it through the Availability Node, and record durable
   publication state — reusing existing upload/finalize/S-120 without
