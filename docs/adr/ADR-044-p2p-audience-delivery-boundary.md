@@ -96,8 +96,20 @@ so they are the low-uncertainty part of the decision.
    valid invitation claim, a distinct backend-owned audience authorization —
    not the claim alone, an ADR-032 `PlaybackGrant`, or possession of a
    Hyperdrive key or ciphertext — gates release of the wrapped content key.
-   This composition choice does not define the authorization's name, record,
-   API, fields, token, lifetime, or key-envelope mechanics.
+8. **D2 selects the K1 key/envelope profile.** Each P2P package uses a fresh
+   256-bit content key and AES-256-GCM media encryption. The CK is persisted
+   only server-wrapped with AES-256-GCM under a versioned server KEK. The
+   device envelope uses HPKE Base mode with
+   `DHKEM(P-256, HKDF-SHA256)` / `HKDF-SHA256` / `AES-256-GCM`, bound to the
+   invitation, viewer, active device key, asset/package, O3 audience
+   authorization, and expiry. Android uses a P-256 ECDH key in Android
+   Keystore; the private key is non-exportable by contract, StrongBox is not
+   required, and no external hardware is required. Missing required
+   Keystore/ECDH capability fails closed and never silently falls back to a
+   software private key. Revocation prevents new envelope releases; MVP-0
+   does not claim remote erasure of a CK already legitimately released to
+   volatile memory. Bare may receive only a transient CK for the authorized
+   playback session and never the device private key or backend secrets.
 
 ## Open questions
 
@@ -113,12 +125,16 @@ the numbered decision trail.
    inherited by local P2P delivery. The evidence, neutral option matrix, exact
    owner response, and non-selected alternatives are recorded in
    `docs/audit/mvp0-p2p-adr044-d1-grant-composition.md`.
-2. **Key envelope.** Content-key algorithm, envelope format, wrapping scheme,
-   device key generation and storage, and revocation semantics. Global
-   invariant 8 of the design input bounds this to one invitation, one viewer,
-   one active device path for MVP-0 — which materially simplifies the
-   envelope but must be recorded as a deliberate limitation, not an
-   accidental one.
+2. **Key envelope — resolved for D2 on 2026-09-05.** The owner selected `K1`:
+   AES-256-GCM package encryption, server-wrapped CK under a versioned
+   AES-256-GCM KEK, and an HPKE P-256 device envelope whose Android private
+   key remains non-exportable in Android Keystore. StrongBox and external
+   hardware are not required. Release is fail-closed across invitation,
+   viewer, active device, asset/package, O3 authorization, readiness, expiry,
+   and revocation. Revocation blocks new releases rather than claiming remote
+   DRM erasure. The full contract, alternatives, runtime responsibility split,
+   implementation STOP condition, and four integrated Reflection passes are
+   recorded in `docs/audit/mvp0-p2p-adr044-d2-key-envelope.md`.
 3. **Publication state.** The publication/outbox schema, its recovery
    semantics, and how P2P publication state relates to
    `PreparationStatus::Ready` without delaying S-120 readiness or its
@@ -144,8 +160,9 @@ the numbered decision trail.
 | Risk | Failure mode | Mitigation |
 |---|---|---|
 | Key-as-authorization drift | An implementation treats possession of the Hyperdrive key or a synced package as permission to play | Proposed decision 1; certification must include a negative case where a synced package is unplayable without control-plane authorization |
-| Premature acceptance | This ADR is accepted with § Open questions unresolved, and P2/P3 inherit undefined crypto | The status gate above: `Proposed` blocks P2 presentation by design |
-| Non-binding hypothesis hardening into contract | The suggested invite routes and RPC surface in `docs/plan/mvp0-p2p-design-inputs.md` are implemented as if decided | That document labels every non-binding section; P3's task card must restate the chosen surface as its own decision |
+| Premature acceptance | This ADR is accepted with § Open questions unresolved, and P2/P3 inherit undefined publication semantics | The status gate above: `Proposed` blocks P2 presentation by design |
+| Key-custody downgrade | A target device/runtime cannot complete K1 and implementation silently exports or software-stores the device private key | D2 K1 STOP condition: capability failure or inability to use the opaque Keystore key reopens D2; no K2 fallback is implicit |
+| Non-binding hypothesis hardening into contract | Suggested invite routes or encodings are implemented as if D2 selected them | D2 selects semantic bindings and crypto profile, not REST field names or wire encoding; P3 must choose and test one deterministic encoding |
 | Availability Node scope creep | The node acquires a credential or authority to "make integration easier" | Proposed decision 4 is an explicit deny-list, testable at review time |
 | Silent HTTP fallback | Certification passes because a legacy route served bytes | Proposed decision 6; G7 requires legacy media delivery disabled during the critical proof |
 
@@ -153,14 +170,15 @@ the numbered decision trail.
 
 If accepted as proposed:
 
-- `P2` gains a defined publication target: encrypted package plus durable
-  publication state, with Ready gated on publication succeeding.
-- `P3` gains a defined authorization target: an invite record persisting only
-  a token hash, and a claim that binds one viewer and yields a minimal P2P
-  access descriptor plus a wrapped content key.
-- `P4`/`P5` gain a defined trust boundary: the worklet verifies and serves
-  ciphertext it cannot independently decrypt without a key the control plane
-  released to the app.
+- `P2` gains a defined encrypted-package target and a server-wrapped content-key
+  custody contract, while its publication/outbox state remains D3.
+- `P3` gains a defined authorization and K1 device-envelope target: an invite
+  record persists only a token hash; an authorized one-viewer/one-active-device
+  path may receive an expiring HPKE-wrapped CK after the full fail-closed release
+  predicate succeeds.
+- `P4`/`P5` gain a defined trust boundary: the worklet verifies/serves
+  ciphertext and may receive only a transient CK after host-side authorized
+  unwrap; it never receives the device private key or backend secrets.
 - ADR-032 and the S-125 implementation are untouched, so review playback
   carries no regression risk from this slice.
 - A second decision will eventually be required if audience delivery and
@@ -180,6 +198,11 @@ If accepted as proposed:
 - **Publish plaintext HLS and rely on swarm obscurity.** Rejected: it makes
   every peer and the Availability Node a plaintext holder, which no
   rights/consent posture in this repository tolerates (ADR-008, ADR-028).
+- **K2 portable HPKE with a software-held device private key.** Not selected:
+  portability does not justify weakening K1's non-exportable-device-key
+  property; it is not an automatic fallback.
+- **K3 hardware JWE.** Not selected: its JOSE/JWE surface and host complexity
+  are unnecessary for MVP absent an external interoperability requirement.
 - **Defer the ADR and let P2 decide implicitly.** Rejected: it is what
   `docs/plan/mvp0-p2p-first.md` guardrail 9 exists to prevent, and it would
   place a security boundary decision inside an implementation task card.
@@ -207,6 +230,8 @@ closure evidence, 7 blocks `P4`.
 - `docs/plan/mvp0-p2p-first.md` — guardrails 8–11 and § Deferred decisions
 - `docs/plan/mvp0-p2p-design-inputs.md` — transcribed design inputs and their binding status
 - `docs/tasks/mvp0-p2p-first.md` — MVP0-P2P task ledger
+- `docs/audit/mvp0-p2p-adr044-d1-grant-composition.md` — D1 evidence and owner selection
+- `docs/audit/mvp0-p2p-adr044-d2-key-envelope.md` — D2 K1 evidence and owner selection
 - `docs/adr/ADR-043-mobile-p2p-runtime-ownership-and-proof-isolation.md` — accepted mobile runtime boundary
 - `docs/adr/ADR-032-hls-playback-delivery-boundary.md` — authoritative for review playback
 - `docs/adr/ADR-008-rights-ledger-fail-closed-precondition.md` — fail-closed rights precondition
