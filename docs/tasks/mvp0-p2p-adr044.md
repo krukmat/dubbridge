@@ -14,8 +14,9 @@ Resolve the architectural questions that keep ADR-044 `Proposed` and block
 presentation of P2. Following ADR-038 Amendment 5, this ledger separates
 evidence extraction, option comparison, owner selection, and mechanical
 codification into independently verifiable Effort S leaves. The coherent
-decision outcome remains a Med-high parent approval/review envelope: the split
-does not turn an authorization-boundary choice into autonomous Low-band work.
+decision outcome remains a parent approval/review envelope: the split does not
+turn authorization, cryptography, or publication-state decisions into autonomous
+Low-band work.
 
 The governing slice plan remains `docs/plan/mvp0-p2p-first.md`; the decision
 inputs are in `docs/plan/mvp0-p2p-design-inputs.md` and the proposed decision
@@ -32,8 +33,8 @@ record is `docs/adr/ADR-044-p2p-audience-delivery-boundary.md`.
 | `ADR044-D1-OWNER` | Owner selects reuse, bypass, or parallel audience authorization | Complete 2026-09-05; `O3 parallel` selected | S3 PASS |
 | `ADR044-D1-S4` | Mechanically record the frozen owner selection in the audit record and ADR-044 | Complete 2026-09-05; `make qa-docs` PASS | D1-OWNER satisfied 2026-09-05 |
 | `ADR044-D1-SYNC` | Consolidate the resolved D1/O3 status across canonical plan, roadmap, task, architecture, and ADR index documents | Complete 2026-09-05; `make qa-docs` PASS | D1-S4 PASS |
-| `ADR044-D2` | Resolve the content-key and device-envelope contract | Ready to define and score separately | D1-SYNC PASS |
-| `ADR044-D3` | Resolve publication/outbox state and recovery semantics | Deferred; define and score separately | D2 |
+| `ADR044-D2` | Resolve the content-key and device-envelope contract | Complete 2026-09-05; owner selected `K1`; closure ledger/audit recorded | D1-SYNC PASS |
+| `ADR044-D3` | Resolve publication/outbox state and recovery semantics | Ready to define and score separately | D2 PASS |
 | `ADR044-D4` | Accept ADR-044 and propagate the accepted decision through canonical status documents | Deferred; define and score separately | D1-D3 plus any closure-blocking audit decision |
 
 No task in this ledger authorizes P2 source work. P2 still requires its own
@@ -67,10 +68,8 @@ approval after ADR-044 is accepted.
      changing ADR-044 from `Proposed`.
   4. ADR-032 remains unchanged and authoritative for review-time HTTP HLS.
   5. `make qa-docs` passes and no document claims ADR-044 or P2 is approved.
-- **Phase-1 review:** `Task-analysis review: n/a -
-  ADR/plan/task-ledger-only exemption.`
-- **Phase-2 review:** `Code-solution review: n/a -
-  ADR/plan/task-ledger-only exemption.`
+- **Phase-1 review:** `Task-analysis review: n/a - ADR/plan/task-ledger-only exemption.`
+- **Phase-2 review:** `Code-solution review: n/a - ADR/plan/task-ledger-only exemption.`
 - **Owner review:** the D1-OWNER decision checkpoint remains mandatory.
 - **Verification:** `make qa-docs`; semantic consistency against ADR-032,
   ADR-043, the slice plan, and design inputs.
@@ -429,3 +428,27 @@ python3 scripts/rri.py \
   --touches docs/adr/README.md \
   --C 0 --D 1 --K 2 --P 0 --T 0 --A 0 --X 2
 ```
+
+## ADR044-D2 — key-envelope closure
+
+- **Status:** `[x] Complete 2026-09-05`; owner selected `K1`.
+- **Parent RRI:** **70 → Complex → Effort L**.
+- **Executable leaves:** S1-S4 RRI 24 Low; S5 RRI 23 Low; SYNC RRI 25 Low.
+- **Evidence:** `docs/audit/mvp0-p2p-adr044-d2-key-envelope.md` and
+  `docs/tasks/mvp0-p2p-adr044-d2.md`.
+- **Selected contract:** AES-256-GCM package encryption, server-wrapped CK,
+  HPKE Base P-256 device envelope, non-exportable Android Keystore private
+  key, no external hardware or StrongBox requirement, fail-closed capability
+  handling, one-viewer/one-active-device MVP scope, bounded revocation, and
+  no silent K2 fallback.
+- **Runtime boundary:** API owns authorization/key release; RN/native owns the
+  opaque private-key operation; Bare receives only transient CK; Availability
+  Node remains ciphertext-only.
+- **STOP condition:** inability to complete HPKE/P-256 against the opaque
+  Android Keystore key without export reopens D2; implementation may not
+  degrade to software private-key custody.
+- **Reflection:** crypto/key custody PASS; binding/expiry/revocation PASS;
+  runtime authority/secret leakage PASS; scope/status PASS.
+- **Result:** ADR-044 question 2 is resolved but ADR-044 remains `Proposed`.
+  D3 publication/outbox state is next. D4 acceptance and P2/P3 source work
+  remain blocked.
