@@ -47,7 +47,7 @@ operational surfaces from planned ones. Delivery sequence lives in
 | First-party session gateway (transparent JWT relay) | Operational | S-040, ADR-031 |
 | First-party mobile client (React Native + Expo) | Canonical, sole authenticated product surface | S-050/S-105, ADR-029/031 |
 | Mobile P2P runtime boundary | P1 closed `[x] Done` 2026-09-01 (7/8 children PASS: packaging/protocol, ownership/composition, storage, replication transport, verification/reconnect/teardown; P1.F3b itself stays `not PASS`, non-blocking, deferred into X28); no product P2P runtime or network activity is active outside bounded proof runners | MVP0-P2P P1, ADR-043 |
-| P2P audience delivery (encrypted publication, invite/claim, verified sync, loopback playback) | Not started — ADR-044 is `Proposed`; D1 selected `O3 parallel`, while remaining decisions and acceptance still block P2 | MVP0-P2P P2–P7, ADR-044 |
+| P2P audience delivery (encrypted publication, invite/claim, verified sync, loopback playback) | Not started — ADR-044 is `Proposed`; D1 selected `O3 parallel` and D2 selected `K1`; D3 and ADR acceptance still block P2 | MVP0-P2P P2–P7, ADR-044 |
 
 Human review runtime (S-170) and publication runtime (S-180) have no plan/task
 ledger yet.
@@ -108,11 +108,13 @@ ledger yet.
   only, mobile Hyperdrive/Hyperswarm sync, and a loopback HLS gateway —
   replaces server media transport for the certified invited-playback path.
   ADR-032 remains authoritative for review playback and is not replaced.
-  ADR-044 D1 closed on 2026-09-05 with `O3 parallel`: after a valid invitation
-  claim, a distinct backend-owned audience authorization gates wrapped-key
-  release. ADR-044 is still **not accepted**; D2/D3 and the remaining
-  phase-specific questions block `P2`, so nothing in this boundary exists in
-  code. Design inputs:
+  ADR-044 D1 closed on 2026-09-05 with `O3 parallel`; D2 closed on the same
+  date with owner-selected `K1`: AES-256-GCM package encryption, server-wrapped
+  CK, HPKE P-256 device envelope, non-exportable Android Keystore key, no
+  external-hardware or StrongBox requirement, fail-closed capability handling,
+  and no silent K2 fallback. ADR-044 is still **not accepted**; D3 and the
+  remaining phase-specific questions block `P2`, so nothing in this boundary
+  exists in product code. Design inputs:
   `docs/plan/mvp0-p2p-design-inputs.md`.
 - `crates/connectors` (primary S-090, ADR-025): per-platform integrations behind a
   `PlatformConnector` trait. For owner-authorized download (content owner grants
