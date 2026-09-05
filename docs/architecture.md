@@ -47,7 +47,7 @@ operational surfaces from planned ones. Delivery sequence lives in
 | First-party session gateway (transparent JWT relay) | Operational | S-040, ADR-031 |
 | First-party mobile client (React Native + Expo) | Canonical, sole authenticated product surface | S-050/S-105, ADR-029/031 |
 | Mobile P2P runtime boundary | P1 closed `[x] Done` 2026-09-01 (7/8 children PASS: packaging/protocol, ownership/composition, storage, replication transport, verification/reconnect/teardown; P1.F3b itself stays `not PASS`, non-blocking, deferred into X28); no product P2P runtime or network activity is active outside bounded proof runners | MVP0-P2P P1, ADR-043 |
-| P2P audience delivery (encrypted publication, invite/claim, verified sync, loopback playback) | Architecture accepted — ADR-044 D1 `O3 parallel`, D2 `K1`, D3 `O4`, D4 ACCEPT complete; P2 plan/decomposition exists and `P2.T0` is the next owner gate; no P2 source implementation yet | MVP0-P2P P2–P7, ADR-044 |
+| P2P audience delivery (encrypted publication, invite/claim, verified sync, loopback playback) | Architecture accepted; P2.T0 PASS with Node.js/TypeScript Availability Node + mTLS (`AN-R1 + AN-A1`); P2.T1 durable publication/outbox foundation is the next owner gate; no P2 source implementation yet | MVP0-P2P P2–P7, ADR-044 |
 
 Human review runtime (S-170) and publication runtime (S-180) have no plan/task
 ledger yet.
@@ -117,10 +117,15 @@ ledger yet.
   lost/stuck/unknown work; delivery is at-least-once/idempotent under one stable
   logical publication/K1 lineage; and `P2P_READY` is separate from S-120 Ready
   and written only after durable confirmation of the external publication.
-  D4 accepted the consolidated boundary on 2026-09-05. P2 is now architecture-
-  unblocked and has its own re-scoped plan (`docs/plan/mvp0-p2p-p2-encrypted-publication.md`);
-  the next explicit gate is `P2.T0`, which selects Availability Node runtime/auth
-  and concrete O4 state/audit semantics before source work. Design inputs:
+  D4 accepted the consolidated boundary on 2026-09-05. P2.T0 then froze
+  `AN-R1 + AN-A1`: a dedicated Node.js/TypeScript Availability Node using the
+  Hyperdrive/Hyperswarm JS ecosystem, behind a private mTLS-authenticated
+  publication-control surface. It remains ciphertext-only and has no DB,
+  business-authorization, plaintext-key, or backend-signing authority. T0 also
+  froze `building -> publish_pending -> publishing -> reconciling -> ready`
+  semantics (`failed` terminal only) plus the minimum ADR-018 P2 audit set.
+  `P2.T1` durable publication/outbox persistence is now the next owner gate;
+  no P2 source path is implemented yet. Design inputs:
   `docs/plan/mvp0-p2p-design-inputs.md`.
 - `crates/connectors` (primary S-090, ADR-025): per-platform integrations behind a
   `PlatformConnector` trait. For owner-authorized download (content owner grants
