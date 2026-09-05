@@ -25,11 +25,11 @@ record is `docs/adr/ADR-044-p2p-audience-delivery-boundary.md`.
 
 | Task | Objective | Status | Depends on |
 |---|---|---|---|
-| `ADR044-D1` | Parent envelope: resolve ADR-032 grant composition without delegating the architecture choice to an agent | Approved by owner 2026-09-05; S1-S2 PASS, S3 ready | P1 PASS |
+| `ADR044-D1` | Parent envelope: resolve ADR-032 grant composition without delegating the architecture choice to an agent | Approved by owner 2026-09-05; awaiting D1-OWNER | P1 PASS |
 | `ADR044-D1-S1` | Extract frozen ADR-032 grant invariants and citations | Complete 2026-09-05; `make qa-docs` PASS | D1 approval satisfied 2026-09-05 |
 | `ADR044-D1-S2` | Extract frozen P2 audience/key-release constraints and comparison criteria | Complete 2026-09-05; `make qa-docs` PASS | S1 PASS |
-| `ADR044-D1-S3` | Populate the neutral three-option decision matrix and expose tradeoffs | Ready | S2 PASS |
-| `ADR044-D1-OWNER` | Owner selects reuse, bypass, or parallel audience authorization | Blocked by S3 | S3 |
+| `ADR044-D1-S3` | Populate the neutral three-option decision matrix and expose tradeoffs | Complete 2026-09-05; `make qa-docs` PASS | S2 PASS |
+| `ADR044-D1-OWNER` | Owner selects reuse, bypass, or parallel audience authorization | Awaiting explicit owner selection | S3 PASS |
 | `ADR044-D1-S4` | Mechanically record the frozen owner selection in the audit record and ADR-044 | Blocked by owner selection | D1-OWNER |
 | `ADR044-D2` | Resolve the content-key and device-envelope contract | Deferred; define and score separately | D1-S4 |
 | `ADR044-D3` | Resolve publication/outbox state and recovery semantics | Deferred; define and score separately | D2 |
@@ -41,9 +41,9 @@ approval after ADR-044 is accepted.
 
 ## ADR044-D1 — grant-composition parent envelope
 
-- **Status:** `[~] Approved by owner on 2026-09-05`; S1-S2 are complete
-  and S3 is ready. The envelope remains open through S4.
-  ADR-044 remains `Proposed`; D2-D4 and P2 stay separately gated.
+- **Status:** `[~] Approved by owner on 2026-09-05`; S1-S3 are complete and
+  the envelope is stopped at D1-OWNER. It performs no edits itself and remains
+  open through S4. ADR-044 remains `Proposed`.
 - **Type:** architecture-decision envelope around docs/ADR-only Effort S
   leaves; no runtime or schema implementation.
 - **Effort:** L (parent RRI 55, Med-high). Executable leaves: S (RRI 23–24,
@@ -152,7 +152,8 @@ authorization boundary.
 
 ### ADR044-D1-S3 — neutral option matrix
 
-- **Status:** `[ ] Ready after S2`.
+- **Status:** `[x] Complete 2026-09-05`; matrix completeness/neutrality review
+  and `make qa-docs` PASS.
 - **Effort:** S (RRI 24, Low).
 - **Objective:** compare reuse, bypass, and parallel authorization against the
   frozen S1/S2 registers, exposing satisfied constraints, conflicts,
@@ -304,3 +305,53 @@ also freezes the stated semantic condition at D1; it is not shorthand for a
 future implementation choice. “Undecided” identifies evidence that D1 cannot
 resolve within its approved scope. These labels convey no preference and are
 not converted to points.
+
+### S3 neutral option matrix
+
+Status: **complete** (`ADR044-D1-S3`); matrix completeness/neutrality review
+and `make qa-docs` passed on 2026-09-05. Execution is stopped at D1-OWNER.
+
+#### Option meanings used only for this comparison
+
+| Option | Bounded semantic reading |
+|---|---|
+| `O1 reuse` | Issue an ADR-032 `PlaybackGrant` as the backend-owned P2P audience authorization event. Its affirmative decision gates wrapped-key release; HTTP manifest/segment mechanics do not acquire local-P2P meaning merely through reuse. |
+| `O2 bypass` | Issue no ADR-032 `PlaybackGrant` for P2P. A fresh backend check of the claimed invitation/current eligibility is itself the authorization event that gates wrapped-key release. “Bypass” applies to the ADR-032 grant, not to backend authorization or audit. |
+| `O3 parallel` | Use a distinct backend-owned audience-authorization concept after a valid invitation claim. That concept, rather than an ADR-032 grant or claim alone, gates wrapped-key release. |
+
+These readings define only the composition choice. They do not define record,
+route, field, token, algorithm, or envelope shape.
+
+#### Matrix
+
+Each cell uses the S2 rubric's non-ranking findings. Parenthetical IDs bind the
+finding to the same frozen constraints for all three options.
+
+| Criterion | `O1 reuse` | `O2 bypass` | `O3 parallel` |
+|---|---|---|---|
+| `R1 authority` | **conditional** — satisfies backend authority if the owner explicitly extends the ADR-032 grant's authorization meaning to this P2P audience path (`P2-C1`, `A32-F1`). | **conditional** — satisfies backend authority if each release uses a fresh backend claim/current-eligibility decision; possession alone remains insufficient (`P2-C1`). | **conditional** — satisfies backend authority if the parallel concept is created/evaluated only by the control plane and is required for release (`P2-C1`). |
+| `R2 binding` | **conditional** — ADR-032 supplies no invitation or device binding; viewer/asset/device linkage must remain an explicit P3/key-contract obligation outside the reused transport semantics (`P2-C3`, ADR-032 non-semantics). | **conditional** — claim can bind viewer/asset, but the single active-device binding remains an explicit P3/key-contract obligation (`P2-C3`). | **conditional** — the separate concept can own the audience binding, but its viewer/asset/device semantics remain an explicit P3/key-contract obligation (`P2-C3`). |
+| `R3 expiry/revocation` | **conditional** — ADR-032 establishes scoped expiry, but invite eligibility and what happens after key release remain unresolved; advanced revocation is not implied (`P2-C4`, `A32-F2`, `A32-F4`). | **conditional** — a fresh eligibility check can reject expired claims, but no continuing grant expiry exists by definition; post-release revocation remains unresolved (`P2-C4`). | **conditional** — the concept can represent current eligibility/expiry, but its lifetime and post-release revocation semantics remain unresolved (`P2-C4`). |
+| `R4 wrapped-key release` | **conditional** — only a valid reused grant may authorize release; wrapping details remain D2 (`P2-C5`, `P2-C9`). | **conditional** — only a successful fresh claim/current-eligibility check may authorize release; wrapping details remain D2 (`P2-C5`, `P2-C9`). | **conditional** — only a valid parallel authorization may authorize release; wrapping details remain D2 (`P2-C5`, `P2-C9`). |
+| `R5 ADR-032 compatibility` | **conditional** — compatible only if reuse is limited to its backend authorization/grant meaning and does not reinterpret manifest rewriting or segment references for local P2P (`P2-C6`, `P2-C8`, `A32-I1`). | **satisfied** — ADR-032 remains unchanged and exclusively governs its existing playback path; the P2P path has no ADR-032 grant (`P2-C6`, `P2-C8`). | **satisfied** — ADR-032 remains unchanged while the P2P audience path uses a distinct concept (`P2-C6`, `P2-C8`). |
+| `R6 auditability` | **satisfied** — ADR-032 already requires durable traceability for grant creation/refusal; P2P transfer remains separate high-volume traffic (`P2-C7`, `A32-F6`). | **conditional** — the claim/current-eligibility authorization result must be durably recorded as the equivalent grant/refusal decision even though no grant is issued (`P2-C7`). | **conditional** — creation/refusal or evaluation of the parallel authorization must be durably recorded; the exact event list remains ADR-044 open question 6 (`P2-C7`). |
+| `R7 scope discipline` | **satisfied** — D1 can select semantic reuse while leaving grant fields, key contract, routes, and schemas undecided (`P2-C9`). | **satisfied** — D1 can select direct claim/current-eligibility authorization while leaving its API/persistence expression undecided (`P2-C9`). | **satisfied** — D1 can select a parallel concept while leaving its name, schema, API, and lifecycle fields undecided (`P2-C9`). |
+
+#### Exposed tradeoffs, without ranking
+
+| Option | Constraint it makes direct | Tension or cost left visible | Assumption required by a D1 selection |
+|---|---|---|---|
+| `O1 reuse` | Reuses ADR-032's established backend grant and durable grant/refusal observability (`A32-F1`, `A32-F6`). | The accepted grant is coupled to manifest/segment delivery semantics that local P2P does not use (`A32-F3`, `A32-F4`, `P2-C8`). | “Reuse” means reuse of the authorization/grant event only; it does not make local files into ADR-032 segment references. |
+| `O2 bypass` | Keeps ADR-032 entirely scoped to its existing path and makes a current invitation check the direct release gate (`P2-C1`, `P2-C6`). | It has no durable grant object by definition, so current authorization proof, expiry after claim, and equivalent refusal audit must be explicit elsewhere (`P2-C4`, `P2-C7`). | “Bypass” never means bypassing `apps/api`, current eligibility, fail-closed refusal, or durable audit. |
+| `O3 parallel` | Gives P2P audience authorization a concept distinct from both HTTP delivery mechanics and the invitation claim (`P2-C1`, `P2-C6`, `P2-C8`). | It creates a second authorization model whose consistency with invitation state and ADR-032 policy must remain reviewable (`P2-C3`, `P2-C4`, `P2-C7`). | “Parallel” remains backend-owned and cannot become a transport capability or authorize by Hyperdrive-key possession. |
+
+#### Unresolved regardless of option
+
+The matrix intentionally leaves all of these undecided: content-key algorithm,
+envelope format, device-key generation/storage, post-release revocation,
+schemas, routes, fields, tokens, publication/outbox semantics, the complete
+ADR-018 event list, and ADR-044 acceptance (`P2-C9`). No option removes those
+later gates.
+
+There is no winner, recommendation, numeric score, or aggregate rank in this
+matrix.
