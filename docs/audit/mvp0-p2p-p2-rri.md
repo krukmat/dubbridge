@@ -1,3 +1,11 @@
+---
+type: Audit
+title: "MVP0-P2P P2 RRI and decomposition audit"
+status: ready_for_approval
+slice: MVP0-P2P
+parent: P2
+---
+
 # MVP0-P2P P2 RRI and decomposition audit
 
 Date: 2026-09-05  
