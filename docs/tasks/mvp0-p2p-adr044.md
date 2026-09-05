@@ -25,13 +25,13 @@ record is `docs/adr/ADR-044-p2p-audience-delivery-boundary.md`.
 
 | Task | Objective | Status | Depends on |
 |---|---|---|---|
-| `ADR044-D1` | Parent envelope: resolve ADR-032 grant composition without delegating the architecture choice to an agent | Approved by owner 2026-09-05; awaiting D1-OWNER | P1 PASS |
+| `ADR044-D1` | Parent envelope: resolve ADR-032 grant composition without delegating the architecture choice to an agent | Complete 2026-09-05; owner selected `O3 parallel`; S4/QA PASS | P1 PASS |
 | `ADR044-D1-S1` | Extract frozen ADR-032 grant invariants and citations | Complete 2026-09-05; `make qa-docs` PASS | D1 approval satisfied 2026-09-05 |
 | `ADR044-D1-S2` | Extract frozen P2 audience/key-release constraints and comparison criteria | Complete 2026-09-05; `make qa-docs` PASS | S1 PASS |
 | `ADR044-D1-S3` | Populate the neutral three-option decision matrix and expose tradeoffs | Complete 2026-09-05; `make qa-docs` PASS | S2 PASS |
-| `ADR044-D1-OWNER` | Owner selects reuse, bypass, or parallel audience authorization | Awaiting explicit owner selection | S3 PASS |
-| `ADR044-D1-S4` | Mechanically record the frozen owner selection in the audit record and ADR-044 | Blocked by owner selection | D1-OWNER |
-| `ADR044-D2` | Resolve the content-key and device-envelope contract | Deferred; define and score separately | D1-S4 |
+| `ADR044-D1-OWNER` | Owner selects reuse, bypass, or parallel audience authorization | Complete 2026-09-05; `O3 parallel` selected | S3 PASS |
+| `ADR044-D1-S4` | Mechanically record the frozen owner selection in the audit record and ADR-044 | Complete 2026-09-05; `make qa-docs` PASS | D1-OWNER satisfied 2026-09-05 |
+| `ADR044-D2` | Resolve the content-key and device-envelope contract | Ready to define and score separately | D1-S4 PASS |
 | `ADR044-D3` | Resolve publication/outbox state and recovery semantics | Deferred; define and score separately | D2 |
 | `ADR044-D4` | Accept ADR-044 and propagate the accepted decision through canonical status documents | Deferred; define and score separately | D1-D3 plus any closure-blocking audit decision |
 
@@ -41,9 +41,9 @@ approval after ADR-044 is accepted.
 
 ## ADR044-D1 — grant-composition parent envelope
 
-- **Status:** `[~] Approved by owner on 2026-09-05`; S1-S3 are complete and
-  the envelope is stopped at D1-OWNER. It performs no edits itself and remains
-  open through S4. ADR-044 remains `Proposed`.
+- **Status:** `[x] Complete 2026-09-05`; the owner selected `O3 parallel` at
+  D1-OWNER and S4 recorded only that frozen composition choice. ADR-044 remains
+  `Proposed`; D2-D4 and P2 remain separately gated.
 - **Type:** architecture-decision envelope around docs/ADR-only Effort S
   leaves; no runtime or schema implementation.
 - **Effort:** L (parent RRI 55, Med-high). Executable leaves: S (RRI 23–24,
@@ -171,10 +171,17 @@ The owner selects exactly one matrix option or asks for revised evidence. No
 agent may infer selection from scores, prior prose, or architectural preference.
 Until that selection is explicit, S4, D2, D3, D4, and P2 remain blocked.
 
+**Resolved 2026-09-05:** after the three options were identified explicitly,
+the owner replied `03`. The immediately preceding exchange named the intended
+choice as `O3`; the response is therefore recorded as the exact selection of
+`O3 parallel`. This selects composition only and does not approve D2-D4, ADR
+acceptance, or P2 implementation.
 
 ### ADR044-D1-S4 — mechanical decision codification
 
-- **Status:** `[ ] Blocked by D1-OWNER`.
+- **Status:** `[x] Complete 2026-09-05`; the frozen `O3 parallel` selection is
+  recorded in this ledger, the D1 audit record, and ADR-044; semantic checks
+  and `make qa-docs` PASS.
 - **Effort:** S (RRI 23, Low).
 - **Objective:** transcribe the exact owner-selected option into the audit
   record and ADR-044 while preserving `Proposed` status.
@@ -309,7 +316,8 @@ not converted to points.
 ### S3 neutral option matrix
 
 Status: **complete** (`ADR044-D1-S3`); matrix completeness/neutrality review
-and `make qa-docs` passed on 2026-09-05. Execution is stopped at D1-OWNER.
+and `make qa-docs` passed on 2026-09-05. As required, S3 stopped at D1-OWNER;
+the later owner response and S4 closure are recorded below.
 
 #### Option meanings used only for this comparison
 
@@ -355,3 +363,30 @@ later gates.
 
 There is no winner, recommendation, numeric score, or aggregate rank in this
 matrix.
+
+### S4 owner-selected decision and closure
+
+Status: **complete** (`ADR044-D1-S4`); exact-selection comparison, architectural
+boundary inspection, RRI reproduction, and `make qa-docs` passed on
+2026-09-05.
+
+The owner selected `O3 parallel` with the exact response `03` at D1-OWNER.
+The frozen meaning is a distinct backend-owned audience-authorization concept
+created or evaluated only after a valid invitation claim. That authorization,
+not the claim alone and never possession of a Hyperdrive key or ciphertext,
+gates wrapped-content-key release. ADR-032 remains unchanged and authoritative
+for its existing review-time HTTP HLS path.
+
+This selection does not define the concept's name, persistence model, fields,
+API, token, lifetime, cryptographic algorithm, key envelope, device-key
+storage, publication/outbox behavior, recovery semantics, complete audit-event
+list, or post-release revocation behavior. Those remain inputs to D2-D4 and the
+still-open ADR questions. The complete evidence and selection disposition are
+preserved in
+`docs/audit/mvp0-p2p-adr044-d1-grant-composition.md`.
+
+Formal development Reflection and code-solution review are **n/a**: D1 and
+all leaves are ADR/task-ledger-only work with no source, schema, migration,
+configuration, or runtime behavior change. Integrated closure instead checked
+the selected boundary against every S1/S2 constraint, verified that ADR-032
+was untouched, and retained the parent Med-high approval envelope through S4.

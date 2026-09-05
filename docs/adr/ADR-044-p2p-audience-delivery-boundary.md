@@ -91,18 +91,28 @@ so they are the low-uncertainty part of the decision.
    complete with legacy HTTP media delivery disabled. A run that succeeds
    only because an HTTP or S3 media route served bytes is
    `MVP0_P2P_NOT_CERTIFIED`.
+7. **P2P audience authorization is a parallel control-plane concept.** The
+   owner selected `O3 parallel` at the D1 checkpoint on 2026-09-05. After a
+   valid invitation claim, a distinct backend-owned audience authorization —
+   not the claim alone, an ADR-032 `PlaybackGrant`, or possession of a
+   Hyperdrive key or ciphertext — gates release of the wrapped content key.
+   This composition choice does not define the authorization's name, record,
+   API, fields, token, lifetime, or key-envelope mechanics.
 
 ## Open questions
 
-These must be answered before this ADR can move to `Accepted`. Each is a
-real design decision with more than one defensible answer.
+The unresolved questions below must be answered before this ADR can move to
+`Accepted`. Each unresolved item is a real design decision with more than one
+defensible answer; an item explicitly marked resolved remains here to preserve
+the numbered decision trail.
 
-1. **Grant composition.** Does P2P playback issue an ADR-032 `PlaybackGrant`,
-   bypass it entirely, or introduce a parallel audience-scoped authorization
-   record? The `PlaybackGrant` currently carries manifest-rewriting and
-   segment-reference semantics that have no meaning when the segments are
-   local. A grant reduced to "this viewer may unwrap this content key now"
-   may be the right shape, or may be better modeled as a distinct record.
+1. **Grant composition — resolved for D1 on 2026-09-05.** The owner selected
+   `O3 parallel`: a distinct backend-owned audience-authorization concept
+   follows a valid invitation claim and gates wrapped-content-key release.
+   ADR-032 remains unchanged and no HTTP manifest/segment semantics are
+   inherited by local P2P delivery. The evidence, neutral option matrix, exact
+   owner response, and non-selected alternatives are recorded in
+   `docs/audit/mvp0-p2p-adr044-d1-grant-composition.md`.
 2. **Key envelope.** Content-key algorithm, envelope format, wrapping scheme,
    device key generation and storage, and revocation semantics. Global
    invariant 8 of the design input bounds this to one invitation, one viewer,
