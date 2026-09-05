@@ -47,7 +47,7 @@ operational surfaces from planned ones. Delivery sequence lives in
 | First-party session gateway (transparent JWT relay) | Operational | S-040, ADR-031 |
 | First-party mobile client (React Native + Expo) | Canonical, sole authenticated product surface | S-050/S-105, ADR-029/031 |
 | Mobile P2P runtime boundary | P1 closed `[x] Done` 2026-09-01 (7/8 children PASS: packaging/protocol, ownership/composition, storage, replication transport, verification/reconnect/teardown; P1.F3b itself stays `not PASS`, non-blocking, deferred into X28); no product P2P runtime or network activity is active outside bounded proof runners | MVP0-P2P P1, ADR-043 |
-| P2P audience delivery (encrypted publication, invite/claim, verified sync, loopback playback) | Not started — ADR-044 is `Proposed`; D1 `O3 parallel`, D2 `K1`, and D3 `O4` are resolved; explicit D4 ADR acceptance still blocks P2 | MVP0-P2P P2–P7, ADR-044 |
+| P2P audience delivery (encrypted publication, invite/claim, verified sync, loopback playback) | Architecture accepted — ADR-044 D1 `O3 parallel`, D2 `K1`, D3 `O4`, D4 ACCEPT complete; P2 plan/decomposition exists and `P2.T0` is the next owner gate; no P2 source implementation yet | MVP0-P2P P2–P7, ADR-044 |
 
 Human review runtime (S-170) and publication runtime (S-180) have no plan/task
 ledger yet.
@@ -101,7 +101,7 @@ ledger yet.
   and are unit-tested, but no product-facing P2P command, invite, or
   network activity is wired to the app — this boundary remains
   non-operational for end users pending P2–P7.
-- **P2P audience delivery** (MVP0-P2P P2–P7, ADR-044 `Proposed`): the
+- **P2P audience delivery** (MVP0-P2P P2–P7, ADR-044 `Accepted`): the
   control-plane/data-plane split in which `apps/api` stays the sole
   authorization authority while an encrypted P2P data plane — package builder,
   durable publication state, an Availability Node seeding ciphertext only,
@@ -117,8 +117,10 @@ ledger yet.
   lost/stuck/unknown work; delivery is at-least-once/idempotent under one stable
   logical publication/K1 lineage; and `P2P_READY` is separate from S-120 Ready
   and written only after durable confirmation of the external publication.
-  ADR-044 is still **not accepted**; D4 acceptance blocks P2, so none of this
-  D2P publication path exists in product code. Design inputs:
+  D4 accepted the consolidated boundary on 2026-09-05. P2 is now architecture-
+  unblocked and has its own re-scoped plan (`docs/plan/mvp0-p2p-p2-encrypted-publication.md`);
+  the next explicit gate is `P2.T0`, which selects Availability Node runtime/auth
+  and concrete O4 state/audit semantics before source work. Design inputs:
   `docs/plan/mvp0-p2p-design-inputs.md`.
 - `crates/connectors` (primary S-090, ADR-025): per-platform integrations behind a
   `PlatformConnector` trait. For owner-authorized download (content owner grants
@@ -187,7 +189,7 @@ sub-case. Every intake mode must use the same fail-closed
   object-write/metadata-write divergence, and periodic reconciliation lists
   canonical `ingests/` keys, compares them against relational references, and deletes
   only planner-approved orphan candidates.
-- For future P2P publication, D3/O4 extends that cross-store discipline: a
+- For P2P publication, accepted D3/O4 extends that cross-store discipline: a
   transactional outbox captures durable publication intent in PostgreSQL before
   external publication; queue delivery is optional and non-authoritative; a
   reconciler uses authoritative PostgreSQL state to recover lost/unknown work.
