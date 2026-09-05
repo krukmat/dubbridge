@@ -174,19 +174,19 @@ and approval cards must be created at activation time.
 
 > **Current ADR gate after P1 closure:** P1 reaching PASS (all children —
 > through `P1.B2`) does **not** unlock P2 source work. Nothing below is a
-> phase plan. ADR-044 D1 closed on 2026-09-05 with `O3 parallel`; before P2
-> can be presented: (a) resolve ADR044-D2/D3 and complete the ADR acceptance
-> gate; (b) author
+> phase plan. ADR-044 D1 closed on 2026-09-05 with `O3 parallel`; D2 closed
+> on 2026-09-05 with `K1`; before P2 can be presented: (a) resolve ADR044-D3
+> and complete the ADR acceptance gate; (b) author
 > `docs/plan/mvp0-p2p-p2-*.md` and expand this ledger's P2 entry to a full
 > task (RRI, Compact Approval Task Card, complete HP/EC set) per the workflow
 > guide's Step 2/3. Track this gap in `docs/plan/roadmap.md` § Known planning
 > gaps until a plan file exists for P2.
 >
-> The first ADR-resolution envelope, `ADR044-D1` in
-> `docs/tasks/mvp0-p2p-adr044.md`, is complete: its four Effort S leaves
-> preserved the parent RRI 55 gate, and the owner selected `O3 parallel`.
-> `ADR044-D2` (content-key/device envelope) is next. ADR-044 remains
-> `Proposed`; D1 completion is not P2 approval.
+> `ADR044-D2` is recorded in `docs/tasks/mvp0-p2p-adr044-d2.md` and
+> `docs/audit/mvp0-p2p-adr044-d2-key-envelope.md`: owner-selected `K1`, no
+> external-hardware or StrongBox requirement, fail-closed Keystore capability
+> handling, and no silent K2 fallback. ADR-044 remains `Proposed`; D2 closure
+> is not P2/P3 source approval.
 
 Design inputs for every entry below — use cases, scope boundaries, global
 invariants, acceptance-gate definitions, the control/data-plane split, the
@@ -212,8 +212,8 @@ and revised approval card: `docs/plan/mvp0-p2p-p1-replication.md`,
 
 - **Gate / use case:** G2 / CU-01. **Blocked on:** P1 PASS **and** accepted
   ADR-044 (`docs/adr/ADR-044-p2p-audience-delivery-boundary.md` is
-  `Proposed`; question 1 is resolved as `O3 parallel`, while questions 2–3
-  and ADR acceptance still block this task's scope).
+  `Proposed`; questions 1–2 are resolved as `O3 parallel` / `K1`, while D3
+  publication/outbox semantics and ADR acceptance still block this task's scope).
 - **Objective:** turn an S-120-prepared HLS derivative into a ciphertext-only
   P2P package, publish it through the Availability Node, and record durable
   publication state — reusing existing upload/finalize/S-120 without
@@ -240,21 +240,21 @@ and revised approval card: `docs/plan/mvp0-p2p-p1-replication.md`,
 ### P3 — Invite, claim, and content-key envelope
 
 - **Gate / use case:** G3 / CU-02 and the claim half of CU-04.
-  **Blocked on:** P2 PASS and an accepted key/envelope contract (ADR-044 open
-  question 2).
+  **Blocked on:** P2 PASS and accepted ADR-044. The key/envelope design itself
+  is resolved by D2/K1, but P3 source work is not authorized by that decision.
 - **Objective:** let an owner invite one viewer to Ready P2P content, and let
   that viewer claim it and receive a minimal authorized P2P access descriptor
   plus a wrapped content key.
 - **In scope:** invitation record (token hash only), create/claim/inbox
   surface, content-key envelope delivery, minimal device/public-key
-  capability if key wrapping requires it.
+  capability required by K1.
 - **Out of scope:** bulk invites, email delivery, public revoke endpoint,
   multi-device, advanced revocation, `play_from`/`play_until`.
 - **HP-1:** an owner creates an invite for Ready content; the raw token/link
   is returned exactly once and only its hash is persisted alongside the asset
   reference, owner subject, expiration, and claim metadata.
 - **HP-2:** an eligible viewer claims the invite and receives the minimal P2P
-  access descriptor and wrapped content key; re-claiming with the same viewer
+  access descriptor and K1 device envelope; re-claiming with the same viewer
   is idempotent and returns the current access state.
 - **HP-3:** `GET /me/invitations` (or the chosen equivalent) returns only the
   authenticated viewer's invitations, and the viewer never needs the raw
@@ -275,85 +275,3 @@ and revised approval card: `docs/plan/mvp0-p2p-p1-replication.md`,
 - **Objective:** sync the encrypted package into the mobile Bare runtime over
   Hyperdrive/Hyperswarm and emit `READY` only after verification against the
   expected manifest hash.
-- **In scope:** `startSync`/`getSyncState`/`verifyPackage`-equivalent
-  operations on the ADR-043 versioned protocol; local ciphertext cache;
-  resume; sync-state surfacing to the app.
-- **Out of scope:** decryption, playback, gateway, dashboard, segment-priority
-  or progressive streaming (MVP-0 preloads the full package before Play).
-- **HP-1:** a claimed descriptor discovers a peer, replicates the full
-  encrypted package, verifies it against the expected manifest hash, and only
-  then reports `READY`.
-- **HP-2:** an interrupted sync resumes without restarting from zero and
-  without corrupting the local cache.
-- **EC-1:** corrupted ciphertext or a manifest-hash mismatch fails
-  verification and can never become playable; the package is not reported
-  `READY`.
-- **EC-2:** the worklet never receives the device private key, server
-  key-encryption key, JWT signing key, or database credentials, and never
-  persists a plaintext content key.
-- **EC-3:** a package that syncs successfully is still unplayable without
-  control-plane authorization — possession is not permission (ADR-044
-  proposed decision 1).
-
-### P5 — Local HLS gateway + existing VideoPlayer
-
-- **Gate / use case:** G5 / the playback half of CU-04. **Blocked on:** P4
-  PASS.
-- **Objective:** serve the verified local package as decrypted HLS over a
-  loopback gateway consumed by the existing `VideoPlayer`, with no HTTP or S3
-  media fallback.
-- **In scope:** gateway lifecycle
-  (`startPlaybackGateway`/`stopPlaybackGateway`-equivalent), transient
-  in-memory content-key handling, decryption at serve time, `expo-video`
-  integration through the existing player.
-- **Out of scope:** any change to ADR-032 review playback; DRM; offline
-  certification; trusted-time.
-- **HP-1:** a verified local package plays end-to-end through the loopback
-  gateway and the existing `VideoPlayer`, with no request reaching a server
-  media route.
-- **HP-2:** stopping the gateway releases the transient content key and
-  terminates delivery deterministically.
-- **EC-1:** gateway startup failure, key-unwrap failure, or an unverified
-  package stops delivery outright — it never falls back to HTTP or S3 media.
-- **EC-2:** the plaintext content key exists only in memory for the duration
-  of the session and is never written to disk or logs.
-
-### P6 — Minimal My Content + Invites dashboard
-
-- **Gate / use case:** G6 / CU-03. **Blocked on:** P3–P5 PASS.
-- **Objective:** expose the minimal owner and viewer state required to drive
-  the flow, and nothing more.
-- **In scope:** `MY CONTENT` with `Processing | Ready | Failed`; `INVITES`
-  with `Pending | Syncing | Available | Expired`; the actions those states
-  permit.
-- **Out of scope:** analytics, community surfaces, payments, Studio Web,
-  multi-device management.
-- **HP-1:** an owner sees only their own content and its correct state, and
-  can create an invite exactly when the content is Ready.
-- **HP-2:** a viewer sees only invitations accessible to them, with the
-  correct state and a `can_play` signal consistent with sync/verification.
-- **EC-1:** unavailable, expired, or not-yet-verified content never offers a
-  Play affordance.
-- **EC-2:** no owner-only state or another viewer's invitation is visible to
-  a viewer.
-
-### P7 — End-to-end P2P certification
-
-- **Gate / use case:** G7 / all four CU. **Blocked on:** P2–P6 PASS and a
-  decided certification profile (ADR-044 open question 5).
-- **Objective:** certify the complete owner-to-viewer flow with legacy HTTP
-  media delivery disabled, emitting `MVP0_P2P_CERTIFIED` or
-  `MVP0_P2P_NOT_CERTIFIED`.
-- **In scope:** the certification profile that disables legacy media routes
-  without disabling control-plane APIs; the end-to-end run and its evidence.
-- **Out of scope:** offline certification, multi-device, performance
-  targets.
-- **HP-1:** `OWNER: Login → Upload → S-120 → P2P Publish → Ready → Invite`
-  and `VIEWER: Login → Claim → Invites → Sync → Verify → READY → Play`
-  both complete while control-plane APIs remain available and no legacy HTTP
-  media route serves bytes.
-- **EC-1:** any HTTP or S3 media fallback observed during the critical
-  playback proof yields `MVP0_P2P_NOT_CERTIFIED` — a passing run that
-  depended on fallback is a failed certification, not a pass.
-- **EC-2:** disabling legacy media routes must not disable auth, assets,
-  invites, or audit; a control-plane regression also fails certification.
