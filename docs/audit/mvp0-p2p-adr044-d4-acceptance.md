@@ -1,3 +1,11 @@
+---
+type: Audit
+title: "ADR044-D4 acceptance audit"
+status: complete
+slice: MVP0-P2P
+parent: ADR044-D4
+---
+
 # ADR-044 D4 acceptance audit
 
 Date: 2026-09-05  
