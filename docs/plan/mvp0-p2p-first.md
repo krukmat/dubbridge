@@ -9,184 +9,161 @@ slice: MVP0-P2P
 
 > **Task ledger:** `docs/tasks/mvp0-p2p-first.md`.
 > **External input:** `p2p-mvp/` (integrity verified against its package manifest).
-> **Status:** P0 is closed with an Android-only compatibility PASS accepted by
-> the repository owner on 2026-08-27. A maintainability review materially
-> replanned P1 on 2026-08-27; the repository owner then approved revised P1 and
-> accepted ADR-043. The earlier P1/P1.A approval route remains superseded. P1.F1
-> was separately approved, implemented, and closed PASS after owner verification
-> on 2026-08-27. P1.F2 may now be prepared/presented but its source execution is
-> not authorized.
-> iPhone/iOS support is explicitly deferred by the repository owner.
-> **Planning gap:** `P2`–`P7` have no plan file yet — see
-> `docs/plan/roadmap.md` § Known planning gaps for the tracked gap. Their
-> design inputs are transcribed in `docs/plan/mvp0-p2p-design-inputs.md` and
-> their scope/HP/EC summaries in `docs/tasks/mvp0-p2p-first.md` § Deferred
-> task acceptance summaries, so they can be analyzed without the external
-> package; the audience-delivery ADR required by design decision 9 below is
-> drafted as `docs/adr/ADR-044-p2p-audience-delivery-boundary.md`
-> (**Proposed** — D1 grant composition closed on 2026-09-05 with
-> `O3 parallel`; D2 key/device envelope closed with `K1`; D3 publication/outbox
-> semantics closed with `O4`; `ADR044-D4` acceptance is the next gate and `P2`
-> remains unpresentable until the ADR is accepted).
+> **Status:** P0 is closed PASS. P1 is closed Done (2026-09-01) with its accepted
+> non-blocking device-proof residual tracked separately. ADR-043 is Accepted.
+> ADR-044 completed D1 `O3 parallel`, D2 `K1`, D3 `O4`, and D4 acceptance on
+> 2026-09-05 and is now **Accepted**. The P2 architecture prerequisite is therefore
+> satisfied. P2 now has its own plan/task/RRI decomposition at
+> `docs/plan/mvp0-p2p-p2-encrypted-publication.md` and
+> `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`; `P2.T0` is the next explicit
+> owner gate. No P2 source implementation is authorized yet.
+> iPhone/iOS support remains deferred by the repository owner.
 
 ## Objective
 
-Prove whether the current Expo/React Native client can host a maintainable Bare
-runtime boundary and a bounded P2P replication path. P0 established native
-compatibility; P1 establishes explicit mobile ownership, reproducible worklet
-packaging, a versioned RPC contract, lifecycle/error handling, and an isolated
-two-runtime proof without freezing spike scaffolding as product architecture.
-Only after that foundation and the audience-delivery ADR gates pass may
-separately approved tasks add encrypted publication, invitation access,
-verified package sync, a local HLS gateway, and product UI.
+Deliver invited audience playback over a ciphertext-only P2P data plane while
+preserving the existing control-plane authorization, rights, review playback, and
+S-120 preparation pipeline.
 
-The target product flow is owner upload → existing rights/finalize/S-120 →
-encrypted P2P publication → invitation, and viewer claim → verified local
-package → loopback HLS → the existing `VideoPlayer`.
+P0 proved Android Bare/React Native compatibility. P1 established maintainable
+mobile/Bare ownership and isolated verified replication. ADR-044 now defines the
+accepted audience-delivery boundary. P2-P7 implement the product path in separately
+planned and approved phases.
+
+Target product flow:
+
+```text
+owner upload
+ -> existing rights/finalize
+ -> S-120 prepared HLS Ready
+ -> P2 encrypted P2P publication / P2P_READY
+ -> P3 invitation + claim + K1 device envelope
+ -> P4 verified local ciphertext sync
+ -> P5 loopback HLS gateway
+ -> existing VideoPlayer
+ -> P6 product dashboard
+ -> P7 no-HTTP-fallback certification
+```
 
 ## Guardrails and design decisions
 
-1. P0 is a stop/go feasibility spike, not a product P2P implementation. It does
-   not add Hyperdrive, HyperSwarm, invitations, keys, package persistence, or a
-   local media gateway.
-2. P0's `AndroidBareRuntimeProbe`, inline worklet source, and custom JSON
-   request/reply protocol are compatibility evidence, not permanent P1/product
-   architecture. P1 first preserves their proven behavior as characterization,
-   then deletes those implementations and their obsolete test/config/script
-   wiring after parity exists through the accepted ADR-043 boundary. Historical
-   P0 audit evidence is retained. Native Bare dependencies/build settings remain
-   only when the replacement runtime or a native A/B proof demonstrates a live
-   requirement.
-3. Cross-cutting mobile ownership belongs in the app composition root:
-   `SafeAreaProvider → AuthProvider → P2PProvider → RootNavigator`.
-   `RootNavigator` remains navigation-only. `P2PProvider` owns a stable
-   framework-independent `P2PService`, which owns one product
-   `BareRuntimeClient`; mounting it never starts network activity.
-4. Worklet source is packaged reproducibly with `bare-pack`; host/worklet
-   multiplexing uses `bare-rpc` under a typed, versioned DubBridge protocol.
-   Fatal exceptions/rejections and Bare suspend/resume events are explicit
-   lifecycle inputs, not incidental logging.
-5. Product mobile targets one Bare worklet. P1's seed/client pair exists only in
-   a development proof runner backed by a runtime factory and is not exposed by
-   the product service API.
-6. Synthetic fixture bytes may be generated in memory, but Hyperdrive/Corestore
-   metadata and blocks use a run-scoped cache directory with close-before-delete,
-   verified removal, and a bounded abandoned-run janitor. P1 creates no durable
-   product cache or device identity.
-7. Reuse existing authentication, rights/finalize, `StorageAdapter`, S-120 HLS,
-   `VideoPlayer`, and mobile navigation seams. New code must not replace them.
-8. `PreparationStatus::Ready` remains the S-120 HLS-readiness signal. D3
-   selected a separate durable P2P readiness boundary: PostgreSQL authoritative
-   publication state + transactional outbox, optional queue acceleration, and a
-   PostgreSQL reconciler safety net. P2P publication must not delay S-120 Ready
-   or downstream transcription enqueue.
-9. ADR-032 remains authoritative for present review playback. Before P2P invite
-   delivery can be implemented, ADR-044 must be accepted. Its first three
-   architecture questions are resolved: D1 `O3 parallel` authorization, D2 `K1`
-   key/device envelope, and D3 `O4` publication/recovery. D4 acceptance remains
-   the explicit gate before `P2` may be presented.
-10. P2P publication is ciphertext-only. Raw invitation tokens, plaintext content
-   keys, JWT signing material, and device private keys must never be persisted or
-   logged. The selected K1 contract is recorded in
-   `docs/audit/mvp0-p2p-adr044-d2-key-envelope.md`.
-11. The Availability Node, when planned, may seed ciphertext only; it must not
-   receive PostgreSQL, JWT, signing-key, invitation, business-authorization, or
-   plaintext content-key authority. Under D3/O4 it also never owns product
-   `P2P_READY` state.
-12. The repository owner waived phase-1 and phase-2 peer review only for this
-   MVP0-P2P slice on 2026-08-27. The bounded exception and controls that remain
-   mandatory are recorded in `docs/audit/mvp0-p2p-review-exception.md`; it does
-   not waive HITL approval, RRI, tests, Reflection, coverage, or owner
-   verification.
+1. P0 is feasibility evidence, not product architecture.
+2. P1 retired the temporary P0 scaffold behind the accepted ADR-043 boundary.
+3. Mobile composition remains `SafeAreaProvider -> AuthProvider -> P2PProvider ->
+   RootNavigator`; navigation does not own the P2P runtime.
+4. Product mobile owns one reproducibly bundled/versioned Bare worklet through
+   `P2PService -> BareRuntimeClient`; normal mounting never starts networking.
+5. P1's seed/client proof runners are development-only and absent from product APIs.
+6. P1 transient proof storage does not pre-decide P4 product cache/device lifecycle.
+7. Existing authentication, rights/finalize, `StorageAdapter`, S-120 HLS,
+   `VideoPlayer`, and mobile navigation seams are reused rather than replaced.
+8. `PreparationStatus::Ready` remains S-120 HLS readiness. P2P publication is a
+   separate durable predicate and must not delay S-120 Ready or downstream ASR.
+9. **ADR-044 is Accepted.** Its accepted core is D1 `O3 parallel` authorization,
+   D2 `K1` key/device envelope, and D3 `O4` publication/recovery. P2 may now be
+   planned/presented, but its own RRI/HITL is still mandatory before source work.
+10. P2P publication is ciphertext-only. Raw invite tokens, plaintext CKs, server
+    KEKs, JWT-signing material, and device private keys are never persisted/logged
+    outside their accepted boundaries.
+11. Availability Node may seed ciphertext only; it never owns PostgreSQL/business
+    authorization, plaintext CK/KEK, user/invite state, or backend signing authority.
+    Its concrete service trust/operation contract is the P2.T0 owner decision.
+12. The owner waiver of phase-1/phase-2 peer review applies only to MVP0-P2P P0-P7
+    as recorded in `docs/audit/mvp0-p2p-review-exception.md`; it does not waive RRI,
+    HITL, tests, Reflection, coverage, or owner verification.
 
 ## Execution sequence
 
 ```text
-P0 Bare/RN compatibility (stop/go)
- → P1 maintainable mobile runtime foundation + isolated replication proof
- → ADR-044 D1 authorization / D2 key envelope / D3 publication contract
- → ADR044-D4 explicit ADR acceptance
- → P2 encrypted publication state/outbox
- → P3 invitation/claim and key envelope
- → P4 mobile verified ciphertext sync
- → P5 loopback HLS gateway
- → P6 dashboard
- → P7 no-HTTP-fallback certification
+P0 Bare/RN compatibility                         ✅
+ -> P1 mobile foundation + replication proof    ✅
+ -> ADR-044 D1/D2/D3/D4                         ✅ Accepted
+ -> P2.T0 Availability Node/O4 contract          ⏭ next owner gate
+ -> P2.T1-T6 encrypted publication               blocked on their own approvals
+ -> P3 invitation/claim + K1 envelope
+ -> P4 verified mobile ciphertext sync
+ -> P5 loopback HLS gateway
+ -> P6 dashboard
+ -> P7 no-HTTP-fallback certification
 ```
 
-Each arrow is a hard dependency and each task is presented, scored, reviewed,
-and approved independently under the repository workflow.
+Each arrow is a hard dependency. Each executable parent is independently scored,
+presented, approved, implemented, verified, and synchronized under the repository
+workflow.
 
-## P0 scope
+## P0 / P1 result
 
-P0 may touch only the mobile dependency/configuration surface, a deliberately
-small `mobile/src/p2p/` bridge/proof module, its tests, and this task's evidence.
-It must establish a bounded `initialize → ping → shutdown` RPC lifecycle on
-Android using the selected Bare integration and document the Android native
-build prerequisites. iPhone/iOS support is not part of this P0 result.
+- **P0:** Android Bare/Expo compatibility PASS accepted 2026-08-27.
+- **P1:** `[x] Done` 2026-09-01. Maintainable composition/runtime ownership,
+  reproducible RPC worklet, transient storage cleanup, Hyperdrive/Hyperswarm
+  replication, digest verification, bounded reconnect, and teardown evidence are
+  closed. P1.F3b's physical device-proof residual remains separately deferred and
+  non-blocking under the existing roadmap disposition.
+- **ADR-043:** Accepted and unchanged.
 
-It must not create a persistent device identity, contact a DHT, open a local
-HTTP server, replicate media, or introduce any backend/API/database behavior.
+## P2 activation
+
+P2 is no longer blocked on ADR acceptance. The activated plan is:
+
+- `docs/plan/mvp0-p2p-p2-encrypted-publication.md`
+- `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`
+- `docs/audit/mvp0-p2p-p2-rri.md`
+- `docs/audit/mvp0-p2p-p2-t0-approval-card.md`
+
+The unreduced P2 phase is RRI 131 Excessive and therefore cannot execute directly.
+It is re-scoped into T0-T6. `P2.T0` is a docs/architecture/security contract gate;
+it freezes Availability Node runtime/auth, idempotency/observability, state semantics,
+and the minimum ADR-018 audit inventory. T1-T6 remain independently gated.
 
 ## Affected module boundaries
 
-| Boundary | P0/P1 role | Later P2P role |
+| Boundary | P0/P1 result | P2+ role |
 |---|---|---|
-| Mobile composition root | P0 host today; P1 moves auth/P2P providers above navigation | Own cross-cutting mobile service composition without transport logic in navigation |
-| `P2PProvider` / `P2PService` | P1 establishes an inert, stable product runtime owner | Expose sync state/actions and coordinate authenticated lifecycle |
-| `BareRuntimeClient` / one product worklet | P1 establishes reproducible bundle, versioned RPC, fatal and suspend/resume handling | Own mobile P2P engine mechanics behind the service boundary |
-| P1 proof runner | Create isolated seed/client sessions only for explicit Android evidence | Absent from product API and normal startup |
-| `apps/api` / `apps/gateway` | Untouched | Control-plane authorization, descriptors, audit |
-| `apps/worker-runner` / `StorageAdapter` | Untouched | Read prepared HLS, build encrypted package, publish from durable O4 intent |
-| PostgreSQL / `crates/db` | Untouched | Publication state/outbox, invitation, and envelope metadata |
-| Queue/job seam | Existing coordination seam | Optional O4 acceleration only; never publication authority |
-| Availability Node | Absent | Ciphertext-only seed runtime / publication evidence source |
+| Mobile composition root | ADR-043 ownership established | unchanged by P2 |
+| `P2PProvider` / `P2PService` | inert stable runtime owner | P4+ sync/lifecycle coordination |
+| `BareRuntimeClient` / product worklet | versioned product runtime boundary | P4/P5 ciphertext sync/local playback mechanics |
+| `apps/api` / gateway | existing control plane | P3+ invitation/audience authorization; not P2 media transport |
+| `apps/worker-runner` | existing S-120/ASR orchestration | P2 package build/dispatch/reconcile downstream of S-120 Ready |
+| `StorageAdapter` | existing storage authority | P2 reads prepared HLS through bounded existing seams |
+| PostgreSQL / `crates/db` | existing metadata authority | P2 publication state/outbox; later invitation/device metadata |
+| queue/jobs | existing coordination seam | O4 optional acceleration only, never publication authority |
+| Availability Node | absent before P2 | ciphertext-only publication executor/evidence source |
 
 ## Verification strategy
 
-P0's repeatable Android native-development proof passed with the selected
-versions and was accepted by the repository owner. P1 adds deterministic bundle
-drift checks, protocol/lifecycle unit coverage, provider/service ownership tests,
-transient-storage deletion evidence, and an Android seed/client replication
-witness. A digest match is necessary but insufficient unless both runtime
-sessions close and their run-scoped cache paths are verified absent.
+P2 must prove the accepted O4 failure semantics rather than only the happy path:
+lost dispatch, duplicate delivery, unknown external result, remote-success/ACK-loss,
+local Ready-commit loss, and duplicate-after-Ready must converge on one logical
+package/K1 lineage without false readiness. It must additionally prove ciphertext-
+only publication and non-regression of S-120 Ready/ASR.
 
-Future P2 must additionally prove the D3/O4 crash and idempotency contract:
-lost dispatch, duplicate delivery, unknown remote result, remote-success/ACK-loss,
-and duplicate-after-Ready must converge on one logical package/K1 lineage without
-false readiness.
+P3-P7 each add their own behavioral and end-to-end evidence; P7 is the phase that
+proves the certified media path works with legacy HTTP media fallback disabled.
 
 ## Status artifacts
 
 - `docs/tasks/mvp0-p2p-first.md`
 - this plan
 - `docs/plan/mvp0-p2p-design-inputs.md`
+- `docs/plan/mvp0-p2p-p2-encrypted-publication.md`
+- `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`
 - `docs/plan/roadmap.md`
-- `docs/architecture.md`, `docs/adr/README.md`, accepted ADR-043, and proposed ADR-044
-- D1/D2/D3 audit records under `docs/audit/`
-- `p2p-mvp/RUN_STATE.json` and the P0 handoff required by the external package
+- `docs/architecture.md`
+- `docs/adr/README.md`
+- accepted ADR-043 and ADR-044
+- D1-D4 and P2 planning audit records under `docs/audit/`
 
-## Deferred decisions
+## Remaining phase-specific decisions
 
-Every item below is carried as a numbered decision question in ADR-044
-(`Proposed`), with the phase each one blocks. Resolved items remain listed to
-preserve the decision trail.
+ADR-044 acceptance intentionally does not pre-decide all later implementation
+choices:
 
-- `[x]` P2P audience-delivery ADR and ADR-032 relationship — ADR-044 question 1
-  resolved 2026-09-05 as `O3 parallel`; ADR-032 remains unchanged.
-- `[x]` Content-key algorithm, envelope format, device-key generation/storage,
-  and bounded revocation semantics — question 2 resolved as `K1`; full contract
-  in `docs/audit/mvp0-p2p-adr044-d2-key-envelope.md`.
-- `[x]` Publication/outbox and recovery semantics — question 3 resolved as `O4`:
-  PostgreSQL + transactional outbox authority, optional queue accelerator,
-  reconciler safety net, same-lineage idempotency, and separate fail-closed
-  `P2P_READY`; full contract in
-  `docs/audit/mvp0-p2p-adr044-d3-publication.md`.
-- ADR-044 acceptance — next closure task `ADR044-D4`; P2 remains blocked until
-  acceptance.
-- Persistent product cache, device identity, sign-out wipe, and background
-  execution beyond P1's transient foreground proof.
-- Availability Node deployment, authentication, observability, and operational
-  ownership.
-- P2P certification profile that disables legacy HTTP media routes without
+- **P2.T0:** Availability Node runtime/deployment authentication, observability, and
+  operational ownership; concrete O4 state semantics; P2 minimum audit inventory.
+- **P4:** persistent product cache/device lifecycle, sign-out wipe, and background
+  execution beyond P1 transient proof.
+- **P7:** certification profile that disables legacy HTTP media routes without
   disabling control-plane APIs.
+
+These are scoped downstream decisions under the accepted ADR, not reasons to reopen
+D1-D4.
