@@ -16,7 +16,8 @@ behavioral_coverage_contract: behavior-v2
 - Parent P2 RRI: **131 Excessive / Effort XL** — no direct implementation.
 - Parent disposition: mandatory re-scope into T0-T6 below.
 - `P2.T0`: **PASS 2026-09-05** — owner selected `AN-R1 + AN-A1` and accepted the proposed publication-state and minimum audit contract.
-- Source authorization: **none for T1**. `P2.T1` is the next explicit owner gate.
+- Original `P2.T1` RRI 78 parent: **SUPERSEDED / NON-EXECUTABLE** by lower-RRI decomposition on 2026-09-05.
+- Source authorization: **none for T1a**. `P2.T1a` is the next explicit owner gate.
 - Review exception: existing owner-directed MVP0-P2P P0-P7 phase-1/phase-2 review override remains in force; it does not waive RRI/HITL/Reflection/tests.
 
 ## Task map
@@ -26,14 +27,22 @@ The child scores below are conservative planning scores used to choose the gate.
 | ID | Objective | Planning RRI | Effort | Status | Depends on |
 |---|---|---:|---|---|---|
 | P2.T0 | Freeze Availability Node trust/operation + concrete O4 implementation contract | 64 Complex | L | **PASS** | ADR-044 Accepted |
-| P2.T1 | Durable publication identity, state machine, migration + transactional outbox repository | 78 High | XL | **NEXT OWNER GATE** | T0 PASS |
-| P2.T2 | K1 encrypted package construction + server-wrapped CK custody | 82 High | XL | Pending | T1 PASS |
+| P2.T1 | Durable publication/outbox persistence parent | 78 High | XL | **SUPERSEDED — container only** | T0 PASS |
+| P2.T1a | Pure domain publication identity/state contract + unit tests | **22 Low** | S | **NEXT OWNER GATE** | T0 PASS |
+| P2.T1b | PostgreSQL publication/outbox schema + constraints only | **32 Medium** | S/M | Pending | T1a PASS |
+| P2.T1c | Atomic create/ensure publication + outbox repository write | **47 Medium-high** | M | Pending | T1b PASS |
+| P2.T1d | Outstanding-work/read model repository queries | **36 Medium** | S/M | Pending | T1c PASS |
+| P2.T1e | Guarded persistence transitions + same-lineage confirmation evidence | **44 Medium-high** | M | Pending | T1d PASS |
+| P2.T1f | Persistence integration certification + negative/restart evidence | **33 Medium** | M | Pending | T1e PASS |
+| P2.T2 | K1 encrypted package construction + server-wrapped CK custody | 82 High | XL | Pending | T1a-T1f PASS |
 | P2.T3 | Availability Node ciphertext publication executor | 72 High | XL | Pending | T0 + T2 PASS |
-| P2.T4 | O4 outbox dispatch, optional queue acceleration + reconciler | 84 High | XL | Pending | T1 + T3 PASS |
+| P2.T4 | O4 outbox dispatch, optional queue acceleration + reconciler | 84 High | XL | Pending | T1a-T1f + T3 PASS |
 | P2.T5 | S-120 downstream integration + fail-closed P2P_READY transition | 74 High | XL | Pending | T2 + T4 PASS |
-| P2.T6 | ADR-018 audit inventory, crash-window integration certification + P2 closure | 76 High | XL | Pending | T1-T5 PASS |
+| P2.T6 | ADR-018 audit inventory, crash-window integration certification + P2 closure | 76 High | XL | Pending | T1a-T1f + T2-T5 PASS |
 
-Every High/Complex implementation parent is decomposed again before source edits. Low-band maximization applies only at real pure/mechanical seams.
+The old T1 card is superseded by `docs/audit/mvp0-p2p-p2-t1-decomposition.md`. The current next card is `docs/audit/mvp0-p2p-p2-t1a-approval-card.md`.
+
+Every High/Complex implementation parent is decomposed again before source edits. Low-band maximization applies only at real pure/mechanical seams; crypto/key-custody and distributed recovery are not artificially downgraded.
 
 ## P2.T0 — Availability Node / O4 implementation contract — PASS
 
@@ -54,45 +63,82 @@ Evidence:
 
 Four integrated T0 Reflection passes are recorded PASS. T0 was docs/architecture only; it did not authorize or perform P2 source work.
 
-## P2.T1 — durable publication + transactional outbox persistence — NEXT OWNER GATE
+## P2.T1 — durable publication/outbox persistence — SUPERSEDED CONTAINER
 
-### Scope
+The former RRI-78 executable parent is now only a grouping label for T1a-T1f. No source may be executed under T1 directly.
 
-Freeze and implement only the PostgreSQL/domain foundation required by O4:
+### P2.T1a — pure domain identity/state contract — NEXT OWNER GATE
 
-- stable logical publication/package identity and lineage reference;
-- semantic publication state with T0-frozen readiness semantics;
-- migration for publication state and durable outbox intent;
-- atomic create/ensure publication + outbox transaction;
-- repository operations required for outstanding-work lookup and later claim/reconcile/confirmation transitions;
-- database invariants preventing duplicate active logical publication or an invalid direct transition to `ready`.
+Scope:
 
-T1 does **not** implement K1 media encryption, Availability Node runtime, mTLS transport, queue dispatch, S-120 trigger wiring, P3 invitation/device envelope, or final P2 audit certification.
+- stable logical publication identity type;
+- stable K1 lineage reference type;
+- T0-compatible semantic publication states;
+- pure transition/readiness guards;
+- focused unit tests for invalid direct `ready`, terminal/regressive transitions, lineage stability, and unknown/reconciling semantics.
 
-### Candidate path envelope
+Expected source envelope: new `crates/domain/src/p2p_publication.rs`, `crates/domain/src/lib.rs` export, colocated unit tests, and T1a documentation only.
 
-Exact paths are frozen and re-scored at execution presentation. Expected bounded surfaces are:
+Explicitly excludes PostgreSQL, migrations, repositories, outbox persistence, crypto, workers, queue/reconciler, Availability Node, and S-120 integration.
 
-- new `crates/domain/src/p2p_publication.rs` plus `crates/domain/src/lib.rs` export;
-- new `crates/db/src/p2p_publication_repo.rs` plus `crates/db/src/lib.rs` export;
-- one new `infra/migrations/<next>_create_p2p_publications_and_outbox.sql` migration;
-- focused domain + PostgreSQL repository integration tests;
-- T1 task/audit/status documentation only.
+### P2.T1b — PostgreSQL schema + constraints
 
-No `apps/**`, `mobile/**`, `crates/storage/**`, `crates/jobs/**`, crypto implementation, or Availability Node source belongs in T1.
+Scope only the next migration:
 
-### Behavioral acceptance
+- publication persistence structure;
+- outbox persistence structure;
+- stable logical identity + lineage columns;
+- non-secret confirmation metadata needed by T1e;
+- safe uniqueness/check/FK constraints.
 
-- **HP-T1-1:** one transaction creates one non-ready logical publication identity plus one durable publication outbox obligation.
-- **HP-T1-2:** restart/re-read observes the same identity/lineage and outstanding obligation; no side effect is required to rediscover the work.
-- **EC-T1-1:** duplicate create for the same logical lineage converges idempotently or returns an explicit conflict; it never creates a second logical package.
-- **EC-T1-2:** PostgreSQL constraints/repository API cannot mark the publication `ready` without durable same-lineage external-confirmation evidence.
-- **EC-T1-3:** unknown/stale in-flight work remains non-ready and is representable for later T4 reconciliation.
-- **EC-T1-4:** T1 persistence contains no plaintext CK/KEK, raw invite token, service private key, or application signing secret.
+No Rust repository implementation or worker behavior.
 
-### Planning gate
+### P2.T1c — atomic create/ensure publication + outbox write
 
-Planning RRI remains **78 High / Effort XL**. The exact repository RRI command must be run against the final frozen file set before source execution; if that score differs materially, the higher/current result governs. Until that execution presentation is owner-approved, **T1 source is not authorized**.
+Scope only the minimal DB write repository behavior:
+
+- create or idempotently ensure a logical publication;
+- create the initial outbox obligation in the same PostgreSQL transaction;
+- return the stable logical identity;
+- prevent implicit second active lineage.
+
+No scans, state-transition API, dispatch, queue, or Availability Node call.
+
+### P2.T1d — outstanding-work/read queries
+
+Scope only read-side repository behavior:
+
+- fetch publication by stable identity;
+- observe outstanding durable publication obligations;
+- expose non-secret PostgreSQL truth required by later T4 recovery.
+
+No claim/lease or state mutation.
+
+### P2.T1e — guarded persistence transitions
+
+Scope only durable state mutation:
+
+- apply T0 lifecycle transitions;
+- persist same-lineage external-confirmation evidence fields;
+- guard `ready` so it cannot be written without required durable confirmation;
+- retain unknown outcome as non-ready/reconciling.
+
+No network/external side effect.
+
+### P2.T1f — persistence certification
+
+Scope only integration/negative evidence:
+
+- atomic publication + outbox creation;
+- restart/re-read of same identity and outstanding intent;
+- duplicate create/idempotency;
+- invalid direct-ready rejection;
+- schema/serialization secret-deny-list inspection;
+- behavior-v2 mapping for T1 acceptance.
+
+If certification finds a production defect, reopen the responsible leaf rather than turning T1f into an unbounded corrective implementation task.
+
+Canonical decomposition evidence: `docs/audit/mvp0-p2p-p2-t1-decomposition.md`.
 
 ## P2.T2 — K1 encrypted package builder
 
@@ -160,6 +206,6 @@ Implement only the T0-selected `AN-R1 + AN-A1` runtime/auth contract. Seed/open 
 
 ## Parent closure criteria
 
-P2 is PASS only when T0-T6 are individually closed, every behavior maps to passing executable evidence, integrated Reflection covers confidentiality, crash consistency, readiness separation, and scope, canonical docs are synchronized, and the repository owner performs final verification.
+P2 is PASS only when T0, T1a-T1f, and T2-T6 are individually closed, every behavior maps to passing executable evidence, integrated Reflection covers confidentiality, crash consistency, readiness separation, and scope, canonical docs are synchronized, and the repository owner performs final verification.
 
 P3 remains blocked until that P2 PASS is recorded.
