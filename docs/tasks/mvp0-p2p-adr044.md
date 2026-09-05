@@ -25,10 +25,10 @@ record is `docs/adr/ADR-044-p2p-audience-delivery-boundary.md`.
 
 | Task | Objective | Status | Depends on |
 |---|---|---|---|
-| `ADR044-D1` | Parent envelope: resolve ADR-032 grant composition without delegating the architecture choice to an agent | Approved by owner 2026-09-05; S1 PASS, S2 ready | P1 PASS |
+| `ADR044-D1` | Parent envelope: resolve ADR-032 grant composition without delegating the architecture choice to an agent | Approved by owner 2026-09-05; S1-S2 PASS, S3 ready | P1 PASS |
 | `ADR044-D1-S1` | Extract frozen ADR-032 grant invariants and citations | Complete 2026-09-05; `make qa-docs` PASS | D1 approval satisfied 2026-09-05 |
-| `ADR044-D1-S2` | Extract frozen P2 audience/key-release constraints and comparison criteria | Ready | S1 PASS |
-| `ADR044-D1-S3` | Populate the neutral three-option decision matrix and expose tradeoffs | Blocked by S2 | S2 |
+| `ADR044-D1-S2` | Extract frozen P2 audience/key-release constraints and comparison criteria | Complete 2026-09-05; `make qa-docs` PASS | S1 PASS |
+| `ADR044-D1-S3` | Populate the neutral three-option decision matrix and expose tradeoffs | Ready | S2 PASS |
 | `ADR044-D1-OWNER` | Owner selects reuse, bypass, or parallel audience authorization | Blocked by S3 | S3 |
 | `ADR044-D1-S4` | Mechanically record the frozen owner selection in the audit record and ADR-044 | Blocked by owner selection | D1-OWNER |
 | `ADR044-D2` | Resolve the content-key and device-envelope contract | Deferred; define and score separately | D1-S4 |
@@ -41,8 +41,8 @@ approval after ADR-044 is accepted.
 
 ## ADR044-D1 — grant-composition parent envelope
 
-- **Status:** `[~] Approved by owner on 2026-09-05`; S1 is complete and
-  S2 is ready. The envelope remains open through S4.
+- **Status:** `[~] Approved by owner on 2026-09-05`; S1-S2 are complete
+  and S3 is ready. The envelope remains open through S4.
   ADR-044 remains `Proposed`; D2-D4 and P2 stay separately gated.
 - **Type:** architecture-decision envelope around docs/ADR-only Effort S
   leaves; no runtime or schema implementation.
@@ -137,7 +137,8 @@ authorization boundary.
 
 ### ADR044-D1-S2 — P2 criteria register
 
-- **Status:** `[ ] Ready after S1`.
+- **Status:** `[x] Complete 2026-09-05`; citation/criteria inspection and
+  `make qa-docs` PASS.
 - **Effort:** S (RRI 24, Low).
 - **Objective:** add cited P2 constraints and one shared comparison rubric for
   authorization authority, binding, expiry/revocation, wrapped-key release,
@@ -151,7 +152,7 @@ authorization boundary.
 
 ### ADR044-D1-S3 — neutral option matrix
 
-- **Status:** `[ ] Blocked by S2`.
+- **Status:** `[ ] Ready after S2`.
 - **Effort:** S (RRI 24, Low).
 - **Objective:** compare reuse, bypass, and parallel authorization against the
   frozen S1/S2 registers, exposing satisfied constraints, conflicts,
@@ -258,3 +259,48 @@ add those meanings to ADR-032.
 | `A32-I2` | Reusing an authorization decision does not by itself require reusing every delivery field or transport mechanism; conversely, ADR-032 does not establish that a separate record would preserve its fail-closed and audit invariants. |
 
 No P2 option is scored or preferred by this register.
+
+### S2 P2 constraints and comparison criteria
+
+Status: **complete** (`ADR044-D1-S2`); citation/criteria inspection and
+`make qa-docs` passed on 2026-09-05.
+
+#### Frozen P2 constraint register
+
+Authority labels below matter: `canonical` identifies an accepted ADR or an
+operative slice guardrail; `proposed` identifies invariant text in ADR-044
+that remains unaccepted; `scope input` bounds this comparison without silently
+promoting the external taskpack to repository architecture.
+
+| ID | Frozen constraint | Authority and citation |
+|---|---|---|
+| `P2-C1` | The backend control plane remains authoritative for whether this viewer may play this asset; possession of a Hyperdrive key, package, or ciphertext cache is not authorization. | **Canonical:** `docs/plan/mvp0-p2p-first.md` guardrail 9. **Proposed restatement:** `docs/adr/ADR-044-p2p-audience-delivery-boundary.md` § Proposed decision, items 1 and 3. |
+| `P2-C2` | P2P carries ciphertext only and the certified P2P path cannot depend on HTTP/S3 media fallback. | **Canonical:** `docs/plan/mvp0-p2p-first.md` guardrails 10–11. **Proposed restatement:** ADR-044 § Proposed decision, items 2 and 6. |
+| `P2-C3` | The compared authorization concept must bind an eligible claimed viewer to the asset and must not silently rebind a claim already held by another viewer. MVP-0 evaluates one invitation, one viewer, and one active-device path; multi-device behavior remains out of scope. | **Scope input:** `docs/plan/mvp0-p2p-design-inputs.md` §§ MVP-0 scope, Global invariants item 8, and Invite contract; `docs/tasks/mvp0-p2p-first.md` § P3, HP-2 and EC-1. ADR-044 § Open questions item 2 records the same deliberate limitation as unresolved decision input. |
+| `P2-C4` | Unknown or expired claims fail closed. The comparison must expose where expiry is checked and what can be revoked in MVP-0, while not inventing advanced revocation semantics. | **Scope input:** `docs/tasks/mvp0-p2p-first.md` § P3, EC-1 and Out of scope; `docs/plan/mvp0-p2p-design-inputs.md` §§ MVP-0 scope and Invite contract. |
+| `P2-C5` | A wrapped content key may be released only after the control plane authorizes the viewer/device path. Raw invite tokens and plaintext content keys are never persisted or logged; Bare never receives the device private key, server KEK, JWT signing key, or PostgreSQL credentials. | **Canonical:** `docs/plan/mvp0-p2p-first.md` guardrails 10–11. **Scope input:** `docs/tasks/mvp0-p2p-first.md` § P3, Objective, EC-2 and EC-3; `docs/plan/mvp0-p2p-design-inputs.md` § Responsibility split. |
+| `P2-C6` | ADR-032 remains authoritative and unchanged for authenticated review playback. This decision may define additional P2P audience authorization but cannot replace or silently mutate that accepted path. | **Canonical:** `docs/plan/mvp0-p2p-first.md` guardrail 9; ADR-032 in full. **Proposed restatement:** ADR-044 § Proposed decision, item 3. |
+| `P2-C7` | Grant or refusal decisions are governance-significant. The chosen concept must leave a durable, traceable decision point, while high-volume media transfer need not create one durable row per media request. | **Canonical:** ADR-032 § Observability is split between durable grants and high-volume segment traffic. **Proposed decision input:** ADR-044 § Open questions item 6. |
+| `P2-C8` | Transport-specific manifest rewriting and remote segment-reference mechanics must not be asserted for locally served P2P media unless a later implementation decision gives them meaning. | **Accepted facts plus bounded inference:** `A32-F3`, `A32-F4`, `A32-I1`; ADR-044 § Open questions item 1. |
+| `P2-C9` | D1 decides composition only. It cannot choose algorithms, envelope formats, device-key storage, schemas, routes, fields, tokens, publication/outbox behavior, or ADR acceptance. | **Approved envelope scope:** ADR-044 § Open questions 2–3; `docs/plan/mvp0-p2p-first.md` § Deferred decisions; this ledger § ADR044-D1, Out of scope. |
+
+#### Shared comparison rubric
+
+S3 must apply every criterion below to every option, in this order, without a
+numeric score or aggregate rank.
+
+| Criterion | Question applied identically to each option | Permitted finding |
+|---|---|---|
+| `R1 authority` | What backend-owned event answers “may this viewer play this asset now,” and does it preserve `P2-C1`? | `satisfied`, `conditional`, `conflict`, or `undecided` plus rationale |
+| `R2 binding` | Where are asset, claimed viewer, and the single active-device path bound, without silent rebind, per `P2-C3`? | Same four findings |
+| `R3 expiry/revocation` | Where is current eligibility/expiry checked, and what revocation limitation remains visible under `P2-C4`? | Same four findings |
+| `R4 wrapped-key release` | What authorization result gates wrapped-key release while preserving the secret boundary in `P2-C5`? | Same four findings |
+| `R5 ADR-032 compatibility` | Does the option leave review playback unchanged and keep local P2P transport semantics distinct, per `P2-C6` and `P2-C8`? | Same four findings |
+| `R6 auditability` | Is there one durable, traceable grant/refusal or equivalent authorization event per `P2-C7`? | Same four findings |
+| `R7 scope discipline` | Can the composition choice be recorded without deciding any item prohibited by `P2-C9`? | Same four findings |
+
+“Conditional” means the option can satisfy the criterion only if the owner
+also freezes the stated semantic condition at D1; it is not shorthand for a
+future implementation choice. “Undecided” identifies evidence that D1 cannot
+resolve within its approved scope. These labels convey no preference and are
+not converted to points.
