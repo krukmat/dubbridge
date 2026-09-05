@@ -24,8 +24,8 @@ plan: docs/plan/mvp0-p2p-first.md
 |---|---|---|---|
 | P0 | Bare / Expo / React Native compatibility spike | PASS — Android-only; owner verified 2026-08-27 | — |
 | P1 | Maintainable mobile P2P foundation + replication proof | Parent approved; P1.F1 closed PASS; P1.F2 is the next gated child | P0 PASS |
-| P2 | Encrypted P2P publication after S-120 | Pending | P1 PASS; approved ADR |
-| P3 | Invite, claim, and content-key envelope | Pending | P2 PASS; approved key contract |
+| P2 | Encrypted P2P publication after S-120 | Pending | P1 PASS; accepted ADR-044; own plan/RRI/HITL |
+| P3 | Invite, claim, and content-key envelope | Pending | P2 PASS; accepted ADR-044 / K1 contract |
 | P4 | Mobile package sync and verification | Pending | P3 PASS |
 | P5 | Local HLS gateway + existing VideoPlayer | Pending | P4 PASS |
 | P6 | Minimal My Content + Invites dashboard | Pending | P3–P5 PASS |
@@ -175,18 +175,17 @@ and approval cards must be created at activation time.
 > **Current ADR gate after P1 closure:** P1 reaching PASS (all children —
 > through `P1.B2`) does **not** unlock P2 source work. Nothing below is a
 > phase plan. ADR-044 D1 closed on 2026-09-05 with `O3 parallel`; D2 closed
-> on 2026-09-05 with owner-selected `K1`. Before P2 can be presented:
-> (a) resolve ADR044-D3 and complete the ADR acceptance gate; (b) author
-> `docs/plan/mvp0-p2p-p2-*.md` and expand this ledger's P2 entry to a full
-> task (RRI, Compact Approval Task Card, complete HP/EC set) per the workflow
-> guide's Step 2/3. Track this gap in `docs/plan/roadmap.md` § Known planning
-> gaps until a plan file exists for P2.
+> with owner-selected `K1`; D3 closed with owner-selected `O4`. Before P2 can
+> be presented: (a) complete the explicit `ADR044-D4` acceptance gate; (b)
+> author `docs/plan/mvp0-p2p-p2-*.md` and expand this ledger's P2 entry to a
+> full task (RRI, Compact Approval Task Card, complete HP/EC set) per the
+> workflow guide's Step 2/3. Track this gap in `docs/plan/roadmap.md` § Known
+> planning gaps until a plan file exists for P2.
 >
-> The D1 decision remains in `docs/tasks/mvp0-p2p-adr044.md`; D2 closure is in
-> `docs/tasks/mvp0-p2p-adr044-d2.md` and
-> `docs/audit/mvp0-p2p-adr044-d2-key-envelope.md`. D2 selected K1 with no
-> external-hardware/StrongBox requirement and no silent K2 fallback. ADR-044
-> remains `Proposed`; D2 completion is not P2/P3 source approval.
+> D1 evidence is in `docs/audit/mvp0-p2p-adr044-d1-grant-composition.md`; D2
+> closure is in `docs/audit/mvp0-p2p-adr044-d2-key-envelope.md`; D3/O4 closure
+> is in `docs/audit/mvp0-p2p-adr044-d3-publication.md`. ADR-044 remains
+> `Proposed`; D1-D3 completion is not P2/P3 source approval.
 
 Design inputs for every entry below — use cases, scope boundaries, global
 invariants, acceptance-gate definitions, the control/data-plane split, the
@@ -210,32 +209,40 @@ and revised approval card: `docs/plan/mvp0-p2p-p1-replication.md`,
 
 ### P2 — Encrypted P2P publication after S-120
 
-- **Gate / use case:** G2 / CU-01. **Blocked on:** P1 PASS **and** accepted
-  ADR-044 (`docs/adr/ADR-044-p2p-audience-delivery-boundary.md` is
-  `Proposed`; questions 1–2 are resolved as `O3 parallel` / `K1`, while D3
-  publication/outbox semantics and ADR acceptance still block this task's scope).
+- **Gate / use case:** G2 / CU-01. **Blocked on:** P1 PASS, explicit D4
+  acceptance of ADR-044, and P2's own plan/RRI/HITL. ADR-044 questions 1–3
+  are resolved as `O3 parallel` / `K1` / `O4`; the ADR itself is still
+  `Proposed`, so P2 source work remains unauthorized.
 - **Objective:** turn an S-120-prepared HLS derivative into a ciphertext-only
   P2P package, publish it through the Availability Node, and record durable
   publication state — reusing existing upload/finalize/S-120 without
   modification.
 - **In scope:** encrypted package builder; P2P publication metadata
   (`p2p package id`, `manifest hash`, `hyperdrive key`, publication state,
-  server-wrapped content key); Availability Node seeding; publication outbox.
+  server-wrapped content key); Availability Node seeding; D3/O4 transactional
+  outbox, optional queue acceleration, and reconciliation mechanics once the
+  implementation task freezes concrete schema/runtime details.
 - **Out of scope:** invitations, claim, key delivery to a viewer, mobile
   sync, playback, dashboard.
-- **HP-1:** a Ready S-120 derivative produces an encrypted package whose
-  files are all ciphertext, publishes through the Availability Node, and only
-  then reports the asset as P2P-ready.
-- **HP-2:** publication state is durable and survives a worker restart
-  without republishing or duplicating a package.
-- **EC-1:** a publication failure at any step leaves the asset **not**
-  P2P-ready; no partial or unseeded package is ever advertised as available.
-- **EC-2:** publication never delays `PreparationStatus::Ready` or its
-  downstream transcription enqueue (`docs/plan/mvp0-p2p-first.md`
-  guardrail 8).
-- **EC-3:** the plaintext content key is never persisted or logged, and the
-  Availability Node never receives it, database credentials, or backend
-  signing keys (guardrails 10–11).
+- **HP-1:** a Ready S-120 derivative produces an encrypted package whose files
+  are all ciphertext, publishes through the Availability Node, and only then
+  reports the logical publication as P2P-ready in authoritative PostgreSQL
+  state.
+- **HP-2:** publication state + durable outbox intent survive worker/process
+  restart; duplicate dispatch/retry converges on the same logical package/K1
+  lineage without republishing a second logical package.
+- **HP-3:** queue delivery, if used, is replaceable/non-authoritative; a
+  PostgreSQL-driven reconciler can recover lost dispatch and unknown external
+  outcomes independently of queue visibility.
+- **EC-1:** publication failure or unknown external outcome leaves the asset
+  **not** P2P-ready; no partial/unconfirmed package is advertised available.
+- **EC-2:** publication never delays `PreparationStatus::Ready` or downstream
+  transcription enqueue (`docs/plan/mvp0-p2p-first.md` guardrail 8).
+- **EC-3:** plaintext CK is never persisted/logged, and Availability Node never
+  receives it, DB credentials, business authorization, KEK, or signing keys.
+- **EC-4:** queue ACK, dispatch completion, or Availability Node reachability
+  alone can never transition `P2P_READY`; only durable confirmation of the
+  current logical publication can do so.
 
 ### P3 — Invite, claim, and content-key envelope
 
@@ -265,9 +272,8 @@ and revised approval card: `docs/plan/mvp0-p2p-p1-replication.md`,
   logged at any point in create, claim, or inbox.
 - **EC-3:** an invite for non-Ready content, or by a non-owner, is rejected
   before any descriptor or key material is produced.
-- **Note:** the route shapes in `docs/plan/mvp0-p2p-design-inputs.md` §
-  Invite contract are explicitly non-binding; this task decides its own
-  surface.
+- **Note:** the route shapes in `docs/plan/mvp0-p2p-design-inputs.md` § Invite
+  contract are explicitly non-binding; this task decides its own surface.
 
 ### P4 — Mobile package sync and verification
 
@@ -346,8 +352,7 @@ and revised approval card: `docs/plan/mvp0-p2p-p1-replication.md`,
   `MVP0_P2P_NOT_CERTIFIED`.
 - **In scope:** the certification profile that disables legacy media routes
   without disabling control-plane APIs; the end-to-end run and its evidence.
-- **Out of scope:** offline certification, multi-device, performance
-  targets.
+- **Out of scope:** offline certification, multi-device, performance targets.
 - **HP-1:** `OWNER: Login → Upload → S-120 → P2P Publish → Ready → Invite`
   and `VIEWER: Login → Claim → Invites → Sync → Verify → READY → Play`
   both complete while control-plane APIs remain available and no legacy HTTP
