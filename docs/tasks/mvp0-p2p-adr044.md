@@ -10,445 +10,195 @@ plan: docs/plan/mvp0-p2p-first.md
 
 ## Purpose
 
-Resolve the architectural questions that keep ADR-044 `Proposed` and block
-presentation of P2. Following ADR-038 Amendment 5, this ledger separates
-evidence extraction, option comparison, owner selection, and mechanical
-codification into independently verifiable Effort S leaves. The coherent
-decision outcome remains a parent approval/review envelope: the split does not
-turn authorization, cryptography, or publication-state decisions into autonomous
-Low-band work.
+Resolve the architectural questions that keep ADR-044 `Proposed` and block P2.
+The decision sequence separates evidence extraction, owner selection, mechanical
+codification, and canonical synchronization. Detailed option evidence lives in
+the per-decision audits; this parent ledger records the authoritative closure
+state and next gate.
 
-The governing slice plan remains `docs/plan/mvp0-p2p-first.md`; the decision
-inputs are in `docs/plan/mvp0-p2p-design-inputs.md` and the proposed decision
-record is `docs/adr/ADR-044-p2p-audience-delivery-boundary.md`.
+Governing sources:
+
+- `docs/plan/mvp0-p2p-first.md`
+- `docs/plan/mvp0-p2p-design-inputs.md`
+- `docs/adr/ADR-044-p2p-audience-delivery-boundary.md`
+
+No task in this ledger authorizes P2 source work. P2 requires an accepted
+ADR-044 plus its own plan, full task definition, RRI, Compact Approval Task Card,
+and explicit HITL approval.
 
 ## Task map
 
 | Task | Objective | Status | Depends on |
 |---|---|---|---|
-| `ADR044-D1` | Parent envelope: resolve ADR-032 grant composition without delegating the architecture choice to an agent | Complete 2026-09-05; owner selected `O3 parallel`; S4/SYNC/QA PASS | P1 PASS |
-| `ADR044-D1-S1` | Extract frozen ADR-032 grant invariants and citations | Complete 2026-09-05; `make qa-docs` PASS | D1 approval satisfied 2026-09-05 |
-| `ADR044-D1-S2` | Extract frozen P2 audience/key-release constraints and comparison criteria | Complete 2026-09-05; `make qa-docs` PASS | S1 PASS |
-| `ADR044-D1-S3` | Populate the neutral three-option decision matrix and expose tradeoffs | Complete 2026-09-05; `make qa-docs` PASS | S2 PASS |
-| `ADR044-D1-OWNER` | Owner selects reuse, bypass, or parallel audience authorization | Complete 2026-09-05; `O3 parallel` selected | S3 PASS |
-| `ADR044-D1-S4` | Mechanically record the frozen owner selection in the audit record and ADR-044 | Complete 2026-09-05; `make qa-docs` PASS | D1-OWNER satisfied 2026-09-05 |
-| `ADR044-D1-SYNC` | Consolidate the resolved D1/O3 status across canonical plan, roadmap, task, architecture, and ADR index documents | Complete 2026-09-05; `make qa-docs` PASS | D1-S4 PASS |
-| `ADR044-D2` | Resolve the content-key and device-envelope contract | Complete 2026-09-05; owner selected `K1`; closure ledger/audit recorded | D1-SYNC PASS |
-| `ADR044-D3` | Resolve publication/outbox state and recovery semantics | Ready to define and score separately | D2 PASS |
-| `ADR044-D4` | Accept ADR-044 and propagate the accepted decision through canonical status documents | Deferred; define and score separately | D1-D3 plus any closure-blocking audit decision |
+| `ADR044-D1` | Resolve ADR-032 grant composition | **Complete 2026-09-05 — owner selected `O3 parallel`** | P1 PASS |
+| `ADR044-D2` | Resolve content-key / device-envelope contract | **Complete 2026-09-05 — owner selected `K1`** | D1 PASS |
+| `ADR044-D3` | Resolve publication/outbox state and recovery semantics | **Complete 2026-09-05 — owner selected `O4`** | D2 PASS |
+| `ADR044-D4` | Review consolidated ADR-044 and explicitly accept/reject it; propagate status | **Next gate — not yet presented/approved** | D1-D3 PASS |
 
-No task in this ledger authorizes P2 source work. P2 still requires its own
-plan, full task definition, RRI, Compact Approval Task Card, and explicit HITL
-approval after ADR-044 is accepted.
+## D1 — grant composition
 
-## ADR044-D1 — grant-composition parent envelope
+- **Outcome:** `O3 parallel`.
+- **Meaning:** after a valid invitation claim, a distinct backend-owned audience
+  authorization gates key release. The invitation claim alone, ADR-032
+  `PlaybackGrant`, Hyperdrive key, or ciphertext possession is insufficient.
+- **ADR-032:** unchanged and authoritative for review-time HTTP HLS.
+- **Parent RRI:** 55 → Med-high → Effort L.
+- **Leaves:** S1-S3 RRI 24 Low S; S4 RRI 23 Low S; status sync completed.
+- **Audit:** `docs/audit/mvp0-p2p-adr044-d1-grant-composition.md`.
 
-- **Status:** `[x] Complete 2026-09-05`; the owner selected `O3 parallel` at
-  D1-OWNER and S4 recorded only that frozen composition choice. ADR-044 remains
-  `Proposed`; D2-D4 and P2 remain separately gated.
-- **Type:** architecture-decision envelope around docs/ADR-only Effort S
-  leaves; no runtime or schema implementation.
-- **Effort:** L (parent RRI 55, Med-high). Executable leaves: S (RRI 23–24,
-  Low).
-- **Objective:** give the owner cited, neutral evidence for choosing how P2
-  audience authorization composes with ADR-032, then codify only the owner's
-  frozen selection.
-- **In scope:** reuse of `PlaybackGrant`, authorization bypass, and a parallel
-  audience-authorization concept; fail-closed authorization, revocation,
-  auditability, ADR-032 compatibility, one-viewer/one-device scope, and the
-  authority required to release a device-wrapped content key.
-- **Out of scope:** agent-selected recommendation; accepting ADR-044; choosing
-  algorithms/envelope formats; defining schemas, routes, fields, or tokens;
-  changing ADR-032; implementing P2/P3; modifying runtime behavior.
-- **Acceptance criteria:**
-  1. S1–S3 produce a cited, criteria-consistent matrix without normative
-     recommendation language.
-  2. The owner explicitly selects one option at D1-OWNER.
-  3. S4 records that exact selection without adding implementation detail or
-     changing ADR-044 from `Proposed`.
-  4. ADR-032 remains unchanged and authoritative for review-time HTTP HLS.
-  5. `make qa-docs` passes and no document claims ADR-044 or P2 is approved.
-- **Phase-1 review:** `Task-analysis review: n/a - ADR/plan/task-ledger-only exemption.`
-- **Phase-2 review:** `Code-solution review: n/a - ADR/plan/task-ledger-only exemption.`
-- **Owner review:** the D1-OWNER decision checkpoint remains mandatory.
-- **Verification:** `make qa-docs`; semantic consistency against ADR-032,
-  ADR-043, the slice plan, and design inputs.
-- **Handoff:** `ADR044-D1 — execute S1 through S3 after envelope approval,
-  stop for D1-OWNER, then execute S4 using only the frozen owner selection.`
+D1 did not accept ADR-044 or authorize P2/P3.
 
-### Parent RRI report
+## D2 — content key / device envelope
 
-**Platform:** dubbridge
+- **Outcome:** `K1`.
+- **Content:** one fresh 256-bit CK per package; AES-256-GCM media encryption.
+- **Server custody:** CK persisted only server-wrapped under versioned
+  AES-256-GCM KEK; plaintext CK never persisted/logged.
+- **Device envelope:** HPKE Base using
+  `DHKEM(P-256, HKDF-SHA256)` / `HKDF-SHA256` / `AES-256-GCM`.
+- **Device key:** non-exportable P-256 ECDH key in Android Keystore. StrongBox
+  is optional, no external hardware is required, and missing required
+  Keystore/ECDH capability fails closed. No silent K2/software-key fallback.
+- **Binding:** invitation + viewer + active device + asset/package + O3 audience
+  authorization + expiry/revocation.
+- **Bare:** may receive only a transient authorized playback CK, never device
+  private key/backend secrets.
+- **Parent RRI:** 70 → Complex → Effort L.
+- **Audit:** `docs/audit/mvp0-p2p-adr044-d2-key-envelope.md`.
+- **Ledger:** `docs/tasks/mvp0-p2p-adr044-d2.md`.
 
-| Variable | Score | Evidence | Confidence |
-|---|---:|---|---|
-| C cyclomatic | 1 | Non-development decision-weight heuristic: one architecture selection envelope, no runtime implementation | High |
-| F files | 2 | `--touches` names 3 files | High |
-| D domain | 4 | Audience authorization-boundary decision | High |
-| T coverage | 0 | Documentation task; deterministic `make qa-docs` plus semantic consistency verification | High |
-| A ambiguity | 0 | Options, criteria, leaf boundaries, owner checkpoint, and stop boundary are explicit | High |
-| K coupling | 3 | Selection must compose ADR-032, invitation claim, key release, audit, and device binding | High |
-| P impact | 1 | Records an ADR proposal while retaining `Proposed`; no runtime/public API change | High |
-| X context | 3 | One cross-cutting audience-delivery boundary across several canonical documents | High |
+D2 did not accept ADR-044 or authorize P2/P3.
 
-**Base value:** 33.
+## D3 — publication / outbox / recovery
 
-**Penalties applied:** `arch_decision` (+12); `auth_security` (+10).
+- **Status:** `[x] Complete 2026-09-05`.
+- **Owner checkpoint:** owner explicitly selected `O4` with
+  `apruebo o4. documentalo` after reviewing O1/O2/O3 and the long-term hybrid.
+- **Selected contract:** **O4 — transactional outbox + optional queue
+  accelerator + PostgreSQL reconciler**.
+- **Parent RRI:** **60 → Complex → Effort L**.
+- **Leaves:** S1-S4 RRI 14 Low S; S5 RRI 13 Low S; SYNC RRI 17 Low S.
+- **Audit:** `docs/audit/mvp0-p2p-adr044-d3-publication.md`.
+- **Ledger:** `docs/tasks/mvp0-p2p-adr044-d3.md`.
 
-**Final RRI:** 55 → Med-high → Effort L → Balanced-to-Premium, thinking on.
+### D3 frozen semantics
 
-**Gates:** explicit parent-envelope approval before any leaf; docs/ADR-only
-phase-1 and phase-2 review exemptions; mandatory owner-selection checkpoint;
-parent band retained through integrated closure. The honest Low-band pass
-produced four coherent Effort S leaves and no agent-owned architecture choice.
+1. `PreparationStatus::Ready` remains S-120 HLS readiness and does not wait for
+   P2P publication or delay ASR/transcription enqueue.
+2. P2P has a separate durable readiness predicate (`P2P_READY` semantically).
+3. PostgreSQL is authoritative for stable logical publication identity,
+   publication state, durable outbox intent, and the Ready transition.
+4. A transactional outbox records the publication obligation atomically with
+   local publication state before any external side effect is required.
+5. Delivery is at-least-once and idempotent; D3 makes no distributed
+   exactly-once claim.
+6. An existing/future queue may accelerate normal dispatch/backpressure, but it
+   is replaceable and non-authoritative. Queue enqueue/ACK is never publication
+   success evidence.
+7. A PostgreSQL-driven reconciler is the recovery safety net for lost dispatch,
+   stale/incomplete work, unknown remote result, and remote-success/ACK-loss.
+8. Outbox retry, queue duplicates, reconciler re-drive, and Availability Node
+   confirmation all use one stable logical package/publication identity and K1
+   lineage. Retry cannot silently create a new package/CK lineage.
+9. Availability Node remains ciphertext-only and cannot own PostgreSQL/business
+   state, authorization, KEK, plaintext CK, invite/viewer data, or signing keys.
+10. D2/K1 envelope release consumes the authoritative D3 Ready predicate
+    fail-closed.
 
-Canonical command:
+### O4 authority hierarchy
 
-```bash
-python3 scripts/rri.py \
-  --touches docs/tasks/mvp0-p2p-adr044.md \
-  --touches docs/audit/mvp0-p2p-adr044-d1-grant-composition.md \
-  --touches docs/adr/ADR-044-p2p-audience-delivery-boundary.md \
-  --C 1 --D 4 --K 3 --P 1 --T 0 --A 0 --X 3 \
-  --penalty arch_decision --penalty auth_security
+```text
+PostgreSQL publication state + transactional outbox
+        = durable authority
+
+queue
+        = optional delivery accelerator
+
+PostgreSQL reconciler
+        = recovery safety net
+
+Availability Node
+        = ciphertext publication executor/evidence source
 ```
 
-## Executable Effort S leaves
+No queue or Availability Node status independently establishes `P2P_READY`.
 
-All four leaves are docs/ADR/task-ledger work and therefore run directly by
-the primary agent; Low-band scoring does not make them eligible Qwen Developer
-code patches. S1–S3 use the same conservative `auth_security` penalty because
-their subject matter is authorization even though they cannot change the
-authorization boundary.
+### Crash-window requirements
 
-### ADR044-D1-S1 — ADR-032 constraint register
-
-- **Status:** `[x] Complete 2026-09-05`; citation inspection and
-  `make qa-docs` PASS.
-- **Effort:** S (RRI 24, Low).
-- **Objective:** add a cited register of ADR-032 `PlaybackGrant` semantics and
-  explicit non-semantics to the decision evidence workspace below.
-- **Allowed path:** this ledger only.
-- **Acceptance criteria:** every constraint cites ADR-032; facts are separated
-  from inference; no P2 option is scored or recommended; status is updated in
-  this ledger.
-- **Verification:** inspect every citation against ADR-032; `make qa-docs`.
-- **Handoff:** `Extract ADR-032 facts only; do not compare options or edit an ADR.`
-
-### ADR044-D1-S2 — P2 criteria register
-
-- **Status:** `[x] Complete 2026-09-05`; citation/criteria inspection and
-  `make qa-docs` PASS.
-- **Effort:** S (RRI 24, Low).
-- **Objective:** add cited P2 constraints and one shared comparison rubric for
-  authorization authority, binding, expiry/revocation, wrapped-key release,
-  ADR-032 compatibility, audit, and MVP device scope.
-- **Allowed path:** this ledger only.
-- **Acceptance criteria:** criteria trace to ADR-043, ADR-044, the slice plan,
-  or design inputs; implementation details stay non-binding; no option is
-  scored or recommended; status is updated here.
-- **Verification:** citation/criteria consistency check; `make qa-docs`.
-- **Handoff:** `Extract P2 constraints and freeze neutral criteria only.`
-
-### ADR044-D1-S3 — neutral option matrix
-
-- **Status:** `[x] Complete 2026-09-05`; matrix completeness/neutrality review
-  and `make qa-docs` PASS.
-- **Effort:** S (RRI 24, Low).
-- **Objective:** compare reuse, bypass, and parallel authorization against the
-  frozen S1/S2 registers, exposing satisfied constraints, conflicts,
-  assumptions, and unresolved tradeoffs.
-- **Allowed path:** this ledger only.
-- **Acceptance criteria:** every option uses identical criteria; every cell
-  links to a frozen register entry; there is no winner/recommendation; the
-  task stops at D1-OWNER and updates status here.
-- **Verification:** matrix completeness and neutrality review; `make qa-docs`.
-- **Handoff:** `Populate the matrix from frozen evidence; stop before selecting.`
-
-### ADR044-D1-OWNER — explicit selection checkpoint
-
-The owner selects exactly one matrix option or asks for revised evidence. No
-agent may infer selection from scores, prior prose, or architectural preference.
-Until that selection is explicit, S4, D2, D3, D4, and P2 remain blocked.
-
-**Resolved 2026-09-05:** after the three options were identified explicitly,
-the owner replied `03`. The immediately preceding exchange named the intended
-choice as `O3`; the response is therefore recorded as the exact selection of
-`O3 parallel`. This selects composition only and does not approve D2-D4, ADR
-acceptance, or P2 implementation.
-
-### ADR044-D1-S4 — mechanical decision codification
-
-- **Status:** `[x] Complete 2026-09-05`; the frozen `O3 parallel` selection is
-  recorded in this ledger, the D1 audit record, and ADR-044; semantic checks
-  and `make qa-docs` PASS.
-- **Effort:** S (RRI 23, Low).
-- **Objective:** transcribe the exact owner-selected option into the audit
-  record and ADR-044 while preserving `Proposed` status.
-- **Allowed paths:** this ledger,
-  `docs/audit/mvp0-p2p-adr044-d1-grant-composition.md`, and
-  `docs/adr/ADR-044-p2p-audience-delivery-boundary.md`.
-- **Acceptance criteria:** the audit record includes the frozen registers,
-  neutral matrix, exact owner selection, rejected alternatives, and remaining
-  open questions; ADR-044 records no choice beyond the selection; no schemas,
-  APIs, tokens, algorithms, or P2 source work are introduced; statuses are
-  updated; `make qa-docs` passes.
-- **Verification:** exact comparison to owner selection; semantic consistency;
-  `make qa-docs`.
-- **Handoff:** `Codify only the frozen D1-OWNER selection; keep ADR-044 Proposed.`
-
-### Leaf RRI reports
-
-S1, S2, and S3 each use this command and score:
-
-```bash
-python3 scripts/rri.py \
-  --touches docs/tasks/mvp0-p2p-adr044.md \
-  --C 0 --D 3 --K 1 --P 0 --T 0 --A 0 --X 2 \
-  --penalty auth_security
-```
-
-Final RRI: **24 → Low → Effort S** (base 14 + `auth_security` 10).
-
-S4 uses:
-
-```bash
-python3 scripts/rri.py \
-  --touches docs/tasks/mvp0-p2p-adr044.md \
-  --touches docs/audit/mvp0-p2p-adr044-d1-grant-composition.md \
-  --touches docs/adr/ADR-044-p2p-audience-delivery-boundary.md \
-  --C 0 --D 1 --K 1 --P 0 --T 0 --A 0 --X 2 \
-  --penalty auth_security
-```
-
-Final RRI: **23 → Low → Effort S** (base 13 + `auth_security` 10). The
-architecture choice is not an agent decision in S4; it is frozen at D1-OWNER.
-
-## Decision evidence workspace
-
-Parent-envelope approval was given explicitly by the repository owner in this
-session on 2026-09-05: `aprobada task y subidivision`. That approval authorizes
-the bounded S1-S4 sequence but does not select an architecture option at
-D1-OWNER and does not authorize P2 source work.
-
-### S1 ADR-032 constraints
-
-Status: **complete** (`ADR044-D1-S1`); citation inspection and
-`make qa-docs` passed on 2026-09-05.
-
-#### Accepted facts
-
-| ID | Frozen ADR-032 constraint | Citation |
-|---|---|---|
-| `A32-F1` | Prepared HLS is not exposed through raw object-storage keys. Access crosses a backend-owned grant boundary and storage keys remain an implementation detail. | `docs/adr/ADR-032-hls-playback-delivery-boundary.md` § Prepared HLS is never exposed as raw object-storage keys |
-| `A32-F2` | Before granting playback, that boundary validates S-120 readiness. For review playback it also validates caller authentication and org/project authorization; for audience playback it validates publication visibility; any playback token or signed URL remains scoped and expiring. | `docs/adr/ADR-032-hls-playback-delivery-boundary.md` § Prepared HLS is never exposed as raw object-storage keys |
-| `A32-F3` | The backend may realize delivery with signed object-store URLs, backend proxying, or CDN-backed signed URLs, but the stable contract is that the backend grants access. ADR-032 does not freeze one of those transport implementations. | `docs/adr/ADR-032-hls-playback-delivery-boundary.md` § Prepared HLS is never exposed as raw object-storage keys |
-| `A32-F4` | A client-followable manifest is produced without revealing storage layout. Segment access remains bounded by the same playback grant, either by rechecking it per request or by issuing short-lived scoped segment references. A manifest is not durable permission. | `docs/adr/ADR-032-hls-playback-delivery-boundary.md` § Manifest and segment URLs are generated by the playback boundary |
-| `A32-F5` | Playback fails closed when the prepared package is missing, malformed, processing, or failed. Review playback additionally follows authenticated review/workspace gates; audience playback follows the S-180 publication gate and ADR-030. | `docs/adr/ADR-032-hls-playback-delivery-boundary.md` § Playback is readiness-gated and publication-gated |
-| `A32-F6` | Creating or refusing a playback grant is governance-significant and durably traceable under ADR-018. Individual segment requests require traces/metrics but not necessarily one durable audit row each. | `docs/adr/ADR-032-hls-playback-delivery-boundary.md` § Observability is split between durable grants and high-volume segment traffic |
-| `A32-F7` | S-125 owns the server-side playback boundary only. It does not define public-player or consumer-player UX. | `docs/adr/ADR-032-hls-playback-delivery-boundary.md` § S-125 owns HLS playback delivery |
-| `A32-F8` | ADR-032 deliberately leaves CDN/public delivery undecided until S-180 or a later public-distribution slice defines the audience requirement. | `docs/adr/ADR-032-hls-playback-delivery-boundary.md` § Consequences, Negative / trade-offs |
-
-#### Explicitly non-semantic for this decision
-
-The accepted ADR-032 text does not define an invitation claim, a
-viewer/device binding, ciphertext replication, content-key wrapping or unwrap,
-or key revocation. It therefore supplies no accepted record shape or token
-shape for those P2P concerns. This is a bounded absence observation over the
-decision, consequences, and alternatives in
-`docs/adr/ADR-032-hls-playback-delivery-boundary.md`; it is not a proposal to
-add those meanings to ADR-032.
-
-#### Inferences reserved for the neutral comparison
-
-| ID | Non-binding inference from the accepted facts |
+| Window | Required O4 result |
 |---|---|
-| `A32-I1` | The authorization question captured by `A32-F1`, `A32-F2`, `A32-F5`, and `A32-F6` can be compared independently from ADR-032's HTTP-oriented manifest and segment mechanics in `A32-F3` and `A32-F4`. |
-| `A32-I2` | Reusing an authorization decision does not by itself require reusing every delivery field or transport mechanism; conversely, ADR-032 does not establish that a separate record would preserve its fail-closed and audit invariants. |
+| before durable transaction | no publication obligation |
+| committed, before dispatch | outbox/reconciler recovers same work |
+| during external operation | non-ready/unknown; same identity reconciled/retried |
+| remote success, ACK lost | no second logical package; same identity converges on existing result |
+| ACK received, local Ready commit lost | remains non-ready until reconciliation reconfirms then commits Ready |
+| duplicate after Ready | idempotent no-op; no lineage rotation/state regression |
 
-No P2 option is scored or preferred by this register.
+### Fail-closed readiness
 
-### S2 P2 constraints and comparison criteria
+`P2P_READY` is true only when authoritative PostgreSQL state durably proves the
+current lineage is valid, K1 package construction completed, external
+publication of that same lineage is confirmed, persisted publication evidence
+matches that lineage, and no unresolved unknown-outcome condition remains.
 
-Status: **complete** (`ADR044-D1-S2`); citation/criteria inspection and
-`make qa-docs` passed on 2026-09-05.
+Anything missing, stale, conflicting, or unknown means **not P2P-ready**.
 
-#### Frozen P2 constraint register
+### D3 integrated Reflection
 
-Authority labels below matter: `canonical` identifies an accepted ADR or an
-operative slice guardrail; `proposed` identifies invariant text in ADR-044
-that remains unaccepted; `scope input` bounds this comparison without silently
-promoting the external taskpack to repository architecture.
+1. **Transactional/crash-window correctness — PASS.** Local durable intent is
+   atomic in PostgreSQL; external publication remains explicitly non-atomic and
+   recoverable.
+2. **Idempotency/unknown outcome — PASS.** One stable identity spans outbox,
+   queue, reconciler, and Availability Node; unknown outcome never yields Ready.
+3. **S-120 independence / D2 interaction — PASS.** Existing S-120 Ready/ASR
+   continue independently; D3 readiness gates K1 release.
+4. **Scope/status — PASS.** D3 does not select SQL names, routes, queue product,
+   retry constants, Availability Node credentials/deployment, certification
+   profile, or complete audit-event inventory. ADR-044 remains `Proposed`.
 
-| ID | Frozen constraint | Authority and citation |
-|---|---|---|
-| `P2-C1` | The backend control plane remains authoritative for whether this viewer may play this asset; possession of a Hyperdrive key, package, or ciphertext cache is not authorization. | **Canonical:** `docs/plan/mvp0-p2p-first.md` guardrail 9. **Proposed restatement:** `docs/adr/ADR-044-p2p-audience-delivery-boundary.md` § Proposed decision, items 1 and 3. |
-| `P2-C2` | P2P carries ciphertext only and the certified P2P path cannot depend on HTTP/S3 media fallback. | **Canonical:** `docs/plan/mvp0-p2p-first.md` guardrails 10–11. **Proposed restatement:** ADR-044 § Proposed decision, items 2 and 6. |
-| `P2-C3` | The compared authorization concept must bind an eligible claimed viewer to the asset and must not silently rebind a claim already held by another viewer. MVP-0 evaluates one invitation, one viewer, and one active-device path; multi-device behavior remains out of scope. | **Scope input:** `docs/plan/mvp0-p2p-design-inputs.md` §§ MVP-0 scope, Global invariants item 8, and Invite contract; `docs/tasks/mvp0-p2p-first.md` § P3, HP-2 and EC-1. ADR-044 § Open questions item 2 records the same deliberate limitation as unresolved decision input. |
-| `P2-C4` | Unknown or expired claims fail closed. The comparison must expose where expiry is checked and what can be revoked in MVP-0, while not inventing advanced revocation semantics. | **Scope input:** `docs/tasks/mvp0-p2p-first.md` § P3, EC-1 and Out of scope; `docs/plan/mvp0-p2p-design-inputs.md` §§ MVP-0 scope and Invite contract. |
-| `P2-C5` | A wrapped content key may be released only after the control plane authorizes the viewer/device path. Raw invite tokens and plaintext content keys are never persisted or logged; Bare never receives the device private key, server KEK, JWT signing key, or PostgreSQL credentials. | **Canonical:** `docs/plan/mvp0-p2p-first.md` guardrails 10–11. **Scope input:** `docs/tasks/mvp0-p2p-first.md` § P3, Objective, EC-2 and EC-3; `docs/plan/mvp0-p2p-design-inputs.md` § Responsibility split. |
-| `P2-C6` | ADR-032 remains authoritative and unchanged for authenticated review playback. This decision may define additional P2P audience authorization but cannot replace or silently mutate that accepted path. | **Canonical:** `docs/plan/mvp0-p2p-first.md` guardrail 9; ADR-032 in full. **Proposed restatement:** ADR-044 § Proposed decision, item 3. |
-| `P2-C7` | Grant or refusal decisions are governance-significant. The chosen concept must leave a durable, traceable decision point, while high-volume media transfer need not create one durable row per media request. | **Canonical:** ADR-032 § Observability is split between durable grants and high-volume segment traffic. **Proposed decision input:** ADR-044 § Open questions item 6. |
-| `P2-C8` | Transport-specific manifest rewriting and remote segment-reference mechanics must not be asserted for locally served P2P media unless a later implementation decision gives them meaning. | **Accepted facts plus bounded inference:** `A32-F3`, `A32-F4`, `A32-I1`; ADR-044 § Open questions item 1. |
-| `P2-C9` | D1 decides composition only. It cannot choose algorithms, envelope formats, device-key storage, schemas, routes, fields, tokens, publication/outbox behavior, or ADR acceptance. | **Approved envelope scope:** ADR-044 § Open questions 2–3; `docs/plan/mvp0-p2p-first.md` § Deferred decisions; this ledger § ADR044-D1, Out of scope. |
+## D4 — explicit ADR acceptance gate
 
-#### Shared comparison rubric
+D1-D3 are now complete. `ADR044-D4` is the next gate and must be independently
+scored/presented under current workflow policy.
 
-S3 must apply every criterion below to every option, in this order, without a
-numeric score or aggregate rank.
+D4 may only:
 
-| Criterion | Question applied identically to each option | Permitted finding |
-|---|---|---|
-| `R1 authority` | What backend-owned event answers “may this viewer play this asset now,” and does it preserve `P2-C1`? | `satisfied`, `conditional`, `conflict`, or `undecided` plus rationale |
-| `R2 binding` | Where are asset, claimed viewer, and the single active-device path bound, without silent rebind, per `P2-C3`? | Same four findings |
-| `R3 expiry/revocation` | Where is current eligibility/expiry checked, and what revocation limitation remains visible under `P2-C4`? | Same four findings |
-| `R4 wrapped-key release` | What authorization result gates wrapped-key release while preserving the secret boundary in `P2-C5`? | Same four findings |
-| `R5 ADR-032 compatibility` | Does the option leave review playback unchanged and keep local P2P transport semantics distinct, per `P2-C6` and `P2-C8`? | Same four findings |
-| `R6 auditability` | Is there one durable, traceable grant/refusal or equivalent authorization event per `P2-C7`? | Same four findings |
-| `R7 scope discipline` | Can the composition choice be recorded without deciding any item prohibited by `P2-C9`? | Same four findings |
+1. review the consolidated ADR-044 proposal and D1-D3 evidence;
+2. resolve any closure-blocking inconsistency discovered by that review;
+3. obtain explicit owner acceptance/rejection;
+4. if accepted, change ADR-044 status and synchronize canonical status docs.
 
-“Conditional” means the option can satisfy the criterion only if the owner
-also freezes the stated semantic condition at D1; it is not shorthand for a
-future implementation choice. “Undecided” identifies evidence that D1 cannot
-resolve within its approved scope. These labels convey no preference and are
-not converted to points.
+D4 is **not** P2 approval. P2 planning/RRI/HITL starts only after ADR acceptance.
 
-### S3 neutral option matrix
+## Phase-specific open decisions after D3
 
-Status: **complete** (`ADR044-D1-S3`); matrix completeness/neutrality review
-and `make qa-docs` passed on 2026-09-05. As required, S3 stopped at D1-OWNER;
-the later owner response and S4 closure are recorded below.
+ADR-044 questions 4–7 remain later phase gates rather than D1-D3 blockers:
 
-#### Option meanings used only for this comparison
+- Availability Node deployment/authentication/observability/operational ownership
+  — blocks P2 deployment completion;
+- certification profile — blocks P7;
+- complete ADR-018 P2P audit-event inventory — blocks P2/P3 closure evidence;
+- persistent cache/device/sign-out/background lifecycle — blocks P4 product
+  lifecycle closure.
 
-| Option | Bounded semantic reading |
-|---|---|
-| `O1 reuse` | Issue an ADR-032 `PlaybackGrant` as the backend-owned P2P audience authorization event. Its affirmative decision gates wrapped-key release; HTTP manifest/segment mechanics do not acquire local-P2P meaning merely through reuse. |
-| `O2 bypass` | Issue no ADR-032 `PlaybackGrant` for P2P. A fresh backend check of the claimed invitation/current eligibility is itself the authorization event that gates wrapped-key release. “Bypass” applies to the ADR-032 grant, not to backend authorization or audit. |
-| `O3 parallel` | Use a distinct backend-owned audience-authorization concept after a valid invitation claim. That concept, rather than an ADR-032 grant or claim alone, gates wrapped-key release. |
+## Verification / environment
 
-These readings define only the composition choice. They do not define record,
-route, field, token, algorithm, or envelope shape.
+- Local Ollama/models/devices/emulators: `n/a` for D1-D3 docs/ADR decision work;
+  no local evidence simulated.
+- Phase-1/phase-2 peer review: docs/ADR/task-ledger exemption where recorded in
+  each child ledger/audit.
+- D3 final repository verification is recorded against the synchronized branch
+  head by CI and AGENTS parity checks.
 
-#### Matrix
+## Current result
 
-Each cell uses the S2 rubric's non-ranking findings. Parenthetical IDs bind the
-finding to the same frozen constraints for all three options.
+```text
+D1  O3 parallel    ✅ complete
+D2  K1             ✅ complete
+D3  O4             ✅ complete
+D4  ADR acceptance ⏭ next explicit gate
 
-| Criterion | `O1 reuse` | `O2 bypass` | `O3 parallel` |
-|---|---|---|---|
-| `R1 authority` | **conditional** — satisfies backend authority if the owner explicitly extends the ADR-032 grant's authorization meaning to this P2P audience path (`P2-C1`, `A32-F1`). | **conditional** — satisfies backend authority if each release uses a fresh backend claim/current-eligibility decision; possession alone remains insufficient (`P2-C1`). | **conditional** — satisfies backend authority if the parallel concept is created/evaluated only by the control plane and is required for release (`P2-C1`). |
-| `R2 binding` | **conditional** — ADR-032 supplies no invitation or device binding; viewer/asset/device linkage must remain an explicit P3/key-contract obligation outside the reused transport semantics (`P2-C3`, ADR-032 non-semantics). | **conditional** — claim can bind viewer/asset, but the single active-device binding remains an explicit P3/key-contract obligation (`P2-C3`). | **conditional** — the separate concept can own the audience binding, but its viewer/asset/device semantics remain an explicit P3/key-contract obligation (`P2-C3`). |
-| `R3 expiry/revocation` | **conditional** — ADR-032 establishes scoped expiry, but invite eligibility and what happens after key release remain unresolved; advanced revocation is not implied (`P2-C4`, `A32-F2`, `A32-F4`). | **conditional** — a fresh eligibility check can reject expired claims, but no continuing grant expiry exists by definition; post-release revocation remains unresolved (`P2-C4`). | **conditional** — the concept can represent current eligibility/expiry, but its lifetime and post-release revocation semantics remain unresolved (`P2-C4`). |
-| `R4 wrapped-key release` | **conditional** — only a valid reused grant may authorize release; wrapping details remain D2 (`P2-C5`, `P2-C9`). | **conditional** — only a successful fresh claim/current-eligibility check may authorize release; wrapping details remain D2 (`P2-C5`, `P2-C9`). | **conditional** — only a valid parallel authorization may authorize release; wrapping details remain D2 (`P2-C5`, `P2-C9`). |
-| `R5 ADR-032 compatibility` | **conditional** — compatible only if reuse is limited to its backend authorization/grant meaning and does not reinterpret manifest rewriting or segment references for local P2P (`P2-C6`, `P2-C8`, `A32-I1`). | **satisfied** — ADR-032 remains unchanged and exclusively governs its existing playback path; the P2P path has no ADR-032 grant (`P2-C6`, `P2-C8`). | **satisfied** — ADR-032 remains unchanged while the P2P audience path uses a distinct concept (`P2-C6`, `P2-C8`). |
-| `R6 auditability` | **satisfied** — ADR-032 already requires durable traceability for grant creation/refusal; P2P transfer remains separate high-volume traffic (`P2-C7`, `A32-F6`). | **conditional** — the claim/current-eligibility authorization result must be durably recorded as the equivalent grant/refusal decision even though no grant is issued (`P2-C7`). | **conditional** — creation/refusal or evaluation of the parallel authorization must be durably recorded; the exact event list remains ADR-044 open question 6 (`P2-C7`). |
-| `R7 scope discipline` | **satisfied** — D1 can select semantic reuse while leaving grant fields, key contract, routes, and schemas undecided (`P2-C9`). | **satisfied** — D1 can select direct claim/current-eligibility authorization while leaving its API/persistence expression undecided (`P2-C9`). | **satisfied** — D1 can select a parallel concept while leaving its name, schema, API, and lifecycle fields undecided (`P2-C9`). |
-
-#### Exposed tradeoffs, without ranking
-
-| Option | Constraint it makes direct | Tension or cost left visible | Assumption required by a D1 selection |
-|---|---|---|---|
-| `O1 reuse` | Reuses ADR-032's established backend grant and durable grant/refusal observability (`A32-F1`, `A32-F6`). | The accepted grant is coupled to manifest/segment delivery semantics that local P2P does not use (`A32-F3`, `A32-F4`, `P2-C8`). | “Reuse” means reuse of the authorization/grant event only; it does not make local files into ADR-032 segment references. |
-| `O2 bypass` | Keeps ADR-032 entirely scoped to its existing path and makes a current invitation check the direct release gate (`P2-C1`, `P2-C6`). | It has no durable grant object by definition, so current authorization proof, expiry after claim, and equivalent refusal audit must be explicit elsewhere (`P2-C4`, `P2-C7`). | “Bypass” never means bypassing `apps/api`, current eligibility, fail-closed refusal, or durable audit. |
-| `O3 parallel` | Gives P2P audience authorization a concept distinct from both HTTP delivery mechanics and the invitation claim (`P2-C1`, `P2-C6`, `P2-C8`). | It creates a second authorization model whose consistency with invitation state and ADR-032 policy must remain reviewable (`P2-C3`, `P2-C4`, `P2-C7`). | “Parallel” remains backend-owned and cannot become a transport capability or authorize by Hyperdrive-key possession. |
-
-#### Unresolved regardless of option
-
-The matrix intentionally leaves all of these undecided: content-key algorithm,
-envelope format, device-key generation/storage, post-release revocation,
-schemas, routes, fields, tokens, publication/outbox semantics, the complete
-ADR-018 event list, and ADR-044 acceptance (`P2-C9`). No option removes those
-later gates.
-
-There is no winner, recommendation, numeric score, or aggregate rank in this
-matrix.
-
-### S4 owner-selected decision and closure
-
-Status: **complete** (`ADR044-D1-S4`); exact-selection comparison, architectural
-boundary inspection, RRI reproduction, and `make qa-docs` passed on
-2026-09-05.
-
-The owner selected `O3 parallel` with the exact response `03` at D1-OWNER.
-The frozen meaning is a distinct backend-owned audience-authorization concept
-created or evaluated only after a valid invitation claim. That authorization,
-not the claim alone and never possession of a Hyperdrive key or ciphertext,
-gates wrapped-content-key release. ADR-032 remains unchanged and authoritative
-for its existing review-time HTTP HLS path.
-
-This selection does not define the concept's name, persistence model, fields,
-API, token, lifetime, cryptographic algorithm, key envelope, device-key
-storage, publication/outbox behavior, recovery semantics, complete audit-event
-list, or post-release revocation behavior. Those remain inputs to D2-D4 and the
-still-open ADR questions. The complete evidence and selection disposition are
-preserved in
-`docs/audit/mvp0-p2p-adr044-d1-grant-composition.md`.
-
-Formal development Reflection and code-solution review are **n/a**: D1 and
-all leaves are ADR/task-ledger-only work with no source, schema, migration,
-configuration, or runtime behavior change. Integrated closure instead checked
-the selected boundary against every S1/S2 constraint, verified that ADR-032
-was untouched, and retained the parent Med-high approval envelope through S4.
-
-### D1 canonical-document consolidation
-
-Status: **complete** (`ADR044-D1-SYNC`) on 2026-09-05. The repository owner
-requested consolidation after a semantic audit found that the D1 ledger,
-audit, and ADR were current but the slice plan, roadmap, main slice ledger,
-architecture overview, and ADR index still described question 1 only at the
-pre-selection level.
-
-- **Effort/RRI:** S; **17 → Low** (six docs, no runtime behavior or new
-  architecture choice).
-- **Allowed paths:** this ledger, `docs/plan/mvp0-p2p-first.md`,
-  `docs/plan/roadmap.md`, `docs/tasks/mvp0-p2p-first.md`,
-  `docs/architecture.md`, and `docs/adr/README.md`.
-- **Result:** all six documents now state that D1 selected `O3 parallel`, D2
-  is next, ADR-044 remains `Proposed`, questions 2–3 and acceptance still
-  block P2, and no P2 source work is authorized.
-- **Honest Low-band maximization:** `honest-low-max: residual` — further
-  splitting would make the status propagation non-atomic and temporarily
-  contradictory; the coherent task already scores Low.
-- **Review/Reflection:** task-analysis review, code-solution review, and
-  formal development Reflection are `n/a` for docs/ADR/status-only work.
-- **Verification:** semantic cross-document inspection, `make qa-docs`,
-  `git diff --check`, and byte equality of `AGENTS.md`/
-  `AGENTS.override.md` — PASS.
-
-Canonical RRI command:
-
-```bash
-python3 scripts/rri.py \
-  --touches docs/tasks/mvp0-p2p-adr044.md \
-  --touches docs/plan/mvp0-p2p-first.md \
-  --touches docs/plan/roadmap.md \
-  --touches docs/tasks/mvp0-p2p-first.md \
-  --touches docs/architecture.md \
-  --touches docs/adr/README.md \
-  --C 0 --D 1 --K 2 --P 0 --T 0 --A 0 --X 2
+ADR-044 = Proposed
+P2      = NOT AUTHORIZED
+P3      = NOT AUTHORIZED
 ```
-
-## ADR044-D2 — key-envelope closure
-
-- **Status:** `[x] Complete 2026-09-05`; owner selected `K1`.
-- **Parent RRI:** **70 → Complex → Effort L**.
-- **Executable leaves:** S1-S4 RRI 24 Low; S5 RRI 23 Low; SYNC RRI 25 Low.
-- **Evidence:** `docs/audit/mvp0-p2p-adr044-d2-key-envelope.md` and
-  `docs/tasks/mvp0-p2p-adr044-d2.md`.
-- **Selected contract:** AES-256-GCM package encryption, server-wrapped CK,
-  HPKE Base P-256 device envelope, non-exportable Android Keystore private
-  key, no external hardware or StrongBox requirement, fail-closed capability
-  handling, one-viewer/one-active-device MVP scope, bounded revocation, and
-  no silent K2 fallback.
-- **Runtime boundary:** API owns authorization/key release; RN/native owns the
-  opaque private-key operation; Bare receives only transient CK; Availability
-  Node remains ciphertext-only.
-- **STOP condition:** inability to complete HPKE/P-256 against the opaque
-  Android Keystore key without export reopens D2; implementation may not
-  degrade to software private-key custody.
-- **Reflection:** crypto/key custody PASS; binding/expiry/revocation PASS;
-  runtime authority/secret leakage PASS; scope/status PASS.
-- **Result:** ADR-044 question 2 is resolved but ADR-044 remains `Proposed`.
-  D3 publication/outbox state is next. D4 acceptance and P2/P3 source work
-  remain blocked.
