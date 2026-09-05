@@ -25,20 +25,20 @@ slice: MVP0-P2P
 > package; the audience-delivery ADR required by design decision 9 below is
 > drafted as `docs/adr/ADR-044-p2p-audience-delivery-boundary.md`
 > (**Proposed** — D1 grant composition closed on 2026-09-05 with
-> `O3 parallel`; D2 key/device envelope closed on 2026-09-05 with `K1`;
-> D3 publication/outbox semantics is next, and `P2` stays unpresentable until
-> D3 closes and the ADR is accepted).
+> `O3 parallel`; D2 key/device envelope closed with `K1`; D3 publication/outbox
+> semantics closed with `O4`; `ADR044-D4` acceptance is the next gate and `P2`
+> remains unpresentable until the ADR is accepted).
 
 ## Objective
 
 Prove whether the current Expo/React Native client can host a maintainable Bare
 runtime boundary and a bounded P2P replication path. P0 established native
-compatibility; P1 must now establish explicit mobile ownership, reproducible
-worklet packaging, a versioned RPC contract, lifecycle/error handling, and an
-isolated two-runtime proof without freezing spike scaffolding as product
-architecture. Only after that foundation passes may separately approved tasks
-add encrypted publication, invitation access, verified package sync, a local HLS
-gateway, and product UI.
+compatibility; P1 establishes explicit mobile ownership, reproducible worklet
+packaging, a versioned RPC contract, lifecycle/error handling, and an isolated
+two-runtime proof without freezing spike scaffolding as product architecture.
+Only after that foundation and the audience-delivery ADR gates pass may
+separately approved tasks add encrypted publication, invitation access,
+verified package sync, a local HLS gateway, and product UI.
 
 The target product flow is owner upload → existing rights/finalize/S-120 →
 encrypted P2P publication → invitation, and viewer claim → verified local
@@ -75,25 +75,24 @@ package → loopback HLS → the existing `VideoPlayer`.
    product cache or device identity.
 7. Reuse existing authentication, rights/finalize, `StorageAdapter`, S-120 HLS,
    `VideoPlayer`, and mobile navigation seams. New code must not replace them.
-8. `PreparationStatus::Ready` remains the S-120 HLS-readiness signal. A later
-   P2P publication workflow must introduce its own durable status and outbox;
-   it must not delay S-120 readiness or its downstream transcription enqueue.
+8. `PreparationStatus::Ready` remains the S-120 HLS-readiness signal. D3
+   selected a separate durable P2P readiness boundary: PostgreSQL authoritative
+   publication state + transactional outbox, optional queue acceleration, and a
+   PostgreSQL reconciler safety net. P2P publication must not delay S-120 Ready
+   or downstream transcription enqueue.
 9. ADR-032 remains authoritative for present review playback. Before P2P invite
-   delivery can be implemented, an ADR must define the new audience boundary:
-   backend authorization and audit stay authoritative while P2P transports only
-   ciphertext. Drafted as ADR-044 (`Proposed`); question 1 closed on 2026-09-05
-   with `O3 parallel`, and question 2 closed on 2026-09-05 with `K1` (AES-256-GCM
-   package encryption, server-wrapped CK, HPKE P-256 device envelope, non-exportable
-   Android Keystore private key, no external-hardware/StrongBox requirement, and
-   fail-closed capability handling with no silent K2 fallback). Question 3 must
-   still be resolved and the ADR accepted before `P2` may be presented.
+   delivery can be implemented, ADR-044 must be accepted. Its first three
+   architecture questions are resolved: D1 `O3 parallel` authorization, D2 `K1`
+   key/device envelope, and D3 `O4` publication/recovery. D4 acceptance remains
+   the explicit gate before `P2` may be presented.
 10. P2P publication is ciphertext-only. Raw invitation tokens, plaintext content
    keys, JWT signing material, and device private keys must never be persisted or
-   logged. The selected K1 contract is recorded in ADR-044 D2 and
+   logged. The selected K1 contract is recorded in
    `docs/audit/mvp0-p2p-adr044-d2-key-envelope.md`.
 11. The Availability Node, when planned, may seed ciphertext only; it must not
-   receive PostgreSQL, JWT, signing-key, invitation, or plaintext content-key
-   authority.
+   receive PostgreSQL, JWT, signing-key, invitation, business-authorization, or
+   plaintext content-key authority. Under D3/O4 it also never owns product
+   `P2P_READY` state.
 12. The repository owner waived phase-1 and phase-2 peer review only for this
    MVP0-P2P slice on 2026-08-27. The bounded exception and controls that remain
    mandatory are recorded in `docs/audit/mvp0-p2p-review-exception.md`; it does
@@ -105,7 +104,9 @@ package → loopback HLS → the existing `VideoPlayer`.
 ```text
 P0 Bare/RN compatibility (stop/go)
  → P1 maintainable mobile runtime foundation + isolated replication proof
- → ADR + P2 encrypted publication state/outbox
+ → ADR-044 D1 authorization / D2 key envelope / D3 publication contract
+ → ADR044-D4 explicit ADR acceptance
+ → P2 encrypted publication state/outbox
  → P3 invitation/claim and key envelope
  → P4 mobile verified ciphertext sync
  → P5 loopback HLS gateway
@@ -136,9 +137,10 @@ HTTP server, replicate media, or introduce any backend/API/database behavior.
 | `BareRuntimeClient` / one product worklet | P1 establishes reproducible bundle, versioned RPC, fatal and suspend/resume handling | Own mobile P2P engine mechanics behind the service boundary |
 | P1 proof runner | Create isolated seed/client sessions only for explicit Android evidence | Absent from product API and normal startup |
 | `apps/api` / `apps/gateway` | Untouched | Control-plane authorization, descriptors, audit |
-| `apps/worker-runner` / `StorageAdapter` | Untouched | Read prepared HLS, build encrypted package, publish through outbox |
-| PostgreSQL / `crates/db` | Untouched | Publication, invitation, and envelope metadata |
-| Availability Node | Absent | Ciphertext-only seed runtime |
+| `apps/worker-runner` / `StorageAdapter` | Untouched | Read prepared HLS, build encrypted package, publish from durable O4 intent |
+| PostgreSQL / `crates/db` | Untouched | Publication state/outbox, invitation, and envelope metadata |
+| Queue/job seam | Existing coordination seam | Optional O4 acceleration only; never publication authority |
+| Availability Node | Absent | Ciphertext-only seed runtime / publication evidence source |
 
 ## Verification strategy
 
@@ -149,32 +151,41 @@ transient-storage deletion evidence, and an Android seed/client replication
 witness. A digest match is necessary but insufficient unless both runtime
 sessions close and their run-scoped cache paths are verified absent.
 
+Future P2 must additionally prove the D3/O4 crash and idempotency contract:
+lost dispatch, duplicate delivery, unknown remote result, remote-success/ACK-loss,
+and duplicate-after-Ready must converge on one logical package/K1 lineage without
+false readiness.
+
 ## Status artifacts
 
 - `docs/tasks/mvp0-p2p-first.md`
 - this plan
-- `docs/plan/mvp0-p2p-design-inputs.md` — transcribed P2–P7 design inputs
-- `docs/plan/roadmap.md` — synchronized with P1's architecture reapproval gate
-- `docs/architecture.md`, `docs/adr/README.md`, accepted ADR-043, and
-  proposed ADR-044
+- `docs/plan/mvp0-p2p-design-inputs.md`
+- `docs/plan/roadmap.md`
+- `docs/architecture.md`, `docs/adr/README.md`, accepted ADR-043, and proposed ADR-044
+- D1/D2/D3 audit records under `docs/audit/`
 - `p2p-mvp/RUN_STATE.json` and the P0 handoff required by the external package
 
 ## Deferred decisions
 
 Every item below is carried as a numbered decision question in ADR-044
-(`Proposed`), with the phase each one blocks; this list stays here as the
-plan-level index. Resolved items remain listed to preserve the decision trail.
+(`Proposed`), with the phase each one blocks. Resolved items remain listed to
+preserve the decision trail.
 
-- `[x]` P2P audience-delivery ADR and ADR-032 relationship — ADR-044 question
-  1 resolved 2026-09-05 as `O3 parallel`; ADR-032 remains unchanged and a
-  distinct backend-owned authorization gates wrapped-key release.
+- `[x]` P2P audience-delivery ADR and ADR-032 relationship — ADR-044 question 1
+  resolved 2026-09-05 as `O3 parallel`; ADR-032 remains unchanged.
 - `[x]` Content-key algorithm, envelope format, device-key generation/storage,
-  and bounded revocation semantics — ADR-044 question 2 resolved 2026-09-05
-  as `K1`; full contract in `docs/audit/mvp0-p2p-adr044-d2-key-envelope.md`.
+  and bounded revocation semantics — question 2 resolved as `K1`; full contract
+  in `docs/audit/mvp0-p2p-adr044-d2-key-envelope.md`.
+- `[x]` Publication/outbox and recovery semantics — question 3 resolved as `O4`:
+  PostgreSQL + transactional outbox authority, optional queue accelerator,
+  reconciler safety net, same-lineage idempotency, and separate fail-closed
+  `P2P_READY`; full contract in
+  `docs/audit/mvp0-p2p-adr044-d3-publication.md`.
+- ADR-044 acceptance — next closure task `ADR044-D4`; P2 remains blocked until
+  acceptance.
 - Persistent product cache, device identity, sign-out wipe, and background
-  execution requirements beyond P1's transient foreground proof.
-- Publication/outbox schema and recovery semantics — next ADR closure task
-  `ADR044-D3`.
+  execution beyond P1's transient foreground proof.
 - Availability Node deployment, authentication, observability, and operational
   ownership.
 - P2P certification profile that disables legacy HTTP media routes without
