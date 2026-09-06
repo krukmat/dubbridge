@@ -28,20 +28,25 @@ media delivery is disabled during certification. This is not GA.
 
 The base path remains `T6 -> T7`. The P2P release path adds:
 
-- `T6p-a`: freeze Availability Node placement, mTLS identities, versioned KEK,
-  persistent ciphertext volume, health, ports, resources, and secret paths;
-- `T6p-b`: add production Compose/config/private-network wiring after the P2
-  package and Availability Node contracts pass;
-- `T6p-c`: certify the local deployment contract;
-- `T6p-d`: deploy the P2 publication plane and prove a real backend P2P-ready
-  publication on Digital Ocean;
+- `T6p-a`: after `P2.C0 PASS`, freeze only deployment-specific ownership and
+  configuration: Availability Node placement, mTLS identities, versioned KEK,
+  persistent ciphertext volume, health, ports, resources, and secret paths. It
+  consumes the C0 contracts/fixtures; it does not redefine them;
+- `T6p-b`: after stable `P2.T2` and `P2.T3` contract implementations, add
+  production Compose/config/private-network wiring;
+- `T6p-c`: certify the local deployment contract after `T6p-b`;
+- `T6p-d`: after `T6 PASS`, `T6p-c PASS`, and `P2 PASS`, deploy the P2
+  publication plane and prove only backend ciphertext publication plus durable
+  `P2P_READY` on Digital Ocean;
 - `T7p`: build and verify the physical Android owner-to-invited-viewer P2P RC;
 - `T9g`: issue GO/NO-GO only after MVP0-P2P P7 certifies the exact deployed
   revision and RC, required CI is green, and rollback/log/soak evidence exists.
 
 `T6` remains the base HTTP/HLS deployment smoke and is not itself the P2P
-go-live. `T7b`, `T8`, and `T8b` remain optional. X29 is now a release blocker
-for `T7p`/`T9g`, even though it remains accepted residual evidence for P1.
+go-live. `T6p-d` is backend-only and does not demonstrate invited playback;
+that requires P3-P6, `T7p`, P7, and `T9g`. `T7b`, `T8`, and `T8b` remain
+optional. X29 is now a release blocker for `T7p`/`T9g`, even though it remains
+accepted residual evidence for P1.
 
 Target gates: X29 resolved by September 18, P2/backend deployment by October
 12, P3-P6 plus Android RC by October 24, and P7/T9g by October 30. If either
@@ -677,9 +682,12 @@ flowchart LR
     T8 --> T8b
     T8b --> T9
     T3b -.folds into demo if done in time.-> T9
-    T5 --> T6PA["T6p-a P2P production inputs"]
-    T6PA --> T6PB["T6p-b/c P2P descriptor + local evidence"]
-    T6PB --> T6PD["T6p-d DO P2 backend smoke"]
+    C0["P2.C0 PASS"] --> T6PA["T6p-a deployment ownership/config freeze"]
+    T6PA --> P2T23["P2.T2 + P2.T3 stable contract implementation"]
+    P2T23 --> T6PB["T6p-b P2P descriptor"]
+    T6PB --> T6PC["T6p-c local evidence"]
+    T6PC --> T6PD["T6p-d DO ciphertext + durable P2P_READY"]
+    P2PASS["P2 PASS"] --> T6PD
     T6 --> T6PD
     T6PD --> T7P["T7p Android P2P RC"]
     T7 --> T7P

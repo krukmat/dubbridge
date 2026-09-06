@@ -154,15 +154,17 @@ boot, which is architecturally precluded by ADR-026's own localhost/
 local-fs rejection; full image-boot readiness remains T6's scope against
 real DO infrastructure. **T5 (parent) is now closed** — all four children
 (T5a–T5d) done. `T6` (first deploy) is next, unstarted. Deployment-enablement slice: makes the already-closed pipeline publicly runnable on a Digital Ocean droplet; adds no new technology beyond Redis (already in use). Full history incl. gap findings G10–G13: `docs/audit/roadmap-history.md` § S-230. | `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md`, `docs/audit/s-230-t5b-rri.md` |
-| **MVP0-P2P** | P2P-first invited playback: encrypted publication, invite/claim, verified mobile sync, loopback playback, product surface, and no-HTTP-fallback certification | S-120, S-125, S-127, S-160; ADR-043 and ADR-044 Accepted; S-230 P2P deployment/RC gates | 🟡 P0 and P1 closed. P2.T0 PASS; P2.T1a-T1f Done and owner-approved as P2.T1 on 2026-09-06; P2.C0 is next. P3-P7 remain pending. October target: controlled Android P2P beta/POC by 2026-10-30 through S-230 T6p-a..d, T7p, P7, and T9g. X29 is a release blocker for that target. iOS remains deferred. | `docs/plan/mvp0-p2p-first.md`, `docs/tasks/mvp0-p2p-first.md`, `docs/plan/mvp0-p2p-p2-encrypted-publication.md`, `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`, `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md`, `docs/adr/ADR-043-mobile-p2p-runtime-ownership-and-proof-isolation.md`, `docs/adr/ADR-044-p2p-audience-delivery-boundary.md` |
+| **MVP0-P2P** | P2P-first invited playback: encrypted publication, invite/claim, verified mobile sync, loopback playback, product surface, and no-HTTP-fallback certification | S-120, S-125, S-127, S-160; ADR-043 and ADR-044 Accepted; S-230 P2P deployment/RC gates | 🟡 P0 and P1 closed. P2.T0 PASS; P2.T1a-T1f Done and owner-approved as P2.T1; P2.C0 PASS on 2026-09-06. C0 froze `p2p-manifest-v1`, `p2p-aad-v1`, K1 custody, `availability-publication-v1`, P2 audit correlation, and `p2p-ready-descriptor-v1`. P3-P7 remain pending. October target: controlled Android P2P beta/POC by 2026-10-30 through S-230 T6p-a..d, T7p, P7, and T9g. X29 is a release blocker for that target. iOS remains deferred. | `docs/plan/mvp0-p2p-first.md`, `docs/tasks/mvp0-p2p-first.md`, `docs/plan/mvp0-p2p-p2-encrypted-publication.md`, `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`, `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md`, `docs/adr/ADR-043-mobile-p2p-runtime-ownership-and-proof-isolation.md`, `docs/adr/ADR-044-p2p-audience-delivery-boundary.md` |
 
 > **MVP0-P2P / S-230 October update (2026-09-06):** ADR-044 is Accepted;
-> P2.T0 is PASS and P2.T1a-T1f are Done/owner-approved as P2.T1. P2.C0 is the
-> next shared-contract gate. S-230 retains its base deploy path and adds
-> T6p-a..d, T7p, and T9g so the final October P2P go-live depends on the exact
-> deployed publication plane, Android RC, P2-P6 PASS, P7 certification, X29
-> physical-device resolution, and green release CI. The target is a controlled
-> Android beta/POC by 2026-10-30, not GA.
+> P2.T0 is PASS, P2.T1a-T1f are Done/owner-approved as P2.T1, and P2.C0 is
+> PASS. C0 froze the manifest/AAD/K1, Availability Node publication, P2 audit,
+> and P3 ready-descriptor contracts. The deployment sequence is `P2.C0 PASS ->
+> T6p-a -> P2.T2 + P2.T3 stable contract implementation -> T6p-b -> T6p-c ->
+> T6p-d`; `T6p-d` proves backend ciphertext publication plus durable
+> `P2P_READY`, not invited playback. Invited playback requires P3-P6, T7p, P7,
+> and T9g. The final October target is a controlled Android beta/POC by
+> 2026-10-30, not GA.
 >
 > **Historical ADR-044 update (2026-09-05):** D1 grant composition closed with
 > owner-selected `O3 parallel`; D2 key/device envelope closed with owner-selected
@@ -266,8 +268,8 @@ captured above under Governing principles and ADR-025/ADR-026.
 - `S-070` (JWKS / production identity hardening) and `S-170`/`S-180` (human review
   and publication runtime) still need plan/task ledgers before execution.
 - **MVP0-P2P `P3`–`P7`** still need detailed per-phase executable plan files.
-  P2 now has a canonical plan/ledger; T0 is PASS, T1 is Done/owner-approved,
-  and C0 is next. The cross-slice October dependency and release gates are
+  P2 now has a canonical plan/ledger; T0 and C0 are PASS, and T1 is
+  Done/owner-approved. The cross-slice October dependency and release gates are
   recorded in the MVP0-P2P and S-230 plans. The earlier design-input work was
   partially closed 2026-08-28:
   their design inputs are now transcribed into

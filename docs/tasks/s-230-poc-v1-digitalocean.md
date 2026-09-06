@@ -81,10 +81,10 @@ ledger.
 | T5c | Production Compose and TLS reverse proxy | config-only | M (RRI 26 Moderate, recomputed 2026-08-27) | T5b | [x] Done 2026-08-27 — Claude Sonnet 5 direct (owner override); Gemma Reviewer PASS 0 findings both phases; owner-verified |
 | T5d | Local descriptor evidence and aggregate status sync | operational/docs | S (RRI 22 Low, recomputed 2026-08-27) | T5c | [x] Done 2026-08-27 — structural render + fail-closed guard evidence; owner-verified |
 | T6 | First deploy and end-to-end smoke on Digital Ocean | operational | L | T5 | [ ] Planned |
-| T6p-a | Freeze P2P production inputs and ownership | planning/config | TBD exact-path | T5; P2.T0 PASS | [ ] Planned |
-| T6p-b | P2P Compose/config/secrets/private-network wiring | config/ops | TBD exact-path | T6p-a; P2.T3 + P2.T5 contracts PASS | [ ] Planned |
-| T6p-c | Local P2P deployment-contract evidence | operational/evidence | TBD exact-path | T6p-b | [ ] Planned |
-| T6p-d | Deploy P2 publication plane + backend smoke on DO | operational | TBD exact-path | T6; T6p-c; P2 PASS | [ ] Planned |
+| T6p-a | Freeze deployment-specific P2P ownership and configuration | planning/config | TBD exact-path | P2.C0 PASS | [ ] Planned |
+| T6p-b | P2P Compose/config/secrets/private-network wiring | config/ops | TBD exact-path | T6p-a PASS; P2.T2 + P2.T3 stable contract implementation | [ ] Planned |
+| T6p-c | Local P2P deployment-contract evidence | operational/evidence | TBD exact-path | T6p-b PASS | [ ] Planned |
+| T6p-d | Deploy backend ciphertext publication + durable P2P_READY smoke on DO | operational | TBD exact-path | T6 PASS; T6p-c PASS; P2 PASS | [ ] Planned |
 | T7 | Mobile POC build against the deployed backend | development/ops | M | T6 | [ ] Planned |
 | T7p | Physical Android P2P release candidate | development/ops | TBD exact-path | T7; T7c; T6p-d; P3-P6 PASS; X29 resolved | [ ] Planned |
 | T7b | Mobile registration screen | development | M | T7 | [ ] Planned — droppable (first) |
@@ -5073,19 +5073,26 @@ Digital Ocean backend and verify the full flow on a device.
 
 **Status:** [ ] Planned
 
-- **T6p-a — input freeze:** define Availability Node private placement, image
-  version, mTLS identity/rotation, versioned KEK injection/rotation, persistent
-  ciphertext storage, ports, resources, health, secrets, and ownership.
-- **T6p-b — descriptor:** wire the Availability Node and P2 publication
-  components into production Compose/config without exposing the control
-  endpoint publicly.
-- **T6p-c — local evidence:** render and exercise the deployment contract,
-  including fail-closed secret/network checks and persistent-volume behavior.
-- **T6p-d — DO deployment:** deploy the exact P2 plane and demonstrate real
-  `S-120 Ready -> ciphertext package -> Availability Node -> PostgreSQL
-  P2P_READY`, including the no-queue and recovery evidence required by P2.
+- **T6p-a — input freeze (after `P2.C0 PASS`):** freeze only deployment-specific
+  Availability Node placement, image version, mTLS identity/rotation, versioned
+  KEK injection/rotation, persistent ciphertext storage, ports, resources,
+  health, secrets, and ownership. Consume the C0 contracts/fixtures without
+  redefining package, crypto, Availability Node, audit, or ready-descriptor
+  contracts.
+- **T6p-b — descriptor (after stable `P2.T2` and `P2.T3` contract
+  implementations):** wire the Availability Node and P2 publication components
+  into production Compose/config without exposing the control endpoint publicly.
+- **T6p-c — local evidence (after `T6p-b PASS`):** render and exercise the
+  deployment contract, including fail-closed secret/network checks and
+  persistent-volume behavior.
+- **T6p-d — DO deployment (after `T6 PASS`, `T6p-c PASS`, and `P2 PASS`):**
+  deploy the exact P2 plane and demonstrate only `S-120 Ready -> ciphertext
+  package -> Availability Node -> PostgreSQL P2P_READY`, including the no-queue
+  and recovery evidence required by P2.
 
-T6p-d proves backend readiness only. It cannot emit the product go-live claim.
+T6p-d proves backend ciphertext publication and durable `P2P_READY` only. It
+does not demonstrate invited playback or emit the product go-live claim; invited
+playback requires P3-P6, T7p, P7, and T9g.
 Each executable child requires exact paths, `scripts/rri.py`, and its normal
 workflow gate before execution.
 
