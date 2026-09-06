@@ -1,4 +1,4 @@
-// MVP0-P2P P2.T1c: atomic publication + outbox persistence (ADR-044/O4).
+// MVP0-P2P P2.T1c/T1d: atomic persistence + read model (ADR-044/O4).
 use sqlx::PgPool;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -46,6 +46,12 @@ pub struct EnsurePublicationResult {
     pub created: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutstandingPublicationWork {
+    pub publication: P2pPublicationRecord,
+    pub outbox: P2pOutboxRecord,
+}
+
 #[derive(sqlx::FromRow)]
 struct PublicationRow {
     id: Uuid,
@@ -73,6 +79,31 @@ struct OutboxRow {
     last_error: Option<String>,
     created_at: OffsetDateTime,
     updated_at: OffsetDateTime,
+}
+
+#[derive(sqlx::FromRow)]
+struct OutstandingWorkRow {
+    p_id: Uuid,
+    p_asset_id: Uuid,
+    p_lineage_id: Uuid,
+    p_state: String,
+    p_external_publication_id: Option<String>,
+    p_confirmed_lineage_id: Option<Uuid>,
+    p_external_confirmed_at: Option<OffsetDateTime>,
+    p_failure_detail: Option<String>,
+    p_created_at: OffsetDateTime,
+    p_updated_at: OffsetDateTime,
+    o_id: Uuid,
+    o_publication_id: Uuid,
+    o_lineage_id: Uuid,
+    o_delivery_state: String,
+    o_attempt_count: i32,
+    o_available_at: OffsetDateTime,
+    o_claimed_at: Option<OffsetDateTime>,
+    o_delivered_at: Option<OffsetDateTime>,
+    o_last_error: Option<String>,
+    o_created_at: OffsetDateTime,
+    o_updated_at: OffsetDateTime,
 }
 
 fn publication_from_row(row: PublicationRow) -> Result<P2pPublicationRecord, DbError> {
@@ -112,6 +143,38 @@ fn outbox_from_row(row: OutboxRow) -> P2pOutboxRecord {
         created_at: row.created_at,
         updated_at: row.updated_at,
     }
+}
+
+fn outstanding_from_row(row: OutstandingWorkRow) -> Result<OutstandingPublicationWork, DbError> {
+    let publication = publication_from_row(PublicationRow {
+        id: row.p_id,
+        asset_id: row.p_asset_id,
+        lineage_id: row.p_lineage_id,
+        state: row.p_state,
+        external_publication_id: row.p_external_publication_id,
+        confirmed_lineage_id: row.p_confirmed_lineage_id,
+        external_confirmed_at: row.p_external_confirmed_at,
+        failure_detail: row.p_failure_detail,
+        created_at: row.p_created_at,
+        updated_at: row.p_updated_at,
+    })?;
+    let outbox = outbox_from_row(OutboxRow {
+        id: row.o_id,
+        publication_id: row.o_publication_id,
+        lineage_id: row.o_lineage_id,
+        delivery_state: row.o_delivery_state,
+        attempt_count: row.o_attempt_count,
+        available_at: row.o_available_at,
+        claimed_at: row.o_claimed_at,
+        delivered_at: row.o_delivered_at,
+        last_error: row.o_last_error,
+        created_at: row.o_created_at,
+        updated_at: row.o_updated_at,
+    });
+    if publication.id != outbox.publication_id || publication.lineage_id != outbox.lineage_id {
+        return Err(DbError::Conflict);
+    }
+    Ok(OutstandingPublicationWork { publication, outbox })
 }
 
 /// Atomically create (or idempotently ensure) one logical publication and its
@@ -205,4 +268,117 @@ pub async fn ensure_publication_with_outbox(
         outbox: outbox_from_row(outbox_row),
         created,
     })
+}
+
+/// Read one publication by stable logical identity.
+pub async fn get_publication(
+    pool: &PgPool,
+    publication_id: P2pPublicationId,
+) -> Result<Option<P2pPublicationRecord>, DbError> {
+    let row = sqlx::query_as::<_, PublicationRow>(
+        r#"
+        SELECT id, asset_id, lineage_id, state,
+               external_publication_id, confirmed_lineage_id, external_confirmed_at,
+               failure_detail, created_at, updated_at
+          FROM p2p_publications
+         WHERE id = $1
+        "#,
+    )
+    .bind(publication_id.0)
+    .fetch_optional(pool)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    row.map(publication_from_row).transpose()
+}
+
+/// Read the single MVP publication associated with an asset.
+pub async fn get_publication_by_asset(
+    pool: &PgPool,
+    asset_id: AssetId,
+) -> Result<Option<P2pPublicationRecord>, DbError> {
+    let row = sqlx::query_as::<_, PublicationRow>(
+        r#"
+        SELECT id, asset_id, lineage_id, state,
+               external_publication_id, confirmed_lineage_id, external_confirmed_at,
+               failure_detail, created_at, updated_at
+          FROM p2p_publications
+         WHERE asset_id = $1
+        "#,
+    )
+    .bind(asset_id.0)
+    .fetch_optional(pool)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    row.map(publication_from_row).transpose()
+}
+
+/// Read the durable outbox obligation associated with one publication.
+pub async fn get_outbox_for_publication(
+    pool: &PgPool,
+    publication_id: P2pPublicationId,
+) -> Result<Option<P2pOutboxRecord>, DbError> {
+    let row = sqlx::query_as::<_, OutboxRow>(
+        r#"
+        SELECT id, publication_id, lineage_id, delivery_state, attempt_count,
+               available_at, claimed_at, delivered_at, last_error, created_at, updated_at
+          FROM p2p_publication_outbox
+         WHERE publication_id = $1
+        "#,
+    )
+    .bind(publication_id.0)
+    .fetch_optional(pool)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    Ok(row.map(outbox_from_row))
+}
+
+/// Return non-terminal publication obligations that a later T4 worker/reconciler
+/// may inspect. This is intentionally read-only: no claim, lease, retry, queue, or
+/// external side effect is performed here.
+pub async fn list_outstanding_publication_work(
+    pool: &PgPool,
+    limit: i64,
+) -> Result<Vec<OutstandingPublicationWork>, DbError> {
+    let bounded_limit = limit.clamp(1, 1_000);
+    let rows = sqlx::query_as::<_, OutstandingWorkRow>(
+        r#"
+        SELECT
+            p.id AS p_id,
+            p.asset_id AS p_asset_id,
+            p.lineage_id AS p_lineage_id,
+            p.state AS p_state,
+            p.external_publication_id AS p_external_publication_id,
+            p.confirmed_lineage_id AS p_confirmed_lineage_id,
+            p.external_confirmed_at AS p_external_confirmed_at,
+            p.failure_detail AS p_failure_detail,
+            p.created_at AS p_created_at,
+            p.updated_at AS p_updated_at,
+            o.id AS o_id,
+            o.publication_id AS o_publication_id,
+            o.lineage_id AS o_lineage_id,
+            o.delivery_state AS o_delivery_state,
+            o.attempt_count AS o_attempt_count,
+            o.available_at AS o_available_at,
+            o.claimed_at AS o_claimed_at,
+            o.delivered_at AS o_delivered_at,
+            o.last_error AS o_last_error,
+            o.created_at AS o_created_at,
+            o.updated_at AS o_updated_at
+          FROM p2p_publications p
+          JOIN p2p_publication_outbox o ON o.publication_id = p.id
+         WHERE p.state IN ('publish_pending', 'publishing', 'reconciling')
+           AND o.delivery_state <> 'delivered'
+         ORDER BY o.available_at ASC, o.created_at ASC
+         LIMIT $1
+        "#,
+    )
+    .bind(bounded_limit)
+    .fetch_all(pool)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    rows.into_iter().map(outstanding_from_row).collect()
 }
