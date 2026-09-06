@@ -461,7 +461,7 @@ Code-solution review: muse-glimmer (in-session artifact) - PASS
 
 | ID | Objective | Exact writable paths | RRI | Status | Depends on |
 |---|---|---|---|---|---|
-| `T4a` | Pure recovery decision kernel | `crates/domain/src/p2p_recovery.rs`; `crates/domain/src/lib.rs` | RUN BEFORE EXECUTION | Planned | C0 PASS; T1 accepted base |
+| `T4a` | Pure recovery decision kernel | `crates/domain/src/p2p_recovery.rs`; `crates/domain/src/lib.rs` | RRI 29 Moderate | Done 2026-09-07 | C0 PASS; T1 accepted base |
 | `T4b` | Bounded PostgreSQL claim/lease/release | `infra/migrations/0034_add_p2p_publication_claim_leases.sql`; `crates/db/src/p2p_publication_repo.rs` | RUN BEFORE EXECUTION | Planned | T4a |
 | `T4c` | Backend mTLS Availability Node client | `crates/connectors/src/p2p_availability.rs`; `crates/connectors/src/lib.rs`; `crates/connectors/Cargo.toml`; `Cargo.lock` | RUN BEFORE EXECUTION | Planned | T3 contract PASS |
 | `T4d` | PostgreSQL outbox dispatcher | `crates/jobs/src/p2p_publication_job.rs`; `crates/jobs/src/lib.rs`; `crates/jobs/Cargo.toml`; `Cargo.lock` | RUN BEFORE EXECUTION | Planned | T4b; T4c |
@@ -474,6 +474,186 @@ Code-solution review: muse-glimmer (in-session artifact) - PASS
 **EC-T4-2:** duplicate-after-Ready is idempotent; no lineage rotation/regression.
 
 Optional queue acceleration is deferred and requires its own later task/RRI; queue state can never establish readiness.
+
+### P2.T4a closure record — Done 2026-09-07
+
+**RRI 29 Moderate** (`scripts/rri.py --touches crates/domain/src/p2p_recovery.rs
+--touches crates/domain/src/lib.rs --cc 6 --D 2 --K 2 --P 2 --T 2 --A 2 --X 1`,
+`crates/domain` anchor floor D/P/K=2 per `docs/policies/RRI_POLICY.md`).
+Executed autonomously under the owner-delegated authority granted
+2026-09-06 for the absence window (RRI 26+ approval carried by that grant,
+not a per-task waiver).
+
+**Scope delivered:** a new, pure (no IO/clock/crypto/queue) decision-kernel
+module `crates/domain/src/p2p_recovery.rs` — `DispatchOutcome`,
+`DispatchAttempt`, `RecoveryAction` and `decide_recovery_action(state,
+lineage_id, attempt) -> RecoveryAction`, consulting only the caller-supplied
+PostgreSQL-state snapshot and the already-Done `p2p_publication::{K1LineageId,
+PublicationState}` (P2.T1). Priority order: terminal state -> `NoOp`;
+exact-lineage-matched prior success -> `ConfirmReady`; held lease ->
+`WaitForLease`; else retry-budget logic -> `ClaimAndDispatch` / `Retry` /
+`MarkFailed`; a defensive fallback (`Retry`) covers the anomalous
+success-with-mismatched-lineage case so `Ready` is never fabricated without
+proof. Wired into the crate via one `pub mod p2p_recovery;` line in
+`crates/domain/src/lib.rs`. 7 unit tests included.
+
+Task-analysis review: gemma `.agent/local-agent-p2-t4a/phase1-result.json` - PASS
+Code-solution review: gemma `.agent/local-agent-p2-t4a/phase2-result.json` - PASS
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma` (`gemma4:26b-a4b-it-qat`, RRI 26-55 chain primary)
+- Command: `python3 scripts/gemma-code-review.py --model gemma4:26b-a4b-it-qat --num-ctx 65536 --num-predict 8192 --passes 3 --out .agent/local-agent-p2-t4a/phase2-result.json .agent/local-agent-p2-t4a/phase2-packet.txt`
+- Artifact: `.agent/local-agent-p2-t4a/phase2-result.json` (phase 2);
+  `.agent/local-agent-p2-t4a/phase1-result.json` (phase 1)
+- Verdict: `PASS` (phase 1, 0 findings); phase 2 aggregate status `findings`
+  with exactly one low-confidence observation (see below)
+- Findings: phase 2, 3/3 passes usable, 1 `likely_false_positive` /
+  `location_inconsistent` (the same observation reported at three different
+  line numbers across passes — 53, 54, 65 — itself evidence of low
+  confidence), severity `minor`, scope `out-of-scope`, the model's own
+  `suggestion` field reading "None required; logic is sound." It questions
+  whether the `retryable`/`attempts == 0` branch coupling in
+  `decide_recovery_action` is correct; independently re-verified against the
+  acceptance table (HP-T4-1/2, EC-T4-1/2) and the boundary case
+  `attempts == max_attempts` — confirmed correct, no defect.
+- Muse Glimmer fallback: not triggered — reason: Gemma primary usable both phases
+- D14 fallback: not triggered — reason: n/a
+- D14 provider route: n/a
+- disposition_divergence: `none`
+- Primary-agent disposition: 1 finding reviewed and rejected as a
+  non-actionable, self-acknowledged non-issue; 0 findings required a code
+  change.
+
+### Implementation routing evidence
+
+- **Route:** Moderate local-first (`scripts/local-agent/run_local_task.py`,
+  `nemotron-3.5-lightning:30b-a3b-q4_K_M`, disposable worktree
+  `.agent/worktrees/p2-t4a`), per RRI 26-40. The `AGENT_WORKFLOW_GUIDE.md §
+  Bounded cloud-implementation priority` MVP0-P2P exception was evaluated
+  against a live host-memory check (83-84% free, no models loaded) rather
+  than assumed from the exception's stated premise; the premise did not hold
+  at execution time, so local-first was used.
+- **Attempt 1:** the local implementer correctly authored the complete,
+  correct content of the new file `crates/domain/src/p2p_recovery.rs`
+  (accepted unchanged — all 7 tests and the full acceptance table pass) via
+  `write_file`. It then needed one single mechanical edit to the
+  pre-existing `crates/domain/src/lib.rs`: insert `pub mod p2p_recovery;`
+  alongside the crate's other `pub mod` lines. It attempted this via the
+  runner's `apply_patch` (single-unique-anchor replacement) tool, but the
+  anchor became non-unique after its own first insertion succeeded, and each
+  further retry compounded into duplicate-line corruption across 9 failed
+  `apply_patch` calls until the 30-turn budget exhausted
+  (`status: budget_exhausted`, `reason: total_turns_exhausted`) without a
+  `finish` call. Transcript: `.agent/local-agent-p2-t4a/attempt1-transcript.json`.
+- **Orchestrator direct edit (documented tooling-failure exception):** the
+  orchestrator reset `crates/domain/src/lib.rs` to its clean pre-attempt
+  state (`git checkout --` inside the disposable worktree, safe — no other
+  work existed there) and applied the single line the model had already
+  correctly specified: `pub mod p2p_recovery;` after the existing `pub mod
+  p2p_publication;` line. This is the tooling-failure case per
+  `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Post-repair-budget Low-band
+  decomposition` — the model correctly diagnosed and specified the needed
+  change (a one-line mod declaration explicitly named in the task card's own
+  `allowed_paths`), but the wrapper's anchor-based patch mechanism failed to
+  construct a usable diff once its own prior partial success made the anchor
+  non-unique. No logic was authored or altered by the orchestrator; the
+  model's own file content is what ships.
+- **Lesson recorded:** `apply_patch`'s single-unique-anchor contract is
+  unsafe for a one-line insertion into a list of near-identical sibling
+  lines (`pub mod X;`) once a prior attempt has already partially inserted
+  content — a future runner improvement could special-case single-line
+  insertions via an idempotent "insert after last matching prefix" mode
+  instead of anchor-replacement.
+- This does not count against the Moderate 2-attempt whole-task repair
+  budget: attempt 1 produced a fully correct, accepted solution; the
+  tooling-failure exception completed it, it did not repair a defect in the
+  model's own output.
+
+### Reflection log
+
+Required passes: 2 (`29` -> `Moderate`)
+
+#### Pass 1
+
+- **Draft verdict:** `decide_recovery_action` implements the full priority
+  order (terminal -> exact-match confirm -> lease -> retry budget ->
+  defensive fallback) and all 7 tests pass against HP-T4-1, HP-T4-2,
+  EC-T4-1, EC-T4-2, plus the two additional invariants (exact-lineage-match,
+  lease-priority) called out in the design.
+- **Critique findings:** Gemma phase-2's one `likely_false_positive` finding
+  about the `retryable`/`attempts == 0` coupling was checked against the
+  exact boundary case `attempts == max_attempts` (confirmed `MarkFailed`,
+  not an off-by-one) and the `attempts == 0` case with a non-`None` prior
+  outcome (confirmed the function has no invariant to defend there — it is
+  a pure function of its inputs, and caller-side consistency of
+  `DispatchAttempt` is T4b+'s responsibility, not this kernel's). No other
+  issues found: no IO/clock/crypto/queue import anywhere in the module; no
+  branch returns `ConfirmReady` without the exact `Some(lineage_id) ==
+  confirmed_lineage` check; no branch returns non-`NoOp` for a terminal
+  state (checked first, unconditionally).
+- **Revisions applied:** none needed.
+
+#### Pass 2
+
+- **Draft verdict:** unchanged from Pass 1; re-read the module fresh, this
+  time tracing every one of the 6 `RecoveryAction` variants back to at least
+  one test that produces it (`NoOp`: `ec_t4a_2`/`failed_state_is_also_
+  terminal`; `ClaimAndDispatch`: `hp_t4a_1`; `WaitForLease`:
+  `lease_held_wins_over_retry`; `Retry`: `hp_t4a_2`/`ec_t4a_1`
+  (attempt1)/`confirm_ready_requires_lineage_to_match_exactly`'s
+  mismatched-lineage case; `MarkFailed`: `ec_t4a_1` (attempt2);
+  `ConfirmReady`: `confirm_ready_requires_lineage_to_match_exactly`'s
+  matched-lineage case).
+- **Critique findings:** every variant is reachable and tested; no dead
+  branch, no untested variant. Confirmed the module has zero dependencies
+  beyond `crate::p2p_publication` (checked `use` statements) and the crate's
+  own `Cargo.toml` needed no changes (no new dependency). Confirmed `cargo
+  clippy -p dubbridge-domain --all-targets --all-features -- -D warnings`
+  is clean, so no lint-suppressed issue is hiding behind an `#[allow]`.
+- **Revisions applied:** none needed.
+
+### Behavioral coverage certification
+
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| HP-T4-1 | Happy path | a crash-before-dispatch snapshot (no attempt recorded) resumes correctly at the decision-kernel level | unit | `crates/domain/src/p2p_recovery.rs::tests::hp_t4a_1_no_lease_no_prior_attempt_claims_and_dispatches` | passed |
+| HP-T4-2 | Happy path | reconciliation converges from a lease-expired snapshot with no queue reference in the function signature or body | unit | `crates/domain/src/p2p_recovery.rs::tests::hp_t4a_2_reconciler_recovers_without_queue_after_lease_expires` | passed |
+| EC-T4-1 | Edge case | repeated unknown/timeout outcomes retry until the attempt budget is exhausted, then mark failed, never fabricating ready | unit | `crates/domain/src/p2p_recovery.rs::tests::ec_t4a_1_unknown_outcome_is_retried_then_marked_failed_at_budget` | passed |
+| EC-T4-2 | Edge case | a duplicate/late confirmation after `Ready` is an idempotent no-op | unit | `crates/domain/src/p2p_recovery.rs::tests::ec_t4a_2_duplicate_after_ready_is_idempotent_noop` | passed |
+
+These four cases prove the pure decision-kernel logic only, at the unit
+layer — the cheapest layer that genuinely proves this leaf's behavior. Full
+crash/PostgreSQL-persistence integration proof (an actual crash, a real
+claimed lease, a real dispatched job) is out of scope for `T4a` by design
+(`Objective: Pure recovery decision kernel`) and belongs to `T4b`-`T4f`,
+which call this kernel against real persisted state. Two supplemental unit
+tests beyond the four named cases (`failed_state_is_also_terminal_and_
+takes_no_action`, `confirm_ready_requires_lineage_to_match_exactly`) prove
+invariants the design relies on (Failed is terminal like Ready;
+`ConfirmReady` requires an exact lineage match) that are prerequisites for
+EC-T4-2 and HP-T4-1/2 holding under adversarial inputs, not separate
+required cases.
+
+### Owner final verification
+
+- Owner: `Claude Sonnet 5 (orchestrator of record, under owner-delegated
+  autonomous authority granted 2026-09-06 for the absence window)`
+- Date: `2026-09-07`
+- Statement: I verified the decision kernel is pure (no IO/clock/crypto/
+  queue dependency — checked via `use` statements and the module's own doc
+  comment), that all 6 `RecoveryAction` variants are reachable and tested,
+  that the diff to `crates/domain/src/lib.rs` is exactly the one specified
+  `pub mod` line, and that the one Gemma phase-2 finding is a genuine
+  non-issue (self-acknowledged "no suggestion required") rather than a
+  disguised defect, independently re-checked against the
+  `attempts == max_attempts` boundary and the terminal-state short-circuit.
+- Commands run: `cargo fmt -p dubbridge-domain -- --check`; `cargo test -p
+  dubbridge-domain -- p2p_recovery`; `cargo test -p dubbridge-domain`;
+  `cargo clippy -p dubbridge-domain --all-targets --all-features -- -D
+  warnings`
+
+---
 
 ## P2.T5 — S-120 activation + P2P_READY
 
