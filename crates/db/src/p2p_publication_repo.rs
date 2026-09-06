@@ -1,11 +1,13 @@
-// MVP0-P2P P2.T1c/T1d: atomic persistence + read model (ADR-044/O4).
+// MVP0-P2P P2.T1c/T1d/T1e: atomic persistence, read model, guarded transitions (ADR-044/O4).
 use sqlx::PgPool;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
 use dubbridge_domain::{
     asset::AssetId,
-    p2p_publication::{K1LineageId, P2pPublicationId, PublicationState},
+    p2p_publication::{
+        K1LineageId, P2pPublicationId, P2pPublicationLifecycle, PublicationState,
+    },
 };
 
 use crate::error::DbError;
@@ -381,4 +383,133 @@ pub async fn list_outstanding_publication_work(
     .map_err(DbError::QueryFailed)?;
 
     rows.into_iter().map(outstanding_from_row).collect()
+}
+
+/// Persist durable external publication confirmation for this exact lineage.
+/// Repeating the same confirmation is idempotent; conflicting evidence fails closed.
+pub async fn record_external_confirmation(
+    pool: &PgPool,
+    publication_id: P2pPublicationId,
+    lineage_id: K1LineageId,
+    external_publication_id: &str,
+    confirmed_at: OffsetDateTime,
+) -> Result<P2pPublicationRecord, DbError> {
+    if external_publication_id.trim().is_empty() {
+        return Err(DbError::Conflict);
+    }
+
+    let row = sqlx::query_as::<_, PublicationRow>(
+        r#"
+        UPDATE p2p_publications
+           SET external_publication_id = $3,
+               confirmed_lineage_id = $2,
+               external_confirmed_at = COALESCE(external_confirmed_at, $4),
+               updated_at = now()
+         WHERE id = $1
+           AND lineage_id = $2
+           AND state IN ('publishing', 'reconciling')
+           AND (external_publication_id IS NULL OR external_publication_id = $3)
+        RETURNING id, asset_id, lineage_id, state,
+                  external_publication_id, confirmed_lineage_id, external_confirmed_at,
+                  failure_detail, created_at, updated_at
+        "#,
+    )
+    .bind(publication_id.0)
+    .bind(lineage_id.0)
+    .bind(external_publication_id)
+    .bind(confirmed_at)
+    .fetch_optional(pool)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    match row {
+        Some(row) => publication_from_row(row),
+        None => {
+            if get_publication(pool, publication_id).await?.is_none() {
+                Err(DbError::NotFound)
+            } else {
+                Err(DbError::Conflict)
+            }
+        }
+    }
+}
+
+/// Apply one durable lifecycle transition under a row lock, using the pure T1a
+/// state machine as the authoritative transition guard. `Ready` succeeds only
+/// when same-lineage external confirmation is already persisted on the row.
+pub async fn transition_publication_state(
+    pool: &PgPool,
+    publication_id: P2pPublicationId,
+    next: PublicationState,
+    failure_detail: Option<&str>,
+) -> Result<P2pPublicationRecord, DbError> {
+    if next == PublicationState::Failed {
+        if failure_detail.is_none_or(|value| value.trim().is_empty()) {
+            return Err(DbError::Conflict);
+        }
+    } else if failure_detail.is_some() {
+        return Err(DbError::Conflict);
+    }
+
+    let mut tx = pool.begin().await.map_err(DbError::QueryFailed)?;
+    let row = sqlx::query_as::<_, PublicationRow>(
+        r#"
+        SELECT id, asset_id, lineage_id, state,
+               external_publication_id, confirmed_lineage_id, external_confirmed_at,
+               failure_detail, created_at, updated_at
+          FROM p2p_publications
+         WHERE id = $1
+         FOR UPDATE
+        "#,
+    )
+    .bind(publication_id.0)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(DbError::QueryFailed)?
+    .ok_or(DbError::NotFound)?;
+
+    let current_state: PublicationState = row
+        .state
+        .parse()
+        .map_err(|_| DbError::UnknownStoredValue {
+            field: "p2p_publications.state",
+            value: row.state.clone(),
+        })?;
+    let lineage_id = K1LineageId(row.lineage_id);
+    let mut lifecycle = P2pPublicationLifecycle {
+        id: P2pPublicationId(row.id),
+        lineage_id,
+        state: current_state,
+    };
+    let ready_confirmation = if next == PublicationState::Ready {
+        row.confirmed_lineage_id.map(K1LineageId)
+    } else {
+        None
+    };
+
+    lifecycle
+        .transition(next, ready_confirmation)
+        .map_err(|_| DbError::Conflict)?;
+
+    let updated = sqlx::query_as::<_, PublicationRow>(
+        r#"
+        UPDATE p2p_publications
+           SET state = $2,
+               failure_detail = $3,
+               updated_at = now()
+         WHERE id = $1
+        RETURNING id, asset_id, lineage_id, state,
+                  external_publication_id, confirmed_lineage_id, external_confirmed_at,
+                  failure_detail, created_at, updated_at
+        "#,
+    )
+    .bind(publication_id.0)
+    .bind(next.to_string())
+    .bind(failure_detail)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    tx.commit().await.map_err(DbError::QueryFailed)?;
+    publication_from_row(updated)
 }
