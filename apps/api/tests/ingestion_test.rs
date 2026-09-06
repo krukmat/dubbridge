@@ -1829,6 +1829,12 @@ async fn migrate_and_reset(pool: &PgPool) {
         .run(pool)
         .await
         .expect("migrations");
+    sqlx::query(
+        "TRUNCATE TABLE artifact_records, assets, audit_events, pending_ingestions, rights_records RESTART IDENTITY CASCADE",
+    )
+    .execute(pool)
+    .await
+    .expect("truncate ingestion tables");
 }
 
 async fn install_pending_ingestion_insert_failure_trigger(pool: &PgPool) {

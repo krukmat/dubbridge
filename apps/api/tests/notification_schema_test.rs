@@ -10,6 +10,10 @@ async fn setup_pool() -> Option<PgPool> {
         .run(&pool)
         .await
         .expect("migrations");
+    sqlx::query("TRUNCATE TABLE notifications, push_tokens RESTART IDENTITY CASCADE")
+        .execute(&pool)
+        .await
+        .expect("truncate notification schema tables");
     Some(pool)
 }
 

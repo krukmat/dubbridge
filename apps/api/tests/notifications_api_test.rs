@@ -636,6 +636,12 @@ async fn migrate_and_reset(pool: &PgPool) {
         .run(pool)
         .await
         .expect("migrations");
+    sqlx::query(
+        "TRUNCATE TABLE organizations, org_members, projects, project_assets, assets, target_languages, review_tasks, review_decisions, publications, notifications RESTART IDENTITY CASCADE",
+    )
+    .execute(pool)
+    .await
+    .expect("truncate notification tables");
 }
 
 async fn insert_org(pool: &PgPool, org: &Organization) {
