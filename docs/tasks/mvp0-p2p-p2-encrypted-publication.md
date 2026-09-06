@@ -105,7 +105,9 @@ Owner-approved freeze:
 | `T2a-i` | Crate skeleton bootstrap only (workspace member, crate manifest, empty lib doc) | `Cargo.toml`; `crates/p2p/Cargo.toml`; `crates/p2p/src/lib.rs` | **16 Low** | **[x] Done 2026-09-06** | C0 PASS |
 | `T2a-ii` | `p2p-manifest-v1` path/digest contract types | — split into `T2a-ii-1` + `T2a-ii-2` | 29 Moderate (parent, superseded by split) | **SPLIT — no parent execution** | T2a-i |
 | `T2a-ii-1` | Path normalization/validation (`normalize_path`, `sort_paths`) | `crates/p2p/src/path.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | **12 Low** | **[x] Done 2026-09-06** | T2a-i |
-| `T2a-ii-2` | Manifest struct + `p2p-manifest-v1` canonical JSON + digest | `crates/p2p/src/manifest.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | RUN BEFORE EXECUTION | Planned | T2a-ii-1 |
+| `T2a-ii-2` | Manifest struct + `p2p-manifest-v1` canonical JSON + digest + AAD | — split into `T2a-ii-2a` + `T2a-ii-2b` | 29 Moderate (parent, superseded by split) | **SPLIT — no parent execution** | T2a-ii-1 |
+| `T2a-ii-2a` | Manifest struct + `p2p-manifest-v1` canonical JSON + digest | `crates/p2p/src/manifest.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | **14 Low** | **[x] Done 2026-09-06** | T2a-ii-1 |
+| `T2a-ii-2b` | `p2p-aad-v1` AAD builder + canonical JSON | `crates/p2p/src/aad.rs`; `crates/p2p/src/lib.rs` | **14 Low** | Planned | T2a-ii-1 |
 | `T2b` | Prepared-HLS package reader/snapshot | `crates/p2p/src/source.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | RUN BEFORE EXECUTION | Planned | T2a |
 | `T2c` | AES-256-GCM + canonical AAD + nonce invariant | `crates/p2p/src/crypto.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | RUN BEFORE EXECUTION | Planned | T2a |
 | `T2d` | Generate-once CK + versioned KEK wrap/unwrap + zeroization | `crates/p2p/src/key_wrap.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | RUN BEFORE EXECUTION | Planned | T2c |
@@ -290,6 +292,86 @@ Code-solution review: muse-glimmer (in-session artifact) - PASS
   equivalence confirmed by an unchanged test/clippy/fmt result.
 - Commands run: `cargo test -p dubbridge-p2p`; `cargo clippy -p dubbridge-p2p
   --all-features`; `cargo fmt --check`
+
+---
+
+### P2.T2a-ii-2a closure record — Done 2026-09-06
+
+**Honest Low-band split rationale.** Parent `T2a-ii-2` (manifest struct +
+canonical JSON + digest + AAD) scored **RRI 29 Moderate**
+(`--cc 8 --D 2 --K 1 --P 2 --T 1 --A 1 --X 2`). The `p2p-manifest-v1`
+canonical-serialization/digest concern and the `p2p-aad-v1` AAD-builder
+concern are two independent golden fixtures in the same C0 file
+(`manifest` vs. `aad_example`) with independent test vectors — a genuine
+pre-existing seam, split into `T2a-ii-2a` (this leaf, RRI 14 Low,
+`--cc 5 --D 1 --K 1 --P 1 --T 1 --A 0 --X 1`) and `T2a-ii-2b` (AAD, RRI 14
+Low, not yet executed).
+
+**Scope delivered:** `crates/p2p/src/manifest.rs` defining `Manifest` /
+`ManifestFile` with field declaration order matching the frozen
+ASCII-sorted JSON key order (the entire canonicalization mechanism —
+`serde_json::to_string` preserves declaration order and adds no
+whitespace), plus `canonical_json(&Manifest) -> String` and
+`manifest_sha256(&str) -> String` (hand-rolled lowercase hex over
+`sha2::Sha256::digest`). Orchestrator added `serde_json = { workspace =
+true }` and `sha2 = "0.10"` to `crates/p2p/Cargo.toml` and `pub mod
+manifest;` to `lib.rs` directly (mechanical existing-file edits, per the
+`T2a-i` full-file lesson).
+
+**Fixture pre-verification:** before building the delegation packet, the
+orchestrator independently recomputed both `expected_manifest_sha256` and
+the golden canonical string's SHA-256 with Python `hashlib` and confirmed
+they matched the committed fixture — the delegated test therefore asserts
+against a value verified by a second, independent implementation, not
+only the fixture file's own claim.
+
+Task-analysis review: muse-glimmer (in-session artifact) - PASS
+Code-solution review: muse-glimmer (in-session artifact) - PASS
+
+### Gemma Reviewer evidence
+
+- Model: `muse-glimmer:30b-q4_K_M` (RRI 0-25 chain primary)
+- Command: direct Ollama `/api/chat` (`num_ctx=32768`, `think=false`, `temperature=0`)
+- Passes run / usable: `1/1` phase-1 + `1/1` phase-2
+- Aggregate status: `PASS`
+- Consensus findings: `0` | Pass-specific: `0` | Disagreement: `0`
+- Isolated adjudicator: `not triggered`
+- D14 provider route: `n/a`
+- disposition_divergence: `null`
+- Primary-agent disposition: both phases PASS on first packet with 0
+  findings; implementation succeeded on the first delegation attempt with
+  no repair cycle needed.
+
+### Implementation routing evidence
+
+- **Route:** local Qwen delegation (`scripts/delegate-low-rri.py --mode
+  full-file`, `qwen3.8:27b-mlx`), RRI 0-25 Low band, single new file.
+- **Attempt 1:** succeeded outright — 8/8 tests passed (7 existing +1 new)
+  on first compile, including the exact frozen canonical-string and
+  digest assertions. `cargo fmt --check` flagged only line-wrap/
+  trailing-newline formatting (not a finding per policy); `cargo fmt`
+  applied once, re-verified 8/8 still passing afterward. No repair
+  attempt was needed.
+
+### Behavioral coverage certification
+
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| HP-1 | Happy path | manifest serializes to the exact frozen canonical JSON byte sequence | unit | `crates/p2p/src/manifest.rs::tests::test_canonical_json_and_digest` | passed |
+| HP-2 | Happy path | canonical JSON digests to the exact frozen SHA-256 value | unit | `crates/p2p/src/manifest.rs::tests::test_canonical_json_and_digest` | passed |
+
+### Owner final verification
+
+- Owner: `Claude Opus 5 (orchestrator of record, under owner-delegated
+  autonomous authority granted 2026-09-06 for the absence window)`
+- Date: `2026-09-06`
+- Statement: I verified the canonical JSON and digest match the C0-frozen
+  golden fixture exactly, independently re-verified with a second
+  implementation (Python hashlib) before delegation, and that no
+  AES-GCM/key/AAD logic leaked into this leaf.
+- Commands run: `cargo test -p dubbridge-p2p`; `cargo clippy -p dubbridge-p2p
+  --all-features`; `cargo fmt --check`; `python3 -c "... hashlib.sha256 ..."`
+  cross-check against `docs/fixtures/mvp0-p2p-manifest-v1.json`
 
 ---
 
