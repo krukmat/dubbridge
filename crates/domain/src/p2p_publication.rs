@@ -161,11 +161,15 @@ impl P2pPublicationLifecycle {
         }
 
         if next == PublicationState::Ready {
-            let confirmed = confirmed_lineage.ok_or(P2pPublicationError::MissingReadyConfirmation)?;
+            let confirmed =
+                confirmed_lineage.ok_or(P2pPublicationError::MissingReadyConfirmation)?;
             if confirmed != self.lineage_id {
                 return Err(P2pPublicationError::ConfirmationLineageMismatch);
             }
-            if !matches!(self.state, PublicationState::Publishing | PublicationState::Reconciling) {
+            if !matches!(
+                self.state,
+                PublicationState::Publishing | PublicationState::Reconciling
+            ) {
                 return Err(P2pPublicationError::InvalidTransition {
                     from: self.state,
                     to: next,
@@ -264,21 +268,29 @@ mod tests {
     #[test]
     fn ec_t1a_2_terminal_states_do_not_regress() {
         let mut ready = lifecycle();
-        ready.transition(PublicationState::PublishPending, None).unwrap();
-        ready.transition(PublicationState::Publishing, None).unwrap();
+        ready
+            .transition(PublicationState::PublishPending, None)
+            .unwrap();
+        ready
+            .transition(PublicationState::Publishing, None)
+            .unwrap();
         let ready_lineage = ready.lineage_id;
         ready
             .transition(PublicationState::Ready, Some(ready_lineage))
             .unwrap();
-        assert!(ready
-            .transition(PublicationState::Reconciling, None)
-            .is_err());
+        assert!(
+            ready
+                .transition(PublicationState::Reconciling, None)
+                .is_err()
+        );
 
         let mut failed = lifecycle();
         failed.transition(PublicationState::Failed, None).unwrap();
-        assert!(failed
-            .transition(PublicationState::PublishPending, None)
-            .is_err());
+        assert!(
+            failed
+                .transition(PublicationState::PublishPending, None)
+                .is_err()
+        );
     }
 
     #[test]
@@ -308,7 +320,14 @@ mod tests {
             (Reconciling, Publishing),
             (Reconciling, Failed),
         ];
-        let states = [Building, PublishPending, Publishing, Reconciling, Ready, Failed];
+        let states = [
+            Building,
+            PublishPending,
+            Publishing,
+            Reconciling,
+            Ready,
+            Failed,
+        ];
 
         for from in states {
             for to in states {
@@ -334,7 +353,10 @@ mod tests {
             PublicationState::Ready,
             PublicationState::Failed,
         ] {
-            assert_eq!(PublicationState::from_str(&state.to_string()).unwrap(), state);
+            assert_eq!(
+                PublicationState::from_str(&state.to_string()).unwrap(),
+                state
+            );
         }
     }
 }
