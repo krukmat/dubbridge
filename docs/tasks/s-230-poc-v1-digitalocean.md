@@ -5073,6 +5073,10 @@ Digital Ocean backend and verify the full flow on a device.
 
 **Status:** [ ] Planned
 
+**Canonical P2 inputs:** `docs/plan/mvp0-p2p-p2-encrypted-publication.md`,
+`docs/tasks/mvp0-p2p-p2-encrypted-publication.md`, and
+`docs/audit/mvp0-p2p-p2-c0-contract-freeze.md`.
+
 - **T6p-a — input freeze (after `P2.C0 PASS`):** freeze only deployment-specific
   Availability Node placement, image version, mTLS identity/rotation, versioned
   KEK injection/rotation, persistent ciphertext storage, ports, resources,

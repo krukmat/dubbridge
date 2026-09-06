@@ -184,12 +184,13 @@ Optional queue acceleration is deferred and requires its own later task/RRI; que
 
 ## S-230 dependency sync
 
-C0 freezes these cross-slice gates:
+C0 freezes the contracts consumed by these cross-slice gates:
 
-- `S-230-T6p-a` completion requires `S-230-T5 PASS + P2.T0 PASS + P2.C0 PASS`.
-- `S-230-T6p-b` requires `T6p-a PASS + P2.C0 PASS + P2.T3 contract subtree PASS`; it may not redefine package/AN contracts.
-- `S-230-T6p-c` depends on `T6p-b`.
-- `S-230-T6p-d` remains `S-230-T6 PASS + T6p-c PASS + P2 PASS` and proves backend publication only.
+- `S-230-T6p-a` depends on `P2.C0 PASS` and freezes only deployment-specific ownership/configuration. It consumes the existing C0 contracts/fixtures and does not redefine them.
+- `S-230-T6p-b` requires `T6p-a PASS` plus stable `P2.T2` and `P2.T3` contract implementations.
+- `S-230-T6p-c` depends on `T6p-b PASS`.
+- `S-230-T6p-d` depends on `S-230-T6 PASS + T6p-c PASS + P2 PASS` and proves only backend ciphertext publication plus durable `P2P_READY`.
+- Invited playback requires P3-P6, T7p, P7, and T9g; T6p-d does not demonstrate it.
 
 ## Parent closure criteria
 

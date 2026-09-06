@@ -267,12 +267,13 @@ These are calendar workstreams. Source authorship still follows the repository's
 
 ## S-230 October integration
 
-C0 is now an explicit input to the deployment lane:
+C0 is now the frozen contractual input to the deployment lane:
 
-- `S-230-T6p-a` completion requires `S-230-T5 PASS + P2.T0 PASS + P2.C0 PASS`.
-- `T6p-b` cannot begin until `T6p-a PASS`, C0's package contract remains frozen, and the T3 Availability Node contract subtree is PASS/stable.
-- `T6p-c` proves local deployment wiring only.
-- `T6p-d` remains blocked on `S-230-T6 PASS + T6p-c PASS + P2 PASS` and proves backend publication only, not invited Android playback.
+- `S-230-T6p-a` depends on `P2.C0 PASS` and freezes only deployment-specific ownership/configuration. It consumes the C0 contracts/fixtures and does not redefine them.
+- `S-230-T6p-b` requires `T6p-a PASS` plus stable `P2.T2` and `P2.T3` contract implementations.
+- `S-230-T6p-c` depends on `T6p-b PASS` and proves the local deployment contract.
+- `S-230-T6p-d` depends on `S-230-T6 PASS + T6p-c PASS + P2 PASS` and proves only backend ciphertext publication plus durable `P2P_READY`.
+- Invited playback is not part of T6p-d; it requires P3-P6, T7p, P7, and T9g.
 
 ## Gates
 

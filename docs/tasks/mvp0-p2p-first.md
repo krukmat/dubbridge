@@ -12,8 +12,9 @@ plan: docs/plan/mvp0-p2p-first.md
 > **External taskpack:** `p2p-mvp/taskpacks/P0.zip` through `P7.zip`.
 > **Current task:** P0 and P1 are closed. ADR-044 is Accepted. P2.T0 is PASS and
 > P2.T1a-T1f are Done/owner-approved as the completed P2.T1 persistence outcome
-> on 2026-09-06. P2.C0 is the next gate; P2-P7 and S-230 now share the controlled
-> Android P2P go-live target for October 2026. The external package is untracked input, so its
+> on 2026-09-06. P2.C0 is PASS; the next P2 implementation work is P2.T2
+> leaf-by-leaf under the frozen contracts. P2-P7 and S-230 share the controlled
+> Android P2P beta/POC target of 2026-10-30, not GA. The external package is untracked input, so its
 > state/handoff files are evidence but not substitutes for this ledger.
 
 ## Task map
@@ -22,7 +23,7 @@ plan: docs/plan/mvp0-p2p-first.md
 |---|---|---|---|
 | P0 | Bare / Expo / React Native compatibility spike | PASS — Android-only; owner verified 2026-08-27 | — |
 | P1 | Maintainable mobile P2P foundation + replication proof | Done 2026-09-01 | P0 PASS |
-| P2 | Encrypted P2P publication after S-120 | In progress — T0 PASS; T1 Done/owner-approved; C0 next | P1 PASS; ADR-044 Accepted |
+| P2 | Encrypted P2P publication after S-120 | In progress — T0 PASS; T1 Done/owner-approved; C0 PASS; T2 next leaf-by-leaf | P1 PASS; ADR-044 Accepted |
 | P3 | Invite, claim, and content-key envelope | Pending | P2 PASS; accepted ADR-044 / K1 contract |
 | P4 | Mobile package sync and verification | Pending | P3 PASS |
 | P5 | Local HLS gateway + existing VideoPlayer | Pending | P4 PASS |
@@ -172,8 +173,9 @@ and approval cards must be created at activation time.
 
 > **Current P2 gate:** ADR-044 D1-D4 are closed and the ADR is Accepted. The
 > detailed P2 plan/ledger exist; T0 is PASS and T1 is Done/owner-approved.
-> P2.C0 is next and must freeze the shared contract/path boundary before the
-> decomposed T2-T6 implementation workstreams are presented.
+> P2.C0 is PASS and froze the shared contract/path boundary. The decomposed
+> T2-T6 leaves now follow that boundary, beginning with P2.T2 leaf-by-leaf;
+> neither P2.T1 nor C0 is reopened.
 >
 > D1 evidence is in `docs/audit/mvp0-p2p-adr044-d1-grant-composition.md`; D2
 > closure is in `docs/audit/mvp0-p2p-adr044-d2-key-envelope.md`; D3/O4 closure
@@ -202,8 +204,8 @@ and revised approval card: `docs/plan/mvp0-p2p-p1-replication.md`,
 ### P2 — Encrypted P2P publication after S-120
 
 - **Gate / use case:** G2 / CU-01. **Status:** in progress. P1 and ADR-044 gates
-  are satisfied; T0 PASS and T1 Done/owner-approved. `P2.C0` is next, followed
-  by decomposed exact-path T2-T6 gates.
+  are satisfied; T0 PASS, T1 Done/owner-approved, and `P2.C0 PASS`. The next P2
+  work is the decomposed exact-path P2.T2 leaf sequence.
 - **Objective:** turn an S-120-prepared HLS derivative into a ciphertext-only
   P2P package, publish it through the Availability Node, and record durable
   publication state — reusing existing upload/finalize/S-120 without
@@ -336,8 +338,8 @@ and revised approval card: `docs/plan/mvp0-p2p-p1-replication.md`,
 
 ### P7 — End-to-end P2P certification
 
-- **Gate / use case:** G7 / all four CU. **Blocked on:** P2–P6 PASS and a
-  decided certification profile (ADR-044 open question 5).
+- **Gate / use case:** G7 / all four CU. **Blocked on:** P2–P6 PASS and the
+  phase-specific certification profile constrained by Accepted ADR-044.
 - **Objective:** certify the complete owner-to-viewer flow with legacy HTTP
   media delivery disabled, emitting `MVP0_P2P_CERTIFIED` or
   `MVP0_P2P_NOT_CERTIFIED`.

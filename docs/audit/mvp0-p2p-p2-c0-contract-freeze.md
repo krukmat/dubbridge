@@ -295,34 +295,36 @@ Migration numbers `0033`, `0034`, `0035` are reserved by this integration order 
 
 C0 synchronizes the cross-slice contract as follows:
 
+> **Documentation sync (2026-09-06):** this section records the owner-directed
+> downstream S-230 sequence; it does not alter the frozen C0 package,
+> cryptographic, publication, audit, fixture, or path-ownership contracts.
+
 ```text
-P2.T0 PASS + P2.C0 PASS + S-230-T5 PASS
-                  |
-                  v
-             S-230-T6p-a
-     freeze production P2P inputs/ownership
-                  |
-                  v
-             S-230-T6p-b
-      requires frozen package + AN contract
-                  |
-                  v
-             S-230-T6p-c
-                  |
-        S-230-T6 PASS + P2 PASS
-                  |
-                  v
-             S-230-T6p-d
-      backend publication-plane smoke only
+P2.C0 PASS
+     |
+     v
+S-230-T6p-a deployment ownership/config freeze
+     |
+     v
+P2.T2 + P2.T3 stable contract implementation
+     |
+     v
+S-230-T6p-b -> S-230-T6p-c
+                         |
+          S-230-T6 PASS + P2 PASS
+                         |
+                         v
+                    S-230-T6p-d
+       ciphertext publication + durable P2P_READY only
 ```
 
 Exact dependency semantics:
 
-- `T6p-a` may be **planned** while C0 is being prepared, but it cannot close/freeze production P2P inputs until `P2.C0 PASS`; its dependency becomes `S-230-T5; P2.T0 PASS; P2.C0 PASS`.
-- `T6p-b` cannot begin until `T6p-a PASS`, `P2.C0 PASS`, and the implemented Availability Node contract is stable (`P2.T3 contract subtree PASS`). Package layout/crypto serialization are already frozen by C0; deployment wiring may not redefine them.
-- `T6p-c` depends on `T6p-b` and proves deployment contract only.
-- `T6p-d` remains blocked on `S-230-T6 PASS + T6p-c PASS + P2 PASS` and proves **backend publication only**. It does not prove viewer claim/device envelope/mobile playback.
-- `T7p`/`T9g` remain blocked on X29/P3–P7/release requirements already recorded by S-230.
+- `T6p-a` depends on `P2.C0 PASS` and freezes only deployment-specific ownership/configuration. It consumes these C0 contracts/fixtures and does not redefine them.
+- `T6p-b` cannot begin until `T6p-a PASS` plus stable `P2.T2` and `P2.T3` contract implementations. Package layout/crypto serialization remain frozen by C0.
+- `T6p-c` depends on `T6p-b PASS` and proves the local deployment contract only.
+- `T6p-d` depends on `S-230-T6 PASS + T6p-c PASS + P2 PASS` and proves only backend ciphertext publication plus durable `P2P_READY`.
+- Invited playback remains outside T6p-d and requires P3-P6, T7p, P7, and T9g, including the X29/release requirements recorded by S-230.
 
 ## 8. Integration order
 

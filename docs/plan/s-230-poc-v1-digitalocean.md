@@ -802,6 +802,9 @@ not, `T9` records the exact partial state.
 ## Related
 
 - `docs/tasks/s-230-poc-v1-digitalocean.md` — task ledger
+- `docs/plan/mvp0-p2p-p2-encrypted-publication.md` — canonical P2 implementation plan and T6p integration gates
+- `docs/tasks/mvp0-p2p-p2-encrypted-publication.md` — C0-frozen P2.T2-T6 leaf map and dependencies
+- `docs/audit/mvp0-p2p-p2-c0-contract-freeze.md` — frozen contracts/fixtures consumed by T6p-a; not redefined by S-230
 - `docs/plan/roadmap.md` — S-030 Phase 3, X9, X21
 - `docs/adr/ADR-026-layered-fail-closed-configuration-and-environment-separation.md`
 - `docs/adr/ADR-006-postgres-metadata-object-storage-binaries.md`

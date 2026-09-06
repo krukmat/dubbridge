@@ -9,7 +9,7 @@ slice: MVP0-P2P
 
 > **Task ledger:** `docs/tasks/mvp0-p2p-first.md`.
 > **External input:** `p2p-mvp/` (integrity verified against its package manifest).
-> **Status:** P0 is closed PASS. P1 is closed Done (2026-09-01) with its device-proof residual tracked in X29. ADR-043 and ADR-044 are Accepted. `P2.T0` is PASS with `AN-R1 + AN-A1`; `P2.T1a`-`P2.T1f` are **Done and owner-approved as P2.T1** (2026-09-06). The next P2 gate is the shared `P2.C0` contract freeze, followed by decomposed T2-T6 work. The October target is a controlled Android P2P product demonstration deployed through S-230, not GA.
+> **Status:** P0 is closed PASS. P1 is closed Done (2026-09-01) with its device-proof residual tracked in X29. ADR-043 and ADR-044 are Accepted. `P2.T0` is PASS with `AN-R1 + AN-A1`; `P2.T1a`-`P2.T1f` are **Done and owner-approved as P2.T1** (2026-09-06); and `P2.C0` is **PASS** (2026-09-06). The next P2 implementation work is P2.T2 leaf-by-leaf under the C0-frozen contracts. The October target is a controlled Android P2P beta/POC deployed through S-230 by 2026-10-30, not GA.
 > iPhone/iOS support remains deferred by the repository owner.
 
 ## Objective
@@ -55,8 +55,8 @@ P0 Bare/RN compatibility                         ✅
  -> ADR-044 D1/D2/D3/D4                         ✅ Accepted
  -> P2.T0 Availability Node/O4 contract          ✅ AN-R1 + AN-A1
  -> P2.T1 durable publication + outbox           ✅ Done / owner-approved
- -> P2.C0 shared publication contract freeze     ⏭ next gate
- -> P2.T2-T6 encrypted publication               decomposed execution after C0
+ -> P2.C0 shared publication contract freeze     ✅ PASS
+ -> P2.T2-T6 encrypted publication               decomposed leaf execution under C0
  -> P3 invitation/claim + K1 envelope
  -> P4 verified mobile ciphertext sync
  -> P5 loopback HLS gateway
@@ -82,7 +82,7 @@ P2 is no longer blocked on ADR acceptance. The activated artifacts are:
 - `docs/audit/mvp0-p2p-p2-t0-approval-card.md`
 - `docs/audit/mvp0-p2p-p2-t0-selection.md`
 
-The unreduced P2 phase is RRI 131 Excessive and cannot execute directly. T0 and T1 are complete. `P2.C0` is the next planning/contract gate; it freezes the package, crypto, Availability Node, audit, and path-ownership interfaces needed to avoid conflicting downstream implementations.
+The unreduced P2 phase is RRI 131 Excessive and cannot execute directly. T0 and T1 are complete, and `P2.C0` passed on 2026-09-06. C0 froze `p2p-manifest-v1`, `p2p-aad-v1`, K1 custody, `availability-publication-v1`, P2 audit correlation, `p2p-ready-descriptor-v1`, golden fixtures, and exact T2-T6 path ownership. The canonical contract and leaf map are in `docs/audit/mvp0-p2p-p2-c0-contract-freeze.md` and `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`; P2.T2 now proceeds leaf-by-leaf without reopening C0 or P2.T1.
 
 ## October 2026 release profile and S-230 dependency
 
@@ -90,15 +90,17 @@ The October goal is a controlled Android beta/POC for one owner, one invited vie
 
 S-230 may deploy and validate its existing base platform independently. Its **P2P go-live decision**, however, depends on the deployed P2P publication plane, an Android P2P release candidate, P2-P6 PASS, and P7 certification against the exact release artifact. P2 alone proves backend publication; it does not prove invited playback.
 
+The cross-slice deployment order is `P2.C0 PASS -> S-230-T6p-a -> P2.T2 + P2.T3 stable contract implementation -> S-230-T6p-b -> S-230-T6p-c -> S-230-T6p-d`. T6p-a freezes only deployment-specific ownership/configuration and consumes C0 contracts/fixtures without redefining them. T6p-d proves only backend ciphertext publication plus durable `P2P_READY`; invited playback still requires P3-P6, T7p, P7, and T9g.
+
 The October release does not include iOS, multi-device, email delivery, offline/background operation, progressive streaming, performance certification, TTS/dubbed audio, or managed deployment automation. `S-230-T7b`, `T8`, and `T8b` remain optional unless explicitly selected for demo polish.
 
 ### Calendar target
 
 | Window | Required outcome |
 |---|---|
-| Sep 6-10 | Record T1 Done, freeze the controlled-demo profile, approve `P2.C0`, and promote X29 to an October release blocker |
-| Sep 11-18 | Freeze shared contracts; prepare independent K1, Availability Node, recovery, audit/test, S-230 P2P-infrastructure, and P3-P7 planning workstreams |
-| Sep 19-Oct 2 | Implement and integrate P2 T2-T5 workstreams; prepare the S-230 P2P deployment descriptor |
+| Sep 6-10 | Record T1 Done and `P2.C0 PASS`, freeze the controlled-demo profile and T6p-a deployment-specific inputs, and promote X29 to an October release blocker |
+| Sep 11-18 | Implement the C0-frozen P2.T2 and P2.T3 contract leaves; prepare recovery, audit/test, and P3-P7 planning workstreams |
+| Sep 19-Oct 2 | Stabilize P2.T2/P2.T3, execute T6p-b/T6p-c, and implement/integrate the remaining P2 T4-T5 workstreams |
 | Oct 3-12 | Close P2 certification and demonstrate/deploy the backend publication path on Digital Ocean |
 | Oct 13-24 | Complete P3-P6 joins and the physical Android P2P release candidate |
 | Oct 25-30 | Run P7 on the exact deployed artifacts, soak/rollback checks, and the S-230 P2P GO/NO-GO |
@@ -107,7 +109,7 @@ If physical Android proof is not available by September 18, or P2 is not PASS by
 
 ## Parallel execution policy
 
-Planning, interface definition, test design, and evidence preparation may run concurrently. After `P2.C0`, the K1 builder, Availability Node, recovery kernel/client, S-120 characterization, and audit/test harness are designed as disjoint workstreams with explicit joins.
+Planning, interface definition, test design, and evidence preparation may run concurrently. With `P2.C0 PASS`, the K1 builder, Availability Node, recovery kernel/client, S-120 characterization, and audit/test harness are designed as disjoint workstreams with explicit joins.
 
 The current repository workflow still executes one approved task ID at a time. Multiple agents may write source within one approved RRI 26-55 task only when ADR-040's split-authorship conditions are met: one orchestrator, a common base SHA, frozen interfaces, disjoint path ownership, one writer per path, and whole-task integration/verification. Running separate executable task IDs concurrently requires a separately accepted workflow amendment; this plan does not assume one.
 
@@ -131,7 +133,7 @@ P2 must prove accepted O4 failure semantics rather than only the happy path: los
 
 ## Remaining phase-specific decisions
 
-- **P2.C0 / T2-T6:** C0 freezes shared contracts and ownership; large parents must be decomposed into exact-path leaves before execution.
+- **P2.T2-T6:** C0 has frozen shared contracts and ownership; the decomposed exact-path leaves execute independently under those contracts.
 - **P4:** persistent product cache/device lifecycle, sign-out wipe, and background execution beyond P1 transient proof.
 - **P7:** certification profile that disables legacy HTTP media routes without disabling control-plane APIs.
 
