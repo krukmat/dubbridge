@@ -1,13 +1,11 @@
 // MVP0-P2P P2.T1c/T1d/T1e: atomic persistence, read model, guarded transitions (ADR-044/O4).
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, Transaction};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
 use dubbridge_domain::{
     asset::AssetId,
-    p2p_publication::{
-        K1LineageId, P2pPublicationId, P2pPublicationLifecycle, PublicationState,
-    },
+    p2p_publication::{K1LineageId, P2pPublicationId, P2pPublicationLifecycle, PublicationState},
 };
 
 use crate::error::DbError;
@@ -109,13 +107,10 @@ struct OutstandingWorkRow {
 }
 
 fn publication_from_row(row: PublicationRow) -> Result<P2pPublicationRecord, DbError> {
-    let state = row
-        .state
-        .parse()
-        .map_err(|_| DbError::UnknownStoredValue {
-            field: "p2p_publications.state",
-            value: row.state.clone(),
-        })?;
+    let state = row.state.parse().map_err(|_| DbError::UnknownStoredValue {
+        field: "p2p_publications.state",
+        value: row.state.clone(),
+    })?;
 
     Ok(P2pPublicationRecord {
         id: P2pPublicationId(row.id),
@@ -176,7 +171,97 @@ fn outstanding_from_row(row: OutstandingWorkRow) -> Result<OutstandingPublicatio
     if publication.id != outbox.publication_id || publication.lineage_id != outbox.lineage_id {
         return Err(DbError::Conflict);
     }
-    Ok(OutstandingPublicationWork { publication, outbox })
+    Ok(OutstandingPublicationWork {
+        publication,
+        outbox,
+    })
+}
+
+async fn insert_or_lock_publication(
+    tx: &mut Transaction<'_, Postgres>,
+    asset_id: AssetId,
+    publication_id: P2pPublicationId,
+    lineage_id: K1LineageId,
+) -> Result<(PublicationRow, bool), DbError> {
+    let inserted = sqlx::query_as::<_, PublicationRow>(
+        r#"
+        INSERT INTO p2p_publications (id, asset_id, lineage_id, state)
+        VALUES ($1, $2, $3, 'building')
+        ON CONFLICT (asset_id) DO NOTHING
+        RETURNING id, asset_id, lineage_id, state,
+                  external_publication_id, confirmed_lineage_id, external_confirmed_at,
+                  failure_detail, created_at, updated_at
+        "#,
+    )
+    .bind(publication_id.0)
+    .bind(asset_id.0)
+    .bind(lineage_id.0)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    let created = inserted.is_some();
+    let row = match inserted {
+        Some(row) => row,
+        None => sqlx::query_as::<_, PublicationRow>(
+            r#"
+            SELECT id, asset_id, lineage_id, state,
+                   external_publication_id, confirmed_lineage_id, external_confirmed_at,
+                   failure_detail, created_at, updated_at
+              FROM p2p_publications
+             WHERE asset_id = $1
+             FOR UPDATE
+            "#,
+        )
+        .bind(asset_id.0)
+        .fetch_one(&mut **tx)
+        .await
+        .map_err(DbError::QueryFailed)?,
+    };
+
+    if row.lineage_id != lineage_id.0 {
+        return Err(DbError::Conflict);
+    }
+    Ok((row, created))
+}
+
+async fn ensure_outbox_row(
+    tx: &mut Transaction<'_, Postgres>,
+    publication_id: Uuid,
+    lineage_id: Uuid,
+    outbox_id: Uuid,
+) -> Result<OutboxRow, DbError> {
+    sqlx::query(
+        r#"
+        INSERT INTO p2p_publication_outbox (id, publication_id, lineage_id)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (publication_id) DO NOTHING
+        "#,
+    )
+    .bind(outbox_id)
+    .bind(publication_id)
+    .bind(lineage_id)
+    .execute(&mut **tx)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    let row = sqlx::query_as::<_, OutboxRow>(
+        r#"
+        SELECT id, publication_id, lineage_id, delivery_state, attempt_count,
+               available_at, claimed_at, delivered_at, last_error, created_at, updated_at
+          FROM p2p_publication_outbox
+         WHERE publication_id = $1
+        "#,
+    )
+    .bind(publication_id)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    if row.lineage_id != lineage_id {
+        return Err(DbError::Conflict);
+    }
+    Ok(row)
 }
 
 /// Atomically create (or idempotently ensure) one logical publication and its
@@ -191,78 +276,15 @@ pub async fn ensure_publication_with_outbox(
     outbox_id: Uuid,
 ) -> Result<EnsurePublicationResult, DbError> {
     let mut tx = pool.begin().await.map_err(DbError::QueryFailed)?;
-
-    let inserted = sqlx::query_as::<_, PublicationRow>(
-        r#"
-        INSERT INTO p2p_publications (id, asset_id, lineage_id, state)
-        VALUES ($1, $2, $3, 'building')
-        ON CONFLICT (asset_id) DO NOTHING
-        RETURNING id, asset_id, lineage_id, state,
-                  external_publication_id, confirmed_lineage_id, external_confirmed_at,
-                  failure_detail, created_at, updated_at
-        "#,
+    let (publication_row, created) =
+        insert_or_lock_publication(&mut tx, asset_id, publication_id, lineage_id).await?;
+    let outbox_row = ensure_outbox_row(
+        &mut tx,
+        publication_row.id,
+        publication_row.lineage_id,
+        outbox_id,
     )
-    .bind(publication_id.0)
-    .bind(asset_id.0)
-    .bind(lineage_id.0)
-    .fetch_optional(&mut *tx)
-    .await
-    .map_err(DbError::QueryFailed)?;
-
-    let created = inserted.is_some();
-    let publication_row = match inserted {
-        Some(row) => row,
-        None => sqlx::query_as::<_, PublicationRow>(
-            r#"
-            SELECT id, asset_id, lineage_id, state,
-                   external_publication_id, confirmed_lineage_id, external_confirmed_at,
-                   failure_detail, created_at, updated_at
-              FROM p2p_publications
-             WHERE asset_id = $1
-             FOR UPDATE
-            "#,
-        )
-        .bind(asset_id.0)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(DbError::QueryFailed)?,
-    };
-
-    if publication_row.lineage_id != lineage_id.0 {
-        return Err(DbError::Conflict);
-    }
-
-    sqlx::query(
-        r#"
-        INSERT INTO p2p_publication_outbox (id, publication_id, lineage_id)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (publication_id) DO NOTHING
-        "#,
-    )
-    .bind(outbox_id)
-    .bind(publication_row.id)
-    .bind(publication_row.lineage_id)
-    .execute(&mut *tx)
-    .await
-    .map_err(DbError::QueryFailed)?;
-
-    let outbox_row = sqlx::query_as::<_, OutboxRow>(
-        r#"
-        SELECT id, publication_id, lineage_id, delivery_state, attempt_count,
-               available_at, claimed_at, delivered_at, last_error, created_at, updated_at
-          FROM p2p_publication_outbox
-         WHERE publication_id = $1
-        "#,
-    )
-    .bind(publication_row.id)
-    .fetch_one(&mut *tx)
-    .await
-    .map_err(DbError::QueryFailed)?;
-
-    if outbox_row.lineage_id != publication_row.lineage_id {
-        return Err(DbError::Conflict);
-    }
-
+    .await?;
     tx.commit().await.map_err(DbError::QueryFailed)?;
 
     Ok(EnsurePublicationResult {
@@ -468,10 +490,8 @@ pub async fn transition_publication_state(
     .map_err(DbError::QueryFailed)?
     .ok_or(DbError::NotFound)?;
 
-    let current_state: PublicationState = row
-        .state
-        .parse()
-        .map_err(|_| DbError::UnknownStoredValue {
+    let current_state: PublicationState =
+        row.state.parse().map_err(|_| DbError::UnknownStoredValue {
             field: "p2p_publications.state",
             value: row.state.clone(),
         })?;
