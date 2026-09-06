@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: "Plan: S-230 — POC v1 deployment (Digital Ocean)"
-status: planned
+status: in_progress
 slice: S-230
 ---
 # Plan: S-230 — POC v1 deployment (Digital Ocean)
@@ -13,8 +13,40 @@ preparation, ASR, subtitles, human review, publication, in-app playback — and
 make it a running, publicly reachable POC on Digital Ocean within a 10-day
 window, without adding any technology the repository does not already depend on.
 
-This slice is a **deployment-enablement slice**, not a product slice. Every task
-exists because something concrete blocks a real deploy today.
+This slice is a deployment-enablement slice. By owner amendment on 2026-09-06,
+its final October go-live also supports the MVP0-P2P product demonstration.
+The base deployment remains independently useful, but S-230 cannot claim the
+P2P go-live until the exact deployed backend and Android release candidate pass
+MVP0-P2P P7 certification.
+
+## October 2026 P2P go-live amendment
+
+The release target is a controlled Android beta/POC: one owner uploads a short
+video, one invited viewer claims it, fully syncs and verifies the encrypted
+package, and plays it through the loopback gateway. Legacy HTTP/S3 audience
+media delivery is disabled during certification. This is not GA.
+
+The base path remains `T6 -> T7`. The P2P release path adds:
+
+- `T6p-a`: freeze Availability Node placement, mTLS identities, versioned KEK,
+  persistent ciphertext volume, health, ports, resources, and secret paths;
+- `T6p-b`: add production Compose/config/private-network wiring after the P2
+  package and Availability Node contracts pass;
+- `T6p-c`: certify the local deployment contract;
+- `T6p-d`: deploy the P2 publication plane and prove a real backend P2P-ready
+  publication on Digital Ocean;
+- `T7p`: build and verify the physical Android owner-to-invited-viewer P2P RC;
+- `T9g`: issue GO/NO-GO only after MVP0-P2P P7 certifies the exact deployed
+  revision and RC, required CI is green, and rollback/log/soak evidence exists.
+
+`T6` remains the base HTTP/HLS deployment smoke and is not itself the P2P
+go-live. `T7b`, `T8`, and `T8b` remain optional. X29 is now a release blocker
+for `T7p`/`T9g`, even though it remains accepted residual evidence for P1.
+
+Target gates: X29 resolved by September 18, P2/backend deployment by October
+12, P3-P6 plus Android RC by October 24, and P7/T9g by October 30. If either
+the Android gate or P2 date is missed, October may expose the base S-230 POC
+and a labeled backend preview, but must not claim invited P2P playback.
 
 ## Scope decision (owner, 2026-08-16)
 
@@ -645,6 +677,15 @@ flowchart LR
     T8 --> T8b
     T8b --> T9
     T3b -.folds into demo if done in time.-> T9
+    T5 --> T6PA["T6p-a P2P production inputs"]
+    T6PA --> T6PB["T6p-b/c P2P descriptor + local evidence"]
+    T6PB --> T6PD["T6p-d DO P2 backend smoke"]
+    T6 --> T6PD
+    T6PD --> T7P["T7p Android P2P RC"]
+    T7 --> T7P
+    T7P --> P7["MVP0-P2P P7 exact-artifact certification"]
+    P7 --> T9G["T9g October GO/NO-GO"]
+    T9G --> T9
 ```
 
 The three dotted `T3b -.if done...->` edges into `T4a`–`T4o`/`T5`/`T6` are

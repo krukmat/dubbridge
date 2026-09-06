@@ -1,7 +1,7 @@
 ---
 type: TaskList
 title: "S-230 POC v1 Deployment (Digital Ocean)"
-status: planned
+status: in_progress
 slice: S-230
 plan: docs/plan/s-230-poc-v1-digitalocean.md
 ---
@@ -81,12 +81,18 @@ ledger.
 | T5c | Production Compose and TLS reverse proxy | config-only | M (RRI 26 Moderate, recomputed 2026-08-27) | T5b | [x] Done 2026-08-27 — Claude Sonnet 5 direct (owner override); Gemma Reviewer PASS 0 findings both phases; owner-verified |
 | T5d | Local descriptor evidence and aggregate status sync | operational/docs | S (RRI 22 Low, recomputed 2026-08-27) | T5c | [x] Done 2026-08-27 — structural render + fail-closed guard evidence; owner-verified |
 | T6 | First deploy and end-to-end smoke on Digital Ocean | operational | L | T5 | [ ] Planned |
+| T6p-a | Freeze P2P production inputs and ownership | planning/config | TBD exact-path | T5; P2.T0 PASS | [ ] Planned |
+| T6p-b | P2P Compose/config/secrets/private-network wiring | config/ops | TBD exact-path | T6p-a; P2.T3 + P2.T5 contracts PASS | [ ] Planned |
+| T6p-c | Local P2P deployment-contract evidence | operational/evidence | TBD exact-path | T6p-b | [ ] Planned |
+| T6p-d | Deploy P2 publication plane + backend smoke on DO | operational | TBD exact-path | T6; T6p-c; P2 PASS | [ ] Planned |
 | T7 | Mobile POC build against the deployed backend | development/ops | M | T6 | [ ] Planned |
+| T7p | Physical Android P2P release candidate | development/ops | TBD exact-path | T7; T7c; T6p-d; P3-P6 PASS; X29 resolved | [ ] Planned |
 | T7b | Mobile registration screen | development | M | T7 | [ ] Planned — droppable (first) |
 | T7c | Session lifetime and expiry behavior | development/config | S | T7 | [ ] Planned |
 | T8 | Subtitle visible in the review surface (optional) | development | M | T6 | [ ] Planned — droppable (second) |
 | T8b | Translated subtitle visible in the review surface | development | M | T3b, T8 | [ ] Planned — double-conditional |
-| T9 | Status, README, and debt-register closeout | docs-only | S | T7, plus each of T7b / T7c / T8 / T8b / T3b that was executed | [ ] Planned |
+| T9g | October P2P GO/NO-GO | operational/decision | S | T6p-d; T7p; P7 PASS; X28 closed; release CI green | [ ] Planned |
+| T9 | Status, README, and debt-register closeout | docs-only | S | T9g GO, plus each optional task executed | [ ] Planned |
 
 ---
 
@@ -4266,7 +4272,7 @@ for this docs-only closeout; do not alter implementation files or start T5.
 **Effort:** XL — RRI 71 High
 **Depends on:** S-230-T4q (which closes the S-230-T4 parent)
 **Status:** Approved 2026-08-24 — non-executable parent; 🟡 in progress —
-T5a Done 2026-08-26, T5b Done 2026-08-27; T5c and T5d remain (T5c unblocked,
+T5a Done 2026-08-26, T5b Done 2026-08-27; T5c and T5d are also Done,
 T5d transitively blocked on T5c via its `Depends on` chain).
 
 **Parent approval:** owner `matias` approved the RRI 71 parent and mandatory
@@ -4972,7 +4978,7 @@ itself did not move: this task only ran validation.
 **Type:** operational
 **Effort:** L (operational; RRI expected well below the effort impression)
 **Depends on:** S-230-T5
-**Status:** [ ] Planned
+**Status:** [ ] Planned — base platform smoke; not the P2P go-live
 
 **Acceptance criteria:**
 
@@ -5058,6 +5064,46 @@ walkthrough evidence, distribution instructions.
 Digital Ocean backend and verify the full flow on a device.
 
 **Stop condition:** Stop after the device walkthrough. Do not start T8.
+
+---
+
+## S-230-T6p: P2P production-plane deployment
+
+**Type:** non-executable parent over T6p-a through T6p-d
+
+**Status:** [ ] Planned
+
+- **T6p-a — input freeze:** define Availability Node private placement, image
+  version, mTLS identity/rotation, versioned KEK injection/rotation, persistent
+  ciphertext storage, ports, resources, health, secrets, and ownership.
+- **T6p-b — descriptor:** wire the Availability Node and P2 publication
+  components into production Compose/config without exposing the control
+  endpoint publicly.
+- **T6p-c — local evidence:** render and exercise the deployment contract,
+  including fail-closed secret/network checks and persistent-volume behavior.
+- **T6p-d — DO deployment:** deploy the exact P2 plane and demonstrate real
+  `S-120 Ready -> ciphertext package -> Availability Node -> PostgreSQL
+  P2P_READY`, including the no-queue and recovery evidence required by P2.
+
+T6p-d proves backend readiness only. It cannot emit the product go-live claim.
+Each executable child requires exact paths, `scripts/rri.py`, and its normal
+workflow gate before execution.
+
+---
+
+## S-230-T7p: Physical Android P2P release candidate
+
+**Type:** development/operational
+
+**Depends on:** S-230-T7, S-230-T7c, S-230-T6p-d, MVP0-P2P P3-P6 PASS, X29 resolved
+
+**Status:** [ ] Planned
+
+Build the exact Android RC and prove on physical hardware the owner upload to
+invite, viewer claim, full ciphertext sync, manifest verification, and loopback
+playback path. No legacy HTTP/S3 audience-media fallback may be compiled or
+observed in the certification profile. Emit the exact commit, build artifact,
+device/runtime evidence, and installation instructions consumed by P7.
 
 ---
 
@@ -5377,12 +5423,28 @@ or migrations.
 
 ---
 
+## S-230-T9g: October P2P GO/NO-GO
+
+**Type:** operational/decision
+
+**Depends on:** S-230-T6p-d, S-230-T7p, MVP0-P2P P7 PASS, X28 closed, required CI green on the exact release commit
+
+**Status:** [ ] Planned
+
+Issue GO only when P7 certifies the deployed revision and Android RC, X29 is
+resolved, rollback and log access are rehearsed, required security/secret
+checks pass, and the controlled soak has no release-blocking finding. Otherwise
+record NO-GO and expose only the base S-230 POC and/or a labeled backend P2P
+preview; never downgrade the ciphertext-only, same-lineage, fail-closed Ready,
+mTLS, audit, or no-fallback requirements.
+
+---
+
 ## S-230-T9: Status, README, and debt-register closeout
 
 **Type:** docs-only
 **Effort:** S
-**Depends on:** S-230-T7, and whichever of S-230-T7b / S-230-T7c / S-230-T8 /
-S-230-T8b / T3b were executed rather than dropped
+**Depends on:** S-230-T9g GO, and whichever optional tasks were executed
 **Status:** [ ] Planned
 
 **Acceptance criteria:**

@@ -10,12 +10,10 @@ plan: docs/plan/mvp0-p2p-first.md
 
 > **Plan:** `docs/plan/mvp0-p2p-first.md`.
 > **External taskpack:** `p2p-mvp/taskpacks/P0.zip` through `P7.zip`.
-> **Current task:** P0 is closed. P1 was materially replanned for a maintainable
-> mobile/runtime boundary; revised P1 and ADR-043 were approved on 2026-08-27.
-> P1.F1 was separately approved, implemented, and closed PASS after owner
-> verification on 2026-08-27. P1.F2 may now be prepared/presented but is not
-> authorized for source execution. The external package
-> is untracked input, so its
+> **Current task:** P0 and P1 are closed. ADR-044 is Accepted. P2.T0 is PASS and
+> P2.T1a-T1f are Done/owner-approved as the completed P2.T1 persistence outcome
+> on 2026-09-06. P2.C0 is the next gate; P2-P7 and S-230 now share the controlled
+> Android P2P go-live target for October 2026. The external package is untracked input, so its
 > state/handoff files are evidence but not substitutes for this ledger.
 
 ## Task map
@@ -23,8 +21,8 @@ plan: docs/plan/mvp0-p2p-first.md
 | ID | Title | Status | Depends on |
 |---|---|---|---|
 | P0 | Bare / Expo / React Native compatibility spike | PASS — Android-only; owner verified 2026-08-27 | — |
-| P1 | Maintainable mobile P2P foundation + replication proof | Parent approved; P1.F1 closed PASS; P1.F2 is the next gated child | P0 PASS |
-| P2 | Encrypted P2P publication after S-120 | Pending | P1 PASS; accepted ADR-044; own plan/RRI/HITL |
+| P1 | Maintainable mobile P2P foundation + replication proof | Done 2026-09-01 | P0 PASS |
+| P2 | Encrypted P2P publication after S-120 | In progress — T0 PASS; T1 Done/owner-approved; C0 next | P1 PASS; ADR-044 Accepted |
 | P3 | Invite, claim, and content-key envelope | Pending | P2 PASS; accepted ADR-044 / K1 contract |
 | P4 | Mobile package sync and verification | Pending | P3 PASS |
 | P5 | Local HLS gateway + existing VideoPlayer | Pending | P4 PASS |
@@ -172,20 +170,14 @@ The following tasks stay unpresented until their dependency evidence exists. The
 external taskpacks are useful input, but the detailed ledger entries, RRI reports,
 and approval cards must be created at activation time.
 
-> **Current ADR gate after P1 closure:** P1 reaching PASS (all children —
-> through `P1.B2`) does **not** unlock P2 source work. Nothing below is a
-> phase plan. ADR-044 D1 closed on 2026-09-05 with `O3 parallel`; D2 closed
-> with owner-selected `K1`; D3 closed with owner-selected `O4`. Before P2 can
-> be presented: (a) complete the explicit `ADR044-D4` acceptance gate; (b)
-> author `docs/plan/mvp0-p2p-p2-*.md` and expand this ledger's P2 entry to a
-> full task (RRI, Compact Approval Task Card, complete HP/EC set) per the
-> workflow guide's Step 2/3. Track this gap in `docs/plan/roadmap.md` § Known
-> planning gaps until a plan file exists for P2.
+> **Current P2 gate:** ADR-044 D1-D4 are closed and the ADR is Accepted. The
+> detailed P2 plan/ledger exist; T0 is PASS and T1 is Done/owner-approved.
+> P2.C0 is next and must freeze the shared contract/path boundary before the
+> decomposed T2-T6 implementation workstreams are presented.
 >
 > D1 evidence is in `docs/audit/mvp0-p2p-adr044-d1-grant-composition.md`; D2
 > closure is in `docs/audit/mvp0-p2p-adr044-d2-key-envelope.md`; D3/O4 closure
-> is in `docs/audit/mvp0-p2p-adr044-d3-publication.md`. ADR-044 remains
-> `Proposed`; D1-D3 completion is not P2/P3 source approval.
+> is in `docs/audit/mvp0-p2p-adr044-d3-publication.md`.
 
 Design inputs for every entry below — use cases, scope boundaries, global
 invariants, acceptance-gate definitions, the control/data-plane split, the
@@ -209,10 +201,9 @@ and revised approval card: `docs/plan/mvp0-p2p-p1-replication.md`,
 
 ### P2 — Encrypted P2P publication after S-120
 
-- **Gate / use case:** G2 / CU-01. **Blocked on:** P1 PASS, explicit D4
-  acceptance of ADR-044, and P2's own plan/RRI/HITL. ADR-044 questions 1–3
-  are resolved as `O3 parallel` / `K1` / `O4`; the ADR itself is still
-  `Proposed`, so P2 source work remains unauthorized.
+- **Gate / use case:** G2 / CU-01. **Status:** in progress. P1 and ADR-044 gates
+  are satisfied; T0 PASS and T1 Done/owner-approved. `P2.C0` is next, followed
+  by decomposed exact-path T2-T6 gates.
 - **Objective:** turn an S-120-prepared HLS derivative into a ciphertext-only
   P2P package, publish it through the Availability Node, and record durable
   publication state — reusing existing upload/finalize/S-120 without
