@@ -5,10 +5,15 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+dubbridge-domain = { path = "../domain" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = "0.10"
 unicode-normalization = "0.1"
+
+[dev-dependencies]
+time = { workspace = true }
+uuid = { workspace = true }
 
 [lints]
 workspace = true

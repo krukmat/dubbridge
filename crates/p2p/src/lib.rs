@@ -5,3 +5,4 @@
 pub mod aad;
 pub mod manifest;
 pub mod path;
+pub mod source;

@@ -891,10 +891,13 @@ dependencies = [
 name = "dubbridge-p2p"
 version = "0.1.0"
 dependencies = [
+ "dubbridge-domain",
  "serde",
  "serde_json",
  "sha2",
+ "time",
  "unicode-normalization",
+ "uuid",
 ]
 
 [[package]]
