@@ -888,6 +888,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "dubbridge-p2p"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "dubbridge-playback"
 version = "0.1.0"
 dependencies = [

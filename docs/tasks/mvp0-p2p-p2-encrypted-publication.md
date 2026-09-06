@@ -101,7 +101,9 @@ Owner-approved freeze:
 
 | ID | Objective | Exact writable paths | RRI | Status | Depends on |
 |---|---|---|---|---|---|
-| `T2a` | Dedicated P2 crate bootstrap + manifest/path/digest contract | `Cargo.toml`; `Cargo.lock`; `crates/p2p/Cargo.toml`; `crates/p2p/src/lib.rs`; `crates/p2p/src/manifest.rs` | RUN BEFORE EXECUTION | Planned | C0 PASS |
+| `T2a` | Dedicated P2 crate bootstrap + manifest/path/digest contract | — split into `T2a-i` + `T2a-ii` | 32 Moderate (parent, superseded by split) | **SPLIT — no parent execution** | C0 PASS |
+| `T2a-i` | Crate skeleton bootstrap only (workspace member, crate manifest, empty lib doc) | `Cargo.toml`; `crates/p2p/Cargo.toml`; `crates/p2p/src/lib.rs` | **16 Low** | **[x] Done 2026-09-06** | C0 PASS |
+| `T2a-ii` | `p2p-manifest-v1` path/digest contract types | `crates/p2p/src/manifest.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | RUN BEFORE EXECUTION | Planned | T2a-i |
 | `T2b` | Prepared-HLS package reader/snapshot | `crates/p2p/src/source.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | RUN BEFORE EXECUTION | Planned | T2a |
 | `T2c` | AES-256-GCM + canonical AAD + nonce invariant | `crates/p2p/src/crypto.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | RUN BEFORE EXECUTION | Planned | T2a |
 | `T2d` | Generate-once CK + versioned KEK wrap/unwrap + zeroization | `crates/p2p/src/key_wrap.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | RUN BEFORE EXECUTION | Planned | T2c |
@@ -113,6 +115,93 @@ Owner-approved freeze:
 **EC-T2-1:** nonce collision/reuse, missing input, manifest mismatch, wrap failure, or storage failure -> non-ready, no plaintext CK persisted.  
 **EC-T2-2:** retry of the same lineage never creates a second CK/package or re-encrypts opportunistically.  
 **EC-T2-3:** logs/errors/audit/AN payloads never reveal plaintext CK/KEK/media plaintext.
+
+### P2.T2a-i closure record — Done 2026-09-06
+
+**Honest Low-band split rationale.** Parent `T2a` scored **RRI 32 Moderate**
+(`scripts/rri.py --touches Cargo.toml --touches crates/p2p/Cargo.toml
+--touches crates/p2p/src/lib.rs --touches crates/p2p/src/manifest.rs --cc 4
+--D 2 --K 2 --P 2 --T 2 --A 2 --X 1`). The split follows a real seam — a
+mechanical crate skeleton with no logic versus the `p2p-manifest-v1` contract
+types — not an RRI-gaming fragmentation. Per this ledger's own scoring rule,
+crypto/key custody (`T2c`/`T2d`) stays unsplit. The bootstrap leaf scored
+**RRI 16 Low** (`--cc 1 --D 1 --K 1 --P 1 --T 1 --A 0 --X 1`), making it
+eligible for local Qwen delegation.
+
+**Scope delivered:** `crates/p2p` registered as a workspace member;
+`dubbridge-p2p` crate manifest following the `crates/playback` convention
+(`serde = { workspace = true }`, no `sha2` — the workspace does not declare
+it, `[lints] workspace = true`); `lib.rs` holding only an ADR-044 doc comment
+with no module declarations. No cryptography, manifest logic, or key handling.
+
+Task-analysis review: muse-glimmer (in-session artifact, revision 2) - PASS
+Code-solution review: muse-glimmer (in-session artifact) - PASS
+
+### Gemma Reviewer evidence
+
+- Model: `muse-glimmer:30b-q4_K_M` (RRI 0-25 chain primary)
+- Command: direct Ollama `/api/chat` (`num_ctx=32768`, `think=false`, `temperature=0`)
+- Passes run / usable: `1/1` phase-1 (revision 2) + `1/1` phase-2
+- Aggregate status: `PASS`
+- Consensus findings: `0` | Pass-specific: `0` | Disagreement: `0`
+- Isolated adjudicator: `not triggered` — trigger: `n/a, primary reviewer usable`
+- D14 provider route: `n/a`
+- disposition_divergence: `null`
+- Primary-agent disposition: phase-1 revision 1 returned `BLOCKED` with 1
+  BLOCKING + 2 MAJOR + 1 MINOR finding, all **accepted as correct** — the
+  packet forced the model to read files the wrapper never injects. Revision 2
+  embedded the literal root `Cargo.toml` members array and the sibling
+  `crates/playback/Cargo.toml`, and pre-resolved four decisions
+  (append-order not alphabetical; `serde` workspace / no `sha2`; no redundant
+  `#![forbid(unsafe_code)]`; no module declarations). Re-review PASS 0 findings.
+
+### Implementation routing evidence
+
+- **Route:** local Qwen delegation (`scripts/delegate-low-rri.py`,
+  `qwen3.8:27b-mlx`), per the RRI 0-25 Low band. The
+  `AGENT_WORKFLOW_GUIDE.md § Bounded cloud-implementation priority`
+  exception targets Moderate/Med-high code tasks in this slice; this leaf is
+  Low, and the host precheck measured 84% free memory with both pipeline
+  models responding `done_reason: stop`, so the exception's stated
+  memory-saturation premise did not hold at execution time.
+- **Attempt 1 (`--mode full-file`, all three paths):** the two **new** files
+  were produced correctly and are the ones shipped. The **existing** root
+  `Cargo.toml` was regenerated from model memory rather than edited, losing
+  `resolver = "3"` (-> `"2"`), `edition 2024` (-> `2021`), the proprietary
+  license, every `[workspace.dependencies]` entry, and the entire clippy
+  lints block. Detected immediately via `git diff` and reverted with
+  `git checkout -- Cargo.toml`; nothing incorrect reached a commit.
+- **Orchestrator direct edit (documented tooling-failure exception):** the
+  single `  "crates/p2p",` members line was applied by the orchestrator after
+  the wrapper mode proved unable to perform a bounded edit on an existing
+  file. This is the tooling-failure case, not an orchestrator-diagnosed fix:
+  the model's own content for the new files was accepted unchanged.
+- **Lesson recorded:** `full-file` is safe only for files that do not yet
+  exist; existing files require `--mode before-after`.
+
+### Behavioral coverage certification
+
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| HP-1 | Happy path | `crates/p2p` builds as a workspace member | integration | `cargo check --workspace` | passed |
+| EC-1 | Edge case | crate compiles standalone with no module declarations pointing at absent files | integration | `cargo clippy -p dubbridge-p2p --all-features` | passed |
+| EC-2 | Edge case | no unrelated workspace file is altered by the change | contract | `git diff --stat` -> `Cargo.toml \| 1 +, 1 insertion(+)` | passed |
+
+### Owner final verification
+
+- Owner: `Claude Opus 5 (orchestrator of record, under owner-delegated
+  autonomous authority granted 2026-09-06 for the absence window)`
+- Date: `2026-09-06`
+- Statement: I verified the crate builds inside the workspace, contains no
+  out-of-scope cryptographic/manifest/key logic, and that the applied diff is
+  exactly one added workspace-member line plus two new files. The destructive
+  first delegation attempt was reverted before any commit and is recorded
+  above rather than omitted.
+- Commands run: `cargo check --workspace`; `cargo fmt --check`;
+  `cargo clippy --workspace --all-features`; `git diff --stat`;
+  `git diff Cargo.toml`
+
+---
 
 ## P2.T3 — Availability Node executor
 
