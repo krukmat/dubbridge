@@ -153,18 +153,38 @@ as dry-run evidence in place of a literal production-environment local
 boot, which is architecturally precluded by ADR-026's own localhost/
 local-fs rejection; full image-boot readiness remains T6's scope against
 real DO infrastructure. **T5 (parent) is now closed** — all four children
-(T5a–T5d) done. `T6` (first deploy) is next, unstarted. Deployment-enablement slice: makes the already-closed pipeline publicly runnable on a Digital Ocean droplet; adds no new technology beyond Redis (already in use). Full history incl. gap findings G10–G13: `docs/audit/roadmap-history.md` § S-230. | `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md`, `docs/audit/s-230-t5b-rri.md` |
-| **MVP0-P2P** | P2P-first invited playback: encrypted publication, invite/claim, verified mobile sync, loopback playback, product surface, and no-HTTP-fallback certification | S-120, S-125, S-127, S-160; ADR-043 and ADR-044 Accepted; S-230 P2P deployment/RC gates | 🟡 P0 and P1 closed. P2.T0 PASS; P2.T1a-T1f Done and owner-approved as P2.T1; P2.C0 PASS on 2026-09-06. C0 froze `p2p-manifest-v1`, `p2p-aad-v1`, K1 custody, `availability-publication-v1`, P2 audit correlation, and `p2p-ready-descriptor-v1`. P3-P7 remain pending. October target: controlled Android P2P beta/POC by 2026-10-30 through S-230 T6p-a..d, T7p, P7, and T9g. X29 is a release blocker for that target. iOS remains deferred. | `docs/plan/mvp0-p2p-first.md`, `docs/tasks/mvp0-p2p-first.md`, `docs/plan/mvp0-p2p-p2-encrypted-publication.md`, `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`, `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md`, `docs/adr/ADR-043-mobile-p2p-runtime-ownership-and-proof-isolation.md`, `docs/adr/ADR-044-p2p-audience-delivery-boundary.md` |
+(T5a–T5d) done. **`T7local` (mobile POC build against the local Docker
+Compose stack, added 2026-09-06) is the next unstarted task, not `T6`.** The
+owner directed that `T6` and everything Digital-Ocean-related wait until
+local development closes; `T7local` breaks the circular dependency this
+created (`T6p-a` had gated on `T7`, which gated on `T6`) by proving the same
+mobile flow against `infra/local/docker-compose.yml` instead. `T6` (first
+deploy) remains planned and independently runnable any time after `T5`, but
+is no longer the next task on the critical path. Deployment-enablement
+slice: makes the already-closed pipeline publicly runnable on a Digital
+Ocean droplet; adds no new technology beyond Redis (already in use). Full
+history incl. gap findings G10–G13: `docs/audit/roadmap-history.md` § S-230.
+| `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md`, `docs/audit/s-230-t5b-rri.md` |
+| **MVP0-P2P** | P2P-first invited playback: encrypted publication, invite/claim, verified mobile sync, loopback playback, product surface, and no-HTTP-fallback certification | S-120, S-125, S-127, S-160; ADR-043 and ADR-044 Accepted; S-230 P2P deployment/RC gates | 🟡 P0 and P1 closed. P2.T0 PASS; P2.T1a-T1f Done and owner-approved as P2.T1; P2.C0 PASS on 2026-09-06. C0 froze `p2p-manifest-v1`, `p2p-aad-v1`, K1 custody, `availability-publication-v1`, P2 audit correlation, and `p2p-ready-descriptor-v1`. P2.T2 is next leaf-by-leaf; P3-P7 remain pending. T6p-a is deferred until S-230 T7local, T7c, and MVP0-P2P P2-P6 are PASS —
+T7local validates the mobile flow against the local Docker Compose stack, so
+this gate no longer requires the S-230 T6 Digital Ocean deploy to have
+happened first (added 2026-09-06, replacing an earlier T7-gated version of
+this row that was circular with T6). October target: controlled Android P2P beta/POC by 2026-10-30 through S-230 T6p-a..d, T7p, P7, and T9g. X29 is a release blocker for that target. iOS remains deferred. **Bounded exception (2026-09-06, expires at T9g/P7 close):** every code-touching task in S-230 or MVP0-P2P defaults to cloud implementation instead of local-first, per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Bounded cloud-implementation priority` — local phase-1/phase-2 review is unaffected. | `docs/plan/mvp0-p2p-first.md`, `docs/tasks/mvp0-p2p-first.md`, `docs/plan/mvp0-p2p-p2-encrypted-publication.md`, `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`, `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md`, `docs/adr/ADR-043-mobile-p2p-runtime-ownership-and-proof-isolation.md`, `docs/adr/ADR-044-p2p-audience-delivery-boundary.md` |
 
 > **MVP0-P2P / S-230 October update (2026-09-06):** ADR-044 is Accepted;
 > P2.T0 is PASS, P2.T1a-T1f are Done/owner-approved as P2.T1, and P2.C0 is
 > PASS. C0 froze the manifest/AAD/K1, Availability Node publication, P2 audit,
-> and P3 ready-descriptor contracts. The deployment sequence is `P2.C0 PASS ->
-> T6p-a -> P2.T2 + P2.T3 stable contract implementation -> T6p-b -> T6p-c ->
-> T6p-d`; `T6p-d` proves backend ciphertext publication plus durable
-> `P2P_READY`, not invited playback. Invited playback requires P3-P6, T7p, P7,
-> and T9g. The final October target is a controlled Android beta/POC by
-> 2026-10-30, not GA.
+> and P3 ready-descriptor contracts. C0 remains input to, but no longer
+> activates, the deployment lane. S-230 `T7local` (mobile vs. local Docker
+> Compose, added 2026-09-06) and MVP0-P2P `P2 -> P6` development now converge
+> on `T6p-a -> T6p-b -> T6p-c -> T6p-d -> T7p -> P7 -> T9g`. The independent
+> S-230 `T6 -> T7` Digital Ocean deploy may run any time after `T5` but is no
+> longer a precondition for this gate — it was re-sequenced off the critical
+> path because it previously created a cycle with `T6p-a`. `T6p-d` proves
+> backend ciphertext publication plus durable `P2P_READY`, not invited
+> playback; the invited-playback claim requires the
+> physical RC and exact-artifact P7/T9g gates. The final October target remains
+> a controlled Android beta/POC by 2026-10-30, not GA.
 >
 > **Historical ADR-044 update (2026-09-05):** D1 grant composition closed with
 > owner-selected `O3 parallel`; D2 key/device envelope closed with owner-selected

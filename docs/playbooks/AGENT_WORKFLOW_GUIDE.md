@@ -1031,6 +1031,41 @@ attributable to the local implementer, revert the affected band (Moderate
 and/or Med-high) to cloud implementation while retaining the local review
 roles.
 
+#### Bounded cloud-implementation priority — S-230 + MVP0-P2P rollout (2026-09-06)
+
+The host driving this repository's local agent work is memory-constrained
+for the local implementer roles specifically: 32 GB total RAM, already at
+~31 GB used at idle, against implementer models in the 18–25 GB range
+(`nemotron-3.5-lightning:30b-a3b-q4_K_M`, `qwen3.8:27b-mlx`). This is the
+"sustained swap/thermal degradation attributable to the local implementer"
+condition the rollback trigger above already anticipates — this subsection
+invokes that trigger explicitly and scopes it, rather than defining a new
+mechanism.
+
+**Scope:** every code-touching task (Rust backend, mobile RN/Expo, P2P
+runtime) inside the `S-230` (`docs/plan/s-230-poc-v1-digitalocean.md`) and
+`MVP0-P2P` (`docs/plan/mvp0-p2p-first.md`,
+`docs/plan/mvp0-p2p-p2-encrypted-publication.md`) slices, Moderate and
+Med-high alike, defaults to **cloud implementation** (the band's resolved
+Codex/Claude cloud-takeover model) instead of the local-first
+`run_local_task.py` route — cloud is tried first, not only after a local
+repair-budget exhaustion. Docs-only, config-only, and planning tasks in
+these same slices are **not** affected and keep the normal RRI-band routing
+local-first default.
+
+**Unaffected:** phase-1/phase-2 independent review (Gemma primary, Muse
+Glimmer intermediate, D14 final) stays local, unchanged. This exception
+covers only who authors the implementation, never who reviews it, and never
+changes RRI, band, Reflection pass count, or the HITL approval gate.
+
+**Duration:** bounded to this rollout. Expires automatically when both
+`S-230-T9g` (the October GO/NO-GO) and MVP0-P2P `P7` close — at that point
+this subsection should be removed or marked historical, and local-first
+routing resumes its normal RRI-band default for any later work on these
+slices. Do not extend this exception to other slices by analogy; a
+different slice hitting the same host constraint needs its own explicit,
+dated exception recorded here.
+
 **Target-file size gate:** before building a task card for RRI 26–40
 local-first delegation, check every file in `allowed_paths` and every file
 the local implementer must read in full. If any exceeds **500 lines**, do

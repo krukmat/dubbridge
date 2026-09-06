@@ -184,13 +184,20 @@ Optional queue acceleration is deferred and requires its own later task/RRI; que
 
 ## S-230 dependency sync
 
-C0 freezes the contracts consumed by these cross-slice gates:
+C0 freezes the contracts consumed later by these cross-slice gates; it no
+longer activates the deployment lane by itself:
 
-- `S-230-T6p-a` depends on `P2.C0 PASS` and freezes only deployment-specific ownership/configuration. It consumes the existing C0 contracts/fixtures and does not redefine them.
-- `S-230-T6p-b` requires `T6p-a PASS` plus stable `P2.T2` and `P2.T3` contract implementations.
+- `S-230-T6p-a` requires `S-230-T7local PASS + S-230-T7c PASS + MVP0-P2P
+  P2-P6 PASS` — the local-Docker-Compose mobile validation, not the
+  post-deploy `S-230-T7` confirmation — and freezes only deployment-specific
+  ownership/configuration against those implemented surfaces. It consumes
+  the existing C0 contracts/fixtures and does not redefine them.
+- `S-230-T6p-b` depends on `T6p-a PASS`.
 - `S-230-T6p-c` depends on `T6p-b PASS`.
-- `S-230-T6p-d` depends on `S-230-T6 PASS + T6p-c PASS + P2 PASS` and proves only backend ciphertext publication plus durable `P2P_READY`.
-- Invited playback requires P3-P6, T7p, P7, and T9g; T6p-d does not demonstrate it.
+- `S-230-T6p-d` depends on `T6p-c PASS` and proves only backend ciphertext
+  publication plus durable `P2P_READY`.
+- Invited playback additionally requires T7p, P7, and T9g against the exact
+  deployed artifact; T6p-d does not demonstrate it.
 
 ## Parent closure criteria
 

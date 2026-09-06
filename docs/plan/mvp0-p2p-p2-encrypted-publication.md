@@ -267,13 +267,21 @@ These are calendar workstreams. Source authorship still follows the repository's
 
 ## S-230 October integration
 
-C0 is now the frozen contractual input to the deployment lane:
+C0 remains the frozen contractual input to the deployment lane, but deployment
+planning is deferred until the relevant implementation phases are complete:
 
-- `S-230-T6p-a` depends on `P2.C0 PASS` and freezes only deployment-specific ownership/configuration. It consumes the C0 contracts/fixtures and does not redefine them.
-- `S-230-T6p-b` requires `T6p-a PASS` plus stable `P2.T2` and `P2.T3` contract implementations.
+- `S-230-T6p-a` requires `S-230-T7local PASS + S-230-T7c PASS + MVP0-P2P
+  P2-P6 PASS` — the local-Docker-Compose mobile validation, not the
+  post-deploy `S-230-T7` confirmation, which remains independent of this
+  gate. It then freezes only deployment-specific ownership/configuration
+  against the implemented surfaces while consuming the C0 contracts/fixtures
+  without redefining them.
+- `S-230-T6p-b` depends on `T6p-a PASS` and authors the production descriptor.
 - `S-230-T6p-c` depends on `T6p-b PASS` and proves the local deployment contract.
-- `S-230-T6p-d` depends on `S-230-T6 PASS + T6p-c PASS + P2 PASS` and proves only backend ciphertext publication plus durable `P2P_READY`.
-- Invited playback is not part of T6p-d; it requires P3-P6, T7p, P7, and T9g.
+- `S-230-T6p-d` depends on `T6p-c PASS` and proves only backend ciphertext
+  publication plus durable `P2P_READY` on the already-proven S-230 base.
+- Invited playback is not part of T6p-d; it additionally requires T7p, P7, and
+  T9g against the exact deployed artifact.
 
 ## Gates
 

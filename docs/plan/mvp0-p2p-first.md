@@ -90,7 +90,18 @@ The October goal is a controlled Android beta/POC for one owner, one invited vie
 
 S-230 may deploy and validate its existing base platform independently. Its **P2P go-live decision**, however, depends on the deployed P2P publication plane, an Android P2P release candidate, P2-P6 PASS, and P7 certification against the exact release artifact. P2 alone proves backend publication; it does not prove invited playback.
 
-The cross-slice deployment order is `P2.C0 PASS -> S-230-T6p-a -> P2.T2 + P2.T3 stable contract implementation -> S-230-T6p-b -> S-230-T6p-c -> S-230-T6p-d`. T6p-a freezes only deployment-specific ownership/configuration and consumes C0 contracts/fixtures without redefining them. T6p-d proves only backend ciphertext publication plus durable `P2P_READY`; invited playback still requires P3-P6, T7p, P7, and T9g.
+The deployment lane is intentionally deferred until the implementation surfaces
+exist. S-230's local-stack development path (`T7local -> T7c`, validated
+against `infra/local/docker-compose.yml`, added 2026-09-06) and MVP0-P2P
+development (`P2 -> P3 -> P4 -> P5 -> P6`) converge on `S-230-T6p-a -> T6p-b ->
+T6p-c -> T6p-d -> T7p -> P7 -> T9g`. `P2.C0 PASS` remains the frozen
+contractual input, but is not by itself the activation gate for T6p-a. The
+independent S-230 `T6 -> T7` Digital Ocean deploy is not part of this
+convergence — the owner required it to wait until local development closes,
+so `T6p-a` gates on the local-stack path (`T7local`) instead. T6p-d proves
+only backend ciphertext publication plus durable `P2P_READY`; invited
+playback is not claimed until the physical RC and exact-artifact P7/T9g
+gates pass.
 
 The October release does not include iOS, multi-device, email delivery, offline/background operation, progressive streaming, performance certification, TTS/dubbed audio, or managed deployment automation. `S-230-T7b`, `T8`, and `T8b` remain optional unless explicitly selected for demo polish.
 
@@ -98,18 +109,24 @@ The October release does not include iOS, multi-device, email delivery, offline/
 
 | Window | Required outcome |
 |---|---|
-| Sep 6-10 | Record T1 Done and `P2.C0 PASS`, freeze the controlled-demo profile and T6p-a deployment-specific inputs, and promote X29 to an October release blocker |
-| Sep 11-18 | Implement the C0-frozen P2.T2 and P2.T3 contract leaves; prepare recovery, audit/test, and P3-P7 planning workstreams |
-| Sep 19-Oct 2 | Stabilize P2.T2/P2.T3, execute T6p-b/T6p-c, and implement/integrate the remaining P2 T4-T5 workstreams |
-| Oct 3-12 | Close P2 certification and demonstrate/deploy the backend publication path on Digital Ocean |
-| Oct 13-24 | Complete P3-P6 joins and the physical Android P2P release candidate |
-| Oct 25-30 | Run P7 on the exact deployed artifacts, soak/rollback checks, and the S-230 P2P GO/NO-GO |
+| Sep 6-18 | Record T1 Done and `P2.C0 PASS`, execute P2 leaf-by-leaf, advance S-230 `T7local -> T7c` against the local Docker Compose stack, and resolve X29 |
+| Sep 19-Oct 15 | Complete P2 and the P3-P6 development sequence; do not activate T6p-a while either development gate remains open. The independent S-230 `T6 -> T7` Digital Ocean deploy may proceed in this window or later without affecting T6p-a |
+| Oct 16-21 | Freeze deployment inputs in T6p-a, then execute T6p-b/T6p-c and deploy the backend publication plane through T6p-d |
+| Oct 22-26 | Build and prove the physical Android P2P release candidate in T7p |
+| Oct 27-30 | Run P7 on the exact deployed artifacts, complete soak/rollback evidence, and issue the S-230 P2P GO/NO-GO |
 
-If physical Android proof is not available by September 18, or P2 is not PASS by October 12, October may ship only the base S-230 HTTP/HLS POC plus a clearly labeled backend P2P preview. It must not claim P2P invited playback.
+If physical Android proof is not available by September 18, or the required development gate (S-230 `T7local -> T7c` PASS against the local Docker Compose stack, and MVP0-P2P `P2 -> P6` PASS) is not complete by October 15, October may ship only the base S-230 HTTP/HLS POC plus a clearly labeled backend P2P preview. It must not claim P2P invited playback.
 
 ## Parallel execution policy
 
-Planning, interface definition, test design, and evidence preparation may run concurrently. With `P2.C0 PASS`, the K1 builder, Availability Node, recovery kernel/client, S-120 characterization, and audit/test harness are designed as disjoint workstreams with explicit joins.
+Planning, interface definition, test design, and evidence preparation within the
+active MVP0-P2P phase may run concurrently. With `P2.C0 PASS`, the K1 builder,
+Availability Node, recovery kernel/client, S-120 characterization, and audit/test
+harness are designed as disjoint workstreams with explicit joins. S-230 T6p
+deployment planning is the exception: it remains deferred until S-230
+T7local and MVP0-P2P P2-P6 are PASS, so it is based on implemented surfaces
+rather than provisional ones — this intentionally does not require the
+independent S-230 T6 -> T7 Digital Ocean deploy.
 
 The current repository workflow still executes one approved task ID at a time. Multiple agents may write source within one approved RRI 26-55 task only when ADR-040's split-authorship conditions are met: one orchestrator, a common base SHA, frozen interfaces, disjoint path ownership, one writer per path, and whole-task integration/verification. Running separate executable task IDs concurrently requires a separately accepted workflow amendment; this plan does not assume one.
 

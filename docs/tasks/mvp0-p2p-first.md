@@ -28,7 +28,7 @@ plan: docs/plan/mvp0-p2p-first.md
 | P4 | Mobile package sync and verification | Pending | P3 PASS |
 | P5 | Local HLS gateway + existing VideoPlayer | Pending | P4 PASS |
 | P6 | Minimal My Content + Invites dashboard | Pending | P3–P5 PASS |
-| P7 | End-to-end P2P certification | Pending | P2–P6 PASS |
+| P7 | End-to-end P2P certification | Pending | P2–P6 PASS; S-230-T7p PASS |
 
 > **Review exception:** the repository owner waived phase-1 and phase-2 peer
 > review for P0–P7 only. Each task still requires its RRI-derived approval,
@@ -338,8 +338,9 @@ and revised approval card: `docs/plan/mvp0-p2p-p1-replication.md`,
 
 ### P7 — End-to-end P2P certification
 
-- **Gate / use case:** G7 / all four CU. **Blocked on:** P2–P6 PASS and the
-  phase-specific certification profile constrained by Accepted ADR-044.
+- **Gate / use case:** G7 / all four CU. **Blocked on:** P2–P6 PASS,
+  `S-230-T7p PASS`, and the phase-specific certification profile constrained
+  by Accepted ADR-044.
 - **Objective:** certify the complete owner-to-viewer flow with legacy HTTP
   media delivery disabled, emitting `MVP0_P2P_CERTIFIED` or
   `MVP0_P2P_NOT_CERTIFIED`.
