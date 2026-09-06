@@ -20,7 +20,9 @@ static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../../infra/migration
 async fn test_pool() -> PgPool {
     let database_url = std::env::var("DUBBRIDGE_DATABASE_URL")
         .expect("DUBBRIDGE_DATABASE_URL must be set for DB integration tests");
-    let pool = create_pool(&database_url).await.expect("connect test database");
+    let pool = create_pool(&database_url)
+        .await
+        .expect("connect test database");
     MIGRATOR.run(&pool).await.expect("run migrations");
     pool
 }
@@ -49,15 +51,10 @@ async fn hp_t1_atomic_create_restart_reread_and_same_lineage_idempotency() {
     let lineage_id = K1LineageId::new();
     let outbox_id = Uuid::new_v4();
 
-    let created = ensure_publication_with_outbox(
-        &pool,
-        asset_id,
-        publication_id,
-        lineage_id,
-        outbox_id,
-    )
-    .await
-    .expect("create publication and outbox");
+    let created =
+        ensure_publication_with_outbox(&pool, asset_id, publication_id, lineage_id, outbox_id)
+            .await
+            .expect("create publication and outbox");
     assert!(created.created);
     assert_eq!(created.publication.state, PublicationState::Building);
     assert_eq!(created.publication.lineage_id, lineage_id);
@@ -98,15 +95,9 @@ async fn ec_t1_conflicting_lineage_and_partial_atomic_create_fail_closed() {
     let publication_id = P2pPublicationId::new();
     let lineage_id = K1LineageId::new();
 
-    ensure_publication_with_outbox(
-        &pool,
-        asset_id,
-        publication_id,
-        lineage_id,
-        Uuid::new_v4(),
-    )
-    .await
-    .expect("initial ensure");
+    ensure_publication_with_outbox(&pool, asset_id, publication_id, lineage_id, Uuid::new_v4())
+        .await
+        .expect("initial ensure");
 
     let conflict = ensure_publication_with_outbox(
         &pool,
@@ -121,26 +112,30 @@ async fn ec_t1_conflicting_lineage_and_partial_atomic_create_fail_closed() {
     let missing_asset = AssetId(Uuid::new_v4());
     let orphan_publication = P2pPublicationId::new();
     let orphan_outbox = Uuid::new_v4();
-    assert!(ensure_publication_with_outbox(
-        &pool,
-        missing_asset,
-        orphan_publication,
-        K1LineageId::new(),
-        orphan_outbox,
-    )
-    .await
-    .is_err());
+    assert!(
+        ensure_publication_with_outbox(
+            &pool,
+            missing_asset,
+            orphan_publication,
+            K1LineageId::new(),
+            orphan_outbox,
+        )
+        .await
+        .is_err()
+    );
 
-    let publication_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM p2p_publications WHERE id = $1")
-        .bind(orphan_publication.0)
-        .fetch_one(&pool)
-        .await
-        .expect("count orphan publication");
-    let outbox_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM p2p_publication_outbox WHERE id = $1")
-        .bind(orphan_outbox)
-        .fetch_one(&pool)
-        .await
-        .expect("count orphan outbox");
+    let publication_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM p2p_publications WHERE id = $1")
+            .bind(orphan_publication.0)
+            .fetch_one(&pool)
+            .await
+            .expect("count orphan publication");
+    let outbox_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM p2p_publication_outbox WHERE id = $1")
+            .bind(orphan_outbox)
+            .fetch_one(&pool)
+            .await
+            .expect("count orphan outbox");
     assert_eq!(publication_count, 0);
     assert_eq!(outbox_count, 0);
 }
@@ -152,45 +147,46 @@ async fn hp_ec_t1_outstanding_read_and_ready_guard_require_same_lineage_confirma
     let publication_id = P2pPublicationId::new();
     let lineage_id = K1LineageId::new();
 
-    ensure_publication_with_outbox(
-        &pool,
-        asset_id,
-        publication_id,
-        lineage_id,
-        Uuid::new_v4(),
-    )
-    .await
-    .expect("create publication");
+    ensure_publication_with_outbox(&pool, asset_id, publication_id, lineage_id, Uuid::new_v4())
+        .await
+        .expect("create publication");
 
-    assert!(transition_publication_state(
+    assert!(
+        transition_publication_state(&pool, publication_id, PublicationState::Ready, None,)
+            .await
+            .is_err()
+    );
+
+    transition_publication_state(
         &pool,
         publication_id,
-        PublicationState::Ready,
+        PublicationState::PublishPending,
         None,
     )
     .await
-    .is_err());
-
-    transition_publication_state(&pool, publication_id, PublicationState::PublishPending, None)
-        .await
-        .expect("building -> publish_pending");
+    .expect("building -> publish_pending");
     let work = list_outstanding_publication_work(&pool, 10)
         .await
         .expect("list outstanding work");
-    assert!(work.iter().any(|item| item.publication.id == publication_id));
+    assert!(
+        work.iter()
+            .any(|item| item.publication.id == publication_id)
+    );
 
     transition_publication_state(&pool, publication_id, PublicationState::Publishing, None)
         .await
         .expect("publish_pending -> publishing");
-    assert!(record_external_confirmation(
-        &pool,
-        publication_id,
-        K1LineageId::new(),
-        "hyperdrive:wrong-lineage",
-        OffsetDateTime::now_utc(),
-    )
-    .await
-    .is_err());
+    assert!(
+        record_external_confirmation(
+            &pool,
+            publication_id,
+            K1LineageId::new(),
+            "hyperdrive:wrong-lineage",
+            OffsetDateTime::now_utc(),
+        )
+        .await
+        .is_err()
+    );
 
     record_external_confirmation(
         &pool,
@@ -207,20 +203,19 @@ async fn hp_ec_t1_outstanding_read_and_ready_guard_require_same_lineage_confirma
     assert_eq!(ready.state, PublicationState::Ready);
     assert_eq!(ready.confirmed_lineage_id, Some(lineage_id));
 
-    assert!(transition_publication_state(
-        &pool,
-        publication_id,
-        PublicationState::Reconciling,
-        None,
-    )
-    .await
-    .is_err());
+    assert!(
+        transition_publication_state(&pool, publication_id, PublicationState::Reconciling, None,)
+            .await
+            .is_err()
+    );
     let work_after_ready = list_outstanding_publication_work(&pool, 1_000)
         .await
         .expect("list after ready");
-    assert!(!work_after_ready
-        .iter()
-        .any(|item| item.publication.id == publication_id));
+    assert!(
+        !work_after_ready
+            .iter()
+            .any(|item| item.publication.id == publication_id)
+    );
 }
 
 #[tokio::test]
@@ -247,6 +242,9 @@ async fn ec_t1_schema_contains_no_forbidden_secret_fields() {
         "jwt_signing_secret",
     ];
     for field in forbidden {
-        assert!(!columns.iter().any(|column| column == field), "forbidden secret field: {field}");
+        assert!(
+            !columns.iter().any(|column| column == field),
+            "forbidden secret field: {field}"
+        );
     }
 }
