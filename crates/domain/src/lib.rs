@@ -6,6 +6,7 @@ pub mod asset;
 pub mod audit;
 pub mod consent;
 pub mod ingestion;
+pub mod p2p_publication;
 pub mod platform_ingest;
 pub mod playback;
 pub mod recording;
