@@ -321,28 +321,56 @@ present.
 already owns that responsibility; if yes, extend or reuse it unless
 repository evidence proves incompatibility.
 
-## Open decisions blocking P2
+## Decision status (updated 2026-09-06 — see audit F4)
 
-None of the material above decides these. They are the reason
-`docs/plan/mvp0-p2p-first.md` guardrail 9 requires an ADR before P2P invite
-delivery can be implemented; the draft is
-`docs/adr/ADR-044-p2p-audience-delivery-boundary.md` (Proposed — **not
-accepted**, so P2 remains unpresentable).
+`docs/adr/ADR-044-p2p-audience-delivery-boundary.md` is **Accepted**
+(D1-D4 closed 2026-09-05; see its own Status line). It is no longer a draft
+and no longer blocks P2 presentation. `docs/plan/mvp0-p2p-first.md`
+guardrail 8 (renumbered from the stale guardrail 9 cited by an earlier
+version of this section) now reads: "**ADR-044 is Accepted.** D1 `O3
+parallel`, D2 `K1`, and D3 `O4` constrain P2-P7." P2.T0 (Availability Node
+trust/operation contract, `AN-R1 + AN-A1`) and P2.C0 (shared package/
+publication/audit contracts) are both PASS; P2.T1 (durable publication/
+outbox persistence) is Done and owner-approved. None of this pre-approves
+any individual P2-P7 executable leaf — each still needs its own RRI,
+task card, and HITL approval per `docs/plan/mvp0-p2p-first.md` § Execution
+sequence — but the ADR-level blocker this section originally recorded is
+resolved.
 
-1. How invite authorization composes with ADR-032's `PlaybackGrant` — whether
-   P2P playback issues a grant, bypasses it, or introduces a parallel
-   audience-scoped authorization record.
-2. Content-key algorithm, envelope format, device-key generation/storage, and
-   revocation semantics (`docs/plan/mvp0-p2p-first.md` § Deferred decisions).
-3. Publication/outbox schema and recovery semantics, and how P2P publication
-   state relates to `PreparationStatus::Ready` without delaying S-120
-   readiness or its downstream transcription enqueue (guardrail 8).
-4. Availability Node deployment, authentication, observability, and
-   operational ownership.
-5. The P2P certification profile that disables legacy HTTP media routes
-   without disabling control-plane APIs.
-6. Persistent product cache, device identity, sign-out wipe, and background
-   execution requirements beyond P1's transient foreground proof.
+Of the six items originally listed here as "open decisions blocking P2",
+three were resolved by ADR-044 itself and three were confirmed by its own
+D4 closure to be downstream phase gates, not ADR-level contradictions:
+
+1. **Resolved — D1.** Invite-authorization composition with ADR-032's
+   `PlaybackGrant`: `O3 parallel` — a distinct backend-owned audience
+   authorization (not the claim alone, a `PlaybackGrant`, or ciphertext
+   possession) gates wrapped-content-key release. Evidence:
+   `docs/audit/mvp0-p2p-adr044-d1-grant-composition.md`.
+2. **Resolved — D2.** Content-key algorithm/envelope/device-key/revocation:
+   `K1` — AES-256-GCM package encryption, server-wrapped CK, HPKE P-256
+   device envelope, non-exportable Android Keystore key, fail-closed
+   capability handling, no silent fallback. Evidence:
+   `docs/audit/mvp0-p2p-adr044-d2-key-envelope.md`.
+3. **Resolved — D3.** Publication/outbox schema and recovery semantics, and
+   the `PreparationStatus::Ready`/`P2P_READY` relationship: `O4` —
+   PostgreSQL + transactional outbox as durable authority, optional queue
+   accelerator, PostgreSQL reconciler safety net, at-least-once/idempotent
+   delivery under one stable logical publication/K1 lineage, `P2P_READY`
+   written only after durable confirmation and kept separate from S-120
+   Ready. Evidence: `docs/audit/mvp0-p2p-adr044-d3-publication.md`.
+4. **Resolved — P2.T0 (downstream of D1-D3, per D4).** Availability Node
+   deployment, authentication, observability, operational ownership:
+   `AN-R1 + AN-A1` — dedicated Node.js/TypeScript service, private
+   mTLS-authenticated control surface, ciphertext-only scope. Evidence:
+   `docs/audit/mvp0-p2p-p2-t0-selection.md`.
+5. **Still open — a P2-P7 phase gate, not an ADR-044 blocker.** The P2P
+   certification profile that disables legacy HTTP media routes without
+   disabling control-plane APIs has no frozen contract yet; resolve it in
+   the phase that implements certification, not retroactively here.
+6. **Still open — a P2-P7 phase gate, not an ADR-044 blocker.** Persistent
+   product cache, device identity, sign-out wipe, and background execution
+   requirements beyond P1's transient foreground proof remain unresolved;
+   resolve in the phase that implements persistent device state.
 
 ## Defects and contradictions in the source material
 
@@ -372,6 +400,6 @@ Recorded so a future session does not re-derive them:
 - `docs/tasks/mvp0-p2p-first.md` — the task ledger and P2–P7 acceptance summaries
 - `docs/plan/roadmap.md` § Known planning gaps — the tracked P2–P7 planning gap
 - `docs/adr/ADR-043-mobile-p2p-runtime-ownership-and-proof-isolation.md` — accepted mobile runtime boundary
-- `docs/adr/ADR-044-p2p-audience-delivery-boundary.md` — Proposed; blocks P2
+- `docs/adr/ADR-044-p2p-audience-delivery-boundary.md` — Accepted (D1-D4 closed 2026-09-05); no longer blocks P2 presentation
 - `docs/adr/ADR-032-hls-playback-delivery-boundary.md` — authoritative for present review playback
 - `p2p-mvp/` — the external, untracked, non-authoritative source of this record

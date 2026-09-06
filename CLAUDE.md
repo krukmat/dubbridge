@@ -56,7 +56,7 @@ npm run screenshots   # Maestro E2E visual suite (requires Java + device)
 
 ## Architecture
 
-**Rust workspace** (`Cargo.toml`) owns API, orchestration, persistence, and all governance gates. Python is isolated to AI workers behind typed JSON contracts (`workers/*-py`).
+**Rust workspace** (`Cargo.toml`) owns API, orchestration, persistence, and all governance gates. Python is isolated to AI workers behind typed JSON contracts (`workers/*-py`). Node.js/TypeScript is isolated to the P2P Availability Node (`apps/availability-node`, ciphertext-only, ADR-044); see `docs/node-exceptions.md`.
 
 ### Apps
 

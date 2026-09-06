@@ -1,7 +1,7 @@
 // S-230-T2-c: integration test proving the migration runner applies all
 // infra/migrations and is idempotent on a second run. Mirrors the
 // setup_pool() pattern used throughout apps/api/tests/*.rs.
-use std::env;
+use std::{env, fs};
 
 use sqlx::{PgPool, Row};
 
@@ -10,8 +10,19 @@ async fn connect() -> Option<PgPool> {
     Some(PgPool::connect(&url).await.expect("connect"))
 }
 
-// HP-1: against a reachable database, all 31 migration files apply and are
-// tracked in _sqlx_migrations.
+fn migration_file_count() -> i64 {
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../infra/migrations");
+    fs::read_dir(dir)
+        .expect("read infra/migrations directory")
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "sql"))
+        .count() as i64
+}
+
+// HP-1: against a reachable database, every migration file under
+// infra/migrations applies and is tracked in _sqlx_migrations. The expected
+// count is derived from the directory rather than hardcoded, so adding a new
+// migration file never requires a hand-edit of this test (EC-1).
 // HP-2: a second run against the same already-migrated database is a
 // no-op and still returns Ok.
 #[tokio::test]
@@ -30,9 +41,10 @@ async fn migrations_apply_and_are_idempotent_on_second_run() {
         .await
         .expect("query _sqlx_migrations count");
     let count: i64 = row.get("count");
+    let expected = migration_file_count();
     assert_eq!(
-        count, 31,
-        "expected exactly 31 applied migrations, found {count}"
+        count, expected,
+        "expected exactly {expected} applied migrations (derived from infra/migrations), found {count}"
     );
 
     sqlx::migrate!("../../infra/migrations")

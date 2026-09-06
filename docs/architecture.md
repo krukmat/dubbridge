@@ -16,6 +16,13 @@ operational surfaces from planned ones. Delivery sequence lives in
   and quality gates.
 - Python is isolated to ML worker implementations where the ecosystem justifies an
   exception (`docs/python-exceptions.md`).
+- Node.js/TypeScript is isolated to the P2P Availability Node where the
+  Hyperdrive/Hyperswarm JS ecosystem justifies an exception
+  (`docs/node-exceptions.md`, ADR-044). The exception is scoped to that one
+  service: it stores and seeds ciphertext only, and has no database,
+  business-authorization, plaintext-key, or backend-signing authority — those
+  remain in `apps/api` (Rust). No other `apps/*` or `crates/*` surface is
+  covered by this exception.
 - PostgreSQL is authoritative for structured metadata. Binary artifacts are
   immutable object-store records referenced by storage key and SHA-256 checksum
   (ADR-006).
@@ -47,7 +54,7 @@ operational surfaces from planned ones. Delivery sequence lives in
 | First-party session gateway (transparent JWT relay) | Operational | S-040, ADR-031 |
 | First-party mobile client (React Native + Expo) | Canonical, sole authenticated product surface | S-050/S-105, ADR-029/031 |
 | Mobile P2P runtime boundary | P1 closed `[x] Done` 2026-09-01 (7/8 children PASS: packaging/protocol, ownership/composition, storage, replication transport, verification/reconnect/teardown; P1.F3b itself stays `not PASS`, non-blocking, deferred into X28); no product P2P runtime or network activity is active outside bounded proof runners | MVP0-P2P P1, ADR-043 |
-| P2P audience delivery (encrypted publication, invite/claim, verified sync, loopback playback) | Architecture accepted; P2.T0 PASS with Node.js/TypeScript Availability Node + mTLS (`AN-R1 + AN-A1`); P2.T1 durable publication/outbox foundation is the next owner gate; no P2 source implementation yet | MVP0-P2P P2–P7, ADR-044 |
+| P2P audience delivery (encrypted publication, invite/claim, verified sync, loopback playback) | Architecture accepted; P2.T0 PASS with Node.js/TypeScript Availability Node + mTLS (`AN-R1 + AN-A1`); P2.C0 PASS (froze the shared package/publication/audit contracts); P2.T1 durable publication/outbox foundation is Done and owner-approved (`crates/domain/src/p2p_publication.rs`, `crates/db/src/p2p_publication_repo.rs`, migration `0032`); remaining P2 leaves (T2+) not yet implemented | MVP0-P2P P2–P7, ADR-044 |
 
 Human review runtime (S-170) and publication runtime (S-180) have no plan/task
 ledger yet.
@@ -124,9 +131,14 @@ ledger yet.
   business-authorization, plaintext-key, or backend-signing authority. T0 also
   froze `building -> publish_pending -> publishing -> reconciling -> ready`
   semantics (`failed` terminal only) plus the minimum ADR-018 P2 audit set.
-  `P2.T1` durable publication/outbox persistence is now the next owner gate;
-  no P2 source path is implemented yet. Design inputs:
-  `docs/plan/mvp0-p2p-design-inputs.md`.
+  P2.C0 then froze the shared `p2p-manifest-v1`/`p2p-aad-v1`/K1-custody/
+  `availability-publication-v1`/`p2p-ready-descriptor-v1` contracts used by
+  the remaining P2 leaves. `P2.T1` durable publication/outbox persistence is
+  Done and owner-approved: `crates/domain/src/p2p_publication.rs`,
+  `crates/db/src/p2p_publication_repo.rs`, and migration
+  `0032_create_p2p_publications_and_outbox.sql` are landed on
+  `feature/p2p-mvp-core`. Remaining P2 leaves (T2 onward) are not yet
+  implemented. Design inputs: `docs/plan/mvp0-p2p-design-inputs.md`.
 - `crates/connectors` (primary S-090, ADR-025): per-platform integrations behind a
   `PlatformConnector` trait. For owner-authorized download (content owner grants
   scoped access to their own YouTube/Vimeo account), it resolves ownership/metadata
