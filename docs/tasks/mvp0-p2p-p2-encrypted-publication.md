@@ -107,7 +107,7 @@ Owner-approved freeze:
 | `T2a-ii-1` | Path normalization/validation (`normalize_path`, `sort_paths`) | `crates/p2p/src/path.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | **12 Low** | **[x] Done 2026-09-06** | T2a-i |
 | `T2a-ii-2` | Manifest struct + `p2p-manifest-v1` canonical JSON + digest + AAD | — split into `T2a-ii-2a` + `T2a-ii-2b` | 29 Moderate (parent, superseded by split) | **SPLIT — no parent execution** | T2a-ii-1 |
 | `T2a-ii-2a` | Manifest struct + `p2p-manifest-v1` canonical JSON + digest | `crates/p2p/src/manifest.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | **14 Low** | **[x] Done 2026-09-06** | T2a-ii-1 |
-| `T2a-ii-2b` | `p2p-aad-v1` AAD builder + canonical JSON | `crates/p2p/src/aad.rs`; `crates/p2p/src/lib.rs` | **14 Low** | Planned | T2a-ii-1 |
+| `T2a-ii-2b` | `p2p-aad-v1` AAD builder + canonical JSON | `crates/p2p/src/aad.rs`; `crates/p2p/src/lib.rs` | **14 Low** | **[x] Done 2026-09-06** | T2a-ii-1 |
 | `T2b` | Prepared-HLS package reader/snapshot | `crates/p2p/src/source.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | RUN BEFORE EXECUTION | Planned | T2a |
 | `T2c` | AES-256-GCM + canonical AAD + nonce invariant | `crates/p2p/src/crypto.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | RUN BEFORE EXECUTION | Planned | T2a |
 | `T2d` | Generate-once CK + versioned KEK wrap/unwrap + zeroization | `crates/p2p/src/key_wrap.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | RUN BEFORE EXECUTION | Planned | T2c |
@@ -372,6 +372,75 @@ Code-solution review: muse-glimmer (in-session artifact) - PASS
 - Commands run: `cargo test -p dubbridge-p2p`; `cargo clippy -p dubbridge-p2p
   --all-features`; `cargo fmt --check`; `python3 -c "... hashlib.sha256 ..."`
   cross-check against `docs/fixtures/mvp0-p2p-manifest-v1.json`
+
+---
+
+### P2.T2a-ii-2b closure record — Done 2026-09-06
+
+**Honest Low-band split rationale.** See `T2a-ii-2a` above — same parent
+`T2a-ii-2` split at the manifest/AAD seam. This leaf scored **RRI 14 Low**
+(`--cc 2 --D 1 --K 1 --P 1 --T 1 --A 0 --X 1`).
+
+**Scope delivered:** `crates/p2p/src/aad.rs` defining `Aad` with field
+declaration order matching the frozen `p2p-aad-v1` canonical JSON key
+order, plus `canonical_aad_json(&Aad) -> String`. Reuses
+`crate::manifest::manifest_sha256` in its own test rather than duplicating
+digest logic, proving that function is generic over any canonical string.
+Orchestrator added `pub mod aad;` to `lib.rs` directly (mechanical
+existing-file edit).
+
+Task-analysis review: muse-glimmer (in-session artifact) - PASS
+Code-solution review: muse-glimmer (in-session artifact) - PASS
+
+### Gemma Reviewer evidence
+
+- Model: `muse-glimmer:30b-q4_K_M` (RRI 0-25 chain primary)
+- Command: direct Ollama `/api/chat` (`num_ctx=32768`, `think=false`, `temperature=0`)
+- Passes run / usable: `1/1` phase-1 + `1/1` phase-2
+- Aggregate status: `PASS`
+- Consensus findings: `0` | Pass-specific: `0` | Disagreement: `0`
+- Isolated adjudicator: `not triggered`
+- D14 provider route: `n/a`
+- disposition_divergence: `null`
+- Primary-agent disposition: both phases PASS, 0 findings.
+
+### Implementation routing evidence
+
+- **Route:** local Qwen delegation (`scripts/delegate-low-rri.py --mode
+  full-file`, `qwen3.8:27b-mlx`), RRI 0-25 Low band, single new file.
+- **Attempt 1:** produced fully correct logic (10/10 tests incl. both new
+  assertions) but again appended the same stray non-Rust trailing line
+  (`--- CONTENT ---`) already diagnosed in `T2a-ii-1`'s closure record —
+  now confirmed as a recurring defect class: the model echoes the
+  wrapper's own tagged-block `CONTENT_MARKER` literal
+  (`scripts/delegate-low-rri.py:73`) as a spurious closing bookend. The
+  file (53 lines) again exceeded the repair wrapper's 40-line anchor cap,
+  so rather than re-running a repair delegation already known to fail the
+  same guard, the orchestrator applied the same previously-reviewed
+  scripted, asserted byte-removal fix directly (documented tooling-failure
+  exception), verified identical logic via `cargo test`/`clippy`/`fmt`
+  (all clean, no diff needed after removal). Recorded in
+  `feedback_full_file_appends_content_marker_echo` for future sessions so
+  this defect class is recognized without a second diagnostic pass.
+
+### Behavioral coverage certification
+
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| HP-1 | Happy path | AAD serializes to the exact frozen canonical JSON byte sequence | unit | `crates/p2p/src/aad.rs::tests::test_canonical_aad_json` | passed |
+| HP-2 | Happy path | canonical AAD JSON digests to the exact frozen SHA-256 value via the reused `manifest_sha256` | unit | `crates/p2p/src/aad.rs::tests::test_canonical_aad_json_sha256` | passed |
+
+### Owner final verification
+
+- Owner: `Claude Opus 5 (orchestrator of record, under owner-delegated
+  autonomous authority granted 2026-09-06 for the absence window)`
+- Date: `2026-09-06`
+- Statement: I verified the AAD canonical JSON and its digest match the
+  C0-frozen golden fixture exactly, that `manifest_sha256` reuse is
+  correct and duplicates no logic, and that no encryption/key-handling
+  code leaked into this leaf.
+- Commands run: `cargo test -p dubbridge-p2p`; `cargo clippy -p dubbridge-p2p
+  --all-features`; `cargo fmt --check`
 
 ---
 

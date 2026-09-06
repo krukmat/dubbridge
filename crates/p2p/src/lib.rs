@@ -2,5 +2,6 @@
 //! Contract types will be defined in subsequent leaves.
 //! This crate currently contains only the skeleton structure.
 
+pub mod aad;
 pub mod manifest;
 pub mod path;
