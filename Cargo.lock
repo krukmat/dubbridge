@@ -892,6 +892,7 @@ name = "dubbridge-p2p"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "unicode-normalization",
 ]
 
 [[package]]
