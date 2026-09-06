@@ -25,8 +25,23 @@ P2 does not implement invitations, viewer claims, device-envelope delivery, mobi
   - `AN-A1`: mTLS service identity on the private publication-control surface.
   - accepted semantic state model: `building -> publish_pending -> publishing -> reconciling -> ready`, with `failed` terminal only.
   - accepted minimum ADR-018 audit inventory: intent created; K1 lineage sealed/server-wrapped; external publication confirmed; reconciliation entered; `P2P_READY`; terminal publication failure.
+- P2.C0: **PASS 2026-09-06**.
+  - `p2p-manifest-v1` uses restricted RFC 8785/JCS canonical UTF-8 JSON, normalized relative paths, deterministic ordering, SHA-256 lowercase-hex digests, and shared golden fixtures.
+  - `p2p-aad-v1` + AES-256-GCM use one 96-bit CSPRNG nonce per file/CK lineage; retries reuse sealed ciphertext rather than re-encrypt the same lineage.
+  - CK is generated once per new lineage and wrapped under a versioned server KEK; retry never silently rotates CK/KEK/lineage.
+  - `availability-publication-v1` is a private mTLS PUT contract with same-lineage/digest idempotency and conflict-safe evidence.
+  - P2 audit correlation uses publication/lineage correlation without fabricating ingestion tokens.
+  - `p2p-ready-descriptor-v1` is the minimal internal handoff to P3 after authoritative `P2P_READY`.
+  - T2-T6 are decomposed into exact-path leaves; optional queue acceleration is outside the October critical path.
 - ADR-032 remains unchanged for review-time HTTP HLS.
 - ADR-018 durable audit requirements apply to governance-significant P2 events.
+
+Canonical C0 evidence:
+
+- `docs/audit/mvp0-p2p-p2-c0-contract-freeze.md`
+- `docs/audit/mvp0-p2p-p2-c0-rri.md`
+- `docs/fixtures/mvp0-p2p-manifest-v1.json`
+- `docs/fixtures/mvp0-p2p-publication-contract-v1.json`
 
 ## Parent RRI and mandatory re-scope
 
@@ -34,9 +49,9 @@ The unreduced P2 phase crosses storage, database, migrations, cryptographic key 
 
 Conservative planning score: **RRI 131 — Excessive — Effort XL**.
 
-P2 is decomposed into independently gated parents T0-T6. T0 and the decomposed T1 persistence leaves are complete. The original T1 parent scored **78 High / XL**, became a non-executable container, and its T1a-T1f leaves are **Done and owner-approved as P2.T1 on 2026-09-06**.
+P2 is decomposed into independently gated parents T0-T6. T0, the decomposed T1 persistence leaves, and C0 are complete. The original T1 parent scored **78 High / XL**, became a non-executable container, and its T1a-T1f leaves are **Done and owner-approved as P2.T1 on 2026-09-06**.
 
-The next gate is **P2.C0**, a docs/contract freeze that makes the remaining implementation workstreams safely composable.
+The remaining P2 implementation begins only through the C0-frozen exact-path leaves under T2-T6. Each executable leaf is scored with `scripts/rri.py` immediately before presentation/execution; C0 completion does not authorize source work.
 
 ## Architecture
 
@@ -48,12 +63,12 @@ S-120 HLS Ready
 P2.T1 durable publication/outbox persistence ✅
       |
       v
-P2.C0 shared contract + fixture + path freeze
+P2.C0 shared contract + fixture + path freeze ✅
       |
       +----------+----------------+----------------+
       v          v                v                v
 P2.T2 K1      P2.T3 AN-R1      P2.T4 recovery   P2.T6 audit/test
-builder       executor          kernel/client    harness (early)
+builder       executor          kernel/client    harness
       |
       +----------+----------------+----------------+
                          |
@@ -67,7 +82,7 @@ same-lineage durable confirmation
 PostgreSQL P2P_READY
       |
       v
-P3 may later consume readiness + K1 lineage
+P3 consumes p2p-ready-descriptor-v1
 ```
 
 The queue is never authority. Availability Node reachability is never readiness. Unknown remote outcome stays non-ready. Logical package identity and K1 lineage cannot change merely because work is retried or redelivered.
@@ -85,8 +100,6 @@ Owner-approved contract:
 - Availability Node secret deny-list includes PostgreSQL credentials, plaintext CK, KEK, invite/viewer/business authorization, application JWT signing material, and service private credentials in payload/logs;
 - semantic publication state is `building -> publish_pending -> publishing -> reconciling -> ready`; unknown external outcome stays `reconciling`; `failed` is terminal only;
 - minimum P2 ADR-018 event set accepted as recorded in the T0 selection audit.
-
-Evidence: `docs/audit/mvp0-p2p-p2-t0-selection.md`.
 
 ### P2.T1 — persistence parent — SUPERSEDED AS EXECUTABLE GATE
 
@@ -107,8 +120,6 @@ Only pure Rust domain semantics:
 - unit tests for lineage stability, unknown/reconciling behavior, invalid direct Ready, terminal/regressive transitions.
 
 No PostgreSQL, migration, repository, crypto, worker, queue, Availability Node, or S-120 source.
-
-Approval card: `docs/audit/mvp0-p2p-p2-t1a-approval-card.md`.
 
 #### P2.T1b — PostgreSQL schema + constraints — DONE
 
@@ -140,20 +151,24 @@ Planning **RRI 33 Medium / Effort M**.
 
 Only integration/negative evidence for atomicity, restart/re-read, duplicate create, invalid Ready, and secret-deny-list inspection. Defects reopen the responsible implementation leaf rather than expanding certification scope.
 
-### P2.C0 — shared implementation contract freeze — NEXT GATE
+### P2.C0 — shared implementation contract freeze — PASS
 
-Before downstream source work fans out, freeze:
+**Owner-approved 2026-09-06; RRI 66 Complex / Effort L; four Reflection passes PASS.**
 
-- manifest-v1 serialization, path normalization, ordering, digest encoding, and shared golden fixtures;
-- AES-256-GCM suite, canonical AAD, unique nonce allocation, and restart behavior;
+C0 freezes:
+
+- manifest-v1 canonical serialization, normalized path order/digest encoding, and shared golden fixtures;
+- AES-256-GCM, canonical AAD, unique 96-bit nonce allocation, and same-lineage retry behavior;
 - generate-once CK sealing/retry semantics and versioned KEK resolver/rotation/zeroization boundary;
 - ciphertext handoff to the Availability Node plus request, response, error, idempotency, and confirmation evidence;
 - audit event/transaction/correlation map and the minimal P3 descriptor;
-- exact path ownership, shared-file ownership, base SHA, and integration order for every implementation leaf.
+- exact path ownership, shared-file ownership, migration reservation order, and integration order for every T2-T6 implementation leaf.
 
-Every T2-T6 executable leaf receives an exact-path RRI before presentation. Shared registries, migrations, manifests, lockfiles, module exports, configuration, Compose, and status documents remain owned by the orchestrator/integration leaf.
+C0 intentionally introduces no source or migration changes. Full contract and leaf/path matrix: `docs/audit/mvp0-p2p-p2-c0-contract-freeze.md`.
 
-### P2.T2 — K1 package construction
+### P2.T2 — K1 package construction — DECOMPOSED
+
+C0 decomposition: `T2a` dedicated `crates/p2p` manifest/path contract; `T2b` S-120 package reader; `T2c` AES-GCM/AAD/nonce invariant; `T2d` generate-once CK + KEK wrapping; `T2e` additive K1 persistence (`0033`); `T2f` package assembly/seal; `T2g` crypto/golden certification.
 
 Build encrypted package material from existing S-120 HLS:
 
@@ -163,44 +178,55 @@ Build encrypted package material from existing S-120 HLS:
 - manifest/hash evidence over ciphertext package content;
 - server-wrapped CK under the configured versioned KEK boundary;
 - plaintext CK transient only and never logged/persisted;
-- retry of the same logical publication consumes the already-frozen lineage rather than silently rotating package identity/CK.
+- retry of the same logical publication consumes the already-sealed lineage rather than silently rotating package identity/CK.
 
-### P2.T3 — Availability Node publication executor
+### P2.T3 — Availability Node publication executor — DECOMPOSED
 
-Implement the T0-frozen `AN-R1 + AN-A1` contract:
+C0 decomposition: `T3a` Node/TS service + v1 contract; `T3b` private mTLS; `T3c` persistent Hyperdrive + idempotency/conflict behavior; `T3d` contract/security certification.
+
+Implement the T0/C0-frozen `AN-R1 + AN-A1` contract:
 
 - Node.js/TypeScript service;
 - mTLS-authenticated private control surface;
-- accepts only stable publication identity plus non-secret ciphertext metadata/material references;
+- accepts only stable publication identity plus non-secret ciphertext package reference/metadata;
 - opens/seeds ciphertext package bytes only;
 - idempotently returns existing publication evidence for the same logical identity;
 - never receives PostgreSQL credentials, plaintext CK, server KEK, invitation/viewer state, business authorization, or backend signing authority.
 
-### P2.T4 — O4 dispatch + reconciliation
+### P2.T4 — O4 dispatch + reconciliation — DECOMPOSED
+
+C0 decomposition: `T4a` pure recovery kernel; `T4b` PostgreSQL claims/leases (`0034`); `T4c` mTLS AN client; `T4d` outbox dispatcher; `T4e` worker/reconciler join; `T4f` recovery certification.
 
 Implement delivery/recovery mechanics:
 
-- outbox dispatcher;
-- optional existing queue adapter as an accelerator only;
+- PostgreSQL outbox dispatcher;
 - bounded claim/lease/retry behavior;
 - PostgreSQL-driven reconciler for lost dispatch, stale work, unknown outcome, remote-success/ACK-loss, and local Ready-commit loss;
 - idempotent duplicate-after-Ready behavior;
 - no exactly-once claim.
 
-### P2.T5 — S-120 integration + fail-closed Ready transition
+Optional queue acceleration is **outside the October P2 critical path** and receives a later separately-scored task if needed.
+
+### P2.T5 — S-120 integration + fail-closed Ready transition — DECOMPOSED
+
+C0 decomposition: `T5a` current-order characterization; `T5b` fail-contained activation; `T5c` authoritative ready/P3 descriptor read model; `T5d` S-120/ASR non-regression.
 
 Wire P2 downstream of S-120 without changing S-120 semantics:
 
-- create/ensure publication intent only after the required prepared HLS derivative exists;
-- never block or roll back `PreparationStatus::Ready` or transcription enqueue;
+- existing preparation reaches `Ready` first;
+- existing `prepare_transcription_post_ready(...)` call occurs before P2 activation;
+- P2 activation failure cannot undo/delay S-120 Ready or suppress the transcription enqueue attempt;
 - transition semantic `P2P_READY` only when PostgreSQL durably proves same-lineage package construction and external publication confirmation;
-- expose only the minimal internal descriptor P3 will later consume.
+- expose only `p2p-ready-descriptor-v1` for future P3.
 
-### P2.T6 — audit, crash-window certification, and closure
+### P2.T6 — audit, crash-window certification, and closure — DECOMPOSED
+
+C0 decomposition: `T6a` backward-compatible P2 audit correlation (`0035`); `T6b` six durable audit event mappings; `T6c` deterministic six-window crash harness; `T6d` ciphertext/secret-boundary certification; `T6e` P2 evidence/status closure.
 
 Close P2 with executable evidence for all O4 crash windows and K1 confidentiality:
 
 - implement/finalize the P2 ADR-018 inventory beginning with T0's accepted minimum;
+- never fabricate `ingest_token` for P2 correlation;
 - integration coverage over PostgreSQL + worker + Availability Node contract;
 - lost dispatch, duplicate delivery, unknown result, lost ACK, lost Ready commit, duplicate-after-Ready;
 - ciphertext-only publication inspection;
@@ -213,7 +239,7 @@ Close P2 with executable evidence for all O4 crash windows and K1 confidentialit
 
 - **HP-P2-1:** existing S-120 Ready HLS -> one K1 ciphertext package -> confirmed Availability Node publication -> authoritative PostgreSQL `P2P_READY`, while ASR remains independently enqueueable.
 - **HP-P2-2:** process restart after durable publication intent but before external dispatch -> the same logical package/lineage is recovered and published once logically under at-least-once delivery.
-- **HP-P2-3:** optional queue acceleration is removed/unavailable -> PostgreSQL outbox/reconciler still recovers and completes the same publication.
+- **HP-P2-3:** optional queue acceleration is absent -> PostgreSQL outbox/reconciler still recovers and completes the same publication.
 
 ### Edge cases
 
@@ -225,19 +251,28 @@ Close P2 with executable evidence for all O4 crash windows and K1 confidentialit
 
 ## Verification strategy
 
-Every implementation leaf must map its HP/EC cases to executable evidence under `behavior-v2`. P2 closure requires migration/repository integration tests, K1 crypto vectors, Availability Node contract tests, worker/outbox/reconciler integration tests, deterministic failure injection for all six D3 crash windows, audit persistence tests, S-120/ASR non-regression, and ciphertext inspection.
+Every implementation leaf must map its HP/EC cases to executable evidence under `behavior-v2`. P2 closure requires migration/repository integration tests, K1 crypto vectors, cross-runtime golden-fixture conformance, Availability Node contract/mTLS tests, worker/outbox/reconciler integration tests, deterministic failure injection for all six D3 crash windows, audit persistence tests, S-120/ASR non-regression, and ciphertext inspection.
 
 ## Remaining workstreams and joins
 
-After C0, decomposition should expose independently verifiable leaves rather than execute T2-T6 as oversized parents:
+C0 has replaced the former provisional decomposition with the exact-path leaf matrix in `docs/audit/mvp0-p2p-p2-c0-contract-freeze.md`:
 
-- **K1:** contracts/types; S-120 reader; AES-GCM plus nonce allocation as one invariant; KEK wrapping; ciphertext sink/manifest; assembly/seal/persistence join; certification.
-- **Availability Node:** service/contract bootstrap; mTLS controller; persistent Hyperdrive/idempotency; secret-boundary tests; golden-fixture conformance.
-- **O4 recovery:** pure recovery kernel; claim/lease repository; AN mTLS client; dispatcher/reconciler join; six-window certification. Queue acceleration stays optional and off the critical path.
-- **S-120 join:** early characterization/inert seam; later activation/readiness integration; non-regression certification.
-- **Audit/testing:** build the deterministic harness early; close only after cross-component and confidentiality evidence passes.
+- **T2:** `T2a -> T2b/T2c -> T2d -> T2e -> T2f -> T2g`.
+- **T3:** `T3a -> T3b -> T3c -> T3d`.
+- **T4:** `T4a -> T4b`; `T4c` after T3 contract; then `T4d -> T4e -> T4f`.
+- **T5:** `T5a` characterization before source hook; `T5b -> T5c -> T5d` after T2/T4 integration.
+- **T6:** `T6a -> T6b`, then integrated `T6c/T6d -> T6e`.
 
-These are calendar workstreams. Source authorship still follows the repository's one-task-at-a-time rule unless an explicit workflow amendment authorizes concurrent task IDs. ADR-040 split authorship may be used inside one eligible approved RRI 26-55 task with disjoint paths and a single integration owner.
+These are calendar workstreams. Source authorship still follows the repository's one-task-at-a-time rule. ADR-040 per-module split authorship may be used only inside one eligible approved RRI 26–55 task with common base SHA, frozen interfaces, disjoint writable paths, one writer per path, shared files owned by the orchestrator, and whole-task integration/verification.
+
+## S-230 October integration
+
+C0 is now an explicit input to the deployment lane:
+
+- `S-230-T6p-a` completion requires `S-230-T5 PASS + P2.T0 PASS + P2.C0 PASS`.
+- `T6p-b` cannot begin until `T6p-a PASS`, C0's package contract remains frozen, and the T3 Availability Node contract subtree is PASS/stable.
+- `T6p-c` proves local deployment wiring only.
+- `T6p-d` remains blocked on `S-230-T6 PASS + T6p-c PASS + P2 PASS` and proves backend publication only, not invited Android playback.
 
 ## Gates
 
@@ -246,7 +281,7 @@ These are calendar workstreams. Source authorship still follows the repository's
 3. P2.T0 architecture/security contract — **PASS 2026-09-05 (`AN-R1 + AN-A1`)**.
 4. Original P2.T1 High-band gate — **superseded/non-executable**.
 5. P2.T1a-T1f durable persistence outcome — **Done / owner-approved 2026-09-06**.
-6. P2.C0 shared contract/path freeze — **next gate**.
-7. T2-T6 are decomposed, independently scored, presented, approved, and joined after C0; planning and evidence work may proceed in parallel.
-8. P2 closes only after T0, T1a-T1f, and T2-T6 PASS, integrated Reflection, coverage certification, status synchronization, and owner verification.
+6. P2.C0 shared contract/path freeze — **PASS 2026-09-06**.
+7. T2-T6 exact-path leaves are independently scored, presented/approved where required, executed, verified, and joined after C0.
+8. P2 closes only after T0, T1a-T1f, C0, and T2-T6 PASS, integrated Reflection, coverage/certification evidence, status synchronization, and owner verification.
 9. P3 remains blocked until P2 PASS.
