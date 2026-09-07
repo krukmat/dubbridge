@@ -1,0 +1,50 @@
+{
+  "changed_paths": [],
+  "findings": [
+    {
+      "detail": "The specification fails to freeze the RPC command schema and the receipt structure, leaving the interface between the worklet and the host undefined.",
+      "line": 1,
+      "path": "task-analysis-packet",
+      "scope": "out-of-scope",
+      "severity": "blocking",
+      "suggestion": "Define the exact JSON-RPC method name and the structure of the returned capability/schema_version object."
+    },
+    {
+      "detail": "The \"proof cache root\" is referenced as a requirement for path validation but its source of truth (environment variable, config, or hardcoded path) is not specified.",
+      "line": 1,
+      "path": "task-analysis-packet",
+      "scope": "out-of-scope",
+      "severity": "major",
+      "suggestion": "Explicitly define the trusted source for the root path to prevent directory traversal attacks."
+    },
+    {
+      "detail": "The contract for the Corestore storage adapter is missing; it is unclear how the worklet will access the filesystem or if it uses a virtualized/sandboxed adapter.",
+      "line": 1,
+      "path": "task-analysis-packet",
+      "scope": "out-of-scope",
+      "severity": "major",
+      "suggestion": "Specify the required import interface for the filesystem/storage adapter in the Bare bundle."
+    },
+    {
+      "detail": "Error handling and cleanup semantics are undefined. It is unclear if a failure during `close()` results in a fatal protocol error or a silent failure.",
+      "line": 1,
+      "path": "task-analysis-packet",
+      "scope": "out-of-scope",
+      "severity": "minor",
+      "suggestion": "Define the error state machine for the open/close lifecycle and the expected error codes."
+    },
+    {
+      "detail": "The test suite requirements are incomplete. There is no requirement for negative testing (e.g., attempting to open a path outside the allowed root).",
+      "line": 1,
+      "path": "task-analysis-packet",
+      "scope": "out-of-scope",
+      "severity": "minor",
+      "suggestion": "Add a mandatory test case for path validation/boundary enforcement."
+    }
+  ],
+  "format_warnings": [
+    "bare STATUS value accepted (non-standard format): 'FINDINGS'"
+  ],
+  "status": "findings",
+  "summary": "The task specification is currently insufficient for a Med-high approval card. It lacks the necessary technical constraints and formal definitions required to prevent scope creep or security vulnerabilities during implementation."
+}

@@ -1,0 +1,95 @@
+{
+  "fixture_version": "p2p-c0-publication-contract-golden-v1",
+  "availability_node": {
+    "contract_version": "availability-publication-v1",
+    "method": "PUT",
+    "path_template": "/v1/publications/{publication_id}",
+    "transport": "private-mTLS",
+    "request": {
+      "contract_version": "availability-publication-v1",
+      "publication_id": "22222222-2222-4222-8222-222222222222",
+      "lineage_id": "33333333-3333-4333-8333-333333333333",
+      "manifest_version": "p2p-manifest-v1",
+      "manifest_digest_sha256": "b753ba52473d8b9f1ddc8444d43d6166c6b46eeb1214018e3a33503f56a021b4",
+      "package_ref": "packages/22222222-2222-4222-8222-222222222222/33333333-3333-4333-8333-333333333333"
+    },
+    "success_first_publish": {
+      "http_status": 201,
+      "body": {
+        "contract_version": "availability-publication-v1",
+        "publication_id": "22222222-2222-4222-8222-222222222222",
+        "lineage_id": "33333333-3333-4333-8333-333333333333",
+        "manifest_digest_sha256": "b753ba52473d8b9f1ddc8444d43d6166c6b46eeb1214018e3a33503f56a021b4",
+        "external_publication_id": "hyperdrive:example-stable-public-key",
+        "evidence_id": "availability-evidence-example-001",
+        "confirmed_at": "2026-09-06T14:00:00Z"
+      }
+    },
+    "success_idempotent_replay": {
+      "http_status": 200,
+      "rule": "same publication_id + lineage_id + manifest_digest returns the same external_publication_id and evidence_id"
+    },
+    "errors": [
+      {
+        "http_status": 400,
+        "code": "invalid_contract",
+        "meaning": "malformed or unsupported contract version"
+      },
+      {
+        "http_status": 403,
+        "code": "service_identity_rejected",
+        "meaning": "authenticated mTLS identity is not authorized for publication control"
+      },
+      {
+        "http_status": 409,
+        "code": "publication_conflict",
+        "meaning": "same logical publication identity carries a different lineage or manifest digest"
+      },
+      {
+        "http_status": 422,
+        "code": "package_invalid",
+        "meaning": "package_ref, manifest, normalized paths, or ciphertext digests fail validation"
+      },
+      {
+        "http_status": 503,
+        "code": "publication_unavailable",
+        "meaning": "transient Hyperdrive/storage failure; caller must remain non-ready and reconcile same lineage"
+      }
+    ],
+    "package_ref_rules": {
+      "opaque_to_backend_contract": true,
+      "relative_only": true,
+      "configured_ciphertext_root_only": true,
+      "no_arbitrary_host_path": true
+    },
+    "secret_deny_list": [
+      "postgres_credentials",
+      "plaintext_ck",
+      "server_kek",
+      "invite_state",
+      "viewer_state",
+      "business_authorization",
+      "application_jwt_signing_material",
+      "service_private_key_payload"
+    ]
+  },
+  "p3_ready_descriptor": {
+    "descriptor_version": "p2p-ready-descriptor-v1",
+    "asset_id": "11111111-1111-4111-8111-111111111111",
+    "publication_id": "22222222-2222-4222-8222-222222222222",
+    "lineage_id": "33333333-3333-4333-8333-333333333333",
+    "manifest_version": "p2p-manifest-v1",
+    "manifest_digest_sha256": "b753ba52473d8b9f1ddc8444d43d6166c6b46eeb1214018e3a33503f56a021b4",
+    "external_publication_id": "hyperdrive:example-stable-public-key",
+    "ck_wrap_ref": "p2p-ck-wrap:22222222-2222-4222-8222-222222222222",
+    "kek_id": "p2p-server-kek",
+    "kek_version": 1,
+    "ready_at": "2026-09-06T14:00:01Z"
+  },
+  "p3_descriptor_rules": [
+    "Descriptor is internal control-plane data and exists only for authoritative PostgreSQL P2P_READY.",
+    "Descriptor contains no plaintext CK, wrapped CK bytes, invitation, viewer, device, or device-envelope material.",
+    "P3 resolves ck_wrap_ref server-side and independently enforces O3 authorization plus D2/K1 release predicates.",
+    "Availability Node response is evidence only; PostgreSQL persistence of same-lineage confirmation establishes readiness."
+  ]
+}

@@ -1,0 +1,55 @@
+name: p2p-t1
+
+on:
+  push:
+    paths:
+      - "crates/domain/src/p2p_publication.rs"
+      - "crates/domain/src/lib.rs"
+      - "crates/db/src/p2p_publication_repo.rs"
+      - "crates/db/src/lib.rs"
+      - "crates/db/tests/p2p_publication_repo.rs"
+      - "infra/migrations/0032_create_p2p_publications_and_outbox.sql"
+      - ".github/workflows/p2p-t1.yml"
+  pull_request:
+    paths:
+      - "crates/domain/src/p2p_publication.rs"
+      - "crates/domain/src/lib.rs"
+      - "crates/db/src/p2p_publication_repo.rs"
+      - "crates/db/src/lib.rs"
+      - "crates/db/tests/p2p_publication_repo.rs"
+      - "infra/migrations/0032_create_p2p_publications_and_outbox.sql"
+      - ".github/workflows/p2p-t1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-p2p-t1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: dubbridge_test
+          POSTGRES_USER: dubbridge
+          POSTGRES_PASSWORD: dubbridge
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DUBBRIDGE_DATABASE_URL: postgres://dubbridge:dubbridge@localhost:5432/dubbridge_test
+      CARGO_NET_RETRY: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run P2.T1 domain contract tests
+        run: cargo test --locked -p dubbridge-domain p2p_publication
+      - name: Run P2.T1 PostgreSQL persistence certification
+        run: cargo test --locked -p dubbridge-db --test p2p_publication_repo -- --test-threads=1

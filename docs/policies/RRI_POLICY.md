@@ -713,6 +713,36 @@ this one controls what may be marked Done after the fact.
 
 ## Decomposition triggers
 
+### Honest Low-band maximization is the default first pass
+
+Before task presentation or direct Low-band execution, score the coherent
+parent outcome and make a good-faith attempt to express its executable work as
+independently meaningful **RRI 0–25 / Effort S leaves**. This is a
+hardware-aware local-first optimization, not a scoring waiver:
+
+- every leaf receives its own measured `F`, honest D/K/P/X judgments, all
+  applicable penalties, acceptance criteria, allowed paths, verification,
+  dependencies, and evidence/status-sync obligations;
+- the preliminary parent RRI remains the approval and integrated-review
+  envelope, so an RRI 26+ parent still requires HITL approval before any Low
+  leaf begins and retains its original reviewer/Reflection gates at assembly;
+- architecture, security, governance, schema, and similar unresolved choices
+  remain explicit decision checkpoints rather than being disguised as Low
+  implementation;
+- assembly and integration are scored independently, and no leaf may hide
+  cross-task coupling or inherit another leaf's score;
+- if further splitting would break a behavioral invariant, produce an
+  unverifiable fragment, or merely game the score, record
+  `honest-low-max: residual` and keep that residue in its actual band.
+
+Low scoring alone does not make a task eligible for local Qwen Developer:
+that route remains limited to simple code patches. The complete procedure is
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Honest Low-band maximization before
+presentation`.
+
+The hard triggers below still apply. They force a split even when the honest
+first pass found no useful additional Low leaf.
+
 Split a task into subtasks before implementing if **any** of the following apply:
 
 - Final RRI ≥ 56. This is the default hard gate for Complex, High, Very high, and Excessive tasks.
@@ -729,17 +759,21 @@ Split a task into subtasks before implementing if **any** of the following apply
 because they can force decomposition even below 56, and they help explain why a task that
 started below 56 must still be split after recomputation.
 
-**Split target:** divide until each subtask scores RRI ≤ 55 with A ∈ {0, 1}
-(own acceptance criteria + happy/edge examples per the workflow guide).
+**Split target:** maximize coherent RRI 0–25 / Effort S leaves, each with
+A ∈ {0, 1} and its own acceptance criteria plus happy/edge examples where
+required by the workflow guide. Any inseparable above-Low residue keeps its
+actual score and route; mandatory hard-trigger decomposition must at minimum
+reduce executable leaves to RRI ≤ 55 before implementation.
 
 ## Reporting format
 
 Before every implementation, compute the RRI as a table. Store the full report in
-the task ledger or a dedicated RRI artifact. For RRI 26+, the compact approval
-card links to that report and shows only the final score/band, gates, penalties,
-dominant drivers, and resolved routing. For RRI 0–25, include the full report in
-the local delegation packet and final report instead of presenting an approval
-card.
+the task ledger or a dedicated RRI artifact. A decomposed set stores both the
+parent-envelope report and each leaf report. For a parent RRI 26+, the compact
+approval card links to those reports and shows only the parent score/band,
+gates, penalties, dominant drivers, resolved routing, and leaf summary. For an
+independent RRI 0–25 task, include the full report in the local delegation
+packet and final report instead of presenting an approval card.
 
 | Variable | Score | Evidence | Confidence |
 |---|---|---|---|

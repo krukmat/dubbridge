@@ -1,0 +1,10 @@
+{
+  "task_id": "P1.F2",
+  "card_hash": "1aea5b4710306319b470d3976bb74de2642747eecc7d486e65e4baeb9bff3d1e",
+  "refinement_artifact_sha256": "72f2812059a05a197713036ceacbe3392e04d794643b9d4743607e72a164c79e",
+  "decision": "CLOUD_REQUIRED",
+  "primary_id": "codex-gpt-5.6-terra",
+  "timestamp": "2026-08-27T16:23:40Z",
+  "rationale": "Muse Glimmer returned a valid GO_LOCAL advisory. The primary downgrades it to CLOUD_REQUIRED because the final RRI 55 lies in ADR-038's 46-55 cloud-only whole-task sub-band; no ADR-040 per-module split was approved or evaluated as eligible. The frozen scope remains intact, and the owner-selected operational cloud route is gpt-5.6-terra at high reasoning effort.",
+  "gate_decision_note": "The receipt binds the exact canonical refinement artifact and immutable task-packet byte hash. med_high_gate.py returns CLOUD_REQUIRED because the primary validly downgrades GO_LOCAL; the RRI 46-55 policy independently excludes whole-task local implementation."
+}

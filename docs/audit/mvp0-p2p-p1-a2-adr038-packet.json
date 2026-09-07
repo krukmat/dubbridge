@@ -1,0 +1,37 @@
+{
+  "task_id": "P1.A2",
+  "rri": 46,
+  "approved_by": "Matias, repository owner",
+  "approval": "2026-08-30 explicit instruction: Trabaja en la task P1.A2",
+  "objective": "Implement proof-only deterministic synthetic seed storage with a redacted count/digest receipt, close-before-delete, verified absence, and a bounded abandoned-run janitor.",
+  "allowed_paths": [
+    "mobile/src/p2p/runtime/worklet.ts",
+    "mobile/src/p2p/runtime/protocol.ts",
+    "mobile/src/p2p/runtime/worklet.bundle.js",
+    "mobile/src/p2p/proof/P1ProofRuntimeFactory.ts",
+    "mobile/src/p2p/proof/transient-storage.ts",
+    "mobile/src/p2p/proof/P1SeedProofRunner.ts",
+    "mobile/__tests__/p2p/transient-seed.test.ts"
+  ],
+  "acceptance": [
+    "HP-A2: deterministic fixture writes and hashes inside exactly one valid proof run directory; the receipt reveals byte count and SHA-256 only; all handles close, that directory is deleted, and absence is verified.",
+    "EC-A2: traversal or foreign path and write/hash/close/delete failures fail closed; only valid marked stale runs below the proof root are eligible for janitor deletion.",
+    "No discovery, Hyperswarm, replication, product P2PService call, or persistent product state is introduced."
+  ],
+  "constraints": [
+    "ADR-043: only Paths.cache/dubbridge-p2p/proofs/<run-id>; close handles before delete; verify nonexistence; janitor is bounded after crash.",
+    "P1.A1b.0: host passes the sole file: URI through Bare.argv[0]; URI/path, keys, fixture content, and raw errors do not enter RPC receipts or logs.",
+    "A cleanup failure cannot produce PASS. Android evidence is redacted and must not claim resolution of X28."
+  ],
+  "out_of_scope": [
+    "Hyperswarm, discovery, replication, client worklet",
+    "P2PService, normal product startup, public API, durable identity or storage",
+    "user media, keys, HTTP, iOS, Android X28 remediation"
+  ],
+  "verification": [
+    "focused transient-seed Jest test covering HP-A2 and EC-A2",
+    "npm run build:bare-worklet and npm run check:bare-worklet",
+    "npm run typecheck, npm run lint, and full mobile Jest"
+  ],
+  "known_environment_constraint": "X28 remains an Android Bare-runtime device-proof blocker caused by upstream bare-module@6.3.2 inside react-native-bare-kit@0.15.0; it is not an Ollama issue."
+}

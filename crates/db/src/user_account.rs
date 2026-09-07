@@ -198,8 +198,7 @@ mod tests {
         sqlx::query("TRUNCATE TABLE user_account, organizations RESTART IDENTITY CASCADE")
             .execute(&pool)
             .await
-            .expect("truncate auth tables");
-
+            .expect("truncate user_account tables");
         Some(pool)
     }
 

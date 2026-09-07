@@ -1,0 +1,60 @@
+{
+  "schema": "behavior-map-v2",
+  "version": 1,
+  "policy": {
+    "new_features": "strict",
+    "legacy_features": "grandfathered until explicitly migrated",
+    "evidence": "executable paths only; specification files are not evidence"
+  },
+  "features": [
+    {"file": "p4-workspace.feature", "mode": "legacy"},
+    {"file": "p6-compliance.feature", "mode": "legacy"},
+    {"file": "s-050-mobile-client.feature", "mode": "legacy"},
+    {"file": "s-055-maestro-suite.feature", "mode": "legacy"},
+    {"file": "s-060-mobile-asset-lifecycle.feature", "mode": "legacy"},
+    {
+      "file": "s-120-media-preparation.feature",
+      "mode": "strict",
+      "mappings": [
+        {
+          "scenario": "S120_HP1",
+          "tasks": ["S-120-T2", "S-120-T3", "S-120-T4", "S-120-T5"],
+          "evidence": [
+            "apps/api/tests/preparation_repo_test.rs::insert_probe_metadata_artifact_links_to_source",
+            "apps/api/tests/preparation_repo_test.rs::insert_hls_artifacts_persists_manifest_and_segments",
+            "apps/api/tests/preparation_repo_test.rs::preparation_status_transitions_succeed"
+          ]
+        },
+        {
+          "scenario": "S120_EC1",
+          "tasks": ["S-120-T5", "S-125-T4"],
+          "evidence": [
+            "apps/api/tests/playback_grant_test.rs::not_ready_asset_returns_fail_closed_denial_and_writes_no_grant_row"
+          ]
+        },
+        {
+          "scenario": "S120_EC2",
+          "tasks": ["S-120-T4", "S-120-T5"],
+          "evidence": [
+            "apps/api/tests/preparation_repo_test.rs::failed_status_persists_error_detail"
+          ]
+        },
+        {
+          "scenario": "S120_EC3",
+          "tasks": ["S-120-T3", "S-120-T4", "S-120-T5"],
+          "evidence": [
+            "apps/api/tests/preparation_repo_test.rs::malformed_hls_output_does_not_persist_artifacts",
+            "crates/media/src/lib.rs::parse_ffprobe_output_rejects_missing_format"
+          ]
+        }
+      ]
+    },
+    {"file": "s-125-hls-playback-delivery.feature", "mode": "legacy"},
+    {"file": "s-127-mobile-review-player.feature", "mode": "legacy"},
+    {"file": "s-130-asr-transcription.feature", "mode": "legacy"},
+    {"file": "s-140-subtitle-generation.feature", "mode": "legacy"},
+    {"file": "s-160-review.feature", "mode": "legacy"},
+    {"file": "s-200-mobile-auth.feature", "mode": "legacy"},
+    {"file": "s-210-mobile-product-experience.feature", "mode": "legacy"}
+  ]
+}

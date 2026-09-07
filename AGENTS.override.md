@@ -95,6 +95,15 @@ prepend for any task invoking a local role:
 
 ## Complexity And Model Guidance
 
+Before freezing or presenting executable work, run the workflow guide's
+**honest Low-band maximization pass**: score the coherent parent outcome, then
+prefer independently meaningful and verifiable RRI 0–25 / Effort S leaves so
+eligible bounded code patches can use the local developer within hardware
+limits. Never game RRI, suppress penalties, hide coupling, or split an
+invariant into unverifiable fragments. The parent score still governs HITL
+approval, band-routed review, Reflection count, and integrated closure; any
+inseparable residue keeps its actual band.
+
 **When RRI has been computed**, the `Complexity` field must use the RRI band
 name:
 

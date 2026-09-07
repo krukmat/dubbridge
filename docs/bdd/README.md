@@ -5,11 +5,12 @@ Canonical home for repository BDD artifacts: `docs/bdd/`.
 ## Convention
 
 - All DubBridge `.feature` specs live in `docs/bdd/`.
+- `docs/bdd/behavior-map-v2.json` is the machine-readable canonical inventory and strict/legacy migration record enforced by `make qa-bdd-map`.
 - Scenario IDs remain stable and behavioral.
-- Mobile-owned executable evidence may still live in `mobile/maestro/` or mobile
-  tests even when the canonical `.feature` file lives in `docs/bdd/`.
-- Retrospective slices may map to shipped unit/integration evidence or runner
-  artifacts when no standalone Maestro flow exists.
+- Mobile-owned executable evidence may still live in `mobile/maestro/` or mobile tests even when the canonical `.feature` file lives in `docs/bdd/`.
+- Retrospective slices may map to shipped unit/integration evidence or runner artifacts when no standalone Maestro flow exists.
+- One scenario may map to multiple tasks and multiple executable evidence items.
+- A `.feature` specification is never executable evidence for itself.
 
 ## Canonical spec files
 
@@ -25,6 +26,7 @@ Canonical home for repository BDD artifacts: `docs/bdd/`.
 - `s-140-subtitle-generation.feature`
 - `s-160-review.feature`
 - `s-200-mobile-auth.feature`
+- `s-210-mobile-product-experience.feature`
 
 ## S-050 — First-party mobile client
 Spec: `docs/bdd/s-050-mobile-client.feature`
@@ -61,12 +63,14 @@ Spec: `docs/bdd/s-060-mobile-asset-lifecycle.feature`
 ## S-120 — Media preparation
 Spec: `docs/bdd/s-120-media-preparation.feature`
 
+`S-120` is the first historical spec migrated to strict `behavior-map-v2` traceability. Its scenarios intentionally map many-to-many across the preparation tasks because metadata extraction, HLS persistence and final readiness are delivered by separate implementation steps.
+
 | Scenario ID | Description | Task | Executable Evidence | Mobile Flow | HP / EC |
 | --- | --- | --- | --- | --- | --- |
-| S120_HP1 | Successful preparation produces metadata and HLS outputs | S-120-T2 | `s-120-media-preparation.feature` | — | HP |
-| S120_EC1 | Downstream processing is blocked while asset is not prepared | S-120-T3 | `s-120-media-preparation.feature` | — | EC |
-| S120_EC2 | Preparation failure leaves the asset not ready and observable | S-120-T4 | `s-120-media-preparation.feature` | — | EC |
-| S120_EC3 | Malformed probe/transcode result does not mark the asset prepared | S-120-T5 | `s-120-media-preparation.feature` | — | EC |
+| S120_HP1 | Successful preparation produces metadata and HLS outputs | S-120-T2, S-120-T3, S-120-T4, S-120-T5 | `apps/api/tests/preparation_repo_test.rs::insert_probe_metadata_artifact_links_to_source`; `apps/api/tests/preparation_repo_test.rs::insert_hls_artifacts_persists_manifest_and_segments`; `apps/api/tests/preparation_repo_test.rs::preparation_status_transitions_succeed` | — | HP |
+| S120_EC1 | Downstream processing is blocked while asset is not prepared | S-120-T5, S-125-T4 | `apps/api/tests/playback_grant_test.rs::not_ready_asset_returns_fail_closed_denial_and_writes_no_grant_row` | — | EC |
+| S120_EC2 | Preparation failure leaves the asset not ready and observable | S-120-T4, S-120-T5 | `apps/api/tests/preparation_repo_test.rs::failed_status_persists_error_detail` | — | EC |
+| S120_EC3 | Malformed probe/transcode result does not mark the asset prepared | S-120-T3, S-120-T4, S-120-T5 | `apps/api/tests/preparation_repo_test.rs::malformed_hls_output_does_not_persist_artifacts`; `crates/media/src/lib.rs::parse_ffprobe_output_rejects_missing_format` | — | EC |
 
 ## S-125 — HLS playback delivery
 Spec: `docs/bdd/s-125-hls-playback-delivery.feature`

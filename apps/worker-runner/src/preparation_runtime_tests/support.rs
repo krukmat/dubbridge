@@ -20,12 +20,6 @@ pub(super) async fn setup_pool() -> Option<PgPool> {
         .run(&pool)
         .await
         .expect("migrations");
-    sqlx::query(
-        "TRUNCATE TABLE pending_ingestions, audit_events, artifact_records, rights_records, assets, asset_preparation_status, asset_transcription_status RESTART IDENTITY CASCADE",
-    )
-    .execute(&pool)
-    .await
-    .expect("truncate");
     Some(pool)
 }
 

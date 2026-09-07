@@ -52,7 +52,10 @@ doc gates).
 | [ADR-040](ADR-040-per-module-complexity-split-implementation-routing.md) | Per-module complexity-split implementation routing (RRI 26-55) | Accepted (amends ADR-036/ADR-038; agent workflow only) |
 | [ADR-041](ADR-041-pre-approval-med-high-decomposition-local-favoring-granularity.md) | Pre-approval Med-high task decomposition for local-favoring granularity | Proposed (amends RRI_POLICY.md § Decomposition triggers if accepted; agent workflow only) |
 | [ADR-042](ADR-042-push-review-remediation-controller-and-escalation-lifecycle.md) | Push-review remediation controller and bounded escalation lifecycle | Proposed (scope: X27; amends ADR-034/ADR-039 if accepted; agent workflow only) |
-| [ADR-043](ADR-043-devstral-local-implementer-binding.md) | Devstral Small 2 as the Moderate local implementer | Accepted (runtime binding and 128K context baseline) |
+| [ADR-043](ADR-043-mobile-p2p-runtime-ownership-and-proof-isolation.md) | Mobile P2P runtime ownership and proof isolation | Accepted (scope: MVP0-P2P P1; does not decide audience delivery) |
+| [ADR-044](ADR-044-p2p-audience-delivery-boundary.md) | P2P audience delivery boundary | Accepted 2026-09-05 (D1 `O3 parallel`, D2 `K1`, D3 `O4`; P2 still requires its own plan/RRI/HITL) |
+| [ADR-045](ADR-045-devstral-local-implementer-binding.md) | Devstral Small 2 as the Moderate local implementer | Accepted (runtime binding and 128K context baseline) |
+| [ADR-046](ADR-046-local-model-reviewer-and-architect-rebinding.md) | Local reviewer and architect rebinding | Accepted 2026-08-31 |
 
 ## Backfill note
 
@@ -65,4 +68,3 @@ the divergence.
 
 The numbering gaps (ADR-001..005, 007, 009..017) are intentionally left open for
 decisions that predate or are unrelated to the slices currently in the repository.
-- [ADR-044 — Local reviewer and architect rebinding](ADR-044-local-model-reviewer-and-architect-rebinding.md) — Accepted 2026-08-31

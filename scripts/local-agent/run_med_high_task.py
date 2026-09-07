@@ -2,8 +2,14 @@
 """Med-high route supervisor and cloud-handoff evidence bundle (ADR-038 T4).
 
 RRI 41-45 may launch the Moderate local-first runner after a valid GO_LOCAL
-receipt; RRI 46-55 remains cloud-only. This module owns that distinction and
-the cloud evidence bundle for every non-success route.
+receipt; RRI 46-55 never launches a whole-task local runner. This module
+owns that distinction and the cloud evidence bundle for the above-Low
+residue of every non-success 46-55 route. Per ADR-038 Amendment 4
+(2026-08-30), the orchestrator must attempt Low-band decomposition
+(`scripts/delegate-low-rri.py` on RRI 0-25 candidate subtasks) before
+invoking this module's cloud bundle for a 46-55 result -- that decomposition
+step is orchestrator-level and happens upstream of this module, which still
+assumes the scope it receives is the cloud-eligible residue.
 
 This module never edits code and never re-implements the runner's own turn
 loop, model binding, or repair budget -- that enforcement lives in

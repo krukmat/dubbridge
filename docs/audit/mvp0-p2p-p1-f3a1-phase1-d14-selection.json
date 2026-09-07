@@ -1,0 +1,17 @@
+{
+  "packet_sha256": "f15ec089b22fd782d8b2ec5951a3a8188a69f4ce0ca2972e7ed114c97f8c7a24",
+  "phase": "task-analysis",
+  "recommended_model": "gpt-5.6-terra",
+  "recommended_reasoning_effort": "medium",
+  "role": "d14",
+  "rri": 47,
+  "schema_version": "fallback-selection-v1",
+  "selected_by": null,
+  "selected_model": null,
+  "selected_reasoning_effort": null,
+  "selection_mode": "human-select",
+  "status": "awaiting_fallback_selection",
+  "task_id": "P1.F3a.1",
+  "trigger": "Gemma returned invalid LINE fields on two 3-pass attempts; Muse Glimmer reduced-profile phase-1 review stalled without a usable result.",
+  "trigger_kind": "reviewer-chain-unusable"
+}

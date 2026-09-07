@@ -1,0 +1,10 @@
+{
+  "task_id": "P1.A2",
+  "card_hash": "7c22e2a5a5abf1910592a9a9d106a32f8266a569a24c2da970b89933ea828f68",
+  "refinement_artifact_sha256": "9af59e312ab9c64988f897e9af91ec8face350512f7edf7713695373a684bb23",
+  "decision": "CLOUD_REQUIRED",
+  "primary_id": "claude-sonnet-5",
+  "timestamp": "2026-08-30T21:05:00Z",
+  "rationale": "Muse Glimmer recommended GO_LOCAL, but RRI 46 falls in the 46-55 Med-high sub-band where ADR-038 Amendment 1 policy-excludes a whole-task local developer regardless of the refinement recommendation (downgrade permitted, upgrade never permitted). This receipt records the mandatory downgrade to CLOUD_REQUIRED for this gate. Per ADR-038 Amendment 4 (2026-08-30), the orchestrator will attempt Low-band (RRI 0-25) decomposition of the remaining scope via scripts/delegate-low-rri.py before invoking the cloud-takeover packet on any residue that cannot be decomposed to Low.",
+  "rri": 46
+}

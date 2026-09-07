@@ -1,7 +1,7 @@
 ---
 type: TaskList
 title: "S-230 POC v1 Deployment (Digital Ocean)"
-status: planned
+status: in_progress
 slice: S-230
 plan: docs/plan/s-230-poc-v1-digitalocean.md
 ---
@@ -81,12 +81,19 @@ ledger.
 | T5c | Production Compose and TLS reverse proxy | config-only | M (RRI 26 Moderate, recomputed 2026-08-27) | T5b | [x] Done 2026-08-27 — Claude Sonnet 5 direct (owner override); Gemma Reviewer PASS 0 findings both phases; owner-verified |
 | T5d | Local descriptor evidence and aggregate status sync | operational/docs | S (RRI 22 Low, recomputed 2026-08-27) | T5c | [x] Done 2026-08-27 — structural render + fail-closed guard evidence; owner-verified |
 | T6 | First deploy and end-to-end smoke on Digital Ocean | operational | L | T5 | [ ] Planned |
-| T7 | Mobile POC build against the deployed backend | development/ops | M | T6 | [ ] Planned |
-| T7b | Mobile registration screen | development | M | T7 | [ ] Planned — droppable (first) |
-| T7c | Session lifetime and expiry behavior | development/config | S | T7 | [ ] Planned |
-| T8 | Subtitle visible in the review surface (optional) | development | M | T6 | [ ] Planned — droppable (second) |
+| T6p-a | Freeze deployment-specific P2P ownership and configuration | planning/config | RUN BEFORE ACTIVATION | T7local PASS; T7c PASS; MVP0-P2P P2-P6 PASS | [ ] Deferred until development gates pass |
+| T6p-b | P2P Compose/config/secrets/private-network wiring | config/ops | TBD exact-path | T6p-a PASS | [ ] Planned |
+| T6p-c | Local P2P deployment-contract evidence | operational/evidence | TBD exact-path | T6p-b PASS | [ ] Planned |
+| T6p-d | Deploy backend ciphertext publication + durable P2P_READY smoke on DO | operational | TBD exact-path | T6p-c PASS | [ ] Planned |
+| T7local | Mobile POC build against the local Docker Compose stack | development/ops | M | T5d | [ ] Planned |
+| T7 | Mobile POC build against the deployed backend | development/ops | M | T6; T7local PASS | [ ] Planned |
+| T7p | Physical Android P2P release candidate | development/ops | TBD exact-path | T7; T7c; T6p-d; P3-P6 PASS; X29 resolved | [ ] Planned |
+| T7b | Mobile registration screen | development | M | T7local | [ ] Planned — droppable (first) |
+| T7c | Session lifetime and expiry behavior | development/config | S | T7local | [ ] Planned |
+| T8 | Subtitle visible in the review surface (optional) | development | M | T7local | [ ] Planned — droppable (second) |
 | T8b | Translated subtitle visible in the review surface | development | M | T3b, T8 | [ ] Planned — double-conditional |
-| T9 | Status, README, and debt-register closeout | docs-only | S | T7, plus each of T7b / T7c / T8 / T8b / T3b that was executed | [ ] Planned |
+| T9g | October P2P GO/NO-GO | operational/decision | S | T6p-d; T7p; P7 PASS; X28 closed; release CI green | [ ] Planned |
+| T9 | Status, README, and debt-register closeout | docs-only | S | T9g GO, plus each optional task executed | [ ] Planned |
 
 ---
 
@@ -4266,7 +4273,7 @@ for this docs-only closeout; do not alter implementation files or start T5.
 **Effort:** XL — RRI 71 High
 **Depends on:** S-230-T4q (which closes the S-230-T4 parent)
 **Status:** Approved 2026-08-24 — non-executable parent; 🟡 in progress —
-T5a Done 2026-08-26, T5b Done 2026-08-27; T5c and T5d remain (T5c unblocked,
+T5a Done 2026-08-26, T5b Done 2026-08-27; T5c and T5d are also Done,
 T5d transitively blocked on T5c via its `Depends on` chain).
 
 **Parent approval:** owner `matias` approved the RRI 71 parent and mandatory
@@ -4972,7 +4979,7 @@ itself did not move: this task only ran validation.
 **Type:** operational
 **Effort:** L (operational; RRI expected well below the effort impression)
 **Depends on:** S-230-T5
-**Status:** [ ] Planned
+**Status:** [ ] Planned — base platform smoke; not the P2P go-live
 
 **Acceptance criteria:**
 
@@ -5020,12 +5027,86 @@ code to make the smoke pass — a failure is a finding, not a patch target.
 
 ---
 
+## S-230-T7local: Mobile POC build against the local Docker Compose stack
+
+**Type:** development/operational
+**Effort:** M
+**Depends on:** S-230-T5d
+**Status:** [ ] Planned
+
+> Added 2026-09-06 at owner request, re-sequencing the base `T6 -> T7` path so
+> that P2P deployment-input freeze (`T6p-a`) no longer requires a completed
+> Digital Ocean deploy. The owner's stated intent: "T6 y todo lo relacionado
+> con Digital Ocean" must wait until local development closes, but the
+> existing ledger had `T6p-a` gated on `T7`, and `T7` gated on `T6` (the DO
+> deploy) — a genuine circular dependency once `T6p-a` was moved off `T7`
+> alone. This task breaks the cycle: it proves the same end-to-end mobile
+> flow `T7` proves, but against `infra/local/docker-compose.yml` instead of a
+> deployed backend, so `T6p-a`, `T7b`, `T7c`, `T8`, and `T8b` can all close
+> without requiring `T6` first. `T7` (below) still exists as the
+> post-deploy confirmation that the same build also works against the real
+> Digital Ocean backend, but it is no longer on the critical path to any
+> P2P gate.
+
+**Happy paths considered:**
+
+- **HP-1:** A build configured with `EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL`
+  pointed at the gateway exposed by `infra/local/docker-compose.yml`
+  completes login, upload, rights confirmation, finalize, review, publish,
+  and in-app playback against the local stack — the same behavioral
+  surface `T7` exercises against the deployed backend, minus DNS/TLS.
+
+**Edge cases considered:**
+
+- **EC-1:** A missing or malformed gateway URL surfaces the existing
+  `ConfigErrorScreen` rather than failing opaquely at first request.
+- **EC-2:** An expired or rejected token drives the existing logout path, not a
+  silent stall.
+
+**Acceptance criteria:**
+
+- The build targets the local Compose stack's gateway (HTTP, no TLS
+  required at this stage) with an explicit, recorded environment
+  configuration.
+- Every stage is asserted on observed downstream state (audit rows,
+  artifact records, review-task creation), not on a 2xx response alone —
+  same standard `S-230-T6`'s acceptance criteria hold the DO smoke to.
+- `npm run typecheck && npm run lint && npm test` stay green.
+- Install and run instructions (including bringing up
+  `infra/local/docker-compose.yml`) are recorded so `T7b`/`T7c`/`T8`/`T8b`
+  can each be developed and verified against this same local target without
+  redoing this setup.
+
+**Files expected to change:** mobile environment/build configuration only.
+Product screens are expected to need no change; if any does, record why.
+
+**Evidence to emit:** local-stack build transcript, `make qa-mobile` output,
+on-device or simulator walkthrough evidence with per-stage downstream-state
+proof, environment-configuration record.
+
+**Status artifacts affected:** this ledger; README mobile section.
+
+**Handoff prompt:** Produce a mobile build pointed at the gateway exposed by
+`infra/local/docker-compose.yml` and verify the full flow (login through
+playback) with per-stage evidence, not just 2xx responses.
+
+**Stop condition:** Stop after the local walkthrough. Do not provision or
+deploy anything on Digital Ocean.
+
+---
+
 ## S-230-T7: Mobile POC build against the deployed backend
 
 **Type:** development/operational
 **Effort:** M
-**Depends on:** S-230-T6
+**Depends on:** S-230-T6; S-230-T7local PASS
 **Status:** [ ] Planned
+
+Post-deploy confirmation only: `T7local` already proves the mobile flow works
+end to end; this task reuses that build configuration and confirms it also
+completes against the real Digital Ocean backend. It is no longer a
+precondition for `T6p-a`, `T7b`, `T7c`, `T8`, or `T8b` — those now depend on
+`T7local`.
 
 **Happy paths considered:**
 
@@ -5061,11 +5142,83 @@ Digital Ocean backend and verify the full flow on a device.
 
 ---
 
+## S-230-T6p: P2P production-plane deployment
+
+**Type:** non-executable parent over T6p-a through T6p-d
+
+**Status:** [ ] Planned
+
+**Canonical P2 inputs:** `docs/plan/mvp0-p2p-p2-encrypted-publication.md`,
+`docs/tasks/mvp0-p2p-p2-encrypted-publication.md`, and
+`docs/audit/mvp0-p2p-p2-c0-contract-freeze.md`.
+
+- **T6p-a — input freeze (after `T7local PASS`, `T7c PASS`, and MVP0-P2P
+  `P2-P6 PASS`):** freeze only deployment-specific Availability Node
+  placement, image version, mTLS identity/rotation, versioned KEK
+  injection/rotation, persistent ciphertext storage, ports, resources,
+  health, secrets, and ownership against implemented surfaces. Consume the
+  C0 contracts/fixtures without redefining package, crypto, Availability
+  Node, audit, or ready-descriptor contracts. Gated on `T7local`
+  (validation against the local Docker Compose stack), not `T7` (validation
+  against the deployed backend) — the DO deploy (`T6`) is intentionally not
+  a precondition for freezing P2P deployment inputs.
+- **T6p-b — descriptor (after `T6p-a PASS`):** wire the Availability Node
+  and P2 publication components into production Compose/config without
+  exposing the control endpoint publicly.
+- **T6p-c — local evidence (after `T6p-b PASS`):** render and exercise the
+  deployment contract, including fail-closed secret/network checks and
+  persistent-volume behavior.
+- **T6p-d — DO deployment (after `T6p-c PASS`):**
+  deploy the exact P2 plane and demonstrate only `S-120 Ready -> ciphertext
+  package -> Availability Node -> PostgreSQL P2P_READY`, including the no-queue
+  and recovery evidence required by P2.
+
+T6p-d proves backend ciphertext publication and durable `P2P_READY` only. It
+does not demonstrate invited playback or emit the product go-live claim; invited
+playback requires T7p, P7, and T9g against the exact deployed artifact.
+Each executable child requires exact paths, `scripts/rri.py`, and its normal
+workflow gate before execution.
+
+### S-230-T6p-a: Freeze deployment-specific P2P ownership and configuration (deferred)
+
+**Type:** planning/config
+
+**Depends on:** `S-230-T7local PASS`; `S-230-T7c PASS`; MVP0-P2P
+`P2-P6 PASS`. `P2.C0 PASS` is a satisfied contractual input, not the
+activation gate. Note this depends on `T7local` (local-stack validation),
+not `T7` (post-deploy validation) — see `S-230-T7local`.
+
+**Status:** [ ] Deferred — do not present or execute until both development
+gates pass.
+
+At activation, inspect the implemented runtime/configuration surfaces, assign
+exact writable paths for T6p-a through T6p-d, rerun `scripts/rri.py`, and
+present the resulting task under the then-current workflow. The freeze remains
+deployment-specific and must consume C0 without redefining it.
+
+---
+
+## S-230-T7p: Physical Android P2P release candidate
+
+**Type:** development/operational
+
+**Depends on:** S-230-T7, S-230-T7c, S-230-T6p-d, MVP0-P2P P3-P6 PASS, X29 resolved
+
+**Status:** [ ] Planned
+
+Build the exact Android RC and prove on physical hardware the owner upload to
+invite, viewer claim, full ciphertext sync, manifest verification, and loopback
+playback path. No legacy HTTP/S3 audience-media fallback may be compiled or
+observed in the certification profile. Emit the exact commit, build artifact,
+device/runtime evidence, and installation instructions consumed by P7.
+
+---
+
 ## S-230-T7b: Mobile registration screen
 
 **Type:** development (mobile)
 **Effort:** M (provisional; recompute with `scripts/rri.py`)
-**Depends on:** S-230-T7
+**Depends on:** S-230-T7local
 **Status:** [ ] Planned — droppable, first drop candidate
 
 > Added 2026-08-16 at owner request, promoting a secondary finding of the
@@ -5154,7 +5307,7 @@ authenticated. Do not touch the backend auth surface.
 
 **Type:** development/config (mobile + descriptor value)
 **Effort:** S (provisional; recompute with `scripts/rri.py`)
-**Depends on:** S-230-T7
+**Depends on:** S-230-T7local
 **Status:** [ ] Planned — not a drop candidate
 
 > Added 2026-08-16 at owner request, promoting the second secondary finding of
@@ -5240,7 +5393,7 @@ launch. Do not touch the API's token issuance.
 
 **Type:** development
 **Effort:** M
-**Depends on:** S-230-T6
+**Depends on:** S-230-T7local
 **Status:** [ ] Planned — droppable, second drop candidate after S-230-T7b
 
 **Problem (plan G9):** `apps/worker-runner/src/review_enqueue.rs:35` creates
@@ -5377,12 +5530,28 @@ or migrations.
 
 ---
 
+## S-230-T9g: October P2P GO/NO-GO
+
+**Type:** operational/decision
+
+**Depends on:** S-230-T6p-d, S-230-T7p, MVP0-P2P P7 PASS, X28 closed, required CI green on the exact release commit
+
+**Status:** [ ] Planned
+
+Issue GO only when P7 certifies the deployed revision and Android RC, X29 is
+resolved, rollback and log access are rehearsed, required security/secret
+checks pass, and the controlled soak has no release-blocking finding. Otherwise
+record NO-GO and expose only the base S-230 POC and/or a labeled backend P2P
+preview; never downgrade the ciphertext-only, same-lineage, fail-closed Ready,
+mTLS, audit, or no-fallback requirements.
+
+---
+
 ## S-230-T9: Status, README, and debt-register closeout
 
 **Type:** docs-only
 **Effort:** S
-**Depends on:** S-230-T7, and whichever of S-230-T7b / S-230-T7c / S-230-T8 /
-S-230-T8b / T3b were executed rather than dropped
+**Depends on:** S-230-T9g GO, and whichever optional tasks were executed
 **Status:** [ ] Planned
 
 **Acceptance criteria:**

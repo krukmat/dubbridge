@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: "Plan: S-230 — POC v1 deployment (Digital Ocean)"
-status: planned
+status: in_progress
 slice: S-230
 ---
 # Plan: S-230 — POC v1 deployment (Digital Ocean)
@@ -13,8 +13,57 @@ preparation, ASR, subtitles, human review, publication, in-app playback — and
 make it a running, publicly reachable POC on Digital Ocean within a 10-day
 window, without adding any technology the repository does not already depend on.
 
-This slice is a **deployment-enablement slice**, not a product slice. Every task
-exists because something concrete blocks a real deploy today.
+This slice is a deployment-enablement slice. By owner amendment on 2026-09-06,
+its final October go-live also supports the MVP0-P2P product demonstration.
+The base deployment remains independently useful, but S-230 cannot claim the
+P2P go-live until the exact deployed backend and Android release candidate pass
+MVP0-P2P P7 certification.
+
+## October 2026 P2P go-live amendment
+
+The release target is a controlled Android beta/POC: one owner uploads a short
+video, one invited viewer claims it, fully syncs and verifies the encrypted
+package, and plays it through the loopback gateway. Legacy HTTP/S3 audience
+media delivery is disabled during certification. This is not GA.
+
+The base path remains `T6 -> T7`, and a parallel `T7local -> T7c/T7b/T8/T8b`
+development path validates the same mobile behaviors against
+`infra/local/docker-compose.yml` without waiting on a Digital Ocean deploy
+(added 2026-09-06, breaking a circular dependency: `T6p-a` cannot gate on
+`T7`, which itself gated on `T6`, once the owner required "T6 and everything
+Digital-Ocean-related" to wait for local development to close). The P2P
+release path adds:
+
+- `T6p-a`: after `T7local PASS`, `T7c PASS`, and MVP0-P2P `P2-P6 PASS`, freeze
+  only deployment-specific ownership and configuration against the
+  implemented surfaces: Availability Node placement, mTLS identities,
+  versioned KEK, persistent ciphertext volume, health, ports, resources, and
+  secret paths. It consumes the already-frozen C0 contracts/fixtures; it does
+  not redefine them;
+- `T6p-b`: after `T6p-a PASS`, add production
+  Compose/config/private-network wiring;
+- `T6p-c`: certify the local deployment contract after `T6p-b`;
+- `T6p-d`: after `T6p-c PASS`, deploy the P2
+  publication plane and prove only backend ciphertext publication plus durable
+  `P2P_READY` on Digital Ocean;
+- `T7p`: build and verify the physical Android owner-to-invited-viewer P2P RC;
+- `T9g`: issue GO/NO-GO only after MVP0-P2P P7 certifies the exact deployed
+  revision and RC, required CI is green, and rollback/log/soak evidence exists.
+
+`T6` remains the base HTTP/HLS deployment smoke and is not itself the P2P
+go-live. `T6p-d` is backend-only and does not demonstrate invited playback;
+that requires P3-P6, `T7p`, P7, and `T9g`. `T7b`, `T8`, and `T8b` remain
+optional. X29 is now a release blocker for `T7p`/`T9g`, even though it remains
+accepted residual evidence for P1.
+
+Target gates: X29 resolved while S-230 `T7local -> T7c/T7b/T8/T8b` (local
+stack) and MVP0-P2P `P2 -> P6` development advance; both development gates
+PASS by October 15; T6p-a through T6p-d close by October 21 (including the
+independent `T6`/`T7` Digital Ocean deploy, which may run any time after `T5`
+but is not itself gating); the Android RC closes by October 26; and P7/T9g
+close by October 30. If either the Android gate or the development/deployment
+dates are missed, October may expose the base S-230 POC and a labeled backend
+preview, but must not claim invited P2P playback.
 
 ## Scope decision (owner, 2026-08-16)
 
@@ -628,15 +677,19 @@ flowchart LR
     T4A["T4a–T4o Low/S<br/>tests + image patches ✓"] --> T4P["T4p local evidence ✓"]
     T4P --> T4Q["T4q parent closeout ✓"]
     T4Q --> T5["T5 DO descriptor + secrets<br/>T5a ✓ done 2026-08-26, hostname frozen<br/>(poc.iotforce.es); T5b/T5c/T5d ✓ done 2026-08-27 — T5 closed"]
-    T5 --> T6["T6 deploy + E2E smoke"]
-    T6 --> T7["T7 mobile build vs DO"]
-    T6 --> T8["T8 subtitle visible in review (optional)"]
-    T7 --> T7b["T7b mobile registration screen (optional)"]
-    T7 --> T7c["T7c session lifetime + expiry (optional)"]
+    T5 --> T5D["T5d ✓ local descriptor evidence"]
+    T5D --> T7LOCAL["T7local mobile build<br/>vs local Docker Compose"]
+    T5 --> T6["T6 deploy + E2E smoke<br/>(independent, not gating)"]
+    T6 --> T7["T7 mobile build vs DO<br/>(post-deploy confirmation only)"]
+    T7LOCAL --> T7
+    T7LOCAL --> T8["T8 subtitle visible in review (optional)"]
+    T7LOCAL --> T7b["T7b mobile registration screen (optional)"]
+    T7LOCAL --> T7c["T7c session lifetime + expiry"]
     T7 --> T9["T9 docs and status closeout"]
     T8 --> T9
     T7b --> T9
     T7c --> T9
+    T7c --> T6PA
     T0["T0 plan + ledger"] -.parallel track, not a T6 gate.-> T3b["T3b S-150 translation chain<br/>(T2c-v..T3c)"]
     T3b -.if done: T4m/T4n bundle translation worker.-> T4A
     T3b -.if done: add provider credential var.-> T5
@@ -645,6 +698,16 @@ flowchart LR
     T8 --> T8b
     T8b --> T9
     T3b -.folds into demo if done in time.-> T9
+    C0["P2.C0 PASS"] --> P2DEV["MVP0-P2P P2-P6 development PASS"]
+    P2DEV --> T6PA["T6p-a deployment ownership/config freeze"]
+    T7LOCAL --> T6PA
+    T6PA --> T6PB["T6p-b P2P descriptor"]
+    T6PB --> T6PC["T6p-c local evidence"]
+    T6PC --> T6PD["T6p-d DO ciphertext + durable P2P_READY"]
+    T6PD --> T7P["T7p Android P2P RC"]
+    T7P --> P7["MVP0-P2P P7 exact-artifact certification"]
+    P7 --> T9G["T9g October GO/NO-GO"]
+    T9G --> T9
 ```
 
 The three dotted `T3b -.if done...->` edges into `T4a`–`T4o`/`T5`/`T6` are
@@ -753,6 +816,9 @@ not, `T9` records the exact partial state.
 ## Related
 
 - `docs/tasks/s-230-poc-v1-digitalocean.md` — task ledger
+- `docs/plan/mvp0-p2p-p2-encrypted-publication.md` — canonical P2 implementation plan and T6p integration gates
+- `docs/tasks/mvp0-p2p-p2-encrypted-publication.md` — C0-frozen P2.T2-T6 leaf map and dependencies
+- `docs/audit/mvp0-p2p-p2-c0-contract-freeze.md` — frozen contracts/fixtures retained as T6p-a inputs after the implementation gates pass; not redefined by S-230
 - `docs/plan/roadmap.md` — S-030 Phase 3, X9, X21
 - `docs/adr/ADR-026-layered-fail-closed-configuration-and-environment-separation.md`
 - `docs/adr/ADR-006-postgres-metadata-object-storage-binaries.md`

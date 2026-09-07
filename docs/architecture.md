@@ -16,6 +16,13 @@ operational surfaces from planned ones. Delivery sequence lives in
   and quality gates.
 - Python is isolated to ML worker implementations where the ecosystem justifies an
   exception (`docs/python-exceptions.md`).
+- Node.js/TypeScript is isolated to the P2P Availability Node where the
+  Hyperdrive/Hyperswarm JS ecosystem justifies an exception
+  (`docs/node-exceptions.md`, ADR-044). The exception is scoped to that one
+  service: it stores and seeds ciphertext only, and has no database,
+  business-authorization, plaintext-key, or backend-signing authority — those
+  remain in `apps/api` (Rust). No other `apps/*` or `crates/*` surface is
+  covered by this exception.
 - PostgreSQL is authoritative for structured metadata. Binary artifacts are
   immutable object-store records referenced by storage key and SHA-256 checksum
   (ADR-006).
@@ -46,6 +53,8 @@ operational surfaces from planned ones. Delivery sequence lives in
 | Environment separation + reproducible container runtime wiring | Operational | S-030, ADR-026 |
 | First-party session gateway (transparent JWT relay) | Operational | S-040, ADR-031 |
 | First-party mobile client (React Native + Expo) | Canonical, sole authenticated product surface | S-050/S-105, ADR-029/031 |
+| Mobile P2P runtime boundary | P1 closed `[x] Done` 2026-09-01 (7/8 children PASS: packaging/protocol, ownership/composition, storage, replication transport, verification/reconnect/teardown; P1.F3b itself stays `not PASS`, non-blocking, deferred into X28); no product P2P runtime or network activity is active outside bounded proof runners | MVP0-P2P P1, ADR-043 |
+| P2P audience delivery (encrypted publication, invite/claim, verified sync, loopback playback) | Architecture accepted; P2.T0 PASS with Node.js/TypeScript Availability Node + mTLS (`AN-R1 + AN-A1`); P2.C0 PASS (froze the shared package/publication/audit contracts); P2.T1 durable publication/outbox foundation is Done and owner-approved (`crates/domain/src/p2p_publication.rs`, `crates/db/src/p2p_publication_repo.rs`, migration `0032`); P2.T2a-i through P2.T2e are Done (T2d: generate-once CK + versioned KEK wrap/unwrap + zeroization, `crates/p2p/src/key_wrap.rs`; T2e: additive sealed-K1 persistence, `infra/migrations/0033`, `crates/db/src/p2p_publication_repo.rs::record_sealed_k1`); remaining P2 leaves (T2f-T2g, P3-P7) not yet implemented | MVP0-P2P P2–P7, ADR-044 |
 
 Human review runtime (S-170) and publication runtime (S-180) have no plan/task
 ledger yet.
@@ -78,6 +87,63 @@ ledger yet.
 
 ### Planned
 
+- `mobile/src/p2p/` (MVP0-P2P P1, accepted ADR-043): the app composition root,
+  above `RootNavigator`, owns `AuthProvider` and a `P2PProvider`. The provider
+  owns a framework-independent `P2PService`, which owns one product
+  `BareRuntimeClient`/worklet and remains network-inert until an explicit future
+  command. Reproducibly packaged, versioned `bare-rpc` communication and explicit
+  fatal/suspend/resume handling form the runtime seam. P1's two-worklet
+  seed/client topology stays isolated in a development-only proof runner and
+  uses verifiably deleted cache storage; it is not the product topology. The P0
+  probe/custom bridge was retained as the unchanged oracle through F3a.1's
+  `P2PDevelopmentHarness` (owner-verified), then retired in P1.F3a.2; P1.F3b
+  separately audited each related config/dependency setting but stays
+  `not PASS` itself (device-proof criteria deferred, non-blocking, into
+  X28). ADR-043 and the revised P1 parent were approved on 2026-08-27, and
+  **P1 closed `[x] Done` on 2026-09-01** — 7/8 children (F1 packaging/RPC
+  seam, F2 ownership/composition, F3a scaffold retirement, A1/A2 storage
+  lifecycle, B1 replication transport, B2 verification/reconnect/teardown)
+  are PASS, with P1.F3b's residual status accepted as non-blocking.
+  Composition, storage, and an isolated replication proof exist
+  and are unit-tested, but no product-facing P2P command, invite, or
+  network activity is wired to the app — this boundary remains
+  non-operational for end users pending P2–P7.
+- **P2P audience delivery** (MVP0-P2P P2–P7, ADR-044 `Accepted`): the
+  control-plane/data-plane split in which `apps/api` stays the sole
+  authorization authority while an encrypted P2P data plane — package builder,
+  durable publication state, an Availability Node seeding ciphertext only,
+  mobile Hyperdrive/Hyperswarm sync, and a loopback HLS gateway — replaces
+  server media transport for the certified invited-playback path. ADR-032
+  remains authoritative for review playback and is not replaced. ADR-044 D1
+  selected `O3 parallel`; D2 selected `K1` (AES-256-GCM package encryption,
+  server-wrapped CK, HPKE P-256 device envelope, non-exportable Android
+  Keystore key, no external hardware/StrongBox requirement, fail-closed
+  capability handling, no silent K2 fallback). D3 selected `O4`: PostgreSQL
+  publication state + transactional outbox are durable authority; queue usage
+  is an optional/replayable accelerator only; a PostgreSQL reconciler repairs
+  lost/stuck/unknown work; delivery is at-least-once/idempotent under one stable
+  logical publication/K1 lineage; and `P2P_READY` is separate from S-120 Ready
+  and written only after durable confirmation of the external publication.
+  D4 accepted the consolidated boundary on 2026-09-05. P2.T0 then froze
+  `AN-R1 + AN-A1`: a dedicated Node.js/TypeScript Availability Node using the
+  Hyperdrive/Hyperswarm JS ecosystem, behind a private mTLS-authenticated
+  publication-control surface. It remains ciphertext-only and has no DB,
+  business-authorization, plaintext-key, or backend-signing authority. T0 also
+  froze `building -> publish_pending -> publishing -> reconciling -> ready`
+  semantics (`failed` terminal only) plus the minimum ADR-018 P2 audit set.
+  P2.C0 then froze the shared `p2p-manifest-v1`/`p2p-aad-v1`/K1-custody/
+  `availability-publication-v1`/`p2p-ready-descriptor-v1` contracts used by
+  the remaining P2 leaves. `P2.T1` durable publication/outbox persistence is
+  Done and owner-approved: `crates/domain/src/p2p_publication.rs`,
+  `crates/db/src/p2p_publication_repo.rs`, and migration
+  `0032_create_p2p_publications_and_outbox.sql` are landed on
+  `feature/p2p-mvp-core`. `P2.T2a-i` through `P2.T2e` are Done (T2d: the
+  generate-once content key plus versioned KEK wrap/unwrap and zeroization,
+  `crates/p2p/src/key_wrap.rs`; T2e: additive sealed-K1 persistence —
+  `infra/migrations/0033_extend_p2p_publications_k1.sql` plus
+  `crates/db/src/p2p_publication_repo.rs::record_sealed_k1`). Remaining P2
+  leaves (`T2f` onward) are not yet implemented. Design inputs:
+  `docs/plan/mvp0-p2p-design-inputs.md`.
 - `crates/connectors` (primary S-090, ADR-025): per-platform integrations behind a
   `PlatformConnector` trait. For owner-authorized download (content owner grants
   scoped access to their own YouTube/Vimeo account), it resolves ownership/metadata
@@ -145,6 +211,10 @@ sub-case. Every intake mode must use the same fail-closed
   object-write/metadata-write divergence, and periodic reconciliation lists
   canonical `ingests/` keys, compares them against relational references, and deletes
   only planner-approved orphan candidates.
+- For P2P publication, accepted D3/O4 extends that cross-store discipline: a
+  transactional outbox captures durable publication intent in PostgreSQL before
+  external publication; queue delivery is optional and non-authoritative; a
+  reconciler uses authoritative PostgreSQL state to recover lost/unknown work.
 
 ## Prepared media and playback boundaries
 

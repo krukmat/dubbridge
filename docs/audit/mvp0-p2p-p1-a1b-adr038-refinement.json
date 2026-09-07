@@ -1,0 +1,104 @@
+{
+  "error": null,
+  "finished_at": "2026-08-30T13:55:00.153783Z",
+  "generation": {
+    "created_at": "2026-08-30T13:54:59.832759Z",
+    "done": true,
+    "eval_count": 662,
+    "eval_duration": 113466108000,
+    "load_duration": 9533848208,
+    "prompt_eval_count": 1148,
+    "prompt_eval_duration": 6967882000,
+    "think_disabled": true,
+    "thinking_present": false,
+    "thinking_sha256": null,
+    "total_duration": 130095881041
+  },
+  "model": {
+    "expected_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "resolved_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "tag": "muse-glimmer:30b-q4_K_M"
+  },
+  "packet": {
+    "expected_sha256": "8c7f792dc1b698b4b8cb135d62e93233d27550099667a1cc00bd7e08077f816f",
+    "path": "docs/audit/mvp0-p2p-p1-a1b-adr038-packet.json",
+    "sha256": "8c7f792dc1b698b4b8cb135d62e93233d27550099667a1cc00bd7e08077f816f"
+  },
+  "profile": "med-high-refinement-v1",
+  "prompt": {
+    "profile": "med-high-refinement-v1",
+    "sha256": "db5a5c7e8194daeec9d0dd709ad48a03bfd05b39de5ce176798653fd6356582e",
+    "version": "med-high-refinement-prompt-v1"
+  },
+  "response": {
+    "raw_text_sha256": "a3e2568f268292324584a80386047b73aae176585661666156bc91b91b83bf9d",
+    "validated": {
+      "acceptance_tests": [
+        "HP-A1 valid runId creates Directory and returns transient-hyperdrive-corestore receipt",
+        "EC-A1b invalid runId returns PROOF_STORAGE_CONFIG_INVALID before network activity",
+        "Jest runtime-protocol test passes in-band"
+      ],
+      "claims": [
+        {
+          "label": "SUPPORTED",
+          "statement": "Approved scope is limited to five source/test paths"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "URI must be host-derived startup data only"
+        },
+        {
+          "label": "UNKNOWN",
+          "statement": "Current factory implementation is unknown"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Acceptance requires exact two-field capability receipt"
+        }
+      ],
+      "excluded_scope": [
+        "Hyperswarm, discovery, replication, product P2PService APIs",
+        "Persistence, cleanup/janitor logic, direct bare-fs dependency",
+        "Filesystem-path logging/RPC/receipts, iOS, commits, pushes, deployment"
+      ],
+      "implementation_steps": [
+        "Inspect allowed paths to confirm current factory and protocol signatures",
+        "Add runId validation and URI derivation using Paths.cache",
+        "Implement OPEN_CLOSE_TRANSIENT_DRIVE open/close with schema_version 1 receipt"
+      ],
+      "refined_scope": [
+        "Derive run-scoped Expo cache URI from validated runId for proof-only factory",
+        "Pass URI unchanged as sole Bare worklet argument",
+        "Implement versioned OPEN_CLOSE_TRANSIENT_DRIVE with exact receipt"
+      ],
+      "risks": [
+        "Edit may escape frozen P1.A1b boundary",
+        "URI leakage into RPC/receipt/log violates constraint",
+        "Corestore close semantics differ from expected"
+      ],
+      "route_recommendation": "CLOUD_REQUIRED",
+      "stop_conditions": [
+        "Any edit outside five allowed paths",
+        "Behavior escapes P1.A1b boundary",
+        "URI used as RPC field, receipt, log, or product API parameter"
+      ],
+      "summary": "Evidence is insufficient to bound implementation safely within the frozen P1.A1b boundary. Material unknowns remain about current factory and worklet behavior.",
+      "unknowns": [
+        "Current implementation of P1ProofRuntimeFactory and worklet",
+        "Exact shape of Paths.cache and runId validation",
+        "Existing test coverage for OPEN_CLOSE_TRANSIENT_DRIVE"
+      ]
+    }
+  },
+  "runtime": {
+    "num_ctx": 16384,
+    "num_predict": 1024,
+    "ollama_url": "http://127.0.0.1:11434",
+    "temperature": 0.0,
+    "timeout_seconds": 180.0
+  },
+  "schema_version": "adr037-local-architect-artifact-v1",
+  "started_at": "2026-08-30T13:52:49.723849Z",
+  "status": "ok",
+  "success": true
+}

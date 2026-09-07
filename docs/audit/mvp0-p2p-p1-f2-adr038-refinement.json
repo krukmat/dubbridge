@@ -1,0 +1,111 @@
+{
+  "error": null,
+  "finished_at": "2026-08-27T16:23:23.222010Z",
+  "generation": {
+    "created_at": "2026-08-27T16:23:22.992661Z",
+    "done": true,
+    "eval_count": 672,
+    "eval_duration": 125923933000,
+    "load_duration": 6666251458,
+    "prompt_eval_count": 1182,
+    "prompt_eval_duration": 7812215000,
+    "think_disabled": true,
+    "thinking_present": false,
+    "thinking_sha256": null,
+    "total_duration": 140497815166
+  },
+  "model": {
+    "expected_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "resolved_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "tag": "muse-glimmer:30b-q4_K_M"
+  },
+  "packet": {
+    "expected_sha256": "1aea5b4710306319b470d3976bb74de2642747eecc7d486e65e4baeb9bff3d1e",
+    "path": "docs/audit/mvp0-p2p-p1-f2-adr038-packet.json",
+    "sha256": "1aea5b4710306319b470d3976bb74de2642747eecc7d486e65e4baeb9bff3d1e"
+  },
+  "profile": "med-high-refinement-v1",
+  "prompt": {
+    "profile": "med-high-refinement-v1",
+    "sha256": "25ab983e3dd5e522970be78963945f89ff33c748c457e9ad3c0586a076581956",
+    "version": "med-high-refinement-prompt-v1"
+  },
+  "response": {
+    "raw_text_sha256": "1f0f147fa57e939e7e59254b43e9b70c6fa0b8eb33c6423262ab80f2cff20dfd",
+    "validated": {
+      "acceptance_tests": [
+        "App.tsx composes providers in required order and P0 diagnostic calls initialize -> ping -> shutdown",
+        "Mounting, rerendering, navigation, auth-route changes do not auto-start, duplicate, or leak runtime",
+        "RootNavigator creates no auth/P2P provider and mounting is network-inert",
+        "Focused P0/client/service/provider tests, typecheck, lint, full Jest, three Reflection passes pass"
+      ],
+      "claims": [
+        {
+          "label": "SUPPORTED",
+          "statement": "P2PProvider must own one stable P2PService and P2PService owns one BareRuntimeClient"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Provider mounting must be network-inert"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "Only ten frozen paths may be modified"
+        },
+        {
+          "label": "SUPPORTED",
+          "statement": "P0 source must remain as characterization oracle"
+        }
+      ],
+      "excluded_scope": [
+        "P0 source deletion or modification",
+        "Hyperdrive, Corestore, Hyperswarm, discovery, networking, fixture storage",
+        "Product API/UI, backend, HTTP/HLS, persistence/identity, iOS",
+        "Commits, pushes, deployment, or external writes",
+        "Navigator creating auth or P2P provider or starting network on mount"
+      ],
+      "implementation_steps": [
+        "Update mobile/App.tsx composition to AuthProvider -> P2PProvider -> RootNavigator",
+        "Ensure P2PProvider owns single P2PService and P2PService owns single BareRuntimeClient",
+        "Add external-store subscription boundary with no auto-start on mount",
+        "Add typed lifecycle errors for invalid calls and keep P0 diagnostic calls explicit",
+        "Run typecheck, lint, and Jest tests on allowed paths"
+      ],
+      "refined_scope": [
+        "Compose App.tsx with AuthProvider -> P2PProvider -> RootNavigator ordering",
+        "Implement inert BareRuntimeClient -> P2PService boundary with typed lifecycle errors",
+        "Add subscribable snapshot store for status consumers without auto-start",
+        "Retain P0 diagnostic oracle initialize -> ping -> shutdown via stable service boundary",
+        "Modify only the ten allowed source/test paths and P1.F2 evidence artifacts"
+      ],
+      "risks": [
+        "Provider ownership inversion could cause network start on mount",
+        "Scope creep into P0 source deletion or networking features",
+        "Edit escaping frozen ten-path boundary triggers stop condition"
+      ],
+      "route_recommendation": "GO_LOCAL",
+      "stop_conditions": [
+        "Any edit outside allowed_paths",
+        "Network activity on provider mount",
+        "P0 source deletion or modification",
+        "Behavior escapes P1.F2 frozen boundary"
+      ],
+      "summary": "Compose App.tsx as AuthProvider -> P2PProvider -> RootNavigator with inert P2P ownership and explicit P0 diagnostic boundary. Keep network inert on mount and enforce typed lifecycle errors.",
+      "unknowns": [
+        "Exact shape of existing P0 diagnostic oracle interface",
+        "Current test coverage baseline for bare-bridge and provider"
+      ]
+    }
+  },
+  "runtime": {
+    "num_ctx": 8192,
+    "num_predict": 4096,
+    "ollama_url": "http://127.0.0.1:11434",
+    "temperature": 0.0,
+    "timeout_seconds": 240.0
+  },
+  "schema_version": "adr037-local-architect-artifact-v1",
+  "started_at": "2026-08-27T16:21:02.477034Z",
+  "status": "ok",
+  "success": true
+}

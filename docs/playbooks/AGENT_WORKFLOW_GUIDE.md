@@ -113,8 +113,17 @@ and Architect-refined implementation routing below), not to cloud. A
        packets, report sections);
      - **Status artifacts affected** — exact ledgers, plans, reports, ADR
        indexes, or downstream blocker docs to synchronize before closure.
+   - Before freezing or presenting executable task leaves, perform the
+     **honest Low-band maximization pass** defined below. Treat the original
+     outcome as the parent approval/review envelope, then prefer coherent,
+     independently verifiable RRI 0–25 / Effort S leaves wherever real seams
+     permit them.
 4. **Gate by RRI** — compute RRI with `scripts/rri.py`, then apply the
    band's approval gate and implementation route:
+   - Score both the parent outcome envelope and every proposed executable
+     leaf. The parent score continues to govern HITL approval, review
+     independence, Reflection count, and integrated closure; a Low leaf only
+     changes the bounded authoring route.
    - **0–25 Low** — skip the full human approval presentation. Use local Qwen
      Developer delegation through Ollama only for eligible simple code
      patches; otherwise execute directly as the primary agent.
@@ -170,11 +179,29 @@ and Architect-refined implementation routing below), not to cloud. A
   **Evidence to emit** and **Status artifacts affected** (see Step 3 above)
   named up front — these are execution-time outputs, not post-hoc closure
   notes.
-- A task ledger can opt into automated enforcement by declaring
-  `Behavioral coverage contract: unit-v1`. For ledgers with that marker,
-  `make qa-docs` rejects completed development tasks whose `HP-#`/`EC-#`
-  cases lack unit test evidence. Legacy completed tasks without the marker
-  are grandfathered until migrated.
+- **Behavioral testing semantics:** BDD defines stable externally observable
+  product/domain behavior; ATDD-style acceptance discipline is expressed by
+  acceptance criteria plus approved `HP-#`/`EC-#` examples and executable
+  evidence; TDD is the implementation technique used to drive code with
+  tests. Do not collapse these three responsibilities into one test layer.
+- New development ledgers default to
+  `Behavioral coverage contract: behavior-v2`. Under `behavior-v2`, every
+  completed `HP-#`/`EC-#` case must map to passing executable evidence at the
+  cheapest layer that genuinely proves the behavior: `unit`, `component`,
+  `integration`, `contract`, or `e2e`. The deterministic `make qa-docs` gate
+  validates the declared layer, evidence references, Reflection requirement,
+  and owner-verification structure; the referenced tests/runners remain
+  responsible for proving the behavior itself.
+- `Behavioral coverage contract: unit-v1` is the grandfathered legacy
+  contract. Its existing unit-evidence semantics and validator remain in
+  force for ledgers that already declare it. Do not mass-migrate completed
+  historical ledgers solely for consistency; migrate an active/touched
+  ledger only when the change materially benefits from cross-layer evidence.
+- Stable product/domain behavior that should survive implementation refactors
+  or cross subsystem boundaries belongs in canonical `docs/bdd/*.feature`
+  specifications and, for strict specs, in the machine-readable mapping
+  checked by `make qa-bdd-map`. Do not introduce Cucumber/Behave or another
+  BDD runner merely to execute `.feature` files.
 
 ## Per-task discipline
 
@@ -234,33 +261,40 @@ and Architect-refined implementation routing below), not to cloud. A
   evidence** (concrete files, functions, and tests, with a short explanation
   of what each demonstrates). Required only for development tasks; skip for
   docs/config/migration-only/planning tasks.
-- **Unit coverage certification:** before marking a development task `[x]
-  Done`, add a `Unit coverage certification` section mapping every approved
-  `HP-#`/`EC-#` case to at least one unit test reference
-  (`` `path/to/file.rs::test_name` ``) whose recorded result is `passed`.
-  `N/A` is not allowed for development-task cases — refactor until testable
-  or revise the task definition before closure.
+- **Behavioral coverage certification:** before marking a `behavior-v2`
+  development task `[x] Done`, add a `Behavioral coverage certification`
+  section mapping every approved `HP-#`/`EC-#` case to at least one passing
+  executable evidence reference and its test layer. Pure deterministic logic
+  should normally map to unit evidence; cross-boundary behavior may map to
+  component, integration, contract, or E2E evidence when that is the
+  cheapest layer that genuinely proves the behavior. `N/A` is not allowed
+  for development-task cases — revise the behavior/evidence contract before
+  closure if the case is not actually executable.
+- Legacy `unit-v1` ledgers retain their required `Unit coverage
+  certification` format and unit-test semantics; the legacy validator
+  remains authoritative for those ledgers.
 - The same completion record must include `Owner final verification` with
   owner, date, verification statement, and exact commands run. The owner
-  certifies each referenced unit test genuinely covers the claimed behavior;
-  the automated gate verifies structure and referenced-test existence.
+  certifies each referenced evidence item genuinely covers the claimed
+  behavior; the automated gate verifies structure and referenced-evidence
+  existence/selector rules, not semantic sufficiency.
 
-Required completion format for development tasks:
+Required completion format for new development tasks (`behavior-v2`):
 
 ```md
-### Unit coverage certification
+### Behavioral coverage certification
 
-| Case ID | Type | Behavior | Unit test evidence | Result |
-|---|---|---|---|---|
-| HP-1 | Happy path | valid input creates session | `apps/gateway/src/auth/login.rs::valid_login_creates_session` | passed |
-| EC-1 | Edge case | unknown state fails closed | `apps/gateway/src/auth/login.rs::unknown_state_returns_unauthorized` | passed |
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| HP-1 | Happy path | valid input creates session | integration | `apps/gateway/tests/auth.rs::valid_login_creates_session` | passed |
+| EC-1 | Edge case | unknown state fails closed | unit | `apps/gateway/src/auth/login.rs::unknown_state_returns_unauthorized` | passed |
 
 ### Owner final verification
 
 - Owner: `<name-or-handle>`
 - Date: `YYYY-MM-DD`
-- Statement: I verified every happy path and edge case defined for this task has unit test evidence that replicates the expected behavior.
-- Commands run: `<exact test commands>`
+- Statement: I verified every happy path and edge case defined for this task has executable evidence at an appropriate layer that replicates the expected behavior.
+- Commands run: `<exact test/runner commands>`
 ```
 
 ## Live per-task phase todo list
@@ -317,7 +351,7 @@ generic role label), with status `pending`/`in_progress`/`blocked`/
 artifact, not a new approval or review gate. It never replaces the HITL
 approval checkpoint, the band-routed review chain, the Reflection log, or any
 other closure gate. `completed` still requires that phase's own evidence
-(review artifact, Reflection log, unit coverage cert, owner verification,
+(review artifact, Reflection log, behavioral coverage cert, owner verification,
 etc.) — the checklist records the step happened, not that it happened
 correctly.
 
@@ -407,19 +441,25 @@ first decompose the remaining work into scored Low-band subtasks; cloud is the
 last resort when that route cannot proceed.
 
 **Med-high (41–55):** ADR-038 is its fail-closed, evidence-bearing
-refinement/receipt gate. **RRI 46–55** is cloud-only **for the whole task**
-except a module independently qualified under ADR-040 per-module split
-routing (below). **RRI 41–45** (ADR-038 Amendment 3, 2026-08-23) is the
-exception: a `GO_LOCAL` result routes the whole task through the same
-local-first path as 26–40 Moderate instead of cloud.
+refinement/receipt gate. **RRI 46–55** never starts a whole-task local
+developer — except a module independently qualified under ADR-040
+per-module split routing (below) — but before its cloud-takeover packet is
+emitted, ADR-038 Amendment 4 (2026-08-30) requires the same Low-band
+decomposition attempt as Moderate (§ Post-repair-budget Low-band
+decomposition below), escalating to cloud only for the residue that itself
+scores above Low. **RRI 41–45** (ADR-038 Amendment 3, 2026-08-23) is a
+further exception: a `GO_LOCAL` result routes the whole task through the
+same local-first path as 26–40 Moderate instead of cloud.
 
 ```mermaid
 flowchart LR
     Card["Approved Med-high card\n(RRI 41-55)"] --> Glimmer["Qwen3.6 27B advisory refinement\ngpt-oss:20b"]
     Glimmer -->|GO_LOCAL or CLOUD_REQUIRED| Receipt["Primary hash-bound\nroute receipt"]
     Receipt -->|"downgrade allowed;\nupgrade never allowed"| Gate{"med_high_gate.py\nboth sides GO_LOCAL?"}
-    Gate -->|CLOUD_REQUIRED| Cloud["Resolved Codex / Claude takeover model\n+ full ADR-038 S5 evidence bundle"]
-    Gate -->|"GO_LOCAL, RRI 46-55\n(policy excluded)"| Cloud
+    Gate -->|CLOUD_REQUIRED| Decompose46["46-55: attempt Low-band\ndecomposition first (Amendment 4)"]
+    Gate -->|"GO_LOCAL, RRI 46-55\n(no whole-task local attempt)"| Decompose46
+    Decompose46 -->|"residue scores Moderate+"| Cloud["Resolved Codex / Claude takeover model\n+ full ADR-038 S5 evidence bundle"]
+    Decompose46 -->|"Low-band subtasks"| DelegateLow["delegate-low-rri.py\norchestrator-only authorship"]
     Gate -->|"GO_LOCAL, RRI 41-45"| LocalFirst["Moderate local-first path\nrun_local_task.py, 2 repair attempts"]
 ```
 
@@ -427,7 +467,8 @@ Implementation surfaces: `scripts/local-architect/run_analysis.py`
 (`med-high-refinement-v1` profile) for the GPT-OSS 20B artifact,
 `scripts/local-agent/med_high_gate.py` for the fail-closed route decision,
 `scripts/local-agent/run_med_high_task.py` for automatic cloud-evidence-bundle
-emission on every `CLOUD_REQUIRED` or 46–55 `GO_LOCAL` result. For **RRI
+emission on every `CLOUD_REQUIRED` or 46–55 `GO_LOCAL` result that survives
+the Amendment 4 decomposition attempt with cloud-eligible residue. For **RRI
 41–45**, a `GO_LOCAL` result instead hands off to
 `scripts/local-agent/run_local_task.py` exactly as Moderate does — no
 whole-task local attempt/repair applies to 46–55 outside an ADR-040-qualified
@@ -435,6 +476,47 @@ module.
 
 Both sub-bands keep the band-resolved independent reviewer, 3 Reflection
 passes, and the RRI 26+/41+ human approval gate.
+
+#### Honest Low-band maximization before presentation
+
+Before an executable task set is frozen or presented, the orchestrator must
+make a good-faith, hardware-aware attempt to maximize **coherent RRI 0–25 /
+Effort S leaves**. Local development is the preferred implementation muscle:
+keep each leaf's context, allowed paths, behavior, and verification small
+enough for the Low-band route when the system has a real independent seam.
+
+The pass is mandatory even when the preliminary parent score is below the
+existing hard decomposition triggers. It proceeds as follows:
+
+1. Freeze the parent outcome, invariants, integration boundary, and
+   preliminary RRI before splitting.
+2. Split only at real behavioral, file-ownership, evidence, or decision
+   boundaries. Give every leaf its own objective, dependencies, allowed
+   paths, acceptance criteria, verification, evidence/status obligations,
+   and `scripts/rri.py` score.
+3. Prefer leaves with final RRI 0–25 / Effort S. For development leaves,
+   route eligible simple patches through the bounded local Qwen Developer
+   path; Low docs, planning, policy, ADR, and structure-heavy work remains
+   direct primary-agent work under the existing Low-band rule.
+4. Preserve architecture, security, governance, schema, and other owner
+   choices as explicit decision checkpoints. Evidence collection and option
+   comparison may be separate Low leaves; the agent must not relabel the
+   unresolved decision itself as mechanical work.
+5. Score assembly, integration, and status propagation as real work. Do not
+   inherit a child score, hide cross-leaf coupling, omit penalties, understate
+   context, split one invariant across unverifiable fragments, or create
+   documentation shells whose only purpose is to reach Low.
+6. Stop when another split would cease to be independently meaningful or
+   verifiable. Record `honest-low-max: residual` with the reason and route the
+   inseparable residue at its actual RRI band.
+
+When the parent envelope scores RRI 26+, its one approval checkpoint remains
+mandatory before any contained Low leaf starts. Approval covers the frozen
+leaf set but does not change the parent's band-resolved phase reviews or final
+unified/integrated verification. A later scope expansion or changed invariant
+requires recomputing both parent and affected leaves. This early pass
+generalizes, but does not replace, the recovery-time decomposition route
+below.
 
 #### Post-repair-budget Low-band decomposition
 
@@ -448,12 +530,22 @@ assembling, never authoring substantive logic directly. Cloud escalation
 stays available as the fallback of last resort, not the default.
 
 An ADR-040-qualified local module tramo follows its own two-attempt local
-budget and may use this decomposition route for remaining module work. A
-**46–55** Med-high whole-task `GO_LOCAL` advisory never starts a local
-developer and never creates a whole-task local repair budget. **RRI 41–45**
-(ADR-038 Amendment 3) is the exception: a `GO_LOCAL` result there does start
-a whole-task local attempt under the Moderate route, including this same
-post-repair-budget decomposition step on 2/2 exhaustion.
+budget and may use this decomposition route for remaining module work. **RRI
+41–45** (ADR-038 Amendment 3) starts a whole-task local attempt under the
+Moderate route, including this same post-repair-budget decomposition step on
+2/2 exhaustion.
+
+**RRI 46–55** never gets a whole-task local repair budget (Amendment 1) —
+but per **ADR-038 Amendment 4 (2026-08-30)**, the same decomposition
+mechanism still applies as the step *before* the cloud-takeover packet on
+any 46–55 `GO_LOCAL`/`CLOUD_REQUIRED` result: decompose the remaining scope
+into candidate subtasks, score each with `scripts/rri.py`, dispatch every
+RRI 0–25 candidate via `scripts/delegate-low-rri.py`, and route only the
+above-Low residue (or a hard-excluded surface per § Med-high hard exclusions)
+to cloud. This is not a whole-task local attempt and does not reopen
+Amendment 1's single-session budget — it is orchestrator-only decomposition
+and delegation of independently-scored Low subtasks, exactly as Moderate's
+own post-repair-budget step.
 
 A direct orchestrator edit is permitted only in two narrow, explicitly
 recorded cases: (1) a **documented tooling-failure exception** — the local
@@ -796,12 +888,14 @@ acceptance criteria, happy paths, edge cases); **Critique** (re-read as if
 reviewing someone else's code — logical correctness against every `HP-#`/
 `EC-#`, error handling at boundaries, unintended side effects, applicable
 design patterns for performance/UX where user-facing, test coverage gaps
-against the 90% gate); **Revise** (apply concrete fixes, or state
-explicitly that none are needed); **Certify** (proceed to unit coverage
-certification only after every required pass has a complete loop recorded).
+against the applicable gates); **Revise** (apply concrete fixes, or state
+explicitly that none are needed); **Certify** (proceed to behavioral
+coverage certification only after every required pass has a complete loop
+recorded).
 
 Document passes in the task completion record as a `### Reflection log`
-section before `### Unit coverage certification`:
+section before `### Behavioral coverage certification` for `behavior-v2`
+ledgers (legacy `unit-v1` ledgers keep `### Unit coverage certification`):
 
 ```md
 ### Reflection log
@@ -829,19 +923,30 @@ judgment — if the task writes non-trivial logic, apply it.
 
 ## Testing and commit rules
 
-- TDD where practical: test first, implement, run tests.
-- Target at least **90% line coverage** for the implemented scope, enforced
-  as a quality gate, not reporting-only.
+- **TDD where practical.** For a reproducible defect, add the regression test
+  first, confirm it fails for the intended reason (RED), implement the fix,
+  then confirm it passes (GREEN). For deterministic critical logic — domain
+  invariants, authorization, rights/consent fail-closed gates, parsers,
+  routing/state machines and policy decisions — strongly prefer test-first
+  unless a concrete reason is recorded. Do not force test-first chronology
+  for wiring, trivial DTOs, migrations/config, generated glue, or purely
+  visual changes when another evidence layer is the correct proof.
+- The **90% line-coverage threshold is the Rust workspace gate** enforced by
+  `cargo llvm-cov` with the repository's configured filename exclusions. It
+  is a quality gate, not a claim that every stack has 90% line coverage.
+  Mobile is gated independently by typecheck, lint, and Jest; cross-stack
+  behavioral completion is enforced through `behavior-v2` evidence.
 - Prefer real backends over mocks.
 - **Do not commit if any test is broken.** Run all tests before commit and
   push.
-- Keep the automated coverage gate aligned with CI. If the required
-  threshold changes, update both this guide and `.github/workflows/ci.yml`
-  in the same change.
+- Keep the automated coverage gate aligned with CI. If the Rust threshold or
+  exclusions change, update this guide and the corresponding Makefile/CI
+  configuration in the same change.
 - The `.githooks/pre-push` hook enforces the fast deterministic Rust gates
   (`fmt`, `clippy`, `test`, `cargo check`) plus dependency-policy checks when
   Cargo manifests change; CI keeps the full blocking baseline including the
-  90% coverage gate. Enable with `git config core.hooksPath .githooks`.
+  Rust 90% coverage gate and the separate mobile gate. Enable with
+  `git config core.hooksPath .githooks`.
 - Ask for confirmation before deleting anything.
 
 ## Handoff prompt format
@@ -868,6 +973,16 @@ work. For harder Low-RRI attempts, the wrapper supports `--temperature`/
 `DUBBRIDGE_LOW_RRI_TEMPERATURE` and `--think`/`--no-think`/
 `DUBBRIDGE_LOW_RRI_THINK`; keep thinking off by default (it can consume the
 token budget before the tagged response completes).
+
+**Indentation drift is not a delegation defect.** A `--mode before-after`
+diff can shift surrounding-line indentation by one or two spaces relative to
+the anchor (an artifact of the model retyping context lines). Do not pause a
+delegation chain to inspect or hand-correct this, do not flag it as a phase-1
+or phase-2 review finding, and do not spend a repair attempt on it — it is
+cosmetic, not a scope or correctness defect. Run `cargo fmt` once after the
+last sub-task in a chain touching the same file, not after each sub-task.
+This is the Low-RRI-delegation-specific case of the general rule that
+whitespace/formatting differences are never findings against a contract.
 
 For **RRI 26–40 local-first implementation** (Moderate), use
 `scripts/local-agent/run_local_task.py` in a disposable git worktree. The
@@ -914,6 +1029,57 @@ the disposable worktree boundary, or sustained swap/thermal degradation
 attributable to the local implementer, revert the affected band (Moderate
 and/or Med-high) to cloud implementation while retaining the local review
 roles.
+
+#### Bounded cloud-implementation priority — S-230 + MVP0-P2P rollout (2026-09-06, deactivated 2026-09-07)
+
+**Status: deactivated 2026-09-07 by explicit owner instruction** ("desactiva
+la excepcion ya que ahora estoy en linea") — the owner is back online and
+available for the normal local-first workflow, so the operational trigger
+this subsection existed for (owner unavailable to supervise local-agent
+work during the host memory constraint) no longer applies for the moment.
+Effective immediately: code-touching tasks in `S-230` and `MVP0-P2P` resume
+the normal RRI-band local-first default (Moderate → `run_local_task.py`;
+Med-high → ADR-038) instead of defaulting to cloud. This does not retroactively
+reclassify any task already implemented under the exception while it was
+active. The host memory constraint described below is unchanged and may
+recur — if local-agent work later needs to default to cloud again (e.g. the
+owner steps away again during an active local-implementer memory-pressure
+window), record a fresh dated reactivation note here rather than assuming
+this historical text still applies; do not silently reactivate this section
+by inference.
+
+The host driving this repository's local agent work is memory-constrained
+for the local implementer roles specifically: 32 GB total RAM, already at
+~31 GB used at idle, against implementer models in the 18–25 GB range
+(`devstral-small-2:24b-instruct-2512-q4_K_M`, `qwen3.8:27b-mlx`). This is the
+"sustained swap/thermal degradation attributable to the local implementer"
+condition the rollback trigger above already anticipates — this subsection
+invokes that trigger explicitly and scopes it, rather than defining a new
+mechanism.
+
+**Scope:** every code-touching task (Rust backend, mobile RN/Expo, P2P
+runtime) inside the `S-230` (`docs/plan/s-230-poc-v1-digitalocean.md`) and
+`MVP0-P2P` (`docs/plan/mvp0-p2p-first.md`,
+`docs/plan/mvp0-p2p-p2-encrypted-publication.md`) slices, Moderate and
+Med-high alike, defaults to **cloud implementation** (the band's resolved
+Codex/Claude cloud-takeover model) instead of the local-first
+`run_local_task.py` route — cloud is tried first, not only after a local
+repair-budget exhaustion. Docs-only, config-only, and planning tasks in
+these same slices are **not** affected and keep the normal RRI-band routing
+local-first default.
+
+**Unaffected:** phase-1/phase-2 independent review (Gemma primary, Muse
+Glimmer intermediate, D14 final) stays local, unchanged. This exception
+covers only who authors the implementation, never who reviews it, and never
+changes RRI, band, Reflection pass count, or the HITL approval gate.
+
+**Duration:** bounded to this rollout. Expires automatically when both
+`S-230-T9g` (the October GO/NO-GO) and MVP0-P2P `P7` close — at that point
+this subsection should be removed or marked historical, and local-first
+routing resumes its normal RRI-band default for any later work on these
+slices. Do not extend this exception to other slices by analogy; a
+different slice hitting the same host constraint needs its own explicit,
+dated exception recorded here.
 
 **Target-file size gate:** before building a task card for RRI 26–40
 local-first delegation, check every file in `allowed_paths` and every file
@@ -1071,9 +1237,10 @@ the task blocked. Never downgrade silently to self-review.
   chain. In RRI 56+ the cross-vendor peer **replaces** Gemma/GPT-OSS 20B —
   they do not both run.
 - The four existing development-task closure blocks (Step 1 reviewer/D14,
-  Step 2 Reflection log, Step 3 coverage cert, Step 4 owner verification)
-  are preserved; the band-resolved reviewer occupies the reviewer slot
-  inside Step 1, with D14 as the Step 1 fallback path in every band.
+  Step 2 Reflection log, Step 3 behavioral coverage cert, Step 4 owner
+  verification) are preserved; the band-resolved reviewer occupies the
+  reviewer slot inside Step 1, with D14 as the Step 1 fallback path in every
+  band.
 
 ### Enforcement note
 
@@ -1102,6 +1269,14 @@ eligible simple code patches. It is bound to `qwen3.8:27b-mlx`; the shared
   final judgment.
 - Qwen-authored Low-RRI patches require an independent primary-agent review
   even when Gemma Reviewer also runs.
+- **Whitespace/formatting is not a finding.** When comparing a delegated
+  patch against its packet contract, or evaluating any phase-1/phase-2 diff,
+  differences limited to spacing, indentation, or line breaks are not a
+  discrepancy or finding on their own — only functional/behavioral deviation
+  from the contract or acceptance criteria is. This does not relax
+  `qa-fmt`/`prettier`/`eslint`/`rustfmt` or any other automated formatting
+  gate — those still run and still block on their own terms; it only scopes
+  what counts as reviewer/orchestrator judgment on top of them.
 
 The sentence above is the canonical source for the authority-boundary clause
 sent to Ollama as part of Gemma Reviewer's system prompt, mechanically
@@ -1230,10 +1405,12 @@ Task completion records for Low/Moderate development tasks must include:
 `--passes 1` collapses to the single-pass form (no reconciliation fields, no
 per-pass artifacts). Run with `make qa-gemma-review` (local only; not
 required in GitHub-hosted CI until an Ollama-capable runner is available).
-For ledgers declaring `Behavioral coverage contract: unit-v1`, `make
-qa-docs` rejects completed sections omitting the `Reflection log` (RRI 26+)
-or both a `Review artifact:` line and a `REVIEW-OVERRIDE:` line at **every**
-RRI band.
+Legacy ledgers declaring `Behavioral coverage contract: unit-v1` retain the
+existing `check-task-unit-coverage.sh` review-artifact/override enforcement.
+For `behavior-v2`, `make qa-docs` enforces RRI-dependent Reflection and Owner
+final verification through `check-behavioral-coverage.py`; reviewer evidence
+remains governed by the band-routed workflow above rather than being
+misrepresented as unit-test evidence.
 
 ### Review artifact receipt and REVIEW-OVERRIDE lines (GEG-1)
 
@@ -1253,7 +1430,7 @@ The completed task section must reference it:
 
 `scripts/check-task-unit-coverage.sh` checks the file exists, is valid JSON,
 its `task_id` matches the section, and its `commit_sha` is reachable from
-the reviewed history.
+the reviewed history for legacy `unit-v1` ledgers.
 
 If no review ran (or none is applicable), use a typed override line instead
 — never both, never neither:
@@ -1266,10 +1443,10 @@ If no review ran (or none is applicable), use a typed override line instead
 ```
 
 Every `REVIEW-OVERRIDE:` line also needs a matching row in the append-only
-ledger `docs/audit/gemma-review-overrides.md` — the validator fails a
-section whose override has no ledger row, even with the companion field
-present. `urgency` overrides require a human `Waiver-by`; an agent may not
-self-issue one. Full contract: `docs/policies/RRI_POLICY.md § Review
+ledger `docs/audit/gemma-review-overrides.md` — the legacy validator fails a
+`unit-v1` section whose override has no ledger row, even with the companion
+field present. `urgency` overrides require a human `Waiver-by`; an agent may
+not self-issue one. Full contract: `docs/policies/RRI_POLICY.md § Review
 evidence gate (artifact-or-override, all bands)`.
 
 ## Local Architect / Complex Analyst (ADR-037)
@@ -1392,7 +1569,7 @@ code-review replacement, patch approver, or final RRI authority.
 
 A development task is not done until the closure gates for its band have
 been checked **in order** — evaluate the review gate first; do not start
-the closure summary with unit coverage certification or owner final
+the closure summary with behavioral coverage certification or owner final
 verification.
 
 **Applies to every development task regardless of RRI band**, including Low
@@ -1539,20 +1716,29 @@ there.
        cycle; record the disposition of each finding in the log.
 ```
 
-### Step 3 — Unit coverage certification (all development tasks)
+### Step 3 — Behavioral coverage certification (all new development tasks)
+
+For `behavior-v2` ledgers:
 
 ```
-[ ] 3. Record `### Unit coverage certification` block in the task entry.
-       - Table: Case ID | Type | Behavior | Unit test evidence | Result
-       - Every HP-# and EC-# must map to at least one passing test.
+[ ] 3. Record `### Behavioral coverage certification` block in the task entry.
+       - Table: Case ID | Type | Behavior | Layer | Executable evidence | Result
+       - Every HP-# and EC-# maps to at least one passing executable evidence item.
+       - Allowed layers: unit | component | integration | contract | e2e.
+       - Use the cheapest layer that genuinely proves the behavior.
        - `N/A` is not permitted for development-task happy paths or edge cases.
 ```
+
+For grandfathered `unit-v1` ledgers, retain the legacy `### Unit coverage
+certification` block and existing unit-test-only semantics.
 
 ### Step 4 — Owner final verification (all development tasks)
 
 ```
 [ ] 4. Record `### Owner final verification` block in the task entry.
        - Owner, date, statement, exact commands run.
+       - The owner verifies that each mapped evidence item genuinely proves
+         the claimed behavior at the declared layer.
 ```
 
 Only after all applicable steps above are checked may the task status be
@@ -1572,6 +1758,7 @@ flipped to `[x] Done` and the completion reported to the user.
 
 - `CLAUDE.md`, `AGENTS.md`, `README_AGENT_ORDER.md`
 - `DEVELOPMENT_REFERENCE.md` — developer entry point: architecture, ADR index, roadmap, BDD, setup, and QA gates
+- `docs/playbooks/BEHAVIORAL_TESTING_CONTRACT.md` — focused reference for the TDD / ATDD-style / BDD contract enforced here
 - `docs/policies/HITL_AUTONOMY_POLICY.md`
 - `docs/policies/RRI_POLICY.md` — RRI formula, anchor rubric, bands, and gates
 - `docs/adr/ADR-040-per-module-complexity-split-implementation-routing.md` — per-module complexity-split routing (RRI 26–55)

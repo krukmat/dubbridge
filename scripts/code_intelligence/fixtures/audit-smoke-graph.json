@@ -1,0 +1,67 @@
+{
+  "git_revision": "0000000000000000000000000000000000000000",
+  "graph_revision": "audit-smoke-graph-v1",
+  "anchors": ["crate::playback::resolve_stream"],
+  "files": ["crates/playback/src/lib.rs", "crates/auth/src/lib.rs"],
+  "symbols": ["crate::playback::resolve_stream", "auth::internal::session_topology"],
+  "relationships": [
+    {
+      "from": "crate::playback::resolve_stream",
+      "to": "crate::playback::manifest",
+      "kind": "calls",
+      "classification": "task_local"
+    },
+    {
+      "from": "crate::playback::resolve_stream",
+      "to": "auth::internal::session_topology",
+      "kind": "depends_on",
+      "classification": "cross_boundary"
+    },
+    {
+      "from": "workspace",
+      "to": "all-crates",
+      "kind": "contains",
+      "classification": "global_architecture"
+    }
+  ],
+  "tests": ["playback::tests::valid_manifest_resolves"],
+  "boundaries": ["playback", "auth"],
+  "governance": ["ADR-023"],
+  "source_fragments": [
+    {
+      "path": "crates/playback/src/lib.rs",
+      "start_line": 10,
+      "end_line": 16,
+      "content": "audit smoke task-local fragment",
+      "classification": "task_local"
+    },
+    {
+      "path": "crates/auth/src/lib.rs",
+      "start_line": 1,
+      "end_line": 5,
+      "content": "audit smoke cross-boundary fragment",
+      "classification": "cross_boundary"
+    },
+    {
+      "path": "docs/architecture.md",
+      "start_line": 1,
+      "end_line": 8,
+      "content": "audit smoke global architecture fragment",
+      "classification": "global_architecture"
+    },
+    {
+      "path": "fixtures/private.txt",
+      "start_line": 1,
+      "end_line": 1,
+      "content": "sensitive audit fixture value",
+      "classification": "secret"
+    },
+    {
+      "path": "tmp/runtime.json",
+      "start_line": 1,
+      "end_line": 1,
+      "content": "ephemeral audit fixture value",
+      "classification": "runtime_data"
+    }
+  ]
+}

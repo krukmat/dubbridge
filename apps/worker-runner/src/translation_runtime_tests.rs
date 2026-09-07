@@ -15,12 +15,6 @@ async fn setup_pool() -> Option<PgPool> {
         .run(&pool)
         .await
         .expect("migrations");
-    sqlx::query(
-        "TRUNCATE TABLE translation_dispatch_outbox, localization_generation_claims, asset_translation_status, artifact_records, project_assets, target_languages, projects, organizations, assets RESTART IDENTITY CASCADE",
-    )
-    .execute(&pool)
-    .await
-    .expect("truncate");
     Some(pool)
 }
 
