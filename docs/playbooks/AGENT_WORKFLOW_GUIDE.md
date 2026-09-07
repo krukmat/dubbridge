@@ -1031,7 +1031,23 @@ attributable to the local implementer, revert the affected band (Moderate
 and/or Med-high) to cloud implementation while retaining the local review
 roles.
 
-#### Bounded cloud-implementation priority — S-230 + MVP0-P2P rollout (2026-09-06)
+#### Bounded cloud-implementation priority — S-230 + MVP0-P2P rollout (2026-09-06, deactivated 2026-09-07)
+
+**Status: deactivated 2026-09-07 by explicit owner instruction** ("desactiva
+la excepcion ya que ahora estoy en linea") — the owner is back online and
+available for the normal local-first workflow, so the operational trigger
+this subsection existed for (owner unavailable to supervise local-agent
+work during the host memory constraint) no longer applies for the moment.
+Effective immediately: code-touching tasks in `S-230` and `MVP0-P2P` resume
+the normal RRI-band local-first default (Moderate → `run_local_task.py`;
+Med-high → ADR-038) instead of defaulting to cloud. This does not retroactively
+reclassify any task already implemented under the exception while it was
+active. The host memory constraint described below is unchanged and may
+recur — if local-agent work later needs to default to cloud again (e.g. the
+owner steps away again during an active local-implementer memory-pressure
+window), record a fresh dated reactivation note here rather than assuming
+this historical text still applies; do not silently reactivate this section
+by inference.
 
 The host driving this repository's local agent work is memory-constrained
 for the local implementer roles specifically: 32 GB total RAM, already at
