@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 dubbridge-domain = { path = "../domain" }
+aes-gcm = "0.11.1"
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = "0.10"
