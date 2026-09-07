@@ -1,0 +1,18 @@
+{
+  "schema_version": "rri-v2-design-0.2",
+  "mode": "candidate_only",
+  "task": {
+    "task_id": "example-planning-document",
+    "parent_id": null,
+    "lineage_id": "example-planning-document",
+    "work_family": "planning",
+    "kind": "planning",
+    "baseline_sha": "example-baseline",
+    "snapshot_at": "2026-09-07T00:00:00Z",
+    "measurement_stage": "pre_implementation"
+  },
+  "applicability": {"status": "not_applicable", "reason": "Planning documents are outside the implementation rubric.", "evidence_refs": ["docs/proposals/rri-v2-model.md#5-work-size-without-file-count-cliffs"]},
+  "size": {"status": "not_applicable", "method": "separate_work_family", "value": null, "evidence_refs": ["planning-scope"]},
+  "uncertainty": {"unresolved": []},
+  "risk": {"hazards": [], "likelihood": null}
+}

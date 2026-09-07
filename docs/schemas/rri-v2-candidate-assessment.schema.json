@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dubbridge.local/schemas/rri-v2-candidate-assessment.schema.json",
+  "title": "RRI v2 candidate assessment input",
+  "description": "Candidate-only assessment envelope for rri-v2-design-0.2. It does not authorize work or contain calibrated effort predictions.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "mode",
+    "task",
+    "applicability",
+    "size",
+    "uncertainty",
+    "risk"
+  ],
+  "properties": {
+    "schema_version": {"const": "rri-v2-design-0.2"},
+    "mode": {"const": "candidate_only"},
+    "task": {"$ref": "#/$defs/task"},
+    "applicability": {"$ref": "#/$defs/applicability"},
+    "axes": {
+      "type": "object",
+      "required": ["L", "I", "Q", "V"],
+      "properties": {
+        "L": {"$ref": "#/$defs/axis"},
+        "I": {"$ref": "#/$defs/axis"},
+        "Q": {"$ref": "#/$defs/axis"},
+        "V": {"$ref": "#/$defs/axis"}
+      },
+      "additionalProperties": false
+    },
+    "size": {"$ref": "#/$defs/size"},
+    "uncertainty": {"$ref": "#/$defs/uncertainty"},
+    "risk": {"$ref": "#/$defs/risk"}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "nonempty_string": {"type": "string", "minLength": 1},
+    "evidence_refs": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/nonempty_string"}
+    },
+    "level": {"type": "integer", "minimum": 0, "maximum": 4},
+    "range": {
+      "type": "array",
+      "prefixItems": [
+        {"$ref": "#/$defs/level"},
+        {"$ref": "#/$defs/level"}
+      ],
+      "items": false
+    },
+    "task": {
+      "type": "object",
+      "required": [
+        "task_id",
+        "lineage_id",
+        "work_family",
+        "kind",
+        "baseline_sha",
+        "snapshot_at",
+        "measurement_stage"
+      ],
+      "properties": {
+        "task_id": {"$ref": "#/$defs/nonempty_string"},
+        "parent_id": {"type": ["string", "null"]},
+        "lineage_id": {"$ref": "#/$defs/nonempty_string"},
+        "work_family": {"$ref": "#/$defs/nonempty_string"},
+        "kind": {"$ref": "#/$defs/nonempty_string"},
+        "baseline_sha": {"$ref": "#/$defs/nonempty_string"},
+        "snapshot_at": {"$ref": "#/$defs/nonempty_string"},
+        "measurement_stage": {"enum": ["pre_implementation", "post_implementation"]}
+      },
+      "additionalProperties": false
+    },
+    "applicability": {
+      "type": "object",
+      "required": ["status", "reason", "evidence_refs"],
+      "properties": {
+        "status": {"enum": ["applicable", "not_applicable"]},
+        "reason": {"$ref": "#/$defs/nonempty_string"},
+        "evidence_refs": {"$ref": "#/$defs/evidence_refs"}
+      },
+      "additionalProperties": false
+    },
+    "axis": {
+      "type": "object",
+      "required": ["status", "method", "evidence_refs"],
+      "properties": {
+        "status": {"enum": ["observed", "estimated", "unknown"]},
+        "method": {"$ref": "#/$defs/nonempty_string"},
+        "evidence_refs": {"$ref": "#/$defs/evidence_refs"},
+        "level": {"$ref": "#/$defs/level"},
+        "range": {"$ref": "#/$defs/range"}
+      },
+      "oneOf": [
+        {"required": ["level"], "not": {"required": ["range"]}},
+        {"required": ["range"], "not": {"required": ["level"]}}
+      ],
+      "additionalProperties": false
+    },
+    "size": {
+      "type": "object",
+      "required": ["status", "method", "value", "evidence_refs"],
+      "properties": {
+        "status": {"enum": ["observed", "estimated", "unknown", "not_applicable"]},
+        "method": {"$ref": "#/$defs/nonempty_string"},
+        "value": {"type": ["number", "null"], "minimum": 0},
+        "evidence_refs": {"$ref": "#/$defs/evidence_refs"}
+      },
+      "additionalProperties": false
+    },
+    "uncertainty": {
+      "type": "object",
+      "required": ["unresolved"],
+      "properties": {
+        "unresolved": {"type": "array", "items": {"$ref": "#/$defs/nonempty_string"}}
+      },
+      "additionalProperties": false
+    },
+    "risk": {
+      "type": "object",
+      "required": ["hazards", "likelihood"],
+      "properties": {
+        "hazards": {"type": "array", "items": {"$ref": "#/$defs/nonempty_string"}},
+        "likelihood": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    }
+  }
+}

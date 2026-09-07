@@ -1,0 +1,40 @@
+{
+  "task_id": "rri-v2-candidate-calculator",
+  "phase": "task-analysis",
+  "schema_version": 1,
+  "reviewer": "gemma4:26b-a4b-it-qat",
+  "reviewer_label": "gemma",
+  "verdict": "PASS",
+  "date": "2026-09-07",
+  "packet_summary": "RRI 33 candidate-only collector/calculator; standalone Python schema validation and ordinal computation; active RRI/HITL and prediction calibration excluded.",
+  "precheck": {
+    "ollama_restarted": true,
+    "prior_server_pid": 88971,
+    "new_server_pid": 87423,
+    "endpoint": "127.0.0.1:11434",
+    "initial_profile": {
+      "num_ctx": 32768,
+      "num_predict": 512,
+      "think": "default",
+      "terminal_reason": "length",
+      "content_length": 0,
+      "decision": "capacity recovery required"
+    },
+    "recovery_profile": {
+      "num_ctx": 16384,
+      "num_predict": 512,
+      "think": false,
+      "terminal_reason": "stop",
+      "content_length": 1237,
+      "decision": "usable reduced-profile review"
+    }
+  },
+  "findings": [
+    {
+      "severity": "none",
+      "finding": "No material gap found. The reviewer confirmed the candidate-only isolation, validation ordering, ordinal arithmetic, invalid-input handling, inapplicability dispatch, and null prediction contract.",
+      "disposition": "Proceed to HITL approval; preserve the stated boundaries during implementation."
+    }
+  ],
+  "raw_response_format_note": "The reviewer returned a PASS JSON fenced response whose findings were strings rather than the requested objects; the PASS verdict and substance were independently recorded above."
+}

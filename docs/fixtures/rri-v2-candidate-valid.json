@@ -1,0 +1,28 @@
+{
+  "schema_version": "rri-v2-design-0.2",
+  "mode": "candidate_only",
+  "task": {
+    "task_id": "example-coordinated-mapping",
+    "parent_id": null,
+    "lineage_id": "example-coordinated-mapping",
+    "work_family": "maintenance",
+    "kind": "maintenance",
+    "baseline_sha": "example-baseline",
+    "snapshot_at": "2026-09-07T00:00:00Z",
+    "measurement_stage": "pre_implementation"
+  },
+  "applicability": {
+    "status": "applicable",
+    "reason": "Implementation behavior is within the RRI v2 rubric.",
+    "evidence_refs": ["docs/proposals/rri-v2-model.md#4-technical-profile-rubric"]
+  },
+  "axes": {
+    "L": {"status": "estimated", "method": "change inventory", "evidence_refs": ["contract-example"], "level": 2},
+    "I": {"status": "estimated", "method": "contract graph", "evidence_refs": ["contract-example"], "level": 2},
+    "Q": {"status": "estimated", "method": "state inventory", "evidence_refs": ["contract-example"], "level": 1},
+    "V": {"status": "estimated", "method": "oracle design", "evidence_refs": ["contract-example"], "level": 2}
+  },
+  "size": {"status": "estimated", "method": "unique_transformation_sites", "value": 1, "evidence_refs": ["contract-example"]},
+  "uncertainty": {"unresolved": []},
+  "risk": {"hazards": [], "likelihood": null}
+}
