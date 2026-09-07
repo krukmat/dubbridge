@@ -1,0 +1,189 @@
+name: Temporary guarded P2P merge into model migration v2
+
+on:
+  push:
+    branches:
+      - feat/devstral-128k-migration
+    paths:
+      - .github/workflows/_temp_merge_p2p_into_devstral_v2.yml
+
+permissions:
+  contents: write
+
+jobs:
+  merge-p2p:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/devstral-128k-migration
+          fetch-depth: 0
+
+      - name: Merge P2P with guarded conflict resolution
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "DubBridge Integration Bot"
+          git config user.email "integration-bot@users.noreply.github.com"
+
+          MIGRATION_HEAD="$(git rev-parse HEAD)"
+          git fetch origin feature/p2p-mvp-core
+          P2P_HEAD="$(git rev-parse origin/feature/p2p-mvp-core)"
+          BASE="$(git merge-base "$MIGRATION_HEAD" "$P2P_HEAD")"
+
+          echo "migration=$MIGRATION_HEAD"
+          echo "p2p=$P2P_HEAD"
+          echo "merge-base=$BASE"
+
+          git diff "$BASE" "$MIGRATION_HEAD" -- docs/playbooks/AGENT_WORKFLOW_GUIDE.md > /tmp/guide.patch
+          git diff "$BASE" "$MIGRATION_HEAD" -- scripts/local-agent/run_med_high_task.py > /tmp/run_med_high.patch
+
+          set +e
+          git merge --no-ff --no-commit "$P2P_HEAD"
+          set -e
+
+          mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
+          printf 'conflict: %s\n' "${conflicts[@]:-}"
+          for f in "${conflicts[@]}"; do
+            case "$f" in
+              docs/adr/README.md|docs/audit/agent-workflow-binding-history.md|docs/playbooks/AGENT_WORKFLOW_GUIDE.md|scripts/local-agent/run_med_high_task.py) ;;
+              *) echo "Unexpected merge conflict: $f" >&2; exit 41 ;;
+            esac
+          done
+
+          if printf '%s\n' "${conflicts[@]}" | grep -Fxq 'docs/adr/README.md'; then
+            git checkout --theirs -- docs/adr/README.md
+          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('docs/adr/README.md')
+          lines = p.read_text().splitlines()
+          lines = [l for l in lines if 'ADR-043-devstral-local-implementer-binding.md' not in l and 'ADR-044-local-model-reviewer-and-architect-rebinding.md' not in l]
+          if not any('ADR-045-devstral-local-implementer-binding.md' in l for l in lines):
+              idx = next(i for i,l in enumerate(lines) if 'ADR-044-p2p-audience-delivery-boundary.md' in l)
+              lines[idx+1:idx+1] = [
+                  '| [ADR-045](ADR-045-devstral-local-implementer-binding.md) | Devstral Small 2 as the Moderate local implementer | Accepted (runtime binding and 128K context baseline) |',
+                  '| [ADR-046](ADR-046-local-model-reviewer-and-architect-rebinding.md) | Local reviewer and architect rebinding | Accepted 2026-08-31 |',
+              ]
+          p.write_text('\n'.join(lines) + '\n')
+          PY
+          git add docs/adr/README.md
+
+          if printf '%s\n' "${conflicts[@]}" | grep -Fxq 'docs/audit/agent-workflow-binding-history.md'; then
+            git checkout --theirs -- docs/audit/agent-workflow-binding-history.md
+          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('docs/audit/agent-workflow-binding-history.md')
+          lines = p.read_text().splitlines()
+          additions = [
+              '| 2026-08-31 (ADR-045) | RRI 26–40, RRI 41–45 after `GO_LOCAL`, and ADR-040 local tramos | `nemotron-3.5-lightning:30b-a3b-q4_K_M` | `devstral-small-2:24b-instruct-2512-q4_K_M` | Replace the active Moderate/authorized Med-high implementer binding and restore a 128K (`131072`) normal context baseline; Low remains Qwen and RRI 46–55 whole-task routing remains cloud-only |',
+              '| 2026-08-31 (ADR-046) | RRI 0–25 phase-1/phase-2 reviewer | Muse Glimmer (`muse-glimmer:30b-q4_K_M`) | `gpt-oss:20b` (64K, medium reasoning), Gemma intermediate fallback | Retire Muse from the active review stack while preserving independent evidence-backed review |',
+              '| 2026-08-31 (ADR-046) | RRI 26–55 phase-1/phase-2 reviewer | Gemma primary, Muse Glimmer intermediate fallback | Gemma primary, `gpt-oss:20b` (64K, medium reasoning) intermediate fallback | Retire Muse from the active review stack while retaining reviewer diversity |',
+              '| 2026-08-31 (ADR-046) | Local Architect / Complex Analyst | `muse-glimmer:30b-q4_K_M` | `qwen3.6:27b-q4_K_M` (64K, `think=false`) | Move architecture analysis to a 27B Qwen profile with lower memory pressure on 32GB Apple Silicon |',
+          ]
+          if not any('2026-08-31 (ADR-045)' in l for l in lines):
+              idx = next(i for i,l in enumerate(lines) if l.startswith('| 2026-08-24 | RRI 26–40'))
+              lines[idx+1:idx+1] = additions
+          p.write_text('\n'.join(lines) + '\n')
+          PY
+          git add docs/audit/agent-workflow-binding-history.md
+
+          if printf '%s\n' "${conflicts[@]}" | grep -Fxq 'docs/playbooks/AGENT_WORKFLOW_GUIDE.md'; then
+            git checkout --theirs -- docs/playbooks/AGENT_WORKFLOW_GUIDE.md
+            git add docs/playbooks/AGENT_WORKFLOW_GUIDE.md
+            git apply --3way --index /tmp/guide.patch
+          fi
+
+          if printf '%s\n' "${conflicts[@]}" | grep -Fxq 'scripts/local-agent/run_med_high_task.py'; then
+            git checkout --theirs -- scripts/local-agent/run_med_high_task.py
+            git add scripts/local-agent/run_med_high_task.py
+            git apply --3way --index /tmp/run_med_high.patch
+          fi
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          guide = Path('docs/playbooks/AGENT_WORKFLOW_GUIDE.md')
+          text = guide.read_text()
+          text = text.replace('`nemotron-3.5-lightning:30b-a3b-q4_K_M`', '`devstral-small-2:24b-instruct-2512-q4_K_M`')
+          text = text.replace('| RRI 0–25 reviewer chain (phases 1 and 2) | `muse-glimmer:30b-q4_K_M` → `gemma4:26b-a4b-it-qat` → D14 |', '| RRI 0–25 reviewer chain (phases 1 and 2) | `gpt-oss:20b` (64K, medium reasoning) → `gemma4:26b-a4b-it-qat` → D14 |')
+          text = text.replace('| RRI 26–55 reviewer chain (phases 1 and 2) | `gemma4:26b-a4b-it-qat` → `muse-glimmer:30b-q4_K_M` → D14 |', '| RRI 26–55 reviewer chain (phases 1 and 2) | `gemma4:26b-a4b-it-qat` → `gpt-oss:20b` (64K, medium reasoning) → D14 |')
+          text = text.replace('| Local Architect / Complex Analyst | `muse-glimmer:30b-q4_K_M` — advisory-only (ADR-037), never a phase-1/phase-2 reviewer in any band |', '| Local Architect / Complex Analyst | `qwen3.6:27b-q4_K_M` (64K, `think=false`) — advisory-only (ADR-037), never a phase-1/phase-2 reviewer in any band |')
+          text = text.replace('Muse Glimmer advisory refinement (`GO_LOCAL` |', 'Qwen3.6 Local Architect advisory refinement (`GO_LOCAL` |')
+          text = text.replace('`32768` for Moderate nemotron roles, lowered 2026-08-24 for\n   host memory constraints', '`131072` for Moderate Devstral roles; reviewer/architect contexts remain role-bounded for\n   host memory constraints')
+          guide.write_text(text)
+
+          run = Path('scripts/local-agent/run_med_high_task.py')
+          rtext = run.read_text().replace('MED_HIGH_RUNNER_MODEL = "nemotron-3.5-lightning:30b-a3b-q4_K_M"', 'MED_HIGH_RUNNER_MODEL = "devstral-small-2:24b-instruct-2512-q4_K_M"')
+          run.write_text(rtext)
+
+          # Align the Med-high refinement gate with the approved Local Architect.
+          gate = Path('scripts/local-agent/med_high_gate.py')
+          gtext = gate.read_text()
+          gtext = gtext.replace('REQUIRED_MODEL_TAG = "gpt-oss:20b"', 'REQUIRED_MODEL_TAG = "qwen3.6:27b-q4_K_M"')
+          gtext = gtext.replace('GPT-OSS 20B', 'Qwen3.6 27B')
+          gate.write_text(gtext)
+
+          # The frozen bundle fixture is hash-bound to the exact refinement artifact.
+          test = Path('scripts/local-agent/run_med_high_task_test.py')
+          ttext = test.read_text()
+          ttext = ttext.replace('_RECEIPT_SHA = "31d923290a7ec004229a8ca7407af072b1de021aeff1ed97fe7bee9eb39befa2"', '_RECEIPT_SHA = "5f4f97e0703e24ba083fcf764bb874d9ffcb583581cd340e83ffe68e9c450523"')
+          ttext = ttext.replace('"tag": "gpt-oss:20b"', '"tag": "qwen3.6:27b-q4_K_M"')
+          test.write_text(ttext)
+          PY
+          git add docs/playbooks/AGENT_WORKFLOW_GUIDE.md scripts/local-agent/run_med_high_task.py scripts/local-agent/med_high_gate.py scripts/local-agent/run_med_high_task_test.py
+
+          if [ -f docs/adr/ADR-043-devstral-local-implementer-binding.md ]; then
+            git mv docs/adr/ADR-043-devstral-local-implementer-binding.md docs/adr/ADR-045-devstral-local-implementer-binding.md
+          fi
+          if [ -f docs/adr/ADR-044-local-model-reviewer-and-architect-rebinding.md ]; then
+            git mv docs/adr/ADR-044-local-model-reviewer-and-architect-rebinding.md docs/adr/ADR-046-local-model-reviewer-and-architect-rebinding.md
+          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('docs/adr/ADR-045-devstral-local-implementer-binding.md')
+          if p.exists(): p.write_text(p.read_text().replace('ADR-043', 'ADR-045'))
+          p = Path('docs/adr/ADR-046-local-model-reviewer-and-architect-rebinding.md')
+          if p.exists(): p.write_text(p.read_text().replace('ADR-044', 'ADR-046'))
+          PY
+          git add docs/adr/ADR-045-devstral-local-implementer-binding.md docs/adr/ADR-046-local-model-reviewer-and-architect-rebinding.md
+
+          if git diff --name-only --diff-filter=U | grep -q .; then
+            echo 'Unresolved conflicts remain:' >&2
+            git diff --name-only --diff-filter=U >&2
+            exit 42
+          fi
+
+          ! grep -Eq 'nemotron-3\.5-lightning:30b-a3b-q4_K_M|muse-glimmer:30b-q4_K_M' docs/playbooks/AGENT_WORKFLOW_GUIDE.md
+          grep -Fq 'devstral-small-2:24b-instruct-2512-q4_K_M' docs/playbooks/AGENT_WORKFLOW_GUIDE.md
+          grep -Fq 'gpt-oss:20b' docs/playbooks/AGENT_WORKFLOW_GUIDE.md
+          grep -Fq 'qwen3.6:27b-q4_K_M' docs/playbooks/AGENT_WORKFLOW_GUIDE.md
+          grep -Fq 'MED_HIGH_RUNNER_MODEL = "devstral-small-2:24b-instruct-2512-q4_K_M"' scripts/local-agent/run_med_high_task.py
+          grep -Fq 'REQUIRED_MODEL_TAG = "qwen3.6:27b-q4_K_M"' scripts/local-agent/med_high_gate.py
+          ! grep -Fq 'gpt-oss:20b' scripts/local-agent/med_high_gate.py
+          grep -Fq 'default="qwen3.6:27b-q4_K_M"' scripts/local-architect/run_analysis.py
+          test -f docs/adr/ADR-043-mobile-p2p-runtime-ownership-and-proof-isolation.md
+          test -f docs/adr/ADR-044-p2p-audience-delivery-boundary.md
+          test -f docs/adr/ADR-045-devstral-local-implementer-binding.md
+          test -f docs/adr/ADR-046-local-model-reviewer-and-architect-rebinding.md
+          test ! -f docs/adr/ADR-043-devstral-local-implementer-binding.md
+          test ! -f docs/adr/ADR-044-local-model-reviewer-and-architect-rebinding.md
+
+          git diff --check
+          export PYTHONPATH="$PWD/scripts:$PWD/scripts/local-agent:$PWD/scripts/local-architect"
+          python3 scripts/gemma_local_test.py
+          python3 scripts/gemma_code_review_test.py
+          python3 scripts/peer_workflow_review_test.py
+          python3 scripts/reviewer_model_binding_test.py
+          python3 scripts/local-agent/devstral_binding_test.py
+          python3 scripts/local-agent/med_high_gate_test.py
+          python3 scripts/local-agent/run_med_high_task_test.py
+          python3 scripts/local-agent/run_local_task_test.py
+          python3 scripts/local-architect/run_analysis_test.py
+
+          git rm -f .github/workflows/_temp_merge_p2p_into_devstral.yml .github/workflows/_temp_merge_p2p_into_devstral_v2.yml
+          git add -A
+          git diff --cached --check
+          git commit -m "merge: integrate feature/p2p-mvp-core into devstral migration"
+          git push origin HEAD:feat/devstral-128k-migration
