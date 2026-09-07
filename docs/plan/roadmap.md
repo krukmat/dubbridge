@@ -165,7 +165,16 @@ slice: makes the already-closed pipeline publicly runnable on a Digital
 Ocean droplet; adds no new technology beyond Redis (already in use). Full
 history incl. gap findings G10–G13: `docs/audit/roadmap-history.md` § S-230.
 | `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md`, `docs/audit/s-230-t5b-rri.md` |
-| **MVP0-P2P** | P2P-first invited playback: encrypted publication, invite/claim, verified mobile sync, loopback playback, product surface, and no-HTTP-fallback certification | S-120, S-125, S-127, S-160; ADR-043 and ADR-044 Accepted; S-230 P2P deployment/RC gates | 🟡 P0 and P1 closed. P2.T0 PASS; P2.T1a-T1f Done and owner-approved as P2.T1; P2.C0 PASS on 2026-09-06. C0 froze `p2p-manifest-v1`, `p2p-aad-v1`, K1 custody, `availability-publication-v1`, P2 audit correlation, and `p2p-ready-descriptor-v1`. P2.T2 leaf-by-leaf: `T2a-i`/`T2a-ii-1`/`T2a-ii-2a`/`T2a-ii-2b`/`T2b`/`T2c`/`T2d`/`T2e` are Done (T2d closed 2026-09-07 — generate-once CK + versioned KEK wrap/unwrap + zeroization, RRI 28 Moderate, `crates/p2p/src/key_wrap.rs`; T2e closed 2026-09-07 — additive sealed-K1 persistence, RRI 55 Med-high, ADR-038 `CLOUD_REQUIRED` route, owner-verified, `infra/migrations/0033_extend_p2p_publications_k1.sql` + `crates/db/src/p2p_publication_repo.rs::record_sealed_k1`); `T2f`-`T2g` remain planned. P3-P7 remain pending. T6p-a is deferred until S-230 T7local, T7c, and MVP0-P2P P2-P6 are PASS —
+| **MVP0-P2P** | P2P-first invited playback: encrypted publication, invite/claim, verified mobile sync, loopback playback, product surface, and no-HTTP-fallback certification | S-120, S-125, S-127, S-160; ADR-043 and ADR-044 Accepted; S-230 P2P deployment/RC gates | 🟡 P0 and P1 closed. P2.T0 PASS; P2.T1a-T1f Done and owner-approved as P2.T1; P2.C0 PASS on 2026-09-06. C0 froze `p2p-manifest-v1`, `p2p-aad-v1`, K1 custody, `availability-publication-v1`, P2 audit correlation, and `p2p-ready-descriptor-v1`. P2.T2 leaf-by-leaf: `T2a-i`/`T2a-ii-1`/`T2a-ii-2a`/`T2a-ii-2b`/`T2b`/`T2c`/`T2d`/`T2e`/`T2f` are Done (T2d closed 2026-09-07 — generate-once CK + versioned KEK wrap/unwrap + zeroization, RRI 28 Moderate, `crates/p2p/src/key_wrap.rs`; T2e closed 2026-09-07 — additive sealed-K1 persistence, RRI 55 Med-high, ADR-038 `CLOUD_REQUIRED` route, owner-verified, `infra/migrations/0033_extend_p2p_publications_k1.sql` + `crates/db/src/p2p_publication_repo.rs::record_sealed_k1`; T2f closed 2026-09-07 — pure ciphertext package/manifest assembly, RRI 24 Low, `crates/p2p/src/package_builder.rs`, phase-2 review via the Gemma fallback after Muse
+Glimmer's normal- and reduced-profile attempts were both exhausted on host
+memory saturation — status `FINDINGS` with one consensus minor finding
+(O(N²) duplicate-path check, disposed as accepted-follow-up, no BLOCKED
+verdict at any point in the chain), owner final verification recorded
+2026-09-07, `[x] Done`
+(`docs/tasks/mvp0-p2p-p2-encrypted-publication.md` §
+"P2.T2f — implementation and closure record")). `T2g` remains planned. P3-P7
+remain pending. T6p-a is deferred until S-230 T7local, T7c, and MVP0-P2P
+P2-P6 are PASS —
 T7local validates the mobile flow against the local Docker Compose stack, so
 this gate no longer requires the S-230 T6 Digital Ocean deploy to have
 happened first (added 2026-09-06, replacing an earlier T7-gated version of

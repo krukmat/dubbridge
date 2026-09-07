@@ -112,7 +112,7 @@ Owner-approved freeze:
 | `T2c` | AES-256-GCM + canonical AAD + nonce invariant | `crates/p2p/src/crypto.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | **23 Low** | **[x] Done 2026-09-07** | T2a |
 | `T2d` | Generate-once CK + versioned KEK wrap/unwrap + zeroization | `crates/p2p/src/key_wrap.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | **28 Moderate** | **[x] Done 2026-09-07** | T2c |
 | `T2e` | Additive sealed-K1 persistence | `infra/migrations/0033_extend_p2p_publications_k1.sql`; `crates/db/src/p2p_publication_repo.rs` | **55 Med-high** | **[x] Done 2026-09-07** | T2d; T1 accepted base |
-| `T2f` | Ciphertext package assembly/seal + durable manifest/package evidence | `crates/p2p/src/package_builder.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock`; `crates/db/src/p2p_publication_repo.rs` | RUN BEFORE EXECUTION | Planned | T2b–T2e |
+| `T2f` | Ciphertext package assembly/seal (pure, in-process only — durable persistence narrowed out to a later leaf, see design) | `crates/p2p/src/package_builder.rs`; `crates/p2p/src/lib.rs` | **24 Low** | Design frozen, phase-1 PASS (Gemma fallback) — pending delegation | T2b–T2e |
 | `T2g` | K1/golden/cross-runtime certification | `crates/p2p/tests/k1_contract.rs` | RUN BEFORE EXECUTION | Planned | T2f |
 
 **HP-T2-1:** valid S-120 HLS -> one complete ciphertext-only K1 package with manifest/hash evidence and one server-wrapped CK lineage.  
@@ -1003,6 +1003,503 @@ Required passes: 3 (`RRI 55` → `Med-high`)
   clippy -p dubbridge-db --all-targets --all-features -- -D warnings`
   (against local Postgres,
   `DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@localhost:5432/dubbridge`)
+
+Status: **[x] Done 2026-09-07.**
+
+### P2.T2f — design (frozen before delegation, 2026-09-07)
+
+**Objective:** compose the already-frozen `crates/p2p` primitives
+(`source::build_snapshot`, `crypto::encrypt_file`, `key_wrap`,
+`manifest::Manifest`/`aad::Aad`) into one deterministic, pure (no DB/IO/
+storage/network) function that turns a `PackageSnapshot` plus its plaintext
+file bytes into a sealed ciphertext package: one `EncryptedFile` per input
+file plus the canonical `Manifest` describing them — the exact
+`crates/p2p/src/package_builder.rs` scope frozen at C0
+(`docs/audit/mvp0-p2p-p2-c0-contract-freeze.md` §6, `P2.T2f` row).
+
+- **In scope:** `crates/p2p/src/package_builder.rs` (new), `pub mod
+  package_builder;` in `crates/p2p/src/lib.rs`. No new external dependency
+  expected (`aes-gcm`, `sha2`, `zeroize` already present from T2c/T2d); if
+  none is needed, `crates/p2p/Cargo.toml`/`Cargo.lock` stay untouched despite
+  being listed as allowed paths in C0 (allowed, not mandatory, per every
+  prior T2 leaf's own pattern).
+- **Dependency-direction ruling (resolves the open question from this
+  task's presentation-time analysis):** `crates/p2p` cannot depend on
+  `crates/storage` or `crates/db` — the workspace dependency direction is
+  `domain -> db/storage -> ingestion -> apps`
+  (`docs/architecture.md` § Shared crates; restated verbatim in T2e's design
+  above). `package_builder.rs` therefore follows the exact pattern already
+  established by `source.rs` (T2b) and `crypto.rs` (T2c): it is a pure
+  function over caller-supplied bytes. Reading plaintext file bytes from
+  `StorageAdapter`, writing the sealed ciphertext package to the "ciphertext-
+  only package volume" under its opaque `package_ref`
+  (C0 §3, `packages/<publication_id>/<lineage_id>`), and persisting
+  manifest-digest/package-ref evidence via `crates/db` are **out of scope for
+  T2f** — they belong to a later integration leaf (T3/T4 territory, not yet
+  scoped) that has both `crates/p2p` and `crates/storage`/`crates/db` as
+  dependencies simultaneously, which `crates/p2p` itself structurally cannot.
+  This is a narrowing of the `allowed_paths` line C0 froze for `P2.T2f`
+  (which lists `crates/db/src/p2p_publication_repo.rs` as *allowed*, not
+  *required*) — T2f uses none of that allowance; only the pure crate-local
+  files are touched. This mirrors T2d's identical narrowing (KEK-byte
+  resolution pushed to a later, not-yet-scoped caller).
+- **Retry/idempotency ruling (resolves the second open question — revised
+  after phase-1 review, see disposition below):** C0 requires
+  "retry/reconciliation of an already sealed lineage reuses the sealed
+  ciphertext and manifest, never re-encrypts." Because `package_builder` is
+  pure and stateless (no DB read of prior seal state), it cannot itself
+  detect "already sealed" — that detection is entirely the later integration
+  leaf's responsibility: it must check persisted seal evidence (`sealed_at`
+  from T2e, or the later leaf's own manifest-digest/package-ref evidence)
+  and, if already sealed, **never call `package_builder` again at all** for
+  that lineage, instead reusing the already-persisted `SealedPackage`
+  bytes/manifest directly. `package_builder` itself therefore has no retry
+  concept and no caller-supplied nonce — it always calls the existing,
+  unmodified `crypto::encrypt_file` (which generates its own fresh CSPRNG
+  nonce internally per T2c's frozen contract and already builds the AAD via
+  the unmodified `canonical_aad_json`). This is a correction of this
+  design's original nonce-promotion idea, which the phase-1 reviewer
+  correctly identified as introducing an AAD/encryption divergence risk
+  from the frozen `crypto.rs` primitive while not actually buying any real
+  retry guarantee (a pure function can never enforce a caller's retry
+  discipline regardless of whether the nonce is internal or supplied) —
+  `HP-T2f-2`'s determinism assertion is retained as a property of
+  `build_package` (documenting that encryption/manifest assembly are
+  otherwise faithful to their inputs), but is no longer the mechanism that
+  makes retry-reuse possible; it is a general regression guard, and the
+  original ciphertext-identity framing is dropped since fresh internal
+  nonces make two calls' ciphertext differ by design (matching
+  `crypto.rs`'s own `HP-T2c-2`).
+- **Persistence-schema ruling (resolves the third open question):**
+  no new migration is scoped to T2f. C0 reserves migration numbers `0033`
+  (T2e, already used), `0034` (T4b), and `0035` (T6a) — none for T2f. Since
+  `package_builder` is pure and out-of-process persistence is explicitly
+  deferred to the later integration leaf, T2f introduces no schema change of
+  its own; that later leaf is responsible for proposing whatever
+  `manifest_digest`/`package_ref` persistence it needs (extending
+  `p2p_publications` again, or a new table) as part of its own scoped design,
+  not inherited from T2f.
+- **Contract (revised after phase-1 review):**
+  ```rust
+  pub struct PackageFileInput {
+      pub path: String,          // from SnapshotFile::path — re-normalized and
+                                  // re-checked by build_package, never trusted as-is
+      pub plaintext: Vec<u8>,    // full file bytes, caller-read from StorageAdapter
+  }
+
+  #[derive(Debug, PartialEq, Eq)]
+  pub enum PackageBuildError {
+      EmptyPackage,              // zero input files
+      DuplicatePath,             // two input files normalize to the identical path
+      InvalidPath(crate::path::PathError),  // a path fails path::normalize_path
+      OutOfOrder,                // files are not in manifest-first, sorted-segments order
+      Encryption(crate::crypto::CryptoError, String),  // (cause, offending path)
+      // CORRECTED at implementation time to Encryption(String, String) —
+      // see "P2.T2f — implementation and closure record" below for why.
+  }
+
+  pub struct SealedPackage {
+      pub manifest: crate::manifest::Manifest,
+      pub manifest_canonical_json: String,
+      pub manifest_digest_sha256: String,
+      pub files: Vec<SealedFile>,   // same order as manifest.files
+  }
+
+  pub struct SealedFile {
+      pub path: String,
+      pub ciphertext: Vec<u8>,   // AES-256-GCM output including the 16-byte tag
+  }
+
+  pub fn build_package(
+      asset_id: &str,
+      publication_id: &str,
+      lineage_id: &str,
+      ck: &[u8; 32],
+      inputs: &[PackageFileInput],
+  ) -> Result<SealedPackage, PackageBuildError>
+  ```
+  **Validation, in order, before any encryption call (revised after a
+  second phase-1 review pass — see disposition below):** (1) zero inputs ->
+  `EmptyPackage`; (2) every `input.path` is re-normalized via the existing
+  unmodified `path::normalize_path` — any failure propagates as
+  `InvalidPath` (never trusts the caller's claim that paths are already
+  normalized); (3) two inputs whose normalized paths are identical ->
+  `DuplicatePath` (the literal C0 "hard conflict" rule); (4) **the manifest
+  slot check is now a concrete literal comparison, not merely a position
+  check:** `inputs[0]`'s normalized path must equal the fixed literal
+  `"index.m3u8"` — the same canonical HLS manifest filename
+  `crates/storage::hls_manifest_key` already constructs
+  (`format!("{}index.m3u8", hls_prefix(asset_id))`; `package_builder` does
+  not import `crates/storage` — see the dependency-direction ruling — so it
+  re-states this one literal filename constant directly rather than
+  depending on that crate) -> a mismatch is `OutOfOrder`, closing the
+  second-pass `major` finding that any arbitrary path could occupy
+  position 0; (5) positions `1..N` must be in **strictly ascending** order
+  per `path::sort_paths` semantics (`paths[i] < paths[i+1]`, not `<=`,
+  since step 3 already rejects equal-path duplicates so a `<=` comparison
+  was needlessly weaker) -> otherwise `OutOfOrder`, closing the original
+  `major` finding that order was assumed, not verified.
+  Then, for each input in its (validated) order: builds `aad::Aad {
+  aad_version: "p2p-aad-v1", asset_id, publication_id, lineage_id,
+  manifest_version: "p2p-manifest-v1", path: normalized_path }` and calls
+  the existing, **unmodified** `crypto::encrypt_file(ck, &aad,
+  &input.plaintext)` — no reimplementation of the AES-GCM call, closing the
+  phase-1 `blocking` finding that a duplicated call risked AAD/encryption
+  divergence from the frozen T2c primitive. `encrypt_file` generates its
+  own fresh CSPRNG nonce per call (T2c's contract, unchanged); its
+  `EncryptedFile::nonce` becomes the manifest's `nonce_b64u` (base64url,
+  no padding). Builds one `manifest::ManifestFile` per input
+  (`ciphertext_sha256` = SHA-256 hex of the produced ciphertext,
+  `ciphertext_size`/`plaintext_size` from the actual buffers). Computes
+  `manifest_canonical_json` via the existing unmodified
+  `manifest::canonical_json`, and `manifest_digest_sha256` via the existing
+  unmodified `manifest::manifest_sha256`.
+  **Retry/reuse note:** `build_package` has no lineage/retry concept —
+  per the Retry/idempotency ruling above, a caller that already has
+  persisted seal evidence for a lineage must not call `build_package` again
+  at all; it reuses the persisted `SealedPackage` bytes/manifest directly.
+  This function's only idempotency-relevant property is that it is a
+  faithful, non-lossy transform of its inputs (see `HP-T2f-2`), not that
+  repeated calls produce identical ciphertext — `encrypt_file`'s
+  fresh-nonce-per-call guarantee (T2c `HP-T2c-2`) means two `build_package`
+  calls on identical inputs necessarily produce **different** ciphertext,
+  by design, exactly like calling `encrypt_file` twice would.
+
+**HP-T2f-1:** one manifest-position file + N segment `PackageFileInput`s (in
+already-sorted order, valid 32-byte CK) -> `Ok(SealedPackage)` whose
+`manifest.files` carries correct per-file `ciphertext_sha256`/
+`ciphertext_size`/`plaintext_size`/`nonce_b64u`, and whose
+`manifest_digest_sha256` is the SHA-256 of `manifest_canonical_json`
+(cross-checked against `manifest::manifest_sha256` called independently in
+the test), and whose per-file ciphertext independently decrypts back to the
+original plaintext using `crypto.rs`'s own AAD/nonce (round-trip, not just
+"returns Ok" — the direct regression test for the phase-1 `blocking`
+AAD-divergence finding).
+**HP-T2f-2:** non-lossy transform — every input file's `path`/`plaintext`
+is represented exactly once in the output (`files.len() == inputs.len()`,
+paths match 1:1), and calling `build_package` twice on identical inputs
+produces two *decryptable* packages whose plaintext recovers identically
+(not byte-identical ciphertext — see Retry/reuse note above; this replaces
+the earlier, incorrect "byte-identical ciphertext" framing this design
+started with).
+**EC-T2f-1:** zero input files -> `Err(EmptyPackage)`, never a manifest with
+an empty `files` array.
+**EC-T2f-2:** two inputs whose paths normalize to the same value (e.g. one
+already-normalized and a Unicode-equivalent NFD variant of the same path)
+-> `Err(DuplicatePath)`, never silently encrypting both — the direct
+regression test for the phase-1 `major` finding on incomplete
+normalization.
+**EC-T2f-3:** an invalid path (absolute, backslash, `.`/`..` segment) in any
+input -> `Err(InvalidPath(_))`, never a silently-accepted bad path.
+**EC-T2f-4:** inputs not in manifest-first/sorted-segments order (e.g. two
+segments swapped, or a valid-but-wrong path at position 0 such as
+`"segments/000001.ts"` instead of `"index.m3u8"`) -> `Err(OutOfOrder)` —
+the direct regression test for both the original `major` finding (order
+assumed, not enforced) and the second-pass `major` finding (position 0 not
+concretely validated).
+**EC-T2f-5:** a CK slice that is not exactly 32 bytes -> documented
+unreachable at the `&[u8; 32]` type level, same disposition and pattern as
+`crypto.rs::ec_t2c_1` and `key_wrap.rs::ec_t2d_1` (corrects this design's
+original `EC-T2f-4`, which the phase-1 reviewer correctly flagged as
+describing a behaviorally-untestable case as if it were a real test).
+`PackageBuildError::Encryption`'s carried `CryptoError::InvalidKeyLength`
+variant is documented-unreachable for the identical reason (second-pass
+`nit` finding) — `CryptoError::EncryptionFailed` is the only reachable
+`Encryption(_)` cause in practice, retained as a defensive variant matching
+`crypto.rs`'s own enum shape rather than narrowed away.
+
+**Phase-1 review disposition (`.agent/local-agent-p2-t2f/phase1-result.json`,
+`muse-glimmer:30b-q4_K_M`, recorded 2026-09-07):** raw verdict `BLOCKED`, 7
+findings, every finding independently verified against repository evidence
+(`crates/p2p/src/crypto.rs`, `crates/p2p/src/path.rs`, T2c/T2d's own
+ledger disposition precedent) rather than accepted or dismissed at face
+value:
+- **blocking** — duplicating the AES-GCM call instead of reusing
+  `crypto::encrypt_file` risks AAD/encryption divergence from the frozen
+  T2c primitive — **accepted, design revised**: the contract above now
+  calls `crypto::encrypt_file` unmodified; no custom AEAD call remains in
+  `package_builder`.
+- **blocking** — a pure builder cannot itself enforce "retry reuses sealed
+  ciphertext, never re-encrypts"; the caller-supplied-nonce mechanism this
+  design started with was caller-discipline only — **accepted, design
+  revised**: nonce sourcing is no longer promoted to the caller; the Retry/
+  idempotency ruling now states plainly that a caller with existing seal
+  evidence must not call `build_package` again at all, rather than trying
+  to make the pure function itself retry-aware.
+- **major** — `EC-T2f-4`'s "CK slice not exactly 32 bytes" is unreachable
+  given `ck: &[u8; 32]` — **accepted, corrected**: renumbered `EC-T2f-5` and
+  reclassified as documented-unreachable, matching the exact precedent
+  already accepted for `crypto.rs::ec_t2c_1` and `key_wrap.rs::ec_t2d_1`.
+- **major** — file ordering (manifest-first, sorted segments) was assumed
+  from `T2b`'s contract but never validated inside `build_package` itself
+  — **accepted, design revised**: added an explicit order check
+  (`PackageBuildError::OutOfOrder`) and `EC-T2f-4` as its regression test.
+- **major** — path normalization was assumed ("already normalized") and
+  only checked by string equality, not re-verified — **accepted, design
+  revised**: `build_package` now calls the existing unmodified
+  `path::normalize_path` on every input path itself, with `InvalidPath`
+  and a revised `EC-T2f-2`/`EC-T2f-3` as regression tests.
+- **minor** — unspecified edge cases (empty plaintext, non-UTF-8 path) —
+  **partially accepted**: empty-plaintext files are not special-cased (an
+  empty `Vec<u8>` is valid input to `encrypt_file`, matching AES-GCM's own
+  support for zero-length plaintext — no design change needed); non-UTF-8
+  paths are not reachable given `path: String`'s Rust-level UTF-8 guarantee
+  (same class as the already-accepted CK-length unreachability) — no test
+  added, documented here instead.
+- **nit** — cross-call/lineage-wide nonce collision detection cannot be
+  performed inside a pure function — **acknowledged, no action**: already
+  explicitly stated as the calling integration leaf's responsibility in the
+  original design (unchanged by this revision, since nonce generation
+  reverted to `encrypt_file`'s own internal CSPRNG per finding-1's fix).
+
+**Second phase-1 review pass disposition
+(`.agent/local-agent-p2-t2f/phase1-result-v2.json`, `muse-glimmer:30b-q4_K_M`,
+recorded 2026-09-07, run against the revised design above):** raw verdict
+`BLOCKED`, 4 findings:
+- **major** — retry/reuse still relies on caller discipline, since a pure
+  function structurally cannot enforce that a caller never re-invokes it —
+  **rejected as out of scope for this primitive, not a defect**: verified
+  against `crates/p2p`'s own established precedent — `key_wrap.rs`'s T2d
+  design has an identical accepted disposition for its analogous finding
+  ("`unwrap_ck` doesn't itself validate `wrapped.kek_id`/`kek_version`
+  against caller context... remains a caller-side KEK-resolution policy,
+  out of scope for this pure primitive," T2d design section above, accepted
+  without further change). Demanding a stateless, DB-free function enforce
+  cross-call retry discipline would require it to violate the very
+  dependency-direction boundary (`crates/p2p` cannot see `crates/db`) that
+  C0 and every prior T2 leaf already established; the design already states
+  this obligation explicitly for the later integration leaf rather than
+  hiding it, which is what T2d's accepted precedent also does.
+- **major** — the order check ("position 0 is fixed") never verifies
+  `inputs[0]`'s actual path, so an arbitrary path at position 0 still
+  passes — **accepted, design revised**: `inputs[0]`'s normalized path must
+  now equal the concrete literal `"index.m3u8"` (the same filename
+  `crates/storage::hls_manifest_key` constructs, restated here since
+  `crates/p2p` cannot depend on `crates/storage`), verified by reading
+  `crates/storage/src/lib.rs:67-69` directly rather than assuming the
+  literal. `EC-T2f-4` extended to cover a wrong-but-valid path at position 0.
+- **minor** — the order check should use strict `<` rather than `<=` for
+  positions `1..N` — **accepted, corrected**: `DuplicatePath` already
+  rejects equal adjacent paths at step 3, so `<=` was needlessly weaker;
+  changed to strict ascending order.
+- **nit** — `PackageBuildError::Encryption`'s carried `CryptoError` can
+  hold the unreachable `InvalidKeyLength` variant — **accepted,
+  documented**: noted as documented-unreachable alongside `EC-T2f-5`,
+  matching the established pattern rather than narrowing the type.
+
+Raw model verdict on this second pass remains `BLOCKED` (Muse Glimmer does
+not re-emit `PASS` once a `major` finding is raised, even one the primary
+agent disposes as out-of-scope with cross-referenced precedent rather than
+as a design defect). Per `docs/policies/HITL_AUTONOMY_POLICY.md` and this
+repository's own standing rule that Gemma/Muse Glimmer review is never
+bypassed or self-overridden, this raw `BLOCKED` was reported to the owner
+rather than the primary agent unilaterally recording `PASS` on its own
+disposition. **Owner decision (2026-09-07): escalate to the Gemma fallback**
+(the next reviewer in the RRI 0-25 chain, `muse-glimmer -> gemma -> D14`,
+per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Band-routed peer review),
+rather than a third Muse Glimmer pass, a same-primitive scope expansion, or
+self-resolving the finding.
+
+**Gemma fallback review
+(`.agent/local-agent-p2-t2f/phase1-gemma-fallback-result.json`,
+`gemma4:26b-a4b-it-qat`, `num_ctx=32768`, `think=false`, `temperature=0`,
+after a fresh warm-up probe confirming `done_reason: stop` with non-empty
+content):** the identical, unmodified v2 packet (no further design changes
+were pending — every fixable finding was already applied) was sent to
+Gemma per the owner's selection. **Verdict: `PASS`, 0 findings.** Gemma's
+review notes independently confirm the same disposition reasoning the
+primary agent had already reached for the contested retry/reuse finding:
+*"Removing the caller-supplied nonce and reverting to the internal CSPRNG
+in `crypto::encrypt_file` eliminates the possibility of a caller
+accidentally reusing a nonce... the responsibility for lineage management
+is correctly pushed to the integration layer (the caller decides whether to
+call `build_package` again or reuse a previous `SealedPackage`)"* — matching
+this design's own Retry/reuse note and the cross-referenced T2d precedent,
+not a divergent or lower-bar review.
+
+Task-analysis review: gemma (`.agent/local-agent-p2-t2f/phase1-gemma-fallback-result.json`) - PASS (fallback triggered after Muse Glimmer's second pass remained BLOCKED on a finding the primary agent disposed as out-of-scope-for-a-pure-primitive; owner-selected escalation, not a self-resolved override)
+
+- **RRI:** `python3 scripts/rri.py --touches crates/p2p/src/package_builder.rs
+  --touches crates/p2p/src/lib.rs --cc 9 --D 2 --K 2 --P 1 --T 1 --A 1 --X 0`
+  -> **RRI 24, Low (0-25)** (unchanged from the pre-revision score — raw CC
+  9 still maps to the same policy-table score band as CC 6). `D`/`K` scored
+  at T2c's per-file-crypto level (not T2d's key-custody-elevated level),
+  since CK handling here is pass-through — `package_builder` never
+  generates, persists, or wraps a CK, matching T2c's scope rather than
+  T2d's custody scope. `CC` raised from the original `6` to `9` to reflect
+  the revised design's added validation branches (path re-normalization,
+  duplicate-path check, order check) on top of the original per-file
+  encryption loop. No anchor-rubric match for `crates/p2p` — D/K/P are
+  agent-supplied judgment, same as every prior T2 crate-local leaf.
+- **Honest Low-band maximization pass:** the module has one cohesive
+  responsibility (compose already-frozen primitives into one sealed
+  package) with one shared invariant (manifest/ciphertext consistency
+  across all files in the package) — splitting per-file encryption from
+  manifest assembly would fragment that invariant across two unverifiable
+  pieces (rule 5 of the maximization pass forbids this). Already Low at RRI
+  24; no split proposed or needed.
+- **Route:** RRI 0-25 Low — per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` §
+  Mandatory workflow before implementing, no full approval card is required.
+  Low-band direct local delegation via `scripts/delegate-low-rri.py`
+  (`--mode full-file`, new file), Qwen Developer (`qwen3.8:27b-mlx`), same
+  pattern as `T2b`/`T2c`. Cryptographic determinism is verified
+  independently by the orchestrator via `HP-T2f-2`'s byte-identical
+  round-trip assertion, not merely trusted from the delegation's own claim.
+
+### P2.T2f — implementation and closure record, 2026-09-07
+
+**Implementation summary.** Delegated to Qwen Developer
+(`qwen3.8:27b-mlx`, `scripts/delegate-low-rri.py --mode full-file`) against
+the frozen design above. First attempt failed with `invalid tagged response:
+missing file end marker` (`--num-predict 8192` too small for the generated
+module + 7 test functions); retried once with `--num-predict 16384`, which
+completed. The delegated output required one bounded orchestrator repair
+(the single permitted repair attempt for Low-RRI local delegation): the
+generated test module used `Aes256Gcm::new(Key::from_slice(&ck))` (missing
+`KeyInit` in scope, then a type-inference ambiguity on `Key`) and
+`aad_bytes.as_ref().chain(sf.ciphertext.as_ref())` (an iterator, not a valid
+`decrypt` argument) instead of the `Payload { msg, aad }` shape
+`crypto.rs`'s own test already established. Fixed to
+`Aes256Gcm::new_from_slice(&ck).unwrap()` and
+`Payload { msg: &sf.ciphertext, aad: &aad_bytes }`, matching
+`crypto.rs::hp_t2c_1_round_trip_recovers_plaintext` exactly — a mechanical
+correction to an already-established codebase pattern, not a redesign.
+
+**One deliberate, scope-preserving deviation from the frozen contract
+text above:** `PackageBuildError::Encryption` is `Encryption(String,
+String)` (cause formatted via `format!("{:?}", e)`, offending path), not
+the design's originally-specified
+`Encryption(crate::crypto::CryptoError, String)`. `PackageBuildError`
+derives `#[derive(Debug, PartialEq, Eq)]`; `crypto::CryptoError`
+(`crates/p2p/src/crypto.rs:11`) derives only `#[derive(Debug)]`. Using the
+typed field as specified would require adding `PartialEq, Eq` to
+`CryptoError` in `crypto.rs` — a file outside T2f's frozen `allowed_paths`
+(`crates/p2p/src/package_builder.rs` and `crates/p2p/src/lib.rs` only, per
+the C0 freeze cited above). `PathError` (`path.rs`) already derives
+`PartialEq, Eq`, which is why `InvalidPath(PathError)` needed no equivalent
+change. File-scope discipline was treated as higher priority than exact
+contract-text fidelity for this detail; the deviation was flagged explicitly
+in the phase-2 review packet and is recorded here for the ledger to match
+the actually-implemented and reviewed contract.
+
+**Tiger Style / X26 D2 decomposition.** The initial `build_package` was 80
+lines, exceeding the repository's `clippy::too_many_lines` cap of 70
+(`docs/plan/roadmap.md` X26 D2). Decomposed into `build_package` (public
+entry point), `validate_and_normalize_paths` (private: empty/normalize/
+duplicate/manifest-slot/order checks, steps 1-5 of the frozen validation
+order), and `encrypt_one` (private: per-file AAD construction + `encrypt_file`
+call + `ManifestFile`/`SealedFile` assembly) — the public contract (signature,
+error variants, validation order) is unchanged; this is pure internal
+structure to satisfy the line-count gate.
+
+**Local verification (independently run by the orchestrator, not merely
+trusted from delegation):** `cargo check -p dubbridge-p2p`; `cargo check
+--workspace --all-targets`; `cargo test -p dubbridge-p2p --lib` (7/7 new
+tests pass; 33/33 total in the crate); `cargo fmt -p dubbridge-p2p --
+--check`; `cargo clippy -p dubbridge-p2p --all-targets --all-features --
+-D warnings` (clean after fixing 2 deprecated `Nonce::from_slice` calls in
+tests with `#[allow(deprecated)]` matching `crypto.rs`'s own convention, one
+`clippy::nonminimal_bool` simplification, the `too_many_lines` decomposition
+above, and 3 `clippy::unnecessary_cast` removals in
+`base64url_encode_no_padding`).
+
+### Gemma Reviewer evidence
+
+- Model: `gemma4:26b-a4b-it-qat` (fallback — see chain below)
+- Command: `python3 scripts/gemma-code-review.py <phase2 packet> --passes 3
+  --model gemma4:26b-a4b-it-qat --num-ctx 16384 --out
+  .agent/local-agent-p2-t2f/phase2-result-gemma-fallback.json --task-id
+  P2.T2f`
+- Fallback chain actually exercised: Muse Glimmer (`muse-glimmer:30b-q4_K_M`)
+  attempted first at the normal profile (`num_ctx=65536`, 3 passes) — 0/3
+  usable, every pass failed with "idle timeout after 180s without a token."
+  Diagnosed as host memory saturation (`memory_pressure`: ~61-64MB free of
+  32GB; `GET /api/ps`: Muse Glimmer fully loaded, ~16.7GB+ VRAM), not a
+  content or packet defect. Per the mandatory resource-recovery protocol
+  (`AGENT_WORKFLOW_GUIDE.md` § Mandatory workflow before implementing, Step
+  0): unloaded (`ollama stop`), retried once at the reduced profile
+  (`num_ctx=16384`, `--no-think`, `--temperature 0`) — also 0/3 usable,
+  identical idle-timeout failure (`api/ps` showed ~17.4GB VRAM still
+  resident even at the smaller context, confirming the model's own weight
+  footprint, not `num_ctx`, was the actual bottleneck). Both the normal and
+  reduced-profile bounded retries against the primary reviewer were
+  exhausted before escalating, per § Gemma Reviewer / Muse Glimmer Reviewer
+  § Availability. Escalated to the band's intermediate fallback, Gemma
+  (`gemma4:26b-a4b-it-qat`, `num_ctx=16384`), after unloading Muse Glimmer
+  to free the resident memory.
+- Passes run / usable: `3/3`
+- Aggregate status: `FINDINGS`
+- Consensus findings: `1` | Pass-specific: `1` (same finding at a
+  slightly different reported line across passes — location-inconsistent
+  variant of the same consensus item, not a distinct issue) | Disagreement: `0`
+- Artifacts: `.agent/local-agent-p2-t2f/phase2-result-gemma-fallback.json`,
+  `.agent/local-agent-p2-t2f/phase2-result-gemma-fallback.pass{1,2,3}.json`
+  (Muse Glimmer's two exhausted attempts left no usable result files —
+  both runs produced 0 parseable passes, consistent with the idle-timeout
+  diagnosis above)
+- Isolated adjudicator: `not triggered` — trigger: `n/a` (the intermediate
+  fallback produced a usable result; D14 is only mandatory when the
+  intermediate fallback also fails the same way, which did not occur here)
+- D14 provider route: `n/a`
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted the one consensus finding as a valid,
+  independently-verified minor observation (see below); no false positives
+  to reject; no repair needed given its severity and the package's actual
+  scale.
+
+**Finding disposition.** Gemma's one consensus finding: the duplicate-path
+check in `validate_and_normalize_paths` (`crates/p2p/src/
+package_builder.rs:92-98`, nested `for i`/`for j` loop) is O(N²); a
+`HashSet<String>` would be more efficient. Independently verified against
+the actual source at the cited location — the finding is accurate: the
+nested loop is genuine O(N²) over `normalized_paths`. Disposition:
+**accepted-follow-up, not repaired now.** A sealed package's file count is
+bounded by one asset's HLS manifest + segment list (typically tens of
+files, not an adversarially-scaled input), so the practical performance
+impact is negligible; this is a minor style/efficiency observation, not a
+correctness or security defect, and does not justify spending another
+delegation/review cycle before closing an otherwise-passing task. Revisit
+only if `package_builder` is later called with package sizes where O(N²)
+would matter in practice.
+
+### Reviewability budget
+
+Reviewability budget: within (small new file + `lib.rs` one-line change,
+well under the derived Low-RRI review budget; no `D14-OVERRIDE` needed).
+
+### Behavioral coverage certification
+
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| HP-T2f-1 | Happy path | manifest-position file + N sorted segments, valid 32-byte CK -> `Ok(SealedPackage)` with correct per-file digest/size/nonce and independently-decryptable ciphertext | unit | `crates/p2p/src/package_builder.rs::tests::hp_t2f_1_valid_package_produces_correct_manifest_and_roundtrips` | passed |
+| HP-T2f-2 | Happy path | non-lossy transform; two calls on identical inputs each independently decrypt correctly (not byte-identical ciphertext, by design — fresh nonce per call) | unit | `crates/p2p/src/package_builder.rs::tests::hp_t2f_2_two_calls_are_each_independently_decryptable_but_not_byte_identical` | passed |
+| EC-T2f-1 | Edge case | zero input files -> `Err(EmptyPackage)` | unit | `crates/p2p/src/package_builder.rs::tests::ec_t2f_1_empty_inputs_is_rejected` | passed |
+| EC-T2f-2 | Edge case | two inputs normalizing to the same path -> `Err(DuplicatePath)` | unit | `crates/p2p/src/package_builder.rs::tests::ec_t2f_2_duplicate_normalized_path_is_rejected` | passed |
+| EC-T2f-3 | Edge case | an invalid path (absolute/backslash/`.`/`..`) -> `Err(InvalidPath(_))` | unit | `crates/p2p/src/package_builder.rs::tests::ec_t2f_3_invalid_path_is_rejected` | passed |
+| EC-T2f-4 | Edge case | a valid-but-wrong path at position 0 (not the literal `"index.m3u8"`) -> `Err(OutOfOrder)` | unit | `crates/p2p/src/package_builder.rs::tests::ec_t2f_4_wrong_manifest_slot_path_is_rejected` | passed |
+| EC-T2f-4 (unsorted) | Edge case | segments at positions 1..N not in strict ascending order -> `Err(OutOfOrder)` | unit | `crates/p2p/src/package_builder.rs::tests::ec_t2f_4b_unsorted_segments_are_rejected` | passed |
+| EC-T2f-5 | Edge case | CK slice not exactly 32 bytes | n/a | documented-unreachable at the `&[u8; 32]` type level, same disposition as `crypto.rs::ec_t2c_1`/`key_wrap.rs::ec_t2d_1` | n/a (type-level guarantee, not executable) |
+
+Reviewability budget line, Gemma Reviewer evidence, and this table together
+close Step 1 (code-solution review) and Step 3 (behavioral coverage) of the
+development task closure checklist for this RRI 0-25 Low task.
+
+Task-analysis review: gemma (`.agent/local-agent-p2-t2f/phase1-gemma-fallback-result.json`) - PASS
+Code-solution review: gemma (`.agent/local-agent-p2-t2f/phase2-result-gemma-fallback.json`) - PASS (status `FINDINGS`, 1 consensus minor finding, disposed as accepted-follow-up, no BLOCKED verdict at any point in the phase-2 chain)
+
+### Owner final verification
+
+- Owner: `Matias Kruk`
+- Date: `2026-09-07`
+- Statement: I verified every happy path and edge case defined for this task
+  has executable evidence at an appropriate layer that replicates the
+  expected behavior, and approve the closure of this task including the one
+  disposed Gemma Reviewer finding (O(N²) duplicate-path check, accepted as
+  follow-up, not blocking).
+- Commands run: `cargo check -p dubbridge-p2p`, `cargo check --workspace
+  --all-targets`, `cargo test -p dubbridge-p2p --lib`, `cargo fmt -p
+  dubbridge-p2p -- --check`, `cargo clippy -p dubbridge-p2p --all-targets
+  --all-features -- -D warnings`
 
 Status: **[x] Done 2026-09-07.**
 
