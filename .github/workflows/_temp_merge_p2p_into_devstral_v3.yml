@@ -25,14 +25,19 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          src = Path('.github/workflows/_temp_merge_p2p_into_devstral_v2.yml').read_text().splitlines()
-          start = next(i for i, line in enumerate(src) if line.strip() == 'run: |') + 1
+          text = Path('.github/workflows/_temp_merge_p2p_into_devstral_v2.yml').read_text()
+          marker = '        run: |\n'
+          if marker not in text:
+              raise SystemExit('run block marker not found')
+          raw = text.split(marker, 1)[1]
           block = []
-          for line in src[start:]:
-              if line.startswith('          '):
+          for line in raw.splitlines():
+              if not line:
+                  block.append('')
+              elif line.startswith('          '):
                   block.append(line[10:])
               else:
-                  break
+                  raise SystemExit(f'unexpected line outside run block: {line!r}')
           script = '\n'.join(block) + '\n'
           old = 'python3 scripts/local-agent/run_local_task_test.py\n'
           new = (
