@@ -6,6 +6,9 @@ date: 2026-08-31
 
 # ADR-046 — Local reviewer and architect rebinding
 
+- **Status:** Accepted
+- **Date:** 2026-08-31
+
 ## Decision
 
 Retire Muse Glimmer from every active DubBridge role. Historical ADR/audit references remain as historical truth.
