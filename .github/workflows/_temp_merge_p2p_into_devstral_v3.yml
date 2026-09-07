@@ -1,0 +1,54 @@
+name: Temporary guarded P2P merge into model migration v3
+
+on:
+  push:
+    branches:
+      - feat/devstral-128k-migration
+    paths:
+      - .github/workflows/_temp_merge_p2p_into_devstral_v3.yml
+
+permissions:
+  contents: write
+
+jobs:
+  merge-p2p:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/devstral-128k-migration
+          fetch-depth: 0
+
+      - name: Execute validated merge recipe with scoped migration tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path('.github/workflows/_temp_merge_p2p_into_devstral_v2.yml').read_text().splitlines()
+          start = next(i for i, line in enumerate(src) if line.strip() == 'run: |') + 1
+          block = []
+          for line in src[start:]:
+              if line.startswith('          '):
+                  block.append(line[10:])
+              else:
+                  break
+          script = '\n'.join(block) + '\n'
+          old = 'python3 scripts/local-agent/run_local_task_test.py\n'
+          new = (
+              'python3 scripts/local-agent/run_local_task_test.py ParseArgsModelDefaultTest\n'
+              'python3 scripts/local-agent/run_local_task_test.py ResolveEffectiveLimitsTest\n'
+              'python3 scripts/local-agent/run_local_task_test.py MedHighRunnerLimitsIntegrationTest\n'
+              'python3 scripts/local-agent/run_local_task_test.py AttemptBundleEmission.test_hp1_single_attempt_success_emits_one_bundle\n'
+          )
+          if old not in script:
+              raise SystemExit('expected full run_local_task_test invocation not found')
+          script = script.replace(old, new, 1)
+          old_rm = 'git rm -f .github/workflows/_temp_merge_p2p_into_devstral.yml .github/workflows/_temp_merge_p2p_into_devstral_v2.yml'
+          new_rm = old_rm + ' .github/workflows/_temp_merge_p2p_into_devstral_v3.yml'
+          if old_rm not in script:
+              raise SystemExit('expected temp workflow cleanup command not found')
+          script = script.replace(old_rm, new_rm, 1)
+          Path('/tmp/guarded-p2p-merge.sh').write_text(script)
+          PY
+          bash /tmp/guarded-p2p-merge.sh
