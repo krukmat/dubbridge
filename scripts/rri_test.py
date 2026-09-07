@@ -35,17 +35,69 @@ class FMapping(unittest.TestCase):
 
 
 class BaseFormula(unittest.TestCase):
+    # ADR-045 (rri-v2-design-0.2): "base" = max(ici_band_rri, risk_base),
+    # no longer a weighted sum of all eight variables. These tests assert
+    # the v2 authority directly; see TechnicalProfileV2 for axis derivation.
     def test_all_zero(self):
-        self.assertEqual(base_of(c_score=0), 0)
+        # B=0 -> ici_band ceiling 25 (top of Low); risk_base 0 -> base 25.
+        self.assertEqual(base_of(c_score=0), 25)
 
     def test_all_five(self):
-        # 100 * (5 * sum(weights=1.00) / 5) = 100.
+        # C=5->L=4, K=5->I=4, D=5->Q=4, T=5->V=4 -> B=4 -> ici_band 100.
         self.assertEqual(base_of(c_score=5, f_override=5, d=5, k=5, p=5, t=5, a=5, x=5), 100)
 
-    def test_t1_vector(self):
-        # C1 F1 D1 T2 A0 K1 P0 X2 -> 0.99 / 5 * 100 = 19.8 -> 20.
-        self.assertEqual(
-            base_of(c_score=1, f_override=1, d=1, k=1, p=0, t=2, a=0, x=2), 20)
+
+class TechnicalProfileV2(unittest.TestCase):
+    def test_axes_from_scores_maps_c_k_d_t(self):
+        axes = rri.axes_from_scores({"C": 2, "K": 3, "D": 1, "T": 0, "F": 0, "A": 0, "P": 0, "X": 0})
+        self.assertEqual(axes, {"L": 2, "I": 3, "Q": 1, "V": 0})
+
+    def test_axes_collapse_score_five_onto_level_four(self):
+        axes = rri.axes_from_scores({"C": 5, "K": 5, "D": 5, "T": 5, "F": 0, "A": 0, "P": 0, "X": 0})
+        self.assertEqual(axes, {"L": 4, "I": 4, "Q": 4, "V": 4})
+
+    def test_technical_summary_bottleneck_and_ici(self):
+        tech = rri.technical_summary({"C": 1, "K": 3, "D": 0, "T": 0, "F": 0, "A": 0, "P": 0, "X": 0})
+        self.assertEqual(tech["bottleneck"], 3)
+        self.assertEqual(tech["ici"], 75)
+
+    def test_ici_to_band_rri_bridge_table(self):
+        self.assertEqual(rri.ici_to_band_rri(0), 25)
+        self.assertEqual(rri.ici_to_band_rri(25), 40)
+        self.assertEqual(rri.ici_to_band_rri(50), 55)
+        self.assertEqual(rri.ici_to_band_rri(75), 70)
+        self.assertEqual(rri.ici_to_band_rri(100), 100)
+
+    def test_risk_floor_can_exceed_ici_band(self):
+        # auth/rights anchor floor (D/P/K=4) with C/K contributing low ICI
+        # axes must still win via the risk band, not be masked by a low ICI.
+        r = rri.evaluate(c_score=0, touches=["crates/auth/src/lib.rs"],
+                          d=0, k=0, p=0, t=0, a=0, x=0)
+        self.assertGreaterEqual(r["risk_band_rri"], r["ici_band_rri"] - 100)
+        self.assertEqual(r["final"], max(r["ici_band_rri"], r["risk_band_rri"]))
+        self.assertGreaterEqual(r["final"], 56)  # auth floor forces high band
+
+    def test_final_is_never_below_either_input(self):
+        r = rri.evaluate(c_score=3, f_override=2, d=4, k=2, p=4, t=1, a=1, x=2,
+                          manual_penalties=["auth_security"])
+        self.assertEqual(r["final"], max(r["ici_band_rri"], r["risk_band_rri"]))
+        self.assertGreaterEqual(r["final"], r["ici_band_rri"])
+        self.assertGreaterEqual(r["final"], r["risk_band_rri"])
+
+    def test_base_stays_penalty_inclusive_like_final(self):
+        # Regression for a Gemma Reviewer finding on ADR-045: base_val must
+        # track risk_band_rri (penalty-inclusive), not the pre-penalty
+        # risk_base, or the "base RRI > 100" decomposition trigger could miss
+        # a penalty-driven overflow that final would otherwise report.
+        # C/K/D/T all 0 -> ici_band_rri sits at its 25 floor; pre-penalty
+        # risk_base (P=5 only) is 10 -- both <= 25, so the old buggy base_val
+        # would have stayed 25 even though stacked penalties push
+        # risk_band_rri (and therefore final) to 32.
+        r = rri.evaluate(c_score=0, f_override=0, d=0, k=0, p=5, t=0, a=0, x=0,
+                          manual_penalties=["auth_security", "arch_decision"])
+        self.assertEqual(r["ici_band_rri"], 25)
+        self.assertEqual(r["final"], 32)
+        self.assertEqual(r["base"], r["final"])
 
 
 class AnchorRubric(unittest.TestCase):

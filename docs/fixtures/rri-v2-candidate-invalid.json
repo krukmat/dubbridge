@@ -1,0 +1,23 @@
+{
+  "schema_version": "rri-v2-design-0.2",
+  "mode": "candidate_only",
+  "task": {
+    "task_id": "example-invalid-missing-q",
+    "parent_id": null,
+    "lineage_id": "example-invalid-missing-q",
+    "work_family": "maintenance",
+    "kind": "maintenance",
+    "baseline_sha": "example-baseline",
+    "snapshot_at": "2026-09-07T00:00:00Z",
+    "measurement_stage": "pre_implementation"
+  },
+  "applicability": {"status": "applicable", "reason": "Implementation behavior is within the rubric.", "evidence_refs": ["scenario"]},
+  "axes": {
+    "L": {"status": "estimated", "method": "inspection", "evidence_refs": ["scenario"], "level": 1},
+    "I": {"status": "estimated", "method": "inspection", "evidence_refs": ["scenario"], "level": 1},
+    "V": {"status": "estimated", "method": "inspection", "evidence_refs": ["scenario"], "level": 1}
+  },
+  "size": {"status": "estimated", "method": "sites", "value": 1, "evidence_refs": ["scenario"]},
+  "uncertainty": {"unresolved": []},
+  "risk": {"hazards": [], "likelihood": null}
+}

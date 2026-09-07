@@ -1,8 +1,28 @@
 #!/usr/bin/env python3
 # RRI calculator — deterministic Required Reasoning Index engine. [rri-calculator-script T1]
-# Source of truth: docs/policies/RRI_POLICY.md. The agent measures raw inputs
-# (paths, raw CC, coverage); this script owns every numeric->score mapping and the
-# entire formula, anchor-rubric, penalty, band, and decomposition logic.
+# Source of truth: docs/policies/RRI_POLICY.md and ADR-045 (rri-v2-design-0.2
+# authority replacement). The agent measures raw inputs (paths, raw CC,
+# coverage); this script owns every numeric->score mapping and the entire
+# technical-profile, anchor-rubric, penalty, band, and decomposition logic.
+#
+# v2 authority (ADR-045, 2026-09-07): the final band is no longer a weighted
+# sum of the eight 0-5 variables. It is max(ici_band, risk_band):
+#   - ici_band derives from the ordinal technical profile (L,I,Q,V), each
+#     0-4, bottleneck B = max(L,I,Q,V), ICI = 25*B (docs/proposals/
+#     rri-v2-formula.md §1). Axes are deterministically derived from the
+#     same CLI inputs this script already collects (see axes_from_scores).
+#   - risk_band derives from the existing anchor-rubric D/P/K floors and
+#     penalty table, which ICI deliberately excludes (rri-v2-formula.md §3:
+#     "Neither S nor R enters ICI... a simple permission change can have
+#     ICI 25 and high operational risk"). This preserves every ADR-anchored
+#     security/governance floor from v1.
+#   - Unresolved/low-confidence axes are never allowed to lower the band:
+#     the existing low-confidence +1 bump still applies before axis mapping,
+#     and an axis derived from a bumped variable therefore biases upward,
+#     consistent with rri-v2-formula.md §2's fail-closed unknown handling.
+#   - No calibrated effort prediction (P50/P90) is emitted anywhere in this
+#     script; those remain not_calibrated per rri-v2-formula.md §5 and are
+#     out of scope for band/gate/routing authority.
 """Compute the Required Reasoning Index (RRI) for a DubBridge task.
 
 Usage (task-presentation time, no diff yet):
@@ -436,6 +456,64 @@ def detect_penalties(scores, matched_auth, manual):
     return applied
 
 
+# --- v2 technical profile (rri-v2-design-0.2, ADR-045) --------------------------
+# Deterministic 0-5 -> 0-4 axis derivation from the existing scored variables.
+# Rationale for each mapping (no new agent inputs are introduced):
+#   L (logical/algorithmic obligations)   <- C (cyclomatic complexity proxy)
+#   I (contract/integration obligations)  <- K (coupling / side effects)
+#   Q (state/temporal obligations)        <- D (domain complexity; DubBridge's
+#                                             D floor already encodes async
+#                                             orchestration/state-heavy domains
+#                                             at D>=4, see the anchor rubric)
+#   V (verification/oracle obligations)   <- T (test-coverage risk; weak/no
+#                                             coverage raises the verification
+#                                             obligation, so V tracks T directly)
+def _score5_to_level4(score):
+    """Map an existing 0-5 RRI variable score to a 0-4 v2 technical level.
+
+    0-5 has six steps, 0-4 has five; collapse the top two (4 and 5) onto the
+    top level (4) so nothing above the existing "critical" anchor is diluted,
+    and floor divide the rest. This never rounds a higher v1 score down past
+    a lower v2 level: 0->0, 1->1, 2->2, 3->3, 4->4, 5->4.
+    """
+    return min(4, score)
+
+
+def axes_from_scores(scores):
+    """Derive the (L, I, Q, V) v2 technical profile from existing 0-5 scores.
+
+    Returns a dict of ints 0-4. This is a deterministic bridge, not a new
+    measurement: it reuses the same agent-supplied/rubric-floored inputs
+    already collected for C/K/D/T, per ADR-045.
+    """
+    return {
+        "L": _score5_to_level4(scores["C"]),
+        "I": _score5_to_level4(scores["K"]),
+        "Q": _score5_to_level4(scores["D"]),
+        "V": _score5_to_level4(scores["T"]),
+    }
+
+
+def technical_summary(scores):
+    """Return {profile, bottleneck, ici} for the derived (L,I,Q,V) axes."""
+    axes = axes_from_scores(scores)
+    bottleneck = max(axes.values())
+    return {"profile": axes, "bottleneck": bottleneck, "ici": 25 * bottleneck}
+
+
+# ICI (0/25/50/75/100) -> band upper-bound anchor. Each ICI step maps to the
+# band whose upper bound is closest without exceeding the legacy band ceiling
+# a bottleneck of that severity should reach, per ADR-045's bridge decision.
+ICI_BAND_CEILING = {0: 25, 25: 40, 50: 55, 75: 70, 100: 100}
+
+
+def ici_to_band_rri(ici):
+    """Map an ICI value (0/25/50/75/100) to a representative final-RRI point
+    inside its bridged band ceiling, so it can be combined with risk_band via
+    max() and rendered through the existing resolve_band() crosswalk."""
+    return ICI_BAND_CEILING[ici]
+
+
 # --- Bands crosswalk (RRI_POLICY.md "Bands, autonomy gates, and model tiers") ---
 # (upper_inclusive, label, effort, codex, claude, thinking, gate)
 BANDS = [
@@ -578,13 +656,29 @@ def evaluate(*, cc=None, c_score=None, auto_cc=False, touches=None,
         scores[v] = min(5, scores[v] + 1)
         confidence[v] = "Low"
 
-    # Base value: weighted sum, normalized by /5, scaled x100, rounded to nearest.
-    weighted = sum(WEIGHTS[v] * scores[v] for v in VARS)
-    base_val = round(100 * weighted / 5)
-
     applied = detect_penalties(scores, matched_auth, manual_penalties)
     penalty_total = sum(val for val, _ in applied.values())
-    final = base_val + penalty_total
+
+    # v2 authority: final band = max(ici_band, risk_band).
+    # ici_band captures technical/reasoning difficulty via the bottleneck
+    # axis (L,I,Q,V); risk_band captures domain/security/governance floors
+    # and penalties that ICI deliberately excludes (rri-v2-formula.md §3).
+    tech = technical_summary(scores)
+    ici_band_rri = ici_to_band_rri(tech["ici"])
+    # Risk/domain base: D/P/K's own per-variable contribution to the legacy
+    # 0-100 scale (same unit as the old weighted sum), as if C/F/T/A/X were
+    # all 0. This isolates the anchor-rubric-driven domain/security/data
+    # floor that ICI deliberately excludes (rri-v2-formula.md §3).
+    risk_base = round(100 * (
+        WEIGHTS["D"] * scores["D"] + WEIGHTS["P"] * scores["P"]
+        + WEIGHTS["K"] * scores["K"]) / 5)
+    risk_band_rri = risk_base + penalty_total
+    # base_val must stay penalty-inclusive (same figure as final) so the
+    # "base RRI > 100" decomposition trigger cannot miss a penalty-driven
+    # overflow that final would otherwise report (Gemma Reviewer finding,
+    # ADR-045 phase-2 review).
+    base_val = max(ici_band_rri, risk_band_rri)
+    final = max(ici_band_rri, risk_band_rri)
 
     band = resolve_band(final)
     triggers = detect_triggers(final, base_val, scores, applied)
@@ -599,6 +693,8 @@ def evaluate(*, cc=None, c_score=None, auto_cc=False, touches=None,
         "base": base_val, "penalties": applied, "penalty_total": penalty_total,
         "final": final, "band": band, "triggers": triggers,
         "advisories": advisories, "platform": profile.name,
+        "technical": tech,
+        "ici_band_rri": ici_band_rri, "risk_band_rri": risk_band_rri,
     }
 
 
@@ -626,10 +722,19 @@ def render_markdown(r):
     else:
         pen = "none"
     b = r["band"]
-    lines.append(f"**Base value:** 100 x (weighted / 5) = {r['base']}")
+    tech = r["technical"]
+    lines.append(
+        f"**Technical profile (v2, ADR-045):** L={tech['profile']['L']} "
+        f"I={tech['profile']['I']} Q={tech['profile']['Q']} "
+        f"V={tech['profile']['V']} -> bottleneck B={tech['bottleneck']} -> "
+        f"ICI={tech['ici']}")
+    lines.append(
+        f"**Risk/domain band input:** {r['risk_band_rri']} "
+        f"(D/P/K weighted + penalties {r['penalty_total']})")
     lines.append(f"**Penalties applied:** {pen}")
     lines.append(
-        f"**Final RRI:** {r['final']} -> band {b['label']} ({b['range']}) -> "
+        f"**Final RRI:** {r['final']} = max(ici_band {r['ici_band_rri']}, "
+        f"risk_band {r['risk_band_rri']}) -> band {b['label']} ({b['range']}) -> "
         f"Effort {b['effort']} . Codex {b['codex']} . Claude {b['claude']} . "
         f"thinking {b['thinking']}")
     lines.append(f"**Gates for this band:** {b['gate']}")
@@ -649,6 +754,9 @@ def render_json(r):
         "platform": r.get("platform"),
         "variables": {v: {"score": r["scores"][v], "evidence": r["evidence"][v],
                           "confidence": r["confidence"][v]} for v in TABLE_ORDER},
+        "technical": r["technical"],
+        "ici_band_rri": r["ici_band_rri"],
+        "risk_band_rri": r["risk_band_rri"],
         "base": r["base"],
         "penalties": [{"name": n, "value": v, "reason": why}
                       for n, (v, why) in sorted(r["penalties"].items())],
@@ -657,6 +765,8 @@ def render_json(r):
         "band": r["band"],
         "triggers": r["triggers"],
         "advisories": r["advisories"],
+        "authority": "rri-v2-design-0.2 (ADR-045)",
+        "effort_prediction_status": "not_calibrated",
     }, indent=2)
 
 

@@ -10,6 +10,17 @@ governs: "task complexity scoring and model selection"
 > canonical method for complexity-and-risk scoring, model-tier selection, and
 > autonomy-gate determination. `AGENT_WORKFLOW_GUIDE.md` is the highest authority;
 > this file is the detailed procedure it delegates to.
+>
+> **Formula superseded by ADR-045 (2026-09-07):** the weighted-sum formula in
+> § Formula below is retained in this policy as historical/documentation
+> context only; `scripts/rri.py` no longer computes or reports it (the
+> `legacy_weighted_base` output field was removed 2026-09-07 once the v2
+> authority was verified stable — see
+> `docs/audit/rri-v2-authority-replacement-2026-09-07.md`). See § Formula
+> (v2 authority, ADR-045) directly below for the authoritative computation.
+> Every other section of this policy — variables, anchor rubric, penalties,
+> bands/gates/reviewer chains, decomposition triggers — is unchanged and
+> still governs, keyed off the same final 0-100+ score.
 
 ## Purpose
 
@@ -23,7 +34,41 @@ For band **RRI 0–25**, the agent skips the full human approval presentation an
 may delegate eligible execution to local Qwen Developer through Ollama, then reviews, verifies, and
 reports the result (see `docs/policies/HITL_AUTONOMY_POLICY.md` for the full rule).
 
-## Formula
+## Formula (v2 authority, ADR-045)
+
+The final RRI is the **maximum** of two independently computed inputs — a
+technical-difficulty reading and a domain/security-risk reading — never their
+average or weighted sum:
+
+```
+ici_band   = ICI_BAND_CEILING[ICI]                     # technical difficulty
+risk_band  = 100 × ((0.15·D + 0.10·P + 0.12·K) / 5) + Penalties  # domain/risk
+RRI        = max(ici_band, risk_band)
+```
+
+Where the technical-difficulty side derives a four-axis ordinal profile
+`(L, I, Q, V)` — each `min(4, score)` from the existing C/K/D/T variables
+(`L←C, I←K, Q←D, V←T`) — takes the bottleneck `B = max(L,I,Q,V)`, and maps
+`ICI = 25×B` onto the RRI point anchoring the equivalent band ceiling
+(`ICI_BAND_CEILING = {0:25, 25:40, 50:55, 75:70, 100:100}`).
+
+This replaces the prior weighted-sum-of-eight-variables formula, per
+`docs/adr/ADR-045-rri-v2-authority-replacement.md`, adopting the technical
+profile from `docs/proposals/rri-v2-model.md` /
+`docs/proposals/rri-v2-formula.md` (`rri-v2-design-0.2`). The rationale for
+`max()` over an average: a single dominant obligation (technical or risk)
+must not be diluted by five easy variables — see `rri-v2-formula.md` §1 and
+§3 ("Neither S nor R enters ICI... a simple permission change can have ICI
+25 and high operational risk").
+
+**F, T, A, X remain scored** exactly as below — F/T feed evidence and V's
+axis derivation; A and X remain reported for task-presentation context and
+routing rationale (ambiguity/context-size), but do not enter either `max()`
+input directly. Penalties remain fully additive into `risk_band` exactly as
+before.
+
+<details>
+<summary>Legacy formula (superseded, retained for audit/history only)</summary>
 
 ```
 RRI = 100 × ((0.18·C + 0.12·F + 0.15·D + 0.15·T + 0.12·A + 0.12·K + 0.10·P + 0.06·X) / 5)
@@ -32,8 +77,17 @@ RRI = 100 × ((0.18·C + 0.12·F + 0.15·D + 0.15·T + 0.12·A + 0.12·K + 0.10�
 
 Weight verification: 0.18 + 0.12 + 0.15 + 0.15 + 0.12 + 0.12 + 0.10 + 0.06 = **1.00** ✓
 
-Each variable is scored **0–5**. The base term is therefore in **[0, 100]**.
-Penalties push the score above 100.
+`scripts/rri.py` no longer computes or reports this value (field
+`legacy_weighted_base` removed 2026-09-07); it is retained here only as
+historical documentation of the pre-ADR-045 formula. It never determined
+the band, gate, or any routing decision after ADR-045 landed, and does not
+now.
+
+</details>
+
+Each variable is scored **0–5**. Both `max()` inputs are in **[0, 100]**
+before penalties; penalties push `risk_band` (and therefore the final RRI)
+above 100.
 
 ## Variables
 
@@ -917,8 +971,11 @@ trigger, authority boundary, and evidence format.
 
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` — highest authority; adopts this policy
 - `docs/policies/HITL_AUTONOMY_POLICY.md` — approval requirements and local delegation rule
+- `docs/adr/ADR-045-rri-v2-authority-replacement.md` — v2 technical-profile formula authority (supersedes the weighted-sum § Formula)
+- `docs/proposals/rri-v2-model.md`, `docs/proposals/rri-v2-formula.md` — measurement model and full formula design ADR-045 partially adopts
 - `docs/adr/ADR-040-per-module-complexity-split-implementation-routing.md` — per-module complexity-split routing for RRI 26–55
 - `docs/tasks/rri-integration.md` — integration task ledger
-- `scripts/rri.py` — canonical calculator
+- `scripts/rri.py` — canonical calculator (v2 authority per ADR-045)
+- `scripts/rri_v2_candidate.py` — schema-validated full-envelope assessment tool
 - `scripts/rri_test.py` — unit tests (run via `make qa-rri`)
 - `scripts/gemma-code-review.py` — Gemma Reviewer wrapper
