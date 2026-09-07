@@ -54,7 +54,7 @@ operational surfaces from planned ones. Delivery sequence lives in
 | First-party session gateway (transparent JWT relay) | Operational | S-040, ADR-031 |
 | First-party mobile client (React Native + Expo) | Canonical, sole authenticated product surface | S-050/S-105, ADR-029/031 |
 | Mobile P2P runtime boundary | P1 closed `[x] Done` 2026-09-01 (7/8 children PASS: packaging/protocol, ownership/composition, storage, replication transport, verification/reconnect/teardown; P1.F3b itself stays `not PASS`, non-blocking, deferred into X28); no product P2P runtime or network activity is active outside bounded proof runners | MVP0-P2P P1, ADR-043 |
-| P2P audience delivery (encrypted publication, invite/claim, verified sync, loopback playback) | Architecture accepted; P2.T0 PASS with Node.js/TypeScript Availability Node + mTLS (`AN-R1 + AN-A1`); P2.C0 PASS (froze the shared package/publication/audit contracts); P2.T1 durable publication/outbox foundation is Done and owner-approved (`crates/domain/src/p2p_publication.rs`, `crates/db/src/p2p_publication_repo.rs`, migration `0032`); remaining P2 leaves (T2+) not yet implemented | MVP0-P2P P2–P7, ADR-044 |
+| P2P audience delivery (encrypted publication, invite/claim, verified sync, loopback playback) | Architecture accepted; P2.T0 PASS with Node.js/TypeScript Availability Node + mTLS (`AN-R1 + AN-A1`); P2.C0 PASS (froze the shared package/publication/audit contracts); P2.T1 durable publication/outbox foundation is Done and owner-approved (`crates/domain/src/p2p_publication.rs`, `crates/db/src/p2p_publication_repo.rs`, migration `0032`); P2.T2a-i through P2.T2d are Done (T2d: generate-once CK + versioned KEK wrap/unwrap + zeroization, `crates/p2p/src/key_wrap.rs`); remaining P2 leaves (T2e-T2g, P3-P7) not yet implemented | MVP0-P2P P2–P7, ADR-044 |
 
 Human review runtime (S-170) and publication runtime (S-180) have no plan/task
 ledger yet.
@@ -137,8 +137,10 @@ ledger yet.
   Done and owner-approved: `crates/domain/src/p2p_publication.rs`,
   `crates/db/src/p2p_publication_repo.rs`, and migration
   `0032_create_p2p_publications_and_outbox.sql` are landed on
-  `feature/p2p-mvp-core`. Remaining P2 leaves (T2 onward) are not yet
-  implemented. Design inputs: `docs/plan/mvp0-p2p-design-inputs.md`.
+  `feature/p2p-mvp-core`. `P2.T2a-i` through `P2.T2d` are Done (T2d: the
+  generate-once content key plus versioned KEK wrap/unwrap and zeroization,
+  `crates/p2p/src/key_wrap.rs`). Remaining P2 leaves (`T2e` onward) are not
+  yet implemented. Design inputs: `docs/plan/mvp0-p2p-design-inputs.md`.
 - `crates/connectors` (primary S-090, ADR-025): per-platform integrations behind a
   `PlatformConnector` trait. For owner-authorized download (content owner grants
   scoped access to their own YouTube/Vimeo account), it resolves ownership/metadata

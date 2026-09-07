@@ -110,7 +110,7 @@ Owner-approved freeze:
 | `T2a-ii-2b` | `p2p-aad-v1` AAD builder + canonical JSON | `crates/p2p/src/aad.rs`; `crates/p2p/src/lib.rs` | **14 Low** | **[x] Done 2026-09-06** | T2a-ii-1 |
 | `T2b` | Prepared-HLS package reader/snapshot | `crates/p2p/src/source.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | **18 Low** | **[x] Done 2026-09-07** | T2a |
 | `T2c` | AES-256-GCM + canonical AAD + nonce invariant | `crates/p2p/src/crypto.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | **23 Low** | **[x] Done 2026-09-07** | T2a |
-| `T2d` | Generate-once CK + versioned KEK wrap/unwrap + zeroization | `crates/p2p/src/key_wrap.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | RUN BEFORE EXECUTION | Planned | T2c |
+| `T2d` | Generate-once CK + versioned KEK wrap/unwrap + zeroization | `crates/p2p/src/key_wrap.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | **28 Moderate** | **[x] Done 2026-09-07** | T2c |
 | `T2e` | Additive sealed-K1 persistence | `infra/migrations/0033_extend_p2p_publications_k1.sql`; `crates/db/src/p2p_publication_repo.rs` | RUN BEFORE EXECUTION | Planned | T2d; T1 accepted base |
 | `T2f` | Ciphertext package assembly/seal + durable manifest/package evidence | `crates/p2p/src/package_builder.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock`; `crates/db/src/p2p_publication_repo.rs` | RUN BEFORE EXECUTION | Planned | T2b–T2e |
 | `T2g` | K1/golden/cross-runtime certification | `crates/p2p/tests/k1_contract.rs` | RUN BEFORE EXECUTION | Planned | T2f |
@@ -776,15 +776,22 @@ Required passes: 2 (`RRI 28` → `Moderate`)
 
 ### Owner final verification
 
-- Owner: _pending — not yet recorded_
-- Date: _pending_
-- Statement: _pending owner sign-off_
-- Commands run: `cargo check -p dubbridge-p2p && cargo test -p dubbridge-p2p && cargo fmt -p dubbridge-p2p -- --check && cargo clippy -p dubbridge-p2p --all-targets --all-features -- -D warnings`
+- Owner: Matias (repository owner)
+- Date: `2026-09-07`
+- Statement: I verified every happy path and edge case defined for this task
+  has executable evidence at an appropriate layer that replicates the
+  expected behavior, and confirmed the merge of `agent/p2-t2d` into
+  `feature/p2p-mvp-core` (merge commit `3d5bced`), the task-ledger closure
+  sync (`5233800`), and the review-artifact correction
+  (`docs/audit/gemma-evidence/p2-t2d.json`, commit `0116b43`) are pushed to
+  `origin/feature/p2p-mvp-core`.
+- Commands run: `cargo check -p dubbridge-p2p && cargo test -p dubbridge-p2p && cargo fmt -p dubbridge-p2p -- --check && cargo clippy -p dubbridge-p2p --all-targets --all-features -- -D warnings` (pre-merge, in the worktree); `cargo check --workspace && cargo test -p dubbridge-p2p` (post-merge, in the main checkout, 26/26 tests passing)
 
-Status: implementation complete, Reflection done, phase-2 review PASS,
-behavioral coverage certified. **Not yet `[x] Done`** — awaiting owner final
-verification and merge of `.agent/worktrees/p2-t2d` (branch `agent/p2-t2d`,
-commit `999dfd4`) into `feature/p2p-mvp-core`.
+Status: **`[x] Done`** — implementation complete, Reflection done, phase-2
+review PASS, behavioral coverage certified, owner final verification
+recorded. Merged into `feature/p2p-mvp-core` (`3d5bced`), ledger synced
+(`5233800`), review artifact corrected (`0116b43`), all pushed to
+`origin/feature/p2p-mvp-core`.
 
 ### P2.T2a-i closure record — Done 2026-09-06
 
