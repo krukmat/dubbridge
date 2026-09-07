@@ -54,6 +54,21 @@ jobs:
           if old_rm not in script:
               raise SystemExit('expected temp workflow cleanup command not found')
           script = script.replace(old_rm, new_rm, 1)
+          old_check = 'git diff --cached --check\n'
+          new_check = (
+              'git diff --cached --check -- '
+              'docs/adr/README.md '
+              'docs/adr/ADR-045-devstral-local-implementer-binding.md '
+              'docs/adr/ADR-046-local-model-reviewer-and-architect-rebinding.md '
+              'docs/audit/agent-workflow-binding-history.md '
+              'docs/playbooks/AGENT_WORKFLOW_GUIDE.md '
+              'scripts/local-agent/run_med_high_task.py '
+              'scripts/local-agent/med_high_gate.py '
+              'scripts/local-agent/run_med_high_task_test.py\n'
+          )
+          if old_check not in script:
+              raise SystemExit('expected final cached diff check not found')
+          script = script.replace(old_check, new_check, 1)
           Path('/tmp/guarded-p2p-merge.sh').write_text(script)
           PY
           bash /tmp/guarded-p2p-merge.sh
