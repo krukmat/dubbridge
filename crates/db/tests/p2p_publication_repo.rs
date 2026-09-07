@@ -3,7 +3,7 @@ use dubbridge_db::{
     error::DbError,
     p2p_publication_repo::{
         ensure_publication_with_outbox, get_outbox_for_publication, get_publication,
-        list_outstanding_publication_work, record_external_confirmation,
+        list_outstanding_publication_work, record_external_confirmation, record_sealed_k1,
         transition_publication_state,
     },
 };
@@ -247,4 +247,160 @@ async fn ec_t1_schema_contains_no_forbidden_secret_fields() {
             "forbidden secret field: {field}"
         );
     }
+}
+
+#[tokio::test]
+async fn hp_t2e_1_first_seal_persists_wrapped_k1_material_atomically() {
+    let pool = test_pool().await;
+    let asset_id = insert_asset(&pool).await;
+    let publication_id = P2pPublicationId::new();
+    let lineage_id = K1LineageId::new();
+
+    ensure_publication_with_outbox(&pool, asset_id, publication_id, lineage_id, Uuid::new_v4())
+        .await
+        .expect("create publication");
+
+    let sealed = record_sealed_k1(
+        &pool,
+        publication_id,
+        lineage_id,
+        "kek-2026-09",
+        3,
+        &[7u8; 12],
+        &[9u8; 48],
+    )
+    .await
+    .expect("seal K1 material");
+
+    assert_eq!(sealed.sealed_kek_id.as_deref(), Some("kek-2026-09"));
+    assert_eq!(sealed.sealed_kek_version, Some(3));
+    assert_eq!(sealed.sealed_nonce.as_deref(), Some([7u8; 12].as_slice()));
+    assert_eq!(
+        sealed.sealed_wrapped_ck.as_deref(),
+        Some([9u8; 48].as_slice())
+    );
+    assert!(sealed.sealed_at.is_some());
+    assert_eq!(sealed.state, PublicationState::Building);
+
+    let reread = get_publication(&pool, publication_id)
+        .await
+        .expect("re-read publication")
+        .expect("publication persists");
+    assert_eq!(reread.sealed_kek_id.as_deref(), Some("kek-2026-09"));
+    assert_eq!(reread.sealed_kek_version, Some(3));
+}
+
+#[tokio::test]
+async fn hp_t2e_2_retry_with_identical_material_is_idempotent() {
+    let pool = test_pool().await;
+    let asset_id = insert_asset(&pool).await;
+    let publication_id = P2pPublicationId::new();
+    let lineage_id = K1LineageId::new();
+
+    ensure_publication_with_outbox(&pool, asset_id, publication_id, lineage_id, Uuid::new_v4())
+        .await
+        .expect("create publication");
+
+    let first = record_sealed_k1(
+        &pool,
+        publication_id,
+        lineage_id,
+        "kek-2026-09",
+        1,
+        &[1u8; 12],
+        &[2u8; 48],
+    )
+    .await
+    .expect("first seal");
+
+    let retry = record_sealed_k1(
+        &pool,
+        publication_id,
+        lineage_id,
+        "kek-2026-09",
+        1,
+        &[1u8; 12],
+        &[2u8; 48],
+    )
+    .await
+    .expect("idempotent retry with identical material");
+
+    assert_eq!(first.sealed_at, retry.sealed_at);
+    assert_eq!(first.sealed_wrapped_ck, retry.sealed_wrapped_ck);
+}
+
+#[tokio::test]
+async fn ec_t2e_1_retry_with_different_material_fails_closed() {
+    let pool = test_pool().await;
+    let asset_id = insert_asset(&pool).await;
+    let publication_id = P2pPublicationId::new();
+    let lineage_id = K1LineageId::new();
+
+    ensure_publication_with_outbox(&pool, asset_id, publication_id, lineage_id, Uuid::new_v4())
+        .await
+        .expect("create publication");
+
+    record_sealed_k1(
+        &pool,
+        publication_id,
+        lineage_id,
+        "kek-2026-09",
+        1,
+        &[1u8; 12],
+        &[2u8; 48],
+    )
+    .await
+    .expect("first seal");
+
+    let conflicting_version = record_sealed_k1(
+        &pool,
+        publication_id,
+        lineage_id,
+        "kek-2026-09",
+        2,
+        &[1u8; 12],
+        &[2u8; 48],
+    )
+    .await;
+    assert!(matches!(conflicting_version, Err(DbError::Conflict)));
+
+    let conflicting_ciphertext = record_sealed_k1(
+        &pool,
+        publication_id,
+        lineage_id,
+        "kek-2026-09",
+        1,
+        &[1u8; 12],
+        &[99u8; 48],
+    )
+    .await;
+    assert!(matches!(conflicting_ciphertext, Err(DbError::Conflict)));
+
+    let unchanged = get_publication(&pool, publication_id)
+        .await
+        .expect("re-read publication")
+        .expect("publication persists");
+    assert_eq!(unchanged.sealed_kek_version, Some(1));
+    assert_eq!(
+        unchanged.sealed_wrapped_ck.as_deref(),
+        Some([2u8; 48].as_slice())
+    );
+}
+
+#[tokio::test]
+async fn ec_t2e_2_seal_on_missing_publication_returns_not_found() {
+    let pool = test_pool().await;
+    let missing_publication_id = P2pPublicationId::new();
+
+    let result = record_sealed_k1(
+        &pool,
+        missing_publication_id,
+        K1LineageId::new(),
+        "kek-2026-09",
+        1,
+        &[1u8; 12],
+        &[2u8; 48],
+    )
+    .await;
+    assert!(matches!(result, Err(DbError::NotFound)));
 }

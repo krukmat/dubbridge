@@ -20,6 +20,11 @@ pub struct P2pPublicationRecord {
     pub confirmed_lineage_id: Option<K1LineageId>,
     pub external_confirmed_at: Option<OffsetDateTime>,
     pub failure_detail: Option<String>,
+    pub sealed_kek_id: Option<String>,
+    pub sealed_kek_version: Option<i32>,
+    pub sealed_nonce: Option<Vec<u8>>,
+    pub sealed_wrapped_ck: Option<Vec<u8>>,
+    pub sealed_at: Option<OffsetDateTime>,
     pub created_at: OffsetDateTime,
     pub updated_at: OffsetDateTime,
 }
@@ -62,6 +67,11 @@ struct PublicationRow {
     confirmed_lineage_id: Option<Uuid>,
     external_confirmed_at: Option<OffsetDateTime>,
     failure_detail: Option<String>,
+    sealed_kek_id: Option<String>,
+    sealed_kek_version: Option<i32>,
+    sealed_nonce: Option<Vec<u8>>,
+    sealed_wrapped_ck: Option<Vec<u8>>,
+    sealed_at: Option<OffsetDateTime>,
     created_at: OffsetDateTime,
     updated_at: OffsetDateTime,
 }
@@ -91,6 +101,11 @@ struct OutstandingWorkRow {
     p_confirmed_lineage_id: Option<Uuid>,
     p_external_confirmed_at: Option<OffsetDateTime>,
     p_failure_detail: Option<String>,
+    p_sealed_kek_id: Option<String>,
+    p_sealed_kek_version: Option<i32>,
+    p_sealed_nonce: Option<Vec<u8>>,
+    p_sealed_wrapped_ck: Option<Vec<u8>>,
+    p_sealed_at: Option<OffsetDateTime>,
     p_created_at: OffsetDateTime,
     p_updated_at: OffsetDateTime,
     o_id: Uuid,
@@ -121,6 +136,11 @@ fn publication_from_row(row: PublicationRow) -> Result<P2pPublicationRecord, DbE
         confirmed_lineage_id: row.confirmed_lineage_id.map(K1LineageId),
         external_confirmed_at: row.external_confirmed_at,
         failure_detail: row.failure_detail,
+        sealed_kek_id: row.sealed_kek_id,
+        sealed_kek_version: row.sealed_kek_version,
+        sealed_nonce: row.sealed_nonce,
+        sealed_wrapped_ck: row.sealed_wrapped_ck,
+        sealed_at: row.sealed_at,
         created_at: row.created_at,
         updated_at: row.updated_at,
     })
@@ -152,6 +172,11 @@ fn outstanding_from_row(row: OutstandingWorkRow) -> Result<OutstandingPublicatio
         confirmed_lineage_id: row.p_confirmed_lineage_id,
         external_confirmed_at: row.p_external_confirmed_at,
         failure_detail: row.p_failure_detail,
+        sealed_kek_id: row.p_sealed_kek_id,
+        sealed_kek_version: row.p_sealed_kek_version,
+        sealed_nonce: row.p_sealed_nonce,
+        sealed_wrapped_ck: row.p_sealed_wrapped_ck,
+        sealed_at: row.p_sealed_at,
         created_at: row.p_created_at,
         updated_at: row.p_updated_at,
     })?;
@@ -190,7 +215,9 @@ async fn insert_or_lock_publication(
         ON CONFLICT (asset_id) DO NOTHING
         RETURNING id, asset_id, lineage_id, state,
                   external_publication_id, confirmed_lineage_id, external_confirmed_at,
-                  failure_detail, created_at, updated_at
+                  failure_detail,
+                  sealed_kek_id, sealed_kek_version, sealed_nonce, sealed_wrapped_ck, sealed_at,
+                  created_at, updated_at
         "#,
     )
     .bind(publication_id.0)
@@ -207,7 +234,9 @@ async fn insert_or_lock_publication(
             r#"
             SELECT id, asset_id, lineage_id, state,
                    external_publication_id, confirmed_lineage_id, external_confirmed_at,
-                   failure_detail, created_at, updated_at
+                   failure_detail,
+                   sealed_kek_id, sealed_kek_version, sealed_nonce, sealed_wrapped_ck, sealed_at,
+                   created_at, updated_at
               FROM p2p_publications
              WHERE asset_id = $1
              FOR UPDATE
@@ -303,7 +332,9 @@ pub async fn get_publication(
         r#"
         SELECT id, asset_id, lineage_id, state,
                external_publication_id, confirmed_lineage_id, external_confirmed_at,
-               failure_detail, created_at, updated_at
+               failure_detail,
+               sealed_kek_id, sealed_kek_version, sealed_nonce, sealed_wrapped_ck, sealed_at,
+               created_at, updated_at
           FROM p2p_publications
          WHERE id = $1
         "#,
@@ -325,7 +356,9 @@ pub async fn get_publication_by_asset(
         r#"
         SELECT id, asset_id, lineage_id, state,
                external_publication_id, confirmed_lineage_id, external_confirmed_at,
-               failure_detail, created_at, updated_at
+               failure_detail,
+               sealed_kek_id, sealed_kek_version, sealed_nonce, sealed_wrapped_ck, sealed_at,
+               created_at, updated_at
           FROM p2p_publications
          WHERE asset_id = $1
         "#,
@@ -378,6 +411,11 @@ pub async fn list_outstanding_publication_work(
             p.confirmed_lineage_id AS p_confirmed_lineage_id,
             p.external_confirmed_at AS p_external_confirmed_at,
             p.failure_detail AS p_failure_detail,
+            p.sealed_kek_id AS p_sealed_kek_id,
+            p.sealed_kek_version AS p_sealed_kek_version,
+            p.sealed_nonce AS p_sealed_nonce,
+            p.sealed_wrapped_ck AS p_sealed_wrapped_ck,
+            p.sealed_at AS p_sealed_at,
             p.created_at AS p_created_at,
             p.updated_at AS p_updated_at,
             o.id AS o_id,
@@ -433,7 +471,9 @@ pub async fn record_external_confirmation(
            AND (external_publication_id IS NULL OR external_publication_id = $3)
         RETURNING id, asset_id, lineage_id, state,
                   external_publication_id, confirmed_lineage_id, external_confirmed_at,
-                  failure_detail, created_at, updated_at
+                  failure_detail,
+                  sealed_kek_id, sealed_kek_version, sealed_nonce, sealed_wrapped_ck, sealed_at,
+                  created_at, updated_at
         "#,
     )
     .bind(publication_id.0)
@@ -478,7 +518,9 @@ pub async fn transition_publication_state(
         r#"
         SELECT id, asset_id, lineage_id, state,
                external_publication_id, confirmed_lineage_id, external_confirmed_at,
-               failure_detail, created_at, updated_at
+               failure_detail,
+               sealed_kek_id, sealed_kek_version, sealed_nonce, sealed_wrapped_ck, sealed_at,
+               created_at, updated_at
           FROM p2p_publications
          WHERE id = $1
          FOR UPDATE
@@ -520,7 +562,9 @@ pub async fn transition_publication_state(
          WHERE id = $1
         RETURNING id, asset_id, lineage_id, state,
                   external_publication_id, confirmed_lineage_id, external_confirmed_at,
-                  failure_detail, created_at, updated_at
+                  failure_detail,
+                  sealed_kek_id, sealed_kek_version, sealed_nonce, sealed_wrapped_ck, sealed_at,
+                  created_at, updated_at
         "#,
     )
     .bind(publication_id.0)
@@ -532,4 +576,71 @@ pub async fn transition_publication_state(
 
     tx.commit().await.map_err(DbError::QueryFailed)?;
     publication_from_row(updated)
+}
+
+/// Persist sealed K1 metadata (wrapped-CK reference under a versioned KEK)
+/// for this exact lineage. Only opaque wrap outputs cross this boundary —
+/// never a plaintext CK or raw KEK bytes. Sealing for the first time on a
+/// lineage with no existing sealed material persists all fields atomically.
+/// Repeating the identical seal is idempotent; different material for the
+/// same lineage fails closed, since a retry/replay must never rotate CK or
+/// silently upgrade KEK version (C0 "generate-once CK" / "versioned KEK").
+pub async fn record_sealed_k1(
+    pool: &PgPool,
+    publication_id: P2pPublicationId,
+    lineage_id: K1LineageId,
+    kek_id: &str,
+    kek_version: i32,
+    nonce: &[u8],
+    wrapped_ck: &[u8],
+) -> Result<P2pPublicationRecord, DbError> {
+    if kek_id.trim().is_empty() {
+        return Err(DbError::Conflict);
+    }
+
+    let sealed_at = OffsetDateTime::now_utc();
+    let row = sqlx::query_as::<_, PublicationRow>(
+        r#"
+        UPDATE p2p_publications
+           SET sealed_kek_id = $3,
+               sealed_kek_version = $4,
+               sealed_nonce = $5,
+               sealed_wrapped_ck = $6,
+               sealed_at = COALESCE(sealed_at, $7),
+               updated_at = now()
+         WHERE id = $1
+           AND lineage_id = $2
+           AND (sealed_kek_id IS NULL
+                OR (sealed_kek_id = $3
+                    AND sealed_kek_version = $4
+                    AND sealed_nonce = $5
+                    AND sealed_wrapped_ck = $6))
+        RETURNING id, asset_id, lineage_id, state,
+                  external_publication_id, confirmed_lineage_id, external_confirmed_at,
+                  failure_detail,
+                  sealed_kek_id, sealed_kek_version, sealed_nonce, sealed_wrapped_ck, sealed_at,
+                  created_at, updated_at
+        "#,
+    )
+    .bind(publication_id.0)
+    .bind(lineage_id.0)
+    .bind(kek_id)
+    .bind(kek_version)
+    .bind(nonce)
+    .bind(wrapped_ck)
+    .bind(sealed_at)
+    .fetch_optional(pool)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    match row {
+        Some(row) => publication_from_row(row),
+        None => {
+            if get_publication(pool, publication_id).await?.is_none() {
+                Err(DbError::NotFound)
+            } else {
+                Err(DbError::Conflict)
+            }
+        }
+    }
 }

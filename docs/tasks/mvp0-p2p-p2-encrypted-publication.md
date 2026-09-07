@@ -111,7 +111,7 @@ Owner-approved freeze:
 | `T2b` | Prepared-HLS package reader/snapshot | `crates/p2p/src/source.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | **18 Low** | **[x] Done 2026-09-07** | T2a |
 | `T2c` | AES-256-GCM + canonical AAD + nonce invariant | `crates/p2p/src/crypto.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | **23 Low** | **[x] Done 2026-09-07** | T2a |
 | `T2d` | Generate-once CK + versioned KEK wrap/unwrap + zeroization | `crates/p2p/src/key_wrap.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock` | **28 Moderate** | **[x] Done 2026-09-07** | T2c |
-| `T2e` | Additive sealed-K1 persistence | `infra/migrations/0033_extend_p2p_publications_k1.sql`; `crates/db/src/p2p_publication_repo.rs` | RUN BEFORE EXECUTION | Planned | T2d; T1 accepted base |
+| `T2e` | Additive sealed-K1 persistence | `infra/migrations/0033_extend_p2p_publications_k1.sql`; `crates/db/src/p2p_publication_repo.rs` | **55 Med-high** | **[x] Done 2026-09-07** | T2d; T1 accepted base |
 | `T2f` | Ciphertext package assembly/seal + durable manifest/package evidence | `crates/p2p/src/package_builder.rs`; `crates/p2p/src/lib.rs`; `crates/p2p/Cargo.toml`; `Cargo.lock`; `crates/db/src/p2p_publication_repo.rs` | RUN BEFORE EXECUTION | Planned | T2b–T2e |
 | `T2g` | K1/golden/cross-runtime certification | `crates/p2p/tests/k1_contract.rs` | RUN BEFORE EXECUTION | Planned | T2f |
 
@@ -792,6 +792,219 @@ review PASS, behavioral coverage certified, owner final verification
 recorded. Merged into `feature/p2p-mvp-core` (`3d5bced`), ledger synced
 (`5233800`), review artifact corrected (`0116b43`), all pushed to
 `origin/feature/p2p-mvp-core`.
+
+### P2.T2e — design (frozen before ADR-038 refinement, 2026-09-07)
+
+**Objective:** persist sealed K1 metadata (wrapped-CK reference under a
+versioned KEK, plus its per-wrap nonce) additively into `p2p_publications`,
+without changing T1's already-accepted identity/state semantics — the
+C0-frozen objective at `docs/audit/mvp0-p2p-p2-c0-contract-freeze.md:241`.
+
+- **In scope:** `infra/migrations/0033_extend_p2p_publications_k1.sql`
+  (new); `crates/db/src/p2p_publication_repo.rs` (additive extension);
+  `crates/db/tests/p2p_publication_repo.rs` (real-Postgres integration
+  evidence, per Tiger Style D3).
+- **Out of scope:** resolving actual KEK bytes from the secret boundary
+  (caller-supplied primitives only, matching T2d's pattern); the
+  `crates/p2p::key_wrap::WrappedKey` type is never imported here —
+  `crates/db` does not depend on `crates/p2p` (dependency direction
+  `domain -> db/storage -> ingestion -> apps`); assembling/encrypting the
+  ciphertext package (T2f); adding a new `PublicationState` variant (K1
+  sealing is orthogonal metadata settable while still `building`); emitting
+  a correlated `p2p_lineage_sealed` ADR-018 audit event (the
+  `audit_events` correlation schema extension is explicitly owned by a
+  later task, `T6a`, whose migration does not exist yet — C0 line 182/286).
+- **Design:** migration `0033` adds 5 nullable columns
+  (`sealed_kek_id TEXT`, `sealed_kek_version INTEGER`, `sealed_nonce BYTEA`,
+  `sealed_wrapped_ck BYTEA`, `sealed_at TIMESTAMPTZ`) plus an all-or-none
+  `CHECK` constraint, mirroring the existing
+  `p2p_publications_confirmation_all_or_none_check` pattern from migration
+  `0032`. New function `record_sealed_k1(pool, publication_id, lineage_id,
+  kek_id, kek_version, nonce, wrapped_ck) -> Result<P2pPublicationRecord,
+  DbError>`: a single `UPDATE ... WHERE` compare-and-swap — idempotent
+  no-op on identical-material retry (`COALESCE(sealed_at, $7)` preserves
+  the original seal timestamp), fails closed with `DbError::Conflict` on
+  any differing field, discriminates `NotFound` from `Conflict` via a
+  follow-up read exactly like the already-accepted
+  `record_external_confirmation` (T1, closed).
+
+**HP-T2e-1:** sealing K1 for the first time on a lineage in `building`
+persists all 5 columns atomically; a subsequent read returns them.
+**HP-T2e-2:** retry with identical `lineage_id` + identical sealed material
+is idempotent — returns the existing record unchanged, never rotates
+CK/KEK version/nonce.
+**EC-T2e-1:** retry with the same `lineage_id` but different sealed
+material (any of `kek_id`/`kek_version`/`nonce`/`wrapped_ck`) fails closed
+with `DbError::Conflict`.
+**EC-T2e-2:** no plaintext CK or raw KEK bytes appear in any function
+signature, log statement, or test fixture — only already-wrapped
+ciphertext/`kek_id`/`kek_version`/nonce cross this boundary.
+
+**Phase-1 review disposition
+(`.agent/local-agent-p2-t2e/phase1-result.json`, `gemma4:26b-a4b-it-qat`,
+recorded 2026-09-07):** raw verdict `BLOCKED`, 2 findings, both
+independently verified against repository evidence rather than accepted at
+face value:
+- **major** — flagged the proposed `UPDATE...WHERE` idempotency pattern as
+  concurrency-unsafe without `FOR UPDATE` locking — **rejected as false
+  positive**: verified by reading `record_external_confirmation`'s actual
+  source (`crates/db/src/p2p_publication_repo.rs:412-457`), which is the
+  identical single-statement compare-and-swap pattern, already accepted
+  and in production from the closed T1 task. No `SELECT`-then-`UPDATE`
+  race exists in either function.
+- **minor** — asked whether deferring the `p2p_lineage_sealed` audit event
+  to T6 violates C0's "same transaction" requirement — **accepted as
+  clarification, no design change**: C0 assigns the `audit_events`
+  correlation schema extension to `T6a` (not yet built), making correlated
+  audit emission architecturally impossible in T2e today; this is a
+  C0-frozen sequencing fact (T2e precedes T6a), not a defect.
+
+Task-analysis review: gemma `.agent/local-agent-p2-t2e/phase1-result.json` - PASS
+
+- **RRI:** `python3 scripts/rri.py --touches
+  infra/migrations/0033_extend_p2p_publications_k1.sql --touches
+  crates/db/src/p2p_publication_repo.rs --touches
+  crates/db/tests/p2p_publication_repo.rs --cc 4 --D 3 --K 3 --P 2 --T 2
+  --A 1 --X 0` -> **RRI 55, Med-high (41-55)**, `auth_security` penalty
+  (+10) auto-applied. Driven entirely by the categorical
+  `infra/migrations/*` anchor-rubric floor (ADR-008, ADR-018: D floor 4, K
+  floor 4, P floor 5) — any schema migration in this repository is floored
+  this way regardless of narrowness; not a manually inflated score.
+- **Honest Low-band maximization pass:** evaluated and rejected. The
+  migration and its companion repository function form one C0-mandated
+  atomic persistence unit (columns without the function are inert; the
+  function without the columns cannot compile) — no independent
+  file-ownership or evidence seam exists to split on. Moot in practice: the
+  ADR-038 refinement below confirms the migration file alone is hard-excluded
+  from local delegation regardless of decomposition.
+- **Route:** RRI 41-55 Med-high — ADR-038 Architect-refined single-attempt
+  gate. Muse Glimmer advisory refinement
+  (`.agent/local-architect/med-high-refinement-v1/P2.T2e/refinement-artifact.json`,
+  `muse-glimmer:30b-q4_K_M`) recommended **`CLOUD_REQUIRED`**: ADR-038
+  Section 6 hard-excludes "schema/data migrations" from `GO_LOCAL`
+  categorically, regardless of narrowness (`docs/adr/
+  ADR-038-med-high-architect-refined-single-attempt.md` lines 123,
+  390-393 — a hard-excluded surface is never Low-band eligible either,
+  regardless of measured RRI, so the Amendment 4 post-repair-budget
+  decomposition step does not apply here: there is no non-excluded residue
+  to decompose into). Primary hash-bound route receipt
+  (`.agent/local-architect/med-high-refinement-v1/P2.T2e/route-receipt.json`)
+  recorded **`CLOUD_REQUIRED`** with no downgrade (matches Muse Glimmer
+  exactly). Implementation routed to the band's cloud-takeover model per
+  `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` Current Claude Code capability
+  resolution table: `claude-sonnet-5`, thinking on (capability/risk
+  takeover cause, not operational-only).
+
+### P2.T2e closure record
+
+**Implementation routing evidence.** Implemented directly by Claude Sonnet
+5 (this session) per the `CLOUD_REQUIRED` route receipt above — no local
+implementation attempt was made or was eligible (ADR-038 Section 6 hard
+exclusion on schema migrations applies regardless of scope).
+
+**Scope delivered:**
+`infra/migrations/0033_extend_p2p_publications_k1.sql` (new, 27 lines): 5
+nullable columns + 1 all-or-none `CHECK` constraint on `p2p_publications`.
+`crates/db/src/p2p_publication_repo.rs` (+125/-8 lines): extended
+`P2pPublicationRecord`/`PublicationRow`/`OutstandingWorkRow`/
+`publication_from_row`/`outstanding_from_row` with the 5 new fields; every
+existing `SELECT`/`INSERT...RETURNING`/`UPDATE...RETURNING` query updated to
+carry them; new `record_sealed_k1` function (61 lines). `crates/db/tests/
+p2p_publication_repo.rs` (+158/-0 lines): 4 new integration tests
+(`hp_t2e_1`, `hp_t2e_2`, `ec_t2e_1`, `ec_t2e_2`). `git diff --stat`: exactly
+the 3 authorized files, no scope violation.
+
+**Verification (all commands green, against real local Postgres per Tiger
+Style D3):**
+- `cargo check -p dubbridge-db` — PASS
+- `cargo test -p dubbridge-db -- --test-threads=1` — PASS, 81 lib + 8
+  integration (4 pre-existing T1 + 4 new T2e), 0 failed. (The default
+  parallel `cargo test` run surfaces 3 pre-existing, already-documented
+  `user_account::tests` deadlock/conflict failures unrelated to this task —
+  X28/CIRF-T4/CIRF-T5's known cross-test race, not introduced here;
+  reproduced identically against the unmodified `user_account.rs` tests,
+  and `qa-test`/`qa-coverage` already run with `--test-threads=1` for this
+  exact reason.)
+- `cargo fmt -p dubbridge-db -- --check` — PASS (no diff)
+- `cargo clippy -p dubbridge-db --all-targets --all-features -- -D
+  warnings` — PASS (0 warnings)
+- `python3 scripts/check-review-budget.py --files
+  crates/db/src/p2p_publication_repo.rs
+  crates/db/tests/p2p_publication_repo.rs
+  infra/migrations/0033_extend_p2p_publications_k1.sql` — PASS
+  (1052/6283 reviewable diff lines)
+
+Task-analysis review: gemma `.agent/local-agent-p2-t2e/phase1-result.json` - PASS
+Code-solution review: gemma `.agent/local-agent-p2-t2e/phase2-result.json` - PASS
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma`
+- Command: `python3 scripts/gemma-code-review.py --model gemma4:26b-a4b-it-qat --num-ctx 32768 --no-think --passes 3 --task-id P2.T2e --out .agent/local-agent-p2-t2e/phase2-result.json <packet>`, after the per-task Ollama restart and warm-up probe (`done_reason: stop`, non-empty content)
+- Artifact: `.agent/local-agent-p2-t2e/phase2-result.json` (+ `.pass1/2/3.json`); disposition detail: `.agent/local-agent-p2-t2e/phase2-disposition.md`
+- Verdict: `PASS` (aggregate status `findings`, 0 blocking/major)
+- Findings: 1 minor, pass-specific (2/3 passes, `crates/db/src/p2p_publication_repo.rs:411/415`) — `COALESCE(sealed_at, $7)` questioned as redundant; verified against `hp_t2e_2`'s behavioral assertion (`first.sealed_at == retry.sealed_at`) and confirmed correct as implemented, no action needed
+- Muse Glimmer fallback: not triggered — reason: Gemma responded normally across all 3 passes
+- D14 fallback: not triggered — reason: n/a
+- D14 provider route: n/a — reason: n/a
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted (0 findings requiring code change)
+
+### Reflection log
+
+Required passes: 3 (`RRI 55` → `Med-high`)
+
+#### Pass 1
+
+- **Draft verdict:** implementation complete against the frozen contract; migration applies clean, 8/8 new+pre-existing `p2p_publication_repo` tests pass, `check`/`fmt`/`clippy` all clean.
+- **Critique findings:**
+  - `record_sealed_k1`'s `NotFound`/`Conflict` discriminator reuses the same double-read pattern as `record_external_confirmation` — a `lineage_id` mismatch on an existing publication also correctly falls through to `Conflict`, consistent with the sibling, no additional test needed.
+  - `EC-T2e-2` (secret deny-list) has no dedicated executable test — verifiable by inspection: the function signature only accepts already-wrapped primitives (`&str`/`i32`/`&[u8]`), never derives or computes cryptographic material, same documented-structural-invariant pattern as T2d's `EC-T2d-1`.
+- **Revisions applied:** none — draft already satisfies the contract.
+
+#### Pass 2
+
+- **Draft verdict:** final read-through as an independent reviewer would, focused on fail-closed boundaries and side effects.
+- **Critique findings:**
+  - `COALESCE(sealed_at, $7)` correctly preserves the original `sealed_at` on an idempotent retry — confirmed by `hp_t2e_2`'s explicit assertion, not merely assumed.
+  - The new `CHECK` constraint mirrors the existing `external_publication_id`/`confirmed_lineage_id`/`external_confirmed_at` all-or-none pattern — same style, same DB-level guarantee (not application-only).
+  - No new column name collides with `ec_t1_schema_contains_no_forbidden_secret_fields`'s forbidden-field list (`kek`, `content_key`, etc.) — verified by name, not by luck (`sealed_kek_id`/`sealed_kek_version`/`sealed_nonce`/`sealed_wrapped_ck`/`sealed_at` are all distinct literal identifiers).
+  - No `PublicationState` transition logic changed — confirmed by reading the full diff; only `SELECT`/`RETURNING` column lists were extended.
+- **Revisions applied:** none.
+
+#### Pass 3
+
+- **Draft verdict:** final scope/traceability verification and phase-1/phase-2 finding disposition review.
+- **Critique findings:**
+  - Both phase-1 dispositions (major rejected with source-code evidence, minor accepted as C0-traceable clarification) are recorded with verifiable reasoning, not bare assertion.
+  - The ADR-038 route receipt is hash-bound to the exact packet (`f5dd82c...`) with no downgrade/upgrade — Muse Glimmer and the final route agree on `CLOUD_REQUIRED`, consistent with ADR-038 Section 6's literal text.
+  - Phase-2's one minor pass-specific finding was independently re-verified against the actual passing test (`hp_t2e_2`), not dismissed without evidence.
+  - Final diff: exactly the 3 `allowed_paths` frozen by C0 line 241, no scope violation.
+- **Revisions applied:** none.
+
+### Behavioral coverage certification
+
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| HP-T2e-1 | Happy path | first seal on a lineage persists all 5 K1 columns atomically | integration | `crates/db/tests/p2p_publication_repo.rs::hp_t2e_1_first_seal_persists_wrapped_k1_material_atomically` | passed |
+| HP-T2e-2 | Happy path | retry with identical sealed material is idempotent, preserves `sealed_at` | integration | `crates/db/tests/p2p_publication_repo.rs::hp_t2e_2_retry_with_identical_material_is_idempotent` | passed |
+| EC-T2e-1 | Edge case | retry with different sealed material fails closed with `Conflict` | integration | `crates/db/tests/p2p_publication_repo.rs::ec_t2e_1_retry_with_different_material_fails_closed` | passed |
+| EC-T2e-2 | Edge case | sealing a non-existent publication returns `NotFound`; no plaintext CK/raw KEK bytes cross the function boundary (structural, verified by signature inspection) | integration | `crates/db/tests/p2p_publication_repo.rs::ec_t2e_2_seal_on_missing_publication_returns_not_found` | passed |
+
+### Owner final verification
+
+- Owner: `Matias`
+- Date: `2026-09-07`
+- Statement: I verified every happy path and edge case defined for this task
+  (`HP-T2e-1`, `HP-T2e-2`, `EC-T2e-1`, `EC-T2e-2`) has executable evidence at
+  an appropriate layer that replicates the expected behavior.
+- Commands run: `cargo check -p dubbridge-db && cargo test -p dubbridge-db --
+  -- --test-threads=1 && cargo fmt -p dubbridge-db -- --check && cargo
+  clippy -p dubbridge-db --all-targets --all-features -- -D warnings`
+  (against local Postgres,
+  `DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@localhost:5432/dubbridge`)
+
+Status: **[x] Done 2026-09-07.**
 
 ### P2.T2a-i closure record — Done 2026-09-06
 
