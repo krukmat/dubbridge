@@ -1,3 +1,9 @@
+---
+type: ADR
+status: Accepted
+date: 2026-08-31
+---
+
 # ADR-045: Devstral Small 2 as the Moderate local implementer
 
 - **Status:** Accepted
