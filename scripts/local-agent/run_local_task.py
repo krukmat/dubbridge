@@ -117,10 +117,10 @@ COMMAND_TIMEOUT_SECONDS = session_loop.COMMAND_TIMEOUT_SECONDS
 
 # ADR-038 Amendment 3 permits a whole-task local route only for RRI 41-45
 # after a GO_LOCAL receipt. It uses the Moderate 30-turn/two-repair budget
-# but requires the Nemotron binding. RRI 46-55 remains cloud-only here; the
-# supervisor is the route authority and this runner rejects direct bypasses.
+# but requires the Devstral Small 2 binding. RRI 46-55 remains cloud-only here;
+# the supervisor is the route authority and this runner rejects direct bypasses.
 MED_HIGH_BAND_LABEL = "Med-high"
-MED_HIGH_REQUIRED_MODEL = "nemotron-3.5-lightning:30b-a3b-q4_K_M"
+MED_HIGH_REQUIRED_MODEL = "devstral-small-2:24b-instruct-2512-q4_K_M"
 MED_HIGH_RRI_MIN = 41
 MED_HIGH_LOCAL_RRI_MAX = 45
 MED_HIGH_RRI_MAX = 55
@@ -132,23 +132,11 @@ LOW_REQUIRED_MODEL = "qwen3.8:27b-mlx"
 # this workspace's largest source files while leaving room for the JSON
 # envelope around it.
 GENERATION_TOKEN_BUDGET = 8192
-# Originally set for qwen3.6:35b-a3b: its advertised context window
-# (`ollama show`) is 131072, but that full size measurably slowed
-# generation, so this was set explicitly to a smaller ceiling rather than
-# trusting Ollama's server-side default (smaller still, and would silently
-# truncate the model's view of the supplied full-file context on a long
-# session) or the full advertised window (slow in practice for this
-# workspace's task sizes). ADR-036 Amendment 2 (2026-08-11) rebound the
-# implementer to qwen3.6:27b-q4_K_M; Amendment 3 (2026-08-12) rebinds it again
-# to nemotron-3.5-lightning:30b-a3b-q4_K_M. This ceiling has not been
-# re-measured against either binding. Owner directive, 2026-08-12, sets the
-# Moderate/M operational ceiling to 64K: enough room for multi-turn tool
-# history and full-file reads without the 90K KV-cache allocation. Lowered
-# to 32K per owner directive, 2026-08-24: nemotron-3.5-lightning is memory-
-# constrained on this host, and 32K keeps the KV-cache allocation smaller
-# while still covering this runner's multi-turn tool history and full-file
-# reads for the workspace's task sizes.
-MODEL_CONTEXT_TOKENS = 32768
+# Devstral Small 2 uses a 128K normal local-implementer context baseline.
+# This deliberately removes the Nemotron-specific 32K operational ceiling:
+# use the available budget for relevant authorized context and reduce it only
+# after an observed resource/capacity symptom through the normal recovery path.
+MODEL_CONTEXT_TOKENS = 131072
 
 # TOOL_CALLING_SYSTEM_PROMPT and TOOL_CALL_JSON_SCHEMA moved to cli.py in
 # LRPC-0b (chat-transport/tool-contract concerns, alongside build_live_chat_fn
@@ -286,8 +274,8 @@ def default_local_agent_model(card):
     """Resolve the default only after reading the task card.
 
     Low cards retain Qwen. Moderate cards and ADR-038's permitted 41-45
-    GO_LOCAL route use Nemotron; callers can still request an explicit model,
-    subject to the Med-high exact-binding check below.
+    GO_LOCAL route use Devstral Small 2; callers can still request an explicit
+    model, subject to the Med-high exact-binding check below.
     """
     rri = _rri(card)
     if rri is not None and rri <= LOW_RRI_MAX:
@@ -299,7 +287,7 @@ def resolve_effective_limits(card):
     """Resolve the permitted whole-task local route's limits.
 
     Moderate and a receipt-authorized RRI 41-45 card share the 30-turn,
-    two-repair budget. The latter additionally pins the Nemotron tag.
+    two-repair budget. The latter additionally pins the Devstral Small 2 tag.
     """
     if _is_architect_refined_local(card):
         return EffectiveLimits(

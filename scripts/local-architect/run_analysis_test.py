@@ -465,7 +465,7 @@ class MedHighRefinementProfileTest(unittest.TestCase):
 
 class ParseArgsDefaultsTest(unittest.TestCase):
     """ADR-037 Amendment 1 (T4b): --model-tag / --expected-model-digest
-    defaults must resolve to Muse Glimmer's tag and its paired digest --
+    defaults must resolve to Qwen3.6 27B's tag and its paired digest --
     a stale pairing would fail_closed on model_digest_mismatch for every
     default-args invocation."""
 
@@ -480,12 +480,12 @@ class ParseArgsDefaultsTest(unittest.TestCase):
         with unittest.mock.patch.object(sys, "argv", argv):
             return _MOD.parse_args()
 
-    def test_hp1_model_tag_and_digest_defaults_resolve_to_muse_glimmer(self) -> None:
+    def test_hp1_model_tag_and_digest_defaults_resolve_to_gpt_oss(self) -> None:
         config = self._parse([])
-        self.assertEqual(config.model_tag, "muse-glimmer:30b-q4_K_M")
+        self.assertEqual(config.model_tag, "qwen3.6:27b-q4_K_M")
         self.assertEqual(
             config.expected_model_digest,
-            "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+            "3a40c32f1450b8380412898385b0e00df5d6d2d801dd192ca1acb7e735cd050e",
         )
 
     def test_ec1_explicit_model_tag_and_digest_override_the_new_default(self) -> None:

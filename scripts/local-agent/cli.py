@@ -25,7 +25,7 @@ from rust_toolchain import build_default_boundary, build_default_formatter
 from runner_file_tools import ALLOWED_TOOL_NAMES, RunnerFileTools
 from session_loop import BoundaryViolation, MalformedToolCall, run_loop
 
-_DEFAULT_MODEL_CONTEXT_TOKENS = 32768
+_DEFAULT_MODEL_CONTEXT_TOKENS = 131072
 _DEFAULT_GENERATION_TOKEN_BUDGET = 8192
 
 _TOOL_CALLING_OUTPUT_FORMAT_TEXT = """\

@@ -240,7 +240,7 @@ class TestRunCrossVendorReview(unittest.TestCase):
 
 class TestRunQwenBandReview(unittest.TestCase):
     """ADR-036 Amendment 2 (T4b): the RRI 26-55 chain is Gemma primary ->
-    Muse Glimmer fallback -> D14. Flag/attribute names keep the historical
+    GPT-OSS 20B fallback -> D14. Flag/attribute names keep the historical
     "qwen" spelling for CLI/env-var/test-mock stability; qwen_model's real
     default value is Gemma's tag, not qwen3.6:27b-q4_K_M."""
 
@@ -261,22 +261,22 @@ class TestRunQwenBandReview(unittest.TestCase):
     def test_returns_qwen_result_when_primary_succeeds(self):
         qwen_result = {"reviewer": "gemma4:26b-a4b-it-qat", "verdict": "pass", "summary": "ok", "findings": []}
         with patch.object(_mod, "_run_qwen_with_retry", return_value=(qwen_result, None)), \
-             patch.object(_mod, "_run_muse_glimmer_fallback") as glimmer_fallback:
+             patch.object(_mod, "_run_gpt_oss_fallback") as glimmer_fallback:
             result = _mod.run_qwen_band_review("packet", "task", self._args())
         self.assertEqual(result["reviewer"], "gemma4:26b-a4b-it-qat")
         glimmer_fallback.assert_not_called()
 
-    def test_falls_back_to_muse_glimmer_after_gemma_failure(self):
-        glimmer_result = {"reviewer": "muse-glimmer:30b-q4_K_M", "verdict": "pass", "summary": "ok", "findings": []}
+    def test_falls_back_to_gpt_oss_after_gemma_failure(self):
+        glimmer_result = {"reviewer": "gpt-oss:20b", "verdict": "pass", "summary": "ok", "findings": []}
         with patch.object(_mod, "_run_qwen_with_retry", return_value=(None, "length")), \
-             patch.object(_mod, "_run_muse_glimmer_fallback", return_value=(glimmer_result, None)):
+             patch.object(_mod, "_run_gpt_oss_fallback", return_value=(glimmer_result, None)):
             result = _mod.run_qwen_band_review("packet", "task", self._args())
-        self.assertEqual(result["reviewer"], "muse-glimmer:30b-q4_K_M")
+        self.assertEqual(result["reviewer"], "gpt-oss:20b")
 
-    def test_returns_d14_signal_when_gemma_and_muse_glimmer_fail(self):
+    def test_returns_d14_signal_when_gemma_and_gpt_oss_fail(self):
         d14 = {"reviewer": "d14", "verdict": "d14_required", "summary": "stub", "findings": [], "d14_packet": {}}
         with patch.object(_mod, "_run_qwen_with_retry", return_value=(None, "gemma failed")), \
-             patch.object(_mod, "_run_muse_glimmer_fallback", return_value=(None, "muse-glimmer failed")), \
+             patch.object(_mod, "_run_gpt_oss_fallback", return_value=(None, "gpt-oss failed")), \
              patch.object(_mod, "run_d14_fallback", return_value=d14):
             result = _mod.run_qwen_band_review("packet", "task", self._args())
         self.assertEqual(result["reviewer"], "d14")
@@ -330,6 +330,13 @@ class TestD14FallbackSelection(unittest.TestCase):
             patch.object(_mod.gemma_local, "read_packet", return_value="content"),
         ]
         if rri <= 25:
+            patches.append(
+                patch.object(
+                    _mod,
+                    "_run_gpt_oss_review",
+                    return_value=(None, "gpt-oss unavailable"),
+                )
+            )
             patches.append(
                 patch.object(
                     _mod,

@@ -27,6 +27,11 @@ trail. Adding a row here is part of the same change that alters a rule.
 | 2026-08-11 | Local Architect / Complex Analyst (ADR-037) | `qwen3.6:27b-q4_K_M` | `muse-glimmer:30b-q4_K_M` | ADR-037 Amendment 1; role no longer doubles as a phase-1/phase-2 reviewer in any band |
 | 2026-08-16 (ADR-036 Amendments 3/4/7) | RRI 0–25 and RRI 26–40 local implementer | `nemotron-3.5-lightning:30b-a3b-q4_K_M` | `qwen3.8:27b-mlx` | Both bands share one implementer model family |
 | 2026-08-24 | RRI 26–40, RRI 41–45 after `GO_LOCAL`, and ADR-040 local tramos | `qwen3.8:27b-mlx` | `nemotron-3.5-lightning:30b-a3b-q4_K_M` | Owner-authorized routing correction; Low remains Qwen and RRI 46–55 whole-task routing remains cloud-only |
+| 2026-08-31 (ADR-045) | RRI 26–40, RRI 41–45 after `GO_LOCAL`, and ADR-040 local tramos | `nemotron-3.5-lightning:30b-a3b-q4_K_M` | `devstral-small-2:24b-instruct-2512-q4_K_M` | Replace the active Moderate/authorized Med-high implementer binding and restore a 128K (`131072`) normal context baseline; Low remains Qwen and RRI 46–55 whole-task routing remains cloud-only |
+| 2026-08-31 (ADR-046) | RRI 0–25 phase-1/phase-2 reviewer | Muse Glimmer (`muse-glimmer:30b-q4_K_M`) | `gpt-oss:20b` (64K, medium reasoning), Gemma intermediate fallback | Retire Muse from the active review stack while preserving independent evidence-backed review |
+| 2026-08-31 (ADR-046) | RRI 26–55 phase-1/phase-2 reviewer | Gemma primary, Muse Glimmer intermediate fallback | Gemma primary, `gpt-oss:20b` (64K, medium reasoning) intermediate fallback | Retire Muse from the active review stack while retaining reviewer diversity |
+| 2026-08-31 (ADR-046) | Local Architect / Complex Analyst | `muse-glimmer:30b-q4_K_M` | `qwen3.6:27b-q4_K_M` (64K, `think=false`) | Move architecture analysis to a 27B Qwen profile with lower memory pressure on 32GB Apple Silicon |
+| 2026-08-31 (ADR-043) | RRI 26–40, RRI 41–45 after `GO_LOCAL`, and ADR-040 local tramos | `nemotron-3.5-lightning:30b-a3b-q4_K_M` | `devstral-small-2:24b-instruct-2512-q4_K_M` | Replace the active Moderate/authorized Med-high implementer binding and restore a 128K (`131072`) normal context baseline; Low remains Qwen and RRI 46–55 whole-task routing remains cloud-only |
 
 ## Routing and process directives
 
@@ -53,3 +58,4 @@ trail. Adding a row here is part of the same change that alters a rule.
 | Path | Outcome | Reference |
 |---|---|---|
 | Local-agent Serena / semantic-tool editing surface | Never produced a successful edit; replaced by the `write_file` / `apply_patch` / `finish` tool contract | `docs/plan/local-agent-simple-editing.md` |
+| 2026-08-31 | Active local stack rebinding | Reviewer slots previously held by Muse Glimmer -> `gpt-oss:20b` (64K, medium reasoning); Local Architect / Complex Analyst -> `qwen3.6:27b-q4_K_M` (64K, think=false). Muse Glimmer retired from the active stack; historical rows retained. |

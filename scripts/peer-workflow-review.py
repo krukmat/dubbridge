@@ -8,17 +8,17 @@ Implements the review contract defined in docs/plan/portable-peer-review-gate.md
 
 Reviewer is resolved from the task's RRI band:
   RRI 0-25   (Low)                  -> Gemma (local Ollama)
-  RRI 26-55  (Moderate + Med-high)  -> gemma4:26b-a4b-it-qat, muse-glimmer fallback, D14
+  RRI 26-55  (Moderate + Med-high)  -> gemma4:26b-a4b-it-qat, gpt-oss fallback, D14
   RRI 56+    (Complex+)             -> cross-vendor peer, with D14 fallback
 
 ADR-036 Amendment 2 / owner directive 2026-08-11: the RRI 26-55 primary
 reviewer reverted from qwen3.6:27b-q4_K_M (now the local implementer) to
-Gemma, with Muse Glimmer as the intermediate fallback before D14. The
+Gemma, with GPT-OSS 20B as the intermediate fallback before D14. The
 "qwen" names below (DEFAULT_QWEN_REVIEW_MODEL, --qwen-model,
 run_qwen_band_review, _run_qwen_with_retry) are retained for CLI-flag,
 env-var, and test-mock stability; their bound VALUE is Gemma's tag, not
 qwen3.6:27b-q4_K_M. The Low-band (RRI 0-25) Gemma-only path below predates
-the separate 2026-08-11 Low-band Muse-Glimmer-primary directive and is not
+the separate 2026-08-11 Low-band GPT-OSS-primary directive and is not
 in T4b's scope (see docs/tasks/local-model-stack-restructure-2026-08.md
 T4b completion record for the explicit judgment call).
 
@@ -133,8 +133,9 @@ def _gemma_system_prompt(phase: str) -> str:
         )
     return (
         "You are a read-only code-solution reviewer for DubBridge. "
-        "Review the supplied diff and acceptance criteria for correctness, "
-        "fail-closed behavior, missing tests, and side effects.\n"
+        "Review only the supplied diff and acceptance criteria for correctness, "
+        "fail-closed behavior, missing tests, and side effects. Every finding must be supported "
+        "by supplied code evidence; do not infer unseen files or behavior.\n"
         "Return ONLY tagged text in this exact shape:\n"
         "STATUS: PASS\n"
         "SUMMARY: short review summary\n"
@@ -166,8 +167,9 @@ def _local_structured_system_prompt(phase: str) -> str:
         )
     return (
         "You are a read-only code-solution reviewer for DubBridge. "
-        "Review the supplied diff and acceptance criteria for correctness, "
-        "fail-closed behavior, missing tests, and side effects.\n"
+        "Review only the supplied diff and acceptance criteria for correctness, "
+        "fail-closed behavior, missing tests, and side effects. Every finding must be supported "
+        "by supplied code evidence; do not infer unseen files or behavior.\n"
         "Return EXACTLY this shape:\n"
         "VERDICT: PASS|FINDINGS|BLOCKED\n"
         "SUMMARY: <one line>\n"
@@ -294,48 +296,56 @@ def _run_gemma_fallback(packet: str, phase: str, args) -> Tuple[Optional[dict], 
     return None, last_error or "gemma reviewer unavailable"
 
 
-def _run_muse_glimmer_fallback(packet: str, phase: str, args) -> Tuple[Optional[dict], Optional[str]]:
-    """RRI 26-55 band intermediate fallback (owner directive 2026-08-11):
-    Muse Glimmer, invoked when the Gemma primary (still resolved through the
-    "qwen"-named args.qwen_model / DEFAULT_QWEN_REVIEW_MODEL for CLI/test
-    stability) is unavailable, stalled, or returns invalid/BLOCKED output."""
+def _run_gpt_oss_review(
+    packet: str, phase: str, args, *, unload_first_model: str | None = None
+) -> Tuple[Optional[dict], Optional[str]]:
+    """Run GPT-OSS 20B with the evidence-bound 64K/medium reviewer profile."""
+    review_args = argparse.Namespace(**vars(args))
+    review_args.num_ctx = gemma_local.DEFAULT_REVIEW_NUM_CTX
+    review_args.temperature = 0.0
+    review_args.think = gemma_local.DEFAULT_REVIEW_REASONING_EFFORT
+    if unload_first_model:
+        gemma_local.unload_model(args.host, unload_first_model, args.idle_timeout)
     last_error = None
     for _ in range(2):
         try:
             result = run_local_structured_review(
-                packet,
-                phase,
-                args,
+                packet, phase, review_args,
                 model=gemma_local.DEFAULT_REVIEW_MODEL,
                 reviewer=gemma_local.DEFAULT_REVIEW_MODEL,
             )
         except (gemma_local.GemmaIdleTimeout, gemma_local.GemmaWallTimeout, RuntimeError) as exc:
             last_error = str(exc)
+            gemma_local.unload_model(args.host, gemma_local.DEFAULT_REVIEW_MODEL, args.idle_timeout)
             continue
+        gemma_local.unload_model(args.host, gemma_local.DEFAULT_REVIEW_MODEL, args.idle_timeout)
         if result["verdict"] == "blocked":
-            last_error = "muse-glimmer reviewer returned BLOCKED"
+            last_error = "gpt-oss reviewer returned BLOCKED"
             continue
         return result, None
-    return None, last_error or "muse-glimmer reviewer unavailable"
+    return None, last_error or "gpt-oss reviewer unavailable"
+
+
+def _run_gpt_oss_fallback(packet: str, phase: str, args) -> Tuple[Optional[dict], Optional[str]]:
+    return _run_gpt_oss_review(packet, phase, args, unload_first_model=args.qwen_model)
 
 
 def run_qwen_band_review(content: str, phase: str, args) -> dict:
     packet = _build_peer_packet(phase, content, args.task_id)
-    qwen_result, qwen_error = _run_qwen_with_retry(packet, phase, args, args.qwen_model)
-    if qwen_result is not None:
-        return qwen_result
+    primary_result, primary_error = _run_qwen_with_retry(packet, phase, args, args.qwen_model)
+    if primary_result is not None:
+        return primary_result
 
-    print(f"[peer-review] gemma (26-55 primary) fallback triggered: {qwen_error}", file=sys.stderr)
-    glimmer_result, glimmer_error = _run_muse_glimmer_fallback(packet, phase, args)
-    if glimmer_result is not None:
-        return glimmer_result
+    print(f"[peer-review] gemma (26-55 primary) second reviewer triggered: {primary_error}", file=sys.stderr)
+    second_result, second_error = _run_gpt_oss_fallback(packet, phase, args)
+    if second_result is not None:
+        return second_result
 
-    print(f"[peer-review] muse-glimmer fallback failed: {glimmer_error}", file=sys.stderr)
+    print(f"[peer-review] gpt-oss second reviewer failed: {second_error}", file=sys.stderr)
     d14_result = run_d14_fallback(packet, phase, DEFAULT_QWEN_REVIEW_MODEL)
     d14_result["summary"] = (
-        f"gemma (26-55 primary) unavailable/invalid ({qwen_error}); "
-        f"muse-glimmer unavailable/invalid ({glimmer_error}); "
-        "D14 adjudication required."
+        f"gemma (26-55 primary) unavailable/invalid ({primary_error}); "
+        f"gpt-oss unavailable/invalid ({second_error}); D14 adjudication required."
     )
     return d14_result
 
@@ -635,7 +645,7 @@ def parse_args():
     parser.add_argument(
         "--model",
         default=os.environ.get(
-            "DUBBRIDGE_REVIEW_MODEL",
+            "DUBBRIDGE_GEMMA_REVIEW_MODEL",
             os.environ.get("DUBBRIDGE_LOW_RRI_MODEL", gemma_local.DEFAULT_MODEL),
         ),
         help="Gemma model for the Low-band path and Gemma fallback.",
@@ -699,7 +709,7 @@ def main() -> int:
     band = resolve_band(args.rri)
     cross_vendor = needs_cross_vendor(args.rri)
     qwen_band = needs_local_qwen_review(args.rri)
-    peer = resolve_peer(args.caller) if cross_vendor else (DEFAULT_QWEN_REVIEW_MODEL if qwen_band else "gemma")
+    peer = resolve_peer(args.caller) if cross_vendor else (DEFAULT_QWEN_REVIEW_MODEL if qwen_band else gemma_local.DEFAULT_REVIEW_MODEL)
     artifact = args.artifact or default_artifact_path(args.task_id, args.phase)
 
     print(
@@ -741,16 +751,19 @@ def main() -> int:
         print(f"[peer-review] verdict={verdict.upper()} artifact={artifact}", file=sys.stderr)
         return review_exit_code(verdict)
 
-    # Gemma band (RRI 0-25). A fully unusable local chain reaches the same
-    # packet-bound D14 selection checkpoint as every other band.
-    result, gemma_error = _run_gemma_fallback(content, args.phase, args)
+    # Low band (RRI 0-25): GPT-OSS primary -> Gemma fallback -> D14.
+    packet = _build_peer_packet(args.phase, content, args.task_id)
+    result, gpt_error = _run_gpt_oss_review(packet, args.phase, args)
     if result is None:
-        packet = _build_peer_packet(args.phase, content, args.task_id)
-        d14_result = run_d14_fallback(packet, args.phase, "gemma")
-        d14_result["summary"] = (
-            f"Gemma unavailable/invalid ({gemma_error}); D14 adjudication required."
-        )
-        return handle_d14_fallback(d14_result, args, artifact)
+        result, gemma_error = _run_gemma_fallback(content, args.phase, args)
+        if result is None:
+            d14_result = run_d14_fallback(packet, args.phase, gemma_local.DEFAULT_REVIEW_MODEL)
+            d14_result["summary"] = (
+                f"gpt-oss unavailable/invalid ({gpt_error}); "
+                f"Gemma unavailable/invalid ({gemma_error}); D14 adjudication required."
+            )
+            return handle_d14_fallback(d14_result, args, artifact)
+
 
     write_artifact(result, artifact)
     verdict = result["verdict"]

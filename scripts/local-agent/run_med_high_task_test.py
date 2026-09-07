@@ -13,7 +13,7 @@ import med_high_gate
 import run_med_high_task as _MOD
 
 CARD_HASH = "a" * 64
-_RECEIPT_SHA = "31d923290a7ec004229a8ca7407af072b1de021aeff1ed97fe7bee9eb39befa2"
+_RECEIPT_SHA = "5f4f97e0703e24ba083fcf764bb874d9ffcb583581cd340e83ffe68e9c450523"
 
 # Captured after T1, T2, and T4 have all landed (plan D4): covers T4's schema
 # change (new "8. Acceptance tests" section, sections 8-11 renumbered to
@@ -72,7 +72,7 @@ MISSING
   "model": {{
     "expected_digest": "sha256:deadbeef",
     "resolved_digest": "sha256:deadbeef",
-    "tag": "muse-glimmer:30b-q4_K_M"
+    "tag": "qwen3.6:27b-q4_K_M"
   }},
   "packet": {{
     "sha256": "{CARD_HASH}"
@@ -930,7 +930,7 @@ class SuperviseIntegrationTest(unittest.TestCase):
         _write_json(p_path, receipt)
         return r_path, p_path
 
-    def test_hp1_rri_41_45_go_local_launches_nemotron_runner(self):
+    def test_hp1_rri_41_45_go_local_launches_devstral_runner(self):
         card_path = _card(self.tmp.name)
         out_path = os.path.join(self.tmp.name, "out.json")
         bundle_path = os.path.join(self.tmp.name, "bundle.md")
@@ -952,7 +952,7 @@ class SuperviseIntegrationTest(unittest.TestCase):
         self.assertIsNone(result.bundle_path)
         self.assertEqual(
             runner.call_args.kwargs["model"],
-            "nemotron-3.5-lightning:30b-a3b-q4_K_M",
+            "devstral-small-2:24b-instruct-2512-q4_K_M",
         )
 
     def test_hp1_go_local_is_policy_excluded_and_never_launches_runner(self):
@@ -1018,7 +1018,7 @@ class SuperviseIntegrationTest(unittest.TestCase):
         r_path, p_path = self._write_gate_inputs("CLOUD_REQUIRED", "GO_LOCAL")
 
         def fake_popen(argv, start_new_session=None):
-            self.fail("Qwen35 must not be launched when the route is CLOUD_REQUIRED")
+            self.fail("local runner must not be launched when the route is CLOUD_REQUIRED")
 
         result = _MOD.supervise(
             card_path=card_path, worktree=self.tmp.name, out_path=out_path,

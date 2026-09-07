@@ -49,7 +49,7 @@ curl -s http://127.0.0.1:11434/api/chat -d '{
 ```
 
 Use the role's effective production context: `65536` for the Low/S Qwen Developer
-delegation wrapper, `65536` for the Moderate/M local-agent runner, and the
+delegation wrapper, `131072` for the Moderate/M Devstral local-agent runner, and the
 configured reviewer context for review roles. A `"length"` result with empty
 content on a small ping (e.g. `num_predict: 16`) is usually just an undersized
 budget, not the real failure — retry at the production `num_predict` before

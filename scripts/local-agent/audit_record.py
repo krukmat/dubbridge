@@ -169,7 +169,7 @@ def build_attempt_bundles(card, result, model, session_start, session_end):
         bundles.append(
             {
                 "capsule_hash": card.capsule_hash,
-                "implementer_id": "nemotron",
+                "implementer_id": "devstral",
                 "model_tag": model,
                 "start_ts": session_start.isoformat().replace("+00:00", "Z"),
                 "end_ts": session_end.isoformat().replace("+00:00", "Z"),
