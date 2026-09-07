@@ -453,7 +453,7 @@ same local-first path as 26–40 Moderate instead of cloud.
 
 ```mermaid
 flowchart LR
-    Card["Approved Med-high card\n(RRI 41-55)"] --> Glimmer["Qwen3.6 27B advisory refinement\ngpt-oss:20b"]
+    Card["Approved Med-high card\n(RRI 41-55)"] --> Glimmer["Qwen3.6 27B advisory refinement\nqwen3.6:27b-q4_K_M"]
     Glimmer -->|GO_LOCAL or CLOUD_REQUIRED| Receipt["Primary hash-bound\nroute receipt"]
     Receipt -->|"downgrade allowed;\nupgrade never allowed"| Gate{"med_high_gate.py\nboth sides GO_LOCAL?"}
     Gate -->|CLOUD_REQUIRED| Decompose46["46-55: attempt Low-band\ndecomposition first (Amendment 4)"]
@@ -464,7 +464,7 @@ flowchart LR
 ```
 
 Implementation surfaces: `scripts/local-architect/run_analysis.py`
-(`med-high-refinement-v1` profile) for the GPT-OSS 20B artifact,
+(`med-high-refinement-v1` profile) for the Qwen3.6 27B artifact,
 `scripts/local-agent/med_high_gate.py` for the fail-closed route decision,
 `scripts/local-agent/run_med_high_task.py` for automatic cloud-evidence-bundle
 emission on every `CLOUD_REQUIRED` or 46–55 `GO_LOCAL` result that survives
@@ -1451,7 +1451,7 @@ evidence gate (artifact-or-override, all bands)`.
 
 ## Local Architect / Complex Analyst (ADR-037)
 
-**Local Architect / Complex Analyst** (`gpt-oss:20b` via Ollama,
+**Local Architect / Complex Analyst** (`qwen3.6:27b-q4_K_M` via Ollama,
 per ADR-037) is a bounded, advisory-only role for architecture synthesis and
 complex causal analysis on a real work item, invoked before the primary
 agent authors the target ADR/plan/tasks. It is not an implementer, not a

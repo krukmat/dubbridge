@@ -170,7 +170,7 @@ ADR-038 governs routing for final **RRI 41–55**. The approval gate is
 standard; band-resolved independent review (phases 1 and 2) and 3 Reflection
 passes apply.
 
-Route: Muse Glimmer advisory refinement (`GO_LOCAL`|`CLOUD_REQUIRED`) →
+Route: GPT-OSS 20B advisory refinement (`GO_LOCAL`|`CLOUD_REQUIRED`) →
 primary agent's hash-bound route receipt (may downgrade, never upgrade). For
 **RRI 46–55**, every result (including `GO_LOCAL`) first goes through the
 Amendment 4 Low-band decomposition attempt above (§ Post-repair-budget
@@ -180,7 +180,7 @@ module qualified under ADR-040 per-module split routing (below). For **RRI
 41–45** (ADR-038 Amendment 3, 2026-08-23), a `GO_LOCAL` result instead
 routes the whole task through the Moderate local-first path (§ Local-first
 implementation above) — `CLOUD_REQUIRED` still escalates to cloud in both
-sub-bands. Hard exclusions from `GO_LOCAL` regardless of Muse Glimmer's
+sub-bands. Hard exclusions from `GO_LOCAL` regardless of GPT-OSS 20B's
 recommendation, unchanged for both sub-bands: auth/security, rights/consent/
 governance invariants, schema/migrations/release cuts, unresolved ADR
 decisions, unbounded scope (ADR-038 §6). Full route, implementation
@@ -258,8 +258,8 @@ checks.
 
 Every development task is reviewed at two phases, resolved from RRI band:
 
-- **RRI 0–25 (Low):** Muse Glimmer primary, Gemma intermediate, D14 final.
-- **RRI 26–55 (Moderate + Med-high):** Gemma primary, Muse Glimmer
+- **RRI 0–25 (Low):** GPT-OSS 20B primary, Gemma intermediate, D14 final.
+- **RRI 26–55 (Moderate + Med-high):** Gemma primary, GPT-OSS 20B
   intermediate, D14 final.
 - **RRI 56+ (Complex+):** cross-vendor peer (replaces Gemma), D14 fallback.
 
@@ -280,7 +280,7 @@ Mandatory for every development task regardless of band; no path may be
 skipped, and reviewer unavailability never opens a human approval gate
 beyond what the RRI band already requires. Trigger conditions, retry
 discipline, and current fallback chains:
-`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer / Muse Glimmer
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer / GPT-OSS 20B
 Reviewer § Availability`.
 
 ## Reviewability budget escape

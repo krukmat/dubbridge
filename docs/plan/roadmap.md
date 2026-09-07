@@ -318,16 +318,21 @@ captured above under Governing principles and ADR-025/ADR-026.
 - Full historical detail behind every closed gap above (the S-090 replan, X22–X24
   ADR closures, the S-200/ADR-031 mobile-auth decision, etc.):
   `docs/audit/roadmap-history.md`.
-- **Nemotron → Devstral local-implementer migration (not scheduled):** a
-  prepared migration bundle exists at
-  `pending/dubbridge_devstral_main_migration/` to replace
-  `nemotron-3.5-lightning:30b-a3b-q4_K_M` with
-  `devstral-small-2:24b-instruct-2512-q4_K_M` as the RRI 26–40 (and
-  `GO_LOCAL`-authorized 41–45) local implementer, and raise its context
-  baseline from 32K to 128K tokens. Locked decisions, scope, and the
-  deterministic substitution helper are in the bundle's `00_README.md`,
-  `01_AGENT_EXECUTION_INSTRUCTIONS.md`, and `02_CHANGE_MATRIX.md`. Explicitly
-  deferred — do not apply now; the owner will schedule this separately.
+- **Nemotron → Devstral local-implementer migration — done:** merged
+  2026-09-07 (PR #9, `feat/devstral-128k-migration` → `feature/p2p-mvp-core`,
+  `ffd7b88`). `ADR-045-devstral-local-implementer-binding.md` (Accepted,
+  2026-08-31) rebinds the RRI 26–45 (and `GO_LOCAL`-authorized 41–45) local
+  implementer from `nemotron-3.5-lightning:30b-a3b-q4_K_M` to
+  `devstral-small-2:24b-instruct-2512-q4_K_M` and raises the context baseline
+  from 32K to 128K tokens (`scripts/local-agent/run_local_task.py`,
+  `scripts/local-agent/cli.py`). The same merge landed
+  `ADR-046-local-model-reviewer-and-architect-rebinding.md`, retiring
+  Muse Glimmer from the active local reviewer/Architect stack in favor of
+  `gpt-oss:20b` (`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` §§ "Local-model
+  role bindings", "Band-routed peer review", "Local Architect / Complex
+  Analyst"). The `pending/dubbridge_devstral_main_migration/` bundle predates
+  this merge and was not the vehicle applied — its contents are stale and
+  can be removed once confirmed superseded.
 
 ## Related
 
