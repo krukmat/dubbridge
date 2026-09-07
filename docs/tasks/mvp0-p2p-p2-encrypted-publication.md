@@ -489,6 +489,303 @@ Code-solution review: muse-glimmer (`.agent/local-agent-p2-t2c/phase2-result.jso
 **EC-T2-2:** retry of the same lineage never creates a second CK/package or re-encrypts opportunistically.  
 **EC-T2-3:** logs/errors/audit/AN payloads never reveal plaintext CK/KEK/media plaintext.
 
+### P2.T2d — design (frozen before delegation, 2026-09-07)
+
+**Objective:** a pure (no DB/IO/storage/network) module providing (1)
+generate-once CSPRNG 256-bit content-key (CK) generation, (2) versioned
+key-encryption-key (KEK) wrap/unwrap of that CK, and (3) best-effort memory
+zeroization of plaintext CK material after use — implementing the
+already-owner-approved key-custody scheme frozen at P2.C0 (`docs/audit/
+mvp0-p2p-p2-c0-contract-freeze.md` § 2 "Generate-once CK" / "Versioned KEK"),
+not a new cryptographic design choice.
+
+- **In scope:** `crates/p2p/src/key_wrap.rs` (new), `pub mod key_wrap;` in
+  `crates/p2p/src/lib.rs`, `zeroize` crate dependency added to
+  `crates/p2p/Cargo.toml` (RustCrypto-family, same ecosystem as the
+  already-used `aes-gcm`/`sha2`). Wrap/unwrap reuses AES-256-GCM (via
+  `aes_gcm::Aes256Gcm`, already a dependency from `T2c`) with a
+  domain-separated AAD (`"p2p-kek-wrap-v1"` concatenated with `kek_id` and
+  `kek_version` — see **Contract** below, revised after phase-1 review)
+  distinct from the per-file `p2p-aad-v1` used by `crypto.rs`, so a
+  wrapped-CK blob can never be mistaken for or replayed as a file
+  ciphertext, and its `kek_id`/`kek_version` metadata is itself
+  cryptographically authenticated.
+- **Out of scope:** resolving actual KEK bytes from the backend secret
+  boundary (env var / secret-store lookup) — this leaf accepts already-loaded
+  KEK bytes plus their `kek_id`/`kek_version` as caller-supplied parameters,
+  matching `T2c`'s pattern of staying pure and pushing IO/secret-resolution to
+  the caller (a later T2e/T2f or a dedicated config-boundary leaf, not yet
+  scoped); KEK rotation/re-wrap maintenance flow (explicitly deferred by C0);
+  persistence of wrapped-CK/`kek_version` metadata (`T2e`).
+- **Contract:**
+  ```rust
+  pub struct WrappedKey {
+      pub kek_id: String,
+      pub kek_version: u32,
+      pub nonce: [u8; 12],       // 96-bit CSPRNG nonce, unique per wrap call
+      pub ciphertext: Vec<u8>,   // AES-256-GCM output (wrapped CK + 16-byte tag)
+  }
+
+  #[derive(Debug)]
+  pub enum KeyWrapError {
+      InvalidKeyLength,          // KEK is not exactly 32 bytes
+      WrapFailed,                // AEAD crate reported failure on wrap
+      UnwrapFailed,               // AEAD crate reported failure on unwrap (bad KEK, tampered ciphertext, or KEK/version mismatch)
+  }
+
+  /// CSPRNG-generates a fresh 256-bit CK. Caller is responsible for wrapping
+  /// it (`wrap_ck`) before the lineage is sealed and for zeroizing the
+  /// plaintext CK once it is no longer needed (this function returns a
+  /// `Zeroizing<[u8; 32]>` so drop-time zeroization is automatic).
+  pub fn generate_ck() -> zeroize::Zeroizing<[u8; 32]>;
+
+  pub fn wrap_ck(
+      ck: &[u8; 32],
+      kek: &[u8; 32],
+      kek_id: &str,
+      kek_version: u32,
+  ) -> Result<WrappedKey, KeyWrapError>;
+
+  pub fn unwrap_ck(
+      wrapped: &WrappedKey,
+      kek: &[u8; 32],
+  ) -> Result<zeroize::Zeroizing<[u8; 32]>, KeyWrapError>;
+  ```
+  `generate_ck` uses the OS CSPRNG (mirrors `T2c`'s
+  `Aes256Gcm::generate_nonce`/`OsRng` pattern) and returns a `Zeroizing`
+  wrapper (from the `zeroize` crate) so the plaintext CK is automatically
+  overwritten with zeros when it goes out of scope — the mechanical
+  enforcement of C0's "best-effort memory zeroization after encryption/wrap
+  use" requirement, not a manual `zeroize()` call a future caller could forget.
+  `wrap_ck`/`unwrap_ck` mirror `crypto.rs::encrypt_file`'s exact AEAD call
+  shape (fresh CSPRNG nonce per wrap, `Payload { msg, aad }`). **Revised after
+  phase-1 review (see below): the AAD is not only the domain-separation
+  literal** — it is `"p2p-kek-wrap-v1"` concatenated with `kek_id` and the
+  decimal `kek_version`, in a fixed delimited format (e.g.
+  `format!("p2p-kek-wrap-v1|{kek_id}|{kek_version}")`), so `kek_id`/
+  `kek_version` are cryptographically authenticated as part of the wrap, not
+  left as unauthenticated metadata on `WrappedKey`. `unwrap_ck` reconstructs
+  the same AAD string from `wrapped.kek_id`/`wrapped.kek_version` before
+  calling AEAD decrypt — this means a `WrappedKey` whose `kek_id`/
+  `kek_version` fields were tampered with (independent of the KEK bytes
+  matching) now fails GCM authentication, closing the key-confusion gap
+  identified below. `unwrap_ck` still does not decide *which* KEK the caller
+  should supply for a given `wrapped.kek_id`/`kek_version` — the C0 rule that
+  "retry uses the lineage's persisted KEK version; it never silently upgrades
+  to the active version" remains a **caller-side KEK-resolution policy**, out
+  of scope for this pure primitive (same seam as `T2c` pushing nonce-reuse
+  bookkeeping to its caller) — but once the caller supplies a KEK, this
+  primitive now authenticates that the metadata the caller believes it's
+  unwrapping under actually matches what was wrapped.
+
+**HP-T2d-1:** `generate_ck()` returns 256 bits of CSPRNG material; two calls
+produce different CKs (proves "generate-once" is enforced by the caller
+invoking this once per lineage, not by hidden internal memoization — this
+function has no lineage concept).
+**HP-T2d-2:** `wrap_ck` + `unwrap_ck` round-trip: a CK wrapped under a given
+KEK/`kek_id`/`kek_version` and then unwrapped with the same KEK recovers the
+exact original CK bytes.
+**HP-T2d-3:** two `wrap_ck` calls with the identical CK/KEK produce different
+nonces and different ciphertexts (CSPRNG-nonce-per-call invariant, same shape
+as `HP-T2c-2`).
+**EC-T2d-1:** a KEK slice that is not exactly 32 bytes -> `Err(InvalidKeyLength)`
+on `wrap_ck`, never a panic or silent truncation/padding — documented
+unreachable at the type level the same way as `EC-T2c-1` if the signature
+uses `&[u8; 32]`.
+**EC-T2d-2:** `unwrap_ck` with the wrong KEK (any 32-byte key other than the
+one used to wrap) -> `Err(UnwrapFailed)` from AEAD authentication failure,
+never a silently-wrong plaintext CK.
+**EC-T2d-3:** `unwrap_ck` on a `WrappedKey` whose ciphertext or nonce was
+tampered with (single byte flipped) -> `Err(UnwrapFailed)`, proving the wrap
+step is itself authenticated, not just confidential.
+**EC-T2d-4 (added after phase-1 review):** a `WrappedKey` produced by
+`wrap_ck` under one `kek_id`/`kek_version`, then unwrapped after mutating
+only its `kek_id` or `kek_version` field (ciphertext/nonce untouched, same
+KEK bytes supplied) -> `Err(UnwrapFailed)`, proving the AAD binding
+cryptographically rejects a swapped-metadata `WrappedKey` rather than
+silently unwrapping it under the wrong identity — this is the direct
+regression test for the phase-1 `major` finding (key-confusion risk from
+`kek_id`/`kek_version` living outside the AAD).
+
+**Phase-1 review disposition (`.agent/local-agent-p2-t2d/phase1-result.json`,
+3/3 consensus, recorded 2026-09-07):**
+- **major** — `kek_id`/`kek_version` not bound into the AAD ("key confusion"
+  risk) — **accepted, design revised above** (AAD now
+  `"p2p-kek-wrap-v1|{kek_id}|{kek_version}"`); `EC-T2d-4` added as its
+  behavioral regression test.
+- **minor** — `unwrap_ck` doesn't itself validate `wrapped.kek_id`/
+  `kek_version` against caller context — **accepted as the same AAD-binding
+  fix**; the caller-side KEK-resolution policy question (which KEK to fetch
+  for a given `kek_id`/`kek_version`) remains explicitly out of scope, per
+  C0's "retry uses the lineage's persisted KEK version" rule living with the
+  caller, not this primitive.
+- **minor** — `KeyWrapError` lacks a distinct `AuthenticationFailed` variant
+  separate from `UnwrapFailed` — **deferred, not acted on**: `UnwrapFailed`
+  already covers every AEAD-authentication-failure path (wrong KEK, tampered
+  ciphertext, tampered AAD/metadata) with one variant, matching `T2c`'s
+  `CryptoError` granularity; splitting it adds a variant with no caller that
+  needs to distinguish the two cases today. Revisit only if a future caller
+  needs to distinguish "wrong key" from "tampered data" behaviorally.
+- **likely_false_positive** — `InvalidKeyLength` unreachable at the
+  `&[u8; 32]` type level — **non-issue, same disposition as `EC-T2c-1`**:
+  documented-unreachable defensive code, kept for API stability, not dead
+  code to prune.
+
+- **RRI:** `python3 scripts/rri.py --touches crates/p2p/src/key_wrap.rs
+  --touches crates/p2p/src/lib.rs --touches crates/p2p/Cargo.toml --cc 4 --D 3
+  --K 3 --P 1 --T 1 --A 1 --X 0` -> **RRI 28, Moderate (26-40)**. This task is
+  key-custody code (CK/KEK confidentiality), so `D`/`K` were scored one point
+  above `T2c`'s `D2`/`K2` despite the mechanically similar AEAD shape,
+  reflecting that a defect here has a materially worse failure mode (silent
+  key exposure/reuse) than a defect in `T2c`'s per-file encryption — this
+  crossed the Low/Moderate boundary as anticipated when this task was queued.
+  No anchor-rubric match for `crates/p2p` — D/K/P are agent-supplied
+  judgment, same as `T2b`/`T2c`.
+- **Honest Low-band maximization pass (§ AGENT_WORKFLOW_GUIDE.md):**
+  evaluated and rejected. The module's three functions
+  (`generate_ck`/`wrap_ck`/`unwrap_ck`) share one type set
+  (`WrappedKey`/`KeyWrapError`/`KeyWrapAad`) and one security invariant (the
+  AAD binding `kek_id`/`kek_version` to the ciphertext); `EC-T2d-4`/`EC-T2d-5`
+  specifically test the interaction between `wrap_ck` and `unwrap_ck`. There
+  is no real file-ownership, behavioral, or evidence boundary to split
+  on — doing so would fragment one cryptographic invariant across
+  unverifiable pieces, which rule 5 of the maximization pass explicitly
+  forbids. `honest-low-max: residual` — reason: single cohesive
+  key-custody primitive, no independent seam; routed at its actual RRI 28
+  Moderate band, not decomposed. Owner concurred 2026-09-07 (asked whether
+  to force a split; declined, kept RRI 28 unsplit).
+- **Route:** RRI 26-40 Moderate — per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
+  § Mandatory workflow before implementing step 4, this requires presenting
+  the plan/tasks and waiting for explicit approval before implementation. The
+  **Bounded cloud-implementation priority — S-230 + MVP0-P2P rollout
+  (2026-09-06)** blanket exception was **deactivated 2026-09-07** (owner back
+  online); the default route for this band is therefore normal Moderate
+  local-first (`run_local_task.py`, `nemotron-3.5-lightning:30b-a3b-q4_K_M`).
+  **However, the owner explicitly approved a task-local cloud-implementation
+  override for this specific task** ("entiendo que dada la complejidad es
+  mejor que sea cloud la implementacion. aprobada", 2026-09-07) — a
+  standalone routing decision for `P2.T2d`'s complexity, not a reactivation
+  of the blanket slice-wide exception. Implementation therefore uses the
+  band's resolved cloud-takeover model (Codex `gpt-5.6-terra`/medium or
+  Claude `claude-sonnet-5`) instead of `run_local_task.py`. Phase-1/phase-2
+  review stays local/unchanged (Gemma primary). This override applies only
+  to `P2.T2d`; later Moderate/Med-high tasks in this slice default back to
+  local-first unless the owner grants another explicit task-local override.
+
+### P2.T2d closure record
+
+**Implementation routing evidence.** The owner-approved cloud override
+routed implementation to Codex CLI (`gpt-5.6-terra`/`high`, per the earlier
+"hazlo con un agente terra high" instruction) inside the disposable worktree
+`.agent/worktrees/p2-t2d` (branch `agent/p2-t2d`). Codex's run
+(`/private/tmp/claude-501/.../scratchpad/p2-t2d-codex-run.log`) shows the
+full implementation packet was received and parsed correctly, then Codex's
+backend returned an account-level usage-limit error
+(`ERROR: You've hit your usage limit... try again at 1:04 PM`) twice,
+producing zero file changes (`git status --porcelain`/`git diff --stat HEAD`
+empty, no `--output-last-message` written). This was an external
+quota-exhaustion failure, not a defect in the packet or design — verified by
+reading the raw transcript rather than inferring from exit code alone (exit
+0 despite total failure). Surfaced to the owner via AskUserQuestion; owner
+selected **"Usar Claude Sonnet 5 directo"** over waiting for Codex's quota
+reset or retrying with a different model. Implementation was then completed
+directly by Claude Sonnet 5 (this session), following the identical frozen
+packet originally given to Codex, inside the same worktree. One compile
+defect was found and fixed during implementation: the packet's suggested
+`aes_gcm::aead::OsRng` path does not exist in the resolved dependency graph
+(`aead 0.6.1`/`rand_core 0.10.1` have no `OsRng` re-export in this
+generation — moved to the separate `getrandom` crate); fixed by using
+`getrandom::fill(&mut ck)` instead (the same OS-CSPRNG mechanism
+`Nonce::generate()` already uses transitively) and adding
+`getrandom = "0.4.2"` as an explicit `crates/p2p/Cargo.toml` dependency —
+within the packet's stated intent ("use `aes_gcm::aead::OsRng` or the
+crate's existing RNG source"), not a design change.
+
+**Scope delivered:** `crates/p2p/src/key_wrap.rs` (new, 235 lines):
+`WrappedKey`, `KeyWrapError`, `KeyWrapAad`/`canonical_key_wrap_aad`,
+`generate_ck`, `wrap_ck`, `unwrap_ck`, and 7 tests
+(`hp_t2d_1..3`, `ec_t2d_2..5`, plus the `ec_t2d_1` documented-unreachable
+comment). `crates/p2p/src/lib.rs` +1 line (`pub mod key_wrap;`).
+`crates/p2p/Cargo.toml` +2 deps (`zeroize = "1.9.0"`,
+`getrandom = "0.4.2"`). `git diff --cached --stat`: `Cargo.lock | 6 +-`,
+`crates/p2p/Cargo.toml | 2 +`, `crates/p2p/src/key_wrap.rs | 235 +`,
+`crates/p2p/src/lib.rs | 1 +` — exactly the 3 authorized files plus the
+expected `Cargo.lock` update, no scope violation.
+
+**Verification (all 4 commands green):**
+- `cargo check -p dubbridge-p2p` — PASS
+- `cargo test -p dubbridge-p2p` — PASS, 26/26 (19 pre-existing +
+  7 new in `key_wrap.rs`)
+- `cargo fmt -p dubbridge-p2p -- --check` — PASS (no diff)
+- `cargo clippy -p dubbridge-p2p --all-targets --all-features -- -D warnings`
+  — PASS (0 warnings)
+
+Task-analysis review: gemma (3-round in-session phase-1, see design section
+above) - PASS
+Code-solution review: gemma `docs/audit/gemma-evidence/p2-t2d.json` - PASS
+
+### Peer Reviewer evidence
+
+- Reviewer: `gemma`
+- Command: direct Ollama `/api/chat` (`gemma4:26b-a4b-it-qat`, `num_ctx=32768`, `think=false`, `temperature=0`), after a fresh per-task Ollama restart and warm-up probe (`done_reason: stop`, non-empty content)
+- Artifact: `docs/audit/gemma-evidence/p2-t2d.json`
+- Verdict: `PASS`
+- Findings: none (0 findings)
+- Muse Glimmer fallback: not triggered — reason: Gemma responded normally on first attempt
+- D14 fallback: not triggered — reason: n/a
+- D14 provider route: n/a — reason: n/a
+- disposition_divergence: `null`
+- Primary-agent disposition: accepted (0 findings to disposition)
+
+### Reflection log
+
+Required passes: 2 (`RRI 28` → `Moderate`)
+
+#### Pass 1
+
+- **Draft verdict:** implementation complete against the frozen contract; 26/26 tests pass (7 new in `key_wrap.rs`), `check`/`fmt`/`clippy` all clean.
+- **Critique findings:**
+  - `unwrap_ck`'s `plaintext.len() != 32` case (`try_into()` failure) has no dedicated behavioral test — acceptable: unreachable in practice since `wrap_ck` always encrypts exactly 32 bytes, and the `UnwrapFailed` fallback (no panic) is defensive-only, mirroring `crypto.rs`'s equivalent handling.
+  - `KeyWrapError::WrapFailed` has no test — consistent with the design's own `EC-T2c`-pattern precedent (no realistic way to force `encrypt` to fail with a valid 32-byte key); not a gap requiring action.
+  - `EC-T2d-1` follows the exact documented-unreachable-comment pattern from `crypto.rs`, as the packet required.
+  - The `UnwrapFailed` doc comment satisfies the phase-1 minor finding requiring it to state both tampering causes (ciphertext/nonce and AAD/metadata).
+- **Revisions applied:** none — draft already satisfies the contract.
+
+#### Pass 2
+
+- **Draft verdict:** final read-through as an independent reviewer would.
+- **Critique findings:**
+  - `wrap_ck`/`unwrap_ck` reconstruct the AAD identically in both directions (same `KeyWrapAad` struct, same field order via `serde_json`) — confirmed correct, mirrors `aad.rs` exactly.
+  - `EC-T2d-5` tests the delimiter-collision regression in both cross-substitution directions (pair1→pair2 and pair2→pair1), stronger than the packet's minimum ask.
+  - Scope stayed exactly to the 3 authorized files plus the mechanical `Cargo.lock` update — no violation.
+  - The `getrandom::fill` substitution for the packet's suggested `OsRng` is a documented, intent-preserving deviation (see Implementation routing evidence above), not an unreviewed design change.
+- **Revisions applied:** none.
+
+### Behavioral coverage certification
+
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| HP-T2d-1 | Happy path | `generate_ck()` returns distinct 256-bit CSPRNG material across calls | unit | `crates/p2p/src/key_wrap.rs::tests::hp_t2d_1_generate_ck_returns_distinct_csprng_material` | passed |
+| HP-T2d-2 | Happy path | `wrap_ck` + `unwrap_ck` round-trip recovers the exact original CK | unit | `crates/p2p/src/key_wrap.rs::tests::hp_t2d_2_wrap_unwrap_round_trip_recovers_original_ck` | passed |
+| HP-T2d-3 | Happy path | two `wrap_ck` calls on identical CK/KEK produce distinct nonces/ciphertexts | unit | `crates/p2p/src/key_wrap.rs::tests::hp_t2d_3_two_wraps_produce_different_nonces_and_ciphertexts` | passed |
+| EC-T2d-1 | Edge case | non-32-byte KEK rejected — documented unreachable at the `&[u8; 32]` type level | unit | `crates/p2p/src/key_wrap.rs::tests` (comment, same pattern as `crypto.rs::ec_t2c_1`) | passed (documented-unreachable, matches established precedent) |
+| EC-T2d-2 | Edge case | `unwrap_ck` with wrong KEK fails AEAD authentication | unit | `crates/p2p/src/key_wrap.rs::tests::ec_t2d_2_unwrap_with_wrong_kek_fails_authentication` | passed |
+| EC-T2d-3 | Edge case | `unwrap_ck` on tampered ciphertext fails AEAD authentication | unit | `crates/p2p/src/key_wrap.rs::tests::ec_t2d_3_unwrap_with_tampered_ciphertext_fails_authentication` | passed |
+| EC-T2d-4 | Edge case | mutated `kek_id`/`kek_version` (AAD tamper) fails authentication — key-confusion regression | unit | `crates/p2p/src/key_wrap.rs::tests::ec_t2d_4_tampered_kek_id_or_version_fails_authentication` | passed |
+| EC-T2d-5 | Edge case | delimiter-colliding `(kek_id, kek_version)` pairs do not produce colliding AADs, both directions | unit | `crates/p2p/src/key_wrap.rs::tests::ec_t2d_5_delimiter_colliding_metadata_pairs_do_not_collide` | passed |
+
+### Owner final verification
+
+- Owner: _pending — not yet recorded_
+- Date: _pending_
+- Statement: _pending owner sign-off_
+- Commands run: `cargo check -p dubbridge-p2p && cargo test -p dubbridge-p2p && cargo fmt -p dubbridge-p2p -- --check && cargo clippy -p dubbridge-p2p --all-targets --all-features -- -D warnings`
+
+Status: implementation complete, Reflection done, phase-2 review PASS,
+behavioral coverage certified. **Not yet `[x] Done`** — awaiting owner final
+verification and merge of `.agent/worktrees/p2-t2d` (branch `agent/p2-t2d`,
+commit `999dfd4`) into `feature/p2p-mvp-core`.
+
 ### P2.T2a-i closure record — Done 2026-09-06
 
 **Honest Low-band split rationale.** Parent `T2a` scored **RRI 32 Moderate**
