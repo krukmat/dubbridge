@@ -168,7 +168,7 @@ C0 intentionally introduces no source or migration changes. Full contract and le
 
 ### P2.T2 — K1 package construction — DECOMPOSED
 
-C0 decomposition: `T2a` dedicated `crates/p2p` manifest/path contract; `T2b` S-120 package reader; `T2c` AES-GCM/AAD/nonce invariant; `T2d` generate-once CK + KEK wrapping; `T2e` additive K1 persistence (`0033`); `T2f` package assembly/seal; `T2g` crypto/golden certification.
+C0 decomposition: `T2a` dedicated `crates/p2p` manifest/path contract; `T2b` S-120 package reader; `T2c` AES-GCM/AAD baseline; `T2d` generate-once CK + KEK wrapping; `T2e` additive K1 persistence (`0033`); `T2f` package assembly/seal; `T2g` crypto/golden certification. T2g's 2026-09-07 cross-runtime evidence passes, but its C0 required nonce-collision guard was absent. After two zero-output local transport failures, the repair was re-split into six executable microleaves: `T2c-r1a` additive assigned-nonce primitive, `T2c-r1b` public-entry refactor, `T2c-r2` pure tracker, `T2c-r3a` private builder seam, `T2c-r3b` tracker/error wiring, and `T2c-r3c` deterministic full-build collision evidence. The 2026-09-08 ADR-045 correction scored each leaf RRI 25 Low / Effort S; the coherent `T2c-r` envelope remains RRI 55 Med-high with a single parent approval, Med-high review, three Reflections, and integrated closure. **2026-09-08: `T2c-r` is `[x] Done` — Owner-verified (`Matias`, 2026-09-08).** All six leaves are source-implemented and independently re-verified (`cargo test -p dubbridge-p2p --all-features`: 41/41 passing; `fmt`/`clippy` clean; phase-1 and phase-2 Gemma review both PASS, 0 findings) — see `docs/tasks/mvp0-p2p-p2-encrypted-publication.md` § "P2.T2c-r — integrated closure record". `T2g` is recertified: the C0 nonce-collision requirement is now satisfied end to end and all four of its contract cases pass.
 
 Build encrypted package material from existing S-120 HLS:
 
@@ -257,7 +257,7 @@ Every implementation leaf must map its HP/EC cases to executable evidence under 
 
 C0 has replaced the former provisional decomposition with the exact-path leaf matrix in `docs/audit/mvp0-p2p-p2-c0-contract-freeze.md`:
 
-- **T2:** `T2a -> T2b/T2c -> T2d -> T2e -> T2f -> T2g`.
+- **T2:** `T2a -> T2b/T2c -> T2d -> T2e -> T2f -> T2c-r1a -> T2c-r1b -> (T2c-r2 + T2c-r3a) -> T2c-r3b -> T2c-r3c -> T2g`.
 - **T3:** `T3a -> T3b -> T3c -> T3d`.
 - **T4:** `T4a -> T4b`; `T4c` after T3 contract; then `T4d -> T4e -> T4f`.
 - **T5:** `T5a` characterization before source hook; `T5b -> T5c -> T5d` after T2/T4 integration.

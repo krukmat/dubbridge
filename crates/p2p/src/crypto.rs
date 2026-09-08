@@ -1,5 +1,5 @@
 use crate::aad::Aad;
-use aes_gcm::aead::{Aead, Generate, KeyInit, Payload};
+use aes_gcm::aead::{Aead, Generate, KeyInit, Nonce as AeadNonce, Payload};
 use aes_gcm::{Aes256Gcm, Nonce};
 
 pub struct EncryptedFile {
@@ -30,15 +30,27 @@ pub fn encrypt_file(
     aad: &Aad,
     plaintext: &[u8],
 ) -> Result<EncryptedFile, CryptoError> {
+    encrypt_file_with_nonce(ck, aad, plaintext, generate_nonce())
+}
+
+pub(crate) fn generate_nonce() -> [u8; 12] {
+    AeadNonce::<Aes256Gcm>::generate().into()
+}
+
+pub(crate) fn encrypt_file_with_nonce(
+    ck: &[u8; 32],
+    aad: &Aad,
+    plaintext: &[u8],
+    nonce: [u8; 12],
+) -> Result<EncryptedFile, CryptoError> {
     let aad_bytes = crate::aad::canonical_aad_json(aad).into_bytes();
-
-    let nonce = Nonce::generate();
-
     let cipher = Aes256Gcm::new_from_slice(ck).map_err(|_| CryptoError::InvalidKeyLength)?;
 
+    #[allow(deprecated)]
+    let nonce_ref = Nonce::from_slice(&nonce);
     let ciphertext = cipher
         .encrypt(
-            &nonce,
+            nonce_ref,
             Payload {
                 msg: plaintext,
                 aad: &aad_bytes,
@@ -48,7 +60,7 @@ pub fn encrypt_file(
 
     Ok(EncryptedFile {
         path: aad.path.clone(),
-        nonce: nonce.into(),
+        nonce,
         ciphertext,
     })
 }
@@ -104,6 +116,61 @@ mod tests {
 
         assert_ne!(enc1.nonce, enc2.nonce);
         assert_ne!(enc1.ciphertext, enc2.ciphertext);
+    }
+
+    #[test]
+    fn hp_t2c_r1a_fixed_nonce_round_trip_recovers_plaintext() {
+        let ck = [0x11; 32];
+        let aad = make_aad("test/fixed-nonce");
+        let plaintext = b"assigned nonce plaintext";
+        let assigned_nonce = [0x22; 12];
+
+        let encrypted = encrypt_file_with_nonce(&ck, &aad, plaintext, assigned_nonce)
+            .expect("assigned-nonce encryption should succeed");
+
+        assert_eq!(encrypted.nonce, assigned_nonce);
+        let cipher = Aes256Gcm::new_from_slice(&ck).unwrap();
+        let aad_bytes = crate::aad::canonical_aad_json(&aad).into_bytes();
+        #[allow(deprecated)]
+        let nonce = Nonce::from_slice(&assigned_nonce);
+        let decrypted = cipher
+            .decrypt(
+                nonce,
+                Payload {
+                    msg: &encrypted.ciphertext,
+                    aad: &aad_bytes,
+                },
+            )
+            .expect("ciphertext should authenticate with the assigned nonce and AAD");
+
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn ec_t2c_r1a_tampered_aad_fails_for_assigned_nonce() {
+        let ck = [0x11; 32];
+        let aad = make_aad("test/fixed-nonce");
+        let assigned_nonce = [0x22; 12];
+        let encrypted = encrypt_file_with_nonce(&ck, &aad, b"authenticated", assigned_nonce)
+            .expect("assigned-nonce encryption should succeed");
+
+        let tampered_aad = make_aad("test/tampered");
+        let cipher = Aes256Gcm::new_from_slice(&ck).unwrap();
+        let aad_bytes = crate::aad::canonical_aad_json(&tampered_aad).into_bytes();
+        #[allow(deprecated)]
+        let nonce = Nonce::from_slice(&assigned_nonce);
+
+        assert!(
+            cipher
+                .decrypt(
+                    nonce,
+                    Payload {
+                        msg: &encrypted.ciphertext,
+                        aad: &aad_bytes,
+                    },
+                )
+                .is_err()
+        );
     }
 
     // ec_t2c_1_wrong_key_length_is_rejected:

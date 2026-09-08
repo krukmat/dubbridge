@@ -1,6 +1,7 @@
 use crate::aad::Aad;
 use crate::crypto;
 use crate::manifest::{self, Manifest, ManifestFile};
+use crate::nonce_tracker::NonceTracker;
 use crate::path;
 
 pub struct PackageFileInput {
@@ -14,6 +15,7 @@ pub enum PackageBuildError {
     DuplicatePath,
     InvalidPath(path::PathError),
     OutOfOrder,
+    NonceCollision,
     Encryption(String, String),
 }
 
@@ -38,14 +40,48 @@ pub fn build_package(
     ck: &[u8; 32],
     inputs: &[PackageFileInput],
 ) -> Result<SealedPackage, PackageBuildError> {
+    build_package_with_nonce_source(
+        asset_id,
+        publication_id,
+        lineage_id,
+        ck,
+        inputs,
+        crypto::generate_nonce,
+    )
+}
+
+fn build_package_with_nonce_source<F>(
+    asset_id: &str,
+    publication_id: &str,
+    lineage_id: &str,
+    ck: &[u8; 32],
+    inputs: &[PackageFileInput],
+    mut next_nonce: F,
+) -> Result<SealedPackage, PackageBuildError>
+where
+    F: FnMut() -> [u8; 12],
+{
     let normalized_paths = validate_and_normalize_paths(inputs)?;
 
     let mut manifest_files: Vec<ManifestFile> = Vec::with_capacity(inputs.len());
     let mut sealed_files: Vec<SealedFile> = Vec::with_capacity(inputs.len());
+    let mut nonce_tracker = NonceTracker::default();
 
     for (i, input) in inputs.iter().enumerate() {
         let norm_path = &normalized_paths[i];
-        let (mf, sf) = encrypt_one(asset_id, publication_id, lineage_id, ck, norm_path, input)?;
+        let nonce = next_nonce();
+        nonce_tracker
+            .register(nonce)
+            .map_err(|_| PackageBuildError::NonceCollision)?;
+        let (mf, sf) = encrypt_one(
+            asset_id,
+            publication_id,
+            lineage_id,
+            ck,
+            norm_path,
+            input,
+            nonce,
+        )?;
         manifest_files.push(mf);
         sealed_files.push(sf);
     }
@@ -119,6 +155,7 @@ fn encrypt_one(
     ck: &[u8; 32],
     norm_path: &str,
     input: &PackageFileInput,
+    nonce: [u8; 12],
 ) -> Result<(ManifestFile, SealedFile), PackageBuildError> {
     let aad = Aad {
         aad_version: "p2p-aad-v1".to_string(),
@@ -129,7 +166,7 @@ fn encrypt_one(
         publication_id: publication_id.to_string(),
     };
 
-    match crypto::encrypt_file(ck, &aad, &input.plaintext) {
+    match crypto::encrypt_file_with_nonce(ck, &aad, &input.plaintext, nonce) {
         Ok(encrypted) => {
             let nonce_b64u = base64url_encode_no_padding(&encrypted.nonce);
             let ciphertext_sha256 = sha256_hex(&encrypted.ciphertext);
@@ -246,12 +283,23 @@ mod tests {
             },
         ];
 
-        let result = build_package("asset1", "pub1", "line1", &ck, &inputs);
-        assert!(result.is_ok());
-        let pkg = result.unwrap();
+        assert!(build_package("asset1", "pub1", "line1", &ck, &inputs).is_ok());
+
+        let assigned_nonces = [[0x41; 12], [0x42; 12], [0x43; 12]];
+        let mut nonce_source = assigned_nonces.into_iter();
+        let pkg = build_package_with_nonce_source("asset1", "pub1", "line1", &ck, &inputs, || {
+            nonce_source.next().expect("one nonce per input")
+        })
+        .expect("distinct assigned nonces should build a package");
 
         assert_eq!(pkg.files.len(), 3);
         assert_eq!(pkg.manifest.files.len(), 3);
+        for (manifest_file, assigned_nonce) in pkg.manifest.files.iter().zip(assigned_nonces) {
+            assert_eq!(
+                nonce_hex_from_b64u_for_test(&manifest_file.nonce_b64u),
+                assigned_nonce
+            );
+        }
 
         // Verify manifest digest
         let expected_digest = manifest::manifest_sha256(&pkg.manifest_canonical_json);
@@ -350,6 +398,29 @@ mod tests {
     }
 
     #[test]
+    fn ec_t2c_r3c_duplicate_nonce_fails_closed() {
+        let ck = [0x31; 32];
+        let inputs = vec![
+            PackageFileInput {
+                path: "index.m3u8".to_string(),
+                plaintext: b"#EXTM3U".to_vec(),
+            },
+            PackageFileInput {
+                path: "segments/000001.ts".to_string(),
+                plaintext: b"segment1".to_vec(),
+            },
+        ];
+        let mut nonce_source = [[0x41; 12], [0x41; 12]].into_iter();
+
+        let result =
+            build_package_with_nonce_source("asset1", "pub1", "line1", &ck, &inputs, || {
+                nonce_source.next().expect("one nonce per input")
+            });
+
+        assert!(matches!(result, Err(PackageBuildError::NonceCollision)));
+    }
+
+    #[test]
     fn ec_t2f_1_empty_inputs_is_rejected() {
         let ck = [0u8; 32];
         let inputs: Vec<PackageFileInput> = vec![];
@@ -419,5 +490,9 @@ mod tests {
         ];
         let result = build_package("asset1", "pub1", "line1", &ck, &inputs);
         assert!(matches!(result, Err(PackageBuildError::OutOfOrder)));
+    }
+
+    fn nonce_hex_from_b64u_for_test(value: &str) -> [u8; 12] {
+        base64url_decode_no_padding(value).try_into().unwrap()
     }
 }

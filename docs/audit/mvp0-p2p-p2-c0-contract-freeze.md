@@ -236,11 +236,17 @@ Shared-file rule: task IDs remain sequential. Within an eligible ADR-040 multi-w
 |---|---|---|---|
 | `P2.T2a` | bootstrap dedicated P2 package crate + manifest/path/digest contract | `Cargo.toml`, `Cargo.lock`, `crates/p2p/Cargo.toml`, `crates/p2p/src/lib.rs`, `crates/p2p/src/manifest.rs` | C0 PASS |
 | `P2.T2b` | read/snapshot existing prepared HLS package through storage seam | `crates/p2p/src/source.rs`, `crates/p2p/src/lib.rs`, `crates/p2p/Cargo.toml`, `Cargo.lock` | T2a |
-| `P2.T2c` | AES-256-GCM per-file encryption, canonical AAD, nonce allocation/collision guard | `crates/p2p/src/crypto.rs`, `crates/p2p/src/lib.rs`, `crates/p2p/Cargo.toml`, `Cargo.lock` | T2a |
+| `P2.T2c` | AES-256-GCM per-file encryption and canonical AAD baseline | `crates/p2p/src/crypto.rs`, `crates/p2p/src/lib.rs`, `crates/p2p/Cargo.toml`, `Cargo.lock` | T2a |
+| `P2.T2c-r1a` | additive internal assigned-nonce encryption primitive | `crates/p2p/src/crypto.rs` | T2c |
+| `P2.T2c-r1b` | route the public CSPRNG entry through the assigned-nonce primitive | `crates/p2p/src/crypto.rs` | T2c-r1a |
+| `P2.T2c-r2` | pure per-build nonce collision tracker and module export | `crates/p2p/src/nonce_tracker.rs`, `crates/p2p/src/lib.rs` | T2c-r1b |
+| `P2.T2c-r3a` | private builder nonce-source seam with unchanged production behavior | `crates/p2p/src/package_builder.rs` | T2c-r1b; T2f |
+| `P2.T2c-r3b` | tracker-before-encryption wiring and typed collision error | `crates/p2p/src/package_builder.rs` | T2c-r2; T2c-r3a |
+| `P2.T2c-r3c` | deterministic full-build collision rejection evidence | `crates/p2p/src/package_builder.rs` | T2c-r3b |
 | `P2.T2d` | generate-once CK + versioned KEK wrap/unwrap primitive and zeroization boundary | `crates/p2p/src/key_wrap.rs`, `crates/p2p/src/lib.rs`, `crates/p2p/Cargo.toml`, `Cargo.lock` | T2c |
 | `P2.T2e` | persist sealed K1 metadata/wrapped-CK reference without changing T1 identity semantics | `infra/migrations/0033_extend_p2p_publications_k1.sql`, `crates/db/src/p2p_publication_repo.rs` | T2d; T1 accepted base |
 | `P2.T2f` | assemble/seal ciphertext package and persist manifest/package evidence | `crates/p2p/src/package_builder.rs`, `crates/p2p/src/lib.rs`, `crates/p2p/Cargo.toml`, `Cargo.lock`, `crates/db/src/p2p_publication_repo.rs` | T2b–T2e |
-| `P2.T2g` | K1/golden/cross-runtime certification | `crates/p2p/tests/k1_contract.rs` | T2f |
+| `P2.T2g` | K1/golden/cross-runtime certification | `crates/p2p/tests/k1_contract.rs` | T2f; T2c-r3c |
 
 The new `crates/p2p` bounded context is intentional: cryptographic package/key-custody logic does not belong in generic `crates/media` or `crates/storage`.
 
