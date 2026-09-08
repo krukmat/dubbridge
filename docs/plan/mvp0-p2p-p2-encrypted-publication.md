@@ -51,7 +51,7 @@ Conservative planning score: **RRI 131 — Excessive — Effort XL**.
 
 P2 is decomposed into independently gated parents T0-T6. T0, the decomposed T1 persistence leaves, and C0 are complete. The original T1 parent scored **78 High / XL**, became a non-executable container, and its T1a-T1f leaves are **Done and owner-approved as P2.T1 on 2026-09-06**.
 
-The remaining P2 implementation begins only through the C0-frozen exact-path leaves under T2-T6. Each executable leaf is scored with `scripts/rri.py` immediately before presentation/execution; C0 completion does not authorize source work.
+P2.T2 is Done, including T2c-r and T2g recertification (2026-09-08); T4a is Done (2026-09-07). Remaining P2 work is T3a-T3d, T4b-T4f, T5a-T5d, and T6a-T6e (18 planned leaves). Remaining implementation uses the C0-frozen exact-path leaves. Each executable leaf is scored with `scripts/rri.py` immediately before presentation/execution; C0 completion does not authorize source work.
 
 ## Architecture
 
@@ -166,7 +166,7 @@ C0 freezes:
 
 C0 intentionally introduces no source or migration changes. Full contract and leaf/path matrix: `docs/audit/mvp0-p2p-p2-c0-contract-freeze.md`.
 
-### P2.T2 — K1 package construction — DECOMPOSED
+### P2.T2 — K1 package construction — DONE
 
 C0 decomposition: `T2a` dedicated `crates/p2p` manifest/path contract; `T2b` S-120 package reader; `T2c` AES-GCM/AAD baseline; `T2d` generate-once CK + KEK wrapping; `T2e` additive K1 persistence (`0033`); `T2f` package assembly/seal; `T2g` crypto/golden certification. T2g's 2026-09-07 cross-runtime evidence passes, but its C0 required nonce-collision guard was absent. After two zero-output local transport failures, the repair was re-split into six executable microleaves: `T2c-r1a` additive assigned-nonce primitive, `T2c-r1b` public-entry refactor, `T2c-r2` pure tracker, `T2c-r3a` private builder seam, `T2c-r3b` tracker/error wiring, and `T2c-r3c` deterministic full-build collision evidence. The 2026-09-08 ADR-045 correction scored each leaf RRI 25 Low / Effort S; the coherent `T2c-r` envelope remains RRI 55 Med-high with a single parent approval, Med-high review, three Reflections, and integrated closure. **2026-09-08: `T2c-r` is `[x] Done` — Owner-verified (`Matias`, 2026-09-08).** All six leaves are source-implemented and independently re-verified (`cargo test -p dubbridge-p2p --all-features`: 41/41 passing; `fmt`/`clippy` clean; phase-1 and phase-2 Gemma review both PASS, 0 findings) — see `docs/tasks/mvp0-p2p-p2-encrypted-publication.md` § "P2.T2c-r — integrated closure record". `T2g` is recertified: the C0 nonce-collision requirement is now satisfied end to end and all four of its contract cases pass.
 
@@ -194,6 +194,8 @@ Implement the T0/C0-frozen `AN-R1 + AN-A1` contract:
 - never receives PostgreSQL credentials, plaintext CK, server KEK, invitation/viewer state, business authorization, or backend signing authority.
 
 ### P2.T4 — O4 dispatch + reconciliation — DECOMPOSED
+
+T4a is Done (2026-09-07); T4b-T4f remain Planned.
 
 C0 decomposition: `T4a` pure recovery kernel; `T4b` PostgreSQL claims/leases (`0034`); `T4c` mTLS AN client; `T4d` outbox dispatcher; `T4e` worker/reconciler join; `T4f` recovery certification.
 

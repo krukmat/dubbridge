@@ -19,7 +19,7 @@ behavioral_coverage_contract: behavior-v2
 - Original `P2.T1` RRI 78 parent: **SUPERSEDED / NON-EXECUTABLE** by lower-RRI decomposition.
 - `P2.T1a`-`P2.T1f`: **Done / owner-approved as the complete P2.T1 persistence outcome on 2026-09-06**. Do not reopen for retrospective review.
 - `P2.C0`: **PASS 2026-09-06 — RRI 66 Complex / Effort L**. Owner approved the ten-path docs/fixture freeze; four Reflection passes PASS.
-- Next executable work belongs to the C0-frozen T2-T6 leaf map below. **C0 does not authorize source execution.** Each leaf must run `scripts/rri.py` on its exact current path set and follow the resulting workflow gate immediately before execution.
+- P2.T2 is Done, including T2c-r and T2g recertification (2026-09-08); T4a is Done (2026-09-07). Remaining P2 work is T3a-T3d, T4b-T4f, T5a-T5d, and T6a-T6e (18 planned leaves). Next executable work belongs to the remaining C0-frozen leaf map below. **C0 does not authorize source execution.** Each leaf must run `scripts/rri.py` on its exact current path set and follow the resulting workflow gate immediately before execution.
 - Review exception: existing owner-directed MVP0-P2P P0-P7 phase-1/phase-2 review override remains in force; it does not waive RRI/HITL/Reflection/tests.
 
 Canonical C0 evidence:
@@ -37,7 +37,7 @@ Canonical C0 evidence:
 | P2.T1 | Durable publication/outbox persistence parent | 78 High | XL | **SUPERSEDED — container only** | T0 PASS |
 | P2.T1a–T1f | Six lower-RRI persistence leaves | per historical ledger | S/M | **Done / owner-approved** | sequential |
 | P2.C0 | Shared package/crypto/AN/audit contract, golden fixtures, path ownership | **66 Complex** | L | **PASS 2026-09-06** | T1 Done |
-| P2.T2 | K1 encrypted package construction + server-wrapped CK custody | 82 High parent | XL | **DECOMPOSED — no parent execution** | C0 PASS |
+| P2.T2 | K1 encrypted package construction + server-wrapped CK custody | 82 High parent | XL | **Done outcome — all T2 leaves closed; no parent execution** | C0 PASS |
 | P2.T3 | Availability Node ciphertext publication executor | 72 High parent | XL | **DECOMPOSED — no parent execution** | C0 PASS; T2 contract |
 | P2.T4 | O4 outbox dispatch + reconciler | 84 High parent | XL | **DECOMPOSED — no parent execution** | C0 PASS; T1 Done; T3 contract |
 | P2.T5 | S-120 downstream integration + fail-closed P2P_READY | 74 High parent | XL | **DECOMPOSED — no parent execution** | C0 PASS; T2 + T4 integration |
@@ -1706,7 +1706,7 @@ Non-executable coordination parent, superseded by `T2c-r3a`, `T2c-r3b`, and
 - **RRI:** `scripts/rri.py --touches crates/p2p/src/package_builder.rs --cc
   3 --D 1 --K 1 --P 0 --T 0 --A 0 --X 0` -> **25 Low / S**.
 
-### P2.T2c-r — integrated closure record (implemented — Owner final verification pending)
+### P2.T2c-r — integrated closure record (Done — Owner-verified 2026-09-08)
 
 All six leaves (`T2c-r1a`, `T2c-r1b`, `T2c-r2`, `T2c-r3a`, `T2c-r3b`,
 `T2c-r3c`) are source-implemented across the four in-scope files. Independently

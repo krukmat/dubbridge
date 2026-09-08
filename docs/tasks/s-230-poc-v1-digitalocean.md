@@ -5206,6 +5206,10 @@ deployment-specific and must consume C0 without redefining it.
 
 **Status:** [ ] Planned
 
+Calendar target: X29 resolved by 2026-09-18; T6/T7 and T6p-d by
+2026-10-21; this physical RC by 2026-10-26. T6/T7 are independent of
+T6p-a activation, but T7 PASS remains a mandatory input here.
+
 Build the exact Android RC and prove on physical hardware the owner upload to
 invite, viewer claim, full ciphertext sync, manifest verification, and loopback
 playback path. No legacy HTTP/S3 audience-media fallback may be compiled or

@@ -12,8 +12,8 @@ plan: docs/plan/mvp0-p2p-first.md
 > **External taskpack:** `p2p-mvp/taskpacks/P0.zip` through `P7.zip`.
 > **Current task:** P0 and P1 are closed. ADR-044 is Accepted. P2.T0 is PASS and
 > P2.T1a-T1f are Done/owner-approved as the completed P2.T1 persistence outcome
-> on 2026-09-06. P2.C0 is PASS; the next P2 implementation work is P2.T2
-> leaf-by-leaf under the frozen contracts. P2-P7 and S-230 share the controlled
+> on 2026-09-06. P2.C0 is PASS; T2 (including T2c-r/T2g) and T4a are Done.
+> Remaining P2 work: T3a-d, T4b-f, T5a-d, T6a-e. P2-P7 and S-230 share the controlled
 > Android P2P beta/POC target of 2026-10-30, not GA. The external package is untracked input, so its
 > state/handoff files are evidence but not substitutes for this ledger.
 
@@ -23,7 +23,7 @@ plan: docs/plan/mvp0-p2p-first.md
 |---|---|---|---|
 | P0 | Bare / Expo / React Native compatibility spike | PASS — Android-only; owner verified 2026-08-27 | — |
 | P1 | Maintainable mobile P2P foundation + replication proof | Done 2026-09-01 | P0 PASS |
-| P2 | Encrypted P2P publication after S-120 | In progress — T0 PASS; T1 Done/owner-approved; C0 PASS; T2 next leaf-by-leaf | P1 PASS; ADR-044 Accepted |
+| P2 | Encrypted P2P publication after S-120 | In progress — T0/C0 PASS; T1/T2/T4a Done; T3, T4b-f, T5, T6 pending | P1 PASS; ADR-044 Accepted |
 | P3 | Invite, claim, and content-key envelope | Pending | P2 PASS; accepted ADR-044 / K1 contract |
 | P4 | Mobile package sync and verification | Pending | P3 PASS |
 | P5 | Local HLS gateway + existing VideoPlayer | Pending | P4 PASS |
@@ -167,14 +167,15 @@ coverage for later P2P work.
 
 ## Deferred task acceptance summaries
 
-The following tasks stay unpresented until their dependency evidence exists. Their
-external taskpacks are useful input, but the detailed ledger entries, RRI reports,
-and approval cards must be created at activation time.
+The following tasks stay unpresented until their dependency evidence exists.
+Phase plans and planning ledgers are linked below. Their external taskpacks
+are useful input; exact-path executable leaves, RRI reports,
+and approval cards must still be resolved at activation time.
 
 > **Current P2 gate:** ADR-044 D1-D4 are closed and the ADR is Accepted. The
 > detailed P2 plan/ledger exist; T0 is PASS and T1 is Done/owner-approved.
 > P2.C0 is PASS and froze the shared contract/path boundary. The decomposed
-> T2-T6 leaves now follow that boundary, beginning with P2.T2 leaf-by-leaf;
+> remaining T3, T4b-f, T5, and T6 leaves follow that boundary; T2/T4a are Done;
 > neither P2.T1 nor C0 is reopened.
 >
 > D1 evidence is in `docs/audit/mvp0-p2p-adr044-d1-grant-composition.md`; D2
@@ -205,7 +206,7 @@ and revised approval card: `docs/plan/mvp0-p2p-p1-replication.md`,
 
 - **Gate / use case:** G2 / CU-01. **Status:** in progress. P1 and ADR-044 gates
   are satisfied; T0 PASS, T1 Done/owner-approved, and `P2.C0 PASS`. The next P2
-  work is the decomposed exact-path P2.T2 leaf sequence.
+  work is T3a-d, T4b-f, T5a-d, and T6a-e; T2 and T4a are Done.
 - **Objective:** turn an S-120-prepared HLS derivative into a ciphertext-only
   P2P package, publish it through the Availability Node, and record durable
   publication state — reusing existing upload/finalize/S-120 without
@@ -291,8 +292,8 @@ and revised approval card: `docs/plan/mvp0-p2p-p1-replication.md`,
   key-encryption key, JWT signing key, or database credentials, and never
   persists a plaintext content key.
 - **EC-3:** a package that syncs successfully is still unplayable without
-  control-plane authorization — possession is not permission (ADR-044
-  proposed decision 1).
+  control-plane authorization — possession is not permission (Accepted ADR-044
+  decision 1).
 
 ### P5 — Local HLS gateway + existing VideoPlayer
 
@@ -356,3 +357,23 @@ and revised approval card: `docs/plan/mvp0-p2p-p1-replication.md`,
   depended on fallback is a failed certification, not a pass.
 - **EC-2:** disabling legacy media routes must not disable auth, assets,
   invites, or audit; a control-plane regression also fails certification.
+
+## P3-P7 phase planning index — 2026-09-08
+
+| Phase | Plan | Planning ledger | Disposition |
+|---|---|---|---|
+| P3 | `docs/plan/mvp0-p2p-p3-invitation-envelope.md` | `docs/tasks/mvp0-p2p-p3-invitation-envelope.md` | Planned; activation gate remains P2 PASS; Accepted ADR-044 |
+| P4 | `docs/plan/mvp0-p2p-p4-mobile-sync.md` | `docs/tasks/mvp0-p2p-p4-mobile-sync.md` | Planned; activation gate remains P3 PASS |
+| P5 | `docs/plan/mvp0-p2p-p5-local-playback.md` | `docs/tasks/mvp0-p2p-p5-local-playback.md` | Planned; activation gate remains P4 PASS |
+| P6 | `docs/plan/mvp0-p2p-p6-dashboard.md` | `docs/tasks/mvp0-p2p-p6-dashboard.md` | Planned; activation gate remains P3-P5 PASS |
+| P7 | `docs/plan/mvp0-p2p-p7-certification.md` | `docs/tasks/mvp0-p2p-p7-certification.md` | Planned; activation gate remains P2-P6 PASS; S-230-T7p PASS |
+
+Detailed phase plans and work-package ledgers now exist. Exact-path executable
+leaf decomposition, per-parent/leaf RRI, ownership and elapsed-time estimates
+remain activation work; no phase is approved for source execution by this update.
+P2 still has 18 planned leaves after T2/T4a closure. The October calendar is a
+target with unvalidated capacity, not a delivery guarantee. X29 is required by
+2026-09-18; P2-P6 and T7local/T7c by 2026-10-15; base T6/T7 and T6p-a-d by
+2026-10-21; T7p by 2026-10-26; P7/T9g by 2026-10-30. X28 closure and exact-release
+CI green, rollback/log/security/soak evidence remain T9g gates. A missed gate
+permits only an explicitly labeled base POC/backend preview, not an invited-playback claim.

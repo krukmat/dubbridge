@@ -60,7 +60,7 @@ Target gates: X29 resolved while S-230 `T7local -> T7c/T7b/T8/T8b` (local
 stack) and MVP0-P2P `P2 -> P6` development advance; both development gates
 PASS by October 15; T6p-a through T6p-d close by October 21 (including the
 independent `T6`/`T7` Digital Ocean deploy, which may run any time after `T5`
-but is not itself gating); the Android RC closes by October 26; and P7/T9g
+but is not a T6p-a gate; T7 PASS is required before T7p); the Android RC closes by October 26; and P7/T9g
 close by October 30. If either the Android gate or the development/deployment
 dates are missed, October may expose the base S-230 POC and a labeled backend
 preview, but must not claim invited P2P playback.
@@ -679,7 +679,7 @@ flowchart LR
     T4Q --> T5["T5 DO descriptor + secrets<br/>T5a ✓ done 2026-08-26, hostname frozen<br/>(poc.iotforce.es); T5b/T5c/T5d ✓ done 2026-08-27 — T5 closed"]
     T5 --> T5D["T5d ✓ local descriptor evidence"]
     T5D --> T7LOCAL["T7local mobile build<br/>vs local Docker Compose"]
-    T5 --> T6["T6 deploy + E2E smoke<br/>(independent, not gating)"]
+    T5 --> T6["T6 deploy + E2E smoke<br/>(independent of T6p-a)"]
     T6 --> T7["T7 mobile build vs DO<br/>(post-deploy confirmation only)"]
     T7LOCAL --> T7
     T7LOCAL --> T8["T8 subtitle visible in review (optional)"]
@@ -705,8 +705,11 @@ flowchart LR
     T6PB --> T6PC["T6p-c local evidence"]
     T6PC --> T6PD["T6p-d DO ciphertext + durable P2P_READY"]
     T6PD --> T7P["T7p Android P2P RC"]
+    T7 --> T7P
+    X29["X29 physical Android proof resolved"] --> T7P
     T7P --> P7["MVP0-P2P P7 exact-artifact certification"]
     P7 --> T9G["T9g October GO/NO-GO"]
+    CI["X28 closed + exact-release CI green<br/>rollback, logs, security, soak evidence"] --> T9G
     T9G --> T9
 ```
 
