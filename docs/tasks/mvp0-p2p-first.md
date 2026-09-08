@@ -13,7 +13,7 @@ plan: docs/plan/mvp0-p2p-first.md
 > **Current task:** P0 and P1 are closed. ADR-044 is Accepted. P2.T0 is PASS and
 > P2.T1a-T1f are Done/owner-approved as the completed P2.T1 persistence outcome
 > on 2026-09-06. P2.C0 is PASS; T2 (including T2c-r/T2g) and T4a are Done.
-> Remaining P2 work: T3a-d, T4b-f, T5a-d, T6a-e. P2-P7 and S-230 share the controlled
+> Remaining P2 work: T3b-d, T4b-f, T5a-d, T6a-e. P2-P7 and S-230 share the controlled
 > Android P2P beta/POC target of 2026-10-30, not GA. The external package is untracked input, so its
 > state/handoff files are evidence but not substitutes for this ledger.
 
@@ -206,7 +206,8 @@ and revised approval card: `docs/plan/mvp0-p2p-p1-replication.md`,
 
 - **Gate / use case:** G2 / CU-01. **Status:** in progress. P1 and ADR-044 gates
   are satisfied; T0 PASS, T1 Done/owner-approved, and `P2.C0 PASS`. The next P2
-  work is T3a-d, T4b-f, T5a-d, and T6a-e; T2 and T4a are Done.
+  work is T3b-d, T4b-f, T5a-d, and T6a-e; T2, T3a, and T4a are Done. T3a
+  was owner-verified on 2026-09-08.
 - **Objective:** turn an S-120-prepared HLS derivative into a ciphertext-only
   P2P package, publish it through the Availability Node, and record durable
   publication state — reusing existing upload/finalize/S-120 without
@@ -371,7 +372,7 @@ and revised approval card: `docs/plan/mvp0-p2p-p1-replication.md`,
 Detailed phase plans and work-package ledgers now exist. Exact-path executable
 leaf decomposition, per-parent/leaf RRI, ownership and elapsed-time estimates
 remain activation work; no phase is approved for source execution by this update.
-P2 still has 18 planned leaves after T2/T4a closure. The October calendar is a
+P2 still has 17 planned leaves after T2/T3a/T4a closure. The October calendar is a
 target with unvalidated capacity, not a delivery guarantee. X29 is required by
 2026-09-18; P2-P6 and T7local/T7c by 2026-10-15; base T6/T7 and T6p-a-d by
 2026-10-21; T7p by 2026-10-26; P7/T9g by 2026-10-30. X28 closure and exact-release

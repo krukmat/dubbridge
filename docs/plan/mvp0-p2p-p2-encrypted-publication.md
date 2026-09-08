@@ -51,7 +51,7 @@ Conservative planning score: **RRI 131 — Excessive — Effort XL**.
 
 P2 is decomposed into independently gated parents T0-T6. T0, the decomposed T1 persistence leaves, and C0 are complete. The original T1 parent scored **78 High / XL**, became a non-executable container, and its T1a-T1f leaves are **Done and owner-approved as P2.T1 on 2026-09-06**.
 
-P2.T2 is Done, including T2c-r and T2g recertification (2026-09-08); T4a is Done (2026-09-07). Remaining P2 work is T3a-T3d, T4b-T4f, T5a-T5d, and T6a-T6e (18 planned leaves). Remaining implementation uses the C0-frozen exact-path leaves. Each executable leaf is scored with `scripts/rri.py` immediately before presentation/execution; C0 completion does not authorize source work.
+P2.T2 and T3a are Done (2026-09-08), including T2c-r and T2g recertification; T4a is Done (2026-09-07). Remaining P2 work is T3b-T3d, T4b-T4f, T5a-T5d, and T6a-T6e (17 planned leaves). Remaining implementation uses the C0-frozen exact-path leaves. Each executable leaf is scored with `scripts/rri.py` immediately before presentation/execution; C0 completion does not authorize source work.
 
 ## Architecture
 
@@ -181,6 +181,11 @@ Build encrypted package material from existing S-120 HLS:
 - retry of the same logical publication consumes the already-sealed lineage rather than silently rotating package identity/CK.
 
 ### P2.T3 — Availability Node publication executor — DECOMPOSED
+
+`T3a` is Done and owner-verified on 2026-09-08: the strict v1 contract and
+injected, default-unavailable HTTP adapter exist. `T3b` mTLS, `T3c`
+Hyperdrive/idempotency, and `T3d` full certification remain unstarted and
+separately gated.
 
 C0 decomposition: `T3a` Node/TS service + v1 contract; `T3b` private mTLS; `T3c` persistent Hyperdrive + idempotency/conflict behavior; `T3d` contract/security certification.
 

@@ -19,7 +19,7 @@ behavioral_coverage_contract: behavior-v2
 - Original `P2.T1` RRI 78 parent: **SUPERSEDED / NON-EXECUTABLE** by lower-RRI decomposition.
 - `P2.T1a`-`P2.T1f`: **Done / owner-approved as the complete P2.T1 persistence outcome on 2026-09-06**. Do not reopen for retrospective review.
 - `P2.C0`: **PASS 2026-09-06 — RRI 66 Complex / Effort L**. Owner approved the ten-path docs/fixture freeze; four Reflection passes PASS.
-- P2.T2 is Done, including T2c-r and T2g recertification (2026-09-08); T4a is Done (2026-09-07). Remaining P2 work is T3a-T3d, T4b-T4f, T5a-T5d, and T6a-T6e (18 planned leaves). Next executable work belongs to the remaining C0-frozen leaf map below. **C0 does not authorize source execution.** Each leaf must run `scripts/rri.py` on its exact current path set and follow the resulting workflow gate immediately before execution.
+- P2.T2 and T3a are Done (2026-09-08), including T2c-r and T2g recertification; T4a is Done (2026-09-07). Remaining P2 work is T3b-T3d, T4b-T4f, T5a-T5d, and T6a-T6e (17 planned leaves). Next executable work belongs to the remaining C0-frozen leaf map below. **C0 does not authorize source execution.** Each leaf must run `scripts/rri.py` on its exact current path set and follow the resulting workflow gate immediately before execution.
 - Review exception: existing owner-directed MVP0-P2P P0-P7 phase-1/phase-2 review override remains in force; it does not waive RRI/HITL/Reflection/tests.
 
 Canonical C0 evidence:
@@ -2138,7 +2138,15 @@ Code-solution review: muse-glimmer (in-session artifact) - PASS
 
 | ID | Objective | Exact writable paths | RRI | Status | Depends on |
 |---|---|---|---|---|---|
-| `T3a` | Node/TS service bootstrap + v1 contract validation | `apps/availability-node/package.json`; `apps/availability-node/package-lock.json`; `apps/availability-node/tsconfig.json`; `apps/availability-node/src/contract.ts`; `apps/availability-node/src/server.ts` | RUN BEFORE EXECUTION | Planned | C0 PASS |
+| `T3a` | Node/TS service bootstrap + v1 contract validation | `apps/availability-node/package.json`; `apps/availability-node/package-lock.json`; `apps/availability-node/tsconfig.json`; `apps/availability-node/src/contract.ts`; `apps/availability-node/src/server.ts` | **70 Complex / L parent** | **Done / owner-verified 2026-09-08** | C0 PASS |
+| `T3a-i` | Deterministic Node/TypeScript package boundary | `apps/availability-node/package.json`; `apps/availability-node/package-lock.json` | **25 Low / S** | Done 2026-09-08 | C0 PASS; parent approval |
+| `T3a-ii` | Strict compiler contract + frozen v1 vocabulary/types | `apps/availability-node/tsconfig.json`; `apps/availability-node/src/contract.ts` | **25 Low / S** | Done 2026-09-08 | T3a-i |
+| `T3a-iii` | Strict request object/version/allowed-field boundary | `apps/availability-node/src/contract.ts` | **25 Low / S** | Done 2026-09-08 | T3a-ii |
+| `T3a-iv` | Publication/lineage identity + manifest digest validation | `apps/availability-node/src/contract.ts` | **25 Low / S** | Done 2026-09-08 | T3a-iii |
+| `T3a-v` | Opaque normalized relative `package_ref` validation | `apps/availability-node/src/contract.ts` | **25 Low / S** | Done 2026-09-08 | T3a-iv |
+| `T3a-vi` | Frozen success/error envelope validation + serialization | `apps/availability-node/src/contract.ts` | **25 Low / S** | Done 2026-09-08 | T3a-v |
+| `T3a-vii` | Bounded HTTP ingress/routing adapter | `apps/availability-node/src/server.ts` | **25 Low / S** | Done 2026-09-08 | T3a-vi |
+| `T3a-viii` | Injected publication seam + response/error mapping | `apps/availability-node/src/server.ts` | **25 Low / S** | Done 2026-09-08 | T3a-vii |
 | `T3b` | Private mTLS listener + client-identity policy | `apps/availability-node/src/mtls.ts`; `apps/availability-node/src/server.ts` | RUN BEFORE EXECUTION | Planned | T3a |
 | `T3c` | Persistent Hyperdrive seed/open + idempotency/conflict behavior | `apps/availability-node/src/hyperdrive_store.ts`; `apps/availability-node/src/server.ts` | RUN BEFORE EXECUTION | Planned | T3b |
 | `T3d` | Contract/mTLS/idempotency/traversal/secret certification | `apps/availability-node/test/publication_contract.test.ts`; `apps/availability-node/test/fixtures.ts` | RUN BEFORE EXECUTION | Planned | T3c |
@@ -2146,6 +2154,29 @@ Code-solution review: muse-glimmer (in-session artifact) - PASS
 **HP-T3-1:** authenticated same publication+lineage+manifest digest returns stable publication evidence.  
 **EC-T3-1:** same logical identity with conflicting lineage/digest -> 409 fail-closed.  
 **EC-T3-2:** untrusted mTLS or package path escape -> rejected; service has no DB/business/key authority.
+
+`T3a`'s full RRI report, honest Low-band maximization result, executable-leaf
+acceptance boundaries, and review-exception disposition are recorded in
+`docs/audit/mvp0-p2p-p2-t3a-rri.md`. The parent remains the approval,
+review, Reflection, and integrated-closure envelope; substantive authoring is
+sequentially delegated through the eight scored Low leaves, with the primary
+agent retaining only orchestration, diff validation/application, integration,
+verification, and status synchronization.
+
+Implementation, local-delegation lineage, behavioral coverage, four parent
+Reflection passes, and owner final verification are recorded in
+`docs/audit/mvp0-p2p-p2-t3a-implementation.md`. `T3b`, `T3c`, and `T3d`
+remain unstarted: this leaf exposes no listener, has no mTLS/Hyperdrive
+implementation, and carries no claim of `P2P_READY` or full T3 certification.
+
+### P2.T3a closure record — Done 2026-09-08
+
+Code-solution review: REVIEW-OVERRIDE - explicit owner-directed MVP0-P2P exception
+
+The linked implementation audit records the complete behavioral coverage
+certification, four parent Reflection passes, local-model authorship lineage,
+verification commands, and owner final verification by Matias. This closes
+only T3a; it does not close the T3 parent or authorize T3b-T3d.
 
 ## P2.T4 — O4 dispatcher and reconciler
 

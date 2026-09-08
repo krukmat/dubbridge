@@ -176,7 +176,8 @@ verdict at any point in the chain), owner final verification recorded
 in full, not `P2.T2` alone** (2026-09-08 clarification, in response to an
 owner query on whether T2c-r's closure narrowed the remaining T6p-a
 dependency) — as of `T2`'s closure, P2 still has four unclosed phases
-between T2 and P3: `P2.T3` (Availability Node publication executor,
+between T2 and P3: `P2.T3` (Availability Node publication executor; `T3a`
+is Done and owner-verified on 2026-09-08, while `T3b`-`T3d` remain
 `Planned`), `P2.T4` (O4 dispatch + reconciliation; only `T4a` is `Done
 2026-09-07`, `T4b`–`T4f` remain `Planned`), `P2.T5` (S-120 integration +
 fail-closed `P2P_READY` transition, all four children `Planned`), and
@@ -316,8 +317,9 @@ captured above under Governing principles and ADR-025/ADR-026.
   phase still needs exact-path executable decomposition, parent/leaf RRI,
   band-required review/approval, ownership and elapsed-time estimates at
   activation. Existing HP/EC and accepted ADR-043/044 remain binding.
-  P2 T0/C0 are PASS; T1/T2/T4a are Done; T3a-d, T4b-f, T5a-d, T6a-e remain
-  Planned (18 leaves). T6p-a requires full P2-P6 PASS plus T7local/T7c PASS.
+  P2 T0/C0 are PASS; T1/T2/T3a/T4a are Done; T3b-d, T4b-f, T5a-d, T6a-e
+  remain Planned (17 leaves). T6p-a requires full P2-P6 PASS plus
+  T7local/T7c PASS.
   October capacity is not validated by the existence of these plans. X29 is
   required for the release, X28/CI for T9g; optional queue acceleration and
   S-230 T7b/T8/T8b are outside the mandatory path.

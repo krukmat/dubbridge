@@ -9,7 +9,7 @@ slice: MVP0-P2P
 
 > **Task ledger:** `docs/tasks/mvp0-p2p-first.md`.
 > **External input:** `p2p-mvp/` (integrity verified against its package manifest).
-> **Status:** P0 is closed PASS. P1 is closed Done (2026-09-01) with its device-proof residual tracked in X29. ADR-043 and ADR-044 are Accepted. `P2.T0` is PASS with `AN-R1 + AN-A1`; `P2.T1a`-`P2.T1f` are **Done and owner-approved as P2.T1** (2026-09-06); and `P2.C0` is **PASS** (2026-09-06). P2.T2 is Done, including T2c-r and T2g recertification (2026-09-08); T4a is Done (2026-09-07). Remaining P2 work is T3a-T3d, T4b-T4f, T5a-T5d, and T6a-T6e (18 planned leaves). The October target is a controlled Android P2P beta/POC deployed through S-230 by 2026-10-30, not GA.
+> **Status:** P0 is closed PASS. P1 is closed Done (2026-09-01) with its device-proof residual tracked in X29. ADR-043 and ADR-044 are Accepted. `P2.T0` is PASS with `AN-R1 + AN-A1`; `P2.T1a`-`P2.T1f` are **Done and owner-approved as P2.T1** (2026-09-06); and `P2.C0` is **PASS** (2026-09-06). P2.T2 and T3a are Done (2026-09-08), including T2c-r and T2g recertification; T4a is Done (2026-09-07). Remaining P2 work is T3b-T3d, T4b-T4f, T5a-T5d, and T6a-T6e (17 planned leaves). The October target is a controlled Android P2P beta/POC deployed through S-230 by 2026-10-30, not GA.
 > iPhone/iOS support remains deferred by the repository owner.
 
 ## Objective
@@ -57,7 +57,7 @@ P0 Bare/RN compatibility                         ✅
  -> P2.T1 durable publication + outbox           ✅ Done / owner-approved
  -> P2.C0 shared publication contract freeze     ✅ PASS
  -> P2.T2 K1 construction + T4a recovery kernel   Done
- -> P2.T3, T4b-f, T5, T6                         remaining encrypted-publication work
+ -> P2.T3b-d, T4b-f, T5, T6                      remaining encrypted-publication work
  -> P3 invitation/claim + K1 envelope
  -> P4 verified mobile ciphertext sync
  -> P5 loopback HLS gateway
@@ -83,7 +83,7 @@ P2 is no longer blocked on ADR acceptance. The activated artifacts are:
 - `docs/audit/mvp0-p2p-p2-t0-approval-card.md`
 - `docs/audit/mvp0-p2p-p2-t0-selection.md`
 
-The unreduced P2 phase is RRI 131 Excessive and cannot execute directly. T0 and T1 are complete, and `P2.C0` passed on 2026-09-06. C0 froze `p2p-manifest-v1`, `p2p-aad-v1`, K1 custody, `availability-publication-v1`, P2 audit correlation, `p2p-ready-descriptor-v1`, golden fixtures, and exact T2-T6 path ownership. The canonical contract and leaf map are in `docs/audit/mvp0-p2p-p2-c0-contract-freeze.md` and `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`; P2.T2 is Done, including T2c-r and T2g recertification (2026-09-08); T4a is Done (2026-09-07). Remaining P2 work is T3a-T3d, T4b-T4f, T5a-T5d, and T6a-T6e (18 planned leaves). C0 and P2.T1 remain closed.
+The unreduced P2 phase is RRI 131 Excessive and cannot execute directly. T0 and T1 are complete, and `P2.C0` passed on 2026-09-06. C0 froze `p2p-manifest-v1`, `p2p-aad-v1`, K1 custody, `availability-publication-v1`, P2 audit correlation, `p2p-ready-descriptor-v1`, golden fixtures, and exact T2-T6 path ownership. The canonical contract and leaf map are in `docs/audit/mvp0-p2p-p2-c0-contract-freeze.md` and `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`; P2.T2 and T3a are Done (2026-09-08), including T2c-r and T2g recertification; T4a is Done (2026-09-07). Remaining P2 work is T3b-T3d, T4b-T4f, T5a-T5d, and T6a-T6e (17 planned leaves). C0 and P2.T1 remain closed.
 
 ## October 2026 release profile and S-230 dependency
 
@@ -152,7 +152,7 @@ P2 must prove accepted O4 failure semantics rather than only the happy path: los
 
 ## Remaining phase-specific decisions
 
-- **P2 remaining:** P2.T2 is Done, including T2c-r and T2g recertification (2026-09-08); T4a is Done (2026-09-07). Remaining P2 work is T3a-T3d, T4b-T4f, T5a-T5d, and T6a-T6e (18 planned leaves). C0 contracts and ownership remain frozen.
+- **P2 remaining:** P2.T2 and T3a are Done (2026-09-08), including T2c-r and T2g recertification; T4a is Done (2026-09-07). Remaining P2 work is T3b-T3d, T4b-T4f, T5a-T5d, and T6a-T6e (17 planned leaves). C0 contracts and ownership remain frozen.
 - **P4:** persistent product cache/device lifecycle, sign-out wipe, and background execution beyond P1 transient proof.
 - **P7:** certification profile that disables legacy HTTP media routes without disabling control-plane APIs.
 
@@ -171,7 +171,7 @@ These are scoped downstream decisions under accepted ADR-044, not reasons to reo
 Detailed phase plans and work-package ledgers now exist. Exact-path executable
 leaf decomposition, per-parent/leaf RRI, ownership and elapsed-time estimates
 remain activation work; no phase is approved for source execution by this update.
-P2 still has 18 planned leaves after T2/T4a closure. The October calendar is a
+P2 still has 17 planned leaves after T2/T3a/T4a closure. The October calendar is a
 target with unvalidated capacity, not a delivery guarantee. X29 is required by
 2026-09-18; P2-P6 and T7local/T7c by 2026-10-15; base T6/T7 and T6p-a-d by
 2026-10-21; T7p by 2026-10-26; P7/T9g by 2026-10-30. X28 closure and exact-release
