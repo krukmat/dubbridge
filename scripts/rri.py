@@ -501,10 +501,10 @@ def technical_summary(scores):
     return {"profile": axes, "bottleneck": bottleneck, "ici": 25 * bottleneck}
 
 
-# ICI (0/25/50/75/100) -> band upper-bound anchor. Each ICI step maps to the
-# band whose upper bound is closest without exceeding the legacy band ceiling
-# a bottleneck of that severity should reach, per ADR-045's bridge decision.
-ICI_BAND_CEILING = {0: 25, 25: 40, 50: 55, 75: 70, 100: 100}
+# ICI (0/25/50/75/100) -> band upper-bound anchor (ADR-045 amendment,
+# 2026-09-08). Mechanical and local obligations both qualify for Low when
+# the separate risk input permits it; higher technical anchors are unchanged.
+ICI_BAND_CEILING = {0: 25, 25: 25, 50: 55, 75: 70, 100: 100}
 
 
 def ici_to_band_rri(ici):

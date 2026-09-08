@@ -76,7 +76,7 @@ formula as the authoritative computation. Concretely:
 
 3. **Final band = max(ici_band, risk_band).** `ici_band_rri` maps each ICI
    step (0/25/50/75/100) onto the RRI point that anchors the equivalent band
-   ceiling (25/40/55/70/100). The final score is
+   ceiling (25/25/55/70/100), as amended on 2026-09-08 below. The final score is
    `max(ici_band_rri, risk_band_rri)`, so neither a low technical-difficulty
    reading can suppress a high domain/security risk floor, nor vice versa.
    This is a deliberate fail-closed combination, not an average.
@@ -180,6 +180,30 @@ formula as the authoritative computation. Concretely:
   per `rri-v2-formula.md` §1's own rationale against averaging: it would
   let easy variables dilute a genuine bottleneck, defeating the purpose of
   adopting the max-based construct at all.
+
+## Amendment — Restore Low for local obligations (2026-09-08)
+
+The owner approved the concrete correction with "cambialo directamente"
+after reviewing the reproduced minimum-band problem. Only the ICI25 bridge
+changes: `ICI_BAND_CEILING = {0:25, 25:25, 50:55, 75:70, 100:100}`.
+Previously it mapped ICI25 to RRI40, so a simple local change or merely
+reasonable tests (T1) excluded a task from Low. B0 and B1 now both map to
+25, subject to the existing risk input. This is a deliberate weakly
+monotone mapping, not a calibrated interval-scale difficulty estimate.
+
+ICI50/75/100, all path floors and penalties, CLI inputs, and max aggregation
+remain unchanged. Auth/rights path floors still force ICI100. This does
+not guarantee all sensitive changes retain their prior final band: where
+B1 and risk <=25, a sensitive P-only input outside anchored paths can also
+move from 40 to 25. The existing risk-only arithmetic has that limitation;
+explicit governance-critical HITL approval obligations remain in force.
+Independent-axis scoring and a risk-floor redesign are outside this amendment.
+
+Plan, regressions, review evidence and verification:
+[Low-band correction](../plan/rri-v2-low-band-correction.md),
+[task ledger](../tasks/rri-v2-low-band-correction.md),
+[audit](../audit/rri-v2-low-band-correction.md).
+The original adoption audit remains a historical pre-amendment record.
 
 ## Related
 

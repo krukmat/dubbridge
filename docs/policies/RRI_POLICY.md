@@ -50,7 +50,18 @@ Where the technical-difficulty side derives a four-axis ordinal profile
 `(L, I, Q, V)` — each `min(4, score)` from the existing C/K/D/T variables
 (`L←C, I←K, Q←D, V←T`) — takes the bottleneck `B = max(L,I,Q,V)`, and maps
 `ICI = 25×B` onto the RRI point anchoring the equivalent band ceiling
-(`ICI_BAND_CEILING = {0:25, 25:40, 50:55, 75:70, 100:100}`).
+(`ICI_BAND_CEILING = {0:25, 25:25, 50:55, 75:70, 100:100}`).
+
+**Low-band correction (2026-09-08, ADR-045 amendment):** mechanical (`B=0`)
+and local (`B=1`) obligations both map to 25. The original bridge mapped
+`ICI=25` to 40, excluding ordinary local tasks from Low merely because one
+of C/K/D/T was 1. Low is now reachable when all four are at most 1 and the
+separate risk input is at most 25. Higher technical anchors, path floors,
+penalties, and `max()` aggregation are unchanged. Risk-only sensitive inputs
+outside matched path floors can still have a risk input at most 25; this
+correction does not guarantee a high band for every sensitive change or
+replace HITL's explicit governance-critical approval requirements. Dedicated
+axis assessment and risk calibration remain separate work.
 
 This replaces the prior weighted-sum-of-eight-variables formula, per
 `docs/adr/ADR-045-rri-v2-authority-replacement.md`, adopting the technical

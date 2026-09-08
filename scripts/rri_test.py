@@ -2,6 +2,8 @@
 # Unit tests for the RRI calculator. [rri-calculator-script T1]
 # Run: python3 scripts/rri_test.py   (or: python3 -m unittest scripts/rri_test.py)
 import os
+import itertools
+import json
 import subprocess
 import sys
 import tempfile
@@ -63,10 +65,62 @@ class TechnicalProfileV2(unittest.TestCase):
 
     def test_ici_to_band_rri_bridge_table(self):
         self.assertEqual(rri.ici_to_band_rri(0), 25)
-        self.assertEqual(rri.ici_to_band_rri(25), 40)
+        self.assertEqual(rri.ici_to_band_rri(25), 25)
         self.assertEqual(rri.ici_to_band_rri(50), 55)
         self.assertEqual(rri.ici_to_band_rri(75), 70)
         self.assertEqual(rri.ici_to_band_rri(100), 100)
+
+    def test_local_constant_reaches_low_through_cli(self):
+        args = [sys.executable, SCRIPT, "--platform", "generic", "--cc", "1",
+                "--F", "0", "--D", "1", "--K", "1", "--P", "1",
+                "--T", "1", "--A", "0", "--X", "1"]
+        report = subprocess.run(args + ["--json"], capture_output=True, text=True)
+        self.assertEqual(report.returncode, 0, report.stderr)
+        data = json.loads(report.stdout)
+        self.assertEqual(data["final"], 25)
+        self.assertEqual(data["band"]["label"], "Low")
+        markdown = subprocess.run(args, capture_output=True, text=True)
+        self.assertEqual(markdown.returncode, 0, markdown.stderr)
+        self.assertIn("**Final RRI:** 25", markdown.stdout)
+        self.assertIn("band Low", markdown.stdout)
+
+    def test_risk_above_low_still_wins_for_local_profile(self):
+        result = rri.evaluate(c_score=0, f_override=0, d=1, k=1, p=5,
+                              t=1, a=0, x=1,
+                              manual_penalties=["auth_security", "arch_decision"])
+        self.assertEqual(result["ici_band_rri"], 25)
+        self.assertEqual(result["risk_band_rri"], 37)
+        self.assertEqual(result["final"], 37)
+
+    def test_all_technical_profiles_preserve_upper_levels_and_monotonicity(self):
+        # Exhaust every ordinal profile; check end-to-end scores, including
+        # domain/risk contributions, rather than just repeating the table.
+        results = {}
+        for levels in itertools.product(range(5), repeat=4):
+            c, k, d, t = levels
+            result = rri.evaluate(c_score=c, f_override=0, d=d, k=k,
+                                  p=0, t=t, a=0, x=0)
+            results[levels] = result["final"]
+            b = max(levels)
+            with self.subTest(levels=levels):
+                if b <= 1:
+                    self.assertEqual(result["final"], 25)
+                else:
+                    self.assertEqual(result["final"], {2: 55, 3: 70, 4: 100}[b])
+        for levels, score in results.items():
+            for axis in range(4):
+                if levels[axis] < 4:
+                    raised = list(levels)
+                    raised[axis] += 1
+                    self.assertGreaterEqual(results[tuple(raised)], score)
+
+    def test_sensitive_path_floors_are_unchanged(self):
+        for path in ("crates/auth/src/lib.rs", "crates/domain/src/rights.rs"):
+            with self.subTest(path=path):
+                result = rri.evaluate(c_score=0, touches=[path],
+                                      d=0, k=0, p=0, t=0, a=0, x=0)
+                self.assertEqual(result["final"], 100)
+                self.assertIn("auth_security", result["penalties"])
 
     def test_risk_floor_can_exceed_ici_band(self):
         # auth/rights anchor floor (D/P/K=4) with C/K contributing low ICI
