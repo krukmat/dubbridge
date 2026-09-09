@@ -202,6 +202,14 @@ and Architect-refined implementation routing below), not to cloud. A
   specifications and, for strict specs, in the machine-readable mapping
   checked by `make qa-bdd-map`. Do not introduce Cucumber/Behave or another
   BDD runner merely to execute `.feature` files.
+- **Executable test placement and naming:** product test source belongs next
+  to the product package in its established `test/` or `tests/` tree;
+  `docs/audit/` is reserved for review records, receipts, reports, and other
+  audit evidence, not executable test source. Name test files after the unit,
+  boundary, or behavior they verify (for example,
+  `client-fingerprint-policy.test.js`), never after a roadmap, slice, or task
+  identifier. Keep task traceability in the task ledger, evidence references,
+  and case IDs instead of encoding it in the filename.
 
 ## Per-task discipline
 

@@ -19,7 +19,7 @@ behavioral_coverage_contract: behavior-v2
 - Original `P2.T1` RRI 78 parent: **SUPERSEDED / NON-EXECUTABLE** by lower-RRI decomposition.
 - `P2.T1a`-`P2.T1f`: **Done / owner-approved as the complete P2.T1 persistence outcome on 2026-09-06**. Do not reopen for retrospective review.
 - `P2.C0`: **PASS 2026-09-06 — RRI 66 Complex / Effort L**. Owner approved the ten-path docs/fixture freeze; four Reflection passes PASS.
-- P2.T2 and T3a are Done (2026-09-08), including T2c-r and T2g recertification; T4a is Done (2026-09-07). Remaining P2 work is T3b-T3d, T4b-T4f, T5a-T5d, and T6a-T6e (17 planned leaves). Next executable work belongs to the remaining C0-frozen leaf map below. **C0 does not authorize source execution.** Each leaf must run `scripts/rri.py` on its exact current path set and follow the resulting workflow gate immediately before execution.
+- P2.T2, T3a, and T3b are Done, including T2c-r and T2g recertification; T3b was owner-verified on 2026-09-09. T4a is Done (2026-09-07), and T3c has not started. Remaining P2 work is T3c-T3d, T4b-T4f, T5a-T5d, and T6a-T6e. Next executable work belongs to the remaining C0-frozen leaf map below. **C0 does not authorize source execution.** Each leaf must run `scripts/rri.py` on its exact current path set and follow the resulting workflow gate immediately before execution.
 - Review exception: existing owner-directed MVP0-P2P P0-P7 phase-1/phase-2 review override remains in force; it does not waive RRI/HITL/Reflection/tests.
 
 Canonical C0 evidence:
@@ -2147,7 +2147,13 @@ Code-solution review: muse-glimmer (in-session artifact) - PASS
 | `T3a-vi` | Frozen success/error envelope validation + serialization | `apps/availability-node/src/contract.ts` | **25 Low / S** | Done 2026-09-08 | T3a-v |
 | `T3a-vii` | Bounded HTTP ingress/routing adapter | `apps/availability-node/src/server.ts` | **25 Low / S** | Done 2026-09-08 | T3a-vi |
 | `T3a-viii` | Injected publication seam + response/error mapping | `apps/availability-node/src/server.ts` | **25 Low / S** | Done 2026-09-08 | T3a-vii |
-| `T3b` | Private mTLS listener + client-identity policy | `apps/availability-node/src/mtls.ts`; `apps/availability-node/src/server.ts` | RUN BEFORE EXECUTION | Planned | T3a |
+| `T3b` | Private mTLS listener + client-identity policy | decomposed below; product paths remain `apps/availability-node/src/mtls.ts`; `apps/availability-node/src/server.ts` | **100 Very high parent; six 25 Low leaves** | **Done / owner-verified 2026-09-09** | T3a |
+| `T3b-i` | Policy contract-first evidence | `apps/availability-node/test/client-fingerprint-policy.test.js` | **25 Low / S** | Done 2026-09-09 | T3a; parent approval |
+| `T3b-ii` | Exact fingerprint normalization + allow-list decision | `apps/availability-node/src/mtls.ts` | **25 Low / S** | Done 2026-09-09 | T3b-i |
+| `T3b-iii` | Transport contract-first evidence | `apps/availability-node/test/private-mtls-server.test.js` | **25 Low / S** | Done 2026-09-09 | T3b-ii |
+| `T3b-iv` | Fail-closed TLS options + unbound HTTPS server factory | `apps/availability-node/src/mtls.ts` | **25 Low / S** | Done 2026-09-09 | T3b-iii |
+| `T3b-v` | Ingress-guard contract-first evidence | `apps/availability-node/test/private-publication-ingress.test.js` | **25 Low / S** | Done 2026-09-09 | T3b-iv |
+| `T3b-vi` | Authorized mTLS request composition with existing handler | `apps/availability-node/src/server.ts` | **25 Low / S** | Done 2026-09-09 | T3b-v |
 | `T3c` | Persistent Hyperdrive seed/open + idempotency/conflict behavior | `apps/availability-node/src/hyperdrive_store.ts`; `apps/availability-node/src/server.ts` | RUN BEFORE EXECUTION | Planned | T3b |
 | `T3d` | Contract/mTLS/idempotency/traversal/secret certification | `apps/availability-node/test/publication_contract.test.ts`; `apps/availability-node/test/fixtures.ts` | RUN BEFORE EXECUTION | Planned | T3c |
 
@@ -2165,9 +2171,9 @@ verification, and status synchronization.
 
 Implementation, local-delegation lineage, behavioral coverage, four parent
 Reflection passes, and owner final verification are recorded in
-`docs/audit/mvp0-p2p-p2-t3a-implementation.md`. `T3b`, `T3c`, and `T3d`
-remain unstarted: this leaf exposes no listener, has no mTLS/Hyperdrive
-implementation, and carries no claim of `P2P_READY` or full T3 certification.
+`docs/audit/mvp0-p2p-p2-t3a-implementation.md`. T3a itself exposed no listener
+and carried no mTLS/Hyperdrive or `P2P_READY` claim; T3b has since added and
+closed the private mTLS boundary, while T3c and T3d remain unstarted.
 
 ## P2.T3a — Availability Node contract/bootstrap — DONE
 
@@ -2245,6 +2251,150 @@ The complete Draft → Critique → Revise records are in
 The linked implementation audit records the full evidence and local-model
 authorship lineage. This closes only T3a; it does not close the T3 parent or
 authorize T3b-T3d.
+
+## P2.T3b — private mTLS listener and client-identity policy — DONE
+
+- **Type:** development/security
+- **RRI:** 100 Very high / Effort XL parent; decomposed into six RRI 25 Low
+  leaves
+- **Depends on:** T3a Done
+- **Status:** [x] Done 2026-09-09 — owner-verified by Matias
+- **Full RRI/design:** `docs/audit/mvp0-p2p-p2-t3b-rri.md`
+- **Approval card:** `docs/audit/mvp0-p2p-p2-t3b-approval-card.md`
+
+**Objective:** add an unbound, TLS-1.3-minimum `https.Server` factory with
+mandatory trusted client certificates and exact SHA-256 fingerprint policy,
+then compose it with the existing publication ingress so rejected identities
+cannot invoke the publisher.
+
+**Frozen boundaries:**
+
+- `mtls.ts` owns fingerprint normalization/allow-list evaluation and secure
+  unbound HTTPS server construction (`requestCert=true`,
+  `rejectUnauthorized=true`).
+- `server.ts` owns exact 403 mapping for a trusted-but-unlisted certificate and
+  calls the existing handler only after authorization.
+- Pins accept canonical 64-character lowercase SHA-256 hex after normalizing
+  Node's colon-delimited fingerprint representation. Empty, malformed, or
+  duplicate configuration fails closed; comparison is exact and no CN/SAN
+  fallback exists.
+- No `listen()`, environment/file credential loading, Hyperdrive, deployment,
+  Rust client, business authorization, or readiness state enters T3b.
+
+**Happy paths considered:**
+
+- **HP-1:** a CA-trusted client whose exact fingerprint is allow-listed reaches
+  the injected publication handler exactly once.
+- **HP-2:** normalized Node fingerprint and configured compact lowercase pin
+  match exactly; multiple pins permit an explicit certificate-rotation overlap.
+
+**Edge cases considered:**
+
+- **EC-1:** missing/untrusted client certificate fails TLS negotiation and
+  invokes neither handler nor executor.
+- **EC-2:** CA-trusted but unlisted certificate returns exact `403
+  service_identity_rejected` and invokes neither handler nor executor.
+- **EC-3:** missing/malformed/empty pins or weakened TLS options fail closed;
+  no HTTP listener, implicit bind, CN/SAN fallback, or credential logging.
+
+**Evidence to emit:** three bounded Node product tests, RED/GREEN transcripts,
+strict typecheck/build, negative source scan, local delegation lineage, four
+integrated Reflection passes, behavioral coverage table, and owner verification.
+
+**Status artifacts affected:** this ledger; linked plan; roadmap/architecture
+only if their summary is materially stale after closure; T3b implementation
+audit created during execution.
+
+**Local-to-cloud fallback frozen for approval:** Each Qwen-authored test leaf
+gets one bounded attempt (`180s` idle / `900s` wall limit) and at most one
+smaller repair on the same exact path; no alternate local developer is selected
+silently. Empty output first follows the workflow's reduced-context
+resource-recovery probe.
+Only after that repair path is exhausted may the orchestrator invoke
+`scripts/delegate-low-rri.py --terminal-cloud-escalation --rri 25` to emit an
+ADR-039 `fallback-selection-v1` artifact bound to the exact escalation packet.
+Approval of the linked card preauthorizes role `cloud-implementer`, model
+`gpt-5.6-luna`, reasoning effort `low`, selected by `Matias (P2.T3b approval)`.
+The receipt must validate before a context-bounded cloud implementer starts.
+A changed packet, missing/stale receipt, or unavailable Luna stops fail-closed;
+selecting another model requires `human-select`. D14 is review-only and cannot
+author the fallback patch.
+
+**Handoff prompt:** Execute `T3b-i` through `T3b-vi` strictly in order. Qwen
+Developer authors only the three audit-test leaves. Codex authors the three
+security-sensitive product leaves under the exact contracts above. Stop on any
+scope expansion, inability to obtain RED for the intended reason, TLS downgrade,
+identity ambiguity, or executor call before authorization. Do not start T3c.
+
+**Review disposition:**
+
+Task-analysis review: n/a - REVIEW-OVERRIDE: urgency, see
+`docs/audit/mvp0-p2p-review-exception.md`
+
+- REVIEW-OVERRIDE: urgency — explicit owner-directed MVP0-P2P exception.
+- Waiver-by: Matias, repository owner
+- Scope-note: skips only phase-1 and phase-2 peer review; RRI, approval, tests,
+  four Reflections, owner verification, and status synchronization remain
+  mandatory.
+
+**Implementation evidence:**
+`docs/audit/mvp0-p2p-p2-t3b-implementation.md`
+
+### Reflection log
+
+Required passes: 4 (`100` Very high parent; four-pass Complex closure floor)
+
+#### Pass 1 — contract and identity semantics
+
+- **Draft verdict:** CA trust and exact normalized SHA-256 identity gate the
+  existing publication handler.
+- **Critique findings:** no production defect; exact pins, rotation overlap,
+  malformed/duplicate configuration, and absent identity are covered.
+- **Revisions applied:** none.
+
+#### Pass 2 — failure boundaries
+
+- **Draft verdict:** missing/untrusted certificates fail TLS; trusted-unlisted
+  identity returns exact 403 with zero publisher calls.
+- **Critique findings:** missing-certificate options initially retained
+  explicit `undefined` properties; missing top-level configuration lacked
+  direct assertions.
+- **Revisions applied:** omit credential properties for the missing client;
+  assert absent allow-list and credential configuration.
+
+#### Pass 3 — scope and downgrade resistance
+
+- **Draft verdict:** the server is unbound and caller downgrade fields cannot
+  weaken TLS 1.3, client-certificate request, or authorization.
+- **Critique findings:** no out-of-scope source or CN/SAN fallback found.
+- **Revisions applied:** none; the negative source scan passed.
+
+#### Pass 4 — evidence and regression
+
+- **Draft verdict:** all T3b behavior and T3a regressions pass together.
+- **Critique findings:** `.test.cjs` was executable but unsupported by the
+  repository's `behavior-v2` evidence suffix validator.
+- **Revisions applied:** converted tests to package-native ESM `.test.js` and
+  reran all gates successfully.
+
+### Behavioral coverage certification
+
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| HP-1 | Happy path | trusted and allow-listed certificate reaches publisher exactly once | integration | `apps/availability-node/test/private-publication-ingress.test.js::private publication ingress rejects unauthorized client identities` | passed |
+| HP-2 | Happy path | Node and compact SHA-256 representations normalize exactly; two explicit pins overlap for rotation | unit | `apps/availability-node/test/client-fingerprint-policy.test.js::normalizeSha256Fingerprint and createClientFingerprintPolicy accept exact identities` | passed |
+| EC-1 | Edge case | missing or untrusted certificate fails TLS with zero publisher calls | integration | `apps/availability-node/test/private-publication-ingress.test.js::private publication ingress rejects unauthorized client identities` | passed |
+| EC-2 | Edge case | trusted-unlisted certificate receives exact 403 with zero publisher calls | integration | `apps/availability-node/test/private-publication-ingress.test.js::private publication ingress rejects unauthorized client identities` | passed |
+| EC-3 | Edge case | invalid configuration and downgrade attempts fail closed | component | `apps/availability-node/test/client-fingerprint-policy.test.js::Configuration fail-closed`; `apps/availability-node/test/private-mtls-server.test.js::unbound HTTPS server factory enforces fail-closed mTLS options` | passed |
+
+### Owner final verification
+
+- Owner: Matias
+- Date: 2026-09-09
+- Statement: Owner supplied the integrated verification result confirming that
+  every mapped T3b happy path and edge case, together with all T3a regressions,
+  passed: 9/9 tests, 0 failures, 0 skipped.
+- Commands run: `node --test apps/availability-node/test/*.test.js docs/audit/mvp0-p2p-p2-t3a-contract.test.js docs/audit/mvp0-p2p-p2-t3a-http.test.js`.
 
 ## P2.T4 — O4 dispatcher and reconciler
 

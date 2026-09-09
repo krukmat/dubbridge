@@ -1,4 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { Server as HttpsServer } from "node:https";
+import { TLSSocket } from "node:tls";
 import { TextDecoder } from "node:util";
 import {
   PATH_PREFIX,
@@ -12,6 +14,11 @@ import {
   type PublicationRequest,
   type PublicationHttpResponse,
 } from "./contract.js";
+import {
+  createClientFingerprintPolicy,
+  createPrivateMtlsServer,
+  type PrivateMtlsCredentials,
+} from "./mtls.js";
 
 export const MAX_REQUEST_BODY_BYTES = 64 * 1024;
 
@@ -186,6 +193,33 @@ export function createPublicationHandler(
       }
     });
   };
+}
+
+export function createPrivatePublicationServer(
+  credentials: PrivateMtlsCredentials,
+  allowedClientFingerprints: readonly string[],
+  publisher: PublicationExecutor = unavailablePublicationExecutor
+): HttpsServer {
+  const identityAllowed = createClientFingerprintPolicy(allowedClientFingerprints);
+  const publicationHandler = createPublicationHandler(publisher);
+
+  return createPrivateMtlsServer(credentials, (request, response) => {
+    const socket = request.socket;
+    const fingerprint =
+      socket instanceof TLSSocket && socket.authorized
+        ? socket.getPeerCertificate().fingerprint256
+        : undefined;
+
+    if (!identityAllowed(fingerprint)) {
+      sendPublicationResponse(
+        response,
+        createPublicationError("service_identity_rejected")
+      );
+      return;
+    }
+
+    publicationHandler(request, response);
+  });
 }
 
 function sendPublicationResponse(response: ServerResponse, pubResponse: PublicationHttpResponse): void {
