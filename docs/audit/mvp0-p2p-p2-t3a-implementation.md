@@ -65,9 +65,28 @@ Writable product files stayed inside the approved parent envelope:
   revalidated. Malformed, mismatched, thrown-unknown, or otherwise ambiguous
   results become `503 publication_unavailable`.
 
+## Antares touchpoints
+
+- Refinement: `TYPED-SKIP — no task-relevant CWE hypothesis on the T3a
+  watchlist; apps/availability-node does not match the current watched
+  crates/db, apps/api, or crates/storage surfaces.`
+- Post-implementation: `TYPED-SKIP — the candidate snapshot introduces no
+  task-relevant watchlist hypothesis; no generic Antares sweep was run.`
+
+## Task-analysis review
+
+`Task-analysis review: n/a - REVIEW-OVERRIDE: urgency, see
+docs/audit/gemma-review-overrides.md row P2.T3a`
+
+- REVIEW-OVERRIDE: urgency — explicit owner-directed MVP0-P2P exception.
+- Waiver-by: Matias, repository owner.
+- Scope-note: skips only phase-1 peer review; RRI, approval, tests, Reflection,
+  status synchronization, and owner final verification remain mandatory.
+
 ## Code-solution review
 
-`Code-solution review: REVIEW-OVERRIDE - explicit owner-directed MVP0-P2P exception`
+`Code-solution review: n/a - REVIEW-OVERRIDE: urgency, see
+docs/audit/gemma-review-overrides.md row P2.T3a`
 
 - REVIEW-OVERRIDE: urgency — explicit owner-directed MVP0-P2P exception.
 - Waiver-by: Matias, repository owner.
@@ -79,19 +98,29 @@ Writable product files stayed inside the approved parent envelope:
 
 | Case ID | Type | Behavior | Layer | Executable evidence | Result |
 |---|---|---|---|---|---|
-| HP-T3a-1 | Happy path | frozen request and 201 evidence round-trip through the exact v1 contract | contract | C0 fixture/deny-list Node assertion matrix against `dist/contract.js` | passed |
-| HP-T3a-2 | Happy path | validated ingress invokes the injected executor once and emits exact 201/200 evidence | integration | ephemeral Node HTTP/executor matrix against `dist/server.js` | passed |
-| EC-T3a-1 | Edge case | unknown/secret-bearing fields and unsafe package references fail closed before executor invocation | contract | C0 fixture/deny-list and HTTP invalid-before-publisher matrices | passed |
-| EC-T3a-2 | Edge case | unsupported ingress and malformed, mismatched, or ambiguous executor results map to a frozen error and never imply readiness | integration | ephemeral Node HTTP/executor matrix plus negative source-boundary scan | passed |
+| HP-1 | Happy path | frozen request and 201 evidence round-trip through the exact v1 contract | contract | `docs/audit/mvp0-p2p-p2-t3a-contract.test.js::HP-1` | passed |
+| HP-2 | Happy path | validated ingress invokes the injected executor once and emits exact 201/200 evidence | integration | `docs/audit/mvp0-p2p-p2-t3a-http.test.js::HP-2` | passed |
+| EC-1 | Edge case | unknown/secret-bearing fields and unsafe package references fail closed before executor invocation | contract | `docs/audit/mvp0-p2p-p2-t3a-contract.test.js::EC-1` and `docs/audit/mvp0-p2p-p2-t3a-http.test.js::EC-2` | passed |
+| EC-2 | Edge case | unsupported ingress and malformed, mismatched, or ambiguous executor results map to a frozen error and never imply readiness | integration | `docs/audit/mvp0-p2p-p2-t3a-http.test.js::EC-2` plus negative source-boundary scan | passed |
 
 Supporting gates also passed: deterministic `npm ci`, zero runtime dependency
 vulnerabilities, strict typecheck/build, and `git diff --check`. The case IDs
 above formalize the acceptance boundaries approved in the T3a RRI artifact;
 they add no behavior to the implemented scope.
 
-The inline matrices are the bounded executable evidence required by T3a.
-Tracked contract/mTLS/idempotency/traversal/secret certification files remain
-owned by `T3d`; this record does not claim that later full-T3 gate.
+The two tracked Node test runners are the bounded, reproducible executable
+evidence required by T3a. Run them after `npm run build` with:
+
+```bash
+node --test docs/audit/mvp0-p2p-p2-t3a-contract.test.js \
+  docs/audit/mvp0-p2p-p2-t3a-http.test.js
+```
+
+The first closure rerun used an invalid uppercase check against an all-numeric
+fixture UUID; the harness was corrected to exercise an alphabetic uppercase
+UUID and then passed. No product code changed. The broader tracked contract/
+mTLS/idempotency/traversal/secret certification files remain owned by `T3d`;
+this record does not claim that later full-T3 gate.
 
 ## Parent Reflection — 4/4 PASS
 
@@ -146,12 +175,7 @@ owned by `T3d`; this record does not claim that later full-T3 gate.
   executable evidence at the declared layer, that the implementation remains
   inside the approved contract/bootstrap boundary, and that T3b-T3d remain
   unstarted and separately gated.
-- Commands run: `npm --prefix apps/availability-node ci --ignore-scripts
-  --no-audit --no-fund`; `npm --prefix apps/availability-node audit --omit=dev
-  --json`; `npm --prefix apps/availability-node run typecheck`; `npm --prefix
-  apps/availability-node run build`; C0 fixture/deny-list Node assertion
-  matrix; ephemeral Node HTTP/executor matrix; negative source-boundary scan;
-  `make qa-docs`; `git diff --check`.
+- Commands run: `npm --prefix apps/availability-node ci --ignore-scripts --no-audit --no-fund`; `npm --prefix apps/availability-node audit --omit=dev --json`; `npm --prefix apps/availability-node run typecheck`; `npm --prefix apps/availability-node run build`; `node --test docs/audit/mvp0-p2p-p2-t3a-contract.test.js docs/audit/mvp0-p2p-p2-t3a-http.test.js`; `if rg -n 'createServer|listen\(|hyperdrive|postgres|plaintext_ck|server_kek|P2P_READY' apps/availability-node/src; then exit 1; fi`; `make qa-docs`; `git diff --check`.
 
 T3a is `Done`. The next executable dependency is `T3b`; its RRI and approval
 gate must be run separately before implementation.

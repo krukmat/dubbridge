@@ -115,6 +115,9 @@ leaf.
 
 ## Review disposition
 
+Task-analysis review: n/a - REVIEW-OVERRIDE: urgency, see
+`docs/audit/gemma-review-overrides.md` row `P2.T3a`
+
 - REVIEW-OVERRIDE: urgency — explicit owner-directed MVP0-P2P exception.
 - Waiver-by: Matias, repository owner.
 - Scope-note: skips only phase-1 and phase-2 peer review; the exception expires

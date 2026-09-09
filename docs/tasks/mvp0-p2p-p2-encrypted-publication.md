@@ -2169,14 +2169,82 @@ Reflection passes, and owner final verification are recorded in
 remain unstarted: this leaf exposes no listener, has no mTLS/Hyperdrive
 implementation, and carries no claim of `P2P_READY` or full T3 certification.
 
-### P2.T3a closure record — Done 2026-09-08
+## P2.T3a — Availability Node contract/bootstrap — DONE
 
-Code-solution review: REVIEW-OVERRIDE - explicit owner-directed MVP0-P2P exception
+- **Type:** development
+- **RRI:** 70 Complex / Effort L parent, decomposed into eight RRI 25 Low leaves
+- **Status:** [x] Done 2026-09-08 — owner-verified by Matias
 
-The linked implementation audit records the complete behavioral coverage
-certification, four parent Reflection passes, local-model authorship lineage,
-verification commands, and owner final verification by Matias. This closes
-only T3a; it does not close the T3 parent or authorize T3b-T3d.
+### Happy paths considered
+
+- **HP-1:** the C0-frozen request and 201 evidence round-trip through the exact
+  `availability-publication-v1` boundary.
+- **HP-2:** validated ingress invokes the injected executor once and emits exact
+  201/200 evidence.
+
+### Edge cases considered
+
+- **EC-1:** secret-bearing extra fields and unsafe package references fail
+  closed before executor invocation.
+- **EC-2:** unsupported ingress plus malformed, mismatched, or ambiguous
+  executor results return a frozen error and never imply readiness.
+
+### Review disposition
+
+Task-analysis review: n/a - REVIEW-OVERRIDE: urgency, see
+`docs/audit/gemma-review-overrides.md` row `P2.T3a`
+
+Code-solution review: n/a - REVIEW-OVERRIDE: urgency, see
+`docs/audit/gemma-review-overrides.md` row `P2.T3a`
+
+- REVIEW-OVERRIDE: urgency — explicit owner-directed MVP0-P2P exception.
+- Waiver-by: Matias, repository owner
+- Scope-note: phase-1 and phase-2 review only; all other closure gates passed.
+
+### Antares touchpoints
+
+- Refinement: typed skip — no task-relevant CWE hypothesis matched the T3a
+  watchlist.
+- Post-implementation: typed skip — the candidate introduced no task-relevant
+  watchlist hypothesis.
+
+### Reflection log
+
+Required passes: 4 (RRI 70 Complex).
+
+- Pass 1 — Draft: frozen contract/identity; Critique: typecheck did not prove
+  exact field and identity rejection; Revise: fixture assertions added; PASS.
+- Pass 2 — Draft: trust/path boundary; Critique: normalization and secret-field
+  rejection needed executable proof; Revise: deny-list/path cases added; PASS.
+- Pass 3 — Draft: executor outcome mapping; Critique: returned-malformed and
+  directly-thrown outcomes required distinct handling; Revise: both paths were
+  verified with fail-closed 503 behavior; PASS.
+- Pass 4 — Draft: integrated scope; Critique: compiler drift and generated
+  outputs could escape scope; Revise: strict config restored and ignored
+  outputs confirmed; PASS.
+
+The complete Draft → Critique → Revise records are in
+`docs/audit/mvp0-p2p-p2-t3a-implementation.md` § Parent Reflection.
+
+### Behavioral coverage certification
+
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| HP-1 | Happy path | frozen request/evidence round-trip | contract | `docs/audit/mvp0-p2p-p2-t3a-contract.test.js::HP-1` | passed |
+| HP-2 | Happy path | one executor call and exact 201/200 evidence | integration | `docs/audit/mvp0-p2p-p2-t3a-http.test.js::HP-2` | passed |
+| EC-1 | Edge case | secret fields and unsafe package refs fail before executor | contract | `docs/audit/mvp0-p2p-p2-t3a-contract.test.js::EC-1` | passed |
+| EC-2 | Edge case | invalid ingress and ambiguous results fail closed | integration | `docs/audit/mvp0-p2p-p2-t3a-http.test.js::EC-2` | passed |
+
+### Owner final verification
+
+- Owner: Matias
+- Date: 2026-09-08
+- Statement: I verified every happy path and edge case has executable evidence at an appropriate layer and that T3a remains inside its approved contract/bootstrap boundary.
+- Commands run: `npm --prefix apps/availability-node ci --ignore-scripts --no-audit --no-fund`; `npm --prefix apps/availability-node audit --omit=dev --json`; `npm --prefix apps/availability-node run typecheck`; `npm --prefix apps/availability-node run build`; `node --test docs/audit/mvp0-p2p-p2-t3a-contract.test.js docs/audit/mvp0-p2p-p2-t3a-http.test.js`; `if rg -n 'createServer|listen\(|hyperdrive|postgres|plaintext_ck|server_kek|P2P_READY' apps/availability-node/src; then exit 1; fi`; `make qa-docs`; `git diff --check`.
+
+The linked implementation audit records the full evidence and local-model
+authorship lineage. This closes only T3a; it does not close the T3 parent or
+authorize T3b-T3d.
 
 ## P2.T4 — O4 dispatcher and reconciler
 
