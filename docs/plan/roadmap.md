@@ -180,14 +180,14 @@ between T2 and P3: `P2.T3` (Availability Node publication executor; `T3a`
 and `T3b` are Done and owner-verified; `T3c`'s 2026-09-12 preflight resolved
 its D2 blocker — the missing T2-to-volume package materializer — by
 expanding T3c's own envelope with a new Rust leaf in `crates/p2p` rather
-than opening a separate predecessor task; scope is now frozen into two
-leaves (Rust materializer + Node persistent store), both scoring RRI 70
-Complex via `scripts/rri.py`. Complex band requires human plan review before
-implementation, and automated phase-1 review (cross-vendor peer, `codex`)
-could not complete due to a review-wrapper/CLI version mismatch, leaving the
-D14 fallback awaiting an ADR-039 human fallback-selection checkpoint. `T3c`
-is scope-frozen and RRI-scored but **not yet approved or implemented**; see
-`docs/audit/mvp0-p2p-p2-t3c-preflight.md`. `T3d` has a prepared test-only
+than opening a separate predecessor task. The initial two-leaf envelope was
+then refined into eight implementation/integration leaves while the parent
+remains RRI 70 Complex via `scripts/rri.py`. Matias approved the frozen
+parent envelope at its HITL checkpoint on 2026-09-12 for later in-scope
+execution in dependency order. `T3c-S0`, `T3c-S1a`, and `T3c-S2a` are Done
+(`T3c-S2a` owner-verified 2026-09-12), and the other leaves remain unstarted. The
+approval does not authorize scope expansion or bypass leaf-specific technical
+gates. See `docs/audit/mvp0-p2p-p2-t3c-preflight.md`. `T3d` has a prepared test-only
 definition and remains blocked on T3c),
 `P2.T4` (O4 dispatch + reconciliation; only `T4a` is `Done
 2026-09-07`, `T4b`–`T4f` remain `Planned`), `P2.T5` (S-120 integration +

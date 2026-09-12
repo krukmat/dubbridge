@@ -433,19 +433,25 @@ implementation planning; does not change the frozen parent RRI)
 | T3c-S4 | 70 | Complex | S1b, S2b, S3 |
 | T3c-Integ | 70 (inherited, not independently routable) | Complex | all of the above |
 
-None of these subtasks are approved for implementation. This pass only
-refines the decomposition already frozen under "Alcance congelado"; the
-parent approval requirement, band-resolved review chain, and 4-pass
-Reflection gate stated in § RRI above remain unchanged and still govern
-T3c as a whole.
+On 2026-09-12 Matias approved the frozen `P2.T3c` parent envelope at its
+RRI-70 HITL checkpoint; evidence:
+`.agent/p2-t3c/parent-hitl-approval.json`. The approval is retained for later
+execution of the eight named leaves in dependency order. It does not approve
+scope expansion, changed invariants, new writable paths, or bypass any
+leaf-specific RRI, review, Reflection, verification, or closure gate. S2a was
+separately approved for execution in the same instruction; the other
+unstarted leaves are not being executed by that instruction alone.
 
 Task-analysis review (this section): d14 `.agent/p2-t3c/phase1-review.json`
-covers the frozen Leaf A/Leaf B envelope this section refines; no separate
-phase-1 packet was built for the eight-leaf table since none of these
-leaves are yet approved or being delegated. A dedicated phase-1 pass is
-required for each leaf's own delegation packet before it is sent, per
-`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Per-task discipline, at the time
-implementation is actually approved.
+covers the frozen Leaf A/Leaf B envelope this section refines. Every leaf's
+exact delegation packet requires a dedicated phase-1 pass before it is sent,
+per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Per-task discipline. S2a's
+frozen packet and owner disposition are `.agent/p2-t3c/s2a-phase1-packet.md`
+and `.agent/p2-t3c/s2a-phase1-disposition.json`. The disposition omits a
+false generated `reviewer: gemma` attribution and accepts the defect-free
+substantive analysis without another token-spending pass, per explicit owner
+instruction. The parent gate was subsequently satisfied by Matias on
+2026-09-12; see `.agent/p2-t3c/parent-hitl-approval.json`.
 
 ### T3c-S0 — implemented and closed (2026-09-12)
 
@@ -489,3 +495,36 @@ and behavioral coverage certification recorded in
 "P2.T3c-S1a — atomic tmp-file + rename write primitive — DONE". This closure
 does not change T3c's own Complex-band RRI, approval gate, or the
 still-unapproved status of the remaining leaves in the table above.
+
+### T3c-S2a — implemented and closed (2026-09-12)
+
+Owner-approved for execution separately from the parent HITL gate
+(`.agent/p2-t3c/s2a-execution-approval.json`), scoped to this one leaf only.
+Delivered `apps/availability-node/src/publication_record.ts` (pure
+`encodePublicationRecord`/`decodePublicationRecord` codec over the existing
+C0 `PublicationEvidence` shape, reusing `parsePublicationResponse` for
+validation, no filesystem/network I/O) and its focused
+`test/publication-record.test.js`. This delegation packet required and
+received its own dedicated phase-1 review, separate from the task-level
+packet named above. `gpt-oss:20b` was unusable at both the production and a
+reduced profile (`done_reason: "length"`, 0 content chars, `think:false`
+ignored — the same capacity symptom `S1a` hit); fell back to
+`gemma4:26b-a4b-it-qat`, which returned one finding, independently verified
+against `contract.ts` and disposed as a false positive (no ambiguity exists:
+every `PublicationContractError` reachable from `parsePublicationResponse` is
+already `"invalid_contract"`). The Qwen Developer full-file attempt (safe
+here since both files are new) matched the frozen contract closely; applying
+it surfaced three real TypeScript compile errors (RED) from
+`parsePublicationResponse`'s un-narrowed union return type, repaired directly
+by the orchestrator as a bounded, purely mechanical type-narrowing fix (no
+behavior/contract/test change). All verification is GREEN: typecheck, build,
+the 4 focused tests, and the full 9-test Availability Node suite. Phase-2
+review (`gemma4:26b-a4b-it-qat`, `gpt-oss:20b` skipped after two unusable
+attempts in-session) passed with 0 findings; D14 was not needed at either
+phase. Full routing evidence, RED/GREEN transcript, Reflection log, and
+behavioral coverage certification recorded in
+`docs/tasks/mvp0-p2p-p2-encrypted-publication.md` §
+"P2.T3c-S2a — deterministic durable publication-record codec". Owner final-verification sign-off (workflow-guide closure Step 4) was
+recorded 2026-09-12; this leaf is `[x] Done`. This closure does not change
+T3c's own Complex-band RRI, approval gate, or the still-unapproved status of
+the remaining leaves in the table above.

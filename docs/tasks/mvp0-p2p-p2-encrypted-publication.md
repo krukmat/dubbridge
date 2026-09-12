@@ -19,7 +19,7 @@ behavioral_coverage_contract: behavior-v2
 - Original `P2.T1` RRI 78 parent: **SUPERSEDED / NON-EXECUTABLE** by lower-RRI decomposition.
 - `P2.T1a`-`P2.T1f`: **Done / owner-approved as the complete P2.T1 persistence outcome on 2026-09-06**. Do not reopen for retrospective review.
 - `P2.C0`: **PASS 2026-09-06 — RRI 66 Complex / Effort L**. Owner approved the ten-path docs/fixture freeze; four Reflection passes PASS.
-- P2.T2, T3a, and T3b are Done, including T2c-r and T2g recertification; T3b was owner-verified on 2026-09-09. T4a is Done (2026-09-07). T3c has not started. Its 2026-09-12 preflight stopped at mandatory decision D2: T2 has no implemented writer that materializes the in-memory `SealedPackage` beneath the shared ciphertext root, and no canonical manifest filename/durable handoff is frozen. T3c is therefore **blocked before RRI, phase-1 review, approval, or execution** until a separately scoped T2-to-T3 package-materialization predecessor is defined, approved, and completed. Remaining P2 work is that predecessor, T3c-T3d, T4b-T4f, T5a-T5d, and T6a-T6e. **C0 does not authorize source execution.** Each executable leaf must freeze its exact current path set, run `scripts/rri.py`, and follow the resulting workflow gate immediately before execution.
+- P2.T2, T3a, and T3b are Done, including T2c-r and T2g recertification; T3b was owner-verified on 2026-09-09. T4a is Done (2026-09-07). T3c's 2026-09-12 preflight resolved D2 by expanding T3c with a Rust materializer and decomposed the parent into eight implementation/integration leaves. T3c-S0 and T3c-S1a are Done. On 2026-09-12 Matias approved the frozen RRI-70 `P2.T3c` parent envelope at its HITL checkpoint and separately approved `P2.T3c-S2a` for execution; evidence: `.agent/p2-t3c/parent-hitl-approval.json` and `.agent/p2-t3c/s2a-execution-approval.json`. This parent approval is retained for later in-scope leaves, without authorizing scope expansion or out-of-order execution. T3c-S2a is `[x] Done` (owner-verified 2026-09-12); see its closure record. T3c-S3, S1b, S2b, S4, and T3c-Integ remain unstarted. T3d remains blocked on T3c. Each executable leaf must still freeze its exact current path set, run `scripts/rri.py`, and follow the resulting workflow route immediately before execution.
 - Review exception: existing owner-directed MVP0-P2P P0-P7 phase-1/phase-2 review override remains in force; it does not waive RRI/HITL/Reflection/tests.
 
 Canonical C0 evidence:
@@ -2154,7 +2154,7 @@ Code-solution review: muse-glimmer (in-session artifact) - PASS
 | `T3b-iv` | Fail-closed TLS options + unbound HTTPS server factory | `apps/availability-node/src/mtls.ts` | **25 Low / S** | Done 2026-09-09 | T3b-iii |
 | `T3b-v` | Ingress-guard contract-first evidence | `apps/availability-node/test/private-publication-ingress.test.js` | **25 Low / S** | Done 2026-09-09 | T3b-iv |
 | `T3b-vi` | Authorized mTLS request composition with existing handler | `apps/availability-node/src/server.ts` | **25 Low / S** | Done 2026-09-09 | T3b-v |
-| `T3c` | Persistent Hyperdrive seed/open + idempotency/conflict behavior | candidate envelope below; freeze before RRI | NOT RUN — BLOCKED | Blocked at preflight D2; package-materialization predecessor required | T3b; T2 contract; missing materialization predecessor |
+| `T3c` | Persistent Hyperdrive seed/open + idempotency/conflict behavior | frozen parent plus eight-leaf decomposition below | **70 Complex / L** | Parent awaiting HITL approval; S0/S1a Done; S2a staged; remaining leaves unstarted | T3b; T2 contract |
 | `T3d` | Contract/mTLS/idempotency/traversal/secret certification | `apps/availability-node/test/publication-contract.test.js`; `apps/availability-node/test/fixtures.js` | RUN BEFORE EXECUTION | Planned — definition prepared; blocked on T3c | T3c |
 
 **HP-T3-1:** authenticated same publication+lineage+manifest digest returns stable publication evidence.  
@@ -2407,7 +2407,7 @@ Required passes: 4 (`100` Very high parent; four-pass Complex closure floor)
   passed: 9/9 tests, 0 failures, 0 skipped.
 - Commands run: `node --test apps/availability-node/test/*.test.js docs/audit/mvp0-p2p-p2-t3a-contract.test.js docs/audit/mvp0-p2p-p2-t3a-http.test.js`.
 
-## P2.T3c — persistent Hyperdrive publication and stable replay — SCOPE FROZEN, AWAITING APPROVAL
+## P2.T3c — persistent Hyperdrive publication and stable replay — SCOPE FROZEN, HITL APPROVED (2026-09-12)
 
 - **Type:** development / persistent storage / distributed side effect
 - **Effort:** L (RRI 70, Complex band — see RRI evidence below).
@@ -2421,25 +2421,25 @@ Required passes: 4 (`100` Very high parent; four-pass Complex closure floor)
   Leaf B: Availability Node persistent store). Parent and both leaves score
   **RRI 70 — Complex (56-70)** via `scripts/rri.py` (ADR-045 v2 authority).
   Complex band requires mandatory decomposition before implementation
-  (satisfied by the Leaf A/Leaf B split) and human review of the plan before
-  any implementation starts. **Phase-1 review could not complete
-  automatically**: the RRI 56+ cross-vendor peer route resolves to `codex`,
-  but `scripts/peer-workflow-review.py`'s Codex invocation
-  (`codex review --stdin`) does not match the installed Codex CLI's syntax
-  (`codex review [--config...] [PROMPT|-]`) and fails; the script correctly
-  fell back toward D14, which under ADR-039 requires a human
-  `fallback-selection-v1` checkpoint (model, reasoning effort, selector) that
-  is not yet provided. **No implementation is authorized.** This is a
-  presentation-only update: no Availability Node or `crates/p2p` source was
-  changed.
+  (satisfied by the recorded decomposition) and human review of the plan before
+  any remaining implementation starts. The original two-leaf packet later
+  received the recorded D14 same-provider-degraded phase-1 PASS. That PASS
+  predates the eight-leaf supplementary decomposition and is not a substitute
+  for each leaf's mandatory packet-specific phase-1 review. T3c-S0 and T3c-S1a
+  later closed under explicit leaf-specific owner authorizations; those
+  approvals did not approve the remaining parent envelope. On 2026-09-12,
+  Matias explicitly approved the frozen parent at its HITL checkpoint; the
+  durable record is `.agent/p2-t3c/parent-hitl-approval.json`. The approval
+  covers later execution of the eight named leaves in dependency order, but
+  does not cover changed invariants, new paths, or scope expansion.
 - **Preflight evidence:**
   `docs/audit/mvp0-p2p-p2-t3c-preflight.md` (status: `complete`,
   `ALCANCE CONGELADO`).
 - **RRI evidence:** `.agent/p2-t3c/parent-rri.md`, `leaf-a-rri.md`,
   `leaf-b-rri.md`.
 - **Phase-1 review evidence:** `.agent/p2-t3c/phase1-packet.md`,
-  `.agent/p2-t3c/phase1-review.json` (`verdict: awaiting_fallback_selection`),
-  `.agent/p2-t3c/phase1-review.fallback-selection.json`.
+  `.agent/p2-t3c/phase1-review.json` (`verdict: PASS`, original two-leaf
+  packet), `.agent/p2-t3c/phase1-review.fallback-selection.json`.
 - **Orchestrator runbook:**
   `docs/playbooks/P2_T3C_ORCHESTRATOR_RUNBOOK.md` contains the ordered,
   T3c-only procedure; it stops before T3d.
@@ -2762,6 +2762,209 @@ not wire the module into `lib.rs`, does not implement `T3c-S1b`'s package
 materializer, and does not change T3c's own Complex-band RRI, approval gate,
 or the still-unapproved status of the remaining leaves (`S2a`, `S1b`, `S2b`,
 `S4`, `T3c-Integ`).
+
+### P2.T3c-S2a — deterministic durable publication-record codec — [x] Done (2026-09-12)
+
+- **Type:** development, pure TypeScript codec, RRI 0-25 Low band.
+- **RRI:** 25 — Low / Effort S. Recomputed with
+  `scripts/rri.py --touches apps/availability-node/src/publication_record.ts
+  --touches apps/availability-node/test/publication-record.test.js --cc 4
+  --D 1 --K 0 --P 1 --T 1 --A 0 --X 0`; full report:
+  `.agent/p2-t3c/s2a-rri.md`.
+- **Approval:** Matias approved both this frozen leaf for execution and the
+  RRI-70 parent HITL envelope on 2026-09-12. Evidence:
+  `.agent/p2-t3c/s2a-execution-approval.json` and
+  `.agent/p2-t3c/parent-hitl-approval.json`. The parent approval is retained
+  for later named leaves; it does not broaden scope or bypass dependency,
+  review, Reflection, verification, or closure gates.
+- **Depends on:** the frozen C0 `PublicationEvidence` contract in
+  `apps/availability-node/src/contract.ts`; no implementation dependency on
+  another T3c leaf. Downstream `T3c-S2b` depends on S2a and S3.
+- **Objective:** add a pure, strict, deterministic codec for the Node-local
+  durable publication record so S2b can persist and reload the exact accepted
+  C0 evidence without owning schema validation.
+- **Allowed paths:**
+  - `apps/availability-node/src/publication_record.ts` (new)
+  - `apps/availability-node/test/publication-record.test.js` (new)
+- **Out of scope:** filesystem calls; index layout, locking, atomic writes, or
+  recovery; Hyperdrive/Corestore/Hyperswarm; network/server wiring; dependency
+  changes; edits to `contract.ts`; PostgreSQL; readiness state; any T3c leaf
+  other than S2a.
+- **Frozen contract:**
+  - `PublicationRecord` is the exact seven-field `PublicationEvidence` shape;
+    `contract_version: "availability-publication-v1"` is its version marker.
+    S2a introduces no second record-version vocabulary.
+  - `encodePublicationRecord(record)` validates through the existing C0
+    response validator, projects fields in `EVIDENCE_FIELDS` order, and returns
+    the one canonical UTF-8 `JSON.stringify` byte sequence with no whitespace or
+    trailing newline.
+  - `decodePublicationRecord(bytes)` uses fatal UTF-8 decoding, parses JSON,
+    validates the exact C0 evidence shape, re-encodes it, and rejects unless the
+    input bytes equal that canonical encoding. It performs no I/O.
+  - Invalid input raises `PublicationContractError("invalid_contract")`; no new
+    wire/storage error code is introduced.
+- **Acceptance criteria:**
+  - **HP-S2a-1:** valid C0 evidence encodes to the frozen field order and decodes
+    byte-for-byte to the same seven values.
+  - **HP-S2a-2:** repeated encoding of the same logical record is byte-identical.
+  - **EC-S2a-1:** malformed UTF-8/JSON, non-object values, missing/extra/wrong-
+    type fields, invalid UUID/SHA-256/RFC3339/control-character values, and the
+    wrong `contract_version` fail with `invalid_contract`.
+  - **EC-S2a-2:** semantically equivalent but non-canonical JSON (field reorder,
+    whitespace, duplicate keys, or trailing newline/data) is rejected.
+- **Verification:**
+  `npm --prefix apps/availability-node run typecheck`;
+  `npm --prefix apps/availability-node run build`;
+  `node --test apps/availability-node/test/publication-record.test.js`;
+  existing Availability Node tests; `git diff --check`.
+- **Evidence to emit:** RED/GREEN focused transcript; exact generated diff;
+  phase-1 and phase-2 review artifacts; behavioral coverage table; owner final
+  verification.
+- **Status artifacts affected:** this ledger; T3c preflight leaf-status section;
+  P2 plan only if execution changes T3c readiness. Parent/roadmap/T3d status
+  remains unchanged when S2a alone closes.
+- **Implementation route after parent approval:** the one-per-task Ollama
+  restart/precheck is complete in `.agent/p2-t3c/s2a-phase1-precheck.json` and
+  the packet-specific task analysis is owner-disposed as recorded below;
+  bounded Qwen Developer (`qwen3.8:27b-mlx`) delegation follows, then
+  orchestrator scope/diff/test validation, at most one packet-reviewed repair,
+  Low-band phase-2 review and reviewer-output Reflection, behavioral
+  certification, and owner verification.
+- **Handoff prompt:** `P2.T3c-S2a — add only publication_record.ts and its
+  focused JS test. Implement the frozen exact-C0-evidence canonical UTF-8 JSON
+  codec, with no filesystem/network/index/Hyperdrive behavior and no edits to
+  contract.ts. Stop after focused/full Availability Node verification and the
+  required Low-band review evidence.`
+- **Task-analysis review:** owner-disposition
+  `.agent/p2-t3c/s2a-phase1-disposition.json` - PASS WITH OWNER WAIVER. The raw
+  substantive result found no defects, but its generated `reviewer: gemma`
+  signature was false because the actual model was Qwen. Per the owner's
+  2026-09-12 instruction, the false signature is omitted and no extra model
+  pass is spent when the content is neither hallucinated nor a false positive.
+- **Code-solution review:** `gemma4:26b-a4b-it-qat`
+  `.agent/p2-t3c/s2a-phase2-review.json` - PASS, 0 findings. `gpt-oss:20b`
+  (primary of the RRI 0-25 chain) was skipped for this call after two
+  separate unusable attempts earlier in the same task session (both
+  `done_reason: length` with 0 content characters, ignoring `think:false`
+  and exhausting `num_predict` on hidden thinking tokens — see the phase-1
+  packet review evidence below); went directly to the intermediate fallback
+  per the chain's retry discipline rather than repeat the same failure mode
+  a third time.
+
+### Implementation and closure record (2026-09-12)
+
+**Delegation packet and its own phase-1 review:** this delegation packet
+(`.agent/p2-t3c/s2a-delegation-packet.md`) required and received its own
+phase-1 review, separate from the task-level phase-1 disposition above, per
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Per-task discipline`. `gpt-oss:20b`
+failed twice (full profile `num_ctx=65536`/`num_predict=8192`: >4 min with no
+output, killed; reduced profile `num_ctx=16384`/`num_predict=1024`:
+`done_reason=length`, 0 content chars, 4380 thinking chars — the model
+ignored `think:false`, the same defect class previously fixed for
+`muse-glimmer`). Fell back to `gemma4:26b-a4b-it-qat`, which returned
+`verdict: blocked` with one finding claiming an ambiguity between "throw
+`invalid_contract` on malformed input" and "propagate
+`PublicationContractError` unchanged." Independently verified against
+`apps/availability-node/src/contract.ts` by grepping every
+`PublicationContractError(...)` call site reachable from
+`parsePublicationResponse`: every one uses `"invalid_contract"` only
+(`"package_invalid"` is thrown exclusively inside the unrelated
+`parsePublicationRequest`, never called by this packet), and the error
+class's constructor takes only a single `code` argument with no separate
+message — so no ambiguity exists on any reachable path. Disposed as a
+verified false positive; recorded `verdict: pass` in
+`.agent/p2-t3c/s2a-phase1-packet-review.json`.
+
+**Implementation:** delegated via `scripts/delegate-low-rri.py --mode
+full-file` to Qwen Developer (`qwen3.8:27b-mlx`) for both new files (full-file
+mode is safe here since both are brand-new files, per repo delegation
+practice). Attempt 1 produced a `PATCH` result matching the frozen contract
+closely (correct field order, correct byte-for-byte round-trip contract,
+correct error code). Applying it surfaced three TypeScript compile errors on
+`npm --prefix apps/availability-node run typecheck` — RED evidence:
+`verbatimModuleSyntax` requiring a type-only import for `PublicationEvidence`,
+and two `Property 'evidence' does not exist on type 'PublicationHttpResponse'`
+errors, because `parsePublicationResponse`'s declared return type is the full
+success/error union and a literal `status: 200` argument does not
+automatically narrow it for the type checker. This was repaired directly by
+the orchestrator as a bounded, purely mechanical type-narrowing fix (added
+`import type`, added a small `asEvidence()` helper reusing the same
+`'evidence' in parsed` idiom `contract.ts` itself already uses in
+`serializePublicationBody`) — no behavior, contract, or test change. Full
+RED/GREEN transcript: `.agent/p2-t3c/s2a-red-green.md`.
+
+**Verification (GREEN):** `npm --prefix apps/availability-node run
+typecheck` (exit 0), `npm --prefix apps/availability-node run build` (exit
+0), `node --test apps/availability-node/test/publication-record.test.js`
+(4/4 passing), `node --test apps/availability-node/test/*.test.js` (9/9
+passing, full Availability Node suite), `git diff --check` (exit 0). Scope
+confirmed via `git status --short apps/availability-node/`: exactly the two
+allowed new (`??`) paths, no other file touched, no dependency change, no
+edit to `contract.ts`.
+
+**Reflection log** (Low band; applied to the implementer/reviewer output per
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md`'s RRI 0-25 rule — full text:
+`.agent/p2-t3c/s2a-reflection-log.md`):
+
+- Pass 1 draft verdict: implementation compiles, builds, and passes all
+  focused and full-suite tests after the one bounded orchestrator repair.
+- Critique: verified duplicate-key JSON is correctly rejected via the
+  byte-comparison mechanism (JSON.parse collapses duplicates, so the
+  re-encoded canonical form has fewer bytes than the original serialized
+  duplicate-key input); verified non-object/array/null input to
+  `parsePublicationResponse` fails closed with `invalid_contract` via
+  `contract.ts`'s `isPlainObject` guard, never a raw exception; verified
+  `asEvidence`'s defense-in-depth branch is safe even though currently
+  unreachable for status 200; confirmed no filesystem/network I/O, no new
+  error codes, no new dependencies.
+- Revisions applied: none — no defects found.
+
+### Behavioral coverage certification
+
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| HP-S2a-1 | Happy path | valid evidence encodes in frozen field order and round-trips byte-for-byte | unit | `apps/availability-node/test/publication-record.test.js::"HP: valid evidence encodes in frozen field order and round-trips byte-for-byte"` | passed |
+| HP-S2a-2 | Happy path | repeated encoding of the same logical record is byte-identical | unit | `apps/availability-node/test/publication-record.test.js::"HP: repeated encoding of the same logical record is byte-identical"` | passed |
+| EC-S2a-1 | Edge case | malformed UTF-8/JSON, missing/extra fields, invalid RFC3339, wrong contract_version -> invalid_contract | unit | `apps/availability-node/test/publication-record.test.js::"EC: malformed UTF-8, malformed JSON, and invalid/missing fields are all rejected as invalid_contract"` | passed |
+| EC-S2a-2 | Edge case | reordered/whitespace-padded/trailing-newline non-canonical JSON is rejected | unit | `apps/availability-node/test/publication-record.test.js::"EC: semantically equivalent but non-canonical JSON is rejected"` | passed |
+
+### Gemma Reviewer evidence
+
+- Model: `gemma4:26b-a4b-it-qat` (phase 2); `gemma4:26b-a4b-it-qat` (phase 1
+  packet review, after `gpt-oss:20b` was unusable twice)
+- Command: manual Ollama `/api/chat` invocation (packet-scoped, matching
+  `scripts/gemma-code-review.py`'s reviewer binding for this band)
+- Passes run / usable: 1/1 (phase 1 packet review), 1/1 (phase 2 code
+  review) — `gpt-oss:20b` attempted twice for phase 1 and zero times usable
+  (both empty-content/`done_reason: length`), not attempted for phase 2
+  after the same defect recurred twice in-session
+- Aggregate status: PASS (both phases)
+- Consensus findings: 0 | Pass-specific: 1 (phase 1, verified false positive
+  and rejected) | Disagreement: 0
+- Artifacts: `.agent/p2-t3c/s2a-phase1-packet-review.json`,
+  `.agent/p2-t3c/s2a-phase2-review.json`
+- Isolated adjudicator (D14): not triggered — gemma produced a usable result
+  at both phases
+- D14 provider route: n/a
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted phase-2 PASS as-is; rejected one
+  phase-1 finding as a verified false positive (see verification note above)
+
+### Owner final verification
+
+- Owner: `Matias`
+- Date: `2026-09-12`
+- Statement: I confirm I reviewed the evidence presented (RED/GREEN
+  transcript, Reflection log, phase-1/phase-2 review artifacts, and the
+  behavioral coverage certification table) and authorize marking this task
+  `[x] Done`. I verified every happy path and edge case defined for this
+  task has executable evidence at an appropriate layer that replicates the
+  expected behavior.
+- Commands run: `npm --prefix apps/availability-node run typecheck`,
+  `npm --prefix apps/availability-node run build`,
+  `node --test apps/availability-node/test/publication-record.test.js`,
+  `node --test apps/availability-node/test/*.test.js`, `git diff --check`,
+  `git status --short apps/availability-node/`
 
 - **Objective:** turn the injected T3a/T3b publication seam into a persistent,
   ciphertext-only Hyperdrive/Hyperswarm publisher that returns stable C0 v1
