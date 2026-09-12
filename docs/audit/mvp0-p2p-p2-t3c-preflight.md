@@ -446,3 +446,22 @@ leaves are yet approved or being delegated. A dedicated phase-1 pass is
 required for each leaf's own delegation packet before it is sent, per
 `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Per-task discipline, at the time
 implementation is actually approved.
+
+### T3c-S0 — implemented and closed (2026-09-12)
+
+Owner-approved for implementation the same day as this preflight
+("aprobado para que trabajes en S0"), scoped to this one leaf only —
+S1a/S2a/S3 remain unapproved. Delivered `verify_contained_realpath` plus
+`PathError::SymlinkEscape` in `crates/p2p/src/path.rs`, additive to
+`normalize_path`. Full implementation routing, the two rejected Qwen
+delegation attempts (duplicate-test-module defect; a destructive full-file
+rewrite), the manual mechanical merge, an orchestrator-diagnosed
+nonexistent-ancestor canonicalize bug, and a four-step phase-2 review
+resource-recovery/fallback chain ending in a D14 isolated review that found
+and drove the fix for a genuine dangling-symlink detection gap are recorded
+in `docs/tasks/mvp0-p2p-p2-encrypted-publication.md` §
+"P2.T3c-S0 — symlink-escape containment check — DONE". Final state: 12/12
+`path::` unit tests passing, `fmt`/`clippy` clean, full `dubbridge-p2p`
+crate green. This closure does not change T3c's own Complex-band RRI,
+approval gate, or the still-unapproved status of Leaf A/Leaf B or the other
+seven leaves in the table above.

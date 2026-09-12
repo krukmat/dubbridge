@@ -2463,6 +2463,179 @@ Required passes: 4 (`100` Very high parent; four-pass Complex closure floor)
   Supplementary sub-decomposition pass. **This refines, but does not
   replace or approve,** the frozen Leaf A/Leaf B envelope below; no
   implementation is authorized by this addition.
+
+### P2.T3c-S0 — symlink-escape containment check — DONE (2026-09-12)
+
+- **Type:** development, additive Rust logic, RRI 0-25 Low band.
+- **RRI:** 25 — Low. `scripts/rri.py --touches crates/p2p/src/path.rs --cc 5 --D 1 --K 1 --P 1 --T 1 --A 0 --X 0`.
+- **Objective:** add a filesystem-aware containment check
+  (`verify_contained_realpath`) to `crates/p2p/src/path.rs`, additive to the
+  existing pure-string `normalize_path`, rejecting a symlink escape at any
+  intermediate or final path component before a caller opens a file under a
+  trusted root. Extracted as an independently verifiable Low leaf from the
+  T3c supplementary sub-decomposition; does not itself unblock or implement
+  any part of frozen Leaf A/Leaf B — a later leaf wires it in.
+- **Local stack constraint:** per explicit owner instruction this session
+  ("CODEX no debe usarse. SOLO STACK LOCAL"), Codex was excluded from every
+  phase of this task; only the local Ollama stack and, for the phase-2
+  fallback exhaustion, a context-isolated same-provider Claude subagent
+  (D14) were used.
+
+#### Implementation routing evidence
+
+- **Phase-1 (task-analysis) review:** `gpt-oss:20b`, PASS with one MINOR
+  finding (explicit canonicalize-error-mapping reminder), folded into the
+  delegation packet before dispatch. Artifact:
+  `.agent/p2-t3c/s0-phase1-review.json`.
+- **Delegation attempt 1** (`scripts/delegate-low-rri.py --mode before-after`):
+  produced a diff with a real defect — a second, duplicate
+  `#[cfg(test)] mod tests` block (Rust `E0428`, does not compile). Caught by
+  orchestrator review before applying; never applied to the repository.
+- **Repair attempt 1/1** (`--mode full-file`, in violation of
+  `feedback_full_file_never_for_existing_files` — full-file must never be
+  used against an existing file): produced a catastrophic full-file rewrite
+  that destroyed 5 of 7 pre-existing tests, most of `normalize_path`'s
+  original logic, and reduced `PathError` from 6 variants to 2. Caught by
+  orchestrator review before applying; rejected and never applied. Repair
+  budget (1/1) was exhausted at this point.
+- **Manual mechanical merge (documented exception):** attempt 1's
+  structurally-correct `after_block` logic (everything except the duplicate
+  test-module defect) was merged into the existing file by the orchestrator
+  via targeted edits — a mechanical consolidation of already-Qwen-authored
+  logic, not new orchestrator-authored logic, since the repair budget was
+  already spent and the underlying logic itself (once de-duplicated) was
+  sound.
+- **Orchestrator-diagnosed logic bug:** the merged code failed
+  `test_verify_contained_realpath_valid` (a target under a not-yet-existing
+  subdirectory). Root-caused via a standalone debug binary: the containment
+  check canonicalized `current.parent()` directly, which fails when even the
+  immediate parent doesn't exist yet. Fixed by walking upward to the
+  deepest *existing* ancestor before canonicalizing. This bug existed in
+  both Qwen delegation attempts and neither caught it — only running the
+  tests after the manual merge surfaced it.
+- **Phase-2 (code-solution) review — resource-recovery and fallback chain:**
+  1. `gpt-oss:20b` at production profile (`num_ctx=32768`, `num_predict=1500`,
+     3 passes): 0/3 usable, 2 passes hit `think overrun` — genuine memory-
+     pressure symptom (host had ~830MB free, no models resident before the
+     call).
+  2. Resource-recovery retry, `gpt-oss:20b` at reduced profile
+     (`num_ctx=16384`, `num_predict=800`): stalled — zero log output and a
+     `llama-server` process whose CPU time grew only ~1s/minute over ~20
+     minutes wall time, versus seconds for a healthy pass. Killed
+     (`ollama stop gpt-oss:20b`) rather than waited on indefinitely.
+  3. Intermediate fallback per the RRI 0-25 chain, `gemma4:26b-a4b-it-qat`
+     at the same reduced profile: processed at a healthy rate (~50% CPU
+     sustained) but all 3 passes failed strict response-contract parsing
+     (`missing SUMMARY header`; one pass reached `STATUS: FINDINGS` but
+     without the required header) — a genuine format-contract failure, not
+     a resource symptom (0/3 parsed, 0 think-overrun).
+  4. Mandatory final fallback, **D14** (context-isolated subagent, minimal
+     packet: final diff, acceptance criteria, independently-verified
+     `test`/`fmt`/`clippy` output only — no development transcript). Per the
+     explicit owner "SOLO STACK LOCAL" instruction for this task, the
+     cross-provider attempt (Codex) was not made; D14 ran directly as a
+     same-provider degraded fallback, reason recorded here.
+- **D14 verdict:** FINDINGS.
+  - **BLOCKING** (accepted, fixed): the per-component symlink check gated
+    `symlink_metadata` behind `current.exists()`. `Path::exists()` follows
+    symlinks to stat their *target*, so it silently returns `false` for a
+    dangling symlink (target does not exist) — bypassing the escape check
+    entirely for that case. Independently reproduced with a standalone
+    Rust binary (`/tmp/verify_dangling.rs`) before accepting: confirmed
+    `exists() == false` and `symlink_metadata(...).is_symlink() == true`
+    for the same dangling link. Fixed by checking `symlink_metadata`
+    unconditionally (matching `NotFound` explicitly, treating any other
+    error as `SymlinkEscape`) in both the component walk and the
+    ancestor-walk.
+  - **MAJOR** (accepted, fixed by the same change): the ancestor-walk
+    containment check shared the same `exists()` blind spot, so it could
+    not catch what the component walk missed either.
+  - **MINOR** (acknowledged, no code change): a defensive-robustness note
+    on `Path::parent()` behavior at the root of a relative path — judged
+    unreachable in practice since `current` is always built from the
+    canonicalized (absolute) root.
+  - **MINOR / acknowledged limit** (no code change, not a defect): TOCTOU
+    between the check and a caller's later file use is an inherent
+    limitation of any filesystem-based validation, not specific to this
+    function.
+  - A new regression test,
+    `test_verify_contained_realpath_dangling_symlink_escape`, was added
+    reproducing the exact BLOCKING scenario.
+- **disposition_divergence:** none — all findings accepted as valid; no
+  disagreement between D14 and the orchestrator's independent verification.
+
+#### Gemma Reviewer evidence
+
+- Model: `d14` (context-isolated Claude subagent, same-provider degraded
+  fallback) — reached after `gpt-oss:20b` failed twice (0/3 at 32K genuine
+  memory pressure; stalled ~20min at 16K, killed) and the intermediate
+  fallback `gemma4:26b-a4b-it-qat` produced 0/3 usable passes on a response-
+  format-contract failure (missing `SUMMARY` header).
+- Command: ad hoc `Agent` (general-purpose subagent) invocation carrying the
+  minimal isolated packet (task ID, final diff, acceptance criteria,
+  independently-verified `cargo test`/`fmt`/`clippy` output) — not the
+  Ollama-based `scripts/gemma-code-review.py` path, since all three chain
+  members ahead of D14 were exhausted.
+- Passes run / usable: 1/1 (single D14 invocation, not N-pass consolidation).
+- Aggregate status: `FINDINGS`.
+- Consensus findings: n/a (single pass) | Pass-specific: n/a | Disagreement: 0.
+- Artifacts: D14 verdict text recorded in the implementation routing
+  evidence above (no persisted JSON artifact — single ad hoc subagent
+  call); reproduction script referenced at `/tmp/verify_dangling.rs`
+  (ephemeral, not committed).
+- Isolated adjudicator: `spawned` — trigger: `gpt-oss:20b` and
+  `gemma4:26b-a4b-it-qat` both exhausted per § Availability.
+- D14 provider route: `same-provider-degraded` — reason: explicit owner
+  instruction this session prohibits Codex ("SOLO STACK LOCAL"), so the
+  cross-provider attempt was skipped by direct authorization rather than
+  attempted-and-failed; recorded as a deviation from the default
+  cross-provider-first order for this reason.
+- disposition_divergence: `none`.
+- Primary-agent disposition: accepted all findings; fixed the BLOCKING/MAJOR
+  dangling-symlink gap with a code change plus a new regression test;
+  acknowledged the two MINOR notes without code changes (one judged
+  unreachable, one an inherent, undocumented-but-accepted limitation of any
+  filesystem-based check).
+
+#### Reflection cycle (Low-band, applied to reviewer output)
+
+- **Draft verdict:** implementation compiled, 11/11 (later 12/12) tests
+  passing, fmt/clippy clean, matched every acceptance criterion on paper.
+- **Critique findings:** D14's independent, isolated read caught a real gap
+  the local phase-1 review and the orchestrator's own manual merge both
+  missed — the `exists()`-gated symlink check silently mishandled dangling
+  symlinks. This is exactly the class of finding phase-2 review exists to
+  catch.
+- **Revisions applied:** replaced the `exists()` gate with an unconditional
+  `symlink_metadata` call (component walk and ancestor walk alike),
+  distinguishing `NotFound` from any other error; added
+  `test_verify_contained_realpath_dangling_symlink_escape` as a permanent
+  regression test. Independently reproduced the underlying `exists()`
+  vs. `symlink_metadata` behavior with a standalone binary before accepting
+  the finding, per the workflow's doubt-with-trusted-sources rule.
+
+#### Final verification (post-fix)
+
+```
+$ cargo test -p dubbridge-p2p --lib path::
+running 12 tests ... test result: ok. 12 passed; 0 failed
+$ cargo fmt --check -p dubbridge-p2p
+(clean, no output)
+$ cargo clippy -p dubbridge-p2p -- -D warnings
+Finished, no warnings
+$ cargo test -p dubbridge-p2p --all-features
+... full crate green, incl. k1_contract.rs 3/3 ...
+```
+
+#### Owner final verification
+
+- Owner: pending — implementation, independent D14 review, and orchestrator
+  disposition are complete and independently verified above; awaiting the
+  owner's own confirmation pass before this line is finalized.
+
+- **Task-analysis review:** gpt-oss `.agent/p2-t3c/s0-phase1-review.json` - PASS
+- **Code-solution review:** d14 (recorded above, no separate artifact file) - PASS (post-fix)
+
 - **Objective:** turn the injected T3a/T3b publication seam into a persistent,
   ciphertext-only Hyperdrive/Hyperswarm publisher that returns stable C0 v1
   evidence for the same publication/lineage/digest across replay and process
