@@ -33,11 +33,12 @@ Read these in order before changing anything. They are the authoritative rules f
 |---|----------|-----|
 | 1 | [`README_AGENT_ORDER.md`](README_AGENT_ORDER.md) | Orientation and reading order. |
 | 2 | [`docs/playbooks/AGENT_WORKFLOW_GUIDE.md`](docs/playbooks/AGENT_WORKFLOW_GUIDE.md) | The mandatory `analyze → plan → tasks → approval → implement` workflow. **Highest authority** for any agent-facing decision. |
-| 3 | [`docs/policies/HITL_AUTONOMY_POLICY.md`](docs/policies/HITL_AUTONOMY_POLICY.md) | When explicit human approval is required and what autonomy is permitted. |
-| 4 | [`AGENTS.md`](AGENTS.md) | The shared task-presentation contract. |
-| 5 | [`docs/architecture.md`](docs/architecture.md) | Stable boundaries; operational vs. planned surfaces. |
-| 6 | [`docs/adr/`](docs/adr/) | The decisions that constrain implementation. |
-| 7 | [`docs/plan/roadmap.md`](docs/plan/roadmap.md) | Slice sequence and dependencies — where any task sits. |
+| 3 | [`docs/playbooks/HUMAN_ORCHESTRATOR_RUNBOOK.md`](docs/playbooks/HUMAN_ORCHESTRATOR_RUNBOOK.md) | Relevo ordenado y comandos de monitorización, recuperación y cierre cuando una persona debe reemplazar al agente principal. |
+| 4 | [`docs/policies/HITL_AUTONOMY_POLICY.md`](docs/policies/HITL_AUTONOMY_POLICY.md) | When explicit human approval is required and what autonomy is permitted. |
+| 5 | [`AGENTS.md`](AGENTS.md) | The shared task-presentation contract. |
+| 6 | [`docs/architecture.md`](docs/architecture.md) | Stable boundaries; operational vs. planned surfaces. |
+| 7 | [`docs/adr/`](docs/adr/) | The decisions that constrain implementation. |
+| 8 | [`docs/plan/roadmap.md`](docs/plan/roadmap.md) | Slice sequence and dependencies — where any task sits. |
 
 For development-task behavioral evidence, also read [`docs/playbooks/BEHAVIORAL_TESTING_CONTRACT.md`](docs/playbooks/BEHAVIORAL_TESTING_CONTRACT.md). It defines the repository's cross-stack `behavior-v2` evidence format and BDD traceability gate while the main workflow guide remains the authority for the surrounding task/RRI process.
 
