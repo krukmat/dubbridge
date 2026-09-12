@@ -2636,6 +2636,133 @@ $ cargo test -p dubbridge-p2p --all-features
 - **Task-analysis review:** gpt-oss `.agent/p2-t3c/s0-phase1-review.json` - PASS
 - **Code-solution review:** d14 (recorded above, no separate artifact file) - PASS (post-fix)
 
+### P2.T3c-S1a — atomic tmp-file + rename write primitive — DONE (2026-09-12)
+
+- **Type:** development, additive Rust logic, RRI 0-25 Low band.
+- **RRI:** 25 — Low. `scripts/rri.py --touches crates/p2p/src/atomic_write.rs --cc 4 --D 1 --K 0 --P 1 --T 1 --A 0 --X 0` (reconfirmed live this session).
+- **Objective:** add a new, generic `write_atomic(target, contents)` primitive
+  (`crates/p2p/src/atomic_write.rs`) implementing tmp-file-in-same-directory +
+  `fsync` + atomic rename, with no P2P-specific semantics — a building block
+  for the later `T3c-S1b` package materializer. Additive-only; not wired into
+  `lib.rs` (out of scope for this leaf per its frozen packet).
+- **Local stack constraint:** per the standing owner instruction for this
+  task chain ("SOLO STACK LOCAL, Codex prohibido"), Codex was excluded from
+  every phase; only the local Ollama stack (`gpt-oss:20b` primary,
+  `gemma4:26b-a4b-it-qat` intermediate fallback) was used. D14 was not
+  needed — Gemma produced a usable PASS at both review phases.
+
+#### Implementation routing evidence
+
+- **Per-task Ollama restart:** performed before this leaf's first local-model
+  call (new PID confirmed via `pgrep`/`lsof`; `qwen3.8:27b-mlx` warm-test
+  passed with `done_reason: "stop"` at production profile
+  `num_ctx=65536`/`num_predict=256`).
+- **Phase-1 (task-analysis) review — resource-recovery and fallback chain:**
+  1. `gpt-oss:20b` at production profile (`num_ctx=65536`, `num_predict=1024`):
+     `done_reason: "length"` with empty content — capacity symptom per
+     `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Mandatory workflow before
+     implementing, Step 0 resource-recovery protocol.
+  2. `ollama stop gpt-oss:20b`; retry at reduced profile (`num_ctx=16384`,
+     `num_predict=768`, `think=false`, `temperature=0`): same empty-content
+     symptom.
+  3. Fallback to intermediate model per the RRI 0-25 chain,
+     `gemma4:26b-a4b-it-qat` (documented scoped `num_ctx=8192`): warm-test
+     passed, then the actual phase-1 review passed cleanly —
+     `PASS`, 0 findings.
+- **Delegation** (`scripts/delegate-low-rri.py --mode full-file
+  --target-path crates/p2p/src/atomic_write.rs`, new file): succeeded on the
+  first attempt, no repair needed. Qwen (`qwen3.8:27b-mlx`) produced a
+  216-line file matching every packet requirement: same-directory temp file,
+  PID+counter+nanosecond unique suffix, `write_all` + `File::sync_all` before
+  `std::fs::rename`, best-effort temp cleanup on every failure path, and the
+  three required HP-1/HP-2/EC-1 unit tests. One known mechanical artifact
+  (a trailing `--- CONTENT ---` wrapper-echo marker per
+  `feedback_full_file_appends_content_marker_echo`) was stripped when
+  applying — not a re-delegation trigger.
+- **Formatting:** `rustfmt --check` found 4 purely cosmetic line-wrap diffs
+  (no functional change) — fixed mechanically via `rustfmt` per
+  `feedback_whitespace_not_a_discrepancy`, not treated as a finding.
+- **Compile/test verification (standalone, since this leaf must not touch
+  `lib.rs`):** `rustc --edition 2021 --test crates/p2p/src/atomic_write.rs`
+  compiled cleanly; the resulting binary ran all 3 tests
+  (`hp1_create_new_target`, `hp2_replace_existing_target`,
+  `ec1_no_stray_temp_files`) — all passing.
+- **Phase-2 (code-solution) review — resource-recovery and fallback chain:**
+  1. `gpt-oss:20b` at production profile (`num_ctx=65536`,
+     `num_predict=1536`): `done_reason: "length"`, empty content — same
+     capacity symptom as phase 1.
+  2. `ollama stop gpt-oss:20b`; retry at reduced profile (`num_ctx=16384`,
+     `num_predict=768`): same empty-content symptom.
+  3. Fallback to `gemma4:26b-a4b-it-qat` (`num_ctx=8192`): reviewed the full
+     file content against the acceptance criteria — `PASS`, 0 findings.
+- **disposition_divergence:** `none` — no findings to disposition at either
+  phase.
+
+#### Gemma Reviewer evidence
+
+- Model: `gemma4:26b-a4b-it-qat` (intermediate fallback in the RRI 0-25
+  chain, reached after `gpt-oss:20b` failed the same capacity symptom twice
+  at both phase-1 and phase-2).
+- Command: ad hoc `Ollama /api/chat` invocation (task-specific review
+  prompt embedding the full file content and acceptance criteria), not
+  `make qa-gemma-review` — used directly for consistency with the reduced-
+  context resource-recovery path already in effect this session.
+- Passes run / usable: 1/1 at each phase (single-pass, not N-pass
+  consolidation).
+- Aggregate status: `PASS` (phase 1), `PASS` (phase 2).
+- Consensus findings: 0 | Pass-specific: 0 | Disagreement: 0.
+- Artifacts: raw request/response payloads at
+  `/tmp/_phase1_payload_gemma.json`, `/tmp/_phase2_gemma.json` (ephemeral,
+  not committed).
+- Isolated adjudicator (D14): `not triggered` — Gemma produced a usable PASS
+  at both phases; the chain never reached D14.
+- D14 provider route: `n/a`.
+- disposition_divergence: `none`.
+- Primary-agent disposition: no findings to accept or reject at either
+  phase; implementation accepted as-is.
+
+#### Final verification (standalone, pre-`lib.rs`-wiring)
+
+```
+$ rustfmt --check crates/p2p/src/atomic_write.rs
+(clean after one mechanical rustfmt pass)
+$ rustc --edition 2021 --test crates/p2p/src/atomic_write.rs -o /tmp/atomic_write_test
+(compiles cleanly, no warnings)
+$ /tmp/atomic_write_test --test-threads=1
+running 3 tests
+test tests::ec1_no_stray_temp_files ... ok
+test tests::hp1_create_new_target ... ok
+test tests::hp2_replace_existing_target ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored
+```
+
+Full-crate `cargo test -p dubbridge-p2p`/`clippy` verification is deferred to
+whichever later leaf (`T3c-S1b`) wires `atomic_write` into `lib.rs` — this
+leaf's frozen scope explicitly excludes that wiring.
+
+#### Behavioral coverage certification
+
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| HP-1 | Happy path | write to non-existent target creates it with exact contents | unit | `crates/p2p/src/atomic_write.rs::tests::hp1_create_new_target` | passed |
+| HP-2 | Happy path | write to existing target fully replaces content, no leftover bytes | unit | `crates/p2p/src/atomic_write.rs::tests::hp2_replace_existing_target` | passed |
+| EC-1 | Edge case | no stray temp file remains after a successful write | unit | `crates/p2p/src/atomic_write.rs::tests::ec1_no_stray_temp_files` | passed |
+
+#### Owner final verification
+
+- Owner: pending — implementation, local phase-1/phase-2 review, and
+  standalone verification are complete and recorded above; awaiting the
+  owner's own confirmation pass before this line is finalized.
+
+- **Task-analysis review:** gemma `/tmp/_phase1_payload_gemma.json` (ephemeral) - PASS
+- **Code-solution review:** gemma `/tmp/_phase2_gemma.json` (ephemeral) - PASS
+
+This closure delivers only the `write_atomic` primitive in isolation. It does
+not wire the module into `lib.rs`, does not implement `T3c-S1b`'s package
+materializer, and does not change T3c's own Complex-band RRI, approval gate,
+or the still-unapproved status of the remaining leaves (`S2a`, `S1b`, `S2b`,
+`S4`, `T3c-Integ`).
+
 - **Objective:** turn the injected T3a/T3b publication seam into a persistent,
   ciphertext-only Hyperdrive/Hyperswarm publisher that returns stable C0 v1
   evidence for the same publication/lineage/digest across replay and process

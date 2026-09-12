@@ -465,3 +465,27 @@ in `docs/tasks/mvp0-p2p-p2-encrypted-publication.md` §
 crate green. This closure does not change T3c's own Complex-band RRI,
 approval gate, or the still-unapproved status of Leaf A/Leaf B or the other
 seven leaves in the table above.
+
+### T3c-S1a — implemented and closed (2026-09-12)
+
+Owner-approved for implementation as the next leaf in this same session,
+scoped to this one leaf only — `S2a`/`S1b`/`S2b`/`S4`/`T3c-Integ` remain
+unapproved. Delivered `write_atomic` in a new file
+`crates/p2p/src/atomic_write.rs` (tmp-file-in-same-directory + `fsync` +
+atomic rename, std-only, no P2P-specific semantics), additive-only and
+deliberately **not** wired into `lib.rs` per this leaf's frozen packet scope
+— that wiring belongs to the still-unapproved `T3c-S1b`. Unlike `S0`, the
+first Qwen delegation attempt succeeded with no repair needed. Phase-1 and
+phase-2 review both hit the same `gpt-oss:20b` capacity symptom
+(`done_reason: "length"`, empty content, at both production and reduced
+profile) and both fell back cleanly to the intermediate `gemma4:26b-a4b-it-qat`
+model, which passed with 0 findings at both phases — D14 was not needed.
+Verified standalone via `rustc --edition 2021 --test` (since the file is not
+yet part of the crate's module tree): 3/3 tests passing
+(`hp1_create_new_target`, `hp2_replace_existing_target`,
+`ec1_no_stray_temp_files`). Full routing evidence, resource-recovery steps,
+and behavioral coverage certification recorded in
+`docs/tasks/mvp0-p2p-p2-encrypted-publication.md` §
+"P2.T3c-S1a — atomic tmp-file + rename write primitive — DONE". This closure
+does not change T3c's own Complex-band RRI, approval gate, or the
+still-unapproved status of the remaining leaves in the table above.
