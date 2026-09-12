@@ -42,6 +42,25 @@ MODEL_NUM_PREDICT_OVERRIDES = {
 DEFAULT_TEMPERATURE = 0.1
 DEFAULT_THINK = False
 
+# GPT-OSS harmony-format models require temperature=1.0/top_p=1.0 — the
+# repository default DEFAULT_TEMPERATURE=0.1 (tuned for Gemma/Qwen) combined
+# with think="medium"/"high" causes GPT-OSS to exhaust its entire
+# num_predict budget on internal reasoning with empty visible content
+# (done_reason:"length", content:"") even though the model is not actually
+# stalled or memory-starved (confirmed empirically 2026-09-13: identical
+# packet, only temperature/top_p changed, went from empty content at
+# temperature=0/0.2 to a full structured verdict in 57s at temperature=1.0/
+# top_p=1.0). This is the vendor-recommended sampling configuration for
+# GPT-OSS's harmony reasoning format, not a workaround.
+GPT_OSS_TEMPERATURE = 1.0
+GPT_OSS_TOP_P = 1.0
+# Vendor-recommended baseline generation budget for GPT-OSS 20B on a 32GB
+# host: enough for "medium" thinking on a review-sized packet without
+# starving the visible-content phase. A "high"-thinking critical/architect
+# review should raise num_ctx/num_predict further (49152/8192) at the call
+# site; this constant is the routine-review floor, not a ceiling.
+GPT_OSS_NUM_PREDICT = 6144
+
 TRUTHY_ENV_VALUES = {"1", "true", "TRUE", "yes", "YES", "on", "ON"}
 
 # GPT-OSS uses Ollama native reasoning levels; the retired model-specific /no_think workaround is disabled.
@@ -219,6 +238,27 @@ def resolve_keep_alive(model):
     return "10m"
 
 
+def resolve_temperature(model, temperature):
+    """Force the vendor-recommended sampling temperature for GPT-OSS.
+
+    GPT-OSS's harmony reasoning format needs temperature=1.0 (paired with
+    top_p=1.0); the repository's Gemma/Qwen-tuned DEFAULT_TEMPERATURE (0.1)
+    starves GPT-OSS's visible-content phase when think is "medium"/"high"
+    (empty content, done_reason:"length" — see GPT_OSS_TEMPERATURE above).
+    Non-GPT-OSS models keep whatever the caller passed.
+    """
+    if isinstance(model, str) and model.startswith(GPT_OSS_MODEL_PREFIX):
+        return GPT_OSS_TEMPERATURE
+    return temperature
+
+
+def resolve_top_p(model, top_p):
+    """Force top_p=1.0 for GPT-OSS alongside resolve_temperature; passthrough otherwise."""
+    if isinstance(model, str) and model.startswith(GPT_OSS_MODEL_PREFIX):
+        return GPT_OSS_TOP_P
+    return top_p
+
+
 def build_chat_payload(
     *,
     model,
@@ -228,21 +268,26 @@ def build_chat_payload(
     num_predict,
     temperature,
     think,
+    top_p=None,
 ):
     effective_num_predict = resolve_num_predict(model, num_predict)
     effective_system_prompt = system_prompt
     if not think and model in THINK_DIRECTIVE_MODELS:
         effective_system_prompt = f"{THINK_DIRECTIVE_TEXT}\n{system_prompt}"
+    options = {
+        "temperature": resolve_temperature(model, temperature),
+        "num_predict": effective_num_predict,
+        "num_ctx": num_ctx,
+    }
+    effective_top_p = resolve_top_p(model, top_p)
+    if effective_top_p is not None:
+        options["top_p"] = effective_top_p
     return {
         "model": model,
         "stream": True,
         "think": resolve_think_setting(model, think),
         "keep_alive": resolve_keep_alive(model),
-        "options": {
-            "temperature": temperature,
-            "num_predict": effective_num_predict,
-            "num_ctx": num_ctx,
-        },
+        "options": options,
         "messages": [
             {
                 "role": "system",

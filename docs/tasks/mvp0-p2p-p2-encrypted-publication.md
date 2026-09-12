@@ -2966,6 +2966,203 @@ edit to `contract.ts`.
   `node --test apps/availability-node/test/*.test.js`, `git diff --check`,
   `git status --short apps/availability-node/`
 
+### P2.T3c-S3 — Node containment-check mirror — [x] Done (2026-09-13)
+
+- **Depends on:** the already-implemented and D14-reviewed Rust reference
+  `verify_contained_realpath` in `crates/p2p/src/path.rs` (`P2.T3c-S0`); no
+  implementation dependency on any other T3c leaf.
+- **Objective:** port the Rust symlink-aware containment check to
+  TypeScript so the Availability Node's own filesystem writes (a later T3c
+  leaf) can validate a candidate path stays inside its storage root before
+  writing, mirroring the exact `exists()`-vs-`lstat` dangling-symlink defect
+  class an independent adversarial review already found and fixed in the
+  Rust original.
+- **Allowed paths:**
+  - `apps/availability-node/src/containment.ts` (new)
+  - `apps/availability-node/test/containment.test.js` (new)
+- **Out of scope:** filesystem write semantics, index/lock/atomic-write
+  logic, Hyperdrive/Corestore/Hyperswarm, server wiring, dependency changes,
+  edits to any existing file, and path-string syntax validation (`..`, `.`,
+  empty segments, backslashes, absolute paths) — that is a separate,
+  not-yet-ported `normalizePath`-equivalent, explicitly deferred.
+- **Frozen contract:**
+  - `ContainmentError` extends `Error`, following the exact pattern already
+    used by `PublicationContractError` in
+    `apps/availability-node/src/contract.ts`.
+  - `verifyContainedRealpath(root: string, relative: string): string` is
+    synchronous, canonicalizes `root` via `fs.realpathSync` (any failure,
+    including `ENOENT`, throws `ContainmentError`), walks `relative`'s path
+    components using `fs.lstatSync` (never `fs.existsSync`) to reject any
+    intermediate or final symlink including dangling ones, then
+    canonicalizes the deepest existing ancestor of the final candidate and
+    confirms it still starts with the canonicalized root before returning
+    the joined (non-canonicalized) candidate path.
+- **Acceptance criteria:**
+  - **HP-S3-1:** a relative path with no symlinks anywhere in its component
+    chain resolves successfully and returns the expected joined path.
+  - **HP-S3-2:** a relative path whose final component does not exist yet
+    still resolves successfully.
+  - **EC-S3-1:** a symlink at any intermediate or final path component that
+    points outside `root` is rejected.
+  - **EC-S3-2:** a dangling symlink (its target does not exist) at any
+    component is still rejected — the exact defect class the Rust original's
+    adversarial review found and fixed.
+  - **EC-S3-3:** `root` itself cannot be canonicalized (e.g. does not exist)
+    — throws `ContainmentError`, never a raw `fs` error.
+  - **EC-S3-4:** the final candidate's deepest existing ancestor resolves
+    outside the canonical root via a symlinked directory earlier in the
+    path, independent of any single-component symlink check.
+- **Verification:** `npm --prefix apps/availability-node run typecheck`;
+  `npm --prefix apps/availability-node run build`;
+  `node --test apps/availability-node/test/containment.test.js`; full
+  Availability Node suite (`node --test test/*.test.js`).
+- **Evidence to emit:** phase-1 and phase-2 review artifacts; behavioral
+  coverage table; owner final verification.
+- **Status artifacts affected:** this ledger; T3c preflight leaf-status
+  section.
+- **Implementation route:** the per-task Ollama restart/precheck reused the
+  server already restarted earlier in this task session (T3c-S3 is its own
+  task ID boundary); bounded Qwen Developer (`qwen3.8:27b-mlx`) full-file
+  delegation for both new files, orchestrator scope/diff/test validation,
+  Low-band phase-1 and phase-2 review, reviewer-output Reflection,
+  behavioral certification, owner verification.
+
+**Task-analysis review (phase 1):** the packet
+(`.agent/p2-t3c/s3-phase1-packet.md`) required its own phase-1 pass before
+delegation per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Per-task
+discipline`. First real attempt against `gpt-oss:20b` at the routine
+profile (`think="high"`/`"medium"`, `temperature=0`/`0.2`) reproduced the
+empty-content/`done_reason:"length"` symptom this session diagnosed and
+fixed as a GPT-OSS sampling-parameter defect (see
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Mandatory workflow before
+implementing`, Step 0, and the resolved `project_gpt_oss_postmortem_unresolved`
+memory) — resolved by forcing `temperature=1.0`/`top_p=1.0`. A first
+corrected-sampling attempt (`think="medium"`, `num_ctx=32768`,
+`num_predict=6144`) returned `BLOCKED` with 3 findings (missing
+root-canonicalization-failure handling [BLOCKING], missing invalid-segment
+handling [MAJOR] — resolved by clarifying that syntax validation is
+explicitly out of scope, not a gap — and unspecified test import extension
+[MAJOR]). The packet was revised to address all three. A second attempt
+using a smaller, faster GPT-OSS profile
+(`think="low"`, `num_ctx=16384`, `num_predict=3072`, same
+`temperature=1.0`/`top_p=1.0`; see the reduced-profile note added to
+`AGENT_WORKFLOW_GUIDE.md` Step 0) returned `BLOCKED` again in 48.7s with 6
+further findings on the revised packet (2 BLOCKING, 2 MAJOR, 2 MINOR).
+Independently evaluated each: `ContainmentError` must extend `Error`
+(valid — added an explicit constructor/`super`/`name` requirement mirroring
+`PublicationContractError`); non-existent-root handling (false positive —
+already specified in the prior revision, but promoted from contract prose
+into a named `EC-S3-3` acceptance criterion for clarity); return-type
+string clarification (valid but minor — added a one-line clarification);
+`.js` import extension already-covered stated only in acceptance criteria
+(consolidated into the main contract as a hard requirement); empty
+`relative` string behavior undefined (valid — added an explicit defined
+behavior); missing acceptance criterion for a mid-path symlinked-directory
+escape distinct from a direct component symlink (valid — added `EC-S3-4`).
+Third attempt on the doubly-revised packet (same reduced profile) returned
+**PASS, 0 findings** in 16.7s.
+Artifact: `.agent/p2-t3c/s3-phase1-review.raw.txt` - PASS.
+
+**Implementation:** delegated via `scripts/delegate-low-rri.py --mode
+full-file` to Qwen Developer (`qwen3.8:27b-mlx`) for both new files (both
+brand-new, so full-file mode is safe per repo delegation practice). Both
+delegation attempts (`containment.ts` in 60s, `containment.test.js` in 79s)
+succeeded on the first try with no repair needed. Both results echoed the
+wrapper's own `--- CONTENT ---` tagged-block marker onto the end of the
+extracted file content — a known, previously-documented mechanical Qwen
+full-file artifact (not a correctness defect); stripped manually before
+writing each file rather than re-delegating.
+
+**Verification (GREEN):** `npm --prefix apps/availability-node run
+typecheck` (exit 0), `npm --prefix apps/availability-node run build` (exit
+0), `node --test apps/availability-node/test/containment.test.js` (6/6
+passing: HP-S3-1, HP-S3-2, EC-S3-1, EC-S3-2, EC-S3-3, EC-S3-4), `node --test
+test/*.test.js` (15/15 passing, full Availability Node suite, no
+regression against the pre-existing `publication-record.test.js` suite).
+Scope confirmed via `git status --porcelain apps/availability-node/`:
+exactly the two allowed new (`??`) paths, no other file touched, no
+dependency change.
+
+**Code-solution review (phase 2):** `gpt-oss:20b`
+(`.agent/p2-t3c/s3-phase2-review.raw.txt` - PASS, 0 findings), reduced
+profile (`think="low"`, `num_ctx=16384`, `num_predict=3072`,
+`temperature=1.0`, `top_p=1.0`), 34.4s. Primary of the RRI 0-25 chain was
+usable this time (unlike the phase-1 packet's first two attempts) once the
+corrected sampling parameters were applied consistently.
+
+**Reflection log** (Low band; applied to the reviewer output per
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md`'s RRI 0-25 rule):
+
+- Pass 1 draft verdict: both phase-1 and phase-2 GPT-OSS 20B reviews PASS
+  with 0 findings; 6/6 focused tests and 15/15 full-suite tests passing;
+  typecheck and build clean.
+- Critique: independently re-examined the implementation for anything a
+  reviewer might have missed — the `err instanceof ContainmentError`
+  re-throw inside the same `try/catch` block that raises it (step 4) is
+  functionally correct (verified by EC-S3-1/EC-S3-2 passing) though
+  stylistically unusual; the `while (true)` ancestor-walk loop in step 5
+  terminates correctly via `parent === ancestor` at the filesystem root;
+  the `startsWith` containment check is safe against partial-segment false
+  positives because both operands are always full path-join results
+  produced by `fs.realpathSync`/`path.join`, never raw string prefixes of
+  differing granularity. No defects found beyond what phase-2 review
+  already covered.
+- Revisions applied: none — no additional defects found.
+
+### Behavioral coverage certification
+
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| HP-S3-1 | Happy path | no-symlink relative path resolves successfully | unit | `apps/availability-node/test/containment.test.js::"HP-S3-1: a relative path with no symlinks resolves successfully"` | passed |
+| HP-S3-2 | Happy path | to-be-created final component still resolves | unit | `apps/availability-node/test/containment.test.js::"HP-S3-2: a relative path whose final component does not exist yet still resolves"` | passed |
+| EC-S3-1 | Edge case | symlink pointing outside root is rejected | unit | `apps/availability-node/test/containment.test.js::"EC-S3-1: a symlink pointing outside root is rejected"` | passed |
+| EC-S3-2 | Edge case | dangling symlink is rejected despite non-existent target | unit | `apps/availability-node/test/containment.test.js::"EC-S3-2: a dangling symlink is rejected even though its target does not exist"` | passed |
+| EC-S3-3 | Edge case | non-existent root throws typed ContainmentError | unit | `apps/availability-node/test/containment.test.js::"EC-S3-3: a non-existent root throws ContainmentError, not a raw fs error"` | passed |
+| EC-S3-4 | Edge case | mid-path symlinked directory escapes containment | unit | `apps/availability-node/test/containment.test.js::"EC-S3-4: a symlinked directory earlier in the path escapes containment even without a direct component symlink"` | passed |
+
+### Gemma Reviewer evidence
+
+- Model: `gpt-oss:20b` (both phase 1 and phase 2 — primary of the RRI 0-25
+  chain, usable at both phases once corrected sampling parameters were
+  applied)
+- Command: manual Ollama `/api/chat` invocation via `build_chat_payload`-
+  equivalent parameters (reduced profile: `think="low"`, `num_ctx=16384`,
+  `num_predict=3072`, `temperature=1.0`, `top_p=1.0`, `keep_alive="30m"`)
+- Passes run / usable: 1/1 (phase 1, third attempt on the doubly-revised
+  packet — two earlier attempts on the same task returned real, disposed
+  `BLOCKED` verdicts, not unusable/empty results); 1/1 (phase 2)
+- Aggregate status: PASS (both phases)
+- Consensus findings: 0 | Pass-specific: 0 | Disagreement: 0 (all prior
+  `BLOCKED` findings were resolved by packet revision before the passing
+  attempt, not disposed as false positives within a single passing
+  artifact)
+- Artifacts: `.agent/p2-t3c/s3-phase1-review.raw.txt`,
+  `.agent/p2-t3c/s3-phase2-review.raw.txt`
+- Isolated adjudicator (D14): not triggered — GPT-OSS 20B produced a usable
+  result at both phases
+- D14 provider route: n/a
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted both phase verdicts as-is; the two
+  earlier phase-1 `BLOCKED` verdicts were resolved by revising the packet
+  (documented above), not by overriding or rejecting a finding as a false
+  positive
+
+### Owner final verification
+
+- Owner: `Matias`
+- Date: `2026-09-13`
+- Statement: I confirm I reviewed the evidence presented (phase-1/phase-2
+  review artifacts, verification transcript, Reflection log, and the
+  behavioral coverage certification table) and authorize marking this task
+  `[x] Done`. I verified every happy path and edge case defined for this
+  task has executable evidence at an appropriate layer that replicates the
+  expected behavior.
+- Commands run: `npm --prefix apps/availability-node run typecheck`,
+  `npm --prefix apps/availability-node run build`,
+  `node --test apps/availability-node/test/containment.test.js`,
+  `node --test apps/availability-node/test/*.test.js`,
+  `git status --porcelain apps/availability-node/`
+
 - **Objective:** turn the injected T3a/T3b publication seam into a persistent,
   ciphertext-only Hyperdrive/Hyperswarm publisher that returns stable C0 v1
   evidence for the same publication/lineage/digest across replay and process

@@ -176,6 +176,43 @@ class Payload(unittest.TestCase):
         self.assertEqual(payload["think"], "high")
         self.assertEqual(payload["messages"][0]["content"], "system prompt")
 
+    def test_gpt_oss_forces_vendor_recommended_sampling(self):
+        # Empirically confirmed 2026-09-13: GPT-OSS with think="medium"/"high"
+        # exhausts num_predict on internal reasoning with empty visible
+        # content at low temperature; the caller-requested 0.1/0.0 (tuned for
+        # Gemma/Qwen) must be overridden to the vendor-recommended 1.0/1.0.
+        payload = gemma_local.build_chat_payload(
+            model="gpt-oss:20b",
+            system_prompt="system prompt",
+            packet="packet",
+            num_ctx=65536,
+            num_predict=6144,
+            temperature=0.1,
+            think="medium",
+            top_p=0.3,
+        )
+        self.assertEqual(payload["options"]["temperature"], 1.0)
+        self.assertEqual(payload["options"]["top_p"], 1.0)
+
+    def test_non_gpt_oss_keeps_caller_temperature_and_omits_top_p_by_default(self):
+        payload = gemma_local.build_chat_payload(
+            model="gemma4:26b-a4b-it-qat",
+            system_prompt="system prompt",
+            packet="packet",
+            num_ctx=8192,
+            num_predict=2048,
+            temperature=0.1,
+            think=False,
+        )
+        self.assertEqual(payload["options"]["temperature"], 0.1)
+        self.assertNotIn("top_p", payload["options"])
+
+    def test_resolve_temperature_and_top_p_helpers(self):
+        self.assertEqual(gemma_local.resolve_temperature("gpt-oss:20b", 0.1), 1.0)
+        self.assertEqual(gemma_local.resolve_temperature("qwen3.8:27b-mlx", 0.1), 0.1)
+        self.assertEqual(gemma_local.resolve_top_p("gpt-oss:20b", 0.3), 1.0)
+        self.assertEqual(gemma_local.resolve_top_p("qwen3.8:27b-mlx", 0.3), 0.3)
+
 
 class ModelAvailability(unittest.TestCase):
     def test_ensure_model_available_accepts_installed_default(self):

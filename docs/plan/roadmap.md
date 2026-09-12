@@ -184,8 +184,13 @@ than opening a separate predecessor task. The initial two-leaf envelope was
 then refined into eight implementation/integration leaves while the parent
 remains RRI 70 Complex via `scripts/rri.py`. Matias approved the frozen
 parent envelope at its HITL checkpoint on 2026-09-12 for later in-scope
-execution in dependency order. `T3c-S0`, `T3c-S1a`, and `T3c-S2a` are Done
-(`T3c-S2a` owner-verified 2026-09-12), and the other leaves remain unstarted. The
+execution in dependency order. `T3c-S0`, `T3c-S1a`, `T3c-S2a`, and `T3c-S3`
+are Done (`T3c-S2a` owner-verified 2026-09-12; `T3c-S3` owner-verified
+2026-09-13 — the Node containment-check mirror, which also fixed a
+`gpt-oss:20b` sampling-parameter defect blocking the RRI 0-25 chain's
+primary reviewer, documented in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` §
+Mandatory workflow before implementing, Step 0), and the other leaves
+remain unstarted. The
 approval does not authorize scope expansion or bypass leaf-specific technical
 gates. See `docs/audit/mvp0-p2p-p2-t3c-preflight.md`. `T3d` has a prepared test-only
 definition and remains blocked on T3c),

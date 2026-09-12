@@ -27,7 +27,8 @@ rationale that support that active procedure.
 Before the first Ollama-backed action of every task that will invoke a local model,
 restart Ollama even when the current server appears healthy, then verify that the
 local stack and the models the task will actually invoke respond correctly under
-production generation parameters (`think=false` where applicable, the repo's
+production generation parameters (`think=false` for non-GPT-OSS models; GPT-OSS
+uses its own native reasoning-level/sampling profile — see below — the repo's
 default `num_predict`/`num_ctx` from `gemma_local.py`). A silent `done_reason:
 "length"` with empty `content` (thinking-mode exhausting the token budget before any
 visible output) is a known failure mode. Empty `content` with any terminal reason is
@@ -36,7 +37,7 @@ resource-recovery protocol rather than be retried unchanged. Catching either
 condition here avoids discovering it mid-review, where it forces an avoidable hop
 down the band's reviewer chain that a healthy stack would not have needed.
 
-Warm-up probe used for every model the task's band will use:
+Warm-up probe for a non-GPT-OSS model (`think` is a plain boolean):
 
 ```bash
 curl -s http://127.0.0.1:11434/api/chat -d '{
@@ -48,12 +49,44 @@ curl -s http://127.0.0.1:11434/api/chat -d '{
 }' -m 180
 ```
 
+Warm-up probe for a `gpt-oss*` model — **`think` must be a reasoning-level
+string, never a plain boolean, and `temperature`/`top_p` must be `1.0`**
+(empirically verified 2026-09-13: at low temperature with `think="medium"`/
+`"high"`, GPT-OSS exhausts `num_predict` on internal reasoning and returns
+empty `content` with `done_reason: "length"` — a sampling-parameter defect
+that looks identical to a genuine capacity symptom but is not fixed by the
+resource-recovery protocol's `num_ctx`/`num_predict` reduction):
+
+```bash
+curl -s http://127.0.0.1:11434/api/chat -d '{
+  "model": "gpt-oss:20b",
+  "messages": [{"role": "user", "content": "You are a code reviewer. Reply with ONLY a JSON object: {\"verdict\": \"PASS\", \"findings\": []}"}],
+  "stream": false,
+  "think": "medium",
+  "options": {"num_predict": 6144, "num_ctx": 32768, "temperature": 1.0, "top_p": 1.0},
+  "keep_alive": "30m"
+}' -m 180
+```
+
+`scripts/gemma_local.py::build_chat_payload` applies `resolve_think_setting`/
+`resolve_temperature`/`resolve_top_p` automatically for any `gpt-oss`-prefixed
+model, so callers going through that helper do not need to special-case this
+themselves — only a direct/raw Ollama call (e.g. ad hoc `curl`, bypassing the
+shared wrapper) must replicate it. Critical/architect-level GPT-OSS review
+(e.g. a security-sensitive containment check, a D14 escalation packet) raises
+this to `num_ctx=49152`, `num_predict=8192`, `think="high"`, same
+`temperature=1.0`/`top_p=1.0`.
+
 Use the role's effective production context: `65536` for the Low/S Qwen Developer
 delegation wrapper, `131072` for the Moderate/M Devstral local-agent runner, and the
-configured reviewer context for review roles. A `"length"` result with empty
+configured reviewer context for review roles (GPT-OSS review roles use the
+`32768`/`49152` profiles above instead). A `"length"` result with empty
 content on a small ping (e.g. `num_predict: 16`) is usually just an undersized
 budget, not the real failure — retry at the production `num_predict` before
-concluding the model is unhealthy.
+concluding the model is unhealthy. For GPT-OSS specifically, also confirm
+`temperature`/`top_p` are `1.0` and `think` is a reasoning-level string before
+concluding a capacity/memory issue — the empty-content symptom is far more
+often this sampling-parameter mismatch than an actual resource constraint.
 
 This restart/precheck is infrastructure verification, not a review gate: a healthy
 precheck does not retroactively change a prior phase's recorded result (e.g. a

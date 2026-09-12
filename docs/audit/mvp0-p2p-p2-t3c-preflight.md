@@ -528,3 +528,37 @@ behavioral coverage certification recorded in
 recorded 2026-09-12; this leaf is `[x] Done`. This closure does not change
 T3c's own Complex-band RRI, approval gate, or the still-unapproved status of
 the remaining leaves in the table above.
+
+### T3c-S3 — implemented and closed (2026-09-13)
+
+Delivered `apps/availability-node/src/containment.ts` (a TypeScript mirror
+of the Rust `verify_contained_realpath` in `crates/p2p/src/path.rs`,
+`ContainmentError extends Error`, `lstat`-based dangling-symlink-safe
+containment check) and its focused `test/containment.test.js` (6 tests:
+HP-S3-1, HP-S3-2, EC-S3-1, EC-S3-2, EC-S3-3, EC-S3-4). This task also
+resolved, empirically and in code, the `gpt-oss:20b` empty-content defect
+that blocked S1a/S2a's phase-1 review at the primary model: the root cause
+was a missing `temperature=1.0`/`top_p=1.0` sampling-parameter override for
+GPT-OSS's harmony reasoning format (not solely the `think`-boolean-vs-string
+issue previously suspected) — fixed in `scripts/gemma_local.py`
+(`resolve_temperature`/`resolve_top_p`) and documented in
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Mandatory workflow before
+implementing, Step 0. With this fix, `gpt-oss:20b` was directly usable as
+the RRI 0-25 chain's primary reviewer at both phase-1 and phase-2 for this
+leaf (two real, content-based `BLOCKED` verdicts with genuine findings on
+earlier packet drafts, resolved by packet revision, then a real PASS on
+each phase — never an unusable/empty-content fallback trigger). Qwen
+Developer (`qwen3.8:27b-mlx`) full-file delegation succeeded for both new
+files on the first attempt with no repair needed (each result echoed the
+wrapper's own tagged-block marker onto the file end, a known mechanical
+artifact stripped manually, not a correctness defect). All verification is
+GREEN: typecheck, build, the 6 focused tests, and the full 15-test
+Availability Node suite. D14 was not needed at either phase. Full routing
+evidence, phase-1 packet-revision history, Reflection log, and behavioral
+coverage certification recorded in
+`docs/tasks/mvp0-p2p-p2-encrypted-publication.md` §
+"P2.T3c-S3 — Node containment-check mirror". Owner final-verification
+sign-off (workflow-guide closure Step 4) was recorded 2026-09-13; this leaf
+is `[x] Done`. This closure does not change T3c's own Complex-band RRI,
+approval gate, or the still-unapproved status of the remaining leaves in
+the table above.

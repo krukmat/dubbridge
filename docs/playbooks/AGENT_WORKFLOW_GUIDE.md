@@ -57,21 +57,63 @@ and Architect-refined implementation routing below), not to cloud. A
      phases of the same task reuse it. Confirm no other task's local-model
      runner is active before restarting — wait for it or stop it under its
      own timeout/termination contract rather than killing an unrelated run.
-   - **Resource-recovery protocol** on empty `content`, in order: (1)
-     `ollama stop <model>`, inspect `GET /api/ps` and host memory pressure
-     (`memory_pressure`/`vm_stat` on macOS); (2) retry once with
-     `think=false`, `temperature=0`, `num_ctx<=16384`, `num_predict`
-     `512`–`1024`; (3) if usable, rebuild the real review/delegation packet to
-     fit the reduced context and make one bounded retry at that profile; (4)
-     if still empty/invalid, unload and fall back to the band's normal
-     reviewer/fallback route — never repeat the same high-memory profile. A
-     smaller local model may take a separate D14 review only under an
-     ADR-039 fallback-selection receipt authorizing that exact model/effort,
-     never as a silent substitute for the band-resolved reviewer. Record
-     model, `num_ctx`, `num_predict`, `think`, terminal reason, content
-     length, loaded-model state, and the recovery decision in the precheck or
-     review artifact — a reduced-profile success does not certify the
-     original high-memory profile as healthy.
+   - **GPT-OSS 20B sampling parameters (empirically verified 2026-09-13):**
+     GPT-OSS uses the harmony reasoning format and requires
+     `temperature=1.0`/`top_p=1.0` — not the repository's Gemma/Qwen-tuned
+     `temperature=0.1` default. At low temperature combined with
+     `think="medium"`/`"high"`, GPT-OSS reliably exhausts its entire
+     `num_predict` budget on internal reasoning and returns empty visible
+     `content` with `done_reason: "length"` — a sampling-parameter defect,
+     not a memory/capacity symptom, and not fixed by reducing `num_ctx`.
+     `think` must also be one of GPT-OSS's native reasoning-level strings
+     (`"low"`/`"medium"`/`"high"`), never a raw boolean — a caller bypassing
+     `scripts/gemma_local.py::resolve_think_setting`/`resolve_temperature`/
+     `resolve_top_p` (e.g. a raw `curl` against `/api/chat`) must replicate
+     this model-prefix check itself. `scripts/gemma_local.py::build_chat_payload`
+     applies both resolvers automatically for any `gpt-oss*`-prefixed model;
+     any direct Ollama call for this model family must set the same values.
+     Routine review profile (Low-band phase-1/phase-2, `DEFAULT_REVIEW_MODEL`):
+     `num_ctx=32768`, `num_predict=6144`, `think="medium"`, `temperature=1.0`,
+     `top_p=1.0`, `keep_alive="30m"`. Critical/architect-level review profile
+     (a packet the orchestrator judges high-stakes enough to warrant deeper
+     reasoning — e.g. a security-sensitive containment check, D14 escalation
+     packets): `num_ctx=49152`, `num_predict=8192`, `think="high"`,
+     `temperature=1.0`, `top_p=1.0`. Do not economize `think`/`num_predict`
+     for a local model to save tokens — that constraint applies only to
+     cloud models (Codex/Claude); the only local ceiling is whether the
+     model fits the host's available RAM alongside anything else resident.
+     **Reduced profile for well-bounded packets (observed 2026-09-13,
+     `P2.T3c-S3`):** `num_ctx=16384`, `num_predict=3072`, `think="low"`,
+     same `temperature=1.0`/`top_p=1.0`, completed a real phase-1 review in
+     ~17-49s versus the routine profile's typical run time, with a
+     structurally valid, substantive verdict both times observed. This is
+     not a universal replacement for the routine profile — it is a viable
+     choice when the packet's own scope is small and well-bounded (e.g. two
+     new files, a frozen contract, no multi-module reasoning); prefer the
+     routine `medium` profile when in doubt, and always re-run the affected
+     phase if a reduced-profile attempt returns `BLOCKED` with findings that
+     look shallow or already-addressed, to confirm they are not an artifact
+     of `think="low"` under-reasoning rather than genuine defects.
+   - **Resource-recovery protocol** on empty `content` for non-GPT-OSS
+     models (or GPT-OSS content that stays empty even at the vendor-
+     recommended sampling parameters above), in order: (1) `ollama stop
+     <model>`, inspect `GET /api/ps` and host memory pressure
+     (`memory_pressure`/`vm_stat` on macOS); (2) retry once at the model's
+     normal sampling parameters with `num_ctx<=16384`, `num_predict`
+     `512`–`1024` (GPT-OSS keeps `temperature=1.0`/`top_p=1.0`/its resolved
+     `think` level even at reduced `num_ctx` — only `num_ctx`/`num_predict`
+     shrink for capacity recovery); (3) if usable, rebuild the real review/
+     delegation packet to fit the reduced context and make one bounded retry
+     at that profile; (4) if still empty/invalid, unload and fall back to
+     the band's normal reviewer/fallback route — never repeat the same
+     high-memory profile. A smaller local model may take a separate D14
+     review only under an ADR-039 fallback-selection receipt authorizing
+     that exact model/effort, never as a silent substitute for the
+     band-resolved reviewer. Record model, `num_ctx`, `num_predict`,
+     `think`, `temperature`/`top_p` (when non-default), terminal reason,
+     content length, loaded-model state, and the recovery decision in the
+     precheck or review artifact — a reduced-profile success does not
+     certify the original high-memory profile as healthy.
    - Track as `Restart Ollama + local-stack precheck — <orchestrator>` in the
      live per-task checklist. Operational precondition only — it does not
      replace, skip, or pre-decide the Band-routed peer review outcome, and a
