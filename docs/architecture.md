@@ -54,7 +54,7 @@ operational surfaces from planned ones. Delivery sequence lives in
 | First-party session gateway (transparent JWT relay) | Operational | S-040, ADR-031 |
 | First-party mobile client (React Native + Expo) | Canonical, sole authenticated product surface | S-050/S-105, ADR-029/031 |
 | Mobile P2P runtime boundary | P1 closed `[x] Done` 2026-09-01 (7/8 children PASS: packaging/protocol, ownership/composition, storage, replication transport, verification/reconnect/teardown; P1.F3b itself stays `not PASS`, non-blocking, deferred into X28); no product P2P runtime or network activity is active outside bounded proof runners | MVP0-P2P P1, ADR-043 |
-| P2P audience delivery (encrypted publication, invite/claim, verified sync, loopback playback) | Architecture accepted; P2.T0/C0 PASS; P2.T1 and P2.T2 are Done and owner-verified, including sealed-K1 persistence, ciphertext package construction, and cross-runtime nonce-collision certification; P2.T3a contract/bootstrap and P2.T3b private fail-closed mTLS ingress are Done and owner-verified; P2.T4a recovery kernel is Done. P2.T3c-T3d, T4b-T4f, T5, and T6 remain planned before P3-P7 can activate. | MVP0-P2P P2–P7, ADR-044 |
+| P2P audience delivery (encrypted publication, invite/claim, verified sync, loopback playback) | Architecture accepted; P2.T0/C0 PASS; P2.T1 and P2.T2 are Done and owner-verified, including sealed-K1 persistence, in-memory ciphertext package construction, and cross-runtime nonce-collision certification; P2.T3a contract/bootstrap and P2.T3b private fail-closed mTLS ingress are Done and owner-verified; P2.T4a recovery kernel is Done. P2.T3c is blocked before RRI on the missing T2-to-volume package materialization handoff; T3d, T4b-T4f, T5, and T6 remain planned before P3-P7 can activate. | MVP0-P2P P2–P7, ADR-044 |
 
 Human review runtime (S-170) and publication runtime (S-180) have no plan/task
 ledger yet.
@@ -148,7 +148,9 @@ ledger yet.
   closed `[x] Done` 2026-09-07; T2g: cross-runtime contract and nonce-collision
   guard recertified 2026-09-08). `P2.T3a` contract/bootstrap and `P2.T3b`
   private fail-closed mTLS ingress are Done and owner-verified; `P2.T4a` is
-  Done. Remaining work starts at T3c/T3d, T4b, T5, and T6. Design inputs:
+  Done. T3c's preflight found the T2-to-volume package-materialization handoff
+  missing, so remaining work starts with that predecessor before T3c/T3d,
+  T4b, T5, and T6. Design inputs:
   `docs/plan/mvp0-p2p-design-inputs.md`.
 - `crates/connectors` (primary S-090, ADR-025): per-platform integrations behind a
   `PlatformConnector` trait. For owner-authorized download (content owner grants

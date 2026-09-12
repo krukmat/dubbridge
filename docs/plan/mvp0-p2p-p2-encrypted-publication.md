@@ -51,7 +51,7 @@ Conservative planning score: **RRI 131 — Excessive — Effort XL**.
 
 P2 is decomposed into independently gated parents T0-T6. T0, the decomposed T1 persistence leaves, and C0 are complete. The original T1 parent scored **78 High / XL**, became a non-executable container, and its T1a-T1f leaves are **Done and owner-approved as P2.T1 on 2026-09-06**.
 
-P2.T2, T3a, and T3b are Done, including T2c-r and T2g recertification; T3b was owner-verified on 2026-09-09. T4a is Done (2026-09-07), and T3c has not started. Remaining P2 work is T3c-T3d, T4b-T4f, T5a-T5d, and T6a-T6e. Remaining implementation uses the C0-frozen exact-path leaves. Each executable leaf is scored with `scripts/rri.py` immediately before presentation/execution; C0 completion does not authorize source work.
+P2.T2, T3a, and T3b are Done, including T2c-r and T2g recertification; T3b was owner-verified on 2026-09-09. T4a is Done (2026-09-07). T3c's 2026-09-12 preflight resolved its D2 blocker (no T2-to-volume package materializer existed) by expanding T3c's own envelope with a new Rust leaf in `crates/p2p` rather than opening a separate predecessor task; D3-D5 are resolved and scope is frozen into two leaves. Both leaves and the parent score RRI 70 (Complex band, `scripts/rri.py`, ADR-045 v2 authority), which requires human plan review before implementation. Automated phase-1 review (RRI 56+ cross-vendor peer, resolved to `codex`) could not complete due to a CLI-version mismatch in the review wrapper; the resulting D14 fallback awaits an ADR-039 human fallback-selection checkpoint. T3c is **scope-frozen and RRI-scored but not yet approved or implemented**; T3d remains defined but blocked on T3c. See `docs/audit/mvp0-p2p-p2-t3c-preflight.md` and the active task ledger. Remaining P2 work is T3c (pending approval)-T3d, T4b-T4f, T5a-T5d, and T6a-T6e. Each executable leaf is scored with `scripts/rri.py` immediately before presentation/execution; C0 completion and task preparation do not authorize source work.
 
 ## Architecture
 
@@ -185,8 +185,24 @@ Build encrypted package material from existing S-120 HLS:
 `T3a` is Done and owner-verified on 2026-09-08: the strict v1 contract and
 injected, default-unavailable HTTP adapter exist. `T3b` is Done and
 owner-verified on 2026-09-09 after its RRI-100 parent was decomposed into six
-sequential RRI-25 leaves. `T3c` Hyperdrive/idempotency and `T3d` full
-certification remain unstarted and separately gated.
+sequential RRI-25 leaves. `T3c`'s 2026-09-12 preflight resolved D2 (the
+missing T2-to-volume package materializer) by **expanding T3c's own
+envelope** with a new Rust leaf (`crates/p2p/src/package_writer.rs`) rather
+than opening a separate predecessor task — the C0 request contract places
+`package_ref` construction as the caller's precondition, so the writer
+belongs beside `SealedPackage` construction in the already-existing
+`crates/p2p` crate, not inside the Node.js Availability Node. D3-D5 are
+resolved with direct evidence and scope is frozen into two leaves (Rust
+materializer; Node persistent store). Parent and both leaves score
+**RRI 70 — Complex** (`scripts/rri.py`, ADR-045 v2 authority); mandatory
+decomposition is satisfied by the two-leaf split, but Complex still requires
+human plan review before implementation. Automated phase-1 review could not
+complete: the RRI 56+ cross-vendor-peer route resolves to `codex`, but the
+review wrapper's Codex invocation is broken against the installed CLI
+version, and the resulting D14 fallback requires an ADR-039
+`fallback-selection-v1` human checkpoint not yet provided. No implementation
+is authorized; `T3d`'s test-only definition remains blocked on `T3c`. See
+`docs/audit/mvp0-p2p-p2-t3c-preflight.md` and the active task ledger.
 
 C0 decomposition: `T3a` Node/TS service + v1 contract; `T3b` private mTLS; `T3c` persistent Hyperdrive + idempotency/conflict behavior; `T3d` contract/security certification.
 

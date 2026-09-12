@@ -177,7 +177,18 @@ in full, not `P2.T2` alone** (2026-09-08 clarification, in response to an
 owner query on whether T2c-r's closure narrowed the remaining T6p-a
 dependency) — as of `T2`'s closure, P2 still has four unclosed phases
 between T2 and P3: `P2.T3` (Availability Node publication executor; `T3a`
-and `T3b` are Done and owner-verified, while `T3c`-`T3d` remain `Planned`),
+and `T3b` are Done and owner-verified; `T3c`'s 2026-09-12 preflight resolved
+its D2 blocker — the missing T2-to-volume package materializer — by
+expanding T3c's own envelope with a new Rust leaf in `crates/p2p` rather
+than opening a separate predecessor task; scope is now frozen into two
+leaves (Rust materializer + Node persistent store), both scoring RRI 70
+Complex via `scripts/rri.py`. Complex band requires human plan review before
+implementation, and automated phase-1 review (cross-vendor peer, `codex`)
+could not complete due to a review-wrapper/CLI version mismatch, leaving the
+D14 fallback awaiting an ADR-039 human fallback-selection checkpoint. `T3c`
+is scope-frozen and RRI-scored but **not yet approved or implemented**; see
+`docs/audit/mvp0-p2p-p2-t3c-preflight.md`. `T3d` has a prepared test-only
+definition and remains blocked on T3c),
 `P2.T4` (O4 dispatch + reconciliation; only `T4a` is `Done
 2026-09-07`, `T4b`–`T4f` remain `Planned`), `P2.T5` (S-120 integration +
 fail-closed `P2P_READY` transition, all four children `Planned`), and

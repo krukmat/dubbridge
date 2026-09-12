@@ -19,7 +19,7 @@ behavioral_coverage_contract: behavior-v2
 - Original `P2.T1` RRI 78 parent: **SUPERSEDED / NON-EXECUTABLE** by lower-RRI decomposition.
 - `P2.T1a`-`P2.T1f`: **Done / owner-approved as the complete P2.T1 persistence outcome on 2026-09-06**. Do not reopen for retrospective review.
 - `P2.C0`: **PASS 2026-09-06 — RRI 66 Complex / Effort L**. Owner approved the ten-path docs/fixture freeze; four Reflection passes PASS.
-- P2.T2, T3a, and T3b are Done, including T2c-r and T2g recertification; T3b was owner-verified on 2026-09-09. T4a is Done (2026-09-07), and T3c has not started. Remaining P2 work is T3c-T3d, T4b-T4f, T5a-T5d, and T6a-T6e. Next executable work belongs to the remaining C0-frozen leaf map below. **C0 does not authorize source execution.** Each leaf must run `scripts/rri.py` on its exact current path set and follow the resulting workflow gate immediately before execution.
+- P2.T2, T3a, and T3b are Done, including T2c-r and T2g recertification; T3b was owner-verified on 2026-09-09. T4a is Done (2026-09-07). T3c has not started. Its 2026-09-12 preflight stopped at mandatory decision D2: T2 has no implemented writer that materializes the in-memory `SealedPackage` beneath the shared ciphertext root, and no canonical manifest filename/durable handoff is frozen. T3c is therefore **blocked before RRI, phase-1 review, approval, or execution** until a separately scoped T2-to-T3 package-materialization predecessor is defined, approved, and completed. Remaining P2 work is that predecessor, T3c-T3d, T4b-T4f, T5a-T5d, and T6a-T6e. **C0 does not authorize source execution.** Each executable leaf must freeze its exact current path set, run `scripts/rri.py`, and follow the resulting workflow gate immediately before execution.
 - Review exception: existing owner-directed MVP0-P2P P0-P7 phase-1/phase-2 review override remains in force; it does not waive RRI/HITL/Reflection/tests.
 
 Canonical C0 evidence:
@@ -2154,8 +2154,8 @@ Code-solution review: muse-glimmer (in-session artifact) - PASS
 | `T3b-iv` | Fail-closed TLS options + unbound HTTPS server factory | `apps/availability-node/src/mtls.ts` | **25 Low / S** | Done 2026-09-09 | T3b-iii |
 | `T3b-v` | Ingress-guard contract-first evidence | `apps/availability-node/test/private-publication-ingress.test.js` | **25 Low / S** | Done 2026-09-09 | T3b-iv |
 | `T3b-vi` | Authorized mTLS request composition with existing handler | `apps/availability-node/src/server.ts` | **25 Low / S** | Done 2026-09-09 | T3b-v |
-| `T3c` | Persistent Hyperdrive seed/open + idempotency/conflict behavior | `apps/availability-node/src/hyperdrive_store.ts`; `apps/availability-node/src/server.ts` | RUN BEFORE EXECUTION | Planned | T3b |
-| `T3d` | Contract/mTLS/idempotency/traversal/secret certification | `apps/availability-node/test/publication_contract.test.ts`; `apps/availability-node/test/fixtures.ts` | RUN BEFORE EXECUTION | Planned | T3c |
+| `T3c` | Persistent Hyperdrive seed/open + idempotency/conflict behavior | candidate envelope below; freeze before RRI | NOT RUN — BLOCKED | Blocked at preflight D2; package-materialization predecessor required | T3b; T2 contract; missing materialization predecessor |
+| `T3d` | Contract/mTLS/idempotency/traversal/secret certification | `apps/availability-node/test/publication-contract.test.js`; `apps/availability-node/test/fixtures.js` | RUN BEFORE EXECUTION | Planned — definition prepared; blocked on T3c | T3c |
 
 **HP-T3-1:** authenticated same publication+lineage+manifest digest returns stable publication evidence.  
 **EC-T3-1:** same logical identity with conflicting lineage/digest -> 409 fail-closed.  
@@ -2174,6 +2174,17 @@ Reflection passes, and owner final verification are recorded in
 `docs/audit/mvp0-p2p-p2-t3a-implementation.md`. T3a itself exposed no listener
 and carried no mTLS/Hyperdrive or `P2P_READY` claim; T3b has since added and
 closed the private mTLS boundary, while T3c and T3d remain unstarted.
+
+> **T3 readiness correction — 2026-09-09:** C0's prospective path inventory
+> named only T3c source files and named non-runnable `.ts` paths for T3d. The
+> current Availability Node package has no direct Corestore/Hyperdrive/
+> Hyperswarm dependencies, its `tsconfig.json` compiles only `src/**/*.ts`, and
+> its established tests are Node ESM `.test.js` files importing `dist/` after a
+> build. The definitions below therefore use a conservative candidate envelope
+> that includes dependency manifests and executable `.test.js` evidence. This
+> corrects future task preparation only; it does not change the C0 behavior or
+> authority contract and does not authorize any source change. Full findings:
+> `docs/audit/mvp0-p2p-p2-t3-readiness-2026-09-09.md`.
 
 ## P2.T3a — Availability Node contract/bootstrap — DONE
 
@@ -2395,6 +2406,250 @@ Required passes: 4 (`100` Very high parent; four-pass Complex closure floor)
   every mapped T3b happy path and edge case, together with all T3a regressions,
   passed: 9/9 tests, 0 failures, 0 skipped.
 - Commands run: `node --test apps/availability-node/test/*.test.js docs/audit/mvp0-p2p-p2-t3a-contract.test.js docs/audit/mvp0-p2p-p2-t3a-http.test.js`.
+
+## P2.T3c — persistent Hyperdrive publication and stable replay — SCOPE FROZEN, AWAITING APPROVAL
+
+- **Type:** development / persistent storage / distributed side effect
+- **Effort:** L (RRI 70, Complex band — see RRI evidence below).
+- **Depends on:** T3b Done; T2 package contract Done.
+- **Status:** Unblocked 2026-09-12. D2 ("`PREDECESSOR REQUIRED`") is resolved
+  by **expanding T3c's own envelope** with a new Rust materializer leaf in
+  `crates/p2p` (not a separate predecessor task, per explicit orchestrator
+  instruction) rather than teaching the Availability Node to invent a
+  package layout. D3-D5 are resolved with direct repository/contract
+  evidence. Scope is frozen into two leaves (Leaf A: Rust materializer;
+  Leaf B: Availability Node persistent store). Parent and both leaves score
+  **RRI 70 — Complex (56-70)** via `scripts/rri.py` (ADR-045 v2 authority).
+  Complex band requires mandatory decomposition before implementation
+  (satisfied by the Leaf A/Leaf B split) and human review of the plan before
+  any implementation starts. **Phase-1 review could not complete
+  automatically**: the RRI 56+ cross-vendor peer route resolves to `codex`,
+  but `scripts/peer-workflow-review.py`'s Codex invocation
+  (`codex review --stdin`) does not match the installed Codex CLI's syntax
+  (`codex review [--config...] [PROMPT|-]`) and fails; the script correctly
+  fell back toward D14, which under ADR-039 requires a human
+  `fallback-selection-v1` checkpoint (model, reasoning effort, selector) that
+  is not yet provided. **No implementation is authorized.** This is a
+  presentation-only update: no Availability Node or `crates/p2p` source was
+  changed.
+- **Preflight evidence:**
+  `docs/audit/mvp0-p2p-p2-t3c-preflight.md` (status: `complete`,
+  `ALCANCE CONGELADO`).
+- **RRI evidence:** `.agent/p2-t3c/parent-rri.md`, `leaf-a-rri.md`,
+  `leaf-b-rri.md`.
+- **Phase-1 review evidence:** `.agent/p2-t3c/phase1-packet.md`,
+  `.agent/p2-t3c/phase1-review.json` (`verdict: awaiting_fallback_selection`),
+  `.agent/p2-t3c/phase1-review.fallback-selection.json`.
+- **Orchestrator runbook:**
+  `docs/playbooks/P2_T3C_ORCHESTRATOR_RUNBOOK.md` contains the ordered,
+  T3c-only procedure; it stops before T3d.
+- **Supplementary sub-decomposition (2026-09-12):** requested by the owner
+  to (a) lower the Med-high-eligible portions of Leaf A/Leaf B toward
+  Moderate/Low where honestly possible, and (b) re-analyze the parent-
+  integration step's own cost. Result: four new genuine Low-band leaves
+  (`T3c-S0`, `T3c-S1a`, `T3c-S2a`, `T3c-S3`, each RRI 25) extracted from the
+  frozen envelope; the domain-composing remainder splits into two Med-high
+  leaves (`T3c-S1b`, `T3c-S2b`, RRI 55 each) and one Complex leaf
+  (`T3c-S4`, RRI 70 — corrected from an earlier verbal 55 estimate; verified
+  via `scripts/rri.py`, driven by raw cyclomatic complexity in the
+  Corestore/Hyperdrive/Hyperswarm lifecycle, not by D/K/P). The
+  parent-integration step (`T3c-Integ`) scores RRI 55 in isolation but
+  **inherits the parent's Complex band and full review/approval/Reflection
+  gates** per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Honest Low-band
+  maximization before presentation — it is the parent's final
+  unified/integrated verification, which that section explicitly excludes
+  from independent re-routing. Full analysis, verified RRI evidence, and the
+  updated 8-leaf table: `docs/audit/mvp0-p2p-p2-t3c-preflight.md` §
+  Supplementary sub-decomposition pass. **This refines, but does not
+  replace or approve,** the frozen Leaf A/Leaf B envelope below; no
+  implementation is authorized by this addition.
+- **Objective:** turn the injected T3a/T3b publication seam into a persistent,
+  ciphertext-only Hyperdrive/Hyperswarm publisher that returns stable C0 v1
+  evidence for the same publication/lineage/digest across replay and process
+  restart, while conflicts and invalid packages fail closed.
+
+### Frozen writable envelope (2026-09-12, expanded from the original candidate list)
+
+**Leaf A — Rust package materializer (new, resolves D2):**
+
+- `crates/p2p/src/package_writer.rs` (new)
+- `crates/p2p/src/lib.rs` (module export wiring only)
+- `crates/p2p/tests/package_writer_test.rs` (new)
+
+**Leaf B — Availability Node persistent store (original candidate envelope):**
+
+- `apps/availability-node/package.json`
+- `apps/availability-node/package-lock.json`
+- `apps/availability-node/src/hyperdrive_store.ts`
+- `apps/availability-node/src/server.ts`
+- `apps/availability-node/test/hyperdrive-store.test.js`
+- `apps/availability-node/test/publication-idempotency.test.js`
+
+Leaf A does not call the Availability Node and does no network I/O; it hands
+its output (a materialized package under `package_ref`) to the still-`Planned`
+`P2.T4c` (mTLS AN client), which is out of scope for T3c. Parent integration
+requires running Leaf A's real output through Leaf B's full HP/EC suite
+before T3c can close (see preflight § Alcance congelado).
+
+### Mandatory analysis resolution before RRI
+
+The orchestrator must record these answers in the task packet. If any answer
+needs a path outside the candidate envelope, stop and amend/decompose the task
+before scoring it.
+
+1. **Direct dependency boundary:** verify Node 22 compatibility and pin direct
+   `corestore`, `hyperdrive`, and `hyperswarm` dependencies (plus only a directly
+   required small utility); never rely on the mobile lockfile or a transitive
+   package. Record both declared and lockfile-resolved versions.
+2. **Package materialization boundary:** identify the exact on-disk location and
+   filename of canonical manifest bytes plus ciphertext files under
+   `package_ref`. Current T2 produces the sealed package in memory but no existing
+   source path visibly owns writing that package to the shared ciphertext volume.
+   If this remains true, define and approve the missing predecessor instead of
+   teaching the Availability Node to consume an invented layout.
+3. **Root containment:** freeze separate injected ciphertext-package and
+   Availability-Node storage roots, including canonical/real-path and symlink
+   handling. The backend-supplied relative `package_ref` must never become an
+   arbitrary host-path reader.
+4. **Durable identity/evidence:** freeze where the tuple
+   `(publication_id, lineage_id, manifest_digest_sha256)` maps to the stable
+   Hyperdrive public identifier, `evidence_id`, and original `confirmed_at`, and
+   how that record is committed only after a valid package is opened/seeded.
+5. **Concurrency and lifecycle:** freeze same-ID concurrent request
+   serialization, retry after ambiguous failure, Hyperswarm join/flush semantics,
+   long-lived seeding ownership, and deterministic close behavior. T3c does not
+   bind a host/port or own deployment credential loading.
+
+### Acceptance criteria
+
+1. A first valid, ciphertext-only package below the configured root is validated
+   against its canonical manifest digest and every listed ciphertext size/hash,
+   opened in persistent Corestore/Hyperdrive storage, announced for seeding, and
+   returns exact `201` C0 evidence.
+2. Repeating the same tuple concurrently, later, or after reconstructing the
+   publisher from the same persistent storage returns `200` with byte-for-byte
+   stable `external_publication_id`, `evidence_id`, and `confirmed_at`; it neither
+   creates a second drive nor rewrites package identity.
+3. The same `publication_id` with a different lineage or digest, and the same
+   lineage with a different digest, returns exact `409 publication_conflict`
+   without modifying the accepted record or starting a second seed.
+4. Missing/corrupt manifest data, digest/size mismatch, traversal, absolute or
+   backslash path, normalized-path collision, and a symlink escape return exact
+   `422 package_invalid` before Hyperdrive publication success.
+5. Corestore/Hyperdrive/Hyperswarm open, write, join, flush, or persistence
+   failures return exact `503 publication_unavailable`; no success record is
+   committed and a same-lineage retry remains safe.
+6. The Availability Node receives and persists only ciphertext package material
+   and C0 evidence. It gains no PostgreSQL, CK/KEK, invite/viewer, business-auth,
+   JWT-signing, `P2P_READY`, public-listener, or deployment authority.
+
+### Behavioral examples
+
+- **HP-T3c-1:** valid package + first publication -> one persistent drive/seed +
+  exact `201` evidence.
+- **HP-T3c-2:** identical replay after publisher reconstruction -> exact `200`
+  with the original three stable evidence values.
+- **EC-T3c-1:** same logical publication with conflicting lineage or digest ->
+  `409`, original evidence unchanged, no second drive.
+- **EC-T3c-2:** escaped/corrupt/non-ciphertext package or storage/network failure
+  -> `422`/`503` as frozen, never a success record or readiness claim.
+
+### Verification commands to freeze in the task packet
+
+The task packet may narrow test filenames after honest decomposition, but every
+executed leaf and the integrated parent must preserve these gates:
+
+```bash
+npm --prefix apps/availability-node ci --ignore-scripts --no-audit --no-fund
+npm --prefix apps/availability-node audit --omit=dev --json
+npm --prefix apps/availability-node run typecheck
+npm --prefix apps/availability-node run build
+node --test apps/availability-node/test/hyperdrive-store.test.js \
+  apps/availability-node/test/publication-idempotency.test.js
+node --test apps/availability-node/test/*.test.js \
+  docs/audit/mvp0-p2p-p2-t3a-contract.test.js \
+  docs/audit/mvp0-p2p-p2-t3a-http.test.js
+git diff --check
+make qa-docs
+```
+
+- **Evidence to emit:** preflight decision record; exact dependency versions;
+  parent/leaf RRI outputs; phase-1 and phase-2 evidence as required by the final
+  band and active review override; focused RED/GREEN transcripts; restart replay,
+  concurrency, conflict, containment, integrity, failure, lifecycle, full T3a/T3b
+  regression, Reflection, behavioral coverage, and owner-verification records.
+- **Status artifacts affected:** this ledger;
+  `docs/plan/mvp0-p2p-p2-encrypted-publication.md`; `docs/plan/roadmap.md` only
+  when T3c closes or materially changes downstream readiness; T3c audit/RRI/
+  approval/implementation artifacts; T3d dependency status. Do not mark T3 or
+  unblock T4c until T3d also passes.
+- **Exclusions:** deployment descriptors/environment loading, listener bind,
+  certificate provisioning/rotation, Rust backend client, PostgreSQL/outbox,
+  CK/KEK handling, invite/viewer/device state, `P2P_READY`, T4, and T3d's full
+  cross-boundary certification.
+- **Handoff prompt:** `P2.T3c — resolve and record the five mandatory preflight
+  questions, then freeze/score a coherent parent and independently verifiable
+  leaves for persistent ciphertext-only Hyperdrive publication and stable replay.
+  Implement only after the resulting review/approval route passes. Stop after
+  T3c evidence and status sync; do not start T3d or T4.`
+
+## P2.T3d — Availability Node contract/security certification — DEFINITION PREPARED
+
+- **Orchestrator runbook:** [P2.T3d human-led procedure with Claude Code assistance](../playbooks/P2_T3D_ORCHESTRATOR_RUNBOOK.md).
+  Prepared for future execution with T3c closure as a precondition; does not
+  authorize early execution.
+- **Type:** development / certification
+- **Effort:** M provisional; run RRI after T3c closes against the exact test-only
+  paths and current implementation.
+- **Depends on:** T3c Done. This dependency is not satisfied.
+- **Status:** Planned and blocked on T3c; do not present or execute early.
+- **Exact writable paths:**
+  `apps/availability-node/test/publication-contract.test.js` and
+  `apps/availability-node/test/fixtures.js`.
+- **Objective:** certify the complete T3a-T3c Availability Node boundary through
+  executable Node ESM tests without changing production source. A discovered
+  defect reopens the owning T3a, T3b, or T3c task under a new scope/RRI; T3d does
+  not repair product code inside a certification-only diff.
+
+### Acceptance criteria and behavioral examples
+
+1. **HP-T3d-1:** an allow-listed mTLS client publishes a real temporary
+   ciphertext fixture and receives exact `201`; identical replay after publisher
+   reconstruction receives `200` with stable evidence.
+2. **HP-T3d-2:** the resulting Hyperdrive is readable from its public identifier
+   and contains only the manifest/ciphertext package bytes declared by the
+   fixture; the service still exposes no readiness or authorization decision.
+3. **EC-T3d-1:** absent/untrusted/unlisted client identities cannot invoke the
+   publisher; the existing TLS-handshake/403 split remains exact.
+4. **EC-T3d-2:** conflicting lineage/digest returns `409`; traversal, symlink
+   escape, corrupt manifest, ciphertext size/hash mismatch, and plaintext/secret
+   fixture fields return `422`, with no second drive or stable success evidence.
+5. **EC-T3d-3:** injected storage/network failure returns `503`; logs, responses,
+   persisted metadata, and drive files contain none of the C0 secret deny-list.
+6. All T3a/T3b focused tests pass together with T3d, temporary roots are cleaned
+   deterministically, and no test requires public internet reachability.
+
+```bash
+npm --prefix apps/availability-node run typecheck
+npm --prefix apps/availability-node run build
+node --test apps/availability-node/test/*.test.js \
+  docs/audit/mvp0-p2p-p2-t3a-contract.test.js \
+  docs/audit/mvp0-p2p-p2-t3a-http.test.js
+git diff --check
+make qa-docs
+```
+
+- **Evidence to emit:** complete test transcript; fixture/drive inspection;
+  restart-replay evidence; negative secret scan; task RRI; applicable phase-1/
+  phase-2 disposition; Reflection; behavior-v2 table; owner verification.
+- **Status artifacts affected:** this ledger; linked P2 plan; roadmap T3 summary;
+  T4c dependency status; T3d audit/RRI/approval/closure artifacts.
+- **Exclusions:** product-source repair, deployment/network provisioning, Rust
+  client, PostgreSQL/outbox/readiness, invitations, mobile replication/playback.
+- **Handoff prompt:** `P2.T3d — after T3c is Done, add only the two frozen Node
+  ESM certification files and prove the complete mTLS/publication/replay/conflict/
+  containment/secret boundary. Reopen the owning task for any product defect.
+  Stop after T3 certification and status sync; do not start T4c.`
 
 ## P2.T4 — O4 dispatcher and reconciler
 
