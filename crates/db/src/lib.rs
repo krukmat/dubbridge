@@ -6,6 +6,7 @@ pub mod audit_repo;
 pub mod consent_repo;
 pub mod dubbing_repo;
 pub mod error;
+pub mod haa_read_repo;
 pub mod haa_repo;
 pub mod notification_repo;
 pub mod p2p_publication_repo;
