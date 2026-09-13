@@ -256,12 +256,24 @@ band — never derive one output from another (e.g. do not infer capability from
 | **0–25** | Low | **S** | Primary agent or Local Qwen Developer via Ollama | Primary agent or Local Qwen Developer via Ollama | Off | Muse Glimmer†† | Muse Glimmer Reviewer†† | **Low-band handling:** do not present the full task for approval; use local Qwen Developer only for eligible simple code patches, otherwise execute directly with the primary agent. |
 | **26–40** | Moderate | **M** | Balanced | Balanced | Off | Gemma†† | Gemma Reviewer†† | Confirm tests exist in the affected area. **Implementation route:** local-first via `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL`; after 2/2 repairs, decompose remaining work into scored Low-band subtasks before the concrete task-card cloud takeover is considered as last resort. A ≥2-file task with heterogeneous per-module CC may instead use ADR-040 per-module split routing — see § Per-module complexity-split routing below. |
 | **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Gemma†† | Gemma Reviewer†† | Plan + explicit acceptance criteria required before approval. **Implementation route (ADR-038):** Muse Glimmer advisory refinement → primary hash-bound route receipt → **RRI 46–55:** cloud takeover with the full evidence bundle; a `GO_LOCAL` advisory result is recorded but never launches a local developer, **except** for modules independently qualifying under ADR-040 per-module split routing (Amendment 2). **RRI 41–45 (Amendment 3):** a `GO_LOCAL` result instead routes to the same local-first path as Moderate (2-attempt repair budget); `CLOUD_REQUIRED` still escalates to cloud. See § Per-module complexity-split routing and § Med-high Architect-refined single-attempt handling below. Review/approval rigor unchanged for both sub-bands — 3 Reflection passes and this HITL gate still apply; phase-2 (and phase-1 when it applies) reviewer is Gemma, not the cross-vendor peer. |
-| **56–70** | Complex | **L** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Plan first. **Decompose into subtasks before implementation.** Human reviews the plan. |
-| **71–85** | High | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Characterization tests + explicit acceptance criteria + human reviews the **diff** (not just the plan). **Decomposition remains mandatory.** |
-| **86–100** | Very high | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Do not implement directly. Produce an ADR + risk analysis + decompose into subtasks. |
-| **> 100** | Excessive | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Architecture/design work must happen first. Re-scope before any implementation. |
+| **56–70** | Complex | **L** | Premium | Premium | On | GPT-OSS 20B (Complex profile)* | GPT-OSS 20B (Complex profile)* | Plan first. **Decompose into subtasks before implementation.** Human reviews the plan. |
+| **71–85** | High | **XL** | Premium | Premium | On | GPT-OSS 20B (Complex profile)* | GPT-OSS 20B (Complex profile)* | Characterization tests + explicit acceptance criteria + human reviews the **diff** (not just the plan). **Decomposition remains mandatory.** |
+| **86–100** | Very high | **XL** | Premium | Premium | On | GPT-OSS 20B (Complex profile)* | GPT-OSS 20B (Complex profile)* | Do not implement directly. Produce an ADR + risk analysis + decompose into subtasks. |
+| **> 100** | Excessive | **XL** | Premium | Premium | On | GPT-OSS 20B (Complex profile)* | GPT-OSS 20B (Complex profile)* | Architecture/design work must happen first. Re-scope before any implementation. |
 
-\* **Cross-vendor peer** (RRI 56+ only): `claude-code → codex | codex → claude | other → claude`. Unavailable peer CLI falls back to **D14** (Balanced tier); D14 first uses a responsive provider different from the primary orchestrator, and may use the same provider only after that cross-provider attempt is unusable and is recorded as degraded. Peer + D14 both unavailable → blocked artifact, stop. Phase-1 exemptions (docs/policy/config-only tasks) record `n/a`. Full contract: `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review`.
+\* **RRI 56+ primary reviewer** (2026-09-13, owner-directed rebinding):
+`gpt-oss:20b` at the Complex review profile (`num_ctx=49152`,
+`num_predict=8192`, `think=high`, `temperature=1.0`, `top_p=1.0`) is now
+primary for both phase 1 and phase 2. The **cross-vendor peer** becomes the
+intermediate fallback: `claude-code → codex | codex → claude | other →
+claude`. If gpt-oss is unavailable, stalled, or returns invalid/`BLOCKED`
+output, retry once, then fall back to the cross-vendor peer; an unavailable
+peer CLI falls back to **D14** (Balanced tier) — D14 first uses a responsive
+provider different from the primary orchestrator, and may use the same
+provider only after that cross-provider attempt is unusable and is recorded
+as degraded. All three unavailable → blocked artifact, stop. Phase-1
+exemptions (docs/policy/config-only tasks) record `n/a`. Full contract:
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review`.
 
 †† **Local reviewer bindings:** the phase-1/phase-2 chains for RRI 0–55, their
 retry discipline, D14's cross-provider requirement, and the ADR-037 scope note
@@ -709,6 +721,11 @@ governs *who reviews*, independently of *who authored the code*.
 so ADR-037's advisory-only boundary applies without exception in every band
 (see `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Local Architect / Complex
 Analyst`).
+
+**RRI 56+ note:** this section governs only RRI 0–55. RRI 56+ (Complex+)
+uses its own primary/fallback chain (`gpt-oss:20b` Complex profile → cross-
+vendor peer → D14) defined in the Bands table footnote above and in
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review`.
 
 Invocation: send the diff, task acceptance criteria, and any independently-
 verified facts (test/verification output the orchestrator already produced)

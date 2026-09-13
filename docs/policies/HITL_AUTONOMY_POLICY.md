@@ -261,7 +261,9 @@ Every development task is reviewed at two phases, resolved from RRI band:
 - **RRI 0–25 (Low):** GPT-OSS 20B primary, Gemma intermediate, D14 final.
 - **RRI 26–55 (Moderate + Med-high):** Gemma primary, GPT-OSS 20B
   intermediate, D14 final.
-- **RRI 56+ (Complex+):** cross-vendor peer (replaces Gemma), D14 fallback.
+- **RRI 56+ (Complex+):** GPT-OSS 20B at the Complex profile primary
+  (replaces Gemma, 2026-09-13 owner-directed rebinding), cross-vendor peer
+  intermediate fallback, D14 final fallback.
 
 Both bindings apply regardless of whether implementation stayed local or
 escalated to cloud — the binding governs *who reviews*, independent of *who

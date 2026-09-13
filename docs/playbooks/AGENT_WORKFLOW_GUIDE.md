@@ -1225,15 +1225,31 @@ the task's RRI band and the review phase:
 
 | Review phase | RRI 0–25 (Low) | RRI 26–55 (Moderate + Med-high) | RRI 56+ (Complex+) |
 |---|---|---|---|
-| **Phase 1 — Task-analysis review** (before task-card presentation or delegation) | **GPT-OSS 20B** (advisory) | **Gemma** | **Cross-vendor peer** |
-| **Phase 2 — Code-solution review** (after implementation, before closure) | **GPT-OSS 20B Reviewer** (N-pass) | **Gemma Reviewer** (N-pass) | **Cross-vendor peer replaces Gemma** |
+| **Phase 1 — Task-analysis review** (before task-card presentation or delegation) | **GPT-OSS 20B** (advisory) | **Gemma** | **GPT-OSS 20B (Complex profile)** |
+| **Phase 2 — Code-solution review** (after implementation, before closure) | **GPT-OSS 20B Reviewer** (N-pass) | **Gemma Reviewer** (N-pass) | **GPT-OSS 20B (Complex profile) replaces Gemma** |
+
+**RRI 56+ primary rebinding (2026-09-13, owner-directed):** the cross-vendor
+peer (Codex) is no longer the primary reviewer for either phase in the
+Complex+ band. The primary is now `gpt-oss:20b` run at the **Complex
+review profile** — `num_ctx=49152`, `num_predict=8192`, `think=high`,
+`temperature=1.0`, `top_p=1.0` (the "critical/architect-level" profile
+already defined in § Mandatory workflow before implementing, Step 0, with
+`num_predict` set to `8192` specifically for this binding rather than that
+section's general `10240`). The cross-vendor peer (Codex) moves to
+**fallback**: invoked only if `gpt-oss:20b` is unavailable, stalled, or
+returns invalid/`BLOCKED` output, following the same one-retry-then-fallback
+discipline as every other band's chain. This inverts the previous
+`cross-vendor peer → D14` order to `gpt-oss:20b (Complex profile) → codex →
+D14`. Rationale recorded in `docs/audit/agent-workflow-binding-history.md`;
+this is an explicit owner instruction, not a capability/availability
+finding about Codex.
 
 Canonical chains — every other section names them by band instead of
 re-deriving them:
 
 - **RRI 0–25 chain:** `gpt-oss:20b` → `gemma4:26b-a4b-it-qat` → D14
 - **RRI 26–55 chain:** `gemma4:26b-a4b-it-qat` → `gpt-oss:20b` → D14
-- **RRI 56+ chain:** cross-vendor peer → D14
+- **RRI 56+ chain:** `gpt-oss:20b` (Complex profile) → cross-vendor peer (codex) → D14
 
 D14 is the mandatory final fallback in every band; both local chains apply
 regardless of whether implementation stayed local or escalated to cloud. Retry
@@ -1241,24 +1257,30 @@ discipline: § Gemma Reviewer / GPT-OSS 20B Reviewer § Availability; binding
 rationale: `docs/policies/RRI_POLICY.md § Local pipeline phase-1/phase-2
 reviewer bindings`.
 
-### Cross-vendor peer and D14 provider resolution
+### RRI 56+ primary reviewer, cross-vendor fallback, and D14 provider resolution
+
+The **primary** reviewer for both phases in RRI 56+ is always
+`gpt-oss:20b` at the Complex profile above, regardless of caller identity.
+If it is unavailable, stalled, or returns invalid/`BLOCKED` output after
+one retry, fall back to the cross-vendor peer resolved by caller identity:
 
 ```
-caller = claude-code     -> reviewer = codex
-caller = codex           -> reviewer = claude
-caller = local-provider  -> reviewer = claude
-caller = remote-provider -> reviewer = claude
-caller = unknown         -> reviewer = claude
+caller = claude-code     -> cross-vendor fallback = codex
+caller = codex           -> cross-vendor fallback = claude
+caller = local-provider  -> cross-vendor fallback = claude
+caller = remote-provider -> cross-vendor fallback = claude
+caller = unknown         -> cross-vendor fallback = claude
 ```
 
-This is the **primary reviewer** route for RRI 56+ only; it does not limit
-D14. Whenever D14 triggers in any band, it MUST first use a responsive
-reviewer from a provider different from the primary orchestrator's. A
-same-provider D14 is permitted only as the final degraded fallback after the
-cross-provider D14 is unavailable, unauthenticated, stalled, or returns
-invalid/`BLOCKED` output. Record the cross-provider attempt and, when used,
-the same-provider fallback reason in the review artifact. Context isolation
-is required in both cases.
+This provider-resolution table now applies to the **fallback** step only;
+it does not limit D14. Whenever D14 triggers in any band, it MUST first use
+a responsive reviewer from a provider different from the primary
+orchestrator's. A same-provider D14 is permitted only as the final degraded
+fallback after the cross-provider D14 is unavailable, unauthenticated,
+stalled, or returns invalid/`BLOCKED` output. Record the `gpt-oss:20b`
+attempt, the cross-vendor fallback attempt (if triggered), and, when used,
+the same-provider D14 fallback reason in the review artifact. Context
+isolation is required for D14 in all cases.
 
 ### Report line contract
 
@@ -1284,8 +1306,10 @@ the task blocked. Never downgrade silently to self-review.
   separate, additional check.
 - Each band's primary reviewer, intermediate fallback, and D14's mandatory
   final position are the chains above; both phases of a band use the same
-  chain. In RRI 56+ the cross-vendor peer **replaces** Gemma/GPT-OSS 20B —
-  they do not both run.
+  chain. In RRI 56+, `gpt-oss:20b` (Complex profile) **replaces** Gemma
+  Reviewer/the 26–55 GPT-OSS 20B binding as the primary — they do not both
+  run; the cross-vendor peer (Codex) is that band's fallback, not its
+  primary, per the 2026-09-13 rebinding above.
 - The four existing development-task closure blocks (Step 1 reviewer/D14,
   Step 2 Reflection log, Step 3 behavioral coverage cert, Step 4 owner
   verification) are preserved; the band-resolved reviewer occupies the
@@ -1755,30 +1779,43 @@ above):
         - Primary-agent disposition: `<accepted / rejected false positives / repaired>`
 ```
 
-#### Step 1-C — RRI 56+ (Complex and above): cross-vendor peer / D14
+#### Step 1-C — RRI 56+ (Complex and above): gpt-oss:20b (Complex profile) / cross-vendor peer / D14
 
-The cross-vendor peer **replaces Gemma** as the code-solution reviewer for
-this band (the Gemma/GPT-OSS 20B routing in Step 1-B applies only to
-26–55). Do not run Gemma Reviewer or GPT-OSS 20B Reviewer for RRI 56+; the
-peer is the mandatory path and D14 the mandatory fallback.
+`gpt-oss:20b` at the Complex profile (`num_ctx=49152`, `num_predict=8192`,
+`think=high`, `temperature=1.0`, `top_p=1.0`) **replaces Gemma** as the
+primary code-solution reviewer for this band (the Gemma/GPT-OSS 20B routing
+in Step 1-B applies only to 26–55; this is a distinct, Complex-only
+binding, not the same GPT-OSS 20B role as the 0–25/26–55 chains). Do not
+run Gemma Reviewer for RRI 56+. The cross-vendor peer is the fallback if
+the primary is unavailable/stalled/invalid, and D14 the mandatory final
+fallback.
 
 ```
-[ ] 1d. Resolve the cross-vendor peer from the caller identity:
-        claude-code → codex | codex → claude | any other → claude
+[ ] 1d. Restart Ollama + warm-up probe `gpt-oss:20b` per § Mandatory
+        workflow before implementing, Step 0, if not already done for this
+        task ID.
 
-[ ] 1e. Invoke the peer reviewer via `scripts/peer-workflow-review.py --phase code`
-        (once PPR-2 lands). Until then, invoke the peer manually and write the
-        review artifact to `.agent/peer-code-review-<task-id>.json`.
+[ ] 1e. Invoke `gpt-oss:20b` at the Complex profile with the phase's
+        packet (task-analysis packet for phase 1; diff + acceptance
+        criteria for phase 2). Write the review artifact to
+        `.agent/peer-code-review-<task-id>.json`.
 
-[ ] 1f. Evaluate D14 fallback — spawn context-isolated subagent if:
-        - Peer CLI unavailable, unauthenticated, or returns invalid output.
+[ ] 1f. Evaluate cross-vendor fallback — if `gpt-oss:20b` is unavailable,
+        stalled, or returns invalid/`BLOCKED` output, retry once, then
+        resolve and invoke the cross-vendor peer from the caller identity:
+        claude-code → codex | codex → claude | any other → claude, via
+        `scripts/peer-workflow-review.py --phase code` (once PPR-2 lands)
+        or manual invocation.
+
+[ ] 1g. Evaluate D14 fallback — spawn context-isolated subagent if:
+        - Both `gpt-oss:20b` and the cross-vendor peer are unavailable,
+          unauthenticated, stalled, or return invalid output.
         - If D14 is also unavailable: write a blocked-artifact record and stop.
           Never self-review. Report the task as blocked.
         Spawn per § Context-isolated adjudicator (D14). Output is advisory.
 
-[ ] 1g. Record `### Peer Reviewer evidence` block in the task entry — same
-        fields as Step 1-B's 1g, with `Reviewer: <codex|claude|d14>` and no
-        GPT-OSS 20B fallback line.
+[ ] 1h. Record `### Peer Reviewer evidence` block in the task entry — same
+        fields as Step 1-B's 1g, with `Reviewer: <gpt-oss|codex|claude|d14>`.
 ```
 
 Record the phase-2 report line in the closure report:

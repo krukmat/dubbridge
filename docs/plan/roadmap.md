@@ -234,12 +234,18 @@ the full disposition of every finding, including one defect found only
 through self-review (a session leak the external review never saw) and one
 test-only defect (a Hyperbee core-update timing gap in the new peer-
 replication test, not a production issue). 77/77 tests passing across the
-full Availability Node + P2.T3a suite. **Only `T3c-Integ` (final unified
-verification across every T3c sub-leaf) remains unstarted within the
-frozen envelope; `P2.T3c` and Leaf B remain open.** The
-approval does not authorize scope expansion or bypass leaf-specific technical
-gates. See `docs/audit/mvp0-p2p-p2-t3c-preflight.md`. `T3d` has a prepared test-only
-definition and remains blocked on T3c),
+full Availability Node + P2.T3a suite. **`T3c-Integ` (final unified
+verification proving a package genuinely built by the real Rust production
+pipeline is accepted end-to-end by the real Availability Node publication
+executor) closed `[x] Done` 2026-09-13, owner-verified — `P2.T3c` and Leaf B
+are now fully closed**, resolving the fixture-binary/test suite it added
+(`crates/p2p/src/bin/package_build_and_materialize_fixture.rs`,
+`apps/availability-node/test/package-publication-integration.test.js`; 5/5
+new tests, 78/78 full suite, 0 regressions). The prior HITL approval did not
+authorize scope expansion beyond this frozen envelope. See
+`docs/audit/mvp0-p2p-p2-t3c-preflight.md` and the `T3c-Integ` closure record
+in `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`. `T3d` has a prepared
+test-only definition and is now unblocked),
 `P2.T4` (O4 dispatch + reconciliation; only `T4a` is `Done
 2026-09-07`, `T4b`–`T4f` remain `Planned`), `P2.T5` (S-120 integration +
 fail-closed `P2P_READY` transition, all four children `Planned`), and
