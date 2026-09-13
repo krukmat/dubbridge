@@ -56,6 +56,7 @@ doc gates).
 | [ADR-044](ADR-044-p2p-audience-delivery-boundary.md) | P2P audience delivery boundary | Accepted 2026-09-05 (D1 `O3 parallel`, D2 `K1`, D3 `O4`; P2 still requires its own plan/RRI/HITL) |
 | [ADR-045](ADR-045-devstral-local-implementer-binding.md) | Devstral Small 2 as the Moderate local implementer | Accepted (runtime binding and 128K context baseline) |
 | [ADR-046](ADR-046-local-model-reviewer-and-architect-rebinding.md) | Local reviewer and architect rebinding | Accepted 2026-08-31 |
+| [ADR-047](ADR-047-human-approval-authority.md) | Human Approval Authority protocol and authenticator boundary | Accepted |
 
 ## Backfill note
 
