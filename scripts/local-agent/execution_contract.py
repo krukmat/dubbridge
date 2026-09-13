@@ -78,15 +78,16 @@ def normalize_resolved_execution(
 ) -> ResolvedExecutionConstraints:
     """Normalize already-resolved card/limit/runtime state.
 
-    `limits` remains the authority for whether local execution is permitted and
-    which logical binding applies. This function does not infer or recompute
-    routing policy.
+    `limits` remains the authority for whether local execution is permitted.
+    This function does not infer or recompute routing policy.
     """
 
-    binding_id = getattr(limits, "logical_binding", None) or "local-implementer"
-    logical_binding = LogicalBinding(binding_id=binding_id, role="local-implementer")
-
     if limits.local_execution_allowed:
+        binding_id = getattr(limits, "logical_binding", None) or "local-implementer"
+        logical_binding = LogicalBinding(
+            binding_id=binding_id,
+            role="local-implementer",
+        )
         execution_mode = EXECUTION_MODE_LOCAL
         runtime_preset = RuntimePreset(
             runtime_class=runtime_class,
@@ -96,6 +97,10 @@ def normalize_resolved_execution(
             thinking_mode=thinking_mode,
         )
     else:
+        logical_binding = LogicalBinding(
+            binding_id="cloud-handoff",
+            role="cloud-implementer",
+        )
         execution_mode = EXECUTION_MODE_CLOUD_HANDOFF
         runtime_preset = None
 
