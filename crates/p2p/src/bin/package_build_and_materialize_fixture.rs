@@ -18,6 +18,11 @@
 //! must still let the caller parse the structured error from stdout without
 //! `execFileSync` throwing on a non-zero exit.
 
+// This binary's entire contract is printing JSON to stdout and usage errors
+// to stderr for the Node test harness to consume (see module doc above) —
+// not accidental debug output the print_stdout/print_stderr lints target.
+#![allow(clippy::print_stdout, clippy::print_stderr)]
+
 use std::env;
 use std::path::PathBuf;
 
