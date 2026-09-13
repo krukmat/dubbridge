@@ -30,18 +30,30 @@ The implementation centralizes contracts and evidence only. Existing behavior au
 6. Distinguish execution session, model invocation, repair attempt, test attempt, and fallback handoff.
 7. Persist policy family/version so RRI v1/v2 analytics cannot be mixed silently.
 8. Reference existing authority-bearing receipts/artifacts instead of duplicating their payloads.
+9. Adopt additively first: observe/delegate to the existing runner instead of modifying its behavioral state machine in Wave 1.
 
-## Affected software-factory files
+## Implemented software-factory scope
 
-Expected implementation scope:
+Wave 1 is implemented as an additive facade so existing behavior remains byte/semantically authoritative:
 
-- `scripts/local-agent/execution_contract.py` — new normalized contract types only;
-- `scripts/local-agent/run_local_task.py` — expose logical binding through existing resolved limits and preserve public compatibility;
-- `scripts/local-agent/cli.py` — build normalized constraints, preserve runtime usage, normalize cloud handoff result references;
-- `scripts/local-agent/audit_record.py` — evidence lineage, explicit counters, policy version and usage aggregation;
-- targeted tests under `scripts/local-agent/*_test.py`.
+- `scripts/local-agent/execution_contract.py` — normalized resolved-execution types;
+- `scripts/local-agent/execution_evidence.py` — non-authoritative correlation/economics summary;
+- `scripts/local-agent/run_normalized_task.py` — additive facade that delegates execution to `run_local_task` unchanged, observes runtime usage/audit outputs, and emits the normalized summary;
+- `scripts/local-agent/execution_contract_test.py` — contract invariants;
+- `scripts/local-agent/execution_evidence_test.py` — evidence/counter/handoff invariants;
+- `scripts/local-agent/run_normalized_task_test.py` — observer transparency and error propagation.
 
-Documentation/status scope:
+Wave 1 deliberately does **not** modify:
+
+- `run_local_task.py` routing behavior;
+- `cli.py` state/control flow;
+- `session_loop.py` repair/turn/test machine;
+- `audit_record.py` authority/signature behavior;
+- `fallback_selection.py` recommendation/authorization behavior.
+
+A later refactor may move normalization closer to those modules only after the additive path demonstrates value and equivalent behavior.
+
+## Documentation/status scope
 
 - this plan;
 - `docs/tasks/software-factory-execution-seam-v3-2.md`;
@@ -54,25 +66,27 @@ Documentation/status scope:
 RRI / workflow / TaskCard / EffectiveLimits
                  |
                  v
-      execution_contract.py
-                 |
-                 v
-        cli.py / local runner
-                 |
-        +--------+---------+
-        |                  |
-        v                  v
-  local execution     cloud handoff
-        |                  |
-        +--------+---------+
-                 v
-          audit_record.py
-                 |
-                 v
-      existing audit/review evidence
+        run_normalized_task.py
+          /              \
+         v                v
+execution_contract   existing run_local_task
+                           |
+                           v
+                    session_loop / fallback
+                           |
+                           v
+                     existing audit
+          \              /
+           v            v
+             execution_evidence
+                    |
+                    v
+       execution-summary-v1 (non-authoritative)
 ```
 
-`execution_contract.py` does not import RRI calculators, context providers, P2P code, reviewer policy, or fallback policy.
+The facade observes and references existing evidence; it does not replace it.
+
+`execution_contract.py` and `execution_evidence.py` do not import RRI calculators, context providers, P2P code, reviewer policy, or fallback policy.
 
 ## Non-goals
 
@@ -85,12 +99,18 @@ RRI / workflow / TaskCard / EffectiveLimits
 - no replacement for `fallback_selection`;
 - no new telemetry platform;
 - no product-runtime/P2P changes;
+- no mandatory direct cloud adapter;
 - no reusable cross-project package extraction in this wave.
 
 ## Delivery sequence
 
 1. T1 — normalized resolved execution contract + binding/preset separation.
-2. T2 — runtime usage propagation + explicit evidence counters.
+2. T2 — runtime usage observation + explicit evidence counters.
 3. T3 — normalized cloud-handoff/evidence lineage integration and regression closure.
 
-Each task must preserve current behavior before the next task proceeds.
+## Verification strategy
+
+- pure contract/evidence modules must compile and pass targeted unit tests;
+- the stream observer must return the exact underlying runtime result and re-raise underlying errors unchanged;
+- final branch diff must contain no P2P/product-runtime modifications;
+- existing runtime/reviewer behavior is not claimed recertified unless repository CI/reviewer gates actually run.
