@@ -76,7 +76,7 @@ class ExecutionEvidenceTest(unittest.TestCase):
         self.assertEqual(summary["evidence_refs"]["authorization_receipt_sha256"], "abc123")
         self.assertNotIn("selected_model", summary["evidence_refs"])
 
-    def test_initial_cloud_only_rejection_is_a_handoff_requirement(self):
+    def test_initial_cloud_only_rejection_requires_but_does_not_materialize_handoff(self):
         summary = build_execution_summary(
             execution_session_id="session-4",
             resolved_execution={"task_id": "task-4"},
@@ -84,7 +84,18 @@ class ExecutionEvidenceTest(unittest.TestCase):
             usage_records=[],
         )
         self.assertEqual(summary["fallback_handoff_status"], "cloud_handoff_required")
-        self.assertEqual(summary["counters"]["fallback_handoffs"], 1)
+        self.assertEqual(summary["counters"]["fallback_handoffs"], 0)
+
+    def test_total_elapsed_time_comes_from_authoritative_audit(self):
+        summary = build_execution_summary(
+            execution_session_id="session-5",
+            resolved_execution={"task_id": "task-5"},
+            result={"status": "success", "transcript": []},
+            usage_records=[],
+            authoritative_audit={"elapsed_s": 1.25, "verification_results": {"final_acceptance_passed": True}},
+        )
+        self.assertEqual(summary["elapsed_ms"], 1250.0)
+        self.assertTrue(summary["verification_status"])
 
 
 if __name__ == "__main__":
