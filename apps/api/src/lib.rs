@@ -1,6 +1,7 @@
 pub mod cleanup; // T1-T2
 pub mod consent_gate; // S-110-T2a
 pub mod dto;
+pub mod haa_service;
 pub mod ingestion_service; // S3-T0: transport-agnostic finalization core
 pub mod middleware;
 pub mod playback_api_error;
@@ -163,13 +164,9 @@ mod tests {
 
     #[tokio::test]
     async fn probe_postgres_bounded_by_timeout_on_hung_connection() {
-        // A listener that accepts the TCP connection but never responds,
-        // simulating a hung dependency. The probe must return within a
-        // bounded time instead of hanging forever.
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind hung listener");
         let addr = listener.local_addr().expect("local addr");
         std::thread::spawn(move || {
-            // Accept and hold the connection open without responding.
             let _ = listener.accept();
             std::thread::sleep(Duration::from_secs(30));
         });
