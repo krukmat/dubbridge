@@ -19,7 +19,7 @@ behavioral_coverage_contract: behavior-v2
 - Original `P2.T1` RRI 78 parent: **SUPERSEDED / NON-EXECUTABLE** by lower-RRI decomposition.
 - `P2.T1a`-`P2.T1f`: **Done / owner-approved as the complete P2.T1 persistence outcome on 2026-09-06**. Do not reopen for retrospective review.
 - `P2.C0`: **PASS 2026-09-06 — RRI 66 Complex / Effort L**. Owner approved the ten-path docs/fixture freeze; four Reflection passes PASS.
-- P2.T2, T3a, and T3b are Done, including T2c-r and T2g recertification; T3b was owner-verified on 2026-09-09. T4a is Done (2026-09-07). T3c's 2026-09-12 preflight resolved D2 by expanding T3c with a Rust materializer and decomposed the parent into eight implementation/integration leaves. T3c-S0, T3c-S1a, T3c-S2a, T3c-S3, and T3c-S1b are Done. On 2026-09-12 Matias approved the frozen RRI-70 `P2.T3c` parent envelope at its HITL checkpoint and separately approved `P2.T3c-S2a` for execution; evidence: `.agent/p2-t3c/parent-hitl-approval.json` and `.agent/p2-t3c/s2a-execution-approval.json`. This parent approval is retained for later in-scope leaves, without authorizing scope expansion or out-of-order execution. T3c-S2a and T3c-S3 are `[x] Done` (owner-verified 2026-09-12 and 2026-09-13 respectively); see their closure records. `P2.T3c-S1b` (RRI 55 Med-high, Rust package materializer) was approved 2026-09-13 ("aprobado", Matias); an honest-low-band-maximization pass found no genuinely separable Low residue in its scope (containment-check, idempotency/conflict decision, and write loop share one control-flow graph), so it routed `CLOUD_REQUIRED` per ADR-038 Amendment 1 and was implemented directly by Claude Sonnet 5; `[x] Done` 2026-09-13, Gemma phase-2 review PASS 0 findings, owner verification pending; see its closure record. `P2.T3c-S2b` (RRI 55 Med-high) was approved 2026-09-13 ("aprobado", Matias) and decomposed per ADR-038 Amendment 4 into Candidate A (`write_atomic.ts`, RRI 25 Low, delegated) and Candidate B (`publication_index.ts`, remains RRI 55 Med-high, pending cloud-takeover escalation). Candidate A is tracked as leaf `P2.T3c-S2b-A` and is `[x] Done`, owner-verified 2026-09-13 (Matias); Candidate B has not started. The parent `P2.T3c-S2b` task itself is not yet closed. S4 and T3c-Integ remain unstarted. T3d remains blocked on T3c. Each executable leaf must still freeze its exact current path set, run `scripts/rri.py`, and follow the resulting workflow route immediately before execution.
+- P2.T2, T3a, and T3b are Done, including T2c-r and T2g recertification; T3b was owner-verified on 2026-09-09. T4a is Done (2026-09-07). T3c's 2026-09-12 preflight resolved D2 by expanding T3c with a Rust materializer and decomposed the parent into eight implementation/integration leaves. T3c-S0, T3c-S1a, T3c-S2a, T3c-S3, and T3c-S1b are Done. On 2026-09-12 Matias approved the frozen RRI-70 `P2.T3c` parent envelope at its HITL checkpoint and separately approved `P2.T3c-S2a` for execution; evidence: `.agent/p2-t3c/parent-hitl-approval.json` and `.agent/p2-t3c/s2a-execution-approval.json`. This parent approval is retained for later in-scope leaves, without authorizing scope expansion or out-of-order execution. T3c-S2a and T3c-S3 are `[x] Done` (owner-verified 2026-09-12 and 2026-09-13 respectively); see their closure records. `P2.T3c-S1b` (RRI 55 Med-high, Rust package materializer) was approved 2026-09-13 ("aprobado", Matias); an honest-low-band-maximization pass found no genuinely separable Low residue in its scope (containment-check, idempotency/conflict decision, and write loop share one control-flow graph), so it routed `CLOUD_REQUIRED` per ADR-038 Amendment 1 and was implemented directly by Claude Sonnet 5; `[x] Done` 2026-09-13, Gemma phase-2 review PASS 0 findings, owner verification pending; see its closure record. `P2.T3c-S2b` (RRI 55 Med-high) was approved 2026-09-13 ("aprobado", Matias) and decomposed per ADR-038 Amendment 4 into Candidate A (`write_atomic.ts`, RRI 25 Low, delegated, `[x] Done`) and Candidate B (`publication_index.ts`, RRI 55 Med-high, implemented directly by the primary agent per explicit owner instruction); both closed and the parent `P2.T3c-S2b` leaf itself is `[x] Done`, owner-verified 2026-09-13. `P2.T3c-S4` (four TypeScript modules composing the local Hyperdrive publication executor — `publication_lock.ts`/`hyperdrive_store.ts`/`package_verification.ts`/`publication_executor.ts`, an internal sub-leaf label not used by the frozen Leaf-B envelope itself) is `[x] Done`, owner-verified 2026-09-13; see its closure record. **`S4`'s closure covers only a sub-leaf of Leaf B — it explicitly excludes Hyperswarm announce/join/flush semantics required by Leaf B's own acceptance criterion 5**, documented in the closure record's scope disclosure. Only `T3c-Integ` (final unified verification) and the excluded Hyperswarm work remain unstarted within the parent envelope; **`P2.T3c` itself therefore remains open** (its header at § "P2.T3c — persistent Hyperdrive publication and stable replay" is still `SCOPE FROZEN, HITL APPROVED`, never transitioned to `[x] Done`). T3d remains blocked on T3c. Each executable leaf must still freeze its exact current path set, run `scripts/rri.py`, and follow the resulting workflow route immediately before execution.
 - Review exception: existing owner-directed MVP0-P2P P0-P7 phase-1/phase-2 review override remains in force; it does not waive RRI/HITL/Reflection/tests.
 
 Canonical C0 evidence:
@@ -3853,6 +3853,239 @@ Required passes: 3 (`RRI 55` → Med-high band).
 - Commands run: `node --test apps/availability-node/test/publication-index.test.js`, `node --test apps/availability-node/test/*.test.js`, `npm --prefix apps/availability-node run typecheck`, `npm --prefix apps/availability-node run build`
 
 **Status:** `[x] Done`, owner-verified 2026-09-13.
+
+### P2.T3c-S4 closure record — local Hyperdrive publication executor sub-leaf — Done 2026-09-13
+
+> **Scope disclosure (read before relying on this record for T3c or Leaf-B
+> status):** "S4" is an internal working label used across this session and
+> the prior one for four TypeScript modules
+> (`publication_lock.ts`/`hyperdrive_store.ts`/`package_verification.ts`/
+> `publication_executor.ts`) — it is **not** a section name the frozen
+> envelope below (§ "Frozen writable envelope", Leaf B) uses, and it does
+> **not** close all of Leaf B or all of parent `P2.T3c`. Leaf B's own
+> acceptance criterion 5 ("Corestore/Hyperdrive/Hyperswarm open, write,
+> join, flush, or persistence failures return exact `503
+> publication_unavailable`") requires Hyperswarm announce/join/flush
+> semantics. This closure record's four modules explicitly exclude that
+> work — see `hyperdrive_store.ts`'s own header comment ("That remaining
+> Complex-band residue (P2.T3c-S4-e) composes on top of `openDrive`'s
+> result and is not implemented here") and `publication_executor.ts`'s
+> header ("Does not implement Hyperswarm announce/join/flush (S4-e, out of
+> scope)"). This record therefore closes a **sub-leaf of Leaf B only**: the
+> local, disk-backed Hyperdrive open/write/reopen lifecycle and the
+> publication-executor composition over it. Parent `P2.T3c` remains open;
+> Hyperswarm networking and `T3c-Integ` remain unstarted, unscoped-here
+> future work.
+
+- **Objective:** implement and close the local, disk-backed Hyperdrive
+  publication lifecycle and its composing executor — independent
+  per-publication_id concurrency control, persistent Corestore/Hyperdrive
+  open/reopen, independent package verification against the frozen
+  `p2p-manifest-v1` contract, and the executor that composes all three plus
+  the already-closed `S2b` index policy into stable, replay-safe HTTP
+  evidence.
+- **In scope:** `apps/availability-node/src/publication_lock.ts`,
+  `apps/availability-node/src/hyperdrive_store.ts`,
+  `apps/availability-node/src/package_verification.ts`,
+  `apps/availability-node/src/publication_executor.ts`, and their four test
+  files under `apps/availability-node/test/`.
+- **Out of scope:** Hyperswarm announce/join/flush/topic networking
+  (internally referenced as `S4-e`), `T3c-Integ`, T3d, T4, deployment
+  descriptors, and everything else the parent envelope below excludes.
+
+#### Module-by-module RRI and review chain
+
+| Module | Final RRI | Band | Phase-1/Phase-2 reviewer chain actually used |
+|---|---|---|---|
+| `publication_lock.ts` | 25 | Low | `gpt-oss:20b` (Low chain primary) — PASS, 0 blocking findings |
+| `hyperdrive_store.ts` | 55 | Med-high | `gemma4:26b-a4b-it-qat` unavailable both phases → fallback to `gpt-oss:20b` (26–55 chain intermediate) — PASS after 1 MINOR finding fixed |
+| `package_verification.ts` | 55 (recomputed after refactor; originally scored higher pre-refactor) | Med-high | `gemma4:26b-a4b-it-qat` unavailable → fallback to `gpt-oss:20b` — phase-2 found 1 BLOCKING (TOCTOU-adjacent verification gap), fixed and re-reviewed PASS |
+| `publication_executor.ts` | 70 | Complex | Cross-vendor peer (`codex`, resolved per caller identity `claude-code → codex`) phase-1 and phase-2, first pass — found 1 BLOCKING (TOCTOU: drive write could occur before/without verifying the same bytes verifyPackage hashed) + 1 MAJOR (missing `request.publication_id !== manifest.publication_id` identity check) → both fixed. **Second, confirmatory phase-2 pass used `gpt-oss:20b` instead of Codex** — see disclosed deviation below. |
+
+#### Disclosed deviation: gpt-oss:20b substituted for the RRI 56+ cross-vendor peer on `publication_executor.ts`'s confirmatory re-review
+
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Band-routed peer review states
+that for RRI 56+, the cross-vendor peer (here, `codex`) **replaces**
+Gemma/GPT-OSS 20B entirely for both phase-1 and phase-2 — GPT-OSS 20B is not
+part of the RRI 56+ chain at all. `publication_executor.ts` (RRI 70,
+Complex) already received a genuine Codex phase-1 and first phase-2 pass
+(the BLOCKING/MAJOR findings above), both fixed. A second, narrower
+confirmatory pass was then needed solely to verify the fixes actually
+resolved those findings and that two remaining MAJOR-severity dispositions
+(cross-process race downgraded to accepted, given single-process deployment
+reality; replay-path drive-content divergence deferred to a future
+reconciliation leaf) were sound.
+
+For that second pass only, the primary agent proposed re-invoking Codex per
+the band rule. The user explicitly questioned this ("por que codex?"),
+was shown the exact governing rule and a flagged tension with a stored
+scope-limiting note on Codex usage, and — via two explicit
+choices — directed a documented deviation: use `gpt-oss:20b` instead of
+Codex for this one confirmatory call, with the reason **"Evitar
+costo/latencia de Codex para una re-verificación"** (avoid Codex's cost/
+latency for a mere re-verification pass). This is recorded as a **explicit,
+user-directed, one-time deviation** from the RRI 56+ band's mandated
+reviewer chain — not a silent substitution, and not a precedent for future
+RRI 56+ reviews on this or other modules, which remain bound to the
+cross-vendor-peer rule by default.
+
+### Peer Reviewer evidence — `publication_lock.ts`
+
+- Reviewer: `gpt-oss`
+- Command: manual `scripts/gemma_local.py`-equivalent invocation (Low-band chain primary)
+- Artifact: `docs/audit/mvp0-p2p-p2-t3c-s4-publication-lock-phase2-review.json`
+- Verdict: `PASS`
+- Findings: none blocking
+- GPT-OSS 20B fallback: n/a (GPT-OSS 20B is the Low-band primary reviewer)
+- D14 fallback: not triggered — reason: primary reviewer produced a usable result
+- D14 provider route: n/a
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted (no findings to disposition)
+
+### Peer Reviewer evidence — `hyperdrive_store.ts`
+
+- Reviewer: `gpt-oss`
+- Command: manual Ollama `/api/chat` invocation, 26–55 chain packet
+- Artifact: `docs/audit/mvp0-p2p-p2-t3c-s4-hyperdrive-store-phase2-review.json`
+- Verdict: `PASS` (after 1 fix)
+- Findings: 1 MINOR — `flushDrive` relying on `close()` rather than a true flush primitive, given the upstream `hyperdrive@13.3.3`/`hyperbee@2.27.3` `flush()` incompatibility; accepted as the correct workaround given HP-2's durability proof (write → close → full teardown → reopen recovers content)
+- GPT-OSS 20B fallback: `triggered` — reason: `gemma4:26b-a4b-it-qat` unavailable/unusable both phase-1 and phase-2 attempts
+- D14 fallback: not triggered — reason: GPT-OSS 20B fallback produced a usable result
+- D14 provider route: n/a
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted finding, workaround retained and documented in `hyperdrive_store.ts`'s `flushDrive` docstring
+
+### Peer Reviewer evidence — `package_verification.ts`
+
+- Reviewer: `gpt-oss`
+- Command: manual Ollama `/api/chat` invocation, 26–55 chain packet
+- Artifact: `docs/audit/mvp0-p2p-p2-t3c-s4-package-verification-phase2-review.json`
+- Verdict: `PASS` (after 1 fix)
+- Findings: 1 BLOCKING — a verify-then-use gap where verified bytes were not threaded back to the caller, risking a re-read/TOCTOU window for a persisting caller; fixed by introducing `VerifiedPackageFile`/returning verified `Buffer`s directly in `PackageVerificationResult`
+- GPT-OSS 20B fallback: `triggered` — reason: `gemma4:26b-a4b-it-qat` unavailable/unusable
+- D14 fallback: not triggered — reason: GPT-OSS 20B fallback produced a usable result
+- D14 provider route: n/a
+- disposition_divergence: `none`
+- Primary-agent disposition: accepted and fixed; regression tests EC-13/EC-14 added
+
+### Peer Reviewer evidence — `publication_executor.ts`
+
+- Reviewer: `codex` (phase-1 and first phase-2 pass); `gpt-oss` (second, confirmatory phase-2 pass — **documented user-directed deviation**, see above)
+- Command: manual Codex CLI invocation (first passes); manual Ollama `/api/chat` invocation with a follow-up review packet (`/tmp/executor_review_prompt2.txt`, embedding full current source, a `drive.flush()` runtime-defect repro, and 5 targeted disposition-agreement questions) for the confirmatory pass
+- Artifact: prior-session Codex review notes (first pass, not separately persisted as JSON); `docs/audit/mvp0-p2p-p2-t3c-s4-publication-executor-phase2-review-followup.json` (confirmatory pass, raw gpt-oss:20b response incl. `thinking`, `eval_count: 2857`, `done_reason: "stop"`)
+- Verdict: `PASS` (first pass, after 2 fixes); `PASS` (confirmatory pass, 0 new blocking findings)
+- Findings: first pass — 1 BLOCKING (TOCTOU: drive could be written from independently re-read bytes rather than the exact bytes `verifyPackage` hashed) + 1 MAJOR (missing identity check `request.publication_id !== verification.manifest.publication_id`), both fixed. Confirmatory pass — 2 new MINOR only: (a) suggested an explicit batch-level flush if Hyperbee ever exposes one, no action needed while `close()` remains the only working durability primitive; (b) suggested the replay branch could verify drive contents against `manifest_digest_sha256`, accepted as a valid future hardening and folded into the existing replay-drive-divergence deferral below rather than fixed now.
+- GPT-OSS 20B fallback: `n/a for phase-1/first phase-2 (RRI 56+ chain does not include GPT-OSS 20B)`; `used by explicit user-directed deviation for the confirmatory pass only` — reason: user-selected cost/latency avoidance, not reviewer unavailability
+- D14 fallback: not triggered — reason: both Codex and the deviation-authorized gpt-oss produced usable results
+- D14 provider route: n/a
+- disposition_divergence: `none` — the confirmatory reviewer's `disposition_agreement` explicitly agreed with all three primary-agent dispositions: `{"flush_workaround":"agree","cross_process_race_downgrade":"agree","replay_drive_divergence_deferral":"agree"}`
+- Primary-agent disposition: both BLOCKING/MAJOR findings from the first pass fixed; both MINOR findings from the confirmatory pass accepted as no-action-needed/deferred; two remaining MAJOR-severity design dispositions (cross-process race downgrade; replay-path drive-divergence deferral to a future reconciliation leaf) independently confirmed rather than self-asserted
+
+### Reflection log — `hyperdrive_store.ts`
+
+Required passes: 3 (`55` → `Med-high`)
+
+#### Pass 1
+
+- **Draft verdict:** shared-Corestore-per-root design with per-publication_id namespacing correctly avoids the empirically-verified file-descriptor-lock exclusivity constraint; `openDrive`/`closeDrive`/`closeSharedStore` cover the create/reopen/teardown lifecycle.
+- **Critique findings:** `flushDrive` originally called the nonexistent-at-runtime `drive.flush()`, which throws `this.db.flush is not a function` against the installed `hyperdrive@13.3.3`/`hyperbee@2.27.3` pair — a genuine upstream incompatibility, not a typo.
+- **Revisions applied:** replaced `flushDrive`'s body with `close()`, documented the exact upstream defect and version pair in a docstring, and removed the now-incorrect `flush()` declaration from `src/types/hyperdrive.d.ts`.
+
+#### Pass 2
+
+- **Draft verdict:** durability of the `close()`-based workaround was asserted but not proven.
+- **Critique findings:** no test demonstrated that content survived a full close → shared-store teardown → reopen-from-disk cycle.
+- **Revisions applied:** confirmed `hyperdrive-store.test.js` HP-2 ("reopening the same publication_id after a simulated restart returns the same drive key and persisted content") already exercises exactly this cycle; no new test needed, but the `flushDrive` docstring was extended to point at HP-2 as the durability evidence.
+
+#### Pass 3
+
+- **Draft verdict:** error-path behavior on `store.ready()` failure needed re-checking.
+- **Critique findings:** an early implementation left a failed store in the shared-store map, so a subsequent call would keep reusing a broken store.
+- **Revisions applied:** `openDrive`'s `store.ready()` catch now deletes the entry from `sharedStores` and best-effort-closes the store before rethrowing, verified by `hyperdrive-store.test.js` EC-2 ("an unusable storage root rejects cleanly without leaving a dangling shared store entry").
+
+### Reflection log — `package_verification.ts`
+
+Required passes: 3 (`55` → `Med-high`, post-refactor)
+
+#### Pass 1
+
+- **Draft verdict:** manifest decode/shape validation, containment checks via `verifyContainedRealpath`, and per-file hash/size verification were structurally complete against the frozen `p2p-manifest-v1` contract.
+- **Critique findings:** GPT-OSS 20B's BLOCKING finding — verified bytes were checked but not returned, forcing any persisting caller to re-read the file after verification, reopening a TOCTOU window between verify and use.
+- **Revisions applied:** introduced `VerifiedPackageFile { path, bytes }`, changed `PackageVerificationResult`'s `ok: true` variant to carry `manifestBytes` and `files: readonly VerifiedPackageFile[]`, and made `readAndVerifyFileBytes` return the read `Buffer` on success instead of a boolean.
+
+#### Pass 2
+
+- **Draft verdict:** the manifest/publication_id relationship needed re-examination after the TOCTOU fix changed the result shape.
+- **Critique findings:** `verifyPackage` itself does not check `manifest.publication_id` against any caller-supplied expectation — by design, since this module has no `publication_id` parameter; that check was correctly left to the caller (`publication_executor.ts`).
+- **Revisions applied:** none needed at this layer; confirmed the caller-side identity check exists (see `publication_executor.ts` Reflection log) and added regression tests EC-13/EC-14 exercising the new `VerifiedPackageFile` return shape directly.
+
+#### Pass 3
+
+- **Draft verdict:** path-safety checks (`isSafeRelativePath`) and containment (`verifyContainedRealpath`) looked complete but needed a final adversarial pass for double-decode/duplicate-path issues.
+- **Critique findings:** no issues found — `decodeManifestFile`'s `seenPaths` set already rejects duplicate `path` entries, and `isSafeRelativePath` rejects absolute paths, backslashes, and `.`/`..` segments before containment is even checked.
+- **Revisions applied:** none needed.
+
+### Reflection log — `publication_executor.ts`
+
+Required passes: 4 (`70` → `Complex`)
+
+#### Pass 1
+
+- **Draft verdict:** the executor correctly composes `withPublicationLock`, `verifyPackage`, `openDrive`/`flushDrive`, and `decideAndPersist` in the write-before-persist order the acceptance criteria require.
+- **Critique findings:** Codex's BLOCKING finding — nothing enforced that the exact bytes written into the drive were the same bytes `verifyPackage` had hashed; an implementation could (even if this one didn't yet) re-read the file between verification and the drive write, reopening a TOCTOU window.
+- **Revisions applied:** `writeVerifiedPackageIntoDrive` now takes the `PackageVerificationResult`'s `files`/`manifestBytes` directly (the exact verified `Buffer`s from `package_verification.ts`'s TOCTOU fix above) and never re-reads from disk.
+
+#### Pass 2
+
+- **Draft verdict:** conflict handling for identity mismatches needed re-examination.
+- **Critique findings:** Codex's MAJOR finding — no check that `request.publication_id === verification.manifest.publication_id`; a request could reference a package directory whose manifest declares a different publication_id, and nothing rejected the mismatch before proceeding to a drive write.
+- **Revisions applied:** added the explicit `if (request.publication_id !== verification.manifest.publication_id) throw new PublicationContractError("publication_conflict")` check before opening the drive; covered by the new EC-4 test ("a package whose manifest.publication_id doesn't match the request's publication_id is rejected as a conflict").
+
+#### Pass 3
+
+- **Draft verdict:** durability ordering (write → flush → persist index) looked correct but needed verification that a flush failure could not silently commit a success record.
+- **Critique findings:** no issues found — the `try/finally` around `writeVerifiedPackageIntoDrive`/`flushDrive` means a `flushDrive` rejection propagates out of `execute` before `decideAndPersist` is ever called, and `flushDrive`'s only implementation (`close()`) either succeeds or throws, with no silent partial-success path observed.
+- **Revisions applied:** none needed; confirmed by EC-5 ("the drive persists exactly the manifest and file bytes verifyPackage already hashed").
+
+#### Pass 4
+
+- **Draft verdict:** remaining MAJOR-severity design dispositions needed independent confirmation, not just self-assertion, given the Complex band.
+- **Critique findings:** two accepted-as-is risk areas remained: (1) a cross-process race on the same publication_id is not fully excluded by `withPublicationLock`, which only serializes within one Node.js process; (2) the replay branch (`existing !== null`) opens and closes a drive as a liveness probe but does not verify the drive's actual content still matches `manifest_digest_sha256` — a drive that diverged out-of-band would replay stale evidence without detection.
+- **Revisions applied:** no code change; both risks were disclosed to the user and independently re-verified via the confirmatory `gpt-oss:20b` pass (`disposition_agreement.cross_process_race_downgrade: "agree"`, `disposition_agreement.replay_drive_divergence_deferral: "agree"`). Disposition: (1) accepted given the single-process Availability Node deployment reality — no multi-process/multi-instance topology exists yet for this node; (2) deferred to a future reconciliation/integrity-check leaf (out of this sub-leaf's scope), not silently dropped.
+
+### Behavioral coverage certification
+
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| Lock-HP-1 | Happy path | two concurrent calls with the same key run strictly one at a time, in call order | unit | `apps/availability-node/test/publication-lock.test.js::HP-1` | passed |
+| Lock-HP-2 | Happy path | calls with different keys run fully in parallel, not serialized | unit | `apps/availability-node/test/publication-lock.test.js::HP-2` | passed |
+| Lock-EC-1 | Edge case | a throwing call releases the lock so the next queued call still runs | unit | `apps/availability-node/test/publication-lock.test.js::EC-1` | passed |
+| Lock-EC-2 | Edge case | three queued calls for the same key run in strict FIFO order | unit | `apps/availability-node/test/publication-lock.test.js::EC-2` | passed |
+| Lock-EC-3 | Edge case | a mid-queue throw does not disrupt the calls queued before or after it | unit | `apps/availability-node/test/publication-lock.test.js::EC-3` | passed |
+| Drive-HP-1 | Happy path | opening a drive for a new publication_id creates a fresh, ready drive | component | `apps/availability-node/test/hyperdrive-store.test.js::HP-1` | passed |
+| Drive-HP-2 | Happy path | reopening the same publication_id after a simulated restart returns the same drive key and persisted content | component | `apps/availability-node/test/hyperdrive-store.test.js::HP-2` | passed |
+| Drive-EC-1 | Edge case | two different publication_ids under the same root open two distinct drives sharing one store | component | `apps/availability-node/test/hyperdrive-store.test.js::EC-1` | passed |
+| Drive-EC-2 | Edge case | an unusable storage root rejects cleanly without leaving a dangling shared store entry | component | `apps/availability-node/test/hyperdrive-store.test.js::EC-2` | passed |
+| Verify-HP-1 | Happy path | a well-formed package with matching manifest digest and file hashes verifies ok | unit | `apps/availability-node/test/package-verification.test.js::HP-1` | passed |
+| Verify-HP-2 | Happy path | verified result returns the exact read bytes for manifest and files | unit | `apps/availability-node/test/package-verification.test.js::HP-2` | passed |
+| Verify-EC-1..EC-11,EC-13,EC-14,EC-12 | Edge case | malformed manifest, digest mismatch, containment/symlink escape, path traversal, duplicate paths, size/hash mismatch, and lineage-mismatch conflict cases all reject as `package_invalid`/`publication_conflict` | unit | `apps/availability-node/test/package-verification.test.js::EC-1` through `EC-14` (16 cases total) | passed |
+| Exec-HP-1 | Happy path | first valid publication tuple returns 201 with stable evidence and writes the package into the drive | integration | `apps/availability-node/test/publication-executor.test.js::HP-1` | passed |
+| Exec-HP-2 | Happy path | replaying the same tuple returns 200 with byte-for-byte stable evidence and does not rewrite identity | integration | `apps/availability-node/test/publication-executor.test.js::HP-2` | passed |
+| Exec-HP-3 | Happy path | reconstructing the executor from the same persistent storage still replays the same evidence | integration | `apps/availability-node/test/publication-executor.test.js::HP-3` | passed |
+| Exec-EC-1 | Edge case | same publication_id with a different lineage_id returns `publication_conflict` | integration | `apps/availability-node/test/publication-executor.test.js::EC-1` | passed |
+| Exec-EC-2 | Edge case | a package whose ciphertext hash doesn't match the manifest returns `package_invalid` before any drive write | integration | `apps/availability-node/test/publication-executor.test.js::EC-2` | passed |
+| Exec-EC-4 | Edge case | a package whose manifest.publication_id doesn't match the request's publication_id is rejected as a conflict | integration | `apps/availability-node/test/publication-executor.test.js::EC-4` | passed |
+| Exec-EC-5 | Edge case | the drive persists exactly the manifest and file bytes verifyPackage already hashed | integration | `apps/availability-node/test/publication-executor.test.js::EC-5` | passed |
+| Exec-EC-3 | Edge case | concurrent identical requests for the same publication_id serialize to one 201 and the rest 200 replays | integration | `apps/availability-node/test/publication-executor.test.js::EC-3` | passed |
+
+### Owner final verification
+
+- Owner: `Matias`
+- Date: `2026-09-13`
+- Statement: I verified every happy path and edge case defined for this sub-leaf has executable evidence at an appropriate layer that replicates the expected behavior. I understand and accept that this closure covers only the local, disk-backed Hyperdrive lifecycle sub-scope of Leaf B, and does not close parent P2.T3c or all of Leaf B — Hyperswarm announce/join/flush semantics (Leaf B acceptance criterion 5) remain unimplemented and unscoped here. I explicitly authorized the documented deviation substituting `gpt-oss:20b` for the RRI 56+ band's mandated cross-vendor peer on `publication_executor.ts`'s confirmatory re-verification pass only, for the stated reason of avoiding Codex's cost/latency on a mere re-verification.
+- Commands run: `npm --prefix apps/availability-node run build`, `node --test apps/availability-node/test/*.test.js` (62/62 passing)
+
+**Status:** `[x] Done` for the P2.T3c-S4 sub-leaf (local Hyperdrive publication executor) only, owner-verified 2026-09-13. **Parent `P2.T3c` and Leaf B remain open** — Hyperswarm networking and `T3c-Integ` are unstarted.
 
 - **Objective:** turn the injected T3a/T3b publication seam into a persistent,
   ciphertext-only Hyperdrive/Hyperswarm publisher that returns stable C0 v1

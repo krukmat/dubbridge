@@ -204,8 +204,25 @@ instruction, `[x] Done`, owner-verified — its phase-2 `gpt-oss:20b` review
 stalled `BLOCKED` with zero output and was substituted with documented
 independent verification/self-review rather than escalating to D14, an
 explicitly flagged deviation the owner accepted at sign-off); the parent
-`T3c-S2b` leaf itself is closed. The remaining leaves (`S4`, `T3c-Integ`)
-are unstarted. The
+`T3c-S2b` leaf itself is closed. `T3c-S4` (four TypeScript modules —
+`publication_lock.ts`/`hyperdrive_store.ts`/`package_verification.ts`/
+`publication_executor.ts` — an internal sub-leaf label, not a name used by
+the frozen Leaf-B envelope itself) closed **`[x] Done` 2026-09-13**: local
+per-publication_id locking, persistent disk-backed Corestore/Hyperdrive
+open/reopen, independent package verification against `p2p-manifest-v1`,
+and the composing executor delivering stable replay-safe evidence, RRI
+25/55/55/70 respectively, reviewed via the Low and 26-55 chains for the
+first three and the RRI 56+ cross-vendor peer (`codex`) for
+`publication_executor.ts` — with one explicit, user-directed, documented
+deviation substituting `gpt-oss:20b` for `codex` on that module's second
+confirmatory re-verification pass only (reason: avoiding Codex cost/latency
+on a mere re-check; not a change to the standing band rule). 62/62
+Availability Node tests passing. **This closes only a sub-leaf of Leaf
+B — parent `P2.T3c` and Leaf B remain open**, since Leaf B's own acceptance
+criterion 5 requires Hyperswarm announce/join/flush semantics that these
+four modules explicitly exclude by design (documented in their own header
+comments). The remaining leaves (Hyperswarm networking, `T3c-Integ`) are
+unstarted. The
 approval does not authorize scope expansion or bypass leaf-specific technical
 gates. See `docs/audit/mvp0-p2p-p2-t3c-preflight.md`. `T3d` has a prepared test-only
 definition and remains blocked on T3c),
