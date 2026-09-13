@@ -97,6 +97,14 @@ pub struct ApprovalRequestRecord {
     pub execution_id: Option<Uuid>,
 }
 
+#[derive(Debug, Clone, sqlx::FromRow)]
+struct PendingRequestContext {
+    state: String,
+    approver_kind: String,
+    approver_id: String,
+    expires_at: OffsetDateTime,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConsumeResult {
     Consumed { grant_json: String },
@@ -119,7 +127,10 @@ pub enum ConsumeError {
     AlreadyConsumed,
 }
 
-pub async fn insert_authenticator(pool: &PgPool, value: &NewAuthenticator<'_>) -> Result<(), DbError> {
+pub async fn insert_authenticator(
+    pool: &PgPool,
+    value: &NewAuthenticator<'_>,
+) -> Result<(), DbError> {
     sqlx::query(
         r#"
         INSERT INTO haa_authenticators
@@ -240,9 +251,25 @@ pub async fn insert_challenge(pool: &PgPool, value: &NewChallenge<'_>) -> Result
 
 pub async fn approve(pool: &PgPool, value: &VerifiedApproval<'_>) -> Result<(), DbError> {
     let mut tx = pool.begin().await.map_err(DbError::QueryFailed)?;
-    lock_pending_request(&mut tx, value.request_id).await?;
+    let request = lock_pending_request(&mut tx, value.request_id).await?;
+    if request.expires_at <= value.verified_at || value.receipt_expires_at > request.expires_at {
+        return Err(DbError::Conflict);
+    }
 
-    let challenge_updated = sqlx::query(
+    satisfy_challenge(&mut tx, value).await?;
+    insert_bound_evidence(&mut tx, value, &request).await?;
+    insert_receipt(&mut tx, value).await?;
+    mark_approved(&mut tx, value.request_id, value.verified_at).await?;
+
+    tx.commit().await.map_err(DbError::QueryFailed)?;
+    Ok(())
+}
+
+async fn satisfy_challenge(
+    tx: &mut Transaction<'_, Postgres>,
+    value: &VerifiedApproval<'_>,
+) -> Result<(), DbError> {
+    let result = sqlx::query(
         r#"
         UPDATE haa_challenges
         SET satisfied_at = $3
@@ -253,14 +280,21 @@ pub async fn approve(pool: &PgPool, value: &VerifiedApproval<'_>) -> Result<(), 
     .bind(value.request_id)
     .bind(value.challenge_digest)
     .bind(value.verified_at)
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await
     .map_err(DbError::QueryFailed)?;
-    if challenge_updated.rows_affected() != 1 {
+    if result.rows_affected() != 1 {
         return Err(DbError::Conflict);
     }
+    Ok(())
+}
 
-    sqlx::query(
+async fn insert_bound_evidence(
+    tx: &mut Transaction<'_, Postgres>,
+    value: &VerifiedApproval<'_>,
+    request: &PendingRequestContext,
+) -> Result<(), DbError> {
+    let result = sqlx::query(
         r#"
         INSERT INTO haa_approval_evidence
             (id, request_id, authenticator_id, challenge_digest, kind, evidence_json, verified_at)
@@ -268,6 +302,7 @@ pub async fn approve(pool: &PgPool, value: &VerifiedApproval<'_>) -> Result<(), 
         WHERE EXISTS (
             SELECT 1 FROM haa_authenticators
             WHERE id = $3 AND active
+              AND principal_kind = $8 AND principal_id = $9
         )
         "#,
     )
@@ -278,10 +313,21 @@ pub async fn approve(pool: &PgPool, value: &VerifiedApproval<'_>) -> Result<(), 
     .bind(value.evidence_kind)
     .bind(value.evidence_json)
     .bind(value.verified_at)
-    .execute(&mut *tx)
+    .bind(&request.approver_kind)
+    .bind(&request.approver_id)
+    .execute(&mut **tx)
     .await
     .map_err(map_query_error)?;
+    if result.rows_affected() != 1 {
+        return Err(DbError::Conflict);
+    }
+    Ok(())
+}
 
+async fn insert_receipt(
+    tx: &mut Transaction<'_, Postgres>,
+    value: &VerifiedApproval<'_>,
+) -> Result<(), DbError> {
     sqlx::query(
         r#"
         INSERT INTO haa_approval_receipts (id, request_id, receipt_json, issued_at, expires_at)
@@ -293,20 +339,28 @@ pub async fn approve(pool: &PgPool, value: &VerifiedApproval<'_>) -> Result<(), 
     .bind(value.receipt_json)
     .bind(value.verified_at)
     .bind(value.receipt_expires_at)
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await
     .map_err(map_query_error)?;
+    Ok(())
+}
 
-    sqlx::query(
-        "UPDATE haa_approval_requests SET state = 'approved', updated_at = $2 WHERE id = $1",
+async fn mark_approved(
+    tx: &mut Transaction<'_, Postgres>,
+    request_id: Uuid,
+    approved_at: OffsetDateTime,
+) -> Result<(), DbError> {
+    let result = sqlx::query(
+        "UPDATE haa_approval_requests SET state = 'approved', updated_at = $2 WHERE id = $1 AND state IN ('requested','pending')",
     )
-    .bind(value.request_id)
-    .bind(value.verified_at)
-    .execute(&mut *tx)
+    .bind(request_id)
+    .bind(approved_at)
+    .execute(&mut **tx)
     .await
     .map_err(DbError::QueryFailed)?;
-
-    tx.commit().await.map_err(DbError::QueryFailed)?;
+    if result.rows_affected() != 1 {
+        return Err(DbError::Conflict);
+    }
     Ok(())
 }
 
@@ -461,18 +515,24 @@ pub async fn authorize_and_consume(
 async fn lock_pending_request(
     tx: &mut Transaction<'_, Postgres>,
     request_id: Uuid,
-) -> Result<(), DbError> {
-    let state: Option<String> = sqlx::query_scalar(
-        "SELECT state FROM haa_approval_requests WHERE id = $1 FOR UPDATE",
+) -> Result<PendingRequestContext, DbError> {
+    let request = sqlx::query_as::<_, PendingRequestContext>(
+        r#"
+        SELECT state, approver_kind, approver_id, expires_at
+        FROM haa_approval_requests
+        WHERE id = $1
+        FOR UPDATE
+        "#,
     )
     .bind(request_id)
     .fetch_optional(&mut **tx)
     .await
-    .map_err(DbError::QueryFailed)?;
-    match state.as_deref() {
-        Some("pending") | Some("requested") => Ok(()),
-        Some(_) => Err(DbError::Conflict),
-        None => Err(DbError::NotFound),
+    .map_err(DbError::QueryFailed)?
+    .ok_or(DbError::NotFound)?;
+
+    match request.state.as_str() {
+        "pending" | "requested" => Ok(request),
+        _ => Err(DbError::Conflict),
     }
 }
 
