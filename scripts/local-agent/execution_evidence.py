@@ -64,13 +64,18 @@ def build_execution_summary(
 
     fallback_ref = result.get("fallback_selection_artifact")
     fallback_status = _fallback_handoff_status(result)
-    fallback_count = 1 if fallback_status is not None else 0
+    selection = result.get("fallback_selection")
+    fallback_count = 1 if isinstance(selection, dict) else 0
 
     verification_status = None
+    elapsed_ms = None
     if isinstance(authoritative_audit, dict):
         verification = authoritative_audit.get("verification_results")
         if isinstance(verification, dict):
             verification_status = verification.get("final_acceptance_passed")
+        elapsed_s = authoritative_audit.get("elapsed_s")
+        if isinstance(elapsed_s, (int, float)) and not isinstance(elapsed_s, bool):
+            elapsed_ms = round(elapsed_s * 1000, 3)
 
     return {
         "schema_version": "execution-summary-v1",
@@ -87,6 +92,7 @@ def build_execution_summary(
         "normalized_error_class": (
             None if result.get("status") == "success" else result.get("status")
         ),
+        "elapsed_ms": elapsed_ms,
         "counters": {
             "model_invocations": len(usage_records),
             "repair_attempts": _count_events(transcript, "repair_diagnostic"),
