@@ -5,6 +5,7 @@ pub mod artifact;
 pub mod asset;
 pub mod audit;
 pub mod consent;
+pub mod haa;
 pub mod ingestion;
 pub mod p2p_publication;
 pub mod p2p_recovery;
