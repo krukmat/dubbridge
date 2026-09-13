@@ -122,13 +122,14 @@ The additive facade was chosen over direct edits to current runner/control modul
 
 ## Closure checks
 
-- [ ] final branch diff contains no changes under `crates/p2p`, `apps/availability-node`, `mobile/src/p2p`, or P2P persistence paths;
+- [x] final branch diff contains no changes under `crates/p2p`, `apps/availability-node`, `mobile/src/p2p`, or P2P persistence paths;
 - [x] no new network service or background process;
 - [x] new pure modules compile in independent local verification;
 - [x] targeted pure contract/evidence/observer cases pass in independent local verification;
-- [ ] repository-native CI/checks reviewed;
-- [ ] repository reviewer gate reviewed if available;
-- [ ] ADR index synchronized;
-- [ ] final changed-file inventory recorded.
+- [x] GitHub commit-status context reviewed: no status contexts were attached at review time; repository CI PASS is therefore not claimed;
+- [ ] repository reviewer gate actually executed;
+- [x] ADR index synchronized;
+- [x] final changed-file inventory recorded in `docs/audit/software-factory-execution-seam-v3-2-implementation.md`;
+- [ ] live Ollama facade execution on the target host.
 
-No reviewer PASS is claimed in this ledger until the repository's reviewer path actually runs.
+No reviewer, repository-CI, or live-runtime PASS is claimed until those paths actually run.
