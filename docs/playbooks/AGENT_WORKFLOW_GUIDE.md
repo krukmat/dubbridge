@@ -1528,6 +1528,43 @@ read the assembled prompt as permitting what ADR-037 prohibits):
 `docs/audit/agent-workflow-guide-detail-archive.md § Local Architect /
 Complex Analyst`.
 
+### Availability fallback (owner-authorized, verified 2026-09-13)
+
+If `qwen3.6:27b-q4_K_M` does not return within operational patience (two
+attempts observed unresponsive on a 10.7KB med-high-refinement-v1 packet,
+after 240s and 480s configured timeouts, though the model itself answered a
+smaller packet cleanly earlier in the same session — likely a load-time/
+host-state symptom, not reproduced further), fall back in this exact order,
+per explicit owner instruction:
+
+1. `gpt-oss:20b`, routine profile: `think=medium`, `num_ctx=32768`,
+   `num_predict=4096`, `temperature=1.0`, `top_p=1.0` (same defaults as the
+   Low-band chain's primary reviewer, § Mandatory workflow before
+   implementing Step 0). **Verified 2026-09-13 (`P2.T3c-S2b`): succeeded in
+   59.8s**, `done_reason: stop`, valid JSON with a substantive
+   `route_recommendation` and justification, though it omitted 4 of the 8
+   requested schema fields (`risks`, `stop_conditions`, `unknowns`,
+   `claims`) — accepted by explicit owner disposition as a valid advisory
+   despite the incomplete format contract, since the decisive field and its
+   reasoning were present and substantive.
+2. If that also fails: `gpt-oss:20b`, reduced profile: `think=low`,
+   `num_ctx=16384`, `num_predict=3072`, `temperature=1.0`, `top_p=1.0`,
+   `keep_alive=30m`.
+
+**Mechanical caveat:** `scripts/local-agent/med_high_gate.py`'s
+`validate_refinement_artifact()` hard-requires
+`model.tag == "qwen3.6:27b-q4_K_M"` (`REQUIRED_MODEL_TAG`). A `gpt-oss:20b`
+fallback response does not satisfy that check as-is and the gate script must
+not be invoked against it; the orchestrator instead applies the fallback's
+`route_recommendation` by direct judgment (recorded in a
+`refinement-artifact.json`-shaped file noting `model_route.fallback_used`),
+mirroring how a same-provider-degraded D14 substitution is recorded
+elsewhere in this guide when a primary review chain is exhausted. This is an
+availability fallback for the advisory role only — it does not relax
+ADR-038's routing consequence (a `GO_LOCAL` result at RRI 46-55 still never
+opens a whole-task local attempt; RRI 41-45 still routes through the
+Moderate local-first path on `GO_LOCAL`) or any other gate.
+
 ## Antares Security-Specialist Advisor
 
 The **Antares Security-Specialist Advisor workflow** is a bounded, read-only,

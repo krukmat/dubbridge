@@ -485,7 +485,7 @@ class ParseArgsDefaultsTest(unittest.TestCase):
         self.assertEqual(config.model_tag, "qwen3.6:27b-q4_K_M")
         self.assertEqual(
             config.expected_model_digest,
-            "3a40c32f1450b8380412898385b0e00df5d6d2d801dd192ca1acb7e735cd050e",
+            "a50eda8ed977ab48a12431878896b27ffd5cef552c17af3317d9623b939a7f1e",
         )
 
     def test_ec1_explicit_model_tag_and_digest_override_the_new_default(self) -> None:

@@ -489,8 +489,10 @@ def parse_args() -> Config:
         # Paired with --model-tag's default above -- must always name the
         # exact digest of that same model tag, or the fail-closed
         # model_digest_mismatch check in run_analysis() rejects every
-        # default-args invocation.
-        default="3a40c32f1450b8380412898385b0e00df5d6d2d801dd192ca1acb7e735cd050e",
+        # default-args invocation. Corrected 2026-09-13 (ADR-046): the prior
+        # value never matched any `ollama pull` of this tag; this is the
+        # digest /api/tags actually reports for the installed model.
+        default="a50eda8ed977ab48a12431878896b27ffd5cef552c17af3317d9623b939a7f1e",
         help="Expected Ollama digest for the exact model tag.",
     )
     parser.add_argument("--ollama-url", default="http://127.0.0.1:11434", help="Base URL for the local Ollama API.")

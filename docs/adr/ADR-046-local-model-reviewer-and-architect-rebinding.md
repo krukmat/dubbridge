@@ -18,7 +18,7 @@ Retire Muse Glimmer from every active DubBridge role. Historical ADR/audit refer
 - Low review is `gpt-oss:20b` -> Gemma -> D14.
 - RRI 26–55 review is Gemma -> `gpt-oss:20b` -> D14.
 - GPT-OSS uses 64K context and medium reasoning; second-review temperature is 0 and findings are evidence-bound.
-- Local Architect / Complex Analyst uses `qwen3.6:27b-q4_K_M` with 64K context, temperature 0, `think=false`, `keep_alive=0`, digest `3a40c32f1450b8380412898385b0e00df5d6d2d801dd192ca1acb7e735cd050e`.
+- Local Architect / Complex Analyst uses `qwen3.6:27b-q4_K_M` with 64K context, temperature 0, `think=false`, `keep_alive=0`, digest `a50eda8ed977ab48a12431878896b27ffd5cef552c17af3317d9623b939a7f1e` (corrected 2026-09-13 — the originally recorded digest never matched any `ollama pull` of this tag on the target host; verified live via `/api/tags` against the installed model, modified_at `2026-08-11T20:26:32+02:00`).
 - Reviewer role switches explicitly unload the prior large model and release GPT-OSS after its attempt to minimize simultaneous residency on the 32 GB target host.
 
 ## Unchanged
