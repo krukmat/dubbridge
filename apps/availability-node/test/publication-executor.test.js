@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { createPublicationExecutor } from "../dist/publication_executor.js";
 import { openDrive, closeDrive, closeSharedStore } from "../dist/hyperdrive_store.js";
+import { indexEntryPath, readIndexEntry } from "../dist/publication_index_io.js";
 
 function sha256Hex(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -210,6 +211,62 @@ test("EC-5: the drive persists exactly the manifest and file bytes verifyPackage
 
   assert.deepEqual(manifestInDrive, manifestOnDisk);
   assert.equal(fileInDrive.toString(), fileContent);
+
+  await closeSharedStore(config.driveStorageRoot);
+});
+
+test("HP-4: first valid publication announces on Hyperswarm before returning 201", async () => {
+  const config = makeConfig();
+  const publicationId = randomUUID();
+  const lineageId = randomUUID();
+  const digest = writePackage(config.packageRoot, publicationId, lineageId);
+
+  const executor = createPublicationExecutor({ ...config, hyperswarmJoinTimeoutMs: 30_000 });
+  const result = await executor(makeRequest(publicationId, lineageId, digest));
+
+  assert.equal(result.status, 201);
+  assert.equal(result.evidence.publication_id, publicationId);
+
+  await closeSharedStore(config.driveStorageRoot);
+});
+
+test("EC-6: a Hyperswarm join timeout returns 503 publication_unavailable and commits no success record", async () => {
+  const config = makeConfig();
+  const publicationId = randomUUID();
+  const lineageId = randomUUID();
+  const digest = writePackage(config.packageRoot, publicationId, lineageId);
+
+  const executor = createPublicationExecutor({ ...config, hyperswarmJoinTimeoutMs: 1 });
+
+  await assert.rejects(
+    () => executor(makeRequest(publicationId, lineageId, digest)),
+    (err) => {
+      assert.equal(err.code, "publication_unavailable");
+      return true;
+    }
+  );
+
+  const entryPath = indexEntryPath(config.indexRoot, publicationId);
+  const persisted = await readIndexEntry(entryPath);
+  assert.equal(persisted, null);
+
+  await closeSharedStore(config.driveStorageRoot);
+});
+
+test("EC-7: after a Hyperswarm join timeout, a same-lineage retry with a generous timeout still succeeds with 201", async () => {
+  const config = makeConfig();
+  const publicationId = randomUUID();
+  const lineageId = randomUUID();
+  const digest = writePackage(config.packageRoot, publicationId, lineageId);
+
+  const timingOutExecutor = createPublicationExecutor({ ...config, hyperswarmJoinTimeoutMs: 1 });
+  await assert.rejects(() => timingOutExecutor(makeRequest(publicationId, lineageId, digest)));
+
+  const retryExecutor = createPublicationExecutor({ ...config, hyperswarmJoinTimeoutMs: 30_000 });
+  const result = await retryExecutor(makeRequest(publicationId, lineageId, digest));
+
+  assert.equal(result.status, 201);
+  assert.equal(result.evidence.publication_id, publicationId);
 
   await closeSharedStore(config.driveStorageRoot);
 });

@@ -4502,6 +4502,170 @@ required cases.
 **EC-T6-2:** required audit persistence failure fails closed where ADR-018 requires it.  
 **EC-T6-3:** P2 audit correlation never fabricates/overloads legacy ingestion-token meaning.
 
+### P2.T3c-S4-e closure record — Hyperswarm announce/join sub-leaf — Done 2026-09-13
+
+> **Scope note:** this closes only the Hyperswarm announce/join/flush
+> networking sub-leaf of Leaf B — the piece `P2.T3c-S4`'s own closure record
+> explicitly excluded (Leaf B acceptance criterion 5). It does **not** close
+> parent `P2.T3c` or all of Leaf B: `T3c-Integ` (final unified verification)
+> remains unstarted after this closure.
+
+**Objective:** implement `announceOnSwarm`/`getSharedSwarm` in
+`apps/availability-node/src/hyperdrive_store.ts` so a published drive is
+actually joined on the DHT, replicates its content to connecting peers, and
+survives process restart without silently ceasing to seed a previously
+accepted publication — the Hyperswarm half of Leaf B's acceptance criterion
+5 that `T3c-S4`'s closure record deferred.
+
+**Reviewer deviation (explicit, user-authorized, recorded per policy):**
+this is an RRI 56+ (Complex) leaf; `docs/playbooks/AGENT_WORKFLOW_GUIDE.md §
+Band-routed peer review` mandates a cross-vendor peer (`codex`, since
+caller=claude-code) as the Step 1 code-solution reviewer, with D14 as the
+only sanctioned fallback. The owner explicitly waived that gate for this
+leaf only ("Descartar por completo el rol de revisor cross-vendor para esta
+tarea") and selected the substitute ("Autorevisión mía documentada + tu
+verificación final") via two `AskUserQuestion` exchanges recorded in this
+session's transcript. This is a recorded, bounded deviation authorized by
+the repository owner, not a silent skip — no other task's review gate is
+affected.
+
+**What was reviewed and fixed (self-review, informal but substantive —
+functioned as a genuine Critique pass under the Reflection pattern):**
+
+1. **BLOCKING — missing replication wiring.** `getSharedSwarm` created a
+   `Hyperswarm` but never called `store.replicate()` on incoming
+   connections (`swarm.on("connection", ...)`), so an announced/joined
+   drive was discoverable but could not actually serve content to peers.
+   Fixed by wiring `swarm.on("connection", (connection) =>
+   store.replicate(connection))` when the shared swarm is created —
+   verified structurally correct against `corestore/index.js`'s
+   `ondiscoverykey` dynamic-attachment logic (covers namespaced drives, not
+   just the root core).
+2. **BLOCKING — `flushed()` boolean ignored.** `hyperswarm@4.17.1`'s
+   `PeerDiscovery.flushed()` resolves `Promise<boolean>` (catching internal
+   refresh rejections and resolving `false` rather than rejecting) — the
+   prior code awaited it without checking the value, silently treating a
+   failed announce round as success. Fixed: a `false` resolution now throws
+   the new `HyperswarmAnnounceFailedError`.
+3. **MAJOR — session leak on timeout.** A timed-out announce never
+   destroyed the newly-created `PeerDiscoverySession`, leaking it
+   indefinitely. Fixed: `discovery.destroy()` runs in the failure path for
+   a first-time join.
+4. **MAJOR — restart does not re-announce.** The replay path in
+   `publication_executor.ts` only re-opened the drive for a liveness probe
+   and never re-announced it, so a reconstructed executor (process restart)
+   would silently stop seeding a previously-accepted publication forever.
+   Fixed: the replay branch now calls `announceOnSwarm` unconditionally and
+   fails closed (`publication_unavailable`, 503) if it fails.
+5. **MINOR — teardown ordering.** `closeSharedStore` now evicts both cached
+   entries before attempting either close, and runs both closes via
+   `Promise.allSettled` so one rejecting close can never leave the other
+   cache entry stale.
+6. **Self-found defect (not from any external review): unbounded session
+   leak on repeated `announceOnSwarm` calls for the same topic.** Fix #4
+   above means every replay request re-invokes `announceOnSwarm` for an
+   already-joined topic; `swarm.join()` on an already-tracked topic creates
+   a brand-new `PeerDiscoverySession` that nothing was destroying — a
+   happy-path leak, not just a failure-path one. Root-caused by reading
+   `hyperswarm/lib/peer-discovery.js`'s `session()` method. Fixed by making
+   `announceOnSwarm` idempotent per topic via `swarm.status(topic)`: an
+   already-tracked topic reuses the existing discovery instead of calling
+   `join()` again.
+7. **Test defect found during closure verification, not a production
+   defect:** the new peer-replication test (`HP-2`) initially failed
+   because a freshly-opened Hyperbee core over a live replication
+   connection does not know its own length until an explicit
+   `core.update({ wait: true })` round-trip completes — `Hyperdrive.get()`
+   short-circuits to `null` on an unread core rather than waiting. This
+   only affects a test harness simulating a peer that never had the drive
+   locally; every real caller in this codebase opens a drive it already
+   possesses (production never takes this code path). Fixed by adding the
+   explicit `update({ wait: true })` step to the test before its `get()`
+   call.
+
+**Files changed:**
+
+- `apps/availability-node/src/hyperdrive_store.ts` — replication wiring,
+  `flushed()` boolean check, session-leak fixes (timeout and repeated-call),
+  teardown ordering.
+- `apps/availability-node/src/publication_executor.ts` — replay path now
+  re-announces unconditionally and fails closed on announce failure.
+- `apps/availability-node/src/types/{hyperswarm,corestore,hyperdrive}.d.ts`
+  — ambient type additions (`replicate()`, `status()`, `on("connection",
+  ...)`, corrected `flushed(): Promise<boolean>`, optional `key` on the
+  `Hyperdrive` constructor).
+- `apps/availability-node/test/hyperswarm-announce.test.js` — rewritten:
+  2 → 8 tests (HP-1, EC-1 through EC-5, HP-2, HP-3).
+
+### Behavioral coverage certification
+
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| HP-1 | Happy path | real join + flush succeeds within timeout | integration | `apps/availability-node/test/hyperswarm-announce.test.js::HP-1` | passed |
+| HP-2 | Happy path | a genuine second peer replicates and downloads published content | integration | `apps/availability-node/test/hyperswarm-announce.test.js::HP-2` | passed |
+| HP-3 | Happy path | after simulated restart (`closeSharedStore` + reopen), re-announce makes the drive discoverable again | integration | `apps/availability-node/test/hyperswarm-announce.test.js::HP-3` | passed |
+| EC-1 | Edge case | near-zero timeout rejects with `HyperswarmAnnounceTimeoutError` | integration | `apps/availability-node/test/hyperswarm-announce.test.js::EC-1` | passed |
+| EC-2 | Edge case | `flushed()` resolving `false` rejects with `HyperswarmAnnounceFailedError` and destroys the session | integration | `apps/availability-node/test/hyperswarm-announce.test.js::EC-2` | passed |
+| EC-3 | Edge case | a synchronous `swarm.join()` throw propagates without hanging | integration | `apps/availability-node/test/hyperswarm-announce.test.js::EC-3` | passed |
+| EC-4 | Edge case | a timed-out announce still destroys the joined session (no leak) | integration | `apps/availability-node/test/hyperswarm-announce.test.js::EC-4` | passed |
+| EC-5 | Edge case | repeated `announceOnSwarm` calls for the same drive reuse the existing discovery (`swarm.join()` called once) | integration | `apps/availability-node/test/hyperswarm-announce.test.js::EC-5` | passed |
+
+### Reflection log
+
+Required passes: informal, substituted per the recorded reviewer-deviation
+waiver above (self-review in place of the RRI 56+ cross-vendor peer).
+
+#### Pass 1
+
+- **Draft verdict:** code reviewed against the full Codex cross-vendor peer
+  review output obtained before the owner's waiver (verdict `BLOCKED`, 2
+  BLOCKING + 2 MAJOR + 1 MINOR findings).
+- **Critique findings:** all 5 findings confirmed genuine against source
+  (`corestore`/`hyperswarm` package internals read directly, not assumed).
+- **Revisions applied:** all 5 fixed — see items 1-5 above.
+
+#### Pass 2
+
+- **Draft verdict:** self-review of the revised diff, treating it as
+  someone else's code per the Reflection Critique methodology.
+- **Critique findings:** found a genuine defect the external review never
+  saw — unbounded session accumulation on repeated `announceOnSwarm` calls
+  for the same topic, made acute by the MAJOR #4 replay-reannounce fix.
+- **Revisions applied:** `swarm.status()`-based idempotent reuse (item 6
+  above), plus `EC-5` added to prove it.
+
+#### Pass 3
+
+- **Draft verdict:** full local test suite run (77 tests across
+  `apps/availability-node` + P2.T3a contract/HTTP suites).
+- **Critique findings:** `HP-2` failed — root-caused to a Hyperbee
+  core-update timing gap in the test harness itself (item 7 above), not the
+  implementation.
+- **Revisions applied:** test fix (explicit `core.update({ wait: true })`
+  before the leecher's `get()`). Re-ran: 8/8 in the Hyperswarm suite, 77/77
+  full suite.
+
+### Owner final verification
+
+- Owner: `Matias`
+- Date: `2026-09-13`
+- Statement: I authorized discarding the cross-vendor peer reviewer for
+  this leaf and substituted agent self-review plus my own final
+  verification, per the recorded deviation above. I verified every happy
+  path and edge case defined for this sub-leaf has passing executable
+  evidence, and that the full local suite (77/77) passes with this change
+  included.
+- Commands run: `npm run build`, `node --test
+  apps/availability-node/test/hyperswarm-announce.test.js`, `node --test
+  apps/availability-node/test/*.test.js
+  docs/audit/mvp0-p2p-p2-t3a-contract.test.js
+  docs/audit/mvp0-p2p-p2-t3a-http.test.js`
+
+**Status:** `[x] Done` for the P2.T3c-S4-e sub-leaf (Hyperswarm
+announce/join/flush networking) only. **Parent `P2.T3c` and Leaf B remain
+open** — `T3c-Integ` (final unified verification across every T3c sub-leaf)
+is unstarted.
+
 ## Integration and ownership constraints
 
 - Current workflow executes one approved task ID at a time. Planning/fixture/test-design work may be prepared concurrently, but executable task IDs are not claimed concurrent.

@@ -221,8 +221,22 @@ Availability Node tests passing. **This closes only a sub-leaf of Leaf
 B — parent `P2.T3c` and Leaf B remain open**, since Leaf B's own acceptance
 criterion 5 requires Hyperswarm announce/join/flush semantics that these
 four modules explicitly exclude by design (documented in their own header
-comments). The remaining leaves (Hyperswarm networking, `T3c-Integ`) are
-unstarted. The
+comments). `T3c-S4-e` (Hyperswarm announce/join/flush networking in
+`hyperdrive_store.ts`/`publication_executor.ts`) closed **`[x] Done`
+2026-09-13**: replication wiring (`store.replicate()` on incoming
+connections), `flushed()` boolean-failure handling, session-leak fixes on
+both the timeout and repeated-call paths, and unconditional re-announce on
+replay with fail-closed behavior on announce failure. RRI 56+ Complex; the
+owner explicitly waived the mandated cross-vendor peer reviewer for this
+leaf only and substituted agent self-review plus owner final verification
+(recorded deviation, not a silent skip) — see the leaf's closure record for
+the full disposition of every finding, including one defect found only
+through self-review (a session leak the external review never saw) and one
+test-only defect (a Hyperbee core-update timing gap in the new peer-
+replication test, not a production issue). 77/77 tests passing across the
+full Availability Node + P2.T3a suite. **Only `T3c-Integ` (final unified
+verification across every T3c sub-leaf) remains unstarted within the
+frozen envelope; `P2.T3c` and Leaf B remain open.** The
 approval does not authorize scope expansion or bypass leaf-specific technical
 gates. See `docs/audit/mvp0-p2p-p2-t3c-preflight.md`. `T3d` has a prepared test-only
 definition and remains blocked on T3c),

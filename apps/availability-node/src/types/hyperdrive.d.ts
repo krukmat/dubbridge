@@ -6,8 +6,9 @@ declare module "hyperdrive" {
   import type Corestore from "corestore";
 
   export default class Hyperdrive {
-    constructor(store: Corestore);
+    constructor(store: Corestore, key?: Buffer);
     readonly key: Buffer;
+    readonly discoveryKey: Buffer;
     ready(): Promise<void>;
     close(): Promise<void>;
     put(path: string, content: Buffer | Uint8Array): Promise<void>;
