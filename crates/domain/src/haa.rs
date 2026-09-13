@@ -5,28 +5,59 @@
 //! adapters verify that evidence without changing exact-action semantics.
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
 pub const HAA_PROTOCOL_V1: &str = "dubbridge.haa.v1";
-const ACTION_DIGEST_DOMAIN: &[u8] = b"dubbridge.haa.action.v1\0";
-const INTENT_DIGEST_DOMAIN: &[u8] = b"dubbridge.haa.intent.v1\0";
-const CHALLENGE_DIGEST_DOMAIN: &[u8] = b"dubbridge.haa.challenge.v1\0";
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum HaaError {
-    #[error("floating-point JSON numbers are not supported in HAA canonical input")]
-    FloatingPointNumber,
-    #[error("canonical JSON serialization failed: {0}")]
-    CanonicalSerialization(String),
     #[error("invalid approval state transition from {from:?} to {to:?}")]
     InvalidStateTransition {
         from: ApprovalState,
         to: ApprovalState,
     },
+}
+
+/// Restricted, deterministic JSON-like value used by exact-action contracts.
+///
+/// Floating-point numbers are intentionally absent. Objects use `BTreeMap`, so
+/// key ordering is deterministic before the service layer hashes serialized
+/// content with the HAA domain-separated SHA-256 protocol.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum CanonicalValue {
+    Null,
+    Bool(bool),
+    Integer(i64),
+    String(String),
+    Array(Vec<CanonicalValue>),
+    Object(BTreeMap<String, CanonicalValue>),
+}
+
+impl From<&str> for CanonicalValue {
+    fn from(value: &str) -> Self {
+        Self::String(value.to_owned())
+    }
+}
+
+impl From<String> for CanonicalValue {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+
+impl From<i64> for CanonicalValue {
+    fn from(value: i64) -> Self {
+        Self::Integer(value)
+    }
+}
+
+impl From<bool> for CanonicalValue {
+    fn from(value: bool) -> Self {
+        Self::Bool(value)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -44,7 +75,7 @@ pub struct PolicyRef {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ActionPrecondition {
     pub name: String,
-    pub expected: Value,
+    pub expected: CanonicalValue,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -54,7 +85,7 @@ pub struct ActionSpec {
     pub action_type: String,
     pub resource: String,
     pub environment: Option<String>,
-    pub parameters: Value,
+    pub parameters: BTreeMap<String, CanonicalValue>,
     pub preconditions: Vec<ActionPrecondition>,
 }
 
@@ -111,7 +142,7 @@ pub struct ApprovalEvidence {
     pub request_id: Uuid,
     pub challenge_digest: String,
     /// Authenticator-specific signed/assertion material. Never biometric data.
-    pub payload: Value,
+    pub payload: CanonicalValue,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -218,198 +249,33 @@ pub struct AuthenticatorRecord {
     pub id: String,
     pub principal: PrincipalRef,
     pub kind: String,
-    pub public_key: Value,
+    pub public_key: CanonicalValue,
     pub active: bool,
     pub enrolled_at: OffsetDateTime,
     pub revoked_at: Option<OffsetDateTime>,
 }
 
-#[derive(Serialize)]
-struct IntentDigestView<'a> {
-    protocol_version: &'static str,
-    action_digest: &'a str,
-    requester: &'a PrincipalRef,
-    audience: &'a PrincipalRef,
-    policy: &'a PolicyRef,
-    created_at: OffsetDateTime,
-    expires_at: OffsetDateTime,
-}
-
-pub fn action_digest(action: &ActionSpec) -> Result<String, HaaError> {
-    digest_serializable(ACTION_DIGEST_DOMAIN, action)
-}
-
-pub fn intent_digest(intent: &ApprovalIntent) -> Result<String, HaaError> {
-    let action = action_digest(&intent.action)?;
-    let view = IntentDigestView {
-        protocol_version: HAA_PROTOCOL_V1,
-        action_digest: &action,
-        requester: &intent.requester,
-        audience: &intent.audience,
-        policy: &intent.policy,
-        created_at: intent.created_at,
-        expires_at: intent.expires_at,
-    };
-    digest_serializable(INTENT_DIGEST_DOMAIN, &view)
-}
-
-pub fn challenge_digest(challenge: &ApprovalChallenge) -> Result<String, HaaError> {
-    digest_serializable(CHALLENGE_DIGEST_DOMAIN, challenge)
-}
-
-fn digest_serializable<T: Serialize>(domain: &[u8], value: &T) -> Result<String, HaaError> {
-    let json = serde_json::to_value(value)
-        .map_err(|error| HaaError::CanonicalSerialization(error.to_string()))?;
-    let canonical = canonical_json_bytes(&json)?;
-    let mut hasher = Sha256::new();
-    hasher.update(domain);
-    hasher.update(canonical);
-    Ok(hex_lower(&hasher.finalize()))
-}
-
-pub fn canonical_json_bytes(value: &Value) -> Result<Vec<u8>, HaaError> {
-    let mut output = Vec::new();
-    write_canonical_json(value, &mut output)?;
-    Ok(output)
-}
-
-fn write_canonical_json(value: &Value, output: &mut Vec<u8>) -> Result<(), HaaError> {
-    match value {
-        Value::Null => output.extend_from_slice(b"null"),
-        Value::Bool(flag) => output.extend_from_slice(if *flag { b"true" } else { b"false" }),
-        Value::Number(number) => write_canonical_number(number, output)?,
-        Value::String(text) => write_json_string(text, output)?,
-        Value::Array(values) => write_canonical_array(values, output)?,
-        Value::Object(values) => write_canonical_object(values, output)?,
-    }
-    Ok(())
-}
-
-fn write_canonical_number(number: &serde_json::Number, output: &mut Vec<u8>) -> Result<(), HaaError> {
-    if number.is_f64() {
-        return Err(HaaError::FloatingPointNumber);
-    }
-    output.extend_from_slice(number.to_string().as_bytes());
-    Ok(())
-}
-
-fn write_json_string(text: &str, output: &mut Vec<u8>) -> Result<(), HaaError> {
-    let encoded = serde_json::to_string(text)
-        .map_err(|error| HaaError::CanonicalSerialization(error.to_string()))?;
-    output.extend_from_slice(encoded.as_bytes());
-    Ok(())
-}
-
-fn write_canonical_array(values: &[Value], output: &mut Vec<u8>) -> Result<(), HaaError> {
-    output.push(b'[');
-    for (index, value) in values.iter().enumerate() {
-        if index > 0 {
-            output.push(b',');
-        }
-        write_canonical_json(value, output)?;
-    }
-    output.push(b']');
-    Ok(())
-}
-
-fn write_canonical_object(
-    values: &serde_json::Map<String, Value>,
-    output: &mut Vec<u8>,
-) -> Result<(), HaaError> {
-    output.push(b'{');
-    let sorted: BTreeMap<&str, &Value> = values
-        .iter()
-        .map(|(key, value)| (key.as_str(), value))
-        .collect();
-    for (index, (key, value)) in sorted.into_iter().enumerate() {
-        if index > 0 {
-            output.push(b',');
-        }
-        write_json_string(key, output)?;
-        output.push(b':');
-        write_canonical_json(value, output)?;
-    }
-    output.push(b'}');
-    Ok(())
-}
-
-fn hex_lower(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut output = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        output.push(char::from(HEX[usize::from(byte >> 4)]));
-        output.push(char::from(HEX[usize::from(byte & 0x0f)]));
-    }
-    output
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
     use time::macros::datetime;
 
-    fn principal(kind: &str, id: &str) -> PrincipalRef {
-        PrincipalRef {
-            kind: kind.to_owned(),
-            id: id.to_owned(),
-        }
-    }
-
-    fn action(parameters: Value) -> ActionSpec {
-        ActionSpec {
-            schema: "deployment.execute.v1".to_owned(),
-            action_type: "deployment.execute".to_owned(),
-            resource: "project/localdevengine".to_owned(),
-            environment: Some("production".to_owned()),
-            parameters,
-            preconditions: vec![ActionPrecondition {
-                name: "commit".to_owned(),
-                expected: json!("17ac839"),
-            }],
-        }
-    }
-
-    fn intent(action: ActionSpec) -> ApprovalIntent {
-        ApprovalIntent {
-            action,
-            requester: principal("agent", "release-manager"),
-            audience: principal("executor", "deploy-service"),
-            policy: PolicyRef {
-                id: "prod-deploy".to_owned(),
-                version: "1".to_owned(),
-            },
-            created_at: datetime!(2026-09-13 00:00 UTC),
-            expires_at: datetime!(2026-09-13 00:05 UTC),
-        }
+    fn params(entries: &[(&str, CanonicalValue)]) -> BTreeMap<String, CanonicalValue> {
+        entries
+            .iter()
+            .map(|(key, value)| ((*key).to_owned(), value.clone()))
+            .collect()
     }
 
     #[test]
-    fn canonical_object_key_order_does_not_change_action_digest() {
-        let first = action(json!({"region": "eu", "replicas": 2}));
-        let second = action(json!({"replicas": 2, "region": "eu"}));
-        assert_eq!(action_digest(&first), action_digest(&second));
-    }
-
-    #[test]
-    fn semantic_action_change_changes_digest() {
-        let first = action(json!({"region": "eu", "replicas": 2}));
-        let second = action(json!({"region": "eu", "replicas": 3}));
-        assert_ne!(action_digest(&first), action_digest(&second));
-    }
-
-    #[test]
-    fn floating_point_input_is_rejected() {
-        let value = json!({"threshold": 1.5});
-        assert_eq!(canonical_json_bytes(&value), Err(HaaError::FloatingPointNumber));
-    }
-
-    #[test]
-    fn requester_or_audience_change_changes_intent_digest() {
-        let first = intent(action(json!({"region": "eu"})));
-        let mut second = first.clone();
-        second.audience = principal("executor", "other-service");
-        assert_ne!(intent_digest(&first), intent_digest(&second));
+    fn action_parameters_have_deterministic_key_order() {
+        let first = params(&[("region", "eu".into()), ("replicas", 2_i64.into())]);
+        let second = params(&[("replicas", 2_i64.into()), ("region", "eu".into())]);
+        assert_eq!(first, second);
+        assert_eq!(
+            first.keys().map(String::as_str).collect::<Vec<_>>(),
+            vec!["region", "replicas"]
+        );
     }
 
     #[test]
@@ -421,41 +287,85 @@ mod tests {
     }
 
     #[test]
-    fn receipt_and_execution_grant_are_distinct_serialized_contracts() {
-        let signature = SignatureEnvelope {
-            algorithm: "ES256".to_owned(),
-            key_id: "haa-1".to_owned(),
-            signature_b64: "signature".to_owned(),
+    fn transition_updates_state_and_timestamp() {
+        let at = datetime!(2026-09-13 00:01 UTC);
+        let intent = ApprovalIntent {
+            action: ActionSpec {
+                schema: "deployment.execute.v1".to_owned(),
+                action_type: "deployment.execute".to_owned(),
+                resource: "project/localdevengine".to_owned(),
+                environment: Some("production".to_owned()),
+                parameters: BTreeMap::new(),
+                preconditions: Vec::new(),
+            },
+            requester: PrincipalRef {
+                kind: "agent".to_owned(),
+                id: "release-manager".to_owned(),
+            },
+            audience: PrincipalRef {
+                kind: "executor".to_owned(),
+                id: "deploy-service".to_owned(),
+            },
+            policy: PolicyRef {
+                id: "prod-deploy".to_owned(),
+                version: "1".to_owned(),
+            },
+            created_at: datetime!(2026-09-13 00:00 UTC),
+            expires_at: datetime!(2026-09-13 00:05 UTC),
         };
-        let receipt = ApprovalReceipt {
-            protocol_version: HAA_PROTOCOL_V1.to_owned(),
-            receipt_id: Uuid::nil(),
-            request_id: Uuid::nil(),
+        let mut request = ApprovalRequest {
+            id: Uuid::nil(),
+            intent,
             action_digest: "action".to_owned(),
             intent_digest: "intent".to_owned(),
-            decision: ApprovalDecision::Approved,
-            approver: principal("human", "matias"),
-            authenticator_id: "mac-1".to_owned(),
-            issued_at: datetime!(2026-09-13 00:01 UTC),
-            expires_at: datetime!(2026-09-13 00:05 UTC),
-            haa_signature: signature.clone(),
+            state: ApprovalState::Pending,
+            created_at: datetime!(2026-09-13 00:00 UTC),
+            updated_at: datetime!(2026-09-13 00:00 UTC),
         };
-        let grant = ExecutionGrant {
-            protocol_version: HAA_PROTOCOL_V1.to_owned(),
-            grant_id: Uuid::nil(),
-            request_id: Uuid::nil(),
-            execution_id: Uuid::nil(),
+        request
+            .transition(ApprovalState::Approved, at)
+            .expect("valid transition");
+        assert_eq!(request.state, ApprovalState::Approved);
+        assert_eq!(request.updated_at, at);
+    }
+
+    #[test]
+    fn invalid_transition_is_rejected() {
+        let mut request = ApprovalRequest {
+            id: Uuid::nil(),
+            intent: ApprovalIntent {
+                action: ActionSpec {
+                    schema: "api.call.v1".to_owned(),
+                    action_type: "api.call".to_owned(),
+                    resource: "service/example".to_owned(),
+                    environment: None,
+                    parameters: BTreeMap::new(),
+                    preconditions: Vec::new(),
+                },
+                requester: PrincipalRef {
+                    kind: "agent".to_owned(),
+                    id: "agent-1".to_owned(),
+                },
+                audience: PrincipalRef {
+                    kind: "executor".to_owned(),
+                    id: "executor-1".to_owned(),
+                },
+                policy: PolicyRef {
+                    id: "default".to_owned(),
+                    version: "1".to_owned(),
+                },
+                created_at: datetime!(2026-09-13 00:00 UTC),
+                expires_at: datetime!(2026-09-13 00:05 UTC),
+            },
             action_digest: "action".to_owned(),
-            audience: principal("executor", "deploy-service"),
-            issued_at: datetime!(2026-09-13 00:02 UTC),
-            expires_at: datetime!(2026-09-13 00:03 UTC),
-            haa_signature: signature,
+            intent_digest: "intent".to_owned(),
+            state: ApprovalState::Consumed,
+            created_at: datetime!(2026-09-13 00:00 UTC),
+            updated_at: datetime!(2026-09-13 00:00 UTC),
         };
-        let receipt_json = serde_json::to_value(receipt).expect("receipt serializes");
-        let grant_json = serde_json::to_value(grant).expect("grant serializes");
-        assert!(receipt_json.get("decision").is_some());
-        assert!(receipt_json.get("execution_id").is_none());
-        assert!(grant_json.get("execution_id").is_some());
-        assert!(grant_json.get("decision").is_none());
+        let error = request
+            .transition(ApprovalState::Approved, datetime!(2026-09-13 00:01 UTC))
+            .expect_err("consumed approval must not reopen");
+        assert!(matches!(error, HaaError::InvalidStateTransition { .. }));
     }
 }
