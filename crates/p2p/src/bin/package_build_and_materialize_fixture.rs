@@ -64,7 +64,9 @@ fn parse_args() -> Args {
     while let Some(flag) = argv.next() {
         match flag.as_str() {
             "--root" => {
-                let value = argv.next().unwrap_or_else(|| fail_usage("--root needs a value"));
+                let value = argv
+                    .next()
+                    .unwrap_or_else(|| fail_usage("--root needs a value"));
                 root = Some(PathBuf::from(value));
             }
             "--asset-id" => {
@@ -86,11 +88,15 @@ fn parse_args() -> Args {
                 );
             }
             "--ck-hex" => {
-                let value = argv.next().unwrap_or_else(|| fail_usage("--ck-hex needs a value"));
+                let value = argv
+                    .next()
+                    .unwrap_or_else(|| fail_usage("--ck-hex needs a value"));
                 ck = Some(decode_hex_ck(&value));
             }
             "--file" => {
-                let value = argv.next().unwrap_or_else(|| fail_usage("--file needs a value"));
+                let value = argv
+                    .next()
+                    .unwrap_or_else(|| fail_usage("--file needs a value"));
                 let (path, content) = value
                     .split_once('=')
                     .unwrap_or_else(|| fail_usage("--file must be <relpath>=<content>"));
@@ -106,7 +112,8 @@ fn parse_args() -> Args {
     Args {
         root: root.unwrap_or_else(|| fail_usage("--root is required")),
         asset_id: asset_id.unwrap_or_else(|| fail_usage("--asset-id is required")),
-        publication_id: publication_id.unwrap_or_else(|| fail_usage("--publication-id is required")),
+        publication_id: publication_id
+            .unwrap_or_else(|| fail_usage("--publication-id is required")),
         lineage_id: lineage_id.unwrap_or_else(|| fail_usage("--lineage-id is required")),
         ck: ck.unwrap_or_else(|| fail_usage("--ck-hex is required")),
         files,
