@@ -51,10 +51,10 @@ DEFAULT_THINK = False
 # GPT-OSS's harmony reasoning format, not a workaround.
 GPT_OSS_TEMPERATURE = 1.0
 GPT_OSS_TOP_P = 1.0
-# Empirically selected generation budget for GPT-OSS 20B on the 32 GB target
-# host: a 6144-token run exhausted its budget in hidden reasoning, while the
-# otherwise-identical 8192-token run stopped naturally with visible content.
-GPT_OSS_NUM_PREDICT = 8192
+# Trial generation budget for GPT-OSS 20B on the 32 GB target host. A
+# 6144-token run exhausted its budget in hidden reasoning; 10240 leaves more
+# room to determine whether longer reviews complete usefully in normal use.
+GPT_OSS_NUM_PREDICT = 10240
 
 MODEL_NUM_PREDICT_OVERRIDES = {
     "gemma4:26b-a4b-it-qat": 8192,

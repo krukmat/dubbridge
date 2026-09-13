@@ -39,10 +39,10 @@ class SharedConfig(unittest.TestCase):
         )
 
     def test_resolve_num_predict_raises_default_for_gpt_oss(self):
-        self.assertEqual(gemma_local.GPT_OSS_NUM_PREDICT, 8192)
+        self.assertEqual(gemma_local.GPT_OSS_NUM_PREDICT, 10240)
         self.assertEqual(
             gemma_local.resolve_num_predict("gpt-oss:20b", 4096),
-            8192,
+            10240,
         )
 
     def test_resolve_num_predict_keeps_qwen_default_budget(self):

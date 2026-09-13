@@ -73,11 +73,11 @@ and Architect-refined implementation routing below), not to cloud. A
      applies both resolvers automatically for any `gpt-oss*`-prefixed model;
      any direct Ollama call for this model family must set the same values.
      Routine review profile (Low-band phase-1/phase-2, `DEFAULT_REVIEW_MODEL`):
-     `num_ctx=32768`, `num_predict=8192`, `think="medium"`, `temperature=1.0`,
-     `top_p=1.0`, `keep_alive="30m"`. Critical/architect-level review profile
+     `num_ctx=32768`, `num_predict=10240`, `think="medium"`, `temperature=1.0`,
+     `top_p=1.0`, `keep_alive="1m"`. Critical/architect-level review profile
      (a packet the orchestrator judges high-stakes enough to warrant deeper
      reasoning — e.g. a security-sensitive containment check, D14 escalation
-     packets): `num_ctx=49152`, `num_predict=8192`, `think="high"`,
+     packets): `num_ctx=49152`, `num_predict=10240`, `think="high"`,
      `temperature=1.0`, `top_p=1.0`. Do not economize `think`/`num_predict`
      for a local model to save tokens — that constraint applies only to
      cloud models (Codex/Claude); the only local ceiling is whether the
@@ -1538,7 +1538,7 @@ host-state symptom, not reproduced further), fall back in this exact order,
 per explicit owner instruction:
 
 1. `gpt-oss:20b`, routine profile: `think=medium`, `num_ctx=32768`,
-   `num_predict=8192`, `temperature=1.0`, `top_p=1.0` (same defaults as the
+   `num_predict=10240`, `temperature=1.0`, `top_p=1.0` (same defaults as the
    Low-band chain's primary reviewer, § Mandatory workflow before
    implementing Step 0). **Verified 2026-09-13 (`P2.T3c-S2b`): succeeded in
    59.8s**, `done_reason: stop`, valid JSON with a substantive
@@ -1549,7 +1549,7 @@ per explicit owner instruction:
    reasoning were present and substantive.
 2. If that also fails: `gpt-oss:20b`, reduced profile: `think=low`,
    `num_ctx=16384`, `num_predict=3072`, `temperature=1.0`, `top_p=1.0`,
-   `keep_alive=30m`.
+   `keep_alive=1m`.
 
 **Mechanical caveat:** `scripts/local-agent/med_high_gate.py`'s
 `validate_refinement_artifact()` hard-requires
