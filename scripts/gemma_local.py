@@ -36,9 +36,6 @@ DEFAULT_IDLE_TIMEOUT_SECONDS = 180
 DEFAULT_MAX_WALL_SECONDS = 900
 DEFAULT_NUM_CTX = 131072
 DEFAULT_NUM_PREDICT = 4096
-MODEL_NUM_PREDICT_OVERRIDES = {
-    "gemma4:26b-a4b-it-qat": 8192,
-}
 DEFAULT_TEMPERATURE = 0.1
 DEFAULT_THINK = False
 
@@ -54,12 +51,15 @@ DEFAULT_THINK = False
 # GPT-OSS's harmony reasoning format, not a workaround.
 GPT_OSS_TEMPERATURE = 1.0
 GPT_OSS_TOP_P = 1.0
-# Vendor-recommended baseline generation budget for GPT-OSS 20B on a 32GB
-# host: enough for "medium" thinking on a review-sized packet without
-# starving the visible-content phase. A "high"-thinking critical/architect
-# review should raise num_ctx/num_predict further (49152/8192) at the call
-# site; this constant is the routine-review floor, not a ceiling.
-GPT_OSS_NUM_PREDICT = 6144
+# Empirically selected generation budget for GPT-OSS 20B on the 32 GB target
+# host: a 6144-token run exhausted its budget in hidden reasoning, while the
+# otherwise-identical 8192-token run stopped naturally with visible content.
+GPT_OSS_NUM_PREDICT = 8192
+
+MODEL_NUM_PREDICT_OVERRIDES = {
+    "gemma4:26b-a4b-it-qat": 8192,
+    DEFAULT_REVIEW_MODEL: GPT_OSS_NUM_PREDICT,
+}
 
 TRUTHY_ENV_VALUES = {"1", "true", "TRUE", "yes", "YES", "on", "ON"}
 

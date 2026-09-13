@@ -38,6 +38,13 @@ class SharedConfig(unittest.TestCase):
             8192,
         )
 
+    def test_resolve_num_predict_raises_default_for_gpt_oss(self):
+        self.assertEqual(gemma_local.GPT_OSS_NUM_PREDICT, 8192)
+        self.assertEqual(
+            gemma_local.resolve_num_predict("gpt-oss:20b", 4096),
+            8192,
+        )
+
     def test_resolve_num_predict_keeps_qwen_default_budget(self):
         self.assertEqual(
             gemma_local.resolve_num_predict("qwen3.6:35b-a3b", 4096),
@@ -47,6 +54,12 @@ class SharedConfig(unittest.TestCase):
     def test_resolve_num_predict_preserves_explicit_override(self):
         self.assertEqual(
             gemma_local.resolve_num_predict("gemma4:26b-a4b-it-qat", 6144),
+            6144,
+        )
+
+    def test_resolve_num_predict_preserves_explicit_gpt_oss_override(self):
+        self.assertEqual(
+            gemma_local.resolve_num_predict("gpt-oss:20b", 6144),
             6144,
         )
 
