@@ -6,6 +6,7 @@ pub mod audit_repo;
 pub mod consent_repo;
 pub mod dubbing_repo;
 pub mod error;
+pub mod haa_repo;
 pub mod notification_repo;
 pub mod p2p_publication_repo;
 pub mod pending_ingestion_repo;
@@ -23,8 +24,8 @@ pub mod workspace_repo;
 #[cfg(test)]
 mod workspace_repo_tests;
 
-use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
+use sqlx::PgPool;
 
 use crate::error::DbError;
 
