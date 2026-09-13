@@ -1,0 +1,38 @@
+{
+  "changed_paths": [],
+  "findings": [],
+  "model": "gemma4:26b-a4b-it-qat",
+  "passes_run": 3,
+  "passes_succeeded": 3,
+  "reconciliation": {
+    "consensus": [],
+    "consensus_count": 0,
+    "likely_false_positive": [
+      {
+        "detail": "The `materialize` function calls `std::fs::create_dir_all(&package_dir)?` after the containment check but before writing files. If `package_dir` already exists as a file (not a directory), `create_dir_all` will fail with an `io::Error`. While this is caught and returned as `MaterializeError::Io`, it is a specific edge case where a file exists with the same name as the intended `publication_id`.",
+        "line": 104,
+        "path": "crates/p2p/src/package_writer.rs",
+        "scope": "out-of-scope",
+        "severity": "minor",
+        "suggestion": "None required; current behavior correctly propagates the error as per EC-3."
+      },
+      {
+        "detail": "The `materialize` function calls `std::fs::create_dir_all(&package_dir)?` after the containment check but before writing files. If `package_dir` already exists as a file (not a directory), `create_dir_all` will fail with an `io::Error`, which is correctly propagated as `MaterializeError::Io`. However, if `package_dir` exists as a directory but is empty or contains partial files from a failed previous attempt, the code proceeds to `create_dir_all` (which is a no-op for existing directories) and then proceeds to overwrite files using `write_atomic`. This aligns with the \"Missing\" state logic in `diff_existing` to handle partially-written directories.",
+        "line": 113,
+        "path": "crates/p2p/src/package_writer.rs",
+        "scope": "out-of-scope",
+        "severity": "minor",
+        "suggestion": "None required; behavior is consistent with the stated goal of handling partially-written/corrupt directories."
+      }
+    ],
+    "likely_false_positive_count": 2,
+    "location_inconsistent": [],
+    "location_inconsistent_count": 0,
+    "pass_specific": [],
+    "pass_specific_count": 0,
+    "severity_inconsistent": [],
+    "severity_inconsistent_count": 0
+  },
+  "status": "findings",
+  "summary": "The `package_writer` module correctly implements atomic and idempotent materialization of `SealedPackage` to a filesystem root. It enforces containment via `verify_contained_realpath`, handles conflicts by rejecting different content, and ensures idempotency by checking byte-identical content before writing. Atomic writes are delegated to `atomic_write::write_atomic`."
+}

@@ -184,13 +184,28 @@ than opening a separate predecessor task. The initial two-leaf envelope was
 then refined into eight implementation/integration leaves while the parent
 remains RRI 70 Complex via `scripts/rri.py`. Matias approved the frozen
 parent envelope at its HITL checkpoint on 2026-09-12 for later in-scope
-execution in dependency order. `T3c-S0`, `T3c-S1a`, `T3c-S2a`, and `T3c-S3`
-are Done (`T3c-S2a` owner-verified 2026-09-12; `T3c-S3` owner-verified
-2026-09-13 — the Node containment-check mirror, which also fixed a
-`gpt-oss:20b` sampling-parameter defect blocking the RRI 0-25 chain's
+execution in dependency order. `T3c-S0`, `T3c-S1a`, `T3c-S2a`, `T3c-S3`, and
+`T3c-S1b` are Done (`T3c-S2a` owner-verified 2026-09-12; `T3c-S3`
+owner-verified 2026-09-13 — the Node containment-check mirror, which also
+fixed a `gpt-oss:20b` sampling-parameter defect blocking the RRI 0-25 chain's
 primary reviewer, documented in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` §
-Mandatory workflow before implementing, Step 0), and the other leaves
-remain unstarted. The
+Mandatory workflow before implementing, Step 0; `T3c-S1b`, RRI 55 Med-high,
+approved 2026-09-13 and implemented `[x] Done` the same day — the Rust
+package materializer composing `verify_contained_realpath`, `write_atomic`,
+and `SealedPackage` into `crates/p2p/src/package_writer.rs`, routed
+`CLOUD_REQUIRED` per ADR-038 Amendment 1 after an honest-low-band-
+maximization pass found no separable Low residue, Gemma phase-2 review PASS
+0 findings, owner verification pending). `T3c-S2b` (RRI 55 Med-high) was
+approved 2026-09-13 and decomposed per ADR-038 Amendment 4: Candidate A
+(`write_atomic.ts`, RRI 25 Low, `[x] Done`, owner-verified, phase-2 review
+PASS) and Candidate B (`publication_index.ts`, decide-and-persist policy,
+RRI 55 Med-high, implemented directly by Claude Sonnet 5 per explicit owner
+instruction, `[x] Done`, owner-verified — its phase-2 `gpt-oss:20b` review
+stalled `BLOCKED` with zero output and was substituted with documented
+independent verification/self-review rather than escalating to D14, an
+explicitly flagged deviation the owner accepted at sign-off); the parent
+`T3c-S2b` leaf itself is closed. The remaining leaves (`S4`, `T3c-Integ`)
+are unstarted. The
 approval does not authorize scope expansion or bypass leaf-specific technical
 gates. See `docs/audit/mvp0-p2p-p2-t3c-preflight.md`. `T3d` has a prepared test-only
 definition and remains blocked on T3c),

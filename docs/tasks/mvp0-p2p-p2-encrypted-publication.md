@@ -19,7 +19,7 @@ behavioral_coverage_contract: behavior-v2
 - Original `P2.T1` RRI 78 parent: **SUPERSEDED / NON-EXECUTABLE** by lower-RRI decomposition.
 - `P2.T1a`-`P2.T1f`: **Done / owner-approved as the complete P2.T1 persistence outcome on 2026-09-06**. Do not reopen for retrospective review.
 - `P2.C0`: **PASS 2026-09-06 — RRI 66 Complex / Effort L**. Owner approved the ten-path docs/fixture freeze; four Reflection passes PASS.
-- P2.T2, T3a, and T3b are Done, including T2c-r and T2g recertification; T3b was owner-verified on 2026-09-09. T4a is Done (2026-09-07). T3c's 2026-09-12 preflight resolved D2 by expanding T3c with a Rust materializer and decomposed the parent into eight implementation/integration leaves. T3c-S0, T3c-S1a, T3c-S2a, and T3c-S3 are Done. On 2026-09-12 Matias approved the frozen RRI-70 `P2.T3c` parent envelope at its HITL checkpoint and separately approved `P2.T3c-S2a` for execution; evidence: `.agent/p2-t3c/parent-hitl-approval.json` and `.agent/p2-t3c/s2a-execution-approval.json`. This parent approval is retained for later in-scope leaves, without authorizing scope expansion or out-of-order execution. T3c-S2a and T3c-S3 are `[x] Done` (owner-verified 2026-09-12 and 2026-09-13 respectively); see their closure records. `P2.T3c-S2b` (RRI 55 Med-high) was approved 2026-09-13 ("aprobado", Matias) and decomposed per ADR-038 Amendment 4 into Candidate A (`write_atomic.ts`, RRI 25 Low, delegated) and Candidate B (`publication_index.ts`, remains RRI 55 Med-high, pending cloud-takeover escalation). Candidate A is tracked as leaf `P2.T3c-S2b-A` and is `[x] Done`, owner-verified 2026-09-13 (Matias); Candidate B has not started. The parent `P2.T3c-S2b` task itself is not yet closed. S1b, S4, and T3c-Integ remain unstarted. T3d remains blocked on T3c. Each executable leaf must still freeze its exact current path set, run `scripts/rri.py`, and follow the resulting workflow route immediately before execution.
+- P2.T2, T3a, and T3b are Done, including T2c-r and T2g recertification; T3b was owner-verified on 2026-09-09. T4a is Done (2026-09-07). T3c's 2026-09-12 preflight resolved D2 by expanding T3c with a Rust materializer and decomposed the parent into eight implementation/integration leaves. T3c-S0, T3c-S1a, T3c-S2a, T3c-S3, and T3c-S1b are Done. On 2026-09-12 Matias approved the frozen RRI-70 `P2.T3c` parent envelope at its HITL checkpoint and separately approved `P2.T3c-S2a` for execution; evidence: `.agent/p2-t3c/parent-hitl-approval.json` and `.agent/p2-t3c/s2a-execution-approval.json`. This parent approval is retained for later in-scope leaves, without authorizing scope expansion or out-of-order execution. T3c-S2a and T3c-S3 are `[x] Done` (owner-verified 2026-09-12 and 2026-09-13 respectively); see their closure records. `P2.T3c-S1b` (RRI 55 Med-high, Rust package materializer) was approved 2026-09-13 ("aprobado", Matias); an honest-low-band-maximization pass found no genuinely separable Low residue in its scope (containment-check, idempotency/conflict decision, and write loop share one control-flow graph), so it routed `CLOUD_REQUIRED` per ADR-038 Amendment 1 and was implemented directly by Claude Sonnet 5; `[x] Done` 2026-09-13, Gemma phase-2 review PASS 0 findings, owner verification pending; see its closure record. `P2.T3c-S2b` (RRI 55 Med-high) was approved 2026-09-13 ("aprobado", Matias) and decomposed per ADR-038 Amendment 4 into Candidate A (`write_atomic.ts`, RRI 25 Low, delegated) and Candidate B (`publication_index.ts`, remains RRI 55 Med-high, pending cloud-takeover escalation). Candidate A is tracked as leaf `P2.T3c-S2b-A` and is `[x] Done`, owner-verified 2026-09-13 (Matias); Candidate B has not started. The parent `P2.T3c-S2b` task itself is not yet closed. S4 and T3c-Integ remain unstarted. T3d remains blocked on T3c. Each executable leaf must still freeze its exact current path set, run `scripts/rri.py`, and follow the resulting workflow route immediately before execution.
 - Review exception: existing owner-directed MVP0-P2P P0-P7 phase-1/phase-2 review override remains in force; it does not waive RRI/HITL/Reflection/tests.
 
 Canonical C0 evidence:
@@ -2762,6 +2762,164 @@ not wire the module into `lib.rs`, does not implement `T3c-S1b`'s package
 materializer, and does not change T3c's own Complex-band RRI, approval gate,
 or the still-unapproved status of the remaining leaves (`S2a`, `S1b`, `S2b`,
 `S4`, `T3c-Integ`).
+
+### P2.T3c-S1b — Rust P2P package materializer (Leaf A) — [x] Done (2026-09-13)
+
+- **Type:** development, Rust logic composing three already-Done primitives,
+  RRI 55 Med-high band.
+- **RRI:** 55 — Med-high. `scripts/rri.py --touches crates/p2p/src/package_writer.rs --touches crates/p2p/src/lib.rs --touches crates/p2p/tests/package_writer_test.rs --cc 8 --D 2 --K 1 --P 2 --T 2 --A 1 --X 1` (reconfirmed at presentation time; unchanged at closure).
+- **Objective:** materialize a `build_package()`-produced `SealedPackage` to a
+  shared ciphertext filesystem root as a package directory, atomically and
+  idempotently, returning a validated `package_ref`, without deciding
+  `P2P_READY`, network publication, or Availability Node behavior.
+- **Approval:** presented as a six-block Compact Approval Task Card v2;
+  approved by Matias ("aprobado").
+
+#### Honest Low-band maximization / ADR-038 Amendment 4 decomposition attempt
+
+Before the cloud-takeover packet, the frozen scope was tested against real
+candidate sub-splits (module-wiring edit; directory/path-construction check;
+idempotency/conflict decision; write loop) per
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Honest Low-band maximization
+before presentation. No candidate cleared the "independently meaningful or
+verifiable" bar: containment-check, idempotency-decision, and write-loop
+share one control-flow graph (raw CC 8 = exactly 3 branches: containment-fail
+/ conflict / proceed-and-write) whose acceptance criteria (HP-1/2, EC-1/2/3)
+only hold meaning against the whole `materialize` function. Splitting further
+would either fragment the invariant or require mock-backed acceptance in
+place of the real integration, both prohibited by the maximization pass.
+Recorded as `honest-low-max: residual` — the full RRI 55 scope is the
+irreducible unit. This satisfies ADR-038 Amendment 4's decomposition-attempt
+requirement with no dispatchable Low subtask.
+
+#### Implementation routing evidence
+
+- **Qwen3.6 27B advisory refinement** (`med-high-refinement-v1`,
+  `.agent/p2-t3c/s1b-phase1-refinement.json`, packet sha256
+  `bc979dd97ad800c3fc732f1667aa73cd468ac90c5309094a4860d5c629a69aed`):
+  `route_recommendation: GO_LOCAL`.
+- **Primary hash-bound route receipt:** `CLOUD_REQUIRED` — downgraded the
+  advisory's `GO_LOCAL` per ADR-038 Amendment 1 (RRI 46-55 never opens a
+  whole-task local implementation attempt regardless of the advisory route)
+  and per the honest-low-band-maximization finding above (no dispatchable
+  Low residue exists). `scripts/local-agent/med_high_gate.py` confirms:
+  `{"route": "CLOUD_REQUIRED", "reason": "Primary receipt downgraded
+  GO_LOCAL to cloud."}`.
+- **Cloud takeover classification:** capability/risk (Amendment 1's
+  structural 46-55 exclusion, not an operational/infrastructure failure) —
+  implemented directly by Claude Sonnet 5 as the orchestrator/primary
+  implementer of record, per the Claude Code capability-resolution table's
+  41-55 row (escalation to Opus 5 reserved for stall/repeated failure under
+  Sonnet, neither of which occurred).
+- **Per-task Ollama restart:** performed before this leaf's first
+  Ollama-backed call (new PID confirmed via `pgrep`/`lsof`, listening on
+  `:11434`); `gemma4:26b-a4b-it-qat` warm-tested at routine profile
+  (`num_ctx=32768`, `num_predict=256`, `temperature=0.1`) — `done_reason:
+  "stop"`, non-empty content.
+- **disposition_divergence:** `none` — no findings to disposition.
+
+#### Peer Reviewer evidence
+
+- Reviewer: `gemma` (`gemma4:26b-a4b-it-qat`, RRI 26-55 chain primary).
+- Command: `scripts/gemma-code-review.py --model gemma4:26b-a4b-it-qat
+  --num-ctx 32768 --num-predict 10240 --passes 3 --task-id P2.T3c-S1b`.
+- Artifact: `docs/audit/mvp0-p2p-p2-t3c-s1b-phase2-review.json`.
+- Verdict: `PASS`.
+- Findings: 0 consensus, 0 pass-specific, 0 severity-inconsistent, 0
+  location-inconsistent; 2 likely-false-positive observations (both
+  self-annotated by the reviewer as requiring no action — correctly
+  describing intended behavior: `create_dir_all` propagating an `Io` error if
+  `package_dir` collides with an existing non-directory file, and the
+  `Missing`-state fallthrough correctly handling a partially-written prior
+  attempt). No BLOCKING findings.
+- GPT-OSS 20B fallback: not triggered — Gemma produced a usable 3/3 result.
+- D14 fallback: not triggered.
+- D14 provider route: `n/a`.
+- disposition_divergence: `none`.
+- Primary-agent disposition: no findings required action; implementation
+  accepted as-is.
+
+#### Reflection log
+
+Required passes: 3 (`55` → `Med-high`)
+
+##### Pass 1
+
+- **Draft verdict:** `materialize()` composes `verify_contained_realpath`,
+  `write_atomic`, and `SealedPackage` per the frozen packet; containment
+  checked before any write; conflict detected via byte-for-byte
+  `diff_existing` before any write.
+- **Critique findings:** a partially-written/corrupt prior directory
+  (`ExistingState::Missing` mid-loop) falls through to a full rewrite rather
+  than a truly targeted repair — acceptable per EC-3's own framing (the
+  failure boundary is documented, not assumed atomic across the whole
+  directory), not a defect. A concurrent writer to the same `publication_id`
+  from a different process could race `diff_existing`'s read against another
+  process's write (TOCTOU) — explicitly named as an accepted risk in the
+  Qwen advisory's `risks` field and out of this leaf's scope.
+- **Revisions applied:** none needed.
+
+##### Pass 2
+
+- **Draft verdict:** re-read for failure-boundary correctness and side
+  effects.
+- **Critique findings:** a failure partway through the ciphertext write loop
+  (e.g. file 2 of 3) leaves a genuinely partial directory (file 1 written,
+  file 3 absent). This matches the packet's explicit framing: "the failure
+  boundary is documented explicitly, not silently assumed atomic across the
+  whole directory" — EC-3's acceptance criterion only requires the error to
+  propagate, which it does via `?` at every write site.
+- **Revisions applied:** none needed.
+
+##### Pass 3
+
+- **Draft verdict:** verify full coverage of the required acceptance set and
+  clean tooling output.
+- **Critique findings:** all 5 required acceptance tests (HP-1, HP-2, EC-1,
+  EC-2, EC-3) have executable evidence, plus one additional EC-1b covering
+  the symlink-escape sub-case of EC-1. `cargo fmt --check`, `cargo clippy -D
+  warnings`, and `cargo test` are all clean; no new `Cargo.toml` dependency.
+- **Revisions applied:** none needed.
+
+#### Verification
+
+```
+$ cargo test -p dubbridge-p2p --all-features
+test result: ok. 46 passed (lib) + 3 passed (k1_contract) + 6 passed (package_writer_test); 0 failed
+$ cargo fmt --check -p dubbridge-p2p
+(clean)
+$ cargo clippy -p dubbridge-p2p --all-targets --all-features -- -D warnings
+(clean)
+```
+
+#### Behavioral coverage certification
+
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| HP-1 | Happy path | fresh `publication_id` creates directory with correct manifest + ciphertext bytes, returns `package_ref` | integration | `crates/p2p/tests/package_writer_test.rs::hp1_fresh_materialize_creates_expected_directory` | passed |
+| HP-2 | Happy path | identical replay is a no-op success; mtime/inode unchanged | integration | `crates/p2p/tests/package_writer_test.rs::hp2_idempotent_replay_is_noop_and_does_not_rewrite` | passed |
+| EC-1 | Edge case | `publication_id` escaping root via `../` rejected before any write | integration | `crates/p2p/tests/package_writer_test.rs::ec1_publication_id_traversal_is_rejected_before_any_write` | passed |
+| EC-1 | Edge case | `publication_id` escaping root via symlink rejected | integration | `crates/p2p/tests/package_writer_test.rs::ec1b_symlink_escape_publication_id_is_rejected` | passed |
+| EC-2 | Edge case | existing directory with different content rejected as conflict; existing directory left byte-for-byte unchanged | integration | `crates/p2p/tests/package_writer_test.rs::ec2_conflicting_content_is_rejected_and_existing_left_unchanged` | passed |
+| EC-3 | Edge case | underlying IO failure propagates as an IO error | integration | `crates/p2p/tests/package_writer_test.rs::ec3_io_failure_propagates_as_io_error` | passed |
+
+- **Task-analysis review:** qwen3.6 `.agent/p2-t3c/s1b-phase1-refinement.json` - PASS (advisory `GO_LOCAL`, downgraded to `CLOUD_REQUIRED` by the primary receipt per Amendment 1)
+- **Code-solution review:** gemma `docs/audit/mvp0-p2p-p2-t3c-s1b-phase2-review.json` - PASS
+
+#### Owner final verification
+
+- Owner: pending — implementation, honest-low-band-maximization analysis,
+  ADR-038 routing, 3-pass Reflection, and Gemma phase-2 review are complete
+  and recorded above; awaiting the owner's own confirmation pass before this
+  line is finalized.
+
+This closure delivers `crates/p2p/src/package_writer.rs`, wires
+`pub mod atomic_write;` and `pub mod package_writer;` into `lib.rs`, and adds
+`crates/p2p/tests/package_writer_test.rs`. It does not implement network IO,
+`P2P_READY` transition, or any Availability Node wiring — those remain scoped
+to `T3c-S4`/`T3c-Integ`/`T4`/`T5`. `T3c`'s own Complex-band RRI, approval
+gate, and the still-unapproved status of the remaining leaves (`S2b`, `S4`,
+`T3c-Integ`) are unchanged.
 
 ### P2.T3c-S2a — deterministic durable publication-record codec — [x] Done (2026-09-12)
 
