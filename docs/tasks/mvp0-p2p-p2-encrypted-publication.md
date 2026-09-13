@@ -19,7 +19,7 @@ behavioral_coverage_contract: behavior-v2
 - Original `P2.T1` RRI 78 parent: **SUPERSEDED / NON-EXECUTABLE** by lower-RRI decomposition.
 - `P2.T1a`-`P2.T1f`: **Done / owner-approved as the complete P2.T1 persistence outcome on 2026-09-06**. Do not reopen for retrospective review.
 - `P2.C0`: **PASS 2026-09-06 — RRI 66 Complex / Effort L**. Owner approved the ten-path docs/fixture freeze; four Reflection passes PASS.
-- P2.T2, T3a, and T3b are Done, including T2c-r and T2g recertification; T3b was owner-verified on 2026-09-09. T4a is Done (2026-09-07). T3c's 2026-09-12 preflight resolved D2 by expanding T3c with a Rust materializer and decomposed the parent into eight implementation/integration leaves. T3c-S0 and T3c-S1a are Done. On 2026-09-12 Matias approved the frozen RRI-70 `P2.T3c` parent envelope at its HITL checkpoint and separately approved `P2.T3c-S2a` for execution; evidence: `.agent/p2-t3c/parent-hitl-approval.json` and `.agent/p2-t3c/s2a-execution-approval.json`. This parent approval is retained for later in-scope leaves, without authorizing scope expansion or out-of-order execution. T3c-S2a is `[x] Done` (owner-verified 2026-09-12); see its closure record. T3c-S3, S1b, S2b, S4, and T3c-Integ remain unstarted. T3d remains blocked on T3c. Each executable leaf must still freeze its exact current path set, run `scripts/rri.py`, and follow the resulting workflow route immediately before execution.
+- P2.T2, T3a, and T3b are Done, including T2c-r and T2g recertification; T3b was owner-verified on 2026-09-09. T4a is Done (2026-09-07). T3c's 2026-09-12 preflight resolved D2 by expanding T3c with a Rust materializer and decomposed the parent into eight implementation/integration leaves. T3c-S0, T3c-S1a, T3c-S2a, and T3c-S3 are Done. On 2026-09-12 Matias approved the frozen RRI-70 `P2.T3c` parent envelope at its HITL checkpoint and separately approved `P2.T3c-S2a` for execution; evidence: `.agent/p2-t3c/parent-hitl-approval.json` and `.agent/p2-t3c/s2a-execution-approval.json`. This parent approval is retained for later in-scope leaves, without authorizing scope expansion or out-of-order execution. T3c-S2a and T3c-S3 are `[x] Done` (owner-verified 2026-09-12 and 2026-09-13 respectively); see their closure records. `P2.T3c-S2b` (RRI 55 Med-high) was approved 2026-09-13 ("aprobado", Matias) and decomposed per ADR-038 Amendment 4 into Candidate A (`write_atomic.ts`, RRI 25 Low, delegated) and Candidate B (`publication_index.ts`, remains RRI 55 Med-high, pending cloud-takeover escalation). Candidate A is tracked as leaf `P2.T3c-S2b-A` and is `[x] Done`, owner-verified 2026-09-13 (Matias); Candidate B has not started. The parent `P2.T3c-S2b` task itself is not yet closed. S1b, S4, and T3c-Integ remain unstarted. T3d remains blocked on T3c. Each executable leaf must still freeze its exact current path set, run `scripts/rri.py`, and follow the resulting workflow route immediately before execution.
 - Review exception: existing owner-directed MVP0-P2P P0-P7 phase-1/phase-2 review override remains in force; it does not waive RRI/HITL/Reflection/tests.
 
 Canonical C0 evidence:
@@ -3162,6 +3162,183 @@ corrected sampling parameters were applied consistently.
   `node --test apps/availability-node/test/containment.test.js`,
   `node --test apps/availability-node/test/*.test.js`,
   `git status --porcelain apps/availability-node/`
+
+## P2.T3c-S2b — Availability Node durable publication-index — APPROVED (2026-09-13), Candidate A Done, Candidate B pending
+
+Approved card: `.agent/p2-t3c/s2b-approved-card.md` ("aprobado", Matias,
+2026-09-13). RRI 55 Med-high (D=2/K=1/P=2 floored by analogy to the
+`crates/db`/storage-tier durable-write anchor; T=2; technical bottleneck
+B=2 -> ICI=50, floored to 55 by the risk-band input of 12). Full RRI
+evidence: `.agent/p2-t3c/s2b-medhigh-refinement-v2.json`.
+
+- **Objective:** compose `P2.T3c-S2a`'s frozen record codec
+  (`publication_record.ts`) with filesystem persistence into a durable,
+  restart-safe index keyed by `(publication_id, lineage_id)`.
+- **In scope:** new file `apps/availability-node/src/publication_index.ts`,
+  its focused test file `apps/availability-node/test/publication-index.test.js`;
+  consumes read-only `publication_record.ts` (S2a), `containment.ts` (S3),
+  `contract.ts`'s `PublicationEvidence` shape.
+- **Out of scope:** `hyperdrive_store.ts`, `server.ts`, Corestore/Hyperdrive/
+  Hyperswarm lifecycle (S4), HTTP fan-out, PostgreSQL/outbox, `P2P_READY`,
+  deployment/host/port binding, edits to `contract.ts`/`publication_record.ts`/
+  `containment.ts`.
+- **Acceptance:** criterion 2 (idempotent replay incl. after restart),
+  criterion 3 (conflict detection without touching the existing record),
+  criterion 6 (index stores only C0 evidence fields plus the lookup key), D4
+  success-ordering invariant (caller signals completion explicitly).
+
+### ADR-038 Amendment 4 routing — honest Low-band decomposition
+
+Per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Post-repair-budget Low-band
+decomposition` and ADR-038 Amendment 4 (2026-08-30), an RRI 46-55 result —
+including `GO_LOCAL` — never opens a whole-task local attempt; instead the
+remaining scope is decomposed into independently-scored candidate subtasks
+before any cloud escalation, routing only above-Low residue to cloud.
+
+This leaf's remaining implementation scope decomposed into two candidates:
+
+- **Candidate A — `write_atomic.ts`** (generic atomic tmp-file + rename +
+  fsync write primitive, no domain logic): scored independently at
+  **RRI 25 Low** (`.agent/p2-t3c/s2b-a-atomic-write/rri-report.md` — C=0,
+  F=1, D=1, T=1, A=0, K=0, P=1, X=0; ICI=25, risk-band input 5; no
+  decomposition trigger). Delegated via `scripts/delegate-low-rri.py`,
+  orchestrator-only authorship (diagnosis, packet authoring, review,
+  verification — no direct logic authorship except two narrowly-scoped
+  mechanical corrections, see closure record below). Tracked as its own leaf
+  **`P2.T3c-S2b-A`** below.
+- **Candidate B — `publication_index.ts`** (the domain-composition logic
+  itself: idempotent replay, conflict detection, restart-safe persistence
+  keyed by `(publication_id, lineage_id)`): remains **RRI 55 Med-high** —
+  the coupling to `publication_record.ts`/`containment.ts`/`contract.ts`
+  and the domain invariants (D4 success-ordering, criteria 2/3/6) are not
+  separable into a Low leaf without hiding real coupling/risk, per the
+  honest Low-band maximization pass's own prohibition on fragmenting an
+  invariant to reach Low. **Not yet started** — pending cloud-takeover
+  escalation per ADR-038 Amendment 4's residue-escalation step (ADR-038
+  §5 evidence bundle + the concrete Codex/Claude cloud-takeover model
+  named in the approved card's routing table).
+
+The parent `P2.T3c-S2b` task itself stays Med-high for HITL approval,
+review-chain independence, and Reflection count — this decomposition only
+changes who authors Candidate A's code, never the band, the approval that
+already covers this leaf, or Candidate B's own review/closure requirements
+once implemented.
+
+### P2.T3c-S2b-A — atomic tmp-file + rename write primitive — [x] Done (2026-09-13)
+
+Low-band (RRI 25) decomposition leaf of `P2.T3c-S2b`, per ADR-038 Amendment
+4 above. Full closure record: `.agent/p2-t3c/s2b-a-atomic-write/final-closure.md`;
+full repair-chain history: `.agent/p2-t3c/s2b-a-atomic-write/repair-chain-summary.md`.
+
+- **Allowed paths:** `apps/availability-node/src/write_atomic.ts` (new),
+  `apps/availability-node/test/write-atomic.test.js` (new).
+- **Behavior:** `writeFileAtomic(targetPath, contents: Uint8Array)` writes
+  to a randomly-named temp file in the target's own directory, `fsync`s it,
+  closes it, then atomically renames it onto `targetPath`; on any failure,
+  the temp file is unlinked and the original error re-thrown, leaving the
+  target directory exactly as before the call.
+
+#### Delegation and repair chain (summary; full detail in repair-chain-summary.md)
+
+Six total delegation attempts across the chain (2 real script failures
+caught by reading raw task output rather than trusting a wrapper's "exit
+code 0" summary; 4 successful attempts, each surfacing or fixing exactly
+one real defect): (1) original full-file attempt correctly implemented
+`write_atomic.ts` (applied directly after independent verification) but
+produced a CJS-style test using `require()` against an ESM-only package,
+plus an EC-1 that asserted nothing about failure/cleanup; (2)+(3) repair-1
+packet, first ambiguous ("modify" vs "create" for a nonexistent file)
+rejected by the wrapper, then corrected and accepted — fixed the ESM
+import style (matching `test/containment.test.js`'s established pattern)
+and made EC-1 genuinely inject a failure (write to a path with a missing
+parent directory, assert rejection, assert no stray temp file); this
+surfaced a `Buffer`/`Uint8Array` type mismatch that fails `tsc --strict`;
+(4) repair-2 packet fixed the type mismatch via `Buffer.from(...)`,
+verified against `npm run typecheck`/`run build` passing — this surfaced a
+runtime-only defect: `await fs.readdir(tmpDir)` called against the
+callback-style `node:fs` import (`ERR_INVALID_ARG_TYPE`); (5) repair-3
+packet was rejected by the wrapper (`create` on a now-existing path, since
+attempt 4's content had already been applied); (6) the one-line fix
+(`fs.readdirSync(tmpDir)`, dropping `await`) was applied directly by the
+orchestrator under the documented "mechanical lint-driven refactor of
+already-verified logic" exception, since it was already fully specified
+and phase-1 reviewed (`PASS`, 0 findings) in the repair-3 packet, avoiding
+a seventh delegation round for a single-line async/sync API-style
+correction with no behavioral change.
+
+Every packet revision received its own distinct phase-1 review artifact
+per `AGENT_WORKFLOW_GUIDE.md § Per-task discipline` (none overwritten):
+`phase1-review.json`, `phase1-review-repair1.json`,
+`phase1-review-repair1-v2.json`, `phase1-review-repair2.json`,
+`phase1-review-repair3.json` (all PASS).
+
+### Reflection log (RRI 0-25 — applied to reviewer output per band rule)
+
+- **Draft verdict:** implementation passes typecheck, build, and all 3
+  behavioral tests (HP-1, HP-2, EC-1), plus the full existing
+  availability-node suite (18/18) with no regression.
+- **Critique findings:** phase-2 reviewer's single pass-specific finding
+  (`FileHandle.writeFile()` Node-version-compatibility risk) does not apply
+  — `engines.node` is pinned to the single exact version `22.23.0`, not an
+  open range, and `.writeFile()` was empirically verified live on that
+  exact runtime. No other findings across 3 passes, 0 consensus, 0
+  disagreement.
+- **Revisions applied:** none needed; finding recorded and disposed as a
+  false positive.
+
+### Behavioral coverage certification
+
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| HP-1 | Happy path | writes new content to a path with no existing file | integration | `apps/availability-node/test/write-atomic.test.js::"HP-1: write_atomic writes content correctly"` | passed |
+| HP-2 | Happy path | overwrites an existing file's content in place | integration | `apps/availability-node/test/write-atomic.test.js::"HP-2: write_atomic overwrites existing file"` | passed |
+| EC-1 | Edge case | write to a path with a missing parent directory rejects, and leaves no stray temp file in the existing parent | integration | `apps/availability-node/test/write-atomic.test.js::"EC-1: write_atomic cleans up on failure"` | passed |
+
+Layer is `integration` (not `unit`) because all three tests exercise real
+filesystem I/O against a real temp directory (`fs.mkdtempSync`), not a
+mocked filesystem.
+
+### Gemma Reviewer evidence
+
+- Model: `gpt-oss:20b` (phase 1, all packet revisions; phase 2)
+- Command: `python3 scripts/gemma-code-review.py --passes 3 --task-id
+  "P2.T3c-S2b-A" --attempt 1 --num-ctx 32768 --num-predict 6144 --think
+  --temperature 1.0 --out ".agent/p2-t3c/s2b-a-atomic-write/phase2-review.json"
+  --idle-timeout 180 --max-wall 900 <packet>`
+- Passes run / usable: 3/3
+- Aggregate status: `FINDINGS` (1 pass-specific, non-blocking)
+- Consensus findings: 0 | Pass-specific: 1 | Disagreement: 0
+- Artifacts: `.agent/p2-t3c/s2b-a-atomic-write/phase2-review.json`
+  (aggregate), `phase2-review.pass{1,2,3}.json` (per-pass)
+- Isolated adjudicator (D14): not triggered — usable 3/3 consolidated
+  result, no BLOCKED/invalid output
+- disposition_divergence: `none`
+- Primary-agent disposition: rejected as false positive — see Reflection
+  log above and `final-closure.md` for the full verification note.
+
+Task-analysis review: gpt-oss `.agent/p2-t3c/s2b-a-atomic-write/phase1-review.json` - PASS
+Code-solution review: gpt-oss `.agent/p2-t3c/s2b-a-atomic-write/phase2-review.json` - PASS (finding disposed as false positive)
+
+### Owner final verification
+
+- Owner: `Matias`
+- Date: `2026-09-13`
+- Statement: I confirm I reviewed the evidence presented (repair-chain
+  history, phase-1/phase-2 review artifacts, Reflection log, and the
+  behavioral coverage certification table) and authorize marking this task
+  `[x] Done`. I verified every happy path and edge case defined for this
+  task has executable evidence at an appropriate layer that replicates the
+  expected behavior.
+- Commands run: `npm --prefix apps/availability-node run typecheck`,
+  `npm --prefix apps/availability-node run build`,
+  `node --test apps/availability-node/test/write-atomic.test.js`,
+  `node --test apps/availability-node/test/*.test.js`, `git diff --check`
+
+**Status:** `[x] Done`, owner-verified 2026-09-13. `P2.T3c-S2b`'s
+Candidate B (`publication_index.ts`) and the parent leaf's own closure
+(3-pass Med-high Reflection log, behavioral coverage certification, owner
+verification) remain separately pending — this leaf's `[x] Done` marks
+only `P2.T3c-S2b-A` itself, not the containing `P2.T3c-S2b` task.
 
 - **Objective:** turn the injected T3a/T3b publication seam into a persistent,
   ciphertext-only Hyperdrive/Hyperswarm publisher that returns stable C0 v1
