@@ -35,6 +35,21 @@ The seam does not own:
 - reviewer policy/verdicts;
 - product-runtime or P2P behavior.
 
+### Wave-1 implementation topology
+
+Wave 1 adopts the seam **additively** through `scripts/local-agent/run_normalized_task.py`.
+
+The facade delegates execution to the existing `run_local_task` path unchanged, observes runtime usage and existing audit emissions in the same process, and writes a separate non-authoritative `execution-summary-v1` artifact.
+
+This topology is deliberate:
+
+- current runner/control code remains authoritative;
+- no existing retry/fallback state machine is moved;
+- no existing audit record is replaced;
+- normalization can demonstrate value before any deeper refactor is justified.
+
+A later refactor may move the normalized types closer to existing modules only after behavior equivalence and business value are demonstrated.
+
 ### Logical binding vs runtime preset
 
 A Logical Binding identifies the project-facing execution role/binding. It contains no candidate priority or eligibility.
@@ -44,6 +59,8 @@ A Runtime Preset contains concrete runtime/vendor parameters such as model tag, 
 ### Cloud boundary
 
 Direct cloud execution is optional. A signed/authorized cloud handoff remains a valid Wave-1 endpoint. The normalization seam may reference existing fallback-selection artifacts and authorization receipts but never replaces them.
+
+`cloud_handoff_required` and a materialized fallback handoff are separate evidence states. A local route rejection does not increment the materialized fallback-handoff counter until an existing fallback-selection/checkpoint artifact exists.
 
 ### Evidence taxonomy
 
@@ -57,6 +74,8 @@ Execution evidence distinguishes:
 
 Policy/scoring version is recorded so analytics do not silently mix incompatible RRI semantics.
 
+The normalized summary is a correlation/economics view only. Authority-bearing fallback/reviewer artifacts are referenced by path/digest where possible rather than copied.
+
 ## Consequences
 
 ### Positive
@@ -65,13 +84,16 @@ Policy/scoring version is recorded so analytics do not silently mix incompatible
 - existing behavior authorities remain intact;
 - usage/cost/latency evidence becomes comparable without a new telemetry platform;
 - cloud handoff remains fail-closed and authorization-preserving;
-- the product/P2P runtime remains isolated from software-factory concerns.
+- the product/P2P runtime remains isolated from software-factory concerns;
+- additive adoption minimizes blast radius and enables an evidence-based decision on further refactoring.
 
 ### Trade-offs
 
 - normalized contracts add a small amount of structure to existing local-agent code;
+- Wave 1 has a facade entry point in addition to the current runner entry point;
 - historical records without policy-version/usage metadata remain partially comparable only;
-- direct cloud execution remains outside the seam until a concrete consumer requires it.
+- direct cloud execution remains outside the seam until a concrete consumer requires it;
+- repository-native/live-runtime verification is still required before treating the facade as the default execution entry point.
 
 ## Rejected alternatives
 
@@ -80,5 +102,6 @@ Policy/scoring version is recorded so analytics do not silently mix incompatible
 - routing priority inside model profiles;
 - generic retry/fallback controller replacing current state machines;
 - mandatory cloud adapter;
+- direct modification of the current state machine as the first adoption step;
 - new observability platform;
 - cross-project package extraction before a second concrete consumer exists.
