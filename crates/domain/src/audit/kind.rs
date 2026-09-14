@@ -93,9 +93,7 @@ impl std::fmt::Display for AuditEventKind {
             Self::P2pPublicationIntentCreated => "p2p_publication_intent_created",
             Self::P2pLineageSealed => "p2p_lineage_sealed",
             Self::P2pPublicationConfirmed => "p2p_publication_confirmed",
-            Self::P2pPublicationReconciliationEntered => {
-                "p2p_publication_reconciliation_entered"
-            }
+            Self::P2pPublicationReconciliationEntered => "p2p_publication_reconciliation_entered",
             Self::P2pPublicationReady => "p2p_publication_ready",
             Self::P2pPublicationFailed => "p2p_publication_failed",
         };
