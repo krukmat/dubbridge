@@ -114,26 +114,22 @@ async fn intent_and_lineage_seal_are_correlated_and_idempotent() {
     .await
     .expect("idempotent package seal evidence replay");
 
-    let row: (i64, Option<Uuid>, Option<Uuid>, Option<Uuid>, Option<Uuid>) = sqlx::query_as(
+    let rows: Vec<(Uuid, Uuid, Uuid, Option<Uuid>)> = sqlx::query_as(
         r#"
-        SELECT COUNT(*)::BIGINT,
-               min(correlation_id),
-               min(publication_id),
-               min(lineage_id),
-               min(ingest_token)
+        SELECT correlation_id, publication_id, lineage_id, ingest_token
           FROM audit_events
          WHERE publication_id = $1
            AND event_kind = 'p2p_lineage_sealed'
         "#,
     )
     .bind(publication_id.0)
-    .fetch_one(&pool)
+    .fetch_all(&pool)
     .await
     .expect("read lineage audit");
 
-    assert_eq!(row.0, 1);
-    assert_eq!(row.1, Some(publication_id.0));
-    assert_eq!(row.2, Some(publication_id.0));
-    assert_eq!(row.3, Some(lineage_id.0));
-    assert_eq!(row.4, None);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].0, publication_id.0);
+    assert_eq!(rows[0].1, publication_id.0);
+    assert_eq!(rows[0].2, lineage_id.0);
+    assert_eq!(rows[0].3, None);
 }
