@@ -8,3 +8,5 @@ pub mod package_builder;
 pub mod package_writer;
 pub mod path;
 pub mod source;
+
+pub use zeroize::Zeroizing;

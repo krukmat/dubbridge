@@ -18,6 +18,7 @@ use dubbridge_domain::{
     p2p_publication::{K1LineageId, P2pPublicationId, PublicationState},
 };
 use dubbridge_p2p::{
+    Zeroizing,
     key_wrap::{WrappedKey, generate_ck, unwrap_ck, wrap_ck},
     package_builder::{PackageFileInput, build_package},
     package_writer::materialize,
@@ -35,7 +36,7 @@ struct ActivationConfig {
     ciphertext_root: PathBuf,
     kek_id: String,
     kek_version: u32,
-    kek: [u8; 32],
+    kek: Zeroizing<[u8; 32]>,
 }
 
 impl ActivationConfig {
@@ -44,6 +45,7 @@ impl ActivationConfig {
             reject_partial_key_configuration()?;
             return Ok(None);
         };
+        let kek_hex = Zeroizing::new(kek_hex);
         let ciphertext_root = PathBuf::from(required_nonempty_env(CIPHERTEXT_ROOT_ENV)?);
         let kek_id = required_nonempty_env(KEK_ID_ENV)?;
         let kek_version = required_nonempty_env(KEK_VERSION_ENV)?
@@ -238,7 +240,7 @@ async fn resolve_lineage_ck(
     pool: &PgPool,
     publication: &P2pPublicationRecord,
     config: &ActivationConfig,
-) -> anyhow::Result<[u8; 32]> {
+) -> anyhow::Result<Zeroizing<[u8; 32]>> {
     match (
         publication.sealed_kek_id.as_deref(),
         publication.sealed_kek_version,
@@ -259,9 +261,8 @@ async fn resolve_lineage_ck(
                 nonce,
                 ciphertext: wrapped_ck.to_vec(),
             };
-            let ck = unwrap_ck(&wrapped, &config.kek)
-                .map_err(|_| anyhow::anyhow!("failed to unwrap persisted P2 lineage key"))?;
-            Ok(*ck)
+            unwrap_ck(&wrapped, &config.kek)
+                .map_err(|_| anyhow::anyhow!("failed to unwrap persisted P2 lineage key"))
         }
         _ => bail!("persisted P2 sealed-key metadata is incomplete"),
     }
@@ -271,7 +272,7 @@ async fn create_and_persist_lineage_ck(
     pool: &PgPool,
     publication: &P2pPublicationRecord,
     config: &ActivationConfig,
-) -> anyhow::Result<[u8; 32]> {
+) -> anyhow::Result<Zeroizing<[u8; 32]>> {
     let ck = generate_ck();
     let wrapped = wrap_ck(&ck, &config.kek, &config.kek_id, config.kek_version)
         .map_err(|_| anyhow::anyhow!("failed to wrap P2 lineage key"))?;
@@ -286,7 +287,7 @@ async fn create_and_persist_lineage_ck(
     )
     .await
     .context("failed to persist P2 sealed-key metadata")?;
-    Ok(*ck)
+    Ok(ck)
 }
 
 async fn advance_to_publish_pending(
@@ -339,11 +340,11 @@ fn reject_partial_key_configuration() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn decode_32_byte_hex(value: &str) -> anyhow::Result<[u8; 32]> {
+fn decode_32_byte_hex(value: &str) -> anyhow::Result<Zeroizing<[u8; 32]>> {
     if value.len() != 64 {
         bail!("{KEK_HEX_ENV} must contain exactly 64 hexadecimal characters");
     }
-    let mut output = [0_u8; 32];
+    let mut output = Zeroizing::new([0_u8; 32]);
     for (index, byte) in output.iter_mut().enumerate() {
         let start = index * 2;
         *byte = u8::from_str_radix(&value[start..start + 2], 16).map_err(|_| {
@@ -360,7 +361,7 @@ mod tests {
     #[test]
     fn decode_32_byte_hex_accepts_exact_key_material() {
         let decoded = decode_32_byte_hex(&"ab".repeat(32)).expect("decode key");
-        assert_eq!(decoded, [0xab; 32]);
+        assert_eq!(*decoded, [0xab; 32]);
     }
 
     #[test]

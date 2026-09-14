@@ -17,7 +17,6 @@ uuid.workspace = true
 async-trait = "0.1"
 sha2 = "0.10"
 tempfile = "3"
-zeroize = "1.9.0"
 dubbridge-config = { path = "../../crates/config" }
 dubbridge-connectors = { path = "../../crates/connectors" }
 dubbridge-db = { path = "../../crates/db" }
