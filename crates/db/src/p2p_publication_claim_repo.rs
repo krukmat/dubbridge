@@ -121,10 +121,6 @@ pub async fn claim_next_publication_work(
 }
 
 /// Release a claim owned by `claim_token` back to the durable pending set.
-///
-/// Releasing with a stale or foreign token fails closed. `retry_at` controls
-/// when the outbox obligation becomes claimable again; `last_error` is bounded
-/// to operational diagnostics and must not contain secret material.
 pub async fn release_publication_claim(
     pool: &PgPool,
     outbox_id: Uuid,
@@ -162,10 +158,6 @@ pub async fn release_publication_claim(
 }
 
 /// Mark a successfully reconciled obligation delivered after durable Ready.
-///
-/// Completion remains claim-token guarded so a stale worker cannot acknowledge
-/// work reclaimed by another owner. Remote success alone never calls this path:
-/// callers must first persist same-lineage confirmation and the Ready transition.
 pub async fn complete_publication_claim(
     pool: &PgPool,
     outbox_id: Uuid,
@@ -221,7 +213,17 @@ pub async fn finalize_publication_ready(
     )
     .await?;
 
-    let asset_id = sqlx::query_scalar::<_, Uuid>(
+    let asset_id = persist_ready_publication(&mut tx, finalization).await?;
+    complete_owned_outbox(&mut tx, finalization).await?;
+    insert_ready_audit_events(&mut tx, AssetId(asset_id), finalization).await?;
+    tx.commit().await.map_err(DbError::QueryFailed)
+}
+
+async fn persist_ready_publication(
+    tx: &mut Transaction<'_, Postgres>,
+    finalization: ReadyFinalization<'_>,
+) -> Result<Uuid, DbError> {
+    sqlx::query_scalar::<_, Uuid>(
         r#"
         UPDATE p2p_publications
            SET external_publication_id = $3,
@@ -242,12 +244,17 @@ pub async fn finalize_publication_ready(
     .bind(finalization.lineage_id.0)
     .bind(finalization.external_publication_id)
     .bind(finalization.confirmed_at)
-    .fetch_optional(&mut *tx)
+    .fetch_optional(&mut **tx)
     .await
     .map_err(DbError::QueryFailed)?
-    .ok_or(DbError::Conflict)?;
+    .ok_or(DbError::Conflict)
+}
 
-    let outbox_update = sqlx::query(
+async fn complete_owned_outbox(
+    tx: &mut Transaction<'_, Postgres>,
+    finalization: ReadyFinalization<'_>,
+) -> Result<(), DbError> {
+    let update = sqlx::query(
         r#"
         UPDATE p2p_publication_outbox
            SET delivery_state = 'delivered',
@@ -264,31 +271,36 @@ pub async fn finalize_publication_ready(
     .bind(finalization.outbox_id)
     .bind(finalization.claim_token)
     .bind(finalization.delivered_at)
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await
     .map_err(DbError::QueryFailed)?;
-    if outbox_update.rows_affected() != 1 {
-        return Err(DbError::Conflict);
+
+    if update.rows_affected() == 1 {
+        Ok(())
+    } else {
+        Err(DbError::Conflict)
     }
+}
 
-    let confirmed = AuditEvent::new_p2p_event(
-        AssetId(asset_id),
+async fn insert_ready_audit_events(
+    tx: &mut Transaction<'_, Postgres>,
+    asset_id: AssetId,
+    finalization: ReadyFinalization<'_>,
+) -> Result<(), DbError> {
+    for kind in [
         AuditEventKind::P2pPublicationConfirmed,
-        finalization.publication_id.0,
-        finalization.lineage_id.0,
-        None,
-    );
-    insert_audit_event_tx(&mut tx, &confirmed).await?;
-    let ready = AuditEvent::new_p2p_event(
-        AssetId(asset_id),
         AuditEventKind::P2pPublicationReady,
-        finalization.publication_id.0,
-        finalization.lineage_id.0,
-        None,
-    );
-    insert_audit_event_tx(&mut tx, &ready).await?;
-
-    tx.commit().await.map_err(DbError::QueryFailed)
+    ] {
+        let event = AuditEvent::new_p2p_event(
+            asset_id,
+            kind,
+            finalization.publication_id.0,
+            finalization.lineage_id.0,
+            None,
+        );
+        insert_audit_event_tx(tx, &event).await?;
+    }
+    Ok(())
 }
 
 /// Atomically persist terminal publication failure, release the owned claim,
