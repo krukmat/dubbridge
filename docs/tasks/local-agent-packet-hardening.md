@@ -1,16 +1,17 @@
 ---
 type: TaskList
-title: "Tasks: local-agent delegation packet hardening"
-description: "Fail-closed acceptance-test validation, scope-check root cause, and a JSON-anchor write_file fallback for the shared local-agent pipeline, plus a read-only Devstral 26-45 track record."
+title: "Tasks: local-execution routing decision and evidence hardening"
+description: "Evidence audit and routing disposition followed by versioned packet semantics, immutable session provenance, failure attribution, cause-specific recovery, and normal-use execution evidence."
 plan: docs/plan/local-agent-packet-hardening.md
-status: proposed
+status: active
 slice: local-agent-packet-hardening
 behavior-coverage-contract: behavior-v2
 ---
 
-# Tasks: Local-Agent Delegation Packet Hardening
+# Tasks: Local-Execution Routing Decision and Evidence Hardening
 
 > **Plan:** `docs/plan/local-agent-packet-hardening.md`
+> **Evidence:** `docs/audit/local-execution-routing-evidence-2026-09-14.md`
 
 ## Status legend
 
@@ -20,441 +21,459 @@ behavior-coverage-contract: behavior-v2
 
 ```mermaid
 flowchart LR
-    T1["T1 - reject prose\nacceptance_tests"]
-    T2["T2 - scope_check\nallowed_paths investigation"]
-    T3a["T3a - classify\nMalformedToolCall cause"]
-    T3b["T3b - write_file fallback\non JSON-decode bounces"]
-    T4["T4 - Devstral 26-45\ntrack record (read-only)"]
-
-    T3a --> T3b
+    A1["A1: evidence inventory"] --> A2["A2: incident attribution"]
+    A2 --> D1["D1: routing disposition"]
+    A2 --> A3["A3: reviewer profile"]
+    A2 --> O1["O1: runtime optimization"]
+    A2 --> M1["M1: model candidate"]
+    A3 --> G1["G1: canonical profile correction"]
+    A2 --> B1["B1: typed card contract"]
+    A2 --> C1["C1: provenance + scoped delta"]
+    B1 --> F1["F1: failure taxonomy"]
+    C1 --> F1
+    F1 --> R1["R1: cause-specific recovery"]
+    B1 --> E1["E1: normal-use evidence"]
+    C1 --> E1
+    F1 --> E1
+    O1 --> E1
+    G1 --> E1
 ```
 
-T1, T2, T3a, and T4 have no dependency on each other — different files, no
-shared state — but follow the repo's normal one-task-at-a-time discipline
-(§ "Work on the approved or delegated task only" in
-`docs/playbooks/AGENT_WORKFLOW_GUIDE.md`) rather than true parallel
-execution. T3b depends on T3a's cause-classification landing first: it
-consumes the counter/classification T3a introduces.
+## Task summary
 
-## Task table
+| Task | Type | Status | Outcome |
+|---|---|---|---|
+| A1 — inventory post-migration local execution | analysis/docs | [x] Done | available runtime corpus delimited and corroborated |
+| A2 — classify the observed incidents | analysis/docs | [x] Done | model, packet, runner, transport, and provenance claims separated |
+| D1 — publish routing disposition | policy analysis/docs | [x] Done | existing routes retained; no whole-task expansion above 45 |
+| A3 — evaluate the Complex reviewer profile | analysis/docs | [x] Done | medium recommended; high rejected as the proven default |
+| O1 — evaluate Flash Attention and KV `q8_0` | analysis/docs | [x] Done | retain as capacity baseline; no routing credit |
+| M1 — evaluate an uninstalled coding alternative | analysis/docs | [x] Done | Qwen3-Coder 30B selected as first future candidate; no swap |
+| G1 — correct the canonical Complex-review profile | policy/docs | [ ] Not started | approval-gated propagation of the medium profile |
+| B1 — versioned typed task-card contract | development | [ ] Not started | prose criteria cannot be executed as commands |
+| C1 — immutable run provenance and session-owned scope | development | [ ] Not started | card/state/model identity bound to every result |
+| F1 — normalized failure taxonomy | development | [ ] Not started | failures identify the responsible layer and cause |
+| R1 — cause-specific edit recovery | development | [ ] Not started | recovery reduces payload/ambiguity without full-file default |
+| E1 — normal-use evidence aggregation | development/docs | [ ] Not started | future routing decisions query ordinary execution evidence |
 
-| Task | RRI | Band | Effort | Depends on |
-|---|---:|---|---|---|
-| T1 — reject prose `acceptance_tests` before dispatch | 55 | Med-high | L | — |
-| T2 — root-cause `allowed_paths` vs. `scope_check` contradiction | 55 | Med-high | L | — |
-| T3a — classify `MalformedToolCall` by cause | 55 | Med-high | L | — |
-| T3b — `write_file` fallback on repeated JSON-decode bounces | 55 | Med-high | L | T3a |
-| T4 — Devstral RRI 26-45 track record since 2026-09-07 | 25 | Low | S | — |
-
-All Med-high tasks require their own approval, Qwen3.6 27B advisory
-refinement, and 3 Reflection passes per ADR-038; none may start
-implementation without an explicit approval on its own six-block card. See
-the plan's § Routing note for why these tooling fixes are not guaranteed a
-local-first implementation path.
+Development tasks below are deliberately **not** approval cards. Before any
+one starts, its exact files and behavior boundary must be frozen, its RRI must
+be computed from that scope, the required review route must pass, and the
+repository's task-specific approval checkpoint must be satisfied. The
+analysis/docs tasks completed here are exempt from phase-2 code review.
 
 ---
 
-## T1 — Reject prose `acceptance_tests` entries before dispatch
+## A1 — Inventory post-ADR-045 local execution
 
-- **Status:** [ ] Not started
+- **Status:** [x] Done — 2026-09-14
+- **Type:** analysis / documentation
+- **Output:** `docs/audit/local-execution-routing-evidence-2026-09-14.md`
+
+### Objective
+
+Identify executions after the ADR-045 merge using the runtime audit log as
+the primary index, then corroborate each relevant row against its terminal
+artifact and task-ledger history.
+
+### Acceptance
+
+- The corpus distinguishes a task from an invocation and a parent from the
+  executable leaf that actually ran.
+- Each row records model identity, actual band, terminal class, whether a
+  model turn occurred, whether tests ran, and whether usable authorship can be
+  assessed.
+- Missing, partial, mutable, or non-terminal evidence is stated as such.
+
+### Completion record
+
+The only post-merge RRI 26–45 local-implementer records are two invocations
+of `P2.T2c-r1` with Devstral. Both are `TRANSPORT_ERROR`, with zero total
+turns, zero repair attempts, and no acceptance result. The `P2.T3c-S1b`
+records are RRI 25 Low and name Qwen, so they are excluded from the Devstral
+capability corpus and retained only as runner-hardening evidence.
+
+Task-analysis review: n/a — analysis/docs-only task.
+Code-solution review: n/a — analysis/docs-only task.
+
+---
+
+## A2 — Classify the observed incidents
+
+- **Status:** [x] Done — 2026-09-14
+- **Type:** analysis / documentation
+- **Depends on:** A1
+- **Output:** plan § Evidence-based incident classification; evidence report
+
+### Objective
+
+Determine what each cited artifact proves without converting correlation,
+filenames, or an incomplete checkpoint into a model-capability conclusion.
+
+### Acceptance
+
+- The prose-as-command incident is classified as a confirmed packet/schema
+  defect.
+- The scope incident is classified as a confirmed provenance gap and an
+  unproven `scope_check.py` defect.
+- The malformed JSON incident is classified as one confirmed full-response
+  decode failure, not as proven repeated exhaustion.
+- A forced full-file fallback is rejected unless later cause-specific
+  evidence supports it.
+
+### Completion record
+
+All four acceptance points are reflected in the plan and evidence report.
+The current card matcher accepts the disputed `lib.rs` path; the current card
+was modified after the transcript, so the original loaded scope is not
+recoverable. The tree-comparison artifact contains one malformed event and
+remains `in_progress`. Another transcript demonstrates that whole-file repair
+can erase unrelated valid content, so `write_file` is not a safe generic
+fallback.
+
+Task-analysis review: n/a — analysis/docs-only task.
+Code-solution review: n/a — analysis/docs-only task.
+
+---
+
+## D1 — Publish the routing disposition
+
+- **Status:** [x] Done — 2026-09-14
+- **Type:** policy analysis / documentation
+- **Depends on:** A2
+- **Output:** plan § Routing disposition
+
+### Objective
+
+End the review with an operational choice for each band instead of deferring
+the original question to an unspecified later governance task.
+
+### Acceptance
+
+- `LOCAL_FIRST`: 0–25 and 26–40.
+- `CONDITIONAL_LOCAL_FIRST`: 41–45 after a valid `GO_LOCAL` decision.
+- `LOCAL_DECOMPOSITION_ONLY`: 46–55.
+- `LOCAL_ADVISORY_REVIEW_ONLY`: 56–70.
+- `CLOUD_REQUIRED`: 71+ implementation.
+- The disposition explicitly separates implementation capability from local
+  reviewer or architect capability.
+
+### Completion record
+
+The disposition is published in the plan. It retains current ADR/policy
+boundaries, so no ADR amendment is needed. It explicitly declines a broader
+whole-task local implementation route because the post-migration corpus has
+no completed Devstral authoring outcome to support one.
+
+Task-analysis review: n/a — policy-analysis/docs-only task.
+Code-solution review: n/a — policy-analysis/docs-only task.
+
+---
+
+## A3 — Evaluate the `gpt-oss:20b` Complex-review profile
+
+- **Status:** [x] Done — 2026-09-14
+- **Type:** analysis / documentation
+- **Depends on:** A2
+- **Output:** plan § Reviewer-profile disposition; evidence report
+
+### Objective
+
+Determine whether the canonical RRI 56+ `think=high` profile is supported by
+real repository review outcomes, independently of the decision to keep
+`gpt-oss:20b` as the local reviewer.
+
+### Completion record
+
+Four recorded high-reasoning attempts across two Complex/Very-high review
+packets consumed their generation budgets and returned empty visible content.
+The one completed review in the directly comparable `P2.T3c-Integ` sequence
+used `think=medium`, `num_ctx=49152`, and `num_predict=10240`, and returned a
+parsed `PASS` with `done_reason: stop`. Medium is therefore the recommended
+default; the policy propagation remains G1 because it changes a governance-
+critical binding.
+
+Task-analysis review: n/a — analysis/docs-only task.
+Code-solution review: n/a — analysis/docs-only task.
+
+---
+
+## O1 — Evaluate Flash Attention and KV-cache `q8_0`
+
+- **Status:** [x] Done — 2026-09-14
+- **Type:** analysis / documentation
+- **Depends on:** A2
+- **Output:** plan § Runtime-capacity disposition; evidence report
+
+### Objective
+
+Determine whether the two Ollama settings should be adopted as process
+optimizers and whether they change the routing recommendation.
+
+### Completion record
+
+Ollama 0.34.0 is already configured with
+`OLLAMA_FLASH_ATTENTION=1`, `OLLAMA_KV_CACHE_TYPE=q8_0`, and
+`OLLAMA_MAX_LOADED_MODELS=1`. Retain these as the 32 GB host's capacity
+baseline. They reduce attention/KV-cache memory pressure but neither correct
+packet and provenance defects nor prevent `think=high` from consuming the
+visible-output budget. No routing-band expansion is credited to them. E1 must
+record their effective per-run use because configuration alone does not prove
+that a loaded session used the intended path.
+
+Task-analysis review: n/a — analysis/docs-only task.
+Code-solution review: n/a — analysis/docs-only task.
+
+---
+
+## M1 — Evaluate a not-installed local coding alternative
+
+- **Status:** [x] Done — 2026-09-14
+- **Type:** analysis / documentation
+- **Depends on:** A2
+- **Output:** plan § Alternative local-implementer disposition; evidence report
+
+### Objective
+
+Select the best-fit candidate for a future ordinary bounded task without
+converting vendor specifications into a routing decision or opening a pilot.
+
+### Completion record
+
+`qwen3-coder:30b` is the first candidate by memory fit, active-parameter
+shape, context, and agentic-coding focus. It is not installed or promoted:
+Devstral has zero assessable post-migration outcomes, so replacing it now
+would evade rather than resolve the evidence problem.
+
+Task-analysis review: n/a — analysis/docs-only task.
+Code-solution review: n/a — analysis/docs-only task.
+
+---
+
+## G1 — Correct the canonical Complex-review profile
+
+- **Status:** [ ] Not started — explicit approval required
+- **Type:** policy / documentation
+- **Depends on:** A3
+
+### Objective
+
+Replace `think=high`/`num_predict=8192` with
+`think=medium`/`num_predict=10240` for the RRI 56+ `gpt-oss:20b` primary
+reviewer while retaining `num_ctx=49152`, the sampling values, and the current
+reviewer/fallback order.
+
+### Approval boundary
+
+This changes a governance-critical workflow invariant. The present assignment
+authorizes the conceptual evaluation and planning correction, not silent
+mutation of the canonical workflow guide and RRI policy. Before execution,
+freeze the exact affected policy/history files and obtain explicit approval.
+
+---
+
+## B1 — Introduce a versioned typed task-card contract
+
+- **Status:** [ ] Not started — not approved
 - **Type:** development
-- **Effort:** L (RRI 55, Med-high)
-- **Depends on:** —
-- **RRI:** `python3 scripts/rri.py --cc 4 --D 2 --K 1 --P 2 --T 1 --A 1 --X 1 --touches scripts/local-agent/cli.py --touches scripts/local-agent/run_local_task.py --touches scripts/local-agent/run_local_task_test.py --touches docs/plan/local-agent-packet-hardening.md --touches docs/tasks/local-agent-packet-hardening.md` → **55, Med-high**.
+- **Depends on:** A2
 
 ### Objective
 
-Before a task card's `acceptance_tests` are handed to the runner's
-`test_runner`, validate that each entry is plausibly an invocable command
-(not prose) and fail closed with a clear error naming the offending entry
-and the card's `task_id`, instead of letting the runner `shlex`/whitespace-
-split a sentence into `argv` and fail with an opaque `Errno 2`.
+Replace the ambiguous `acceptance_tests: list[str]` contract for new cards
+with a versioned representation that cannot execute descriptive acceptance
+text.
 
-### In scope
+### Required behavior
 
-- `scripts/local-agent/cli.py` (`load_card`, and wherever `acceptance_tests`
-  is first consumed before being passed into `run_loop`/the test runner).
-- A minimal heuristic is sufficient — e.g. `shlex.split` succeeds, the
-  resulting argv is non-empty, and `argv[0]` resolves via
-  `shutil.which(...)` or matches a small allow-list of known
-  interpreters/wrappers already used in existing cards (`cargo`, `python3`,
-  `npm`, `bash`, `sh`, `rustfmt`). Do not attempt NLP/prose detection beyond
-  this.
+- New cards carry `schema_version` and immutable card identity.
+- `acceptance_criteria` contains stable IDs and prose statements; it is never
+  passed to a subprocess.
+- `verification_commands` contains explicit argv arrays and the criterion IDs
+  each command proves; the runner does not reconstruct shell syntax from
+  prose.
+- Each argv is still checked by the existing command capability boundary.
+- Legacy cards use an explicit compatibility path with a visible provenance
+  marker. Invalid legacy entries fail before context retrieval or model
+  invocation.
+- Card producers and consumers share one parser/schema rather than duplicating
+  interpretation.
 
-### Out of scope
+### Verification scenarios
 
-- `scripts/delegate-low-rri.py`'s own packet generation (not implicated —
-  this defect was in a hand-authored card, not generator output). No change
-  to how `delegate-low-rri.py` builds `acceptance_tests`.
-- `session_loop.py`'s tool-call parsing (T3a/T3b's surface).
+- A v2 card with prose criteria and structured commands loads; only the
+  structured argv is executed.
+- The historical `Validation code uses...` shape is rejected before a model
+  call when presented through legacy compatibility.
+- Environment assignments and explicitly requested shells retain their
+  current safe argv behavior.
+- Escalation and normalized-execution artifacts preserve criterion/command
+  identity without flattening them back into ambiguous strings.
 
-### Happy paths considered
+### Presentation note
 
-- **HP-1:** a card whose every `acceptance_tests` entry is a real,
-  `shlex`-parseable command with a resolvable `argv[0]` (e.g.
-  `"cargo check -p dubbridge-p2p"`) loads and runs unchanged from today's
-  behavior.
-
-### Edge cases considered
-
-- **EC-1:** a card with one prose entry (e.g. `"Validation code uses only
-  real existing fields and dependencies"`) is rejected at load time with an
-  error naming the entry and the card's `task_id`, before any Ollama call
-  is made — not a runtime `command failed to start` surfaced mid-session.
-- **EC-2:** a card whose command uses a project-local script not on `PATH`
-  (e.g. `"python3 scripts/rri.py ..."`) is accepted — the heuristic must not
-  false-positive on real, valid commands already in use elsewhere in the
-  repo's existing task cards.
-
-### Evidence to emit
-
-- New unit tests in `run_local_task_test.py` covering HP-1, EC-1, EC-2.
-- A short before/after note in the closure record quoting the exact error
-  message EC-1 now produces.
-
-### Status artifacts affected
-
-- This task list (`[x] Done` + closure record).
-- `docs/plan/local-agent-packet-hardening.md` if the chosen heuristic
-  differs materially from the "Design decisions" section's description.
-
-### Agent handoff prompt
-
-Task T1. Goal: reject a non-command `acceptance_tests` entry at card-load
-time instead of letting it fail mid-session as a shell error.
-Governing docs: `docs/plan/local-agent-packet-hardening.md`,
-`docs/tasks/local-agent-packet-hardening.md` § T1.
-File: `scripts/local-agent/cli.py`, card-loading path (`load_card` and its
-caller before `run_loop`).
-Acceptance: HP-1, EC-1, EC-2 above, each with a passing test in
-`run_local_task_test.py`.
-Stop condition: once HP-1/EC-1/EC-2 have passing tests and `cli.py`'s
-existing tests still pass, stop — do not touch `delegate-low-rri.py` or
-`session_loop.py`.
+Freeze the producer/consumer migration boundary before scoring. Avoid an
+executable-name allow-list or `which`-based prose heuristic: both confuse host
+availability with packet validity and reject legitimate repository-local
+tools.
 
 ---
 
-## T2 — Root-cause `allowed_paths` vs. `scope_check` contradiction
+## C1 — Bind immutable run provenance and session-owned scope
 
-- **Status:** [ ] Not started
-- **Type:** development (investigation-first; fix is conditional on findings)
-- **Effort:** L (RRI 55, Med-high)
-- **Depends on:** —
-- **RRI:** `python3 scripts/rri.py --cc 5 --D 2 --K 1 --P 2 --T 1 --A 2 --X 1 --touches scripts/local-agent/scope_check.py --touches scripts/local-agent/scope_check_test.py --touches docs/plan/local-agent-packet-hardening.md --touches docs/tasks/local-agent-packet-hardening.md` → **55, Med-high**.
-
-### Objective
-
-Determine why `s1b-source-repair-card.json`
-(`allowed_paths: ["crates/p2p/src/package_writer.rs",
-"crates/p2p/src/lib.rs"]`) produced a `scope_check` result of `in_scope:
-false, offending_paths: ["crates/p2p/src/lib.rs"]` — a path present in its
-own `allowed_paths`. Fix `scope_check.py` if the root cause is a real
-matching/normalization bug; otherwise document the actual cause (e.g. a
-stale diff from a shared disposable worktree) and add a regression test or
-an operational guard as appropriate to what was found.
-
-### In scope
-
-- `scripts/local-agent/scope_check.py` (`_is_allowed`, `_git_paths`,
-  `check_scope`).
-- Reproducing the exact card + a synthetic diff touching
-  `crates/p2p/src/lib.rs` in a disposable worktree to confirm or rule out a
-  path-normalization mismatch (e.g. leading `./`, trailing null-byte
-  handling from `_git_paths`'s NUL-separated `git` output, or a worktree
-  whose `git diff` base differs from what the caller assumed).
-
-### Out of scope
-
-- Re-litigating `P2.T3c-S1b`'s closure or its `CLOUD_REQUIRED` outcome —
-  that task is already `[x] Done` and owner-verified; this task only
-  explains the tooling artifact left behind.
-- Any change to `allowed_paths` semantics or the ADR-038/040 routing rules
-  that consume `scope_check`'s result.
-
-### Happy paths considered
-
-- **HP-1:** a path listed verbatim in `allowed_paths` and actually the only
-  path in the worktree's diff is reported `in_scope: true` — this must keep
-  passing (regression guard on existing behavior).
-
-### Edge cases considered
-
-- **EC-1:** reproducing the exact `s1b-source-repair-card.json` scenario
-  (its `allowed_paths`, a diff touching only `lib.rs`) either (a) now
-  correctly reports `in_scope: true`, proving and fixing a real bug, or (b)
-  reproduces `in_scope: false` only when the worktree's `git diff` base
-  includes an unrelated prior change — in which case the finding is
-  documented as a worktree-reuse hazard, not a `scope_check.py` defect, and
-  T2 closes with that explanation plus a doc note instead of a code fix.
-- **EC-2:** a path in `allowed_paths` with a trailing slash or a `./`
-  prefix is still matched correctly (existing `_normalise_allowed_path`
-  behavior) — regression guard, not new behavior.
-
-### Evidence to emit
-
-- The reproduction transcript/command output showing which of EC-1's two
-  branches occurred.
-- If (a): a new regression test in `scope_check_test.py` covering the exact
-  failure shape.
-- If (b): a short note in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` or this
-  closure record warning that a Low-band decomposition candidate's
-  `scope_check` result can reflect a shared worktree's accumulated diff,
-  not just that leaf's own edit — and whether that warrants a follow-up
-  (recorded as a forward pointer, not built here).
-
-### Status artifacts affected
-
-- This task list (`[x] Done` + closure record, including which of EC-1's
-  branches was confirmed).
-
-### Agent handoff prompt
-
-Task T2. Goal: explain (and fix only if it's a real bug) why
-`scope_check` flagged a path as out-of-scope despite it being listed in
-`allowed_paths`.
-Governing docs: `docs/plan/local-agent-packet-hardening.md`,
-`docs/tasks/local-agent-packet-hardening.md` § T2,
-`.agent/p2-t3c/s1b-source-repair-card.json`,
-`.agent/p2-t3c/s1b-source-repair-transcript.json`.
-File: `scripts/local-agent/scope_check.py`.
-Acceptance: HP-1, EC-1 (both branches), EC-2 above.
-Stop condition: once the root cause is confirmed and either a fix + test
-(branch a) or a documented explanation (branch b) is recorded, stop — do
-not modify `allowed_paths` semantics elsewhere in the pipeline.
-
----
-
-## T3a — Classify `MalformedToolCall` by cause
-
-- **Status:** [ ] Not started
+- **Status:** [ ] Not started — not approved
 - **Type:** development
-- **Effort:** L (RRI 55, Med-high)
-- **Depends on:** —
-- **RRI:** `python3 scripts/rri.py --cc 3 --D 2 --K 1 --P 2 --T 1 --A 1 --X 1 --touches scripts/local-agent/session_loop.py --touches scripts/local-agent/run_local_task_test.py --touches docs/plan/local-agent-packet-hardening.md --touches docs/tasks/local-agent-packet-hardening.md` → **55, Med-high**.
+- **Depends on:** A2
 
 ### Objective
 
-Distinguish, in `session_loop.py`'s `MalformedToolCall` handling
-(`run_loop`, around lines 318-361), a `json.JSONDecodeError`-caused failure
-(raised at `session_loop.py:67`/`cli.py:150-153`, i.e. the model's raw
-response or its `arguments` string wasn't valid JSON) from every other
-`MalformedToolCall` cause (unknown tool name, missing required argument,
-wrong argument type). Track a separate counter for the JSON-decode class.
-This task adds no new externally visible behavior — it is pure
-instrumentation that T3b consumes.
+Make the exact card and starting repository state used by a run recoverable,
+and make scope results describe changes caused by that session rather than an
+unattributed accumulated worktree diff.
 
-### In scope
+### Required behavior
 
-- `session_loop.py`: `MalformedToolCall` needs a way to carry or expose its
-  cause class (e.g. a `cause: Literal["json_decode", "other"]` attribute
-  set where it's raised, or a dedicated `JsonDecodeToolCall(MalformedToolCall)`
-  subclass raised only from the two `json.JSONDecodeError` sites).
-  A second counter (`json_decode_bounces`) alongside the existing
-  `malformed_bounces`, incremented only for that class.
+- Before the model call, record the loaded card SHA-256, schema version,
+  resolved model/runtime preset, HEAD/base revision, and a deterministic
+  snapshot of pre-existing changed paths and content identities.
+- Bind checkpoints, terminal results, audit rows, and fallback packets to the
+  same execution-session ID and card hash.
+- Record the top-level model identity in every terminal and in-progress
+  transcript, not only in a separate audit log or fallback packet.
+- Scope checking compares the session end against the attested start state.
+  Pre-existing unchanged dirt is not attributed to the model; new or changed
+  out-of-scope content fails closed.
+- If the start state cannot be attested or the card/result binding is broken,
+  emit a provenance failure rather than a path-policy verdict.
 
-### Out of scope
+### Verification scenarios
 
-- Any change to what happens on a JSON-decode bounce (that's T3b).
-- The non-JSON-decode `MalformedToolCall` paths' existing behavior/messages.
-
-### Happy paths considered
-
-- **HP-1:** an unknown-tool-name `MalformedToolCall` (e.g. `name not in
-  ALLOWED_TOOL_NAMES`) increments only `malformed_bounces`, not
-  `json_decode_bounces` — existing retry behavior for this class is
-  unchanged.
-
-### Edge cases considered
-
-- **EC-1:** a `json.JSONDecodeError`-caused failure (long/malformed anchor
-  string) increments `json_decode_bounces` and is distinguishable from
-  other causes by whatever the model reads (transcript event, exception
-  type/attribute).
-- **EC-2:** a session with a mix of both classes across turns keeps both
-  counters accurate independently (one class recovering doesn't reset the
-  other's count).
-
-### Evidence to emit
-
-- Unit tests in `run_local_task_test.py` covering HP-1, EC-1, EC-2 using
-  synthetic `chat_fn` responses (the existing test file already fakes
-  `chat_fn`; extend rather than introduce a new test harness).
-
-### Status artifacts affected
-
-- This task list (`[x] Done` + closure record).
-
-### Agent handoff prompt
-
-Task T3a. Goal: classify `MalformedToolCall` failures by cause
-(JSON-decode vs. other) with a dedicated counter, no behavior change.
-Governing docs: `docs/plan/local-agent-packet-hardening.md`,
-`docs/tasks/local-agent-packet-hardening.md` § T3a.
-File: `scripts/local-agent/session_loop.py:44-76` (raise sites),
-`:318-361` (`run_loop`'s bounce handling).
-Acceptance: HP-1, EC-1, EC-2 above.
-Stop condition: once both counters are correctly and independently tracked
-with passing tests, stop — do not implement the `write_file` fallback
-itself (T3b).
+- A card edited after execution no longer appears to explain the earlier
+  transcript: the hash mismatch is explicit.
+- An unchanged pre-existing out-of-scope file does not become a model scope
+  violation.
+- A model modification to that same out-of-scope file is detected.
+- An allowed path changed during the session is reported in-scope with its
+  before/after identity.
 
 ---
 
-## T3b — `write_file` fallback on repeated JSON-decode bounces
+## F1 — Normalize failure causes and evidence
 
-- **Status:** [ ] Not started
+- **Status:** [ ] Not started — not approved
 - **Type:** development
-- **Effort:** L (RRI 55, Med-high)
-- **Depends on:** T3a
-- **RRI:** `python3 scripts/rri.py --cc 5 --D 2 --K 1 --P 2 --T 2 --A 1 --X 1 --touches scripts/local-agent/session_loop.py --touches scripts/local-agent/run_local_task_test.py --touches docs/plan/local-agent-packet-hardening.md --touches docs/tasks/local-agent-packet-hardening.md` → **55, Med-high**.
+- **Depends on:** B1, C1
 
 ### Objective
 
-When `json_decode_bounces` (T3a) reaches 2 for the same target path within
-one session, stop retrying the same `apply_patch`-with-anchor shape and
-instead inject a message instructing the model to use `write_file` with the
-complete file content for that path on its next turn — trading a surgical
-patch for a full-file write once the anchor-escaping approach has
-demonstrably failed twice. Falls back to the existing
-`malformed_tool_call_repeated`/`aborted` path if the model still can't
-produce valid output after the degraded instruction.
+Replace terminal labels that conflate cause and consequence with a stable
+failure taxonomy usable by recovery and routing analysis.
 
-### In scope
+### Required behavior
 
-- `session_loop.py`'s `run_loop`: on the 2nd `json_decode_bounces` count
-  for an in-flight target path, replace the generic `"Malformed tool call:
-  {exc}. Retry."` message with an explicit instruction naming `write_file`
-  and the target path, reusing the existing `messages.append(...)` /
-  `checkpoint_fn` pattern already in the bounce-handling block.
-- Existing `MAX_MALFORMED_BOUNCES` ceiling and `aborted` terminal status are
-  unchanged — this only changes what the model is told to try, not the
-  budget.
+At minimum, distinguish:
 
-### Out of scope
+- transport idle/wall timeout and resource/capacity failure;
+- full model-response JSON decode failure;
+- tool-arguments JSON decode failure;
+- schema, unknown-tool, missing-argument, and wrong-type failure;
+- boundary violation, provenance failure, scope failure;
+- formatter failure, verification-command failure;
+- total-turn and repair-budget exhaustion.
 
-- Raising `MAX_MALFORMED_BOUNCES` or `max_total_turns` — those remain
-  band-resolved constants set elsewhere (`run_local_task.py:113` and the
-  band's `effective_limits`).
-- Any change to the non-JSON-decode `MalformedToolCall` retry message.
+For a response failure, record turn number, response byte/token length when
+available, Ollama completion reason, configured generation/context budgets,
+and whether a target path can be established from a valid envelope. Preserve
+bounded raw evidence without turning secrets into diagnostics.
 
-### Happy paths considered
+### Verification scenarios
 
-- **HP-1:** a session that hits `json_decode_bounces == 1` on a given path,
-  then succeeds with a valid `apply_patch` on the very next turn, never
-  triggers the fallback message — unchanged from today.
-- **HP-2:** a session that hits `json_decode_bounces == 2` on the same
-  path, receives the `write_file`-fallback instruction, and succeeds with a
-  `write_file` call on the following turn — session completes instead of
-  exhausting its turn budget the way `s1b-tree-compare-repair` did.
-
-### Edge cases considered
-
-- **EC-1:** `json_decode_bounces` reaching 2 across *different* target
-  paths (not the same path twice) does not trigger the fallback — the
-  counter/threshold is scoped per path, not session-global, since a
-  fallback instruction for the wrong path would be actively misleading.
-- **EC-2:** the model ignores the fallback instruction and sends another
-  malformed `apply_patch` anyway — normal bounce/abort handling still
-  applies; the fallback message is advisory, not enforced by the runner.
-
-### Evidence to emit
-
-- Unit tests in `run_local_task_test.py` covering HP-1, HP-2, EC-1, EC-2
-  with synthetic `chat_fn` sequences.
-- A closure-record note quoting the exact fallback instruction text sent to
-  the model.
-
-### Status artifacts affected
-
-- This task list (`[x] Done` + closure record).
-- `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § "Mandatory workflow before
-  implementing, Step 0" only if the fallback changes any operator-visible
-  precheck/warm-up behavior (expected: no).
-
-### Agent handoff prompt
-
-Task T3b. Goal: on a 2nd consecutive JSON-decode-classified malformed tool
-call for the same target path, instruct the model to use `write_file`
-instead of continuing to retry `apply_patch` with an anchor.
-Governing docs: `docs/plan/local-agent-packet-hardening.md`,
-`docs/tasks/local-agent-packet-hardening.md` § T3b. Depends on T3a's
-`json_decode_bounces` counter being in place.
-File: `scripts/local-agent/session_loop.py`, `run_loop`'s
-`MalformedToolCall` handling (around lines 318-361).
-Acceptance: HP-1, HP-2, EC-1, EC-2 above.
-Stop condition: once HP-1/HP-2/EC-1/EC-2 have passing tests and existing
-`MAX_MALFORMED_BOUNCES`/`aborted` behavior is unchanged, stop.
+- The historical unterminated full response is classified separately from an
+  invalid JSON string inside otherwise valid tool arguments.
+- Unknown tool and missing path do not increment a JSON-decode counter.
+- A partial checkpoint and a terminal exhaustion artifact cannot share the
+  same lifecycle status.
+- Transport with zero model turns is never counted as a model-authorship
+  failure.
 
 ---
 
-## T4 — Devstral RRI 26-45 track record since 2026-09-07 (read-only)
+## R1 — Add cause-specific bounded edit recovery
 
-- **Status:** [ ] Not started
-- **Type:** analysis / documentation (non-development; decision-weight
-  heuristic, not the code-CC formula)
-- **Effort:** S (RRI 25, Low)
-- **Depends on:** —
-- **RRI:** `python3 scripts/rri.py --cc 1 --D 0 --K 0 --P 1 --T 0 --A 1 --X 0 --touches docs/audit/devstral-26-45-track-record-2026-09.md --touches docs/plan/local-agent-packet-hardening.md --touches docs/tasks/local-agent-packet-hardening.md` → **25, Low**.
+- **Status:** [ ] Not started — not approved
+- **Type:** development
+- **Depends on:** F1
 
 ### Objective
 
-Read-only: enumerate every RRI 26-45 (Moderate, and Med-high 41-45
-`GO_LOCAL`) task closed since 2026-09-07 (the ADR-045 Devstral merge) that
-routed through `run_local_task.py`, and tabulate outcome (success first
-attempt / success after repair / repair-budget exhausted -> decomposed /
-escalated to cloud) with a source citation per row (task ledger closure
-record or `.agent/` receipt). No code changes; no new local-agent
-invocation.
+Recover from an observed edit-transport failure by reducing payload size or
+operation ambiguity while preserving scope and existing content.
 
-### In scope
+### Required behavior
 
-- Reading `docs/plan/roadmap.md`, `docs/tasks/*.md` closure records, and
-  `.agent/` receipts/transcripts dated on or after 2026-09-07.
-- Producing `docs/audit/devstral-26-45-track-record-2026-09.md` — a table:
-  task ID, RRI, outcome class, turns used / budget, source citation.
+- Recovery selection consumes F1's exact failure class.
+- A whole-response decode failure does not invent a target path.
+- The recovery instruction/tool reduces the failing representation (for
+  example, a smaller range/line-oriented replacement or idempotent insertion)
+  rather than increasing it to a complete-file JSON payload.
+- Full-file overwrite remains available only when it was already the correct
+  bounded operation, not as the generic response to malformed JSON.
+- Existing turn/repair ceilings and fail-closed boundary behavior remain in
+  force.
 
-### Out of scope
+### Verification scenarios
 
-- Drawing a conclusion about whether to extend local-first implementation
-  into 46-55 or 56-70 — that is a separate governance decision (an ADR),
-  not this task's output. T4 supplies evidence; it does not recommend.
-- Any new task execution — this is purely retrospective over already-closed
-  work.
+- Long-anchor recovery can complete through a smaller bounded operation.
+- Retrying an idempotent one-line insertion cannot duplicate the inserted
+  line.
+- Recovery cannot alter unrelated valid content in the same file.
+- If the cause or target is unknown, the session remains fail-closed and emits
+  enough evidence for the next routing step.
 
-### Happy paths considered
+---
 
-- **HP-1:** every RRI 26-45 task closed since 2026-09-07 with a discoverable
-  `run_local_task.py` route is included in the table with a working
-  citation link.
+## E1 — Aggregate evidence from normal local executions
 
-### Edge cases considered
+- **Status:** [ ] Not started — not approved
+- **Type:** development / documentation
+- **Depends on:** B1, C1, F1
 
-- **EC-1:** if no qualifying closed task is found at all (Devstral track
-  record is empty so far), the table says so explicitly rather than being
-  silently omitted — an empty result is itself the finding.
+### Objective
 
-### Evidence to emit
+Make the normalized execution seam the queryable source for future routing
+decisions without creating a synthetic pilot or manual grep exercise.
 
-- `docs/audit/devstral-26-45-track-record-2026-09.md` (the table itself).
+### Required behavior
 
-### Status artifacts affected
+- One summary per invocation, grouped by execution-session ID and task ID.
+- Separate parent task/band from executable leaf/band.
+- Record exact implementer model and distinguish authoring success from final
+  verification success.
+- Record requested and effective Flash Attention/KV-cache mode, context
+  allocation, model residency, and available capacity telemetry.
+- Attribute failures to `model`, `packet`, `runner`, `transport`, `resource`,
+  `verification`, or `provenance` with an evidence reference.
+- Record repair, decomposition, human-selected fallback, and cloud takeover
+  without treating them as model-authorship attempts.
+- Supply a deterministic repository command/report that can answer routing
+  questions by band and model from ordinary completed work.
 
-- None beyond the new audit doc — this task does not change any task's
-  status, RRI, or routing.
+### Verification scenarios
 
-### Agent handoff prompt
-
-Task T4. Goal: build a factual, citation-backed table of every RRI 26-45
-local-agent outcome since the 2026-09-07 Devstral migration. Read-only.
-Governing docs: `docs/plan/local-agent-packet-hardening.md`,
-`docs/tasks/local-agent-packet-hardening.md` § T4.
-Output: `docs/audit/devstral-26-45-track-record-2026-09.md`.
-Stop condition: once every discoverable qualifying task is in the table
-with a citation (or the table explicitly states none were found), stop —
-do not propose or draft any band-expansion ADR.
+- The two `P2.T2c-r1` invocations count as transport failures and zero
+  assessable Devstral authoring outcomes.
+- A Low leaf under a Med-high parent is counted in both dimensions without
+  being mislabeled a Med-high local model run.
+- A model-authored patch that passes formatting/scope but fails because the
+  packet contains an invalid command is attributed to the packet layer.
 
 ## Related
 
 - `docs/plan/local-agent-packet-hardening.md`
+- `docs/audit/local-execution-routing-evidence-2026-09-14.md`
 - `docs/adr/ADR-038-med-high-architect-refined-single-attempt.md`
 - `docs/adr/ADR-045-devstral-local-implementer-binding.md`
+- `docs/adr/ADR-047-software-factory-execution-normalization-seam.md`
+- `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
+- `docs/policies/HITL_AUTONOMY_POLICY.md`
 - `docs/policies/RRI_POLICY.md`

@@ -422,6 +422,30 @@ captured above under Governing principles and ADR-025/ADR-026.
   Analyst"). The `pending/dubbridge_devstral_main_migration/` bundle predates
   this merge and was not the vehicle applied — its contents are stale and
   can be removed once confirmed superseded.
+- **Local-execution routing evidence hardening — active (2026-09-14):** the
+  post-migration runtime audit contains two Devstral invocations, both for the
+  same RRI 40 task and both ending with zero model turns on transport timeout;
+  it therefore contains no assessable Devstral authoring outcome. The cited
+  `P2.T3c-S1b` repair attempts are Low-band Qwen runs and expose packet,
+  provenance, and structured-output issues rather than Moderate/Med-high
+  Devstral quality. Current routing is retained: local-first through Moderate,
+  conditional `GO_LOCAL` for 41–45, Low-leaf decomposition only for 46–55,
+  and local advisory/review rather than implementation for 56+. No synthetic
+  pilot is opened. Flash Attention plus KV `q8_0` are already configured and
+  retained as the 32 GB host's capacity baseline, with no routing-band credit;
+  effective per-run optimizer state still needs normalized evidence. Four
+  recorded `gpt-oss:20b` high-reasoning Complex-review attempts exhausted
+  their output budgets with empty visible content, while the comparable
+  completed review succeeded at medium reasoning; changing the canonical
+  high/8192 binding to the recommended medium/10240 profile is tracked as an
+  approval-gated policy correction. `qwen3-coder:30b` is the best-fit
+  not-installed future coding candidate, not a current replacement. Planned
+  hardening separates criteria from commands, binds cards/start state/model
+  identity to results, normalizes failure ownership, and accumulates evidence
+  from ordinary work. See
+  `docs/plan/local-agent-packet-hardening.md`,
+  `docs/tasks/local-agent-packet-hardening.md`, and
+  `docs/audit/local-execution-routing-evidence-2026-09-14.md`.
 
 ## Related
 
