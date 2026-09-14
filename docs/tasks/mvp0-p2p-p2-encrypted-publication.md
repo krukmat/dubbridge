@@ -4225,19 +4225,46 @@ make qa-docs
   Implement only after the resulting review/approval route passes. Stop after
   T3c evidence and status sync; do not start T3d or T4.`
 
-## P2.T3d — Availability Node contract/security certification — DEFINITION PREPARED
+## P2.T3d — Availability Node contract/security certification — PARTIAL, SCOPE DEVIATION, NOT CLOSED
 
 - **Orchestrator runbook:** [P2.T3d human-led procedure with Claude Code assistance](../playbooks/P2_T3D_ORCHESTRATOR_RUNBOOK.md).
   Prepared for future execution with T3c closure as a precondition; does not
   authorize early execution.
 - **Type:** development / certification
-- **Effort:** M provisional; run RRI after T3c closes against the exact test-only
-  paths and current implementation.
-- **Depends on:** T3c Done. This dependency is not satisfied.
-- **Status:** Planned and blocked on T3c; do not present or execute early.
+- **Effort:** M provisional; run RRI before continuing/closing, against the
+  exact test-only paths and current implementation.
+- **Depends on:** T3c Done — satisfied (T3c closed `[x] Done` 2026-09-13).
+- **Status:** **Unblocked but not started as defined.** Between 2026-09-13
+  evening and 2026-09-14 (commits `f27ff75` and `b35c71c`, both dated
+  2026-09-14 08:0x local), a file
+  `apps/availability-node/test/publication-contract-certification.test.js`
+  landed — but it is **not** the two files this task actually defines
+  (`publication-contract.test.js` + `fixtures.js`), and it does not exercise
+  the acceptance criteria below. It imports the already-existing
+  `apps/availability-node/src/contract.ts` (from C0, 2026-09-06) and the
+  already-existing frozen fixture
+  `docs/fixtures/mvp0-p2p-publication-contract-v1.json`, and adds 4 pure
+  unit tests of `parsePublicationRequest`/`parsePublicationResponse`
+  (request/response shape validation, secret-field deny-list, path-traversal
+  rejection, lineage/digest mismatch rejection) — **no mTLS client, no HTTP
+  server, no real Hyperdrive, no `201`/`409`/`422`/`503` transport-level
+  behavior**. None of HP-T3d-1, HP-T3d-2, EC-T3d-1, EC-T3d-3, or the
+  restart-replay/temporary-drive requirements in acceptance criterion 6 are
+  exercised. Only the request/response-shape half of EC-T3d-2 (`422` on
+  malformed input) is covered, and only at the pure-parsing layer, not
+  through the actual service. This file has not been added to the task's
+  `Exact writable paths` and was not reviewed or approved as an amended
+  scope. **Do not report T3d as advanced or closed on the basis of this
+  file** — it is a real, passing, but narrower and differently-scoped test
+  addition than what this task requires. Full acceptance criteria below are
+  unchanged and remain entirely open.
 - **Exact writable paths:**
   `apps/availability-node/test/publication-contract.test.js` and
-  `apps/availability-node/test/fixtures.js`.
+  `apps/availability-node/test/fixtures.js`. (The landed
+  `publication-contract-certification.test.js` is outside this path set —
+  resolve by either amending the task's writable paths through a recorded
+  scope decision, or removing/superseding the file when the correctly-scoped
+  test lands.)
 - **Objective:** certify the complete T3a-T3c Availability Node boundary through
   executable Node ESM tests without changing production source. A discovered
   defect reopens the owning T3a, T3b, or T3c task under a new scope/RRI; T3d does
@@ -4288,11 +4315,186 @@ make qa-docs
 | ID | Objective | Exact writable paths | RRI | Status | Depends on |
 |---|---|---|---|---|---|
 | `T4a` | Pure recovery decision kernel | `crates/domain/src/p2p_recovery.rs`; `crates/domain/src/lib.rs` | RRI 29 Moderate | Done 2026-09-07 | C0 PASS; T1 accepted base |
-| `T4b` | Bounded PostgreSQL claim/lease/release | `infra/migrations/0034_add_p2p_publication_claim_leases.sql`; `crates/db/src/p2p_publication_repo.rs` | RUN BEFORE EXECUTION | Planned | T4a |
-| `T4c` | Backend mTLS Availability Node client | `crates/connectors/src/p2p_availability.rs`; `crates/connectors/src/lib.rs`; `crates/connectors/Cargo.toml`; `Cargo.lock` | RUN BEFORE EXECUTION | Planned | T3 contract PASS |
-| `T4d` | PostgreSQL outbox dispatcher | `crates/jobs/src/p2p_publication_job.rs`; `crates/jobs/src/lib.rs`; `crates/jobs/Cargo.toml`; `Cargo.lock` | RUN BEFORE EXECUTION | Planned | T4b; T4c |
-| `T4e` | Worker runtime + PostgreSQL reconciler integration | `apps/worker-runner/src/p2p_publication_runtime.rs`; `apps/worker-runner/src/main.rs`; `apps/worker-runner/Cargo.toml`; `Cargo.lock` | RUN BEFORE EXECUTION | Planned | T4d |
-| `T4f` | Lost-dispatch/lost-ACK/stale-lease/duplicate certification | `apps/worker-runner/tests/p2p_publication_recovery_test.rs` | RUN BEFORE EXECUTION | Planned | T4e |
+| `T4b` | Bounded PostgreSQL claim/lease/release | `infra/migrations/0034_add_p2p_publication_claim_leases.sql`; `crates/db/src/p2p_publication_claim_repo.rs` | RRI 100 Very high (`scripts/rri.py`, 2026-09-14, retroactive) | **Code landed 2026-09-14, not certified** | T4a |
+| `T4c` | Backend mTLS Availability Node client | `crates/connectors/src/p2p_availability.rs`; `crates/connectors/src/lib.rs`; `crates/connectors/Cargo.toml`; `Cargo.lock` | RRI 70 Complex (`scripts/rri.py`, 2026-09-14, retroactive) | **Code landed 2026-09-14, not certified** | T3 contract PASS |
+| `T4d` | PostgreSQL outbox dispatcher | `crates/jobs/src/p2p_publication_job.rs`; `crates/jobs/src/lib.rs`; `crates/jobs/Cargo.toml`; `Cargo.lock` | RRI 70 Complex (`scripts/rri.py`, 2026-09-14, retroactive) | **Code landed 2026-09-14, not certified** | T4b; T4c |
+| `T4e` | Worker runtime + PostgreSQL reconciler integration | `apps/worker-runner/src/p2p_publication_runtime.rs`; `apps/worker-runner/src/main.rs`; `apps/worker-runner/Cargo.toml`; `Cargo.lock` | RRI 70 Complex (`scripts/rri.py`, 2026-09-14, retroactive) | **Code landed 2026-09-14, not certified** | T4d |
+| `T4f` | Lost-dispatch/lost-ACK/stale-lease/duplicate certification | `apps/worker-runner/tests/p2p_publication_recovery_test.rs` | RRI 70 Complex (`scripts/rri.py`, 2026-09-14, retroactive) | **Code landed 2026-09-14, not certified** | T4e |
+
+> **2026-09-14 status note:** `T4b`-`T4f` all have their exact-`allowed_paths`
+> files present on `feature/p2p-mvp-core` as of commit `f866b1e`
+> (`git diff --stat d4fdb01..f866b1e`: 15 files, +2054/-7 across these five
+> leaves). Unlike `T3d` above, these five leaves' landed files match their
+> defined `Exact writable paths` exactly — no scope deviation detected by
+> path comparison. However **none of the five has**: an `scripts/rri.py`
+> score recorded against the actual diff, a phase-1/phase-2 review artifact
+> for this specific work (the only `T4*`-named artifacts under `.agent/` and
+> `docs/audit/` predate 2026-09 and belong to the unrelated
+> `antares-security-specialist-advisor.md` task ledger's own `T4`/`T3d`
+> entries — confirmed by content, not just name, and excluded here), a
+> Reflection log, behavioral coverage certification, or owner final
+> verification. `cargo test` has not been run against this diff in this
+> session. Each leaf needs its own RRI/review/Reflection/coverage/
+> verification cycle before flipping to `[x] Done` — none can flip to
+> `[x] Done` by code-reading alone, per
+> `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Development task closure
+> checklist`.
+>
+> **2026-09-14 code-quality re-read (non-strict pass):** a second, more
+> lenient code-only read (still no `cargo test` run this session) found
+> `T4b` (claim/lease repo), `T4c` (mTLS client), `T4d` (dispatcher), and
+> `T4f` (recovery integration tests) implementation-sound enough to proceed
+> straight to the closure pipeline (RRI, band-routed review, Reflection,
+> coverage cert, owner verification) without further code changes first —
+> `T4b` is transactionally atomic with `FOR UPDATE SKIP LOCKED` claim
+> semantics and fail-closed ownership checks; `T4c`'s parsing/validation
+> logic is directly unit-tested (3 tests) and its untested mTLS transport
+> surface (`publish`/`from_mtls_pem`) is exercised indirectly via T4f's
+> `FakePublisher` seam, which is normal for a TLS client and not a gap
+> worth blocking on; `T4d`'s core dispatch/retry/confirm logic is exercised
+> by T4f, and its one nominally-untested branch (immediate fail on a
+> non-retryable remote error) shares the same `fail_claim` path already
+> proven by `t4f_retry_budget_exhaustion_persists_terminal_failure`, so it
+> is not a real gap; `T4f` directly proves HP-T4-1, EC-T4-1, and EC-T4-2
+> against a real PostgreSQL integration harness. **`T4e` (worker runtime
+> loop) is the one leaf with a genuine, real gap** — zero test coverage of
+> `from_env`/`run`/error handling — and should not be batched with the
+> other four; see the follow-up task reference below.
+
+### P2.T4b — Reflection log
+
+Required passes: 4 (`RRI 100` → `Very high`)
+
+#### Pass 1
+
+- **Draft verdict:** `claim_next_publication_work` uses `FOR UPDATE SKIP LOCKED`
+  inside a `WITH candidate AS (...) UPDATE ... FROM candidate` single-statement
+  CTE, so claim selection and mutation are atomic in one round trip; no
+  transaction is needed because PostgreSQL executes the whole statement as one
+  atomic operation. `release_publication_claim`, `complete_publication_claim`,
+  `finalize_publication_ready`, and `fail_publication_claim` all guard mutation
+  with `WHERE ... AND claim_token = $N`, so a stale/foreign token affects zero
+  rows instead of stealing another owner's claim.
+- **Critique findings:**
+  - `finalize_publication_ready` and `fail_publication_claim` both call
+    `ensure_claim_owned` then run further statements in the same transaction —
+    correct, but `ensure_claim_owned`'s `SELECT ... FOR UPDATE` locks the outbox
+    row only; the subsequent `p2p_publications` update is guarded by its own
+    `WHERE state IN (...)` predicate rather than a row lock carried from
+    `ensure_claim_owned`. This is not a defect — the `p2p_publications` row
+    isn't shared mutable state between concurrent claim owners the way the
+    outbox row is (only the claim owner reaches this code) — but it is worth
+    naming explicitly since the two tables use different concurrency
+    strategies within the same function.
+  - The `0034` migration's `CHECK` constraint enforces the claimed ⇄ unclaimed
+    invariant declaratively (`isfinite(lease_expires_at)`, `lease_expires_at >
+    claimed_at`), which is a stronger guarantee than testing alone would give:
+    a bug in application code that tried to write an inconsistent
+    claimed/lease-fields combination would fail at the database level, not
+    silently persist corrupt state.
+- **Revisions applied:** none — no defect found in this pass.
+
+#### Pass 2
+
+- **Draft verdict:** re-reading as an independent reviewer, focusing on
+  concurrent-worker correctness under crash/retry.
+- **Critique findings:**
+  - `claim_next_publication_work`'s candidate predicate
+    (`delivery_state = 'pending' AND available_at <= now()`) OR
+    (`delivery_state = 'claimed' AND lease_expires_at <= now()`) correctly
+    reclaims expired leases without a separate sweep job — a crashed worker's
+    claim becomes reclaimable purely by lease expiry, which is exactly
+    HP-T4-1's requirement (crash before dispatch recovers from PostgreSQL).
+  - `fail_publication_claim`'s `p2p_publications` update predicate
+    (`state IN ('publish_pending', 'publishing', 'reconciling')`) intentionally
+    excludes `'ready'` and `'failed'` — so a failure claim can never regress a
+    row that already reached terminal success, satisfying EC-T4-2's
+    idempotency requirement. Verified this isn't merely assumed by reading the
+    exact `WHERE` clause, not the docstring.
+  - `resolve_owned_mutation`'s existence check on zero-rows-affected correctly
+    distinguishes `NotFound` (row never existed / already resolved elsewhere)
+    from `Conflict` (row exists but token mismatch) — matters for the caller's
+    retry/fail decision.
+- **Revisions applied:** none — no defect found in this pass.
+
+#### Pass 3
+
+- **Draft verdict:** focusing on the anchor-rubric-driven concern that
+  motivated the Very-high band — `infra/migrations/**` (ADR-008, ADR-018)
+  floor D=4/P=5/K=4 — i.e., whether this migration and its access pattern pose
+  a governance/audit risk beyond ordinary schema change.
+- **Critique findings:**
+  - The migration only adds two nullable columns plus a `CHECK` constraint and
+    two indexes to an existing table (`p2p_publication_outbox`); it does not
+    touch `p2p_publications`, rights, consent, or audit tables, and adds no new
+    row-level authority. The elevated P/K/D floor is inherited from the
+    generic "any `infra/migrations/**` file" rubric row, not from anything
+    specific to this migration's own blast radius.
+  - No ADR-018 audit row is emitted by any function in this file for
+    claim/release/fail/complete transitions. This is consistent with T4a's
+    own scope (`p2p_recovery.rs` is a pure decision kernel with no audit
+    emission either) and with the fact that publication *state* transitions
+    (which are audited) happen in `p2p_publication_repo.rs`, not here — this
+    file only manages the outbox claim/lease bookkeping layered on top. Not a
+    defect, but worth recording as the reasoning for why no audit gap exists
+    despite the ADR-018 anchor.
+  - Secrets: no credential, token-as-secret, or PII flows through this file;
+    `claim_token` is a random `Uuid` used only for ownership arbitration, not
+    a security credential in the ADR-025 sense.
+- **Revisions applied:** none — no defect found in this pass.
+
+#### Pass 4
+
+- **Draft verdict:** final pass — test coverage and integration correctness
+  against the actual acceptance criteria (HP-T4-1, HP-T4-2, EC-T4-1, EC-T4-2).
+- **Critique findings:**
+  - This file has 0 directly-colocated unit tests (`grep` confirms). Coverage
+    is indirect, via `apps/worker-runner/tests/p2p_publication_recovery_test.rs`
+    (T4f), which exercises `claim_next_publication_work` and
+    `finalize_publication_ready` against a real PostgreSQL integration
+    harness. This is an accepted pattern for a thin persistence-boundary
+    module whose correctness is dominated by SQL semantics best proven
+    end-to-end rather than mocked — consistent with the repository's "prefer
+    real backends over mocks" testing rule — but it does mean this file's own
+    behavioral coverage certification below must cite T4f's tests, not
+    file-local ones.
+  - No separable Low-band residue exists to decompose out of this leaf — the
+    claim/lease/release/finalize functions are mutually load-bearing for the
+    same crash-recovery invariant (HP-T4-1) and splitting them further would
+    fragment a single invariant across unverifiable fragments, which
+    `docs/policies/HITL_AUTONOMY_POLICY.md § Parent envelope and honest
+    Low-band maximization` explicitly prohibits. Recording `honest-low-max:
+    residual` — the whole leaf is the irreducible unit; band stays Very high.
+- **Revisions applied:** none — no defect found in this pass; code is
+  certified sound as implemented.
+
+**Post-Reflection defect found by executable evidence (2026-09-14):** running
+`t4f_stale_lease_is_reclaimed_without_exactly_once_assumption` against a real
+local PostgreSQL instance (not merely read) failed with a `23514` check-
+constraint violation. The `0034` migration's original
+`lease_expires_at > claimed_at` clause rejected the valid production state
+"claimed row whose lease has since expired" — exactly the state
+`claim_next_publication_work`'s own candidate predicate
+(`delivery_state = 'claimed' AND lease_expires_at <= now()`) is written to
+reclaim. **Fixed** by removing the `lease_expires_at > claimed_at` comparison
+from the `CHECK` constraint in `infra/migrations/0034_add_p2p_publication_claim_leases.sql`
+(kept: `claim_token`/`claimed_at`/`lease_expires_at` all non-null and
+`isfinite(lease_expires_at)` when claimed — the real invariant). Local
+tracking DB's constraint and `_sqlx_migrations` checksum row were updated to
+match. Re-run: **6/6 passing**
+(`DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@localhost:5432/dubbridge
+cargo test -p dubbridge-worker-runner --test p2p_publication_recovery_test --
+--test-threads=1`). This is why Reflection alone is not a substitute for
+executable evidence — 4 code-reading passes did not surface this, the actual
+test run against real PostgreSQL did.
+
+**Follow-up task (not yet scored/scheduled):** `P2.T4e-cov` — add unit/
+component coverage for `apps/worker-runner/src/p2p_publication_runtime.rs`
+(`from_env` env-parsing defaults, the `run` tick loop, and its error path),
+so `T4e` has its own executable evidence instead of relying solely on T4f's
+integration proof. Likely RRI 0–25 Low (mechanical test-writing over
+existing glue code, no new logic). Open against `P2.T4e` before that leaf's
+own closure pipeline runs.
 
 **HP-T4-1:** committed-before-dispatch crash is recovered from PostgreSQL.  
 **HP-T4-2:** no queue accelerator exists -> direct dispatch/reconciliation still converges.  

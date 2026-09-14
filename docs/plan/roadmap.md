@@ -244,10 +244,25 @@ are now fully closed**, resolving the fixture-binary/test suite it added
 new tests, 78/78 full suite, 0 regressions). The prior HITL approval did not
 authorize scope expansion beyond this frozen envelope. See
 `docs/audit/mvp0-p2p-p2-t3c-preflight.md` and the `T3c-Integ` closure record
-in `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`. `T3d` has a prepared
-test-only definition and is now unblocked),
-`P2.T4` (O4 dispatch + reconciliation; only `T4a` is `Done
-2026-09-07`, `T4b`–`T4f` remain `Planned`), `P2.T5` (S-120 integration +
+in `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`. **2026-09-14 update:**
+`T3d` is unblocked but not closed — a certification test file landed
+(`publication-contract-certification.test.js`) but it is a narrower,
+differently-scoped file than T3d's defined `publication-contract.test.js` +
+`fixtures.js` (pure request/response-parsing unit tests against the C0
+contract, not the mTLS/HTTP/Hyperdrive boundary T3d's acceptance criteria
+require); see the task ledger's `P2.T3d` section for the full gap. `P2.T4`
+(O4 dispatch + reconciliation): `T4a` is `Done 2026-09-07`; `T4b`–`T4f` have
+their full implementation code landed 2026-09-14 (migration, claim-lease
+repo, mTLS Availability Node client, PostgreSQL outbox dispatcher, worker
+reconciler runtime, and recovery-window tests — all path-conformant to
+their task definitions) but **none has RRI scoring, phase-1/2 review,
+Reflection, coverage certification, or owner verification recorded** — they
+remain not-`[x] Done` pending that closure work, tracked in the task
+ledger's `P2.T4` status note. A 2026-09-14 non-strict code re-read found
+`T4b`/`T4c`/`T4d`/`T4f` implementation-sound enough to proceed straight to
+that closure pipeline as-is; `T4e` (worker runtime loop) has a genuine test
+coverage gap and gets its own tracked follow-up, `P2.T4e-cov` (not yet
+scored/scheduled), rather than blocking the other four. `P2.T5` (S-120 integration +
 fail-closed `P2P_READY` transition, all four children `Planned`), and
 `P2.T6` (audit/crash-window certification and P2 closure, all five children
 `Planned`) — plus `P3`–`P6` themselves, whose phase plans and planning ledgers now exist; executable activation
@@ -385,9 +400,12 @@ captured above under Governing principles and ADR-025/ADR-026.
   phase still needs exact-path executable decomposition, parent/leaf RRI,
   band-required review/approval, ownership and elapsed-time estimates at
   activation. Existing HP/EC and accepted ADR-043/044 remain binding.
-  P2 T0/C0 are PASS; T1/T2/T3a/T3b/T4a are Done; T3c-d, T4b-f, T5a-d, T6a-e
-  remain Planned (16 leaves). T6p-a requires full P2-P6 PASS plus
-  T7local/T7c PASS.
+  P2 T0/C0 are PASS; T1/T2/T3a/T3b/T3c/T4a are Done. As of 2026-09-14:
+  `T4b`-`T4f` have code landed but no closure evidence (RRI/review/
+  Reflection/coverage/owner verification) — not yet `[x] Done`; `T3d` has a
+  partial, scope-deviating test file and remains open against its actual
+  acceptance criteria; `T5a-d`, `T6a-e` remain Planned (11 leaves with no
+  code started). T6p-a requires full P2-P6 PASS plus T7local/T7c PASS.
   October capacity is not validated by the existence of these plans. X29 is
   required for the release, X28/CI for T9g; optional queue acceleration and
   S-230 T7b/T8/T8b are outside the mandatory path.
