@@ -22,6 +22,17 @@ pub struct P2pPublicationClaim {
     pub lease_expires_at: OffsetDateTime,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct ReadyFinalization<'a> {
+    pub outbox_id: Uuid,
+    pub publication_id: P2pPublicationId,
+    pub lineage_id: K1LineageId,
+    pub claim_token: Uuid,
+    pub external_publication_id: &'a str,
+    pub confirmed_at: OffsetDateTime,
+    pub delivered_at: OffsetDateTime,
+}
+
 #[derive(sqlx::FromRow)]
 struct ClaimRow {
     outbox_id: Uuid,
@@ -194,25 +205,19 @@ pub async fn complete_publication_claim(
 /// publication identity rolls the whole transaction back.
 pub async fn finalize_publication_ready(
     pool: &PgPool,
-    outbox_id: Uuid,
-    publication_id: P2pPublicationId,
-    lineage_id: K1LineageId,
-    claim_token: Uuid,
-    external_publication_id: &str,
-    confirmed_at: OffsetDateTime,
-    delivered_at: OffsetDateTime,
+    finalization: ReadyFinalization<'_>,
 ) -> Result<(), DbError> {
-    if claim_token.is_nil() || external_publication_id.trim().is_empty() {
+    if finalization.claim_token.is_nil() || finalization.external_publication_id.trim().is_empty() {
         return Err(DbError::Conflict);
     }
 
     let mut tx = pool.begin().await.map_err(DbError::QueryFailed)?;
     ensure_claim_owned(
         &mut tx,
-        outbox_id,
-        publication_id,
-        lineage_id,
-        claim_token,
+        finalization.outbox_id,
+        finalization.publication_id,
+        finalization.lineage_id,
+        finalization.claim_token,
     )
     .await?;
 
@@ -232,10 +237,10 @@ pub async fn finalize_publication_ready(
            AND (confirmed_lineage_id IS NULL OR confirmed_lineage_id = $2)
         "#,
     )
-    .bind(publication_id.0)
-    .bind(lineage_id.0)
-    .bind(external_publication_id)
-    .bind(confirmed_at)
+    .bind(finalization.publication_id.0)
+    .bind(finalization.lineage_id.0)
+    .bind(finalization.external_publication_id)
+    .bind(finalization.confirmed_at)
     .execute(&mut *tx)
     .await
     .map_err(DbError::QueryFailed)?;
@@ -257,9 +262,9 @@ pub async fn finalize_publication_ready(
            AND claim_token = $2
         "#,
     )
-    .bind(outbox_id)
-    .bind(claim_token)
-    .bind(delivered_at)
+    .bind(finalization.outbox_id)
+    .bind(finalization.claim_token)
+    .bind(finalization.delivered_at)
     .execute(&mut *tx)
     .await
     .map_err(DbError::QueryFailed)?;
@@ -289,14 +294,7 @@ pub async fn fail_publication_claim(
     }
 
     let mut tx = pool.begin().await.map_err(DbError::QueryFailed)?;
-    ensure_claim_owned(
-        &mut tx,
-        outbox_id,
-        publication_id,
-        lineage_id,
-        claim_token,
-    )
-    .await?;
+    ensure_claim_owned(&mut tx, outbox_id, publication_id, lineage_id, claim_token).await?;
 
     let publication_update = sqlx::query(
         r#"
