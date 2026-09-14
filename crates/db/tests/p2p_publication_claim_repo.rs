@@ -17,6 +17,25 @@ use uuid::Uuid;
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../../infra/migrations");
 
+#[derive(sqlx::FromRow)]
+struct AuditCorrelationRow {
+    event_kind: String,
+    correlation_id: Option<Uuid>,
+    publication_id: Option<Uuid>,
+    lineage_id: Option<Uuid>,
+    ingest_token: Option<Uuid>,
+}
+
+#[derive(sqlx::FromRow)]
+struct AuditFailureRow {
+    event_kind: String,
+    correlation_id: Option<Uuid>,
+    publication_id: Option<Uuid>,
+    lineage_id: Option<Uuid>,
+    ingest_token: Option<Uuid>,
+    detail: Option<String>,
+}
+
 async fn test_pool() -> PgPool {
     let database_url = std::env::var("DUBBRIDGE_DATABASE_URL")
         .expect("DUBBRIDGE_DATABASE_URL must be set for DB integration tests");
@@ -290,28 +309,27 @@ async fn hp_t6b_ready_finalization_writes_correlated_confirmed_and_ready_audit()
     .await
     .expect("finalize ready");
 
-    let rows: Vec<(String, Option<Uuid>, Option<Uuid>, Option<Uuid>, Option<Uuid>)> =
-        sqlx::query_as(
-            r#"
-            SELECT event_kind, correlation_id, publication_id, lineage_id, ingest_token
-              FROM audit_events
-             WHERE publication_id = $1
-             ORDER BY happened_at ASC, id ASC
-            "#,
-        )
-        .bind(publication_id.0)
-        .fetch_all(&pool)
-        .await
-        .expect("read P2 audit events");
+    let rows = sqlx::query_as::<_, AuditCorrelationRow>(
+        r#"
+        SELECT event_kind, correlation_id, publication_id, lineage_id, ingest_token
+          FROM audit_events
+         WHERE publication_id = $1
+         ORDER BY happened_at ASC, id ASC
+        "#,
+    )
+    .bind(publication_id.0)
+    .fetch_all(&pool)
+    .await
+    .expect("read P2 audit events");
 
     assert_eq!(rows.len(), 2);
-    assert_eq!(rows[0].0, "p2p_publication_confirmed");
-    assert_eq!(rows[1].0, "p2p_publication_ready");
+    assert_eq!(rows[0].event_kind, "p2p_publication_confirmed");
+    assert_eq!(rows[1].event_kind, "p2p_publication_ready");
     for row in rows {
-        assert_eq!(row.1, Some(publication_id.0));
-        assert_eq!(row.2, Some(publication_id.0));
-        assert_eq!(row.3, Some(lineage_id.0));
-        assert_eq!(row.4, None);
+        assert_eq!(row.correlation_id, Some(publication_id.0));
+        assert_eq!(row.publication_id, Some(publication_id.0));
+        assert_eq!(row.lineage_id, Some(lineage_id.0));
+        assert_eq!(row.ingest_token, None);
     }
 }
 
@@ -341,23 +359,22 @@ async fn hp_t6b_terminal_failure_writes_same_lineage_audit() {
     .await
     .expect("terminal failure");
 
-    let row: (String, Option<Uuid>, Option<Uuid>, Option<Uuid>, Option<Uuid>, Option<String>) =
-        sqlx::query_as(
-            r#"
-            SELECT event_kind, correlation_id, publication_id, lineage_id, ingest_token, detail
-              FROM audit_events
-             WHERE publication_id = $1
-            "#,
-        )
-        .bind(publication_id.0)
-        .fetch_one(&pool)
-        .await
-        .expect("read P2 failure audit");
+    let row = sqlx::query_as::<_, AuditFailureRow>(
+        r#"
+        SELECT event_kind, correlation_id, publication_id, lineage_id, ingest_token, detail
+          FROM audit_events
+         WHERE publication_id = $1
+        "#,
+    )
+    .bind(publication_id.0)
+    .fetch_one(&pool)
+    .await
+    .expect("read P2 failure audit");
 
-    assert_eq!(row.0, "p2p_publication_failed");
-    assert_eq!(row.1, Some(publication_id.0));
-    assert_eq!(row.2, Some(publication_id.0));
-    assert_eq!(row.3, Some(lineage_id.0));
-    assert_eq!(row.4, None);
-    assert_eq!(row.5.as_deref(), Some("publication_unavailable"));
+    assert_eq!(row.event_kind, "p2p_publication_failed");
+    assert_eq!(row.correlation_id, Some(publication_id.0));
+    assert_eq!(row.publication_id, Some(publication_id.0));
+    assert_eq!(row.lineage_id, Some(lineage_id.0));
+    assert_eq!(row.ingest_token, None);
+    assert_eq!(row.detail.as_deref(), Some("publication_unavailable"));
 }
