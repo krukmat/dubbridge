@@ -205,7 +205,7 @@ async fn ec_t4b_foreign_release_fails_closed_and_owner_release_requeues() {
 #[tokio::test]
 async fn ec_t4b_invalid_or_expired_requested_lease_fails_before_db_mutation() {
     let pool = test_pool().await;
-    create_claimable_work(&pool).await;
+    let (_, _, outbox_id) = create_claimable_work(&pool).await;
 
     let nil_token = claim_next_publication_work(
         &pool,
@@ -224,8 +224,9 @@ async fn ec_t4b_invalid_or_expired_requested_lease_fails_before_db_mutation() {
     assert!(matches!(expired, Err(DbError::Conflict)));
 
     let attempt_count: i32 = sqlx::query_scalar(
-        "SELECT attempt_count FROM p2p_publication_outbox LIMIT 1",
+        "SELECT attempt_count FROM p2p_publication_outbox WHERE id = $1",
     )
+    .bind(outbox_id)
     .fetch_one(&pool)
     .await
     .expect("read attempt count");
