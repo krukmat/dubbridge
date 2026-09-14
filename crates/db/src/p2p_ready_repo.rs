@@ -3,9 +3,7 @@
 use dubbridge_domain::{
     asset::AssetId,
     p2p_publication::{K1LineageId, P2pPublicationId},
-    p2p_ready_descriptor::{
-        P2pReadyDescriptor, P2pReadyDescriptorInput, is_lower_hex_sha256,
-    },
+    p2p_ready_descriptor::{P2pReadyDescriptor, P2pReadyDescriptorInput, is_lower_hex_sha256},
 };
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -62,13 +60,12 @@ pub async fn persist_confirmed_manifest_digest(
         return Ok(());
     }
 
-    let exists: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM p2p_publications WHERE id = $1)",
-    )
-    .bind(publication_id.0)
-    .fetch_one(pool)
-    .await
-    .map_err(DbError::QueryFailed)?;
+    let exists: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM p2p_publications WHERE id = $1)")
+            .bind(publication_id.0)
+            .fetch_one(pool)
+            .await
+            .map_err(DbError::QueryFailed)?;
 
     if exists {
         Err(DbError::Conflict)
