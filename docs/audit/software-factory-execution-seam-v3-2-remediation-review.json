@@ -1,0 +1,14 @@
+{
+  "findings": [],
+  "model": "gpt-oss:20b",
+  "phase": "code",
+  "reviewer": "gpt-oss:20b",
+  "summary": "All changes correctly add policy_version handling to TaskCard and load_card without introducing failures. No issues detected.",
+  "ts": "2026-09-14T07:54:06.583730Z",
+  "usage": {
+    "done_reason": "stop",
+    "prompt_tokens": 1108,
+    "response_tokens": 2281
+  },
+  "verdict": "pass"
+}

@@ -166,6 +166,7 @@ def load_card(card_path, task_card_cls):
         rri=data.get("rri"),
         band=data.get("band"),
         capsule_hash=data.get("capsule_hash"),
+        policy_version=data.get("policy_version"),
     )
 
 

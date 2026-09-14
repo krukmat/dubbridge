@@ -184,13 +184,14 @@ a phase-2 line, reviewer resolved by RRI band. Docs/config/migration/ADR/
 plan/task-ledger/policy-only tasks record `n/a` for phase 2.
 
 ```
-Task-analysis review: <gemma|muse-glimmer|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
-Code-solution review: <gemma|muse-glimmer|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
+Task-analysis review: <gemma|gpt-oss|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
+Code-solution review: <gemma|gpt-oss|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
 ```
 
-`muse-glimmer` — primary for RRI 0–25, intermediate fallback for 26–55.
-`gemma` — primary for 26–55, intermediate fallback for 0–25. `codex|claude`
-— RRI 56+, resolved from caller identity (`claude-code → codex`,
+`gpt-oss` — primary for RRI 0–25 and intermediate fallback for 26–55;
+for RRI 56+ it is primary at the Complex profile. `gemma` — primary for
+RRI 26–55 and intermediate fallback for 0–25. `codex|claude` — RRI 56+
+cross-vendor fallback, resolved from caller identity (`claude-code → codex`,
 `codex → claude`, others → `claude`). `d14` — final fallback when the
 preceding chain is unusable, always via a responsive cross-provider reviewer
 first (same-provider only as a recorded degraded fallback). `BLOCKED` —

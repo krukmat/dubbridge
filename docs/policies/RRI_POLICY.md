@@ -253,9 +253,9 @@ band — never derive one output from another (e.g. do not infer capability from
 
 | RRI band | Label | Effort | Capability (Codex) | Capability (Claude Code) | Thinking | Phase-1 reviewer | Phase-2 reviewer | Gate |
 |---|---|---|---|---|---|---|---|---|
-| **0–25** | Low | **S** | Primary agent or Local Qwen Developer via Ollama | Primary agent or Local Qwen Developer via Ollama | Off | Muse Glimmer†† | Muse Glimmer Reviewer†† | **Low-band handling:** do not present the full task for approval; use local Qwen Developer only for eligible simple code patches, otherwise execute directly with the primary agent. |
+| **0–25** | Low | **S** | Primary agent or Local Qwen Developer via Ollama | Primary agent or Local Qwen Developer via Ollama | Off | GPT-OSS 20B†† | GPT-OSS 20B Reviewer†† | **Low-band handling:** do not present the full task for approval; use local Qwen Developer only for eligible simple code patches, otherwise execute directly with the primary agent. |
 | **26–40** | Moderate | **M** | Balanced | Balanced | Off | Gemma†† | Gemma Reviewer†† | Confirm tests exist in the affected area. **Implementation route:** local-first via `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL`; after 2/2 repairs, decompose remaining work into scored Low-band subtasks before the concrete task-card cloud takeover is considered as last resort. A ≥2-file task with heterogeneous per-module CC may instead use ADR-040 per-module split routing — see § Per-module complexity-split routing below. |
-| **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Gemma†† | Gemma Reviewer†† | Plan + explicit acceptance criteria required before approval. **Implementation route (ADR-038):** Muse Glimmer advisory refinement → primary hash-bound route receipt → **RRI 46–55:** cloud takeover with the full evidence bundle; a `GO_LOCAL` advisory result is recorded but never launches a local developer, **except** for modules independently qualifying under ADR-040 per-module split routing (Amendment 2). **RRI 41–45 (Amendment 3):** a `GO_LOCAL` result instead routes to the same local-first path as Moderate (2-attempt repair budget); `CLOUD_REQUIRED` still escalates to cloud. See § Per-module complexity-split routing and § Med-high Architect-refined single-attempt handling below. Review/approval rigor unchanged for both sub-bands — 3 Reflection passes and this HITL gate still apply; phase-2 (and phase-1 when it applies) reviewer is Gemma, not the cross-vendor peer. |
+| **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Gemma†† | Gemma Reviewer†† | Plan + explicit acceptance criteria required before approval. **Implementation route (ADR-038):** Local Architect advisory refinement → primary hash-bound route receipt → **RRI 46–55:** cloud takeover with the full evidence bundle; a `GO_LOCAL` advisory result is recorded but never launches a local developer, **except** for modules independently qualifying under ADR-040 per-module split routing (Amendment 2). **RRI 41–45 (Amendment 3):** a `GO_LOCAL` result instead routes to the same local-first path as Moderate (2-attempt repair budget); `CLOUD_REQUIRED` still escalates to cloud. See § Per-module complexity-split routing and § Med-high Architect-refined single-attempt handling below. Review/approval rigor unchanged for both sub-bands — 3 Reflection passes and this HITL gate still apply; phase-2 (and phase-1 when it applies) reviewer is Gemma, not the cross-vendor peer. |
 | **56–70** | Complex | **L** | Premium | Premium | On | GPT-OSS 20B (Complex profile)* | GPT-OSS 20B (Complex profile)* | Plan first. **Decompose into subtasks before implementation.** Human reviews the plan. |
 | **71–85** | High | **XL** | Premium | Premium | On | GPT-OSS 20B (Complex profile)* | GPT-OSS 20B (Complex profile)* | Characterization tests + explicit acceptance criteria + human reviews the **diff** (not just the plan). **Decomposition remains mandatory.** |
 | **86–100** | Very high | **XL** | Premium | Premium | On | GPT-OSS 20B (Complex profile)* | GPT-OSS 20B (Complex profile)* | Do not implement directly. Produce an ADR + risk analysis + decompose into subtasks. |
@@ -348,7 +348,7 @@ trigger/model; `Codex` or `Claude` alone is not a resolved implementation value.
 The default implementation route for development tasks scoring
 **RRI 26–40** is the local agentic runner. Resolve the implementer from
 `DUBBRIDGE_LOCAL_AGENT_MODEL`, defaulting to
-`nemotron-3.5-lightning:30b-a3b-q4_K_M`, and the Ollama
+`devstral-small-2:24b-instruct-2512-q4_K_M`, and the Ollama
 endpoint from `OLLAMA_HOST`, defaulting to `http://localhost:11434`. The runner
 preloads the complete authorized files and gives the model only the
 card-bound `write_file`/`apply_patch`/`finish` contract. Model-issued reads and
@@ -358,7 +358,7 @@ edited authorized Rust files in isolation and executes the operator-authored
 acceptance commands itself (see
 `docs/plan/local-agent-simple-editing.md`).
 
-Med-high 46–55 remains cloud-only. ADR-038's Muse-Glimmer refinement and
+Med-high 46–55 remains cloud-only. ADR-038's Local Architect refinement and
 hash-bound receipt remain evidence gates, but their result never starts a local
 developer there. Med-high 41–45 is the exception (ADR-038 Amendment 3,
 2026-08-23): a `GO_LOCAL` result starts a local developer via this same
@@ -481,7 +481,7 @@ For final **RRI 26–40**, the implementation default is **local-first**:
 - the code-authoring surface is `scripts/local-agent/run_local_task.py` in a
   disposable worktree;
 - the implementer resolves from `DUBBRIDGE_LOCAL_AGENT_MODEL` (default
-  `qwen3.8:27b-mlx`);
+  `devstral-small-2:24b-instruct-2512-q4_K_M`);
 - tool-call-time and post-run `allowed_paths` scope enforcement are mandatory;
 - the local path has a maximum of **2 repair attempts**, each requiring new
   evidence;
@@ -501,7 +501,7 @@ Bindings used by the operative local-first route:
 | Env var | Default | Purpose |
 |---|---|---|
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint |
-| `DUBBRIDGE_LOCAL_AGENT_MODEL` | `nemotron-3.5-lightning:30b-a3b-q4_K_M` | Default local implementer for RRI 26–40 (Moderate/M), 41–45 after `GO_LOCAL`, and ADR-040 local tramos |
+| `DUBBRIDGE_LOCAL_AGENT_MODEL` | `devstral-small-2:24b-instruct-2512-q4_K_M` | Default local implementer for RRI 26–40 (Moderate/M), 41–45 after `GO_LOCAL`, and ADR-040 local tramos |
 
 **Rollback triggers:** revert Moderate-band implementation to the cloud path if
 the rolling 20-task window shows escalation rate `> 40%`, any accepted
@@ -519,7 +519,7 @@ cloud, while **RRI 41–45** (ADR-038 Amendment 3, 2026-08-23) routes a
 
 ```text
 approved Med-high card
-  -> Muse Glimmer (muse-glimmer:30b-q4_K_M) advisory refinement: GO_LOCAL | CLOUD_REQUIRED
+  -> Local Architect (qwen3.6:27b-q4_K_M) advisory refinement: GO_LOCAL | CLOUD_REQUIRED
   -> primary agent hash-bound route receipt (may downgrade GO_LOCAL to cloud;
      may NEVER upgrade CLOUD_REQUIRED to local)
   -> RRI 46-55: GO_LOCAL is recorded as policy-excluded; no local developer starts;
@@ -535,7 +535,7 @@ approved Med-high card
 Implementation surfaces:
 
 - `scripts/local-architect/run_analysis.py` (`med-high-refinement-v1` profile)
-  produces the hash-bound Muse Glimmer refinement artifact.
+  produces the hash-bound Local Architect refinement artifact.
 - `scripts/local-agent/med_high_gate.py` validates the refinement artifact,
   the primary receipt, card/capsule hash binding, exact model tag/digest, and
   the Med-high RRI band, then applies the fail-closed route rules.
@@ -554,7 +554,7 @@ The approval path is **not** relaxed: 3 Reflection passes apply, and
 the RRI 41+ human approval gate (plan + explicit acceptance criteria before
 implementation) fires. The primary agent remains the planner,
 approver-facing presenter, reviewer, and closer regardless of which route
-Muse Glimmer/the gate select.
+the Local Architect and gate select.
 
 **Phase-1/phase-2 reviewer bindings:** for this band, both non-exempt phase 1
 and phase 2 use the RRI 26–55 chain defined in § Local pipeline
@@ -704,8 +704,7 @@ only), so this rule is enforced by review, not by the gate.
 The non-exempt phase-1 task-analysis reviewer and phase-2 code-solution
 reviewer for RRI 0–55 are:
 
-- **RRI 0–25 (Low):** primary **Muse Glimmer** (`muse-glimmer:30b-q4_K_M`
-  via Ollama).
+- **RRI 0–25 (Low):** primary **GPT-OSS 20B** (`gpt-oss:20b` via Ollama).
 - **RRI 26–55 (Moderate + Med-high):** primary **Gemma**
   (`gemma4:26b-a4b-it-qat` via Ollama) — never the band's own local
   implementer model, which cannot simultaneously implement and independently
@@ -717,7 +716,7 @@ local-first runner or escalated to cloud implementation — the binding
 governs *who reviews*, independently of *who authored the code*.
 
 **ADR-037 scope note:** the Local Architect / Complex Analyst model
-(`muse-glimmer:30b-q4_K_M`) is not a phase-1/phase-2 reviewer for RRI 26–55,
+(`qwen3.6:27b-q4_K_M`) is not a phase-1/phase-2 reviewer for RRI 26–55,
 so ADR-037's advisory-only boundary applies without exception in every band
 (see `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Local Architect / Complex
 Analyst`).
@@ -745,14 +744,14 @@ unavailable, stalled, or returns invalid/`BLOCKED` output, fall back to
 responsive cross-provider reviewer; same-provider use is allowed only after
 that attempt is unusable and must be recorded as degraded. If D14 is also
 unavailable, write a blocked-artifact record and stop; never self-review.
-Chains: RRI 0–25 `muse-glimmer:30b-q4_K_M → gemma4:26b-a4b-it-qat → D14`;
-RRI 26–55 `gemma4:26b-a4b-it-qat → muse-glimmer:30b-q4_K_M → D14`. Neither
+Chains: RRI 0–25 `gpt-oss:20b → gemma4:26b-a4b-it-qat → D14`;
+RRI 26–55 `gemma4:26b-a4b-it-qat → gpt-oss:20b → D14`. Neither
 chain removes D14 as the final fallback.
 
 **Evidence recording:** record the `### Peer Reviewer evidence` block (see
 `AGENT_WORKFLOW_GUIDE.md § Step 1 — Code-solution review`) with
-`Reviewer: muse-glimmer` or `Reviewer: gemma` (whichever ran as primary for
-the band), or `gemma`/`muse-glimmer` respectively if the intermediate
+`Reviewer: gpt-oss` or `Reviewer: gemma` (whichever ran as primary for
+the band), or `gemma`/`gpt-oss` respectively if the intermediate
 fallback triggered, or `d14` if the D14 fallback triggered, same fields
 otherwise unchanged.
 

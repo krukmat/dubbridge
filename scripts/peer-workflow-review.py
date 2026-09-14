@@ -7,9 +7,9 @@ Implements the review contract defined in docs/plan/portable-peer-review-gate.md
   Phase 2 (--phase code):  code-solution review after implementation, before closure.
 
 Reviewer is resolved from the task's RRI band:
-  RRI 0-25   (Low)                  -> Gemma (local Ollama)
+  RRI 0-25   (Low)                  -> gpt-oss:20b, Gemma fallback, D14
   RRI 26-55  (Moderate + Med-high)  -> gemma4:26b-a4b-it-qat, gpt-oss fallback, D14
-  RRI 56+    (Complex+)             -> cross-vendor peer, with D14 fallback
+  RRI 56+    (Complex+)             -> gpt-oss:20b Complex, cross-vendor fallback, D14
 
 ADR-036 Amendment 2 / owner directive 2026-08-11: the RRI 26-55 primary
 reviewer reverted from qwen3.6:27b-q4_K_M (now the local implementer) to
@@ -17,10 +17,8 @@ Gemma, with GPT-OSS 20B as the intermediate fallback before D14. The
 "qwen" names below (DEFAULT_QWEN_REVIEW_MODEL, --qwen-model,
 run_qwen_band_review, _run_qwen_with_retry) are retained for CLI-flag,
 env-var, and test-mock stability; their bound VALUE is Gemma's tag, not
-qwen3.6:27b-q4_K_M. The Low-band (RRI 0-25) Gemma-only path below predates
-the separate 2026-08-11 Low-band GPT-OSS-primary directive and is not
-in T4b's scope (see docs/tasks/local-model-stack-restructure-2026-08.md
-T4b completion record for the explicit judgment call).
+qwen3.6:27b-q4_K_M. The Low-band path uses GPT-OSS primary with Gemma as
+its intermediate fallback.
 
 Cross-vendor resolution (RRI 56+ only):
   claude-code | claude  -> codex
@@ -603,7 +601,10 @@ def parse_args():
         "--rri",
         type=int,
         required=True,
-        help="Task RRI score. Determines reviewer band (0-25 -> Gemma, 26-55 -> qwen/Gemma/D14, 56+ -> cross-vendor peer).",
+        help=(
+            "Task RRI score. Determines reviewer band (0-25 -> GPT-OSS/Gemma/D14, "
+            "26-55 -> Gemma/GPT-OSS/D14, 56+ -> GPT-OSS/cross-vendor/D14)."
+        ),
     )
     parser.add_argument(
         "--caller",
@@ -648,7 +649,7 @@ def parse_args():
             "DUBBRIDGE_GEMMA_REVIEW_MODEL",
             os.environ.get("DUBBRIDGE_LOW_RRI_MODEL", gemma_local.DEFAULT_MODEL),
         ),
-        help="Gemma model for the Low-band path and Gemma fallback.",
+        help="Gemma model for the RRI 26-55 primary path and Low-band fallback.",
     )
     parser.add_argument(
         "--qwen-model",

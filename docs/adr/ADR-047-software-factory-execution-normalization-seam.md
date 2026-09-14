@@ -6,6 +6,9 @@ date: 2026-09-13
 
 # ADR-047 — Software-factory execution normalization seam
 
+- **Status:** Accepted
+- **Date:** 2026-09-13
+
 ## Context
 
 DubBridge already has authoritative software-factory behavior for RRI-based routing, authorized context, bounded local execution, fallback authorization, reviewer chains, and audit evidence.

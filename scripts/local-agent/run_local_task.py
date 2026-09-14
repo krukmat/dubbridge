@@ -194,7 +194,7 @@ def parse_acceptance_commands(commands):
 class TaskCard:
     def __init__(
         self, task_id, spec, acceptance_tests, allowed_paths, rri=None, band=None,
-        capsule_hash=None,
+        capsule_hash=None, policy_version=None,
     ):
         self.task_id = task_id
         self.spec = spec
@@ -212,6 +212,7 @@ class TaskCard:
         # than fabricating a hash, since an invented hash would validate
         # against T1's schema syntactically while being semantically false.
         self.capsule_hash = capsule_hash
+        self.policy_version = policy_version
 
 
 class EffectiveLimits:

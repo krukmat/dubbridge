@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
+import json
 import os
 import sys
+import tempfile
 import unittest
 from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from execution_contract import normalize_resolved_execution
+from cli import load_card
+from run_local_task import TaskCard
 
 
 class ExecutionContractTest(unittest.TestCase):
@@ -30,6 +35,37 @@ class ExecutionContractTest(unittest.TestCase):
         limits = SimpleNamespace(local_execution_allowed=True, max_total_turns=30, max_repair_attempts=2)
         resolved = normalize_resolved_execution(card=card, limits=limits, model="model-b", num_ctx=65536, num_predict=8192).as_dict()
         self.assertEqual(resolved["policy_version"], "rri-v2")
+
+    def test_loaded_card_preserves_explicit_policy_version(self):
+        payload = {
+            "task_id": "legacy",
+            "spec": "test",
+            "acceptance_tests": [],
+            "allowed_paths": [],
+            "rri": 20,
+            "band": "Low",
+            "policy_version": "rri-v1",
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            card_path = os.path.join(tmp, "card.json")
+            with open(card_path, "w", encoding="utf-8") as handle:
+                json.dump(payload, handle)
+            card = load_card(card_path, TaskCard)
+
+        limits = SimpleNamespace(
+            logical_binding="local-implementer",
+            local_execution_allowed=True,
+            max_total_turns=30,
+            max_repair_attempts=2,
+        )
+        resolved = normalize_resolved_execution(
+            card=card,
+            limits=limits,
+            model="model-b",
+            num_ctx=65536,
+            num_predict=8192,
+        ).as_dict()
+        self.assertEqual(resolved["policy_version"], "rri-v1")
 
 
 if __name__ == "__main__":
