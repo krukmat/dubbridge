@@ -13,18 +13,27 @@ ALTER TABLE audit_events
         REFERENCES p2p_publications (id, lineage_id),
     ADD CONSTRAINT audit_events_p2p_correlation_shape_check
         CHECK (
-            (
-                publication_id IS NULL
-                AND lineage_id IS NULL
-                AND correlation_id IS NULL
-            ) OR (
-                publication_id IS NOT NULL
-                AND lineage_id IS NOT NULL
-                AND correlation_id = publication_id
-                AND ingest_token IS NULL
-                AND recording_session_id IS NULL
-                AND platform_ingest_session_id IS NULL
-            )
+            CASE
+                WHEN event_kind IN (
+                    'p2p_publication_intent_created',
+                    'p2p_lineage_sealed',
+                    'p2p_publication_confirmed',
+                    'p2p_publication_reconciliation_entered',
+                    'p2p_publication_ready',
+                    'p2p_publication_failed'
+                ) THEN
+                    asset_id IS NOT NULL
+                    AND publication_id IS NOT NULL
+                    AND lineage_id IS NOT NULL
+                    AND correlation_id = publication_id
+                    AND ingest_token IS NULL
+                    AND recording_session_id IS NULL
+                    AND platform_ingest_session_id IS NULL
+                ELSE
+                    publication_id IS NULL
+                    AND lineage_id IS NULL
+                    AND correlation_id IS NULL
+            END
         );
 
 CREATE INDEX audit_events_p2p_correlation_idx
