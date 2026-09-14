@@ -29,7 +29,9 @@ fn parse_event_kind(value: &str) -> Result<AuditEventKind, DbError> {
     match value {
         "ingestion_finalized" => Ok(AuditEventKind::IngestionFinalized),
         "ingestion_rejected_missing_rights" => Ok(AuditEventKind::IngestionRejectedMissingRights),
-        "ingestion_rejected_missing_uploader_context" => Ok(AuditEventKind::IngestionRejectedMissingUploaderContext),
+        "ingestion_rejected_missing_uploader_context" => {
+            Ok(AuditEventKind::IngestionRejectedMissingUploaderContext)
+        }
         "ingestion_rejected_duplicate_token" => Ok(AuditEventKind::IngestionRejectedDuplicateToken),
         "recording_session_created" => Ok(AuditEventKind::RecordingSessionCreated),
         "recording_rejected_missing_rights" => Ok(AuditEventKind::RecordingRejectedMissingRights),
@@ -38,7 +40,9 @@ fn parse_event_kind(value: &str) -> Result<AuditEventKind, DbError> {
         "recording_failed" => Ok(AuditEventKind::RecordingFailed),
         "recording_bridged_to_asset" => Ok(AuditEventKind::RecordingBridgedToAsset),
         "platform_ingest_session_created" => Ok(AuditEventKind::PlatformIngestSessionCreated),
-        "platform_ingest_rejected_missing_rights" => Ok(AuditEventKind::PlatformIngestRejectedMissingRights),
+        "platform_ingest_rejected_missing_rights" => {
+            Ok(AuditEventKind::PlatformIngestRejectedMissingRights)
+        }
         "platform_ingest_download_started" => Ok(AuditEventKind::PlatformIngestDownloadStarted),
         "platform_ingest_downloaded" => Ok(AuditEventKind::PlatformIngestDownloaded),
         "platform_ingest_failed" => Ok(AuditEventKind::PlatformIngestFailed),
@@ -61,7 +65,9 @@ fn parse_event_kind(value: &str) -> Result<AuditEventKind, DbError> {
         "p2p_publication_intent_created" => Ok(AuditEventKind::P2pPublicationIntentCreated),
         "p2p_lineage_sealed" => Ok(AuditEventKind::P2pLineageSealed),
         "p2p_publication_confirmed" => Ok(AuditEventKind::P2pPublicationConfirmed),
-        "p2p_publication_reconciliation_entered" => Ok(AuditEventKind::P2pPublicationReconciliationEntered),
+        "p2p_publication_reconciliation_entered" => {
+            Ok(AuditEventKind::P2pPublicationReconciliationEntered)
+        }
         "p2p_publication_ready" => Ok(AuditEventKind::P2pPublicationReady),
         "p2p_publication_failed" => Ok(AuditEventKind::P2pPublicationFailed),
         other => Err(DbError::UnknownStoredValue {
@@ -151,12 +157,13 @@ pub async fn list_audit_events_for_owned_asset(
     asset_id: AssetId,
     owner_id: Uuid,
 ) -> Result<Vec<AuditEvent>, DbError> {
-    let owned: Option<i32> = sqlx::query_scalar("SELECT 1 FROM assets WHERE id = $1 AND uploader_id = $2")
-        .bind(asset_id.0)
-        .bind(owner_id)
-        .fetch_optional(pool)
-        .await
-        .map_err(DbError::QueryFailed)?;
+    let owned: Option<i32> =
+        sqlx::query_scalar("SELECT 1 FROM assets WHERE id = $1 AND uploader_id = $2")
+            .bind(asset_id.0)
+            .bind(owner_id)
+            .fetch_optional(pool)
+            .await
+            .map_err(DbError::QueryFailed)?;
 
     if owned.is_none() {
         return Err(DbError::NotFound);
