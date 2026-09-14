@@ -81,6 +81,13 @@ def build_execution_summary(
         "schema_version": "execution-summary-v1",
         "execution_session_id": execution_session_id,
         "task_id": resolved_execution.get("task_id"),
+        "card_contract": {
+            "card_id": resolved_execution.get("card_id"),
+            "schema_version": resolved_execution.get("card_schema_version"),
+            "source_schema": resolved_execution.get("card_source_schema"),
+            "acceptance_criteria": resolved_execution.get("acceptance_criteria", []),
+            "verification_commands": resolved_execution.get("verification_commands", []),
+        },
         "policy_family": resolved_execution.get("policy_family"),
         "policy_version": resolved_execution.get("policy_version"),
         "rri": resolved_execution.get("rri"),

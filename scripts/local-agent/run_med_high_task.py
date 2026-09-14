@@ -320,15 +320,16 @@ def build_evidence_bundle(
         primary_receipt_path=primary_receipt_path,
     )
 
-    acceptance_tests = card.get("acceptance_tests") or []
-    acceptance_tests_section = (
-        "\n".join(f"- `{t}`" for t in acceptance_tests)
-        if acceptance_tests
-        else escalation_packet.MISSING
+    acceptance_contract = {
+        "acceptance_criteria": card.get("acceptance_criteria") or [],
+        "verification_commands": card.get("verification_commands") or [],
+    }
+    acceptance_contract_section = json.dumps(
+        acceptance_contract, indent=2, sort_keys=True
     )
 
     extra_sections = [
-        ("8. Acceptance tests", acceptance_tests_section),
+        ("8. Acceptance and verification contract", acceptance_contract_section),
         ("9. Refinement artifact (Qwen27)", refinement_section),
         ("10. Primary route receipt", receipt_section),
         (

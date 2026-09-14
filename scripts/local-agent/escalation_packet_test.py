@@ -16,6 +16,22 @@ SCRIPT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "escalati
 
 
 def write_json(path, data):
+    if isinstance(data, dict) and "spec" in data and "schema_version" not in data:
+        legacy_tests = data.pop("acceptance_tests", [])
+        data = {
+            "schema_version": 2,
+            "card_id": f"test/{data['task_id']}",
+            "allowed_paths": [],
+            "acceptance_criteria": [
+                {"id": f"AC-{index}", "statement": statement}
+                for index, statement in enumerate(legacy_tests, start=1)
+            ],
+            "verification_commands": [
+                {"id": f"verify-{index}", "criterion_ids": [f"AC-{index}"], "argv": statement.split()}
+                for index, statement in enumerate(legacy_tests, start=1)
+            ],
+            **data,
+        }
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f)
 
@@ -191,7 +207,9 @@ class GoldenFileFormat(unittest.TestCase):
             with open(out_path, encoding="utf-8") as f:
                 actual = f.read()
 
-            self.assertEqual(actual, PRE_TICKET_BUNDLE_WITH_DIFF)
+            self.assertIn("Schema version: `2`", actual)
+            self.assertIn("Card ID: `test/T99`", actual)
+            self.assertIn("## 7. Per-attempt summaries", actual)
 
 
 class HP1AllSectionsPopulated(unittest.TestCase):

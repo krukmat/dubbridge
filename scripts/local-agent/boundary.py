@@ -4,7 +4,7 @@
 The task card is the complete authority surface. Model file operations are
 limited to its ``allowed_paths``. Commands are operator-controlled and the
 runner may execute only argv that exactly match one parsed
-``acceptance_tests`` entry. Rejections raise the runner's
+``verification_commands[].argv`` entry. Rejections raise the runner's
 ``BoundaryViolation`` and therefore terminate the attempt.
 """
 
@@ -93,7 +93,7 @@ class LocalAgentBoundary:
         ):
             raise BoundaryViolation(f"invalid command rejected: {argv!r}")
         if tuple(argv) not in self._allowed_commands:
-            raise BoundaryViolation(f"command outside acceptance_tests: {argv!r}")
+            raise BoundaryViolation(f"command outside verification_commands: {argv!r}")
 
     def env_for_subprocess(self):
         return stripped_agent_env()

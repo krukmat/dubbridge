@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import cli
 import run_local_task as rlt
+from task_card import TaskCard
 
 
 DEVSTRAL = "devstral-small-2:24b-instruct-2512-q4_K_M"
@@ -17,11 +18,14 @@ CONTEXT_128K = 131072
 
 
 def _card(rri):
-    return rlt.TaskCard(
+    return TaskCard(
+        schema_version=2,
+        card_id=f"test/binding-{rri}",
         task_id=f"binding-{rri}",
         spec="binding regression",
-        acceptance_tests=[],
-        allowed_paths=[],
+        acceptance_criteria=(),
+        verification_commands=(),
+        allowed_paths=(),
         rri=rri,
     )
 

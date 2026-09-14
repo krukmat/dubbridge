@@ -5,6 +5,7 @@ import datetime
 import json
 import os
 import subprocess
+import shlex
 import sys
 import tempfile
 import time
@@ -14,6 +15,7 @@ from unittest.mock import patch
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import run_local_task as rlt
 import handoff_schema
+from task_card import AcceptanceCriterion, TaskCard, VerificationCommand
 gemma_local = rlt.gemma_local
 
 
@@ -87,13 +89,76 @@ def _write_and_finish(path, content):
     ]
 
 
-def _make_card(tmp_dir, rri=None, band=None, capsule_hash=None):
-    card = {
-        "task_id": "toy-1",
-        "spec": "Write hello.txt containing 'hi'.",
-        "acceptance_tests": ["HP-1"],
-        "allowed_paths": ["hello.txt"],
+def _command_argv(command):
+    argv = shlex.split(command)
+    assignments = []
+    while argv and "=" in argv[0] and not argv[0].startswith("="):
+        name, _value = argv[0].split("=", 1)
+        if not name.replace("_", "a").isalnum() or name[0].isdigit():
+            break
+        assignments.append(argv.pop(0))
+    return ["env", *assignments, *argv] if assignments else argv
+
+
+def _task_card(task_id, spec, acceptance_tests, allowed_paths, rri=None, band=None,
+               capsule_hash=None, policy_version=None):
+    criteria = tuple(
+        AcceptanceCriterion(f"AC-{index}", statement)
+        for index, statement in enumerate(acceptance_tests, start=1)
+    )
+    commands = tuple(
+        VerificationCommand(f"verify-{index}", (criterion.id,), tuple(_command_argv(criterion.statement)))
+        for index, criterion in enumerate(criteria, start=1)
+    )
+    return TaskCard(
+        schema_version=2,
+        card_id=f"test/{task_id}",
+        task_id=task_id,
+        spec=spec,
+        allowed_paths=tuple(allowed_paths),
+        acceptance_criteria=criteria,
+        verification_commands=commands,
+        rri=rri,
+        band=band,
+        capsule_hash=capsule_hash,
+        policy_version=policy_version,
+    )
+
+
+def _card_payload(task_id, spec, acceptance_tests, allowed_paths, **optional):
+    criteria = [
+        {"id": f"AC-{index}", "statement": statement}
+        for index, statement in enumerate(acceptance_tests, start=1)
+    ]
+    payload = {
+        "schema_version": 2,
+        "card_id": f"test/{task_id}",
+        "task_id": task_id,
+        "spec": spec,
+        "allowed_paths": allowed_paths,
+        "acceptance_criteria": criteria,
+        "verification_commands": [
+            {
+                "id": f"verify-{index}",
+                "criterion_ids": [criterion["id"]],
+                "argv": _command_argv(criterion["statement"]),
+            }
+            for index, criterion in enumerate(criteria, start=1)
+        ],
     }
+    payload.update({key: value for key, value in optional.items() if value is not None})
+    return payload
+
+
+# Preserve the historical concise constructor syntax in this test module while
+# exercising the production runner exclusively with typed cards.
+rlt.TaskCard = _task_card
+
+
+def _make_card(tmp_dir, rri=None, band=None, capsule_hash=None):
+    card = _card_payload(
+        "toy-1", "Write hello.txt containing 'hi'.", ["HP-1"], ["hello.txt"]
+    )
     if rri is not None:
         card["rri"] = rri
     if band is not None:
@@ -601,12 +666,9 @@ class DefaultTestRunnerIsReal(unittest.TestCase):
     every real `python3 run_local_task.py ...` session die at finish."""
 
     def _make_card_with_tests(self, tmp_dir, acceptance_tests):
-        card = {
-            "task_id": "toy-1",
-            "spec": "Write hello.txt containing 'hi'.",
-            "acceptance_tests": acceptance_tests,
-            "allowed_paths": ["hello.txt"],
-        }
+        card = _card_payload(
+            "toy-1", "Write hello.txt containing 'hi'.", acceptance_tests, ["hello.txt"]
+        )
         path = os.path.join(tmp_dir, "card.json")
         with open(path, "w", encoding="utf-8") as f:
             json.dump(card, f)
@@ -1652,7 +1714,7 @@ class AuditLogEmission(unittest.TestCase):
             )
 
         self.assertEqual(record["outcome"], "ORGANIZATION_VIOLATION")
-        self.assertEqual(record["verification_results"]["acceptance_tests"], [True])
+        self.assertTrue(record["verification_results"]["verification_attempts"][0]["passed"])
         self.assertEqual(record["organization_gate"]["status"], "violation")
         self.assertEqual(record["signature"]["status"], "unsigned")
 
@@ -2150,14 +2212,14 @@ class SystemPromptTurnBudgetInterpolation(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             worktree = os.path.join(tmp, "worktree")
             _git_init_worktree(worktree)
-            card = {
-                "task_id": "toy-turns",
-                "spec": "Finish this in a reasonable number of turns, please.",
-                "acceptance_tests": ["HP-1"],
-                "allowed_paths": ["hello.txt"],
-                "band": "Med-high",
-                "rri": 47,
-            }
+            card = _card_payload(
+                "toy-turns",
+                "Finish this in a reasonable number of turns, please.",
+                ["HP-1"],
+                ["hello.txt"],
+                band="Med-high",
+                rri=47,
+            )
             card_path = os.path.join(tmp, "card.json")
             with open(card_path, "w", encoding="utf-8") as f:
                 json.dump(card, f)

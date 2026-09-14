@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import gemma_local
+from task_card import commands_payload, criteria_payload
 from ckg_adapter import CKGAdapterError, CodebaseMemoryCLIAdapter
 from ckg_manifest import CKGContextManifest, derive_worktree_identity, source_sha256
 
@@ -127,9 +128,14 @@ class CKGContextProvider(ContextProvider):
 
     def _retrieval_text(self, repair_hints=None):
         acceptance = json.dumps(
-            self.card.acceptance_tests, ensure_ascii=False, separators=(",", ":")
+            {
+                "acceptance_criteria": criteria_payload(self.card),
+                "verification_commands": commands_payload(self.card),
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
         )
-        parts = [f"{self.card.spec}\n\nAcceptance criteria/tests:\n{acceptance}"]
+        parts = [f"{self.card.spec}\n\nAcceptance and verification contract:\n{acceptance}"]
         if repair_hints:
             edited_paths = repair_hints.get("edited_paths") or []
             if edited_paths:

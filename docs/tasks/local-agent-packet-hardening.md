@@ -49,8 +49,8 @@ flowchart LR
 | A3 — evaluate the Complex reviewer profile | analysis/docs | [x] Done | medium recommended; high rejected as the proven default |
 | O1 — evaluate Flash Attention and KV `q8_0` | analysis/docs | [x] Done | retain as capacity baseline; no routing credit |
 | M1 — evaluate an uninstalled coding alternative | analysis/docs | [x] Done | Qwen3-Coder 30B selected as first future candidate; no swap |
-| G1 — correct the canonical Complex-review profile | policy/docs | [ ] Not started | approval-gated propagation of the medium profile |
-| B1 — versioned typed task-card contract | development | [ ] Not started | prose criteria cannot be executed as commands |
+| G1 — correct the canonical Complex-review profile | policy/docs | [x] Done | canonical Complex profile corrected to medium/10240 |
+| B1 — versioned typed task-card contract | development | [x] Done | prose criteria cannot be executed as commands |
 | C1 — immutable run provenance and session-owned scope | development | [ ] Not started | card/state/model identity bound to every result |
 | F1 — normalized failure taxonomy | development | [ ] Not started | failures identify the responsible layer and cause |
 | R1 — cause-specific edit recovery | development | [ ] Not started | recovery reduces payload/ambiguity without full-file default |
@@ -321,7 +321,7 @@ not the current binding.
 
 ## B1 — Introduce a versioned typed task-card contract
 
-- **Status:** [ ] Not started — not approved
+- **Status:** [x] Done — 2026-09-14
 - **Type:** development
 - **Depends on:** A2
 
@@ -363,6 +363,65 @@ Freeze the producer/consumer migration boundary before scoring. Avoid an
 executable-name allow-list or `which`-based prose heuristic: both confuse host
 availability with packet validity and reject legitimate repository-local
 tools.
+
+### Completion record
+
+B1 introduced the shared frozen `task-card-v2` parser and migrated the local
+runner, context, boundary, audit/escalation, normalized-execution, Med-high
+bundle, and Stage-1 benchmark paths. Criteria remain prose-only; commands are
+exact argv with stable command/criterion identity. The explicit legacy path
+accepts only command-free cards and rejects ambiguous strings before context
+retrieval or model invocation.
+
+Task-analysis review: gpt-oss `.agent/peer-task-review-local-agent-packet-hardening-b1-attempt2.json` - PASS
+Code-solution review: gpt-oss `.agent/peer-code-review-local-agent-packet-hardening-b1.json` - PASS
+
+### Peer Reviewer evidence
+
+- Model/profile: `gpt-oss:20b`, `49152/10240`, `think=medium`, sampling `1.0/1.0`.
+- Passes run / usable: `3/3`; aggregate status `PASS` after primary-agent disposition.
+- Findings: 0 consensus; 4 pass-specific; all rejected as contradicted by supplied code and passing tests. Full disposition is in the aggregate artifact.
+- Fallbacks: cross-vendor and D14 not invoked; owner prohibited cloud reviewers and the local packet was usable.
+
+### Reflection log
+
+Required passes: 3 (`70` → `Complex`).
+
+#### Pass 1 — contract
+
+- **Draft verdict:** the typed split and explicit legacy boundary were complete.
+- **Critique findings:** approved ID/path/band/hash constraints and non-empty criterion references were not all enforced.
+- **Revisions applied:** added fail-closed validation and negative parser tests.
+
+#### Pass 2 — execution and evidence boundaries
+
+- **Draft verdict:** only structured argv reaches subprocess execution and exact IDs propagate downstream.
+- **Critique findings:** no supported defect; reviewer claims about dictionary shape and policy version contradicted the implementation and tests.
+- **Revisions applied:** none.
+
+#### Pass 3 — regression and scope
+
+- **Draft verdict:** producer/consumer migration stays within B1 and leaves C1/F1/R1/E1 unchanged.
+- **Critique findings:** no supported defect; reviewer claims about legacy keyword routing and JSON payload shapes contradicted call sites and tests.
+- **Revisions applied:** none.
+
+### Behavioral coverage certification
+
+| Case | Executable evidence | Result |
+|---|---|---|
+| HP-1 | `task_card_test.TaskCardTest.test_runner_executes_only_structured_argv_and_preserves_ids` | passed |
+| HP-2 | `test_v2_keeps_prose_separate_from_exact_argv`; `test_explicit_shell_is_preserved_as_argv` | passed |
+| EC-1 | `test_invalid_legacy_prose_fails_before_context_or_model` | passed |
+| EC-2 | task-card negative validation tests for schema/IDs/refs/argv/path/band/hash | passed |
+| EC-3 | escalation/Med-high suites plus normalized-evidence identity assertion | passed |
+
+### Owner final verification
+
+- Owner: Codex primary task owner (not a claim of separate human execution).
+- Verified the approved happy paths and edge cases against executable evidence,
+  the synchronized contract documentation, and the final diff.
+- Commands: focused 122-test suite; Stage-1 7-test suite; normalized-evidence
+  identity assertion; `py_compile`; `git diff --check`; `make qa-docs`.
 
 ---
 

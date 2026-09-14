@@ -8,8 +8,8 @@ slice: local-agent-packet-hardening
 
 # Plan: Local-Execution Routing Decision and Evidence Hardening
 
-> **Status:** Active — conceptual review and evidence audit completed
-> 2026-09-14; implementation hardening remains unapproved.
+> **Status:** Active — conceptual review, evidence audit, G1, and B1 completed
+> 2026-09-14; remaining implementation hardening is approval-gated.
 > **Tasks ledger:** `docs/tasks/local-agent-packet-hardening.md`
 > **Evidence report:**
 > `docs/audit/local-execution-routing-evidence-2026-09-14.md`
@@ -217,15 +217,13 @@ would preserve the same evidentiary gap under a new name.
 - select the best-fit not-installed coding candidate without promoting it;
 - publish the routing and profile dispositions above.
 
-### G. Complex-review profile correction — pending approval
+### G. Complex-review profile correction — implemented
 
-Replace the canonical RRI 56+ `think=high`/`num_predict=8192` binding with the
-recommended medium-reasoning profile, update the binding-history rationale,
-and keep the same reviewer/fallback order. This is a governance-critical
-policy change, so the evidence and recommendation may be published here but
-the canonical guides must not be changed without explicit approval.
+G1 replaced the canonical RRI 56+ `think=high`/`num_predict=8192` binding with
+the approved medium-reasoning profile, updated the binding-history rationale,
+and retained the same reviewer/fallback order.
 
-### B. Versioned task-card contract — pending approval
+### B. Versioned task-card contract — implemented
 
 Introduce a versioned contract that separates:
 
@@ -237,6 +235,14 @@ Introduce a versioned contract that separates:
 
 Legacy cards need an explicit compatibility path. Compatibility must never
 silently reinterpret prose as a command.
+
+Implemented by B1 on 2026-09-14. The shared immutable parser requires
+`schema_version: 2`, separates stable criterion statements from exact command
+argv, rejects unknown fields and dangling IDs, and permits legacy adaptation
+only through an explicit opt-in for cards with no commands. Runner prompts,
+context budgeting, command boundaries, audits, escalation packets, normalized
+execution summaries, and the Stage-1 benchmark producer now consume or emit
+that contract without reconstructing shell syntax from prose.
 
 ### C. Session provenance and scope attribution — pending approval
 

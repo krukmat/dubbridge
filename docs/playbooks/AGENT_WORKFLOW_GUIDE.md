@@ -1050,7 +1050,9 @@ replacement), and `finish`. Every edit is limited to the card's
 `allowed_paths`; any model-issued read, command, or unlisted-path access
 terminates immediately as `boundary_violation`. On `finish`, the runner
 formats only edited authorized Rust files through isolated temporary copies,
-then runs the operator-authored `acceptance_tests` in order; a formatter or
+then runs the operator-authored task-card-v2 `verification_commands[].argv` in
+order. The separate `acceptance_criteria` entries are descriptive and are
+never passed to a subprocess; a formatter or
 acceptance failure returns its output plus refreshed authorized file
 contents for a bounded repair. The final diff scope check remains mandatory
 as defense in depth. (Provenance for this clause's role as the canonical

@@ -132,8 +132,10 @@ from the task card, not from a global executable-prefix list.
   `allowed_paths`. An absolute, escaping, symlink-resolved, or simply unlisted
   path terminates the attempt immediately as `boundary_violation`.
 - **Card-bound command capabilities:** model-issued `run_command` accepts only
-  argv exactly matching an operator-authored `acceptance_tests` command in the
-  card. Unlisted reconnaissance or shell composition terminates immediately.
+  argv exactly matching an operator-authored
+  `verification_commands[].argv` entry in a versioned task card. Descriptive
+  `acceptance_criteria` are never executable. Unlisted reconnaissance or shell
+  composition terminates immediately.
   The operator-controlled suite still runs independently on `finish`.
 - **Post-run scope enforcement remains mandatory:** after the model finishes,
   the orchestrator
@@ -145,9 +147,9 @@ from the task card, not from a global executable-prefix list.
 - **No publication authority:** benchmark worktrees are ephemeral and are not
   pushed, merged, deployed, or reused as trusted branches. The orchestrator is
   the only component that may copy an accepted diff out of the worktree.
-- **Verification remains operator-controlled:** the card's acceptance commands
-  run after implementation and determine success independently of the model's
-  self-assessment.
+- **Verification remains operator-controlled:** the card's structured
+  verification commands run after implementation and determine success
+  independently of the model's self-assessment.
 
 This boundary constrains the model-visible task context and commands; it is not
 a complete operating-system confidentiality sandbox. Accepted compilers and

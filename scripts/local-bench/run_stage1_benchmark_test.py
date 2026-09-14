@@ -107,6 +107,9 @@ class RunCardOrchestration(unittest.TestCase):
 
         self.assertEqual(written["rri"], 29)
         self.assertEqual(written["band"], "Moderate")
+        self.assertEqual(written["schema_version"], 2)
+        self.assertEqual(written["card_id"], "stage1/TEST-03")
+        self.assertEqual(written["acceptance_criteria"][0]["id"], "HP-1")
 
 
 class MainPerCardIsolation(unittest.TestCase):

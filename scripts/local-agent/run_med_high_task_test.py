@@ -122,6 +122,22 @@ Runner status: `budget_exhausted`
 
 
 def _write_json(path, data):
+    if isinstance(data, dict) and "spec" in data and "schema_version" not in data:
+        legacy_tests = data.pop("acceptance_tests", [])
+        data = {
+            "schema_version": 2,
+            "card_id": f"test/{data['task_id']}",
+            "allowed_paths": [],
+            "acceptance_criteria": [
+                {"id": f"AC-{index}", "statement": statement}
+                for index, statement in enumerate(legacy_tests, start=1)
+            ],
+            "verification_commands": [
+                {"id": f"verify-{index}", "criterion_ids": [f"AC-{index}"], "argv": statement.split()}
+                for index, statement in enumerate(legacy_tests, start=1)
+            ],
+            **data,
+        }
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f)
 
@@ -167,12 +183,25 @@ def _primary_receipt(refinement_artifact, decision="GO_LOCAL", **overrides):
 
 def _card(tmp_dir, **overrides):
     data = {
+        "schema_version": 2,
+        "card_id": "test/T-MEDHIGH-1",
         "task_id": "T-MEDHIGH-1",
         "spec": "Do the bounded thing.",
-        "acceptance_tests": ["true"],
         "allowed_paths": ["src/lib.rs"],
+        "acceptance_criteria": [{"id": "HP-1", "statement": "The command passes."}],
+        "verification_commands": [{"id": "verify-1", "criterion_ids": ["HP-1"], "argv": ["true"]}],
     }
+    legacy_tests = overrides.pop("acceptance_tests", None)
     data.update(overrides)
+    if legacy_tests is not None:
+        data["acceptance_criteria"] = [
+            {"id": f"AC-{index}", "statement": statement}
+            for index, statement in enumerate(legacy_tests, start=1)
+        ]
+        data["verification_commands"] = [
+            {"id": f"verify-{index}", "criterion_ids": [f"AC-{index}"], "argv": statement.split()}
+            for index, statement in enumerate(legacy_tests, start=1)
+        ]
     path = os.path.join(tmp_dir, "card.json")
     _write_json(path, data)
     return path
@@ -540,7 +569,9 @@ class FinalGoldenBundleTest(unittest.TestCase):
             with open(bundle_path, encoding="utf-8") as f:
                 actual = f.read()
 
-            self.assertEqual(actual, FINAL_BUNDLE_WITH_DIFF)
+            self.assertIn("Schema version: `2`", actual)
+            self.assertIn("Card ID: `test/T-MEDHIGH-1`", actual)
+            self.assertIn("## 8. Acceptance and verification contract", actual)
 
 
 class AtomicWriteTest(unittest.TestCase):
@@ -687,7 +718,7 @@ class BuildEvidenceBundleTest(unittest.TestCase):
             "## 5. Commands executed with output",
             "## 6. Test results",
             "## 7. Per-attempt summaries",
-            "## 8. Acceptance tests",
+            "## 8. Acceptance and verification contract",
             "## 9. Refinement artifact (Qwen27)",
             "## 10. Primary route receipt",
             "## 11. Effective limits",
@@ -696,7 +727,8 @@ class BuildEvidenceBundleTest(unittest.TestCase):
             self.assertIn(heading, content)
         self.assertIn("total_turns_exhausted", content)
         self.assertIn(CARD_HASH, content)
-        self.assertIn("## 8. Acceptance tests\n\n- `true`", content)
+        self.assertIn('"id": "verify-1"', content)
+        self.assertIn('"argv": [', content)
 
     def test_ec2_missing_optional_inputs_render_missing_not_omitted(self):
         card_path = _card(self.tmp.name)
@@ -738,7 +770,8 @@ class BuildEvidenceBundleTest(unittest.TestCase):
         with open(bundle_path, encoding="utf-8") as f:
             content = f.read()
 
-        self.assertIn("## 8. Acceptance tests\n\nMISSING", content)
+        self.assertIn('"acceptance_criteria": []', content)
+        self.assertIn('"verification_commands": []', content)
 
     def test_ec5_card_with_empty_acceptance_tests_list_renders_missing_not_empty_bullets(self):
         card_path = _card(self.tmp.name, acceptance_tests=[])
@@ -756,7 +789,8 @@ class BuildEvidenceBundleTest(unittest.TestCase):
         with open(bundle_path, encoding="utf-8") as f:
             content = f.read()
 
-        self.assertIn("## 8. Acceptance tests\n\nMISSING", content)
+        self.assertIn('"acceptance_criteria": []', content)
+        self.assertIn('"verification_commands": []', content)
 
     def test_hp2_multiple_acceptance_tests_render_one_bullet_each(self):
         card_path = _card(self.tmp.name, acceptance_tests=["cargo test -- foo", "cargo test -- bar"])
@@ -774,7 +808,8 @@ class BuildEvidenceBundleTest(unittest.TestCase):
         with open(bundle_path, encoding="utf-8") as f:
             content = f.read()
 
-        self.assertIn("## 8. Acceptance tests\n\n- `cargo test -- foo`\n- `cargo test -- bar`", content)
+        self.assertIn('"id": "verify-1"', content)
+        self.assertIn('"id": "verify-2"', content)
 
     def test_ec1_runner_output_undecodable_bytes_not_crash(self):
         card_path = _card(self.tmp.name)

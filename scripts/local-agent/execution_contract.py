@@ -12,7 +12,9 @@ or own retry/repair state machines.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Optional
+from typing import Any, Optional
+
+from task_card import commands_payload, criteria_payload
 
 
 POLICY_FAMILY = "rri"
@@ -49,6 +51,11 @@ class ResolvedExecutionConstraints:
     """Normalized view over execution state already resolved upstream."""
 
     task_id: str
+    card_id: str
+    card_schema_version: int
+    card_source_schema: str
+    acceptance_criteria: tuple[dict[str, Any], ...]
+    verification_commands: tuple[dict[str, Any], ...]
     policy_family: str
     policy_version: str
     rri: Optional[int]
@@ -110,6 +117,11 @@ def normalize_resolved_execution(
 
     return ResolvedExecutionConstraints(
         task_id=card.task_id,
+        card_id=card.card_id,
+        card_schema_version=card.schema_version,
+        card_source_schema=card.source_schema,
+        acceptance_criteria=tuple(criteria_payload(card)),
+        verification_commands=tuple(commands_payload(card)),
         policy_family=POLICY_FAMILY,
         policy_version=policy_version,
         rri=getattr(card, "rri", None),

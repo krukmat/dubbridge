@@ -15,6 +15,7 @@ from context_provider import LegacyContextProvider
 from diagnostics import repair_hints, summarize_failure
 from runner_file_tools import ALLOWED_TOOL_NAMES, RunnerFileTools
 from working_history import compact_history_event
+from task_card import commands_payload, criteria_payload
 
 
 class BoundaryViolation(RuntimeError):
@@ -167,8 +168,10 @@ def build_initial_system_message(
         + card.spec
         + "\n\nAllowed paths (complete capability list):\n"
         + json.dumps(card.allowed_paths, ensure_ascii=False, indent=2)
-        + "\n\nRunner-controlled acceptance commands (not model tools):\n"
-        + json.dumps(card.acceptance_tests, ensure_ascii=False, indent=2)
+        + "\n\nDescriptive acceptance criteria (never executable):\n"
+        + json.dumps(criteria_payload(card), ensure_ascii=False, indent=2)
+        + "\n\nRunner-controlled verification commands (exact argv; not model tools):\n"
+        + json.dumps(commands_payload(card), ensure_ascii=False, indent=2)
         + "\n\nAuthorized source context:\n"
         + source_context
     )

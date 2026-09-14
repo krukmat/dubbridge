@@ -82,11 +82,21 @@ class ChatSequencer:
 
 
 def _make_card(tmp_dir, allowed_paths=None, acceptance_tests=None):
+    acceptance_tests = acceptance_tests or []
     card = {
+        "schema_version": 2,
+        "card_id": "test/integration-1",
         "task_id": "integration-1",
         "spec": "spec",
-        "acceptance_tests": acceptance_tests or [],
         "allowed_paths": allowed_paths or [],
+        "acceptance_criteria": [
+            {"id": f"AC-{index}", "statement": command}
+            for index, command in enumerate(acceptance_tests, start=1)
+        ],
+        "verification_commands": [
+            {"id": f"verify-{index}", "criterion_ids": [f"AC-{index}"], "argv": command.split()}
+            for index, command in enumerate(acceptance_tests, start=1)
+        ],
     }
     path = os.path.join(tmp_dir, "card.json")
     with open(path, "w", encoding="utf-8") as f:
