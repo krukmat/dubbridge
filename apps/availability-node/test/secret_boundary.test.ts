@@ -6,7 +6,7 @@ import {
   parsePublicationRequest,
   parsePublicationResponse,
   serializePublicationBody,
-} from "../src/contract.js";
+} from "../dist/contract.js";
 
 const fixtureUrl = new URL(
   "../../../docs/fixtures/mvp0-p2p-publication-contract-v1.json",
