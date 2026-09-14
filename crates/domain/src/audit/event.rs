@@ -18,13 +18,24 @@ pub struct AuditEvent {
     pub recording_session_id: Option<Uuid>,
     /// Present for platform-ingest events; None for ingestion/recording events.
     pub platform_ingest_session_id: Option<Uuid>,
+    /// Generic correlation identity for event families that cannot reuse an
+    /// ingest token. P2 uses the publication id as the stable correlation id.
+    pub correlation_id: Option<Uuid>,
+    /// P2 publication identity. Always paired with `lineage_id` for P2 events.
+    pub publication_id: Option<Uuid>,
+    /// P2 K1 lineage identity. Never inferred from the current publication row.
+    pub lineage_id: Option<Uuid>,
     pub detail: Option<String>,
     pub happened_at: OffsetDateTime,
 }
 
 impl AuditEvent {
+    fn has_no_p2p_correlation(&self) -> bool {
+        self.correlation_id.is_none() && self.publication_id.is_none() && self.lineage_id.is_none()
+    }
+
     /// Returns whether an ingestion audit event has its required correlation
-    /// token and no recording or platform-ingest session correlation.
+    /// token and no recording/platform/P2 correlation.
     pub fn has_valid_ingestion_correlation(&self) -> bool {
         matches!(
             self.event_kind,
@@ -35,11 +46,12 @@ impl AuditEvent {
         ) && self.ingest_token.is_some()
             && self.recording_session_id.is_none()
             && self.platform_ingest_session_id.is_none()
+            && self.has_no_p2p_correlation()
     }
 
     /// Returns whether a recording audit event has its required recording
-    /// session correlation and no platform-ingest session correlation.
-    /// An ingest token remains optional for this event family.
+    /// session correlation and no platform/P2 correlation. An ingest token
+    /// remains optional for this event family.
     pub fn has_valid_recording_correlation(&self) -> bool {
         matches!(
             self.event_kind,
@@ -51,13 +63,11 @@ impl AuditEvent {
                 | AuditEventKind::RecordingBridgedToAsset
         ) && self.recording_session_id.is_some()
             && self.platform_ingest_session_id.is_none()
+            && self.has_no_p2p_correlation()
     }
 
     /// Returns whether a platform-ingest audit event has its required
-    /// platform-ingest session correlation and no recording session correlation.
-    /// An ingest token remains optional for this event family.
-    /// This checks only the in-memory event shape and does not by itself
-    /// guarantee `platform_ingest_session_id` is persisted to the database.
+    /// platform-ingest session correlation and no competing correlations.
     pub fn has_valid_platform_ingest_correlation(&self) -> bool {
         matches!(
             self.event_kind,
@@ -70,12 +80,10 @@ impl AuditEvent {
         ) && self.platform_ingest_session_id.is_some()
             && self.ingest_token.is_none()
             && self.recording_session_id.is_none()
+            && self.has_no_p2p_correlation()
     }
 
     /// Returns whether a workspace audit event has no correlation IDs.
-    /// Workspace events do not carry ingest tokens, recording sessions, or
-    /// platform-ingest sessions.
-    /// This checks only the in-memory event shape.
     pub fn has_valid_workspace_correlation(&self) -> bool {
         matches!(
             self.event_kind,
@@ -85,12 +93,10 @@ impl AuditEvent {
         ) && self.ingest_token.is_none()
             && self.recording_session_id.is_none()
             && self.platform_ingest_session_id.is_none()
+            && self.has_no_p2p_correlation()
     }
 
     /// Returns whether a consent audit event has no correlation IDs.
-    /// Consent events do not carry ingest tokens, recording sessions, or
-    /// platform-ingest sessions.
-    /// This checks only the in-memory event shape.
     pub fn has_valid_consent_correlation(&self) -> bool {
         matches!(
             self.event_kind,
@@ -100,12 +106,10 @@ impl AuditEvent {
         ) && self.ingest_token.is_none()
             && self.recording_session_id.is_none()
             && self.platform_ingest_session_id.is_none()
+            && self.has_no_p2p_correlation()
     }
 
     /// Returns whether a review audit event has no correlation IDs.
-    /// Review events do not carry ingest tokens, recording sessions, or
-    /// platform-ingest sessions.
-    /// This checks only the in-memory event shape.
     pub fn has_valid_review_correlation(&self) -> bool {
         matches!(
             self.event_kind,
@@ -116,12 +120,10 @@ impl AuditEvent {
         ) && self.ingest_token.is_none()
             && self.recording_session_id.is_none()
             && self.platform_ingest_session_id.is_none()
+            && self.has_no_p2p_correlation()
     }
 
     /// Returns whether a playback audit event has no correlation IDs.
-    /// Playback events do not carry ingest tokens, recording sessions, or
-    /// platform-ingest sessions.
-    /// This checks only the in-memory event shape.
     pub fn has_valid_playback_correlation(&self) -> bool {
         matches!(
             self.event_kind,
@@ -129,12 +131,10 @@ impl AuditEvent {
         ) && self.ingest_token.is_none()
             && self.recording_session_id.is_none()
             && self.platform_ingest_session_id.is_none()
+            && self.has_no_p2p_correlation()
     }
 
     /// Returns whether an auth audit event has no correlation IDs.
-    /// Auth events do not carry ingest tokens, recording sessions, or
-    /// platform-ingest sessions.
-    /// This checks only the in-memory event shape.
     pub fn has_valid_auth_correlation(&self) -> bool {
         matches!(
             self.event_kind,
@@ -144,6 +144,52 @@ impl AuditEvent {
         ) && self.ingest_token.is_none()
             && self.recording_session_id.is_none()
             && self.platform_ingest_session_id.is_none()
+            && self.has_no_p2p_correlation()
+    }
+
+    /// P2 events never fabricate an ingest token. They bind the exact durable
+    /// publication and K1 lineage, while `correlation_id` equals publication id.
+    pub fn has_valid_p2p_correlation(&self) -> bool {
+        let is_p2p_kind = matches!(
+            self.event_kind,
+            AuditEventKind::P2pPublicationIntentCreated
+                | AuditEventKind::P2pLineageSealed
+                | AuditEventKind::P2pPublicationConfirmed
+                | AuditEventKind::P2pPublicationReconciliationEntered
+                | AuditEventKind::P2pPublicationReady
+                | AuditEventKind::P2pPublicationFailed
+        );
+        let publication = self.publication_id.filter(|value| !value.is_nil());
+        let lineage = self.lineage_id.filter(|value| !value.is_nil());
+
+        is_p2p_kind
+            && self.asset_id.is_some()
+            && self.ingest_token.is_none()
+            && self.recording_session_id.is_none()
+            && self.platform_ingest_session_id.is_none()
+            && publication.is_some()
+            && lineage.is_some()
+            && self.correlation_id == publication
+    }
+
+    fn base_event(
+        asset_id: Option<AssetId>,
+        event_kind: AuditEventKind,
+        detail: Option<String>,
+    ) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            asset_id,
+            event_kind,
+            ingest_token: None,
+            recording_session_id: None,
+            platform_ingest_session_id: None,
+            correlation_id: None,
+            publication_id: None,
+            lineage_id: None,
+            detail,
+            happened_at: OffsetDateTime::now_utc(),
+        }
     }
 
     /// Constructor for S1 ingestion events. Always sets `ingest_token`.
@@ -153,16 +199,9 @@ impl AuditEvent {
         ingest_token: Uuid,
         detail: Option<String>,
     ) -> Self {
-        Self {
-            id: Uuid::new_v4(),
-            asset_id,
-            event_kind,
-            ingest_token: Some(ingest_token),
-            recording_session_id: None,
-            platform_ingest_session_id: None,
-            detail,
-            happened_at: OffsetDateTime::now_utc(),
-        }
+        let mut event = Self::base_event(asset_id, event_kind, detail);
+        event.ingest_token = Some(ingest_token);
+        event
     }
 
     /// Constructor for S3 recording lifecycle events. Always sets `recording_session_id`.
@@ -173,16 +212,10 @@ impl AuditEvent {
         ingest_token: Option<Uuid>,
         detail: Option<String>,
     ) -> Self {
-        Self {
-            id: Uuid::new_v4(),
-            asset_id,
-            event_kind,
-            ingest_token,
-            recording_session_id: Some(recording_session_id),
-            platform_ingest_session_id: None,
-            detail,
-            happened_at: OffsetDateTime::now_utc(),
-        }
+        let mut event = Self::base_event(asset_id, event_kind, detail);
+        event.ingest_token = ingest_token;
+        event.recording_session_id = Some(recording_session_id);
+        event
     }
 
     /// Constructor for S3 platform-ingest lifecycle events. Always sets
@@ -193,31 +226,14 @@ impl AuditEvent {
         platform_ingest_session_id: Uuid,
         detail: Option<String>,
     ) -> Self {
-        Self {
-            id: Uuid::new_v4(),
-            asset_id,
-            event_kind,
-            ingest_token: None,
-            recording_session_id: None,
-            platform_ingest_session_id: Some(platform_ingest_session_id),
-            detail,
-            happened_at: OffsetDateTime::now_utc(),
-        }
+        let mut event = Self::base_event(asset_id, event_kind, detail);
+        event.platform_ingest_session_id = Some(platform_ingest_session_id);
+        event
     }
 
-    /// Constructor for workspace governance events. These events are not tied to
-    /// asset ingestion or recording correlation identifiers.
+    /// Constructor for workspace governance events.
     pub fn new_workspace_event(event_kind: AuditEventKind, detail: Option<String>) -> Self {
-        Self {
-            id: Uuid::new_v4(),
-            asset_id: None,
-            event_kind,
-            ingest_token: None,
-            recording_session_id: None,
-            platform_ingest_session_id: None,
-            detail,
-            happened_at: OffsetDateTime::now_utc(),
-        }
+        Self::base_event(None, event_kind, detail)
     }
 
     /// Constructor for S-110 voice-consent governance events (ADR-018, ADR-028).
@@ -226,16 +242,7 @@ impl AuditEvent {
         event_kind: AuditEventKind,
         detail: Option<String>,
     ) -> Self {
-        Self {
-            id: Uuid::new_v4(),
-            asset_id: Some(asset_id),
-            event_kind,
-            ingest_token: None,
-            recording_session_id: None,
-            platform_ingest_session_id: None,
-            detail,
-            happened_at: OffsetDateTime::now_utc(),
-        }
+        Self::base_event(Some(asset_id), event_kind, detail)
     }
 
     /// Constructor for S-160 review/publication governance events.
@@ -244,16 +251,7 @@ impl AuditEvent {
         event_kind: AuditEventKind,
         detail: Option<String>,
     ) -> Self {
-        Self {
-            id: Uuid::new_v4(),
-            asset_id: Some(asset_id),
-            event_kind,
-            ingest_token: None,
-            recording_session_id: None,
-            platform_ingest_session_id: None,
-            detail,
-            happened_at: OffsetDateTime::now_utc(),
-        }
+        Self::base_event(Some(asset_id), event_kind, detail)
     }
 
     /// Constructor for S-125 playback-grant governance events.
@@ -262,29 +260,26 @@ impl AuditEvent {
         event_kind: AuditEventKind,
         detail: Option<String>,
     ) -> Self {
-        Self {
-            id: Uuid::new_v4(),
-            asset_id: Some(asset_id),
-            event_kind,
-            ingest_token: None,
-            recording_session_id: None,
-            platform_ingest_session_id: None,
-            detail,
-            happened_at: OffsetDateTime::now_utc(),
-        }
+        Self::base_event(Some(asset_id), event_kind, detail)
     }
 
     /// Constructor for S-200 auth governance events.
     pub fn new_auth_event(event_kind: AuditEventKind, detail: Option<String>) -> Self {
-        Self {
-            id: Uuid::new_v4(),
-            asset_id: None,
-            event_kind,
-            ingest_token: None,
-            recording_session_id: None,
-            platform_ingest_session_id: None,
-            detail,
-            happened_at: OffsetDateTime::now_utc(),
-        }
+        Self::base_event(None, event_kind, detail)
+    }
+
+    /// Constructor for MVP0-P2P publication lifecycle audit events.
+    pub fn new_p2p_event(
+        asset_id: AssetId,
+        event_kind: AuditEventKind,
+        publication_id: Uuid,
+        lineage_id: Uuid,
+        detail: Option<String>,
+    ) -> Self {
+        let mut event = Self::base_event(Some(asset_id), event_kind, detail);
+        event.correlation_id = Some(publication_id);
+        event.publication_id = Some(publication_id);
+        event.lineage_id = Some(lineage_id);
+        event
     }
 }
