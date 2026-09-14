@@ -73,23 +73,27 @@ impl P2pPublicationRuntime {
 
     pub async fn run(self) {
         loop {
-            match self.dispatcher.dispatch_once().await {
-                Ok(DispatchTick::Idle) => tokio::time::sleep(self.idle_interval).await,
-                Ok(DispatchTick::Ready(publication_id)) => {
-                    tracing::info!(%publication_id, "P2P publication reached durable Ready");
-                }
-                Ok(DispatchTick::Retrying(publication_id)) => {
-                    tracing::warn!(%publication_id, "P2P publication scheduled for reconciliation");
-                }
-                Ok(DispatchTick::Failed(publication_id)) => {
-                    tracing::error!(%publication_id, "P2P publication entered terminal failure");
-                }
-                Err(error) => {
-                    tracing::error!(error = %error, "P2P publication reconciler iteration failed");
-                    tokio::time::sleep(self.idle_interval).await;
-                }
-            }
+            self.run_iteration().await;
             tokio::task::yield_now().await;
+        }
+    }
+
+    async fn run_iteration(&self) {
+        match self.dispatcher.dispatch_once().await {
+            Ok(DispatchTick::Idle) => tokio::time::sleep(self.idle_interval).await,
+            Ok(DispatchTick::Ready(publication_id)) => {
+                tracing::info!(%publication_id, "P2P publication reached durable Ready");
+            }
+            Ok(DispatchTick::Retrying(publication_id)) => {
+                tracing::warn!(%publication_id, "P2P publication scheduled for reconciliation");
+            }
+            Ok(DispatchTick::Failed(publication_id)) => {
+                tracing::error!(%publication_id, "P2P publication entered terminal failure");
+            }
+            Err(error) => {
+                tracing::error!(error = %error, "P2P publication reconciler iteration failed");
+                tokio::time::sleep(self.idle_interval).await;
+            }
         }
     }
 }
