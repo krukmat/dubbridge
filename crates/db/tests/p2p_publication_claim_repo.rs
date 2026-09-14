@@ -56,6 +56,30 @@ async fn create_claimable_work(pool: &PgPool) -> (P2pPublicationId, K1LineageId,
     (publication_id, lineage_id, outbox_id)
 }
 
+// `claim_next_publication_work` selects the globally oldest claimable outbox
+// row with no per-fixture filter (by design — it mirrors production, where a
+// single dispatcher pool spans all publications). Any row this test suite
+// leaves in a claimable (`pending`, or `claimed` with an expired lease) state
+// is therefore fair game for the *next* test's own claim call, producing
+// cross-test contamination even under `--test-threads=1`. Force every fixture
+// row to a non-claimable terminal state before the test returns.
+async fn retire_outbox_row(pool: &PgPool, outbox_id: Uuid) {
+    sqlx::query(
+        r#"
+        UPDATE p2p_publication_outbox
+           SET delivery_state = 'delivered',
+               delivered_at = now(),
+               claim_token = NULL,
+               lease_expires_at = NULL
+         WHERE id = $1
+        "#,
+    )
+    .bind(outbox_id)
+    .execute(pool)
+    .await
+    .expect("retire outbox fixture row");
+}
+
 #[tokio::test]
 async fn hp_t4b_claim_is_single_owner_and_increments_attempt_count() {
     let pool = test_pool().await;
@@ -83,6 +107,8 @@ async fn hp_t4b_claim_is_single_owner_and_increments_attempt_count() {
     .await
     .expect("second claim query");
     assert!(second.is_none(), "a live lease must not be stolen");
+
+    retire_outbox_row(&pool, outbox_id).await;
 }
 
 #[tokio::test]
@@ -128,6 +154,8 @@ async fn hp_t4b_expired_lease_is_reclaimable_with_new_owner() {
     assert_eq!(reclaimed.outbox_id, outbox_id);
     assert_eq!(reclaimed.claim_token, second_token);
     assert_eq!(reclaimed.attempt_count, 2);
+
+    retire_outbox_row(&pool, outbox_id).await;
 }
 
 #[tokio::test]
@@ -191,6 +219,8 @@ async fn ec_t4b_foreign_release_fails_closed_and_owner_release_requeues() {
     )
     .await;
     assert!(matches!(stale_repeat, Err(DbError::Conflict)));
+
+    retire_outbox_row(&pool, outbox_id).await;
 }
 
 #[tokio::test]
@@ -221,4 +251,6 @@ async fn ec_t4b_invalid_or_expired_requested_lease_fails_before_db_mutation() {
             .await
             .expect("read attempt count");
     assert_eq!(attempt_count, 0);
+
+    retire_outbox_row(&pool, outbox_id).await;
 }
