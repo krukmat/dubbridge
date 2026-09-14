@@ -7,9 +7,13 @@ use sqlx::{PgPool, Postgres, Transaction};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use dubbridge_domain::p2p_publication::{K1LineageId, P2pPublicationId};
+use dubbridge_domain::{
+    asset::AssetId,
+    audit::{AuditEvent, AuditEventKind},
+    p2p_publication::{K1LineageId, P2pPublicationId},
+};
 
-use crate::error::DbError;
+use crate::{audit_repo::insert_audit_event_tx, error::DbError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct P2pPublicationClaim {
@@ -197,12 +201,8 @@ pub async fn complete_publication_claim(
 }
 
 /// Persist same-lineage external confirmation, transition the publication to
-/// `ready`, and acknowledge the owned outbox claim in one PostgreSQL transaction.
-///
-/// This closes the crash window where the publication could become durable Ready
-/// while its outbox claim remained leased forever and therefore no longer
-/// reclaimable by the dispatcher. A stale/foreign owner or conflicting remote
-/// publication identity rolls the whole transaction back.
+/// `ready`, acknowledge the owned outbox claim, and record both required P2
+/// audit events in one PostgreSQL transaction.
 pub async fn finalize_publication_ready(
     pool: &PgPool,
     finalization: ReadyFinalization<'_>,
@@ -221,7 +221,7 @@ pub async fn finalize_publication_ready(
     )
     .await?;
 
-    let publication_update = sqlx::query(
+    let asset_id = sqlx::query_scalar::<_, Uuid>(
         r#"
         UPDATE p2p_publications
            SET external_publication_id = $3,
@@ -235,18 +235,17 @@ pub async fn finalize_publication_ready(
            AND state IN ('publishing', 'reconciling')
            AND (external_publication_id IS NULL OR external_publication_id = $3)
            AND (confirmed_lineage_id IS NULL OR confirmed_lineage_id = $2)
+        RETURNING asset_id
         "#,
     )
     .bind(finalization.publication_id.0)
     .bind(finalization.lineage_id.0)
     .bind(finalization.external_publication_id)
     .bind(finalization.confirmed_at)
-    .execute(&mut *tx)
+    .fetch_optional(&mut *tx)
     .await
-    .map_err(DbError::QueryFailed)?;
-    if publication_update.rows_affected() != 1 {
-        return Err(DbError::Conflict);
-    }
+    .map_err(DbError::QueryFailed)?
+    .ok_or(DbError::Conflict)?;
 
     let outbox_update = sqlx::query(
         r#"
@@ -272,14 +271,28 @@ pub async fn finalize_publication_ready(
         return Err(DbError::Conflict);
     }
 
+    let confirmed = AuditEvent::new_p2p_event(
+        AssetId(asset_id),
+        AuditEventKind::P2pPublicationConfirmed,
+        finalization.publication_id.0,
+        finalization.lineage_id.0,
+        None,
+    );
+    insert_audit_event_tx(&mut tx, &confirmed).await?;
+    let ready = AuditEvent::new_p2p_event(
+        AssetId(asset_id),
+        AuditEventKind::P2pPublicationReady,
+        finalization.publication_id.0,
+        finalization.lineage_id.0,
+        None,
+    );
+    insert_audit_event_tx(&mut tx, &ready).await?;
+
     tx.commit().await.map_err(DbError::QueryFailed)
 }
 
-/// Atomically persist terminal publication failure and release the owned claim.
-///
-/// This prevents a crash after the `failed` state transition from leaving an
-/// unreclaimable claimed row behind. The outbox remains non-delivered but no
-/// longer leased; terminal publication state keeps it out of dispatch selection.
+/// Atomically persist terminal publication failure, release the owned claim,
+/// and persist the correlated terminal audit event.
 pub async fn fail_publication_claim(
     pool: &PgPool,
     outbox_id: Uuid,
@@ -296,7 +309,7 @@ pub async fn fail_publication_claim(
     let mut tx = pool.begin().await.map_err(DbError::QueryFailed)?;
     ensure_claim_owned(&mut tx, outbox_id, publication_id, lineage_id, claim_token).await?;
 
-    let publication_update = sqlx::query(
+    let asset_id = sqlx::query_scalar::<_, Uuid>(
         r#"
         UPDATE p2p_publications
            SET state = 'failed',
@@ -305,17 +318,16 @@ pub async fn fail_publication_claim(
          WHERE id = $1
            AND lineage_id = $2
            AND state IN ('publish_pending', 'publishing', 'reconciling')
+        RETURNING asset_id
         "#,
     )
     .bind(publication_id.0)
     .bind(lineage_id.0)
     .bind(reason)
-    .execute(&mut *tx)
+    .fetch_optional(&mut *tx)
     .await
-    .map_err(DbError::QueryFailed)?;
-    if publication_update.rows_affected() != 1 {
-        return Err(DbError::Conflict);
-    }
+    .map_err(DbError::QueryFailed)?
+    .ok_or(DbError::Conflict)?;
 
     let outbox_update = sqlx::query(
         r#"
@@ -341,6 +353,15 @@ pub async fn fail_publication_claim(
     if outbox_update.rows_affected() != 1 {
         return Err(DbError::Conflict);
     }
+
+    let failed = AuditEvent::new_p2p_event(
+        AssetId(asset_id),
+        AuditEventKind::P2pPublicationFailed,
+        publication_id.0,
+        lineage_id.0,
+        Some(reason.to_owned()),
+    );
+    insert_audit_event_tx(&mut tx, &failed).await?;
 
     tx.commit().await.map_err(DbError::QueryFailed)
 }
