@@ -5,6 +5,7 @@ use std::{env, path::PathBuf};
 use anyhow::{Context, bail};
 use dubbridge_db::{
     error::DbError,
+    p2p_package_seal_repo::persist_sealed_package_evidence,
     p2p_publication_repo::{
         P2pPublicationRecord, ensure_publication_with_outbox, get_publication_by_asset,
         record_sealed_k1, transition_publication_state,
@@ -116,8 +117,17 @@ async fn activate(
     )
     .map_err(|error| anyhow::anyhow!("failed to build P2 ciphertext package: {error:?}"))?;
 
-    materialize(&config.ciphertext_root, &package)
+    let materialized = materialize(&config.ciphertext_root, &package)
         .map_err(|error| anyhow::anyhow!("failed to materialize P2 ciphertext package: {error}"))?;
+    persist_sealed_package_evidence(
+        pool,
+        publication.id,
+        publication.lineage_id,
+        &package.manifest_digest_sha256,
+        &materialized.publication_id,
+    )
+    .await
+    .context("failed to persist P2 sealed package evidence")?;
     advance_to_publish_pending(pool, publication.id).await
 }
 
