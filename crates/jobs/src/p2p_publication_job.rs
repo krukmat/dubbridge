@@ -22,6 +22,7 @@ use dubbridge_db::p2p_publication_claim_repo::{
 use dubbridge_db::p2p_publication_repo::{
     P2pPublicationRecord, get_publication, transition_publication_state,
 };
+use dubbridge_db::p2p_ready_repo::persist_confirmed_manifest_digest;
 use dubbridge_domain::p2p_publication::{P2pPublicationId, PublicationState};
 use dubbridge_domain::p2p_recovery::{
     DispatchAttempt, DispatchOutcome, RecoveryAction, decide_recovery_action,
@@ -171,6 +172,15 @@ impl P2pPublicationDispatcher {
             Ok(value) => value,
             Err(_) => return self.fail_claim(claim, "publication_response_invalid").await,
         };
+
+        persist_confirmed_manifest_digest(
+            &self.pool,
+            claim.publication_id,
+            claim.lineage_id,
+            &evidence.manifest_digest_sha256,
+        )
+        .await?;
+
         finalize_publication_ready(
             &self.pool,
             ReadyFinalization {
