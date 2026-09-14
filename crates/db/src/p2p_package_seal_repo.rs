@@ -23,6 +23,16 @@ pub async fn persist_sealed_package_evidence(
         UPDATE p2p_publications
            SET manifest_digest_sha256 = $3,
                package_ref = $4,
+               -- K1 is persisted provisionally before package construction so a
+               -- crash cannot rotate the lineage key. Re-assert the complete
+               -- sealed tuple in this seal-completion write so the frozen ADR-018
+               -- `p2p_lineage_sealed` boundary commits wrapped-key identity and
+               -- package evidence together with the audit trigger.
+               sealed_kek_id = sealed_kek_id,
+               sealed_kek_version = sealed_kek_version,
+               sealed_nonce = sealed_nonce,
+               sealed_wrapped_ck = sealed_wrapped_ck,
+               sealed_at = sealed_at,
                updated_at = now()
          WHERE id = $1
            AND lineage_id = $2
