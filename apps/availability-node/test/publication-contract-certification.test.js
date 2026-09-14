@@ -27,32 +27,19 @@ test("T3d contract certification: frozen request and success response round-trip
     fixture.request.publication_id
   );
   const response = parsePublicationResponse(
-    fixture.success_first_publish.status,
+    fixture.success_first_publish.http_status,
     fixture.success_first_publish.body,
     request
   );
 
-  assert.equal(response.status, 201);
+  assert.equal(response.status, fixture.success_first_publish.http_status);
   assert.deepEqual(response.evidence, fixture.success_first_publish.body);
 });
 
-test("T3d secret-deny certification: forbidden publication payload fields fail closed", async () => {
+test("T3d secret-deny certification: frozen forbidden publication fields fail closed", async () => {
   const { parsePublicationRequest } = await contract();
-  const forbiddenFields = [
-    "plaintext_ck",
-    "wrapped_ck",
-    "kek",
-    "kek_bytes",
-    "database_url",
-    "invite_token",
-    "viewer_id",
-    "device_id",
-    "business_authorization",
-    "jwt_signing_secret",
-    "service_private_key",
-  ];
 
-  for (const field of forbiddenFields) {
+  for (const field of fixture.secret_deny_list) {
     const candidate = { ...fixture.request, [field]: "must-not-cross-boundary" };
     expectContractError(
       () => parsePublicationRequest(candidate, fixture.request.publication_id),
