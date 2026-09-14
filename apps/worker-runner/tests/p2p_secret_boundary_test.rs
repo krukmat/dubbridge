@@ -66,8 +66,8 @@ fn sealed_package_contains_ciphertext_not_source_plaintext() {
         },
     ];
 
-    let sealed = build_package(&asset_id, &publication_id, &lineage_id, &ck, &inputs)
-        .expect("seal package");
+    let sealed =
+        build_package(&asset_id, &publication_id, &lineage_id, &ck, &inputs).expect("seal package");
 
     assert_eq!(sealed.files.len(), inputs.len());
     for (sealed_file, input) in sealed.files.iter().zip(&inputs) {
@@ -94,7 +94,10 @@ fn availability_request_is_metadata_only_and_secret_deny_clean() {
     let object = value.as_object().expect("request object");
     assert_eq!(object.len(), 6);
     assert_eq!(
-        object.keys().cloned().collect::<std::collections::BTreeSet<_>>(),
+        object
+            .keys()
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>(),
         [
             "contract_version",
             "lineage_id",
@@ -118,8 +121,8 @@ fn ready_descriptor_exposes_only_opaque_wrap_reference() {
         asset_id,
         publication_id,
         lineage_id,
-        manifest_digest_sha256:
-            "b753ba52473d8b9f1ddc8444d43d6166c6b46eeb1214018e3a33503f56a021b4".to_string(),
+        manifest_digest_sha256: "b753ba52473d8b9f1ddc8444d43d6166c6b46eeb1214018e3a33503f56a021b4"
+            .to_string(),
         external_publication_id: "hyperdrive:stable-id".to_string(),
         kek_id: "server-kek-v1".to_string(),
         kek_version: 1,
