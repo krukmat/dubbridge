@@ -143,17 +143,63 @@ pub async fn release_publication_claim(
     .await
     .map_err(DbError::QueryFailed)?;
 
-    if result.rows_affected() == 1 {
+    resolve_owned_mutation(pool, outbox_id, result.rows_affected()).await
+}
+
+/// Mark a successfully reconciled obligation delivered after durable Ready.
+///
+/// Completion remains claim-token guarded so a stale worker cannot acknowledge
+/// work reclaimed by another owner. Remote success alone never calls this path:
+/// callers must first persist same-lineage confirmation and the Ready transition.
+pub async fn complete_publication_claim(
+    pool: &PgPool,
+    outbox_id: Uuid,
+    claim_token: Uuid,
+    delivered_at: OffsetDateTime,
+) -> Result<(), DbError> {
+    if claim_token.is_nil() {
+        return Err(DbError::Conflict);
+    }
+
+    let result = sqlx::query(
+        r#"
+        UPDATE p2p_publication_outbox
+           SET delivery_state = 'delivered',
+               delivered_at = $3,
+               claim_token = NULL,
+               lease_expires_at = NULL,
+               last_error = NULL,
+               updated_at = now()
+         WHERE id = $1
+           AND delivery_state = 'claimed'
+           AND claim_token = $2
+        "#,
+    )
+    .bind(outbox_id)
+    .bind(claim_token)
+    .bind(delivered_at)
+    .execute(pool)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    resolve_owned_mutation(pool, outbox_id, result.rows_affected()).await
+}
+
+async fn resolve_owned_mutation(
+    pool: &PgPool,
+    outbox_id: Uuid,
+    rows_affected: u64,
+) -> Result<(), DbError> {
+    if rows_affected == 1 {
         return Ok(());
     }
 
-    let exists: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM p2p_publication_outbox WHERE id = $1)",
-    )
-    .bind(outbox_id)
-    .fetch_one(pool)
-    .await
-    .map_err(DbError::QueryFailed)?;
+    let exists: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM p2p_publication_outbox WHERE id = $1)")
+            .bind(outbox_id)
+            .fetch_one(pool)
+            .await
+            .map_err(DbError::QueryFailed)?;
 
     if exists {
         Err(DbError::Conflict)
