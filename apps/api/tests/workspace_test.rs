@@ -648,8 +648,9 @@ async fn migrate_and_reset(pool: &PgPool) {
         .expect("migrations");
 
     // Fail-closed tests drop audit_events intentionally. If it's missing
-    // after the baseline migrate, remove its migration records so sqlx
-    // re-creates it.
+    // after the baseline migrate, remove every migration that creates or
+    // extends that table so sqlx replays the complete current audit schema,
+    // including the P2 correlation columns introduced by migration 0036.
     let audit_exists: Option<i32> = sqlx::query_scalar(
         "SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='audit_events'",
     )
@@ -657,7 +658,7 @@ async fn migrate_and_reset(pool: &PgPool) {
     .await
     .unwrap_or(None);
     if audit_exists.is_none() {
-        sqlx::query("DELETE FROM _sqlx_migrations WHERE version IN (4, 9, 30)")
+        sqlx::query("DELETE FROM _sqlx_migrations WHERE version IN (4, 9, 30, 36)")
             .execute(pool)
             .await
             .expect("clear stale migration records");
