@@ -12,7 +12,7 @@ use std::time::Duration as StdDuration;
 
 use anyhow::Context;
 use dubbridge_connectors::p2p_availability::AvailabilityPublicationClient;
-use dubbridge_jobs::p2p_publication_job::{DispatchTick, P2pPublicationDispatcher};
+use dubbridge_jobs::p2p_publication_job::{DispatchTick, P2pDispatchError, P2pPublicationDispatcher};
 use sqlx::PgPool;
 use time::Duration;
 
@@ -73,28 +73,33 @@ impl P2pPublicationRuntime {
 
     pub async fn run(self) {
         loop {
-            self.run_iteration().await;
+            let result = self.dispatcher.dispatch_once().await;
+            match result {
+                Ok(tick) => self.handle_tick(tick).await,
+                Err(error) => self.handle_error(error).await,
+            }
             tokio::task::yield_now().await;
         }
     }
 
-    async fn run_iteration(&self) {
-        match self.dispatcher.dispatch_once().await {
-            Ok(DispatchTick::Idle) => tokio::time::sleep(self.idle_interval).await,
-            Ok(DispatchTick::Ready(publication_id)) => {
+    async fn handle_tick(&self, tick: DispatchTick) {
+        match tick {
+            DispatchTick::Idle => tokio::time::sleep(self.idle_interval).await,
+            DispatchTick::Ready(publication_id) => {
                 tracing::info!(%publication_id, "P2P publication reached durable Ready");
             }
-            Ok(DispatchTick::Retrying(publication_id)) => {
+            DispatchTick::Retrying(publication_id) => {
                 tracing::warn!(%publication_id, "P2P publication scheduled for reconciliation");
             }
-            Ok(DispatchTick::Failed(publication_id)) => {
+            DispatchTick::Failed(publication_id) => {
                 tracing::error!(%publication_id, "P2P publication entered terminal failure");
             }
-            Err(error) => {
-                tracing::error!(error = %error, "P2P publication reconciler iteration failed");
-                tokio::time::sleep(self.idle_interval).await;
-            }
         }
+    }
+
+    async fn handle_error(&self, error: P2pDispatchError) {
+        tracing::error!(error = %error, "P2P publication reconciler iteration failed");
+        tokio::time::sleep(self.idle_interval).await;
     }
 }
 
