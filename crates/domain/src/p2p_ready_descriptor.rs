@@ -104,7 +104,8 @@ mod tests {
             asset_id: AssetId(Uuid::new_v4()),
             publication_id: P2pPublicationId::new(),
             lineage_id: K1LineageId::new(),
-            manifest_digest_sha256: "b753ba52473d8b9f1ddc8444d43d6166c6b46eeb1214018e3a33503f56a021b4".to_owned(),
+            manifest_digest_sha256:
+                "b753ba52473d8b9f1ddc8444d43d6166c6b46eeb1214018e3a33503f56a021b4".to_owned(),
             external_publication_id: "hyperdrive:stable-key".to_owned(),
             kek_id: "server-kek".to_owned(),
             kek_version: 1,
