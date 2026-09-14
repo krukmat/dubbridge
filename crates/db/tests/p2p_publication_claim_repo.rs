@@ -1,12 +1,8 @@
 use dubbridge_db::{
     create_pool,
     error::DbError,
-    p2p_publication_claim_repo::{
-        claim_next_publication_work, release_publication_claim,
-    },
-    p2p_publication_repo::{
-        ensure_publication_with_outbox, transition_publication_state,
-    },
+    p2p_publication_claim_repo::{claim_next_publication_work, release_publication_claim},
+    p2p_publication_repo::{ensure_publication_with_outbox, transition_publication_state},
 };
 use dubbridge_domain::{
     asset::AssetId,
@@ -53,14 +49,9 @@ async fn create_claimable_work(pool: &PgPool) -> (P2pPublicationId, K1LineageId,
     ensure_publication_with_outbox(pool, asset_id, publication_id, lineage_id, outbox_id)
         .await
         .expect("create publication and outbox");
-    transition_publication_state(
-        pool,
-        publication_id,
-        PublicationState::PublishPending,
-        None,
-    )
-    .await
-    .expect("building -> publish_pending");
+    transition_publication_state(pool, publication_id, PublicationState::PublishPending, None)
+        .await
+        .expect("building -> publish_pending");
 
     (publication_id, lineage_id, outbox_id)
 }
@@ -223,12 +214,11 @@ async fn ec_t4b_invalid_or_expired_requested_lease_fails_before_db_mutation() {
     .await;
     assert!(matches!(expired, Err(DbError::Conflict)));
 
-    let attempt_count: i32 = sqlx::query_scalar(
-        "SELECT attempt_count FROM p2p_publication_outbox WHERE id = $1",
-    )
-    .bind(outbox_id)
-    .fetch_one(&pool)
-    .await
-    .expect("read attempt count");
+    let attempt_count: i32 =
+        sqlx::query_scalar("SELECT attempt_count FROM p2p_publication_outbox WHERE id = $1")
+            .bind(outbox_id)
+            .fetch_one(&pool)
+            .await
+            .expect("read attempt count");
     assert_eq!(attempt_count, 0);
 }
