@@ -134,11 +134,7 @@ impl P2pPublicationDispatcher {
         let publication = self.move_to_publishing(publication).await?;
         let request = match load_request(&self.ciphertext_root, &publication).await {
             Ok(request) => request,
-            Err(error) => {
-                return self
-                    .fail_claim(claim, "package_invalid", Some(error))
-                    .await;
-            }
+            Err(_) => return self.fail_claim(claim, "package_invalid").await,
         };
 
         match self.publisher.publish(&request).await {
@@ -146,7 +142,7 @@ impl P2pPublicationDispatcher {
             Err(error) if is_retryable_remote_error(error) => {
                 self.retry_or_fail(claim, error).await
             }
-            Err(error) => self.fail_claim(claim, remote_error_code(error), None).await,
+            Err(error) => self.fail_claim(claim, remote_error_code(error)).await,
         }
     }
 
@@ -174,8 +170,10 @@ impl P2pPublicationDispatcher {
         claim: P2pPublicationClaim,
         evidence: AvailabilityPublicationEvidence,
     ) -> Result<DispatchTick, P2pDispatchError> {
-        let confirmed_at = OffsetDateTime::parse(&evidence.confirmed_at, &Rfc3339)
-            .map_err(|_| P2pDispatchError::InvalidPackage)?;
+        let confirmed_at = match OffsetDateTime::parse(&evidence.confirmed_at, &Rfc3339) {
+            Ok(value) => value,
+            Err(_) => return self.fail_claim(claim, "publication_response_invalid").await,
+        };
         record_external_confirmation(
             &self.pool,
             claim.publication_id,
@@ -231,7 +229,7 @@ impl P2pPublicationDispatcher {
         );
 
         if action == RecoveryAction::MarkFailed {
-            return self.fail_claim(claim, remote_error_code(error), None).await;
+            return self.fail_claim(claim, remote_error_code(error)).await;
         }
 
         release_publication_claim(
@@ -249,7 +247,6 @@ impl P2pPublicationDispatcher {
         &self,
         claim: P2pPublicationClaim,
         reason: &'static str,
-        package_error: Option<P2pDispatchError>,
     ) -> Result<DispatchTick, P2pDispatchError> {
         transition_publication_state(
             &self.pool,
@@ -266,11 +263,6 @@ impl P2pPublicationDispatcher {
             Some(reason),
         )
         .await?;
-        if let Some(error) = package_error {
-            if !matches!(error, P2pDispatchError::InvalidPackage) {
-                return Err(error);
-            }
-        }
         Ok(DispatchTick::Failed(claim.publication_id))
     }
 }
