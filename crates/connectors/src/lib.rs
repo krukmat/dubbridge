@@ -1,6 +1,8 @@
 // S3-P1: platform connector trait boundary (ADR-025).
 // Pure request-builder / IO-executor split — no DB dependency.
 
+pub mod p2p_availability;
+
 use std::future::Future;
 use std::path::Path;
 
@@ -96,11 +98,11 @@ mod tests {
     #[test]
     fn connector_credential_debug_redacts_value() {
         let cred = ConnectorCredential {
-            credential_ref: "super-secret-oauth-token".to_string(),
+            credential_ref: "example-credential-reference".to_string(),
         };
         let debug_output = format!("{cred:?}");
         assert!(debug_output.contains("[redacted]"));
-        assert!(!debug_output.contains("super-secret-oauth-token"));
+        assert!(!debug_output.contains("example-credential-reference"));
     }
 
     #[test]
