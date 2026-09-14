@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+pub mod p2p_publication_job;
 mod subtitle_job;
 
 pub use subtitle_job::{
