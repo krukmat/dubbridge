@@ -14,6 +14,7 @@ use dubbridge_connectors::p2p_availability::{
     AvailabilityPublicationRequest,
 };
 use dubbridge_db::error::DbError;
+use dubbridge_db::p2p_audit_transition_repo::enter_publication_reconciliation;
 use dubbridge_db::p2p_publication_claim_repo::{
     P2pPublicationClaim, ReadyFinalization, claim_next_publication_work,
     fail_publication_claim as persist_failed_claim, finalize_publication_ready,
@@ -206,11 +207,12 @@ impl P2pPublicationDispatcher {
             AvailabilityPublicationError::AmbiguousOutcome => DispatchOutcome::Unknown,
             _ => DispatchOutcome::Failure,
         };
-        transition_publication_state(
+        let reason = remote_error_code(error);
+        enter_publication_reconciliation(
             &self.pool,
             claim.publication_id,
-            PublicationState::Reconciling,
-            None,
+            claim.lineage_id,
+            reason,
         )
         .await?;
 
@@ -227,7 +229,7 @@ impl P2pPublicationDispatcher {
         );
 
         if action == RecoveryAction::MarkFailed {
-            return self.fail_claim(claim, remote_error_code(error)).await;
+            return self.fail_claim(claim, reason).await;
         }
 
         release_publication_claim(
@@ -235,7 +237,7 @@ impl P2pPublicationDispatcher {
             claim.outbox_id,
             claim.claim_token,
             OffsetDateTime::now_utc() + self.retry_delay,
-            Some(remote_error_code(error)),
+            Some(reason),
         )
         .await?;
         Ok(DispatchTick::Retrying(claim.publication_id))
