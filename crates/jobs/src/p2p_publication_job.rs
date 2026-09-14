@@ -15,12 +15,12 @@ use dubbridge_connectors::p2p_availability::{
 };
 use dubbridge_db::error::DbError;
 use dubbridge_db::p2p_publication_claim_repo::{
-    P2pPublicationClaim, claim_next_publication_work, complete_publication_claim,
+    P2pPublicationClaim, claim_next_publication_work,
+    fail_publication_claim as persist_failed_claim, finalize_publication_ready,
     release_publication_claim,
 };
 use dubbridge_db::p2p_publication_repo::{
-    P2pPublicationRecord, get_publication, record_external_confirmation,
-    transition_publication_state,
+    P2pPublicationRecord, get_publication, transition_publication_state,
 };
 use dubbridge_domain::p2p_publication::{P2pPublicationId, PublicationState};
 use dubbridge_domain::p2p_recovery::{
@@ -174,26 +174,16 @@ impl P2pPublicationDispatcher {
             Ok(value) => value,
             Err(_) => return self.fail_claim(claim, "publication_response_invalid").await,
         };
-        record_external_confirmation(
-            &self.pool,
-            claim.publication_id,
-            claim.lineage_id,
-            &evidence.external_publication_id,
-            confirmed_at,
-        )
-        .await?;
-        transition_publication_state(
-            &self.pool,
-            claim.publication_id,
-            PublicationState::Ready,
-            None,
-        )
-        .await?;
-        complete_publication_claim(
+        let delivered_at = OffsetDateTime::now_utc();
+        finalize_publication_ready(
             &self.pool,
             claim.outbox_id,
+            claim.publication_id,
+            claim.lineage_id,
             claim.claim_token,
-            OffsetDateTime::now_utc(),
+            &evidence.external_publication_id,
+            confirmed_at,
+            delivered_at,
         )
         .await?;
         Ok(DispatchTick::Ready(claim.publication_id))
@@ -248,19 +238,14 @@ impl P2pPublicationDispatcher {
         claim: P2pPublicationClaim,
         reason: &'static str,
     ) -> Result<DispatchTick, P2pDispatchError> {
-        transition_publication_state(
-            &self.pool,
-            claim.publication_id,
-            PublicationState::Failed,
-            Some(reason),
-        )
-        .await?;
-        release_publication_claim(
+        persist_failed_claim(
             &self.pool,
             claim.outbox_id,
+            claim.publication_id,
+            claim.lineage_id,
             claim.claim_token,
             OffsetDateTime::now_utc(),
-            Some(reason),
+            reason,
         )
         .await?;
         Ok(DispatchTick::Failed(claim.publication_id))
