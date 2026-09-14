@@ -7,6 +7,7 @@ pub mod consent_repo;
 pub mod dubbing_repo;
 pub mod error;
 pub mod notification_repo;
+pub mod p2p_audit_transition_repo;
 pub mod p2p_publication_claim_repo;
 pub mod p2p_publication_repo;
 pub mod p2p_ready_repo;
