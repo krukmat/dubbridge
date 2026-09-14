@@ -77,38 +77,44 @@ pub async fn persist_confirmed_manifest_digest(
     }
 }
 
-/// Return the P3 handoff only from authoritative PostgreSQL Ready state with
-/// same-lineage external confirmation, durable manifest evidence and sealed K1
-/// metadata. Incomplete/legacy Ready rows intentionally return None.
+/// Return the downstream handoff only from authoritative PostgreSQL Ready state
+/// after same-lineage confirmation, durable manifest evidence, sealed K1 metadata
+/// and completed delivery of the matching outbox obligation. Any partial/legacy
+/// row intentionally remains invisible.
 pub async fn get_ready_descriptor_by_asset(
     pool: &PgPool,
     asset_id: AssetId,
 ) -> Result<Option<P2pReadyDescriptor>, DbError> {
     let row = sqlx::query_as::<_, ReadyDescriptorRow>(
         r#"
-        SELECT asset_id,
-               id AS publication_id,
-               lineage_id,
-               manifest_digest_sha256,
-               external_publication_id,
-               sealed_kek_id,
-               sealed_kek_version,
+        SELECT p.asset_id,
+               p.id AS publication_id,
+               p.lineage_id,
+               p.manifest_digest_sha256,
+               p.external_publication_id,
+               p.sealed_kek_id,
+               p.sealed_kek_version,
                to_char(
-                   updated_at AT TIME ZONE 'UTC',
+                   p.updated_at AT TIME ZONE 'UTC',
                    'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
                ) AS ready_at
-          FROM p2p_publications
-         WHERE asset_id = $1
-           AND state = 'ready'
-           AND confirmed_lineage_id = lineage_id
-           AND external_publication_id IS NOT NULL
-           AND external_confirmed_at IS NOT NULL
-           AND manifest_digest_sha256 IS NOT NULL
-           AND sealed_kek_id IS NOT NULL
-           AND sealed_kek_version IS NOT NULL
-           AND sealed_nonce IS NOT NULL
-           AND sealed_wrapped_ck IS NOT NULL
-           AND sealed_at IS NOT NULL
+          FROM p2p_publications p
+          JOIN p2p_publication_outbox o
+            ON o.publication_id = p.id
+           AND o.lineage_id = p.lineage_id
+         WHERE p.asset_id = $1
+           AND p.state = 'ready'
+           AND p.confirmed_lineage_id = p.lineage_id
+           AND p.external_publication_id IS NOT NULL
+           AND p.external_confirmed_at IS NOT NULL
+           AND p.manifest_digest_sha256 IS NOT NULL
+           AND p.sealed_kek_id IS NOT NULL
+           AND p.sealed_kek_version IS NOT NULL
+           AND p.sealed_nonce IS NOT NULL
+           AND p.sealed_wrapped_ck IS NOT NULL
+           AND p.sealed_at IS NOT NULL
+           AND o.delivery_state = 'delivered'
+           AND o.delivered_at IS NOT NULL
         "#,
     )
     .bind(asset_id.0)
