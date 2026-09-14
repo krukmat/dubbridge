@@ -252,7 +252,7 @@ Code-solution review: n/a — analysis/docs-only task.
 
 ## G1 — Correct the canonical Complex-review profile
 
-- **Status:** [ ] Not started — explicit approval required
+- **Status:** [x] Done
 - **Type:** policy / documentation
 - **Depends on:** A3
 
@@ -265,10 +265,57 @@ reviewer/fallback order.
 
 ### Approval boundary
 
-This changes a governance-critical workflow invariant. The present assignment
-authorizes the conceptual evaluation and planning correction, not silent
-mutation of the canonical workflow guide and RRI policy. Before execution,
-freeze the exact affected policy/history files and obtain explicit approval.
+This changes a governance-critical workflow invariant. Explicit owner
+approval was obtained before implementation (2026-09-14, "si a todo" /
+G1 card approval), per RRI 55 Med-high policy-only exemption from
+band-routed review.
+
+### RRI
+
+Final RRI 55 (Med-high), `arch_decision` penalty applied — recomputed
+2026-09-14 against `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` +
+`docs/policies/RRI_POLICY.md` (`--touches` both files, `--C 0`,
+`--D 2 --K 1 --P 1 --T 0 --A 1 --X 1 --penalty arch_decision`). Full report
+recorded in the approval card presented in-session; band-routed review is
+`n/a` (policy-only exemption per `AGENT_WORKFLOW_GUIDE.md` §
+"Band-routed peer review").
+
+### Implementation
+
+Corrected the RRI 56+ Complex-review binding in three files:
+
+- `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` — main binding paragraph
+  (§ Band-routed peer review), Step 1-C profile statement, and Step 1e
+  invocation instruction; added a dated correction note citing the evidence.
+- `docs/policies/RRI_POLICY.md` — bands table footnote (\* RRI 56+ primary
+  reviewer), with an inline correction citation.
+- `docs/audit/agent-workflow-binding-history.md` — appended a new dated row
+  (append-only ledger; the original 2026-09-13 row is retained unchanged as
+  history).
+
+`docs/plan/local-agent-packet-hardening.md` and this task's own objective
+text above still describe the profile as a planning target dated before the
+fix — left as-is since they narrate the finding that motivated this task,
+not the current binding.
+
+### Evidence / verification
+
+- `make qa-docs`: full pass (doc-consistency, behavioral-coverage 7 tests,
+  BDD-mapping, task-unit-coverage 24 tests, task-completion-evidence,
+  roadmap-drift, OKF-frontmatter).
+- Source evidence:
+  `docs/audit/local-execution-routing-evidence-2026-09-14.md` §
+  "`gpt-oss:20b` Complex-review profile" — 4/4 `high`-reasoning attempts
+  returned empty content on `done_reason: length`; the one `medium`/`10240`
+  attempt in the same corpus returned a valid `PASS`.
+
+### Status artifacts affected
+
+- `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`, `docs/policies/RRI_POLICY.md`,
+  `docs/audit/agent-workflow-binding-history.md` (this change).
+- No ADR, roadmap, or other task ledger references the specific
+  `8192`/`high` values, so no further propagation is required beyond this
+  task entry.
 
 ---
 

@@ -263,7 +263,11 @@ band — never derive one output from another (e.g. do not infer capability from
 
 \* **RRI 56+ primary reviewer** (2026-09-13, owner-directed rebinding):
 `gpt-oss:20b` at the Complex review profile (`num_ctx=49152`,
-`num_predict=8192`, `think=high`, `temperature=1.0`, `top_p=1.0`) is now
+`num_predict=10240`, `think=medium`, `temperature=1.0`, `top_p=1.0`;
+corrected 2026-09-14 from the original `8192`/`high` after evidence of
+repeated empty-content `length` terminations at `high` reasoning — see
+`docs/audit/local-execution-routing-evidence-2026-09-14.md` and
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review`) is now
 primary for both phase 1 and phase 2. The **cross-vendor peer** becomes the
 intermediate fallback: `claude-code → codex | codex → claude | other →
 claude`. If gpt-oss is unavailable, stalled, or returns invalid/`BLOCKED`

@@ -1231,18 +1231,34 @@ the task's RRI band and the review phase:
 **RRI 56+ primary rebinding (2026-09-13, owner-directed):** the cross-vendor
 peer (Codex) is no longer the primary reviewer for either phase in the
 Complex+ band. The primary is now `gpt-oss:20b` run at the **Complex
-review profile** — `num_ctx=49152`, `num_predict=8192`, `think=high`,
-`temperature=1.0`, `top_p=1.0` (the "critical/architect-level" profile
-already defined in § Mandatory workflow before implementing, Step 0, with
-`num_predict` set to `8192` specifically for this binding rather than that
-section's general `10240`). The cross-vendor peer (Codex) moves to
-**fallback**: invoked only if `gpt-oss:20b` is unavailable, stalled, or
-returns invalid/`BLOCKED` output, following the same one-retry-then-fallback
-discipline as every other band's chain. This inverts the previous
-`cross-vendor peer → D14` order to `gpt-oss:20b (Complex profile) → codex →
-D14`. Rationale recorded in `docs/audit/agent-workflow-binding-history.md`;
-this is an explicit owner instruction, not a capability/availability
-finding about Codex.
+review profile** — `num_ctx=49152`, `num_predict=10240`, `think=medium`,
+`temperature=1.0`, `top_p=1.0` (the same routine review profile already
+defined in § Mandatory workflow before implementing, Step 0, used here as
+the Complex-band binding rather than a separate `high`/`8192` profile — see
+the 2026-09-14 correction note immediately below). The cross-vendor peer
+(Codex) moves to **fallback**: invoked only if `gpt-oss:20b` is unavailable,
+stalled, or returns invalid/`BLOCKED` output, following the same
+one-retry-then-fallback discipline as every other band's chain. This
+inverts the previous `cross-vendor peer → D14` order to `gpt-oss:20b
+(Complex profile) → codex → D14`. Rationale recorded in
+`docs/audit/agent-workflow-binding-history.md`; this is an explicit owner
+instruction, not a capability/availability finding about Codex.
+
+**Reasoning-level correction (2026-09-14, owner-approved):** the profile
+above originally specified `think=high`/`num_predict=8192`. Real repository
+evidence collected during `local-agent-packet-hardening` routing review
+found four independent `high`-reasoning review attempts (`P2.T3c-Integ` ×2,
+`P2.T4b` ×2, at both `num_predict=8192` and reduced/expanded retries) all
+returned `done_reason: length` with empty visible content — the model spent
+its entire output budget on hidden reasoning before reaching a verdict. The
+one completed attempt in the same corpus ran at `think=medium`/
+`num_predict=10240` and returned a valid `PASS` verdict with `done_reason:
+stop`. Full evidence:
+`docs/audit/local-execution-routing-evidence-2026-09-14.md` §
+"`gpt-oss:20b` Complex-review profile". The binding above is corrected to
+`medium`/`10240` accordingly; this is a reasoning-level/budget correction
+only — it does not change which model is primary, the fallback chain, or
+any other RRI 56+ routing rule.
 
 Canonical chains — every other section names them by band instead of
 re-deriving them:
@@ -1781,8 +1797,8 @@ above):
 
 #### Step 1-C — RRI 56+ (Complex and above): gpt-oss:20b (Complex profile) / cross-vendor peer / D14
 
-`gpt-oss:20b` at the Complex profile (`num_ctx=49152`, `num_predict=8192`,
-`think=high`, `temperature=1.0`, `top_p=1.0`) **replaces Gemma** as the
+`gpt-oss:20b` at the Complex profile (`num_ctx=49152`, `num_predict=10240`,
+`think=medium`, `temperature=1.0`, `top_p=1.0`) **replaces Gemma** as the
 primary code-solution reviewer for this band (the Gemma/GPT-OSS 20B routing
 in Step 1-B applies only to 26–55; this is a distinct, Complex-only
 binding, not the same GPT-OSS 20B role as the 0–25/26–55 chains). Do not
@@ -1795,9 +1811,10 @@ fallback.
         workflow before implementing, Step 0, if not already done for this
         task ID.
 
-[ ] 1e. Invoke `gpt-oss:20b` at the Complex profile with the phase's
-        packet (task-analysis packet for phase 1; diff + acceptance
-        criteria for phase 2). Write the review artifact to
+[ ] 1e. Invoke `gpt-oss:20b` at the Complex profile (`num_ctx=49152`,
+        `num_predict=10240`, `think=medium`) with the phase's packet
+        (task-analysis packet for phase 1; diff + acceptance criteria for
+        phase 2). Write the review artifact to
         `.agent/peer-code-review-<task-id>.json`.
 
 [ ] 1f. Evaluate cross-vendor fallback — if `gpt-oss:20b` is unavailable,
