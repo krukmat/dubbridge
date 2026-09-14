@@ -62,7 +62,31 @@ async fn insert_asset(pool: &PgPool) -> AssetId {
     asset_id
 }
 
+async fn retire_existing_claimable_rows(pool: &PgPool) {
+    sqlx::query(
+        r#"
+        UPDATE p2p_publication_outbox
+           SET delivery_state = 'delivered',
+               delivered_at = COALESCE(delivered_at, now()),
+               claim_token = NULL,
+               lease_expires_at = NULL,
+               last_error = NULL,
+               updated_at = now()
+         WHERE delivered_at IS NULL
+            OR delivery_state <> 'delivered'
+        "#,
+    )
+    .execute(pool)
+    .await
+    .expect("retire pre-existing claimable publication work");
+}
+
 async fn create_claimable_work(pool: &PgPool) -> (P2pPublicationId, K1LineageId, Uuid) {
+    // `claim_next_publication_work` is intentionally global production behavior.
+    // The workspace CI database is shared by integration-test binaries, so
+    // retire earlier fixtures before creating this test's single claim target.
+    retire_existing_claimable_rows(pool).await;
+
     let asset_id = insert_asset(pool).await;
     let publication_id = P2pPublicationId::new();
     let lineage_id = K1LineageId::new();
@@ -80,11 +104,8 @@ async fn create_claimable_work(pool: &PgPool) -> (P2pPublicationId, K1LineageId,
 
 // `claim_next_publication_work` selects the globally oldest claimable outbox
 // row with no per-fixture filter (by design — it mirrors production, where a
-// single dispatcher pool spans all publications). Any row this test suite
-// leaves in a claimable (`pending`, or `claimed` with an expired lease) state
-// is therefore fair game for the *next* test's own claim call, producing
-// cross-test contamination even under `--test-threads=1`. Force every fixture
-// row to a non-claimable terminal state before the test returns.
+// single dispatcher pool spans all publications). Force this fixture row to a
+// non-claimable terminal state before the test returns.
 async fn retire_outbox_row(pool: &PgPool, outbox_id: Uuid) {
     sqlx::query(
         r#"
@@ -314,13 +335,14 @@ async fn hp_t6b_ready_finalization_writes_correlated_confirmed_and_ready_audit()
         SELECT event_kind, correlation_id, publication_id, lineage_id, ingest_token
           FROM audit_events
          WHERE publication_id = $1
+           AND event_kind IN ('p2p_publication_confirmed', 'p2p_publication_ready')
          ORDER BY happened_at ASC, id ASC
         "#,
     )
     .bind(publication_id.0)
     .fetch_all(&pool)
     .await
-    .expect("read P2 audit events");
+    .expect("read P2 ready audit events");
 
     assert_eq!(rows.len(), 2);
     assert_eq!(rows[0].event_kind, "p2p_publication_confirmed");
@@ -364,6 +386,7 @@ async fn hp_t6b_terminal_failure_writes_same_lineage_audit() {
         SELECT event_kind, correlation_id, publication_id, lineage_id, ingest_token, detail
           FROM audit_events
          WHERE publication_id = $1
+           AND event_kind = 'p2p_publication_failed'
         "#,
     )
     .bind(publication_id.0)
