@@ -369,7 +369,7 @@ async fn t4f_retry_budget_exhaustion_persists_terminal_failure() {
 #[tokio::test]
 async fn t4f_foreign_claim_completion_remains_fail_closed() {
     let pool = test_pool().await;
-    let fixture = create_work(&pool).await;
+    let _fixture = create_work(&pool).await;
     let token = Uuid::new_v4();
     let claim = claim_next_publication_work(
         &pool,

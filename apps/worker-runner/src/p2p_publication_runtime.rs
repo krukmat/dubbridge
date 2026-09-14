@@ -87,15 +87,9 @@ impl P2pPublicationRuntime {
     async fn handle_tick(&self, tick: DispatchTick) {
         match tick {
             DispatchTick::Idle => tokio::time::sleep(self.idle_interval).await,
-            DispatchTick::Ready(publication_id) => {
-                tracing::info!(%publication_id, "P2P publication reached durable Ready");
-            }
-            DispatchTick::Retrying(publication_id) => {
-                tracing::warn!(%publication_id, "P2P publication scheduled for reconciliation");
-            }
-            DispatchTick::Failed(publication_id) => {
-                tracing::error!(%publication_id, "P2P publication entered terminal failure");
-            }
+            DispatchTick::Ready(publication_id) => log_ready(publication_id),
+            DispatchTick::Retrying(publication_id) => log_retrying(publication_id),
+            DispatchTick::Failed(publication_id) => log_failed(publication_id),
         }
     }
 
@@ -103,6 +97,18 @@ impl P2pPublicationRuntime {
         tracing::error!(error = %error, "P2P publication reconciler iteration failed");
         tokio::time::sleep(self.idle_interval).await;
     }
+}
+
+fn log_ready(publication_id: dubbridge_domain::p2p_publication::P2pPublicationId) {
+    tracing::info!(%publication_id, "P2P publication reached durable Ready");
+}
+
+fn log_retrying(publication_id: dubbridge_domain::p2p_publication::P2pPublicationId) {
+    tracing::warn!(%publication_id, "P2P publication scheduled for reconciliation");
+}
+
+fn log_failed(publication_id: dubbridge_domain::p2p_publication::P2pPublicationId) {
+    tracing::error!(%publication_id, "P2P publication entered terminal failure");
 }
 
 fn reject_partial_configuration() -> anyhow::Result<()> {

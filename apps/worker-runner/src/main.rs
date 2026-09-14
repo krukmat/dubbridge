@@ -224,10 +224,10 @@ async fn stop_p2p_runtime(task: Option<tokio::task::JoinHandle<()>>) {
         return;
     };
     task.abort();
-    if let Err(error) = task.await {
-        if !error.is_cancelled() {
-            tracing::error!(error = %error, "P2P publication runtime terminated unexpectedly");
-        }
+    if let Err(error) = task.await
+        && !error.is_cancelled()
+    {
+        tracing::error!(error = %error, "P2P publication runtime terminated unexpectedly");
     }
 }
 
