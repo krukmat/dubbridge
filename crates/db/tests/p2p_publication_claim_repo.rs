@@ -1,7 +1,10 @@
 use dubbridge_db::{
     create_pool,
     error::DbError,
-    p2p_publication_claim_repo::{claim_next_publication_work, release_publication_claim},
+    p2p_publication_claim_repo::{
+        ReadyFinalization, claim_next_publication_work, fail_publication_claim,
+        finalize_publication_ready, release_publication_claim,
+    },
     p2p_publication_repo::{ensure_publication_with_outbox, transition_publication_state},
 };
 use dubbridge_domain::{
@@ -253,4 +256,108 @@ async fn ec_t4b_invalid_or_expired_requested_lease_fails_before_db_mutation() {
     assert_eq!(attempt_count, 0);
 
     retire_outbox_row(&pool, outbox_id).await;
+}
+
+#[tokio::test]
+async fn hp_t6b_ready_finalization_writes_correlated_confirmed_and_ready_audit() {
+    let pool = test_pool().await;
+    let (publication_id, lineage_id, outbox_id) = create_claimable_work(&pool).await;
+    let claim_token = Uuid::new_v4();
+    claim_next_publication_work(
+        &pool,
+        claim_token,
+        OffsetDateTime::now_utc() + Duration::minutes(5),
+    )
+    .await
+    .expect("claim query")
+    .expect("claim");
+    transition_publication_state(&pool, publication_id, PublicationState::Publishing, None)
+        .await
+        .expect("publish_pending -> publishing");
+
+    finalize_publication_ready(
+        &pool,
+        ReadyFinalization {
+            outbox_id,
+            publication_id,
+            lineage_id,
+            claim_token,
+            external_publication_id: "hyperdrive:t6-audit",
+            confirmed_at: OffsetDateTime::now_utc(),
+            delivered_at: OffsetDateTime::now_utc(),
+        },
+    )
+    .await
+    .expect("finalize ready");
+
+    let rows: Vec<(String, Option<Uuid>, Option<Uuid>, Option<Uuid>, Option<Uuid>)> =
+        sqlx::query_as(
+            r#"
+            SELECT event_kind, correlation_id, publication_id, lineage_id, ingest_token
+              FROM audit_events
+             WHERE publication_id = $1
+             ORDER BY happened_at ASC, id ASC
+            "#,
+        )
+        .bind(publication_id.0)
+        .fetch_all(&pool)
+        .await
+        .expect("read P2 audit events");
+
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0].0, "p2p_publication_confirmed");
+    assert_eq!(rows[1].0, "p2p_publication_ready");
+    for row in rows {
+        assert_eq!(row.1, Some(publication_id.0));
+        assert_eq!(row.2, Some(publication_id.0));
+        assert_eq!(row.3, Some(lineage_id.0));
+        assert_eq!(row.4, None);
+    }
+}
+
+#[tokio::test]
+async fn hp_t6b_terminal_failure_writes_same_lineage_audit() {
+    let pool = test_pool().await;
+    let (publication_id, lineage_id, outbox_id) = create_claimable_work(&pool).await;
+    let claim_token = Uuid::new_v4();
+    claim_next_publication_work(
+        &pool,
+        claim_token,
+        OffsetDateTime::now_utc() + Duration::minutes(5),
+    )
+    .await
+    .expect("claim query")
+    .expect("claim");
+
+    fail_publication_claim(
+        &pool,
+        outbox_id,
+        publication_id,
+        lineage_id,
+        claim_token,
+        OffsetDateTime::now_utc(),
+        "publication_unavailable",
+    )
+    .await
+    .expect("terminal failure");
+
+    let row: (String, Option<Uuid>, Option<Uuid>, Option<Uuid>, Option<Uuid>, Option<String>) =
+        sqlx::query_as(
+            r#"
+            SELECT event_kind, correlation_id, publication_id, lineage_id, ingest_token, detail
+              FROM audit_events
+             WHERE publication_id = $1
+            "#,
+        )
+        .bind(publication_id.0)
+        .fetch_one(&pool)
+        .await
+        .expect("read P2 failure audit");
+
+    assert_eq!(row.0, "p2p_publication_failed");
+    assert_eq!(row.1, Some(publication_id.0));
+    assert_eq!(row.2, Some(publication_id.0));
+    assert_eq!(row.3, Some(lineage_id.0));
+    assert_eq!(row.4, None);
+    assert_eq!(row.5.as_deref(), Some("publication_unavailable"));
 }
