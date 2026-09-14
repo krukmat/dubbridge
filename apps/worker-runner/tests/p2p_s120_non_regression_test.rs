@@ -14,7 +14,7 @@ use dubbridge_domain::{
     p2p_publication::{K1LineageId, P2pPublicationId, PublicationState},
 };
 use sqlx::PgPool;
-use time::{Duration, OffsetDateTime};
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../../infra/migrations");
@@ -255,6 +255,4 @@ async fn ec_t5d_p2_failure_does_not_regress_s120_ready() {
         .expect("read preparation status")
         .expect("preparation row");
     assert_eq!(status.status, PreparationStatus::Ready);
-
-    let _ = Duration::ZERO;
 }
