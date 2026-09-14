@@ -24,11 +24,9 @@ dubbridge-domain = { path = "../../crates/domain" }
 dubbridge-jobs = { path = "../../crates/jobs" }
 dubbridge-media = { path = "../../crates/media" }
 dubbridge-observability = { path = "../../crates/observability" }
+dubbridge-p2p = { path = "../../crates/p2p" }
 dubbridge-providers = { path = "../../crates/providers" }
 dubbridge-storage = { path = "../../crates/storage" }
-
-[dev-dependencies]
-dubbridge-p2p = { path = "../../crates/p2p" }
 
 [lints]
 workspace = true
