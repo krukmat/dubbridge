@@ -1,3 +1,9 @@
+---
+type: Audit
+title: "Software-Factory Execution Seam v3.2 — Implementation Evidence"
+description: "Implementation evidence for the v3.2 normalization seam Wave 1 additive facade."
+---
+
 # Software-Factory Execution Seam v3.2 — Implementation Evidence
 
 **Date:** 2026-09-13  

@@ -1,5 +1,5 @@
 ---
-type: TaskLedger
+type: TaskList
 status: Active
 plan: docs/plan/software-factory-execution-seam-v3-2.md
 ---
