@@ -65,16 +65,29 @@ pub(crate) async fn activate_after_transcription(
     storage: &(dyn StorageAdapter + Send + Sync),
     asset_id: AssetId,
 ) {
-    let config = match ActivationConfig::from_env() {
-        Ok(Some(config)) => config,
-        Ok(None) => return,
+    let Some(config) = load_activation_config(asset_id) else {
+        return;
+    };
+    run_activation(pool, storage, asset_id, &config).await;
+}
+
+fn load_activation_config(asset_id: AssetId) -> Option<ActivationConfig> {
+    match ActivationConfig::from_env() {
+        Ok(config) => config,
         Err(error) => {
             tracing::error!(asset_id = %asset_id, error = %error, "P2 activation configuration rejected");
-            return;
+            None
         }
-    };
+    }
+}
 
-    if let Err(error) = activate(pool, storage, asset_id, &config).await {
+async fn run_activation(
+    pool: &PgPool,
+    storage: &(dyn StorageAdapter + Send + Sync),
+    asset_id: AssetId,
+    config: &ActivationConfig,
+) {
+    if let Err(error) = activate(pool, storage, asset_id, config).await {
         tracing::error!(asset_id = %asset_id, error = %error, "P2 activation failed after S-120 Ready");
     }
 }
@@ -129,7 +142,9 @@ async fn load_or_create_publication(
         Err(DbError::Conflict) => {
             let existing = get_publication_by_asset(pool, asset_id)
                 .await?
-                .ok_or_else(|| anyhow::anyhow!("P2 publication conflict without an existing row"))?;
+                .ok_or_else(|| {
+                    anyhow::anyhow!("P2 publication conflict without an existing row")
+                })?;
             ensure_existing_outbox(pool, asset_id, existing).await
         }
         Err(error) => Err(error.into()),
@@ -172,14 +187,18 @@ async fn load_hls_inputs(
                 .storage_key
                 .strip_prefix(&prefix)
                 .filter(|value| !value.is_empty())
-                .ok_or_else(|| anyhow::anyhow!("HLS segment storage key is outside the asset HLS prefix"))?
+                .ok_or_else(|| {
+                    anyhow::anyhow!("HLS segment storage key is outside the asset HLS prefix")
+                })?
                 .to_string(),
             _ => continue,
         };
-        let bytes = storage
-            .get(&artifact.storage_key)
-            .await
-            .with_context(|| format!("failed to read prepared HLS object '{}'", artifact.storage_key))?;
+        let bytes = storage.get(&artifact.storage_key).await.with_context(|| {
+            format!(
+                "failed to read prepared HLS object '{}'",
+                artifact.storage_key
+            )
+        })?;
         let input = PackageFileInput {
             path: package_path,
             plaintext: bytes,
@@ -193,7 +212,8 @@ async fn load_hls_inputs(
         }
     }
 
-    let manifest = manifest.ok_or_else(|| anyhow::anyhow!("HLS manifest missing for P2 activation"))?;
+    let manifest =
+        manifest.ok_or_else(|| anyhow::anyhow!("HLS manifest missing for P2 activation"))?;
     if segments.is_empty() {
         bail!("HLS segments missing for P2 activation");
     }
@@ -220,9 +240,9 @@ async fn resolve_lineage_ck(
             if kek_id != config.kek_id || kek_version != config.kek_version as i32 {
                 bail!("persisted P2 lineage requires a different KEK resolver entry");
             }
-            let nonce: [u8; 12] = nonce
-                .try_into()
-                .map_err(|_| anyhow::anyhow!("persisted P2 wrapped-key nonce has invalid length"))?;
+            let nonce: [u8; 12] = nonce.try_into().map_err(|_| {
+                anyhow::anyhow!("persisted P2 wrapped-key nonce has invalid length")
+            })?;
             let wrapped = WrappedKey {
                 kek_id: kek_id.to_string(),
                 kek_version: config.kek_version,
@@ -316,8 +336,9 @@ fn decode_32_byte_hex(value: &str) -> anyhow::Result<[u8; 32]> {
     let mut output = [0_u8; 32];
     for (index, byte) in output.iter_mut().enumerate() {
         let start = index * 2;
-        *byte = u8::from_str_radix(&value[start..start + 2], 16)
-            .map_err(|_| anyhow::anyhow!("{KEK_HEX_ENV} must contain only hexadecimal characters"))?;
+        *byte = u8::from_str_radix(&value[start..start + 2], 16).map_err(|_| {
+            anyhow::anyhow!("{KEK_HEX_ENV} must contain only hexadecimal characters")
+        })?;
     }
     Ok(output)
 }
