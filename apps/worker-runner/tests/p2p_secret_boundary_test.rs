@@ -130,7 +130,8 @@ fn ready_descriptor_exposes_only_opaque_wrap_reference() {
     let value = serde_json::to_value(&descriptor).expect("serialize descriptor");
     assert_no_forbidden_keys(&value);
     let serialized = serde_json::to_string(&value).expect("descriptor json");
-    assert!(!serialized.contains(&hex::encode(RAW_KEK)));
+    let raw_kek_hex: String = RAW_KEK.iter().map(|byte| format!("{byte:02x}")).collect();
+    assert!(!serialized.contains(&raw_kek_hex));
     assert!(!serialized.contains("T6-PLAINTEXT"));
     assert!(descriptor.ck_wrap_ref.starts_with("p2p-k1-wrap/"));
 }
