@@ -3,7 +3,7 @@
 // This module deliberately owns no remote dispatch behavior. It only provides
 // durable single-owner work leasing over the authoritative publication outbox.
 
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, Transaction};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -183,6 +183,215 @@ pub async fn complete_publication_claim(
     .map_err(DbError::QueryFailed)?;
 
     resolve_owned_mutation(pool, outbox_id, result.rows_affected()).await
+}
+
+/// Persist same-lineage external confirmation, transition the publication to
+/// `ready`, and acknowledge the owned outbox claim in one PostgreSQL transaction.
+///
+/// This closes the crash window where the publication could become durable Ready
+/// while its outbox claim remained leased forever and therefore no longer
+/// reclaimable by the dispatcher. A stale/foreign owner or conflicting remote
+/// publication identity rolls the whole transaction back.
+pub async fn finalize_publication_ready(
+    pool: &PgPool,
+    outbox_id: Uuid,
+    publication_id: P2pPublicationId,
+    lineage_id: K1LineageId,
+    claim_token: Uuid,
+    external_publication_id: &str,
+    confirmed_at: OffsetDateTime,
+    delivered_at: OffsetDateTime,
+) -> Result<(), DbError> {
+    if claim_token.is_nil() || external_publication_id.trim().is_empty() {
+        return Err(DbError::Conflict);
+    }
+
+    let mut tx = pool.begin().await.map_err(DbError::QueryFailed)?;
+    ensure_claim_owned(
+        &mut tx,
+        outbox_id,
+        publication_id,
+        lineage_id,
+        claim_token,
+    )
+    .await?;
+
+    let publication_update = sqlx::query(
+        r#"
+        UPDATE p2p_publications
+           SET external_publication_id = $3,
+               confirmed_lineage_id = $2,
+               external_confirmed_at = COALESCE(external_confirmed_at, $4),
+               state = 'ready',
+               failure_detail = NULL,
+               updated_at = now()
+         WHERE id = $1
+           AND lineage_id = $2
+           AND state IN ('publishing', 'reconciling')
+           AND (external_publication_id IS NULL OR external_publication_id = $3)
+           AND (confirmed_lineage_id IS NULL OR confirmed_lineage_id = $2)
+        "#,
+    )
+    .bind(publication_id.0)
+    .bind(lineage_id.0)
+    .bind(external_publication_id)
+    .bind(confirmed_at)
+    .execute(&mut *tx)
+    .await
+    .map_err(DbError::QueryFailed)?;
+    if publication_update.rows_affected() != 1 {
+        return Err(DbError::Conflict);
+    }
+
+    let outbox_update = sqlx::query(
+        r#"
+        UPDATE p2p_publication_outbox
+           SET delivery_state = 'delivered',
+               delivered_at = $3,
+               claim_token = NULL,
+               lease_expires_at = NULL,
+               last_error = NULL,
+               updated_at = now()
+         WHERE id = $1
+           AND delivery_state = 'claimed'
+           AND claim_token = $2
+        "#,
+    )
+    .bind(outbox_id)
+    .bind(claim_token)
+    .bind(delivered_at)
+    .execute(&mut *tx)
+    .await
+    .map_err(DbError::QueryFailed)?;
+    if outbox_update.rows_affected() != 1 {
+        return Err(DbError::Conflict);
+    }
+
+    tx.commit().await.map_err(DbError::QueryFailed)
+}
+
+/// Atomically persist terminal publication failure and release the owned claim.
+///
+/// This prevents a crash after the `failed` state transition from leaving an
+/// unreclaimable claimed row behind. The outbox remains non-delivered but no
+/// longer leased; terminal publication state keeps it out of dispatch selection.
+pub async fn fail_publication_claim(
+    pool: &PgPool,
+    outbox_id: Uuid,
+    publication_id: P2pPublicationId,
+    lineage_id: K1LineageId,
+    claim_token: Uuid,
+    failed_at: OffsetDateTime,
+    reason: &str,
+) -> Result<(), DbError> {
+    if claim_token.is_nil() || reason.trim().is_empty() {
+        return Err(DbError::Conflict);
+    }
+
+    let mut tx = pool.begin().await.map_err(DbError::QueryFailed)?;
+    ensure_claim_owned(
+        &mut tx,
+        outbox_id,
+        publication_id,
+        lineage_id,
+        claim_token,
+    )
+    .await?;
+
+    let publication_update = sqlx::query(
+        r#"
+        UPDATE p2p_publications
+           SET state = 'failed',
+               failure_detail = $3,
+               updated_at = now()
+         WHERE id = $1
+           AND lineage_id = $2
+           AND state IN ('publish_pending', 'publishing', 'reconciling')
+        "#,
+    )
+    .bind(publication_id.0)
+    .bind(lineage_id.0)
+    .bind(reason)
+    .execute(&mut *tx)
+    .await
+    .map_err(DbError::QueryFailed)?;
+    if publication_update.rows_affected() != 1 {
+        return Err(DbError::Conflict);
+    }
+
+    let outbox_update = sqlx::query(
+        r#"
+        UPDATE p2p_publication_outbox
+           SET delivery_state = 'pending',
+               available_at = $3,
+               claim_token = NULL,
+               lease_expires_at = NULL,
+               last_error = $4,
+               updated_at = now()
+         WHERE id = $1
+           AND delivery_state = 'claimed'
+           AND claim_token = $2
+        "#,
+    )
+    .bind(outbox_id)
+    .bind(claim_token)
+    .bind(failed_at)
+    .bind(reason)
+    .execute(&mut *tx)
+    .await
+    .map_err(DbError::QueryFailed)?;
+    if outbox_update.rows_affected() != 1 {
+        return Err(DbError::Conflict);
+    }
+
+    tx.commit().await.map_err(DbError::QueryFailed)
+}
+
+async fn ensure_claim_owned(
+    tx: &mut Transaction<'_, Postgres>,
+    outbox_id: Uuid,
+    publication_id: P2pPublicationId,
+    lineage_id: K1LineageId,
+    claim_token: Uuid,
+) -> Result<(), DbError> {
+    let owned = sqlx::query_as::<_, (Uuid, Uuid)>(
+        r#"
+        SELECT publication_id, lineage_id
+          FROM p2p_publication_outbox
+         WHERE id = $1
+           AND delivery_state = 'claimed'
+           AND claim_token = $2
+         FOR UPDATE
+        "#,
+    )
+    .bind(outbox_id)
+    .bind(claim_token)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    match owned {
+        Some((stored_publication_id, stored_lineage_id))
+            if stored_publication_id == publication_id.0 && stored_lineage_id == lineage_id.0 =>
+        {
+            Ok(())
+        }
+        Some(_) => Err(DbError::Conflict),
+        None => {
+            let exists: bool = sqlx::query_scalar(
+                "SELECT EXISTS(SELECT 1 FROM p2p_publication_outbox WHERE id = $1)",
+            )
+            .bind(outbox_id)
+            .fetch_one(&mut **tx)
+            .await
+            .map_err(DbError::QueryFailed)?;
+            if exists {
+                Err(DbError::Conflict)
+            } else {
+                Err(DbError::NotFound)
+            }
+        }
+    }
 }
 
 async fn resolve_owned_mutation(
