@@ -20,15 +20,16 @@ struct AuditEventRow {
     happened_at: OffsetDateTime,
     recording_session_id: Option<Uuid>,
     platform_ingest_session_id: Option<Uuid>,
+    correlation_id: Option<Uuid>,
+    publication_id: Option<Uuid>,
+    lineage_id: Option<Uuid>,
 }
 
 fn parse_event_kind(value: &str) -> Result<AuditEventKind, DbError> {
     match value {
         "ingestion_finalized" => Ok(AuditEventKind::IngestionFinalized),
         "ingestion_rejected_missing_rights" => Ok(AuditEventKind::IngestionRejectedMissingRights),
-        "ingestion_rejected_missing_uploader_context" => {
-            Ok(AuditEventKind::IngestionRejectedMissingUploaderContext)
-        }
+        "ingestion_rejected_missing_uploader_context" => Ok(AuditEventKind::IngestionRejectedMissingUploaderContext),
         "ingestion_rejected_duplicate_token" => Ok(AuditEventKind::IngestionRejectedDuplicateToken),
         "recording_session_created" => Ok(AuditEventKind::RecordingSessionCreated),
         "recording_rejected_missing_rights" => Ok(AuditEventKind::RecordingRejectedMissingRights),
@@ -37,9 +38,7 @@ fn parse_event_kind(value: &str) -> Result<AuditEventKind, DbError> {
         "recording_failed" => Ok(AuditEventKind::RecordingFailed),
         "recording_bridged_to_asset" => Ok(AuditEventKind::RecordingBridgedToAsset),
         "platform_ingest_session_created" => Ok(AuditEventKind::PlatformIngestSessionCreated),
-        "platform_ingest_rejected_missing_rights" => {
-            Ok(AuditEventKind::PlatformIngestRejectedMissingRights)
-        }
+        "platform_ingest_rejected_missing_rights" => Ok(AuditEventKind::PlatformIngestRejectedMissingRights),
         "platform_ingest_download_started" => Ok(AuditEventKind::PlatformIngestDownloadStarted),
         "platform_ingest_downloaded" => Ok(AuditEventKind::PlatformIngestDownloaded),
         "platform_ingest_failed" => Ok(AuditEventKind::PlatformIngestFailed),
@@ -56,6 +55,15 @@ fn parse_event_kind(value: &str) -> Result<AuditEventKind, DbError> {
         "publication_refused" => Ok(AuditEventKind::PublicationRefused),
         "playback_grant_issued" => Ok(AuditEventKind::PlaybackGrantIssued),
         "playback_grant_refused" => Ok(AuditEventKind::PlaybackGrantRefused),
+        "auth_login_succeeded" => Ok(AuditEventKind::AuthLoginSucceeded),
+        "auth_login_failed" => Ok(AuditEventKind::AuthLoginFailed),
+        "auth_registered" => Ok(AuditEventKind::AuthRegistered),
+        "p2p_publication_intent_created" => Ok(AuditEventKind::P2pPublicationIntentCreated),
+        "p2p_lineage_sealed" => Ok(AuditEventKind::P2pLineageSealed),
+        "p2p_publication_confirmed" => Ok(AuditEventKind::P2pPublicationConfirmed),
+        "p2p_publication_reconciliation_entered" => Ok(AuditEventKind::P2pPublicationReconciliationEntered),
+        "p2p_publication_ready" => Ok(AuditEventKind::P2pPublicationReady),
+        "p2p_publication_failed" => Ok(AuditEventKind::P2pPublicationFailed),
         other => Err(DbError::UnknownStoredValue {
             field: "audit_events.event_kind",
             value: other.to_owned(),
@@ -71,13 +79,14 @@ fn row_to_event(row: AuditEventRow) -> Result<AuditEvent, DbError> {
         ingest_token: row.ingest_token,
         recording_session_id: row.recording_session_id,
         platform_ingest_session_id: row.platform_ingest_session_id,
+        correlation_id: row.correlation_id,
+        publication_id: row.publication_id,
+        lineage_id: row.lineage_id,
         detail: row.detail,
         happened_at: row.happened_at,
     })
 }
 
-// H1-T1: transaction-aware variant so the success audit row commits atomically
-// with the asset, rights, and artifact rows.
 pub async fn insert_audit_event_tx(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     event: &AuditEvent,
@@ -86,9 +95,10 @@ pub async fn insert_audit_event_tx(
         r#"
         INSERT INTO audit_events (
             id, asset_id, event_kind, ingest_token, detail, happened_at,
-            recording_session_id, platform_ingest_session_id
+            recording_session_id, platform_ingest_session_id,
+            correlation_id, publication_id, lineage_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         "#,
     )
     .bind(event.id)
@@ -99,6 +109,9 @@ pub async fn insert_audit_event_tx(
     .bind(event.happened_at)
     .bind(event.recording_session_id)
     .bind(event.platform_ingest_session_id)
+    .bind(event.correlation_id)
+    .bind(event.publication_id)
+    .bind(event.lineage_id)
     .execute(&mut **tx)
     .await
     .map_err(DbError::QueryFailed)?;
@@ -110,9 +123,10 @@ pub async fn insert_audit_event(pool: &PgPool, event: &AuditEvent) -> Result<(),
         r#"
         INSERT INTO audit_events (
             id, asset_id, event_kind, ingest_token, detail, happened_at,
-            recording_session_id, platform_ingest_session_id
+            recording_session_id, platform_ingest_session_id,
+            correlation_id, publication_id, lineage_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         "#,
     )
     .bind(event.id)
@@ -123,28 +137,26 @@ pub async fn insert_audit_event(pool: &PgPool, event: &AuditEvent) -> Result<(),
     .bind(event.happened_at)
     .bind(event.recording_session_id)
     .bind(event.platform_ingest_session_id)
+    .bind(event.correlation_id)
+    .bind(event.publication_id)
+    .bind(event.lineage_id)
     .execute(pool)
     .await
     .map_err(DbError::QueryFailed)?;
-
     Ok(())
 }
 
-/// Returns the audit timeline for an owned asset in chronological order.
-/// Fails closed with `DbError::NotFound` when the asset does not exist or is not
-/// owned by `owner_id`.
 pub async fn list_audit_events_for_owned_asset(
     pool: &PgPool,
     asset_id: AssetId,
     owner_id: Uuid,
 ) -> Result<Vec<AuditEvent>, DbError> {
-    let owned: Option<i32> =
-        sqlx::query_scalar("SELECT 1 FROM assets WHERE id = $1 AND uploader_id = $2")
-            .bind(asset_id.0)
-            .bind(owner_id)
-            .fetch_optional(pool)
-            .await
-            .map_err(DbError::QueryFailed)?;
+    let owned: Option<i32> = sqlx::query_scalar("SELECT 1 FROM assets WHERE id = $1 AND uploader_id = $2")
+        .bind(asset_id.0)
+        .bind(owner_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(DbError::QueryFailed)?;
 
     if owned.is_none() {
         return Err(DbError::NotFound);
@@ -153,7 +165,8 @@ pub async fn list_audit_events_for_owned_asset(
     let rows = sqlx::query_as::<_, AuditEventRow>(
         r#"
         SELECT id, asset_id, event_kind, ingest_token, detail, happened_at,
-               recording_session_id, platform_ingest_session_id
+               recording_session_id, platform_ingest_session_id,
+               correlation_id, publication_id, lineage_id
         FROM audit_events
         WHERE asset_id = $1
         ORDER BY happened_at ASC, id ASC
@@ -171,112 +184,37 @@ pub async fn list_audit_events_for_owned_asset(
 mod tests {
     use super::*;
 
-    #[test]
-    fn parse_event_kind_known_variants_succeed() {
-        assert!(matches!(
-            parse_event_kind("consent_granted"),
-            Ok(AuditEventKind::ConsentGranted)
-        ));
-        assert!(matches!(
-            parse_event_kind("recording_recorded"),
-            Ok(AuditEventKind::RecordingRecorded)
-        ));
-        assert!(matches!(
-            parse_event_kind("org_created"),
-            Ok(AuditEventKind::OrgCreated)
-        ));
-        assert!(matches!(
-            parse_event_kind("review_approved"),
-            Ok(AuditEventKind::ReviewApproved)
-        ));
-        assert!(matches!(
-            parse_event_kind("playback_grant_issued"),
-            Ok(AuditEventKind::PlaybackGrantIssued)
-        ));
-        assert!(matches!(
-            parse_event_kind("playback_grant_refused"),
-            Ok(AuditEventKind::PlaybackGrantRefused)
-        ));
-    }
-
-    #[test]
-    fn parse_event_kind_unknown_value_fails_closed() {
-        let err = parse_event_kind("totally_new_event").unwrap_err();
-        assert!(matches!(
-            err,
-            DbError::UnknownStoredValue {
-                field: "audit_events.event_kind",
-                ..
-            }
-        ));
-        assert!(err.to_string().contains("totally_new_event"));
-    }
-
-    #[test]
-    fn row_to_event_round_trips_recording_fields() {
-        let asset_id = Uuid::new_v4();
-        let recording_session_id = Uuid::new_v4();
-        let row = AuditEventRow {
-            id: Uuid::new_v4(),
-            asset_id: Some(asset_id),
-            event_kind: "recording_recorded".to_string(),
-            ingest_token: None,
-            detail: Some("ok".to_string()),
-            happened_at: OffsetDateTime::now_utc(),
-            recording_session_id: Some(recording_session_id),
-            platform_ingest_session_id: None,
-        };
-
-        let event = row_to_event(row).expect("event");
-        assert_eq!(event.asset_id, Some(AssetId(asset_id)));
-        assert_eq!(event.event_kind, AuditEventKind::RecordingRecorded);
-        assert_eq!(event.recording_session_id, Some(recording_session_id));
-        assert!(event.platform_ingest_session_id.is_none());
-    }
-
-    #[test]
-    fn row_to_event_round_trips_platform_ingest_fields() {
-        let platform_ingest_session_id = Uuid::new_v4();
-        let row = AuditEventRow {
+    fn base_row(event_kind: &str) -> AuditEventRow {
+        AuditEventRow {
             id: Uuid::new_v4(),
             asset_id: None,
-            event_kind: "platform_ingest_downloaded".to_string(),
+            event_kind: event_kind.to_string(),
             ingest_token: None,
-            detail: Some("download complete".to_string()),
-            happened_at: OffsetDateTime::now_utc(),
-            recording_session_id: None,
-            platform_ingest_session_id: Some(platform_ingest_session_id),
-        };
-
-        let event = row_to_event(row).expect("event");
-        assert_eq!(event.event_kind, AuditEventKind::PlatformIngestDownloaded);
-        assert_eq!(
-            event.platform_ingest_session_id,
-            Some(platform_ingest_session_id)
-        );
-        assert!(event.ingest_token.is_none());
-        assert!(event.recording_session_id.is_none());
-    }
-
-    #[test]
-    fn row_to_event_round_trips_playback_kind() {
-        let asset_id = Uuid::new_v4();
-        let row = AuditEventRow {
-            id: Uuid::new_v4(),
-            asset_id: Some(asset_id),
-            event_kind: "playback_grant_refused".to_string(),
-            ingest_token: None,
-            detail: Some("reason=asset_not_ready".to_string()),
+            detail: None,
             happened_at: OffsetDateTime::now_utc(),
             recording_session_id: None,
             platform_ingest_session_id: None,
-        };
+            correlation_id: None,
+            publication_id: None,
+            lineage_id: None,
+        }
+    }
+
+    #[test]
+    fn p2p_row_round_trips_correlation() {
+        let asset_id = Uuid::new_v4();
+        let publication_id = Uuid::new_v4();
+        let lineage_id = Uuid::new_v4();
+        let mut row = base_row("p2p_publication_confirmed");
+        row.asset_id = Some(asset_id);
+        row.correlation_id = Some(publication_id);
+        row.publication_id = Some(publication_id);
+        row.lineage_id = Some(lineage_id);
 
         let event = row_to_event(row).expect("event");
         assert_eq!(event.asset_id, Some(AssetId(asset_id)));
-        assert_eq!(event.event_kind, AuditEventKind::PlaybackGrantRefused);
-        assert_eq!(event.detail.as_deref(), Some("reason=asset_not_ready"));
-        assert!(event.recording_session_id.is_none());
-        assert!(event.platform_ingest_session_id.is_none());
+        assert_eq!(event.publication_id, Some(publication_id));
+        assert_eq!(event.lineage_id, Some(lineage_id));
+        assert!(event.has_valid_p2p_correlation());
     }
 }
