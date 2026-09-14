@@ -353,7 +353,10 @@ async fn t4f_retry_budget_exhaustion_persists_terminal_failure() {
         .expect("read terminal outbox")
         .expect("terminal outbox");
     assert_eq!(outbox.delivery_state, "pending");
-    assert_eq!(outbox.last_error.as_deref(), Some("publication_outcome_unknown"));
+    assert_eq!(
+        outbox.last_error.as_deref(),
+        Some("publication_outcome_unknown")
+    );
     let claim_token: Option<Uuid> =
         sqlx::query_scalar("SELECT claim_token FROM p2p_publication_outbox WHERE id = $1")
             .bind(fixture.outbox_id)

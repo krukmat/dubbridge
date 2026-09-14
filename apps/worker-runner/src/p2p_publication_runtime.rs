@@ -12,7 +12,9 @@ use std::time::Duration as StdDuration;
 
 use anyhow::Context;
 use dubbridge_connectors::p2p_availability::AvailabilityPublicationClient;
-use dubbridge_jobs::p2p_publication_job::{DispatchTick, P2pDispatchError, P2pPublicationDispatcher};
+use dubbridge_jobs::p2p_publication_job::{
+    DispatchTick, P2pDispatchError, P2pPublicationDispatcher,
+};
 use sqlx::PgPool;
 use time::Duration;
 
