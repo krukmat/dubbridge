@@ -112,14 +112,9 @@ async fn create_work(pool: &PgPool) -> WorkFixture {
     ensure_publication_with_outbox(pool, asset_id, publication_id, lineage_id, outbox_id)
         .await
         .expect("create publication and outbox");
-    transition_publication_state(
-        pool,
-        publication_id,
-        PublicationState::PublishPending,
-        None,
-    )
-    .await
-    .expect("building -> publish_pending");
+    transition_publication_state(pool, publication_id, PublicationState::PublishPending, None)
+        .await
+        .expect("building -> publish_pending");
 
     let package_root = tempfile::tempdir().expect("package root");
     let package_dir = package_root.path().join(publication_id.to_string());
@@ -245,7 +240,10 @@ async fn t4f_stale_lease_is_reclaimed_without_exactly_once_assumption() {
     let publisher = Arc::new(FakePublisher::new([FakeOutcome::Success]));
     let dispatcher = dispatcher(&pool, publisher, &fixture, 3);
     assert_eq!(
-        dispatcher.dispatch_once().await.expect("reclaimed dispatch"),
+        dispatcher
+            .dispatch_once()
+            .await
+            .expect("reclaimed dispatch"),
         DispatchTick::Ready(fixture.publication_id)
     );
 
@@ -292,11 +290,8 @@ async fn t4f_persisted_remote_confirmation_survives_lost_ready_commit() {
         fixture.publication_id,
         fixture.lineage_id,
         EXTERNAL_PUBLICATION_ID,
-        OffsetDateTime::parse(
-            CONFIRMED_AT,
-            &time::format_description::well_known::Rfc3339,
-        )
-        .expect("confirmed at"),
+        OffsetDateTime::parse(CONFIRMED_AT, &time::format_description::well_known::Rfc3339)
+            .expect("confirmed at"),
     )
     .await
     .expect("persist remote confirmation");
@@ -312,7 +307,10 @@ async fn t4f_persisted_remote_confirmation_survives_lost_ready_commit() {
     let publisher = Arc::new(FakePublisher::new([FakeOutcome::Success]));
     let dispatcher = dispatcher(&pool, publisher, &fixture, 3);
     assert_eq!(
-        dispatcher.dispatch_once().await.expect("reconcile dispatch"),
+        dispatcher
+            .dispatch_once()
+            .await
+            .expect("reconcile dispatch"),
         DispatchTick::Ready(fixture.publication_id)
     );
 
@@ -349,6 +347,20 @@ async fn t4f_retry_budget_exhaustion_persists_terminal_failure() {
         publication.failure_detail.as_deref(),
         Some("publication_outcome_unknown")
     );
+
+    let outbox = get_outbox_for_publication(&pool, fixture.publication_id)
+        .await
+        .expect("read terminal outbox")
+        .expect("terminal outbox");
+    assert_eq!(outbox.delivery_state, "pending");
+    assert_eq!(outbox.last_error.as_deref(), Some("publication_outcome_unknown"));
+    let claim_token: Option<Uuid> =
+        sqlx::query_scalar("SELECT claim_token FROM p2p_publication_outbox WHERE id = $1")
+            .bind(fixture.outbox_id)
+            .fetch_one(&pool)
+            .await
+            .expect("read terminal claim token");
+    assert_eq!(claim_token, None);
 }
 
 #[tokio::test]
