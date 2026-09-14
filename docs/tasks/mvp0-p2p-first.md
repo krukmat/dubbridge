@@ -13,7 +13,8 @@ plan: docs/plan/mvp0-p2p-first.md
 > **Current task:** P0 and P1 are closed. ADR-044 is Accepted. P2.T0 is PASS and
 > P2.T1a-T1f are Done/owner-approved as the completed P2.T1 persistence outcome
 > on 2026-09-06. P2.C0 is PASS; T2 (including T2c-r/T2g) and T4a are Done.
-> Remaining P2 work: T3b-d, T4b-f, T5a-d, T6a-e. P2-P7 and S-230 share the controlled
+> Remaining P2 work excludes T4: T4a-f are Done; T4b-f closed retrospectively
+> under explicit owner waiver on 2026-09-14. P2-P7 and S-230 share the controlled
 > Android P2P beta/POC target of 2026-10-30, not GA. The external package is untracked input, so its
 > state/handoff files are evidence but not substitutes for this ledger.
 
@@ -23,7 +24,7 @@ plan: docs/plan/mvp0-p2p-first.md
 |---|---|---|---|
 | P0 | Bare / Expo / React Native compatibility spike | PASS — Android-only; owner verified 2026-08-27 | — |
 | P1 | Maintainable mobile P2P foundation + replication proof | Done 2026-09-01 | P0 PASS |
-| P2 | Encrypted P2P publication after S-120 | In progress — T0/C0 PASS; T1/T2/T4a Done; T3, T4b-f, T5, T6 pending | P1 PASS; ADR-044 Accepted |
+| P2 | Encrypted P2P publication after S-120 | In progress — T0/C0 PASS; T1/T2/T4a-f Done; T3, T5, T6 pending | P1 PASS; ADR-044 Accepted |
 | P3 | Invite, claim, and content-key envelope | Pending | P2 PASS; accepted ADR-044 / K1 contract |
 | P4 | Mobile package sync and verification | Pending | P3 PASS |
 | P5 | Local HLS gateway + existing VideoPlayer | Pending | P4 PASS |
@@ -175,7 +176,7 @@ and approval cards must still be resolved at activation time.
 > **Current P2 gate:** ADR-044 D1-D4 are closed and the ADR is Accepted. The
 > detailed P2 plan/ledger exist; T0 is PASS and T1 is Done/owner-approved.
 > P2.C0 is PASS and froze the shared contract/path boundary. The decomposed
-> remaining T3, T4b-f, T5, and T6 leaves follow that boundary; T2/T4a are Done;
+> remaining T3, T5, and T6 leaves follow that boundary; T2/T4a-f are Done;
 > neither P2.T1 nor C0 is reopened.
 >
 > D1 evidence is in `docs/audit/mvp0-p2p-adr044-d1-grant-composition.md`; D2
@@ -206,7 +207,7 @@ and revised approval card: `docs/plan/mvp0-p2p-p1-replication.md`,
 
 - **Gate / use case:** G2 / CU-01. **Status:** in progress. P1 and ADR-044 gates
   are satisfied; T0 PASS, T1 Done/owner-approved, and `P2.C0 PASS`. The next P2
-  work is T3b-d, T4b-f, T5a-d, and T6a-e; T2, T3a, and T4a are Done. T3a
+  work is T3b-d, T5a-d, and T6a-e; T2, T3a, and T4a-f are Done. T3a
   was owner-verified on 2026-09-08.
 - **Objective:** turn an S-120-prepared HLS derivative into a ciphertext-only
   P2P package, publish it through the Availability Node, and record durable

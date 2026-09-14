@@ -4315,13 +4315,13 @@ make qa-docs
 | ID | Objective | Exact writable paths | RRI | Status | Depends on |
 |---|---|---|---|---|---|
 | `T4a` | Pure recovery decision kernel | `crates/domain/src/p2p_recovery.rs`; `crates/domain/src/lib.rs` | RRI 29 Moderate | Done 2026-09-07 | C0 PASS; T1 accepted base |
-| `T4b` | Bounded PostgreSQL claim/lease/release | `infra/migrations/0034_add_p2p_publication_claim_leases.sql`; `crates/db/src/p2p_publication_claim_repo.rs` | RRI 100 Very high (`scripts/rri.py`, 2026-09-14, retroactive) | **Code landed 2026-09-14, not certified** | T4a |
-| `T4c` | Backend mTLS Availability Node client | `crates/connectors/src/p2p_availability.rs`; `crates/connectors/src/lib.rs`; `crates/connectors/Cargo.toml`; `Cargo.lock` | RRI 70 Complex (`scripts/rri.py`, 2026-09-14, retroactive) | **Code landed 2026-09-14, not certified** | T3 contract PASS |
-| `T4d` | PostgreSQL outbox dispatcher | `crates/jobs/src/p2p_publication_job.rs`; `crates/jobs/src/lib.rs`; `crates/jobs/Cargo.toml`; `Cargo.lock` | RRI 70 Complex (`scripts/rri.py`, 2026-09-14, retroactive) | **Code landed 2026-09-14, not certified** | T4b; T4c |
-| `T4e` | Worker runtime + PostgreSQL reconciler integration | `apps/worker-runner/src/p2p_publication_runtime.rs`; `apps/worker-runner/src/main.rs`; `apps/worker-runner/Cargo.toml`; `Cargo.lock` | RRI 70 Complex (`scripts/rri.py`, 2026-09-14, retroactive) | **Code landed 2026-09-14, not certified** | T4d |
-| `T4f` | Lost-dispatch/lost-ACK/stale-lease/duplicate certification | `apps/worker-runner/tests/p2p_publication_recovery_test.rs` | RRI 70 Complex (`scripts/rri.py`, 2026-09-14, retroactive) | **Code landed 2026-09-14, not certified** | T4e |
+| `T4b` | Bounded PostgreSQL claim/lease/release | `infra/migrations/0034_add_p2p_publication_claim_leases.sql`; `crates/db/src/p2p_publication_claim_repo.rs` | RRI 100 Very high (`scripts/rri.py`, 2026-09-14, retroactive) | **[x] Done 2026-09-14 (retrospective waiver)** | T4a |
+| `T4c` | Backend mTLS Availability Node client | `crates/connectors/src/p2p_availability.rs`; `crates/connectors/src/lib.rs`; `crates/connectors/Cargo.toml`; `Cargo.lock` | RRI 70 Complex (`scripts/rri.py`, 2026-09-14, retroactive) | **[x] Done 2026-09-14 (retrospective waiver)** | T3 contract PASS |
+| `T4d` | PostgreSQL outbox dispatcher | `crates/jobs/src/p2p_publication_job.rs`; `crates/jobs/src/lib.rs`; `crates/jobs/Cargo.toml`; `Cargo.lock` | RRI 70 Complex (`scripts/rri.py`, 2026-09-14, retroactive) | **[x] Done 2026-09-14 (retrospective waiver)** | T4b; T4c |
+| `T4e` | Worker runtime + PostgreSQL reconciler integration | `apps/worker-runner/src/p2p_publication_runtime.rs`; `apps/worker-runner/src/main.rs`; `apps/worker-runner/Cargo.toml`; `Cargo.lock` | RRI 70 Complex (`scripts/rri.py`, 2026-09-14, retroactive) | **[x] Done 2026-09-14 (retrospective waiver)** | T4d |
+| `T4f` | Lost-dispatch/lost-ACK/stale-lease/duplicate certification | `apps/worker-runner/tests/p2p_publication_recovery_test.rs` | RRI 70 Complex (`scripts/rri.py`, 2026-09-14, retroactive) | **[x] Done 2026-09-14 (retrospective waiver)** | T4e |
 
-> **2026-09-14 status note:** `T4b`-`T4f` all have their exact-`allowed_paths`
+> **2026-09-14 pre-closure status note (superseded by the closure record below):** `T4b`-`T4f` all have their exact-`allowed_paths`
 > files present on `feature/p2p-mvp-core` as of commit `f866b1e`
 > (`git diff --stat d4fdb01..f866b1e`: 15 files, +2054/-7 across these five
 > leaves). Unlike `T3d` above, these five leaves' landed files match their
@@ -4488,7 +4488,8 @@ cargo test -p dubbridge-worker-runner --test p2p_publication_recovery_test --
 executable evidence — 4 code-reading passes did not surface this, the actual
 test run against real PostgreSQL did.
 
-**Follow-up task (not yet scored/scheduled):** `P2.T4e-cov` — add unit/
+**Accepted residual follow-up (not yet scored/scheduled; non-blocking by
+explicit owner waiver):** `P2.T4e-cov` — add unit/
 component coverage for `apps/worker-runner/src/p2p_publication_runtime.rs`
 (`from_env` env-parsing defaults, the `run` tick loop, and its error path),
 so `T4e` has its own executable evidence instead of relying solely on T4f's
@@ -4502,6 +4503,69 @@ own closure pipeline runs.
 **EC-T4-2:** duplicate-after-Ready is idempotent; no lineage rotation/regression.
 
 Optional queue acceleration is deferred and requires its own later task/RRI; queue state can never establish readiness.
+
+### P2.T4b-T4f retrospective integrated closure record — Done 2026-09-14
+
+**Status:** `[x] Done` for `P2.T4b`, `P2.T4c`, `P2.T4d`, `P2.T4e`, and
+`P2.T4f`. Matias explicitly authorized the retrospective waiver in the
+2026-09-14 closure session. The waiver substitutes for the unavailable
+phase-1/phase-2 peer-review chain on all five leaves and accepts T4e's
+documented lack of direct `from_env`/`run` tests. It does not claim those
+gates ran and does not erase the non-blocking `P2.T4e-cov` residual.
+
+Task-analysis review: user-waived (explicit retrospective closure authorization, 2026-09-14) - PASS WITH WAIVER
+Code-solution review: user-waived (explicit retrospective closure authorization, 2026-09-14) - PASS WITH WAIVER
+
+#### Peer-review and Antares deviation evidence
+
+- `T4b`: the required `gpt-oss` Complex primary was restarted and tried at
+  the full and reduced profiles; both responses ended `length` with empty
+  content. Requests, responses, profiles, and restart PIDs are preserved in
+  `docs/audit/mvp0-p2p-p2-t4b-retrospective-review.json`. The owner waived
+  the remaining cross-vendor/D14 fallback and both review phases.
+- `T4c`-`T4f`: no retrospective peer verdict is represented as having run;
+  the owner's urgency waiver substitutes for both phases.
+- Antares typed skip (`T4b`-`T4f`): no task-specific watchlisted CWE
+  hypothesis was recorded that would justify specialist routing; skipped.
+
+#### Reflection logs
+
+Required: 4 passes per leaf (`T4b` Very high; `T4c`-`T4f` Complex). T4b's
+four full passes and the executable-evidence correction are recorded above.
+
+| Leaf | Pass 1 | Pass 2 | Pass 3 | Pass 4 | Revision |
+|---|---|---|---|---|---|
+| `T4c` | Request construction rejects traversal/non-hex input. | Response parsing binds publication, lineage, and digest. | Remote failures map fail-closed. | mTLS transport is isolated behind the publisher seam; no plaintext/KEK input exists. | None. |
+| `T4d` | Claims are bounded and delegated through the repository. | Unknown results remain retryable/non-ready. | Durable confirmation precedes Ready finalization. | Retry exhaustion and foreign ownership fail closed. | None. |
+| `T4e` | Runtime wiring uses PostgreSQL as authority. | Tick-loop errors do not establish Ready. | Environment construction is fail-closed at startup. | Direct runtime-loop tests are absent; retained as `P2.T4e-cov` and accepted only by waiver. | Documentation records the residual; no code change authorized. |
+| `T4f` | Lost/unknown dispatch replays the same lineage. | Expired leases are reclaimable. | Duplicate-after-Ready is idle. | Lost Ready commit, retry exhaustion, and foreign claims are covered against PostgreSQL. | None. |
+
+#### Behavioral coverage certification
+
+| Leaf / cases | Layer | Executable evidence | Result |
+|---|---|---|---|
+| `T4b` / HP-T4-1, EC-T4-2 | PostgreSQL integration | `t4f_stale_lease_is_reclaimed_without_exactly_once_assumption`; `t4f_foreign_claim_completion_remains_fail_closed`; `t4f_duplicate_after_ready_is_idle_and_does_not_redispatch` | passed |
+| `T4c` / request-response contract | unit | `request_rejects_traversal_and_non_hex_digest`; `success_response_must_match_requested_identity_and_digest`; `remote_error_contract_is_strictly_mapped` | 3/3 passed |
+| `T4d` / HP-T4-1, HP-T4-2, EC-T4-1, EC-T4-2 | PostgreSQL integration | all six `p2p_publication_recovery_test` cases | 6/6 passed |
+| `T4e` / shared HP/EC cases | integration, indirect | T4f exercises the dispatcher/repository seam used by the runtime; `cargo check -p dubbridge-worker-runner` verifies production wiring | accepted with waiver; direct `from_env`/`run` coverage remains `P2.T4e-cov` |
+| `T4f` / HP-T4-1, HP-T4-2, EC-T4-1, EC-T4-2 | PostgreSQL integration | `t4f_unknown_outcome_replays_same_lineage_and_converges_ready`; `t4f_stale_lease_is_reclaimed_without_exactly_once_assumption`; `t4f_duplicate_after_ready_is_idle_and_does_not_redispatch`; `t4f_persisted_remote_confirmation_survives_lost_ready_commit`; `t4f_retry_budget_exhaustion_persists_terminal_failure`; `t4f_foreign_claim_completion_remains_fail_closed` | 6/6 passed |
+
+The PostgreSQL suite was certified in isolated database
+`dubbridge_t4_closure_20260914_1`. An earlier run against the shared local
+database failed 4/6 because unrelated pre-existing pending outbox rows were
+claimable; isolation removed that fixture contamination without changing
+code.
+
+#### Owner final verification
+
+- Owner: `Matias`
+- Date: `2026-09-14`
+- Statement: the owner explicitly authorized the retrospective waiver for
+  `P2.T4b`-`P2.T4f`, accepting the recorded review deviations and T4e's
+  indirect-only behavioral evidence, and authorized all five status flips.
+  Codex verified exact-path scope, executed the commands below, and made no
+  implementation changes.
+- Commands run: `DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@localhost:5432/dubbridge_t4_closure_20260914_1 cargo test -p dubbridge-worker-runner --test p2p_publication_recovery_test -- --test-threads=1` (6/6); `DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@localhost:5432/dubbridge cargo test -p dubbridge-connectors p2p_availability -- --nocapture` (3/3); `cargo check -p dubbridge-worker-runner`; `cargo fmt --all -- --check`; `git diff --check`.
 
 ### P2.T4a closure record — Done 2026-09-07
 

@@ -51,7 +51,7 @@ Conservative planning score: **RRI 131 — Excessive — Effort XL**.
 
 P2 is decomposed into independently gated parents T0-T6. T0, the decomposed T1 persistence leaves, and C0 are complete. The original T1 parent scored **78 High / XL**, became a non-executable container, and its T1a-T1f leaves are **Done and owner-approved as P2.T1 on 2026-09-06**.
 
-P2.T2, T3a, and T3b are Done, including T2c-r and T2g recertification; T3b was owner-verified on 2026-09-09. T4a is Done (2026-09-07). T3c's 2026-09-12 preflight resolved its D2 blocker by adding a Rust materializer to T3c's own envelope, then refined the frozen parent into eight implementation/integration leaves. The parent remains RRI 70 Complex and received Matias's explicit HITL approval on 2026-09-12 for later execution of the frozen envelope in dependency order. T3c-S0, T3c-S1a, and T3c-S2a are Done (T3c-S2a owner-verified 2026-09-12). S3, S1b, S2b, S4, and T3c-Integ remain unstarted; T3d remains blocked on T3c. See `docs/audit/mvp0-p2p-p2-t3c-preflight.md`, `.agent/p2-t3c/parent-hitl-approval.json`, and the active task ledger. Remaining P2 work is the unclosed T3c leaves, T3d, T4b-T4f, T5a-T5d, and T6a-T6e. Each executable leaf is scored with `scripts/rri.py` immediately before execution; the parent approval does not authorize scope expansion or bypass leaf-specific technical gates.
+P2.T2, T3a, and T3b are Done, including T2c-r and T2g recertification; T3b was owner-verified on 2026-09-09. P2.T4a-T4f are Done: T4a closed 2026-09-07 and T4b-T4f closed retrospectively on 2026-09-14 under Matias's explicit waiver, with T4e's direct-runtime-test residual retained as non-blocking `P2.T4e-cov`. T3c's 2026-09-12 preflight resolved its D2 blocker by adding a Rust materializer to T3c's own envelope, then refined the frozen parent into eight implementation/integration leaves. The parent remains RRI 70 Complex and received Matias's explicit HITL approval on 2026-09-12 for later execution of the frozen envelope in dependency order. See `docs/audit/mvp0-p2p-p2-t3c-preflight.md`, `.agent/p2-t3c/parent-hitl-approval.json`, and the active task ledger. Remaining P2 work excludes T4 and is tracked leaf-by-leaf in the task ledger. Each executable leaf is scored with `scripts/rri.py` immediately before execution; the parent approval does not authorize scope expansion or bypass leaf-specific technical gates.
 
 ## Architecture
 
@@ -220,7 +220,7 @@ Implement the T0/C0-frozen `AN-R1 + AN-A1` contract:
 
 ### P2.T4 — O4 dispatch + reconciliation — DECOMPOSED
 
-T4a is Done (2026-09-07); T4b-T4f remain Planned.
+T4a is Done (2026-09-07); T4b-T4f are Done (2026-09-14, retrospective owner waiver). `P2.T4e-cov` remains a non-blocking direct-runtime-test residual.
 
 C0 decomposition: `T4a` pure recovery kernel; `T4b` PostgreSQL claims/leases (`0034`); `T4c` mTLS AN client; `T4d` outbox dispatcher; `T4e` worker/reconciler join; `T4f` recovery certification.
 
