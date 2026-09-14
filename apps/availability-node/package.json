@@ -10,6 +10,7 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
+    "test:t6d": "npm run build && node --test test/secret_boundary.test.ts",
     "start": "node dist/server.js"
   },
   "devDependencies": {
