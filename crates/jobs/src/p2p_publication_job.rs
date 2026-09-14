@@ -15,7 +15,7 @@ use dubbridge_connectors::p2p_availability::{
 };
 use dubbridge_db::error::DbError;
 use dubbridge_db::p2p_publication_claim_repo::{
-    P2pPublicationClaim, claim_next_publication_work,
+    P2pPublicationClaim, ReadyFinalization, claim_next_publication_work,
     fail_publication_claim as persist_failed_claim, finalize_publication_ready,
     release_publication_claim,
 };
@@ -107,12 +107,9 @@ impl P2pPublicationDispatcher {
 
     pub async fn dispatch_once(&self) -> Result<DispatchTick, P2pDispatchError> {
         let now = OffsetDateTime::now_utc();
-        let claim = claim_next_publication_work(
-            &self.pool,
-            Uuid::new_v4(),
-            now + self.lease_duration,
-        )
-        .await?;
+        let claim =
+            claim_next_publication_work(&self.pool, Uuid::new_v4(), now + self.lease_duration)
+                .await?;
         let Some(claim) = claim else {
             return Ok(DispatchTick::Idle);
         };
@@ -151,15 +148,15 @@ impl P2pPublicationDispatcher {
         publication: P2pPublicationRecord,
     ) -> Result<P2pPublicationRecord, P2pDispatchError> {
         match publication.state {
-            PublicationState::PublishPending | PublicationState::Reconciling => Ok(
-                transition_publication_state(
+            PublicationState::PublishPending | PublicationState::Reconciling => {
+                Ok(transition_publication_state(
                     &self.pool,
                     publication.id,
                     PublicationState::Publishing,
                     None,
                 )
-                .await?,
-            ),
+                .await?)
+            }
             PublicationState::Publishing => Ok(publication),
             _ => Err(P2pDispatchError::Database(DbError::Conflict)),
         }
@@ -174,16 +171,17 @@ impl P2pPublicationDispatcher {
             Ok(value) => value,
             Err(_) => return self.fail_claim(claim, "publication_response_invalid").await,
         };
-        let delivered_at = OffsetDateTime::now_utc();
         finalize_publication_ready(
             &self.pool,
-            claim.outbox_id,
-            claim.publication_id,
-            claim.lineage_id,
-            claim.claim_token,
-            &evidence.external_publication_id,
-            confirmed_at,
-            delivered_at,
+            ReadyFinalization {
+                outbox_id: claim.outbox_id,
+                publication_id: claim.publication_id,
+                lineage_id: claim.lineage_id,
+                claim_token: claim.claim_token,
+                external_publication_id: &evidence.external_publication_id,
+                confirmed_at,
+                delivered_at: OffsetDateTime::now_utc(),
+            },
         )
         .await?;
         Ok(DispatchTick::Ready(claim.publication_id))
@@ -291,8 +289,7 @@ fn validate_manifest(
 fn is_retryable_remote_error(error: AvailabilityPublicationError) -> bool {
     matches!(
         error,
-        AvailabilityPublicationError::Unavailable
-            | AvailabilityPublicationError::AmbiguousOutcome
+        AvailabilityPublicationError::Unavailable | AvailabilityPublicationError::AmbiguousOutcome
     )
 }
 
