@@ -15,7 +15,6 @@ ALTER TABLE p2p_publication_outbox
                 AND claimed_at IS NOT NULL
                 AND lease_expires_at IS NOT NULL
                 AND isfinite(lease_expires_at)
-                AND lease_expires_at > claimed_at
             ) OR (
                 delivery_state <> 'claimed'
                 AND claim_token IS NULL
