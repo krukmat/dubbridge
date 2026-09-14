@@ -58,29 +58,17 @@ async fn intent_and_lineage_seal_are_correlated_and_idempotent() {
     let publication_id = P2pPublicationId::new();
     let lineage_id = K1LineageId::new();
 
-    ensure_publication_with_outbox(
-        &pool,
-        asset_id,
-        publication_id,
-        lineage_id,
-        Uuid::new_v4(),
-    )
-    .await
-    .expect("create publication");
+    ensure_publication_with_outbox(&pool, asset_id, publication_id, lineage_id, Uuid::new_v4())
+        .await
+        .expect("create publication");
     assert_eq!(
         event_count(&pool, publication_id, "p2p_publication_intent_created").await,
         1
     );
 
-    ensure_publication_with_outbox(
-        &pool,
-        asset_id,
-        publication_id,
-        lineage_id,
-        Uuid::new_v4(),
-    )
-    .await
-    .expect("idempotent publication replay");
+    ensure_publication_with_outbox(&pool, asset_id, publication_id, lineage_id, Uuid::new_v4())
+        .await
+        .expect("idempotent publication replay");
     assert_eq!(
         event_count(&pool, publication_id, "p2p_publication_intent_created").await,
         1
@@ -97,7 +85,10 @@ async fn intent_and_lineage_seal_are_correlated_and_idempotent() {
     )
     .await
     .expect("persist K1 wrap");
-    assert_eq!(event_count(&pool, publication_id, "p2p_lineage_sealed").await, 0);
+    assert_eq!(
+        event_count(&pool, publication_id, "p2p_lineage_sealed").await,
+        0
+    );
 
     persist_sealed_package_evidence(
         &pool,
@@ -145,15 +136,9 @@ async fn reconciliation_state_and_audit_commit_together() {
     let publication_id = P2pPublicationId::new();
     let lineage_id = K1LineageId::new();
 
-    ensure_publication_with_outbox(
-        &pool,
-        asset_id,
-        publication_id,
-        lineage_id,
-        Uuid::new_v4(),
-    )
-    .await
-    .expect("create publication");
+    ensure_publication_with_outbox(&pool, asset_id, publication_id, lineage_id, Uuid::new_v4())
+        .await
+        .expect("create publication");
     transition_publication_state(
         &pool,
         publication_id,
