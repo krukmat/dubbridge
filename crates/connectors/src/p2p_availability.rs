@@ -117,8 +117,8 @@ impl AvailabilityPublicationClient {
             return Err(AvailabilityPublicationError::InvalidConfiguration);
         }
 
-        let parsed = Url::parse(base_url)
-            .map_err(|_| AvailabilityPublicationError::InvalidConfiguration)?;
+        let parsed =
+            Url::parse(base_url).map_err(|_| AvailabilityPublicationError::InvalidConfiguration)?;
         if parsed.scheme() != "https"
             || parsed.host_str().is_none()
             || !parsed.username().is_empty()
@@ -189,8 +189,8 @@ fn parse_response(
         return Ok(evidence);
     }
 
-    let error: AvailabilityErrorBody = serde_json::from_slice(body)
-        .map_err(|_| AvailabilityPublicationError::InvalidResponse)?;
+    let error: AvailabilityErrorBody =
+        serde_json::from_slice(body).map_err(|_| AvailabilityPublicationError::InvalidResponse)?;
     if error.contract_version != CONTRACT_VERSION {
         return Err(AvailabilityPublicationError::InvalidResponse);
     }
@@ -264,7 +264,9 @@ mod tests {
 
     fn request() -> AvailabilityPublicationRequest {
         AvailabilityPublicationRequest::new(
-            P2pPublicationId(uuid::Uuid::parse_str("22222222-2222-4222-8222-222222222222").unwrap()),
+            P2pPublicationId(
+                uuid::Uuid::parse_str("22222222-2222-4222-8222-222222222222").unwrap(),
+            ),
             K1LineageId(uuid::Uuid::parse_str("33333333-3333-4333-8333-333333333333").unwrap()),
             "b753ba52473d8b9f1ddc8444d43d6166c6b46eeb1214018e3a33503f56a021b4",
             "packages/22222222-2222-4222-8222-222222222222/33333333-3333-4333-8333-333333333333",
@@ -299,7 +301,14 @@ mod tests {
             "evidence_id": "evidence-1",
             "confirmed_at": "2026-09-14T06:00:00Z"
         });
-        assert!(parse_response(StatusCode::CREATED, &serde_json::to_vec(&valid).unwrap(), &request).is_ok());
+        assert!(
+            parse_response(
+                StatusCode::CREATED,
+                &serde_json::to_vec(&valid).unwrap(),
+                &request
+            )
+            .is_ok()
+        );
 
         let mismatched = serde_json::json!({
             "contract_version": CONTRACT_VERSION,
@@ -311,7 +320,11 @@ mod tests {
             "confirmed_at": "2026-09-14T06:00:00Z"
         });
         assert!(matches!(
-            parse_response(StatusCode::OK, &serde_json::to_vec(&mismatched).unwrap(), &request),
+            parse_response(
+                StatusCode::OK,
+                &serde_json::to_vec(&mismatched).unwrap(),
+                &request
+            ),
             Err(AvailabilityPublicationError::InvalidResponse)
         ));
     }
