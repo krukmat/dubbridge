@@ -51,9 +51,21 @@ export async function handleRequest(
 ): Promise<void> {
   try {
     const payload = decodeRequestPayload(request.data);
-    if (await handleLifecycleCommand(runtime, request, closeOnce)) return;
-    if (await handleProofCommand(runtime, request, payload, closeOnce)) return;
-    if (await handleProductCommand(runtime, request, payload, closeOnce)) return;
+    if (handleImmediateLifecycleCommand(runtime, request, closeOnce)) return;
+    if (request.command === RUNTIME_COMMAND.SHUTDOWN) {
+      await productPackages.close();
+      safeReply(request, success("stopped"), closeOnce);
+      closeOnce();
+      return;
+    }
+    if (isProofCommand(request.command)) {
+      await executeProofCommand(runtime, request, payload, closeOnce);
+      return;
+    }
+    if (isProductCommand(request.command)) {
+      await executeProductCommand(runtime, request, payload, closeOnce);
+      return;
+    }
     safeReply(request, failure("INVALID_PAYLOAD", "Runtime command is not supported"), closeOnce);
   } catch (error) {
     const protocolError = toProtocolError(error);
@@ -61,11 +73,11 @@ export async function handleRequest(
   }
 }
 
-async function handleLifecycleCommand(
+function handleImmediateLifecycleCommand(
   runtime: WorkletRuntime,
   request: IncomingRequest,
   closeOnce: () => void,
-): Promise<boolean> {
+): boolean {
   if (request.command === RUNTIME_COMMAND.HANDSHAKE) {
     safeReply(
       request,
@@ -79,71 +91,73 @@ async function handleLifecycleCommand(
     );
     return true;
   }
-  if (request.command === RUNTIME_COMMAND.PING) {
-    safeReply(request, success("pong"), closeOnce);
-    return true;
-  }
-  if (request.command === RUNTIME_COMMAND.SHUTDOWN) {
-    await productPackages.close();
-    safeReply(request, success("stopped"), closeOnce);
-    closeOnce();
-    return true;
-  }
-  return false;
+  if (request.command !== RUNTIME_COMMAND.PING) return false;
+  safeReply(request, success("pong"), closeOnce);
+  return true;
 }
 
-async function handleProofCommand(
+function isProofCommand(command: number): boolean {
+  return (
+    command === RUNTIME_COMMAND.OPEN_CLOSE_TRANSIENT_DRIVE ||
+    command === RUNTIME_COMMAND.SEED_WRITE_HASH_DELETE ||
+    command === RUNTIME_COMMAND.DISCOVER_AND_REPLICATE
+  );
+}
+
+async function executeProofCommand(
   runtime: WorkletRuntime,
   request: IncomingRequest,
   payload: Record<string, unknown>,
   closeOnce: () => void,
-): Promise<boolean> {
+): Promise<void> {
   if (request.command === RUNTIME_COMMAND.OPEN_CLOSE_TRANSIENT_DRIVE) {
     safeReply(request, success(await openCloseTransientDrive(runtime)), closeOnce);
-    return true;
+    return;
   }
   if (request.command === RUNTIME_COMMAND.SEED_WRITE_HASH_DELETE) {
     safeReply(request, success(await writeHashSeed(runtime)), closeOnce);
-    return true;
+    return;
   }
-  if (request.command !== RUNTIME_COMMAND.DISCOVER_AND_REPLICATE) return false;
-
   const { topic, role } = decodeDiscoverAndReplicateRequest(payload);
   const drive = await openHeldTransientDrive(runtime);
   const receipt = await discoverAndReplicate(Buffer.from(topic, "hex"), role, drive);
   safeReply(request, success(receipt), closeOnce);
-  return true;
 }
 
-async function handleProductCommand(
+function isProductCommand(command: number): boolean {
+  return (
+    command === RUNTIME_COMMAND.OPEN_PRODUCT_PACKAGE ||
+    command === RUNTIME_COMMAND.READ_PRODUCT_FILE ||
+    command === RUNTIME_COMMAND.CLOSE_PRODUCT_PACKAGE ||
+    command === RUNTIME_COMMAND.CANCEL_PRODUCT_PACKAGE
+  );
+}
+
+async function executeProductCommand(
   runtime: WorkletRuntime,
   request: IncomingRequest,
   payload: Record<string, unknown>,
   closeOnce: () => void,
-): Promise<boolean> {
+): Promise<void> {
   if (request.command === RUNTIME_COMMAND.OPEN_PRODUCT_PACKAGE) {
     const { externalPublicationId } = decodeOpenProductPackageRequest(payload);
     await productPackages.open(runtime, externalPublicationId);
     safeReply(request, success("opened"), closeOnce);
-    return true;
+    return;
   }
   if (request.command === RUNTIME_COMMAND.READ_PRODUCT_FILE) {
     const { path } = decodeReadProductFileRequest(payload);
     const bytes = await productPackages.read(path);
     safeReply(request, success(productFileReceipt(path, bytes)), closeOnce);
-    return true;
+    return;
   }
   if (request.command === RUNTIME_COMMAND.CLOSE_PRODUCT_PACKAGE) {
     await productPackages.close();
     safeReply(request, success("closed"), closeOnce);
-    return true;
+    return;
   }
-  if (request.command === RUNTIME_COMMAND.CANCEL_PRODUCT_PACKAGE) {
-    await productPackages.cancel();
-    safeReply(request, success("cancelled"), closeOnce);
-    return true;
-  }
-  return false;
+  await productPackages.cancel();
+  safeReply(request, success("cancelled"), closeOnce);
 }
 
 function productFileReceipt(path: string, bytes: Uint8Array): Record<string, unknown> {
