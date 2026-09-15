@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo } from "react";
 
 import { VideoPlayer, type VideoPlayerProps } from "../../components/VideoPlayer";
 import type { P2PPlaybackController, P2PPlaybackSession } from "./P2PPlaybackController";
+import { createP2PPlaybackLease } from "./P2PPlaybackLease";
 
 type PlaybackStopper = Pick<P2PPlaybackController, "stop">;
 type P2PVideoPlayerProps = Omit<VideoPlayerProps, "source" | "onRetry" | "onPlaybackError">;
@@ -12,20 +13,10 @@ export type P2PPlaybackSessionViewProps = P2PVideoPlayerProps & {
   onRetry?: () => void;
 };
 
-type ReleaseSession = () => Promise<void>;
-
-function createReleaseSession(controller: PlaybackStopper): ReleaseSession {
-  let releaseOperation: Promise<void> | null = null;
-  return () => {
-    if (releaseOperation === null) releaseOperation = controller.stop();
-    return releaseOperation;
-  };
-}
-
 /**
  * Owns one P5 loopback playback lease and connects it to the existing player.
- * Teardown is intentionally idempotent so player error, retry and React unmount
- * can race without issuing duplicate stop commands or extending CK lifetime.
+ * Player error, retry and React unmount all converge on the same idempotent
+ * release operation; retry stays fail-closed if teardown cannot complete.
  */
 export function P2PPlaybackSessionView({
   session,
@@ -33,23 +24,23 @@ export function P2PPlaybackSessionView({
   onRetry,
   ...playerProps
 }: P2PPlaybackSessionViewProps) {
-  const releaseSession = useMemo(
-    () => createReleaseSession(controller),
+  const lease = useMemo(
+    () => createP2PPlaybackLease(controller),
     [controller, session.playbackUrl],
   );
 
   useEffect(() => () => {
-    void releaseSession().catch(() => undefined);
-  }, [releaseSession]);
+    void lease.release().catch(() => undefined);
+  }, [lease]);
 
   const handlePlaybackError = useCallback(() => {
-    void releaseSession().catch(() => undefined);
-  }, [releaseSession]);
+    void lease.release().catch(() => undefined);
+  }, [lease]);
 
   const handleRetry = useCallback(() => {
     if (!onRetry) return;
-    void releaseSession().then(onRetry).catch(() => undefined);
-  }, [onRetry, releaseSession]);
+    void lease.retryAfterRelease(onRetry).catch(() => undefined);
+  }, [lease, onRetry]);
 
   return (
     <VideoPlayer
