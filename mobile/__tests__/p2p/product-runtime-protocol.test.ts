@@ -1,3 +1,4 @@
+import { productAccountStorageUri } from "../../src/p2p/runtime/product-package-runtime";
 import {
   RUNTIME_COMMAND,
   RUNTIME_PROTOCOL_VERSION,
@@ -83,6 +84,20 @@ describe("P4 product runtime protocol", () => {
       RUNTIME_COMMAND.CLOSE_PRODUCT_PACKAGE,
       RUNTIME_COMMAND.CANCEL_PRODUCT_PACKAGE,
     ]);
+  });
+
+  it("keeps Corestore namespaces distinct for separate signed-in accounts", () => {
+    const runtime = { argv: ["file:/tmp/p2p-product"] };
+
+    expect(productAccountStorageUri(runtime, "viewer-a")).toBe(
+      "file:/tmp/p2p-product/accounts/viewer-a",
+    );
+    expect(productAccountStorageUri(runtime, "viewer-b")).toBe(
+      "file:/tmp/p2p-product/accounts/viewer-b",
+    );
+    expect(productAccountStorageUri(runtime, "viewer-a")).not.toBe(
+      productAccountStorageUri(runtime, "viewer-b"),
+    );
   });
 
   it("hashes ciphertext inside the Bare worklet with SHA-256", async () => {
