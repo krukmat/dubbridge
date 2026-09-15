@@ -2,6 +2,7 @@ import { RuntimeProtocolError } from "./protocol";
 import type { WorkletRuntime } from "./transient-drive";
 
 const DRIVE_KEY = /^[0-9a-f]{64}$/;
+const ACCOUNT_SCOPE = /^[A-Za-z0-9._~-]{1,128}$/;
 const DEFAULT_IO_TIMEOUT_MS = 30_000;
 
 interface ProductStore {
@@ -47,12 +48,17 @@ export class ProductPackageRuntime {
     return this.active !== null;
   }
 
-  async open(runtime: WorkletRuntime, externalPublicationId: string): Promise<void> {
+  async open(
+    runtime: WorkletRuntime,
+    accountScope: string,
+    externalPublicationId: string,
+  ): Promise<void> {
     if (this.active !== null) {
       throw new RuntimeProtocolError("PRODUCT_PACKAGE_OPEN_FAILED", "Product package is already open");
     }
+    validateAccountScope(accountScope);
     validateDriveKey(externalPublicationId);
-    const active = await openPackage(runtimeStorageUri(runtime), externalPublicationId);
+    const active = await openPackage(accountStorageUri(runtime, accountScope), externalPublicationId);
     this.active = active;
   }
 
@@ -129,12 +135,22 @@ async function closePackage(active: ActiveProductPackage): Promise<void> {
   }
 }
 
+function accountStorageUri(runtime: WorkletRuntime, accountScope: string): string {
+  return `${runtimeStorageUri(runtime)}/accounts/${accountScope}`;
+}
+
 function runtimeStorageUri(runtime: WorkletRuntime): string {
   const uri = runtime.argv?.[0];
   if (typeof uri !== "string" || !uri.startsWith("file:") || uri.length <= 5) {
     throw new RuntimeProtocolError("PRODUCT_STORAGE_CONFIG_INVALID", "Product storage configuration is invalid");
   }
-  return uri;
+  return uri.replace(/\/$/, "");
+}
+
+function validateAccountScope(value: string): void {
+  if (!ACCOUNT_SCOPE.test(value) || value === "." || value === "..") {
+    throw new RuntimeProtocolError("INVALID_PAYLOAD", "Product account scope is invalid");
+  }
 }
 
 function validateDriveKey(value: string): void {
