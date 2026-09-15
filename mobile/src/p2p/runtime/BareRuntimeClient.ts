@@ -2,7 +2,12 @@ import { Directory, Paths } from "expo-file-system";
 import { Worklet } from "react-native-bare-kit";
 
 import RUNTIME_WORKLET_SOURCE from "./worklet.bundle.js";
-import { RuntimeProtocolError, type RuntimeHandshake } from "./protocol";
+import {
+  RuntimeProtocolError,
+  type ProductPlaybackReceipt,
+  type RuntimeHandshake,
+  type StartProductPlaybackRequest,
+} from "./protocol";
 import { BareRpcPort, RuntimeProtocolClient } from "./runtime-client";
 
 export type BareRuntimeState = "stopped" | "starting" | "ready" | "failed";
@@ -29,6 +34,8 @@ export type BareRuntimeProtocol = Pick<
   | "hashProductBytes"
   | "closeProductPackage"
   | "cancelProductPackage"
+  | "startProductPlayback"
+  | "stopProductPlayback"
 >;
 export type BareRuntimeProtocolFactory = (worklet: BareRuntimeWorklet) => BareRuntimeProtocol;
 export type ProductAccountStorageCleaner = (
@@ -36,6 +43,8 @@ export type ProductAccountStorageCleaner = (
   accountScope: string,
 ) => Promise<void>;
 type BareRpcStream = ConstructorParameters<typeof BareRpcPort>[0];
+
+type StartPlaybackInput = Omit<StartProductPlaybackRequest, "protocolVersion">;
 
 const PRODUCT_WORKLET_FILENAME = "/dubbridge-p2p-runtime.worklet";
 const ACCOUNT_SCOPE = /^[A-Za-z0-9._-]{1,128}$/;
@@ -62,6 +71,7 @@ function validateAccountScope(accountScope: string): void {
 /** One product Bare worklet with no implicit network or proof behavior. */
 export class BareRuntimeClient {
   private productPackageOpen = false;
+  private playbackAccountScope: string | null = null;
   private protocol: BareRuntimeProtocol | null = null;
   private state: BareRuntimeState = "stopped";
   private worklet: BareRuntimeWorklet | null = null;
@@ -104,9 +114,7 @@ export class BareRuntimeClient {
         this.state = "failed";
         worklet.terminate();
       }
-      if (error instanceof RuntimeProtocolError || error instanceof BareRuntimeClientError) {
-        throw error;
-      }
+      if (error instanceof RuntimeProtocolError || error instanceof BareRuntimeClientError) throw error;
       throw new BareRuntimeClientError(
         "START_FAILED",
         error instanceof Error ? error.message : "Bare runtime could not start",
@@ -119,13 +127,10 @@ export class BareRuntimeClient {
   }
 
   async openProductPackage(accountScope: string, externalPublicationId: string): Promise<void> {
-    if (this.productPackageOpen) {
+    if (this.productPackageOpen || this.playbackAccountScope !== null) {
       throw new BareRuntimeClientError("INVALID_STATE", "A product package is already open");
     }
-    await this.requireReady("open product package").openProductPackage(
-      accountScope,
-      externalPublicationId,
-    );
+    await this.requireReady("open product package").openProductPackage(accountScope, externalPublicationId);
     this.productPackageOpen = true;
   }
 
@@ -153,7 +158,27 @@ export class BareRuntimeClient {
     }
   }
 
+  async startProductPlayback(input: StartPlaybackInput): Promise<ProductPlaybackReceipt> {
+    if (this.productPackageOpen || this.playbackAccountScope !== null) {
+      throw new BareRuntimeClientError("INVALID_STATE", "A product package is already open");
+    }
+    const receipt = await this.requireReady("start product playback").startProductPlayback(input);
+    this.playbackAccountScope = input.accountScope;
+    return receipt;
+  }
+
+  async stopProductPlayback(): Promise<void> {
+    if (this.playbackAccountScope === null) return;
+    try {
+      await this.requireReady("stop product playback").stopProductPlayback();
+    } finally {
+      this.playbackAccountScope = null;
+    }
+  }
+
   async clearProductAccount(accountScope: string): Promise<void> {
+    validateAccountScope(accountScope);
+    if (this.playbackAccountScope === accountScope) await this.stopProductPlayback();
     if (this.productPackageOpen) {
       throw new BareRuntimeClientError(
         "INVALID_STATE",
@@ -171,6 +196,7 @@ export class BareRuntimeClient {
     this.protocol = null;
     this.worklet = null;
     this.productPackageOpen = false;
+    this.playbackAccountScope = null;
     this.state = "stopped";
 
     try {

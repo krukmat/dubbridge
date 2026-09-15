@@ -8,13 +8,16 @@ import {
   RuntimeProtocolError,
   decodeHandshakeResult,
   decodeProductFileReceipt,
+  decodeProductPlaybackReceipt,
   decodeResponseEnvelope,
   decodeRuntimeEvent,
   type DiscoverAndReplicateReceipt,
+  type ProductPlaybackReceipt,
   type RuntimeEvent,
   type RuntimeHandshake,
   type RuntimeRpcPort,
   type SeedWriteHashDeleteReceipt,
+  type StartProductPlaybackRequest,
 } from "./protocol";
 
 const PRODUCT_RPC_TIMEOUT_MS = 35_000;
@@ -132,6 +135,21 @@ export class RuntimeProtocolClient {
       RUNTIME_COMMAND.CANCEL_PRODUCT_PACKAGE,
       "cancelled",
       "Runtime product package cancel reply is invalid",
+      undefined,
+      PRODUCT_RPC_TIMEOUT_MS,
+    );
+  }
+
+  async startProductPlayback(input: Omit<StartProductPlaybackRequest, "protocolVersion">): Promise<ProductPlaybackReceipt> {
+    const result = await this.call(RUNTIME_COMMAND.START_PRODUCT_PLAYBACK, input, PRODUCT_RPC_TIMEOUT_MS);
+    return decodeProductPlaybackReceipt(result);
+  }
+
+  async stopProductPlayback(): Promise<void> {
+    await this.expectExact(
+      RUNTIME_COMMAND.STOP_PRODUCT_PLAYBACK,
+      "stopped",
+      "Runtime product playback stop reply is invalid",
       undefined,
       PRODUCT_RPC_TIMEOUT_MS,
     );

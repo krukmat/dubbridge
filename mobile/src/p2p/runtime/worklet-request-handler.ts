@@ -10,10 +10,12 @@ import {
   decodeOpenProductPackageRequest,
   decodeReadProductFileRequest,
   decodeRequestPayload,
+  decodeStartProductPlaybackRequest,
   type RuntimeProtocolErrorCode,
 } from "./protocol";
 import { hashProductBytes } from "./product-hash";
 import { ProductPackageRuntime } from "./product-package-runtime";
+import { ProductPlaybackRuntime } from "./product-playback-runtime";
 import { discoverAndReplicate } from "./transient-replication";
 import { openCloseTransientDrive, openHeldTransientDrive, type WorkletRuntime } from "./transient-drive";
 import { writeHashSeed } from "./transient-seed";
@@ -25,6 +27,7 @@ export interface IncomingRequest {
 }
 
 const productPackages = new ProductPackageRuntime();
+const productPlayback = new ProductPlaybackRuntime(productPackages);
 
 export function versioned(payload: Record<string, unknown>): Record<string, unknown> {
   return { protocolVersion: RUNTIME_PROTOCOL_VERSION, ...payload };
@@ -97,12 +100,8 @@ function handleImmediateLifecycleCommand(
 }
 
 async function shutdownProductRuntime(request: IncomingRequest, closeOnce: () => void): Promise<void> {
-  if (!productPackages.isOpen) {
-    safeReply(request, success("stopped"), closeOnce);
-    closeOnce();
-    return;
-  }
-  await productPackages.close();
+  await productPlayback.stop();
+  if (productPackages.isOpen) await productPackages.close();
   safeReply(request, success("stopped"), closeOnce);
   closeOnce();
 }
@@ -141,7 +140,9 @@ function isProductCommand(command: number): boolean {
     command === RUNTIME_COMMAND.READ_PRODUCT_FILE ||
     command === RUNTIME_COMMAND.CLOSE_PRODUCT_PACKAGE ||
     command === RUNTIME_COMMAND.CANCEL_PRODUCT_PACKAGE ||
-    command === RUNTIME_COMMAND.HASH_PRODUCT_BYTES
+    command === RUNTIME_COMMAND.HASH_PRODUCT_BYTES ||
+    command === RUNTIME_COMMAND.START_PRODUCT_PLAYBACK ||
+    command === RUNTIME_COMMAND.STOP_PRODUCT_PLAYBACK
   );
 }
 
@@ -156,6 +157,25 @@ async function executeProductCommand(
     safeReply(request, success(hashProductBytes(b4a.from(bytesBase64, "base64"))), closeOnce);
     return;
   }
+  if (request.command === RUNTIME_COMMAND.START_PRODUCT_PLAYBACK) {
+    const playbackRequest = decodeStartProductPlaybackRequest(payload);
+    safeReply(request, success(await productPlayback.start(runtime, playbackRequest)), closeOnce);
+    return;
+  }
+  if (request.command === RUNTIME_COMMAND.STOP_PRODUCT_PLAYBACK) {
+    await productPlayback.stop();
+    safeReply(request, success("stopped"), closeOnce);
+    return;
+  }
+  await executePackageCommand(runtime, request, payload, closeOnce);
+}
+
+async function executePackageCommand(
+  runtime: WorkletRuntime,
+  request: IncomingRequest,
+  payload: Record<string, unknown>,
+  closeOnce: () => void,
+): Promise<void> {
   if (request.command === RUNTIME_COMMAND.OPEN_PRODUCT_PACKAGE) {
     const { accountScope, externalPublicationId } = decodeOpenProductPackageRequest(payload);
     await productPackages.open(runtime, accountScope, externalPublicationId);

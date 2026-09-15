@@ -2,7 +2,11 @@ import {
   BareRuntimeClient,
   type BareRuntimeState,
 } from "./runtime/BareRuntimeClient";
-import type { RuntimeHandshake } from "./runtime/protocol";
+import type {
+  ProductPlaybackReceipt,
+  RuntimeHandshake,
+  StartProductPlaybackRequest,
+} from "./runtime/protocol";
 
 export type P2PRuntimeSnapshot = Readonly<{
   runtimeState: BareRuntimeState;
@@ -22,7 +26,11 @@ export type P2PRuntimeClient = Pick<
   | "closeProductPackage"
   | "cancelProductPackage"
   | "clearProductAccount"
+  | "startProductPlayback"
+  | "stopProductPlayback"
 >;
+
+type StartPlaybackInput = Omit<StartProductPlaybackRequest, "protocolVersion">;
 
 /** Framework-independent product façade. Construction is deliberately inert. */
 export class P2PService {
@@ -92,6 +100,14 @@ export class P2PService {
 
   async clearProductAccount(accountScope: string): Promise<void> {
     return this.runtimeCall(() => this.runtime.clearProductAccount(accountScope));
+  }
+
+  async startProductPlayback(input: StartPlaybackInput): Promise<ProductPlaybackReceipt> {
+    return this.runtimeCall(() => this.runtime.startProductPlayback(input));
+  }
+
+  async stopProductPlayback(): Promise<void> {
+    return this.runtimeCall(() => this.runtime.stopProductPlayback());
   }
 
   private async initializeRuntime(): Promise<RuntimeHandshake> {

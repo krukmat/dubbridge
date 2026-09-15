@@ -3,9 +3,11 @@ import type { P2pSyncSnapshot } from "./SyncState";
 
 export type VerifiedP2pPackageHandle = Readonly<{
   accountScope: string;
+  assetId: string;
   publicationId: string;
   lineageId: string;
   manifestDigestSha256: string;
+  externalPublicationId: string;
 }>;
 
 /**
@@ -35,8 +37,10 @@ export function createVerifiedPackageHandle(
   }
   return {
     accountScope: snapshot.identity.accountScope,
+    assetId: descriptor.assetId,
     publicationId: snapshot.identity.publicationId,
     lineageId: snapshot.identity.lineageId,
     manifestDigestSha256: descriptor.manifestDigestSha256,
+    externalPublicationId: descriptor.externalPublicationId,
   };
 }

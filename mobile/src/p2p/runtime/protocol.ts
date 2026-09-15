@@ -9,6 +9,7 @@ export const RUNTIME_CAPABILITIES = [
   "fatal",
   "shutdown",
   "product-package:v1",
+  "product-playback:v1",
 ] as const;
 
 export const RUNTIME_COMMAND = {
@@ -26,6 +27,8 @@ export const RUNTIME_COMMAND = {
   CLOSE_PRODUCT_PACKAGE: 12,
   CANCEL_PRODUCT_PACKAGE: 13,
   HASH_PRODUCT_BYTES: 14,
+  START_PRODUCT_PLAYBACK: 15,
+  STOP_PRODUCT_PLAYBACK: 16,
 } as const;
 
 export type RuntimeCapability = (typeof RUNTIME_CAPABILITIES)[number];
@@ -58,7 +61,8 @@ export type RuntimeProtocolErrorCode =
   | "PRODUCT_PACKAGE_NOT_OPEN"
   | "PRODUCT_PACKAGE_READ_FAILED"
   | "PRODUCT_PACKAGE_CLOSE_FAILED"
-  | "PRODUCT_HASH_FAILED";
+  | "PRODUCT_HASH_FAILED"
+  | "PRODUCT_PLAYBACK_FAILED";
 
 export const TRANSIENT_DRIVE_RECEIPT = {
   capability: "transient-hyperdrive-corestore",
@@ -101,6 +105,23 @@ export interface HashProductBytesRequest {
   bytesBase64: string;
 }
 
+export interface StartProductPlaybackRequest {
+  protocolVersion: typeof RUNTIME_PROTOCOL_VERSION;
+  accountScope: string;
+  assetId: string;
+  externalPublicationId: string;
+  lineageId: string;
+  manifestDigestSha256: string;
+  publicationId: string;
+  ckBase64: string;
+}
+
+export interface ProductPlaybackReceipt {
+  capability: "product-playback";
+  schema_version: 1;
+  playback_url: string;
+}
+
 export interface ProductPackageFileReceipt {
   capability: "product-package-file";
   schema_version: 1;
@@ -111,6 +132,8 @@ export interface ProductPackageFileReceipt {
 
 const ACCOUNT_SCOPE = /^[A-Za-z0-9._-]{1,128}$/;
 const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+const DRIVE_KEY = /^[0-9a-f]{64}$/;
 
 export function decodeDiscoverAndReplicateRequest(value: unknown): DiscoverAndReplicateRequest {
   if (
@@ -133,7 +156,7 @@ export function decodeOpenProductPackageRequest(value: unknown): OpenProductPack
     typeof value.accountScope !== "string" ||
     !ACCOUNT_SCOPE.test(value.accountScope) ||
     typeof value.externalPublicationId !== "string" ||
-    !/^[0-9a-f]{64}$/.test(value.externalPublicationId)
+    !DRIVE_KEY.test(value.externalPublicationId)
   ) {
     throw new RuntimeProtocolError("INVALID_PAYLOAD", "Product package identity is invalid");
   }
@@ -162,6 +185,32 @@ export function decodeHashProductBytesRequest(value: unknown): HashProductBytesR
     throw new RuntimeProtocolError("INVALID_PAYLOAD", "Product hash payload is invalid");
   }
   return value as unknown as HashProductBytesRequest;
+}
+
+function validPlaybackIdentity(value: Record<string, unknown>): boolean {
+  return typeof value.accountScope === "string" && ACCOUNT_SCOPE.test(value.accountScope) &&
+    typeof value.assetId === "string" && value.assetId.length > 0 && value.assetId.length <= 128 &&
+    typeof value.publicationId === "string" && value.publicationId.length > 0 && value.publicationId.length <= 128 &&
+    typeof value.lineageId === "string" && value.lineageId.length > 0 && value.lineageId.length <= 128 &&
+    typeof value.externalPublicationId === "string" && DRIVE_KEY.test(value.externalPublicationId) &&
+    typeof value.manifestDigestSha256 === "string" && SHA256_HEX.test(value.manifestDigestSha256);
+}
+
+export function decodeStartProductPlaybackRequest(value: unknown): StartProductPlaybackRequest {
+  if (!RuntimeCodec.isRecord(value) || value.protocolVersion !== RUNTIME_PROTOCOL_VERSION ||
+      !validPlaybackIdentity(value) || typeof value.ckBase64 !== "string" || !BASE64.test(value.ckBase64)) {
+    throw new RuntimeProtocolError("INVALID_PAYLOAD", "Product playback request is invalid");
+  }
+  let keyBytes: Uint8Array;
+  try {
+    keyBytes = b4a.from(value.ckBase64, "base64");
+  } catch {
+    throw new RuntimeProtocolError("INVALID_PAYLOAD", "Product playback content key is invalid");
+  }
+  if (keyBytes.byteLength !== 32) {
+    throw new RuntimeProtocolError("INVALID_PAYLOAD", "Product playback content key is invalid");
+  }
+  return value as unknown as StartProductPlaybackRequest;
 }
 
 export interface RuntimeHandshake {
@@ -217,6 +266,18 @@ export function decodeProductFileReceipt(value: unknown, expectedPath: string): 
     throw new RuntimeProtocolError("INVALID_PAYLOAD", "Runtime product file length is invalid");
   }
   return bytes;
+}
+
+export function decodeProductPlaybackReceipt(value: unknown): ProductPlaybackReceipt {
+  if (!RuntimeCodec.isRecord(value)) {
+    throw new RuntimeProtocolError("INVALID_PAYLOAD", "Runtime playback reply is invalid");
+  }
+  const receipt = value as Partial<ProductPlaybackReceipt>;
+  if (receipt.capability !== "product-playback" || receipt.schema_version !== 1 ||
+      typeof receipt.playback_url !== "string" || !/^http:\/\/127\.0\.0\.1:\d+\/[0-9a-f]{32}\/index\.m3u8$/.test(receipt.playback_url)) {
+    throw new RuntimeProtocolError("INVALID_PAYLOAD", "Runtime playback reply is invalid");
+  }
+  return receipt as ProductPlaybackReceipt;
 }
 
 export { RuntimeCodec, encodeProtocolValue, decodeRequestPayload, decodeResponseEnvelope, decodeHandshakeResult, decodeRuntimeEvent } from "./protocol-codec";

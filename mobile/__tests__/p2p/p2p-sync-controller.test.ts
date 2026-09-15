@@ -54,6 +54,7 @@ const handshake: RuntimeHandshake = {
     "fatal",
     "shutdown",
     "product-package:v1",
+    "product-playback:v1",
   ],
 };
 
@@ -82,6 +83,12 @@ function runtime() {
     closeProductPackage: jest.fn(async () => undefined),
     cancelProductPackage: jest.fn(async () => undefined),
     clearProductAccount: jest.fn(async (_accountScope: string) => undefined),
+    startProductPlayback: jest.fn(async () => ({
+      capability: "product-playback" as const,
+      schema_version: 1 as const,
+      playback_url: `http://127.0.0.1:12345/${"c".repeat(32)}/index.m3u8`,
+    })),
+    stopProductPlayback: jest.fn(async () => undefined),
     shutdown: jest.fn(async () => {
       state = "stopped";
     }),
@@ -100,12 +107,16 @@ describe("P4 product sync controller", () => {
     expect(state).toMatchObject({ phase: "READY", manifestVerified: true, packageVerified: true });
     expect(handle).toEqual({
       accountScope: "viewer-1",
+      assetId: "asset-1",
       publicationId: "pub-1",
       lineageId: "lineage-1",
       manifestDigestSha256: manifestDigest,
+      externalPublicationId: "a".repeat(64),
     });
     expect(Object.keys(handle).sort()).toEqual([
       "accountScope",
+      "assetId",
+      "externalPublicationId",
       "lineageId",
       "manifestDigestSha256",
       "publicationId",

@@ -19,7 +19,24 @@ const handshake: RuntimeHandshake = {
     "fatal",
     "shutdown",
     "product-package:v1",
+    "product-playback:v1",
   ],
+};
+
+const playbackInput = {
+  accountScope: "viewer-1",
+  assetId: "asset-1",
+  externalPublicationId: "a".repeat(64),
+  lineageId: "lineage-1",
+  manifestDigestSha256: "b".repeat(64),
+  publicationId: "publication-1",
+  ckBase64: Buffer.alloc(32, 7).toString("base64"),
+};
+
+const playbackReceipt = {
+  capability: "product-playback" as const,
+  schema_version: 1 as const,
+  playback_url: `http://127.0.0.1:12345/${"c".repeat(32)}/index.m3u8`,
 };
 
 function createRuntime() {
@@ -39,6 +56,8 @@ function createRuntime() {
     closeProductPackage: jest.fn(async () => undefined),
     cancelProductPackage: jest.fn(async () => undefined),
     clearProductAccount: jest.fn(async (_accountScope: string) => undefined),
+    startProductPlayback: jest.fn(async () => playbackReceipt),
+    stopProductPlayback: jest.fn(async () => undefined),
     shutdown: jest.fn(async () => {
       state = "stopped";
     }),
@@ -54,6 +73,8 @@ function createProtocol(overrides: Partial<BareRuntimeProtocol> = {}): BareRunti
     hashProductBytes: jest.fn(async () => "d".repeat(64)),
     closeProductPackage: jest.fn(async () => undefined),
     cancelProductPackage: jest.fn(async () => undefined),
+    startProductPlayback: jest.fn(async () => playbackReceipt),
+    stopProductPlayback: jest.fn(async () => undefined),
     shutdown: jest.fn(async () => undefined),
     ...overrides,
   };
@@ -84,7 +105,7 @@ describe("P2PService", () => {
     unsubscribe();
   });
 
-  it("P4 delegates account-scoped package, verification, and cleanup operations", async () => {
+  it("P4/P5 delegates package, playback, verification, and cleanup operations", async () => {
     const runtime = createRuntime();
     const service = new P2PService(runtime);
     const bytes = new Uint8Array([1, 2, 3]);
@@ -94,14 +115,12 @@ describe("P2PService", () => {
     await expect(service.readProductFile("manifest.json")).resolves.toEqual(bytes);
     await expect(service.hashProductBytes(bytes)).resolves.toBe("d".repeat(64));
     await service.cancelProductPackage();
-    await service.closeProductPackage();
+    await expect(service.startProductPlayback(playbackInput)).resolves.toEqual(playbackReceipt);
+    await service.stopProductPlayback();
     await service.clearProductAccount("viewer-1");
 
-    expect(runtime.openProductPackage).toHaveBeenCalledWith("viewer-1", "a".repeat(64));
-    expect(runtime.readProductFile).toHaveBeenCalledWith("manifest.json");
-    expect(runtime.hashProductBytes).toHaveBeenCalledWith(bytes);
-    expect(runtime.cancelProductPackage).toHaveBeenCalledTimes(1);
-    expect(runtime.closeProductPackage).toHaveBeenCalledTimes(1);
+    expect(runtime.startProductPlayback).toHaveBeenCalledWith(playbackInput);
+    expect(runtime.stopProductPlayback).toHaveBeenCalledTimes(1);
     expect(runtime.clearProductAccount).toHaveBeenCalledWith("viewer-1");
   });
 
@@ -201,9 +220,20 @@ describe("BareRuntimeClient", () => {
     await client.cancelProductPackage();
     await client.clearProductAccount("viewer-1");
 
-    expect(protocol.openProductPackage).toHaveBeenCalledWith("viewer-1", "a".repeat(64));
-    expect(protocol.readProductFile).toHaveBeenCalledWith("manifest.json");
-    expect(protocol.hashProductBytes).toHaveBeenCalledWith(bytes);
+    expect(cleaner).toHaveBeenCalledWith("file:/tmp/p2p-product", "viewer-1");
+  });
+
+  it("P5 stops active playback before clearing the signed-out account", async () => {
+    const worklet = createWorklet();
+    const protocol = createProtocol();
+    const cleaner = jest.fn(async () => undefined);
+    const client = new BareRuntimeClient(() => worklet, () => protocol, "file:/tmp/p2p-product", cleaner);
+    await client.initialize();
+
+    await expect(client.startProductPlayback(playbackInput)).resolves.toEqual(playbackReceipt);
+    await client.clearProductAccount("viewer-1");
+
+    expect(protocol.stopProductPlayback).toHaveBeenCalledTimes(1);
     expect(cleaner).toHaveBeenCalledWith("file:/tmp/p2p-product", "viewer-1");
   });
 

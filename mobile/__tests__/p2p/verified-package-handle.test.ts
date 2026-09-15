@@ -39,9 +39,11 @@ describe("P4 verified package handoff", () => {
   it("creates the P5 handle only from verified READY for the exact lineage", () => {
     expect(createVerifiedPackageHandle(descriptor, readySnapshot())).toEqual({
       accountScope: "viewer-1",
+      assetId: "asset-1",
       publicationId: "pub-1",
       lineageId: "lineage-1",
       manifestDigestSha256: "a".repeat(64),
+      externalPublicationId: "b".repeat(64),
     });
   });
 

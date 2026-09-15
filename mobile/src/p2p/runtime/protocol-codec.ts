@@ -40,6 +40,7 @@ const REDACTED_ERROR_MESSAGE: Record<RuntimeProtocolErrorCode, string> = {
   PRODUCT_PACKAGE_READ_FAILED: "Product package read failed",
   PRODUCT_PACKAGE_CLOSE_FAILED: "Product package could not be closed",
   PRODUCT_HASH_FAILED: "Product ciphertext could not be hashed",
+  PRODUCT_PLAYBACK_FAILED: "Product playback failed",
 };
 
 export class RuntimeCodec {
