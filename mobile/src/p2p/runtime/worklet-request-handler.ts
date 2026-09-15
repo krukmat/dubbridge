@@ -149,8 +149,8 @@ async function executeProductCommand(
   closeOnce: () => void,
 ): Promise<void> {
   if (request.command === RUNTIME_COMMAND.OPEN_PRODUCT_PACKAGE) {
-    const { externalPublicationId } = decodeOpenProductPackageRequest(payload);
-    await productPackages.open(runtime, externalPublicationId);
+    const { accountScope, externalPublicationId } = decodeOpenProductPackageRequest(payload);
+    await productPackages.open(runtime, accountScope, externalPublicationId);
     safeReply(request, success("opened"), closeOnce);
     return;
   }
