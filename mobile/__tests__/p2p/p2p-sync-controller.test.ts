@@ -1,3 +1,5 @@
+jest.mock("react-native-bare-kit", () => ({ Worklet: class Worklet {} }));
+
 import { createHash } from "node:crypto";
 
 import type { P2pReadyDescriptor } from "../../src/api/p2p";
