@@ -45,8 +45,9 @@ export class P2PSyncController {
     return this.sync.cancel(identity);
   }
 
-  clearAccount(accountScope: string): Promise<void> {
-    return this.sync.clearAccount(accountScope);
+  async clearAccount(accountScope: string): Promise<void> {
+    await this.sync.clearAccount(accountScope);
+    await this.service.clearProductAccount(accountScope);
   }
 
   async getVerifiedPackageHandle(
