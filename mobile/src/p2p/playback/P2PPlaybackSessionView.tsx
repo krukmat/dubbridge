@@ -48,7 +48,7 @@ export function P2PPlaybackSessionView({
 
   const handleRetry = useCallback(() => {
     if (!onRetry) return;
-    void releaseSession().then(onRetry, onRetry);
+    void releaseSession().then(onRetry).catch(() => undefined);
   }, [onRetry, releaseSession]);
 
   return (

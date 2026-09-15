@@ -55,7 +55,7 @@ describe("P5 playback session view", () => {
     act(() => player.onPlaybackError());
     expect(controller.stop).toHaveBeenCalledTimes(1);
 
-    view.unmount();
+    await view.unmount();
     expect(controller.stop).toHaveBeenCalledTimes(1);
   });
 
@@ -91,5 +91,26 @@ describe("P5 playback session view", () => {
 
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps retry fail-closed when teardown rejects", async () => {
+    const stop = jest.fn(async () => {
+      throw new Error("stop failed");
+    });
+    const onRetry = jest.fn();
+    await render(
+      <P2PPlaybackSessionView
+        session={session}
+        controller={{ stop }}
+        onRetry={onRetry}
+      />,
+    );
+    const player = latestPlayerProps();
+
+    act(() => player.onRetry?.());
+    await act(async () => Promise.resolve());
+
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(onRetry).not.toHaveBeenCalled();
   });
 });
