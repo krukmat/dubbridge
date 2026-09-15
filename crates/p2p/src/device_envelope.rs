@@ -98,7 +98,8 @@ pub fn seal_ck_for_device(
     binding: &DeviceEnvelopeBinding<'_>,
 ) -> Result<SealedDeviceEnvelope, DeviceEnvelopeError> {
     validate_binding(binding)?;
-    let binding_json = serde_json::to_string(binding).map_err(|_| DeviceEnvelopeError::InvalidBinding)?;
+    let binding_json =
+        serde_json::to_string(binding).map_err(|_| DeviceEnvelopeError::InvalidBinding)?;
     let recipient_point = p256_point_from_spki(public_key_spki)?;
     let rng = SystemRandom::new();
     let ephemeral = EphemeralPrivateKey::generate(&ECDH_P256, &rng)
@@ -120,7 +121,8 @@ pub fn seal_ck_for_device(
     kem_context.extend_from_slice(recipient_point);
     let shared_secret = extract_and_expand_kem(&dh, &kem_context)?;
     let (key, nonce) = key_schedule(&shared_secret)?;
-    let unbound = UnboundKey::new(&AES_256_GCM, &key).map_err(|_| DeviceEnvelopeError::Encryption)?;
+    let unbound = UnboundKey::new(&AES_256_GCM, key.as_slice())
+        .map_err(|_| DeviceEnvelopeError::Encryption)?;
     let sealing_key = LessSafeKey::new(unbound);
     let nonce = Nonce::assume_unique_for_key(nonce);
     let mut ciphertext = ck.to_vec();
@@ -181,11 +183,17 @@ fn key_schedule(
     let info_hash = labeled_extract(&[], HPKE_SUITE_ID, b"info_hash", HPKE_INFO);
     let mut context = Vec::with_capacity(65);
     context.push(0);
-    context.extend_from_slice(&psk_id_hash);
-    context.extend_from_slice(&info_hash);
+    context.extend_from_slice(psk_id_hash.as_slice());
+    context.extend_from_slice(info_hash.as_slice());
     let secret = labeled_extract(shared_secret, HPKE_SUITE_ID, b"secret", &[]);
     let key = labeled_expand_32(&secret, HPKE_SUITE_ID, b"key", &context)?;
-    let nonce_bytes = labeled_expand(&secret, HPKE_SUITE_ID, b"base_nonce", &context, 12)?;
+    let nonce_bytes = labeled_expand(
+        secret.as_slice(),
+        HPKE_SUITE_ID,
+        b"base_nonce",
+        &context,
+        12,
+    )?;
     let nonce: [u8; 12] = nonce_bytes
         .as_slice()
         .try_into()
@@ -193,14 +201,23 @@ fn key_schedule(
     Ok((key, nonce))
 }
 
-fn labeled_extract(salt: &[u8], suite_id: &[u8], label: &[u8], ikm: &[u8]) -> Zeroizing<[u8; 32]> {
-    let mut labeled_ikm = Vec::with_capacity(HPKE_VERSION_LABEL.len() + suite_id.len() + label.len() + ikm.len());
+fn labeled_extract(
+    salt: &[u8],
+    suite_id: &[u8],
+    label: &[u8],
+    ikm: &[u8],
+) -> Zeroizing<[u8; 32]> {
+    let mut labeled_ikm =
+        Vec::with_capacity(HPKE_VERSION_LABEL.len() + suite_id.len() + label.len() + ikm.len());
     labeled_ikm.extend_from_slice(HPKE_VERSION_LABEL);
     labeled_ikm.extend_from_slice(suite_id);
     labeled_ikm.extend_from_slice(label);
     labeled_ikm.extend_from_slice(ikm);
     let zero_salt = [0u8; 32];
-    let key = hmac::Key::new(hmac::HMAC_SHA256, if salt.is_empty() { &zero_salt } else { salt });
+    let key = hmac::Key::new(
+        hmac::HMAC_SHA256,
+        if salt.is_empty() { &zero_salt } else { salt },
+    );
     let tag = hmac::sign(&key, &labeled_ikm);
     let mut output = [0u8; 32];
     output.copy_from_slice(tag.as_ref());
@@ -307,6 +324,9 @@ mod tests {
             "authorization-1",
             1_800_000_000,
         );
-        assert_eq!(validate_binding(&binding), Err(DeviceEnvelopeError::InvalidBinding));
+        assert_eq!(
+            validate_binding(&binding),
+            Err(DeviceEnvelopeError::InvalidBinding)
+        );
     }
 }
