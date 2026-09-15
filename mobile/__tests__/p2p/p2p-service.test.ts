@@ -38,6 +38,7 @@ function createRuntime() {
     hashProductBytes: jest.fn(async (_bytes: Uint8Array) => "d".repeat(64)),
     closeProductPackage: jest.fn(async () => undefined),
     cancelProductPackage: jest.fn(async () => undefined),
+    clearProductAccount: jest.fn(async (_accountScope: string) => undefined),
     shutdown: jest.fn(async () => {
       state = "stopped";
     }),
@@ -83,7 +84,7 @@ describe("P2PService", () => {
     unsubscribe();
   });
 
-  it("P4 delegates account-scoped package and verification operations through the runtime boundary", async () => {
+  it("P4 delegates account-scoped package, verification, and cleanup operations", async () => {
     const runtime = createRuntime();
     const service = new P2PService(runtime);
     const bytes = new Uint8Array([1, 2, 3]);
@@ -94,12 +95,14 @@ describe("P2PService", () => {
     await expect(service.hashProductBytes(bytes)).resolves.toBe("d".repeat(64));
     await service.cancelProductPackage();
     await service.closeProductPackage();
+    await service.clearProductAccount("viewer-1");
 
     expect(runtime.openProductPackage).toHaveBeenCalledWith("viewer-1", "a".repeat(64));
     expect(runtime.readProductFile).toHaveBeenCalledWith("manifest.json");
     expect(runtime.hashProductBytes).toHaveBeenCalledWith(bytes);
     expect(runtime.cancelProductPackage).toHaveBeenCalledTimes(1);
     expect(runtime.closeProductPackage).toHaveBeenCalledTimes(1);
+    expect(runtime.clearProductAccount).toHaveBeenCalledWith("viewer-1");
   });
 
   it("EC-F2 preserves a typed invalid lifecycle error and its snapshot", async () => {
@@ -177,23 +180,31 @@ describe("BareRuntimeClient", () => {
     expect(client.currentState).toBe("stopped");
   });
 
-  it("P4 delegates account-scoped package RPC and hashing only while the runtime is ready", async () => {
+  it("P4 delegates package RPC and blocks account cleanup until the package closes", async () => {
     const worklet = createWorklet();
     const protocol = createProtocol();
-    const client = new BareRuntimeClient(() => worklet, () => protocol, "file:/tmp/p2p-product");
+    const cleaner = jest.fn(async () => undefined);
+    const client = new BareRuntimeClient(
+      () => worklet,
+      () => protocol,
+      "file:/tmp/p2p-product",
+      cleaner,
+    );
     const bytes = new Uint8Array([1, 2, 3]);
 
     await expect(client.openProductPackage("viewer-1", "a".repeat(64))).rejects.toMatchObject({ code: "INVALID_STATE" });
     await client.initialize();
     await client.openProductPackage("viewer-1", "a".repeat(64));
+    await expect(client.clearProductAccount("viewer-1")).rejects.toMatchObject({ code: "INVALID_STATE" });
     await expect(client.readProductFile("manifest.json")).resolves.toEqual(bytes);
     await expect(client.hashProductBytes(bytes)).resolves.toBe("d".repeat(64));
     await client.cancelProductPackage();
-    await client.closeProductPackage();
+    await client.clearProductAccount("viewer-1");
 
     expect(protocol.openProductPackage).toHaveBeenCalledWith("viewer-1", "a".repeat(64));
     expect(protocol.readProductFile).toHaveBeenCalledWith("manifest.json");
     expect(protocol.hashProductBytes).toHaveBeenCalledWith(bytes);
+    expect(cleaner).toHaveBeenCalledWith("file:/tmp/p2p-product", "viewer-1");
   });
 
   it("EC-F2 rejects duplicate initialization with a typed error", async () => {
