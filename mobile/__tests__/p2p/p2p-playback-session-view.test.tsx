@@ -55,7 +55,7 @@ describe("P5 playback session view", () => {
     act(() => player.onPlaybackError());
     expect(controller.stop).toHaveBeenCalledTimes(1);
 
-    await view.unmount();
+    await act(async () => view.unmount());
     expect(controller.stop).toHaveBeenCalledTimes(1);
   });
 
