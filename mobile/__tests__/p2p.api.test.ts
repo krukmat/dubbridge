@@ -2,6 +2,7 @@ import type { GatewayClient } from "../src/api/client";
 import {
   claimP2pInvitation,
   createP2pInvitation,
+  getP2pDeviceEnvelope,
   registerP2pDevice,
 } from "../src/api/p2p";
 
@@ -123,6 +124,39 @@ describe("P2P audience API", () => {
       publicationId: "pub-1",
       lineageId: "lineage-1",
       manifestDigestSha256: "a".repeat(64),
+    });
+  });
+
+  it("maps a device envelope without changing bound ciphertext material", async () => {
+    const get = jest.fn().mockImplementation(() =>
+      ok({
+        profile_version: "p2p-k1-hpke-v1",
+        key_id: "android-key-1",
+        encapsulated_key_base64: "enc-base64",
+        ciphertext_base64: "cipher-base64",
+        binding_json: "{\"authorization_id\":\"auth-1\"}",
+      }),
+    );
+    const gateway = client({ get });
+
+    const result = await getP2pDeviceEnvelope(gateway, "access", "auth/1");
+
+    expect(get).toHaveBeenCalledWith(
+      "/api/p2p/authorizations/auth%2F1/device-envelope",
+      "access",
+    );
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        data: {
+          profileVersion: "p2p-k1-hpke-v1",
+          keyId: "android-key-1",
+          encapsulatedKeyBase64: "enc-base64",
+          ciphertextBase64: "cipher-base64",
+          bindingJson: "{\"authorization_id\":\"auth-1\"}",
+        },
+        sessionRotation: null,
+      },
     });
   });
 });
