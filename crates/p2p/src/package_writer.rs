@@ -11,7 +11,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::package_builder::SealedPackage;
-use crate::path::{PathError, verify_contained_realpath};
+use crate::path::{PathError, normalize_path, verify_contained_realpath};
 
 const MANIFEST_FILE_NAME: &str = "manifest.json";
 const PACKAGES_DIR: &str = "packages";
@@ -79,6 +79,8 @@ pub fn canonical_package_ref(publication_id: &str, lineage_id: &str) -> String {
 pub fn materialize(root: &Path, package: &SealedPackage) -> Result<PackageRef, MaterializeError> {
     let publication_id = &package.manifest.publication_id;
     let lineage_id = &package.manifest.lineage_id;
+    validate_identity_segment(publication_id).map_err(MaterializeError::Containment)?;
+    validate_identity_segment(lineage_id).map_err(MaterializeError::Containment)?;
     let package_ref = canonical_package_ref(publication_id, lineage_id);
 
     let package_dir =
@@ -132,6 +134,17 @@ pub fn materialize(root: &Path, package: &SealedPackage) -> Result<PackageRef, M
         package_ref,
         root: package_dir,
     })
+}
+
+fn validate_identity_segment(value: &str) -> Result<(), PathError> {
+    let normalized = normalize_path(value)?;
+    if normalized.contains('/') {
+        // Publication and lineage identities are individual path components.
+        // Reuse the path-validation error boundary rather than allowing an
+        // identity to silently introduce an extra directory level.
+        return Err(PathError::EmptySegment);
+    }
+    Ok(())
 }
 
 enum ExistingState {
