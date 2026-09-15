@@ -21,6 +21,7 @@ export type P2PRuntimeClient = Pick<
   | "hashProductBytes"
   | "closeProductPackage"
   | "cancelProductPackage"
+  | "clearProductAccount"
 >;
 
 /** Framework-independent product façade. Construction is deliberately inert. */
@@ -87,6 +88,10 @@ export class P2PService {
 
   async cancelProductPackage(): Promise<void> {
     return this.runtimeCall(() => this.runtime.cancelProductPackage());
+  }
+
+  async clearProductAccount(accountScope: string): Promise<void> {
+    return this.runtimeCall(() => this.runtime.clearProductAccount(accountScope));
   }
 
   private async initializeRuntime(): Promise<RuntimeHandshake> {
