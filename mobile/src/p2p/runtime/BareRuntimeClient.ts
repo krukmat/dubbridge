@@ -26,6 +26,7 @@ export type BareRuntimeProtocol = Pick<
   | "shutdown"
   | "openProductPackage"
   | "readProductFile"
+  | "hashProductBytes"
   | "closeProductPackage"
   | "cancelProductPackage"
 >;
@@ -104,6 +105,10 @@ export class BareRuntimeClient {
 
   async readProductFile(path: string): Promise<Uint8Array> {
     return this.requireReady("read product file").readProductFile(path);
+  }
+
+  async hashProductBytes(bytes: Uint8Array): Promise<string> {
+    return this.requireReady("hash product bytes").hashProductBytes(bytes);
   }
 
   async closeProductPackage(): Promise<void> {
