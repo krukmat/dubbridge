@@ -14,19 +14,22 @@ use crate::package_builder::SealedPackage;
 use crate::path::{PathError, verify_contained_realpath};
 
 const MANIFEST_FILE_NAME: &str = "manifest.json";
+const PACKAGES_DIR: &str = "packages";
 
-/// Identifies the on-disk location of a materialized package.
+/// Identifies the canonical on-disk location of a materialized package.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackageRef {
     pub publication_id: String,
+    pub lineage_id: String,
+    pub package_ref: String,
     pub root: PathBuf,
 }
 
 #[derive(Debug)]
 pub enum MaterializeError {
-    /// The publication_id or a file path would escape the shared root.
+    /// The publication/lineage identity or a file path would escape the shared root.
     Containment(PathError),
-    /// An existing directory for this publication_id has different content
+    /// An existing directory for this publication lineage has different content
     /// than the package being written now.
     Conflict,
     /// An underlying filesystem operation failed.
@@ -39,7 +42,7 @@ impl std::fmt::Display for MaterializeError {
             MaterializeError::Containment(e) => write!(f, "containment check failed: {e}"),
             MaterializeError::Conflict => write!(
                 f,
-                "an existing package directory has different content for this publication_id"
+                "an existing package directory has different content for this publication lineage"
             ),
             MaterializeError::Io(e) => write!(f, "IO error: {e}"),
         }
@@ -54,10 +57,19 @@ impl From<std::io::Error> for MaterializeError {
     }
 }
 
-/// Materialize `package` under `root` as a directory named by its
-/// `publication_id`, atomically and idempotently.
+/// Build the frozen availability-publication-v1 package reference.
 ///
-/// - If no directory exists yet for this `publication_id`, it is created and
+/// The caller must still route the resulting path through the normal containment
+/// guard before touching the filesystem; publication/lineage strings are not
+/// trusted merely because they came from a manifest.
+pub fn canonical_package_ref(publication_id: &str, lineage_id: &str) -> String {
+    format!("{PACKAGES_DIR}/{publication_id}/{lineage_id}")
+}
+
+/// Materialize `package` under `root` using the frozen package identity
+/// `packages/<publication_id>/<lineage_id>`, atomically and idempotently.
+///
+/// - If no directory exists yet for this publication lineage, it is created and
 ///   every file (manifest + ciphertext files) is written atomically.
 /// - If a directory already exists with byte-identical content, this is a
 ///   successful no-op.
@@ -66,15 +78,19 @@ impl From<std::io::Error> for MaterializeError {
 ///   untouched.
 pub fn materialize(root: &Path, package: &SealedPackage) -> Result<PackageRef, MaterializeError> {
     let publication_id = &package.manifest.publication_id;
+    let lineage_id = &package.manifest.lineage_id;
+    let package_ref = canonical_package_ref(publication_id, lineage_id);
 
     let package_dir =
-        verify_contained_realpath(root, publication_id).map_err(MaterializeError::Containment)?;
+        verify_contained_realpath(root, &package_ref).map_err(MaterializeError::Containment)?;
 
     if package_dir.is_dir() {
         match diff_existing(&package_dir, package) {
             ExistingState::Identical => {
                 return Ok(PackageRef {
                     publication_id: publication_id.clone(),
+                    lineage_id: lineage_id.clone(),
+                    package_ref,
                     root: package_dir,
                 });
             }
@@ -112,6 +128,8 @@ pub fn materialize(root: &Path, package: &SealedPackage) -> Result<PackageRef, M
 
     Ok(PackageRef {
         publication_id: publication_id.clone(),
+        lineage_id: lineage_id.clone(),
+        package_ref,
         root: package_dir,
     })
 }
