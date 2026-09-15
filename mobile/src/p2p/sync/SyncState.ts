@@ -84,17 +84,7 @@ export function transitionSync(
     updatedAtUnixMs: nowUnixMs,
   };
   validateProgress(next.progress);
-
-  if (phase === "READY") {
-    if (!next.manifestVerified || !next.packageVerified || !isProgressComplete(next.progress)) {
-      throw new InvalidSyncTransitionError(
-        current.phase,
-        phase,
-        "P2P sync cannot become READY before manifest, package, and progress verification complete",
-      );
-    }
-  }
-
+  assertReadyInvariant(current.phase, next);
   return next;
 }
 
@@ -103,57 +93,22 @@ export function restoreSyncSnapshot(
   expectedIdentity: P2pSyncIdentity,
 ): P2pSyncSnapshot {
   validateIdentity(expectedIdentity);
-  if (!isRecord(value) || value.schemaVersion !== 1 || !isRecord(value.identity)) {
-    throw new Error("Invalid persisted P2P sync snapshot");
-  }
-
-  const accountScope = value.identity.accountScope;
-  const publicationId = value.identity.publicationId;
-  const lineageId = value.identity.lineageId;
-  if (
-    typeof accountScope !== "string" ||
-    typeof publicationId !== "string" ||
-    typeof lineageId !== "string"
-  ) {
-    throw new Error("Invalid persisted P2P sync snapshot");
-  }
-
-  const identity: P2pSyncIdentity = { accountScope, publicationId, lineageId };
-  if (
-    identity.accountScope !== expectedIdentity.accountScope ||
-    identity.publicationId !== expectedIdentity.publicationId ||
-    identity.lineageId !== expectedIdentity.lineageId
-  ) {
-    throw new Error("Persisted P2P sync identity does not match requested account publication lineage");
-  }
-
-  validateIdentity(identity);
-  const phase = value.phase;
-  if (!isSyncPhase(phase) || !isRecord(value.progress)) {
-    throw new Error("Invalid persisted P2P sync snapshot");
-  }
+  const record = parseSnapshotRecord(value);
+  const identity = parsePersistedIdentity(record.identity);
+  assertIdentityMatches(identity, expectedIdentity);
+  const phase = parseSyncPhase(record.phase);
   const snapshot: P2pSyncSnapshot = {
     schemaVersion: 1,
     identity,
     phase,
-    progress: {
-      filesCompleted: numberField(value.progress.filesCompleted),
-      totalFiles: numberField(value.progress.totalFiles),
-      bytesCompleted: numberField(value.progress.bytesCompleted),
-      totalBytes: numberField(value.progress.totalBytes),
-    },
-    manifestVerified: value.manifestVerified === true,
-    packageVerified: value.packageVerified === true,
-    updatedAtUnixMs: numberField(value.updatedAtUnixMs),
-    lastError: typeof value.lastError === "string" ? value.lastError : null,
+    progress: parseProgress(record.progress),
+    manifestVerified: record.manifestVerified === true,
+    packageVerified: record.packageVerified === true,
+    updatedAtUnixMs: numberField(record.updatedAtUnixMs),
+    lastError: typeof record.lastError === "string" ? record.lastError : null,
   };
   validateProgress(snapshot.progress);
-  if (
-    snapshot.phase === "READY" &&
-    (!snapshot.manifestVerified || !snapshot.packageVerified || !isProgressComplete(snapshot.progress))
-  ) {
-    throw new Error("Persisted READY P2P sync snapshot is incomplete");
-  }
+  assertPersistedReadyInvariant(snapshot);
   return snapshot;
 }
 
@@ -165,6 +120,69 @@ export function packageCacheKey(identity: P2pSyncIdentity): string {
 export function accountCachePrefix(accountScope: string): string {
   validateSafeSegment(accountScope);
   return `${accountScope}/`;
+}
+
+function parseSnapshotRecord(value: unknown): Record<string, unknown> {
+  if (!isRecord(value) || value.schemaVersion !== 1 || !isRecord(value.identity)) {
+    throw new Error("Invalid persisted P2P sync snapshot");
+  }
+  return value;
+}
+
+function parsePersistedIdentity(value: unknown): P2pSyncIdentity {
+  if (!isRecord(value)) throw new Error("Invalid persisted P2P sync snapshot");
+  const identity = {
+    accountScope: stringField(value.accountScope),
+    publicationId: stringField(value.publicationId),
+    lineageId: stringField(value.lineageId),
+  };
+  validateIdentity(identity);
+  return identity;
+}
+
+function assertIdentityMatches(actual: P2pSyncIdentity, expected: P2pSyncIdentity): void {
+  if (
+    actual.accountScope !== expected.accountScope ||
+    actual.publicationId !== expected.publicationId ||
+    actual.lineageId !== expected.lineageId
+  ) {
+    throw new Error("Persisted P2P sync identity does not match requested account publication lineage");
+  }
+}
+
+function parseProgress(value: unknown): P2pSyncProgress {
+  if (!isRecord(value)) throw new Error("Invalid persisted P2P sync snapshot");
+  return {
+    filesCompleted: numberField(value.filesCompleted),
+    totalFiles: numberField(value.totalFiles),
+    bytesCompleted: numberField(value.bytesCompleted),
+    totalBytes: numberField(value.totalBytes),
+  };
+}
+
+function parseSyncPhase(value: unknown): P2pSyncPhase {
+  if (!isSyncPhase(value)) throw new Error("Invalid persisted P2P sync snapshot");
+  return value;
+}
+
+function assertReadyInvariant(from: P2pSyncPhase, snapshot: P2pSyncSnapshot): void {
+  if (snapshot.phase !== "READY") return;
+  if (snapshot.manifestVerified && snapshot.packageVerified && isProgressComplete(snapshot.progress)) {
+    return;
+  }
+  throw new InvalidSyncTransitionError(
+    from,
+    snapshot.phase,
+    "P2P sync cannot become READY before manifest, package, and progress verification complete",
+  );
+}
+
+function assertPersistedReadyInvariant(snapshot: P2pSyncSnapshot): void {
+  if (snapshot.phase !== "READY") return;
+  if (snapshot.manifestVerified && snapshot.packageVerified && isProgressComplete(snapshot.progress)) {
+    return;
+  }
+  throw new Error("Persisted READY P2P sync snapshot is incomplete");
 }
 
 function emptyProgress(): P2pSyncProgress {
@@ -203,6 +221,11 @@ function validateProgress(progress: P2pSyncProgress): void {
 
 function isSyncPhase(value: unknown): value is P2pSyncPhase {
   return typeof value === "string" && Object.prototype.hasOwnProperty.call(TRANSITIONS, value);
+}
+
+function stringField(value: unknown): string {
+  if (typeof value !== "string") throw new Error("Invalid persisted P2P sync snapshot");
+  return value;
 }
 
 function numberField(value: unknown): number {
