@@ -128,7 +128,9 @@ async fn get_device_envelope(
 impl KekConfig {
     fn from_env() -> Result<Self, ()> {
         let id = required_env(KEK_ID_ENV)?;
-        let version = required_env(KEK_VERSION_ENV)?.parse::<u32>().map_err(|_| ())?;
+        let version = required_env(KEK_VERSION_ENV)?
+            .parse::<u32>()
+            .map_err(|_| ())?;
         if version == 0 || version > i32::MAX as u32 {
             return Err(());
         }
