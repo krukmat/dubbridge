@@ -1,3 +1,4 @@
+import { Directory, Paths } from "expo-file-system";
 import { Worklet } from "react-native-bare-kit";
 
 import RUNTIME_WORKLET_SOURCE from "./worklet.bundle.js";
@@ -18,11 +19,24 @@ export class BareRuntimeClientError extends Error {
 
 export type BareRuntimeWorklet = Pick<Worklet, "IPC" | "start" | "terminate">;
 export type BareRuntimeWorkletFactory = () => BareRuntimeWorklet;
-export type BareRuntimeProtocol = Pick<RuntimeProtocolClient, "handshake" | "ping" | "shutdown">;
+export type BareRuntimeProtocol = Pick<
+  RuntimeProtocolClient,
+  | "handshake"
+  | "ping"
+  | "shutdown"
+  | "openProductPackage"
+  | "readProductFile"
+  | "closeProductPackage"
+  | "cancelProductPackage"
+>;
 export type BareRuntimeProtocolFactory = (worklet: BareRuntimeWorklet) => BareRuntimeProtocol;
 type BareRpcStream = ConstructorParameters<typeof BareRpcPort>[0];
 
 const PRODUCT_WORKLET_FILENAME = "/dubbridge-p2p-runtime.worklet";
+
+function defaultProductStorageUri(): string {
+  return new Directory(Paths.cache, "dubbridge-p2p", "product-runtime").uri;
+}
 
 /** One product Bare worklet with no implicit network or proof behavior. */
 export class BareRuntimeClient {
@@ -34,6 +48,7 @@ export class BareRuntimeClient {
     private readonly createWorklet: BareRuntimeWorkletFactory = () => new Worklet(),
     private readonly createProtocol: BareRuntimeProtocolFactory = (worklet) =>
       new RuntimeProtocolClient(new BareRpcPort(worklet.IPC as unknown as BareRpcStream)),
+    private readonly productStorageUri: string = defaultProductStorageUri(),
   ) {}
 
   get currentState(): BareRuntimeState {
@@ -50,7 +65,7 @@ export class BareRuntimeClient {
     this.worklet = worklet;
 
     try {
-      worklet.start(PRODUCT_WORKLET_FILENAME, RUNTIME_WORKLET_SOURCE);
+      worklet.start(PRODUCT_WORKLET_FILENAME, RUNTIME_WORKLET_SOURCE, [this.productStorageUri]);
       const protocol = this.createProtocol(worklet);
       this.protocol = protocol;
       const handshake = await protocol.handshake();
@@ -78,6 +93,22 @@ export class BareRuntimeClient {
 
   async ping(): Promise<"pong"> {
     return this.requireReady("ping").ping();
+  }
+
+  async openProductPackage(externalPublicationId: string): Promise<void> {
+    return this.requireReady("open product package").openProductPackage(externalPublicationId);
+  }
+
+  async readProductFile(path: string): Promise<Uint8Array> {
+    return this.requireReady("read product file").readProductFile(path);
+  }
+
+  async closeProductPackage(): Promise<void> {
+    return this.requireReady("close product package").closeProductPackage();
+  }
+
+  async cancelProductPackage(): Promise<void> {
+    return this.requireReady("cancel product package").cancelProductPackage();
   }
 
   async shutdown(): Promise<void> {
