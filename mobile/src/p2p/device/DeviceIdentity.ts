@@ -1,4 +1,5 @@
-import { NativeModules, Platform } from "react-native";
+import { requireNativeModule } from "expo";
+import { Platform } from "react-native";
 
 export type DevicePublicIdentity = Readonly<{
   keyId: string;
@@ -37,11 +38,12 @@ function nativeModule(): NativeDeviceIdentityModule {
   if (Platform.OS !== "android") {
     throw new DeviceIdentityUnavailableError("K1 device identity is Android-only in MVP-0");
   }
-  const module = (NativeModules as Record<string, unknown>).DubBridgeP2PKeyStore;
-  if (module === null || typeof module !== "object") {
+
+  try {
+    return requireNativeModule<NativeDeviceIdentityModule>("DubBridgeP2PKeyStore");
+  } catch {
     throw new DeviceIdentityUnavailableError();
   }
-  return module as NativeDeviceIdentityModule;
 }
 
 /**
