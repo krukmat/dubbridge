@@ -1,3 +1,9 @@
+---
+type: Playbook
+title: "P5.T3 Android device certification"
+status: active
+---
+
 # P5.T3 Android device certification
 
 Purpose: execute the remaining P5 device evidence without waiting for P6 product screens. This playbook uses the development-only P5 certification harness and the production P3/P4/P5 seams. It does not create a mock content key, alternate decrypt path or remote media fallback.
