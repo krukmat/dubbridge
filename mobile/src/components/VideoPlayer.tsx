@@ -19,6 +19,7 @@ export type VideoPlayerProps = {
   contentFit?: VideoContentFit;
   accessibilityLabel?: string;
   onRetry?: () => void;
+  onPlaybackError?: (message?: string) => void;
 };
 
 function Overlay({
@@ -52,6 +53,7 @@ function useVideoPlayerEvents(
   player: ReturnType<typeof useVideoPlayer>,
   source: VideoSource,
   setPlayerState: Dispatch<SetStateAction<ReturnType<typeof createVideoPlayerState>>>,
+  onPlaybackError?: (message?: string) => void,
 ) {
   useEffect(() => {
     setPlayerState((current) =>
@@ -60,6 +62,7 @@ function useVideoPlayerEvents(
   }, [source, setPlayerState]);
 
   useEventListener(player, "statusChange", ({ status, error }) => {
+    if (status === "error") onPlaybackError?.(error?.message);
     setPlayerState((current) => reduceStatusChange(current, status, error?.message));
   });
 
@@ -97,13 +100,14 @@ export function VideoPlayer({
   contentFit = "contain",
   accessibilityLabel = "Video player",
   onRetry,
+  onPlaybackError,
 }: VideoPlayerProps) {
   const [playerState, setPlayerState] = useState(() => createVideoPlayerState(source));
   const player = useVideoPlayer(source, (instance) => {
     instance.loop = false;
   });
   const shellSnapshot = createVideoPlayerShellSnapshot(source, playerState);
-  useVideoPlayerEvents(player, source, setPlayerState);
+  useVideoPlayerEvents(player, source, setPlayerState, onPlaybackError);
 
   const overlay = shellSnapshot.overlay;
 
