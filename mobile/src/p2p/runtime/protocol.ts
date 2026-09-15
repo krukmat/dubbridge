@@ -25,6 +25,7 @@ export const RUNTIME_COMMAND = {
   READ_PRODUCT_FILE: 11,
   CLOSE_PRODUCT_PACKAGE: 12,
   CANCEL_PRODUCT_PACKAGE: 13,
+  HASH_PRODUCT_BYTES: 14,
 } as const;
 
 export type RuntimeCapability = (typeof RUNTIME_CAPABILITIES)[number];
@@ -56,7 +57,8 @@ export type RuntimeProtocolErrorCode =
   | "PRODUCT_PACKAGE_OPEN_FAILED"
   | "PRODUCT_PACKAGE_NOT_OPEN"
   | "PRODUCT_PACKAGE_READ_FAILED"
-  | "PRODUCT_PACKAGE_CLOSE_FAILED";
+  | "PRODUCT_PACKAGE_CLOSE_FAILED"
+  | "PRODUCT_HASH_FAILED";
 
 export const TRANSIENT_DRIVE_RECEIPT = {
   capability: "transient-hyperdrive-corestore",
@@ -94,6 +96,11 @@ export interface ReadProductFileRequest {
   path: string;
 }
 
+export interface HashProductBytesRequest {
+  protocolVersion: typeof RUNTIME_PROTOCOL_VERSION;
+  bytesBase64: string;
+}
+
 export interface ProductPackageFileReceipt {
   capability: "product-package-file";
   schema_version: 1;
@@ -101,6 +108,9 @@ export interface ProductPackageFileReceipt {
   byte_count: number;
   bytes_base64: string;
 }
+
+const ACCOUNT_SCOPE = /^[A-Za-z0-9._-]{1,128}$/;
+const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 
 export function decodeDiscoverAndReplicateRequest(value: unknown): DiscoverAndReplicateRequest {
   if (
@@ -121,7 +131,7 @@ export function decodeOpenProductPackageRequest(value: unknown): OpenProductPack
     !RuntimeCodec.isRecord(value) ||
     value.protocolVersion !== RUNTIME_PROTOCOL_VERSION ||
     typeof value.accountScope !== "string" ||
-    !isSafeAccountScope(value.accountScope) ||
+    !ACCOUNT_SCOPE.test(value.accountScope) ||
     typeof value.externalPublicationId !== "string" ||
     !/^[0-9a-f]{64}$/.test(value.externalPublicationId)
   ) {
@@ -140,6 +150,18 @@ export function decodeReadProductFileRequest(value: unknown): ReadProductFileReq
     throw new RuntimeProtocolError("INVALID_PAYLOAD", "Product package path is invalid");
   }
   return value as unknown as ReadProductFileRequest;
+}
+
+export function decodeHashProductBytesRequest(value: unknown): HashProductBytesRequest {
+  if (
+    !RuntimeCodec.isRecord(value) ||
+    value.protocolVersion !== RUNTIME_PROTOCOL_VERSION ||
+    typeof value.bytesBase64 !== "string" ||
+    !BASE64.test(value.bytesBase64)
+  ) {
+    throw new RuntimeProtocolError("INVALID_PAYLOAD", "Product hash payload is invalid");
+  }
+  return value as unknown as HashProductBytesRequest;
 }
 
 export interface RuntimeHandshake {
@@ -195,10 +217,6 @@ export function decodeProductFileReceipt(value: unknown, expectedPath: string): 
     throw new RuntimeProtocolError("INVALID_PAYLOAD", "Runtime product file length is invalid");
   }
   return bytes;
-}
-
-function isSafeAccountScope(value: string): boolean {
-  return /^[A-Za-z0-9._~-]{1,128}$/.test(value) && value !== "." && value !== "..";
 }
 
 export { RuntimeCodec, encodeProtocolValue, decodeRequestPayload, decodeResponseEnvelope, decodeHandshakeResult, decodeRuntimeEvent } from "./protocol-codec";
