@@ -11,8 +11,11 @@ export type P2PPackageRuntimeService = Pick<
 export class P2PServicePackageSource implements P2pPackageSource {
   constructor(private readonly service: P2PPackageRuntimeService) {}
 
-  async open(descriptor: P2pReadyDescriptor): Promise<P2pPackageSourceSession> {
-    await this.service.openProductPackage(descriptor.externalPublicationId);
+  async open(
+    descriptor: P2pReadyDescriptor,
+    accountScope: string,
+  ): Promise<P2pPackageSourceSession> {
+    await this.service.openProductPackage(accountScope, descriptor.externalPublicationId);
     return new ServicePackageSession(this.service);
   }
 }
