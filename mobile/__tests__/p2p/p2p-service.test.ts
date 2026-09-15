@@ -33,7 +33,7 @@ function createRuntime() {
       return handshake;
     }),
     ping: jest.fn(async () => "pong" as const),
-    openProductPackage: jest.fn(async (_externalPublicationId: string) => undefined),
+    openProductPackage: jest.fn(async (_accountScope: string, _externalPublicationId: string) => undefined),
     readProductFile: jest.fn(async (_path: string) => new Uint8Array([1, 2, 3])),
     closeProductPackage: jest.fn(async () => undefined),
     cancelProductPackage: jest.fn(async () => undefined),
@@ -81,17 +81,17 @@ describe("P2PService", () => {
     unsubscribe();
   });
 
-  it("P4 delegates product package operations through the runtime boundary", async () => {
+  it("P4 delegates account-scoped product package operations through the runtime boundary", async () => {
     const runtime = createRuntime();
     const service = new P2PService(runtime);
     await service.initialize();
 
-    await service.openProductPackage("a".repeat(64));
+    await service.openProductPackage("viewer-1", "a".repeat(64));
     await expect(service.readProductFile("manifest.json")).resolves.toEqual(new Uint8Array([1, 2, 3]));
     await service.cancelProductPackage();
     await service.closeProductPackage();
 
-    expect(runtime.openProductPackage).toHaveBeenCalledWith("a".repeat(64));
+    expect(runtime.openProductPackage).toHaveBeenCalledWith("viewer-1", "a".repeat(64));
     expect(runtime.readProductFile).toHaveBeenCalledWith("manifest.json");
     expect(runtime.cancelProductPackage).toHaveBeenCalledTimes(1);
     expect(runtime.closeProductPackage).toHaveBeenCalledTimes(1);
@@ -172,19 +172,19 @@ describe("BareRuntimeClient", () => {
     expect(client.currentState).toBe("stopped");
   });
 
-  it("P4 delegates package RPC only while the runtime is ready", async () => {
+  it("P4 delegates account-scoped package RPC only while the runtime is ready", async () => {
     const worklet = createWorklet();
     const protocol = createProtocol();
     const client = new BareRuntimeClient(() => worklet, () => protocol, "file:/tmp/p2p-product");
 
-    await expect(client.openProductPackage("a".repeat(64))).rejects.toMatchObject({ code: "INVALID_STATE" });
+    await expect(client.openProductPackage("viewer-1", "a".repeat(64))).rejects.toMatchObject({ code: "INVALID_STATE" });
     await client.initialize();
-    await client.openProductPackage("a".repeat(64));
+    await client.openProductPackage("viewer-1", "a".repeat(64));
     await expect(client.readProductFile("manifest.json")).resolves.toEqual(new Uint8Array([1, 2, 3]));
     await client.cancelProductPackage();
     await client.closeProductPackage();
 
-    expect(protocol.openProductPackage).toHaveBeenCalledWith("a".repeat(64));
+    expect(protocol.openProductPackage).toHaveBeenCalledWith("viewer-1", "a".repeat(64));
     expect(protocol.readProductFile).toHaveBeenCalledWith("manifest.json");
   });
 
