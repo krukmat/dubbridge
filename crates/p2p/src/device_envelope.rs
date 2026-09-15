@@ -110,7 +110,7 @@ pub fn seal_ck_for_device(
         .as_ref()
         .to_vec();
     let peer = UnparsedPublicKey::new(&ECDH_P256, recipient_point);
-    let dh = agreement::agree_ephemeral(ephemeral, &peer, Unspecified, |secret| {
+    let dh = agreement::agree_ephemeral(ephemeral, peer, Unspecified, |secret| {
         Ok::<_, Unspecified>(Zeroizing::new(secret.to_vec()))
     })
     .map_err(|_| DeviceEnvelopeError::KeyAgreement)?;
