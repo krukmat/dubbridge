@@ -68,8 +68,8 @@ export class P2PService {
     return this.runtimeCall(() => this.runtime.ping());
   }
 
-  async openProductPackage(externalPublicationId: string): Promise<void> {
-    return this.runtimeCall(() => this.runtime.openProductPackage(externalPublicationId));
+  async openProductPackage(accountScope: string, externalPublicationId: string): Promise<void> {
+    return this.runtimeCall(() => this.runtime.openProductPackage(accountScope, externalPublicationId));
   }
 
   async readProductFile(path: string): Promise<Uint8Array> {
