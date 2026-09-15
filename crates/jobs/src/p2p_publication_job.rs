@@ -28,7 +28,10 @@ use dubbridge_domain::p2p_publication::{P2pPublicationId, PublicationState};
 use dubbridge_domain::p2p_recovery::{
     DispatchAttempt, DispatchOutcome, RecoveryAction, decide_recovery_action,
 };
-use dubbridge_p2p::manifest::{Manifest, canonical_json, manifest_sha256};
+use dubbridge_p2p::{
+    manifest::{Manifest, canonical_json, manifest_sha256},
+    package_writer::canonical_package_ref,
+};
 use sqlx::PgPool;
 use thiserror::Error;
 use time::{Duration, OffsetDateTime, format_description::well_known::Rfc3339};
@@ -266,7 +269,10 @@ async fn load_request(
     ciphertext_root: &Path,
     publication: &P2pPublicationRecord,
 ) -> Result<AvailabilityPublicationRequest, P2pDispatchError> {
-    let package_ref = publication.id.to_string();
+    let package_ref = canonical_package_ref(
+        &publication.id.to_string(),
+        &publication.lineage_id.to_string(),
+    );
     let manifest_path = ciphertext_root.join(&package_ref).join(MANIFEST_FILE_NAME);
     let bytes = tokio::fs::read(manifest_path)
         .await
