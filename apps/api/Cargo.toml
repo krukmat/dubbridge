@@ -17,6 +17,7 @@ sqlx = { workspace = true, features = ["migrate"] }
 uuid.workspace = true
 time.workspace = true
 sha2 = "0.10"
+base64 = "0.22"
 redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
 thiserror = "2.0"
 async-trait = "0.1"
