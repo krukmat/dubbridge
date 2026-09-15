@@ -767,6 +767,7 @@ dependencies = [
  "apalis-redis",
  "async-trait",
  "axum 0.8.9",
+ "base64",
  "dubbridge-audit",
  "dubbridge-auth",
  "dubbridge-config",
@@ -776,6 +777,7 @@ dependencies = [
  "dubbridge-jobs",
  "dubbridge-media",
  "dubbridge-observability",
+ "dubbridge-p2p",
  "dubbridge-playback",
  "dubbridge-storage",
  "jsonwebtoken",
@@ -970,6 +972,7 @@ name = "dubbridge-p2p"
 version = "0.1.0"
 dependencies = [
  "aes-gcm",
+ "aws-lc-rs",
  "dubbridge-domain",
  "getrandom 0.4.2",
  "serde",
