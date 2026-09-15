@@ -31,16 +31,37 @@ export type BareRuntimeProtocol = Pick<
   | "cancelProductPackage"
 >;
 export type BareRuntimeProtocolFactory = (worklet: BareRuntimeWorklet) => BareRuntimeProtocol;
+export type ProductAccountStorageCleaner = (
+  productStorageUri: string,
+  accountScope: string,
+) => Promise<void>;
 type BareRpcStream = ConstructorParameters<typeof BareRpcPort>[0];
 
 const PRODUCT_WORKLET_FILENAME = "/dubbridge-p2p-runtime.worklet";
+const ACCOUNT_SCOPE = /^[A-Za-z0-9._-]{1,128}$/;
 
 function defaultProductStorageUri(): string {
   return new Directory(Paths.cache, "dubbridge-p2p", "product-runtime").uri;
 }
 
+async function defaultClearProductAccountStorage(
+  productStorageUri: string,
+  accountScope: string,
+): Promise<void> {
+  validateAccountScope(accountScope);
+  const directory = new Directory(productStorageUri, "accounts", accountScope);
+  if (directory.exists) directory.delete();
+}
+
+function validateAccountScope(accountScope: string): void {
+  if (!ACCOUNT_SCOPE.test(accountScope) || accountScope === "." || accountScope === "..") {
+    throw new BareRuntimeClientError("INVALID_STATE", "Product account scope is invalid");
+  }
+}
+
 /** One product Bare worklet with no implicit network or proof behavior. */
 export class BareRuntimeClient {
+  private productPackageOpen = false;
   private protocol: BareRuntimeProtocol | null = null;
   private state: BareRuntimeState = "stopped";
   private worklet: BareRuntimeWorklet | null = null;
@@ -50,6 +71,7 @@ export class BareRuntimeClient {
     private readonly createProtocol: BareRuntimeProtocolFactory = (worklet) =>
       new RuntimeProtocolClient(new BareRpcPort(worklet.IPC as unknown as BareRpcStream)),
     private readonly productStorageUri: string = defaultProductStorageUri(),
+    private readonly clearProductAccountStorage: ProductAccountStorageCleaner = defaultClearProductAccountStorage,
   ) {}
 
   get currentState(): BareRuntimeState {
@@ -97,10 +119,14 @@ export class BareRuntimeClient {
   }
 
   async openProductPackage(accountScope: string, externalPublicationId: string): Promise<void> {
-    return this.requireReady("open product package").openProductPackage(
+    if (this.productPackageOpen) {
+      throw new BareRuntimeClientError("INVALID_STATE", "A product package is already open");
+    }
+    await this.requireReady("open product package").openProductPackage(
       accountScope,
       externalPublicationId,
     );
+    this.productPackageOpen = true;
   }
 
   async readProductFile(path: string): Promise<Uint8Array> {
@@ -112,11 +138,29 @@ export class BareRuntimeClient {
   }
 
   async closeProductPackage(): Promise<void> {
-    return this.requireReady("close product package").closeProductPackage();
+    try {
+      await this.requireReady("close product package").closeProductPackage();
+    } finally {
+      this.productPackageOpen = false;
+    }
   }
 
   async cancelProductPackage(): Promise<void> {
-    return this.requireReady("cancel product package").cancelProductPackage();
+    try {
+      await this.requireReady("cancel product package").cancelProductPackage();
+    } finally {
+      this.productPackageOpen = false;
+    }
+  }
+
+  async clearProductAccount(accountScope: string): Promise<void> {
+    if (this.productPackageOpen) {
+      throw new BareRuntimeClientError(
+        "INVALID_STATE",
+        "Cannot clear product account storage while a package is open",
+      );
+    }
+    await this.clearProductAccountStorage(this.productStorageUri, accountScope);
   }
 
   async shutdown(): Promise<void> {
@@ -126,6 +170,7 @@ export class BareRuntimeClient {
     const worklet = this.worklet;
     this.protocol = null;
     this.worklet = null;
+    this.productPackageOpen = false;
     this.state = "stopped";
 
     try {
