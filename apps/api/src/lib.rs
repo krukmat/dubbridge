@@ -51,6 +51,7 @@ pub fn build_app(state: Arc<AppState>, verifier: dubbridge_auth::SharedTokenVeri
         .merge(routes::ingestion::router(verifier.clone()))
         .merge(routes::notifications::router(verifier.clone()))
         .merge(routes::p2p_audience::router(verifier.clone()))
+        .merge(routes::p2p_envelope::router(verifier.clone()))
         .merge(routes::playback::router(state.clone(), verifier.clone()))
         .merge(routes::review::router(state.pool.clone(), verifier.clone()))
         .merge(routes::workspace::router(state.pool.clone(), verifier))
