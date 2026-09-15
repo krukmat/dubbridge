@@ -18,6 +18,7 @@ export type P2PRuntimeClient = Pick<
   | "shutdown"
   | "openProductPackage"
   | "readProductFile"
+  | "hashProductBytes"
   | "closeProductPackage"
   | "cancelProductPackage"
 >;
@@ -74,6 +75,10 @@ export class P2PService {
 
   async readProductFile(path: string): Promise<Uint8Array> {
     return this.runtimeCall(() => this.runtime.readProductFile(path));
+  }
+
+  async hashProductBytes(bytes: Uint8Array): Promise<string> {
+    return this.runtimeCall(() => this.runtime.hashProductBytes(bytes));
   }
 
   async closeProductPackage(): Promise<void> {
