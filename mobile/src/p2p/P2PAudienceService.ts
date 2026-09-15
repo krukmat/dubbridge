@@ -3,6 +3,7 @@ import {
   claimP2pInvitation,
   createP2pInvitation,
   getP2pAuthorization,
+  getP2pDeviceEnvelope,
   listP2pInvitations,
   registerP2pDevice,
   type P2pAuthorization,
@@ -57,5 +58,35 @@ export class P2PAudienceService {
     authorizationId: string,
   ): Promise<GatewayResult<P2pAuthorization>> {
     return getP2pAuthorization(this.client, accessToken, authorizationId);
+  }
+
+  /**
+   * Fetches the current O3-authorized K1 envelope and asks the opaque device
+   * identity to unwrap it. The returned CK is transient session material: this
+   * service never persists or logs it and callers must consume it immediately.
+   */
+  async getTransientContentKey(
+    accessToken: string,
+    authorizationId: string,
+  ): Promise<GatewayResult<string>> {
+    const result = await getP2pDeviceEnvelope(this.client, accessToken, authorizationId);
+    if (!result.ok) return result;
+
+    const envelope = result.value.data;
+    const ckBase64 = await this.deviceIdentity.unwrapEnvelope({
+      profileVersion: envelope.profileVersion,
+      keyId: envelope.keyId,
+      encapsulatedKeyBase64: envelope.encapsulatedKeyBase64,
+      ciphertextBase64: envelope.ciphertextBase64,
+      bindingJson: envelope.bindingJson,
+    });
+
+    return {
+      ok: true,
+      value: {
+        data: ckBase64,
+        sessionRotation: result.value.sessionRotation,
+      },
+    };
   }
 }
