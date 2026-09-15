@@ -16,6 +16,7 @@ const P2PSyncContext = createContext<P2PSyncController | undefined>(undefined);
 
 export function P2PProvider({ children }: { children: ReactNode }) {
   const { userId } = useAuth();
+  const accountScope = userId ?? null;
   const serviceRef = useRef<P2PService | null>(null);
   const syncRef = useRef<P2PSyncController | null>(null);
   const previousAccountRef = useRef<string | null>(null);
@@ -24,10 +25,10 @@ export function P2PProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const previousAccount = previousAccountRef.current;
-    previousAccountRef.current = userId;
-    if (previousAccount === null || previousAccount === userId) return;
+    previousAccountRef.current = accountScope;
+    if (previousAccount === null || previousAccount === accountScope) return;
     void syncRef.current?.clearAccount(previousAccount).catch(() => undefined);
-  }, [userId]);
+  }, [accountScope]);
 
   return (
     <P2PServiceContext.Provider value={serviceRef.current}>
