@@ -10,7 +10,17 @@ export type P2PRuntimeSnapshot = Readonly<{
 }>;
 
 export type P2PServiceListener = () => void;
-export type P2PRuntimeClient = Pick<BareRuntimeClient, "currentState" | "initialize" | "ping" | "shutdown">;
+export type P2PRuntimeClient = Pick<
+  BareRuntimeClient,
+  | "currentState"
+  | "initialize"
+  | "ping"
+  | "shutdown"
+  | "openProductPackage"
+  | "readProductFile"
+  | "closeProductPackage"
+  | "cancelProductPackage"
+>;
 
 /** Framework-independent product façade. Construction is deliberately inert. */
 export class P2PService {
@@ -54,6 +64,26 @@ export class P2PService {
     return operation;
   }
 
+  async ping(): Promise<"pong"> {
+    return this.runtimeCall(() => this.runtime.ping());
+  }
+
+  async openProductPackage(externalPublicationId: string): Promise<void> {
+    return this.runtimeCall(() => this.runtime.openProductPackage(externalPublicationId));
+  }
+
+  async readProductFile(path: string): Promise<Uint8Array> {
+    return this.runtimeCall(() => this.runtime.readProductFile(path));
+  }
+
+  async closeProductPackage(): Promise<void> {
+    return this.runtimeCall(() => this.runtime.closeProductPackage());
+  }
+
+  async cancelProductPackage(): Promise<void> {
+    return this.runtimeCall(() => this.runtime.cancelProductPackage());
+  }
+
   private async initializeRuntime(): Promise<RuntimeHandshake> {
     this.publish({ runtimeState: "starting", lastError: null });
     try {
@@ -61,16 +91,7 @@ export class P2PService {
       this.publish({ runtimeState: this.runtime.currentState, lastError: null });
       return handshake;
     } catch (error) {
-      this.publish({ runtimeState: this.runtime.currentState, lastError: this.errorMessage(error) });
-      throw error;
-    }
-  }
-
-  async ping(): Promise<"pong"> {
-    try {
-      return await this.runtime.ping();
-    } catch (error) {
-      this.publish({ runtimeState: this.runtime.currentState, lastError: this.errorMessage(error) });
+      this.publishError(error);
       throw error;
     }
   }
@@ -80,9 +101,22 @@ export class P2PService {
       await this.runtime.shutdown();
       this.publish({ runtimeState: this.runtime.currentState, lastError: null });
     } catch (error) {
-      this.publish({ runtimeState: this.runtime.currentState, lastError: this.errorMessage(error) });
+      this.publishError(error);
       throw error;
     }
+  }
+
+  private async runtimeCall<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      this.publishError(error);
+      throw error;
+    }
+  }
+
+  private publishError(error: unknown): void {
+    this.publish({ runtimeState: this.runtime.currentState, lastError: this.errorMessage(error) });
   }
 
   private publish(snapshot: P2PRuntimeSnapshot): void {
