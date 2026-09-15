@@ -53,9 +53,7 @@ export async function handleRequest(
     const payload = decodeRequestPayload(request.data);
     if (handleImmediateLifecycleCommand(runtime, request, closeOnce)) return;
     if (request.command === RUNTIME_COMMAND.SHUTDOWN) {
-      await productPackages.close();
-      safeReply(request, success("stopped"), closeOnce);
-      closeOnce();
+      await shutdownProductRuntime(request, closeOnce);
       return;
     }
     if (isProofCommand(request.command)) {
@@ -94,6 +92,17 @@ function handleImmediateLifecycleCommand(
   if (request.command !== RUNTIME_COMMAND.PING) return false;
   safeReply(request, success("pong"), closeOnce);
   return true;
+}
+
+async function shutdownProductRuntime(request: IncomingRequest, closeOnce: () => void): Promise<void> {
+  if (!productPackages.isOpen) {
+    safeReply(request, success("stopped"), closeOnce);
+    closeOnce();
+    return;
+  }
+  await productPackages.close();
+  safeReply(request, success("stopped"), closeOnce);
+  closeOnce();
 }
 
 function isProofCommand(command: number): boolean {
