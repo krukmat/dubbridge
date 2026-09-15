@@ -21,6 +21,7 @@ const sourcePaths = [
   path.join(runtimeRoot, "transient-replication-discovery.ts"),
   path.join(runtimeRoot, "transient-replication.ts"),
   path.join(runtimeRoot, "transient-seed.ts"),
+  path.join(runtimeRoot, "product-hash.ts"),
   path.join(runtimeRoot, "product-package-runtime.ts"),
   path.join(runtimeRoot, "worklet-request-handler.ts"),
   path.join(runtimeRoot, "worklet.ts"),
