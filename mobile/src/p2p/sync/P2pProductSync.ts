@@ -24,7 +24,7 @@ export interface P2pPackageSourceSession {
 }
 
 export interface P2pPackageSource {
-  open(descriptor: P2pReadyDescriptor): Promise<P2pPackageSourceSession>;
+  open(descriptor: P2pReadyDescriptor, accountScope: string): Promise<P2pPackageSourceSession>;
 }
 
 export type SyncProgressObserver = (snapshot: P2pSyncSnapshot) => void;
@@ -122,7 +122,7 @@ export class P2pProductSync {
     run: ActiveSyncRun,
   ): Promise<P2pSyncSnapshot> {
     await this.prepareRun(run);
-    run.session = await this.source.open(descriptor);
+    run.session = await this.source.open(descriptor, run.identity.accountScope);
     this.assertRunActive(run);
     const { manifestBytes, manifest } = await this.loadManifest(descriptor, run);
     await this.copyPackage(run, manifestBytes, manifest);
