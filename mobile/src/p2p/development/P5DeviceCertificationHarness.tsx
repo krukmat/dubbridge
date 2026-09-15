@@ -1,21 +1,27 @@
 import { useMemo, useState } from "react";
-import { Button, Modal, Platform, SafeAreaView, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  Button,
+  Modal,
+  Platform,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 
-import { createGatewayClient } from "../../api/client";
 import { useAuth, type AuthContextValue } from "../../auth/AuthProvider";
-import { readRuntimeConfig } from "../../config/env";
-import { P2PAudienceService } from "../P2PAudienceService";
 import { useP2PService } from "../P2PProvider";
-import { P2PPlaybackController, type P2PPlaybackSession } from "../playback/P2PPlaybackController";
+import type { P2PPlaybackSession } from "../playback/P2PPlaybackController";
 import { P2PPlaybackSessionView } from "../playback/P2PPlaybackSessionView";
-import { P2PSyncController } from "../sync/P2PSyncController";
-import { runP5DeviceCertification, type P5DeviceCertificationStage } from "./P5DeviceCertification";
-
-type CertificationDependencies = {
-  audience: P2PAudienceService;
-  sync: P2PSyncController;
-  playback: P2PPlaybackController;
-};
+import {
+  createP5CertificationDependencies,
+  type P5CertificationDependencies,
+} from "./P5DeviceCertificationDependencies";
+import {
+  runP5DeviceCertification,
+  type P5DeviceCertificationStage,
+} from "./P5DeviceCertification";
 
 type HarnessControls = {
   clearToken(): void;
@@ -27,7 +33,7 @@ type HarnessControls = {
 
 type CertificationPanelProps = {
   busy: boolean;
-  dependencies: CertificationDependencies;
+  dependencies: P5CertificationDependencies;
   failureCode: string | null;
   invitationToken: string;
   session: P2PPlaybackSession | null;
@@ -37,21 +43,9 @@ type CertificationPanelProps = {
   onStop(): void;
 };
 
-function createDependencies(enabled: boolean, service: ReturnType<typeof useP2PService>): CertificationDependencies | null {
-  if (!enabled || Platform.OS !== "android") return null;
-  const config = readRuntimeConfig();
-  if (!config.ok) return null;
-  const audience = new P2PAudienceService(createGatewayClient({ gatewayBaseUrl: config.value.gatewayBaseUrl }));
-  return {
-    audience,
-    sync: new P2PSyncController(service),
-    playback: new P2PPlaybackController(audience, service),
-  };
-}
-
 async function executeCertification(
   auth: Pick<AuthContextValue, "sessionRef" | "userId">,
-  dependencies: CertificationDependencies | null,
+  dependencies: P5CertificationDependencies | null,
   invitationToken: string,
   controls: HarnessControls,
 ): Promise<void> {
@@ -72,7 +66,11 @@ async function executeCertification(
   controls.setBusy(true);
   controls.setFailureCode(null);
   const result = await runP5DeviceCertification(
-    { accessToken: auth.sessionRef, accountScope: auth.userId, invitationToken: token },
+    {
+      accessToken: auth.sessionRef,
+      accountScope: auth.userId,
+      invitationToken: token,
+    },
     dependencies,
     controls.setStage,
   );
@@ -88,7 +86,7 @@ async function executeCertification(
 }
 
 async function stopCertification(
-  dependencies: CertificationDependencies,
+  dependencies: P5CertificationDependencies,
   controls: HarnessControls,
 ): Promise<void> {
   controls.setBusy(true);
@@ -105,20 +103,36 @@ async function stopCertification(
 }
 
 function CertificationPanel(props: CertificationPanelProps) {
-  const { busy, dependencies, failureCode, invitationToken, session, stage } = props;
+  const {
+    busy,
+    dependencies,
+    failureCode,
+    invitationToken,
+    session,
+    stage,
+  } = props;
   return (
     <Modal visible animationType="fade" onRequestClose={() => undefined}>
       <SafeAreaView style={styles.screen}>
         <View style={styles.panel}>
           <Text style={styles.title}>P5 device certification</Text>
           <Text style={styles.note}>
-            Development-only. Uses real P3/P4/P5 seams; no mock content key or remote media fallback.
+            Development-only. Uses real P3/P4/P5 seams; no mock content key or
+            remote media fallback.
           </Text>
           {session ? (
             <>
-              <P2PPlaybackSessionView session={session} controller={dependencies.playback} testID="p5-cert-player" />
+              <P2PPlaybackSessionView
+                session={session}
+                controller={dependencies.playback}
+                testID="p5-cert-player"
+              />
               <Text style={styles.status}>stage={stage}</Text>
-              <Button title="Stop certification playback" onPress={props.onStop} disabled={busy} />
+              <Button
+                title="Stop certification playback"
+                onPress={props.onStop}
+                disabled={busy}
+              />
             </>
           ) : (
             <>
@@ -133,31 +147,55 @@ function CertificationPanel(props: CertificationPanelProps) {
                 style={styles.input}
                 testID="p5-cert-invite-token"
               />
-              <Button title={busy ? "Running…" : "Run P5 certification"} onPress={props.onRun} disabled={busy} />
+              <Button
+                title={busy ? "Running…" : "Run P5 certification"}
+                onPress={props.onRun}
+                disabled={busy}
+              />
               <Text style={styles.status}>stage={stage}</Text>
             </>
           )}
-          {failureCode ? <Text style={styles.failure} testID="p5-cert-failure">{failureCode}</Text> : null}
+          {failureCode ? (
+            <Text style={styles.failure} testID="p5-cert-failure">
+              {failureCode}
+            </Text>
+          ) : null}
         </View>
       </SafeAreaView>
     </Modal>
   );
 }
 
-/** Android-only development surface for P5.T3 using the production P3/P4/P5 seams. */
+/** Android-only development surface for P5.T3 using production P3/P4/P5 seams. */
 export function P5DeviceCertificationHarness({ enabled }: { enabled: boolean }) {
   const auth = useAuth();
   const service = useP2PService();
-  const dependencies = useMemo(() => createDependencies(enabled, service), [enabled, service]);
+  const dependencies = useMemo(
+    () => createP5CertificationDependencies(enabled, service),
+    [enabled, service],
+  );
   const [invitationToken, setInvitationToken] = useState("");
-  const [stage, setStage] = useState<P5DeviceCertificationStage | "idle" | "playing">("idle");
+  const [stage, setStage] = useState<
+    P5DeviceCertificationStage | "idle" | "playing"
+  >("idle");
   const [failureCode, setFailureCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [session, setSession] = useState<P2PPlaybackSession | null>(null);
-  if (!enabled || Platform.OS !== "android" || auth.status !== "authed" || !dependencies) return null;
+  if (
+    !enabled ||
+    Platform.OS !== "android" ||
+    auth.status !== "authed" ||
+    !dependencies
+  ) {
+    return null;
+  }
 
   const controls: HarnessControls = {
-    clearToken: () => setInvitationToken(""), setBusy, setFailureCode, setSession, setStage,
+    clearToken: () => setInvitationToken(""),
+    setBusy,
+    setFailureCode,
+    setSession,
+    setStage,
   };
   return (
     <CertificationPanel
@@ -168,18 +206,30 @@ export function P5DeviceCertificationHarness({ enabled }: { enabled: boolean }) 
       session={session}
       stage={stage}
       onChangeToken={setInvitationToken}
-      onRun={() => void executeCertification(auth, dependencies, invitationToken, controls)}
+      onRun={() =>
+        void executeCertification(auth, dependencies, invitationToken, controls)
+      }
       onStop={() => void stopCertification(dependencies, controls)}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#111111", justifyContent: "center", padding: 24 },
+  screen: {
+    flex: 1,
+    backgroundColor: "#111111",
+    justifyContent: "center",
+    padding: 24,
+  },
   panel: { gap: 16 },
   title: { color: "#ffffff", fontSize: 24, fontWeight: "700" },
   note: { color: "#cccccc", lineHeight: 20 },
-  input: { backgroundColor: "#ffffff", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10 },
+  input: {
+    backgroundColor: "#ffffff",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
   status: { color: "#cccccc" },
   failure: { color: "#ff8a80", fontWeight: "600" },
 });
