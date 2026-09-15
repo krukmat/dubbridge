@@ -1,0 +1,31 @@
+name: update-p2p-lock
+
+on:
+  push:
+    paths:
+      - '.github/workflows/update-p2p-lock.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Refresh lockfile for P2P crypto dependency
+        run: cargo check -p dubbridge-p2p
+      - name: Commit lockfile and remove one-shot workflow
+        run: |
+          rm .github/workflows/update-p2p-lock.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock .github/workflows/update-p2p-lock.yml
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "build: refresh lockfile for P2P crypto"
+          git push origin HEAD:${GITHUB_REF_NAME}
