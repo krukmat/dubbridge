@@ -4,6 +4,7 @@ import { Platform } from "react-native";
 
 jest.mock("react-native-bare-kit", () => ({ Worklet: class Worklet {} }));
 
+import { AuthContext, type AuthContextValue } from "../../src/auth/AuthProvider";
 import { P2PProvider } from "../../src/p2p/P2PProvider";
 import { P2PDevelopmentHarness } from "../../src/p2p/development/P2PDevelopmentHarness";
 import { P2PService } from "../../src/p2p/P2PService";
@@ -28,11 +29,27 @@ function createPendingHandshake() {
 
 const platformOS = Object.getOwnPropertyDescriptor(Platform, "OS");
 
+function testAuth(): AuthContextValue {
+  return {
+    sessionRef: null,
+    userId: null,
+    status: "unauthed",
+    loginError: null,
+    login: jest.fn(async () => undefined),
+    logout: jest.fn(async () => undefined),
+    onSessionRotation: jest.fn(async () => undefined),
+  };
+}
+
 function withP2PProvider(enabled = true) {
   return createElement(
-    P2PProvider,
-    null,
-    createElement(P2PDevelopmentHarness, { enabled }),
+    AuthContext.Provider,
+    { value: testAuth() },
+    createElement(
+      P2PProvider,
+      null,
+      createElement(P2PDevelopmentHarness, { enabled }),
+    ),
   );
 }
 
