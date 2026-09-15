@@ -35,6 +35,7 @@ function createRuntime() {
     ping: jest.fn(async () => "pong" as const),
     openProductPackage: jest.fn(async (_accountScope: string, _externalPublicationId: string) => undefined),
     readProductFile: jest.fn(async (_path: string) => new Uint8Array([1, 2, 3])),
+    hashProductBytes: jest.fn(async (_bytes: Uint8Array) => "d".repeat(64)),
     closeProductPackage: jest.fn(async () => undefined),
     cancelProductPackage: jest.fn(async () => undefined),
     shutdown: jest.fn(async () => {
@@ -49,6 +50,7 @@ function createProtocol(overrides: Partial<BareRuntimeProtocol> = {}): BareRunti
     ping: jest.fn(async () => "pong" as const),
     openProductPackage: jest.fn(async () => undefined),
     readProductFile: jest.fn(async () => new Uint8Array([1, 2, 3])),
+    hashProductBytes: jest.fn(async () => "d".repeat(64)),
     closeProductPackage: jest.fn(async () => undefined),
     cancelProductPackage: jest.fn(async () => undefined),
     shutdown: jest.fn(async () => undefined),
@@ -81,18 +83,21 @@ describe("P2PService", () => {
     unsubscribe();
   });
 
-  it("P4 delegates account-scoped product package operations through the runtime boundary", async () => {
+  it("P4 delegates account-scoped package and verification operations through the runtime boundary", async () => {
     const runtime = createRuntime();
     const service = new P2PService(runtime);
+    const bytes = new Uint8Array([1, 2, 3]);
     await service.initialize();
 
     await service.openProductPackage("viewer-1", "a".repeat(64));
-    await expect(service.readProductFile("manifest.json")).resolves.toEqual(new Uint8Array([1, 2, 3]));
+    await expect(service.readProductFile("manifest.json")).resolves.toEqual(bytes);
+    await expect(service.hashProductBytes(bytes)).resolves.toBe("d".repeat(64));
     await service.cancelProductPackage();
     await service.closeProductPackage();
 
     expect(runtime.openProductPackage).toHaveBeenCalledWith("viewer-1", "a".repeat(64));
     expect(runtime.readProductFile).toHaveBeenCalledWith("manifest.json");
+    expect(runtime.hashProductBytes).toHaveBeenCalledWith(bytes);
     expect(runtime.cancelProductPackage).toHaveBeenCalledTimes(1);
     expect(runtime.closeProductPackage).toHaveBeenCalledTimes(1);
   });
@@ -172,20 +177,23 @@ describe("BareRuntimeClient", () => {
     expect(client.currentState).toBe("stopped");
   });
 
-  it("P4 delegates account-scoped package RPC only while the runtime is ready", async () => {
+  it("P4 delegates account-scoped package RPC and hashing only while the runtime is ready", async () => {
     const worklet = createWorklet();
     const protocol = createProtocol();
     const client = new BareRuntimeClient(() => worklet, () => protocol, "file:/tmp/p2p-product");
+    const bytes = new Uint8Array([1, 2, 3]);
 
     await expect(client.openProductPackage("viewer-1", "a".repeat(64))).rejects.toMatchObject({ code: "INVALID_STATE" });
     await client.initialize();
     await client.openProductPackage("viewer-1", "a".repeat(64));
-    await expect(client.readProductFile("manifest.json")).resolves.toEqual(new Uint8Array([1, 2, 3]));
+    await expect(client.readProductFile("manifest.json")).resolves.toEqual(bytes);
+    await expect(client.hashProductBytes(bytes)).resolves.toBe("d".repeat(64));
     await client.cancelProductPackage();
     await client.closeProductPackage();
 
     expect(protocol.openProductPackage).toHaveBeenCalledWith("viewer-1", "a".repeat(64));
     expect(protocol.readProductFile).toHaveBeenCalledWith("manifest.json");
+    expect(protocol.hashProductBytes).toHaveBeenCalledWith(bytes);
   });
 
   it("EC-F2 rejects duplicate initialization with a typed error", async () => {
