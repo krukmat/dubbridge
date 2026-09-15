@@ -160,19 +160,33 @@ function validManifestFile(value: unknown): value is PlaybackManifestFile {
     Number.isSafeInteger(file.ciphertext_size) && Number.isSafeInteger(file.plaintext_size);
 }
 
-function parseManifest(bytes: Uint8Array, input: StartPlaybackInput): PlaybackManifest {
-  let value: unknown;
+function parseManifestJson(bytes: Uint8Array): unknown {
   try {
-    value = JSON.parse(b4a.toString(bytes));
+    return JSON.parse(b4a.toString(bytes));
   } catch {
     return fail("Playback manifest is invalid JSON");
   }
+}
+
+function manifestMetadataMatches(manifest: Partial<PlaybackManifest>, input: StartPlaybackInput): boolean {
+  const checks = [
+    manifest.asset_id === input.assetId,
+    manifest.publication_id === input.publicationId,
+    manifest.lineage_id === input.lineageId,
+    manifest.manifest_version === "p2p-manifest-v1",
+    manifest.cipher === "AES-256-GCM",
+    manifest.digest === "SHA-256",
+  ];
+  return checks.every(Boolean);
+}
+
+function parseManifest(bytes: Uint8Array, input: StartPlaybackInput): PlaybackManifest {
+  const value = parseManifestJson(bytes);
   if (value === null || typeof value !== "object") return fail("Playback manifest is invalid");
   const manifest = value as Partial<PlaybackManifest>;
-  if (manifest.asset_id !== input.assetId || manifest.publication_id !== input.publicationId ||
-      manifest.lineage_id !== input.lineageId || manifest.manifest_version !== "p2p-manifest-v1" ||
-      manifest.cipher !== "AES-256-GCM" || manifest.digest !== "SHA-256" || !Array.isArray(manifest.files) ||
-      !manifest.files.every(validManifestFile)) return fail("Playback manifest identity is invalid");
+  if (!manifestMetadataMatches(manifest, input)) return fail("Playback manifest identity is invalid");
+  if (!Array.isArray(manifest.files)) return fail("Playback manifest files are invalid");
+  if (!manifest.files.every(validManifestFile)) return fail("Playback manifest files are invalid");
   const typed = manifest as PlaybackManifest;
   for (const file of typed.files) validatePackagePath(file.path);
   if (!typed.files.some((file) => file.path === "index.m3u8")) return fail("Playback manifest has no HLS index");

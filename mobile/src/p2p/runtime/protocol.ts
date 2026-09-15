@@ -187,13 +187,20 @@ export function decodeHashProductBytesRequest(value: unknown): HashProductBytesR
   return value as unknown as HashProductBytesRequest;
 }
 
+function boundedId(value: unknown): boolean {
+  return typeof value === "string" && value.length > 0 && value.length <= 128;
+}
+
 function validPlaybackIdentity(value: Record<string, unknown>): boolean {
-  return typeof value.accountScope === "string" && ACCOUNT_SCOPE.test(value.accountScope) &&
-    typeof value.assetId === "string" && value.assetId.length > 0 && value.assetId.length <= 128 &&
-    typeof value.publicationId === "string" && value.publicationId.length > 0 && value.publicationId.length <= 128 &&
-    typeof value.lineageId === "string" && value.lineageId.length > 0 && value.lineageId.length <= 128 &&
-    typeof value.externalPublicationId === "string" && DRIVE_KEY.test(value.externalPublicationId) &&
-    typeof value.manifestDigestSha256 === "string" && SHA256_HEX.test(value.manifestDigestSha256);
+  const checks = [
+    typeof value.accountScope === "string" ? ACCOUNT_SCOPE.test(value.accountScope) : false,
+    boundedId(value.assetId),
+    boundedId(value.publicationId),
+    boundedId(value.lineageId),
+    typeof value.externalPublicationId === "string" ? DRIVE_KEY.test(value.externalPublicationId) : false,
+    typeof value.manifestDigestSha256 === "string" ? SHA256_HEX.test(value.manifestDigestSha256) : false,
+  ];
+  return checks.every(Boolean);
 }
 
 export function decodeStartProductPlaybackRequest(value: unknown): StartProductPlaybackRequest {
