@@ -9,6 +9,7 @@ export type P2pSyncPhase =
   | "FAILED";
 
 export type P2pSyncIdentity = Readonly<{
+  accountScope: string;
   publicationId: string;
   lineageId: string;
 }>;
@@ -39,7 +40,7 @@ const TRANSITIONS: Readonly<Record<P2pSyncPhase, readonly P2pSyncPhase[]>> = {
   READY: ["DISCOVERING"],
   RETRYING: ["DISCOVERING", "CANCELLED", "FAILED"],
   CANCELLED: ["DISCOVERING"],
-  FAILED: ["DISCOVERING"],
+  FAILED: ["DISCOVERING", "CANCELLED"],
 };
 
 export class InvalidSyncTransitionError extends Error {
@@ -107,18 +108,22 @@ export function restoreSyncSnapshot(
   }
 
   const identity = {
+    accountScope: value.identity.accountScope,
     publicationId: value.identity.publicationId,
     lineageId: value.identity.lineageId,
   };
   if (
+    typeof identity.accountScope !== "string" ||
     typeof identity.publicationId !== "string" ||
     typeof identity.lineageId !== "string" ||
+    identity.accountScope !== expectedIdentity.accountScope ||
     identity.publicationId !== expectedIdentity.publicationId ||
     identity.lineageId !== expectedIdentity.lineageId
   ) {
-    throw new Error("Persisted P2P sync identity does not match requested publication lineage");
+    throw new Error("Persisted P2P sync identity does not match requested account publication lineage");
   }
 
+  validateIdentity(identity);
   const phase = value.phase;
   if (!isSyncPhase(phase) || !isRecord(value.progress)) {
     throw new Error("Invalid persisted P2P sync snapshot");
@@ -139,7 +144,10 @@ export function restoreSyncSnapshot(
     lastError: typeof value.lastError === "string" ? value.lastError : null,
   };
   validateProgress(snapshot.progress);
-  if (snapshot.phase === "READY" && (!snapshot.manifestVerified || !snapshot.packageVerified || !isProgressComplete(snapshot.progress))) {
+  if (
+    snapshot.phase === "READY" &&
+    (!snapshot.manifestVerified || !snapshot.packageVerified || !isProgressComplete(snapshot.progress))
+  ) {
     throw new Error("Persisted READY P2P sync snapshot is incomplete");
   }
   return snapshot;
@@ -147,7 +155,12 @@ export function restoreSyncSnapshot(
 
 export function packageCacheKey(identity: P2pSyncIdentity): string {
   validateIdentity(identity);
-  return `${identity.publicationId}/${identity.lineageId}`;
+  return `${identity.accountScope}/${identity.publicationId}/${identity.lineageId}`;
+}
+
+export function accountCachePrefix(accountScope: string): string {
+  validateSafeSegment(accountScope);
+  return `${accountScope}/`;
 }
 
 function emptyProgress(): P2pSyncProgress {
@@ -155,16 +168,22 @@ function emptyProgress(): P2pSyncProgress {
 }
 
 function isProgressComplete(progress: P2pSyncProgress): boolean {
-  return progress.totalFiles > 0 &&
+  return (
+    progress.totalFiles > 0 &&
     progress.filesCompleted === progress.totalFiles &&
-    progress.bytesCompleted === progress.totalBytes;
+    progress.bytesCompleted === progress.totalBytes
+  );
 }
 
 function validateIdentity(identity: P2pSyncIdentity): void {
-  for (const value of [identity.publicationId, identity.lineageId]) {
-    if (!value || value.includes("/") || value.includes("\\") || value === "." || value === "..") {
-      throw new Error("Invalid P2P publication lineage identity");
-    }
+  for (const value of [identity.accountScope, identity.publicationId, identity.lineageId]) {
+    validateSafeSegment(value);
+  }
+}
+
+function validateSafeSegment(value: string): void {
+  if (!value || value.includes("/") || value.includes("\\") || value === "." || value === "..") {
+    throw new Error("Invalid P2P sync identity");
   }
 }
 

@@ -1,6 +1,7 @@
 import { Directory, File, Paths } from "expo-file-system";
 import { validateRelativePath } from "./PackageVerifier";
 import {
+  accountCachePrefix,
   packageCacheKey,
   restoreSyncSnapshot,
   type P2pSyncIdentity,
@@ -18,6 +19,7 @@ export interface P2pSyncCache {
   readCiphertext(identity: P2pSyncIdentity, path: string): Promise<Uint8Array | null>;
   writeCiphertext(identity: P2pSyncIdentity, path: string, bytes: Uint8Array): Promise<void>;
   clear(identity: P2pSyncIdentity): Promise<void>;
+  clearAccount(accountScope: string): Promise<void>;
 }
 
 /**
@@ -76,10 +78,15 @@ export class ExpoP2pSyncCache implements P2pSyncCache {
     if (directory.exists) directory.delete();
   }
 
+  async clearAccount(accountScope: string): Promise<void> {
+    const [account] = accountCachePrefix(accountScope).split("/");
+    const directory = new Directory(this.root, account);
+    if (directory.exists) directory.delete();
+  }
+
   private packageDirectory(identity: P2pSyncIdentity): Directory {
-    const key = packageCacheKey(identity);
-    const [publicationId, lineageId] = key.split("/");
-    return new Directory(this.root, publicationId, lineageId);
+    const [accountScope, publicationId, lineageId] = packageCacheKey(identity).split("/");
+    return new Directory(this.root, accountScope, publicationId, lineageId);
   }
 
   private ensurePackageDirectory(identity: P2pSyncIdentity): Directory {
@@ -132,9 +139,24 @@ export class MemoryP2pSyncCache implements P2pSyncCache {
   }
 
   async clear(identity: P2pSyncIdentity): Promise<void> {
-    const prefix = `${packageCacheKey(identity)}/`;
-    this.snapshots.delete(packageCacheKey(identity));
-    this.manifests.delete(packageCacheKey(identity));
+    const key = packageCacheKey(identity);
+    this.snapshots.delete(key);
+    this.manifests.delete(key);
+    this.deleteFiles(`${key}/`);
+  }
+
+  async clearAccount(accountScope: string): Promise<void> {
+    const prefix = accountCachePrefix(accountScope);
+    for (const key of this.snapshots.keys()) {
+      if (key.startsWith(prefix)) this.snapshots.delete(key);
+    }
+    for (const key of this.manifests.keys()) {
+      if (key.startsWith(prefix)) this.manifests.delete(key);
+    }
+    this.deleteFiles(prefix);
+  }
+
+  private deleteFiles(prefix: string): void {
     for (const key of this.files.keys()) {
       if (key.startsWith(prefix)) this.files.delete(key);
     }
