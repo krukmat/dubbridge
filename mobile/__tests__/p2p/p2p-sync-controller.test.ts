@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import type { P2pReadyDescriptor } from "../../src/api/p2p";
 import { P2PService } from "../../src/p2p/P2PService";
+import type { RuntimeHandshake } from "../../src/p2p/runtime/protocol";
 import { P2PSyncController } from "../../src/p2p/sync/P2PSyncController";
 import { MemoryP2pSyncCache } from "../../src/p2p/sync/SyncCache";
 
@@ -41,6 +42,19 @@ const descriptor: P2pReadyDescriptor = {
   readyAt: "2026-09-15T00:00:00Z",
 };
 
+const handshake: RuntimeHandshake = {
+  protocolVersion: 1,
+  runtimeVersion: "test",
+  capabilities: [
+    "ping",
+    "lifecycle:suspend",
+    "lifecycle:resume",
+    "fatal",
+    "shutdown",
+    "product-package:v1",
+  ],
+};
+
 function digest(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
@@ -53,18 +67,7 @@ function runtime() {
     },
     initialize: jest.fn(async () => {
       state = "ready";
-      return {
-        protocolVersion: 1 as const,
-        runtimeVersion: "test",
-        capabilities: [
-          "ping",
-          "lifecycle:suspend",
-          "lifecycle:resume",
-          "fatal",
-          "shutdown",
-          "product-package:v1",
-        ] as const,
-      };
+      return handshake;
     }),
     ping: jest.fn(async () => "pong" as const),
     openProductPackage: jest.fn(async (_accountScope: string, _id: string) => undefined),
