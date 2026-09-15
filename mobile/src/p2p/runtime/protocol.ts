@@ -85,6 +85,7 @@ export interface DiscoverAndReplicateRequest {
 
 export interface OpenProductPackageRequest {
   protocolVersion: typeof RUNTIME_PROTOCOL_VERSION;
+  accountScope: string;
   externalPublicationId: string;
 }
 
@@ -119,6 +120,8 @@ export function decodeOpenProductPackageRequest(value: unknown): OpenProductPack
   if (
     !RuntimeCodec.isRecord(value) ||
     value.protocolVersion !== RUNTIME_PROTOCOL_VERSION ||
+    typeof value.accountScope !== "string" ||
+    !isSafeAccountScope(value.accountScope) ||
     typeof value.externalPublicationId !== "string" ||
     !/^[0-9a-f]{64}$/.test(value.externalPublicationId)
   ) {
@@ -192,6 +195,10 @@ export function decodeProductFileReceipt(value: unknown, expectedPath: string): 
     throw new RuntimeProtocolError("INVALID_PAYLOAD", "Runtime product file length is invalid");
   }
   return bytes;
+}
+
+function isSafeAccountScope(value: string): boolean {
+  return /^[A-Za-z0-9._~-]{1,128}$/.test(value) && value !== "." && value !== "..";
 }
 
 export { RuntimeCodec, encodeProtocolValue, decodeRequestPayload, decodeResponseEnvelope, decodeHandshakeResult, decodeRuntimeEvent } from "./protocol-codec";
