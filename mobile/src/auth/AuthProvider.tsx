@@ -19,7 +19,7 @@ export type AuthStatus = "loading" | "authed" | "unauthed";
 
 export type AuthContextValue = {
   sessionRef: string | null;
-  userId: string | null;
+  userId?: string | null;
   status: AuthStatus;
   loginError: string | null;
   login: (email: string, password: string) => Promise<void>;
