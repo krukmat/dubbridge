@@ -43,6 +43,10 @@ type ActiveProductPackage = {
 export class ProductPackageRuntime {
   private active: ActiveProductPackage | null = null;
 
+  get isOpen(): boolean {
+    return this.active !== null;
+  }
+
   async open(runtime: WorkletRuntime, externalPublicationId: string): Promise<void> {
     if (this.active !== null) {
       throw new RuntimeProtocolError("PRODUCT_PACKAGE_OPEN_FAILED", "Product package is already open");
