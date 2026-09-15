@@ -119,7 +119,7 @@ describe("P2P product sync", () => {
   it("never marks READY when source ciphertext fails digest verification", async () => {
     const cache = new MemoryP2pSyncCache();
     const corrupt = b4a.from("corrupt");
-    const transport = source(jest.fn(async () => corrupt));
+    const transport = source(jest.fn(async (_path: string) => corrupt));
     const sync = new P2pProductSync(cache, transport.value, sha256);
 
     await expect(sync.sync(descriptor, accountScope)).rejects.toThrow("Ciphertext");
