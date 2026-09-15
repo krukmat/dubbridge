@@ -79,6 +79,7 @@ function runtime() {
     hashProductBytes: jest.fn(async (bytes: Uint8Array) => digest(bytes)),
     closeProductPackage: jest.fn(async () => undefined),
     cancelProductPackage: jest.fn(async () => undefined),
+    clearProductAccount: jest.fn(async (_accountScope: string) => undefined),
     shutdown: jest.fn(async () => {
       state = "stopped";
     }),
@@ -121,9 +122,10 @@ describe("P4 product sync controller", () => {
     );
   });
 
-  it("keeps verified state account-scoped and wipes only the signed-out account", async () => {
+  it("keeps verified state account-scoped and wipes both caches for the signed-out account", async () => {
     const cache = new MemoryP2pSyncCache();
-    const controller = new P2PSyncController(new P2PService(runtime()), cache);
+    const productRuntime = runtime();
+    const controller = new P2PSyncController(new P2PService(productRuntime), cache);
     await controller.startSync(descriptor, "viewer-a");
 
     await expect(controller.getVerifiedPackageHandle(descriptor, "viewer-b")).rejects.toThrow(
@@ -133,5 +135,6 @@ describe("P4 product sync controller", () => {
     await expect(controller.getVerifiedPackageHandle(descriptor, "viewer-a")).rejects.toThrow(
       "no local sync state",
     );
+    expect(productRuntime.clearProductAccount).toHaveBeenCalledWith("viewer-a");
   });
 });
