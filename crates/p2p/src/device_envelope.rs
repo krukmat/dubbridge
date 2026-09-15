@@ -1,5 +1,5 @@
 use aws_lc_rs::{
-    aead::{Aad, AES_256_GCM, LessSafeKey, Nonce, UnboundKey},
+    aead::{AES_256_GCM, Aad, LessSafeKey, Nonce, UnboundKey},
     agreement::{self, ECDH_P256, EphemeralPrivateKey, UnparsedPublicKey},
     error::Unspecified,
     hkdf::{self, KeyType, Prk},
@@ -15,8 +15,8 @@ const HPKE_SUITE_ID: &[u8] = b"HPKE\x00\x10\x00\x01\x00\x02";
 const HPKE_INFO: &[u8] = b"dubbridge:p2p:k1:hpke-base:v1";
 const PROFILE_VERSION: &str = "p2p-k1-hpke-v1";
 const P256_SPKI_PREFIX: &[u8] = &[
-    0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, 0x06,
-    0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00,
+    0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a,
+    0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00,
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -201,12 +201,7 @@ fn key_schedule(
     Ok((key, nonce))
 }
 
-fn labeled_extract(
-    salt: &[u8],
-    suite_id: &[u8],
-    label: &[u8],
-    ikm: &[u8],
-) -> Zeroizing<[u8; 32]> {
+fn labeled_extract(salt: &[u8], suite_id: &[u8], label: &[u8], ikm: &[u8]) -> Zeroizing<[u8; 32]> {
     let mut labeled_ikm =
         Vec::with_capacity(HPKE_VERSION_LABEL.len() + suite_id.len() + label.len() + ikm.len());
     labeled_ikm.extend_from_slice(HPKE_VERSION_LABEL);
@@ -287,7 +282,9 @@ mod tests {
     #[test]
     fn seals_ck_with_bound_profile_and_non_deterministic_encapsulation() {
         let recipient = agreement::PrivateKey::generate(&ECDH_P256).expect("recipient key");
-        let public = recipient.compute_public_key().expect("recipient public key");
+        let public = recipient
+            .compute_public_key()
+            .expect("recipient public key");
         let spki = valid_spki(public.as_ref());
         let binding = DeviceEnvelopeBinding::k1(
             "device-key-1",
