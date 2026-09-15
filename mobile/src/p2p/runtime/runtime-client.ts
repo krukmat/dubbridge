@@ -1,3 +1,4 @@
+import b4a from "b4a";
 import RPC from "bare-rpc";
 
 import {
@@ -17,6 +18,7 @@ import {
 } from "./protocol";
 
 const PRODUCT_RPC_TIMEOUT_MS = 35_000;
+const SHA256_HEX = /^[0-9a-f]{64}$/;
 
 export class BareRpcPort implements RuntimeRpcPort {
   private readonly rpc: RPC;
@@ -101,6 +103,18 @@ export class RuntimeProtocolClient {
   async readProductFile(path: string): Promise<Uint8Array> {
     const result = await this.call(RUNTIME_COMMAND.READ_PRODUCT_FILE, { path }, PRODUCT_RPC_TIMEOUT_MS);
     return decodeProductFileReceipt(result, path);
+  }
+
+  async hashProductBytes(bytes: Uint8Array): Promise<string> {
+    const result = await this.call(
+      RUNTIME_COMMAND.HASH_PRODUCT_BYTES,
+      { bytesBase64: b4a.toString(bytes, "base64") },
+      PRODUCT_RPC_TIMEOUT_MS,
+    );
+    if (typeof result !== "string" || !SHA256_HEX.test(result)) {
+      throw new RuntimeProtocolError("INVALID_PAYLOAD", "Runtime product hash reply is invalid");
+    }
+    return result;
   }
 
   async closeProductPackage(): Promise<void> {
