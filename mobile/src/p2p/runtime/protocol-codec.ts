@@ -34,6 +34,11 @@ const REDACTED_ERROR_MESSAGE: Record<RuntimeProtocolErrorCode, string> = {
   REPLICATION_CONNECT_FAILED: "Replication peer connection failed",
   REPLICATION_TRANSFER_FAILED: "Replication transfer failed",
   REPLICATION_CANCELLED: "Replication was cancelled",
+  PRODUCT_STORAGE_CONFIG_INVALID: "Product storage configuration is invalid",
+  PRODUCT_PACKAGE_OPEN_FAILED: "Product package could not be opened",
+  PRODUCT_PACKAGE_NOT_OPEN: "Product package is not open",
+  PRODUCT_PACKAGE_READ_FAILED: "Product package read failed",
+  PRODUCT_PACKAGE_CLOSE_FAILED: "Product package could not be closed",
 };
 
 export class RuntimeCodec {
