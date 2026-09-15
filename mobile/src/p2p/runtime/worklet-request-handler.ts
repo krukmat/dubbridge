@@ -100,8 +100,8 @@ function handleImmediateLifecycleCommand(
 }
 
 async function shutdownProductRuntime(request: IncomingRequest, closeOnce: () => void): Promise<void> {
-  await productPlayback.stop();
-  if (productPackages.isOpen) await productPackages.close();
+  if (productPlayback.isActive) await productPlayback.stop();
+  else if (productPackages.isOpen) await productPackages.close();
   safeReply(request, success("stopped"), closeOnce);
   closeOnce();
 }
@@ -167,15 +167,6 @@ async function executeProductCommand(
     safeReply(request, success("stopped"), closeOnce);
     return;
   }
-  await executePackageCommand(runtime, request, payload, closeOnce);
-}
-
-async function executePackageCommand(
-  runtime: WorkletRuntime,
-  request: IncomingRequest,
-  payload: Record<string, unknown>,
-  closeOnce: () => void,
-): Promise<void> {
   if (request.command === RUNTIME_COMMAND.OPEN_PRODUCT_PACKAGE) {
     const { accountScope, externalPublicationId } = decodeOpenProductPackageRequest(payload);
     await productPackages.open(runtime, accountScope, externalPublicationId);
