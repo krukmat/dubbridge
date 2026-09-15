@@ -19,9 +19,12 @@ export type P2pManifest = Readonly<{
   publication_id: string;
 }>;
 
-export type PackageVerificationReceipt = Readonly<{
+export type ManifestVerificationReceipt = Readonly<{
   manifest: P2pManifest;
   manifestDigestSha256: string;
+}>;
+
+export type PackageVerificationReceipt = ManifestVerificationReceipt & Readonly<{
   filesVerified: number;
   bytesVerified: number;
 }>;
@@ -36,16 +39,11 @@ export class PackageVerificationError extends Error {
   }
 }
 
-/**
- * Fail-closed package verifier used by the product sync path. READY must only
- * be reached after this succeeds against the authoritative API descriptor.
- */
-export async function verifyP2pPackage(
+export async function verifyManifestAgainstDescriptor(
   descriptor: P2pReadyDescriptor,
   manifestBytes: Uint8Array,
-  readCiphertext: ReadCiphertextFile,
   sha256Hex: Sha256Hex,
-): Promise<PackageVerificationReceipt> {
+): Promise<ManifestVerificationReceipt> {
   const manifestDigest = normalizeDigest(await sha256Hex(manifestBytes));
   if (manifestDigest !== descriptor.manifestDigestSha256) {
     throw new PackageVerificationError("Manifest digest does not match authoritative descriptor");
@@ -63,16 +61,35 @@ export async function verifyP2pPackage(
   if (manifest.cipher !== "AES-256-GCM" || manifest.digest !== "SHA-256") {
     throw new PackageVerificationError("Manifest cryptographic profile is unsupported");
   }
+  if (manifest.files.length === 0) {
+    throw new PackageVerificationError("Manifest contains no ciphertext files");
+  }
 
   const paths = new Set<string>();
-  let bytesVerified = manifestBytes.byteLength;
   for (const file of manifest.files) {
     validateManifestFile(file);
     if (paths.has(file.path)) {
       throw new PackageVerificationError("Manifest contains duplicate file paths");
     }
     paths.add(file.path);
+  }
 
+  return { manifest, manifestDigestSha256: manifestDigest };
+}
+
+/**
+ * Fail-closed package verifier used by the product sync path. READY must only
+ * be reached after this succeeds against the authoritative API descriptor.
+ */
+export async function verifyP2pPackage(
+  descriptor: P2pReadyDescriptor,
+  manifestBytes: Uint8Array,
+  readCiphertext: ReadCiphertextFile,
+  sha256Hex: Sha256Hex,
+): Promise<PackageVerificationReceipt> {
+  const verifiedManifest = await verifyManifestAgainstDescriptor(descriptor, manifestBytes, sha256Hex);
+  let bytesVerified = manifestBytes.byteLength;
+  for (const file of verifiedManifest.manifest.files) {
     let ciphertext: Uint8Array;
     try {
       ciphertext = await readCiphertext(file.path);
@@ -89,14 +106,9 @@ export async function verifyP2pPackage(
     bytesVerified += ciphertext.byteLength;
   }
 
-  if (manifest.files.length === 0) {
-    throw new PackageVerificationError("Manifest contains no ciphertext files");
-  }
-
   return {
-    manifest,
-    manifestDigestSha256: manifestDigest,
-    filesVerified: manifest.files.length + 1,
+    ...verifiedManifest,
+    filesVerified: verifiedManifest.manifest.files.length + 1,
     bytesVerified,
   };
 }
