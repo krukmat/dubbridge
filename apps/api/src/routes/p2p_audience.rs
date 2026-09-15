@@ -35,7 +35,10 @@ const MAX_DEVICE_PUBLIC_KEY_BYTES: usize = 2048;
 pub fn router(verifier: SharedTokenVerifier) -> Router<Arc<AppState>> {
     Router::new()
         .route("/p2p/devices", post(register_device))
-        .route("/assets/{id}/p2p/invitations", post(create_asset_invitation))
+        .route(
+            "/assets/{id}/p2p/invitations",
+            post(create_asset_invitation),
+        )
         .route("/p2p/invitations/claim", post(claim))
         .route("/p2p/invitations", get(list_invitations))
         .route("/p2p/authorizations/{id}", get(get_authorization))
@@ -120,7 +123,9 @@ async fn register_device(
         _ => return StatusCode::BAD_REQUEST.into_response(),
     };
 
-    match register_or_get_active_device(&state.pool, principal.subject_id, key_id, &public_key).await {
+    match register_or_get_active_device(&state.pool, principal.subject_id, key_id, &public_key)
+        .await
+    {
         Ok(device) => (StatusCode::OK, Json(device_response(&device))).into_response(),
         Err(error) => db_error_response(error),
     }
@@ -184,12 +189,12 @@ async fn claim(
         Err(error) => return db_error_response(error),
     };
 
-    let descriptor = match get_ready_descriptor_by_asset(&state.pool, result.invitation.asset_id()).await
-    {
-        Ok(Some(descriptor)) => descriptor,
-        Ok(None) => return StatusCode::CONFLICT.into_response(),
-        Err(error) => return db_error_response(error),
-    };
+    let descriptor =
+        match get_ready_descriptor_by_asset(&state.pool, result.invitation.asset_id()).await {
+            Ok(Some(descriptor)) => descriptor,
+            Ok(None) => return StatusCode::CONFLICT.into_response(),
+            Err(error) => return db_error_response(error),
+        };
 
     (
         StatusCode::OK,
@@ -253,7 +258,10 @@ fn device_response(device: &P2pDeviceRecord) -> DeviceResponse {
     }
 }
 
-fn invitation_response(invitation: &P2pInvitationRecord, now: OffsetDateTime) -> InvitationResponse {
+fn invitation_response(
+    invitation: &P2pInvitationRecord,
+    now: OffsetDateTime,
+) -> InvitationResponse {
     InvitationResponse {
         id: invitation.id,
         asset_id: invitation.asset_id,
