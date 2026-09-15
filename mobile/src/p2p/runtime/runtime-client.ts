@@ -88,12 +88,12 @@ export class RuntimeProtocolClient {
     await this.expectExact(RUNTIME_COMMAND.SHUTDOWN, "stopped", "Runtime shutdown reply is invalid");
   }
 
-  async openProductPackage(externalPublicationId: string): Promise<void> {
+  async openProductPackage(accountScope: string, externalPublicationId: string): Promise<void> {
     await this.expectExact(
       RUNTIME_COMMAND.OPEN_PRODUCT_PACKAGE,
       "opened",
       "Runtime product package open reply is invalid",
-      { externalPublicationId },
+      { accountScope, externalPublicationId },
       PRODUCT_RPC_TIMEOUT_MS,
     );
   }
