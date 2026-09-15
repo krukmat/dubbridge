@@ -50,15 +50,12 @@ describe("P5 playback session view", () => {
     const view = await render(
       <P2PPlaybackSessionView session={session} controller={controller} />,
     );
+    const player = latestPlayerProps();
 
-    await act(async () => {
-      latestPlayerProps().onPlaybackError();
-      await Promise.resolve();
-    });
+    act(() => player.onPlaybackError());
     expect(controller.stop).toHaveBeenCalledTimes(1);
 
     view.unmount();
-    await act(async () => Promise.resolve());
     expect(controller.stop).toHaveBeenCalledTimes(1);
   });
 
@@ -77,11 +74,11 @@ describe("P5 playback session view", () => {
         onRetry={onRetry}
       />,
     );
+    const player = latestPlayerProps();
 
-    await act(async () => {
-      latestPlayerProps().onPlaybackError();
-      latestPlayerProps().onRetry?.();
-      await Promise.resolve();
+    act(() => {
+      player.onPlaybackError();
+      player.onRetry?.();
     });
 
     expect(stop).toHaveBeenCalledTimes(1);
