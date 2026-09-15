@@ -6,6 +6,7 @@ import {
   RuntimeCodec,
   RuntimeProtocolError,
   decodeHandshakeResult,
+  decodeProductFileReceipt,
   decodeResponseEnvelope,
   decodeRuntimeEvent,
   type DiscoverAndReplicateReceipt,
@@ -14,6 +15,8 @@ import {
   type RuntimeRpcPort,
   type SeedWriteHashDeleteReceipt,
 } from "./protocol";
+
+const PRODUCT_RPC_TIMEOUT_MS = 35_000;
 
 export class BareRpcPort implements RuntimeRpcPort {
   private readonly rpc: RPC;
@@ -77,16 +80,47 @@ export class RuntimeProtocolClient {
   }
 
   async ping(): Promise<"pong"> {
-    if ((await this.call(RUNTIME_COMMAND.PING)) !== "pong") {
-      throw new RuntimeProtocolError("INVALID_PAYLOAD", "Runtime ping reply is invalid");
-    }
+    await this.expectExact(RUNTIME_COMMAND.PING, "pong", "Runtime ping reply is invalid");
     return "pong";
   }
 
   async shutdown(): Promise<void> {
-    if ((await this.call(RUNTIME_COMMAND.SHUTDOWN)) !== "stopped") {
-      throw new RuntimeProtocolError("INVALID_PAYLOAD", "Runtime shutdown reply is invalid");
-    }
+    await this.expectExact(RUNTIME_COMMAND.SHUTDOWN, "stopped", "Runtime shutdown reply is invalid");
+  }
+
+  async openProductPackage(externalPublicationId: string): Promise<void> {
+    await this.expectExact(
+      RUNTIME_COMMAND.OPEN_PRODUCT_PACKAGE,
+      "opened",
+      "Runtime product package open reply is invalid",
+      { externalPublicationId },
+      PRODUCT_RPC_TIMEOUT_MS,
+    );
+  }
+
+  async readProductFile(path: string): Promise<Uint8Array> {
+    const result = await this.call(RUNTIME_COMMAND.READ_PRODUCT_FILE, { path }, PRODUCT_RPC_TIMEOUT_MS);
+    return decodeProductFileReceipt(result, path);
+  }
+
+  async closeProductPackage(): Promise<void> {
+    await this.expectExact(
+      RUNTIME_COMMAND.CLOSE_PRODUCT_PACKAGE,
+      "closed",
+      "Runtime product package close reply is invalid",
+      undefined,
+      PRODUCT_RPC_TIMEOUT_MS,
+    );
+  }
+
+  async cancelProductPackage(): Promise<void> {
+    await this.expectExact(
+      RUNTIME_COMMAND.CANCEL_PRODUCT_PACKAGE,
+      "cancelled",
+      "Runtime product package cancel reply is invalid",
+      undefined,
+      PRODUCT_RPC_TIMEOUT_MS,
+    );
   }
 
   async seedWriteHashDelete(): Promise<SeedWriteHashDeleteReceipt> {
@@ -120,7 +154,23 @@ export class RuntimeProtocolClient {
     return result as DiscoverAndReplicateReceipt;
   }
 
-  private async call(command: number, extraPayload?: Record<string, unknown>): Promise<unknown> {
+  private async expectExact(
+    command: number,
+    expected: string,
+    errorMessage: string,
+    extraPayload?: Record<string, unknown>,
+    timeoutMs = this.timeoutMs,
+  ): Promise<void> {
+    if ((await this.call(command, extraPayload, timeoutMs)) !== expected) {
+      throw new RuntimeProtocolError("INVALID_PAYLOAD", errorMessage);
+    }
+  }
+
+  private async call(
+    command: number,
+    extraPayload?: Record<string, unknown>,
+    timeoutMs = this.timeoutMs,
+  ): Promise<unknown> {
     this.pendingCount += 1;
     let timeout: ReturnType<typeof setTimeout> | undefined;
 
@@ -136,7 +186,7 @@ export class RuntimeProtocolClient {
               timeout = setTimeout(() => {
                 this.port.close(new RuntimeProtocolError("RPC_TIMEOUT", "Runtime request timed out"));
                 reject(new RuntimeProtocolError("RPC_TIMEOUT", "Runtime request timed out"));
-              }, this.timeoutMs);
+              }, timeoutMs);
             }),
           ]),
         ),
