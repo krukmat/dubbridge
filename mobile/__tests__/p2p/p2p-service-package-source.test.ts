@@ -17,7 +17,7 @@ const descriptor: P2pReadyDescriptor = {
 
 function createService() {
   return {
-    openProductPackage: jest.fn(async (_id: string) => undefined),
+    openProductPackage: jest.fn(async (_accountScope: string, _id: string) => undefined),
     readProductFile: jest.fn(async (path: string) => new TextEncoder().encode(path)),
     closeProductPackage: jest.fn(async () => undefined),
     cancelProductPackage: jest.fn(async () => undefined),
@@ -25,18 +25,21 @@ function createService() {
 }
 
 describe("P2PServicePackageSource", () => {
-  it("opens the authoritative Hyperdrive identity and maps manifest/files through P2PService", async () => {
+  it("opens the authoritative Hyperdrive identity inside the signed-in account scope", async () => {
     const service = createService();
     const source = new P2PServicePackageSource(service);
 
-    const session = await source.open(descriptor);
+    const session = await source.open(descriptor, "viewer-1");
     await expect(session.readManifest()).resolves.toEqual(new TextEncoder().encode("manifest.json"));
     await expect(session.readCiphertext("segments/000001.ts")).resolves.toEqual(
       new TextEncoder().encode("segments/000001.ts"),
     );
     await session.close();
 
-    expect(service.openProductPackage).toHaveBeenCalledWith(descriptor.externalPublicationId);
+    expect(service.openProductPackage).toHaveBeenCalledWith(
+      "viewer-1",
+      descriptor.externalPublicationId,
+    );
     expect(service.readProductFile).toHaveBeenNthCalledWith(1, "manifest.json");
     expect(service.readProductFile).toHaveBeenNthCalledWith(2, "segments/000001.ts");
     expect(service.closeProductPackage).toHaveBeenCalledTimes(1);
@@ -44,7 +47,7 @@ describe("P2PServicePackageSource", () => {
 
   it("cancels once and prevents stale reads or a later duplicate close", async () => {
     const service = createService();
-    const session = await new P2PServicePackageSource(service).open(descriptor);
+    const session = await new P2PServicePackageSource(service).open(descriptor, "viewer-1");
 
     await session.cancel?.();
     await session.cancel?.();
