@@ -8,6 +8,7 @@ export const RUNTIME_CAPABILITIES = [
   "lifecycle:resume",
   "fatal",
   "shutdown",
+  "product-package:v1",
 ] as const;
 
 export const RUNTIME_COMMAND = {
@@ -20,6 +21,10 @@ export const RUNTIME_COMMAND = {
   SEED_WRITE_HASH_DELETE: 7,
   DISCOVER_AND_REPLICATE: 8,
   CANCEL_REPLICATION: 9,
+  OPEN_PRODUCT_PACKAGE: 10,
+  READ_PRODUCT_FILE: 11,
+  CLOSE_PRODUCT_PACKAGE: 12,
+  CANCEL_PRODUCT_PACKAGE: 13,
 } as const;
 
 export type RuntimeCapability = (typeof RUNTIME_CAPABILITIES)[number];
@@ -46,7 +51,12 @@ export type RuntimeProtocolErrorCode =
   | "REPLICATION_DISCOVERY_FAILED"
   | "REPLICATION_CONNECT_FAILED"
   | "REPLICATION_TRANSFER_FAILED"
-  | "REPLICATION_CANCELLED";
+  | "REPLICATION_CANCELLED"
+  | "PRODUCT_STORAGE_CONFIG_INVALID"
+  | "PRODUCT_PACKAGE_OPEN_FAILED"
+  | "PRODUCT_PACKAGE_NOT_OPEN"
+  | "PRODUCT_PACKAGE_READ_FAILED"
+  | "PRODUCT_PACKAGE_CLOSE_FAILED";
 
 export const TRANSIENT_DRIVE_RECEIPT = {
   capability: "transient-hyperdrive-corestore",
@@ -73,6 +83,24 @@ export interface DiscoverAndReplicateRequest {
   role: "seed" | "client";
 }
 
+export interface OpenProductPackageRequest {
+  protocolVersion: typeof RUNTIME_PROTOCOL_VERSION;
+  externalPublicationId: string;
+}
+
+export interface ReadProductFileRequest {
+  protocolVersion: typeof RUNTIME_PROTOCOL_VERSION;
+  path: string;
+}
+
+export interface ProductPackageFileReceipt {
+  capability: "product-package-file";
+  schema_version: 1;
+  path: string;
+  byte_count: number;
+  bytes_base64: string;
+}
+
 export function decodeDiscoverAndReplicateRequest(value: unknown): DiscoverAndReplicateRequest {
   if (
     !RuntimeCodec.isRecord(value) ||
@@ -85,6 +113,30 @@ export function decodeDiscoverAndReplicateRequest(value: unknown): DiscoverAndRe
     throw new RuntimeProtocolError("REPLICATION_DISCOVERY_FAILED", "Replication peer discovery failed");
   }
   return value as unknown as DiscoverAndReplicateRequest;
+}
+
+export function decodeOpenProductPackageRequest(value: unknown): OpenProductPackageRequest {
+  if (
+    !RuntimeCodec.isRecord(value) ||
+    value.protocolVersion !== RUNTIME_PROTOCOL_VERSION ||
+    typeof value.externalPublicationId !== "string" ||
+    !/^[0-9a-f]{64}$/.test(value.externalPublicationId)
+  ) {
+    throw new RuntimeProtocolError("INVALID_PAYLOAD", "Product package identity is invalid");
+  }
+  return value as unknown as OpenProductPackageRequest;
+}
+
+export function decodeReadProductFileRequest(value: unknown): ReadProductFileRequest {
+  if (
+    !RuntimeCodec.isRecord(value) ||
+    value.protocolVersion !== RUNTIME_PROTOCOL_VERSION ||
+    typeof value.path !== "string" ||
+    value.path.length === 0
+  ) {
+    throw new RuntimeProtocolError("INVALID_PAYLOAD", "Product package path is invalid");
+  }
+  return value as unknown as ReadProductFileRequest;
 }
 
 export interface RuntimeHandshake {
@@ -119,6 +171,27 @@ export class RuntimeProtocolError extends Error {
     super(message);
     this.name = "RuntimeProtocolError";
   }
+}
+
+export function decodeProductFileReceipt(value: unknown, expectedPath: string): Uint8Array {
+  if (!RuntimeCodec.isRecord(value)) {
+    throw new RuntimeProtocolError("INVALID_PAYLOAD", "Runtime product file reply is invalid");
+  }
+  const receipt = value as Partial<ProductPackageFileReceipt>;
+  if (
+    receipt.capability !== "product-package-file" ||
+    receipt.schema_version !== 1 ||
+    receipt.path !== expectedPath ||
+    typeof receipt.byte_count !== "number" ||
+    typeof receipt.bytes_base64 !== "string"
+  ) {
+    throw new RuntimeProtocolError("INVALID_PAYLOAD", "Runtime product file reply is invalid");
+  }
+  const bytes = b4a.from(receipt.bytes_base64, "base64");
+  if (bytes.byteLength !== receipt.byte_count) {
+    throw new RuntimeProtocolError("INVALID_PAYLOAD", "Runtime product file length is invalid");
+  }
+  return bytes;
 }
 
 export { RuntimeCodec, encodeProtocolValue, decodeRequestPayload, decodeResponseEnvelope, decodeHandshakeResult, decodeRuntimeEvent } from "./protocol-codec";
