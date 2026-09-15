@@ -103,14 +103,8 @@ async function stopCertification(
 }
 
 function CertificationPanel(props: CertificationPanelProps) {
-  const {
-    busy,
-    dependencies,
-    failureCode,
-    invitationToken,
-    session,
-    stage,
-  } = props;
+  const { busy, dependencies, failureCode, invitationToken } = props;
+  const { session, stage } = props;
   return (
     <Modal visible animationType="fade" onRequestClose={() => undefined}>
       <SafeAreaView style={styles.screen}>
