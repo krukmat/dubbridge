@@ -1,5 +1,3 @@
-import b4a from "b4a";
-
 import { RuntimeProtocolError } from "./protocol";
 import type { WorkletRuntime } from "./transient-drive";
 
@@ -91,7 +89,7 @@ export class ProductPackageRuntime {
 async function openPackage(storageUri: string, externalPublicationId: string): Promise<ActiveProductPackage> {
   const { Corestore, Hyperdrive, Hyperswarm } = loadDependencies();
   const store = new Corestore(storageUri);
-  const drive = new Hyperdrive(store, b4a.from(externalPublicationId, "hex"));
+  const drive = new Hyperdrive(store, Buffer.from(externalPublicationId, "hex"));
   const swarm = new Hyperswarm();
   swarm.on("connection", (connection) => store.replicate(connection));
 
