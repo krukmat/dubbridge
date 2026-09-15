@@ -408,10 +408,10 @@ async fn upsert_authorization(
 }
 
 fn map_unique_conflict(error: sqlx::Error) -> DbError {
-    if let sqlx::Error::Database(database) = &error {
-        if database.code().as_deref() == Some("23505") {
-            return DbError::Conflict;
-        }
+    if let sqlx::Error::Database(database) = &error
+        && database.code().as_deref() == Some("23505")
+    {
+        return DbError::Conflict;
     }
     DbError::QueryFailed(error)
 }
