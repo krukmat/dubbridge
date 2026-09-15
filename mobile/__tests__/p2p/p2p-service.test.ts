@@ -12,7 +12,14 @@ import type { RuntimeHandshake } from "../../src/p2p/runtime/protocol";
 const handshake: RuntimeHandshake = {
   protocolVersion: 1,
   runtimeVersion: "test",
-  capabilities: ["ping", "lifecycle:suspend", "lifecycle:resume", "fatal", "shutdown"],
+  capabilities: [
+    "ping",
+    "lifecycle:suspend",
+    "lifecycle:resume",
+    "fatal",
+    "shutdown",
+    "product-package:v1",
+  ],
 };
 
 function createRuntime() {
@@ -26,10 +33,31 @@ function createRuntime() {
       return handshake;
     }),
     ping: jest.fn(async () => "pong" as const),
+    openProductPackage: jest.fn(async (_externalPublicationId: string) => undefined),
+    readProductFile: jest.fn(async (_path: string) => new Uint8Array([1, 2, 3])),
+    closeProductPackage: jest.fn(async () => undefined),
+    cancelProductPackage: jest.fn(async () => undefined),
     shutdown: jest.fn(async () => {
       state = "stopped";
     }),
   };
+}
+
+function createProtocol(overrides: Partial<BareRuntimeProtocol> = {}): BareRuntimeProtocol {
+  return {
+    handshake: jest.fn(async () => handshake),
+    ping: jest.fn(async () => "pong" as const),
+    openProductPackage: jest.fn(async () => undefined),
+    readProductFile: jest.fn(async () => new Uint8Array([1, 2, 3])),
+    closeProductPackage: jest.fn(async () => undefined),
+    cancelProductPackage: jest.fn(async () => undefined),
+    shutdown: jest.fn(async () => undefined),
+    ...overrides,
+  };
+}
+
+function createWorklet(): BareRuntimeWorklet {
+  return { IPC: {}, start: jest.fn(), terminate: jest.fn() } as unknown as BareRuntimeWorklet;
 }
 
 describe("P2PService", () => {
@@ -51,6 +79,22 @@ describe("P2PService", () => {
     expect(runtime.shutdown).toHaveBeenCalledTimes(1);
     expect(snapshots).toEqual(["starting", "ready", "stopped"]);
     unsubscribe();
+  });
+
+  it("P4 delegates product package operations through the runtime boundary", async () => {
+    const runtime = createRuntime();
+    const service = new P2PService(runtime);
+    await service.initialize();
+
+    await service.openProductPackage("a".repeat(64));
+    await expect(service.readProductFile("manifest.json")).resolves.toEqual(new Uint8Array([1, 2, 3]));
+    await service.cancelProductPackage();
+    await service.closeProductPackage();
+
+    expect(runtime.openProductPackage).toHaveBeenCalledWith("a".repeat(64));
+    expect(runtime.readProductFile).toHaveBeenCalledWith("manifest.json");
+    expect(runtime.cancelProductPackage).toHaveBeenCalledTimes(1);
+    expect(runtime.closeProductPackage).toHaveBeenCalledTimes(1);
   });
 
   it("EC-F2 preserves a typed invalid lifecycle error and its snapshot", async () => {
@@ -108,47 +152,65 @@ describe("P2PService", () => {
 
 describe("BareRuntimeClient", () => {
   it("HP-F2 starts one worklet only on initialize and tears it down deterministically", async () => {
-    const worklet = { IPC: {}, start: jest.fn(), terminate: jest.fn() } as unknown as BareRuntimeWorklet;
-    const protocol: BareRuntimeProtocol = {
-      handshake: jest.fn(async () => handshake),
-      ping: jest.fn(async () => "pong" as const),
-      shutdown: jest.fn(async () => undefined),
-    };
-    const client = new BareRuntimeClient(() => worklet, () => protocol);
+    const worklet = createWorklet();
+    const protocol = createProtocol();
+    const client = new BareRuntimeClient(() => worklet, () => protocol, "file:/tmp/p2p-product");
 
     expect(client.currentState).toBe("stopped");
     await expect(client.initialize()).resolves.toEqual(handshake);
     await expect(client.ping()).resolves.toBe("pong");
     await client.shutdown();
 
-    expect(worklet.start).toHaveBeenCalledTimes(1);
+    expect(worklet.start).toHaveBeenCalledWith(
+      "/dubbridge-p2p-runtime.worklet",
+      expect.anything(),
+      ["file:/tmp/p2p-product"],
+    );
     expect(protocol.handshake).toHaveBeenCalledTimes(1);
     expect(protocol.shutdown).toHaveBeenCalledTimes(1);
     expect(worklet.terminate).toHaveBeenCalledTimes(1);
     expect(client.currentState).toBe("stopped");
   });
 
+  it("P4 delegates package RPC only while the runtime is ready", async () => {
+    const worklet = createWorklet();
+    const protocol = createProtocol();
+    const client = new BareRuntimeClient(() => worklet, () => protocol, "file:/tmp/p2p-product");
+
+    await expect(client.openProductPackage("a".repeat(64))).rejects.toMatchObject({ code: "INVALID_STATE" });
+    await client.initialize();
+    await client.openProductPackage("a".repeat(64));
+    await expect(client.readProductFile("manifest.json")).resolves.toEqual(new Uint8Array([1, 2, 3]));
+    await client.cancelProductPackage();
+    await client.closeProductPackage();
+
+    expect(protocol.openProductPackage).toHaveBeenCalledWith("a".repeat(64));
+    expect(protocol.readProductFile).toHaveBeenCalledWith("manifest.json");
+  });
+
   it("EC-F2 rejects duplicate initialization with a typed error", async () => {
-    const worklet = { IPC: {}, start: jest.fn(), terminate: jest.fn() } as unknown as BareRuntimeWorklet;
-    const client = new BareRuntimeClient(() => worklet, () => ({
-      handshake: jest.fn(async () => handshake),
-      ping: jest.fn(async () => "pong" as const),
-      shutdown: jest.fn(async () => undefined),
-    }));
+    const worklet = createWorklet();
+    const client = new BareRuntimeClient(
+      () => worklet,
+      () => createProtocol(),
+      "file:/tmp/p2p-product",
+    );
 
     await client.initialize();
     await expect(client.initialize()).rejects.toMatchObject({ code: "INVALID_STATE" });
   });
 
   it("EC-F2 exposes typed stopped and failed runtime states", async () => {
-    const worklet = { IPC: {}, start: jest.fn(), terminate: jest.fn() } as unknown as BareRuntimeWorklet;
-    const client = new BareRuntimeClient(() => worklet, () => ({
-      handshake: jest.fn(async () => {
-        throw new Error("handshake failed");
+    const worklet = createWorklet();
+    const client = new BareRuntimeClient(
+      () => worklet,
+      () => createProtocol({
+        handshake: jest.fn(async () => {
+          throw new Error("handshake failed");
+        }),
       }),
-      ping: jest.fn(async () => "pong" as const),
-      shutdown: jest.fn(async () => undefined),
-    }));
+      "file:/tmp/p2p-product",
+    );
 
     await expect(client.ping()).rejects.toMatchObject({ code: "INVALID_STATE" });
     await expect(client.initialize()).rejects.toMatchObject({ code: "START_FAILED", message: "handshake failed" });
@@ -157,17 +219,13 @@ describe("BareRuntimeClient", () => {
   });
 
   it("EC-F2 keeps a released startup stopped when its handshake resolves later", async () => {
-    const worklet = { IPC: {}, start: jest.fn(), terminate: jest.fn() } as unknown as BareRuntimeWorklet;
+    const worklet = createWorklet();
     let resolveHandshake: (value: RuntimeHandshake) => void = () => undefined;
     const handshakePromise = new Promise<RuntimeHandshake>((resolve) => {
       resolveHandshake = resolve;
     });
-    const protocol: BareRuntimeProtocol = {
-      handshake: jest.fn(() => handshakePromise),
-      ping: jest.fn(async () => "pong" as const),
-      shutdown: jest.fn(async () => undefined),
-    };
-    const client = new BareRuntimeClient(() => worklet, () => protocol);
+    const protocol = createProtocol({ handshake: jest.fn(() => handshakePromise) });
+    const client = new BareRuntimeClient(() => worklet, () => protocol, "file:/tmp/p2p-product");
 
     const starting = client.initialize();
     await client.shutdown();
