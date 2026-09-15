@@ -1,6 +1,7 @@
 pub mod aad;
 pub mod atomic_write;
 pub mod crypto;
+pub mod device_envelope;
 pub mod key_wrap;
 pub mod manifest;
 mod nonce_tracker;
