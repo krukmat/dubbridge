@@ -95,8 +95,11 @@ export class BareRuntimeClient {
     return this.requireReady("ping").ping();
   }
 
-  async openProductPackage(externalPublicationId: string): Promise<void> {
-    return this.requireReady("open product package").openProductPackage(externalPublicationId);
+  async openProductPackage(accountScope: string, externalPublicationId: string): Promise<void> {
+    return this.requireReady("open product package").openProductPackage(
+      accountScope,
+      externalPublicationId,
+    );
   }
 
   async readProductFile(path: string): Promise<Uint8Array> {
