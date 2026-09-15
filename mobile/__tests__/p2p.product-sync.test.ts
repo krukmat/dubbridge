@@ -74,6 +74,33 @@ function source(
   return { value: { open } as P2pPackageSource, open, readCiphertext, cancel, close };
 }
 
+function blockedSource() {
+  let rejectRead: (error: Error) => void = () => undefined;
+  let markReadStarted: () => void = () => undefined;
+  const readStarted = new Promise<void>((resolve) => {
+    markReadStarted = resolve;
+  });
+  const blockedRead = new Promise<Uint8Array>((_resolve, reject) => {
+    rejectRead = reject;
+  });
+  const cancel = jest.fn(async () => {
+    rejectRead(new Error("transport cancelled"));
+  });
+  const close = jest.fn(async () => undefined);
+  const value: P2pPackageSource = {
+    open: jest.fn(async () => ({
+      readManifest: async () => manifestBytes,
+      readCiphertext: async () => {
+        markReadStarted();
+        return blockedRead;
+      },
+      cancel,
+      close,
+    })),
+  };
+  return { value, readStarted, cancel, close };
+}
+
 describe("P2P product sync", () => {
   beforeEach(() => sha256.mockClear());
 
@@ -163,41 +190,35 @@ describe("P2P product sync", () => {
 
   it("cancels an active source and prevents an in-flight sync from promoting READY", async () => {
     const cache = new MemoryP2pSyncCache();
-    let rejectRead: (error: Error) => void = () => undefined;
-    let markReadStarted: () => void = () => undefined;
-    const readStarted = new Promise<void>((resolve) => {
-      markReadStarted = resolve;
-    });
-    const blockedRead = new Promise<Uint8Array>((_resolve, reject) => {
-      rejectRead = reject;
-    });
-    const cancel = jest.fn(async () => {
-      rejectRead(new Error("transport cancelled"));
-    });
-    const close = jest.fn(async () => undefined);
-    const transport: P2pPackageSource = {
-      open: jest.fn(async () => ({
-        readManifest: async () => manifestBytes,
-        readCiphertext: async () => {
-          markReadStarted();
-          return blockedRead;
-        },
-        cancel,
-        close,
-      })),
-    };
-    const sync = new P2pProductSync(cache, transport, sha256);
+    const transport = blockedSource();
+    const sync = new P2pProductSync(cache, transport.value, sha256);
     const identity = { accountScope, publicationId: "pub-1", lineageId: "lineage-1" } as const;
 
     const pending = sync.sync(descriptor, accountScope);
-    await readStarted;
+    await transport.readStarted;
     const cancelled = await sync.cancel(identity);
 
     await expect(pending).rejects.toBeInstanceOf(P2pSyncCancelledError);
     expect(cancelled.phase).toBe("CANCELLED");
     expect((await cache.readSnapshot(identity))?.phase).toBe("CANCELLED");
-    expect(cancel).toHaveBeenCalledTimes(1);
-    expect(close).toHaveBeenCalledTimes(1);
+    expect(transport.cancel).toHaveBeenCalledTimes(1);
+    expect(transport.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("sign-out cancels active replication and wipes its state before it can become READY", async () => {
+    const cache = new MemoryP2pSyncCache();
+    const transport = blockedSource();
+    const sync = new P2pProductSync(cache, transport.value, sha256);
+    const identity = { accountScope, publicationId: "pub-1", lineageId: "lineage-1" } as const;
+
+    const pending = sync.sync(descriptor, accountScope);
+    await transport.readStarted;
+    await sync.clearAccount(accountScope);
+
+    await expect(pending).rejects.toBeInstanceOf(P2pSyncCancelledError);
+    expect(await cache.readSnapshot(identity)).toBeNull();
+    expect(transport.cancel).toHaveBeenCalledTimes(1);
+    expect(transport.close).toHaveBeenCalledTimes(1);
   });
 
   it("clears only the signed-out account cache", async () => {
