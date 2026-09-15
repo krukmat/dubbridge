@@ -33,7 +33,7 @@ function response(result: unknown): Uint8Array {
 }
 
 describe("P4 product runtime protocol", () => {
-  it("carries open/read/close/cancel over the versioned RPC boundary", async () => {
+  it("carries account-scoped open/read/close/cancel over the versioned RPC boundary", async () => {
     const bytes = new TextEncoder().encode("ciphertext");
     const observed: number[] = [];
     const port = new FakePort(async (command, payload) => {
@@ -42,6 +42,7 @@ describe("P4 product runtime protocol", () => {
       if (command === RUNTIME_COMMAND.OPEN_PRODUCT_PACKAGE) {
         expect(request).toEqual({
           protocolVersion: RUNTIME_PROTOCOL_VERSION,
+          accountScope: "viewer-1",
           externalPublicationId: "a".repeat(64),
         });
         return response("opened");
@@ -61,7 +62,7 @@ describe("P4 product runtime protocol", () => {
     });
     const client = new RuntimeProtocolClient(port, 100);
 
-    await client.openProductPackage("a".repeat(64));
+    await client.openProductPackage("viewer-1", "a".repeat(64));
     await expect(client.readProductFile("manifest.json")).resolves.toEqual(bytes);
     await client.closeProductPackage();
     await client.cancelProductPackage();
@@ -94,7 +95,25 @@ describe("P4 product runtime protocol", () => {
     const harness = workletHarness(["file:/tmp/p2p-product"]);
     harness.request(RUNTIME_COMMAND.OPEN_PRODUCT_PACKAGE, {
       protocolVersion: RUNTIME_PROTOCOL_VERSION,
+      accountScope: "viewer-1",
       externalPublicationId: "not-a-drive-key",
+    });
+    await Promise.resolve();
+
+    expect(harness.replies).toEqual([
+      expect.objectContaining({
+        ok: false,
+        error: expect.objectContaining({ code: "INVALID_PAYLOAD" }),
+      }),
+    ]);
+  });
+
+  it("rejects unsafe account scopes before opening product storage", async () => {
+    const harness = workletHarness(["file:/tmp/p2p-product"]);
+    harness.request(RUNTIME_COMMAND.OPEN_PRODUCT_PACKAGE, {
+      protocolVersion: RUNTIME_PROTOCOL_VERSION,
+      accountScope: "../viewer-1",
+      externalPublicationId: "a".repeat(64),
     });
     await Promise.resolve();
 
