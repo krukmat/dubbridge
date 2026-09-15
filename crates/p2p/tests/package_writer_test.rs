@@ -5,7 +5,7 @@
 //! rejection), EC-2 (conflict rejection), EC-3 (IO failure propagation).
 
 use dubbridge_p2p::package_builder::{PackageFileInput, build_package};
-use dubbridge_p2p::package_writer::{MaterializeError, materialize};
+use dubbridge_p2p::package_writer::{MaterializeError, canonical_package_ref, materialize};
 use std::fs;
 use std::path::PathBuf;
 
@@ -33,9 +33,17 @@ fn sample_inputs() -> Vec<PackageFileInput> {
     ]
 }
 
+#[test]
+fn package_ref_matches_frozen_publication_contract() {
+    assert_eq!(
+        canonical_package_ref("pub-id", "lineage-id"),
+        "packages/pub-id/lineage-id"
+    );
+}
+
 /// HP-1: materializing a valid multi-file SealedPackage under a fresh
-/// publication_id creates the expected directory with correct manifest and
-/// per-file ciphertext bytes, and returns a package_ref.
+/// publication/lineage identity creates the expected canonical directory with
+/// correct manifest and per-file ciphertext bytes, and returns a package_ref.
 #[test]
 fn hp1_fresh_materialize_creates_expected_directory() {
     let root = unique_root("hp1");
@@ -45,6 +53,9 @@ fn hp1_fresh_materialize_creates_expected_directory() {
 
     let package_ref = materialize(&root, &package).expect("materialize should succeed");
     assert_eq!(package_ref.publication_id, "pub-hp1");
+    assert_eq!(package_ref.lineage_id, "line1");
+    assert_eq!(package_ref.package_ref, "packages/pub-hp1/line1");
+    assert_eq!(package_ref.root, root.join("packages/pub-hp1/line1"));
 
     let manifest_bytes =
         fs::read(package_ref.root.join("manifest.json")).expect("manifest.json should exist");
@@ -59,7 +70,7 @@ fn hp1_fresh_materialize_creates_expected_directory() {
 }
 
 /// HP-2: materializing the identical SealedPackage a second time (same
-/// publication_id, byte-identical content) is a no-op success (idempotent
+/// publication/lineage, byte-identical content) is a no-op success (idempotent
 /// replay), not an error and not a rewrite (mtime/inode unchanged).
 #[test]
 fn hp2_idempotent_replay_is_noop_and_does_not_rewrite() {
@@ -84,7 +95,9 @@ fn hp2_idempotent_replay_is_noop_and_does_not_rewrite() {
     };
 
     let second = materialize(&root, &package).expect("idempotent replay should succeed");
+    assert_eq!(second.package_ref, first.package_ref);
     assert_eq!(second.publication_id, first.publication_id);
+    assert_eq!(second.lineage_id, first.lineage_id);
 
     let mtime_after = fs::metadata(&manifest_path)
         .expect("manifest metadata")
@@ -112,7 +125,7 @@ fn hp2_idempotent_replay_is_noop_and_does_not_rewrite() {
 
 /// EC-1: a SealedPackage whose publication_id is engineered to escape the
 /// shared root via `../` is rejected with the containment error before any
-/// write occurs.
+/// package write occurs.
 #[test]
 fn ec1_publication_id_traversal_is_rejected_before_any_write() {
     let root = unique_root("ec1");
@@ -124,13 +137,10 @@ fn ec1_publication_id_traversal_is_rejected_before_any_write() {
     let result = materialize(&root, &package);
     assert!(matches!(result, Err(MaterializeError::Containment(_))));
 
-    let entries: Vec<_> = fs::read_dir(&root)
-        .expect("root should still exist")
-        .filter_map(|e| e.ok())
-        .collect();
+    let package_root = root.join("packages");
     assert!(
-        entries.is_empty(),
-        "no write should occur on containment rejection"
+        !package_root.exists(),
+        "no canonical package directory should be created on containment rejection"
     );
 
     let _ = fs::remove_dir_all(&root);
@@ -143,8 +153,9 @@ fn ec1_publication_id_traversal_is_rejected_before_any_write() {
 fn ec1b_symlink_escape_publication_id_is_rejected() {
     let root = unique_root("ec1b");
     let outside = unique_root("ec1b-outside");
+    fs::create_dir_all(root.join("packages")).expect("packages root");
 
-    let link_path = root.join("escape-link");
+    let link_path = root.join("packages/escape-link");
     std::os::unix::fs::symlink(&outside, &link_path).expect("symlink");
 
     let ck = [0u8; 32];
@@ -159,8 +170,8 @@ fn ec1b_symlink_escape_publication_id_is_rejected() {
     let _ = fs::remove_dir_all(&outside);
 }
 
-/// EC-2: materializing a SealedPackage for a publication_id that already has
-/// a directory with DIFFERENT content is rejected as a conflict, and the
+/// EC-2: materializing a SealedPackage for a publication lineage that already
+/// has a directory with DIFFERENT content is rejected as a conflict, and the
 /// pre-existing directory is left byte-for-byte unchanged.
 #[test]
 fn ec2_conflicting_content_is_rejected_and_existing_left_unchanged() {
@@ -171,7 +182,11 @@ fn ec2_conflicting_content_is_rejected_and_existing_left_unchanged() {
         build_package("asset1", "pub-ec2", "line1", &ck, &inputs).expect("build_package v1");
     materialize(&root, &package_v1).expect("first materialize should succeed");
 
-    let manifest_path = root.join("pub-ec2").join("manifest.json");
+    let manifest_path = root
+        .join("packages")
+        .join("pub-ec2")
+        .join("line1")
+        .join("manifest.json");
     let manifest_before = fs::read(&manifest_path).expect("manifest exists");
 
     let different_inputs = vec![
@@ -209,9 +224,7 @@ fn ec3_io_failure_propagates_as_io_error() {
     let inputs = sample_inputs();
     let package = build_package("asset1", "pub-ec3", "line1", &ck, &inputs).expect("build_package");
 
-    // Pre-create the package directory as read-only so the atomic write's
-    // temp-file creation inside it fails with a permission error.
-    let package_dir = root.join("pub-ec3");
+    let package_dir = root.join("packages/pub-ec3/line1");
     fs::create_dir_all(&package_dir).expect("create package dir");
     let mut perms = fs::metadata(&package_dir).expect("metadata").permissions();
     use std::os::unix::fs::PermissionsExt;
@@ -221,7 +234,6 @@ fn ec3_io_failure_propagates_as_io_error() {
     let result = materialize(&root, &package);
     assert!(matches!(result, Err(MaterializeError::Io(_))));
 
-    // Restore permissions so the temp directory can be cleaned up.
     let mut perms = fs::metadata(&package_dir).expect("metadata").permissions();
     perms.set_mode(0o755);
     let _ = fs::set_permissions(&package_dir, perms);
