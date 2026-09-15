@@ -5,7 +5,9 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
+    "preandroid": "npm run build:bare-worklet",
     "android": "expo run:android",
+    "preandroid:p2p-dev": "npm run build:bare-worklet",
     "android:p2p-dev": "EXPO_PUBLIC_P2P_DEV_HARNESS=true expo run:android",
     "build:bare-worklet": "node scripts/build-bare-worklet.mjs",
     "check:bare-worklet": "node scripts/build-bare-worklet.mjs --check",
