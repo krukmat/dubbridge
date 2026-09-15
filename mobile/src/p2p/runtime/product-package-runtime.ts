@@ -2,7 +2,7 @@ import { RuntimeProtocolError } from "./protocol";
 import type { WorkletRuntime } from "./transient-drive";
 
 const DRIVE_KEY = /^[0-9a-f]{64}$/;
-const ACCOUNT_SCOPE = /^[A-Za-z0-9._~-]{1,128}$/;
+const ACCOUNT_SCOPE = /^[A-Za-z0-9._-]{1,128}$/;
 const DEFAULT_IO_TIMEOUT_MS = 30_000;
 
 interface ProductStore {
@@ -56,9 +56,8 @@ export class ProductPackageRuntime {
     if (this.active !== null) {
       throw new RuntimeProtocolError("PRODUCT_PACKAGE_OPEN_FAILED", "Product package is already open");
     }
-    validateAccountScope(accountScope);
     validateDriveKey(externalPublicationId);
-    const active = await openPackage(accountStorageUri(runtime, accountScope), externalPublicationId);
+    const active = await openPackage(productAccountStorageUri(runtime, accountScope), externalPublicationId);
     this.active = active;
   }
 
@@ -135,7 +134,8 @@ async function closePackage(active: ActiveProductPackage): Promise<void> {
   }
 }
 
-function accountStorageUri(runtime: WorkletRuntime, accountScope: string): string {
+export function productAccountStorageUri(runtime: WorkletRuntime, accountScope: string): string {
+  validateAccountScope(accountScope);
   return `${runtimeStorageUri(runtime)}/accounts/${accountScope}`;
 }
 
