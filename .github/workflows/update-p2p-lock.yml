@@ -16,6 +16,7 @@ jobs:
         with:
           ref: ${{ github.ref_name }}
       - uses: dtolnay/rust-toolchain@stable
+      # One-shot compile refreshes the existing lock graph without broad dependency upgrades.
       - name: Refresh lockfile for P2P crypto dependency
         run: cargo check -p dubbridge-p2p
       - name: Commit lockfile and remove one-shot workflow
