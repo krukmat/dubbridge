@@ -32,10 +32,7 @@ const MAX_INVITE_TTL_SECONDS: u64 = 7 * 24 * 60 * 60;
 const MAX_TOKEN_LENGTH: usize = 256;
 const MAX_DEVICE_PUBLIC_KEY_BYTES: usize = 2048;
 
-pub fn router(
-    state: Arc<AppState>,
-    verifier: SharedTokenVerifier,
-) -> Router<Arc<AppState>> {
+pub fn router(verifier: SharedTokenVerifier) -> Router<Arc<AppState>> {
     Router::new()
         .route("/p2p/devices", post(register_device))
         .route("/assets/{id}/p2p/invitations", post(create_asset_invitation))
@@ -46,7 +43,6 @@ pub fn router(
             verifier,
             authenticate_bearer,
         ))
-        .with_state(state)
 }
 
 #[derive(Debug, Deserialize)]
