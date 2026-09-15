@@ -44,6 +44,14 @@ export type P2pAuthorization = Readonly<{
   expiresAtUnix: number;
 }>;
 
+export type P2pDeviceEnvelope = Readonly<{
+  profileVersion: string;
+  keyId: string;
+  encapsulatedKeyBase64: string;
+  ciphertextBase64: string;
+  bindingJson: string;
+}>;
+
 export type P2pClaim = Readonly<{
   invitation: P2pInvitation;
   authorization: P2pAuthorization;
@@ -76,6 +84,14 @@ type ApiAuthorization = {
   viewer_subject_id: string;
   device_id: string;
   expires_at_unix: number;
+};
+
+type ApiDeviceEnvelope = {
+  profile_version: string;
+  key_id: string;
+  encapsulated_key_base64: string;
+  ciphertext_base64: string;
+  binding_json: string;
 };
 
 type ApiReadyDescriptor = {
@@ -141,6 +157,16 @@ function mapAuthorization(value: ApiAuthorization): P2pAuthorization {
     viewerSubjectId: value.viewer_subject_id,
     deviceId: value.device_id,
     expiresAtUnix: value.expires_at_unix,
+  };
+}
+
+function mapDeviceEnvelope(value: ApiDeviceEnvelope): P2pDeviceEnvelope {
+  return {
+    profileVersion: value.profile_version,
+    keyId: value.key_id,
+    encapsulatedKeyBase64: value.encapsulated_key_base64,
+    ciphertextBase64: value.ciphertext_base64,
+    bindingJson: value.binding_json,
   };
 }
 
@@ -222,4 +248,16 @@ export async function getP2pAuthorization(
     accessToken,
   );
   return mapResult(result, mapAuthorization);
+}
+
+export async function getP2pDeviceEnvelope(
+  client: GatewayClient,
+  accessToken: string,
+  authorizationId: string,
+): Promise<GatewayResult<P2pDeviceEnvelope>> {
+  const result = await client.get<ApiDeviceEnvelope>(
+    `/api/p2p/authorizations/${encodeURIComponent(authorizationId)}/device-envelope`,
+    accessToken,
+  );
+  return mapResult(result, mapDeviceEnvelope);
 }
