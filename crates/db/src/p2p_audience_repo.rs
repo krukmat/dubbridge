@@ -200,7 +200,10 @@ pub async fn claim_invitation(
     let device = active_device_for_viewer(&mut tx, device_id, viewer_subject_id).await?;
     ensure_publication_still_ready(&mut tx, &invitation).await?;
 
-    match (invitation.claimed_by_subject_id, invitation.claimed_device_id) {
+    match (
+        invitation.claimed_by_subject_id,
+        invitation.claimed_device_id,
+    ) {
         (None, None) => {
             invitation = sqlx::query_as::<_, P2pInvitationRecord>(
                 r#"
@@ -228,8 +231,8 @@ pub async fn claim_invitation(
         _ => return Err(DbError::Conflict),
     }
 
-    let authorization = upsert_authorization(&mut tx, &invitation, viewer_subject_id, device_id)
-        .await?;
+    let authorization =
+        upsert_authorization(&mut tx, &invitation, viewer_subject_id, device_id).await?;
     tx.commit().await.map_err(DbError::QueryFailed)?;
     Ok(P2pClaimResult {
         invitation,
