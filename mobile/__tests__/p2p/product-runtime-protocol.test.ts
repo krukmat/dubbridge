@@ -7,6 +7,7 @@ import {
   type RuntimeRpcPort,
 } from "../../src/p2p/runtime/protocol";
 import { RuntimeProtocolClient } from "../../src/p2p/runtime/runtime-client";
+import type { WorkletRuntime } from "../../src/p2p/runtime/transient-drive";
 import { versioned, workletHarness } from "../../test-utils/worklet-harness";
 
 class FakePort implements RuntimeRpcPort {
@@ -87,7 +88,10 @@ describe("P4 product runtime protocol", () => {
   });
 
   it("keeps Corestore namespaces distinct for separate signed-in accounts", () => {
-    const runtime = { argv: ["file:/tmp/p2p-product"] };
+    const runtime = {
+      argv: ["file:/tmp/p2p-product"],
+      on: jest.fn(),
+    } as unknown as WorkletRuntime;
 
     expect(productAccountStorageUri(runtime, "viewer-a")).toBe(
       "file:/tmp/p2p-product/accounts/viewer-a",
