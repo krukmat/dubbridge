@@ -107,15 +107,19 @@ export function restoreSyncSnapshot(
     throw new Error("Invalid persisted P2P sync snapshot");
   }
 
-  const identity = {
-    accountScope: value.identity.accountScope,
-    publicationId: value.identity.publicationId,
-    lineageId: value.identity.lineageId,
-  };
+  const accountScope = value.identity.accountScope;
+  const publicationId = value.identity.publicationId;
+  const lineageId = value.identity.lineageId;
   if (
-    typeof identity.accountScope !== "string" ||
-    typeof identity.publicationId !== "string" ||
-    typeof identity.lineageId !== "string" ||
+    typeof accountScope !== "string" ||
+    typeof publicationId !== "string" ||
+    typeof lineageId !== "string"
+  ) {
+    throw new Error("Invalid persisted P2P sync snapshot");
+  }
+
+  const identity: P2pSyncIdentity = { accountScope, publicationId, lineageId };
+  if (
     identity.accountScope !== expectedIdentity.accountScope ||
     identity.publicationId !== expectedIdentity.publicationId ||
     identity.lineageId !== expectedIdentity.lineageId
