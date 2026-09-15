@@ -6,11 +6,13 @@ import {
   RUNTIME_PROTOCOL_VERSION,
   RuntimeProtocolError,
   decodeDiscoverAndReplicateRequest,
+  decodeHashProductBytesRequest,
   decodeOpenProductPackageRequest,
   decodeReadProductFileRequest,
   decodeRequestPayload,
   type RuntimeProtocolErrorCode,
 } from "./protocol";
+import { hashProductBytes } from "./product-hash";
 import { ProductPackageRuntime } from "./product-package-runtime";
 import { discoverAndReplicate } from "./transient-replication";
 import { openCloseTransientDrive, openHeldTransientDrive, type WorkletRuntime } from "./transient-drive";
@@ -138,7 +140,8 @@ function isProductCommand(command: number): boolean {
     command === RUNTIME_COMMAND.OPEN_PRODUCT_PACKAGE ||
     command === RUNTIME_COMMAND.READ_PRODUCT_FILE ||
     command === RUNTIME_COMMAND.CLOSE_PRODUCT_PACKAGE ||
-    command === RUNTIME_COMMAND.CANCEL_PRODUCT_PACKAGE
+    command === RUNTIME_COMMAND.CANCEL_PRODUCT_PACKAGE ||
+    command === RUNTIME_COMMAND.HASH_PRODUCT_BYTES
   );
 }
 
@@ -148,6 +151,11 @@ async function executeProductCommand(
   payload: Record<string, unknown>,
   closeOnce: () => void,
 ): Promise<void> {
+  if (request.command === RUNTIME_COMMAND.HASH_PRODUCT_BYTES) {
+    const { bytesBase64 } = decodeHashProductBytesRequest(payload);
+    safeReply(request, success(hashProductBytes(b4a.from(bytesBase64, "base64"))), closeOnce);
+    return;
+  }
   if (request.command === RUNTIME_COMMAND.OPEN_PRODUCT_PACKAGE) {
     const { accountScope, externalPublicationId } = decodeOpenProductPackageRequest(payload);
     await productPackages.open(runtime, accountScope, externalPublicationId);
