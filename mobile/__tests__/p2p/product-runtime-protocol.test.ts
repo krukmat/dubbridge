@@ -1,3 +1,7 @@
+jest.mock("bare-crypto", () => ({
+  createHash: require("node:crypto").createHash,
+}));
+
 import { productAccountStorageUri } from "../../src/p2p/runtime/product-package-runtime";
 import {
   RUNTIME_COMMAND,
