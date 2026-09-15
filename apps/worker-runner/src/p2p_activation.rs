@@ -126,7 +126,7 @@ async fn activate(
         publication.id,
         publication.lineage_id,
         &package.manifest_digest_sha256,
-        &materialized.publication_id,
+        &materialized.package_ref,
     )
     .await
     .context("failed to persist P2 sealed package evidence")?;
