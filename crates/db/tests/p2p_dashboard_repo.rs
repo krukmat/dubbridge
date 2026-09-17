@@ -71,6 +71,9 @@ async fn insert_claimed_invitation(
     .expect("insert device");
 
     let invitation_id = Uuid::new_v4();
+    let mut token_hash = Vec::with_capacity(32);
+    token_hash.extend_from_slice(invitation_id.as_bytes());
+    token_hash.extend_from_slice(invitation_id.as_bytes());
     let now = OffsetDateTime::now_utc();
     let expires_at = now + Duration::hours(1);
     sqlx::query(
@@ -86,7 +89,7 @@ async fn insert_claimed_invitation(
     .bind(publication_id)
     .bind(lineage_id)
     .bind(owner)
-    .bind(Uuid::new_v4().as_bytes().to_vec())
+    .bind(token_hash)
     .bind(expires_at)
     .bind(viewer)
     .bind(device_id)
@@ -156,13 +159,15 @@ async fn viewer_inbox_returns_only_the_authenticated_viewers_claimed_authorizati
         lineage_id,
     )
     .await;
+    let (other_asset_id, other_publication_id, other_lineage_id) =
+        insert_asset_and_publication(&pool, owner, "Other viewer asset", "building").await;
     insert_claimed_invitation(
         &pool,
         owner,
         other_viewer,
-        asset_id,
-        publication_id,
-        lineage_id,
+        other_asset_id,
+        other_publication_id,
+        other_lineage_id,
     )
     .await;
 
