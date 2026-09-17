@@ -9,6 +9,7 @@ pub mod error;
 pub mod notification_repo;
 pub mod p2p_audience_repo;
 pub mod p2p_audit_transition_repo;
+pub mod p2p_dashboard_repo;
 pub mod p2p_envelope_repo;
 pub mod p2p_package_seal_repo;
 pub mod p2p_publication_claim_repo;
