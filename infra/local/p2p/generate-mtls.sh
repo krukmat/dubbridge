@@ -23,7 +23,9 @@ client_cert="${out_dir}/client-cert.pem"
 client_identity="${out_dir}/client-identity.pem"
 fingerprint_file="${out_dir}/client-fingerprint.txt"
 
-openssl genrsa -out "${ca_key}" 3072 >/dev/null 2>&1
+# genpkey emits PKCS#8 PRIVATE KEY material, accepted by both Node TLS and
+# reqwest/rustls Identity::from_pem without a development-only key parser.
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out "${ca_key}" >/dev/null 2>&1
 openssl req -x509 -new -sha256 -days 3650 \
   -key "${ca_key}" \
   -subj "/CN=DubBridge Local P2P CA" \
@@ -34,7 +36,7 @@ subjectAltName=DNS:availability-node,DNS:localhost,IP:127.0.0.1
 extendedKeyUsage=serverAuth
 keyUsage=digitalSignature,keyEncipherment
 EOF
-openssl genrsa -out "${server_key}" 3072 >/dev/null 2>&1
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out "${server_key}" >/dev/null 2>&1
 openssl req -new -key "${server_key}" -subj "/CN=availability-node" -out "${work_dir}/server.csr"
 openssl x509 -req -sha256 -days 825 \
   -in "${work_dir}/server.csr" \
@@ -46,7 +48,7 @@ cat >"${work_dir}/client.ext" <<'EOF'
 extendedKeyUsage=clientAuth
 keyUsage=digitalSignature,keyEncipherment
 EOF
-openssl genrsa -out "${client_key}" 3072 >/dev/null 2>&1
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out "${client_key}" >/dev/null 2>&1
 openssl req -new -key "${client_key}" -subj "/CN=dubbridge-worker-runner-local" -out "${work_dir}/client.csr"
 openssl x509 -req -sha256 -days 825 \
   -in "${work_dir}/client.csr" \
