@@ -130,6 +130,28 @@ describe("P5 device certification orchestration", () => {
     expect(dependencies.playback.start).not.toHaveBeenCalled();
   });
 
+  it("stops at sync when replication fails", async () => {
+    const dependencies = createDependencies();
+    const stages: string[] = [];
+    dependencies.sync.startSync.mockRejectedValue(new Error("raw transport detail"));
+
+    await expect(
+      runP5DeviceCertification(
+        {
+          accessToken: "access-token",
+          accountScope: "viewer-1",
+          invitationToken: "one-time-invite",
+        },
+        dependencies,
+        (stage) => stages.push(stage),
+      ),
+    ).resolves.toEqual({ ok: false, code: "SYNC_FAILED" });
+
+    expect(stages).toEqual(["claim", "sync"]);
+    expect(dependencies.sync.getVerifiedPackageHandle).not.toHaveBeenCalled();
+    expect(dependencies.playback.start).not.toHaveBeenCalled();
+  });
+
   it("does not start playback when verified-handle creation fails", async () => {
     const dependencies = createDependencies();
     dependencies.sync.getVerifiedPackageHandle.mockRejectedValue(
@@ -148,6 +170,25 @@ describe("P5 device certification orchestration", () => {
     ).resolves.toEqual({ ok: false, code: "VERIFICATION_FAILED" });
 
     expect(dependencies.playback.start).not.toHaveBeenCalled();
+  });
+
+  it("treats an explicit playback denial as fail-closed", async () => {
+    const dependencies = createDependencies();
+    dependencies.playback.start.mockResolvedValue({
+      ok: false,
+      error: { kind: "forbidden", message: "raw authorization detail" },
+    });
+
+    await expect(
+      runP5DeviceCertification(
+        {
+          accessToken: "access-token",
+          accountScope: "viewer-1",
+          invitationToken: "one-time-invite",
+        },
+        dependencies,
+      ),
+    ).resolves.toEqual({ ok: false, code: "PLAYBACK_FAILED" });
   });
 
   it("collapses playback failures to a redacted stable code", async () => {
