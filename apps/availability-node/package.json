@@ -10,8 +10,10 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test test/*.test.js",
+    "test:bootstrap": "npm run build && node --test test/bootstrap-config.test.js",
     "test:t6d": "npm run build && node --test test/secret_boundary.test.ts",
-    "start": "node dist/server.js"
+    "start": "node dist/main.js"
   },
   "devDependencies": {
     "@types/node": "22.20.1",
