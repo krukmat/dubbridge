@@ -79,6 +79,34 @@ services:
       minio-init:
         condition: service_completed_successfully
 
+  availability-node:
+    image: node:22.23.0-bookworm
+    profiles: ["app"]
+    working_dir: /workspace/apps/availability-node
+    command: sh -c "npm ci && npm run build && npm start"
+    environment:
+      DUBBRIDGE_P2P_AVAILABILITY_BIND_HOST: 0.0.0.0
+      DUBBRIDGE_P2P_AVAILABILITY_PORT: 8443
+      DUBBRIDGE_P2P_CIPHERTEXT_ROOT: /var/lib/dubbridge/p2p-ciphertext
+      DUBBRIDGE_P2P_AVAILABILITY_DRIVE_ROOT: /var/lib/dubbridge/p2p-drive
+      DUBBRIDGE_P2P_AVAILABILITY_INDEX_ROOT: /var/lib/dubbridge/p2p-index
+      DUBBRIDGE_P2P_AVAILABILITY_SERVER_KEY_PEM: /run/dubbridge/p2p-mtls/server-key.pem
+      DUBBRIDGE_P2P_AVAILABILITY_SERVER_CERT_PEM: /run/dubbridge/p2p-mtls/server-cert.pem
+      DUBBRIDGE_P2P_AVAILABILITY_CA_PEM: /run/dubbridge/p2p-mtls/ca.pem
+      DUBBRIDGE_P2P_AVAILABILITY_ALLOWED_CLIENT_FINGERPRINTS: ${DUBBRIDGE_P2P_AVAILABILITY_ALLOWED_CLIENT_FINGERPRINTS:-}
+      DUBBRIDGE_P2P_HYPERSWARM_JOIN_TIMEOUT_MS: ${DUBBRIDGE_P2P_HYPERSWARM_JOIN_TIMEOUT_MS:-15000}
+    ports:
+      - "8443:8443"
+    volumes:
+      - ../..:/workspace
+      - availability-node-modules:/workspace/apps/availability-node/node_modules
+      - ../../tmp/p2p-ciphertext:/var/lib/dubbridge/p2p-ciphertext:ro
+      - ../../tmp/p2p-availability-drive:/var/lib/dubbridge/p2p-drive
+      - ../../tmp/p2p-availability-index:/var/lib/dubbridge/p2p-index
+      - ../../tmp/p2p-mtls/ca.pem:/run/dubbridge/p2p-mtls/ca.pem:ro
+      - ../../tmp/p2p-mtls/server-key.pem:/run/dubbridge/p2p-mtls/server-key.pem:ro
+      - ../../tmp/p2p-mtls/server-cert.pem:/run/dubbridge/p2p-mtls/server-cert.pem:ro
+
   worker-runner:
     image: rust:stable
     profiles: ["app"]
@@ -101,8 +129,20 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-dubbridge123}
       AWS_REGION: ${AWS_REGION:-us-east-1}
       DUBBRIDGE_CONFIG_DIR: /workspace/config
+      DUBBRIDGE_P2P_AVAILABILITY_URL: https://availability-node:8443
+      DUBBRIDGE_P2P_AVAILABILITY_CA_PEM: /run/dubbridge/p2p-mtls/ca.pem
+      DUBBRIDGE_P2P_AVAILABILITY_IDENTITY_PEM: /run/dubbridge/p2p-mtls/client-identity.pem
+      DUBBRIDGE_P2P_CIPHERTEXT_ROOT: /var/lib/dubbridge/p2p-ciphertext
+      DUBBRIDGE_P2P_HTTP_TIMEOUT_SECS: ${DUBBRIDGE_P2P_HTTP_TIMEOUT_SECS:-10}
+      DUBBRIDGE_P2P_LEASE_SECS: ${DUBBRIDGE_P2P_LEASE_SECS:-30}
+      DUBBRIDGE_P2P_RETRY_SECS: ${DUBBRIDGE_P2P_RETRY_SECS:-5}
+      DUBBRIDGE_P2P_DISPATCH_INTERVAL_MS: ${DUBBRIDGE_P2P_DISPATCH_INTERVAL_MS:-1000}
+      DUBBRIDGE_P2P_MAX_ATTEMPTS: ${DUBBRIDGE_P2P_MAX_ATTEMPTS:-5}
     volumes:
       - ../..:/workspace
+      - ../../tmp/p2p-ciphertext:/var/lib/dubbridge/p2p-ciphertext
+      - ../../tmp/p2p-mtls/ca.pem:/run/dubbridge/p2p-mtls/ca.pem:ro
+      - ../../tmp/p2p-mtls/client-identity.pem:/run/dubbridge/p2p-mtls/client-identity.pem:ro
     depends_on:
       postgres:
         condition: service_started
@@ -110,6 +150,8 @@ services:
         condition: service_started
       minio-init:
         condition: service_completed_successfully
+      availability-node:
+        condition: service_started
 
   asr-worker-py:
     build:
@@ -129,3 +171,4 @@ services:
 volumes:
   postgres-data:
   minio-data:
+  availability-node-modules:
