@@ -11,14 +11,12 @@ use dubbridge_auth::{AuthenticatedPrincipal, SharedTokenVerifier, authenticate_b
 use dubbridge_db::{
     error::DbError,
     p2p_dashboard_repo::{
-        P2pOwnerContentRecord, P2pViewerInboxRecord, list_owner_p2p_content,
-        list_viewer_p2p_inbox,
+        P2pOwnerContentRecord, P2pViewerInboxRecord, list_owner_p2p_content, list_viewer_p2p_inbox,
     },
     p2p_ready_repo::get_ready_descriptor_by_asset,
 };
 use dubbridge_domain::{
-    p2p_publication::PublicationState,
-    p2p_ready_descriptor::P2pReadyDescriptor,
+    p2p_publication::PublicationState, p2p_ready_descriptor::P2pReadyDescriptor,
 };
 use serde::Serialize;
 use time::OffsetDateTime;
@@ -127,10 +125,11 @@ async fn list_viewer_inbox(
     let mut response = Vec::with_capacity(records.len());
 
     for record in records {
-        let descriptor = match get_ready_descriptor_by_asset(&state.pool, record.invitation.asset_id()).await {
-            Ok(descriptor) => matching_inbox_descriptor(&record, descriptor),
-            Err(error) => return db_error_response(error),
-        };
+        let descriptor =
+            match get_ready_descriptor_by_asset(&state.pool, record.invitation.asset_id()).await {
+                Ok(descriptor) => matching_inbox_descriptor(&record, descriptor),
+                Err(error) => return db_error_response(error),
+            };
         response.push(inbox_response(record, descriptor, now));
     }
 
@@ -236,7 +235,7 @@ mod tests {
     use dubbridge_domain::{
         asset::AssetId,
         p2p_publication::{K1LineageId, P2pPublicationId},
-        p2p_ready_descriptor::{P2pReadyDescriptorInput, P2pReadyDescriptor},
+        p2p_ready_descriptor::{P2pReadyDescriptor, P2pReadyDescriptorInput},
     };
 
     fn descriptor(

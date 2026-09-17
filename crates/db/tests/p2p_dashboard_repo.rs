@@ -150,15 +150,8 @@ async fn viewer_inbox_returns_only_the_authenticated_viewers_claimed_authorizati
     let other_viewer = Uuid::new_v4();
     let (asset_id, publication_id, lineage_id) =
         insert_asset_and_publication(&pool, owner, "Inbox asset", "building").await;
-    let (expected_invitation, expected_authorization) = insert_claimed_invitation(
-        &pool,
-        owner,
-        viewer,
-        asset_id,
-        publication_id,
-        lineage_id,
-    )
-    .await;
+    let (expected_invitation, expected_authorization) =
+        insert_claimed_invitation(&pool, owner, viewer, asset_id, publication_id, lineage_id).await;
     let (other_asset_id, other_publication_id, other_lineage_id) =
         insert_asset_and_publication(&pool, owner, "Other viewer asset", "building").await;
     insert_claimed_invitation(

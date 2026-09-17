@@ -117,7 +117,11 @@ async fn create_work(pool: &PgPool) -> WorkFixture {
         .expect("building -> publish_pending");
 
     let package_root = tempfile::tempdir().expect("package root");
-    let package_dir = package_root.path().join(publication_id.to_string());
+    let package_dir = package_root
+        .path()
+        .join("packages")
+        .join(publication_id.to_string())
+        .join(lineage_id.to_string());
     tokio::fs::create_dir_all(&package_dir)
         .await
         .expect("create package dir");
