@@ -44,7 +44,7 @@ services:
         mc mb --ignore-existing local/dubbridge-local
 
   api:
-    image: rust:stable
+    image: rust:1.98.1-bookworm
     profiles: ["app"]
     working_dir: /workspace
     command: cargo run -p dubbridge-api
@@ -108,7 +108,7 @@ services:
       - ../../tmp/p2p-mtls/server-cert.pem:/run/dubbridge/p2p-mtls/server-cert.pem:ro
 
   worker-runner:
-    image: rust:stable
+    image: rust:1.98.1-bookworm
     profiles: ["app"]
     working_dir: /workspace
     command: cargo run -p dubbridge-worker-runner
