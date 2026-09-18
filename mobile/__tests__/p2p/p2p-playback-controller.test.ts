@@ -15,7 +15,15 @@ const handle: VerifiedP2pPackageHandle = {
   externalPublicationId: "b".repeat(64),
 };
 
-function createAudience(viewerSubjectId = "viewer-1") {
+type AuthorizationOverrides = Partial<{
+  assetId: string;
+  publicationId: string;
+  lineageId: string;
+  viewerSubjectId: string;
+  expiresAtUnix: number;
+}>;
+
+function createAudience(overrides: AuthorizationOverrides = {}) {
   return {
     getAuthorization: jest.fn(async () => ({
       ok: true as const,
@@ -26,9 +34,10 @@ function createAudience(viewerSubjectId = "viewer-1") {
           assetId: "asset-1",
           publicationId: "publication-1",
           lineageId: "lineage-1",
-          viewerSubjectId,
+          viewerSubjectId: "viewer-1",
           deviceId: "device-1",
           expiresAtUnix: Math.floor(Date.now() / 1000) + 600,
+          ...overrides,
         },
         sessionRotation: null,
       },
@@ -93,7 +102,7 @@ describe("P5 playback controller", () => {
   });
 
   it("fails before K1 unwrap when authorization belongs to another viewer", async () => {
-    const audience = createAudience("viewer-2");
+    const audience = createAudience({ viewerSubjectId: "viewer-2" });
     const service = createService();
     const controller = new P2PPlaybackController(
       audience as unknown as P2PAudienceService,
@@ -106,6 +115,34 @@ describe("P5 playback controller", () => {
     expect(audience.getTransientContentKey).not.toHaveBeenCalled();
     expect(service.startProductPlayback).not.toHaveBeenCalled();
   });
+
+
+  it.each([
+    ["asset", { assetId: "asset-2" }],
+    ["publication", { publicationId: "publication-2" }],
+    ["lineage", { lineageId: "lineage-2" }],
+    [
+      "expiry",
+      { expiresAtUnix: Math.floor(Date.now() / 1000) - 1 },
+    ],
+  ] as const)(
+    "fails before K1 unwrap when authorization %s does not match the verified package",
+    async (_caseName, overrides) => {
+      const audience = createAudience(overrides);
+      const service = createService();
+      const controller = new P2PPlaybackController(
+        audience as unknown as P2PAudienceService,
+        service as unknown as P2PService,
+      );
+
+      await expect(
+        controller.start("access-token", "auth-1", handle),
+      ).rejects.toBeInstanceOf(P2PPlaybackAuthorizationError);
+
+      expect(audience.getTransientContentKey).not.toHaveBeenCalled();
+      expect(service.startProductPlayback).not.toHaveBeenCalled();
+    },
+  );
 
   it("stops the loopback session explicitly", async () => {
     const service = createService();
