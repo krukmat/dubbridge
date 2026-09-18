@@ -1,14 +1,13 @@
 ---
 type: Plan
 title: "P5: Local HLS playback through the existing player"
-status: planned
+status: in_progress
 slice: MVP0-P2P
 ---
 
 # P5 — Local HLS playback through the existing player
 
-Task ledger: `docs/tasks/mvp0-p2p-p5-local-playback.md`. Documentation prepared 2026-09-08;
-implementation remains blocked on **P4 PASS** and the per-task workflow gate.
+Task ledger: `docs/tasks/mvp0-p2p-p5-local-playback.md`. P5 is now **in progress**: T0 is closed and T1/T2 have automated evidence that removes the previously recorded missing-test blocker. Formal T1/T2 closure still awaits owner/governance synchronization, and T3 Android certification remains outstanding. The formal **P4 PASS** dependency is unchanged.
 
 ## Objective
 
@@ -38,10 +37,10 @@ Freeze loopback-only listener and local session access boundary, HLS path/URI va
 
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
-| P5.T0 | Gateway/session contract freeze | planning | M | P4 PASS | Planned; not activated |
-| P5.T1 | Loopback ciphertext decryption gateway | development | L | T0 PASS | Planned; not activated |
-| P5.T2 | Existing VideoPlayer and deterministic teardown | development | M | T1 PASS | Planned; not activated |
-| P5.T3 | Playback and secret-boundary certification | development/evidence | M | T2 PASS | Planned; not activated |
+| P5.T0 | Gateway/session contract freeze | planning | M | P4 PASS | Done 2026-09-18 |
+| P5.T1 | Loopback ciphertext decryption gateway | development | L | T0 PASS | Automated evidence PASS; formal closure pending |
+| P5.T2 | Existing VideoPlayer and deterministic teardown | development | M | T1 PASS | Automated evidence PASS; formal closure pending |
+| P5.T3 | Playback and secret-boundary certification | development/evidence | M | T2 PASS | Next evidence step; Android certification required |
 
 
 The companion ledger defines acceptance, HP/EC, evidence and handoff per task.
@@ -57,9 +56,13 @@ All required parent/leaf HP/EC must map to passing executable evidence at the
 appropriate layer. Apply the current band-routed review (or recorded applicable
 exception), Reflection, behavioral certification and owner-verification gates.
 Synchronize this plan, its ledger, the parent plan/ledger and roadmap. No phase
-PASS is implied by plan availability or provisional effort.
+PASS is implied by automated/component evidence alone. The 2026-09-18 T1/T2
+evidence remediation is recorded in
+`docs/audit/mvp0-p2p-p5-t1-t2-evidence-remediation-2026-09-18.md`.
 
-P3-P6 must all close before S-230 T6p-a can activate.
+Aggregate P5 remains **IN PROGRESS** until formal T1/T2 closure plus T3 Android
+device evidence. P6 and roadmap PASS gates therefore remain unchanged. P3-P6
+must all close before S-230 T6p-a can activate.
 
 ## Calendar and estimation limits
 
