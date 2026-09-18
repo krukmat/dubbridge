@@ -1,7 +1,7 @@
 ---
 type: TaskList
 title: "Tasks: P5 Local HLS playback through the existing player"
-status: planned
+status: in_progress
 slice: MVP0-P2P
 plan: docs/plan/mvp0-p2p-p5-local-playback.md
 behavioral_coverage_contract: behavior-v2
@@ -9,18 +9,18 @@ behavioral_coverage_contract: behavior-v2
 
 # P5 — planning task ledger
 
-**Status:** Planned; no task activated or implemented by this documentation update.
-**Phase gate:** P4 PASS.
-**Effort:** provisional per work package below; executable RRI/effort pending activation.
+**Status:** In progress. T0 is closed; T1/T2 now have automated evidence that removes the prior missing-test blocker, but formal closure still awaits owner verification and task-governance synchronization. T3 Android certification remains outstanding.
+**Phase gate:** P4 PASS remains the formal upstream gate; this evidence remediation does not override it.
+**Effort:** provisional per work package below; no new RRI record is fabricated by the automated-evidence remediation.
 
 ## Task map
 
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
 | P5.T0 | Gateway/session contract freeze | planning | M | P4 PASS | `[x]` Done 2026-09-18 |
-| P5.T1 | Loopback ciphertext decryption gateway | development | L | T0 PASS | Blocked — server security paths untested, see verification note |
-| P5.T2 | Existing VideoPlayer and deterministic teardown | development | M | T1 PASS | Blocked — gated on T1, see verification note |
-| P5.T3 | Playback and secret-boundary certification | development/evidence | M | T2 PASS | Planned; not activated (unchanged — CONS-T8b, needs device) |
+| P5.T1 | Loopback ciphertext decryption gateway | development | L | T0 PASS | Automated evidence PASS 2026-09-18; formal closure pending owner verification/governance sync |
+| P5.T2 | Existing VideoPlayer and deterministic teardown | development | M | T1 PASS | Automated evidence PASS 2026-09-18; formal closure pending owner verification/governance sync |
+| P5.T3 | Playback and secret-boundary certification | development/evidence | M | T2 PASS | Next evidence step; Android device/emulator certification still required |
 
 
 ## Shared activation and closure contract
@@ -93,15 +93,14 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T0 PASS
 
-**Status:** Blocked — not closeable. **Verification note (2026-09-18):** the
-extracted pure helpers (decrypt/manifest-rewrite/range-parse) have 3/3 tests,
-but `ProductPlaybackRuntime` itself — the actual loopback server, including
-traversal rejection, session-token scoping, and CK zeroization on stop/error
-— has zero test coverage anywhere in the repo. This is a network-facing
-fail-closed security boundary asserted only by code inspection. Full
-evidence:
-`docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`.
-Needs an integration test before closure, not authorization alone.
+**Status:** Automated evidence PASS 2026-09-18; formal Done is pending owner
+verification and task-governance synchronization. The previous blocker is
+resolved by executable coverage of the actual `ProductPlaybackRuntime`,
+including a real OS loopback TCP-listener proof plus component coverage for
+session-token scoping, traversal denial, ciphertext/AAD tamper denial,
+missing-key denial, deterministic teardown, and CK zeroization on stop/start
+failure. Production P5 runtime code was unchanged. Evidence:
+`docs/audit/mvp0-p2p-p5-t1-t2-evidence-remediation-2026-09-18.md`.
 
 **Acceptance criteria:** Serve only verified package HLS through loopback; use accepted K1 authenticated decryption and transient authorized CK; validate relative package paths and scope local requests to the session.
 
@@ -130,13 +129,13 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T1 PASS
 
-**Status:** Blocked — not closeable independently. **Verification note
-(2026-09-18):** 4/4 tests pass and this leaf's own boundary (idempotent
-release/fail-closed retry) is met, but its closure claim ("release transient
-CK") transitively depends on P5.T1's untested zeroization — closing T2 while
-T1 stays open would misrepresent what has actually been proven. Full
-evidence:
-`docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`.
+**Status:** Automated evidence PASS 2026-09-18; formal Done is pending owner
+verification and task-governance synchronization. The prior transitive blocker
+is removed: T1 now proves runtime CK zeroization/listener/package teardown,
+while the existing lease tests prove idempotent release and teardown-before-
+retry. Additional controller tests now cover asset/publication/lineage/viewer/
+expiry authorization mismatches before K1 unwrap/playback startup. Evidence:
+`docs/audit/mvp0-p2p-p5-t1-t2-evidence-remediation-2026-09-18.md`.
 
 **Acceptance criteria:** Connect existing player to scoped loopback URL; release transient CK and gateway on stop/sign-out/error according to frozen lifecycle; preserve existing review playback.
 
@@ -165,7 +164,7 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T2 PASS
 
-**Status:** Planned; not activated.
+**Status:** Next evidence step. Do not mark PASS until Android certification evidence is recorded; T1/T2 formal closure must also be synchronized first.
 
 **Acceptance criteria:** Prove package playback, tamper denial, teardown and review-path non-regression with executable evidence and network capture; hand off play capability/state to P6.
 
