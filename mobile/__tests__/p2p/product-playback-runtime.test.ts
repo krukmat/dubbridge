@@ -8,6 +8,8 @@ jest.mock(
 );
 
 import { createCipheriv, createHash } from "node:crypto";
+import { get as httpGet, type IncomingHttpHeaders } from "node:http";
+import { createServer as createNodeServer, type Socket } from "node:net";
 
 import type { ProductPackageRuntime } from "../../src/p2p/runtime/product-package-runtime";
 import {
@@ -231,6 +233,29 @@ function sessionToken(playbackUrl: string): string {
   return playbackUrl.split("/")[3] ?? "";
 }
 
+function requestLoopback(
+  url: string,
+): Promise<{
+  statusCode: number;
+  headers: IncomingHttpHeaders;
+  body: Buffer;
+}> {
+  return new Promise((resolve, reject) => {
+    const request = httpGet(url, (response) => {
+      const chunks: Buffer[] = [];
+      response.on("data", (chunk: Buffer) => chunks.push(chunk));
+      response.on("end", () =>
+        resolve({
+          statusCode: response.statusCode ?? 0,
+          headers: response.headers,
+          body: Buffer.concat(chunks),
+        }),
+      );
+    });
+    request.on("error", reject);
+  });
+}
+
 describe("P5 decrypt-on-read runtime", () => {
   beforeEach(() => {
     mockCreateServer.mockReset();
@@ -331,6 +356,31 @@ describe("P5 decrypt-on-read runtime", () => {
     expect(() => parseRangeHeader("bytes=100-120", 100)).toThrow(
       "byte range is invalid",
     );
+  });
+
+  it("serves the verified manifest over a real OS loopback TCP listener", async () => {
+    const fixture = createRuntimeFixture();
+    mockCreateServer.mockImplementationOnce(
+      (listener: (socket: unknown) => void) =>
+        createNodeServer((socket: Socket) => listener(socket)),
+    );
+    const runtime = new ProductPlaybackRuntime(
+      fixture.packages as unknown as ProductPackageRuntime,
+    );
+
+    const receipt = await runtime.start(fixture.runtimeArg, fixture.input);
+    const response = await requestLoopback(receipt.playback_url);
+
+    expect(receipt.playback_url).toMatch(
+      /^http:\/\/127\.0\.0\.1:\d+\/[0-9a-f]{32}\/index\.m3u8$/,
+    );
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.body.toString()).toContain(
+      `/${sessionToken(receipt.playback_url)}/segments/000001.ts`,
+    );
+
+    await runtime.stop();
   });
 
   it("serves verified HLS only through randomized 127.0.0.1 session URLs and zeroizes CK on stop", async () => {
