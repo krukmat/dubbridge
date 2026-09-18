@@ -73,6 +73,7 @@ services:
       - "8080:8080"
     volumes:
       - ../..:/workspace
+      - local-app-storage:/tmp/dubbridge-storage
     depends_on:
       postgres:
         condition: service_started
@@ -142,6 +143,7 @@ services:
       DUBBRIDGE_P2P_MAX_ATTEMPTS: ${DUBBRIDGE_P2P_MAX_ATTEMPTS:-5}
     volumes:
       - ../..:/workspace
+      - local-app-storage:/tmp/dubbridge-storage
       - ../../tmp/p2p-ciphertext:/var/lib/dubbridge/p2p-ciphertext
       - ../../tmp/p2p-mtls/ca.pem:/run/dubbridge/p2p-mtls/ca.pem:ro
       - ../../tmp/p2p-mtls/client-identity.pem:/run/dubbridge/p2p-mtls/client-identity.pem:ro
@@ -174,3 +176,4 @@ volumes:
   postgres-data:
   minio-data:
   availability-node-modules:
+  local-app-storage:
