@@ -164,13 +164,11 @@ These are scoped downstream decisions under accepted ADR-044, not reasons to reo
 |---|---|---|---|
 | P3 | `docs/plan/mvp0-p2p-p3-invitation-envelope.md` | `docs/tasks/mvp0-p2p-p3-invitation-envelope.md` | Planned; activation gate remains P2 PASS; Accepted ADR-044 |
 | P4 | `docs/plan/mvp0-p2p-p4-mobile-sync.md` | `docs/tasks/mvp0-p2p-p4-mobile-sync.md` | Planned; activation gate remains P3 PASS |
-| P5 | `docs/plan/mvp0-p2p-p5-local-playback.md` | `docs/tasks/mvp0-p2p-p5-local-playback.md` | Planned; activation gate remains P4 PASS |
+| P5 | `docs/plan/mvp0-p2p-p5-local-playback.md` | `docs/tasks/mvp0-p2p-p5-local-playback.md` | In progress; T1/T2 automated evidence PASS, formal closure + T3 Android evidence pending; P4 PASS gate unchanged |
 | P6 | `docs/plan/mvp0-p2p-p6-dashboard.md` | `docs/tasks/mvp0-p2p-p6-dashboard.md` | Planned; activation gate remains P3-P5 PASS |
 | P7 | `docs/plan/mvp0-p2p-p7-certification.md` | `docs/tasks/mvp0-p2p-p7-certification.md` | Planned; activation gate remains P2-P6 PASS; S-230-T7p PASS |
 
-Detailed phase plans and work-package ledgers now exist. Exact-path executable
-leaf decomposition, per-parent/leaf RRI, ownership and elapsed-time estimates
-remain activation work; no phase is approved for source execution by this update.
+Detailed phase plans and work-package ledgers now exist. P5 has moved beyond its original planning-only state under explicit owner-directed execution: T1/T2 now carry automated evidence remediation, but aggregate P5 is not PASS. Formal T1/T2 closure, T3 Android evidence, and the unchanged upstream/downstream gates still apply. Other phase entries retain their own activation and closure requirements.
 P2 still has 17 planned leaves after T2/T3a/T4a closure. The October calendar is a
 target with unvalidated capacity, not a delivery guarantee. X29 is required by
 2026-09-18; P2-P6 and T7local/T7c by 2026-10-15; base T6/T7 and T6p-a-d by
