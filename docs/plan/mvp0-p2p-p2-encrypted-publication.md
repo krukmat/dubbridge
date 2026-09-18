@@ -194,7 +194,9 @@ focused plus 98/98 integrated checks. The owner then accepted the mapped
 evidence and closed `T3d` and aggregate T3 on 2026-09-18. Durable closure
 evidence is in `docs/audit/mvp0-p2p-p2-t3d-implementation.md`. No
 production-source repair or downstream task was authorized by this
-certification work; the documentary gates were explicitly deferred.
+certification work. The owner initially deferred the documentary gates;
+the mandatory publication hook later ran `make qa-docs` successfully, while
+`git diff --check` was not rerun.
 
 C0 decomposition: `T3a` Node/TS service + v1 contract; `T3b` private mTLS; `T3c` persistent Hyperdrive + idempotency/conflict behavior; `T3d` contract/security certification.
 

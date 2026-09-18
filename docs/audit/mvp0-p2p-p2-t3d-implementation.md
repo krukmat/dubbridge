@@ -163,9 +163,10 @@ Behavioral coverage contract: `behavior-v2`.
   `node --test apps/availability-node/test/*.test.js
   docs/audit/mvp0-p2p-p2-t3a-contract.test.js
   docs/audit/mvp0-p2p-p2-t3a-http.test.js`.
-- Closure-turn rerun: none. The owner explicitly deferred the documentary
-  gates (`git diff --check` and `make qa-docs`) for now; they remain pending
-  and are not represented as post-closure PASS.
+- Closure-turn rerun: none. The owner initially deferred the documentary
+  gates. During publication, the mandatory pre-push hook subsequently ran
+  `make qa-docs` successfully; `git diff --check` was not rerun and is not
+  represented as post-closure PASS.
 
 `P2.T3d`, `CONS-T3`, and aggregate T3 are closed. `P2` remains open, and no
 downstream task is started by this evidence record.

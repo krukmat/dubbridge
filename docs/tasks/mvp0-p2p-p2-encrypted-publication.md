@@ -4314,8 +4314,7 @@ make qa-docs
 
 ### Closure record (2026-09-18)
 
-Implementation and all closure gates except the explicitly deferred
-documentary rerun are complete. Full evidence and
+Implementation and closure evidence are complete. Full evidence and
 finding dispositions: `docs/audit/mvp0-p2p-p2-t3d-implementation.md`.
 
 ```
@@ -4383,8 +4382,9 @@ Behavioral coverage contract: `behavior-v2`.
   `node --test apps/availability-node/test/*.test.js
   docs/audit/mvp0-p2p-p2-t3a-contract.test.js
   docs/audit/mvp0-p2p-p2-t3a-http.test.js`.
-- Closure-turn rerun: none. Per the owner's instruction, `git diff --check`
-  and `make qa-docs` are deferred and remain pending rather than being
+- Closure-turn rerun: none. The owner initially deferred the documentary
+  gates. During publication, the mandatory pre-push hook subsequently ran
+  `make qa-docs` successfully; `git diff --check` was not rerun and is not
   represented as post-closure PASS.
 
 `P2.T3d`, aggregate T3, and `CONS-T3` are closed. P2 remains open and no

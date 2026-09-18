@@ -456,10 +456,11 @@ to `crates/storage/`, so a generic sweep is prohibited.
 happy-path/edge-case evidence and explicitly instructed closure of P2.T3d,
 aggregate T3, and CONS-T3, plus synchronization of T3/T4c. The exact
 typecheck, build, focused 8/8, and integrated 98/98 commands recorded in the
-durable audit were accepted without a closure-turn rerun. Per the same
-instruction, `git diff --check` and `make qa-docs` are deferred and remain
-pending; they are not represented as post-closure PASS. P2 remains open and
-no other remediation task was started.
+durable audit were accepted without a closure-turn rerun. The owner initially
+deferred the documentary gates; during publication, the mandatory pre-push
+hook subsequently ran `make qa-docs` successfully. `git diff --check` was not
+rerun and is not represented as post-closure PASS. P2 remains open and no
+other remediation task was started.
 
 ## Related
 

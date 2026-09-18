@@ -408,8 +408,10 @@ captured above under Governing principles and ADR-025/ADR-026.
   P2 T0/C0 are PASS; T1/T2/T3a/T3b/T3c/T3d/T4a-T4f are Done. As of 2026-09-14,
   T4b-T4f are retrospectively owner-verified under explicit waiver, with
   `P2.T4e-cov` retained as a non-blocking residual. On 2026-09-18 `T3d` and
-  aggregate T3 were owner-verified and marked Done; the closure-turn
-  documentary gates were explicitly deferred. **Correction (2026-09-18,
+  aggregate T3 were owner-verified and marked Done. The owner initially
+  deferred the documentary gates; the mandatory publication hook later ran
+  `make qa-docs` successfully, while `git diff --check` was not rerun.
+  **Correction (2026-09-18,
   `docs/audit/mvp0-p2p-s230-consistency-audit-2026-09-18.md` Finding 3):**
   the prior wording here ("`T5a-d`, `T6a-e` remain Planned, 11 leaves with
   no code started") was stale — source exists at HEAD for `T5a-d` and
