@@ -111,7 +111,9 @@ services:
       - ../../tmp/p2p-mtls/client-fingerprint.txt:/run/dubbridge/p2p-mtls/client-fingerprint.txt:ro
 
   worker-runner:
-    image: rust:1.98.1-bookworm
+    build:
+      context: ../..
+      dockerfile: infra/local/worker-runner.Dockerfile
     profiles: ["app"]
     working_dir: /workspace
     command: cargo run -p dubbridge-worker-runner
