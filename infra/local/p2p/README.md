@@ -15,11 +15,9 @@ bash infra/local/p2p/generate-mtls.sh
 The generated CA, server certificate, client identity and client SHA-256
 fingerprint live under `tmp/p2p-mtls/` (git-ignored).
 
-Export the generated client fingerprint for Compose:
-
-```bash
-export DUBBRIDGE_P2P_AVAILABILITY_ALLOWED_CLIENT_FINGERPRINTS="$(cat tmp/p2p-mtls/client-fingerprint.txt)"
-```
+Compose mounts `client-fingerprint.txt` and loads the allowed client fingerprint
+inside the Availability Node container, so no shell export is required for the
+Compose path.
 
 The server certificate is valid for `availability-node`, `localhost`, and
 `127.0.0.1`. The worker client always uses real TLS + a real client
@@ -68,6 +66,10 @@ Then:
 docker compose -f infra/local/docker-compose.yml --profile app up \
   postgres redis minio minio-init availability-node api worker-runner
 ```
+
+The Compose path reads the generated client fingerprint directly from
+`tmp/p2p-mtls/client-fingerprint.txt`; it does not depend on a previously
+exported shell variable.
 
 Relevant wiring:
 
