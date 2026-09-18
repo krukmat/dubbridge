@@ -45,7 +45,7 @@ folded into CONS-T10a's acceptance criteria below, not into this table.
 | CONS-T0 | **Done 2026-09-18** — corrected P2.T5/T6 status labels and the T6a migration-numbering reference in `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`; corrected the stale "11 leaves with no code started" claim and added the T7p/T6p-a dependency-scope clarification in `docs/plan/roadmap.md`; annotated the orphaned `docs/plan/mvp0-p2p-p7local-certification.md` duplicate (`status: superseded`, points to the canonical hyphenated doc); linked both 2026-09-14/2026-09-17 audits plus this remediation ledger from `docs/plan/mvp0-p2p-first.md` § Related audits. Docs-only, exempt from the RRI/approval gate. | — |
 | CONS-T1 | **Done 2026-09-18** (RRI 25 Low, see closure record below) — the drift was narrower than first assumed: the Rust dispatcher already used the canonical path helper; only the test fixture's `makeRequest()` hardcoded a stale `package_ref`. Fixed; 86/86 Availability Node tests passing (was 82/86). | — |
 | CONS-T2 | Single full verification pass (`qa-local`, `qa-coverage`, `qa-mobile`, Availability Node suite) — reusable evidence for every retro-closure below | CONS-T1 (done, unblocked) |
-| CONS-T3 | Complete P2.T3d per its original acceptance criteria (mTLS/HTTP/replay/409/422/503); decide the fate of the out-of-scope test file already landed | CONS-T2 |
+| CONS-T3 | **Done 2026-09-18 / owner-verified** — completed P2.T3d per its original acceptance criteria (mTLS/HTTP/replay/409/422/503); the out-of-scope test remains untouched and is superseded as closure evidence | CONS-T2 |
 | CONS-T4 | Retro-close P2.T5a-d + T6a-d (RRI, band-routed review, Reflection, behavior-v2 cert, owner verification, path-drift noted) | CONS-T2 (D0-a resolved — full waiver granted, unblocked) |
 | CONS-T5 | P2.T6e -> **P2 PASS** | CONS-T3, CONS-T4 |
 | CONS-T6/T7/T8a | Retro-closure package: P3 (reconstruct T0 + close T1-T3), P4, P5.T0-T2 — 3 leaves, one presentation pass | CONS-T5 |
@@ -341,14 +341,12 @@ outright. The Availability Node full suite background run from earlier in
 this session is still in progress; its result will be appended here when it
 completes.
 
-## CONS-T3 — P2.T3d Availability Node contract/mTLS/security certification — preflight complete, awaiting owner RRI-56+ approval
+## CONS-T3 — P2.T3d Availability Node contract/mTLS/security certification — [x] Done (2026-09-18)
 
-**Status:** analysis and phase-1 review complete; **implementation not
-started — RRI 70 Complex requires explicit owner approval before any
-code/test is written**, per `docs/policies/HITL_AUTONOMY_POLICY.md`
-("Always requires explicit approval: Starting any implementation task with
-RRI > 25"). This section records the preflight and routing; it does not
-authorize execution.
+**Status:** **[x] Done / owner-verified 2026-09-18.** Implementation,
+executable verification, phase-2 review, four Reflection passes,
+behavior-v2 certification, and final owner confirmation are complete. Durable evidence:
+`docs/audit/mvp0-p2p-p2-t3d-implementation.md`.
 
 **Origin:** Finding 2 in
 `docs/audit/mvp0-p2p-s230-consistency-audit-2026-09-18.md` — the file that
@@ -432,12 +430,36 @@ section and in `docs/audit/mvp0-p2p-p2-t3d-preflight.md` are the approved
 envelope. This approval authorizes implementation of exactly the two named
 files (`apps/availability-node/test/publication-contract.test.js`,
 `apps/availability-node/test/fixtures.js`) per the criterion mapping in the
-preflight § 9. **No implementation has occurred yet in this session** —
-execution is handed off to a follow-up session via
-`docs/audit/mvp0-p2p-p2-t3d-handoff-prompt.md`.
+preflight § 9. The approved handoff was executed in the follow-up session;
+the result is recorded below and in
+`docs/audit/mvp0-p2p-p2-t3d-implementation.md`.
 
-**Next step:** resume in a new session using that handoff prompt. Do not
-re-run RRI or phase-1 review unless the frozen scope changes.
+**Execution result (2026-09-18):** added only
+`apps/availability-node/test/publication-contract.test.js` and
+`apps/availability-node/test/fixtures.js`; no production source changed.
+Typecheck/build PASS, focused test 8/8 PASS, integrated Availability Node +
+T3a suite 98/98 PASS. Phase-2 `gpt-oss:20b` Complex review PASS with two LOW
+observations dispositioned in the durable audit. The old
+`publication-contract-certification.test.js` remains untouched (deletion was
+not approved) and is superseded, not counted as full T3d evidence.
+
+```
+Task-analysis review: gpt-oss .agent/p2-t3d/phase1-review-v1.json - PASS
+Code-solution review: gpt-oss .agent/p2-t3d/phase2-review-v1.json - PASS
+```
+
+**Antares:** refinement and post-implementation typed skip — no static
+watchlist entry is scoped to `apps/availability-node/`; CWE-22 is restricted
+to `crates/storage/`, so a generic sweep is prohibited.
+
+**Owner final verification (2026-09-18):** Matias accepted the mapped
+happy-path/edge-case evidence and explicitly instructed closure of P2.T3d,
+aggregate T3, and CONS-T3, plus synchronization of T3/T4c. The exact
+typecheck, build, focused 8/8, and integrated 98/98 commands recorded in the
+durable audit were accepted without a closure-turn rerun. Per the same
+instruction, `git diff --check` and `make qa-docs` are deferred and remain
+pending; they are not represented as post-closure PASS. P2 remains open and
+no other remediation task was started.
 
 ## Related
 

@@ -2134,7 +2134,7 @@ Code-solution review: muse-glimmer (in-session artifact) - PASS
 
 ---
 
-## P2.T3 — Availability Node executor
+## P2.T3 — Availability Node executor — [x] Done (2026-09-18)
 
 | ID | Objective | Exact writable paths | RRI | Status | Depends on |
 |---|---|---|---|---|---|
@@ -2154,8 +2154,8 @@ Code-solution review: muse-glimmer (in-session artifact) - PASS
 | `T3b-iv` | Fail-closed TLS options + unbound HTTPS server factory | `apps/availability-node/src/mtls.ts` | **25 Low / S** | Done 2026-09-09 | T3b-iii |
 | `T3b-v` | Ingress-guard contract-first evidence | `apps/availability-node/test/private-publication-ingress.test.js` | **25 Low / S** | Done 2026-09-09 | T3b-iv |
 | `T3b-vi` | Authorized mTLS request composition with existing handler | `apps/availability-node/src/server.ts` | **25 Low / S** | Done 2026-09-09 | T3b-v |
-| `T3c` | Persistent Hyperdrive seed/open + idempotency/conflict behavior | frozen parent plus eight-leaf decomposition below | **70 Complex / L** | Parent awaiting HITL approval; S0/S1a Done; S2a staged; remaining leaves unstarted | T3b; T2 contract |
-| `T3d` | Contract/mTLS/idempotency/traversal/secret certification | `apps/availability-node/test/publication-contract.test.js`; `apps/availability-node/test/fixtures.js` | RUN BEFORE EXECUTION | Planned — definition prepared; blocked on T3c | T3c |
+| `T3c` | Persistent Hyperdrive seed/open + idempotency/conflict behavior | frozen parent plus eight-leaf decomposition below | **70 Complex / L** | **[x] Done / owner-verified 2026-09-13** | T3b; T2 contract |
+| `T3d` | Contract/mTLS/idempotency/traversal/secret certification | `apps/availability-node/test/publication-contract.test.js`; `apps/availability-node/test/fixtures.js` | **70 Complex / L** | **[x] Done / owner-verified 2026-09-18** | T3c |
 
 **HP-T3-1:** authenticated same publication+lineage+manifest digest returns stable publication evidence.  
 **EC-T3-1:** same logical identity with conflicting lineage/digest -> 409 fail-closed.  
@@ -4225,16 +4225,19 @@ make qa-docs
   Implement only after the resulting review/approval route passes. Stop after
   T3c evidence and status sync; do not start T3d or T4.`
 
-## P2.T3d — Availability Node contract/security certification — PARTIAL, SCOPE DEVIATION, NOT CLOSED
+## P2.T3d — Availability Node contract/security certification — [x] Done (2026-09-18)
 
 - **Orchestrator runbook:** [P2.T3d human-led procedure with Claude Code assistance](../playbooks/P2_T3D_ORCHESTRATOR_RUNBOOK.md).
-  Prepared for future execution with T3c closure as a precondition; does not
-  authorize early execution.
+  The owner-approved handoff resumed at its implementation step after T3c
+  closure; earlier preflight steps were not repeated.
 - **Type:** development / certification
-- **Effort:** M provisional; run RRI before continuing/closing, against the
-  exact test-only paths and current implementation.
+- **Effort:** L; RRI 70 Complex (approved 2026-09-18; exact calculation and
+  honest-low-max disposition in the preflight).
 - **Depends on:** T3c Done — satisfied (T3c closed `[x] Done` 2026-09-13).
-- **Status:** **Unblocked but not started as defined.** Between 2026-09-13
+- **Status:** **[x] Done / owner-verified 2026-09-18.** The
+  two frozen files now provide the full mTLS/HTTP/executor/Hyperdrive
+  certification and pass 8/8 focused plus 98/98 integrated checks. Durable
+  evidence: `docs/audit/mvp0-p2p-p2-t3d-implementation.md`. Between 2026-09-13
   evening and 2026-09-14 (commits `f27ff75` and `b35c71c`, both dated
   2026-09-14 08:0x local), a file
   `apps/availability-node/test/publication-contract-certification.test.js`
@@ -4255,16 +4258,15 @@ make qa-docs
   through the actual service. This file has not been added to the task's
   `Exact writable paths` and was not reviewed or approved as an amended
   scope. **Do not report T3d as advanced or closed on the basis of this
-  file** — it is a real, passing, but narrower and differently-scoped test
-  addition than what this task requires. Full acceptance criteria below are
-  unchanged and remain entirely open.
+  file** — it remains a real, passing, narrower addition, but the
+  correctly-scoped test now supersedes it as T3d evidence. The old file was
+  not deleted because deletion was not approved.
 - **Exact writable paths:**
   `apps/availability-node/test/publication-contract.test.js` and
   `apps/availability-node/test/fixtures.js`. (The landed
-  `publication-contract-certification.test.js` is outside this path set —
-  resolve by either amending the task's writable paths through a recorded
-  scope decision, or removing/superseding the file when the correctly-scoped
-  test lands.)
+  `publication-contract-certification.test.js` is outside this path set and
+  remains untouched; `publication-contract.test.js` supersedes it for task
+  certification.)
 - **Objective:** certify the complete T3a-T3c Availability Node boundary through
   executable Node ESM tests without changing production source. A discovered
   defect reopens the owning T3a, T3b, or T3c task under a new scope/RRI; T3d does
@@ -4310,13 +4312,91 @@ make qa-docs
   containment/secret boundary. Reopen the owning task for any product defect.
   Stop after T3 certification and status sync; do not start T4c.`
 
+### Closure record (2026-09-18)
+
+Implementation and all closure gates except the explicitly deferred
+documentary rerun are complete. Full evidence and
+finding dispositions: `docs/audit/mvp0-p2p-p2-t3d-implementation.md`.
+
+```
+Task-analysis review: gpt-oss .agent/p2-t3d/phase1-review-v1.json - PASS
+Code-solution review: gpt-oss .agent/p2-t3d/phase2-review-v1.json - PASS
+```
+
+Verification: typecheck PASS; build PASS; focused T3d 8/8 PASS; integrated
+Availability Node + T3a suite 98/98 PASS. Antares refinement and
+post-implementation touchpoints are typed skips because the static watchlist
+has no entry scoped to `apps/availability-node/` (CWE-22 is restricted to
+`crates/storage/`).
+
+### Reflection log
+
+Required/completed: 4 passes (RRI 70 Complex).
+
+1. **Behavior/persistence — Draft → Critique → Revise:** verified real
+   Rust-built publication, restart replay, identical evidence, and unchanged
+   Hypercore length; hardened cleanup so shared-store close errors propagate
+   after deterministic root removal; focused rerun 8/8 PASS.
+2. **Trust/confidentiality — Draft → Critique → Revise:** verified the
+   TLS-handshake/`403` split with zero executor calls and scanned all eight
+   synthetic deny-list canaries across response, console, index, and every
+   raw drive buffer; no revision required.
+3. **Failure/side effects — Draft → Critique → Revise:** verified exact
+   `409`/`422`/`400`/`503` mappings plus stable/absent persistence effects;
+   accepted the reviewer's Cargo/OpenSSL dependency note as an intentional
+   frozen prerequisite, with no code change.
+4. **Scope/integration/review — Draft → Critique → Revise:** verified only
+   the two authorized test files changed, no `src/` repair occurred, and
+   98/98 integrated checks pass; rejected the hypothetical overlapping
+   console-capture finding as inapplicable because this suite creates one
+   capture without concurrency opt-in and restores it in `finally`.
+
+### Behavioral coverage certification
+
+Behavioral coverage contract: `behavior-v2`.
+
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| HP-T3d-1 | Happy path | Real package publishes over allow-listed mTLS with `201`; reconstructed server/executor replays with `200`, stable evidence, and no second write | e2e | `apps/availability-node/test/publication-contract.test.js::HP-T3d-1/2 + EC-T3d-3 secrecy` | passed |
+| HP-T3d-2 | Happy path | Drive public key binds to response and contains exactly `verifyPackage`'s manifest/ciphertext bytes, with no readiness/authorization decision | e2e | `apps/availability-node/test/publication-contract.test.js::HP-T3d-1/2 + EC-T3d-3 secrecy` | passed |
+| EC-T3d-1 | Edge case | Missing/rogue identities fail TLS; unlisted trusted client receives `403`; executor is not invoked | e2e | `apps/availability-node/test/publication-contract.test.js::EC-T3d-1` | passed |
+| EC-T3d-2a | Edge case | Different lineage receives `409`, preserving evidence and drive length | e2e | `apps/availability-node/test/publication-contract.test.js::EC-T3d-2 conflicts` | passed |
+| EC-T3d-2b | Edge case | Different digest receives `409`, preserving evidence and drive length | e2e | `apps/availability-node/test/publication-contract.test.js::EC-T3d-2 conflicts` | passed |
+| EC-T3d-2c | Edge case | Tampered real ciphertext receives `422` before drive/index creation | e2e | `apps/availability-node/test/publication-contract.test.js::tampered ciphertext` | passed |
+| EC-T3d-2d | Edge case | Symlink escape receives `422` before drive/index creation | e2e | `apps/availability-node/test/publication-contract.test.js::symlink escape` | passed |
+| EC-T3d-2e | Edge case | Malformed JSON, wrong content type, and oversized body receive `400` without executor invocation | e2e | `apps/availability-node/test/publication-contract.test.js::EC-T3d-2 request framing` | passed |
+| EC-T3d-3a | Edge case | Forced Hyperswarm timeout receives `503` and commits no success index | e2e | `apps/availability-node/test/publication-contract.test.js::EC-T3d-3` | passed |
+| EC-T3d-3b | Edge case | Eight secret fields/canaries are absent from HTTP, console, index, and raw drive bytes | e2e | `apps/availability-node/test/publication-contract.test.js::HP-T3d-1/2 + EC-T3d-3 secrecy` | passed |
+| INT-T3d-6 | Integration | T3a-T3d suite passes together and temporary roots clean deterministically | integration | integrated Node command in the audit record; cleanup assertions in `fixtures.js` | passed |
+
+### Owner final verification
+
+- Owner: `Matias`
+- Date: `2026-09-18`
+- Statement: the owner accepted every mapped happy-path/edge-case evidence
+  item and instructed closure of `P2.T3d`, aggregate T3, and `CONS-T3`, plus
+  synchronization of T3/T4c. This does not close P2 or start another task.
+- Commands accepted from the recorded verification evidence:
+  `npm --prefix apps/availability-node run typecheck`;
+  `npm --prefix apps/availability-node run build`;
+  `node --test apps/availability-node/test/publication-contract.test.js`;
+  `node --test apps/availability-node/test/*.test.js
+  docs/audit/mvp0-p2p-p2-t3a-contract.test.js
+  docs/audit/mvp0-p2p-p2-t3a-http.test.js`.
+- Closure-turn rerun: none. Per the owner's instruction, `git diff --check`
+  and `make qa-docs` are deferred and remain pending rather than being
+  represented as post-closure PASS.
+
+`P2.T3d`, aggregate T3, and `CONS-T3` are closed. P2 remains open and no
+downstream work was started.
+
 ## P2.T4 — O4 dispatcher and reconciler
 
 | ID | Objective | Exact writable paths | RRI | Status | Depends on |
 |---|---|---|---|---|---|
 | `T4a` | Pure recovery decision kernel | `crates/domain/src/p2p_recovery.rs`; `crates/domain/src/lib.rs` | RRI 29 Moderate | Done 2026-09-07 | C0 PASS; T1 accepted base |
 | `T4b` | Bounded PostgreSQL claim/lease/release | `infra/migrations/0034_add_p2p_publication_claim_leases.sql`; `crates/db/src/p2p_publication_claim_repo.rs` | RRI 100 Very high (`scripts/rri.py`, 2026-09-14, retroactive) | **[x] Done 2026-09-14 (retrospective waiver)** | T4a |
-| `T4c` | Backend mTLS Availability Node client | `crates/connectors/src/p2p_availability.rs`; `crates/connectors/src/lib.rs`; `crates/connectors/Cargo.toml`; `Cargo.lock` | RRI 70 Complex (`scripts/rri.py`, 2026-09-14, retroactive) | **[x] Done 2026-09-14 (retrospective waiver)** | T3 contract PASS |
+| `T4c` | Backend mTLS Availability Node client | `crates/connectors/src/p2p_availability.rs`; `crates/connectors/src/lib.rs`; `crates/connectors/Cargo.toml`; `Cargo.lock` | RRI 70 Complex (`scripts/rri.py`, 2026-09-14, retroactive) | **[x] Done 2026-09-14 (retrospective waiver)** | T3 contract PASS; aggregate T3 owner-verified and Done 2026-09-18 |
 | `T4d` | PostgreSQL outbox dispatcher | `crates/jobs/src/p2p_publication_job.rs`; `crates/jobs/src/lib.rs`; `crates/jobs/Cargo.toml`; `Cargo.lock` | RRI 70 Complex (`scripts/rri.py`, 2026-09-14, retroactive) | **[x] Done 2026-09-14 (retrospective waiver)** | T4b; T4c |
 | `T4e` | Worker runtime + PostgreSQL reconciler integration | `apps/worker-runner/src/p2p_publication_runtime.rs`; `apps/worker-runner/src/main.rs`; `apps/worker-runner/Cargo.toml`; `Cargo.lock` | RRI 70 Complex (`scripts/rri.py`, 2026-09-14, retroactive) | **[x] Done 2026-09-14 (retrospective waiver)** | T4d |
 | `T4f` | Lost-dispatch/lost-ACK/stale-lease/duplicate certification | `apps/worker-runner/tests/p2p_publication_recovery_test.rs` | RRI 70 Complex (`scripts/rri.py`, 2026-09-14, retroactive) | **[x] Done 2026-09-14 (retrospective waiver)** | T4e |

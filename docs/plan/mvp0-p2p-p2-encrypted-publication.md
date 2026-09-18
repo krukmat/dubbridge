@@ -180,26 +180,21 @@ Build encrypted package material from existing S-120 HLS:
 - plaintext CK transient only and never logged/persisted;
 - retry of the same logical publication consumes the already-sealed lineage rather than silently rotating package identity/CK.
 
-### P2.T3 — Availability Node publication executor — DECOMPOSED
+### P2.T3 — Availability Node publication executor — DONE 2026-09-18
 
 `T3a` is Done and owner-verified on 2026-09-08: the strict v1 contract and
 injected, default-unavailable HTTP adapter exist. `T3b` is Done and
 owner-verified on 2026-09-09 after its RRI-100 parent was decomposed into six
-sequential RRI-25 leaves. `T3c`'s 2026-09-12 preflight resolved D2 (the
-missing T2-to-volume package materializer) by **expanding T3c's own
-envelope** with a new Rust leaf (`crates/p2p/src/package_writer.rs`) rather
-than opening a separate predecessor task — the C0 request contract places
-`package_ref` construction as the caller's precondition, so the writer
-belongs beside `SealedPackage` construction in the already-existing
-`crates/p2p` crate, not inside the Node.js Availability Node. D3-D5 are
-resolved with direct evidence. The initial two-leaf envelope was subsequently
-refined into eight implementation/integration leaves while the parent remains
-**RRI 70 — Complex** (`scripts/rri.py`, ADR-045 v2 authority). T3c-S0 and
-T3c-S1a are Done under leaf-specific owner authorizations; T3c-S2a is staged
-with its exact two-path contract frozen, and the other leaves remain unstarted.
-Complex still requires human plan approval for the remaining parent envelope;
-no remaining implementation is authorized and `T3d` stays blocked on `T3c`. See
-`docs/audit/mvp0-p2p-p2-t3c-preflight.md` and the active task ledger.
+sequential RRI-25 leaves. `T3c` is Done and owner-verified on 2026-09-13,
+including the real Rust package materializer, persistent Hyperdrive executor,
+stable replay/conflict behavior, and Rust-to-Node integration evidence. On
+2026-09-18 the owner approved `T3d` at RRI 70 Complex; its two frozen test
+files were implemented, independently reviewed PASS, and verified with 8/8
+focused plus 98/98 integrated checks. The owner then accepted the mapped
+evidence and closed `T3d` and aggregate T3 on 2026-09-18. Durable closure
+evidence is in `docs/audit/mvp0-p2p-p2-t3d-implementation.md`. No
+production-source repair or downstream task was authorized by this
+certification work; the documentary gates were explicitly deferred.
 
 C0 decomposition: `T3a` Node/TS service + v1 contract; `T3b` private mTLS; `T3c` persistent Hyperdrive + idempotency/conflict behavior; `T3d` contract/security certification.
 

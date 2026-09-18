@@ -244,13 +244,13 @@ are now fully closed**, resolving the fixture-binary/test suite it added
 new tests, 78/78 full suite, 0 regressions). The prior HITL approval did not
 authorize scope expansion beyond this frozen envelope. See
 `docs/audit/mvp0-p2p-p2-t3c-preflight.md` and the `T3c-Integ` closure record
-in `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`. **2026-09-14 update:**
-`T3d` is unblocked but not closed — a certification test file landed
-(`publication-contract-certification.test.js`) but it is a narrower,
-differently-scoped file than T3d's defined `publication-contract.test.js` +
-`fixtures.js` (pure request/response-parsing unit tests against the C0
-contract, not the mTLS/HTTP/Hyperdrive boundary T3d's acceptance criteria
-require); see the task ledger's `P2.T3d` section for the full gap. **`P2.T4`
+in `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`. **2026-09-18 update:**
+`T3d` is `[x] Done` and owner-verified, with independent review PASS plus
+8/8 focused and 98/98 integrated checks across the real
+mTLS/HTTP/executor/Hyperdrive boundary; aggregate T3 is therefore Done. The earlier
+`publication-contract-certification.test.js` remains untouched and is
+superseded as closure evidence by the approved `publication-contract.test.js`
++ `fixtures.js`; see `docs/audit/mvp0-p2p-p2-t3d-implementation.md`. **`P2.T4`
 (O4 dispatch + reconciliation) is fully Done:** `T4a` closed 2026-09-07 and
 `T4b`-`T4f` closed retrospectively on 2026-09-14 under Matias's explicit
 waiver. The ledger records RRI, four-pass Reflection, executable coverage,
@@ -405,11 +405,11 @@ captured above under Governing principles and ADR-025/ADR-026.
   phase still needs exact-path executable decomposition, parent/leaf RRI,
   band-required review/approval, ownership and elapsed-time estimates at
   activation. Existing HP/EC and accepted ADR-043/044 remain binding.
-  P2 T0/C0 are PASS; T1/T2/T3a/T3b/T3c/T4a-T4f are Done. As of 2026-09-14,
+  P2 T0/C0 are PASS; T1/T2/T3a/T3b/T3c/T3d/T4a-T4f are Done. As of 2026-09-14,
   T4b-T4f are retrospectively owner-verified under explicit waiver, with
-  `P2.T4e-cov` retained as a non-blocking residual; `T3d` has a
-  partial, scope-deviating test file and remains open against its actual
-  acceptance criteria. **Correction (2026-09-18,
+  `P2.T4e-cov` retained as a non-blocking residual. On 2026-09-18 `T3d` and
+  aggregate T3 were owner-verified and marked Done; the closure-turn
+  documentary gates were explicitly deferred. **Correction (2026-09-18,
   `docs/audit/mvp0-p2p-s230-consistency-audit-2026-09-18.md` Finding 3):**
   the prior wording here ("`T5a-d`, `T6a-e` remain Planned, 11 leaves with
   no code started") was stale — source exists at HEAD for `T5a-d` and
