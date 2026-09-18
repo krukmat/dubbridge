@@ -86,7 +86,7 @@ services:
     image: node:22.23.0-bookworm
     profiles: ["app"]
     working_dir: /workspace/apps/availability-node
-    command: sh -c "npm ci && npm run build && npm start"
+    command: sh -c 'export DUBBRIDGE_P2P_AVAILABILITY_ALLOWED_CLIENT_FINGERPRINTS="$(cat /run/dubbridge/p2p-mtls/client-fingerprint.txt)" && npm ci && npm run build && npm start'
     environment:
       DUBBRIDGE_P2P_AVAILABILITY_BIND_HOST: 0.0.0.0
       DUBBRIDGE_P2P_AVAILABILITY_PORT: 8443
@@ -96,7 +96,6 @@ services:
       DUBBRIDGE_P2P_AVAILABILITY_SERVER_KEY_PEM: /run/dubbridge/p2p-mtls/server-key.pem
       DUBBRIDGE_P2P_AVAILABILITY_SERVER_CERT_PEM: /run/dubbridge/p2p-mtls/server-cert.pem
       DUBBRIDGE_P2P_AVAILABILITY_CA_PEM: /run/dubbridge/p2p-mtls/ca.pem
-      DUBBRIDGE_P2P_AVAILABILITY_ALLOWED_CLIENT_FINGERPRINTS: ${DUBBRIDGE_P2P_AVAILABILITY_ALLOWED_CLIENT_FINGERPRINTS:-}
       DUBBRIDGE_P2P_HYPERSWARM_JOIN_TIMEOUT_MS: ${DUBBRIDGE_P2P_HYPERSWARM_JOIN_TIMEOUT_MS:-15000}
     ports:
       - "8443:8443"
@@ -109,6 +108,7 @@ services:
       - ../../tmp/p2p-mtls/ca.pem:/run/dubbridge/p2p-mtls/ca.pem:ro
       - ../../tmp/p2p-mtls/server-key.pem:/run/dubbridge/p2p-mtls/server-key.pem:ro
       - ../../tmp/p2p-mtls/server-cert.pem:/run/dubbridge/p2p-mtls/server-cert.pem:ro
+      - ../../tmp/p2p-mtls/client-fingerprint.txt:/run/dubbridge/p2p-mtls/client-fingerprint.txt:ro
 
   worker-runner:
     image: rust:1.98.1-bookworm
