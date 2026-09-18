@@ -162,6 +162,16 @@ function installServerHarness(options?: {
   return harness;
 }
 
+type TestPlaybackSocket = {
+  on(
+    event: string,
+    listener: (...args: unknown[]) => void,
+  ): TestPlaybackSocket;
+  write(data: string | Uint8Array): boolean;
+  end(data?: string | Uint8Array): void;
+  destroy(): void;
+};
+
 function createSocketHarness() {
   const listeners = new Map<string, Array<(...args: unknown[]) => void>>();
   const writes: Array<string | Uint8Array> = [];
@@ -169,22 +179,27 @@ function createSocketHarness() {
   const ended = new Promise<void>((resolve) => {
     resolveEnded = resolve;
   });
-  const socket = {
-    on: jest.fn((event: string, listener: (...args: unknown[]) => void) => {
+  const socket: TestPlaybackSocket = {
+    on: jest.fn(
+      (
+        event: string,
+        listener: (...args: unknown[]) => void,
+      ): TestPlaybackSocket => {
       const current = listeners.get(event) ?? [];
       current.push(listener);
       listeners.set(event, current);
-      return socket;
-    }),
-    write: jest.fn((data: string | Uint8Array) => {
+        return socket;
+      },
+    ),
+    write: jest.fn((data: string | Uint8Array): boolean => {
       writes.push(data);
       return true;
     }),
-    end: jest.fn((data?: string | Uint8Array) => {
+    end: jest.fn((data?: string | Uint8Array): void => {
       if (data !== undefined) writes.push(data);
       resolveEnded?.();
     }),
-    destroy: jest.fn(() => {
+    destroy: jest.fn((): void => {
       for (const listener of listeners.get("close") ?? []) listener();
       resolveEnded?.();
     }),
