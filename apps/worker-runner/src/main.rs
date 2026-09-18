@@ -196,6 +196,8 @@ async fn main() -> anyhow::Result<()> {
     let p2p_runtime =
         p2p_publication_runtime::P2pPublicationRuntime::from_env(runtime.pool.clone()).await?;
     let p2p_publication_enabled = p2p_runtime.is_some();
+    preparation_runtime::validate_p2p_activation_startup_config(p2p_publication_enabled)
+        .context("P2 activation configuration rejected at startup")?;
     let p2p_task = p2p_runtime.map(|runtime| tokio::spawn(runtime.run()));
     let storage_reference = runtime.storage.object_url("__startup_probe__");
 

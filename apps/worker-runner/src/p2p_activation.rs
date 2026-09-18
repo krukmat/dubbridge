@@ -74,6 +74,31 @@ pub(crate) async fn activate_after_transcription(
     run_activation(pool, storage, asset_id, &config).await;
 }
 
+/// Fail worker startup visibly when the P2P publication runtime is enabled
+/// but activation's own KEK configuration is missing or partial, instead of
+/// silently skipping every asset's P2 activation at job time.
+pub(crate) fn validate_startup_config(publication_runtime_enabled: bool) -> anyhow::Result<()> {
+    check_activation_config_against_runtime(
+        ActivationConfig::from_env(),
+        publication_runtime_enabled,
+    )
+}
+
+fn check_activation_config_against_runtime(
+    activation_config: anyhow::Result<Option<ActivationConfig>>,
+    publication_runtime_enabled: bool,
+) -> anyhow::Result<()> {
+    match activation_config {
+        Ok(Some(_)) => Ok(()),
+        Ok(None) if publication_runtime_enabled => bail!(
+            "P2P publication runtime is enabled but P2 activation KEK configuration \
+             ({KEK_HEX_ENV}/{KEK_ID_ENV}/{KEK_VERSION_ENV}) is absent"
+        ),
+        Ok(None) => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
 fn load_activation_config(asset_id: AssetId) -> Option<ActivationConfig> {
     match ActivationConfig::from_env() {
         Ok(config) => config,
@@ -368,5 +393,48 @@ mod tests {
     fn decode_32_byte_hex_rejects_invalid_material() {
         assert!(decode_32_byte_hex("00").is_err());
         assert!(decode_32_byte_hex(&"zz".repeat(32)).is_err());
+    }
+
+    fn sample_activation_config() -> ActivationConfig {
+        ActivationConfig {
+            ciphertext_root: PathBuf::from("/tmp/p2p-ciphertext"),
+            kek_id: "kek-1".to_string(),
+            kek_version: 1,
+            kek: Zeroizing::new([0xab; 32]),
+        }
+    }
+
+    #[test]
+    fn startup_check_allows_runtime_disabled_and_kek_absent() {
+        let result = check_activation_config_against_runtime(Ok(None), false);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn startup_check_allows_runtime_enabled_and_kek_complete() {
+        let result =
+            check_activation_config_against_runtime(Ok(Some(sample_activation_config())), true);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn startup_check_fails_when_runtime_enabled_and_kek_absent() {
+        let result = check_activation_config_against_runtime(Ok(None), true);
+        let error = result.expect_err("must fail closed");
+        let message = format!("{error}");
+        assert!(message.contains(KEK_HEX_ENV), "message was: {message}");
+    }
+
+    #[test]
+    fn startup_check_fails_when_kek_partial_or_invalid_regardless_of_runtime_state() {
+        let partial_error = Err(anyhow::anyhow!(
+            "{KEK_HEX_ENV} is required when {KEK_ID_ENV} is configured"
+        ));
+        assert!(check_activation_config_against_runtime(partial_error, true).is_err());
+
+        let invalid_version_error = Err(anyhow::anyhow!(
+            "{KEK_VERSION_ENV} must be a positive integer"
+        ));
+        assert!(check_activation_config_against_runtime(invalid_version_error, false).is_err());
     }
 }

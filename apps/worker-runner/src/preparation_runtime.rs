@@ -9,6 +9,8 @@ use sqlx::PgPool;
 #[path = "p2p_activation.rs"]
 mod p2p_activation;
 
+pub(crate) use p2p_activation::validate_startup_config as validate_p2p_activation_startup_config;
+
 use crate::{
     preparation_artifact_persistence::{
         load_source_artifact, persist_hls_artifacts, persist_probe_artifact,
