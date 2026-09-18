@@ -1,9 +1,21 @@
 ---
 type: Plan
 title: "P7Local: local end-to-end P2P certification"
-status: planned
+status: superseded
 slice: MVP0-P2P
 ---
+
+> **Duplicate/orphaned (found 2026-09-18, `docs/audit/mvp0-p2p-s230-consistency-audit-2026-09-18.md`
+> Finding 6):** this file duplicates
+> `docs/plan/mvp0-p2p-p7-local-certification.md`, which is the canonical
+> plan — it has a corresponding task ledger
+> (`docs/tasks/mvp0-p2p-p7-local-certification.md`, already `Planned` with
+> `P7L.T0`-`T3` defined) and is the version referenced going forward. This
+> file is not referenced by `docs/plan/mvp0-p2p-first.md`,
+> `docs/tasks/mvp0-p2p-first.md`, or `docs/plan/roadmap.md`. Kept in place
+> (not deleted) per
+> `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` — deletion is out of scope for a
+> report-only consistency pass; use the canonical file for all P7Local work.
 
 # P7Local — local end-to-end P2P certification
 

@@ -271,7 +271,17 @@ P2-P6 are PASS —
 T7local validates the mobile flow against the local Docker Compose stack, so
 this gate no longer requires the S-230 T6 Digital Ocean deploy to have
 happened first (added 2026-09-06, replacing an earlier T7-gated version of
-this row that was circular with T6). October target: controlled Android P2P beta/POC by 2026-10-30 through S-230 T6p-a..d, T7p, P7, and T9g. X29 is a release blocker for that target. iOS remains deferred. **Bounded exception (2026-09-06, deactivated 2026-09-07 by owner instruction — owner back online):** while active, every code-touching task in S-230 or MVP0-P2P defaulted to cloud implementation instead of local-first, per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Bounded cloud-implementation priority`. Deactivated 2026-09-07; code-touching tasks in these slices now resume the normal RRI-band local-first default. Local phase-1/phase-2 review was and remains unaffected. | `docs/plan/mvp0-p2p-first.md`, `docs/tasks/mvp0-p2p-first.md`, `docs/plan/mvp0-p2p-p2-encrypted-publication.md`, `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`, `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md`, `docs/adr/ADR-043-mobile-p2p-runtime-ownership-and-proof-isolation.md`, `docs/adr/ADR-044-p2p-audience-delivery-boundary.md` |
+this row that was circular with T6). **Scope clarification (2026-09-18,
+owner decision D0-d,
+`docs/tasks/mvp0-p2p-s230-consistency-remediation.md`):** this
+re-sequencing removed the T6/T7 dependency from `T6p-a`'s gate only. It
+does not apply to `T7p`, which still depends on the S-230 Digital Ocean
+deploy chain (`T7`; itself gated on `T6`) per
+`docs/tasks/s-230-poc-v1-digitalocean.md`'s own `T7p` row
+("`T7; T7c; T6p-d; P3-P6 PASS; X29 resolved`") — confirmed as the standing
+dependency, not a doc disagreement to resolve away. October target:
+controlled Android P2P beta/POC by 2026-10-30 through S-230 T6p-a..d, T7p,
+P7, and T9g. X29 is a release blocker for that target. iOS remains deferred. **Bounded exception (2026-09-06, deactivated 2026-09-07 by owner instruction — owner back online):** while active, every code-touching task in S-230 or MVP0-P2P defaulted to cloud implementation instead of local-first, per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Bounded cloud-implementation priority`. Deactivated 2026-09-07; code-touching tasks in these slices now resume the normal RRI-band local-first default. Local phase-1/phase-2 review was and remains unaffected. | `docs/plan/mvp0-p2p-first.md`, `docs/tasks/mvp0-p2p-first.md`, `docs/plan/mvp0-p2p-p2-encrypted-publication.md`, `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`, `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md`, `docs/adr/ADR-043-mobile-p2p-runtime-ownership-and-proof-isolation.md`, `docs/adr/ADR-044-p2p-audience-delivery-boundary.md`, `docs/tasks/mvp0-p2p-s230-consistency-remediation.md` (2026-09-18 doc-vs-code consistency remediation plan, report-only, not yet approved) |
 
 > **MVP0-P2P / S-230 October update (2026-09-06):** ADR-044 is Accepted;
 > P2.T0 is PASS, P2.T1a-T1f are Done/owner-approved as P2.T1, and P2.C0 is
@@ -399,11 +409,27 @@ captured above under Governing principles and ADR-025/ADR-026.
   T4b-T4f are retrospectively owner-verified under explicit waiver, with
   `P2.T4e-cov` retained as a non-blocking residual; `T3d` has a
   partial, scope-deviating test file and remains open against its actual
-  acceptance criteria; `T5a-d`, `T6a-e` remain Planned (11 leaves with no
-  code started). T6p-a requires full P2-P6 PASS plus T7local/T7c PASS.
-  October capacity is not validated by the existence of these plans. X29 is
-  required for the release, X28/CI for T9g; optional queue acceleration and
-  S-230 T7b/T8/T8b are outside the mandatory path.
+  acceptance criteria. **Correction (2026-09-18,
+  `docs/audit/mvp0-p2p-s230-consistency-audit-2026-09-18.md` Finding 3):**
+  the prior wording here ("`T5a-d`, `T6a-e` remain Planned, 11 leaves with
+  no code started") was stale — source exists at HEAD for `T5a-d` and
+  `T6a-d` (61 files, +5761/-297 lines, migrations `0034`-`0037`), only
+  `T6e` (final P2 closeout) genuinely has not run. None of `T5a-d`/`T6a-d`
+  carry RRI/review/Reflection/coverage/owner-verification evidence yet;
+  retro-closure is tracked as
+  `docs/tasks/mvp0-p2p-s230-consistency-remediation.md` § CONS-T4 (T5/T6)
+  and § CONS-T5 (`T6e` -> P2 PASS), under an owner-granted waiver (D0-a,
+  resolved 2026-09-18: full waiver, reusing the P2.T4b-T4f precedent).
+  `P2.T3c` briefly regressed at HEAD between 2026-09-15 and 2026-09-18: a
+  materializer path change (commit `8eb2f05`) left a stale `package_ref` in
+  the Node-side test fixture (not the production dispatcher, which already
+  used the canonical helper), failing 4/86 Availability Node tests. Fixed
+  2026-09-18 (RRI 25 Low, `docs/tasks/mvp0-p2p-s230-consistency-remediation.md`
+  § CONS-T1 closure record); 86/86 Availability Node tests now pass.
+  T6p-a requires full P2-P6 PASS plus T7local/T7c PASS. October capacity is
+  not validated by the existence of these plans. X29 is required for the
+  release, X28/CI for T9g; optional queue acceleration and S-230
+  T7b/T8/T8b are outside the mandatory path.
 - Full historical detail behind every closed gap above (the S-090 replan, X22–X24
   ADR closures, the S-200/ADR-031 mobile-auth decision, etc.):
   `docs/audit/roadmap-history.md`.

@@ -43,6 +43,37 @@ async fn insert_asset(pool: &PgPool) -> AssetId {
     asset_id
 }
 
+// `claim_next_publication_work` (crates/db/src/p2p_publication_claim_repo.rs)
+// selects the globally oldest claimable outbox row with no per-fixture filter
+// (by design — it mirrors production, where a single dispatcher pool spans
+// all publications). This test transitions a publication through
+// publish_pending/publishing/reconciling, which makes its outbox row a
+// candidate for that global claim query for the duration of the test unless
+// retired early. Once this test's own `list_outstanding_publication_work`
+// check no longer needs the row to be listed, retire it to a non-claimable
+// terminal state so a concurrently-running claim-repo test binary cannot
+// steal it (same pattern already used by
+// crates/db/tests/p2p_publication_claim_repo.rs's `retire_outbox_row`).
+// Neither `record_external_confirmation` nor `transition_publication_state`
+// read or write `p2p_publication_outbox`, so retiring the row here does not
+// affect this test's own subsequent assertions.
+async fn retire_outbox_row_for_publication(pool: &PgPool, publication_id: P2pPublicationId) {
+    sqlx::query(
+        r#"
+        UPDATE p2p_publication_outbox
+           SET delivery_state = 'delivered',
+               delivered_at = now(),
+               claim_token = NULL,
+               lease_expires_at = NULL
+         WHERE publication_id = $1
+        "#,
+    )
+    .bind(publication_id.0)
+    .execute(pool)
+    .await
+    .expect("retire outbox fixture row");
+}
+
 #[tokio::test]
 async fn hp_t1_atomic_create_restart_reread_and_same_lineage_idempotency() {
     let pool = test_pool().await;
@@ -172,6 +203,11 @@ async fn hp_ec_t1_outstanding_read_and_ready_guard_require_same_lineage_confirma
         work.iter()
             .any(|item| item.publication.id == publication_id)
     );
+    // Retire the outbox row now: nothing below this point needs it globally
+    // claimable, and leaving it claimable for the rest of the test exposes
+    // it to a concurrently-running claim-repo test binary's unscoped
+    // `claim_next_publication_work` query (see helper doc comment above).
+    retire_outbox_row_for_publication(&pool, publication_id).await;
 
     transition_publication_state(&pool, publication_id, PublicationState::Publishing, None)
         .await

@@ -275,6 +275,7 @@ class RubricRow:
 
 # DubBridge rubric (RRI_POLICY.md "DubBridge anchor rubric"). ADR-anchored.
 _DUBBRIDGE_RUBRIC = [
+    RubricRow("crates/*/tests/*", 0, 0, 0, "—", "crate integration tests"),
     RubricRow("crates/domain/src/rights*", 4, 5, 4, "ADR-008, ADR-018", "crates/domain rights-ledger"),
     RubricRow("crates/audit/*", 4, 5, 4, "ADR-008, ADR-018", "crates/audit"),
     RubricRow("infra/migrations/*", 4, 5, 4, "ADR-008, ADR-018", "infra/migrations"),

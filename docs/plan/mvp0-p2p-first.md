@@ -177,3 +177,16 @@ target with unvalidated capacity, not a delivery guarantee. X29 is required by
 2026-10-21; T7p by 2026-10-26; P7/T9g by 2026-10-30. X28 closure and exact-release
 CI green, rollback/log/security/soak evidence remain T9g gates. A missed gate
 permits only an explicitly labeled base POC/backend preview, not an invited-playback claim.
+
+## Related audits (2026-09-18)
+
+- `docs/audit/mvp0-p2p-t5-t6-local-dev-readiness-2026-09-14.md` — T5/T6
+  ledger-vs-code drift and four local-dev blockers (A-D).
+- `docs/audit/mvp0-p2p-p6-t0-preflight-2026-09-17.md` — P6.T0 contract gaps
+  GAP-1 (owner read model) and GAP-2 (viewer-invitation recovery), both
+  P6.T0-scoped decisions, not free-standing owner choices.
+- `docs/audit/mvp0-p2p-s230-consistency-audit-2026-09-18.md` — full
+  doc-vs-code consistency audit (7 findings) behind
+  `docs/tasks/mvp0-p2p-s230-consistency-remediation.md`, the report-only
+  remediation task map for all drift found above (not yet approved for
+  implementation).

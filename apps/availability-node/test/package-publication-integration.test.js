@@ -33,7 +33,7 @@ function makeRequest(publicationId, lineageId, manifestDigest) {
     lineage_id: lineageId,
     manifest_version: "p2p-manifest-v1",
     manifest_digest_sha256: manifestDigest,
-    package_ref: publicationId,
+    package_ref: `packages/${publicationId}/${lineageId}`,
   };
 }
 

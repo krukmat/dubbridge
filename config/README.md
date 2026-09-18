@@ -73,11 +73,18 @@ not set the single-underscore forms expecting them to reach production.
 
 ### P2P publication runtime variables
 
-P2P publication currently has two direct environment readers outside
-`AppConfig`: `apps/worker-runner/src/p2p_publication_runtime.rs` and
-`apps/availability-node/src/bootstrap.ts`. They intentionally remain flat
-`DUBBRIDGE_P2P_*` variables for this MVP surface; do not add them to
-`config/local.toml` and assume Figment owns them.
+P2P publication currently has four direct environment readers outside
+`AppConfig`: `apps/worker-runner/src/p2p_publication_runtime.rs`,
+`apps/worker-runner/src/p2p_activation.rs`, `apps/api/src/routes/
+p2p_envelope.rs`, and `apps/availability-node/src/bootstrap.ts`. They
+intentionally remain flat `DUBBRIDGE_P2P_*` variables for this MVP surface;
+do not add them to `config/local.toml` and assume Figment owns them.
+**Documented exception (2026-09-18, owner decision D0-b,
+`docs/tasks/mvp0-p2p-s230-consistency-remediation.md`):** the owner
+explicitly chose to keep these as direct reads rather than migrate them
+into the typed `crates/config` loader (ADR-026) — this section plus
+`.env.example` is the recorded exception, not a gap awaiting a future
+migration.
 
 Worker publication/reconciliation:
 
@@ -103,6 +110,22 @@ Availability Node bootstrap:
 - `DUBBRIDGE_P2P_AVAILABILITY_CA_PEM`
 - `DUBBRIDGE_P2P_AVAILABILITY_ALLOWED_CLIENT_FINGERPRINTS`
 - `DUBBRIDGE_P2P_HYPERSWARM_JOIN_TIMEOUT_MS` (default `15000`)
+
+K1 key-encryption-key (KEK), read independently and redundantly by both
+`apps/api/src/routes/p2p_envelope.rs` (always required) and
+`apps/worker-runner/src/p2p_activation.rs` (required only when P2P
+activation is configured — see below):
+
+- `DUBBRIDGE_P2P_KEK_HEX` — 64 hex characters (256-bit key); secret, never
+  commit a real value
+- `DUBBRIDGE_P2P_KEK_ID`
+- `DUBBRIDGE_P2P_KEK_VERSION` — positive integer
+
+Fail-closed partial-configuration guard in `p2p_activation.rs`: if either
+`DUBBRIDGE_P2P_KEK_ID` or `DUBBRIDGE_P2P_KEK_VERSION` is set,
+`DUBBRIDGE_P2P_KEK_HEX` becomes required too — activation refuses to start
+with only some of the three set. `p2p_envelope.rs` requires all three
+unconditionally.
 
 The local Compose profile wires these paths to `tmp/` bind mounts. Generate
 real local CA/server/client material first with

@@ -4749,12 +4749,29 @@ required cases.
 
 ## P2.T5 — S-120 activation + P2P_READY
 
+> **Status-drift annotation (2026-09-18,
+> `docs/audit/mvp0-p2p-s230-consistency-audit-2026-09-18.md` Finding 3):**
+> the `Status` column below reads `Planned`, but source files for all four
+> leaves exist and are wired at HEAD (`c6e28be`):
+> `apps/worker-runner/src/p2p_activation.rs`,
+> `crates/domain/src/p2p_ready_descriptor.rs`,
+> `apps/worker-runner/tests/p2p_s120_non_regression_test.rs`, among 61
+> changed files / +5761/-297 lines / migrations `0034`-`0037`. No RRI,
+> band-routed review artifact, Reflection log, behavioral coverage
+> certification, or owner-verification block exists for any T5 leaf. Do not
+> read `Planned` as "not started" — read it as "implemented, not yet
+> retro-certified." Retro-closure is tracked as
+> `docs/tasks/mvp0-p2p-s230-consistency-remediation.md` § CONS-T4, under an
+> owner-granted waiver (D0-a, resolved 2026-09-18: full waiver granted,
+> reusing the P2.T4b-T4f precedent, commit `6a6d0c7`). Do not flip these
+> rows to `Done` outside that task.
+
 | ID | Objective | Exact writable paths | RRI | Status | Depends on |
 |---|---|---|---|---|---|
-| `T5a` | Characterize existing Ready/transcription ordering before activation | `apps/worker-runner/src/preparation_runtime_tests/p2p_activation.rs`; `apps/worker-runner/src/preparation_runtime_tests.rs` | RUN BEFORE EXECUTION | Planned | C0 PASS |
-| `T5b` | Fail-contained P2 activation after Ready + transcription post-ready | `apps/worker-runner/src/p2p_activation.rs`; `apps/worker-runner/src/preparation_runtime.rs`; `apps/worker-runner/src/main.rs` | RUN BEFORE EXECUTION | Planned | T2 PASS; T4 integration PASS; T5a |
-| `T5c` | Authoritative ready read model + `p2p-ready-descriptor-v1` | `crates/domain/src/p2p_ready_descriptor.rs`; `crates/domain/src/lib.rs`; `crates/db/src/p2p_publication_repo.rs` | RUN BEFORE EXECUTION | Planned | T5b |
-| `T5d` | S-120/ASR + no-false-ready non-regression | `apps/worker-runner/tests/p2p_s120_non_regression_test.rs` | RUN BEFORE EXECUTION | Planned | T5c |
+| `T5a` | Characterize existing Ready/transcription ordering before activation | `apps/worker-runner/src/preparation_runtime_tests/p2p_activation.rs`; `apps/worker-runner/src/preparation_runtime_tests.rs` | RUN BEFORE EXECUTION | Planned (source exists, not retro-certified — see annotation) | C0 PASS |
+| `T5b` | Fail-contained P2 activation after Ready + transcription post-ready | `apps/worker-runner/src/p2p_activation.rs`; `apps/worker-runner/src/preparation_runtime.rs`; `apps/worker-runner/src/main.rs` | RUN BEFORE EXECUTION | Planned (source exists, not retro-certified — see annotation) | T2 PASS; T4 integration PASS; T5a |
+| `T5c` | Authoritative ready read model + `p2p-ready-descriptor-v1` | `crates/domain/src/p2p_ready_descriptor.rs`; `crates/domain/src/lib.rs`; `crates/db/src/p2p_publication_repo.rs` | RUN BEFORE EXECUTION | Planned (source exists, not retro-certified — see annotation) | T5b |
+| `T5d` | S-120/ASR + no-false-ready non-regression | `apps/worker-runner/tests/p2p_s120_non_regression_test.rs` | RUN BEFORE EXECUTION | Planned (source exists, not retro-certified — see annotation) | T5c |
 
 **HP-T5-1:** S-120 Ready and transcription enqueue attempt complete independently while P2 proceeds.  
 **HP-T5-2:** durable same-lineage package + external confirmation -> PostgreSQL P2P_READY + minimal P3 descriptor.  
@@ -4763,13 +4780,29 @@ required cases.
 
 ## P2.T6 — audit + deterministic certification + closure
 
+> **Status-drift + numbering-drift annotation (2026-09-18,
+> `docs/audit/mvp0-p2p-s230-consistency-audit-2026-09-18.md` Finding 3):**
+> same status-drift condition as P2.T5 above — source exists for T6a-T6d at
+> HEAD (`apps/worker-runner/tests/p2p_crash_windows_test.rs`,
+> `apps/worker-runner/tests/p2p_secret_boundary_test.rs`,
+> `apps/availability-node/test/secret_boundary.test.ts`, the six P2 audit
+> kinds in `crates/domain/src/audit/kind.rs`), but no RRI/review/Reflection/
+> coverage/owner-verification evidence exists; retro-closure tracked as
+> `docs/tasks/mvp0-p2p-s230-consistency-remediation.md` § CONS-T4 under the
+> D0-a waiver (resolved 2026-09-18, full grant). Additionally, `T6a`'s
+> writable path below names migration `0035`, but the actual audit-
+> correlation migration on disk is `0036_extend_audit_events_p2p_correlation.sql`
+> — `0035` was used by `p2p_ready_descriptor_evidence` instead (a T5c
+> concern). Migrations `0032`-`0038` all exist; flag the corrected mapping
+> for D0-a ratification inside CONS-T4, do not silently renumber this table.
+
 | ID | Objective | Exact writable paths | RRI | Status | Depends on |
 |---|---|---|---|---|---|
-| `T6a` | Backward-compatible P2 audit correlation schema | `infra/migrations/0035_extend_audit_events_p2p_correlation.sql` | RUN BEFORE EXECUTION | Planned | C0 PASS |
-| `T6b` | Six P2 audit kinds + durable emitter/repository correlation | `crates/domain/src/audit/kind.rs`; `crates/domain/src/audit/event.rs`; `crates/domain/src/audit/tests.rs`; `crates/db/src/audit_repo.rs`; `crates/audit/src/lib.rs` | RUN BEFORE EXECUTION | Planned | T6a |
-| `T6c` | Deterministic six-window crash/recovery harness | `apps/worker-runner/tests/p2p_crash_windows_test.rs` | RUN BEFORE EXECUTION | Planned | T2-T5 integration PASS; T6b |
-| `T6d` | Ciphertext-only + secret-deny certification | `apps/worker-runner/tests/p2p_secret_boundary_test.rs`; `apps/availability-node/test/secret_boundary.test.ts` | RUN BEFORE EXECUTION | Planned | T3 PASS; T6b |
-| `T6e` | P2 evidence/status closeout only | `docs/audit/mvp0-p2p-p2-t6-closure.md`; `docs/plan/mvp0-p2p-p2-encrypted-publication.md`; `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`; `docs/plan/mvp0-p2p-first.md`; `docs/tasks/mvp0-p2p-first.md`; `docs/plan/roadmap.md` | RUN BEFORE EXECUTION | Planned | T6c; T6d; all P2 evidence PASS |
+| `T6a` | Backward-compatible P2 audit correlation schema | `infra/migrations/0036_extend_audit_events_p2p_correlation.sql` (ledger previously named `0035`; corrected 2026-09-18, see annotation) | RUN BEFORE EXECUTION | Planned (source exists, not retro-certified — see annotation) | C0 PASS |
+| `T6b` | Six P2 audit kinds + durable emitter/repository correlation | `crates/domain/src/audit/kind.rs`; `crates/domain/src/audit/event.rs`; `crates/domain/src/audit/tests.rs`; `crates/db/src/audit_repo.rs`; `crates/audit/src/lib.rs` | RUN BEFORE EXECUTION | Planned (source exists, not retro-certified — see annotation) | T6a |
+| `T6c` | Deterministic six-window crash/recovery harness | `apps/worker-runner/tests/p2p_crash_windows_test.rs` | RUN BEFORE EXECUTION | Planned (source exists, not retro-certified — see annotation) | T2-T5 integration PASS; T6b |
+| `T6d` | Ciphertext-only + secret-deny certification | `apps/worker-runner/tests/p2p_secret_boundary_test.rs`; `apps/availability-node/test/secret_boundary.test.ts` | RUN BEFORE EXECUTION | Planned (source exists, not retro-certified — see annotation) | T3 PASS; T6b |
+| `T6e` | P2 evidence/status closeout only | `docs/audit/mvp0-p2p-p2-t6-closure.md`; `docs/plan/mvp0-p2p-p2-encrypted-publication.md`; `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`; `docs/plan/mvp0-p2p-first.md`; `docs/tasks/mvp0-p2p-first.md`; `docs/plan/roadmap.md` | RUN BEFORE EXECUTION | Planned — this leaf (final P2 PASS closeout) genuinely has not run; tracked as `docs/tasks/mvp0-p2p-s230-consistency-remediation.md` § CONS-T5 | T6c; T6d; all P2 evidence PASS |
 
 **HP-T6-1:** clean publication produces durable, correlated audit evidence and closes P2 only after all acceptance evidence passes.  
 **EC-T6-1:** each injected D3 crash window converges without false Ready or second lineage.  
@@ -4946,6 +4979,23 @@ is unstarted.
 the final unified verification step within the frozen `P2.T3c` envelope —
 **`P2.T3c` and Leaf B are now fully closed**; no unstarted work remains
 inside the parent envelope approved at the 2026-09-12 HITL checkpoint.
+
+> **Regression + fix addendum (2026-09-18,
+> `docs/audit/mvp0-p2p-s230-consistency-audit-2026-09-18.md` Finding 1):** a
+> later, unrelated materializer path change (commit `8eb2f05`, 2026-09-15)
+> left this suite's own `makeRequest()` test fixture with a stale
+> `package_ref` (bare UUID instead of the canonical
+> `packages/<publication_id>/<lineage_id>`), failing 4/5 tests in this file
+> (`HP-T3c-1`, `HP-T3c-2`, `EC-T3c-1a`, `EC-T3c-1b`). The production Rust
+> dispatcher was never affected — it already called
+> `dubbridge_p2p::package_writer::canonical_package_ref` directly. Fixed
+> 2026-09-18 (RRI 25 Low); see
+> `docs/tasks/mvp0-p2p-s230-consistency-remediation.md` § CONS-T1 closure
+> record for the full root-cause/fix/review evidence. 5/5 in this file and
+> 86/86 across the full Availability Node suite pass again as of that fix.
+> This closure record's original `[x] Done` status and owner verification
+> are unaffected — the regression was introduced by a later commit, not a
+> defect in the work certified here.
 
 **Objective:** prove a P2P ciphertext package genuinely built by the real
 Rust production pipeline (`crates/p2p`) is accepted end-to-end by the real
