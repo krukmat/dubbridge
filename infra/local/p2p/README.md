@@ -71,6 +71,25 @@ The Compose path reads the generated client fingerprint directly from
 `tmp/p2p-mtls/client-fingerprint.txt`; it does not depend on a previously
 exported shell variable.
 
+### Preflight check
+
+Before relying on a local certification run, verify branch, mTLS material,
+and (once the stack is up) container/health/port-provenance state:
+
+```bash
+# Static checks only (branch, HEAD, mTLS files):
+bash infra/local/p2p/preflight.sh
+
+# Also validate the running stack (compose services, API health, TCP 8080
+# provenance, worker ffmpeg, and recent worker/Availability Node logs):
+bash infra/local/p2p/preflight.sh --with-runtime
+```
+
+The script exits non-zero if any check fails and never prints secrets. The
+TCP 8080 provenance check is macOS/`lsof`-only and recognizes Docker Desktop
+and Colima port-forwarding processes; a different local Docker backend may
+need its own allow-list entry.
+
 Relevant wiring:
 
 ```text
