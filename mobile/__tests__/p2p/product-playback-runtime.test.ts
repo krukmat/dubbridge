@@ -259,6 +259,28 @@ describe("P5 decrypt-on-read runtime", () => {
     ).toThrow("integrity check failed");
   });
 
+  it("rejects ciphertext when manifest path changes the authenticated AAD", () => {
+    const plaintext = Buffer.from("segment payload");
+    const fixture = encryptFixture("segments/000001.ts", plaintext);
+    const alteredFile = {
+      ...fixture.file,
+      path: "segments/000002.ts",
+    };
+    const manifest = {
+      ...fixture.manifestBase,
+      files: [alteredFile],
+    };
+
+    expect(() =>
+      decryptProductFile(
+        fixture.key,
+        manifest,
+        alteredFile,
+        fixture.encrypted,
+      ),
+    ).toThrow("Playback decryption failed");
+  });
+
   it("rewrites HLS segment references to the randomized loopback session", () => {
     const token = "a".repeat(32);
     const manifest = {
@@ -409,6 +431,24 @@ describe("P5 decrypt-on-read runtime", () => {
     ).toHaveLength(1);
 
     await runtime.stop();
+  });
+
+  it("rejects a missing content key before opening package or transport state", async () => {
+    const fixture = createRuntimeFixture();
+    const runtime = new ProductPlaybackRuntime(
+      fixture.packages as unknown as ProductPackageRuntime,
+    );
+
+    await expect(
+      runtime.start(fixture.runtimeArg, {
+        ...fixture.input,
+        ckBase64: "",
+      }),
+    ).rejects.toThrow("Playback content key is invalid");
+
+    expect(fixture.packages.open).not.toHaveBeenCalled();
+    expect(mockCreateServer).not.toHaveBeenCalled();
+    expect(runtime.isActive).toBe(false);
   });
 
   it("zeroizes the decoded CK and closes package state when loopback startup fails", async () => {
