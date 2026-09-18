@@ -10,11 +10,16 @@ plan: docs/plan/mvp0-p2p-first.md
 
 > **Plan:** `docs/plan/mvp0-p2p-first.md`.
 > **External taskpack:** `p2p-mvp/taskpacks/P0.zip` through `P7.zip`.
-> **Current task:** P0 and P1 are closed. ADR-044 is Accepted. P2.T0 is PASS and
-> P2.T1a-T1f are Done/owner-approved as the completed P2.T1 persistence outcome
-> on 2026-09-06. P2.C0 is PASS; T2 (including T2c-r/T2g) and T4a are Done.
-> Remaining P2 work excludes T4: T4a-f are Done; T4b-f closed retrospectively
-> under explicit owner waiver on 2026-09-14. P2-P7 and S-230 share the controlled
+> **Current task:** P0, P1, and now P2 are closed. ADR-044 is Accepted. P2.T0
+> is PASS and P2.T1a-T1f are Done/owner-approved as the completed P2.T1
+> persistence outcome on 2026-09-06. P2.C0 is PASS; T2 (including T2c-r/T2g)
+> and T4a are Done. T3, T4b-f (retrospective closure, 2026-09-14), T5, T6a-d
+> (retrospective closure, CONS-T4, 2026-09-18), and T6e (CONS-T5, 2026-09-18)
+> are all Done — **aggregate `P2` is PASS**
+> (`docs/audit/mvp0-p2p-p2-t6-closure.md`). P3-P7 are unblocked at the
+> phase-activation-gate level; each still needs its own exact-path
+> decomposition, RRI, and approval before implementation execution can start.
+> P2-P7 and S-230 share the controlled
 > Android P2P beta/POC target of 2026-10-30, not GA. The external package is untracked input, so its
 > state/handoff files are evidence but not substitutes for this ledger.
 
@@ -24,7 +29,7 @@ plan: docs/plan/mvp0-p2p-first.md
 |---|---|---|---|
 | P0 | Bare / Expo / React Native compatibility spike | PASS — Android-only; owner verified 2026-08-27 | — |
 | P1 | Maintainable mobile P2P foundation + replication proof | Done 2026-09-01 | P0 PASS |
-| P2 | Encrypted P2P publication after S-120 | In progress — T0/C0 PASS; T1/T2/T4a-f Done; T3, T5, T6 pending | P1 PASS; ADR-044 Accepted |
+| P2 | Encrypted P2P publication after S-120 | **Done 2026-09-18 — all leaves T0-T6e closed; P2: PASS** | P1 PASS; ADR-044 Accepted |
 | P3 | Invite, claim, and content-key envelope | Pending | P2 PASS; accepted ADR-044 / K1 contract |
 | P4 | Mobile package sync and verification | Pending | P3 PASS |
 | P5 | Local HLS gateway + existing VideoPlayer | Pending | P4 PASS |

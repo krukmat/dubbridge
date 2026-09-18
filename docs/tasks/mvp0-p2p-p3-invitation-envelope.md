@@ -17,10 +17,10 @@ behavioral_coverage_contract: behavior-v2
 
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
-| P3.T0 | Contract and executable-path freeze | planning | M | P2 PASS | Planned; not activated |
-| P3.T1 | Invitation persistence, claim, and inbox | development | L | T0 PASS | Planned; not activated |
-| P3.T2 | O3 authorization and native K1 envelope delivery | development | L | T1 PASS | Planned; not activated |
-| P3.T3 | P3 integration certification and closure | development/evidence | M | T2 PASS | Planned; not activated |
+| P3.T0 | Contract and executable-path freeze | planning | M | P2 PASS | Blocked — no contract artifact exists, see verification note |
+| P3.T1 | Invitation persistence, claim, and inbox | development | L | T0 PASS | Blocked — claim-race logic untested, see verification note |
+| P3.T2 | O3 authorization and native K1 envelope delivery | development | L | T1 PASS | Blocked — fail-closed authorization join untested, see verification note |
+| P3.T3 | P3 integration certification and closure | development/evidence | M | T2 PASS | Blocked — no work product exists, see verification note |
 
 
 ## Shared activation and closure contract
@@ -46,7 +46,11 @@ Release artifact/gate changes also synchronize the S-230 plan and ledger.
 
 **Depends on:** P2 PASS
 
-**Status:** Planned; not activated.
+**Status:** Blocked. **Verification note (2026-09-18):** source exists
+(`infra/migrations/0038_create_p2p_audience.sql`) but no contract/decision
+artifact for this leaf's own deliverable exists at all. Full evidence:
+`docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`.
+Not closeable via authorization alone.
 
 **Acceptance criteria:** Freeze invitation/claim/inbox and separate O3 authorization contracts, active-device binding, expiry/revocation predicates, audit map and exact path ownership; score the coherent implementation parent and independently meaningful leaves.
 
@@ -75,7 +79,12 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T0 PASS
 
-**Status:** Planned; not activated.
+**Status:** Blocked. **Verification note (2026-09-18):** source exists
+(`crates/db/src/p2p_audience_repo.rs`, `apps/api/src/routes/p2p_audience.rs`)
+with 0 repo-layer tests; the concurrent-claim row-lock (EC-P3.T1-1's actual
+race scenario) has zero test evidence. Full evidence:
+`docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`.
+Needs a claim-race test before closure.
 
 **Acceptance criteria:** Implement hash-only invitation storage, owner-only creation on P2P_READY content, atomic single-viewer claim and scoped inbox; preserve same-viewer idempotency and durable audit.
 
@@ -104,7 +113,14 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T1 PASS
 
-**Status:** Planned; not activated.
+**Status:** Blocked. **Verification note (2026-09-18):** source exists
+(`crates/p2p/src/device_envelope.rs`, `crates/db/src/p2p_envelope_repo.rs`,
+`apps/api/src/routes/p2p_envelope.rs`, mobile `DeviceIdentity.ts`); only the
+pure crypto-sealing step is tested. The DB-side fail-closed join (device/
+viewer/publication/expiry/revocation), handler fail-closed status codes, and
+the mobile no-software-fallback throw path all have 0 tests — the leaf's own
+core acceptance criterion is unverified. Full evidence:
+`docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`.
 
 **Acceptance criteria:** Implement distinct backend audience authorization and all accepted D2 release predicates; prove HPKE Base P-256/HKDF-SHA256/AES-256-GCM with non-exportable Android Keystore private key, native unwrap, binding and expiry checks.
 
@@ -133,7 +149,9 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T2 PASS
 
-**Status:** Planned; not activated.
+**Status:** Blocked. **Verification note (2026-09-18):** no work product
+exists for this leaf. Full evidence:
+`docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`.
 
 **Acceptance criteria:** Map every parent P3 HP/EC to executable evidence, including claim races, O3 denial, native Keystore interop and log/storage secret inspection; publish descriptor/native-adapter handoff to P4/P5.
 

@@ -17,10 +17,10 @@ behavioral_coverage_contract: behavior-v2
 
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
-| P5.T0 | Gateway/session contract freeze | planning | M | P4 PASS | Planned; not activated |
-| P5.T1 | Loopback ciphertext decryption gateway | development | L | T0 PASS | Planned; not activated |
-| P5.T2 | Existing VideoPlayer and deterministic teardown | development | M | T1 PASS | Planned; not activated |
-| P5.T3 | Playback and secret-boundary certification | development/evidence | M | T2 PASS | Planned; not activated |
+| P5.T0 | Gateway/session contract freeze | planning | M | P4 PASS | `[x]` Done 2026-09-18 |
+| P5.T1 | Loopback ciphertext decryption gateway | development | L | T0 PASS | Blocked — server security paths untested, see verification note |
+| P5.T2 | Existing VideoPlayer and deterministic teardown | development | M | T1 PASS | Blocked — gated on T1, see verification note |
+| P5.T3 | Playback and secret-boundary certification | development/evidence | M | T2 PASS | Planned; not activated (unchanged — CONS-T8b, needs device) |
 
 
 ## Shared activation and closure contract
@@ -46,7 +46,25 @@ Release artifact/gate changes also synchronize the S-230 plan and ledger.
 
 **Depends on:** P4 PASS
 
-**Status:** Planned; not activated.
+**Status:** `[x]` Done — retro-certified 2026-09-18 under owner waiver D0-a.
+RRI 25 Low (`scripts/rri.py`,
+`mobile/src/p2p/playback/{P2PPlaybackLease,P2PPlaybackController}.ts`).
+
+**Reflection:** Low band, cycle folded into review evidence below.
+
+**Behavioral coverage certification:** HP-P5.T0-1 and EC-P5.T0-1 map to
+passing `unit` evidence — 6/6 tests; the tested authorization branch
+(wrong-viewer) is covered.
+
+**Named residual (owner-accepted):** other `assertAuthorization` OR-branches
+(asset/publication/lineage mismatch, expiry) are implemented but not
+individually exercised by a test; no standalone contract/decision artifact
+exists separate from the code. Non-blocking — same class as `P2.T4e-cov`.
+
+**Owner final verification:** Matias, 2026-09-18 — closed on "cierra los
+otros", accepting the named residual as described in
+`docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`.
+Commands run: `npm test -- mobile/src/p2p/playback`.
 
 **Acceptance criteria:** Define loopback/session ownership, package path mapping, native unwrap → transient CK handoff, expiry/error handling and teardown evidence; freeze executable paths.
 
@@ -75,7 +93,15 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T0 PASS
 
-**Status:** Planned; not activated.
+**Status:** Blocked — not closeable. **Verification note (2026-09-18):** the
+extracted pure helpers (decrypt/manifest-rewrite/range-parse) have 3/3 tests,
+but `ProductPlaybackRuntime` itself — the actual loopback server, including
+traversal rejection, session-token scoping, and CK zeroization on stop/error
+— has zero test coverage anywhere in the repo. This is a network-facing
+fail-closed security boundary asserted only by code inspection. Full
+evidence:
+`docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`.
+Needs an integration test before closure, not authorization alone.
 
 **Acceptance criteria:** Serve only verified package HLS through loopback; use accepted K1 authenticated decryption and transient authorized CK; validate relative package paths and scope local requests to the session.
 
@@ -104,7 +130,13 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T1 PASS
 
-**Status:** Planned; not activated.
+**Status:** Blocked — not closeable independently. **Verification note
+(2026-09-18):** 4/4 tests pass and this leaf's own boundary (idempotent
+release/fail-closed retry) is met, but its closure claim ("release transient
+CK") transitively depends on P5.T1's untested zeroization — closing T2 while
+T1 stays open would misrepresent what has actually been proven. Full
+evidence:
+`docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`.
 
 **Acceptance criteria:** Connect existing player to scoped loopback URL; release transient CK and gateway on stop/sign-out/error according to frozen lifecycle; preserve existing review playback.
 

@@ -152,7 +152,7 @@ P2 must prove accepted O4 failure semantics rather than only the happy path: los
 
 ## Remaining phase-specific decisions
 
-- **P2 remaining:** P2.T2 and T3a are Done (2026-09-08), including T2c-r and T2g recertification. P2.T4a-T4f are Done (T4a 2026-09-07; T4b-T4f 2026-09-14 under retrospective owner waiver). Remaining work excludes T4; `P2.T4e-cov` is retained as a non-blocking residual. C0 contracts and ownership remain frozen.
+- **P2: Done, PASS (2026-09-18).** P2.T2 and T3a are Done (2026-09-08), including T2c-r and T2g recertification. P2.T4a-T4f are Done (T4a 2026-09-07; T4b-T4f 2026-09-14 under retrospective owner waiver); `P2.T4e-cov` is retained as a non-blocking residual. P2.T3c/T3c-Integ (2026-09-13), P2.T3d (CONS-T3), P2.T5a-d/T6a-d (retrospective closure, CONS-T4), and P2.T6e (CONS-T5) are all Done — aggregate `P2` is PASS as of 2026-09-18; see `docs/audit/mvp0-p2p-p2-t6-closure.md`. C0 contracts and ownership remain frozen.
 - **P4:** persistent product cache/device lifecycle, sign-out wipe, and background execution beyond P1 transient proof.
 - **P7:** certification profile that disables legacy HTTP media routes without disabling control-plane APIs.
 

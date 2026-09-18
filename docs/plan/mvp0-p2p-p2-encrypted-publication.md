@@ -1,11 +1,18 @@
 ---
 type: Plan
 title: "Plan: MVP0-P2P P2 encrypted publication"
-status: in_progress
+status: completed
 slice: MVP0-P2P
 ---
 
 # P2 — encrypted P2P publication after S-120
+
+> **Status: `[x] Done` — aggregate `P2` PASS, 2026-09-18.** All leaves
+> `T0`-`T6e` are closed. Full closure record:
+> `docs/audit/mvp0-p2p-p2-t6-closure.md`; task ledger:
+> `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`. P3-P7 are unblocked at
+> the phase-activation-gate level; each still needs its own exact-path
+> decomposition, RRI, and approval before implementation.
 
 ## Objective
 

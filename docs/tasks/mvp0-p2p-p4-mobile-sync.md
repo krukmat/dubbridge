@@ -17,10 +17,10 @@ behavioral_coverage_contract: behavior-v2
 
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
-| P4.T0 | Lifecycle, cache, and RPC freeze | planning | M | P3 PASS | Planned; not activated |
-| P4.T1 | Product replication and bounded resume | development | L | T0 PASS | Planned; not activated |
-| P4.T2 | Manifest verification and lifecycle isolation | development | L | T1 PASS | Planned; not activated |
-| P4.T3 | P4 certification and P5 handoff | development/evidence | M | T2 PASS | Planned; not activated |
+| P4.T0 | Lifecycle, cache, and RPC freeze | planning | M | P3 PASS | `[x]` Done 2026-09-18 |
+| P4.T1 | Product replication and bounded resume | development | L | T0 PASS | Blocked — bounded reconnect not implemented, see verification note |
+| P4.T2 | Manifest verification and lifecycle isolation | development | L | T1 PASS | `[x]` Done 2026-09-18 |
+| P4.T3 | P4 certification and P5 handoff | development/evidence | M | T2 PASS | Blocked — no certification artifact, see verification note |
 
 
 ## Shared activation and closure contract
@@ -46,7 +46,21 @@ Release artifact/gate changes also synchronize the S-230 plan and ledger.
 
 **Depends on:** P3 PASS
 
-**Status:** Planned; not activated.
+**Status:** `[x]` Done — retro-certified 2026-09-18 under owner waiver D0-a (peer
+review waived; verification not waived). RRI 25 Low (`scripts/rri.py`,
+`mobile/src/p2p/sync/{SyncState,SyncCache,P2PSyncController}.ts`).
+
+**Reflection:** Low band, cycle folded into review evidence below — no gap found.
+
+**Behavioral coverage certification:** HP-P4.T0-1 and EC-P4.T0-1 both map to
+passing `unit` evidence — 14/14 tests in `mobile/src/p2p/sync/__tests__`
+directly exercise the sync/resume/verify state machine, the READY invariant,
+per-account cache isolation, and sign-out cancellation.
+
+**Owner final verification:** Matias, 2026-09-18 — closed on "cierra los
+otros" after reviewing the named residual-free verdict in
+`docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`.
+Commands run: `npm test -- mobile/src/p2p/sync`.
 
 **Acceptance criteria:** Freeze persistent ciphertext-cache lifecycle and versioned sync/verification operations, owner paths and evidence mapping; preserve inert startup and proof-runner isolation.
 
@@ -75,7 +89,14 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T0 PASS
 
-**Status:** Planned; not activated.
+**Status:** Blocked — not closeable. **Verification note (2026-09-18):** the
+"bounded reconnect against unavailable peers" criterion (EC-P4.T1-1) is not
+implemented — `reconnect-budget.ts` is wired only into the P1/P2 dev-proof
+topology, never into `P2pProductSync.ts`; the product path is
+single-attempt-then-fail. This is a criterion gap, not an under-test gap.
+Full evidence: `docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`.
+Needs either implementation or an explicit owner risk-acceptance before
+closure.
 
 **Acceptance criteria:** Wire explicit product sync through P2PService → BareRuntimeClient → product worklet, bounded reconnect/cancel and reusable partial ciphertext cache.
 
@@ -104,7 +125,26 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T1 PASS
 
-**Status:** Planned; not activated.
+**Status:** `[x]` Done — retro-certified 2026-09-18 under owner waiver D0-a.
+RRI 25 Low (`scripts/rri.py`,
+`mobile/src/p2p/sync/{PackageVerifier,VerifiedPackageHandle}.ts`,
+`mobile/src/p2p/runtime/replication-verify.ts`).
+
+**Reflection:** Low band, cycle folded into review evidence below.
+
+**Behavioral coverage certification:** HP-P4.T2-1 and EC-P4.T2-1 map to
+passing `unit` evidence — 14/14 tests; digest mismatch, missing files, and
+identity mismatch each fail closed under a dedicated test.
+
+**Named residual (owner-accepted):** no test isolates cancellation during
+`VERIFYING` specifically (only `DOWNLOADING` is tested); "secrets never reach
+Bare" is a structural/interface guarantee, not an explicit negative-assertion
+test. Non-blocking, same class as `P2.T4e-cov`.
+
+**Owner final verification:** Matias, 2026-09-18 — closed on "cierra los
+otros", accepting the named residual as described in
+`docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`.
+Commands run: `npm test -- mobile/src/p2p/sync`.
 
 **Acceptance criteria:** Verify complete package against expected canonical manifest/hash and file digests before READY; enforce frozen sign-out/cache/device lifecycle and no-secret runtime boundary.
 
@@ -133,7 +173,12 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T2 PASS
 
-**Status:** Planned; not activated.
+**Status:** Blocked — not closeable. **Verification note (2026-09-18):** no
+discrete certification artifact exists (P5 has an analogous
+`P5DeviceCertification.ts`; P4 has none), and "account-change" as distinct
+from sign-out is not separately exercised by any test. Full evidence:
+`docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`.
+Needs the missing artifact/test before closure.
 
 **Acceptance criteria:** Certify sync/resume/corruption/account-change HP/EC on the product runtime; record verified package handle and state contract consumed by P5.
 

@@ -1,7 +1,7 @@
 ---
 type: TaskList
 title: "Tasks: MVP0-P2P P2 encrypted publication"
-status: in_progress
+status: completed
 slice: MVP0-P2P
 plan: docs/plan/mvp0-p2p-p2-encrypted-publication.md
 behavioral_coverage_contract: behavior-v2
@@ -20,6 +20,10 @@ behavioral_coverage_contract: behavior-v2
 - `P2.T1a`-`P2.T1f`: **Done / owner-approved as the complete P2.T1 persistence outcome on 2026-09-06**. Do not reopen for retrospective review.
 - `P2.C0`: **PASS 2026-09-06 — RRI 66 Complex / Effort L**. Owner approved the ten-path docs/fixture freeze; four Reflection passes PASS.
 - P2.T2, T3a, and T3b are Done, including T2c-r and T2g recertification; T3b was owner-verified on 2026-09-09. T4a is Done (2026-09-07). T3c's 2026-09-12 preflight resolved D2 by expanding T3c with a Rust materializer and decomposed the parent into eight implementation/integration leaves. T3c-S0, T3c-S1a, T3c-S2a, T3c-S3, and T3c-S1b are Done. On 2026-09-12 Matias approved the frozen RRI-70 `P2.T3c` parent envelope at its HITL checkpoint and separately approved `P2.T3c-S2a` for execution; evidence: `.agent/p2-t3c/parent-hitl-approval.json` and `.agent/p2-t3c/s2a-execution-approval.json`. This parent approval is retained for later in-scope leaves, without authorizing scope expansion or out-of-order execution. T3c-S2a and T3c-S3 are `[x] Done` (owner-verified 2026-09-12 and 2026-09-13 respectively); see their closure records. `P2.T3c-S1b` (RRI 55 Med-high, Rust package materializer) was approved 2026-09-13 ("aprobado", Matias); an honest-low-band-maximization pass found no genuinely separable Low residue in its scope (containment-check, idempotency/conflict decision, and write loop share one control-flow graph), so it routed `CLOUD_REQUIRED` per ADR-038 Amendment 1 and was implemented directly by Claude Sonnet 5; `[x] Done` 2026-09-13, Gemma phase-2 review PASS 0 findings, owner verification pending; see its closure record. `P2.T3c-S2b` (RRI 55 Med-high) was approved 2026-09-13 ("aprobado", Matias) and decomposed per ADR-038 Amendment 4 into Candidate A (`write_atomic.ts`, RRI 25 Low, delegated, `[x] Done`) and Candidate B (`publication_index.ts`, RRI 55 Med-high, implemented directly by the primary agent per explicit owner instruction); both closed and the parent `P2.T3c-S2b` leaf itself is `[x] Done`, owner-verified 2026-09-13. `P2.T3c-S4` (four TypeScript modules composing the local Hyperdrive publication executor — `publication_lock.ts`/`hyperdrive_store.ts`/`package_verification.ts`/`publication_executor.ts`, an internal sub-leaf label not used by the frozen Leaf-B envelope itself) is `[x] Done`, owner-verified 2026-09-13; see its closure record. `P2.T3c-S4-e` (Hyperswarm announce/join/flush networking) closed `[x] Done` 2026-09-13, resolving `S4`'s excluded acceptance criterion 5. `T3c-Integ` (final unified verification proving a real Rust-built package is accepted end-to-end by the real Availability Node executor) closed `[x] Done` 2026-09-13, owner-verified — see its closure record. **`P2.T3c` and Leaf B are now fully closed** (header at § "P2.T3c — persistent Hyperdrive publication and stable replay" is `[x] Done`); no unstarted work remains in the frozen parent envelope. `T3d` is now unblocked. Each executable leaf must still freeze its exact current path set, run `scripts/rri.py`, and follow the resulting workflow route immediately before execution.
+- `P2.T3d` and `P2.T4b`-`T4f` are Done; `P2.T5a`-`T5d` and `P2.T6a`-`T6d` are
+  Done (retrospective closure, CONS-T4, 2026-09-18); `P2.T6e` is Done
+  (CONS-T5, 2026-09-18). **Aggregate `P2`: PASS.** See
+  `docs/audit/mvp0-p2p-p2-t6-closure.md`.
 - Review exception: existing owner-directed MVP0-P2P P0-P7 phase-1/phase-2 review override remains in force; it does not waive RRI/HITL/Reflection/tests.
 
 Canonical C0 evidence:
@@ -4854,8 +4858,8 @@ required cases.
 > closure record"). The migration-numbering correction (`T6a`'s path is
 > `0036_extend_audit_events_p2p_correlation.sql`, not `0035` — `0035` was
 > used by `p2p_ready_descriptor_evidence`, a T5c concern) is preserved in
-> the table below. `T6e` remains open, tracked as
-> `docs/tasks/mvp0-p2p-s230-consistency-remediation.md` § CONS-T5.
+> the table below. `T6e` is now also `[x] Done` (CONS-T5, 2026-09-18,
+> `docs/audit/mvp0-p2p-p2-t6-closure.md`) — **aggregate `P2` is PASS**.
 
 | ID | Objective | Exact writable paths | RRI | Status | Depends on |
 |---|---|---|---|---|---|
@@ -4863,7 +4867,7 @@ required cases.
 | `T6b` | Six P2 audit kinds + durable emitter/repository correlation | `crates/domain/src/audit/kind.rs`; `crates/domain/src/audit/event.rs`; `crates/domain/src/audit/tests.rs`; `crates/db/src/audit_repo.rs`; `crates/audit/src/lib.rs` | RRI 100 Very high (`scripts/rri.py`, 2026-09-18, retroactive — `crates/audit` anchor-rubric floor, same mechanism as T6a) | **[x] Done 2026-09-18 (retrospective waiver, CONS-T4)** | T6a |
 | `T6c` | Deterministic six-window crash/recovery harness | `apps/worker-runner/tests/p2p_crash_windows_test.rs` | RRI 55 Med-high (`scripts/rri.py`, 2026-09-18, retroactive) | **[x] Done 2026-09-18 (retrospective waiver, CONS-T4)** | T2-T5 integration PASS; T6b |
 | `T6d` | Ciphertext-only + secret-deny certification | `apps/worker-runner/tests/p2p_secret_boundary_test.rs`; `apps/availability-node/test/secret_boundary.test.ts` | RRI 70 Complex (`scripts/rri.py`, 2026-09-18, retroactive) | **[x] Done 2026-09-18 (retrospective waiver, CONS-T4)** | T3 PASS; T6b |
-| `T6e` | P2 evidence/status closeout only | `docs/audit/mvp0-p2p-p2-t6-closure.md`; `docs/plan/mvp0-p2p-p2-encrypted-publication.md`; `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`; `docs/plan/mvp0-p2p-first.md`; `docs/tasks/mvp0-p2p-first.md`; `docs/plan/roadmap.md` | RUN BEFORE EXECUTION | Planned — this leaf (final P2 PASS closeout) genuinely has not run; tracked as `docs/tasks/mvp0-p2p-s230-consistency-remediation.md` § CONS-T5 | T6c; T6d; all P2 evidence PASS |
+| `T6e` | P2 evidence/status closeout only | `docs/audit/mvp0-p2p-p2-t6-closure.md`; `docs/plan/mvp0-p2p-p2-encrypted-publication.md`; `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`; `docs/plan/mvp0-p2p-first.md`; `docs/tasks/mvp0-p2p-first.md`; `docs/plan/roadmap.md` | n/a — docs-only, RRI-exempt | **[x] Done 2026-09-18, owner-verified** — CONS-T5; `docs/audit/mvp0-p2p-p2-t6-closure.md` | T6c; T6d; all P2 evidence PASS |
 
 **HP-T6-1:** clean publication produces durable, correlated audit evidence and closes P2 only after all acceptance evidence passes.  
 **EC-T6-1:** each injected D3 crash window converges without false Ready or second lineage.  

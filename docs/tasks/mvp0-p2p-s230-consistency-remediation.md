@@ -9,18 +9,14 @@ behavioral_coverage_contract: behavior-v2
 
 # MVP0-P2P / S-230 consistency remediation — planning ledger
 
-**Status:** In progress. Report-only per owner instruction (2026-09-18). D0-a
-through D0-d are resolved (see below), which unblocks CONS-T4/T9/T11 and the
-T7p/T6p-d chain. **CONS-T0, CONS-T1, CONS-T2, CONS-T3, CONS-T4, and CONS-T9
-are all Done as of 2026-09-18, all owner-verified** — the critical path's
-first five sequential steps (T0 -> T1 -> T2 -> T3 -> T4) plus the
-independent, already-unblocked T9 are closed; CONS-T5 (`P2.T6e` -> P2 PASS)
-is next on the critical path and unblocked. Every implemented CONS-* task's
-RRI was computed with `scripts/rri.py`, not hand-estimated, and CONS-T4's 8
-leaves were retro-certified under the explicit D0-a full waiver rather than
-through a fresh band-routed review — no RRI 26+ task in this ledger has
-gone through implementation without either explicit owner approval or an
-explicit, recorded waiver.
+**Status:** In progress. Report-only per owner instruction (2026-09-18).
+**Done, owner-verified:** CONS-T0/T1/T2/T3/T4/T5/T9 (aggregate `MVP0-P2P P2`
+is **PASS**, `docs/audit/mvp0-p2p-p2-t6-closure.md`) plus, as of this pass,
+**P4.T0, P4.T2, P5.T0** (see CONS-T6/T7/T8a below). **Blocked, not
+closeable via authorization alone:** P3 (all 4 leaves), P4.T1, P4.T3, P5.T1,
+P5.T2, plus CONS-T8b/T10a/T10c (hardware, product decision, and net-new UI
+respectively — outside any waiver's reach). Full verdict and evidence:
+`docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`.
 
 **Origin:** independent repo audit of the last week of commits
 (2026-09-14 to 2026-09-18, `feature/p2p-mvp-core`) against
@@ -53,8 +49,8 @@ folded into CONS-T10a's acceptance criteria below, not into this table.
 | CONS-T2 | **Done 2026-09-18** — full verification pass complete in substance (`qa-docs`/`qa-local` PASS after an RRI-rubric gap fix + a real cross-test-binary race fix, both RRI 25 Low, reviewed PASS; `qa-coverage`/`qa-mobile` run with results attributed to pre-existing, out-of-scope gaps, none caused by this session). Reusable evidence for every retro-closure below. The parallel Availability Node full-suite background run (`bf2c0ndx1`) is still in progress; its result is supplementary evidence, not a blocker on CONS-T2's own completion. | CONS-T1 (done, unblocked) |
 | CONS-T3 | **Done 2026-09-18 / owner-verified** — completed P2.T3d per its original acceptance criteria (mTLS/HTTP/replay/409/422/503); the out-of-scope test remains untouched and is superseded as closure evidence | CONS-T2 |
 | CONS-T4 | **Done 2026-09-18, owner-verified** — retro-closed P2.T5a-d + T6a-d with per-leaf RRI (`scripts/rri.py`, 55/70/70/25/100/100/55/70), Reflection logs, behavioral coverage certification against real re-run tests, and 3 honestly-recorded non-blocking residuals (T5a single-case, T5b `activate()` success-path indirection, T5c repo-level indirection). Owner approved closure explicitly ("cierra CONST-T4 con mi approval", 2026-09-18). Full record: `docs/tasks/mvp0-p2p-p2-encrypted-publication.md` § "P2.T5a-d + T6a-d retrospective integrated closure record". | CONS-T2 (D0-a resolved — full waiver granted, unblocked) |
-| CONS-T5 | P2.T6e -> **P2 PASS** | CONS-T3, CONS-T4 |
-| CONS-T6/T7/T8a | Retro-closure package: P3 (reconstruct T0 + close T1-T3), P4, P5.T0-T2 — 3 leaves, one presentation pass | CONS-T5 |
+| CONS-T5 | **Done 2026-09-18, owner-verified** — `P2.T6e` closeout recorded, all preconditions (T0-T6d) already independently verified. Aggregate `MVP0-P2P P2` is now **PASS**. Full record: `docs/audit/mvp0-p2p-p2-t6-closure.md`. | CONS-T3, CONS-T4 (both done, unblocked) |
+| CONS-T6/T7/T8a | **Partially closed 2026-09-18.** P4.T0, P4.T2, P5.T0 are `[x]` Done, owner-verified (named residuals accepted). P3 (all 4 leaves), P4.T1, P4.T3, P5.T1, P5.T2 remain Blocked — real gaps, mostly in untested fail-closed logic, not just under-review. Per-leaf detail and closure records: the P3/P4/P5 task ledgers themselves and `docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`. | CONS-T5 |
 | CONS-T8b | P5.T3 + X29: real Android device certification | CONS-T6/T7/T8a |
 | CONS-T9 | **Done 2026-09-18** — documented the P2P runtime config exception per D0-b in `config/README.md` and `.env.example`. Re-auditing the actual `grep -rhoE "DUBBRIDGE_P2P_[A-Z_]+"` source found 12 vars, not 9: the 9 the audit counted (`AVAILABILITY_URL`/`CA_PEM`/`IDENTITY_PEM`/`CIPHERTEXT_ROOT`/`HTTP_TIMEOUT_SECS`/`LEASE_SECS`/`RETRY_SECS`/`DISPATCH_INTERVAL_MS`/`MAX_ATTEMPTS`) were already fully documented; the 3 genuinely undocumented ones were `DUBBRIDGE_P2P_KEK_HEX`/`KEK_ID`/`KEK_VERSION` (read directly by `apps/api/src/routes/p2p_envelope.rs` and `apps/worker-runner/src/p2p_activation.rs`, outside the worker-publication/bootstrap groups the "9" count came from). Docs-only, exempt from the RRI/approval gate. | D0-b resolved — unblocked |
 | CONS-T10a | Freeze P6.T0 contract: resolve GAP-1 (owner-facing read model) and GAP-2 (choose the backend-projection or persisted-claim-record option already named in the P6.T0 preflight) | CONS-T8b |
@@ -467,6 +463,32 @@ deferred the documentary gates; during publication, the mandatory pre-push
 hook subsequently ran `make qa-docs` successfully. `git diff --check` was not
 rerun and is not represented as post-closure PASS. P2 remains open and no
 other remediation task was started.
+
+## CONS-T5 — P2.T6e closeout — Done 2026-09-18 (owner-verified)
+
+**Status:** `[x] Done` — docs-only, RRI-exempt (same class as CONS-T0/CONS-T9).
+Full record: `docs/audit/mvp0-p2p-p2-t6-closure.md`.
+
+**Why this was safe to close without re-running verification:** `T6e`'s only
+job is the closeout record itself; every precondition it depends on
+(`T6c`, `T6d`, "all P2 evidence PASS") was already independently verified in
+CONS-T1 (materializer regression fixed, 86/86 Availability Node tests),
+CONS-T2 (full `qa-docs`/`qa-local` pass, three residuals confirmed
+pre-existing and out of scope), CONS-T3 (`P2.T3d`, owner-verified), and
+CONS-T4 (`T5a-d`/`T6a-d`, owner-verified). No source path is in `T6e`'s
+`allowed_paths`, so there is nothing to re-test.
+
+**Owner authorization:** given in-session, 2026-09-18 ("cierra todas las
+tasks con mi autorización"), after the agent presented the precondition
+checklist and explicitly scoped which of the then-open CONS tasks that
+authorization could honestly cover. Recorded in full in
+`docs/audit/mvp0-p2p-p2-t6-closure.md` § Owner final verification.
+
+**Result:** aggregate `MVP0-P2P P2` is **PASS**. Status synchronized in the
+same pass across `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`,
+`docs/plan/mvp0-p2p-p2-encrypted-publication.md`,
+`docs/tasks/mvp0-p2p-first.md`, `docs/plan/mvp0-p2p-first.md`,
+`docs/plan/roadmap.md`, and `docs/architecture.md`.
 
 ## Related
 
