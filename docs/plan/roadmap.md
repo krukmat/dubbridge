@@ -257,10 +257,23 @@ waiver. The ledger records RRI, four-pass Reflection, executable coverage,
 review deviations, and owner verification for all five leaves. The waiver
 accepts T4e's indirect integration evidence without claiming direct
 `from_env`/`run` coverage; `P2.T4e-cov` remains a non-blocking, unscored
-residual. `P2.T5` (S-120 integration +
-fail-closed `P2P_READY` transition, all four children `Planned`), and
-`P2.T6` (audit/crash-window certification and P2 closure, all five children
-`Planned`) — plus `P3`–`P6` themselves, whose phase plans and planning ledgers now exist; executable activation
+residual. **2026-09-18 update:** `P2.T5` (`T5a`-`T5d`, S-120 integration +
+fail-closed `P2P_READY` transition) and `P2.T6` (`T6a`-`T6d`, audit/
+crash-window certification) are retrospectively `[x] Done` and
+owner-verified, closed via `docs/tasks/mvp0-p2p-s230-consistency-remediation.md`
+§ CONS-T4 under the same class of explicit owner waiver as `T4b`-`T4f`.
+Per-leaf RRI (`scripts/rri.py`, retroactive): T5a 55, T5b 70, T5c 70, T5d
+25, T6a 100, T6b 100, T6c 55, T6d 70 — the two Very-high T6a/T6b scores
+come from the `infra/migrations/**`/`crates/audit` anchor-rubric floors
+(ADR-008/018) alone, not from diff size. Three non-blocking residuals are
+recorded (T5a single HP case with no EC variant, T5b's `activate()`
+success-path coverage is indirect, T5c's `p2p_ready_repo.rs` coverage is
+transitive) — same honesty-over-completeness precedent as `P2.T4e-cov`.
+Full closure record:
+`docs/tasks/mvp0-p2p-p2-encrypted-publication.md` § "P2.T5a-d + T6a-d
+retrospective integrated closure record". Only `P2.T6e` (final P2 evidence/
+status closeout, tracked as CONS-T5) remains open before aggregate P2 is
+PASS — plus `P3`–`P6` themselves, whose phase plans and planning ledgers now exist; executable activation
 work remains per § Known planning gaps below. `T6p-d` specifically proves backend
 ciphertext publication plus durable `P2P_READY`, which are exactly what
 `P2.T3` and `P2.T5` implement — so `T6p-a` cannot start until its full gates pass, and the integrated P2

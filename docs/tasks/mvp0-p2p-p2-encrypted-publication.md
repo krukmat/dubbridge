@@ -4829,29 +4829,17 @@ required cases.
 
 ## P2.T5 — S-120 activation + P2P_READY
 
-> **Status-drift annotation (2026-09-18,
-> `docs/audit/mvp0-p2p-s230-consistency-audit-2026-09-18.md` Finding 3):**
-> the `Status` column below reads `Planned`, but source files for all four
-> leaves exist and are wired at HEAD (`c6e28be`):
-> `apps/worker-runner/src/p2p_activation.rs`,
-> `crates/domain/src/p2p_ready_descriptor.rs`,
-> `apps/worker-runner/tests/p2p_s120_non_regression_test.rs`, among 61
-> changed files / +5761/-297 lines / migrations `0034`-`0037`. No RRI,
-> band-routed review artifact, Reflection log, behavioral coverage
-> certification, or owner-verification block exists for any T5 leaf. Do not
-> read `Planned` as "not started" — read it as "implemented, not yet
-> retro-certified." Retro-closure is tracked as
-> `docs/tasks/mvp0-p2p-s230-consistency-remediation.md` § CONS-T4, under an
-> owner-granted waiver (D0-a, resolved 2026-09-18: full waiver granted,
-> reusing the P2.T4b-T4f precedent, commit `6a6d0c7`). Do not flip these
-> rows to `Done` outside that task.
+> **Status-drift annotation — resolved 2026-09-18.** All four leaves were
+> retro-certified via CONS-T4 and are `[x] Done`; see the closure record
+> below (§ "P2.T5a-d + T6a-d retrospective integrated closure record"). The
+> table's `Status` column now reflects this.
 
 | ID | Objective | Exact writable paths | RRI | Status | Depends on |
 |---|---|---|---|---|---|
-| `T5a` | Characterize existing Ready/transcription ordering before activation | `apps/worker-runner/src/preparation_runtime_tests/p2p_activation.rs`; `apps/worker-runner/src/preparation_runtime_tests.rs` | RUN BEFORE EXECUTION | Planned (source exists, not retro-certified — see annotation) | C0 PASS |
-| `T5b` | Fail-contained P2 activation after Ready + transcription post-ready | `apps/worker-runner/src/p2p_activation.rs`; `apps/worker-runner/src/preparation_runtime.rs`; `apps/worker-runner/src/main.rs` | RUN BEFORE EXECUTION | Planned (source exists, not retro-certified — see annotation) | T2 PASS; T4 integration PASS; T5a |
-| `T5c` | Authoritative ready read model + `p2p-ready-descriptor-v1` | `crates/domain/src/p2p_ready_descriptor.rs`; `crates/domain/src/lib.rs`; `crates/db/src/p2p_publication_repo.rs` | RUN BEFORE EXECUTION | Planned (source exists, not retro-certified — see annotation) | T5b |
-| `T5d` | S-120/ASR + no-false-ready non-regression | `apps/worker-runner/tests/p2p_s120_non_regression_test.rs` | RUN BEFORE EXECUTION | Planned (source exists, not retro-certified — see annotation) | T5c |
+| `T5a` | Characterize existing Ready/transcription ordering before activation | `apps/worker-runner/src/preparation_runtime_tests/p2p_activation.rs`; `apps/worker-runner/src/preparation_runtime_tests.rs` | RRI 55 Med-high (`scripts/rri.py`, 2026-09-18, retroactive) | **[x] Done 2026-09-18 (retrospective waiver, CONS-T4)** | C0 PASS |
+| `T5b` | Fail-contained P2 activation after Ready + transcription post-ready | `apps/worker-runner/src/p2p_activation.rs`; `apps/worker-runner/src/preparation_runtime.rs`; `apps/worker-runner/src/main.rs` | RRI 70 Complex (`scripts/rri.py`, 2026-09-18, retroactive) | **[x] Done 2026-09-18 (retrospective waiver, CONS-T4)** | T2 PASS; T4 integration PASS; T5a |
+| `T5c` | Authoritative ready read model + `p2p-ready-descriptor-v1` | `crates/domain/src/p2p_ready_descriptor.rs`; `crates/domain/src/lib.rs`; `crates/db/src/p2p_publication_repo.rs` | RRI 70 Complex (`scripts/rri.py`, 2026-09-18, retroactive) | **[x] Done 2026-09-18 (retrospective waiver, CONS-T4)** | T5b |
+| `T5d` | S-120/ASR + no-false-ready non-regression | `apps/worker-runner/tests/p2p_s120_non_regression_test.rs` | RRI 25 Low (`scripts/rri.py`, 2026-09-18, retroactive) | **[x] Done 2026-09-18 (retrospective waiver, CONS-T4)** | T5c |
 
 **HP-T5-1:** S-120 Ready and transcription enqueue attempt complete independently while P2 proceeds.  
 **HP-T5-2:** durable same-lineage package + external confirmation -> PostgreSQL P2P_READY + minimal P3 descriptor.  
@@ -4860,34 +4848,172 @@ required cases.
 
 ## P2.T6 — audit + deterministic certification + closure
 
-> **Status-drift + numbering-drift annotation (2026-09-18,
-> `docs/audit/mvp0-p2p-s230-consistency-audit-2026-09-18.md` Finding 3):**
-> same status-drift condition as P2.T5 above — source exists for T6a-T6d at
-> HEAD (`apps/worker-runner/tests/p2p_crash_windows_test.rs`,
-> `apps/worker-runner/tests/p2p_secret_boundary_test.rs`,
-> `apps/availability-node/test/secret_boundary.test.ts`, the six P2 audit
-> kinds in `crates/domain/src/audit/kind.rs`), but no RRI/review/Reflection/
-> coverage/owner-verification evidence exists; retro-closure tracked as
-> `docs/tasks/mvp0-p2p-s230-consistency-remediation.md` § CONS-T4 under the
-> D0-a waiver (resolved 2026-09-18, full grant). Additionally, `T6a`'s
-> writable path below names migration `0035`, but the actual audit-
-> correlation migration on disk is `0036_extend_audit_events_p2p_correlation.sql`
-> — `0035` was used by `p2p_ready_descriptor_evidence` instead (a T5c
-> concern). Migrations `0032`-`0038` all exist; flag the corrected mapping
-> for D0-a ratification inside CONS-T4, do not silently renumber this table.
+> **Status-drift + numbering-drift annotation — resolved 2026-09-18.**
+> `T6a`-`T6d` were retro-certified via CONS-T4 and are `[x] Done`; see the
+> closure record above (§ "P2.T5a-d + T6a-d retrospective integrated
+> closure record"). The migration-numbering correction (`T6a`'s path is
+> `0036_extend_audit_events_p2p_correlation.sql`, not `0035` — `0035` was
+> used by `p2p_ready_descriptor_evidence`, a T5c concern) is preserved in
+> the table below. `T6e` remains open, tracked as
+> `docs/tasks/mvp0-p2p-s230-consistency-remediation.md` § CONS-T5.
 
 | ID | Objective | Exact writable paths | RRI | Status | Depends on |
 |---|---|---|---|---|---|
-| `T6a` | Backward-compatible P2 audit correlation schema | `infra/migrations/0036_extend_audit_events_p2p_correlation.sql` (ledger previously named `0035`; corrected 2026-09-18, see annotation) | RUN BEFORE EXECUTION | Planned (source exists, not retro-certified — see annotation) | C0 PASS |
-| `T6b` | Six P2 audit kinds + durable emitter/repository correlation | `crates/domain/src/audit/kind.rs`; `crates/domain/src/audit/event.rs`; `crates/domain/src/audit/tests.rs`; `crates/db/src/audit_repo.rs`; `crates/audit/src/lib.rs` | RUN BEFORE EXECUTION | Planned (source exists, not retro-certified — see annotation) | T6a |
-| `T6c` | Deterministic six-window crash/recovery harness | `apps/worker-runner/tests/p2p_crash_windows_test.rs` | RUN BEFORE EXECUTION | Planned (source exists, not retro-certified — see annotation) | T2-T5 integration PASS; T6b |
-| `T6d` | Ciphertext-only + secret-deny certification | `apps/worker-runner/tests/p2p_secret_boundary_test.rs`; `apps/availability-node/test/secret_boundary.test.ts` | RUN BEFORE EXECUTION | Planned (source exists, not retro-certified — see annotation) | T3 PASS; T6b |
+| `T6a` | Backward-compatible P2 audit correlation schema | `infra/migrations/0036_extend_audit_events_p2p_correlation.sql` (ledger previously named `0035`; corrected 2026-09-18, see annotation) | RRI 100 Very high (`scripts/rri.py`, 2026-09-18, retroactive — `infra/migrations/**` anchor-rubric floor D=4/K=4/P=5 alone forces the ICI bottleneck regardless of diff size) | **[x] Done 2026-09-18 (retrospective waiver, CONS-T4)** | C0 PASS |
+| `T6b` | Six P2 audit kinds + durable emitter/repository correlation | `crates/domain/src/audit/kind.rs`; `crates/domain/src/audit/event.rs`; `crates/domain/src/audit/tests.rs`; `crates/db/src/audit_repo.rs`; `crates/audit/src/lib.rs` | RRI 100 Very high (`scripts/rri.py`, 2026-09-18, retroactive — `crates/audit` anchor-rubric floor, same mechanism as T6a) | **[x] Done 2026-09-18 (retrospective waiver, CONS-T4)** | T6a |
+| `T6c` | Deterministic six-window crash/recovery harness | `apps/worker-runner/tests/p2p_crash_windows_test.rs` | RRI 55 Med-high (`scripts/rri.py`, 2026-09-18, retroactive) | **[x] Done 2026-09-18 (retrospective waiver, CONS-T4)** | T2-T5 integration PASS; T6b |
+| `T6d` | Ciphertext-only + secret-deny certification | `apps/worker-runner/tests/p2p_secret_boundary_test.rs`; `apps/availability-node/test/secret_boundary.test.ts` | RRI 70 Complex (`scripts/rri.py`, 2026-09-18, retroactive) | **[x] Done 2026-09-18 (retrospective waiver, CONS-T4)** | T3 PASS; T6b |
 | `T6e` | P2 evidence/status closeout only | `docs/audit/mvp0-p2p-p2-t6-closure.md`; `docs/plan/mvp0-p2p-p2-encrypted-publication.md`; `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`; `docs/plan/mvp0-p2p-first.md`; `docs/tasks/mvp0-p2p-first.md`; `docs/plan/roadmap.md` | RUN BEFORE EXECUTION | Planned — this leaf (final P2 PASS closeout) genuinely has not run; tracked as `docs/tasks/mvp0-p2p-s230-consistency-remediation.md` § CONS-T5 | T6c; T6d; all P2 evidence PASS |
 
 **HP-T6-1:** clean publication produces durable, correlated audit evidence and closes P2 only after all acceptance evidence passes.  
 **EC-T6-1:** each injected D3 crash window converges without false Ready or second lineage.  
 **EC-T6-2:** required audit persistence failure fails closed where ADR-018 requires it.  
 **EC-T6-3:** P2 audit correlation never fabricates/overloads legacy ingestion-token meaning.
+
+### P2.T5a-d + T6a-d retrospective integrated closure record — Done 2026-09-18
+
+**Status:** `[x] Done` for `P2.T5a`, `P2.T5b`, `P2.T5c`, `P2.T5d`, `P2.T6a`,
+`P2.T6b`, `P2.T6c`, and `P2.T6d`. Matias approved the retrospective closure
+of this consolidated set 2026-09-18
+(`docs/tasks/mvp0-p2p-s230-consistency-remediation.md` § CONS-T4, itself
+gated on the D0-a full waiver resolved the same day, reusing the
+`P2.T4b-T4f` precedent, commit `6a6d0c7`). All 8 leaves' source already
+existed at HEAD before this closure pass (range `d4fdb01..95e36da`,
+2026-09-14); this record adds RRI, Reflection, behavioral coverage
+certification, and owner verification — it authored no new source.
+`T6e` (final P2 evidence/status closeout) is out of scope here and remains
+tracked as `docs/tasks/mvp0-p2p-s230-consistency-remediation.md` § CONS-T5.
+
+Task-analysis review: user-waived (D0-a full waiver, 2026-09-18) - PASS WITH WAIVER
+Code-solution review: user-waived (D0-a full waiver, 2026-09-18) - PASS WITH WAIVER
+
+#### RRI (per leaf, `scripts/rri.py`, retroactive, 2026-09-18)
+
+| Leaf | RRI | Band | Dominant driver |
+|---|---|---|---|
+| `T5a` | 55 | Med-high | worker-runner test scope, no anchor-rubric row (agent-judged D/K/P) |
+| `T5b` | 70 | Complex | worker-runner activation seam, no anchor-rubric row (agent-judged D/K/P) |
+| `T5c` | 70 | Complex | `crates/domain`/`crates/db` mixed scope |
+| `T5d` | 25 | Low | single non-regression test file, narrow scope |
+| `T6a` | 100 | Very high | `infra/migrations/**` anchor-rubric floor (D=4/K=4/P=5, ADR-008/018) forces ICI bottleneck to 100 regardless of the migration's actual size (one small, additive, backward-compatible `ALTER TABLE`) |
+| `T6b` | 100 | Very high | `crates/audit` anchor-rubric floor, same mechanism as T6a |
+| `T6c` | 55 | Med-high | worker-runner integration-test scope, no anchor-rubric row |
+| `T6d` | 70 | Complex | cross-runtime (Rust + Node) secret-boundary certification scope |
+
+The `T6a`/`T6b` Very-high scores are the same anchor-rubric-floor mechanism
+that produced `T4b`'s real RRI 100 in the accepted precedent — confirmed by
+reading `scripts/rri.py:472-495` (`_score5_to_level4` collapses any D/K
+score of 4 or 5 onto technical level 4, forcing bottleneck B=4 → ICI=100 for
+`infra/migrations/**`/`crates/audit` touches independent of file count or
+diff size). This is the RRI v2 formula working as designed for
+security/governance-critical paths (ADR-008, ADR-018), not the kind of
+rubric-table gap found and fixed for `crates/db/tests/*` in
+`docs/tasks/mvp0-p2p-s230-consistency-remediation.md` § CONS-T2.
+
+#### Peer-review and Antares deviation evidence
+
+- All 8 leaves: no retrospective peer verdict is represented as having run
+  for this closure pass; the owner's D0-a full waiver substitutes for both
+  phase-1 and phase-2 review on every leaf, mirroring `T4c`-`T4f`'s
+  precedent (only `T4b` among the precedent set had an actual attempted-
+  and-failed `gpt-oss` review recorded; none of `T5a-d`/`T6a-d` attempted
+  one in this pass).
+- Antares typed skip (`T5a-d`, `T6a-d`): no task-specific watchlisted CWE
+  hypothesis was recorded that would justify specialist routing; skipped.
+
+#### Reflection logs
+
+Required by band: `T5a`/`T6c` (Med-high) 3 passes; `T5b`/`T5c`/`T6d`
+(Complex) 4 passes; `T5d` (Low) reflection folds into the review step per
+policy, not a separate log; `T6a`/`T6b` (Very high) nominally require
+decomposition before any implementation, which does not apply here since no
+implementation occurred — the Complex-band 4-pass depth is applied as the
+practical ceiling for this retrospective certification pass, recorded here
+as an explicit, deliberate deviation rather than a silent skip.
+
+| Leaf | Pass 1 | Pass 2 | Pass 3 | Pass 4 | Revision |
+|---|---|---|---|---|---|
+| `T5a` | `t5a_s120_ready_is_durable_before_transcription_post_ready_enqueue` proves S-120 Ready commits before the transcription-enqueue call observes it. | Stage-log assertion (`["probe", "hls", "transcription_enqueue"]`) proves ordering, not just eventual consistency. | Only one HP case exists; no explicit EC variant (e.g. Ready-but-enqueue-fails) is present in this file. | Confirmed real gap, not fixed here — recorded honestly below rather than claimed as covered. | None (test-characterization leaf; the gap is in scope coverage, not a defect to fix). |
+| `T5b` | `activate_after_transcription` is fail-contained by construction: absent/partial KEK env config returns `None` (no-op) via `load_activation_config`; any error inside `activate()` is logged and swallowed by `run_activation`, never propagated to the caller. | Confirmed by direct code read (`p2p_activation.rs:64-95`) that `process_preparation_job`'s existing S-120 flow cannot be broken by P2 activation failing. | The `activate()` success path itself (real publication creation, package build, materialization, and `advance_to_publish_pending` wired together end-to-end with real env config) has no direct integration test — each primitive it composes (`build_package`, `materialize`, `persist_sealed_package_evidence`) is independently tested elsewhere (T2f, T3c, T6a/b), but the orchestration in `activate()` is not. | Confirmed real gap via `grep` (no test file references `activate_after_transcription` or exercises `run_activation`/`activate` directly with config present). | None — recorded as a residual, same class as the accepted `P2.T4e-cov` precedent, not fixed in this closure pass. |
+| `T5c` | `p2p_ready_descriptor.rs` unit tests (`descriptor_contains_only_opaque_key_reference`, `invalid_digest_fails_closed`) prove the descriptor's shape and fail-closed digest validation. | `crates/db/src/p2p_ready_repo.rs` (`persist_confirmed_manifest_digest`, `get_ready_descriptor_by_asset`) has no direct unit/integration test of its own, but is exercised transitively by `p2p_crash_windows_test.rs` (T6c) and `p2p_s120_non_regression_test.rs` (T5d), both of which read/assert ready-descriptor state through these functions. | Confirmed by `grep -rln "p2p_ready_repo\|get_ready_descriptor_by_asset"` matching those two integration-test files. | No direct repository-level unit test exists; coverage is real but indirect. | None — transitive integration coverage accepted as sufficient for this closure pass; direct repo-level unit tests would strengthen it but are not required to certify the stated HP/EC behavior. |
+| `T5d` | `p2p_s120_non_regression_test.rs` ran 4/4: `hp_t5d_authoritative_ready_materializes_minimal_descriptor`, `ec_t5d_ready_without_manifest_evidence_is_not_exposed`, `ec_t5d_ready_with_undelivered_outbox_is_not_exposed`, `ec_t5d_p2_failure_does_not_regress_s120_ready`. | Case names map directly to this leaf's own HP/EC naming convention — strong first-party evidence, not inferred. | Confirmed passing in isolation this session (`cargo test -p dubbridge-worker-runner --test p2p_s120_non_regression_test -- --test-threads=1`). | No further findings. | None needed. |
+| `T6a` | Migration `0036_extend_audit_events_p2p_correlation.sql` read in full: additive `ALTER TABLE ADD COLUMN` (nullable), FK to `p2p_publications(id, lineage_id)`, and a `CHECK` constraint requiring the P2 shape for the six new event kinds and strict `NULL` for every pre-existing kind. | Confirmed backward-compatible by construction — no existing row can violate the new CHECK, since it only constrains rows whose `event_kind` is one of the six new P2 kinds. | No migration-level test exists (none of `infra/migrations/**` has dedicated test files in this repo; migrations are proved by the integration tests that exercise the schema they add). | `p2p_audit_lifecycle.rs` and `p2p_publication_claim_repo.rs` (below) exercise this schema end-to-end. | None — migration correctness accepted on direct read plus downstream integration-test evidence. |
+| `T6b` | `crates/db/tests/p2p_audit_lifecycle.rs` (2/2 passing) directly asserts `p2p_publication_intent_created` (with idempotent-replay dedup) and `p2p_publication_reconciliation_entered`, and asserts `p2p_lineage_sealed` correctly does *not* fire on K1-seal alone (only on package-seal evidence). | Initially flagged the remaining three kinds (`p2p_publication_confirmed`, `p2p_publication_ready`, `p2p_publication_failed`) as untested by grepping `apps/worker-runner/tests/*` and finding no match. | Found on closer inspection that `crates/db/tests/p2p_publication_claim_repo.rs` (T4b's own file, already `[x] Done`) contains two tests explicitly named `hp_t6b_ready_finalization_writes_correlated_confirmed_and_ready_audit` and `hp_t6b_terminal_failure_writes_same_lineage_audit`, which directly assert all three remaining kinds. Re-ran: 6/6 passing, including both. | Revised the earlier draft finding — T6b has full, direct, named HP-level test coverage across two files; the initial "gap" was a file-location search miss, not a real coverage gap. | Corrected the coverage claim before certifying (see behavioral coverage table below); no code change. |
+| `T6c` | `p2p_crash_windows_test.rs` ran 6/6: all six named crash/recovery windows (`window_1`..`window_6`) covering restart-after-intent, restart-after-K1-seal, restart-after-publish-pending, expired-claim reclaim, ambiguous-remote-outcome replay, and persisted-external-evidence recovery. | Confirmed passing in isolation this session. | Case count and naming match the leaf's own "deterministic six-window" objective exactly. | No further findings. | None needed. |
+| `T6d` | `p2p_secret_boundary_test.rs` (Rust, 3/3) and `apps/availability-node/test/secret_boundary.test.ts` (Node, 3/3) both ran clean. | Rust side: `availability_request_is_metadata_only_and_secret_deny_clean`, `ready_descriptor_exposes_only_opaque_wrap_reference`, `sealed_package_contains_ciphertext_not_source_plaintext`. Node side: rejects every frozen secret-bearing field, publication request stays metadata-only, serialized success evidence cannot carry secret extensions. | Confirmed passing in isolation, both runtimes, this session. | Cross-runtime (Rust + Node) certification matches the leaf's stated ciphertext-only/secret-deny objective on both sides of the boundary. | None needed. |
+
+#### Behavioral coverage certification
+
+| Leaf / cases | Layer | Executable evidence | Result |
+|---|---|---|---|
+| `T5a` / HP-T5-1 (partial) | integration | `preparation_runtime_tests::p2p_activation::t5a_s120_ready_is_durable_before_transcription_post_ready_enqueue` | passed; no direct EC case in this file (see Reflection log) |
+| `T5b` / EC-T5-1 (indirect, by construction) | unit + code-read | `p2p_activation::tests::decode_32_byte_hex_*` (2/2) plus direct-read fail-containment proof; no direct integration test of the `activate()` success path | accepted with residual, same class as `P2.T4e-cov` |
+| `T5c` / HP-T5-2 (partial, descriptor shape only) | unit + indirect integration | `p2p_ready_descriptor::tests::descriptor_contains_only_opaque_key_reference`, `invalid_digest_fails_closed` (2/2); `p2p_ready_repo` exercised transitively by T5d/T6c | passed / accepted indirect |
+| `T5d` / HP-T5-2, EC-T5-1, EC-T5-2 | integration | `hp_t5d_authoritative_ready_materializes_minimal_descriptor`; `ec_t5d_ready_without_manifest_evidence_is_not_exposed`; `ec_t5d_ready_with_undelivered_outbox_is_not_exposed`; `ec_t5d_p2_failure_does_not_regress_s120_ready` | 4/4 passed |
+| `T6a` / HP-T6-1 (schema precondition) | migration + code-read | `infra/migrations/0036_extend_audit_events_p2p_correlation.sql` (additive, backward-compatible, CHECK-enforced) | verified by direct read; proved live by T6b's tests below |
+| `T6b` / HP-T6-1, EC-T6-2, EC-T6-3 | integration | `p2p_audit_lifecycle::intent_and_lineage_seal_are_correlated_and_idempotent`; `p2p_audit_lifecycle::reconciliation_state_and_audit_commit_together`; `p2p_publication_claim_repo::hp_t6b_ready_finalization_writes_correlated_confirmed_and_ready_audit`; `p2p_publication_claim_repo::hp_t6b_terminal_failure_writes_same_lineage_audit` | 4/4 passed (2 files) |
+| `T6c` / EC-T6-1 | integration | `p2p_crash_windows_test::window_1_restart_after_intent_reuses_publication_and_lineage`..`window_6_persisted_external_evidence_recovers_without_false_ready` | 6/6 passed |
+| `T6d` / HP-T6-1 (ciphertext-only), EC-T6-3 (secret-deny) | unit + contract | `p2p_secret_boundary_test::availability_request_is_metadata_only_and_secret_deny_clean`, `::ready_descriptor_exposes_only_opaque_wrap_reference`, `::sealed_package_contains_ciphertext_not_source_plaintext`; Node `secret_boundary.test.ts` (3 cases) | 6/6 passed (2 runtimes) |
+
+Every PostgreSQL-backed test above was run against the local Docker Compose
+Postgres instance (`local-postgres-1`, already running) with
+`DUBBRIDGE_DATABASE_URL=postgres://dubbridge:dubbridge@localhost:5432/dubbridge`,
+each file run individually with `--test-threads=1` to avoid the cross-binary
+outbox race documented and partially fixed in
+`docs/tasks/mvp0-p2p-s230-consistency-remediation.md` § CONS-T2 (that fix
+covers a different two-file pair; running each P2.T5/T6 file individually in
+this pass sidesteps the same class of cross-binary contention rather than
+depending on that fix's scope).
+
+**Known residuals (not fixed in this pass, recorded honestly rather than
+overstated):**
+- `T5a`: only one HP case exists in-file; no explicit EC case (e.g.
+  Ready-committed-but-enqueue-fails) is characterized.
+- `T5b`: the `activate()` end-to-end success path (real config, real
+  publication creation through to `advance_to_publish_pending`) has no
+  direct integration test; fail-containment is proven, the happy path's
+  orchestration is not directly exercised end-to-end in one test.
+- `T5c`: `p2p_ready_repo.rs`'s repository functions have no dedicated
+  unit/integration test file of their own; coverage is real but transitive
+  through T5d/T6c.
+
+Neither residual blocks this closure per the `P2.T4e-cov` precedent (an
+honestly-recorded, non-blocking residual accepted by the same class of
+owner waiver), but both should be considered before any future work builds
+directly on `p2p_activation.rs`'s success path or `p2p_ready_repo.rs` in
+isolation.
+
+#### Owner final verification
+
+- Owner: `Matias`
+- Date: `2026-09-18`
+- Statement: the owner explicitly approved closure of `P2.T5a-d` and
+  `P2.T6a-d` ("cierra CONST-T4 con mi approval", 2026-09-18), accepting the
+  recorded RRI per leaf, the Reflection logs, the behavioral coverage
+  certification including the three named non-blocking residuals (T5a's
+  single HP case with no explicit EC variant, T5b's indirect `activate()`
+  success-path coverage, T5c's transitive `p2p_ready_repo.rs` coverage),
+  and the D0-a full-waiver substitution for band-routed peer review on all
+  8 leaves. The owner did not request a closure-turn command rerun beyond
+  what is recorded below.
+- Commands run: `cargo test -p dubbridge-worker-runner --bin
+  dubbridge-worker-runner preparation_runtime_tests` (11/11, incl. T5a);
+  `cargo test -p dubbridge-worker-runner --test p2p_s120_non_regression_test
+  -- --test-threads=1` (4/4, T5d); `cargo test -p dubbridge-db --test
+  p2p_audit_lifecycle -- --test-threads=1` (2/2, T6b); `cargo test -p
+  dubbridge-domain audit::` (26/26, pre-existing X26 predicates, not T6b-
+  specific); `cargo test -p dubbridge-db --test p2p_publication_claim_repo
+  -- --test-threads=1` (6/6, incl. the two `hp_t6b_*` cases); `cargo test -p
+  dubbridge-worker-runner --test p2p_crash_windows_test -- --test-threads=1`
+  (6/6, T6c); `cargo test -p dubbridge-worker-runner --test
+  p2p_secret_boundary_test -- --test-threads=1` (3/3, T6d Rust side); `node
+  --test apps/availability-node/test/secret_boundary.test.ts` (3/3, T6d Node
+  side); `make qa-docs` (PASS); `git diff --check` (clean, no whitespace
+  errors).
+
+`P2.T5a-d` and `P2.T6a-d` are `[x] Done`, owner-verified 2026-09-18.
+`T6e` and aggregate P2 closure remain open, tracked as
+`docs/tasks/mvp0-p2p-s230-consistency-remediation.md` § CONS-T5.
 
 ### P2.T3c-S4-e closure record — Hyperswarm announce/join sub-leaf — Done 2026-09-13
 

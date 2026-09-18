@@ -1,7 +1,7 @@
 ---
 type: TaskList
 title: "Tasks: MVP0-P2P / S-230 doc-vs-code consistency remediation"
-status: planned
+status: in_progress
 slice: MVP0-P2P
 plan: docs/plan/mvp0-p2p-first.md
 behavioral_coverage_contract: behavior-v2
@@ -9,12 +9,18 @@ behavioral_coverage_contract: behavior-v2
 
 # MVP0-P2P / S-230 consistency remediation — planning ledger
 
-**Status:** Planned. Report-only per owner instruction (2026-09-18). D0-a
+**Status:** In progress. Report-only per owner instruction (2026-09-18). D0-a
 through D0-d are resolved (see below), which unblocks CONS-T4/T9/T11 and the
-T7p/T6p-d chain, and CONS-T0 (docs-only, exempt from the RRI/approval gate)
-is now Done. No RRI 26+ task below is approved for implementation yet — each
-still requires its own `scripts/rri.py` run and, per band, explicit owner
-approval before implementation starts (`docs/policies/HITL_AUTONOMY_POLICY.md`).
+T7p/T6p-d chain. **CONS-T0, CONS-T1, CONS-T2, CONS-T3, CONS-T4, and CONS-T9
+are all Done as of 2026-09-18, all owner-verified** — the critical path's
+first five sequential steps (T0 -> T1 -> T2 -> T3 -> T4) plus the
+independent, already-unblocked T9 are closed; CONS-T5 (`P2.T6e` -> P2 PASS)
+is next on the critical path and unblocked. Every implemented CONS-* task's
+RRI was computed with `scripts/rri.py`, not hand-estimated, and CONS-T4's 8
+leaves were retro-certified under the explicit D0-a full waiver rather than
+through a fresh band-routed review — no RRI 26+ task in this ledger has
+gone through implementation without either explicit owner approval or an
+explicit, recorded waiver.
 
 **Origin:** independent repo audit of the last week of commits
 (2026-09-14 to 2026-09-18, `feature/p2p-mvp-core`) against
@@ -44,9 +50,9 @@ folded into CONS-T10a's acceptance criteria below, not into this table.
 |---|---|---|
 | CONS-T0 | **Done 2026-09-18** — corrected P2.T5/T6 status labels and the T6a migration-numbering reference in `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`; corrected the stale "11 leaves with no code started" claim and added the T7p/T6p-a dependency-scope clarification in `docs/plan/roadmap.md`; annotated the orphaned `docs/plan/mvp0-p2p-p7local-certification.md` duplicate (`status: superseded`, points to the canonical hyphenated doc); linked both 2026-09-14/2026-09-17 audits plus this remediation ledger from `docs/plan/mvp0-p2p-first.md` § Related audits. Docs-only, exempt from the RRI/approval gate. | — |
 | CONS-T1 | **Done 2026-09-18** (RRI 25 Low, see closure record below) — the drift was narrower than first assumed: the Rust dispatcher already used the canonical path helper; only the test fixture's `makeRequest()` hardcoded a stale `package_ref`. Fixed; 86/86 Availability Node tests passing (was 82/86). | — |
-| CONS-T2 | Single full verification pass (`qa-local`, `qa-coverage`, `qa-mobile`, Availability Node suite) — reusable evidence for every retro-closure below | CONS-T1 (done, unblocked) |
+| CONS-T2 | **Done 2026-09-18** — full verification pass complete in substance (`qa-docs`/`qa-local` PASS after an RRI-rubric gap fix + a real cross-test-binary race fix, both RRI 25 Low, reviewed PASS; `qa-coverage`/`qa-mobile` run with results attributed to pre-existing, out-of-scope gaps, none caused by this session). Reusable evidence for every retro-closure below. The parallel Availability Node full-suite background run (`bf2c0ndx1`) is still in progress; its result is supplementary evidence, not a blocker on CONS-T2's own completion. | CONS-T1 (done, unblocked) |
 | CONS-T3 | **Done 2026-09-18 / owner-verified** — completed P2.T3d per its original acceptance criteria (mTLS/HTTP/replay/409/422/503); the out-of-scope test remains untouched and is superseded as closure evidence | CONS-T2 |
-| CONS-T4 | Retro-close P2.T5a-d + T6a-d (RRI, band-routed review, Reflection, behavior-v2 cert, owner verification, path-drift noted) | CONS-T2 (D0-a resolved — full waiver granted, unblocked) |
+| CONS-T4 | **Done 2026-09-18, owner-verified** — retro-closed P2.T5a-d + T6a-d with per-leaf RRI (`scripts/rri.py`, 55/70/70/25/100/100/55/70), Reflection logs, behavioral coverage certification against real re-run tests, and 3 honestly-recorded non-blocking residuals (T5a single-case, T5b `activate()` success-path indirection, T5c repo-level indirection). Owner approved closure explicitly ("cierra CONST-T4 con mi approval", 2026-09-18). Full record: `docs/tasks/mvp0-p2p-p2-encrypted-publication.md` § "P2.T5a-d + T6a-d retrospective integrated closure record". | CONS-T2 (D0-a resolved — full waiver granted, unblocked) |
 | CONS-T5 | P2.T6e -> **P2 PASS** | CONS-T3, CONS-T4 |
 | CONS-T6/T7/T8a | Retro-closure package: P3 (reconstruct T0 + close T1-T3), P4, P5.T0-T2 — 3 leaves, one presentation pass | CONS-T5 |
 | CONS-T8b | P5.T3 + X29: real Android device certification | CONS-T6/T7/T8a |
@@ -130,7 +136,7 @@ corrected directly — whitespace drift, not a delegation defect, per
 
 **Owner final verification:** pending — record owner, date, statement, and exact commands run before this closure record is treated as final per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Development task closure checklist`.
 
-## CONS-T2 — verification pass — race fix implemented and all gates run 2026-09-18; pending Availability Node background result only
+## CONS-T2 — verification pass — Done 2026-09-18 (race fix implemented and all gates run; Availability Node full-suite background run supplementary, non-blocking)
 
 - `make qa-docs`: **PASS** (re-verified after all CONS-T0/CONS-T1 doc edits).
 - `make qa-local` (`fmt` + `clippy` + `test` + `cargo check`): first attempt failed —

@@ -54,7 +54,7 @@ operational surfaces from planned ones. Delivery sequence lives in
 | First-party session gateway (transparent JWT relay) | Operational | S-040, ADR-031 |
 | First-party mobile client (React Native + Expo) | Canonical, sole authenticated product surface | S-050/S-105, ADR-029/031 |
 | Mobile P2P runtime boundary | P1 closed `[x] Done` 2026-09-01 (7/8 children PASS: packaging/protocol, ownership/composition, storage, replication transport, verification/reconnect/teardown; P1.F3b itself stays `not PASS`, non-blocking, deferred into X28); no product P2P runtime or network activity is active outside bounded proof runners | MVP0-P2P P1, ADR-043 |
-| P2P audience delivery (encrypted publication, invite/claim, verified sync, loopback playback) | Architecture accepted; P2.T0/C0 PASS; P2.T1 and P2.T2 are Done and owner-verified, including sealed-K1 persistence, in-memory ciphertext package construction, and cross-runtime nonce-collision certification; P2.T3a contract/bootstrap and P2.T3b private fail-closed mTLS ingress are Done and owner-verified; P2.T4a recovery kernel is Done. P2.T3c (Rust package materializer + Availability Node persistent Hyperdrive publication, including T3c-Integ's real-pipeline end-to-end verification) is Done and owner-verified as of 2026-09-13. T3d, T4b-T4f, T5, and T6 remain planned before P3-P7 can activate. | MVP0-P2P P2–P7, ADR-044 |
+| P2P audience delivery (encrypted publication, invite/claim, verified sync, loopback playback) | Architecture accepted; P2.T0/C0 PASS; P2.T1 and P2.T2 are Done and owner-verified, including sealed-K1 persistence, in-memory ciphertext package construction, and cross-runtime nonce-collision certification; P2.T3a contract/bootstrap and P2.T3b private fail-closed mTLS ingress are Done and owner-verified; P2.T4a recovery kernel is Done. P2.T3c (Rust package materializer + Availability Node persistent Hyperdrive publication, including T3c-Integ's real-pipeline end-to-end verification) is Done and owner-verified as of 2026-09-13. P2.T3d and P2.T4b-T4f are Done. P2.T5 and P2.T6a-T6d are Done and owner-verified as of 2026-09-18 (retrospective closure, CONS-T4). Only P2.T6e (final closeout) remains before P3-P7 can activate. | MVP0-P2P P2–P7, ADR-044 |
 
 Human review runtime (S-170) and publication runtime (S-180) have no plan/task
 ledger yet.
@@ -155,7 +155,15 @@ ledger yet.
   `[x] Done` (closed 2026-09-13, owner-verified), including `T3c-Integ`'s
   unified verification that a package genuinely built by the real Rust
   pipeline is accepted end-to-end by the real Availability Node executor.
-  `T3d`, `T4b`–`T4f`, `T5`, and `T6` remain planned. Design inputs:
+  `P2.T3d` (Availability Node contract/mTLS/security certification) and
+  `P2.T4b`–`T4f` (O4 dispatcher/reconciler) are Done, the latter closed
+  retrospectively 2026-09-14 under an explicit owner waiver. `P2.T5`
+  (S-120 integration + fail-closed `P2P_READY`) and `P2.T6a`–`T6d`
+  (audit correlation + deterministic crash-window certification) are also
+  Done, closed retrospectively 2026-09-18 under the same class of waiver
+  (`docs/tasks/mvp0-p2p-s230-consistency-remediation.md` § CONS-T4). Only
+  `P2.T6e` (final P2 evidence/status closeout) remains before aggregate P2
+  is PASS and P3-P7 can activate. Design inputs:
   `docs/plan/mvp0-p2p-design-inputs.md`.
 - `crates/connectors` (primary S-090, ADR-025): per-platform integrations behind a
   `PlatformConnector` trait. For owner-authorized download (content owner grants
