@@ -5,7 +5,7 @@ import { BareRpcPort, RuntimeProtocolClient } from "../runtime/runtime-client";
 import RUNTIME_WORKLET_SOURCE from "../runtime/worklet.bundle.js";
 
 const RUN_ID = /^[a-z0-9]{8,64}$/;
-const PROOF_WORKLET_FILENAME = "/dubbridge-p2p-proof.worklet";
+const PROOF_WORKLET_FILENAME = "/dubbridge-p2p-proof.bundle";
 
 export class ProofStorageConfigError extends Error {
   readonly code = "PROOF_STORAGE_CONFIG_INVALID" as const;

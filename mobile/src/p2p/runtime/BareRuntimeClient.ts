@@ -46,7 +46,7 @@ type BareRpcStream = ConstructorParameters<typeof BareRpcPort>[0];
 
 type StartPlaybackInput = Omit<StartProductPlaybackRequest, "protocolVersion">;
 
-const PRODUCT_WORKLET_FILENAME = "/dubbridge-p2p-runtime.worklet";
+const PRODUCT_WORKLET_FILENAME = "/dubbridge-p2p-runtime.bundle";
 const ACCOUNT_SCOPE = /^[A-Za-z0-9._-]{1,128}$/;
 
 function defaultProductStorageUri(): string {
