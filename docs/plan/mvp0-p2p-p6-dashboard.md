@@ -1,13 +1,13 @@
 ---
 type: Plan
 title: "P6: Minimal My Content and Invites dashboard"
-status: planned
+status: in_progress
 slice: MVP0-P2P
 ---
 
 # P6 — Minimal My Content and Invites dashboard
 
-Task ledger: `docs/tasks/mvp0-p2p-p6-dashboard.md`. **Activation gate satisfied 2026-09-22: P3 PASS + P4 PASS + P5-DEV.** P6.T0 is unblocked but not activated; activation still requires its exact-path/RRI workflow. P5.T3 is deferred to release certification.
+Task ledger: `docs/tasks/mvp0-p2p-p6-dashboard.md`. **Activation gate satisfied 2026-09-22: P3 PASS + P4 PASS + P5-DEV. P6.T0 is closure-ready; owner verification pending.** T0 froze the authoritative state/action/navigation contract at RRI 25 Low. P5.T3 is deferred to release certification.
 
 ## Objective
 
@@ -37,7 +37,7 @@ Freeze state projection and action eligibility from canonical backend and runtim
 
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
-| P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **Unblocked / not activated** |
+| P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **Closure-ready 2026-09-22; owner verification pending** |
 | P6.T1 | Owner My Content and invite action | development | M | T0 PASS | Planned; not activated |
 | P6.T2 | Viewer claim, Invites, sync and play actions | development | L | T1 PASS | Planned; not activated |
 | P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | Planned; not activated |
@@ -78,3 +78,8 @@ this document does not establish capacity or guarantee the October date.
 - `docs/adr/ADR-043-mobile-p2p-runtime-ownership-and-proof-isolation.md` — product runtime ownership.
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and `docs/policies/HITL_AUTONOMY_POLICY.md` — activation and closure.
 - `DESIGN.md` — existing mobile visual intent; shipped theme tokens resolve visual drift.
+
+
+### P6.T0 contract freeze — 2026-09-22
+
+Evidence: `docs/audit/mvp0-p2p-p6-t0-state-navigation-contract-2026-09-22.md`. Owner/content state comes only from `/api/p2p/content`; viewer access from `/api/p2p/inbox`; local availability from verified P4 sync state. Invite requires authoritative P2P Ready + descriptor. Play requires active authorization + exact descriptor + verified READY package and remains subject to P5 O3 revalidation. Navigation is frozen to Home → My content / Invites with existing P3/P4/P5 services retaining capability ownership.
