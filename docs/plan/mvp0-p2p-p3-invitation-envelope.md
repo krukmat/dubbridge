@@ -78,3 +78,8 @@ this document does not establish capacity or guarantee the October date.
 - `docs/audit/mvp0-p2p-p3-t0-contract-freeze-2026-09-22.md` — current P3 source reconciliation, contract freeze, gaps, path ownership and evidence/RRI decomposition.
 - `docs/audit/mvp0-p2p-p3-t1-implementation-2026-09-22.md` — T1 claim-race, exact-lineage handoff, durable audience audit and 15/15 CI evidence.
 - `docs/audit/mvp0-p2p-p3-t2a-backend-evidence-2026-09-22.md` — T2-A DB release matrix, envelope API/binding, durable envelope audit and 15/15 CI evidence.
+
+
+### 2026-09-22 temporary T2c3 execution pause
+
+Owner direction: keep the Android emulator HPKE/Keystore instrumentation disabled until further notice. T2c1/T2c2 implementation remains valid; the T2c3 harness remains in source but its workflow is hard-disabled. P3.T2 must remain IN PROGRESS and must not be promoted to PASS until T2c3 is explicitly re-enabled and certified.

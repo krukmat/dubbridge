@@ -1,21 +1,13 @@
 name: p3-t2-native
 
 on:
-  push:
-    paths:
-      - 'mobile/src/p2p/device/**'
-      - 'mobile/__tests__/p2p/device-identity.test.ts'
-      - 'mobile/modules/dubbridge-p2p-keystore/**'
-      - '.github/workflows/p3-t2-native.yml'
-  pull_request:
-    paths:
-      - 'mobile/src/p2p/device/**'
-      - 'mobile/__tests__/p2p/device-identity.test.ts'
-      - 'mobile/modules/dubbridge-p2p-keystore/**'
-      - '.github/workflows/p3-t2-native.yml'
+  workflow_dispatch:
 
 jobs:
   android-keystore-hpke-interop:
+    # Temporarily hard-disabled by owner direction on 2026-09-22.
+    # Keep the implementation/test harness intact; remove this guard only when explicitly re-enabled.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

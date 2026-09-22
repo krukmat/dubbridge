@@ -9,7 +9,7 @@ behavioral_coverage_contract: behavior-v2
 
 # P3 — planning task ledger
 
-**Status:** In progress. P3.T0 PASS. P3.T1 PASS. P3.T2 is active: backend block T2-A (T2a/T2b/T2d) completed at `a228ddad` with 15/15 CI PASS; native block T2-B/T2c remains.
+**Status:** In progress. P3.T0 PASS. P3.T1 PASS. P3.T2 backend block T2-A is complete. T2-B implementation is present; T2c1/T2c2 are implemented, while T2c3 Android emulator HPKE/Keystore execution is temporarily disabled by owner direction on 2026-09-22 until explicitly re-enabled.
 **Phase gate:** P2 PASS; Accepted ADR-044.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
@@ -19,7 +19,7 @@ behavioral_coverage_contract: behavior-v2
 |---|---|---|---|---|---|
 | P3.T0 | Contract and executable-path freeze | planning | M | P2 PASS | **PASS 2026-09-22** — owner-approved; CI 15/15 green |
 | P3.T1 | Invitation persistence, claim, and inbox | development | decomposed | T0 PASS | **PASS 2026-09-22** — owner-verified; `4dede25d` 15/15 CI green |
-| P3.T2 | O3 authorization and native K1 envelope delivery | development | decomposed | T1 PASS | **In progress** — T2-A backend Done (`a228ddad`, 15/15 CI PASS); T2-B/T2c native binding+expiry+opaque-key interop pending |
+| P3.T2 | O3 authorization and native K1 envelope delivery | development | decomposed | T1 PASS | **In progress** — T2-A Done; T2c1/T2c2 implemented; T2c3 emulator HPKE/Keystore execution temporarily disabled by owner direction; no T2 PASS claimed |
 | P3.T3 | P3 integration certification and closure | development/evidence | M | T2 PASS | Blocked — no work product exists, see verification note |
 
 
@@ -170,12 +170,12 @@ Delivered in T2-A:
   the response is released; audit failure returns 500. Audit detail contains
   bounded identifiers/reason codes only.
 
-Remaining **T2-B / T2c**:
-- explicit JS no-software-fallback tests;
-- native binding JSON parsing + expiry enforcement before HPKE unwrap;
-- Android Keystore opaque-private-key HPKE/P-256 interop evidence.
+T2-B / T2c disposition:
+- **T2c1 implemented:** explicit JS native-only/no-software-fallback tests.
+- **T2c2 implemented:** native binding JSON parsing + expiry enforcement before HPKE unwrap.
+- **T2c3 implementation present but execution paused:** Android Keystore opaque-private-key HPKE/P-256 instrumentation exists, but the emulator workflow is temporarily hard-disabled by owner direction on 2026-09-22 until explicitly re-enabled.
 
-P3.T2 is **not PASS** until T2c closes and receives its own verification.
+P3.T2 remains **IN PROGRESS / not PASS** while T2c3 certification is paused. The pause does not remove or weaken the acceptance criterion.
 
 **Acceptance criteria:** Implement distinct backend audience authorization and all accepted D2 release predicates; prove HPKE Base P-256/HKDF-SHA256/AES-256-GCM with non-exportable Android Keystore private key, native unwrap, binding and expiry checks.
 
