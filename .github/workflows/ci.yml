@@ -107,7 +107,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       minio:
-        image: minio/minio:RELEASE.2025-04-22T22-12-26Z@sha256:a1ea29fa28355559ef137d71fc570e508a214ec84ff8083e39bc5428980b015e
+        image: ghcr.io/coollabsio/minio:2025-04-22t22-12-26z@sha256:d8cfccee3f7bf0182d89c223b2ff53b94c9a88237bc0dd5733dd49fa0f4dab4c
         env:
           MINIO_ROOT_USER: dubbridge
           MINIO_ROOT_PASSWORD: dubbridge-minio-ci
@@ -130,8 +130,8 @@ jobs:
       - name: Create S3 integration-test bucket
         run: |
           docker run --rm --network host --entrypoint /bin/sh \
-            minio/mc:RELEASE.2025-08-13T08-35-41Z \
-            -ec 'mc alias set ci http://127.0.0.1:9000 dubbridge dubbridge-minio-ci && mc mb --ignore-existing ci/dubbridge-ci'
+            ghcr.io/coollabsio/minio:2025-04-22t22-12-26z@sha256:d8cfccee3f7bf0182d89c223b2ff53b94c9a88237bc0dd5733dd49fa0f4dab4c \
+            -ec '/usr/bin/mc alias set ci http://127.0.0.1:9000 dubbridge dubbridge-minio-ci && /usr/bin/mc mb --ignore-existing ci/dubbridge-ci'
       - name: Run mandatory S3 integration test
         run: make qa-test-s3
 
