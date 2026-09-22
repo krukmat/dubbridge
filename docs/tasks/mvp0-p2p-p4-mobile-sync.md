@@ -21,6 +21,7 @@ behavioral_coverage_contract: behavior-v2
 | P4.T1 | Product replication and bounded resume | development | L | T0 PASS | Blocked — bounded reconnect not implemented, see verification note |
 | P4.T2 | Manifest verification and lifecycle isolation | development | L | T1 PASS | `[x]` Done 2026-09-18 |
 | P4.T3 | P4 certification and P5 handoff | development/evidence | M | T2 PASS | Blocked — no certification artifact, see verification note |
+| P4.T1-r1 | Product storage file-URI → path at the Corestore boundary (repair; blocks P5.T3) | development | S (provisional) | P4.T1 source present | Planned — RRI/card/approval pending; not implemented |
 
 
 ## Shared activation and closure contract
@@ -198,3 +199,66 @@ downstream input to its consuming phase before claiming closure.
 freeze and score exact paths, preserve the accepted boundary, and deliver only
 P4.T3's acceptance criteria through the current workflow. Stop on a
 contract conflict or unmet dependency; do not silently advance the next phase.
+
+## P4.T1-r1 — Product storage file-URI → path at the Corestore boundary
+
+**Type:** development (defect repair; blocks P5.T3 SYNC)
+
+**Effort:** S (provisional — run `scripts/rri.py` on the exact paths before presentation)
+
+**Depends on:** P4.T1 product worklet source (`de199ff`); does not require P4.T1 closure.
+
+**Status:** Planned — not scored, not presented, not approved, not implemented.
+Owner instruction 2026-09-22: no local-AI roles for this line of work for now
+(weekly usage 94 %); resume from `docs/prompts/p4-t1-r1-storage-uri-fix.md`.
+
+**Defect (confirmed):** `ProductPackageRuntime.open` passes the host `file:` URI
+(`Bare.argv[0]` + `/accounts/<scope>`) straight to `new Corestore(...)`, which treats
+strings as filesystem paths → on Android `ENOENT stat "file:"` in `drive.ready()`.
+Evidence: `docs/audit/mvp0-p2p-p5-t3-android-certification-blocked-2026-09-22.md`
+§ "Corrida diagnóstica instrumentada".
+
+**Selected option (recommended, pending owner approval):** A — keep the host→worklet
+`file:` URI contract; convert exactly once with `bare-url` `fileURLToPath` immediately
+before `new Corestore` in `openPackage`; map conversion failure to
+`PRODUCT_STORAGE_CONFIG_INVALID` before any storage/network handle exists.
+
+**Allowed paths:**
+- `mobile/src/p2p/runtime/product-package-runtime.ts`
+- `mobile/src/p2p/runtime/worklet.bundle.js` (regenerated via `npm run build:bare-worklet` only)
+- `mobile/__tests__/p2p/product-storage-path.test.ts` (new)
+- `mobile/package.json`, `mobile/package-lock.json` — only if the owner approves
+  declaring `bare-url@^2.5.2` as a direct dependency (must resolve to the installed 2.5.2)
+- `docs/audit/mvp0-p2p-p1-a1b-storage-contract.md` (amendment note only)
+
+**Out of scope:** `transient-drive.ts` proof path (same latent defect; residual,
+dev-only), host `BareRuntimeClient`/Expo URI construction, RPC/protocol/codec,
+the TS2339 residual from `f2fa64c`, P4.T1/P4.T3 closure.
+
+**Acceptance criteria:**
+- **HP-P4.T1-r1-1:** A valid root URI whose path contains a space (`%20`) opens a
+  real Corestore/Hyperdrive (RocksDB) at `<decoded root>/accounts/<scope>`; no
+  relative `file:` directory is created in the process cwd. (RED on current code.)
+- **HP-P4.T1-r1-2:** Distinct account scopes resolve to distinct absolute
+  directories, identical to the host cleaner's `Directory(root, "accounts", scope)`.
+- **EC-P4.T1-r1-1:** Non-empty authority (`file://evil/…`), encoded `/` (`%2F`) or
+  NUL (`%00`), or non-`file:` scheme → `PRODUCT_STORAGE_CONFIG_INVALID`; no
+  Corestore/Hyperswarm constructed.
+- **EC-P4.T1-r1-2:** `%2520` decodes once to a literal `%20` (no double decoding).
+- **Device:** a fresh invitation on the Android emulator no longer fails with
+  `ENOENT stat "file:"`; record the next observed stage/result as-is (may expose a
+  later blocker; not a PASS claim).
+
+**Test notes:** follow the existing `bare-crypto` idiom —
+`jest.mock("bare-url", () => require("node:url"))`; mock `hyperswarm` with a fake
+whose `join().flushed()` resolves `true` (no network); use `@jest-environment node`
+and `process.chdir` into a temp dir so a RED run cannot pollute `mobile/`. A real
+Corestore open under `jest-expo` was verified feasible on 2026-09-22.
+
+**Evidence to emit:** RED→GREEN test output; `npm run check:bare-worklet`;
+`npm run typecheck` compared to the 3-error TS2339 baseline; `npm run lint`;
+Android emulator run with redacted markers; RRI report.
+
+**Status artifacts affected:** this ledger; P5 ledger/plan P5.T3 status; the P5.T3
+audit; `docs/audit/mvp0-p2p-p1-a1b-storage-contract.md` amendment.
+

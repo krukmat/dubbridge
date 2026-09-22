@@ -82,6 +82,28 @@ services:
       minio-init:
         condition: service_completed_successfully
 
+  gateway:
+    image: rust:1.98.1-bookworm
+    profiles: ["app"]
+    working_dir: /workspace
+    command: cargo run -p dubbridge-gateway
+    env_file:
+      - path: ../../.env
+        required: false
+    environment:
+      DUBBRIDGE_ENV: local
+      DUBBRIDGE_CONFIG_DIR: /workspace/config
+      DUBBRIDGE_DATABASE_URL: postgres://dubbridge:dubbridge@postgres:5432/dubbridge
+      DUBBRIDGE_REDIS_URL: redis://redis:6379
+      DUBBRIDGE_GATEWAY__UPSTREAM_API_BASE_URL: http://api:8080
+    ports:
+      - "8082:8081"
+    volumes:
+      - ../..:/workspace
+    depends_on:
+      api:
+        condition: service_started
+
   availability-node:
     image: node:22.23.0-bookworm
     profiles: ["app"]

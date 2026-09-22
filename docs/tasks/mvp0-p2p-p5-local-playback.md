@@ -20,7 +20,7 @@ behavioral_coverage_contract: behavior-v2
 | P5.T0 | Gateway/session contract freeze | planning | M | P4 PASS | `[x]` Done 2026-09-18 |
 | P5.T1 | Loopback ciphertext decryption gateway | development | L | T0 PASS | Automated evidence PASS 2026-09-18; formal closure pending owner verification/governance sync |
 | P5.T2 | Existing VideoPlayer and deterministic teardown | development | M | T1 PASS | Automated evidence PASS 2026-09-18; formal closure pending owner verification/governance sync |
-| P5.T3 | Playback and secret-boundary certification | development/evidence | M | T2 PASS | Next evidence step; Android device/emulator certification still required |
+| P5.T3 | Playback and secret-boundary certification | development/evidence | M | T2 PASS | **BLOCKED by P4** (2026-09-22): SYNC falla por `ENOENT stat "file:"` — el `file:` URI llega a Corestore como path (causa confirmada con instrumentación). Fix planificado: `docs/tasks/mvp0-p2p-p4-mobile-sync.md` § P4.T1-r1. Evidencia: `docs/audit/mvp0-p2p-p5-t3-android-certification-blocked-2026-09-22.md`. |
 
 
 ## Shared activation and closure contract
@@ -164,7 +164,37 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T2 PASS
 
-**Status:** Next evidence step. Do not mark PASS until Android certification evidence is recorded; T1/T2 formal closure must also be synchronized first.
+**Status:** BLOCKED 2026-09-22 — **ahora en la etapa SYNC, ya no en CLAIM**. El
+arreglo del gateway local (servicio `gateway` en `infra/local/docker-compose.yml`
++ default `8082` en `mobile/app.config.ts`) resolvió el bloqueo de CLAIM, que
+quedó confirmado OK con dos invitaciones frescas reclamadas con éxito. El nuevo
+bloqueo es `SYNC_FAILED`, reproducible 2/2, clasificado como **defecto P4**
+(runtime P2P del cliente móvil): el worklet falla en `openPackage()` con una
+excepción cruda que cae en la rama catch-all, ~2-3 s (no es el timeout de
+discovery de 30 s). P3 quedó descartado con verificación en disco, no solo en DB.
+Actualización 2026-09-22: una corrida instrumentada confirmó la hipótesis (1) —
+`ENOENT stat "file:"` en `drive.ready()`, el `file:` URI llega a Corestore como
+path— y descartó la (2) para esa corrida. Fix planificado en
+`docs/tasks/mvp0-p2p-p4-mobile-sync.md` § P4.T1-r1. No se aplicó corrección permanente. Detalle completo, cadena de
+propagación y evidencia: `docs/audit/mvp0-p2p-p5-t3-android-certification-blocked-2026-09-22.md`
+§ "Continuación 2026-09-22". El párrafo siguiente queda como registro histórico
+del bloqueo anterior, ya superado:
+
+**Registro histórico (superado) —** BLOCKED at the CLAIM stage of the happy-path attempt. Root
+cause is a local-development-environment gap, not a P3/P4/P5 code defect: the
+mobile certification harness's default gateway URL
+(`mobile/app.config.ts` → `http://10.0.2.2:8081`) matches neither the local
+Docker Compose `api` container (8080) nor any gateway service (Compose has none),
+and `apps/api` does not itself serve the `/api/*`-prefixed paths the mobile
+client calls (only the gateway, which strips that prefix, does). A standalone
+`dubbridge-gateway` process happened to already be running outside Compose on
+port 8082 in this environment; pointing the harness at it via
+`EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL` required a full rebuild, which invalidated
+the persisted auth session, and no viewer credentials were available to log back
+in. Stopped per task rules rather than fabricating credentials or modifying code.
+No PASS evidence exists yet. Full attempt record, root-cause trace, and follow-up
+recommendations: `docs/audit/mvp0-p2p-p5-t3-android-certification-blocked-2026-09-22.md`.
+T1/T2 formal closure still separately pending owner verification/governance sync.
 
 **Acceptance criteria:** Prove package playback, tamper denial, teardown and review-path non-regression with executable evidence and network capture; hand off play capability/state to P6.
 

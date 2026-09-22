@@ -40,7 +40,7 @@ Freeze loopback-only listener and local session access boundary, HLS path/URI va
 | P5.T0 | Gateway/session contract freeze | planning | M | P4 PASS | Done 2026-09-18 |
 | P5.T1 | Loopback ciphertext decryption gateway | development | L | T0 PASS | Automated evidence PASS; formal closure pending |
 | P5.T2 | Existing VideoPlayer and deterministic teardown | development | M | T1 PASS | Automated evidence PASS; formal closure pending |
-| P5.T3 | Playback and secret-boundary certification | development/evidence | M | T2 PASS | Next evidence step; Android certification required |
+| P5.T3 | Playback and secret-boundary certification | development/evidence | M | T2 PASS | **BLOCKED by P4** (2026-09-22): SYNC falla por `ENOENT stat "file:"` — el `file:` URI llega a Corestore como path (causa confirmada con instrumentación). Fix planificado: `docs/tasks/mvp0-p2p-p4-mobile-sync.md` § P4.T1-r1. Evidencia: `docs/audit/mvp0-p2p-p5-t3-android-certification-blocked-2026-09-22.md`. |
 
 
 The companion ledger defines acceptance, HP/EC, evidence and handoff per task.

@@ -11,6 +11,11 @@ Purpose: execute the remaining P5 device evidence without waiting for P6 product
 ## Preconditions
 
 - Branch: `feature/p2p-mvp-core` at the exact revision being certified.
+- Local Docker Compose stack is up with the `app` profile, including the
+  `gateway` service (`docker-compose -f infra/local/docker-compose.yml --profile app up -d`).
+  The mobile app's default `gatewayBaseUrl` (`mobile/app.config.ts`) targets this
+  gateway at `http://10.0.2.2:8082` (emulator alias for the host); it is not the
+  `api` container's own port (8080) and not Metro's port (8081).
 - Android emulator/device available and the app can reach the configured DubBridge gateway.
 - Backend has one owner-ready P2P publication and a fresh one-time viewer invitation.
 - The viewer account used in the app is the intended invitation recipient.
