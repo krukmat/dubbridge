@@ -7,7 +7,7 @@ slice: MVP0-P2P
 
 # P3 — Invitation, audience authorization, and K1 device envelope
 
-Task ledger: `docs/tasks/mvp0-p2p-p3-invitation-envelope.md`. P2 is PASS and ADR-044 is accepted. P3.T0 PASS. P3.T1 implementation is closure-ready at `4dede25d` with 15/15 CI green; owner verification is the remaining T1 gate before P3.T2 may activate.
+Task ledger: `docs/tasks/mvp0-p2p-p3-invitation-envelope.md`. P2 is PASS and ADR-044 is accepted. P3.T0 PASS. P3.T1 PASS on 2026-09-22 after owner verification; implementation head `4dede25d` completed 15/15 CI green. P3.T2 may now activate.
 
 ## Objective
 
@@ -36,7 +36,7 @@ Freeze concrete API/schema names, token-expiry policy, O3 authorization lifecycl
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
 | P3.T0 | Contract and executable-path freeze | planning | M | P2 PASS | **PASS 2026-09-22** |
-| P3.T1 | Invitation persistence, claim, and inbox | development | decomposed | T0 PASS | **Closure-ready 2026-09-22**; 15/15 CI green; owner verification pending |
+| P3.T1 | Invitation persistence, claim, and inbox | development | decomposed | T0 PASS | **PASS 2026-09-22**; owner-verified; 15/15 CI green |
 | P3.T2 | O3 authorization and native K1 envelope delivery | development | decomposed | T1 PASS | Blocked on T1 PASS; exact leaves frozen |
 | P3.T3 | P3 integration certification and closure | development/evidence | M | T2 PASS | Planned; not activated |
 

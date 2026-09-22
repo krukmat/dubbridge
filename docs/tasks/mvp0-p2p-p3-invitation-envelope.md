@@ -9,7 +9,7 @@ behavioral_coverage_contract: behavior-v2
 
 # P3 — planning task ledger
 
-**Status:** In progress. P3.T0 PASS. P3.T1 implementation/evidence is closure-ready on 2026-09-22 at `4dede25d` with 15/15 CI checks green; final T1 PASS awaits owner verification of the implemented block.
+**Status:** In progress. P3.T0 PASS. P3.T1 **PASS 2026-09-22** after owner verification; implementation head `4dede25d` completed 15/15 CI checks green. P3.T2 is now the next P3 block.
 **Phase gate:** P2 PASS; Accepted ADR-044.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
@@ -18,7 +18,7 @@ behavioral_coverage_contract: behavior-v2
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
 | P3.T0 | Contract and executable-path freeze | planning | M | P2 PASS | **PASS 2026-09-22** — owner-approved; CI 15/15 green |
-| P3.T1 | Invitation persistence, claim, and inbox | development | decomposed | T0 PASS | **Closure-ready 2026-09-22** — T1a/T1b/T1c implemented; `4dede25d` 15/15 CI green; owner verification pending |
+| P3.T1 | Invitation persistence, claim, and inbox | development | decomposed | T0 PASS | **PASS 2026-09-22** — owner-verified; `4dede25d` 15/15 CI green |
 | P3.T2 | O3 authorization and native K1 envelope delivery | development | L | T1 PASS | Blocked on T1 PASS — release-context test exists; remaining predicate/API/native/audit certification frozen in T0 artifact |
 | P3.T3 | P3 integration certification and closure | development/evidence | M | T2 PASS | Blocked — no work product exists, see verification note |
 
@@ -98,9 +98,9 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T0 PASS
 
-**Status:** **Closure-ready 2026-09-22; owner verification pending.** The approved
-T1a/T1b/T1c block is implemented and certified at implementation head
-`4dede25d`, which completed 15/15 CI checks successfully. Evidence:
+**Status:** **PASS 2026-09-22.** The owner verified the implemented T1a/T1b/T1c
+block after review. Implementation head `4dede25d` completed 15/15 CI checks
+successfully. Evidence:
 `docs/audit/mvp0-p2p-p3-t1-implementation-2026-09-22.md`.
 
 Delivered:
@@ -111,8 +111,8 @@ Delivered:
 - **T1c:** durable P3 device/invitation/claim/authorization/denial audit contract
   is wired through the governance audit boundary with bounded non-secret details.
 
-The earlier "0 repo-layer tests" note is superseded. T2 remains blocked until
-this T1 closure receives owner verification and the ledger records T1 PASS.
+The earlier "0 repo-layer tests" note is superseded. T1 is now owner-verified;
+P3.T2 may activate under its own current workflow.
 
 **Acceptance criteria:** Implement hash-only invitation storage, owner-only creation on P2P_READY content, atomic single-viewer claim and scoped inbox; preserve same-viewer idempotency and durable audit.
 

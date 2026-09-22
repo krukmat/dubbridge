@@ -3,7 +3,7 @@ type: Audit
 title: "MVP0-P2P P3.T1 implementation and certification evidence"
 task: P3.T1
 date: 2026-09-22
-status: closure-ready
+status: pass
 ---
 
 # P3.T1 — invitation, claim and inbox implementation evidence
@@ -13,8 +13,7 @@ status: closure-ready
 The owner approved the P3.T1 implementation block after P3.T0 PASS. T1a, T1b
 and T1c are implemented. Final implementation head
 `4dede25dda68190d556958e4cd9c35c2ad326b5b` completed **15/15 CI checks
-successfully**. P3.T1 is therefore technically closure-ready; formal PASS still
-requires owner verification of this implemented block.
+successfully**. P3.T1 is therefore **PASS 2026-09-22** after owner verification of the implemented block.
 
 No P3.T2 native/envelope-certification work is claimed here.
 
@@ -158,8 +157,7 @@ coverage gates; this is not an inferred PASS from source inspection.
 
 ## Handoff
 
-P3.T1 is **closure-ready / owner verification pending**.
+P3.T1 is **PASS / owner-verified 2026-09-22**.
 
-Only after owner verification updates the ledger to **P3.T1 PASS** may P3.T2
-activate. P3.T2 remains the separate O3 envelope-release/native K1
+P3.T2 may now activate. P3.T2 remains the separate O3 envelope-release/native K1
 certification block and is not implicitly approved by this evidence.
