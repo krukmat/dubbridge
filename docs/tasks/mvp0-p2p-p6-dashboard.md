@@ -1,7 +1,7 @@
 ---
 type: TaskList
 title: "Tasks: P6 Minimal My Content and Invites dashboard"
-status: planned
+status: in_progress
 slice: MVP0-P2P
 plan: docs/plan/mvp0-p2p-p6-dashboard.md
 behavioral_coverage_contract: behavior-v2
@@ -9,7 +9,7 @@ behavioral_coverage_contract: behavior-v2
 
 # P6 — planning task ledger
 
-**Status:** **Unblocked / not activated.** P3 PASS, P4 PASS and P5-DEV are all satisfied as of 2026-09-22. No P6 task is activated by the P5-DEV closure itself.
+**Status:** **In progress. P6.T0 is closure-ready 2026-09-22; owner verification pending.** P3 PASS, P4 PASS and P5-DEV are satisfied. T1-T3 remain unactivated.
 **Phase gate:** **SATISFIED 2026-09-22 — P3 PASS + P4 PASS + P5-DEV.** P5.T3/P5-CERT is not an activation prerequisite.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
@@ -17,7 +17,7 @@ behavioral_coverage_contract: behavior-v2
 
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
-| P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **Unblocked / not activated** |
+| P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **Closure-ready 2026-09-22 — owner verification pending** |
 | P6.T1 | Owner My Content and invite action | development | M | T0 PASS | Planned; not activated |
 | P6.T2 | Viewer claim, Invites, sync and play actions | development | L | T1 PASS | Planned; not activated |
 | P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | Planned; not activated |
@@ -46,7 +46,7 @@ Release artifact/gate changes also synchronize the S-230 plan and ledger.
 
 **Depends on:** P3 PASS; P4 PASS; P5-DEV. P5.T3 may remain pending.
 
-**Status:** **Unblocked / not activated.** Upstream gate satisfied 2026-09-22.
+**Status:** **Closure-ready 2026-09-22; owner verification pending.** RRI 25 Low, docs-only planning contract. Evidence: `docs/audit/mvp0-p2p-p6-t0-state-navigation-contract-2026-09-22.md`.
 
 **Acceptance criteria:** Map each owner/viewer state to authoritative facts, permitted actions and loading/empty/error behavior; freeze navigation and exact component ownership.
 
