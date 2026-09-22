@@ -7,6 +7,7 @@ import {
   type P2pManifestFile,
   type Sha256Hex,
 } from "./PackageVerifier";
+import { createReconnectBudget, recordDisconnect } from "../runtime/reconnect-budget";
 import type { P2pSyncCache } from "./SyncCache";
 import {
   createSyncSnapshot,
@@ -28,6 +29,15 @@ export interface P2pPackageSource {
 }
 
 export type SyncProgressObserver = (snapshot: P2pSyncSnapshot) => void;
+
+const DEFAULT_MAX_RECONNECT_RETRIES = 1;
+
+class P2pSourceTransportError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "P2pSourceTransportError";
+  }
+}
 
 type ActiveSyncRun = {
   readonly identity: P2pSyncIdentity;
@@ -57,6 +67,7 @@ export class P2pProductSync {
     private readonly source: P2pPackageSource,
     private readonly sha256Hex: Sha256Hex,
     private readonly onProgress: SyncProgressObserver = () => undefined,
+    private readonly maxReconnectRetries = DEFAULT_MAX_RECONNECT_RETRIES,
   ) {}
 
   async sync(descriptor: P2pReadyDescriptor, accountScope: string): Promise<P2pSyncSnapshot> {
@@ -66,12 +77,12 @@ export class P2pProductSync {
 
     const run = this.beginRun(identity, state);
     try {
-      return await this.executeSync(descriptor, run);
+      return await this.executeWithReconnect(descriptor, run);
     } catch (error) {
       await this.handleSyncFailure(run, error);
       throw error;
     } finally {
-      await run.session?.close().catch(() => undefined);
+      await this.closeSession(run);
       this.releaseRun(run);
     }
   }
@@ -117,12 +128,43 @@ export class P2pProductSync {
     return run;
   }
 
-  private async executeSync(
+  private async executeWithReconnect(
+    descriptor: P2pReadyDescriptor,
+    run: ActiveSyncRun,
+  ): Promise<P2pSyncSnapshot> {
+    let budget = createReconnectBudget(this.maxReconnectRetries);
+
+    while (true) {
+      try {
+        return await this.executeSyncAttempt(descriptor, run);
+      } catch (error) {
+        if (!this.isReconnectable(error, run)) throw error;
+
+        const recorded = recordDisconnect(budget);
+        budget = recorded.budget;
+        await this.closeSession(run);
+
+        if (recorded.decision === "exhausted") throw error;
+
+        const message = error instanceof Error ? error.message : "P2P source transport failed";
+        run.state = await this.persistForRun(
+          transitionSync(run.state, "RETRYING", { lastError: message }),
+          run,
+        );
+      }
+    }
+  }
+
+  private async executeSyncAttempt(
     descriptor: P2pReadyDescriptor,
     run: ActiveSyncRun,
   ): Promise<P2pSyncSnapshot> {
     await this.prepareRun(run);
-    run.session = await this.source.open(descriptor, run.identity.accountScope);
+    try {
+      run.session = await this.source.open(descriptor, run.identity.accountScope);
+    } catch (error) {
+      throw this.sourceTransportError("P2P source open failed", error);
+    }
     this.assertRunActive(run);
     const { manifestBytes, manifest } = await this.loadManifest(descriptor, run);
     await this.copyPackage(run, manifestBytes, manifest);
@@ -152,7 +194,12 @@ export class P2pProductSync {
     run: ActiveSyncRun,
   ): Promise<{ manifestBytes: Uint8Array; manifest: P2pManifest }> {
     const session = this.requireSession(run);
-    const manifestBytes = await session.readManifest();
+    let manifestBytes: Uint8Array;
+    try {
+      manifestBytes = await session.readManifest();
+    } catch (error) {
+      throw this.sourceTransportError("P2P manifest read failed", error);
+    }
     this.assertRunActive(run);
     const { manifest } = await verifyManifestAgainstDescriptor(
       descriptor,
@@ -218,7 +265,12 @@ export class P2pProductSync {
     cached: Uint8Array | null,
   ): Promise<Uint8Array> {
     if (cached !== null && (await this.matchesFile(file, cached))) return cached;
-    const ciphertext = await this.requireSession(run).readCiphertext(file.path);
+    let ciphertext: Uint8Array;
+    try {
+      ciphertext = await this.requireSession(run).readCiphertext(file.path);
+    } catch (error) {
+      throw this.sourceTransportError(`P2P ciphertext read failed: ${file.path}`, error);
+    }
     this.assertRunActive(run);
     if (!(await this.matchesFile(file, ciphertext))) {
       throw new PackageVerificationError(`Ciphertext verification failed: ${file.path}`);
@@ -308,6 +360,25 @@ export class P2pProductSync {
   private requireSession(run: ActiveSyncRun): P2pPackageSourceSession {
     if (run.session === null) throw new Error("P2P source session is not open");
     return run.session;
+  }
+
+  private isReconnectable(error: unknown, run: ActiveSyncRun): boolean {
+    return (
+      !run.cancelled &&
+      !(error instanceof P2pSyncCancelledError) &&
+      error instanceof P2pSourceTransportError
+    );
+  }
+
+  private sourceTransportError(prefix: string, error: unknown): P2pSourceTransportError {
+    const detail = error instanceof Error ? error.message : "unknown transport error";
+    return new P2pSourceTransportError(`${prefix}: ${detail}`);
+  }
+
+  private async closeSession(run: ActiveSyncRun): Promise<void> {
+    const session = run.session;
+    run.session = null;
+    await session?.close().catch(() => undefined);
   }
 
   private releaseRun(run: ActiveSyncRun): void {

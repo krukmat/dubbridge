@@ -157,6 +157,7 @@ describe("P2P product sync", () => {
     });
     expect(state?.phase).toBe("FAILED");
     expect(state?.packageVerified).toBe(false);
+    expect(transport.open).toHaveBeenCalledTimes(1);
   });
 
   it("returns an already verified READY snapshot without reopening the network source", async () => {
@@ -186,6 +187,140 @@ describe("P2P product sync", () => {
 
     expect(state.phase).toBe("READY");
     expect(viewerBTransport.open).toHaveBeenCalledTimes(1);
+  });
+
+
+  it("reconnects once after a transient source-open failure and reaches READY", async () => {
+    const cache = new MemoryP2pSyncCache();
+    const successful = source();
+    const open = jest
+      .fn()
+      .mockRejectedValueOnce(new Error("peer unavailable"))
+      .mockImplementation(successful.open);
+    const phases: string[] = [];
+    const sync = new P2pProductSync(
+      cache,
+      { open },
+      sha256,
+      (state) => phases.push(state.phase),
+      1,
+    );
+
+    const state = await sync.sync(descriptor, accountScope);
+
+    expect(state.phase).toBe("READY");
+    expect(open).toHaveBeenCalledTimes(2);
+    expect(phases).toContain("RETRYING");
+    expect(successful.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops after the bounded reconnect budget is exhausted and never becomes READY", async () => {
+    const cache = new MemoryP2pSyncCache();
+    const open = jest.fn(async () => {
+      throw new Error("peer unavailable");
+    });
+    const phases: string[] = [];
+    const sync = new P2pProductSync(
+      cache,
+      { open },
+      sha256,
+      (state) => phases.push(state.phase),
+      1,
+    );
+    const identity = { accountScope, publicationId: "pub-1", lineageId: "lineage-1" };
+
+    await expect(sync.sync(descriptor, accountScope)).rejects.toThrow("P2P source open failed");
+
+    expect(open).toHaveBeenCalledTimes(2);
+    expect(phases).not.toContain("READY");
+    expect((await cache.readSnapshot(identity))?.phase).toBe("RETRYING");
+  });
+
+  it("reuses verified partial ciphertext after reconnect instead of restarting the package", async () => {
+    const cache = new MemoryP2pSyncCache();
+    const reads: string[] = [];
+    const closes = [jest.fn(async () => undefined), jest.fn(async () => undefined)];
+    let attempt = 0;
+    const open = jest.fn(async () => {
+      const currentAttempt = attempt++;
+      return {
+        readManifest: async () => manifestBytes,
+        readCiphertext: async (path: string) => {
+          reads.push(`${currentAttempt}:${path}`);
+          if (currentAttempt === 0 && path === "segments/000001.ts") {
+            throw new Error("peer disconnected");
+          }
+          return path === "index.m3u8" ? first : second;
+        },
+        close: closes[currentAttempt],
+      };
+    });
+    const sync = new P2pProductSync(cache, { open }, sha256, () => undefined, 1);
+
+    const state = await sync.sync(descriptor, accountScope);
+
+    expect(state.phase).toBe("READY");
+    expect(open).toHaveBeenCalledTimes(2);
+    expect(reads).toEqual([
+      "0:index.m3u8",
+      "0:segments/000001.ts",
+      "1:segments/000001.ts",
+    ]);
+    expect(closes[0]).toHaveBeenCalledTimes(1);
+    expect(closes[1]).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancellation during a reconnect attempt stops further opens and never promotes READY", async () => {
+    const cache = new MemoryP2pSyncCache();
+    let rejectBlockedRead: (error: Error) => void = () => undefined;
+    let markSecondReadStarted: () => void = () => undefined;
+    const secondReadStarted = new Promise<void>((resolve) => {
+      markSecondReadStarted = resolve;
+    });
+    const blockedRead = new Promise<Uint8Array>((_resolve, reject) => {
+      rejectBlockedRead = reject;
+    });
+    const firstClose = jest.fn(async () => undefined);
+    const secondClose = jest.fn(async () => undefined);
+    const secondCancel = jest.fn(async () => {
+      rejectBlockedRead(new Error("transport cancelled"));
+    });
+    let attempt = 0;
+    const open = jest.fn(async () => {
+      const currentAttempt = attempt++;
+      if (currentAttempt === 0) {
+        return {
+          readManifest: async () => {
+            throw new Error("peer disconnected");
+          },
+          readCiphertext: async () => first,
+          close: firstClose,
+        };
+      }
+      return {
+        readManifest: async () => manifestBytes,
+        readCiphertext: async () => {
+          markSecondReadStarted();
+          return blockedRead;
+        },
+        cancel: secondCancel,
+        close: secondClose,
+      };
+    });
+    const sync = new P2pProductSync(cache, { open }, sha256, () => undefined, 2);
+    const identity = { accountScope, publicationId: "pub-1", lineageId: "lineage-1" } as const;
+
+    const pending = sync.sync(descriptor, accountScope);
+    await secondReadStarted;
+    const cancelled = await sync.cancel(identity);
+
+    await expect(pending).rejects.toBeInstanceOf(P2pSyncCancelledError);
+    expect(cancelled.phase).toBe("CANCELLED");
+    expect(open).toHaveBeenCalledTimes(2);
+    expect((await cache.readSnapshot(identity))?.phase).toBe("CANCELLED");
+    expect(firstClose).toHaveBeenCalledTimes(1);
+    expect(secondCancel).toHaveBeenCalledTimes(1);
+    expect(secondClose).toHaveBeenCalledTimes(1);
   });
 
   it("cancels an active source and prevents an in-flight sync from promoting READY", async () => {
