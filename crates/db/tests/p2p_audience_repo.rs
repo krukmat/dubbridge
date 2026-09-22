@@ -236,7 +236,6 @@ async fn invitation_claim_is_owner_scoped_idempotent_and_exposes_only_active_aut
     ));
 }
 
-
 #[tokio::test]
 async fn concurrent_different_viewer_claims_have_exactly_one_winner() {
     let pool = test_pool().await;
@@ -259,12 +258,8 @@ async fn concurrent_different_viewer_claims_have_exactly_one_winner() {
 
     let pool_a = pool.clone();
     let pool_b = pool.clone();
-    let claim_a = async {
-        claim_invitation(&pool_a, &hash, viewer_a, device_a.id, now).await
-    };
-    let claim_b = async {
-        claim_invitation(&pool_b, &hash, viewer_b, device_b.id, now).await
-    };
+    let claim_a = async { claim_invitation(&pool_a, &hash, viewer_a, device_a.id, now).await };
+    let claim_b = async { claim_invitation(&pool_b, &hash, viewer_b, device_b.id, now).await };
     let (result_a, result_b) = tokio::join!(claim_a, claim_b);
 
     let winners = [&result_a, &result_b]
@@ -288,7 +283,11 @@ async fn concurrent_different_viewer_claims_have_exactly_one_winner() {
     .expect("count invitation authorizations");
     assert_eq!(authorization_count, 1);
 
-    let winner = result_a.as_ref().ok().or_else(|| result_b.as_ref().ok()).expect("winner");
+    let winner = result_a
+        .as_ref()
+        .ok()
+        .or_else(|| result_b.as_ref().ok())
+        .expect("winner");
     let repeated = claim_invitation(
         &pool,
         &hash,

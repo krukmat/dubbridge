@@ -73,9 +73,7 @@ fn parse_event_kind(value: &str) -> Result<AuditEventKind, DbError> {
         "p2p_device_registered" => Ok(AuditEventKind::P2pDeviceRegistered),
         "p2p_invitation_created" => Ok(AuditEventKind::P2pInvitationCreated),
         "p2p_invitation_claimed" => Ok(AuditEventKind::P2pInvitationClaimed),
-        "p2p_audience_authorization_issued" => {
-            Ok(AuditEventKind::P2pAudienceAuthorizationIssued)
-        }
+        "p2p_audience_authorization_issued" => Ok(AuditEventKind::P2pAudienceAuthorizationIssued),
         "p2p_device_envelope_released" => Ok(AuditEventKind::P2pDeviceEnvelopeReleased),
         "p2p_audience_access_denied" => Ok(AuditEventKind::P2pAudienceAccessDenied),
         other => Err(DbError::UnknownStoredValue {
@@ -253,5 +251,4 @@ mod tests {
         assert_eq!(event.correlation_id, Some(authorization_id));
         assert!(event.has_valid_p3_correlation());
     }
-
 }

@@ -28,8 +28,7 @@ use dubbridge_domain::{
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha256};
-use dubbridge_domain::{asset::AssetId, p2p_publication::{K1LineageId, P2pPublicationId}, p2p_ready_descriptor::P2pReadyDescriptor};
-    use time::OffsetDateTime;
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::state::AppState;
@@ -386,7 +385,6 @@ async fn get_authorization(
 }
 
 
-
 fn p3_package_event(
     invitation: &P2pInvitationRecord,
     event_kind: AuditEventKind,
@@ -493,6 +491,11 @@ fn db_error_response(error: DbError) -> Response {
 mod tests {
     use super::{descriptor_matches_claim, hash_token, invitation_status, new_invitation_token};
     use dubbridge_db::p2p_audience_repo::{P2pAudienceAuthorizationRecord, P2pInvitationRecord};
+    use dubbridge_domain::{
+        asset::AssetId,
+        p2p_publication::{K1LineageId, P2pPublicationId},
+        p2p_ready_descriptor::P2pReadyDescriptor,
+    };
     use time::OffsetDateTime;
     use uuid::Uuid;
 
@@ -505,7 +508,6 @@ mod tests {
         assert_ne!(left, right);
         assert_eq!(hash_token(&left).len(), 32);
     }
-
 
     #[test]
     fn claim_descriptor_must_match_exact_invitation_and_authorization_lineage() {
@@ -558,7 +560,11 @@ mod tests {
             ready_at: "2026-09-22T00:00:00Z".to_owned(),
         };
 
-        assert!(descriptor_matches_claim(&descriptor, &invitation, &authorization));
+        assert!(descriptor_matches_claim(
+            &descriptor,
+            &invitation,
+            &authorization
+        ));
 
         let mut wrong_lineage = descriptor.clone();
         wrong_lineage.lineage_id = K1LineageId(Uuid::new_v4());

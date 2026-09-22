@@ -578,7 +578,6 @@ fn auth_correlation_rejects_any_correlation_id_and_other_families() {
     assert!(!event.has_valid_auth_correlation());
 }
 
-
 #[test]
 fn p3_audience_events_enforce_exact_package_correlation_when_required() {
     use crate::asset::AssetId;
@@ -644,7 +643,6 @@ fn p3_device_and_unresolved_denial_events_never_require_fake_package_identity() 
     );
     assert!(denial.has_valid_p3_correlation());
 }
-
 
 #[test]
 fn audit_event_kind_display_p3_variants() {

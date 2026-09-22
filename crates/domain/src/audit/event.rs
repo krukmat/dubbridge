@@ -172,7 +172,6 @@ impl AuditEvent {
             && self.correlation_id == publication
     }
 
-
     /// P3 audience/device events use an explicit non-nil correlation identity.
     /// Invitation/authorization/envelope success events also bind exact asset,
     /// publication and lineage. Device registration and pre-resolution denials
@@ -190,7 +189,8 @@ impl AuditEvent {
         let correlation = self.correlation_id.filter(|value| !value.is_nil());
         let publication = self.publication_id.filter(|value| !value.is_nil());
         let lineage = self.lineage_id.filter(|value| !value.is_nil());
-        let has_exact_package = self.asset_id.is_some() && publication.is_some() && lineage.is_some();
+        let has_exact_package =
+            self.asset_id.is_some() && publication.is_some() && lineage.is_some();
         let has_no_package = publication.is_none() && lineage.is_none();
 
         let shape_valid = match self.event_kind {
@@ -307,7 +307,6 @@ impl AuditEvent {
     pub fn new_auth_event(event_kind: AuditEventKind, detail: Option<String>) -> Self {
         Self::base_event(None, event_kind, detail)
     }
-
 
     /// Constructor for MVP0-P2P P3 audience/device governance events.
     pub fn new_p3_event(
