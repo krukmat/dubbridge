@@ -97,6 +97,24 @@ function readyOwnerItem() {
   });
 }
 
+function secondReadyOwnerItem() {
+  return ownerApiItem({
+    assetId: "asset-ready-2",
+    title: "Second ready package",
+    publicationId: "pub-ready-2",
+    lineageId: "lineage-ready-2",
+    state: "ready",
+    descriptor: {
+      ...READY_DESCRIPTOR,
+      assetId: "asset-ready-2",
+      publicationId: "pub-ready-2",
+      lineageId: "lineage-ready-2",
+      externalPublicationId: "hyperdrive:ready-2",
+      ckWrapRef: "k1:ready-2",
+    },
+  });
+}
+
 function createdInvitation(token = "invite-secret") {
   return {
     ok: true,
@@ -242,45 +260,73 @@ describe("MyContentScreen", () => {
     expect(mockClient.post).toHaveBeenCalledTimes(1);
   });
 
-  it("refreshes authoritative content and fails closed when P3 rejects stale Ready state", async () => {
-    mockClient.get
-      .mockResolvedValueOnce({
-        ok: true,
-        value: { data: [readyOwnerItem()], sessionRotation: null },
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        value: {
-          data: [
-            ownerApiItem({
-              assetId: "asset-ready",
-              title: "Ready package",
-              publicationId: "pub-ready",
-              lineageId: "lineage-ready",
-              state: "processing",
-              descriptor: null,
-            }),
-          ],
-          sessionRotation: null,
-        },
-      });
-    mockClient.post.mockResolvedValue({
-      ok: false,
-      error: { kind: "http", status: 409 },
-    });
+  it.each([
+    ["403", { kind: "forbidden" }, "Invite creation is not allowed for this content."],
+    ["404", { kind: "http", status: 404 }, "This content is no longer eligible for an invite."],
+    ["409", { kind: "http", status: 409 }, "This content is no longer eligible for an invite."],
+  ])(
+    "refreshes authoritative content and fails closed when P3 rejects stale Ready state with %s",
+    async (_label, error, expectedMessage) => {
+      mockClient.get
+        .mockResolvedValueOnce({
+          ok: true,
+          value: { data: [readyOwnerItem()], sessionRotation: null },
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          value: {
+            data: [
+              ownerApiItem({
+                assetId: "asset-ready",
+                title: "Ready package",
+                publicationId: "pub-ready",
+                lineageId: "lineage-ready",
+                state: "processing",
+                descriptor: null,
+              }),
+            ],
+            sessionRotation: null,
+          },
+        });
+      mockClient.post.mockResolvedValue({ ok: false, error });
 
-    const { getByTestId, getByText, queryByTestId, queryByText } = await renderScreen();
-    await waitFor(() => expect(getByText("Ready package")).toBeTruthy());
+      const { getByTestId, getByText, queryByTestId, queryByText } = await renderScreen();
+      await waitFor(() => expect(getByText("Ready package")).toBeTruthy());
+
+      await act(async () => {
+        fireEvent.press(getByTestId("my-content-create-invite-asset-ready"));
+      });
+
+      await waitFor(() => expect(getByTestId("my-content-invite-error")).toBeTruthy());
+      expect(getByText(expectedMessage)).toBeTruthy();
+      expect(mockClient.get).toHaveBeenCalledTimes(2);
+      expect(queryByTestId("my-content-create-invite-asset-ready")).toBeNull();
+      expect(queryByText("invite-secret")).toBeNull();
+    },
+  );
+
+  it("locks other Create actions while a one-time raw token is visible", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: {
+        data: [readyOwnerItem(), secondReadyOwnerItem()],
+        sessionRotation: null,
+      },
+    });
+    mockClient.post.mockResolvedValue(createdInvitation("locked-token"));
+
+    const { getByTestId, getByText } = await renderScreen();
+    await waitFor(() => expect(getByText("Second ready package")).toBeTruthy());
 
     await act(async () => {
       fireEvent.press(getByTestId("my-content-create-invite-asset-ready"));
     });
+    await waitFor(() => expect(getByText("locked-token")).toBeTruthy());
 
-    await waitFor(() => expect(getByTestId("my-content-invite-error")).toBeTruthy());
-    expect(getByText("This content is no longer eligible for an invite.")).toBeTruthy();
-    expect(mockClient.get).toHaveBeenCalledTimes(2);
-    expect(queryByTestId("my-content-create-invite-asset-ready")).toBeNull();
-    expect(queryByText("invite-secret")).toBeNull();
+    const secondCreate = getByTestId("my-content-create-invite-asset-ready-2");
+    expect(secondCreate.props.accessibilityState.disabled).toBe(true);
+    fireEvent.press(secondCreate);
+    expect(mockClient.post).toHaveBeenCalledTimes(1);
   });
 
   it("logs out when P3 reports the create session expired", async () => {
