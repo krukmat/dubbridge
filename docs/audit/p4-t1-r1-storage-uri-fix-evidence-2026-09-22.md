@@ -100,3 +100,25 @@ stage is observed; this artifact does not infer a device PASS from CI.
 
 The development-only P1 `transient-drive.ts` URI/path issue remains a separate
 named residual and was not changed.
+
+## Direct dependency follow-up — 2026-09-22
+
+Owner approved declaring `bare-url@^2.5.2` directly in the mobile package.
+The lockfile continues to resolve `bare-url@2.5.2`; no runtime version changed.
+
+The dependency ownership change altered the deterministic packed output, so the
+committed Bare worklet was regenerated from a clean GitHub Actions checkout.
+
+- dependency declaration: `2b2009e8dcc03b2178a560c0ca9401ee08e23944`
+- Rust fmt/clippy cleanup unrelated to this repair: `6debd60ad7fcef2ec3c2427910930ba2eaf91fbf`
+- regenerated worklet: `929addbebb8e4b12dee3f27eff6fd0fde0a92100`
+- committed worklet blob: `3280493d917fe7e39a0f9f20471f02bba3693b3a`
+- regenerated/check sha256:
+  `dcfd5a437ed4839f886ae3ab495775c2ca1a1aa37072ec8a3ff057b8e2ec7a24`
+- `npm run build:bare-worklet`: PASS
+- `npm run check:bare-worklet`: PASS
+- temporary regeneration workflow removed in the same worklet commit
+
+The Android fresh-invitation rerun remains the only device gate for this repair;
+this follow-up still does not mark P5.T3 or aggregate P5 PASS.
+
