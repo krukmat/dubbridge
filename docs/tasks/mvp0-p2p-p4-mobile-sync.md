@@ -1,7 +1,7 @@
 ---
 type: TaskList
 title: "Tasks: P4 Verified mobile ciphertext synchronization"
-status: planned
+status: pass
 slice: MVP0-P2P
 plan: docs/plan/mvp0-p2p-p4-mobile-sync.md
 behavioral_coverage_contract: behavior-v2
@@ -9,7 +9,7 @@ behavioral_coverage_contract: behavior-v2
 
 # P4 — planning task ledger
 
-**Status:** **In progress. P3 PASS gate satisfied 2026-09-22.** P4.T0/T1/T2 are Done; **P4.T3 is closure-ready and is the next formal task.**
+**Status:** **PASS 2026-09-22.** P4.T0/T1/T2/T3 are closed. P4.T3 owner verification is the explicit 2026-09-22 sign-off; certification head `780519c5` completed 15/15 CI PASS. P4.T1-r1 device confirmation remains deferred to P5.T3/P5-CERT and does not reopen P4.
 **Phase gate:** **P3 PASS — satisfied 2026-09-22.**
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
@@ -20,7 +20,7 @@ behavioral_coverage_contract: behavior-v2
 | P4.T0 | Lifecycle, cache, and RPC freeze | planning | M | P3 PASS | `[x]` Done 2026-09-18 |
 | P4.T1 | Product replication and bounded resume | development | L | T0 PASS | `[x]` Done 2026-09-22 — review PASS |
 | P4.T2 | Manifest verification and lifecycle isolation | development | L | T1 PASS | `[x]` Done 2026-09-18 |
-| P4.T3 | P4 certification and P5 handoff | development/evidence | M | T2 PASS | **Closure-ready 2026-09-22** — HP/EC mapped; P5 handoff certified; owner verification pending |
+| P4.T3 | P4 certification and P5 handoff | development/evidence | M | T2 PASS | **PASS 2026-09-22** — HP/EC mapped; P5 handoff certified; 15/15 CI; owner-verified |
 | P4.T1-r1 | Product storage file-URI → path at the Corestore boundary (repair; blocks P5.T3) | development | S | P4.T1 source present | Implemented + CI verified — Android rerun pending |
 
 
@@ -176,7 +176,7 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T2 PASS
 
-**Status:** **Closure-ready 2026-09-22; owner verification pending.** The
+**Status:** **PASS 2026-09-22.** Owner verification completed after certification head `780519c5` reached 15/15 CI PASS. The
 2026-09-18 gaps are now addressed: P4.T1 bounded reconnect is Done with review
 PASS, and `p2p.provider-account-change.test.tsx` exercises authenticated
 Account A → B cleanup through `P2PProvider`. The current mobile gate passes

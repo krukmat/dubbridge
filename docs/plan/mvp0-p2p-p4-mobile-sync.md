@@ -1,14 +1,13 @@
 ---
 type: Plan
 title: "P4: Verified mobile ciphertext synchronization"
-status: planned
+status: pass
 slice: MVP0-P2P
 ---
 
 # P4 — Verified mobile ciphertext synchronization
 
-Task ledger: `docs/tasks/mvp0-p2p-p4-mobile-sync.md`. Documentation prepared 2026-09-08;
-implementation remains blocked on **P3 PASS** and the per-task workflow gate.
+Task ledger: `docs/tasks/mvp0-p2p-p4-mobile-sync.md`. **P4 PASS 2026-09-22.** P3 PASS gate is satisfied; T0/T1/T2/T3 are closed and the P5 handoff is certified.
 
 ## Objective
 
@@ -38,10 +37,10 @@ Freeze cache location/quota/cleanup, account and device isolation, sign-out wipe
 
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
-| P4.T0 | Lifecycle, cache, and RPC freeze | planning | M | P3 PASS | Planned; not activated |
+| P4.T0 | Lifecycle, cache, and RPC freeze | planning | M | P3 PASS | **Done** |
 | P4.T1 | Product replication and bounded resume | development | L | T0 PASS | `[x]` Done 2026-09-22 — review PASS |
-| P4.T2 | Manifest verification and lifecycle isolation | development | L | T1 PASS | Planned; not activated |
-| P4.T3 | P4 certification and P5 handoff | development/evidence | M | T2 PASS | **Closure-ready 2026-09-22; owner verification pending** |
+| P4.T2 | Manifest verification and lifecycle isolation | development | L | T1 PASS | **Done** |
+| P4.T3 | P4 certification and P5 handoff | development/evidence | M | T2 PASS | **PASS 2026-09-22** |
 
 
 The companion ledger defines acceptance, HP/EC, evidence and handoff per task.
