@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -69,11 +69,19 @@ function run(command, args) {
 }
 
 async function buildBundle() {
-  const temporaryRoot = await mkdtemp(path.join(mobileRoot, ".bare-pack-"));
+  // The staging directory lives inside mobileRoot and --base is mobileRoot, so
+  // every packed path stays inside the bundle root. Basing on the staging
+  // directory instead emits node_modules as "/../node_modules/...", escaping the
+  // root; the escaping set includes every package.json, which is what the Bare
+  // runtime's traverse reads to determine each module's type. Its name must be
+  // deterministic (not mkdtemp) because the packed paths become bundle keys and
+  // the committed bundle is drift-checked by sha256.
+  const temporaryRoot = path.join(mobileRoot, ".bare-pack");
   const temporaryRuntime = path.join(temporaryRoot, "src", "p2p", "runtime");
   const temporaryOutput = path.join(temporaryRoot, "worklet.bundle.js");
 
   try {
+    await rm(temporaryRoot, { force: true, recursive: true });
     await mkdir(temporaryRuntime, { recursive: true });
     for (const sourcePath of sourcePaths) {
       const source = await readFile(sourcePath, "utf8");
@@ -84,7 +92,7 @@ async function buildBundle() {
     await run(process.execPath, [
       path.join(mobileRoot, "node_modules", "bare-pack", "bin.js"),
       "--base",
-      temporaryRoot,
+      mobileRoot,
       "--host",
       "android-arm64",
       "--host",
