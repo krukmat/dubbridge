@@ -458,7 +458,7 @@ captured above under Governing principles and ADR-025/ADR-026.
   used the canonical helper), failing 4/86 Availability Node tests. Fixed
   2026-09-18 (RRI 25 Low, `docs/tasks/mvp0-p2p-s230-consistency-remediation.md`
   § CONS-T1 closure record); 86/86 Availability Node tests now pass.
-  T6p-a requires full P2-P6 PASS plus T7local/T7c PASS. October capacity is
+  T6p-a requires MVP0-P2P DEV-HANDOFF plus T7local/T7c PASS; deferred P5.T3 is not part of that development gate. October capacity is
   not validated by the existence of these plans. X29 is required for the
   release, X28/CI for T9g; optional queue acceleration and S-230
   T7b/T8/T8b are outside the mandatory path.
