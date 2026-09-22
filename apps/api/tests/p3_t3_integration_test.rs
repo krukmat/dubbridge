@@ -9,7 +9,6 @@ use axum::{
     body::{Body, to_bytes},
     http::{Method, Request, StatusCode, header},
 };
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use dubbridge_api::{build_app, state::AppState};
 use dubbridge_auth::{
     AuthenticatedPrincipal, SharedTokenVerifier, TokenVerificationError, TokenVerifier,
@@ -65,7 +64,6 @@ struct TestContext {
     app: axum::Router,
     owner: Uuid,
     viewer: Uuid,
-    outsider: Uuid,
     _storage: TempDir,
 }
 
@@ -76,7 +74,6 @@ struct ClaimedFixture {
     invitation_id: Uuid,
     authorization_id: Uuid,
     device_id: Uuid,
-    token: String,
 }
 
 impl TestContext {
@@ -114,7 +111,6 @@ impl TestContext {
             app: build_app(state, verifier),
             owner,
             viewer,
-            outsider,
             _storage: storage,
         })
     }
@@ -205,10 +201,6 @@ impl TestContext {
             invitation_id,
             authorization_id,
             device_id,
-            token: claim_body["invitation"]["id"]
-                .as_str()
-                .map(|_| String::new())
-                .unwrap_or_default(),
         }
     }
 }
