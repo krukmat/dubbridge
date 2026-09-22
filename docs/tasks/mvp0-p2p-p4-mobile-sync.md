@@ -18,7 +18,7 @@ behavioral_coverage_contract: behavior-v2
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
 | P4.T0 | Lifecycle, cache, and RPC freeze | planning | M | P3 PASS | `[x]` Done 2026-09-18 |
-| P4.T1 | Product replication and bounded resume | development | L | T0 PASS | Implemented + verified — Med-high review pending |
+| P4.T1 | Product replication and bounded resume | development | L | T0 PASS | `[x]` Done 2026-09-22 — review PASS |
 | P4.T2 | Manifest verification and lifecycle isolation | development | L | T1 PASS | `[x]` Done 2026-09-18 |
 | P4.T3 | P4 certification and P5 handoff | development/evidence | M | T2 PASS | Blocked — no certification artifact, see verification note |
 | P4.T1-r1 | Product storage file-URI → path at the Corestore boundary (repair; blocks P5.T3) | development | S (provisional) | P4.T1 source present | Planned — RRI/card/approval pending; not implemented |
@@ -90,16 +90,16 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T0 PASS
 
-**Status:** Implemented + verified; formal Done is pending the required
-Med-high band independent code-solution review. Execution RRI 55 (Med-high) is
+**Status:** `[x]` Done — 2026-09-22. Execution RRI 55 (Med-high) is
 recorded in `docs/audit/p4-t1-bounded-reconnect-rri-2026-09-22.md`.
-The previously named bounded-reconnect gap is implemented in
-`P2pProductSync.ts`: one automatic reconnect by default, transport-only retry,
-verified partial-cache reuse, bounded exhaustion, and cancellation/sign-out
-domination. GitHub Actions mobile evidence on
+The bounded-reconnect implementation provides one automatic reconnect by default,
+transport-only retry, verified partial-cache reuse, bounded exhaustion, and
+cancellation/sign-out domination. GitHub Actions mobile evidence on
 `0c3d484648565755348011b85a6a84acca41fb0c` is 60/60 suites and 434/434 tests
-PASS, including the focused product-sync suite. Full evidence:
-`docs/audit/p4-t1-bounded-reconnect-evidence-2026-09-22.md`.
+PASS. Independent code-solution review PASS is recorded in
+`docs/audit/p4-t1-bounded-reconnect-code-solution-review-2026-09-22.md`.
+Named non-blocking residual: `closeSession()` suppresses underlying close errors,
+so strong transport-resource cleanup on a failing close is not separately proven.
 
 **Acceptance criteria:** Wire explicit product sync through P2PService → BareRuntimeClient → product worklet, bounded reconnect/cancel and reusable partial ciphertext cache.
 
