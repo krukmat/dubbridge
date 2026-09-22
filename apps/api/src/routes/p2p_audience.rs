@@ -319,9 +319,7 @@ async fn descriptor_for_claim(
     {
         Ok(Some(descriptor)) => descriptor,
         Ok(None) => {
-            return Err(
-                claim_handoff_denial_response(state, result, "descriptor_missing").await,
-            );
+            return Err(claim_handoff_denial_response(state, result, "descriptor_missing").await);
         }
         Err(error) => return Err(db_error_response(error)),
     };
@@ -429,7 +427,6 @@ async fn get_authorization(
         Err(error) => db_error_response(error),
     }
 }
-
 
 fn p3_package_event(
     invitation: &P2pInvitationRecord,
