@@ -195,3 +195,6 @@ permits only an explicitly labeled base POC/backend preview, not an invited-play
 > mobile revalidation (62/62 suites, 446/446 tests). P5-DEV is closure-ready
 > pending owner verification. P5.T3 remains deferred P5-CERT and aggregate P5
 > remains IN PROGRESS.
+
+
+> **P5-DEV formal closure — 2026-09-22:** T0/T1/T2 are formally closed; `e63209f5` completed 15/15 CI, mobile revalidation is 62/62 suites and 446/446 tests, and owner verification is complete. **P5-DEV is SATISFIED.** P5.T3/P5-CERT remains open. **P6.T0 is now unblocked but not activated.**
