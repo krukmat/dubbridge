@@ -9,7 +9,7 @@ behavioral_coverage_contract: behavior-v2
 
 # P3 — planning task ledger
 
-**Status:** In progress. P3.T0 PASS. P3.T1 PASS. P3.T2 backend block T2-A is complete. T2c1/T2c2 are implemented. T2c3 implementation is present; hosted-emulator CI remains hard-disabled, and a local one-shot Android certification runner is now prepared for execution via Codex Astra or another local agent.
+**Status:** In progress. P3.T0 PASS. P3.T1 PASS. P3.T2 backend block T2-A is complete. T2c1 PASS; T2c2 PASS; T2c3 PASS after local Android certification on 2026-09-22. P3.T2 = closure-ready; owner verification pending. Hosted-emulator CI remains hard-disabled; P3.T3 is not activated.
 **Phase gate:** P2 PASS; Accepted ADR-044.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
@@ -19,7 +19,7 @@ behavioral_coverage_contract: behavior-v2
 |---|---|---|---|---|---|
 | P3.T0 | Contract and executable-path freeze | planning | M | P2 PASS | **PASS 2026-09-22** — owner-approved; CI 15/15 green |
 | P3.T1 | Invitation persistence, claim, and inbox | development | decomposed | T0 PASS | **PASS 2026-09-22** — owner-verified; `4dede25d` 15/15 CI green |
-| P3.T2 | O3 authorization and native K1 envelope delivery | development | decomposed | T1 PASS | **In progress** — T2-A Done; T2c1/T2c2 implemented; T2c3 local Android runner ready, execution pending; hosted-emulator workflow remains disabled; no T2 PASS claimed |
+| P3.T2 | O3 authorization and native K1 envelope delivery | development | decomposed | T1 PASS | **closure-ready** — T2-A Done; T2c1 PASS; T2c2 PASS; T2c3 PASS; owner verification pending; no T2 PASS claimed |
 | P3.T3 | P3 integration certification and closure | development/evidence | M | T2 PASS | Blocked — no work product exists, see verification note |
 
 
@@ -153,7 +153,7 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T1 PASS
 
-**Status:** **In progress.** Backend block **T2-A** is complete at implementation
+**Status:** **closure-ready; owner verification pending.** P3.T2 is not PASS. Backend block **T2-A** is complete at implementation
 head `a228ddad` with **15/15 CI PASS**. Evidence:
 `docs/audit/mvp0-p2p-p3-t2a-backend-evidence-2026-09-22.md`.
 
@@ -171,11 +171,16 @@ Delivered in T2-A:
   bounded identifiers/reason codes only.
 
 T2-B / T2c disposition:
-- **T2c1 implemented:** explicit JS native-only/no-software-fallback tests.
-- **T2c2 implemented:** native binding JSON parsing + expiry enforcement before HPKE unwrap.
-- **T2c3 implementation present; local certification path ready:** Android Keystore opaque-private-key HPKE/P-256 instrumentation exists. The hosted-emulator workflow remains hard-disabled, while `scripts/p3-t2c3-certify-android.sh` now provides the supported one-shot local certification path with zero-test rejection and redacted evidence generation.
+- **T2c1 PASS:** existing JS native-only/no-software-fallback evidence retained; no JS source changes in this certification.
+- **T2c2 PASS:** native binding JSON parsing + expiry enforcement before HPKE unwrap verified by the existing instrumentation.
+- **T2c3 PASS:** local runner returned `P3_T2C3_RESULT=PASS` against `d14ff8b6646bde4e635d4c2d5bc6e4ff784615e8` on `sdk_gphone64_arm64`, API 34: **2 tests / 0 failures / 0 errors / 0 skipped**.
 
-P3.T2 remains **IN PROGRESS / not PASS** until the local T2c3 runner executes successfully and the resulting evidence receives owner verification. The hosted-emulator pause does not remove or weaken the acceptance criterion.
+Evidence: [`docs/audit/mvp0-p2p-p3-t2c3-android-certification-2026-09-22.md`](../audit/mvp0-p2p-p3-t2c3-android-certification-2026-09-22.md). The binding case's exact existing name is `bindingValidationRejectsExpiryAndIdentityDriftBeforeUnwrap`; the harness now matches it exactly. Product crypto, test bodies and assertions were unchanged.
+
+**P3.T2 = closure-ready; owner verification pending.** No aggregate T2 PASS is claimed. P3.T3 remains blocked and unactivated; the hosted-emulator workflow remains hard-disabled.
+
+Certification checklist: harness self-check completed; local API 34 instrumentation completed; redacted evidence and status synchronization completed; owner final verification pending.
+Resource plan: existing deterministic Android runner; bounded harness correction and local independent review only; no new Android infrastructure.
 
 **Acceptance criteria:** Implement distinct backend audience authorization and all accepted D2 release predicates; prove HPKE Base P-256/HKDF-SHA256/AES-256-GCM with non-exportable Android Keystore private key, native unwrap, binding and expiry checks.
 

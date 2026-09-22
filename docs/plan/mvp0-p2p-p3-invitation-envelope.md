@@ -7,7 +7,7 @@ slice: MVP0-P2P
 
 # P3 — Invitation, audience authorization, and K1 device envelope
 
-Task ledger: `docs/tasks/mvp0-p2p-p3-invitation-envelope.md`. P2 is PASS and ADR-044 is accepted. P3.T0 PASS. P3.T1 PASS on 2026-09-22 after owner verification; implementation head `4dede25d` completed 15/15 CI green. P3.T2 may now activate.
+Task ledger: `docs/tasks/mvp0-p2p-p3-invitation-envelope.md`. P2 is PASS and ADR-044 is accepted. P3.T0 PASS. P3.T1 PASS on 2026-09-22 after owner verification; implementation head `4dede25d` completed 15/15 CI green. P3.T2 is closure-ready after local T2c3 PASS on 2026-09-22; owner verification remains pending. P3.T3 is not activated.
 
 ## Objective
 
@@ -37,7 +37,7 @@ Freeze concrete API/schema names, token-expiry policy, O3 authorization lifecycl
 |---|---|---|---|---|---|
 | P3.T0 | Contract and executable-path freeze | planning | M | P2 PASS | **PASS 2026-09-22** |
 | P3.T1 | Invitation persistence, claim, and inbox | development | decomposed | T0 PASS | **PASS 2026-09-22**; owner-verified; 15/15 CI green |
-| P3.T2 | O3 authorization and native K1 envelope delivery | development | decomposed | T1 PASS | Blocked on T1 PASS; exact leaves frozen |
+| P3.T2 | O3 authorization and native K1 envelope delivery | development | decomposed | T1 PASS | **closure-ready**; T2c1 PASS; T2c2 PASS; T2c3 PASS; owner verification pending; not T2 PASS |
 | P3.T3 | P3 integration certification and closure | development/evidence | M | T2 PASS | Planned; not activated |
 
 
@@ -80,6 +80,8 @@ this document does not establish capacity or guarantee the October date.
 - `docs/audit/mvp0-p2p-p3-t2a-backend-evidence-2026-09-22.md` — T2-A DB release matrix, envelope API/binding, durable envelope audit and 15/15 CI evidence.
 
 
-### 2026-09-22 temporary T2c3 execution pause
+### 2026-09-22 local T2c3 certification
 
-Owner direction: keep the GitHub-hosted Android emulator HPKE/Keystore instrumentation disabled until further notice. T2c1/T2c2 implementation remains valid and the T2c3 instrumentation stays in source. Certification is now routed through `scripts/p3-t2c3-certify-android.sh` against one already-booted local Android target (physical device or local emulator, API 31+). The runner rejects zero-test execution and emits redacted task evidence. P3.T2 remains IN PROGRESS until that local T2c3 evidence passes and receives owner verification; the GitHub emulator workflow does not need to be re-enabled for closure.
+The local runner `scripts/p3-t2c3-certify-android.sh` returned `P3_T2C3_RESULT=PASS` against `d14ff8b6646bde4e635d4c2d5bc6e4ff784615e8` on `sdk_gphone64_arm64`, Android API 34, with **2 tests / 0 failures / 0 errors / 0 skipped**. Evidence: [`mvp0-p2p-p3-t2c3-android-certification-2026-09-22.md`](../audit/mvp0-p2p-p3-t2c3-android-certification-2026-09-22.md). The harness matches the existing binding test's full `BeforeUnwrap` name; no crypto implementation or assertion changes were needed.
+
+**T2c1 PASS; T2c2 PASS; T2c3 PASS. P3.T2 = closure-ready; owner verification pending.** P3.T2 is not PASS and P3.T3 is not activated. The GitHub-hosted emulator workflow remains hard-disabled and contributed no certification evidence.
