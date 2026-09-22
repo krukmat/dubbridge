@@ -9,15 +9,15 @@ behavioral_coverage_contract: behavior-v2
 
 # P6 — planning task ledger
 
-**Status:** Planned; no task activated or implemented by this documentation update.
-**Phase gate:** P3 PASS; P4 PASS; P5-DEV (P5.T0-T2 formally closed). P5.T3/P5-CERT is not an activation prerequisite.
+**Status:** **Unblocked / not activated.** P3 PASS, P4 PASS and P5-DEV are all satisfied as of 2026-09-22. No P6 task is activated by the P5-DEV closure itself.
+**Phase gate:** **SATISFIED 2026-09-22 — P3 PASS + P4 PASS + P5-DEV.** P5.T3/P5-CERT is not an activation prerequisite.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
 ## Task map
 
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
-| P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | Planned; not activated |
+| P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **Unblocked / not activated** |
 | P6.T1 | Owner My Content and invite action | development | M | T0 PASS | Planned; not activated |
 | P6.T2 | Viewer claim, Invites, sync and play actions | development | L | T1 PASS | Planned; not activated |
 | P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | Planned; not activated |
@@ -46,7 +46,7 @@ Release artifact/gate changes also synchronize the S-230 plan and ledger.
 
 **Depends on:** P3 PASS; P4 PASS; P5-DEV. P5.T3 may remain pending.
 
-**Status:** Planned; not activated.
+**Status:** **Unblocked / not activated.** Upstream gate satisfied 2026-09-22.
 
 **Acceptance criteria:** Map each owner/viewer state to authoritative facts, permitted actions and loading/empty/error behavior; freeze navigation and exact component ownership.
 
