@@ -143,6 +143,20 @@ describe("P2P product sync", () => {
     expect(transport.readCiphertext).toHaveBeenCalledWith("segments/000001.ts");
   });
 
+  it("re-fetches cached ciphertext whose digest is invalid instead of trusting presence", async () => {
+    const cache = new MemoryP2pSyncCache();
+    const identity = { accountScope, publicationId: "pub-1", lineageId: "lineage-1" };
+    await cache.writeCiphertext(identity, "index.m3u8", b4a.from("wrong-ciphertext"));
+    const transport = source();
+    const sync = new P2pProductSync(cache, transport.value, sha256);
+
+    const state = await sync.sync(descriptor, accountScope);
+
+    expect(state.phase).toBe("READY");
+    expect(transport.readCiphertext).toHaveBeenCalledWith("index.m3u8");
+    expect(await cache.readCiphertext(identity, "index.m3u8")).toEqual(first);
+  });
+
   it("never marks READY when source ciphertext fails digest verification", async () => {
     const cache = new MemoryP2pSyncCache();
     const corrupt = b4a.from("corrupt");
