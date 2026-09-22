@@ -9,7 +9,7 @@ behavioral_coverage_contract: behavior-v2
 
 # P6 — planning task ledger
 
-**Status:** **In progress. P6.T0 is closure-ready 2026-09-22; owner verification pending.** P3 PASS, P4 PASS and P5-DEV are satisfied. T1-T3 remain unactivated.
+**Status:** **In progress. P6.T0 PASS 2026-09-22.** Contract freeze, owner verification and exact-head `c6ce2039` 15/15 CI PASS are complete. **P6.T1 is unblocked and activated for Block 1 (T1.A+B+C); T2/T3 remain blocked.**
 **Phase gate:** **SATISFIED 2026-09-22 — P3 PASS + P4 PASS + P5-DEV.** P5.T3/P5-CERT is not an activation prerequisite.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
@@ -17,7 +17,7 @@ behavioral_coverage_contract: behavior-v2
 
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
-| P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **Closure-ready 2026-09-22 — owner verification pending** |
+| P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **PASS 2026-09-22 — owner-verified; c6ce2039 15/15 CI** |
 | P6.T1 | Owner My Content and invite action | development | M | T0 PASS | Planned; not activated |
 | P6.T2 | Viewer claim, Invites, sync and play actions | development | L | T1 PASS | Planned; not activated |
 | P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | Planned; not activated |
@@ -46,7 +46,7 @@ Release artifact/gate changes also synchronize the S-230 plan and ledger.
 
 **Depends on:** P3 PASS; P4 PASS; P5-DEV. P5.T3 may remain pending.
 
-**Status:** **Closure-ready 2026-09-22; owner verification pending.** RRI 25 Low, docs-only planning contract. Evidence: `docs/audit/mvp0-p2p-p6-t0-state-navigation-contract-2026-09-22.md`.
+**Status:** **PASS 2026-09-22.** RRI 25 Low, docs-only planning contract; owner verification complete and exact head `c6ce2039` completed 15/15 CI. Evidence: `docs/audit/mvp0-p2p-p6-t0-state-navigation-contract-2026-09-22.md`.
 
 **Acceptance criteria:** Map each owner/viewer state to authoritative facts, permitted actions and loading/empty/error behavior; freeze navigation and exact component ownership.
 
@@ -75,7 +75,7 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T0 PASS
 
-**Status:** Planned; not activated.
+**Status:** **In progress — Block 1 T1.A+B+C activated 2026-09-22.** T0 PASS dependency satisfied. Exact Block 1 runtime scope: `mobile/src/screens/MyContentScreen.tsx` + `mobile/__tests__/MyContentScreen.test.tsx`; docs/status files are ancillary. Initial RRI: **55 / Med-high**; no auth decision is delegated to UI.
 
 **Acceptance criteria:** Render owned content and correct P2P publication state; create/copy the one-time invite through P3; use existing design primitives.
 

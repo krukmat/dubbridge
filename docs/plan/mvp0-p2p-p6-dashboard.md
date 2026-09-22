@@ -7,7 +7,7 @@ slice: MVP0-P2P
 
 # P6 — Minimal My Content and Invites dashboard
 
-Task ledger: `docs/tasks/mvp0-p2p-p6-dashboard.md`. **Activation gate satisfied 2026-09-22: P3 PASS + P4 PASS + P5-DEV. P6.T0 is closure-ready; owner verification pending.** T0 froze the authoritative state/action/navigation contract at RRI 25 Low. P5.T3 is deferred to release certification.
+Task ledger: `docs/tasks/mvp0-p2p-p6-dashboard.md`. **Activation gate satisfied 2026-09-22. P6.T0 PASS:** owner verification complete and `c6ce2039` finished 15/15 CI. **P6.T1 Block 1 (T1.A+B+C) is active** with runtime scope limited to `MyContentScreen` + component tests; T2/T3 remain blocked. P5.T3 is deferred to release certification.
 
 ## Objective
 
@@ -37,8 +37,8 @@ Freeze state projection and action eligibility from canonical backend and runtim
 
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
-| P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **Closure-ready 2026-09-22; owner verification pending** |
-| P6.T1 | Owner My Content and invite action | development | M | T0 PASS | Planned; not activated |
+| P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **PASS 2026-09-22** |
+| P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **In progress — Block 1 T1.A+B+C active; RRI 55 Med-high** |
 | P6.T2 | Viewer claim, Invites, sync and play actions | development | L | T1 PASS | Planned; not activated |
 | P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | Planned; not activated |
 

@@ -3,7 +3,7 @@ type: Audit
 title: "MVP0-P2P P6.T0 state, action and navigation contract"
 date: 2026-09-22
 task: P6.T0
-status: closure_ready_owner_verification_pending
+status: pass
 rri: 25
 band: Low
 ---
@@ -12,7 +12,7 @@ band: Low
 
 ## Result
 
-**CLOSURE-READY. Owner verification pending.**
+**PASS 2026-09-22.**
 
 P6 activation prerequisites are satisfied:
 
@@ -276,7 +276,7 @@ all non-verified sync states are excluded from Play.
 
 ## Handoff
 
-After owner verification, P6.T0 may become PASS and P6.T1 may activate.
+Owner verification was explicitly provided on 2026-09-22 and exact head `c6ce2039` completed 15/15 CI PASS. **P6.T0 is PASS and P6.T1 may activate.**
 
 P6.T1 must rescore its actual source paths and implement only the frozen owner
 surface. P6.T2 remains blocked on T1 PASS.
