@@ -9,7 +9,7 @@ behavioral_coverage_contract: behavior-v2
 
 # P3 — planning task ledger
 
-**Status:** In progress. P3.T0 PASS on 2026-09-22 after owner approval and 15/15 CI checks green. P3.T1 is the active development block.
+**Status:** In progress. P3.T0 PASS. P3.T1 implementation/evidence is closure-ready on 2026-09-22 at `4dede25d` with 15/15 CI checks green; final T1 PASS awaits owner verification of the implemented block.
 **Phase gate:** P2 PASS; Accepted ADR-044.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
@@ -18,7 +18,7 @@ behavioral_coverage_contract: behavior-v2
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
 | P3.T0 | Contract and executable-path freeze | planning | M | P2 PASS | **PASS 2026-09-22** — owner-approved; CI 15/15 green |
-| P3.T1 | Invitation persistence, claim, and inbox | development | decomposed | T0 PASS | **Active 2026-09-22** — T1a/T1b/T1c approved |
+| P3.T1 | Invitation persistence, claim, and inbox | development | decomposed | T0 PASS | **Closure-ready 2026-09-22** — T1a/T1b/T1c implemented; `4dede25d` 15/15 CI green; owner verification pending |
 | P3.T2 | O3 authorization and native K1 envelope delivery | development | L | T1 PASS | Blocked on T1 PASS — release-context test exists; remaining predicate/API/native/audit certification frozen in T0 artifact |
 | P3.T3 | P3 integration certification and closure | development/evidence | M | T2 PASS | Blocked — no work product exists, see verification note |
 
@@ -98,20 +98,38 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T0 PASS
 
-**Status:** Blocked on T0 PASS. **Re-verification 2026-09-22:** the earlier
-"0 repo-layer tests" statement is stale. `crates/db/tests/p2p_audience_repo.rs`
-now proves owner-scoped creation, same-viewer/device idempotency, foreign-viewer
-denial, publication drift denial, inbox visibility and basic release-context
-revocation. Remaining T1 gaps are: (1) a real concurrent different-viewer claim
-race, (2) an explicit exact `publication_id + lineage_id` check on the descriptor
-returned after claim (the handler currently re-reads by `asset_id`), and
-(3) durable P3 invitation/claim/authorization audit events. Exact leaves/paths
-are frozen by the T0 contract artifact.
+**Status:** **Closure-ready 2026-09-22; owner verification pending.** The approved
+T1a/T1b/T1c block is implemented and certified at implementation head
+`4dede25d`, which completed 15/15 CI checks successfully. Evidence:
+`docs/audit/mvp0-p2p-p3-t1-implementation-2026-09-22.md`.
+
+Delivered:
+- **T1a:** real concurrent different-viewer claim race proves exactly one winner,
+  exactly one authorization row and idempotent repeat by the winner.
+- **T1b:** claim response now fails closed unless descriptor, invitation and
+  authorization share the exact asset + publication + lineage identity.
+- **T1c:** durable P3 device/invitation/claim/authorization/denial audit contract
+  is wired through the governance audit boundary with bounded non-secret details.
+
+The earlier "0 repo-layer tests" note is superseded. T2 remains blocked until
+this T1 closure receives owner verification and the ledger records T1 PASS.
 
 **Acceptance criteria:** Implement hash-only invitation storage, owner-only creation on P2P_READY content, atomic single-viewer claim and scoped inbox; preserve same-viewer idempotency and durable audit.
 
 - **HP-P3.T1-1:** Owner creates an invite; token is returned once; eligible viewer claims and later uses their inbox without the raw token.
 - **EC-P3.T1-1:** Concurrent different-viewer claims have one winner; expired/unknown/non-owner/non-ready requests fail closed without logging tokens.
+
+### Implementation evidence
+
+Implementation lineage:
+`cbb00567` → `ec1ce7ea` → `e7e851a3` → `ea8b7d8c` →
+`e8df1ae9` → `d7eb83fe` → `94ba73fc` → `4dede25d`.
+
+Final implementation head `4dede25d`: **15/15 CI PASS**, including
+`test`, `coverage`, `cargo-check`, `clippy`, `fmt`, `release-build`,
+`mobile`, `s3-integration`, `deny`, `config-secrets`,
+`peer-workflow-review`, `maintainability`, `python-complexity`,
+`roadmap-drift` and `qa-docs`.
 
 **Evidence to emit:** task-scoped contract/decision record for planning; actual
 command/test/device/network results as relevant to the acceptance criteria for
