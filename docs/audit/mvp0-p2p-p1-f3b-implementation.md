@@ -678,12 +678,152 @@ construct and drive a real `RPC` instance through the changed import.
   (`sha256=3e199894ead2a3f5ef1da6fda4929a4f4858d50d85cdb7c7f6cdc1123a49654b`,
   no drift)
 
+## 11. `P1.F3b-fix-2` closure (2026-09-22) — X29 root-cause fix
+
+Development-task closure for the § 9.5 fix (`.worklet` → `.bundle` in both
+worklet filenames). RRI 25 Low (right at the Low/Moderate boundary), so no
+formal Reflection log is required
+(`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` § Reflection design pattern
+applies at RRI 26+); applied informal judgment given the boundary score and
+the behavioral significance of the fix (crash → working ping round-trip).
+
+### RRI
+
+`scripts/rri.py --touches mobile/src/p2p/runtime/BareRuntimeClient.ts --touches mobile/src/p2p/proof/ProofRuntimeFactory.ts --touches mobile/__tests__/p2p/p2p-service.test.ts --touches mobile/__tests__/p2p/transient-drive.test.ts --cc 1 --D 1 --K 1 --P 2 --T 1 --A 0 --X 2 --platform rn`
+
+C=0, F=2, D=1, T=1, A=0, K=1, P=2, X=2. Technical profile L=0 I=1 Q=1 V=1 →
+bottleneck 1 → ICI=25. Risk/domain band input 9. No penalties. **Final RRI:
+25 → Low (0–25).** T (test-coverage risk) was scored 1 ("reasonable tests
+exist") only after the coverage gap below was closed — scored 4
+("no tests in the affected area") before that fix, which alone would have
+put the technical profile's V axis at 4 and the bottleneck-driven ICI at
+100 (Very-high band). This is not a hypothetical: `mobile/__tests__/p2p/
+p2p-service.test.ts:191-194` and `mobile/__tests__/p2p/
+transient-drive.test.ts:38-42` asserted the **pre-fix** `.worklet` filename
+literal — stale since commit `75eeb3b`, and would have silently let a
+regression back to `.worklet` pass CI. Found by running
+`npx jest __tests__/p2p/` post-fix (2 failed / 167 total) before scoring
+T, not assumed; fixed in commit `c16c3ff` before finalizing this score.
+
+### Code-solution review
+
+```
+Code-solution review: gpt-oss docs/audit/gemma-evidence/x29-worklet-extension-fix.json - PASS
+```
+
+### Gemma Reviewer evidence
+
+- Model: `gpt-oss:20b` (RRI 0–25 chain primary)
+- Command: `GEMMA_REVIEW_TASK_ID=x29-worklet-extension-fix GEMMA_REVIEW_BASE=726b302 REVIEW_PATHS="mobile/src/p2p/runtime/BareRuntimeClient.ts mobile/src/p2p/proof/ProofRuntimeFactory.ts mobile/__tests__/p2p/p2p-service.test.ts mobile/__tests__/p2p/transient-drive.test.ts" make qa-gemma-review`
+- Passes run / usable: `3/3`
+- Aggregate status: `PASS`
+- Consensus findings: `0` | Pass-specific: `0` | Disagreement: `0`
+- Artifacts: `docs/audit/gemma-evidence/x29-worklet-extension-fix.json` (receipt); `/tmp/dubbridge-gemma-review-x29-worklet-extension-fix.json` (result, not persisted — ephemeral local run output)
+- Isolated adjudicator: `not triggered` — trigger: n/a, primary reviewer produced a usable PASS
+- D14 provider route: `n/a`
+- disposition_divergence: `null`
+- Primary-agent disposition: accepted (no findings to disposition)
+
+### Unit coverage certification
+
+| Case ID | Type | Behavior | Unit test evidence | Result |
+|---|---|---|---|---|
+| HP-fix-2 | Happy path | `Worklet.start()` is called with the corrected `.bundle` filename, so `bare-module-traverse` types the bundle as `BUNDLE` (not `SCRIPT`) | `mobile/__tests__/p2p/p2p-service.test.ts:191-194` (`.bundle`, product runtime), `mobile/__tests__/p2p/transient-drive.test.ts:38-42` (`.bundle`, proof runtime) | passed |
+| HP-fix-2b | Happy path (device proof) | With the corrected filename, `initialize → ping → shutdown` completes cleanly on real Android hardware — zero `SyntaxError`/SIGABRT | Manual device run, `fenix_t7` emulator (Android 34), 2026-09-22: `W ReactNativeJS: [P2P development harness] ping=pong`; `SyntaxError`/SIGABRT count = 0 (§ 9.5 step 4) | passed |
+| EC-fix-2 | Edge case | An unrecognized extension (the pre-fix `.worklet`) types the bundle as `SCRIPT`, and the bundle's JSON header is compiled as script source, crashing the worklet thread — the updated tests pin the corrected literal so this regression can no longer pass silently | `mobile/__tests__/p2p/p2p-service.test.ts:191-194`, `mobile/__tests__/p2p/transient-drive.test.ts:38-42` — both failed against the pre-fix `.worklet` value before being corrected in commit `c16c3ff`, confirming they actually discriminate the defect | passed |
+
+HP-fix-2b's device-layer proof cannot be automated in Jest (the native Bare
+runtime is mocked in the unit suite); it is included because the unit-level
+evidence alone (HP-fix-2, EC-fix-2) proves the *contract* — the exact
+filename passed to `Worklet.start()` — but not that the native runtime
+actually types and executes the bundle correctly. Both layers together are
+the cheapest combination that genuinely proves the behavior.
+
+### Owner final verification
+
+- Owner: `Matias, repository owner`
+- Date: `2026-09-22`
+- Statement: closure directed explicitly in chat ("cierra X29") after the
+  fix's on-device verification (§ 9.5), the RRI 25 Low score above, the
+  `gpt-oss:20b` code-solution review (PASS, 0 findings), and the
+  test-coverage gap fix (commit `c16c3ff`) were all completed and reported.
+  I accept the mapped happy-path and edge-case evidence above as covering
+  the claimed behavior.
+- Commands run: `npm run typecheck` (clean); `npm run lint` (clean);
+  `npx jest __tests__/p2p/` (33 suites, 167/167 passed, re-run after
+  `c16c3ff`); `npm run check:bare-worklet`
+  (`sha256=5d99caee01d2c15788725c50b670fa69887468d69e4749b6c6c885e3dc47dd0e`,
+  no drift); `GEMMA_REVIEW_TASK_ID=x29-worklet-extension-fix
+  GEMMA_REVIEW_BASE=726b302 REVIEW_PATHS="..." make qa-gemma-review`
+  (3/3 PASS, 0 findings)
+
+## 12. X29's remaining two criteria, executed (2026-09-22)
+
+With § 11's fix closed, the two items P1.F3b folded into X29 on 2026-08-27
+(§ 6) were re-checked directly instead of left on static/indirect evidence.
+
+### 12.1 `npm run android:p2p-dev` full build/install/launch
+
+Prior device verification (§ 9.5) relied on Metro-serving a changed bundle
+to an already-installed dev client via force-stop + relaunch, not a fresh
+invocation of the actual `android:p2p-dev` npm script. Ran it directly
+(`JAVA_HOME=`openjdk@17`, emulator `fenix_t7`, logcat cleared first):
+
+```
+$ npm run android:p2p-dev
+...
+BUILD SUCCESSFUL in 5s
+› Installing .../app-debug.apk
+› Opening dubbridge://expo-development-client/?url=...  on fenix_t7
+
+$ adb logcat -d | grep -E "P2P development harness|SyntaxError|Fatal signal"
+W ReactNativeJS: [P2P development harness] ping=pong
+```
+
+Zero `SyntaxError`/`Fatal signal` matches. This confirms the pre-hook chain
+(`check:bare-runtime` + `build:bare-worklet`), the
+`EXPO_PUBLIC_P2P_DEV_HARNESS=true` env gate, and the deep-link launch all
+work end-to-end from the documented entrypoint, not only via the
+faster Metro-reload path used for iterative debugging in § 9.5.
+
+### 12.2 `useLegacyPackaging` on/off native A/B — executed
+
+F3b's dependency audit (§ 2.3) retained `useLegacyPackaging: true` on
+**static mechanism proof only** (bare-kit ships native addons as jniLibs;
+the flag governs disk extraction at install time) — never an executed A/B,
+which X29 explicitly required. Executed it:
+
+| Run | `expo.useLegacyPackaging` | Build | Native link errors | `ping=pong` |
+|---|---|---|---|---|
+| 1 (baseline) | `true` (committed) | `BUILD SUCCESSFUL` | none | yes |
+| 2 (A/B) | `false` | `BUILD SUCCESSFUL` (`packageDebug` re-ran, not cached) | none (`UnsatisfiedLinkError`/`dlopen failed`/`CANNOT LINK`: 0 matches in build log or logcat) | yes |
+| 3 (restore) | `true` (reverted to committed value) | `BUILD SUCCESSFUL` | none | yes |
+
+`mobile/android/gradle.properties` was edited to `false` for run 2 and
+reverted to the committed `true` immediately after (`git diff` confirmed
+clean before and after); no repository file was left changed by this
+experiment.
+
+**Finding:** on this device (`fenix_t7`, Android 34, arm64-v8a emulator),
+disabling legacy packaging did **not** reproduce a native-loading failure —
+the harness's `initialize → ping → shutdown` round trip succeeded
+identically in both states. This does not overturn F3b's `true` retain
+decision, which rested on a broader static analysis (autolinked
+`react-native-b4a`/`b4a` peerOptional wiring with zero JS imports, silent-
+breakage risk per EC-F3b) that this one emulator run cannot exhaustively
+test — a real device, a different ABI, or a release (non-debug) build could
+still behave differently. What this closes is narrower and specific: X29's
+literal requirement was an *executed* A/B, not a particular outcome, and it
+is now executed and recorded rather than justified by static proof alone.
+The committed `useLegacyPackaging: true` is unchanged.
+
 ## Related
 
-- `docs/tasks/mvp0-p2p-p1-replication.md` § P1.F3b
+- `docs/tasks/mvp0-p2p-p1-replication.md` §§ P1.F3b, P1.F3b-fix-2
 - `docs/audit/mvp0-p2p-p1-f3b-rri.md`
 - `docs/audit/mvp0-p2p-review-exception.md`
 - `docs/audit/mvp0-p2p-p0-native-preflight.md`
+- `docs/audit/gemma-evidence/x29-worklet-extension-fix.json`
 - `docs/plan/roadmap.md` § X28
 - `docs/adr/ADR-043-mobile-p2p-runtime-ownership-and-proof-isolation.md`
 - `holepunchto/bare-module` commit `991afc2` ("Fix bundle evaluation order

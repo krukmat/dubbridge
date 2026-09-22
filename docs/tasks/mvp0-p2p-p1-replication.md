@@ -517,6 +517,54 @@ and passing focused/typecheck/lint/full-Jest verification.
   §§ 9, 10 (review override, unit coverage certification, owner final
   verification).
 
+### P1.F3b-fix-2 — worklet filename extension fix (X29 root cause)
+
+- **Status:** `[x] Done 2026-09-22.` Re-traced the § 9.2/9.4 crash on-device
+  and found it was never the upstream `bare-module@6.3.2` bug recorded
+  since 2026-08-28: `Worklet.start(filename, source)` derives `source`'s
+  module type from `filename`'s extension (`react-native-bare-kit`'s
+  README requires `.bundle`), and both `BareRuntimeClient.ts` and
+  `ProofRuntimeFactory.ts` passed `.worklet`, which
+  `bare-module-traverse`'s `moduleType()` does not recognize — it fell
+  through to `SCRIPT`, so the bundle's JSON header was compiled as script
+  source, producing the `SyntaxError: Unexpected token ':'` that aborted
+  the worklet thread. Fixed by changing both filenames' extension to
+  `.bundle`. This also exposed two Jest tests
+  (`p2p-service.test.ts`, `transient-drive.test.ts`) that asserted the
+  pre-fix `.worklet` literal, silently stale since the fix landed — fixed
+  in the same task. Withdraws the § 9.2 upstream conclusion; the self-build
+  `libbare-kit.so` rejection (§ 9.3) is unaffected (it addressed a
+  different, now-moot diagnosis, not this one).
+- **Effort / RRI:** `S / 25 Low` (right at the Low/Moderate boundary) —
+  `docs/audit/mvp0-p2p-p1-f3b-implementation.md` § 11. Owner directed
+  closure in chat after the on-device fix, review, and coverage-gap fix
+  were reported.
+- **Allowed paths:** `mobile/src/p2p/runtime/BareRuntimeClient.ts`,
+  `mobile/src/p2p/proof/ProofRuntimeFactory.ts`,
+  `mobile/__tests__/p2p/p2p-service.test.ts`,
+  `mobile/__tests__/p2p/transient-drive.test.ts`.
+- **HP-fix-2:** `Worklet.start()` receives a `.bundle` filename; the bundle
+  is typed `BUNDLE`, not `SCRIPT`; `initialize → ping → shutdown` completes
+  on-device with zero `SyntaxError`/SIGABRT.
+- **EC-fix-2:** an unrecognized extension (e.g. the pre-fix `.worklet`)
+  types the source as `SCRIPT` and crashes on the bundle's JSON header;
+  the corrected tests now pin the right literal so this can't regress
+  silently.
+- **Verification:** `npm run typecheck` clean; `npm run lint` clean;
+  `npx jest __tests__/p2p/` 167/167 passed (33 suites); `npm run
+  check:bare-worklet` no drift
+  (`sha256=5d99caee01d2c15788725c50b670fa69887468d69e4749b6c6c885e3dc47dd0e`);
+  `gpt-oss:20b` code-solution review PASS, 3/3 passes, 0 findings
+  (`docs/audit/gemma-evidence/x29-worklet-extension-fix.json`); manual
+  device run on `fenix_t7` (Android 34), 2026-09-22, `ping=pong`.
+- **Closure evidence:** `docs/audit/mvp0-p2p-p1-f3b-implementation.md`
+  § 11 (RRI, code-solution review, Gemma Reviewer evidence, unit coverage
+  certification, owner final verification); § 12 (the two remaining X29
+  criteria — `npm run android:p2p-dev` full build/install/launch, and the
+  executed `useLegacyPackaging` on/off native A/B — both run the same day
+  and closed there). **All three X29 device-dependent criteria are now
+  satisfied; X29 itself is closed, see roadmap.**
+
 ## P1.A1 — Hyperdrive/Corestore Android bundle smoke proof (planning parent)
 
 - **Status:** PASS — Done 2026-08-30 after repository-owner final
