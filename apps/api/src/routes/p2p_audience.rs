@@ -144,7 +144,7 @@ async fn register_device(
                     json!({
                         "device_id": device.id,
                         "subject_id": principal.subject_id,
-                        "key_id": device.key_id,
+                        "key_id": device.key_id.clone(),
                     })
                     .to_string(),
                 ),
@@ -208,7 +208,7 @@ async fn create_asset_invitation(
                 .into_response()
         }
         Err(error) => {
-            if matches!(error, DbError::NotFound | DbError::Conflict) {
+            if matches!(&error, DbError::NotFound | DbError::Conflict) {
                 let denial = AuditEvent::new_p3_event(
                     Some(AssetId(asset_id)),
                     AuditEventKind::P2pAudienceAccessDenied,
@@ -254,7 +254,7 @@ async fn claim(
     {
         Ok(result) => result,
         Err(error) => {
-            if matches!(error, DbError::NotFound | DbError::Conflict) {
+            if matches!(&error, DbError::NotFound | DbError::Conflict) {
                 let denial = AuditEvent::new_p3_event(
                     None,
                     AuditEventKind::P2pAudienceAccessDenied,
