@@ -105,19 +105,6 @@ jobs:
   s3-integration:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
-    services:
-      minio:
-        image: ghcr.io/coollabsio/minio:2025-04-22t22-12-26z@sha256:d8cfccee3f7bf0182d89c223b2ff53b94c9a88237bc0dd5733dd49fa0f4dab4c
-        env:
-          MINIO_ROOT_USER: dubbridge
-          MINIO_ROOT_PASSWORD: dubbridge-minio-ci
-        ports:
-          - 9000:9000
-        options: >-
-          --health-cmd "curl --silent --fail http://localhost:9000/minio/health/live || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     env:
       DUBBRIDGE_STORAGE_TEST_ENDPOINT: http://127.0.0.1:9000
       DUBBRIDGE_STORAGE_TEST_ACCESS_KEY_ID: dubbridge
@@ -127,6 +114,22 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - name: Start MinIO S3 test service
+        run: |
+          docker run -d --name dubbridge-minio-ci \
+            -p 9000:9000 \
+            -e MINIO_ROOT_USER=dubbridge \
+            -e MINIO_ROOT_PASSWORD=dubbridge-minio-ci \
+            ghcr.io/coollabsio/minio:2025-04-22t22-12-26z@sha256:d8cfccee3f7bf0182d89c223b2ff53b94c9a88237bc0dd5733dd49fa0f4dab4c \
+            server /data
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:9000/minio/health/live >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs dubbridge-minio-ci
+          exit 1
       - name: Create S3 integration-test bucket
         run: |
           docker run --rm --network host --entrypoint /bin/sh \
@@ -134,6 +137,9 @@ jobs:
             -ec '/usr/bin/mc alias set ci http://127.0.0.1:9000 dubbridge dubbridge-minio-ci && /usr/bin/mc mb --ignore-existing ci/dubbridge-ci'
       - name: Run mandatory S3 integration test
         run: make qa-test-s3
+      - name: Stop MinIO S3 test service
+        if: always()
+        run: docker rm -f dubbridge-minio-ci >/dev/null 2>&1 || true
 
   cargo-check:
     if: github.event_name != 'schedule'
