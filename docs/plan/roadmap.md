@@ -515,3 +515,6 @@ captured above under Governing principles and ADR-025/ADR-026.
 > 62/62 suites and 446/446 tests PASS. Owner verification is the final step to
 > establish P5-DEV and unlock P6.T0. P5.T3 remains a deferred physical
 > release-certification obligation and aggregate P5 remains IN PROGRESS.
+
+
+> **P5-DEV SATISFIED — 2026-09-22:** P5.T0/T1/T2 are formally closed. Preparation head `e63209f5` completed 15/15 CI; mobile revalidation is 62/62 suites and 446/446 tests; owner verification is complete. P5.T3/P5-CERT remains open in the release lane and aggregate P5 remains IN PROGRESS. **P6.T0 is now unblocked / not activated.**
