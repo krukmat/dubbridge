@@ -75,13 +75,11 @@ async fn p3_device_and_package_audit_shapes_persist_without_weakening_p2_contrac
         .await
         .expect("persist exact-package P3 event");
 
-    let rows: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM audit_events WHERE id = ANY($1)",
-    )
-    .bind(vec![device_event.id, package_event.id])
-    .fetch_one(&pool)
-    .await
-    .expect("count P3 audit rows");
+    let rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM audit_events WHERE id = ANY($1)")
+        .bind(vec![device_event.id, package_event.id])
+        .fetch_one(&pool)
+        .await
+        .expect("count P3 audit rows");
     assert_eq!(rows, 2);
 }
 
