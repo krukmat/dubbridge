@@ -7,7 +7,7 @@ slice: MVP0-P2P
 
 # P6 — Minimal My Content and Invites dashboard
 
-Task ledger: `docs/tasks/mvp0-p2p-p6-dashboard.md`. **Activation gate satisfied 2026-09-22. P6.T0 PASS:** owner verification complete and `c6ce2039` finished 15/15 CI. **P6.T1 Block 1 (T1.A+B+C) is active** with runtime scope limited to `MyContentScreen` + component tests; T2/T3 remain blocked. P5.T3 is deferred to release certification.
+Task ledger: `docs/tasks/mvp0-p2p-p6-dashboard.md`. **Activation gate satisfied 2026-09-22. P6.T0 PASS:** owner verification complete and `c6ce2039` finished 15/15 CI. **P6.T1 Block 1 (T1.A+B+C) PASS** on `b52d366c` with 15/15 CI, mobile 63/63 suites / 452/452 tests and 90.43% workspace line coverage. T1 remains in progress for D-H; T2/T3 remain blocked. P5.T3 is deferred to release certification.
 
 ## Objective
 
@@ -38,7 +38,7 @@ Freeze state projection and action eligibility from canonical backend and runtim
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
 | P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **PASS 2026-09-22** |
-| P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **In progress — Block 1 T1.A+B+C active; RRI 55 Med-high** |
+| P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **In progress — Block 1 A+B+C PASS; D-H pending; RRI 55 Med-high** |
 | P6.T2 | Viewer claim, Invites, sync and play actions | development | L | T1 PASS | Planned; not activated |
 | P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | Planned; not activated |
 
@@ -83,3 +83,19 @@ this document does not establish capacity or guarantee the October date.
 ### P6.T0 contract freeze — 2026-09-22
 
 Evidence: `docs/audit/mvp0-p2p-p6-t0-state-navigation-contract-2026-09-22.md`. Owner/content state comes only from `/api/p2p/content`; viewer access from `/api/p2p/inbox`; local availability from verified P4 sync state. Invite requires authoritative P2P Ready + descriptor. Play requires active authorization + exact descriptor + verified READY package and remains subject to P5 O3 revalidation. Navigation is frozen to Home → My content / Invites with existing P3/P4/P5 services retaining capability ownership.
+
+
+### P6.T1 Block 1 result — 2026-09-22
+
+Evidence: `docs/audit/mvp0-p2p-p6-t1-block1-my-content-2026-09-22.md`.
+
+`MyContentScreen` now projects only backend-authoritative P2P owner states and
+uses exact descriptor identity for Invite presentation. The first implementation
+was refactored after the maintainability gate rejected declaration concentration;
+the final model/state-hook/view split is green.
+
+Head `b52d366c`: 15/15 CI PASS; mobile 63/63 suites, 452/452 tests; workspace
+line coverage 90.43%.
+
+P6.T1 is not closed. Next work begins at T1.D (actual P3 Create Invite), then
+one-time Copy UX and navigation.

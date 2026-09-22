@@ -18,7 +18,7 @@ behavioral_coverage_contract: behavior-v2
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
 | P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **PASS 2026-09-22 — owner-verified; c6ce2039 15/15 CI** |
-| P6.T1 | Owner My Content and invite action | development | M | T0 PASS | Planned; not activated |
+| P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **In progress — Block 1 T1.A+B+C PASS; T1.D-H pending** |
 | P6.T2 | Viewer claim, Invites, sync and play actions | development | L | T1 PASS | Planned; not activated |
 | P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | Planned; not activated |
 
@@ -75,7 +75,7 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T0 PASS
 
-**Status:** **In progress — Block 1 T1.A+B+C activated 2026-09-22.** T0 PASS dependency satisfied. Exact Block 1 runtime scope: `mobile/src/screens/MyContentScreen.tsx` + `mobile/__tests__/MyContentScreen.test.tsx`; docs/status files are ancillary. Initial RRI: **55 / Med-high**; no auth decision is delegated to UI.
+**Status:** **In progress — Block 1 T1.A+B+C PASS 2026-09-22.** Exact head `b52d366c` completed 15/15 CI; mobile 63/63 suites and 452/452 tests; coverage 90.43%. Runtime scope now uses `MyContentScreen.tsx` + `p2p/dashboard/MyContentModel.ts` + `p2p/dashboard/useMyContentState.ts` + `MyContentScreen.test.tsx` after the maintainability split. T1.D-H remain pending. Activation RRI: **55 / Med-high**; no auth decision is delegated to UI.
 
 **Acceptance criteria:** Render owned content and correct P2P publication state; create/copy the one-time invite through P3; use existing design primitives.
 
@@ -153,3 +153,20 @@ downstream input to its consuming phase before claiming closure.
 freeze and score exact paths, preserve the accepted boundary, and deliver only
 P6.T3's acceptance criteria through the current workflow. Stop on a
 contract conflict or unmet dependency; do not silently advance the next phase.
+
+
+### P6.T1 execution breakdown — 2026-09-22
+
+| Block | Scope | Status |
+|---|---|---|
+| T1.A | Formal T0 closure / T1 activation | **PASS** |
+| T1.B | My Content authoritative states + loading/empty/error | **PASS** |
+| T1.C | Exact Ready descriptor Invite eligibility | **PASS** |
+| T1.D | P3 Create Invite integration | Pending |
+| T1.E | One-time token + Copy Invite | Pending |
+| T1.F | Navigation | Pending |
+| T1.G | Remaining component/integration tests | Pending |
+| T1.H | Aggregate T1 certification/owner verification | Pending |
+
+Block 1 evidence:
+`docs/audit/mvp0-p2p-p6-t1-block1-my-content-2026-09-22.md`.
