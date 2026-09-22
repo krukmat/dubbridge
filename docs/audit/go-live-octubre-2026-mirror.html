@@ -260,7 +260,7 @@
   <div class="pillrow">
     <span class="pill pass"><span class="dot"></span>NUEVO: aggregate <strong>MVP0-P2P P2 — PASS</strong> (CONS-T4/T5 cierran T5a-d/T6a-d/T6e)</span>
     <span class="pill pass"><span class="dot"></span>NUEVO: P4.T0, P4.T2, P5.T0 — <strong>Done</strong>, owner-verified</span>
-    <span class="pill watch"><span class="dot"></span>P3 completo, P4.T1/T3, P5.T1/T2 — Blocked, gaps reales (no solo falta de revisión)</span>
+    <span class="pill watch"><span class="dot"></span>P3 completo, P4.T3, P5.T1/T2 — Blocked; P4.T1 implementado (revisión pendiente); NUEVO: causa raíz P5.T3 confirmada</span>
     <span class="pill bad"><span class="dot"></span>CI sigue roja (misma causa histórica); ninguna regresión de esta sesión</span>
     <span class="pill pass"><span class="dot"></span>ADR-043 + ADR-044 Accepted</span>
     <span class="pill pass"><span class="dot"></span>NUEVO: X29 — <strong>CLOSED 2026-09-22</strong>, causa raíz real (no upstream), ambos criterios de dispositivo ejecutados</span>
@@ -547,7 +547,7 @@
           <div class="lrow blocked"><span class="id">P3–P6</span><span class="desc">Mobile P2P de cara al usuario — verificado leaf por leaf (CONS-T6/T7/T8a): 3/12 cierran, 9/12 quedan Blocked por gaps reales, no solo falta de revisión</span><span class="status">parcial: 3/12</span></div>
           <div class="sub-ladder">
             <div class="sub-row warn"><span class="sid">P3</span><span class="sdesc"><strong>Invitación/claim</strong> — las 4 leaves (T0-T3) Blocked: sin contrato T0, sin test de claim-race T1, join de autorización sin test T2, sin artefacto de certificación T3</span></div>
-            <div class="sub-row"><span class="sid">P4</span><span class="sdesc"><strong>Sync verificado</strong> — T0 y T2 <strong>Done</strong>; T1 Blocked (reconexión acotada no implementada); T3 Blocked (sin artefacto de certificación)</span></div>
+            <div class="sub-row"><span class="sid">P4</span><span class="sdesc"><strong>Sync verificado</strong> — T0 y T2 <strong>Done</strong>; T1 <strong>Implemented+verified</strong> (reconexión acotada en <code>P2pProductSync.ts</code>, RRI 55, revisión Med-high pendiente — 22-sep); T3 Blocked (sin artefacto de certificación)</span></div>
             <div class="sub-row"><span class="sid">P5</span><span class="sdesc"><strong>Reproducción local</strong> — T0 <strong>Done</strong>; T1 Blocked (servidor loopback sin test de seguridad); T2 Blocked (depende de T1); T3 sin cambios (necesita dispositivo, X29)</span></div>
             <div class="sub-row warn"><span class="sid">P6</span><span class="sdesc"><strong>Dashboard</strong> — sin cambios, su propio gate (P3-P5 PASS) sigue sin satisfacerse</span></div>
           </div>
@@ -596,11 +596,15 @@
       </div>
       <div class="risk med">
         <span class="tag2">P3–P6 — verificación parcial</span>
-        <p><code>CONS-T6/T7/T8a</code> verificó P3/P4/P5.T0-2 leaf por leaf contra criterios de aceptación reales. Resultado: <strong>P4.T0, P4.T2, P5.T0 Done</strong>, owner-verified. <strong>P3 completo (4 leaves), P4.T1, P4.T3, P5.T1, P5.T2 quedan Blocked</strong> — gaps reales, no solo falta de revisión: lógica fail-closed sin test (claim-race P3.T1, join de autorización P3.T2, servidor loopback P5.T1), un criterio no implementado (reconexión acotada P4.T1), y artefactos de certificación inexistentes (P3.T3, P4.T3). P6 sigue sin arrancar su propio gate (P3-P5 PASS). Detalle por leaf: <code>docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md</code>.</p>
+        <p><code>CONS-T6/T7/T8a</code> verificó P3/P4/P5.T0-2 leaf por leaf contra criterios de aceptación reales. Resultado: <strong>P4.T0, P4.T2, P5.T0 Done</strong>, owner-verified. <strong>P3 completo (4 leaves), P4.T1, P4.T3, P5.T1, P5.T2 quedan Blocked</strong> — gaps reales, no solo falta de revisión: lógica fail-closed sin test (claim-race P3.T1, join de autorización P3.T2, servidor loopback P5.T1), un criterio ya cerrado desde entonces (reconexión acotada P4.T1 — implementada 22-sep, ver actualización), y artefactos de certificación inexistentes (P3.T3, P4.T3). P6 sigue sin arrancar su propio gate (P3-P5 PASS). Detalle por leaf: <code>docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md</code>.</p>
+      </div>
+      <div class="risk high">
+        <span class="tag2">NUEVO: P5.T3 — causa raíz confirmada</span>
+        <p>Una corrida diagnóstica instrumentada del 22-sep confirmó por qué P5.T3 falla en la etapa <code>SYNC</code> (<code>ENOENT stat "file:"</code>): el runtime P2P de producto (<code>mobile/src/p2p/runtime/product-package-runtime.ts</code>) pasa el <code>file:</code> URI crudo a <code>Corestore</code> sin convertirlo a path — <code>hypercore-storage</code> lo trata como string de filesystem, no como URI. El contrato de storage de P1 citaba la guía oficial de Bare como justificación, pero esa guía sí convierte via <code>URL.fileURLToPath</code>; el contrato omitió ese paso y ningún test existente lo hubiera detectado (mockean Corestore o solo comparan strings de URI). Fix planificado (Opción A, mínimo, preserva el contrato) y nueva tarea creada: <code>docs/tasks/mvp0-p2p-p4-mobile-sync.md</code> § <strong>P4.T1-r1</strong> — <code>Planned, RRI/aprobación pendiente, no implementado</code>. Detalle completo: <code>docs/audit/mvp0-p2p-p5-t3-android-certification-blocked-2026-09-22.md</code>.</p>
       </div>
       <div class="risk high">
         <span class="tag2">CI roja</span>
-        <p>El run más reciente en <code>feature/p2p-mvp-core</code> (push de hoy, commit <code>12c4a91</code>) sigue en fallo: <code>deny</code> (<code>RUSTSEC-2026-0285</code>, rustls), <code>s3-integration</code> (<code>docker pull</code> de MinIO denegado), y <code>coverage</code> (88.35% workspace, bajo el piso 90%, atribuido a archivos P3 sin activar). Mismas causas de infraestructura que el 17-sep — ninguna regresión introducida por el trabajo de remediación. La rama no puede fusionarse en este estado.</p>
+        <p><strong>Actualización 22-sep, tarde:</strong> tras el merge de la rama remota (commit <code>c726e42</code>), las tres causas anteriores (<code>deny</code>/RUSTSEC, <code>s3-integration</code>/MinIO, <code>coverage</code>) ya <strong>pasan</strong>. La CI ahora falla por algo distinto: <code>fmt</code> y <code>clippy</code>, ambos por formato sin aplicar en <code>crates/db/tests/p2p_audience_repo.rs</code> (un test P2 traído por el merge). No es una regresión de lógica de negocio, pero la rama sigue sin poder fusionarse limpiamente.</p>
       </div>
       <div class="risk info">
         <span class="tag2">P2P local-dev — infra lista</span>
@@ -631,7 +635,7 @@
     <div class="timeline">
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">6–10 SEP</div><div class="work">T1 done + P2.C0 PASS + T2 completo + T3a/T3b done; nueva T7local</div><div class="outcome">X29 promovido a blocker</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">11–18 SEP</div><div class="work">P2.T3c/T3d/T4 cerrados; ledger de remediación abierto y ejecutado — CONS-T0/T1/T2/T3/T4/T5/T9 <strong>Done</strong> (aggregate P2 PASS); CONS-T6/T7/T8a verificó P3/P4/P5.T0-2 leaf por leaf: P4.T0/P4.T2/P5.T0 Done, resto Blocked por gaps reales; CI sigue roja (RUSTSEC + MinIO + coverage); S-230 T7local sin avance en 12 días</div><div class="outcome">X29 OPEN, plazo venció 18-sep</div></div>
-      <div class="tstep now"><div class="bar"><div class="dot"></div></div><div class="window">19 SEP–2 OCT</div><div class="work">Resolver CI roja de la rama; cerrar los 9 leaves Blocked de P3/P4/P5 (tests fail-closed faltantes, reconexión acotada, artefactos de certificación); terminar local-dev-readiness; S-230 T7local→T7c; <strong>22-sep: X29 cerrado</strong> — causa raíz propia encontrada y arreglada, no upstream</div><div class="outcome">◆ X29 resuelto 22-sep, 4 días tarde vs. plazo<div class="here-flag">estás acá</div></div></div>
+      <div class="tstep now"><div class="bar"><div class="dot"></div></div><div class="window">19 SEP–2 OCT</div><div class="work">Resolver CI roja de la rama; cerrar los 9 leaves Blocked de P3/P4/P5 (tests fail-closed faltantes, reconexión acotada, artefactos de certificación); terminar local-dev-readiness; S-230 T7local→T7c; <strong>22-sep: X29 cerrado</strong>; <strong>22-sep tarde: P4.T1 implementado</strong> (reconexión acotada, RRI 55, revisión pendiente) y <strong>causa raíz de P5.T3 confirmada</strong> (bug <code>file:</code>→Corestore, fix planificado P4.T1-r1, no implementado aún)</div><div class="outcome">◆ X29 resuelto 22-sep, 4 días tarde vs. plazo<div class="here-flag">estás acá</div></div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">3–12 OCT</div><div class="work">Cerrar P3-P6 completos, arrancar P6</div><div class="outcome">Mobile P2P debe estar PASS</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">13–15 OCT</div><div class="work">Activar T6p-a → T6p-b → T6p-c → T6p-d</div><div class="outcome">gate de desarrollo debe cerrar el 15-oct</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">16–24 OCT</div><div class="work">P3–P6 certificación formal + candidato Android físico</div><div class="outcome">T7p listo</div></div>
@@ -662,7 +666,13 @@
     <code>docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md</code> (evidencia por leaf) ·
     <code>make qa-docs</code> (pasó limpio tras los cierres).
     <div class="lineage" id="linaje-completo">
-      <strong>Linaje:</strong> este documento (2026-09-22 — cierra X29: causa raíz propia de 2
+      <strong>Linaje:</strong> este documento (2026-09-22 tarde — merge de 14 commits remotos
+      (<code>c726e42</code>): P4.T1 pasa de Blocked a <strong>Implemented+verified</strong>
+      (reconexión acotada, <code>P2pProductSync.ts</code>, RRI 55, revisión Med-high pendiente);
+      P4.T3 suma test de cambio de cuenta (RRI 25 Low); CI cambia de causa — <code>deny</code>/
+      <code>s3-integration</code>/<code>coverage</code> ahora pasan, <code>fmt</code>/<code>clippy</code>
+      fallan por un test P2 sin formatear; nueva tarea <code>P4.T1-r1</code> registrada para el
+      fix de causa raíz de P5.T3 confirmado hoy mismo) ← 2026-09-22 mediodía (cierra X29: causa raíz propia de 2
       líneas en <code>BareRuntimeClient.ts</code>/<code>ProofRuntimeFactory.ts</code>, no bug
       upstream; retracta el diagnóstico "confirmado" de la entrada 2026-08-28; corrige 2 tests
       Jest obsoletos hallados por scoring RRI honesto; ejecuta los 2 criterios de dispositivo
