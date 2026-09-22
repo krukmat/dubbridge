@@ -35,8 +35,10 @@ constructed.
 - generated worklet sha256:
   `2f1f79cdf1d62a2b7cd8fafd3819b4ccb5039b71b519fbf7e954d1654a7bfd1b`
 
-No `mobile/package.json` or lockfile change was made. `bare-url` remains the
-already-packaged transitive dependency for this narrowly scoped repair.
+Owner decision 2026-09-22: declare `bare-url@^2.5.2` as a direct mobile dependency.
+`mobile/package.json` and the lockfile now declare it explicitly; the existing lock
+resolution remains `bare-url@2.5.2`, so this changes dependency ownership only, not
+the resolved runtime version.
 
 ## RED -> GREEN proof
 
