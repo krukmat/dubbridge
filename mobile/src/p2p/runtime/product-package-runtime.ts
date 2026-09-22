@@ -96,8 +96,9 @@ export class ProductPackageRuntime {
 }
 
 async function openPackage(storageUri: string, externalPublicationId: string): Promise<ActiveProductPackage> {
+  const storagePath = productStoragePath(storageUri);
   const { Corestore, Hyperdrive, Hyperswarm } = loadDependencies();
-  const store = new Corestore(storageUri);
+  const store = new Corestore(storagePath);
   const drive = new Hyperdrive(store, Buffer.from(externalPublicationId, "hex"));
   const swarm = new Hyperswarm();
   swarm.on("connection", (connection) => store.replicate(connection));
@@ -145,6 +146,22 @@ function runtimeStorageUri(runtime: WorkletRuntime): string {
     throw new RuntimeProtocolError("PRODUCT_STORAGE_CONFIG_INVALID", "Product storage configuration is invalid");
   }
   return uri.replace(/\/$/, "");
+}
+
+function productStoragePath(storageUri: string): string {
+  try {
+    const bareUrl = require("bare-url") as { fileURLToPath(url: string): string };
+    const storagePath = bareUrl.fileURLToPath(storageUri);
+    if (storagePath.includes("\0")) {
+      throw new Error("Product storage path contains NUL");
+    }
+    return storagePath;
+  } catch {
+    throw new RuntimeProtocolError(
+      "PRODUCT_STORAGE_CONFIG_INVALID",
+      "Product storage configuration is invalid",
+    );
+  }
 }
 
 function validateAccountScope(value: string): void {
