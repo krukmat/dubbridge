@@ -1,9 +1,4 @@
-use std::{
-    collections::HashMap,
-    env,
-    path::PathBuf,
-    sync::Arc,
-};
+use std::{collections::HashMap, env, path::PathBuf, sync::Arc};
 
 use axum::{
     body::{Body, to_bytes},
@@ -39,7 +34,10 @@ impl StubTokenVerifier {
     fn with_subject(mut self, token: &str, subject_id: Uuid) -> Self {
         self.responses.insert(
             token.to_owned(),
-            Ok(AuthenticatedPrincipal::new(subject_id, Vec::<String>::new())),
+            Ok(AuthenticatedPrincipal::new(
+                subject_id,
+                Vec::<String>::new(),
+            )),
         );
         self
     }
@@ -173,24 +171,39 @@ impl TestContext {
         let authorization_id = parse_uuid(&claim_body["authorization"]["id"]);
 
         assert_eq!(parse_uuid(&claim_body["invitation"]["id"]), invitation_id);
-        assert_eq!(parse_uuid(&claim_body["authorization"]["invitation_id"]), invitation_id);
-        assert_eq!(parse_uuid(&claim_body["authorization"]["asset_id"]), asset_id);
+        assert_eq!(
+            parse_uuid(&claim_body["authorization"]["invitation_id"]),
+            invitation_id
+        );
+        assert_eq!(
+            parse_uuid(&claim_body["authorization"]["asset_id"]),
+            asset_id
+        );
         assert_eq!(
             parse_uuid(&claim_body["authorization"]["publication_id"]),
             publication_id
         );
-        assert_eq!(parse_uuid(&claim_body["authorization"]["lineage_id"]), lineage_id);
+        assert_eq!(
+            parse_uuid(&claim_body["authorization"]["lineage_id"]),
+            lineage_id
+        );
         assert_eq!(
             parse_uuid(&claim_body["authorization"]["viewer_subject_id"]),
             self.viewer
         );
-        assert_eq!(parse_uuid(&claim_body["authorization"]["device_id"]), device_id);
+        assert_eq!(
+            parse_uuid(&claim_body["authorization"]["device_id"]),
+            device_id
+        );
         assert_eq!(parse_uuid(&claim_body["descriptor"]["asset_id"]), asset_id);
         assert_eq!(
             parse_uuid(&claim_body["descriptor"]["publication_id"]),
             publication_id
         );
-        assert_eq!(parse_uuid(&claim_body["descriptor"]["lineage_id"]), lineage_id);
+        assert_eq!(
+            parse_uuid(&claim_body["descriptor"]["lineage_id"]),
+            lineage_id
+        );
 
         ClaimedFixture {
             asset_id,
@@ -226,12 +239,9 @@ async fn p3_t3a_owner_invite_claim_o3_and_envelope_binding_are_integrated() {
     .await;
     assert_eq!(envelope_response.status(), StatusCode::OK);
     let envelope = json_body(envelope_response).await;
-    let binding: Value = serde_json::from_str(
-        envelope["binding_json"]
-            .as_str()
-            .expect("binding json"),
-    )
-    .expect("parse envelope binding");
+    let binding: Value =
+        serde_json::from_str(envelope["binding_json"].as_str().expect("binding json"))
+            .expect("parse envelope binding");
 
     assert_eq!(envelope["profile_version"], "p2p-k1-hpke-v1");
     assert_eq!(envelope["key_id"], DEVICE_KEY_ID);
@@ -239,16 +249,17 @@ async fn p3_t3a_owner_invite_claim_o3_and_envelope_binding_are_integrated() {
     assert_eq!(binding["invitation_id"], fixture.invitation_id.to_string());
     assert_eq!(binding["viewer_id"], ctx.viewer.to_string());
     assert_eq!(binding["asset_id"], fixture.asset_id.to_string());
-    assert_eq!(binding["publication_id"], fixture.publication_id.to_string());
+    assert_eq!(
+        binding["publication_id"],
+        fixture.publication_id.to_string()
+    );
     assert_eq!(binding["lineage_id"], fixture.lineage_id.to_string());
     assert_eq!(
         binding["authorization_id"],
         fixture.authorization_id.to_string()
     );
     assert!(
-        binding["expires_at_unix"]
-            .as_i64()
-            .expect("binding expiry")
+        binding["expires_at_unix"].as_i64().expect("binding expiry")
             > OffsetDateTime::now_utc().unix_timestamp()
     );
     assert!(
