@@ -34,13 +34,26 @@ export class DeviceIdentityUnavailableError extends Error {
   }
 }
 
-function nativeModule(): NativeDeviceIdentityModule {
-  if (Platform.OS !== "android") {
+type DeviceIdentityRuntime = Readonly<{
+  platformOs: string;
+  requireModule: () => NativeDeviceIdentityModule;
+}>;
+
+function defaultRuntime(): DeviceIdentityRuntime {
+  return {
+    platformOs: Platform.OS,
+    requireModule: () =>
+      requireNativeModule<NativeDeviceIdentityModule>("DubBridgeP2PKeyStore"),
+  };
+}
+
+function nativeModule(runtime: DeviceIdentityRuntime): NativeDeviceIdentityModule {
+  if (runtime.platformOs !== "android") {
     throw new DeviceIdentityUnavailableError("K1 device identity is Android-only in MVP-0");
   }
 
   try {
-    return requireNativeModule<NativeDeviceIdentityModule>("DubBridgeP2PKeyStore");
+    return runtime.requireModule();
   } catch {
     throw new DeviceIdentityUnavailableError();
   }
@@ -51,8 +64,10 @@ function nativeModule(): NativeDeviceIdentityModule {
  * the P-256 private key must remain opaque inside Android Keystore.
  */
 export class AndroidKeystoreDeviceIdentity implements DeviceIdentity {
+  constructor(private readonly runtime: DeviceIdentityRuntime = defaultRuntime()) {}
+
   async getOrCreateP256Identity(): Promise<DevicePublicIdentity> {
-    const module = nativeModule();
+    const module = nativeModule(this.runtime);
     if (typeof module.getOrCreateP256Identity !== "function") {
       throw new DeviceIdentityUnavailableError();
     }
@@ -69,7 +84,7 @@ export class AndroidKeystoreDeviceIdentity implements DeviceIdentity {
   }
 
   async unwrapEnvelope(envelope: DeviceEnvelope): Promise<string> {
-    const module = nativeModule();
+    const module = nativeModule(this.runtime);
     if (typeof module.unwrapHpkeBaseEnvelope !== "function") {
       throw new DeviceIdentityUnavailableError("Native HPKE unwrap is unavailable");
     }

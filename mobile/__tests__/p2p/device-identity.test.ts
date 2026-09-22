@@ -1,13 +1,3 @@
-const mockRequireNativeModule = jest.fn();
-
-jest.mock("expo", () => ({
-  requireNativeModule: (...args: unknown[]) => mockRequireNativeModule(...args),
-}));
-
-jest.mock("react-native", () => ({
-  Platform: { OS: "android" },
-}));
-
 import {
   AndroidKeystoreDeviceIdentity,
   DeviceIdentityUnavailableError,
@@ -23,16 +13,13 @@ const envelope: DeviceEnvelope = {
 };
 
 describe("K1 Android device identity boundary", () => {
-  beforeEach(() => {
-    mockRequireNativeModule.mockReset();
-  });
-
   it("fails closed when the native module cannot be resolved", async () => {
-    mockRequireNativeModule.mockImplementation(() => {
-      throw new Error("native module missing");
+    const identity = new AndroidKeystoreDeviceIdentity({
+      platformOs: "android",
+      requireModule: () => {
+        throw new Error("native module missing");
+      },
     });
-
-    const identity = new AndroidKeystoreDeviceIdentity();
 
     await expect(identity.getOrCreateP256Identity()).rejects.toBeInstanceOf(
       DeviceIdentityUnavailableError,
@@ -42,10 +29,25 @@ describe("K1 Android device identity boundary", () => {
     );
   });
 
-  it("has no software fallback when native methods are absent", async () => {
-    mockRequireNativeModule.mockReturnValue({});
+  it("fails closed outside Android instead of introducing a software identity", async () => {
+    const requireModule = jest.fn();
+    const identity = new AndroidKeystoreDeviceIdentity({
+      platformOs: "ios",
+      requireModule,
+    });
 
-    const identity = new AndroidKeystoreDeviceIdentity();
+    await expect(identity.getOrCreateP256Identity()).rejects.toMatchObject({
+      name: "DeviceIdentityUnavailableError",
+      message: "K1 device identity is Android-only in MVP-0",
+    });
+    expect(requireModule).not.toHaveBeenCalled();
+  });
+
+  it("has no software fallback when native methods are absent", async () => {
+    const identity = new AndroidKeystoreDeviceIdentity({
+      platformOs: "android",
+      requireModule: () => ({}),
+    });
 
     await expect(identity.getOrCreateP256Identity()).rejects.toMatchObject({
       name: "DeviceIdentityUnavailableError",
@@ -57,14 +59,15 @@ describe("K1 Android device identity boundary", () => {
   });
 
   it("rejects malformed native public identity instead of inventing one in JS", async () => {
-    mockRequireNativeModule.mockReturnValue({
-      getOrCreateP256Identity: jest.fn().mockResolvedValue({
-        keyId: "",
-        publicKeySpkiBase64: "",
+    const identity = new AndroidKeystoreDeviceIdentity({
+      platformOs: "android",
+      requireModule: () => ({
+        getOrCreateP256Identity: jest.fn().mockResolvedValue({
+          keyId: "",
+          publicKeySpkiBase64: "",
+        }),
       }),
     });
-
-    const identity = new AndroidKeystoreDeviceIdentity();
 
     await expect(identity.getOrCreateP256Identity()).rejects.toMatchObject({
       name: "DeviceIdentityUnavailableError",
@@ -78,12 +81,13 @@ describe("K1 Android device identity boundary", () => {
       publicKeySpkiBase64: "native-spki",
     });
     const unwrapHpkeBaseEnvelope = jest.fn().mockResolvedValue("transient-ck");
-    mockRequireNativeModule.mockReturnValue({
-      getOrCreateP256Identity,
-      unwrapHpkeBaseEnvelope,
+    const identity = new AndroidKeystoreDeviceIdentity({
+      platformOs: "android",
+      requireModule: () => ({
+        getOrCreateP256Identity,
+        unwrapHpkeBaseEnvelope,
+      }),
     });
-
-    const identity = new AndroidKeystoreDeviceIdentity();
 
     await expect(identity.getOrCreateP256Identity()).resolves.toEqual({
       keyId: "dubbridge-p2p-k1-v1",
