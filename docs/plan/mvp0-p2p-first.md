@@ -89,7 +89,7 @@ The unreduced P2 phase is RRI 131 Excessive and cannot execute directly. T0 and 
 
 The October goal is a controlled Android beta/POC for one owner, one invited viewer, one device, and a short video. The must-have path is P2 encrypted publication, P3 invite/claim and K1 device envelope, P4 verified full-package sync, P5 loopback playback through the existing `VideoPlayer`, P6 minimal product states/actions, and P7 certification with legacy HTTP/S3 audience-media delivery disabled.
 
-S-230 may deploy and validate its existing base platform independently. Its **P2P go-live decision**, however, depends on the deployed P2P publication plane, an Android P2P release candidate, P2-P6 PASS, and P7 certification against the exact release artifact. P2 alone proves backend publication; it does not prove invited playback.
+S-230 may deploy and validate its existing base platform independently. Its **P2P go-live decision** depends on the deployed P2P publication plane, an Android P2P release candidate, resolved P5.T3 physical evidence, and P7 certification against the exact release artifact. Downstream development uses `DEV-HANDOFF` (P3 PASS + P4 PASS + P5-DEV + P6 PASS), so P5.T3 no longer blocks P6/deployment preparation.
 
 The deployment lane is intentionally deferred until the implementation surfaces
 exist. S-230's local-stack development path (`T7local -> T7c`, validated
@@ -112,10 +112,10 @@ The October release does not include iOS, multi-device, email delivery, offline/
 | Window | Required outcome |
 |---|---|
 | Sep 6-18 | Record T1 Done and `P2.C0 PASS`, execute P2 leaf-by-leaf, advance S-230 `T7local -> T7c` against the local Docker Compose stack, and resolve X29 |
-| Sep 19-Oct 15 | Complete P2 and the P3-P6 development sequence; do not activate T6p-a while either development gate remains open. The independent S-230 `T6 -> T7` Digital Ocean deploy may proceed in this window or later without affecting T6p-a |
+| Sep 19-Oct 15 | Complete P3 PASS, P4 PASS, P5-DEV and P6 PASS. P5.T3 may remain deferred. Do not activate T6p-a until `DEV-HANDOFF` and T7local/T7c close. The independent S-230 `T6 -> T7` Digital Ocean deploy may proceed separately |
 | Oct 16-21 | Freeze deployment inputs in T6p-a, then execute T6p-b/T6p-c and deploy the backend publication plane through T6p-d; complete base T6/T7 before the T7p join |
 | Oct 22-26 | Build and prove the physical Android P2P release candidate in T7p |
-| Oct 27-30 | Run P7 on the exact deployed artifacts, complete soak/rollback evidence, and issue the S-230 P2P GO/NO-GO |
+| Oct 27-30 | Run P7 on the exact deployed artifacts; resolve any still-open P5.T3 evidence in P7.T2; complete soak/rollback evidence and issue the S-230 P2P GO/NO-GO |
 
 If physical Android proof is not available by September 18, or the required development gate (S-230 `T7local -> T7c` PASS against the local Docker Compose stack, and MVP0-P2P `P2 -> P6` PASS) is not complete by October 15, October may ship only the base S-230 HTTP/HLS POC plus a clearly labeled backend P2P preview. It must not claim P2P invited playback.
 
@@ -126,7 +126,7 @@ active MVP0-P2P phase may run concurrently. With `P2.C0 PASS`, the K1 builder,
 Availability Node, recovery kernel/client, S-120 characterization, and audit/test
 harness are designed as disjoint workstreams with explicit joins. S-230 T6p
 deployment planning is the exception: it remains deferred until S-230
-T7local, T7c, and MVP0-P2P P2-P6 are PASS, so it is based on implemented surfaces
+T7local, T7c, and MVP0-P2P DEV-HANDOFF are satisfied, so it is based on implemented surfaces
 rather than provisional ones — this intentionally does not require the
 independent S-230 T6 -> T7 Digital Ocean deploy.
 
@@ -165,8 +165,8 @@ These are scoped downstream decisions under accepted ADR-044, not reasons to reo
 | P3 | `docs/plan/mvp0-p2p-p3-invitation-envelope.md` | `docs/tasks/mvp0-p2p-p3-invitation-envelope.md` | Planned; activation gate remains P2 PASS; Accepted ADR-044 |
 | P4 | `docs/plan/mvp0-p2p-p4-mobile-sync.md` | `docs/tasks/mvp0-p2p-p4-mobile-sync.md` | Planned; activation gate remains P3 PASS |
 | P5 | `docs/plan/mvp0-p2p-p5-local-playback.md` | `docs/tasks/mvp0-p2p-p5-local-playback.md` | In progress; T1/T2 automated evidence PASS, formal closure + T3 Android evidence pending; P4 PASS gate unchanged |
-| P6 | `docs/plan/mvp0-p2p-p6-dashboard.md` | `docs/tasks/mvp0-p2p-p6-dashboard.md` | Planned; activation gate remains P3-P5 PASS |
-| P7 | `docs/plan/mvp0-p2p-p7-certification.md` | `docs/tasks/mvp0-p2p-p7-certification.md` | Planned; activation gate remains P2-P6 PASS; S-230-T7p PASS |
+| P6 | `docs/plan/mvp0-p2p-p6-dashboard.md` | `docs/tasks/mvp0-p2p-p6-dashboard.md` | Planned; gate is P3 PASS + P4 PASS + P5-DEV; P5.T3 deferred |
+| P7 | `docs/plan/mvp0-p2p-p7-certification.md` | `docs/tasks/mvp0-p2p-p7-certification.md` | Planned; gate is P2-P4 PASS + P5-DEV + P6 PASS + S-230-T7p; P7.T2 resolves deferred P5.T3 |
 
 Detailed phase plans and work-package ledgers now exist. P5 has moved beyond its original planning-only state under explicit owner-directed execution: T1/T2 now carry automated evidence remediation, but aggregate P5 is not PASS. Formal T1/T2 closure, T3 Android evidence, and the unchanged upstream/downstream gates still apply. Other phase entries retain their own activation and closure requirements.
 P2 still has 17 planned leaves after T2/T3a/T4a closure. The October calendar is a

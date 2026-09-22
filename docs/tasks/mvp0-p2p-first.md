@@ -33,8 +33,8 @@ plan: docs/plan/mvp0-p2p-first.md
 | P3 | Invite, claim, and content-key envelope | Pending | P2 PASS; accepted ADR-044 / K1 contract |
 | P4 | Mobile package sync and verification | Pending | P3 PASS |
 | P5 | Local HLS gateway + existing VideoPlayer | Pending | P4 PASS |
-| P6 | Minimal My Content + Invites dashboard | Pending | P3–P5 PASS |
-| P7 | End-to-end P2P certification | Pending | P2–P6 PASS; S-230-T7p PASS |
+| P6 | Minimal My Content + Invites dashboard | Pending | P3 PASS; P4 PASS; P5-DEV (T0-T2); P5.T3 deferred |
+| P7 | End-to-end P2P certification | Pending | P2-P4 PASS; P5-DEV; P6 PASS; S-230-T7p PASS; P5.T3 resolved by/within P7.T2 |
 
 > **Review exception:** the repository owner waived phase-1 and phase-2 peer
 > review for P0–P7 only. Each task still requires its RRI-derived approval,
@@ -327,7 +327,7 @@ and revised approval card: `docs/plan/mvp0-p2p-p1-replication.md`,
 
 ### P6 — Minimal My Content + Invites dashboard
 
-- **Gate / use case:** G6 / CU-03. **Blocked on:** P3–P5 PASS.
+- **Gate / use case:** G6 / CU-03. **Blocked on:** P3 PASS, P4 PASS and P5-DEV. P5.T3 is deferred.
 - **Objective:** expose the minimal owner and viewer state required to drive
   the flow, and nothing more.
 - **In scope:** `MY CONTENT` with `Processing | Ready | Failed`; `INVITES`
@@ -346,9 +346,10 @@ and revised approval card: `docs/plan/mvp0-p2p-p1-replication.md`,
 
 ### P7 — End-to-end P2P certification
 
-- **Gate / use case:** G7 / all four CU. **Blocked on:** P2–P6 PASS,
-  `S-230-T7p PASS`, and the phase-specific certification profile constrained
-  by Accepted ADR-044.
+- **Gate / use case:** G7 / all four CU. **Blocked on:** P2-P4 PASS, P5-DEV,
+  P6 PASS, `S-230-T7p PASS`, and the phase-specific certification profile
+  constrained by Accepted ADR-044. P5.T3 may enter P7 pending but must be
+  resolved by P7.T2 before a passing verdict.
 - **Objective:** certify the complete owner-to-viewer flow with legacy HTTP
   media delivery disabled, emitting `MVP0_P2P_CERTIFIED` or
   `MVP0_P2P_NOT_CERTIFIED`.
@@ -372,8 +373,8 @@ and revised approval card: `docs/plan/mvp0-p2p-p1-replication.md`,
 | P3 | `docs/plan/mvp0-p2p-p3-invitation-envelope.md` | `docs/tasks/mvp0-p2p-p3-invitation-envelope.md` | Planned; activation gate remains P2 PASS; Accepted ADR-044 |
 | P4 | `docs/plan/mvp0-p2p-p4-mobile-sync.md` | `docs/tasks/mvp0-p2p-p4-mobile-sync.md` | Planned; activation gate remains P3 PASS |
 | P5 | `docs/plan/mvp0-p2p-p5-local-playback.md` | `docs/tasks/mvp0-p2p-p5-local-playback.md` | Planned; activation gate remains P4 PASS |
-| P6 | `docs/plan/mvp0-p2p-p6-dashboard.md` | `docs/tasks/mvp0-p2p-p6-dashboard.md` | Planned; activation gate remains P3-P5 PASS |
-| P7 | `docs/plan/mvp0-p2p-p7-certification.md` | `docs/tasks/mvp0-p2p-p7-certification.md` | Planned; activation gate remains P2-P6 PASS; S-230-T7p PASS |
+| P6 | `docs/plan/mvp0-p2p-p6-dashboard.md` | `docs/tasks/mvp0-p2p-p6-dashboard.md` | Planned; gate is P3 PASS + P4 PASS + P5-DEV; P5.T3 deferred |
+| P7 | `docs/plan/mvp0-p2p-p7-certification.md` | `docs/tasks/mvp0-p2p-p7-certification.md` | Planned; gate is P2-P4 PASS + P5-DEV + P6 PASS + S-230-T7p; P7.T2 resolves deferred P5.T3 |
 
 Detailed phase plans and work-package ledgers now exist. Exact-path executable
 leaf decomposition, per-parent/leaf RRI, ownership and elapsed-time estimates

@@ -21,6 +21,11 @@ MVP0-P2P P7 certification.
 
 ## October 2026 P2P go-live amendment
 
+**Sequencing amendment 2026-09-22:** the deployment-development gate is now
+`MVP0-P2P DEV-HANDOFF` = P3 PASS + P4 PASS + P5-DEV + P6 PASS. P5.T3 is not
+part of this gate; its physical evidence is carried to the release lane and
+must be resolved before a passing P7 verdict/T9g GO.
+
 The release target is a controlled Android beta/POC: one owner uploads a short
 video, one invited viewer claims it, fully syncs and verifies the encrypted
 package, and plays it through the loopback gateway. Legacy HTTP/S3 audience
@@ -34,7 +39,7 @@ development path validates the same mobile behaviors against
 Digital-Ocean-related" to wait for local development to close). The P2P
 release path adds:
 
-- `T6p-a`: after `T7local PASS`, `T7c PASS`, and MVP0-P2P `P2-P6 PASS`, freeze
+- `T6p-a`: after `T7local PASS`, `T7c PASS`, and MVP0-P2P `DEV-HANDOFF`, freeze
   only deployment-specific ownership and configuration against the
   implemented surfaces: Availability Node placement, mTLS identities,
   versioned KEK, persistent ciphertext volume, health, ports, resources, and
@@ -698,7 +703,7 @@ flowchart LR
     T8 --> T8b
     T8b --> T9
     T3b -.folds into demo if done in time.-> T9
-    C0["P2.C0 PASS"] --> P2DEV["MVP0-P2P P2-P6 development PASS"]
+    C0["P2.C0 PASS"] --> P2DEV["MVP0-P2P DEV-HANDOFF"]
     P2DEV --> T6PA["T6p-a deployment ownership/config freeze"]
     T7LOCAL --> T6PA
     T6PA --> T6PB["T6p-b P2P descriptor"]

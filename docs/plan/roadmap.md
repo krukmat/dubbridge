@@ -417,6 +417,15 @@ captured above under Governing principles and ADR-025/ADR-026.
 
 ## Known planning gaps
 
+> **MVP0-P2P sequencing amendment — 2026-09-22:** P5.T3 is now a deferred
+> release-certification obligation, not a downstream development gate. P6
+> activates on P3 PASS + P4 PASS + **P5-DEV** (P5.T0-T2 formally closed).
+> S-230 T6p/T7p preparation uses **DEV-HANDOFF** = P3 PASS + P4 PASS + P5-DEV
+> + P6 PASS. P5.T3 remains mandatory and is resolved from compatible exact-RC
+> T7p evidence or, at latest, P7.T2. P7.T3/T9g cannot PASS/GO without it.
+> This supersedes older roadmap sentences that require aggregate P5/P2-P6 PASS
+> for those development activations.
+
 - `S-xxx` numbering is canonical. Update this map whenever a phase, dependency, or
   ADR materially changes; do not introduce new active `P*` or bare `S0`–`S9` phase IDs.
 - `S-070` (JWKS / production identity hardening) and `S-170`/`S-180` (human review
