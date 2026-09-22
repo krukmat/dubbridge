@@ -9,7 +9,7 @@ behavioral_coverage_contract: behavior-v2
 
 # P3 — planning task ledger
 
-**Status:** In progress. P3.T0 PASS. P3.T1 **PASS 2026-09-22** after owner verification; implementation head `4dede25d` completed 15/15 CI checks green. P3.T2 is now the next P3 block.
+**Status:** In progress. P3.T0 PASS. P3.T1 PASS. P3.T2 is active: backend block T2-A (T2a/T2b/T2d) completed at `a228ddad` with 15/15 CI PASS; native block T2-B/T2c remains.
 **Phase gate:** P2 PASS; Accepted ADR-044.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
@@ -19,7 +19,7 @@ behavioral_coverage_contract: behavior-v2
 |---|---|---|---|---|---|
 | P3.T0 | Contract and executable-path freeze | planning | M | P2 PASS | **PASS 2026-09-22** — owner-approved; CI 15/15 green |
 | P3.T1 | Invitation persistence, claim, and inbox | development | decomposed | T0 PASS | **PASS 2026-09-22** — owner-verified; `4dede25d` 15/15 CI green |
-| P3.T2 | O3 authorization and native K1 envelope delivery | development | L | T1 PASS | Blocked on T1 PASS — release-context test exists; remaining predicate/API/native/audit certification frozen in T0 artifact |
+| P3.T2 | O3 authorization and native K1 envelope delivery | development | decomposed | T1 PASS | **In progress** — T2-A backend Done (`a228ddad`, 15/15 CI PASS); T2-B/T2c native binding+expiry+opaque-key interop pending |
 | P3.T3 | P3 integration certification and closure | development/evidence | M | T2 PASS | Blocked — no work product exists, see verification note |
 
 
@@ -153,20 +153,46 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T1 PASS
 
-**Status:** Blocked on T1 PASS. **Re-verification 2026-09-22:** source is
-present in `crates/p2p/src/device_envelope.rs`,
-`crates/db/src/p2p_envelope_repo.rs`, `apps/api/src/routes/p2p_envelope.rs`,
-`mobile/src/p2p/device/DeviceIdentity.ts` and the Android
-`DubBridgeP2PKeyStoreModule.kt`. The DB integration suite already proves a
-valid release context and denial after device revocation, so the earlier "all
-0 tests" statement is stale. Remaining T2 work is the full fail-closed predicate
-matrix, handler/binding behavior, explicit JS no-software-fallback evidence,
-native opaque-key interop certification and P3 envelope audit coverage.
+**Status:** **In progress.** Backend block **T2-A** is complete at implementation
+head `a228ddad` with **15/15 CI PASS**. Evidence:
+`docs/audit/mvp0-p2p-p3-t2a-backend-evidence-2026-09-22.md`.
+
+Delivered in T2-A:
+- **T2a:** release predicate matrix now proves wrong viewer, dead authorization,
+  dead invitation, device revocation/device drift, non-ready/reconciling
+  publication, missing sealed-K1 evidence and undelivered outbox all fail closed.
+  Impossible publication/lineage drift is additionally rejected by schema
+  constraint/FK before release evaluation.
+- **T2b:** envelope construction is isolated/testable, binds exact
+  invitation/viewer/device/asset/publication/lineage/authorization/expiry, and
+  maps KEK/nonce/wrapped-CK/device-key failures to stable fail-closed reasons.
+- **T2d:** envelope success and denial now emit durable ADR-018 P3 audit before
+  the response is released; audit failure returns 500. Audit detail contains
+  bounded identifiers/reason codes only.
+
+Remaining **T2-B / T2c**:
+- explicit JS no-software-fallback tests;
+- native binding JSON parsing + expiry enforcement before HPKE unwrap;
+- Android Keystore opaque-private-key HPKE/P-256 interop evidence.
+
+P3.T2 is **not PASS** until T2c closes and receives its own verification.
 
 **Acceptance criteria:** Implement distinct backend audience authorization and all accepted D2 release predicates; prove HPKE Base P-256/HKDF-SHA256/AES-256-GCM with non-exportable Android Keystore private key, native unwrap, binding and expiry checks.
 
 - **HP-P3.T2-1:** Eligible claimed viewer and active device receive a package-bound envelope and unwrap through the opaque native key.
 - **EC-P3.T2-1:** Wrong device/package/viewer, expired or revoked authorization, non-ready publication, or missing Keystore capability produces no CK release; no software private-key fallback.
+
+### T2-A implementation evidence
+
+Implementation lineage:
+`35f04a2e` → `44976e05` → `22c18fea` → `a0ddc408` →
+`767c2393` → `a228ddad`.
+
+Final backend implementation head `a228ddad`: **15/15 CI PASS**, including
+`test`, `coverage`, `cargo-check`, `clippy`, `fmt`, `release-build`,
+`mobile`, `s3-integration`, `deny`, `config-secrets`,
+`peer-workflow-review`, `maintainability`, `python-complexity`,
+`roadmap-drift` and `qa-docs`.
 
 **Evidence to emit:** task-scoped contract/decision record for planning; actual
 command/test/device/network results as relevant to the acceptance criteria for

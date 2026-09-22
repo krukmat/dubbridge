@@ -611,7 +611,7 @@
       </div>
       <div class="risk info">
         <span class="tag2">CI — verde</span>
-        <p>El head de implementación P3.T1 <code>4dede25d</code> cerró <strong>15/15 checks PASS</strong>, incluyendo mobile, fmt, clippy, test, coverage, release-build, s3-integration y policy gates. Esto certifica el bloque T1a/T1b/T1c; el cierre formal de T1 sigue esperando owner verification.</p>
+        <p>P3.T1 ya está owner-verified/PASS. El head backend de P3.T2-A <code>a228ddad</code> cerró <strong>15/15 checks PASS</strong>, incluyendo mobile, fmt, clippy, test, coverage, release-build, s3-integration y policy gates. P3.T2 sigue abierto únicamente por T2-B/T2c native/Keystore.</p>
       </div>
       <div class="risk info">
         <span class="tag2">P2P local-dev — infra lista</span>
@@ -642,7 +642,7 @@
     <div class="timeline">
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">6–10 SEP</div><div class="work">T1 done + P2.C0 PASS + T2 completo + T3a/T3b done; nueva T7local</div><div class="outcome">X29 promovido a blocker</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">11–18 SEP</div><div class="work">P2.T3c/T3d/T4 cerrados; ledger de remediación abierto y ejecutado — CONS-T0/T1/T2/T3/T4/T5/T9 <strong>Done</strong> (aggregate P2 PASS); CONS-T6/T7/T8a verificó P3/P4/P5.T0-2 leaf por leaf: P4.T0/P4.T2/P5.T0 Done, resto Blocked por gaps reales; CI sigue roja (RUSTSEC + MinIO + coverage); S-230 T7local sin avance en 12 días</div><div class="outcome">X29 OPEN, plazo venció 18-sep</div></div>
-      <div class="tstep now"><div class="bar"><div class="dot"></div></div><div class="window">19 SEP–2 OCT</div><div class="work">P3.T0 PASS; P3.T1 closure-ready y pendiente de owner verification antes de T2→T3. En paralelo: cerrar P4.T3/aggregate P4, formalizar P5.T1/T2 para <strong>P5-DEV</strong> y ejecutar T7local→T7c. P5.T3 sigue en certificación tardía.</div><div class="outcome">◆ objetivo inmediato: P3 PASS + P4 PASS + P5-DEV<div class="here-flag">estás acá</div></div></div>
+      <div class="tstep now"><div class="bar"><div class="dot"></div></div><div class="window">19 SEP–2 OCT</div><div class="work">P3.T0/T1 PASS; P3.T2-A backend Done y T2-B/T2c native es el siguiente bloque antes de T3. En paralelo: cerrar P4.T3/aggregate P4, formalizar P5.T1/T2 para <strong>P5-DEV</strong> y ejecutar T7local→T7c. P5.T3 sigue en certificación tardía.</div><div class="outcome">◆ objetivo inmediato: P3 PASS + P4 PASS + P5-DEV<div class="here-flag">estás acá</div></div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">3–12 OCT</div><div class="work">Activar y cerrar P6 sobre el nuevo gate</div><div class="outcome">DEV-HANDOFF = P3 + P4 + P5-DEV + P6</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">13–21 OCT</div><div class="work">T6p-a → T6p-b → T6p-c → T6p-d; completar T6/T7 si sigue pendiente</div><div class="outcome">backend P2P desplegado</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">22–26 OCT</div><div class="work">T7p: candidato Android físico; reutilizar evidencia para P5.T3 si cubre criterios exactos</div><div class="outcome">RC listo + posible P5-CERT</div></div>
@@ -657,7 +657,8 @@
     <code>docs/tasks/mvp0-p2p-p1-replication.md</code> § P1.F3b-fix-2 ·
     <code>docs/audit/mvp0-p2p-p5-t3-sequencing-replan-2026-09-22.md</code> (P5-DEV/P5-CERT y DEV-HANDOFF) ·
     <code>docs/audit/mvp0-p2p-p3-t0-contract-freeze-2026-09-22.md</code> (P3.T0a–g freeze, gaps y path ownership) ·
-    <code>docs/audit/mvp0-p2p-p3-t1-implementation-2026-09-22.md</code> (T1a/T1b/T1c, head <code>4dede25d</code>, 15/15 CI PASS) ·
+    <code>docs/audit/mvp0-p2p-p3-t1-implementation-2026-09-22.md</code> (T1 PASS, head <code>4dede25d</code>) ·
+    <code>docs/audit/mvp0-p2p-p3-t2a-backend-evidence-2026-09-22.md</code> (T2a/T2b/T2d, head <code>a228ddad</code>, 15/15 CI PASS) ·
     <code>docs/plan/roadmap.md</code> § X29 (CLOSED 2026-09-22) ·
     <code>docs/audit/gemma-evidence/x29-worklet-extension-fix.json</code> (commit
     <code>c16c3ff</code>, reviewer <code>gpt-oss:20b</code>, verdict <code>PASS</code>) ·

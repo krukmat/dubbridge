@@ -77,3 +77,4 @@ this document does not establish capacity or guarantee the October date.
 - `docs/audit/mvp0-p2p-p2-c0-contract-freeze.md` — ready descriptor and sealed-lineage input.
 - `docs/audit/mvp0-p2p-p3-t0-contract-freeze-2026-09-22.md` — current P3 source reconciliation, contract freeze, gaps, path ownership and evidence/RRI decomposition.
 - `docs/audit/mvp0-p2p-p3-t1-implementation-2026-09-22.md` — T1 claim-race, exact-lineage handoff, durable audience audit and 15/15 CI evidence.
+- `docs/audit/mvp0-p2p-p3-t2a-backend-evidence-2026-09-22.md` — T2-A DB release matrix, envelope API/binding, durable envelope audit and 15/15 CI evidence.
