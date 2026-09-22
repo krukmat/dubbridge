@@ -1,0 +1,48 @@
+name: p3-t2-native
+
+on:
+  push:
+    paths:
+      - 'mobile/src/p2p/device/**'
+      - 'mobile/__tests__/p2p/device-identity.test.ts'
+      - 'mobile/modules/dubbridge-p2p-keystore/**'
+      - '.github/workflows/p3-t2-native.yml'
+  pull_request:
+    paths:
+      - 'mobile/src/p2p/device/**'
+      - 'mobile/__tests__/p2p/device-identity.test.ts'
+      - 'mobile/modules/dubbridge-p2p-keystore/**'
+      - '.github/workflows/p3-t2-native.yml'
+
+jobs:
+  android-keystore-hpke-interop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install mobile dependencies
+        run: npm ci
+        working-directory: mobile
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --no-install --clean
+        working-directory: mobile
+        env:
+          CI: '1'
+      - name: Run Android Keystore HPKE instrumentation
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          working-directory: mobile/android
+          script: ./gradlew connectedDebugAndroidTest --stacktrace

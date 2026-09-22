@@ -24,8 +24,8 @@ import javax.crypto.Mac
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-private const val KEY_ALIAS = "dubbridge-p2p-k1-v1"
-private const val PROFILE_VERSION = "p2p-k1-hpke-v1"
+internal const val KEY_ALIAS = "dubbridge-p2p-k1-v1"
+internal const val PROFILE_VERSION = "p2p-k1-hpke-v1"
 private val HPKE_VERSION_LABEL = "HPKE-v1".toByteArray(StandardCharsets.US_ASCII)
 private val KEM_SUITE_ID = byteArrayOf(
   'K'.code.toByte(), 'E'.code.toByte(), 'M'.code.toByte(),
@@ -69,11 +69,11 @@ class DubBridgeP2PKeyStoreModule : Module() {
     }
 
     AsyncFunction("unwrapHpkeBaseEnvelope") { envelope: HpkeEnvelopeRecord ->
-      unwrapEnvelope(envelope)
+      unwrapEnvelope(envelope.toNativeEnvelope())
     }
   }
 
-  private fun getOrCreateKeyPair(): KeyPair {
+  internal fun getOrCreateKeyPair(): KeyPair {
     val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
     if (keyStore.containsAlias(KEY_ALIAS)) {
       return loadOpaqueKeyPair(keyStore)
@@ -103,10 +103,11 @@ class DubBridgeP2PKeyStoreModule : Module() {
     check(privateKey.encoded == null) { "K1 private key must remain non-exportable" }
   }
 
-  private fun unwrapEnvelope(envelope: HpkeEnvelopeRecord): String {
-    require(envelope.profileVersion == PROFILE_VERSION) { "Unsupported K1 envelope profile" }
-    require(envelope.keyId == KEY_ALIAS) { "K1 envelope targets another device key" }
-    require(envelope.bindingJson.isNotBlank()) { "K1 envelope binding is missing" }
+  internal fun unwrapEnvelope(
+    envelope: NativeHpkeEnvelope,
+    nowUnix: Long = System.currentTimeMillis() / 1000,
+  ): String {
+    validateEnvelopeBinding(envelope, nowUnix)
 
     val encapsulated = decodeBase64(envelope.encapsulatedKeyBase64, "encapsulated key")
     val ciphertext = decodeBase64(envelope.ciphertextBase64, "ciphertext")
