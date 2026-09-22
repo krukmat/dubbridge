@@ -335,6 +335,12 @@ async fn p3_t3b_envelope_release_fails_closed_across_live_o3_device_and_package_
         return;
     };
 
+    assert_o3_and_viewer_denials(&ctx).await;
+    assert_package_denials(&ctx).await;
+    assert_device_denial(&ctx).await;
+}
+
+async fn assert_o3_and_viewer_denials(ctx: &TestContext) {
     let wrong_viewer = ctx.claimed_fixture().await;
     assert_denied(&ctx.app, wrong_viewer.authorization_id, OUTSIDER_TOKEN).await;
 
@@ -351,34 +357,26 @@ async fn p3_t3b_envelope_release_fails_closed_across_live_o3_device_and_package_
     )
     .await;
 
-    let revoked_authorization = ctx.claimed_fixture().await;
+    let revoked = ctx.claimed_fixture().await;
     sqlx::query("UPDATE p2p_audience_authorizations SET revoked_at = now() WHERE id = $1")
-        .bind(revoked_authorization.authorization_id)
+        .bind(revoked.authorization_id)
         .execute(&ctx.pool)
         .await
         .expect("revoke authorization");
-    assert_denied(
-        &ctx.app,
-        revoked_authorization.authorization_id,
-        VIEWER_TOKEN,
-    )
-    .await;
+    assert_denied(&ctx.app, revoked.authorization_id, VIEWER_TOKEN).await;
 
-    let expired_authorization = ctx.claimed_fixture().await;
+    let expired = ctx.claimed_fixture().await;
     sqlx::query(
         "UPDATE p2p_audience_authorizations SET expires_at = now() - interval '1 second' WHERE id = $1",
     )
-    .bind(expired_authorization.authorization_id)
+    .bind(expired.authorization_id)
     .execute(&ctx.pool)
     .await
     .expect("expire authorization");
-    assert_denied(
-        &ctx.app,
-        expired_authorization.authorization_id,
-        VIEWER_TOKEN,
-    )
-    .await;
+    assert_denied(&ctx.app, expired.authorization_id, VIEWER_TOKEN).await;
+}
 
+async fn assert_package_denials(ctx: &TestContext) {
     let non_ready = ctx.claimed_fixture().await;
     sqlx::query("UPDATE p2p_publications SET state = 'failed' WHERE id = $1")
         .bind(non_ready.publication_id)
@@ -397,14 +395,16 @@ async fn p3_t3b_envelope_release_fails_closed_across_live_o3_device_and_package_
     .await
     .expect("remove durable delivery evidence");
     assert_denied(&ctx.app, undelivered.authorization_id, VIEWER_TOKEN).await;
+}
 
-    let revoked_device = ctx.claimed_fixture().await;
+async fn assert_device_denial(ctx: &TestContext) {
+    let revoked = ctx.claimed_fixture().await;
     sqlx::query("UPDATE p2p_devices SET revoked_at = now() WHERE id = $1")
-        .bind(revoked_device.device_id)
+        .bind(revoked.device_id)
         .execute(&ctx.pool)
         .await
         .expect("revoke device");
-    assert_denied(&ctx.app, revoked_device.authorization_id, VIEWER_TOKEN).await;
+    assert_denied(&ctx.app, revoked.authorization_id, VIEWER_TOKEN).await;
 }
 
 async fn assert_denied(app: &axum::Router, authorization_id: Uuid, token: &str) {
