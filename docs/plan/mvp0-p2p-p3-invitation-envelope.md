@@ -82,4 +82,4 @@ this document does not establish capacity or guarantee the October date.
 
 ### 2026-09-22 temporary T2c3 execution pause
 
-Owner direction: keep the Android emulator HPKE/Keystore instrumentation disabled until further notice. T2c1/T2c2 implementation remains valid; the T2c3 harness remains in source but its workflow is hard-disabled. P3.T2 must remain IN PROGRESS and must not be promoted to PASS until T2c3 is explicitly re-enabled and certified.
+Owner direction: keep the GitHub-hosted Android emulator HPKE/Keystore instrumentation disabled until further notice. T2c1/T2c2 implementation remains valid and the T2c3 instrumentation stays in source. Certification is now routed through `scripts/p3-t2c3-certify-android.sh` against one already-booted local Android target (physical device or local emulator, API 31+). The runner rejects zero-test execution and emits redacted task evidence. P3.T2 remains IN PROGRESS until that local T2c3 evidence passes and receives owner verification; the GitHub emulator workflow does not need to be re-enabled for closure.

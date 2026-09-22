@@ -552,7 +552,7 @@
           <div class="lrow now"><span class="id">local-dev</span><span class="desc">Entrypoint + servicio compose + certs mTLS + env vars — mergeado y ya en el checkout local (HEAD == origin, verificado 19-sep); falta correr el smoke test móvil real</span><span class="status">infra lista</span></div>
           <div class="lrow blocked"><span class="id">DEV-HANDOFF</span><span class="desc">Camino de desarrollo: P3 PASS + P4 PASS + P5-DEV + P6 PASS. P5.T3 queda explícitamente fuera de este gate.</span><span class="status">abierto</span></div>
           <div class="sub-ladder">
-            <div class="sub-row warn"><span class="sid">P3</span><span class="sdesc"><strong>Invitación / O3 / K1</strong> — P3.T0/T1 PASS; T2-A backend cerrado. T2c1/T2c2 están implementados. <strong>T2c3 Android emulator HPKE/Keystore está temporalmente deshabilitado por dirección del owner</strong>; P3.T2 permanece IN PROGRESS y no se reclama PASS.</span></div>
+            <div class="sub-row warn"><span class="sid">P3</span><span class="sdesc"><strong>Invitación / O3 / K1</strong> — P3.T0/T1 PASS; T2-A backend cerrado. T2c1/T2c2 están implementados. <strong>T2c3 se certificará con runner Android local one-shot</strong>; el emulador hospedado de GitHub sigue hard-disabled. El runner ya está preparado para Astra/dispositivo local y P3.T2 permanece IN PROGRESS hasta obtener evidencia PASS.</span></div>
             <div class="sub-row"><span class="sid">P4</span><span class="sdesc"><strong>Sync verificado</strong> — T0/T1/T2 Done; T3 está closure-ready y ya no depende de P5.T3. Falta owner verification/status sync.</span></div>
             <div class="sub-row"><span class="sid">P5-DEV</span><span class="sdesc"><strong>Reproducción local</strong> — T0 Done; T1/T2 tienen evidencia automática PASS y necesitan cierre formal. Cuando cierren, P5-DEV queda satisfecho aunque T3 siga pendiente.</span></div>
             <div class="sub-row"><span class="sid">P5.T3</span><span class="sdesc"><strong>Certificación física</strong> — diferida; no bloquea P6. Se resuelve con T7p compatible o P7.T2.</span></div>
@@ -611,7 +611,7 @@
       </div>
       <div class="risk info">
         <span class="tag2">CI — verde</span>
-        <p>P3.T1 ya está owner-verified/PASS. El head backend de P3.T2-A <code>a228ddad</code> cerró <strong>15/15 checks PASS</strong>, incluyendo mobile, fmt, clippy, test, coverage, release-build, s3-integration y policy gates. P3.T2 sigue abierto únicamente por T2-B/T2c native/Keystore.</p>
+        <p>P3.T1 ya está owner-verified/PASS. El head backend de P3.T2-A <code>a228ddad</code> cerró <strong>15/15 checks PASS</strong>, incluyendo mobile, fmt, clippy, test, coverage, release-build, s3-integration y policy gates. P3.T2 sigue abierto únicamente por la ejecución T2c3 native/Keystore; T2c1/T2c2 están implementados y el runner local one-shot ya está preparado.</p>
       </div>
       <div class="risk info">
         <span class="tag2">P2P local-dev — infra lista</span>

@@ -193,6 +193,8 @@ jobs:
         working-directory: mobile
       - name: Run mobile gate (strict types + lint + tests)
         run: make qa-mobile
+      - name: Verify P3 T2c3 local certification harness
+        run: bash scripts/p3-t2c3-certify-android.sh --self-check
 
   deny:
     runs-on: ubuntu-latest
