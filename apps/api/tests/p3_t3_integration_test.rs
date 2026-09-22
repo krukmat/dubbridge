@@ -8,6 +8,11 @@ use dubbridge_api::{build_app, state::AppState};
 use dubbridge_auth::{
     AuthenticatedPrincipal, SharedTokenVerifier, TokenVerificationError, TokenVerifier,
 };
+use dubbridge_db::audit_repo::insert_audit_event;
+use dubbridge_domain::{
+    asset::AssetId,
+    audit::{AuditEvent, AuditEventKind},
+};
 use dubbridge_p2p::key_wrap::wrap_ck;
 use dubbridge_storage::LocalFsAdapter;
 use serde_json::{Value, json};
@@ -326,6 +331,26 @@ async fn p3_t3a_owner_invite_claim_o3_and_envelope_binding_are_integrated() {
     .await
     .expect("count release audit");
     assert_eq!(release_events, 1);
+
+    assert_partial_p3_package_audit_rejected(&ctx, &fixture).await;
+}
+
+async fn assert_partial_p3_package_audit_rejected(
+    ctx: &TestContext,
+    fixture: &ClaimedFixture,
+) {
+    let malformed = AuditEvent::new_p3_event(
+        Some(AssetId(fixture.asset_id)),
+        AuditEventKind::P2pInvitationCreated,
+        Uuid::new_v4(),
+        Some(fixture.publication_id),
+        None,
+        None,
+    );
+    assert!(
+        insert_audit_event(&ctx.pool, &malformed).await.is_err(),
+        "P3 package audit must reject incomplete publication/lineage identity"
+    );
 }
 
 #[tokio::test]
