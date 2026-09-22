@@ -542,12 +542,12 @@ async fn envelope_release_denies_publication_readiness_or_delivery_drift() {
     assert_release_not_found(&pool, non_ready).await;
 
     let lineage_drift = setup_release_fixture(&pool).await;
-    sqlx::query("UPDATE p2p_publications SET confirmed_lineage_id = $1 WHERE id = $2")
+    sqlx::query("UPDATE p2p_audience_authorizations SET lineage_id = $1 WHERE id = $2")
         .bind(Uuid::new_v4())
-        .bind(lineage_drift.publication_id)
+        .bind(lineage_drift.authorization_id)
         .execute(&pool)
         .await
-        .expect("drift confirmed lineage");
+        .expect("drift authorization lineage");
     assert_release_not_found(&pool, lineage_drift).await;
 
     let external_missing = setup_release_fixture(&pool).await;
