@@ -314,17 +314,16 @@ async fn descriptor_for_claim(
     state: &AppState,
     result: &P2pClaimResult,
 ) -> Result<P2pReadyDescriptor, Box<Response>> {
-    let descriptor = match get_ready_descriptor_by_asset(&state.pool, result.invitation.asset_id())
-        .await
-    {
-        Ok(Some(descriptor)) => descriptor,
-        Ok(None) => {
-            return Err(Box::new(
-                claim_handoff_denial_response(state, result, "descriptor_missing").await,
-            ));
-        }
-        Err(error) => return Err(Box::new(db_error_response(error))),
-    };
+    let descriptor =
+        match get_ready_descriptor_by_asset(&state.pool, result.invitation.asset_id()).await {
+            Ok(Some(descriptor)) => descriptor,
+            Ok(None) => {
+                return Err(Box::new(
+                    claim_handoff_denial_response(state, result, "descriptor_missing").await,
+                ));
+            }
+            Err(error) => return Err(Box::new(db_error_response(error))),
+        };
 
     if descriptor_matches_claim(&descriptor, &result.invitation, &result.authorization) {
         Ok(descriptor)
