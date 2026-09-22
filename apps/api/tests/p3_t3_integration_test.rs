@@ -1,4 +1,4 @@
-use std::{collections::HashMap, env, path::PathBuf, sync::Arc};
+use std::{\n    collections::{BTreeSet, HashMap},\n    env,\n    path::PathBuf,\n    sync::Arc,\n};
 
 use axum::{
     body::{Body, to_bytes},
@@ -80,6 +80,7 @@ struct ClaimedFixture {
     invitation_id: Uuid,
     authorization_id: Uuid,
     device_id: Uuid,
+    raw_invitation_token: String,
 }
 
 impl TestContext {
@@ -147,6 +148,7 @@ impl TestContext {
             invitation_id,
             authorization_id,
             device_id,
+            raw_invitation_token: token,
         }
     }
 
@@ -443,6 +445,274 @@ async fn assert_denied(app: &axum::Router, authorization_id: Uuid, token: &str) 
         .await
         .expect("read denial body");
     assert!(bytes.is_empty(), "denial must not return envelope material");
+}
+
+#[tokio::test]
+async fn p3_t3c_backend_audit_and_storage_are_secret_boundary_clean() {
+    let Some(ctx) = TestContext::new().await else {
+        eprintln!("skipping P3.T3 integration test: DB or deterministic test KEK not set");
+        return;
+    };
+    let fixture = ctx.claimed_fixture().await;
+
+    let response = send_request(
+        &ctx.app,
+        Method::GET,
+        &format!(
+            "/p2p/authorizations/{}/device-envelope",
+            fixture.authorization_id
+        ),
+        VIEWER_TOKEN,
+        None,
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let envelope = json_body(response).await;
+    assert_envelope_secret_clean(&ctx, &fixture, &envelope);
+
+    assert_denied(&ctx.app, fixture.authorization_id, OUTSIDER_TOKEN).await;
+
+    let forbidden_values = forbidden_secret_values(&ctx, &fixture).await;
+    assert_p3_audit_secret_clean(&ctx, &fixture, &forbidden_values).await;
+    assert_p3_storage_secret_clean(&ctx, &fixture).await;
+}
+
+fn assert_envelope_secret_clean(ctx: &TestContext, fixture: &ClaimedFixture, envelope: &Value) {
+    let serialized = serde_json::to_string(envelope).expect("serialize envelope");
+    let raw_ck_base64 = BASE64_STANDARD.encode([7_u8; 32]);
+    let raw_kek_hex: String = ctx
+        .kek
+        .key
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+
+    for secret in [
+        fixture.raw_invitation_token.as_str(),
+        raw_ck_base64.as_str(),
+        raw_kek_hex.as_str(),
+        OWNER_TOKEN,
+        VIEWER_TOKEN,
+        OUTSIDER_TOKEN,
+    ] {
+        assert!(
+            !serialized.contains(secret),
+            "device-envelope response leaked forbidden secret material"
+        );
+    }
+
+    for forbidden_key in [
+        "token",
+        "token_hash",
+        "raw_token",
+        "ck",
+        "plaintext_ck",
+        "kek",
+        "kek_hex",
+        "wrapped_ck",
+        "sealed_wrapped_ck",
+        "nonce",
+        "sealed_nonce",
+        "private_key",
+        "shared_secret",
+        "jwt",
+    ] {
+        assert!(
+            envelope.get(forbidden_key).is_none(),
+            "device-envelope response exposed forbidden field"
+        );
+    }
+}
+
+async fn forbidden_secret_values(ctx: &TestContext, fixture: &ClaimedFixture) -> Vec<String> {
+    let token_hash: Vec<u8> =
+        sqlx::query_scalar("SELECT token_hash FROM p2p_invitations WHERE id = $1")
+            .bind(fixture.invitation_id)
+            .fetch_one(&ctx.pool)
+            .await
+            .expect("load invitation token hash");
+    let (sealed_nonce, sealed_wrapped_ck): (Vec<u8>, Vec<u8>) = sqlx::query_as(
+        "SELECT sealed_nonce, sealed_wrapped_ck FROM p2p_publications WHERE id = $1",
+    )
+    .bind(fixture.publication_id)
+    .fetch_one(&ctx.pool)
+    .await
+    .expect("load sealed publication key material");
+
+    vec![
+        fixture.raw_invitation_token.clone(),
+        BASE64_STANDARD.encode(token_hash),
+        BASE64_STANDARD.encode([7_u8; 32]),
+        BASE64_STANDARD.encode(ctx.kek.key),
+        ctx.kek
+            .key
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect(),
+        BASE64_STANDARD.encode(sealed_nonce),
+        BASE64_STANDARD.encode(sealed_wrapped_ck),
+        OWNER_TOKEN.to_owned(),
+        VIEWER_TOKEN.to_owned(),
+        OUTSIDER_TOKEN.to_owned(),
+    ]
+}
+
+async fn assert_p3_audit_secret_clean(
+    ctx: &TestContext,
+    fixture: &ClaimedFixture,
+    forbidden_values: &[String],
+) {
+    let correlations = vec![
+        fixture.device_id,
+        fixture.invitation_id,
+        fixture.authorization_id,
+    ];
+    let rows: Vec<(String, Option<String>)> = sqlx::query_as(
+        r#"
+        SELECT event_kind, detail
+          FROM audit_events
+         WHERE correlation_id = ANY($1)
+         ORDER BY happened_at, id
+        "#,
+    )
+    .bind(correlations)
+    .fetch_all(&ctx.pool)
+    .await
+    .expect("load P3 audit rows");
+
+    let actual: BTreeSet<&str> = rows.iter().map(|(kind, _)| kind.as_str()).collect();
+    let expected = BTreeSet::from([
+        "p2p_device_registered",
+        "p2p_invitation_created",
+        "p2p_invitation_claimed",
+        "p2p_audience_authorization_issued",
+        "p2p_device_envelope_released",
+        "p2p_audience_access_denied",
+    ]);
+    assert_eq!(actual, expected, "P3 audit correlation inventory drifted");
+
+    for (_, detail) in rows {
+        let Some(detail) = detail else {
+            continue;
+        };
+        let value: Value = serde_json::from_str(&detail).expect("P3 audit detail JSON");
+        assert_json_secret_clean(&value, forbidden_values);
+    }
+}
+
+fn assert_json_secret_clean(value: &Value, forbidden_values: &[String]) {
+    const FORBIDDEN_KEYS: [&str; 17] = [
+        "token",
+        "raw_token",
+        "token_hash",
+        "ck",
+        "plaintext_ck",
+        "content_key",
+        "kek",
+        "kek_hex",
+        "wrapped_ck",
+        "sealed_wrapped_ck",
+        "nonce",
+        "sealed_nonce",
+        "private_key",
+        "private_key_bytes",
+        "shared_secret",
+        "hpke_secret",
+        "jwt",
+    ];
+
+    match value {
+        Value::Object(map) => {
+            for (key, child) in map {
+                assert!(
+                    !FORBIDDEN_KEYS.contains(&key.as_str()),
+                    "P3 audit detail contains forbidden secret key"
+                );
+                assert_json_secret_clean(child, forbidden_values);
+            }
+        }
+        Value::Array(values) => {
+            for child in values {
+                assert_json_secret_clean(child, forbidden_values);
+            }
+        }
+        Value::String(text) => {
+            for secret in forbidden_values {
+                assert!(
+                    secret.is_empty() || !text.contains(secret),
+                    "P3 audit detail contains forbidden secret value"
+                );
+            }
+        }
+        _ => {}
+    }
+}
+
+async fn assert_p3_storage_secret_clean(ctx: &TestContext, fixture: &ClaimedFixture) {
+    let columns: Vec<(String, String)> = sqlx::query_as(
+        r#"
+        SELECT table_name, column_name
+          FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name IN (
+               'p2p_invitations',
+               'p2p_devices',
+               'p2p_audience_authorizations',
+               'p2p_publications'
+           )
+        "#,
+    )
+    .fetch_all(&ctx.pool)
+    .await
+    .expect("inspect P3 persistence columns");
+
+    let forbidden_columns = [
+        "token",
+        "raw_token",
+        "ck",
+        "plaintext_ck",
+        "content_key",
+        "kek",
+        "kek_bytes",
+        "raw_kek",
+        "private_key",
+        "private_key_bytes",
+        "jwt",
+        "session_token",
+    ];
+    for (_, column) in columns {
+        assert!(
+            !forbidden_columns.contains(&column.as_str()),
+            "P3 persistence schema contains forbidden plaintext-secret column"
+        );
+    }
+
+    let token_hash: Vec<u8> =
+        sqlx::query_scalar("SELECT token_hash FROM p2p_invitations WHERE id = $1")
+            .bind(fixture.invitation_id)
+            .fetch_one(&ctx.pool)
+            .await
+            .expect("load persisted token hash");
+    assert_eq!(token_hash.len(), 32);
+    assert_ne!(
+        token_hash.as_slice(),
+        fixture.raw_invitation_token.as_bytes(),
+        "raw invitation token must never be persisted"
+    );
+
+    let (sealed_nonce, sealed_wrapped_ck): (Vec<u8>, Vec<u8>) = sqlx::query_as(
+        "SELECT sealed_nonce, sealed_wrapped_ck FROM p2p_publications WHERE id = $1",
+    )
+    .bind(fixture.publication_id)
+    .fetch_one(&ctx.pool)
+    .await
+    .expect("load persisted sealed K1 material");
+    let raw_ck = vec![7_u8; 32];
+    assert_ne!(sealed_nonce, raw_ck, "raw CK must not be stored as nonce");
+    assert_ne!(
+        sealed_wrapped_ck, raw_ck,
+        "raw CK must not be stored in the wrapped-CK column"
+    );
 }
 
 async fn insert_ready_publication(pool: &PgPool, owner: Uuid, kek: &TestKek) -> (Uuid, Uuid, Uuid) {

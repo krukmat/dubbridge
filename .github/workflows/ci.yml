@@ -217,6 +217,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Reject committed secrets in config profiles
         run: make qa-config-secrets
+      - name: Verify P3 T3c secret boundary
+        run: python3 scripts/p3-t3c-secret-boundary.py
 
   coverage:
     if: github.event_name != 'schedule'
