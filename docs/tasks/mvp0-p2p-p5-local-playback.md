@@ -20,7 +20,7 @@ behavioral_coverage_contract: behavior-v2
 | P5.T0 | Gateway/session contract freeze | planning | M | P4 PASS | `[x]` Done 2026-09-18 |
 | P5.T1 | Loopback ciphertext decryption gateway | development | L | T0 PASS | Automated evidence PASS 2026-09-18; formal closure pending owner verification/governance sync |
 | P5.T2 | Existing VideoPlayer and deterministic teardown | development | M | T1 PASS | Automated evidence PASS 2026-09-18; formal closure pending owner verification/governance sync |
-| P5.T3 | Playback and secret-boundary certification | development/evidence | M | T2 PASS | **BLOCKED by P4** (2026-09-22): SYNC falla por `ENOENT stat "file:"` — el `file:` URI llega a Corestore como path (causa confirmada con instrumentación). Fix planificado: `docs/tasks/mvp0-p2p-p4-mobile-sync.md` § P4.T1-r1. Evidencia: `docs/audit/mvp0-p2p-p5-t3-android-certification-blocked-2026-09-22.md`. |
+| P5.T3 | Playback and secret-boundary certification | development/evidence | M | T2 PASS | **Android rerun pending** (2026-09-22): P4.T1-r1 filesystem fix is implemented + CI verified; exact-head device certification must now confirm SYNC/VERIFY/PLAYBACK. |
 
 
 ## Shared activation and closure contract
@@ -164,21 +164,16 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T2 PASS
 
-**Status:** BLOCKED 2026-09-22 — **ahora en la etapa SYNC, ya no en CLAIM**. El
-arreglo del gateway local (servicio `gateway` en `infra/local/docker-compose.yml`
-+ default `8082` en `mobile/app.config.ts`) resolvió el bloqueo de CLAIM, que
-quedó confirmado OK con dos invitaciones frescas reclamadas con éxito. El nuevo
-bloqueo es `SYNC_FAILED`, reproducible 2/2, clasificado como **defecto P4**
-(runtime P2P del cliente móvil): el worklet falla en `openPackage()` con una
-excepción cruda que cae en la rama catch-all, ~2-3 s (no es el timeout de
-discovery de 30 s). P3 quedó descartado con verificación en disco, no solo en DB.
-Actualización 2026-09-22: una corrida instrumentada confirmó la hipótesis (1) —
-`ENOENT stat "file:"` en `drive.ready()`, el `file:` URI llega a Corestore como
-path— y descartó la (2) para esa corrida. Fix planificado en
-`docs/tasks/mvp0-p2p-p4-mobile-sync.md` § P4.T1-r1. No se aplicó corrección permanente. Detalle completo, cadena de
-propagación y evidencia: `docs/audit/mvp0-p2p-p5-t3-android-certification-blocked-2026-09-22.md`
-§ "Continuación 2026-09-22". El párrafo siguiente queda como registro histórico
-del bloqueo anterior, ya superado:
+**Status:** Android rerun pending 2026-09-22. The previously confirmed P4
+filesystem defect is now repaired by P4.T1-r1: the scoped `file:` URI is converted
+exactly once to a filesystem path at the Corestore boundary. CI evidence is green
+(61/61 mobile suites, 441/441 tests; focused RED→GREEN 7/7 current-source PASS;
+committed Bare worklet drift check PASS). Full implementation evidence:
+`docs/audit/p4-t1-r1-storage-uri-fix-evidence-2026-09-22.md`.
+
+The next required evidence is a fresh-invitation Android certification run on the
+final branch revision. It must record whether the path advances through
+SYNC → VERIFY → PLAYBACK and must not infer PASS from CI alone.
 
 **Registro histórico (superado) —** BLOCKED at the CLAIM stage of the happy-path attempt. Root
 cause is a local-development-environment gap, not a P3/P4/P5 code defect: the
