@@ -3,7 +3,8 @@ import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react
 import { createGatewayClient } from "../src/api/client";
 import type { P2pReadyDescriptor } from "../src/api/p2p";
 import type { AuthContextValue } from "../src/auth/AuthProvider";
-import { MyContentScreen, canCreateP2pInvite } from "../src/screens/MyContentScreen";
+import { canCreateP2pInvite } from "../src/p2p/dashboard/MyContentModel";
+import { MyContentScreen } from "../src/screens/MyContentScreen";
 
 (
   globalThis as typeof globalThis & {
