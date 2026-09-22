@@ -3,22 +3,20 @@ type: Audit
 title: "P4.T3 certification closure readiness"
 date: 2026-09-22
 task: P4.T3
-status: blocked_exact_head_device_rerun
+status: superseded_by_2026_09_22_sequencing_amendment
 ---
 
 # P4.T3 — certification closure readiness
 
 ## Current verdict
 
-**BLOCKED only on exact-head integrated Android evidence.**
+**SUPERSEDED.** This artifact records the pre-replan closure condition. The 2026-09-22 sequencing amendment moved the physical Android proof to deferred P5.T3/P5-CERT, so it no longer blocks P4.T3.
 
 The two gaps named by the 2026-09-18 retrospective have otherwise been removed:
 P4.T1 bounded reconnect is implemented/reviewed, and account-change is now
 exercised through the app's provider lifecycle.
 
-This artifact does **not** claim aggregate P4 PASS because the P4→P5 integrated
-handoff must be re-executed on Android after P4.T1-r1 changed the product package
-open path.
+This artifact is retained as historical evidence only. Current P4.T3 closure is governed by `docs/audit/p4-t3-certification-and-p5-handoff-2026-09-22.md`; Android exact-device proof remains mandatory later for P5.T3/P5-CERT.
 
 ## Evidence already satisfied
 
@@ -43,7 +41,7 @@ provider-account-change, playback-controller and P5 certification suites.
 P4.T1-r1 evidence:
 `docs/audit/p4-t1-r1-storage-uri-fix-evidence-2026-09-22.md`.
 
-## Remaining blocking evidence
+## Historical blocking evidence — superseded for P4 closure
 
 A fresh P5.T3 Android certification run is required on the final branch revision:
 
@@ -59,12 +57,6 @@ It must prove on the real product runtime that:
 Because P4.T1-r1 changed the sync/open path after the prior P5 attempt, older
 device evidence cannot be transposed to this revision.
 
-## Closure condition
+## Current interpretation
 
-When the exact-head P5.T3 device run passes, append its evidence SHA/run details
-here, then synchronize the P4 ledger/plan and parent P2P status artifacts.
-
-Until that run exists:
-
-`P4.T3: BLOCKED`
-`aggregate P4: NOT_PASS`
+The exact-head Android run is no longer a P4 closure condition. It remains a release-certification requirement under P5.T3/P5-CERT and must still be satisfied before the later release gate.

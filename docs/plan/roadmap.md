@@ -505,3 +505,11 @@ captured above under Governing principles and ADR-025/ADR-026.
 
 - `docs/audit/roadmap-history.md` — archived consolidation changelog, design
   rationale, and detailed per-slice status narrative trimmed from this file
+
+
+> **P4.T3 closure update — 2026-09-22:** P3 PASS gate is satisfied. P4.T0/T1/T2
+> are Done. P4.T3 now has explicit HP/EC mapping and a verified-handle handoff to
+> P5 in `docs/audit/p4-t3-certification-and-p5-handoff-2026-09-22.md`.
+> The older exact-head Android blocker is superseded for P4 closure by the
+> 2026-09-22 sequencing amendment; that physical proof remains mandatory under
+> deferred P5.T3/P5-CERT. P4.T3 is closure-ready and awaits owner verification.

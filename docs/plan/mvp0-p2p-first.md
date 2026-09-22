@@ -163,7 +163,7 @@ These are scoped downstream decisions under accepted ADR-044, not reasons to reo
 | Phase | Plan | Planning ledger | Disposition |
 |---|---|---|---|
 | P3 | `docs/plan/mvp0-p2p-p3-invitation-envelope.md` | `docs/tasks/mvp0-p2p-p3-invitation-envelope.md` | **PASS 2026-09-22** |
-| P4 | `docs/plan/mvp0-p2p-p4-mobile-sync.md` | `docs/tasks/mvp0-p2p-p4-mobile-sync.md` | **In progress — P3 PASS gate satisfied; T3 closure-ready** |
+| P4 | `docs/plan/mvp0-p2p-p4-mobile-sync.md` | `docs/tasks/mvp0-p2p-p4-mobile-sync.md` | **In progress — T3 closure-ready; owner verification pending** |
 | P5 | `docs/plan/mvp0-p2p-p5-local-playback.md` | `docs/tasks/mvp0-p2p-p5-local-playback.md` | In progress; T1/T2 automated evidence PASS, formal closure + T3 Android evidence pending; P4 PASS gate unchanged |
 | P6 | `docs/plan/mvp0-p2p-p6-dashboard.md` | `docs/tasks/mvp0-p2p-p6-dashboard.md` | Planned; gate is P3 PASS + P4 PASS + P5-DEV; P5.T3 deferred |
 | P7 | `docs/plan/mvp0-p2p-p7-certification.md` | `docs/tasks/mvp0-p2p-p7-certification.md` | Planned; gate is P2-P4 PASS + P5-DEV + P6 PASS + S-230-T7p; P7.T2 resolves deferred P5.T3 |
