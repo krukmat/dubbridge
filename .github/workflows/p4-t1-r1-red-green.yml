@@ -1,0 +1,54 @@
+name: p4-t1-r1-red-green
+
+on:
+  push:
+    branches:
+      - feature/p2p-mvp-core
+    paths:
+      - ".github/workflows/p4-t1-r1-red-green.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  red-green:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install mobile dependencies
+        run: npm ci
+        working-directory: mobile
+      - name: RED — run new test against exact pre-fix source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git show ed55050e6aaba916f3f4ce26d387a0aff74204ae:mobile/src/p2p/runtime/product-package-runtime.ts             > mobile/src/p2p/runtime/product-package-runtime.ts
+          set +e
+          (cd mobile && npx jest --runInBand __tests__/p2p/product-storage-path.test.ts)             > /tmp/p4-t1-r1-red.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/p4-t1-r1-red.log
+          if [ "$status" -eq 0 ]; then
+            echo "Expected pre-fix source to fail the new storage-path contract."
+            exit 1
+          fi
+          echo "RED confirmed: pre-fix source fails the new storage-path contract."
+      - name: GREEN — restore current source and rerun focused test
+        shell: bash
+        run: |
+          git checkout "$GITHUB_SHA" -- mobile/src/p2p/runtime/product-package-runtime.ts
+          cd mobile
+          npx jest --runInBand __tests__/p2p/product-storage-path.test.ts
+      - name: Remove one-shot workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout "$GITHUB_SHA" -- mobile/src/p2p/runtime/product-package-runtime.ts
+          git rm .github/workflows/p4-t1-r1-red-green.yml
+          git commit -m "ci(p4): remove T1-r1 red-green proof"
+          git push origin HEAD:feature/p2p-mvp-core
