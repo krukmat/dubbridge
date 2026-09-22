@@ -4,14 +4,14 @@ title: "MVP0-P2P P5-DEV closure readiness"
 date: 2026-09-22
 task: P5.T1/P5.T2
 milestone: P5-DEV
-status: closure_ready_owner_verification_pending
+status: pass
 ---
 
 # P5-DEV — T1/T2 closure readiness
 
 ## Verdict
 
-**CLOSURE-READY. Owner verification pending.**
+**PASS. P5-DEV SATISFIED 2026-09-22.**
 
 P5.T0 is already Done. P5.T1 and P5.T2 have executable evidence for their
 development acceptance criteria and no remaining implementation blocker.
@@ -148,5 +148,4 @@ Current state:
 - P5-CERT — not satisfied
 - aggregate P5 — **IN PROGRESS**
 
-Only owner verification and the associated status synchronization remain before
-P5.T1/T2 can become formally Done and P5-DEV can be declared satisfied.
+Owner verification was explicitly provided on 2026-09-22 after preparation head `e63209f5` completed 15/15 CI PASS. P5.T1/T2 are formally Done and **P5-DEV is SATISFIED**. P5.T3/P5-CERT remains open.
