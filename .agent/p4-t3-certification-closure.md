@@ -59,9 +59,7 @@ Account A starts/has P4 state
   -> B must establish its own scoped lifecycle
 ```
 
-Prefer testing through the product controller/cache seam actually used by the
-app. A mere static account-key test is insufficient if it does not exercise the
-account-change lifecycle.
+Prefer testing through the product lifecycle actually used by the app. Current feasibility check found that `mobile/src/p2p/P2PProvider.tsx` already tracks `userId` changes with `previousAccountRef` and calls `P2PSyncController.clearAccount(previousAccount)` whenever the authenticated account changes. Therefore the likely closure is a focused provider-level lifecycle test, not new production behavior. The test should render the provider with Account A, start/populate A state, switch auth context to Account B without an intermediate process restart, and prove A cancellation/cache cleanup occurs while B remains isolated. A mere static account-key test is insufficient if it does not exercise this effect.
 
 ### 3. Permission vs possession
 
@@ -99,9 +97,7 @@ scoped; score it separately before implementation.
 ## RRI
 
 Run `scripts/rri.py` on the exact closure/source-test paths before any new code.
-Documentation-only evidence synchronization is exempt from phase-2 code review,
-but any new account-change/certification source or test seam follows the normal
-development-task workflow.
+Documentation-only evidence synchronization is exempt from phase-2 code review, but a new provider-level account-change test still follows the normal development-task workflow. Do not add a production certification seam unless the provider-level test plus P5.T3/P4.T1 evidence cannot satisfy the criterion.
 
 ## Status synchronization
 
