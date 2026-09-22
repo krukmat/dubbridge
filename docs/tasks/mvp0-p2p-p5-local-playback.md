@@ -9,7 +9,7 @@ behavioral_coverage_contract: behavior-v2
 
 # P5 — planning task ledger
 
-**Status:** In progress. T0 is closed; **T1/T2 are closure-ready and P5-DEV is closure-ready**, with current mobile revalidation at `5ed7bbf5` (62/62 suites, 446/446 tests). Formal closure now awaits only owner verification/status sync. T3 Android certification remains an independent deferred release obligation.
+**Status:** **In progress / P5-DEV SATISFIED 2026-09-22.** T0/T1/T2 are formally closed; preparation head `e63209f5` completed 15/15 CI, mobile revalidation is 62/62 suites and 446/446 tests, and owner verification is complete. P5.T3/P5-CERT remains an independent deferred release obligation, so aggregate P5 is not PASS.
 **Phase gate:** **P4 PASS — satisfied 2026-09-22.**
 **Effort:** provisional per work package below; no new RRI record is fabricated by the automated-evidence remediation.
 
@@ -26,8 +26,8 @@ consolidation point. P7.T3/T9g cannot certify/GO with P5.T3 unresolved or failed
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
 | P5.T0 | Gateway/session contract freeze | planning | M | P4 PASS | `[x]` Done 2026-09-18 |
-| P5.T1 | Loopback ciphertext decryption gateway | development | L | T0 PASS | **Closure-ready 2026-09-22** — HP/EC evidence PASS; owner verification pending |
-| P5.T2 | Existing VideoPlayer and deterministic teardown | development | M | T1 PASS | **Closure-ready 2026-09-22** — HP/EC evidence PASS; owner verification pending |
+| P5.T1 | Loopback ciphertext decryption gateway | development | L | T0 PASS | **PASS / Done 2026-09-22** — HP/EC evidence PASS; 15/15 CI; owner-verified |
+| P5.T2 | Existing VideoPlayer and deterministic teardown | development | M | T1 PASS | **PASS / Done 2026-09-22** — HP/EC evidence PASS; 15/15 CI; owner-verified |
 | P5.T3 | Playback and secret-boundary certification | release-certification evidence | M | T2 PASS | **Deferred release obligation** — remains open; does not block P6 after P5-DEV closes; may be satisfied by compatible T7p evidence or the exact-artifact P7.T2 run |
 
 
@@ -101,7 +101,7 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T0 PASS
 
-**Status:** **Closure-ready 2026-09-22; owner verification pending.** Automated evidence PASS was established 2026-09-18 and revalidated by the current mobile gate (62/62 suites, 446/446 tests). The previous blocker is
+**Status:** **PASS / Done 2026-09-22.** Automated evidence PASS was established 2026-09-18, revalidated by mobile (62/62 suites, 446/446 tests), preparation head `e63209f5` reached 15/15 CI PASS, and owner verification is complete. The previous blocker is
 resolved by executable coverage of the actual `ProductPlaybackRuntime`,
 including a real OS loopback TCP-listener proof plus component coverage for
 session-token scoping, traversal denial, ciphertext/AAD tamper denial,
@@ -216,3 +216,8 @@ downstream input to its consuming phase before claiming closure.
 freeze and score exact paths, preserve the accepted boundary, and deliver only
 P5.T3's acceptance criteria through the current workflow. Stop on a
 contract conflict or unmet dependency; do not silently advance the next phase.
+
+
+## P5-DEV milestone closure — 2026-09-22
+
+**P5-DEV = SATISFIED.** T0-T2 are formally closed for downstream development. P5.T3/P5-CERT remains open and aggregate P5 remains IN PROGRESS.
