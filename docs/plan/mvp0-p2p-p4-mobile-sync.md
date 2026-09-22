@@ -39,7 +39,7 @@ Freeze cache location/quota/cleanup, account and device isolation, sign-out wipe
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
 | P4.T0 | Lifecycle, cache, and RPC freeze | planning | M | P3 PASS | Planned; not activated |
-| P4.T1 | Product replication and bounded resume | development | L | T0 PASS | Planned; not activated |
+| P4.T1 | Product replication and bounded resume | development | L | T0 PASS | Implemented + verified; review pending |
 | P4.T2 | Manifest verification and lifecycle isolation | development | L | T1 PASS | Planned; not activated |
 | P4.T3 | P4 certification and P5 handoff | development/evidence | M | T2 PASS | Planned; not activated |
 
