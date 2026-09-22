@@ -22,8 +22,8 @@ self_check() {
   test -f "$JS_TEST" || fail "JS native-only test missing"
   test -f "$WORKFLOW" || fail "disabled GitHub workflow missing"
 
-  grep -Fq "bindingValidationRejectsExpiryAndIdentityDrift" "$INSTRUMENTATION_TEST"     || fail "binding/expiry instrumentation case missing"
-  grep -Fq "opaqueAndroidKeystoreKeyCompletesHpkeInteropWithoutExport" "$INSTRUMENTATION_TEST"     || fail "opaque-key HPKE instrumentation case missing"
+  grep -Fq "fun bindingValidationRejectsExpiryAndIdentityDriftBeforeUnwrap()" "$INSTRUMENTATION_TEST"     || fail "binding/expiry instrumentation case missing"
+  grep -Fq "fun opaqueAndroidKeystoreKeyCompletesHpkeInteropWithoutExport()" "$INSTRUMENTATION_TEST"     || fail "opaque-key HPKE instrumentation case missing"
   grep -Fq "has no software fallback when native methods are absent" "$JS_TEST"     || fail "JS no-software-fallback evidence missing"
   grep -Fq "workflow_dispatch:" "$WORKFLOW"     || fail "native workflow must remain manual-only"
   grep -Fq 'if: ${{ false }}' "$WORKFLOW"     || fail "native GitHub emulator workflow must remain hard-disabled"
@@ -121,10 +121,38 @@ echo "Building K1 module instrumentation APKs..."
 ./gradlew "$MODULE_PATH:clean" "$MODULE_PATH:assembleDebug" "$MODULE_PATH:assembleDebugAndroidTest" --stacktrace
 
 echo "Running T2c3 instrumentation on the connected Android target..."
+export P3_T2C3_REDACT_SERIAL="$SERIAL"
 set +e
-./gradlew "$MODULE_PATH:connectedDebugAndroidTest" --stacktrace 2>&1 | tee "$RUN_LOG"
-GRADLE_STATUS=${PIPESTATUS[0]}
+./gradlew "$MODULE_PATH:connectedDebugAndroidTest" --stacktrace 2>&1 | python3 -u -c '
+import os, sys
+serial = os.environ["P3_T2C3_REDACT_SERIAL"]
+for line in sys.stdin:
+    sys.stdout.write(line.replace(serial, "[redacted-target]"))
+' | tee "$RUN_LOG"
+GRADLE_STATUS=$?
 set -e
+
+# Gradle also writes device identifiers into its generated XML/protobuf reports.
+# Keep byte lengths stable for protobuf fields and redact report filenames too.
+python3 - "$MODULE_DIR/build/outputs/androidTest-results" "$MODULE_DIR/build/reports/androidTests" <<'PY'
+import hashlib
+import os
+from pathlib import Path
+import sys
+
+serial = os.environ["P3_T2C3_REDACT_SERIAL"].encode()
+replacement = (hashlib.sha256(serial).hexdigest().encode() * (len(serial) // 64 + 1))[:len(serial)]
+for directory in sys.argv[1:]:
+    root = Path(directory)
+    for path in sorted(root.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+        if path.is_file():
+            data = path.read_bytes()
+            if serial in data:
+                path.write_bytes(data.replace(serial, replacement))
+        if serial.decode() in path.name:
+            path.rename(path.with_name(path.name.replace(serial.decode(), replacement.decode())))
+PY
+unset P3_T2C3_REDACT_SERIAL
 
 RESULT_ROOT="$MODULE_DIR/build/outputs/androidTest-results/connected"
 RESULT_XML="$(find "$RESULT_ROOT" -type f -name 'TEST-*.xml' 2>/dev/null | head -n 1 || true)"
@@ -139,6 +167,7 @@ fi
 [ -n "$RESULT_XML" ] || fail "instrumentation finished without a JUnit XML result"
 
 SUMMARY="$(python3 - "$RESULT_XML" <<'PY'
+import json
 import sys
 import xml.etree.ElementTree as ET
 
@@ -151,18 +180,19 @@ errors = sum(int(s.attrib.get("errors", "0")) for s in suites)
 skipped = sum(int(s.attrib.get("skipped", "0")) for s in suites)
 names = {tc.attrib.get("name", "") for tc in root.findall(".//testcase")}
 expected = {
-    "bindingValidationRejectsExpiryAndIdentityDrift",
+    "bindingValidationRejectsExpiryAndIdentityDriftBeforeUnwrap",
     "opaqueAndroidKeystoreKeyCompletesHpkeInteropWithoutExport",
 }
 expected_present = 1 if expected.issubset(names) else 0
-print(f"{tests}|{failures}|{errors}|{skipped}|{expected_present}")
+print(f"{tests}|{failures}|{errors}|{skipped}|{expected_present}|{json.dumps(sorted(names))}")
 PY
 )"
-IFS='|' read -r TESTS FAILURES ERRORS SKIPPED EXPECTED_PRESENT <<< "$SUMMARY"
+IFS='|' read -r TESTS FAILURES ERRORS SKIPPED EXPECTED_PRESENT TEST_NAMES <<< "$SUMMARY"
 
 [ "$TESTS" -ge 2 ] || fail "instrumentation discovered fewer than two tests"
 [ "$FAILURES" = "0" ] || fail "instrumentation reported $FAILURES failures"
 [ "$ERRORS" = "0" ] || fail "instrumentation reported $ERRORS errors"
+[ "$SKIPPED" = "0" ] || fail "instrumentation reported $SKIPPED skipped tests"
 [ "$EXPECTED_PRESENT" = "1" ] || fail "required T2c3 test cases were not present in JUnit output"
 
 RUN_DATE="$(date +%Y-%m-%d)"
@@ -183,21 +213,21 @@ status: pass
 
 ## Result
 
-**PASS** against tested commit `$TESTED_COMMIT`.
+**PASS** against tested commit \`$TESTED_COMMIT\`.
 
 This evidence was produced by the local one-shot runner
-`scripts/p3-t2c3-certify-android.sh`. The GitHub emulator workflow remained
+\`scripts/p3-t2c3-certify-android.sh\`. The GitHub emulator workflow remained
 hard-disabled and was not used as certification evidence.
 
 ## Android target
 
-- model: `$DEVICE_MODEL`
-- Android API: `$API_LEVEL`
-- device reference: SHA-256 prefix `$DEVICE_REF` (raw ADB serial intentionally omitted)
+- model: \`$DEVICE_MODEL\`
+- Android API: \`$API_LEVEL\`
+- device reference: SHA-256 prefix \`$DEVICE_REF\` (raw ADB serial intentionally omitted)
 
 ## Executed instrumentation
 
-Gradle module: `$MODULE_PATH`
+Gradle module: \`$MODULE_PATH\`
 
 JUnit result:
 
@@ -208,19 +238,25 @@ JUnit result:
 
 Required cases executed:
 
-1. `bindingValidationRejectsExpiryAndIdentityDrift`
+1. \`bindingValidationRejectsExpiryAndIdentityDriftBeforeUnwrap\`
    - binding JSON is parsed before unwrap;
-   - profile/device identity drift fails closed;
+   - device identity drift fails closed;
    - missing authorization identity fails closed;
-   - `expires_at_unix <= now` fails closed.
+   - \`expires_at_unix <= now\` fails closed.
 
-2. `opaqueAndroidKeystoreKeyCompletesHpkeInteropWithoutExport`
-   - P-256 K1 private key is generated/loaded through `AndroidKeyStore`;
-   - `privateKey.encoded == null` proves the private key is not exportable through the API;
+2. \`opaqueAndroidKeystoreKeyCompletesHpkeInteropWithoutExport\`
+   - P-256 K1 private key is generated/loaded through \`AndroidKeyStore\`;
+   - \`privateKey.encoded == null\` proves the private key is not exportable through the API;
    - native ECDH + RFC9180-compatible HPKE derivation + AES-256-GCM unwrap recovers the expected CK;
    - the CK is used only as transient test material and is not persisted/logged.
 
 ## T2c3 acceptance mapping
+
+AndroidKeyStore P-256 → privateKey.encoded == null → native ECDH →
+HPKE P-256 / HKDF-SHA256 / AES-256-GCM unwrap → CK recovered transiently.
+
+Binding JSON parsed → profile/device/package/auth IDs valid →
+expires_at_unix > now → unwrap allowed.
 
 - **HP-P3.T2-1 native half:** PASS — opaque Android K1 completes the package-bound HPKE unwrap.
 - **EC-P3.T2-1 native half:** PASS — expired or identity-drifted binding is rejected before unwrap; no software private-key fallback participates.
@@ -230,7 +266,7 @@ requires repository owner verification/status synchronization.
 EOF
 
 cat > "$RESULT_JSON" <<JSON
-{"status":"PASS","tested_commit":"$TESTED_COMMIT","evidence":"$EVIDENCE_REL","tests":$TESTS,"failures":$FAILURES,"errors":$ERRORS,"skipped":$SKIPPED,"api_level":$API_LEVEL,"device_model":"$DEVICE_MODEL","device_ref_sha256":"$DEVICE_REF"}
+{"status":"PASS","tested_commit":"$TESTED_COMMIT","evidence":"$EVIDENCE_REL","tests":$TESTS,"failures":$FAILURES,"errors":$ERRORS,"skipped":$SKIPPED,"test_names":$TEST_NAMES,"api_level":$API_LEVEL,"device_model":"$DEVICE_MODEL","device_ref_sha256":"$DEVICE_REF"}
 JSON
 
 echo "P3_T2C3_RESULT=PASS"
