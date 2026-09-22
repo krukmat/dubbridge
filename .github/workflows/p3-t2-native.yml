@@ -37,20 +37,24 @@ jobs:
         working-directory: mobile
         env:
           CI: '1'
+      - name: Resolve K1 module and prebuild instrumentation APKs
+        working-directory: mobile/android
+        run: |
+          MODULE_PATH="$(./gradlew projects --console=plain | sed -n "s/.*Project '\\(:[^']*dubbridge[^']*p2p[^']*\\)'.*/\\1/p" | head -n 1)"
+          if [ -z "$MODULE_PATH" ]; then
+            echo "DubBridge P2P Keystore Gradle subproject not found"
+            ./gradlew projects --console=plain
+            exit 1
+          fi
+          echo "K1_MODULE_PATH=$MODULE_PATH" >> "$GITHUB_ENV"
+          ./gradlew "${MODULE_PATH}:assembleDebug" "${MODULE_PATH}:assembleDebugAndroidTest" --stacktrace
       - name: Run Android Keystore HPKE instrumentation
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 31
           arch: x86_64
-          profile: pixel_6
+          profile: pixel_2
           disable-animations: true
+          emulator-boot-timeout: 600
           working-directory: mobile/android
-          script: |
-            MODULE_PATH="$(./gradlew projects --console=plain | sed -n "s/.*Project '\\(:[^']*dubbridge[^']*p2p[^']*\\)'.*/\\1/p" | head -n 1)"
-            if [ -z "$MODULE_PATH" ]; then
-              echo "DubBridge P2P Keystore Gradle subproject not found"
-              ./gradlew projects --console=plain
-              exit 1
-            fi
-            echo "Running instrumentation for $MODULE_PATH"
-            ./gradlew "${MODULE_PATH}:connectedDebugAndroidTest" --stacktrace
+          script: ./gradlew "${K1_MODULE_PATH}:connectedDebugAndroidTest" --stacktrace
