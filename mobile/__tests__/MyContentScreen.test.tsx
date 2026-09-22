@@ -141,7 +141,8 @@ beforeEach(() => {
 afterEach(cleanup);
 
 async function renderScreen() {
-  return render(<MyContentScreen gatewayBaseUrl="http://localhost:3000" />);
+  const result = await render(<MyContentScreen gatewayBaseUrl="http://localhost:3000" />);
+  return result;
 }
 
 describe("MyContentScreen", () => {
@@ -212,8 +213,10 @@ describe("MyContentScreen", () => {
     expect(mockSetStringAsync).toHaveBeenCalledWith("invite-secret");
     expect(getByText("Copied")).toBeTruthy();
 
-    fireEvent.press(getByTestId("my-content-dismiss-invite"));
-    expect(queryByText("invite-secret")).toBeNull();
+    await act(async () => {
+      fireEvent.press(getByTestId("my-content-dismiss-invite"));
+    });
+    await waitFor(() => expect(queryByText("invite-secret")).toBeNull());
   });
 
   it("does not reconstruct a raw invite token after the screen remounts", async () => {
@@ -229,7 +232,9 @@ describe("MyContentScreen", () => {
       fireEvent.press(first.getByTestId("my-content-create-invite-asset-ready"));
     });
     await waitFor(() => expect(first.getByText("one-time-secret")).toBeTruthy());
-    first.unmount();
+    await act(async () => {
+      first.unmount();
+    });
 
     const second = await renderScreen();
     await waitFor(() => expect(second.getByText("Ready package")).toBeTruthy());
