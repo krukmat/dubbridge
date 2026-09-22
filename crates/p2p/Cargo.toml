@@ -7,7 +7,7 @@ license.workspace = true
 [dependencies]
 dubbridge-domain = { path = "../domain" }
 aes-gcm = "0.11.1"
-aws-lc-rs = { version = "1.17.1", default-features = false, features = ["aws-lc-sys"] }
+aws-lc-rs = { version = "1.18.1", default-features = false, features = ["aws-lc-sys"] }
 getrandom = "0.4.2"
 serde = { workspace = true }
 serde_json = { workspace = true }

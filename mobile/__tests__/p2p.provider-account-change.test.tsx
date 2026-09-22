@@ -52,7 +52,7 @@ describe("P2PProvider account lifecycle", () => {
   afterEach(() => cleanup());
 
   it("clears the previous P2P account when authenticated identity changes", async () => {
-    const view = render(
+    const view = await render(
       <P2PProvider>
         <Text>child</Text>
       </P2PProvider>,
@@ -61,7 +61,7 @@ describe("P2PProvider account lifecycle", () => {
     expect(clearAccount).not.toHaveBeenCalled();
 
     mockUseAuth.mockReturnValue(authValue("viewer-b"));
-    view.rerender(
+    await view.rerender(
       <P2PProvider>
         <Text>child</Text>
       </P2PProvider>,
@@ -72,7 +72,7 @@ describe("P2PProvider account lifecycle", () => {
     });
     expect(clearAccount).toHaveBeenCalledWith("viewer-a");
 
-    view.rerender(
+    await view.rerender(
       <P2PProvider>
         <Text>child</Text>
       </P2PProvider>,
@@ -84,14 +84,14 @@ describe("P2PProvider account lifecycle", () => {
   });
 
   it("clears the signed-out account when auth transitions to unauthenticated", async () => {
-    const view = render(
+    const view = await render(
       <P2PProvider>
         <Text>child</Text>
       </P2PProvider>,
     );
 
     mockUseAuth.mockReturnValue(authValue(null));
-    view.rerender(
+    await view.rerender(
       <P2PProvider>
         <Text>child</Text>
       </P2PProvider>,
