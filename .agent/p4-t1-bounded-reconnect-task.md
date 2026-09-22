@@ -76,8 +76,7 @@ fail-closed and terminal under the existing semantics.
 
 Cancellation/sign-out must win immediately over retry.
 
-Do not add unbounded timers, background retry workers, global retry engines or
-new persistence schema.
+Do not add wall-clock backoff for this MVP0 leaf; bounded attempt count is sufficient for the current acceptance criterion and keeps cancellation deterministic in tests. Do not add unbounded timers, background retry workers, global retry engines or new persistence schema.
 
 ## Exact acceptance cases
 
