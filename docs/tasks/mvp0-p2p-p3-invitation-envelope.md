@@ -1,7 +1,7 @@
 ---
 type: TaskList
 title: "Tasks: P3 Invitation, audience authorization, and K1 device envelope"
-status: planned
+status: in_progress
 slice: MVP0-P2P
 plan: docs/plan/mvp0-p2p-p3-invitation-envelope.md
 behavioral_coverage_contract: behavior-v2
@@ -9,7 +9,7 @@ behavioral_coverage_contract: behavior-v2
 
 # P3 — planning task ledger
 
-**Status:** Planned; no task activated or implemented by this documentation update.
+**Status:** In progress. P3.T0 has been reconciled against the current implementation; T0a-T0g are frozen in `docs/audit/mvp0-p2p-p3-t0-contract-freeze-2026-09-22.md`. Final T0 PASS awaits owner verification; no P3 source change is claimed by the freeze.
 **Phase gate:** P2 PASS; Accepted ADR-044.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
@@ -17,9 +17,9 @@ behavioral_coverage_contract: behavior-v2
 
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
-| P3.T0 | Contract and executable-path freeze | planning | M | P2 PASS | Blocked — no contract artifact exists, see verification note |
-| P3.T1 | Invitation persistence, claim, and inbox | development | L | T0 PASS | Blocked — claim-race logic untested, see verification note |
-| P3.T2 | O3 authorization and native K1 envelope delivery | development | L | T1 PASS | Blocked — fail-closed authorization join untested, see verification note |
+| P3.T0 | Contract and executable-path freeze | planning | M | P2 PASS | Closure-ready 2026-09-22 — T0a-T0g frozen; owner verification pending |
+| P3.T1 | Invitation persistence, claim, and inbox | development | L | T0 PASS | Blocked on T0 PASS — existing repo tests verified; gaps frozen: concurrent claim race, exact-lineage descriptor handoff, durable P3 audit |
+| P3.T2 | O3 authorization and native K1 envelope delivery | development | L | T1 PASS | Blocked on T1 PASS — release-context test exists; remaining predicate/API/native/audit certification frozen in T0 artifact |
 | P3.T3 | P3 integration certification and closure | development/evidence | M | T2 PASS | Blocked — no work product exists, see verification note |
 
 
@@ -46,16 +46,35 @@ Release artifact/gate changes also synchronize the S-230 plan and ledger.
 
 **Depends on:** P2 PASS
 
-**Status:** Blocked. **Verification note (2026-09-18):** source exists
-(`infra/migrations/0038_create_p2p_audience.sql`) but no contract/decision
-artifact for this leaf's own deliverable exists at all. Full evidence:
-`docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`.
-Not closeable via authorization alone.
+**Status:** Closure-ready 2026-09-22; owner verification pending. The missing
+task-scoped contract now exists at
+`docs/audit/mvp0-p2p-p3-t0-contract-freeze-2026-09-22.md`. T0a-T0c reconcile
+the current source and freeze invitation/claim/inbox plus O3/device boundaries;
+T0d-T0g freeze secrets/audit, exact path ownership, evidence/RRI decomposition
+and the handoff to T1/T2/T3. This planning closure changes no runtime behavior.
 
 **Acceptance criteria:** Freeze invitation/claim/inbox and separate O3 authorization contracts, active-device binding, expiry/revocation predicates, audit map and exact path ownership; score the coherent implementation parent and independently meaningful leaves.
 
 - **HP-P3.T0-1:** Ready descriptor and accepted D2 produce a complete API/schema/envelope contract with owned paths.
 - **EC-P3.T0-1:** A missing readiness or Keystore boundary remains explicitly blocked; claim alone never grants envelope access.
+
+### Frozen T0 decomposition
+
+| Leaf | Result | Disposition |
+|---|---|---|
+| T0a | Current source/schema/API/native inventory reconciled | Done |
+| T0b | Invitation / claim / inbox contract frozen | Done |
+| T0c | O3 authorization + active-device + K1 release contract frozen | Done |
+| T0d | Secret-deny and P3 audit-event contract frozen | Done |
+| T0e | Exact writable-path ownership for T1/T2/T3 frozen | Done |
+| T0f | Test/evidence map and RRI decomposition frozen | Done |
+| T0g | Contract artifact + downstream handoff synchronized | Closure-ready; owner verification pending |
+
+The coherent P3 implementation parent is **RRI 100 / Very high** because it spans
+authorization, persisted state, audit and native cryptographic custody. It must not
+execute as one patch. The contract artifact therefore freezes independently
+verifiable leaves and their planned RRI envelopes; every executable leaf must
+rerun `scripts/rri.py` against its exact current paths immediately before work.
 
 **Evidence to emit:** task-scoped contract/decision record for planning; actual
 command/test/device/network results as relevant to the acceptance criteria for
@@ -79,12 +98,15 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T0 PASS
 
-**Status:** Blocked. **Verification note (2026-09-18):** source exists
-(`crates/db/src/p2p_audience_repo.rs`, `apps/api/src/routes/p2p_audience.rs`)
-with 0 repo-layer tests; the concurrent-claim row-lock (EC-P3.T1-1's actual
-race scenario) has zero test evidence. Full evidence:
-`docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`.
-Needs a claim-race test before closure.
+**Status:** Blocked on T0 PASS. **Re-verification 2026-09-22:** the earlier
+"0 repo-layer tests" statement is stale. `crates/db/tests/p2p_audience_repo.rs`
+now proves owner-scoped creation, same-viewer/device idempotency, foreign-viewer
+denial, publication drift denial, inbox visibility and basic release-context
+revocation. Remaining T1 gaps are: (1) a real concurrent different-viewer claim
+race, (2) an explicit exact `publication_id + lineage_id` check on the descriptor
+returned after claim (the handler currently re-reads by `asset_id`), and
+(3) durable P3 invitation/claim/authorization audit events. Exact leaves/paths
+are frozen by the T0 contract artifact.
 
 **Acceptance criteria:** Implement hash-only invitation storage, owner-only creation on P2P_READY content, atomic single-viewer claim and scoped inbox; preserve same-viewer idempotency and durable audit.
 
@@ -113,14 +135,15 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T1 PASS
 
-**Status:** Blocked. **Verification note (2026-09-18):** source exists
-(`crates/p2p/src/device_envelope.rs`, `crates/db/src/p2p_envelope_repo.rs`,
-`apps/api/src/routes/p2p_envelope.rs`, mobile `DeviceIdentity.ts`); only the
-pure crypto-sealing step is tested. The DB-side fail-closed join (device/
-viewer/publication/expiry/revocation), handler fail-closed status codes, and
-the mobile no-software-fallback throw path all have 0 tests — the leaf's own
-core acceptance criterion is unverified. Full evidence:
-`docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`.
+**Status:** Blocked on T1 PASS. **Re-verification 2026-09-22:** source is
+present in `crates/p2p/src/device_envelope.rs`,
+`crates/db/src/p2p_envelope_repo.rs`, `apps/api/src/routes/p2p_envelope.rs`,
+`mobile/src/p2p/device/DeviceIdentity.ts` and the Android
+`DubBridgeP2PKeyStoreModule.kt`. The DB integration suite already proves a
+valid release context and denial after device revocation, so the earlier "all
+0 tests" statement is stale. Remaining T2 work is the full fail-closed predicate
+matrix, handler/binding behavior, explicit JS no-software-fallback evidence,
+native opaque-key interop certification and P3 envelope audit coverage.
 
 **Acceptance criteria:** Implement distinct backend audience authorization and all accepted D2 release predicates; prove HPKE Base P-256/HKDF-SHA256/AES-256-GCM with non-exportable Android Keystore private key, native unwrap, binding and expiry checks.
 

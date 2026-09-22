@@ -1,14 +1,13 @@
 ---
 type: Plan
 title: "P3: Invitation, audience authorization, and K1 device envelope"
-status: planned
+status: in_progress
 slice: MVP0-P2P
 ---
 
 # P3 — Invitation, audience authorization, and K1 device envelope
 
-Task ledger: `docs/tasks/mvp0-p2p-p3-invitation-envelope.md`. Documentation prepared 2026-09-08;
-implementation remains blocked on **P2 PASS; Accepted ADR-044** and the per-task workflow gate.
+Task ledger: `docs/tasks/mvp0-p2p-p3-invitation-envelope.md`. P2 is PASS and ADR-044 is accepted. On 2026-09-22 P3.T0 was reconciled against the current implementation and its contract/path freeze was produced; T0 is closure-ready pending owner verification.
 
 ## Objective
 
@@ -26,9 +25,7 @@ leaf examples below supplement it rather than narrowing acceptance.
 
 Existing API authentication/ownership, PostgreSQL, P2 ready descriptor and server-wrapped CK; Android native Keystore adapter. Candidate areas: `apps/api`, `crates/domain`, `crates/db`, `crates/p2p`, `mobile` native adapter and tests. Reserve migration numbers against the current ledger at activation.
 
-These are candidate areas, not an executable writable-path grant. The phase
-activation task must inspect the then-current source, reserve exact paths and
-freeze interfaces before any development leaf is presented or delegated.
+These areas were reconciled by P3.T0 on 2026-09-22. Exact writable paths and leaf boundaries are now frozen in `docs/audit/mvp0-p2p-p3-t0-contract-freeze-2026-09-22.md`; executable leaves must still re-fetch current source and rerun RRI before work.
 
 ## Phase-specific decisions to freeze
 
@@ -38,9 +35,9 @@ Freeze concrete API/schema names, token-expiry policy, O3 authorization lifecycl
 
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
-| P3.T0 | Contract and executable-path freeze | planning | M | P2 PASS | Planned; not activated |
-| P3.T1 | Invitation persistence, claim, and inbox | development | L | T0 PASS | Planned; not activated |
-| P3.T2 | O3 authorization and native K1 envelope delivery | development | L | T1 PASS | Planned; not activated |
+| P3.T0 | Contract and executable-path freeze | planning | M | P2 PASS | Closure-ready; owner verification pending |
+| P3.T1 | Invitation persistence, claim, and inbox | development | decomposed | T0 PASS | Blocked on T0 PASS; exact leaves frozen |
+| P3.T2 | O3 authorization and native K1 envelope delivery | development | decomposed | T1 PASS | Blocked on T1 PASS; exact leaves frozen |
 | P3.T3 | P3 integration certification and closure | development/evidence | M | T2 PASS | Planned; not activated |
 
 
@@ -59,7 +56,7 @@ exception), Reflection, behavioral certification and owner-verification gates.
 Synchronize this plan, its ledger, the parent plan/ledger and roadmap. No phase
 PASS is implied by plan availability or provisional effort.
 
-P3-P6 must all close before S-230 T6p-a can activate.
+Current sequencing amendment: P6 activates only after P3 PASS + P4 PASS + P5-DEV. S-230 P2P deployment preparation consumes DEV-HANDOFF = P3 PASS + P4 PASS + P5-DEV + P6 PASS; deferred P5.T3 is not part of that development gate.
 
 ## Calendar and estimation limits
 
@@ -78,3 +75,4 @@ this document does not establish capacity or guarantee the October date.
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` and `docs/policies/HITL_AUTONOMY_POLICY.md` — activation and closure.
 - `docs/audit/mvp0-p2p-adr044-d2-key-envelope.md` — exact K1 predicates and opaque native-key proof.
 - `docs/audit/mvp0-p2p-p2-c0-contract-freeze.md` — ready descriptor and sealed-lineage input.
+- `docs/audit/mvp0-p2p-p3-t0-contract-freeze-2026-09-22.md` — current P3 source reconciliation, contract freeze, gaps, path ownership and evidence/RRI decomposition.
