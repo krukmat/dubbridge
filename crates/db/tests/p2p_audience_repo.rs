@@ -94,6 +94,36 @@ async fn insert_ready_publication(pool: &PgPool, owner: Uuid) -> (AssetId, Uuid,
     (asset_id, publication_id, lineage_id)
 }
 
+async fn assert_invalid_invitation_creation(
+    pool: &PgPool,
+    owner: Uuid,
+    asset_id: AssetId,
+    now: OffsetDateTime,
+) {
+    assert!(matches!(
+        create_invitation(
+            pool,
+            owner,
+            asset_id,
+            &token_hash(Uuid::new_v4()),
+            now - Duration::seconds(1),
+        )
+        .await,
+        Err(DbError::Conflict)
+    ));
+    assert!(matches!(
+        create_invitation(
+            pool,
+            Uuid::new_v4(),
+            asset_id,
+            &token_hash(Uuid::new_v4()),
+            now + Duration::hours(1),
+        )
+        .await,
+        Err(DbError::NotFound)
+    ));
+}
+
 #[tokio::test]
 async fn device_registration_is_idempotent_and_rejects_conflicting_active_identity() {
     let pool = test_pool().await;
@@ -135,28 +165,7 @@ async fn invitation_claim_is_owner_scoped_idempotent_and_exposes_only_active_aut
     let (asset_id, publication_id, lineage_id) = insert_ready_publication(&pool, owner).await;
     let now = OffsetDateTime::now_utc();
 
-    assert!(matches!(
-        create_invitation(
-            &pool,
-            owner,
-            asset_id,
-            &token_hash(Uuid::new_v4()),
-            now - Duration::seconds(1),
-        )
-        .await,
-        Err(DbError::Conflict)
-    ));
-    assert!(matches!(
-        create_invitation(
-            &pool,
-            Uuid::new_v4(),
-            asset_id,
-            &token_hash(Uuid::new_v4()),
-            now + Duration::hours(1),
-        )
-        .await,
-        Err(DbError::NotFound)
-    ));
+    assert_invalid_invitation_creation(&pool, owner, asset_id, now).await;
 
     let hash = token_hash(Uuid::new_v4());
     let invitation = create_invitation(&pool, owner, asset_id, &hash, now + Duration::hours(1))
