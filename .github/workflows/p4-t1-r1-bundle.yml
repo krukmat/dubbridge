@@ -8,7 +8,7 @@ on:
       - ".github/workflows/p4-t1-r1-bundle.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   bundle:
@@ -32,3 +32,12 @@ jobs:
           name: p4-t1-r1-worklet
           path: mobile/src/p2p/runtime/worklet.bundle.js
           if-no-files-found: error
+
+      - name: Commit generated worklet and remove one-shot workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/src/p2p/runtime/worklet.bundle.js
+          git rm .github/workflows/p4-t1-r1-bundle.yml
+          git commit -m "build(p4): regenerate T1-r1 worklet bundle"
+          git push origin HEAD:feature/p2p-mvp-core
