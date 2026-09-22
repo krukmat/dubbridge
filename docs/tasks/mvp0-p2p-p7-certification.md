@@ -10,17 +10,17 @@ behavioral_coverage_contract: behavior-v2
 # P7 — planning task ledger
 
 **Status:** Planned; no task activated or implemented by this documentation update.
-**Phase gate:** P2-P6 PASS; S-230-T7p PASS.
+**Phase gate:** P2-P4 PASS; P5-DEV; P6 PASS; S-230-T7p PASS. P5.T3 may enter P7 pending but must be resolved by P7.T2 before verdict.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
 ## Task map
 
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
-| P7.T0 | Certification profile and artifact manifest | planning/config | M | P2-P6 PASS; S-230-T7p PASS | Planned; not activated |
+| P7.T0 | Certification profile and artifact manifest | planning/config | M | P2-P4 PASS; P5-DEV; P6 PASS; S-230-T7p PASS | Planned; not activated |
 | P7.T1 | No-fallback controls and control-plane checks | operational/evidence | M | T0 PASS | Planned; not activated |
 | P7.T2 | Physical owner-to-viewer end-to-end proof | operational/evidence | M | T1 PASS | Planned; not activated |
-| P7.T3 | Certification verdict and T9g handoff | operational/evidence | S | T2 evidence complete (PASS or failure) | Planned; not activated |
+| P7.T3 | Certification verdict and T9g handoff | operational/evidence | S | T2 evidence complete + P5.T3 disposition recorded | Planned; not activated |
 
 
 ## Shared activation and closure contract
@@ -44,7 +44,7 @@ Release artifact/gate changes also synchronize the S-230 plan and ledger.
 
 **Effort:** M (provisional; re-score/decompose at activation)
 
-**Depends on:** P2-P6 PASS; S-230-T7p PASS
+**Depends on:** P2-P4 PASS; P5-DEV; P6 PASS; S-230-T7p PASS. P5.T3 may still be open.
 
 **Status:** Planned; not activated.
 
@@ -62,7 +62,7 @@ evidence when behavior is delivered. Record failures rather than inferring PASS.
 **Status artifacts affected:** shared status set above; propagate any changed
 downstream input to its consuming phase before claiming closure.
 
-**Agent handoff:** Read this phase plan and governing references. Verify P2-P6 PASS; S-230-T7p PASS;
+**Agent handoff:** Read this phase plan and governing references. Verify P2-P4 PASS, P5-DEV, P6 PASS and S-230-T7p PASS; P5.T3 may remain pending until T2;
 freeze and score exact paths, preserve the accepted boundary, and deliver only
 P7.T0's acceptance criteria through the current workflow. Stop on a
 contract conflict or unmet dependency; do not silently advance the next phase.
@@ -97,6 +97,12 @@ P7.T1's acceptance criteria through the current workflow. Stop on a
 contract conflict or unmet dependency; do not silently advance the next phase.
 
 ## P7.T2 — Physical owner-to-viewer end-to-end proof
+
+**P5.T3 consolidation rule (2026-09-22):** this exact-artifact physical run is
+the mandatory fallback evidence producer for deferred P5.T3. If a prior T7p
+run already satisfies the same criteria against the exact RC, P7.T2 may reuse
+that evidence after artifact-identity verification. Otherwise P7.T2 must execute
+the playback/no-fallback proof. A failed P5.T3 criterion forces NOT_CERTIFIED.
 
 **Type:** operational/evidence
 

@@ -7,7 +7,7 @@ slice: MVP0-P2P
 
 # P6.T0 preflight — state/action/navigation contract
 
-This is a preflight only. **P6.T0 remains blocked until P3-P5 are PASS.** No P6 task is activated by this record.
+This is a preflight only. **Replan 2026-09-22:** P6.T0 remains blocked until P3 PASS, P4 PASS and P5-DEV (T0-T2 formally closed). P5.T3 is no longer an activation prerequisite. No P6 task is activated by this record.
 
 ## Current mobile seams confirmed
 
@@ -95,4 +95,4 @@ Proposed minimum ownership for activation:
 
 ## Activation gate
 
-P6.T0 may activate only after P3-P5 PASS. At activation, resolve GAP-1 and GAP-2, freeze exact API/state contracts and writable paths, then implement tests before P6.T1 UI work.
+P6.T0 may activate after P3 PASS, P4 PASS and P5-DEV. P5.T3 may remain pending. At activation, resolve GAP-1 and GAP-2, freeze exact API/state contracts and writable paths, then implement tests before P6.T1 UI work.

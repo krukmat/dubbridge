@@ -8,7 +8,7 @@ slice: MVP0-P2P
 # P6 — Minimal My Content and Invites dashboard
 
 Task ledger: `docs/tasks/mvp0-p2p-p6-dashboard.md`. Documentation prepared 2026-09-08;
-implementation remains blocked on **P3-P5 PASS** and the per-task workflow gate.
+implementation remains blocked on **P3 PASS + P4 PASS + P5-DEV** and the per-task workflow gate. P5.T3 is deferred to release certification.
 
 ## Objective
 
@@ -38,7 +38,7 @@ Freeze state projection and action eligibility from canonical backend and runtim
 
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
-| P6.T0 | State/action and navigation contract | planning | M | P3-P5 PASS | Planned; not activated |
+| P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | Planned; not activated |
 | P6.T1 | Owner My Content and invite action | development | M | T0 PASS | Planned; not activated |
 | P6.T2 | Viewer claim, Invites, sync and play actions | development | L | T1 PASS | Planned; not activated |
 | P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | Planned; not activated |
@@ -59,7 +59,9 @@ exception), Reflection, behavioral certification and owner-verification gates.
 Synchronize this plan, its ledger, the parent plan/ledger and roadmap. No phase
 PASS is implied by plan availability or provisional effort.
 
-P3-P6 must all close before S-230 T6p-a can activate.
+P3 and P4 must be PASS, P5-DEV must be closed, and P6 must close before S-230
+T6p-a can activate. P5.T3 is intentionally carried to the release-certification
+lane and is not part of this development gate.
 
 ## Calendar and estimation limits
 

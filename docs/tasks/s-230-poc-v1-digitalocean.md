@@ -49,6 +49,10 @@ ledger.
 
 ## Task index
 
+> **MVP0-P2P DEV-HANDOFF — amended 2026-09-22:** P3 PASS + P4 PASS + P5-DEV
+> (P5.T0-T2 formally closed) + P6 PASS. P5.T3 is excluded from this development
+> gate and carried to the release-certification lane; P7/T9g still require it.
+
 | ID | Title | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
 | T0 | Slice plan, ledger, and roadmap entry | docs-only | S | — | [x] Done |
@@ -81,13 +85,13 @@ ledger.
 | T5c | Production Compose and TLS reverse proxy | config-only | M (RRI 26 Moderate, recomputed 2026-08-27) | T5b | [x] Done 2026-08-27 — Claude Sonnet 5 direct (owner override); Gemma Reviewer PASS 0 findings both phases; owner-verified |
 | T5d | Local descriptor evidence and aggregate status sync | operational/docs | S (RRI 22 Low, recomputed 2026-08-27) | T5c | [x] Done 2026-08-27 — structural render + fail-closed guard evidence; owner-verified |
 | T6 | First deploy and end-to-end smoke on Digital Ocean | operational | L | T5 | [ ] Planned |
-| T6p-a | Freeze deployment-specific P2P ownership and configuration | planning/config | RUN BEFORE ACTIVATION | T7local PASS; T7c PASS; MVP0-P2P P2-P6 PASS | [ ] Deferred until development gates pass |
+| T6p-a | Freeze deployment-specific P2P ownership and configuration | planning/config | RUN BEFORE ACTIVATION | T7local PASS; T7c PASS; MVP0-P2P DEV-HANDOFF | [ ] Deferred until development gates pass |
 | T6p-b | P2P Compose/config/secrets/private-network wiring | config/ops | TBD exact-path | T6p-a PASS | [ ] Planned |
 | T6p-c | Local P2P deployment-contract evidence | operational/evidence | TBD exact-path | T6p-b PASS | [ ] Planned |
 | T6p-d | Deploy backend ciphertext publication + durable P2P_READY smoke on DO | operational | TBD exact-path | T6p-c PASS | [ ] Planned |
 | T7local | Mobile POC build against the local Docker Compose stack | development/ops | M | T5d | [ ] Planned |
 | T7 | Mobile POC build against the deployed backend | development/ops | M | T6; T7local PASS | [ ] Planned |
-| T7p | Physical Android P2P release candidate | development/ops | TBD exact-path | T7; T7c; T6p-d; P3-P6 PASS; X29 resolved | [ ] Planned |
+| T7p | Physical Android P2P release candidate | development/ops | TBD exact-path | T7; T7c; T6p-d; MVP0-P2P DEV-HANDOFF; X29 resolved | [ ] Planned |
 | T7b | Mobile registration screen | development | M | T7local | [ ] Planned — droppable (first) |
 | T7c | Session lifetime and expiry behavior | development/config | S | T7local | [ ] Planned |
 | T8 | Subtitle visible in the review surface (optional) | development | M | T7local | [ ] Planned — droppable (second) |
@@ -5168,7 +5172,7 @@ Digital Ocean backend and verify the full flow on a device.
 `docs/audit/mvp0-p2p-p2-c0-contract-freeze.md`.
 
 - **T6p-a — input freeze (after `T7local PASS`, `T7c PASS`, and MVP0-P2P
-  `P2-P6 PASS`):** freeze only deployment-specific Availability Node
+  `DEV-HANDOFF`):** freeze only deployment-specific Availability Node
   placement, image version, mTLS identity/rotation, versioned KEK
   injection/rotation, persistent ciphertext storage, ports, resources,
   health, secrets, and ownership against implemented surfaces. Consume the
@@ -5199,7 +5203,7 @@ workflow gate before execution.
 **Type:** planning/config
 
 **Depends on:** `S-230-T7local PASS`; `S-230-T7c PASS`; MVP0-P2P
-`P2-P6 PASS`. `P2.C0 PASS` is a satisfied contractual input, not the
+`DEV-HANDOFF`. `P2.C0 PASS` is a satisfied contractual input, not the
 activation gate. Note this depends on `T7local` (local-stack validation),
 not `T7` (post-deploy validation) — see `S-230-T7local`.
 
