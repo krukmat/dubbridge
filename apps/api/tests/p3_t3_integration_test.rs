@@ -9,6 +9,7 @@ use axum::{
     body::{Body, to_bytes},
     http::{Method, Request, StatusCode, header},
 };
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use dubbridge_api::{build_app, state::AppState};
 use dubbridge_auth::{
     AuthenticatedPrincipal, SharedTokenVerifier, TokenVerificationError, TokenVerifier,
