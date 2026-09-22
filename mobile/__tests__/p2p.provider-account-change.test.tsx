@@ -84,7 +84,7 @@ describe("P2PProvider account lifecycle", () => {
   });
 
   it("clears the signed-out account when auth transitions to unauthenticated", async () => {
-    const view = render(
+    const view = await render(
       <P2PProvider>
         <Text>child</Text>
       </P2PProvider>,
