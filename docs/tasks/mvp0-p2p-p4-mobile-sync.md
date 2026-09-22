@@ -21,7 +21,7 @@ behavioral_coverage_contract: behavior-v2
 | P4.T1 | Product replication and bounded resume | development | L | T0 PASS | `[x]` Done 2026-09-22 — review PASS |
 | P4.T2 | Manifest verification and lifecycle isolation | development | L | T1 PASS | `[x]` Done 2026-09-18 |
 | P4.T3 | P4 certification and P5 handoff | development/evidence | M | T2 PASS | Blocked — no certification artifact, see verification note |
-| P4.T1-r1 | Product storage file-URI → path at the Corestore boundary (repair; blocks P5.T3) | development | S (provisional) | P4.T1 source present | Planned — RRI/card/approval pending; not implemented |
+| P4.T1-r1 | Product storage file-URI → path at the Corestore boundary (repair; blocks P5.T3) | development | S | P4.T1 source present | Implemented + CI verified — Android rerun pending |
 
 
 ## Shared activation and closure contract
@@ -206,13 +206,19 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Type:** development (defect repair; blocks P5.T3 SYNC)
 
-**Effort:** S (provisional — run `scripts/rri.py` on the exact paths before presentation)
+**Effort:** L by execution gate — RRI 55 (Med-high), recorded in
+`docs/audit/p4-t1-r1-storage-uri-rri-2026-09-22.md`.
 
-**Depends on:** P4.T1 product worklet source (`de199ff`); does not require P4.T1 closure.
+**Depends on:** P4.T1 product worklet source (`de199ff`); P4.T1 is now Done.
 
-**Status:** Planned — not scored, not presented, not approved, not implemented.
-Owner instruction 2026-09-22: no local-AI roles for this line of work for now
-(weekly usage 94 %); resume from `docs/prompts/p4-t1-r1-storage-uri-fix.md`.
+**Status:** Implemented + CI verified 2026-09-22. Production fix
+`e44d00f497fe0f7128ce3a31a797b13840dafb2c`; focused RED→GREEN proof and
+full mobile evidence are recorded in
+`docs/audit/p4-t1-r1-storage-uri-fix-evidence-2026-09-22.md`.
+The committed Bare worklet is drift-free at sha256
+`2f1f79cdf1d62a2b7cd8fafd3819b4ccb5039b71b519fbf7e954d1654a7bfd1b`.
+The remaining acceptance gate is the exact-head Android P5.T3 rerun; no device
+PASS is inferred from CI.
 
 **Defect (confirmed):** `ProductPackageRuntime.open` passes the host `file:` URI
 (`Bare.argv[0]` + `/accounts/<scope>`) straight to `new Corestore(...)`, which treats
@@ -220,7 +226,7 @@ strings as filesystem paths → on Android `ENOENT stat "file:"` in `drive.ready
 Evidence: `docs/audit/mvp0-p2p-p5-t3-android-certification-blocked-2026-09-22.md`
 § "Corrida diagnóstica instrumentada".
 
-**Selected option (recommended, pending owner approval):** A — keep the host→worklet
+**Implemented option:** A — keep the host→worklet
 `file:` URI contract; convert exactly once with `bare-url` `fileURLToPath` immediately
 before `new Corestore` in `openPackage`; map conversion failure to
 `PRODUCT_STORAGE_CONFIG_INVALID` before any storage/network handle exists.
@@ -235,12 +241,12 @@ before `new Corestore` in `openPackage`; map conversion failure to
 
 **Out of scope:** `transient-drive.ts` proof path (same latent defect; residual,
 dev-only), host `BareRuntimeClient`/Expo URI construction, RPC/protocol/codec,
-the TS2339 residual from `f2fa64c`, P4.T1/P4.T3 closure.
+P4.T1/P4.T3 closure. The earlier TS2339 observation is no longer present in the current mobile gate.
 
 **Acceptance criteria:**
 - **HP-P4.T1-r1-1:** A valid root URI whose path contains a space (`%20`) opens a
   real Corestore/Hyperdrive (RocksDB) at `<decoded root>/accounts/<scope>`; no
-  relative `file:` directory is created in the process cwd. (RED on current code.)
+  relative `file:` directory is created in the process cwd. RED→GREEN proven in CI.
 - **HP-P4.T1-r1-2:** Distinct account scopes resolve to distinct absolute
   directories, identical to the host cleaner's `Directory(root, "accounts", scope)`.
 - **EC-P4.T1-r1-1:** Non-empty authority (`file://evil/…`), encoded `/` (`%2F`) or
