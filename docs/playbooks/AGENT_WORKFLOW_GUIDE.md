@@ -39,6 +39,60 @@ task through the same Moderate local-first path as RRI 26–40 (§ Local-first
 and Architect-refined implementation routing below), not to cloud. A
 `CLOUD_REQUIRED` result in 41–45 still routes directly to cloud, unchanged.
 
+## Productive token use and consumption
+
+For every task, maximize verified progress per token, not token volume. Balance
+cloud consumption, local capacity, elapsed time, and quality according to the
+task's scope and RRI. Apply these rules during planning, execution, and recovery:
+
+- **Choose the execution mix deliberately.** Prefer existing deterministic
+  scripts, searches, generators, linters, tests, and reusable automation for
+  mechanical work. Favor local AI for eligible reasoning, implementation, and
+  review under the existing routes. Reserve cloud work for the portions whose
+  resolved route, complexity, or evidenced local limitations require it. Low
+  docs/policy/structure-heavy work remains with the primary agent. Do not create
+  automation or delegation whose setup and review cost exceeds its likely use.
+- **Keep the resource plan small.** In the existing task ledger or delegation
+  packet, record one concise line identifying automation/local/cloud work, why
+  cloud is needed when applicable, expected consumption (qualitative if no
+  telemetry), and any owner-provided budget. For a single-step task, keep this
+  assessment brief without creating a new artifact. Do not solicit a numeric
+  budget routinely or introduce an additional approval card/block.
+- **Spend context on the task.** Load relevant canonical rules and dependencies,
+  search before bulk reading, and reuse current evidence. Keep handoffs focused
+  on the objective, allowed paths, acceptance criteria, invariants, and evidence;
+  use targeted excerpts where the packet contract permits. Preserve required
+  complete-file inputs/outputs and review context. Delegate independent work
+  when it saves time or improves quality; avoid redundant full-context agents,
+  repeated unchanged reads, and optional reviews with no distinct question.
+- **Respect the resolved route.** Apply the honest Low-band maximization pass;
+  do not lower scores or fragment invariants to save cloud tokens. Preserve
+  model/effort bindings, task pins, local profiles, restart/precheck, independent
+  reviews, Reflection, verification, and fallback-selection gates. Efficiency
+  is not grounds to reduce local reasoning/output profiles or silently change
+  a selected cloud model. A mandated cloud route is sufficient justification.
+- **Reassess when progress stalls or consumption grows.** Warning signs include
+  repeated failures without new evidence, expanding context/scope, an unexpected
+  cloud takeover, or measured/estimated consumption approaching an explicit
+  budget. Follow required retry/recovery contracts, but do not extend them with
+  unchanged attempts. Inspect deterministic evidence, narrow the uncertainty,
+  reuse completed work, and reconsider eligible local/automation options before
+  further expensive attempts. A required local route stays required.
+- **Make human help actionable.** When consumption is elevated or likely to
+  exceed the task's resource plan, tell the user the driver, useful progress so
+  far, and the proposed adjustment. If human input would materially reduce the
+  remaining cost or uncertainty, ask for one specific contribution: a missing
+  decision, a reproduction, an unavailable log, or a bounded action only they
+  can perform. Explain what it would unblock. Continue independent authorized
+  work while awaiting the answer; pause dependent work when that answer is
+  necessary or an existing approval/fallback/budget boundary requires it.
+  Reuse existing authorization; this is not a blanket permission checkpoint.
+- **Report honestly and proportionally.** Use available usage/billing telemetry;
+  distinguish observed counts/costs from estimates. If unavailable, say so and
+  use qualitative indicators, never invented token totals, prices, or savings.
+  Honor explicit owner budgets and disclose material deviations at closure in
+  the existing record. Routine low-consumption work needs no separate report.
+
 ## Mandatory workflow before implementing
 
 0. **Per-task Ollama restart and local-stack precheck** — before the first
@@ -126,6 +180,8 @@ and Architect-refined implementation routing below), not to cloud. A
      example and per-role context table:
      `docs/audit/agent-workflow-guide-detail-archive.md § Step 0`.
 1. **Analyze** — read context, dependencies, and affected files.
+   Apply § Productive token use and consumption to choose a task-appropriate
+   mix of deterministic automation, eligible local AI, and cloud work.
    - **Mobile UI / presentation tasks** under `mobile/`: also read the root
      `DESIGN.md` before planning or implementation (governs visual intent and
      component usage; does not replace task files, `mobile/src/theme/

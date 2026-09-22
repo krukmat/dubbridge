@@ -186,6 +186,18 @@ Use the six-block Compact Approval Task Card v2 from
 Keep full task and RRI detail in the linked ledger/artifact instead of repeating
 it in the approval card.
 
+## Productive Token Use
+
+For every task, maximize useful, verified progress per token. Prefer existing
+deterministic automation and eligible local AI; keep cloud work, context, and
+delegation proportional to the task. Follow the canonical procedure in
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Productive token use and consumption`.
+Preserve RRI routing, resolved models/profiles, required reviews, and retry
+budgets. When consumption is elevated or progress stalls, explain the cause
+and adjustment; ask for a concrete human contribution when it can materially
+reduce cost or uncertainty. Continue independent authorized work. Use real
+telemetry when available, label estimates, and never invent usage or savings.
+
 ## Complexity And Model Defaults
 
 Before task presentation, score the coherent parent outcome and run the
