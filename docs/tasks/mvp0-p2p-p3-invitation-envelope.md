@@ -1,7 +1,7 @@
 ---
 type: TaskList
 title: "Tasks: P3 Invitation, audience authorization, and K1 device envelope"
-status: in_progress
+status: pass
 slice: MVP0-P2P
 plan: docs/plan/mvp0-p2p-p3-invitation-envelope.md
 behavioral_coverage_contract: behavior-v2
@@ -9,7 +9,7 @@ behavioral_coverage_contract: behavior-v2
 
 # P3 — planning task ledger
 
-**Status:** In progress. P3.T0 PASS. P3.T1 PASS. P3.T2 PASS. **P3.T3 is active: T3a/T3b integration PASS and T3c secret-boundary PASS on 2026-09-22; T3d remains pending.** T3c exact head `6c3a565c` completed 15/15 CI with the integrated T3 suite 3/3 PASS in test and coverage. Hosted-emulator CI remains hard-disabled.
+**Status:** **PASS 2026-09-22.** P3.T0/T1/T2 PASS; P3.T3a/T3b/T3c/T3d PASS. Owner verification for T3d/P3 closure is the explicit 2026-09-22 instruction to close the task. Evidence head `d5644b0b` completed 15/15 CI; implementation head `6c3a565c` completed 15/15 CI with the integrated T3 suite 3/3 PASS in test and coverage. Hosted-emulator CI remains hard-disabled.
 **Phase gate:** P2 PASS; Accepted ADR-044.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
@@ -20,7 +20,7 @@ behavioral_coverage_contract: behavior-v2
 | P3.T0 | Contract and executable-path freeze | planning | M | P2 PASS | **PASS 2026-09-22** — owner-approved; CI 15/15 green |
 | P3.T1 | Invitation persistence, claim, and inbox | development | decomposed | T0 PASS | **PASS 2026-09-22** — owner-verified; `4dede25d` 15/15 CI green |
 | P3.T2 | O3 authorization and native K1 envelope delivery | development | decomposed | T1 PASS | **PASS 2026-09-22** — T2-A Done; T2c1/T2c2/T2c3 PASS; `56e9412a` 15/15 CI green; owner-verified |
-| P3.T3 | P3 integration certification and closure | development/evidence | decomposed | T2 PASS | **In progress** — T3a PASS; T3b PASS; T3c PASS; T3d pending |
+| P3.T3 | P3 integration certification and closure | development/evidence | decomposed | T2 PASS | **PASS 2026-09-22** — T3a/T3b/T3c/T3d PASS; owner-verified |
 
 
 ## Shared activation and closure contract
@@ -221,7 +221,7 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T2 PASS
 
-**Status:** **In progress.** T3a/T3b integrated certification PASS at `eb1e8abe`; **T3c secret-boundary PASS at `6c3a565c` with 15/15 CI, 3/3 integrated cases in test/coverage, static secret-boundary PASS and 90.43% workspace line coverage. T3d remains pending.** **Historical verification note (2026-09-18):** no work product
+**Status:** **PASS 2026-09-22.** T3a/T3b integrated certification PASS at `eb1e8abe`; T3c secret-boundary PASS at `6c3a565c`; **T3d closure/handoff PASS and owner-verified. Aggregate P3 = PASS.** **Historical verification note (2026-09-18):** no work product
 exists for this leaf. Full evidence:
 `docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`.
 
@@ -238,7 +238,7 @@ exists for this leaf. Full evidence:
 | T3a | Integrated owner → invite → claim → O3 → envelope happy path | **PASS 2026-09-22** |
 | T3b | Integrated fail-closed viewer/O3/device/package matrix | **PASS 2026-09-22** |
 | T3c | API/audit/DB/mobile/native secret-boundary inspection | **PASS 2026-09-22** |
-| T3d | Evidence map, downstream handoff, final closure | **Pending** |
+| T3d | Evidence map, downstream handoff, final closure | **PASS 2026-09-22** |
 
 T3a/T3b implementation certification head `eb1e8abe` completed 15/15 CI.
 During that certification, the DB audit CHECK was found to lag the already
@@ -253,7 +253,9 @@ coverage remained 90.43%, and the static guard returned
 `P3_T3C_SECRET_BOUNDARY=PASS`.
 
 T3c closes the frozen secret-deny boundary without re-enabling the hosted
-Android HPKE emulator. **P3.T3 remains IN PROGRESS until T3d closes.**
+Android HPKE emulator. **T3d is now closed; P3.T3 PASS and aggregate P3 PASS.**
+
+T3d evidence: `docs/audit/mvp0-p2p-p3-t3d-closure-2026-09-22.md`.
 
 **Evidence to emit:** task-scoped contract/decision record for planning; actual
 command/test/device/network results as relevant to the acceptance criteria for

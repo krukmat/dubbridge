@@ -279,8 +279,7 @@ work remains per § Known planning gaps below. `T6p-d` specifically proves backe
 ciphertext publication plus durable `P2P_READY`, which are exactly what
 `P2.T3` and `P2.T5` implement — so `T6p-a` cannot start until its full gates pass, and the integrated P2
 publication flow required by `T6p-d` is not yet implemented/certified. The
-base S-230 deployment remains a separate deliverable. P3-P7
-remain pending. T6p-a is deferred until S-230 T7local, T7c, and MVP0-P2P
+base S-230 deployment remains a separate deliverable. **P3 PASS 2026-09-22; P4 is in progress with T3 closure-ready.** P5-P7 remain incomplete. T6p-a is deferred until S-230 T7local, T7c, and MVP0-P2P
 P2-P6 are PASS —
 T7local validates the mobile flow against the local Docker Compose stack, so
 this gate no longer requires the S-230 T6 Digital Ocean deploy to have
@@ -298,8 +297,7 @@ controlled Android P2P beta/POC by 2026-10-30 through S-230 T6p-a..d, T7p,
 P7, and T9g. X29 is a release blocker for that target. iOS remains deferred. **Bounded exception (2026-09-06, deactivated 2026-09-07 by owner instruction — owner back online):** while active, every code-touching task in S-230 or MVP0-P2P defaulted to cloud implementation instead of local-first, per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Bounded cloud-implementation priority`. Deactivated 2026-09-07; code-touching tasks in these slices now resume the normal RRI-band local-first default. Local phase-1/phase-2 review was and remains unaffected. **2026-09-18: `CONS-T5` closed `P2.T6e` — aggregate `MVP0-P2P P2` is PASS**
 (`docs/audit/mvp0-p2p-p2-t6-closure.md`). `CONS-T6/T7/T8a` then verified P3/
 P4/P5.T0-2 per-leaf against real acceptance criteria (not authorization
-alone): **P4.T0, P4.T2, P5.T0 are Done, owner-verified**; **P3 (all 4
-leaves), P4.T1, P4.T3, P5.T1, P5.T2 remain Blocked** on genuine gaps, mostly
+alone): **P4.T0, P4.T2, P5.T0 are Done, owner-verified**; **P3 is now PASS (2026-09-22); P4.T1 is Done; P4.T3 is closure-ready; P5.T1/P5.T2 retain formal-closure work** on genuine gaps, mostly
 untested fail-closed logic — see
 `docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`
 and the P3/P4/P5 task ledgers. `CONS-T8b`/`CONS-T10a`/`CONS-T10c` stay
@@ -430,9 +428,7 @@ captured above under Governing principles and ADR-025/ADR-026.
   ADR materially changes; do not introduce new active `P*` or bare `S0`–`S9` phase IDs.
 - `S-070` (JWKS / production identity hardening) and `S-170`/`S-180` (human review
   and publication runtime) still need plan/task ledgers before execution.
-- **MVP0-P2P P3-P7:** phase plans and planning work-package ledgers now exist
-  (2026-09-08); see the phase index in `docs/plan/mvp0-p2p-first.md` and
-  `docs/tasks/mvp0-p2p-first.md`. P3-P7 remain Planned/not activated. Each
+- **MVP0-P2P P3-P7:** phase plans and planning work-package ledgers exist. **P3 PASS 2026-09-22. P4 is in progress with T0/T1/T2 Done and T3 closure-ready.** P5-P7 remain incomplete. Each
   phase still needs exact-path executable decomposition, parent/leaf RRI,
   band-required review/approval, ownership and elapsed-time estimates at
   activation. Existing HP/EC and accepted ADR-043/044 remain binding.

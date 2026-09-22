@@ -10,7 +10,7 @@ plan: docs/plan/mvp0-p2p-first.md
 
 > **Plan:** `docs/plan/mvp0-p2p-first.md`.
 > **External taskpack:** `p2p-mvp/taskpacks/P0.zip` through `P7.zip`.
-> **Current task:** P0, P1, and now P2 are closed. ADR-044 is Accepted. P2.T0
+> **Current task:** P0, P1, P2 and P3 are closed. P4.T3 is the next formal closure task. ADR-044 is Accepted. P2.T0
 > is PASS and P2.T1a-T1f are Done/owner-approved as the completed P2.T1
 > persistence outcome on 2026-09-06. P2.C0 is PASS; T2 (including T2c-r/T2g)
 > and T4a are Done. T3, T4b-f (retrospective closure, 2026-09-14), T5, T6a-d
@@ -30,8 +30,8 @@ plan: docs/plan/mvp0-p2p-first.md
 | P0 | Bare / Expo / React Native compatibility spike | PASS — Android-only; owner verified 2026-08-27 | — |
 | P1 | Maintainable mobile P2P foundation + replication proof | Done 2026-09-01 | P0 PASS |
 | P2 | Encrypted P2P publication after S-120 | **Done 2026-09-18 — all leaves T0-T6e closed; P2: PASS** | P1 PASS; ADR-044 Accepted |
-| P3 | Invite, claim, and content-key envelope | Pending | P2 PASS; accepted ADR-044 / K1 contract |
-| P4 | Mobile package sync and verification | Pending | P3 PASS |
+| P3 | Invite, claim, and content-key envelope | **PASS 2026-09-22** | P2 PASS; accepted ADR-044 / K1 contract |
+| P4 | Mobile package sync and verification | **In progress — T0/T1/T2 Done; T3 closure-ready** | P3 PASS |
 | P5 | Local HLS gateway + existing VideoPlayer | Pending | P4 PASS |
 | P6 | Minimal My Content + Invites dashboard | Pending | P3 PASS; P4 PASS; P5-DEV (T0-T2); P5.T3 deferred |
 | P7 | End-to-end P2P certification | Pending | P2-P4 PASS; P5-DEV; P6 PASS; S-230-T7p PASS; P5.T3 resolved by/within P7.T2 |

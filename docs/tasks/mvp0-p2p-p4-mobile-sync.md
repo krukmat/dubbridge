@@ -9,8 +9,8 @@ behavioral_coverage_contract: behavior-v2
 
 # P4 — planning task ledger
 
-**Status:** Planned; no task activated or implemented by this documentation update.
-**Phase gate:** P3 PASS.
+**Status:** **In progress. P3 PASS gate satisfied 2026-09-22.** P4.T0/T1/T2 are Done; **P4.T3 is closure-ready and is the next formal task.**
+**Phase gate:** **P3 PASS — satisfied 2026-09-22.**
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
 ## Task map

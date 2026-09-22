@@ -1,13 +1,13 @@
 ---
 type: Plan
 title: "P3: Invitation, audience authorization, and K1 device envelope"
-status: in_progress
+status: pass
 slice: MVP0-P2P
 ---
 
 # P3 — Invitation, audience authorization, and K1 device envelope
 
-Task ledger: `docs/tasks/mvp0-p2p-p3-invitation-envelope.md`. P2 is PASS and ADR-044 is accepted. P3.T0/T1/T2 PASS. **P3.T3 is active: T3a/T3b integration PASS and T3c secret-boundary PASS on 2026-09-22.** T3c exact head `6c3a565c` completed 15/15 CI with 3/3 integrated T3 cases PASS in test and coverage; T3d remains pending.
+Task ledger: `docs/tasks/mvp0-p2p-p3-invitation-envelope.md`. P2 is PASS and ADR-044 is accepted. **P3 PASS 2026-09-22.** T0/T1/T2 PASS; T3a/T3b/T3c/T3d PASS. T3d publishes the P4 descriptor and P5 native-key handoff, and the owner explicitly directed closure.
 
 ## Objective
 
@@ -38,7 +38,7 @@ Freeze concrete API/schema names, token-expiry policy, O3 authorization lifecycl
 | P3.T0 | Contract and executable-path freeze | planning | M | P2 PASS | **PASS 2026-09-22** |
 | P3.T1 | Invitation persistence, claim, and inbox | development | decomposed | T0 PASS | **PASS 2026-09-22**; owner-verified; 15/15 CI green |
 | P3.T2 | O3 authorization and native K1 envelope delivery | development | decomposed | T1 PASS | **PASS 2026-09-22**; T2c1/T2c2/T2c3 PASS; `56e9412a` 15/15 CI green; owner-verified |
-| P3.T3 | P3 integration certification and closure | development/evidence | decomposed | T2 PASS | **In progress** — T3a/T3b/T3c PASS; T3d pending |
+| P3.T3 | P3 integration certification and closure | development/evidence | decomposed | T2 PASS | **PASS 2026-09-22** — T3a/T3b/T3c/T3d PASS |
 
 
 The companion ledger defines acceptance, HP/EC, evidence and handoff per task.
@@ -106,4 +106,4 @@ T3c secret-boundary certification completed at `6c3a565c`:
 Evidence:
 `docs/audit/mvp0-p2p-p3-t3c-secret-boundary-evidence-2026-09-22.md`.
 
-**Current P3.T3 status: IN PROGRESS. T3d is the only remaining T3 leaf.**
+**P3.T3 PASS. Aggregate P3 PASS.** T3d closure/handoff evidence: `docs/audit/mvp0-p2p-p3-t3d-closure-2026-09-22.md`. P4's P3 PASS activation gate is now satisfied.
