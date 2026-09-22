@@ -1,9 +1,9 @@
 import * as Clipboard from "expo-clipboard";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 
 import { createGatewayClient } from "../../api/client";
 import type { P2pOwnerContent } from "../../api/p2pDashboard";
-import { useAuth } from "../../auth/AuthProvider";
+import { useAuth, type AuthContextValue } from "../../auth/AuthProvider";
 import { P2PAudienceService } from "../P2PAudienceService";
 import {
   canCreateP2pInvite,
@@ -24,32 +24,23 @@ export type MyContentInviteState =
     }
   | { kind: "error"; assetId: string; message: string };
 
-export function useMyContentInvite(
-  gatewayBaseUrl: string,
-  refreshOwnerContent: () => Promise<void>,
-) {
-  const auth = useAuth();
-  const audience = useMemo(
-    () => new P2PAudienceService(createGatewayClient({ gatewayBaseUrl })),
-    [gatewayBaseUrl],
-  );
-  const [inviteState, setInviteState] = useState<MyContentInviteState>({ kind: "idle" });
+type InviteStateSetter = Dispatch<SetStateAction<MyContentInviteState>>;
 
-  const createInvite = useCallback(
+function useCreateInvite(
+  audience: P2PAudienceService,
+  auth: AuthContextValue,
+  refreshOwnerContent: () => Promise<void>,
+  setInviteState: InviteStateSetter,
+) {
+  return useCallback(
     async (content: P2pOwnerContent) => {
-      if (!canCreateP2pInvite(content)) {
+      if (!canCreateP2pInvite(content) || !auth.sessionRef) {
         setInviteState({
           kind: "error",
           assetId: content.assetId,
-          message: "This content is not eligible for an invite.",
-        });
-        return;
-      }
-      if (!auth.sessionRef) {
-        setInviteState({
-          kind: "error",
-          assetId: content.assetId,
-          message: "Session unavailable.",
+          message: auth.sessionRef
+            ? "This content is not eligible for an invite."
+            : "Session unavailable.",
         });
         return;
       }
@@ -68,32 +59,27 @@ export function useMyContentInvite(
         });
         return;
       }
-
       if (result.error.kind === "session_expired") {
         setInviteState({ kind: "idle" });
         await auth.logout();
         return;
       }
-
-      if (shouldRefreshAfterInviteError(result.error)) {
-        await refreshOwnerContent();
-      }
+      if (shouldRefreshAfterInviteError(result.error)) await refreshOwnerContent();
       setInviteState({
         kind: "error",
         assetId: content.assetId,
         message: p2pInviteErrorMessage(result.error),
       });
     },
-    [
-      audience,
-      auth.logout,
-      auth.onSessionRotation,
-      auth.sessionRef,
-      refreshOwnerContent,
-    ],
+    [audience, auth, refreshOwnerContent, setInviteState],
   );
+}
 
-  const copyInvite = useCallback(async () => {
+function useCopyInvite(
+  inviteState: MyContentInviteState,
+  setInviteState: InviteStateSetter,
+) {
+  return useCallback(async () => {
     if (inviteState.kind !== "created") return;
     const { invitationId, token } = inviteState;
     try {
@@ -110,11 +96,22 @@ export function useMyContentInvite(
           : current,
       );
     }
-  }, [inviteState]);
+  }, [inviteState, setInviteState]);
+}
 
-  const dismissInvite = useCallback(() => {
-    setInviteState({ kind: "idle" });
-  }, []);
+export function useMyContentInvite(
+  gatewayBaseUrl: string,
+  refreshOwnerContent: () => Promise<void>,
+) {
+  const auth = useAuth();
+  const audience = useMemo(
+    () => new P2PAudienceService(createGatewayClient({ gatewayBaseUrl })),
+    [gatewayBaseUrl],
+  );
+  const [inviteState, setInviteState] = useState<MyContentInviteState>({ kind: "idle" });
+  const createInvite = useCreateInvite(audience, auth, refreshOwnerContent, setInviteState);
+  const copyInvite = useCopyInvite(inviteState, setInviteState);
+  const dismissInvite = useCallback(() => setInviteState({ kind: "idle" }), []);
 
   return { inviteState, createInvite, copyInvite, dismissInvite };
 }
