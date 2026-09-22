@@ -577,4 +577,3 @@ async fn envelope_release_denies_publication_readiness_or_delivery_drift() {
     .expect("remove durable delivery evidence");
     assert_release_not_found(&pool, undelivered).await;
 }
-
