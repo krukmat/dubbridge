@@ -188,3 +188,10 @@ permits only an explicitly labeled base POC/backend preview, not an invited-play
   `docs/tasks/mvp0-p2p-s230-consistency-remediation.md`, the report-only
   remediation task map for all drift found above (not yet approved for
   implementation).
+
+
+> **P5-DEV closure-readiness update — 2026-09-22:** P4 PASS is satisfied.
+> P5.T0 is Done; P5.T1/T2 have mapped executable HP/EC evidence and current
+> mobile revalidation (62/62 suites, 446/446 tests). P5-DEV is closure-ready
+> pending owner verification. P5.T3 remains deferred P5-CERT and aggregate P5
+> remains IN PROGRESS.

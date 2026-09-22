@@ -167,3 +167,22 @@ aggregate P5 = IN PROGRESS, not PASS
 P6 gate      = unchanged / still closed
 roadmap PASS = unchanged
 ```
+
+
+## Sequencing amendment reconciliation — 2026-09-22
+
+The original 2026-09-18 planning disposition predated the split between
+**P5-DEV** and **P5-CERT**. Its automated evidence findings remain valid, but the
+statement that downstream development must wait for P5.T3 is superseded.
+
+Current sequencing:
+
+- T0 Done;
+- T1/T2 automated evidence remains PASS;
+- current mobile revalidation at `5ed7bbf5`: **62/62 suites, 446/446 tests PASS**;
+- T1/T2 are closure-ready pending owner verification;
+- P5-DEV becomes satisfied when that owner verification/status sync completes;
+- P5.T3 remains open as P5-CERT and is still mandatory before P7/T9g release
+  certification.
+
+No physical Android PASS is inferred from this amendment.

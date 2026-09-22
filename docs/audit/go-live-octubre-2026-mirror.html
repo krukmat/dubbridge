@@ -565,7 +565,7 @@
           <div class="sub-ladder">
             <div class="sub-row warn"><span class="sid">P3</span><span class="sdesc"><strong>Invitación / O3 / K1</strong> — P3.T0/T1/T2 PASS. <strong>P3.T3 Bloque 1 (T3a/T3b) PASS técnico</strong>: integración HTTP+PostgreSQL 2/2 PASS, fail-closed matrix PASS, repair durable audit 0039 aplicado y head <code>eb1e8abe</code> 15/15 CI / 90.43% coverage. <strong>T3c PASS</strong> — backend/audit/DB + mobile/native secret boundary; head <code>6c3a565c</code> 15/15 CI, T3 suite 3/3 PASS y static guard PASS. <strong>T3d PASS</strong> — evidence map + P4/P5 handoff + owner verification. <strong>P3 agregado PASS.</strong></span></div>
             <div class="sub-row"><span class="sid">P4</span><span class="sdesc"><strong>PASS 2026-09-22</strong> — T0/T1/T2/T3 cerrados; head <code>780519c5</code> 15/15 CI; handoff P4→P5 certificado y owner verification completada. P5.T3 físico sigue diferido.</span></div>
-            <div class="sub-row"><span class="sid">P5-DEV</span><span class="sdesc"><strong>Reproducción local</strong> — T0 Done; T1/T2 tienen evidencia automática PASS y necesitan cierre formal. Cuando cierren, P5-DEV queda satisfecho aunque T3 siga pendiente.</span></div>
+            <div class="sub-row warn"><span class="sid">P5-DEV</span><span class="sdesc"><strong>Closure-ready</strong> — T0 Done; T1/T2 HP/EC mapeados, mobile actual 62/62 suites y 446/446 tests PASS. Solo falta owner verification/status sync. T3 sigue diferido como P5-CERT.</span></div>
             <div class="sub-row"><span class="sid">P5.T3</span><span class="sdesc"><strong>Certificación física</strong> — diferida; no bloquea P6. Se resuelve con T7p compatible o P7.T2.</span></div>
             <div class="sub-row warn"><span class="sid">P6</span><span class="sdesc"><strong>Dashboard</strong> — gate nuevo: P3 PASS + P4 PASS + P5-DEV.</span></div>
           </div>
@@ -614,7 +614,7 @@
       </div>
       <div class="risk med">
         <span class="tag2">DEV-HANDOFF — todavía abierto</span>
-        <p>El replan mantiene los gates de desarrollo: <strong>P3 PASS + P4 PASS + P5-DEV + P6 PASS</strong>. P3 y P4 ya están PASS; el siguiente gap formal es cerrar P5.T1/T2 para establecer P5-DEV. La única relajación de secuencia es retirar P5.T3 de este gate.</p>
+        <p>El replan mantiene los gates de desarrollo: <strong>P3 PASS + P4 PASS + P5-DEV + P6 PASS</strong>. P3 y P4 ya están PASS; P5.T1/T2 ya están closure-ready; el único gap formal para establecer P5-DEV es owner verification/status sync. La única relajación de secuencia es retirar P5.T3 de este gate.</p>
       </div>
       <div class="risk med">
         <span class="tag2">P5.T3 — diferido, no eliminado</span>
@@ -653,7 +653,7 @@
     <div class="timeline">
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">6–10 SEP</div><div class="work">T1 done + P2.C0 PASS + T2 completo + T3a/T3b done; nueva T7local</div><div class="outcome">X29 promovido a blocker</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">11–18 SEP</div><div class="work">P2.T3c/T3d/T4 cerrados; ledger de remediación abierto y ejecutado — CONS-T0/T1/T2/T3/T4/T5/T9 <strong>Done</strong> (aggregate P2 PASS); CONS-T6/T7/T8a verificó P3/P4/P5.T0-2 leaf por leaf: P4.T0/P4.T2/P5.T0 Done, resto Blocked por gaps reales; CI sigue roja (RUSTSEC + MinIO + coverage); S-230 T7local sin avance en 12 días</div><div class="outcome">X29 OPEN, plazo venció 18-sep</div></div>
-      <div class="tstep now"><div class="bar"><div class="dot"></div></div><div class="window">19 SEP–2 OCT</div><div class="work"><strong>P3 PASS + P4 PASS</strong>. Siguiente dependencia formal: cerrar P5.T1/T2 para <strong>P5-DEV</strong>; en paralelo sigue T7local→T7c. P5.T3 sigue en certificación tardía.</div><div class="outcome">◆ objetivo inmediato: P5-DEV + T7local/T7c<div class="here-flag">estás acá</div></div></div>
+      <div class="tstep now"><div class="bar"><div class="dot"></div></div><div class="window">19 SEP–2 OCT</div><div class="work"><strong>P3 PASS + P4 PASS</strong>. P5.T1/T2 están closure-ready; falta owner verification para <strong>P5-DEV</strong>. En paralelo sigue T7local→T7c. P5.T3 sigue en certificación tardía.</div><div class="outcome">◆ objetivo inmediato: P5-DEV + T7local/T7c<div class="here-flag">estás acá</div></div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">3–12 OCT</div><div class="work">Activar y cerrar P6 sobre el nuevo gate</div><div class="outcome">DEV-HANDOFF = P3 + P4 + P5-DEV + P6</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">13–21 OCT</div><div class="work">T6p-a → T6p-b → T6p-c → T6p-d; completar T6/T7 si sigue pendiente</div><div class="outcome">backend P2P desplegado</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">22–26 OCT</div><div class="work">T7p: candidato Android físico; reutilizar evidencia para P5.T3 si cubre criterios exactos</div><div class="outcome">RC listo + posible P5-CERT</div></div>

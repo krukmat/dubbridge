@@ -10,7 +10,7 @@ plan: docs/plan/mvp0-p2p-first.md
 
 > **Plan:** `docs/plan/mvp0-p2p-first.md`.
 > **External taskpack:** `p2p-mvp/taskpacks/P0.zip` through `P7.zip`.
-> **Current task:** P0–P4 are closed through P4 PASS. Next formal development gate work is P5.T1/T2 closure to establish P5-DEV; P5.T3 remains deferred release certification. ADR-044 is Accepted. P2.T0
+> **Current task:** P0–P4 are closed through P4 PASS. **P5.T1/T2 and P5-DEV are closure-ready; owner verification is the only remaining development-gate closure step.** P5.T3 remains deferred release certification. ADR-044 is Accepted. P2.T0
 > is PASS and P2.T1a-T1f are Done/owner-approved as the completed P2.T1
 > persistence outcome on 2026-09-06. P2.C0 is PASS; T2 (including T2c-r/T2g)
 > and T4a are Done. T3, T4b-f (retrospective closure, 2026-09-14), T5, T6a-d
@@ -32,7 +32,7 @@ plan: docs/plan/mvp0-p2p-first.md
 | P2 | Encrypted P2P publication after S-120 | **Done 2026-09-18 — all leaves T0-T6e closed; P2: PASS** | P1 PASS; ADR-044 Accepted |
 | P3 | Invite, claim, and content-key envelope | **PASS 2026-09-22** | P2 PASS; accepted ADR-044 / K1 contract |
 | P4 | Mobile package sync and verification | **PASS 2026-09-22** | P3 PASS |
-| P5 | Local HLS gateway + existing VideoPlayer | Pending | P4 PASS |
+| P5 | Local HLS gateway + existing VideoPlayer | **In progress — P5-DEV closure-ready; P5.T3/P5-CERT deferred** | P4 PASS |
 | P6 | Minimal My Content + Invites dashboard | Pending | P3 PASS; P4 PASS; P5-DEV (T0-T2); P5.T3 deferred |
 | P7 | End-to-end P2P certification | Pending | P2-P4 PASS; P5-DEV; P6 PASS; S-230-T7p PASS; P5.T3 resolved by/within P7.T2 |
 
