@@ -384,7 +384,10 @@ mod tests {
         assert_eq!(binding["invitation_id"], context.invitation_id.to_string());
         assert_eq!(binding["viewer_id"], context.viewer_subject_id.to_string());
         assert_eq!(binding["asset_id"], context.asset_id.to_string());
-        assert_eq!(binding["publication_id"], context.publication_id.to_string());
+        assert_eq!(
+            binding["publication_id"],
+            context.publication_id.to_string()
+        );
         assert_eq!(binding["lineage_id"], context.lineage_id.to_string());
         assert_eq!(
             binding["authorization_id"],

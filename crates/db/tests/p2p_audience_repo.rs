@@ -94,7 +94,6 @@ async fn insert_ready_publication(pool: &PgPool, owner: Uuid) -> (AssetId, Uuid,
     (asset_id, publication_id, lineage_id)
 }
 
-
 #[derive(Clone, Copy)]
 struct ReleaseFixture {
     viewer: Uuid,
@@ -444,7 +443,6 @@ async fn envelope_release_requires_live_claim_device_and_ready_publication_evide
         Err(DbError::NotFound)
     ));
 }
-
 
 #[tokio::test]
 async fn envelope_release_denies_wrong_viewer_and_dead_authorization() {
