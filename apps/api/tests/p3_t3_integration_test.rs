@@ -20,8 +20,6 @@ use uuid::Uuid;
 const OWNER_TOKEN: &str = "p3-t3-owner-token";
 const VIEWER_TOKEN: &str = "p3-t3-viewer-token";
 const OUTSIDER_TOKEN: &str = "p3-t3-outsider-token";
-const KEK_ID: &str = "kek-test";
-const KEK_VERSION: i32 = 1;
 const DEVICE_KEY_ID: &str = "dubbridge-p2p-k1-v1";
 const DEVICE_SPKI_BASE64: &str = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEaxfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpZP40Li/hp/m47n60p8D54WK84zV2sxXs7LtkBoN79R9Q==";
 
@@ -55,11 +53,18 @@ impl TokenVerifier for StubTokenVerifier {
     }
 }
 
+struct TestKek {
+    id: String,
+    version: i32,
+    key: [u8; 32],
+}
+
 struct TestContext {
     pool: PgPool,
     app: axum::Router,
     owner: Uuid,
     viewer: Uuid,
+    kek: TestKek,
     _storage: TempDir,
 }
 
@@ -75,6 +80,7 @@ struct ClaimedFixture {
 impl TestContext {
     async fn new() -> Option<Self> {
         let database_url = env::var("DUBBRIDGE_DATABASE_URL").ok()?;
+        let kek = test_kek_from_env()?;
         let pool = PgPool::connect(&database_url)
             .await
             .expect("connect test database");
@@ -107,13 +113,14 @@ impl TestContext {
             app: build_app(state, verifier),
             owner,
             viewer,
+            kek,
             _storage: storage,
         })
     }
 
     async fn claimed_fixture(&self) -> ClaimedFixture {
         let (asset_id, publication_id, lineage_id) =
-            insert_ready_publication(&self.pool, self.owner).await;
+            insert_ready_publication(&self.pool, self.owner, &self.kek).await;
 
         let device_response = send_json(
             &self.app,
@@ -218,10 +225,8 @@ impl TestContext {
 
 #[tokio::test]
 async fn p3_t3a_owner_invite_claim_o3_and_envelope_binding_are_integrated() {
-    configure_kek_env();
-
     let Some(ctx) = TestContext::new().await else {
-        eprintln!("skipping P3.T3 integration test: DUBBRIDGE_DATABASE_URL not set");
+        eprintln!("skipping P3.T3 integration test: DB or deterministic test KEK not set");
         return;
     };
     let fixture = ctx.claimed_fixture().await;
@@ -287,11 +292,8 @@ async fn p3_t3a_owner_invite_claim_o3_and_envelope_binding_are_integrated() {
 
 #[tokio::test]
 async fn p3_t3b_envelope_release_fails_closed_across_live_o3_device_and_package_boundaries() {
-    let _env_guard = KEK_ENV_LOCK.lock().expect("KEK env lock");
-    configure_kek_env();
-
     let Some(ctx) = TestContext::new().await else {
-        eprintln!("skipping P3.T3 integration test: DUBBRIDGE_DATABASE_URL not set");
+        eprintln!("skipping P3.T3 integration test: DB or deterministic test KEK not set");
         return;
     };
 
@@ -383,13 +385,16 @@ async fn assert_denied(app: &axum::Router, authorization_id: Uuid, token: &str) 
     assert!(bytes.is_empty(), "denial must not return envelope material");
 }
 
-async fn insert_ready_publication(pool: &PgPool, owner: Uuid) -> (Uuid, Uuid, Uuid) {
+async fn insert_ready_publication(
+    pool: &PgPool,
+    owner: Uuid,
+    kek: &TestKek,
+) -> (Uuid, Uuid, Uuid) {
     let asset_id = Uuid::new_v4();
     let publication_id = Uuid::new_v4();
     let lineage_id = Uuid::new_v4();
     let now = OffsetDateTime::now_utc();
-    let kek = [3_u8; 32];
-    let wrapped = wrap_ck(&[7_u8; 32], &kek, KEK_ID, KEK_VERSION as u32).expect("wrap CK");
+    let wrapped = wrap_ck(&[7_u8; 32], &kek.key, &kek.id, kek.version as u32).expect("wrap CK");
 
     sqlx::query(
         "INSERT INTO assets (id, title, uploader_id, status) VALUES ($1, $2, $3, 'finalized')",
@@ -423,7 +428,7 @@ async fn insert_ready_publication(pool: &PgPool, owner: Uuid) -> (Uuid, Uuid, Uu
     .bind(format!("hyperdrive:{publication_id}"))
     .bind(now)
     .bind(&wrapped.kek_id)
-    .bind(KEK_VERSION)
+    .bind(kek.version)
     .bind(wrapped.nonce.to_vec())
     .bind(wrapped.ciphertext)
     .bind("a".repeat(64))
@@ -503,10 +508,19 @@ fn parse_uuid(value: &Value) -> Uuid {
     Uuid::parse_str(value.as_str().expect("uuid string")).expect("valid uuid")
 }
 
-fn configure_kek_env() {
-    unsafe {
-        env::set_var("DUBBRIDGE_P2P_KEK_ID", KEK_ID);
-        env::set_var("DUBBRIDGE_P2P_KEK_VERSION", KEK_VERSION.to_string());
-        env::set_var("DUBBRIDGE_P2P_KEK_HEX", "03".repeat(32));
+fn test_kek_from_env() -> Option<TestKek> {
+    let id = env::var("DUBBRIDGE_P2P_KEK_ID").ok()?;
+    let version = env::var("DUBBRIDGE_P2P_KEK_VERSION")
+        .ok()?
+        .parse::<i32>()
+        .ok()?;
+    let hex = env::var("DUBBRIDGE_P2P_KEK_HEX").ok()?;
+    if id.trim().is_empty() || version <= 0 || hex.len() != 64 {
+        return None;
     }
+    let mut key = [0_u8; 32];
+    for (index, byte) in key.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&hex[index * 2..index * 2 + 2], 16).ok()?;
+    }
+    Some(TestKek { id, version, key })
 }

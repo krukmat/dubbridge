@@ -80,6 +80,9 @@ jobs:
     env:
       DUBBRIDGE_DATABASE_URL: postgresql://dubbridge:dubbridge@localhost:5432/dubbridge_test
       DUBBRIDGE_REDIS_URL: redis://127.0.0.1:6379/15
+      DUBBRIDGE_P2P_KEK_ID: p3-t3-ci-kek
+      DUBBRIDGE_P2P_KEK_VERSION: "1"
+      DUBBRIDGE_P2P_KEK_HEX: "0303030303030303030303030303030303030303030303030303030303030303"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -234,6 +237,9 @@ jobs:
           --health-retries 5
     env:
       DUBBRIDGE_DATABASE_URL: postgresql://dubbridge:dubbridge@localhost:5432/dubbridge_test
+      DUBBRIDGE_P2P_KEK_ID: p3-t3-ci-kek
+      DUBBRIDGE_P2P_KEK_VERSION: "1"
+      DUBBRIDGE_P2P_KEK_HEX: "0303030303030303030303030303030303030303030303030303030303030303"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
