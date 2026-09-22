@@ -107,7 +107,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       minio:
-        image: minio/minio:edge-cicd@sha256:29e8e51691d11e779468f275002779b221fd3902518d103e35c8a8bb2ef0f3ea
+        image: quay.io/minio/minio:RELEASE.2025-09-06T17-38-46Z
         env:
           MINIO_ROOT_USER: dubbridge
           MINIO_ROOT_PASSWORD: dubbridge-minio-ci
