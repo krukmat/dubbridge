@@ -236,6 +236,71 @@ async fn invitation_claim_is_owner_scoped_idempotent_and_exposes_only_active_aut
     ));
 }
 
+
+#[tokio::test]
+async fn concurrent_different_viewer_claims_have_exactly_one_winner() {
+    let pool = test_pool().await;
+    let owner = Uuid::new_v4();
+    let viewer_a = Uuid::new_v4();
+    let viewer_b = Uuid::new_v4();
+    let (asset_id, _, _) = insert_ready_publication(&pool, owner).await;
+    let now = OffsetDateTime::now_utc();
+    let hash = token_hash(Uuid::new_v4());
+
+    let invitation = create_invitation(&pool, owner, asset_id, &hash, now + Duration::hours(1))
+        .await
+        .expect("create invitation");
+    let device_a = register_or_get_active_device(&pool, viewer_a, "viewer-a-key", &[1_u8, 2, 3])
+        .await
+        .expect("register viewer A device");
+    let device_b = register_or_get_active_device(&pool, viewer_b, "viewer-b-key", &[4_u8, 5, 6])
+        .await
+        .expect("register viewer B device");
+
+    let pool_a = pool.clone();
+    let pool_b = pool.clone();
+    let claim_a = async {
+        claim_invitation(&pool_a, &hash, viewer_a, device_a.id, now).await
+    };
+    let claim_b = async {
+        claim_invitation(&pool_b, &hash, viewer_b, device_b.id, now).await
+    };
+    let (result_a, result_b) = tokio::join!(claim_a, claim_b);
+
+    let winners = [&result_a, &result_b]
+        .into_iter()
+        .filter(|result| result.is_ok())
+        .count();
+    let conflicts = [&result_a, &result_b]
+        .into_iter()
+        .filter(|result| matches!(result, Err(DbError::Conflict)))
+        .count();
+
+    assert_eq!(winners, 1, "exactly one concurrent claim must win");
+    assert_eq!(conflicts, 1, "the losing concurrent claim must fail closed");
+
+    let authorization_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM p2p_audience_authorizations WHERE invitation_id = $1",
+    )
+    .bind(invitation.id)
+    .fetch_one(&pool)
+    .await
+    .expect("count invitation authorizations");
+    assert_eq!(authorization_count, 1);
+
+    let winner = result_a.as_ref().ok().or_else(|| result_b.as_ref().ok()).expect("winner");
+    let repeated = claim_invitation(
+        &pool,
+        &hash,
+        winner.authorization.viewer_subject_id,
+        winner.authorization.device_id,
+        now + Duration::seconds(1),
+    )
+    .await
+    .expect("winning viewer/device claim remains idempotent");
+    assert_eq!(repeated.authorization.id, winner.authorization.id);
+}
+
 #[tokio::test]
 async fn claim_fails_closed_when_ready_publication_drifts_after_invitation_creation() {
     let pool = test_pool().await;

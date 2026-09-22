@@ -22,7 +22,8 @@ use dubbridge_db::{
 use dubbridge_domain::{asset::AssetId, p2p_ready_descriptor::P2pReadyDescriptor};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use time::OffsetDateTime;
+use dubbridge_domain::{asset::AssetId, p2p_publication::{K1LineageId, P2pPublicationId}, p2p_ready_descriptor::P2pReadyDescriptor};
+    use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::state::AppState;
@@ -195,6 +196,9 @@ async fn claim(
             Ok(None) => return StatusCode::CONFLICT.into_response(),
             Err(error) => return db_error_response(error),
         };
+    if !descriptor_matches_claim(&descriptor, &result.invitation, &result.authorization) {
+        return StatusCode::CONFLICT.into_response();
+    }
 
     (
         StatusCode::OK,
@@ -240,6 +244,21 @@ async fn get_authorization(
         Ok(authorization) => Json(authorization_response(&authorization)).into_response(),
         Err(error) => db_error_response(error),
     }
+}
+
+
+fn descriptor_matches_claim(
+    descriptor: &P2pReadyDescriptor,
+    invitation: &P2pInvitationRecord,
+    authorization: &P2pAudienceAuthorizationRecord,
+) -> bool {
+    descriptor.asset_id.0 == invitation.asset_id
+        && descriptor.publication_id.0 == invitation.publication_id
+        && descriptor.lineage_id.0 == invitation.lineage_id
+        && authorization.asset_id == invitation.asset_id
+        && authorization.publication_id == invitation.publication_id
+        && authorization.lineage_id == invitation.lineage_id
+        && authorization.invitation_id == invitation.id
 }
 
 fn new_invitation_token() -> String {
@@ -309,8 +328,8 @@ fn db_error_response(error: DbError) -> Response {
 
 #[cfg(test)]
 mod tests {
-    use super::{hash_token, invitation_status, new_invitation_token};
-    use dubbridge_db::p2p_audience_repo::P2pInvitationRecord;
+    use super::{descriptor_matches_claim, hash_token, invitation_status, new_invitation_token};
+    use dubbridge_db::p2p_audience_repo::{P2pAudienceAuthorizationRecord, P2pInvitationRecord};
     use time::OffsetDateTime;
     use uuid::Uuid;
 
@@ -322,6 +341,77 @@ mod tests {
         assert!(left.bytes().all(|byte| byte.is_ascii_hexdigit()));
         assert_ne!(left, right);
         assert_eq!(hash_token(&left).len(), 32);
+    }
+
+
+    #[test]
+    fn claim_descriptor_must_match_exact_invitation_and_authorization_lineage() {
+        let asset_id = Uuid::new_v4();
+        let publication_id = Uuid::new_v4();
+        let lineage_id = Uuid::new_v4();
+        let invitation_id = Uuid::new_v4();
+        let viewer_id = Uuid::new_v4();
+        let device_id = Uuid::new_v4();
+        let now = OffsetDateTime::now_utc();
+
+        let invitation = P2pInvitationRecord {
+            id: invitation_id,
+            asset_id,
+            publication_id,
+            lineage_id,
+            owner_subject_id: Uuid::new_v4(),
+            expires_at: now,
+            claimed_by_subject_id: Some(viewer_id),
+            claimed_device_id: Some(device_id),
+            claimed_at: Some(now),
+            revoked_at: None,
+            created_at: now,
+            updated_at: now,
+        };
+        let authorization = P2pAudienceAuthorizationRecord {
+            id: Uuid::new_v4(),
+            invitation_id,
+            asset_id,
+            publication_id,
+            lineage_id,
+            viewer_subject_id: viewer_id,
+            device_id,
+            expires_at: now,
+            revoked_at: None,
+            created_at: now,
+            updated_at: now,
+        };
+        let descriptor = P2pReadyDescriptor {
+            descriptor_version: "p2p-ready-descriptor-v1".to_owned(),
+            asset_id: AssetId(asset_id),
+            publication_id: P2pPublicationId(publication_id),
+            lineage_id: K1LineageId(lineage_id),
+            manifest_version: "p2p-manifest-v1".to_owned(),
+            manifest_digest_sha256: "a".repeat(64),
+            external_publication_id: "hyperdrive:test".to_owned(),
+            ck_wrap_ref: "p2p-k1-wrap/test".to_owned(),
+            kek_id: "kek-test".to_owned(),
+            kek_version: 1,
+            ready_at: "2026-09-22T00:00:00Z".to_owned(),
+        };
+
+        assert!(descriptor_matches_claim(&descriptor, &invitation, &authorization));
+
+        let mut wrong_lineage = descriptor.clone();
+        wrong_lineage.lineage_id = K1LineageId(Uuid::new_v4());
+        assert!(!descriptor_matches_claim(
+            &wrong_lineage,
+            &invitation,
+            &authorization
+        ));
+
+        let mut wrong_publication = descriptor.clone();
+        wrong_publication.publication_id = P2pPublicationId(Uuid::new_v4());
+        assert!(!descriptor_matches_claim(
+            &wrong_publication,
+            &invitation,
+            &authorization
+        ));
     }
 
     #[test]
