@@ -43,3 +43,29 @@ export function myContentErrorMessage(error: {
   if (error.kind === "forbidden") return "You do not have access to P2P content.";
   return error.status ? `Request failed with status ${error.status}.` : "Could not load P2P content.";
 }
+
+
+export function p2pInviteErrorMessage(error: {
+  kind: string;
+  message?: string;
+  status?: number;
+}): string {
+  if (error.kind === "network") return "Network request failed. Try creating the invite again.";
+  if (error.kind === "forbidden") return "Invite creation is not allowed for this content.";
+  if (error.kind === "http" && (error.status === 404 || error.status === 409)) {
+    return "This content is no longer eligible for an invite.";
+  }
+  return error.status
+    ? `Invite creation failed with status ${error.status}.`
+    : "Could not create the invite.";
+}
+
+export function shouldRefreshAfterInviteError(error: {
+  kind: string;
+  status?: number;
+}): boolean {
+  return (
+    error.kind === "forbidden" ||
+    (error.kind === "http" && (error.status === 404 || error.status === 409))
+  );
+}

@@ -7,20 +7,25 @@ import {
   MY_CONTENT_STATE_LABELS,
   MY_CONTENT_STATE_TONES,
 } from "../p2p/dashboard/MyContentModel";
+import {
+  type MyContentInviteState,
+  useMyContentInvite,
+} from "../p2p/dashboard/useMyContentInvite";
 import { useMyContentState } from "../p2p/dashboard/useMyContentState";
-import { color, space, type } from "../theme";
+import { color, radius, space, type } from "../theme";
 
-type MyContentScreenProps = {
-  gatewayBaseUrl: string;
-  onCreateInvite: (content: P2pOwnerContent) => void;
-};
+type CreatedInviteState = Extract<MyContentInviteState, { kind: "created" }>;
 
 function MyContentCard({
   content,
   onCreateInvite,
+  creating,
+  inviteLocked,
 }: {
   content: P2pOwnerContent;
   onCreateInvite: (content: P2pOwnerContent) => void;
+  creating: boolean;
+  inviteLocked: boolean;
 }) {
   const inviteEligible = canCreateP2pInvite(content);
   return (
@@ -46,6 +51,8 @@ function MyContentCard({
           label="Create invite"
           variant="secondary"
           size="sm"
+          loading={creating}
+          disabled={inviteLocked && !creating}
           onPress={() => onCreateInvite(content)}
         />
       ) : null}
@@ -53,24 +60,80 @@ function MyContentCard({
   );
 }
 
+function InviteTokenCard({
+  state,
+  onCopy,
+  onDismiss,
+}: {
+  state: CreatedInviteState;
+  onCopy: () => Promise<void>;
+  onDismiss: () => void;
+}) {
+  return (
+    <Card testID="my-content-invite-token">
+      <Text style={styles.title}>Invite ready</Text>
+      <Text style={styles.body}>
+        This token is shown only in this screen. Copy it before closing.
+      </Text>
+      <Text testID="my-content-invite-token-value" selectable style={styles.token}>
+        {state.token}
+      </Text>
+      {state.copyError ? (
+        <Text testID="my-content-invite-copy-error" style={styles.error}>
+          {state.copyError}
+        </Text>
+      ) : null}
+      <View style={styles.actions}>
+        <Button
+          testID="my-content-copy-invite"
+          label={state.copied ? "Copied" : "Copy invite"}
+          variant="secondary"
+          size="sm"
+          onPress={() => void onCopy()}
+        />
+        <Button
+          testID="my-content-dismiss-invite"
+          label="Done"
+          variant="secondary"
+          size="sm"
+          onPress={onDismiss}
+        />
+      </View>
+    </Card>
+  );
+}
+
 function ReadyContent({
   content,
   onCreateInvite,
+  inviteState,
 }: {
   content: P2pOwnerContent[];
   onCreateInvite: (content: P2pOwnerContent) => void;
+  inviteState: MyContentInviteState;
 }) {
+  const inviteLocked = inviteState.kind === "creating" || inviteState.kind === "created";
   return (
     <View style={styles.list} testID="my-content-list">
       {content.map((item) => (
-        <MyContentCard key={item.publicationId} content={item} onCreateInvite={onCreateInvite} />
+        <MyContentCard
+          key={item.publicationId}
+          content={item}
+          onCreateInvite={onCreateInvite}
+          creating={inviteState.kind === "creating" && inviteState.assetId === item.assetId}
+          inviteLocked={inviteLocked}
+        />
       ))}
     </View>
   );
 }
 
-export function MyContentScreen({ gatewayBaseUrl, onCreateInvite }: MyContentScreenProps) {
-  const { viewState, retry } = useMyContentState(gatewayBaseUrl);
+export function MyContentScreen({ gatewayBaseUrl }: { gatewayBaseUrl: string }) {
+  const { viewState, retry, refresh } = useMyContentState(gatewayBaseUrl);
+  const { inviteState, createInvite, copyInvite, dismissInvite } = useMyContentInvite(
+    gatewayBaseUrl,
+    refresh,
+  );
 
   return (
     <Screen testID="my-content-screen" scroll>
@@ -79,6 +142,17 @@ export function MyContentScreen({ gatewayBaseUrl, onCreateInvite }: MyContentScr
         title="My content"
         copy="Track publication readiness and create invitations for verified packages."
       />
+      {inviteState.kind === "created" ? (
+        <InviteTokenCard state={inviteState} onCopy={copyInvite} onDismiss={dismissInvite} />
+      ) : null}
+      {inviteState.kind === "error" ? (
+        <StateView
+          testID="my-content-invite-error"
+          kind="error"
+          title="Invite not created"
+          message={inviteState.message}
+        />
+      ) : null}
       {viewState.kind === "loading" ? (
         <StateView
           testID="my-content-loading"
@@ -105,7 +179,11 @@ export function MyContentScreen({ gatewayBaseUrl, onCreateInvite }: MyContentScr
         />
       ) : null}
       {viewState.kind === "ready" ? (
-        <ReadyContent content={viewState.content} onCreateInvite={onCreateInvite} />
+        <ReadyContent
+          content={viewState.content}
+          onCreateInvite={(content) => void createInvite(content)}
+          inviteState={inviteState}
+        />
       ) : null}
     </Screen>
   );
@@ -120,5 +198,15 @@ const styles = StyleSheet.create({
   },
   cardText: { flex: 1, gap: space.xs },
   title: { ...type.heading, color: color.ink900 },
+  body: { ...type.body, color: color.ink500 },
   meta: { ...type.meta, color: color.ink500 },
+  token: {
+    ...type.bodyStrong,
+    color: color.ink900,
+    backgroundColor: color.sunken,
+    borderRadius: radius.sm,
+    padding: space.md,
+  },
+  error: { ...type.meta, color: color.danger },
+  actions: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
 });

@@ -44,5 +44,5 @@ export function useMyContentState(gatewayBaseUrl: string) {
     void load();
   }, [load]);
 
-  return { viewState, retry };
+  return { viewState, retry, refresh: load };
 }

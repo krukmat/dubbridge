@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react-native";
+import * as Clipboard from "expo-clipboard";
 
 import { createGatewayClient } from "../src/api/client";
 import type { P2pReadyDescriptor } from "../src/api/p2p";
@@ -20,7 +21,14 @@ jest.mock("../src/api/client", () => ({
   createGatewayClient: jest.fn(),
 }));
 
+jest.mock("expo-clipboard", () => ({
+  setStringAsync: jest.fn().mockResolvedValue(true),
+}));
+
 const mockCreateGatewayClient = createGatewayClient as jest.MockedFunction<typeof createGatewayClient>;
+const mockSetStringAsync = Clipboard.setStringAsync as jest.MockedFunction<
+  typeof Clipboard.setStringAsync
+>;
 
 let mockAuthValue: AuthContextValue;
 let mockClient: { get: jest.Mock; post: jest.Mock; postMultipart: jest.Mock };
@@ -78,6 +86,39 @@ function ownerApiItem({
   };
 }
 
+function readyOwnerItem() {
+  return ownerApiItem({
+    assetId: "asset-ready",
+    title: "Ready package",
+    publicationId: "pub-ready",
+    lineageId: "lineage-ready",
+    state: "ready",
+    descriptor: READY_DESCRIPTOR,
+  });
+}
+
+function createdInvitation(token = "invite-secret") {
+  return {
+    ok: true,
+    value: {
+      data: {
+        invitation: {
+          id: "invite-1",
+          asset_id: "asset-ready",
+          publication_id: "pub-ready",
+          lineage_id: "lineage-ready",
+          owner_subject_id: "owner-1",
+          status: "pending",
+          expires_at_unix: 2_000_000_000,
+          claimed_at_unix: null,
+        },
+        token,
+      },
+      sessionRotation: "rotated-session",
+    },
+  };
+}
+
 beforeEach(() => {
   mockClient = {
     get: jest.fn(),
@@ -85,6 +126,7 @@ beforeEach(() => {
     postMultipart: jest.fn(),
   };
   mockCreateGatewayClient.mockReturnValue(mockClient as never);
+  mockSetStringAsync.mockClear();
   mockAuthValue = {
     sessionRef: "session-p6",
     userId: "owner-1",
@@ -98,16 +140,8 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-async function renderScreen(onCreateInvite = jest.fn()) {
-  return {
-    onCreateInvite,
-    ...(await render(
-      <MyContentScreen
-        gatewayBaseUrl="http://localhost:3000"
-        onCreateInvite={onCreateInvite}
-      />,
-    )),
-  };
+async function renderScreen() {
+  return render(<MyContentScreen gatewayBaseUrl="http://localhost:3000" />);
 }
 
 describe("MyContentScreen", () => {
@@ -124,14 +158,7 @@ describe("MyContentScreen", () => {
             state: "processing",
             descriptor: null,
           }),
-          ownerApiItem({
-            assetId: "asset-ready",
-            title: "Ready package",
-            publicationId: "pub-ready",
-            lineageId: "lineage-ready",
-            state: "ready",
-            descriptor: READY_DESCRIPTOR,
-          }),
+          readyOwnerItem(),
           ownerApiItem({
             assetId: "asset-failed",
             title: "Failed package",
@@ -145,7 +172,7 @@ describe("MyContentScreen", () => {
       },
     });
 
-    const { getByText, getByTestId, queryByTestId, onCreateInvite } = await renderScreen();
+    const { getByText, getByTestId, queryByTestId } = await renderScreen();
 
     await waitFor(() => expect(getByText("Ready package")).toBeTruthy());
 
@@ -154,17 +181,120 @@ describe("MyContentScreen", () => {
     expect(getByText("Failed")).toBeTruthy();
     expect(queryByTestId("my-content-create-invite-asset-processing")).toBeNull();
     expect(queryByTestId("my-content-create-invite-asset-failed")).toBeNull();
+    expect(getByTestId("my-content-create-invite-asset-ready")).toBeTruthy();
+  });
 
-    fireEvent.press(getByTestId("my-content-create-invite-asset-ready"));
-    expect(onCreateInvite).toHaveBeenCalledTimes(1);
-    expect(onCreateInvite).toHaveBeenCalledWith(
-      expect.objectContaining({
-        assetId: "asset-ready",
-        publicationId: "pub-ready",
-        lineageId: "lineage-ready",
-        state: "ready",
-      }),
+  it("creates through P3, exposes the raw token transiently, and copies it", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: { data: [readyOwnerItem()], sessionRotation: null },
+    });
+    mockClient.post.mockResolvedValue(createdInvitation());
+
+    const { getByTestId, getByText, queryByText } = await renderScreen();
+    await waitFor(() => expect(getByText("Ready package")).toBeTruthy());
+
+    await act(async () => {
+      fireEvent.press(getByTestId("my-content-create-invite-asset-ready"));
+    });
+
+    await waitFor(() => expect(getByText("invite-secret")).toBeTruthy());
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/assets/asset-ready/p2p/invitations",
+      "session-p6",
+      {},
     );
+    expect(mockAuthValue.onSessionRotation).toHaveBeenCalledWith("rotated-session");
+
+    await act(async () => {
+      fireEvent.press(getByTestId("my-content-copy-invite"));
+    });
+    expect(mockSetStringAsync).toHaveBeenCalledWith("invite-secret");
+    expect(getByText("Copied")).toBeTruthy();
+
+    fireEvent.press(getByTestId("my-content-dismiss-invite"));
+    expect(queryByText("invite-secret")).toBeNull();
+  });
+
+  it("does not reconstruct a raw invite token after the screen remounts", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: { data: [readyOwnerItem()], sessionRotation: null },
+    });
+    mockClient.post.mockResolvedValue(createdInvitation("one-time-secret"));
+
+    const first = await renderScreen();
+    await waitFor(() => expect(first.getByText("Ready package")).toBeTruthy());
+    await act(async () => {
+      fireEvent.press(first.getByTestId("my-content-create-invite-asset-ready"));
+    });
+    await waitFor(() => expect(first.getByText("one-time-secret")).toBeTruthy());
+    first.unmount();
+
+    const second = await renderScreen();
+    await waitFor(() => expect(second.getByText("Ready package")).toBeTruthy());
+    expect(second.queryByText("one-time-secret")).toBeNull();
+    expect(mockClient.post).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes authoritative content and fails closed when P3 rejects stale Ready state", async () => {
+    mockClient.get
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { data: [readyOwnerItem()], sessionRotation: null },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          data: [
+            ownerApiItem({
+              assetId: "asset-ready",
+              title: "Ready package",
+              publicationId: "pub-ready",
+              lineageId: "lineage-ready",
+              state: "processing",
+              descriptor: null,
+            }),
+          ],
+          sessionRotation: null,
+        },
+      });
+    mockClient.post.mockResolvedValue({
+      ok: false,
+      error: { kind: "http", status: 409 },
+    });
+
+    const { getByTestId, getByText, queryByTestId, queryByText } = await renderScreen();
+    await waitFor(() => expect(getByText("Ready package")).toBeTruthy());
+
+    await act(async () => {
+      fireEvent.press(getByTestId("my-content-create-invite-asset-ready"));
+    });
+
+    await waitFor(() => expect(getByTestId("my-content-invite-error")).toBeTruthy());
+    expect(getByText("This content is no longer eligible for an invite.")).toBeTruthy();
+    expect(mockClient.get).toHaveBeenCalledTimes(2);
+    expect(queryByTestId("my-content-create-invite-asset-ready")).toBeNull();
+    expect(queryByText("invite-secret")).toBeNull();
+  });
+
+  it("logs out when P3 reports the create session expired", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: { data: [readyOwnerItem()], sessionRotation: null },
+    });
+    mockClient.post.mockResolvedValue({
+      ok: false,
+      error: { kind: "session_expired" },
+    });
+
+    const { getByTestId, getByText } = await renderScreen();
+    await waitFor(() => expect(getByText("Ready package")).toBeTruthy());
+    await act(async () => {
+      fireEvent.press(getByTestId("my-content-create-invite-asset-ready"));
+    });
+
+    await waitFor(() => expect(mockAuthValue.logout).toHaveBeenCalledTimes(1));
   });
 
   it("fails closed when Ready carries a mismatched descriptor", async () => {
