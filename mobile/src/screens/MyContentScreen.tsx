@@ -128,18 +128,23 @@ function ReadyContent({
   );
 }
 
-export function MyContentScreen({
-  gatewayBaseUrl,
-  onBack,
-}: {
-  gatewayBaseUrl: string;
-  onBack?: () => void;
-}) {
+type MyContentScreenProps = { gatewayBaseUrl: string; onBack?: () => void };
+
+function BackToHome({ onBack }: { onBack?: () => void }) {
+  return onBack ? (
+    <Button
+      testID="my-content-back"
+      label="Back to home"
+      variant="secondary"
+      onPress={onBack}
+    />
+  ) : null;
+}
+
+export function MyContentScreen({ gatewayBaseUrl, onBack }: MyContentScreenProps) {
   const { viewState, retry, refresh } = useMyContentState(gatewayBaseUrl);
-  const { inviteState, createInvite, copyInvite, dismissInvite } = useMyContentInvite(
-    gatewayBaseUrl,
-    refresh,
-  );
+  const { inviteState, createInvite, copyInvite, dismissInvite } =
+    useMyContentInvite(gatewayBaseUrl, refresh);
 
   return (
     <Screen testID="my-content-screen" scroll>
@@ -191,14 +196,7 @@ export function MyContentScreen({
           inviteState={inviteState}
         />
       ) : null}
-      {onBack ? (
-        <Button
-          testID="my-content-back"
-          label="Back to home"
-          variant="secondary"
-          onPress={onBack}
-        />
-      ) : null}
+      <BackToHome onBack={onBack} />
     </Screen>
   );
 }

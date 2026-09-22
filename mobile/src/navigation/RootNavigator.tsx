@@ -361,9 +361,7 @@ function AuthedNavigator({
         {({ navigation }) => <HomeRoute navigation={navigation} gatewayBaseUrl={gatewayBaseUrl} dubbridgeEnv={dubbridgeEnv} />}
       </AuthedStack.Screen>
       <AuthedStack.Screen name="MyContent">
-        {({ navigation }) => (
-          <MyContentRoute navigation={navigation} gatewayBaseUrl={gatewayBaseUrl} />
-        )}
+        {({ navigation }) => <MyContentRoute navigation={navigation} gatewayBaseUrl={gatewayBaseUrl} />}
       </AuthedStack.Screen>
       <AuthedStack.Screen name="AssetList">
         {({ navigation }) => <AssetListRoute navigation={navigation} gatewayBaseUrl={gatewayBaseUrl} />}
