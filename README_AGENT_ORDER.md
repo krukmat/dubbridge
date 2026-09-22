@@ -64,7 +64,8 @@ inputs.
 
 - `AGENTS.md`, `CLAUDE.md`
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`
-- `docs/playbooks/HUMAN_ORCHESTRATOR_RUNBOOK.md` — relevo humano ordenado y
-  comandos de monitorización, recuperación y cierre cuando el agente principal
-  no puede continuar.
+- `docs/playbooks/HUMAN_ORCHESTRATOR_KT.md` — guía operativa única: aprendizaje,
+  comandos, recuperación, relevo y ejercicios del orquestador humano.
+- `docs/playbooks/HUMAN_ORCHESTRATOR_RUNBOOK.md` — enlace de compatibilidad hacia
+  la guía consolidada.
 - `docs/policies/HITL_AUTONOMY_POLICY.md`

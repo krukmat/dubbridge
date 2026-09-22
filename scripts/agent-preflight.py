@@ -44,12 +44,12 @@ SUMMARY_LINES = [
     "- Include docs/architecture.md, applicable ADRs, docs/plan/roadmap.md, slice plan/task ledger, BDD/product docs, and relevant policies/configs when they constrain the task.",
     "- Ensure plan/task ledger exists for staged work.",
     "- Run scripts/rri.py before presenting or delegating a task.",
-    "- RRI 0-25: no full approval packet; use Gemma only for eligible simple code patches.",
+    "- RRI 0-25: no full approval packet; use the workflow guide's local Qwen Developer route only for eligible simple code patches.",
     "- RRI 26+: present the task and wait for explicit approval before editing.",
     "- Mobile UI/presentation work under mobile/ must read root DESIGN.md first.",
     "",
     "Before closure:",
-    "- For development tasks, evaluate Gemma Reviewer / D14 review before coverage or Done status.",
+    "- For development tasks, pass band-resolved code-solution review per AGENT_WORKFLOW_GUIDE.md before coverage or Done status.",
     "- Sync materially affected status docs before reporting completion.",
 ]
 
@@ -94,7 +94,7 @@ def sentinel_payload(repo_root: Path) -> Dict[str, Any]:
             "run scripts/rri.py before implementation",
             "wait for approval when RRI is 26 or higher",
             "read DESIGN.md for mobile UI/presentation work",
-            "run Gemma Reviewer or D14 before development closure when required",
+            "pass band-resolved code-solution review per AGENT_WORKFLOW_GUIDE.md before development closure when required",
         ],
     }
 
