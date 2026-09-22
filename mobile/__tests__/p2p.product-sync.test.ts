@@ -337,6 +337,58 @@ describe("P2P product sync", () => {
     expect(secondClose).toHaveBeenCalledTimes(1);
   });
 
+  it("sign-out during a reconnect attempt stops further opens and wipes account state", async () => {
+    const cache = new MemoryP2pSyncCache();
+    let rejectBlockedRead: (error: Error) => void = () => undefined;
+    let markSecondReadStarted: () => void = () => undefined;
+    const secondReadStarted = new Promise<void>((resolve) => {
+      markSecondReadStarted = resolve;
+    });
+    const blockedRead = new Promise<Uint8Array>((_resolve, reject) => {
+      rejectBlockedRead = reject;
+    });
+    const firstClose = jest.fn(async () => undefined);
+    const secondClose = jest.fn(async () => undefined);
+    const secondCancel = jest.fn(async () => {
+      rejectBlockedRead(new Error("transport cancelled"));
+    });
+    let attempt = 0;
+    const open = jest.fn(async () => {
+      const currentAttempt = attempt++;
+      if (currentAttempt === 0) {
+        return {
+          readManifest: async () => {
+            throw new Error("peer disconnected");
+          },
+          readCiphertext: async () => first,
+          close: firstClose,
+        };
+      }
+      return {
+        readManifest: async () => manifestBytes,
+        readCiphertext: async () => {
+          markSecondReadStarted();
+          return blockedRead;
+        },
+        cancel: secondCancel,
+        close: secondClose,
+      };
+    });
+    const sync = new P2pProductSync(cache, { open }, sha256, () => undefined, 2);
+    const identity = { accountScope, publicationId: "pub-1", lineageId: "lineage-1" } as const;
+
+    const pending = sync.sync(descriptor, accountScope);
+    await secondReadStarted;
+    await sync.clearAccount(accountScope);
+
+    await expect(pending).rejects.toBeInstanceOf(P2pSyncCancelledError);
+    expect(open).toHaveBeenCalledTimes(2);
+    expect(await cache.readSnapshot(identity)).toBeNull();
+    expect(firstClose).toHaveBeenCalledTimes(1);
+    expect(secondCancel).toHaveBeenCalledTimes(1);
+    expect(secondClose).toHaveBeenCalledTimes(1);
+  });
+
   it("cancels an active source and prevents an in-flight sync from promoting READY", async () => {
     const cache = new MemoryP2pSyncCache();
     const transport = blockedSource();
