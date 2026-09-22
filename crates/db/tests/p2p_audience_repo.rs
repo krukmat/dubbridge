@@ -94,6 +94,63 @@ async fn insert_ready_publication(pool: &PgPool, owner: Uuid) -> (AssetId, Uuid,
     (asset_id, publication_id, lineage_id)
 }
 
+
+#[derive(Clone, Copy)]
+struct ReleaseFixture {
+    viewer: Uuid,
+    authorization_id: Uuid,
+    invitation_id: Uuid,
+    device_id: Uuid,
+    publication_id: Uuid,
+    lineage_id: Uuid,
+    now: OffsetDateTime,
+}
+
+async fn setup_release_fixture(pool: &PgPool) -> ReleaseFixture {
+    let owner = Uuid::new_v4();
+    let viewer = Uuid::new_v4();
+    let (asset_id, publication_id, lineage_id) = insert_ready_publication(pool, owner).await;
+    let now = OffsetDateTime::now_utc();
+    let hash = token_hash(Uuid::new_v4());
+    let invitation = create_invitation(pool, owner, asset_id, &hash, now + Duration::hours(1))
+        .await
+        .expect("create release invitation");
+    let device = register_or_get_active_device(
+        pool,
+        viewer,
+        &format!("viewer-key-{}", Uuid::new_v4()),
+        &[1_u8, 2, 3],
+    )
+    .await
+    .expect("register release device");
+    let claim = claim_invitation(pool, &hash, viewer, device.id, now)
+        .await
+        .expect("claim release invitation");
+
+    ReleaseFixture {
+        viewer,
+        authorization_id: claim.authorization.id,
+        invitation_id: invitation.id,
+        device_id: device.id,
+        publication_id,
+        lineage_id,
+        now,
+    }
+}
+
+async fn assert_release_not_found(pool: &PgPool, fixture: ReleaseFixture) {
+    assert!(matches!(
+        get_envelope_release_context(
+            pool,
+            fixture.authorization_id,
+            fixture.viewer,
+            fixture.now + Duration::seconds(1),
+        )
+        .await,
+        Err(DbError::NotFound)
+    ));
+}
+
 async fn assert_invalid_invitation_creation(
     pool: &PgPool,
     owner: Uuid,
@@ -387,3 +444,139 @@ async fn envelope_release_requires_live_claim_device_and_ready_publication_evide
         Err(DbError::NotFound)
     ));
 }
+
+
+#[tokio::test]
+async fn envelope_release_denies_wrong_viewer_and_dead_authorization() {
+    let pool = test_pool().await;
+
+    let wrong_viewer = setup_release_fixture(&pool).await;
+    assert!(matches!(
+        get_envelope_release_context(
+            &pool,
+            wrong_viewer.authorization_id,
+            Uuid::new_v4(),
+            wrong_viewer.now + Duration::seconds(1),
+        )
+        .await,
+        Err(DbError::NotFound)
+    ));
+
+    let revoked = setup_release_fixture(&pool).await;
+    sqlx::query("UPDATE p2p_audience_authorizations SET revoked_at = $1 WHERE id = $2")
+        .bind(revoked.now)
+        .bind(revoked.authorization_id)
+        .execute(&pool)
+        .await
+        .expect("revoke authorization");
+    assert_release_not_found(&pool, revoked).await;
+
+    let expired = setup_release_fixture(&pool).await;
+    sqlx::query("UPDATE p2p_audience_authorizations SET expires_at = $1 WHERE id = $2")
+        .bind(expired.now - Duration::seconds(1))
+        .bind(expired.authorization_id)
+        .execute(&pool)
+        .await
+        .expect("expire authorization");
+    assert_release_not_found(&pool, expired).await;
+}
+
+#[tokio::test]
+async fn envelope_release_denies_dead_invitation_or_device_binding_drift() {
+    let pool = test_pool().await;
+
+    let revoked_invitation = setup_release_fixture(&pool).await;
+    sqlx::query("UPDATE p2p_invitations SET revoked_at = $1 WHERE id = $2")
+        .bind(revoked_invitation.now)
+        .bind(revoked_invitation.invitation_id)
+        .execute(&pool)
+        .await
+        .expect("revoke invitation");
+    assert_release_not_found(&pool, revoked_invitation).await;
+
+    let expired_invitation = setup_release_fixture(&pool).await;
+    sqlx::query("UPDATE p2p_invitations SET expires_at = $1 WHERE id = $2")
+        .bind(expired_invitation.now - Duration::seconds(1))
+        .bind(expired_invitation.invitation_id)
+        .execute(&pool)
+        .await
+        .expect("expire invitation");
+    assert_release_not_found(&pool, expired_invitation).await;
+
+    let revoked_device = setup_release_fixture(&pool).await;
+    sqlx::query("UPDATE p2p_devices SET revoked_at = $1 WHERE id = $2")
+        .bind(revoked_device.now)
+        .bind(revoked_device.device_id)
+        .execute(&pool)
+        .await
+        .expect("revoke device");
+    assert_release_not_found(&pool, revoked_device).await;
+
+    let mismatched_device = setup_release_fixture(&pool).await;
+    let foreign_viewer = Uuid::new_v4();
+    let foreign_device = register_or_get_active_device(
+        &pool,
+        foreign_viewer,
+        &format!("foreign-key-{}", Uuid::new_v4()),
+        &[4_u8, 5, 6],
+    )
+    .await
+    .expect("register foreign device");
+    sqlx::query("UPDATE p2p_audience_authorizations SET device_id = $1 WHERE id = $2")
+        .bind(foreign_device.id)
+        .bind(mismatched_device.authorization_id)
+        .execute(&pool)
+        .await
+        .expect("drift authorization device");
+    assert_release_not_found(&pool, mismatched_device).await;
+}
+
+#[tokio::test]
+async fn envelope_release_denies_publication_readiness_or_delivery_drift() {
+    let pool = test_pool().await;
+
+    let non_ready = setup_release_fixture(&pool).await;
+    sqlx::query("UPDATE p2p_publications SET state = 'failed' WHERE id = $1")
+        .bind(non_ready.publication_id)
+        .execute(&pool)
+        .await
+        .expect("mark publication failed");
+    assert_release_not_found(&pool, non_ready).await;
+
+    let lineage_drift = setup_release_fixture(&pool).await;
+    sqlx::query("UPDATE p2p_publications SET confirmed_lineage_id = $1 WHERE id = $2")
+        .bind(Uuid::new_v4())
+        .bind(lineage_drift.publication_id)
+        .execute(&pool)
+        .await
+        .expect("drift confirmed lineage");
+    assert_release_not_found(&pool, lineage_drift).await;
+
+    let external_missing = setup_release_fixture(&pool).await;
+    sqlx::query("UPDATE p2p_publications SET external_publication_id = NULL WHERE id = $1")
+        .bind(external_missing.publication_id)
+        .execute(&pool)
+        .await
+        .expect("remove external publication");
+    assert_release_not_found(&pool, external_missing).await;
+
+    let sealed_missing = setup_release_fixture(&pool).await;
+    sqlx::query("UPDATE p2p_publications SET sealed_kek_id = NULL WHERE id = $1")
+        .bind(sealed_missing.publication_id)
+        .execute(&pool)
+        .await
+        .expect("remove sealed K1 evidence");
+    assert_release_not_found(&pool, sealed_missing).await;
+
+    let undelivered = setup_release_fixture(&pool).await;
+    sqlx::query(
+        "UPDATE p2p_publication_outbox SET delivery_state = 'pending', delivered_at = NULL WHERE publication_id = $1 AND lineage_id = $2",
+    )
+    .bind(undelivered.publication_id)
+    .bind(undelivered.lineage_id)
+    .execute(&pool)
+    .await
+    .expect("remove durable delivery evidence");
+    assert_release_not_found(&pool, undelivered).await;
+}
+
