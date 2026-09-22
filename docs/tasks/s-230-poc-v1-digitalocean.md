@@ -5048,6 +5048,21 @@ code to make the smoke pass — a failure is a finding, not a patch target.
 > Digital Ocean backend, but it is no longer on the critical path to any
 > P2P gate.
 
+**Progress note (2026-09-19):** supporting local-infra prerequisites are
+merged and already present in the local checkout on `feature/p2p-mvp-core`
+(`HEAD` == `origin/feature/p2p-mvp-core` at `4df3334`, `git status` clean —
+nothing pending to bring over): Availability Node executable entrypoint
+(`d121394`), local mTLS certificate generator (`4d08a47`, `1d7bf59`
+PKCS8 fix), Availability Node wired into local compose (`15d958b`),
+reproducible mTLS fingerprint bootstrap (`b85c0cc`), and worker-runner
+wired to the ffmpeg-baked local image (`51e88a2`). These are infrastructure
+for `MVP0-P2P P5` (local loopback playback), not this task's own mobile
+build. **This task's acceptance criteria are unaffected and unmet:** no
+mobile build against `infra/local/docker-compose.yml` has been produced,
+no per-stage downstream-state walkthrough evidence exists, and no
+`docs/audit/` artifact records a real smoke-test run. Status stays
+`[ ] Planned`.
+
 **Happy paths considered:**
 
 - **HP-1:** A build configured with `EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL`
