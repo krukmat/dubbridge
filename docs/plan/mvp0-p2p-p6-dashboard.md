@@ -7,7 +7,7 @@ slice: MVP0-P2P
 
 # P6 — Minimal My Content and Invites dashboard
 
-Task ledger: `docs/tasks/mvp0-p2p-p6-dashboard.md`. **Activation gate satisfied 2026-09-22. P6.T0 PASS:** owner verification complete and `c6ce2039` finished 15/15 CI. **P6.T1 Block 1 (T1.A+B+C) PASS** on `b52d366c` with 15/15 CI, mobile 63/63 suites / 452/452 tests and 90.43% workspace line coverage. T1 remains in progress for D-H; T2/T3 remain blocked. P5.T3 is deferred to release certification.
+Task ledger: `docs/tasks/mvp0-p2p-p6-dashboard.md`. **Activation gate satisfied 2026-09-22. P6.T0 PASS:** owner verification complete and `c6ce2039` finished 15/15 CI. **P6.T1 T1.A–E PASS**: Block 1 closed on `b52d366c`; Block 2 Create + one-time Copy closed on implementation head `151721a5` with 15/15 CI, mobile 63/63 suites / 456/456 tests and 90.43% workspace line coverage. T1 remains in progress for F-H; T2/T3 remain blocked. P5.T3 is deferred to release certification.
 
 ## Objective
 
@@ -38,7 +38,7 @@ Freeze state projection and action eligibility from canonical backend and runtim
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
 | P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **PASS 2026-09-22** |
-| P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **In progress — Block 1 A+B+C PASS; D-H pending; RRI 55 Med-high** |
+| P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **In progress — A–E PASS; F–H pending; RRI 55 Med-high** |
 | P6.T2 | Viewer claim, Invites, sync and play actions | development | L | T1 PASS | Planned; not activated |
 | P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | Planned; not activated |
 
@@ -97,5 +97,25 @@ the final model/state-hook/view split is green.
 Head `b52d366c`: 15/15 CI PASS; mobile 63/63 suites, 452/452 tests; workspace
 line coverage 90.43%.
 
-P6.T1 is not closed. Next work begins at T1.D (actual P3 Create Invite), then
-one-time Copy UX and navigation.
+P6.T1 is not closed. Block 2 completed T1.D/E; the remaining sequence is T1.F
+navigation, T1.G remaining component/integration evidence, then T1.H aggregate
+certification and owner verification.
+
+
+### P6.T1 Block 2 result — 2026-09-22
+
+Evidence: `docs/audit/mvp0-p2p-p6-t1-block2-create-copy-invite-2026-09-22.md`.
+
+`MyContentScreen` now routes the Ready owner action through the existing P3
+`POST /api/assets/{id}/p2p/invitations` contract via `P2PAudienceService`.
+Eligibility remains exact-descriptor and server-authoritative; a 403/404/409
+refreshes owner content rather than trusting stale UI state.
+
+The raw invitation token remains only in volatile React state, permits one
+outstanding visible token at a time, copies through `expo-clipboard`, clears on
+Done/unmount, and is never added to persistence or logs.
+
+Implementation head `151721a5`: 15/15 CI PASS; mobile 63/63 suites,
+456/456 tests; workspace line coverage 90.43%.
+
+P6.T1 remains IN PROGRESS. T1.F, T1.G and T1.H are still pending.

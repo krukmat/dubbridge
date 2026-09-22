@@ -9,7 +9,7 @@ behavioral_coverage_contract: behavior-v2
 
 # P6 — planning task ledger
 
-**Status:** **In progress. P6.T0 PASS 2026-09-22.** Contract freeze, owner verification and exact-head `c6ce2039` 15/15 CI PASS are complete. **P6.T1 is unblocked and activated for Block 1 (T1.A+B+C); T2/T3 remain blocked.**
+**Status:** **In progress. P6.T0 PASS 2026-09-22.** Contract freeze, owner verification and exact-head `c6ce2039` 15/15 CI PASS are complete. **P6.T1 Blocks 1+2 (T1.A–E) are PASS; T1.F–H remain pending and T2/T3 remain blocked.**
 **Phase gate:** **SATISFIED 2026-09-22 — P3 PASS + P4 PASS + P5-DEV.** P5.T3/P5-CERT is not an activation prerequisite.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
@@ -18,7 +18,7 @@ behavioral_coverage_contract: behavior-v2
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
 | P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **PASS 2026-09-22 — owner-verified; c6ce2039 15/15 CI** |
-| P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **In progress — Block 1 T1.A+B+C PASS; T1.D-H pending** |
+| P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **In progress — T1.A–E PASS; T1.F–H pending** |
 | P6.T2 | Viewer claim, Invites, sync and play actions | development | L | T1 PASS | Planned; not activated |
 | P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | Planned; not activated |
 
@@ -75,7 +75,7 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T0 PASS
 
-**Status:** **In progress — Block 1 T1.A+B+C PASS 2026-09-22.** Exact head `b52d366c` completed 15/15 CI; mobile 63/63 suites and 452/452 tests; coverage 90.43%. Runtime scope now uses `MyContentScreen.tsx` + `p2p/dashboard/MyContentModel.ts` + `p2p/dashboard/useMyContentState.ts` + `MyContentScreen.test.tsx` after the maintainability split. T1.D-H remain pending. Activation RRI: **55 / Med-high**; no auth decision is delegated to UI.
+**Status:** **In progress — T1.A–E PASS 2026-09-22.** Block 1 closed on `b52d366c`; Block 2 (T1.D+E) closed on implementation head `151721a5` with 15/15 CI, mobile 63/63 suites / 456/456 tests and workspace line coverage 90.43%. `Create invite` now calls the existing P3 API, preserves server authority, refreshes stale eligibility after 403/404/409, and exposes the raw token only as transient screen state with explicit Copy/Done handling. T1.F–H remain pending. Activation RRI: **55 / Med-high**; no auth decision is delegated to UI.
 
 **Acceptance criteria:** Render owned content and correct P2P publication state; create/copy the one-time invite through P3; use existing design primitives.
 
@@ -162,11 +162,14 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 | T1.A | Formal T0 closure / T1 activation | **PASS** |
 | T1.B | My Content authoritative states + loading/empty/error | **PASS** |
 | T1.C | Exact Ready descriptor Invite eligibility | **PASS** |
-| T1.D | P3 Create Invite integration | Pending |
-| T1.E | One-time token + Copy Invite | Pending |
+| T1.D | P3 Create Invite integration | **PASS** |
+| T1.E | One-time token + Copy Invite | **PASS** |
 | T1.F | Navigation | Pending |
 | T1.G | Remaining component/integration tests | Pending |
 | T1.H | Aggregate T1 certification/owner verification | Pending |
 
 Block 1 evidence:
 `docs/audit/mvp0-p2p-p6-t1-block1-my-content-2026-09-22.md`.
+
+Block 2 evidence:
+`docs/audit/mvp0-p2p-p6-t1-block2-create-copy-invite-2026-09-22.md`.
