@@ -189,7 +189,7 @@ describe("BareRuntimeClient", () => {
     await client.shutdown();
 
     expect(worklet.start).toHaveBeenCalledWith(
-      "/dubbridge-p2p-runtime.worklet",
+      "/dubbridge-p2p-runtime.bundle",
       expect.anything(),
       ["file:/tmp/p2p-product"],
     );

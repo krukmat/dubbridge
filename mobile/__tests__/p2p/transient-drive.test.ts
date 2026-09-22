@@ -36,7 +36,7 @@ describe("P1.A1 transient drive lifecycle", () => {
     expect(worklet).toEqual({ start });
     expect(proofStorageUri("proofrun1")).toBe("file:///cache/dubbridge-p2p/proofs/proofrun1/");
     expect(start).toHaveBeenCalledWith(
-      "/dubbridge-p2p-proof.worklet",
+      "/dubbridge-p2p-proof.bundle",
       expect.any(String),
       ["file:///cache/dubbridge-p2p/proofs/proofrun1/"],
     );
