@@ -4,7 +4,7 @@ title: "MVP0-P2P P3.T2c3 Android Keystore / HPKE local certification"
 task: P3.T2
 leaf: T2c3
 date: 2026-09-22
-status: pass
+status: pass-owner-verified
 ---
 
 # P3.T2c3 — Android Keystore opaque-key HPKE certification
@@ -59,8 +59,7 @@ expires_at_unix > now → unwrap allowed.
 - **HP-P3.T2-1 native half:** PASS — opaque Android K1 completes the package-bound HPKE unwrap.
 - **EC-P3.T2-1 native half:** PASS — expired or identity-drifted binding is rejected before unwrap; no software private-key fallback participates.
 
-This closes the execution evidence for T2c3 only. Aggregate P3.T2 status still
-requires repository owner verification/status synchronization.
+This closes the execution evidence for T2c3. Aggregate P3.T2 subsequently received explicit owner verification and final 15/15 CI PASS on `56e9412abf73bffefedff80300a9b9ddad15072e`.
 
 ## Harness correction and verification
 
@@ -107,5 +106,7 @@ correction: **25 / Low**; no product/security invariant changed.
 ## Aggregate boundary
 
 T2c1 PASS; T2c2 PASS; T2c3 PASS.
-P3.T2 = closure-ready; owner verification pending.
-P3.T2 is not PASS. P3.T3 is not activated.
+Final documentation/evidence head `56e9412abf73bffefedff80300a9b9ddad15072e`: **15/15 CI PASS**.
+Owner verification: **PASS 2026-09-22**.
+
+**P3.T2 PASS.** P3.T3 is unblocked but not activated.
