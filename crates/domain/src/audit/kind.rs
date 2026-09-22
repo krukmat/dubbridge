@@ -52,6 +52,13 @@ pub enum AuditEventKind {
     P2pPublicationReconciliationEntered,
     P2pPublicationReady,
     P2pPublicationFailed,
+    // MVP0-P2P P3: audience/device authorization lifecycle.
+    P2pDeviceRegistered,
+    P2pInvitationCreated,
+    P2pInvitationClaimed,
+    P2pAudienceAuthorizationIssued,
+    P2pDeviceEnvelopeReleased,
+    P2pAudienceAccessDenied,
 }
 
 impl std::fmt::Display for AuditEventKind {
@@ -96,6 +103,12 @@ impl std::fmt::Display for AuditEventKind {
             Self::P2pPublicationReconciliationEntered => "p2p_publication_reconciliation_entered",
             Self::P2pPublicationReady => "p2p_publication_ready",
             Self::P2pPublicationFailed => "p2p_publication_failed",
+            Self::P2pDeviceRegistered => "p2p_device_registered",
+            Self::P2pInvitationCreated => "p2p_invitation_created",
+            Self::P2pInvitationClaimed => "p2p_invitation_claimed",
+            Self::P2pAudienceAuthorizationIssued => "p2p_audience_authorization_issued",
+            Self::P2pDeviceEnvelopeReleased => "p2p_device_envelope_released",
+            Self::P2pAudienceAccessDenied => "p2p_audience_access_denied",
         };
         write!(f, "{s}")
     }

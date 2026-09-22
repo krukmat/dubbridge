@@ -29,6 +29,7 @@ fn has_valid_correlation_contract(event: &AuditEvent) -> bool {
         || event.has_valid_playback_correlation()
         || event.has_valid_auth_correlation()
         || event.has_valid_p2p_correlation()
+        || event.has_valid_p3_correlation()
 }
 
 /// Emits one governance audit event durably.
@@ -113,6 +114,14 @@ mod tests {
                 AuditEventKind::P2pPublicationReady,
                 publication_id,
                 lineage_id,
+                None,
+            ),
+            AuditEvent::new_p3_event(
+                Some(asset_id),
+                AuditEventKind::P2pInvitationClaimed,
+                AssetId::new().0,
+                Some(publication_id),
+                Some(lineage_id),
                 None,
             ),
         ];

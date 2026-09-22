@@ -70,6 +70,14 @@ fn parse_event_kind(value: &str) -> Result<AuditEventKind, DbError> {
         }
         "p2p_publication_ready" => Ok(AuditEventKind::P2pPublicationReady),
         "p2p_publication_failed" => Ok(AuditEventKind::P2pPublicationFailed),
+        "p2p_device_registered" => Ok(AuditEventKind::P2pDeviceRegistered),
+        "p2p_invitation_created" => Ok(AuditEventKind::P2pInvitationCreated),
+        "p2p_invitation_claimed" => Ok(AuditEventKind::P2pInvitationClaimed),
+        "p2p_audience_authorization_issued" => {
+            Ok(AuditEventKind::P2pAudienceAuthorizationIssued)
+        }
+        "p2p_device_envelope_released" => Ok(AuditEventKind::P2pDeviceEnvelopeReleased),
+        "p2p_audience_access_denied" => Ok(AuditEventKind::P2pAudienceAccessDenied),
         other => Err(DbError::UnknownStoredValue {
             field: "audit_events.event_kind",
             value: other.to_owned(),
@@ -224,4 +232,26 @@ mod tests {
         assert_eq!(event.lineage_id, Some(lineage_id));
         assert!(event.has_valid_p2p_correlation());
     }
+
+    #[test]
+    fn p3_row_round_trips_audience_correlation() {
+        let asset_id = Uuid::new_v4();
+        let publication_id = Uuid::new_v4();
+        let lineage_id = Uuid::new_v4();
+        let authorization_id = Uuid::new_v4();
+        let mut row = base_row("p2p_audience_authorization_issued");
+        row.asset_id = Some(asset_id);
+        row.correlation_id = Some(authorization_id);
+        row.publication_id = Some(publication_id);
+        row.lineage_id = Some(lineage_id);
+
+        let event = row_to_event(row).expect("event");
+        assert_eq!(
+            event.event_kind,
+            AuditEventKind::P2pAudienceAuthorizationIssued
+        );
+        assert_eq!(event.correlation_id, Some(authorization_id));
+        assert!(event.has_valid_p3_correlation());
+    }
+
 }

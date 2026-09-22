@@ -9,6 +9,7 @@ use axum::{
     routing::{get, post},
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
+use dubbridge_audit::emit_governance_audit;
 use dubbridge_auth::{AuthenticatedPrincipal, SharedTokenVerifier, authenticate_bearer};
 use dubbridge_db::{
     error::DbError,
@@ -19,8 +20,13 @@ use dubbridge_db::{
     },
     p2p_ready_repo::get_ready_descriptor_by_asset,
 };
-use dubbridge_domain::{asset::AssetId, p2p_ready_descriptor::P2pReadyDescriptor};
+use dubbridge_domain::{
+    asset::AssetId,
+    audit::{AuditEvent, AuditEventKind},
+    p2p_ready_descriptor::P2pReadyDescriptor,
+};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use sha2::{Digest, Sha256};
 use dubbridge_domain::{asset::AssetId, p2p_publication::{K1LineageId, P2pPublicationId}, p2p_ready_descriptor::P2pReadyDescriptor};
     use time::OffsetDateTime;
@@ -127,7 +133,27 @@ async fn register_device(
     match register_or_get_active_device(&state.pool, principal.subject_id, key_id, &public_key)
         .await
     {
-        Ok(device) => (StatusCode::OK, Json(device_response(&device))).into_response(),
+        Ok(device) => {
+            let event = AuditEvent::new_p3_event(
+                None,
+                AuditEventKind::P2pDeviceRegistered,
+                device.id,
+                None,
+                None,
+                Some(
+                    json!({
+                        "device_id": device.id,
+                        "subject_id": principal.subject_id,
+                        "key_id": device.key_id,
+                    })
+                    .to_string(),
+                ),
+            );
+            if emit_p3_audit(&state, &event).await.is_err() {
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+            (StatusCode::OK, Json(device_response(&device))).into_response()
+        }
         Err(error) => db_error_response(error),
     }
 }
@@ -155,15 +181,55 @@ async fn create_asset_invitation(
     )
     .await
     {
-        Ok(invitation) => (
-            StatusCode::CREATED,
-            Json(InvitationCreatedResponse {
-                invitation: invitation_response(&invitation, OffsetDateTime::now_utc()),
-                token: raw_token,
-            }),
-        )
-            .into_response(),
-        Err(error) => db_error_response(error),
+        Ok(invitation) => {
+            let event = p3_package_event(
+                &invitation,
+                AuditEventKind::P2pInvitationCreated,
+                invitation.id,
+                Some(
+                    json!({
+                        "invitation_id": invitation.id,
+                        "owner_subject_id": principal.subject_id,
+                        "expires_at_unix": invitation.expires_at.unix_timestamp(),
+                    })
+                    .to_string(),
+                ),
+            );
+            if emit_p3_audit(&state, &event).await.is_err() {
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+            (
+                StatusCode::CREATED,
+                Json(InvitationCreatedResponse {
+                    invitation: invitation_response(&invitation, OffsetDateTime::now_utc()),
+                    token: raw_token,
+                }),
+            )
+                .into_response()
+        }
+        Err(error) => {
+            if matches!(error, DbError::NotFound | DbError::Conflict) {
+                let denial = AuditEvent::new_p3_event(
+                    Some(AssetId(asset_id)),
+                    AuditEventKind::P2pAudienceAccessDenied,
+                    asset_id,
+                    None,
+                    None,
+                    Some(
+                        json!({
+                            "operation": "create_invitation",
+                            "reason": "not_owner_or_not_ready",
+                            "actor_subject_id": principal.subject_id,
+                        })
+                        .to_string(),
+                    ),
+                );
+                if emit_p3_audit(&state, &denial).await.is_err() {
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+            }
+            db_error_response(error)
+        }
     }
 }
 
@@ -187,7 +253,30 @@ async fn claim(
     .await
     {
         Ok(result) => result,
-        Err(error) => return db_error_response(error),
+        Err(error) => {
+            if matches!(error, DbError::NotFound | DbError::Conflict) {
+                let denial = AuditEvent::new_p3_event(
+                    None,
+                    AuditEventKind::P2pAudienceAccessDenied,
+                    request.device_id,
+                    None,
+                    None,
+                    Some(
+                        json!({
+                            "operation": "claim_invitation",
+                            "reason": "claim_denied",
+                            "actor_subject_id": principal.subject_id,
+                            "device_id": request.device_id,
+                        })
+                        .to_string(),
+                    ),
+                );
+                if emit_p3_audit(&state, &denial).await.is_err() {
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+            }
+            return db_error_response(error);
+        }
     };
 
     let descriptor =
@@ -197,7 +286,57 @@ async fn claim(
             Err(error) => return db_error_response(error),
         };
     if !descriptor_matches_claim(&descriptor, &result.invitation, &result.authorization) {
+        let denial = p3_package_event(
+            &result.invitation,
+            AuditEventKind::P2pAudienceAccessDenied,
+            result.authorization.id,
+            Some(
+                json!({
+                    "operation": "claim_descriptor_handoff",
+                    "reason": "identity_mismatch",
+                    "authorization_id": result.authorization.id,
+                })
+                .to_string(),
+            ),
+        );
+        if emit_p3_audit(&state, &denial).await.is_err() {
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
         return StatusCode::CONFLICT.into_response();
+    }
+
+    let claimed = p3_package_event(
+        &result.invitation,
+        AuditEventKind::P2pInvitationClaimed,
+        result.invitation.id,
+        Some(
+            json!({
+                "invitation_id": result.invitation.id,
+                "viewer_subject_id": result.authorization.viewer_subject_id,
+                "device_id": result.authorization.device_id,
+            })
+            .to_string(),
+        ),
+    );
+    let authorized = p3_package_event(
+        &result.invitation,
+        AuditEventKind::P2pAudienceAuthorizationIssued,
+        result.authorization.id,
+        Some(
+            json!({
+                "authorization_id": result.authorization.id,
+                "invitation_id": result.invitation.id,
+                "viewer_subject_id": result.authorization.viewer_subject_id,
+                "device_id": result.authorization.device_id,
+                "expires_at_unix": result.authorization.expires_at.unix_timestamp(),
+            })
+            .to_string(),
+        ),
+    );
+    if emit_p3_audit(&state, &claimed).await.is_err()
+        || emit_p3_audit(&state, &authorized).await.is_err()
+    {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
 
     (
@@ -246,6 +385,30 @@ async fn get_authorization(
     }
 }
 
+
+
+fn p3_package_event(
+    invitation: &P2pInvitationRecord,
+    event_kind: AuditEventKind,
+    correlation_id: Uuid,
+    detail: Option<String>,
+) -> AuditEvent {
+    AuditEvent::new_p3_event(
+        Some(invitation.asset_id()),
+        event_kind,
+        correlation_id,
+        Some(invitation.publication_id),
+        Some(invitation.lineage_id),
+        detail,
+    )
+}
+
+async fn emit_p3_audit(
+    state: &AppState,
+    event: &AuditEvent,
+) -> Result<(), dubbridge_audit::AuditEmitError> {
+    emit_governance_audit(&state.pool, event).await
+}
 
 fn descriptor_matches_claim(
     descriptor: &P2pReadyDescriptor,

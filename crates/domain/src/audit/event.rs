@@ -172,6 +172,46 @@ impl AuditEvent {
             && self.correlation_id == publication
     }
 
+
+    /// P3 audience/device events use an explicit non-nil correlation identity.
+    /// Invitation/authorization/envelope success events also bind exact asset,
+    /// publication and lineage. Device registration and pre-resolution denials
+    /// may omit package identity, but never invent it.
+    pub fn has_valid_p3_correlation(&self) -> bool {
+        let is_p3_kind = matches!(
+            self.event_kind,
+            AuditEventKind::P2pDeviceRegistered
+                | AuditEventKind::P2pInvitationCreated
+                | AuditEventKind::P2pInvitationClaimed
+                | AuditEventKind::P2pAudienceAuthorizationIssued
+                | AuditEventKind::P2pDeviceEnvelopeReleased
+                | AuditEventKind::P2pAudienceAccessDenied
+        );
+        let correlation = self.correlation_id.filter(|value| !value.is_nil());
+        let publication = self.publication_id.filter(|value| !value.is_nil());
+        let lineage = self.lineage_id.filter(|value| !value.is_nil());
+        let has_exact_package = self.asset_id.is_some() && publication.is_some() && lineage.is_some();
+        let has_no_package = publication.is_none() && lineage.is_none();
+
+        let shape_valid = match self.event_kind {
+            AuditEventKind::P2pInvitationCreated
+            | AuditEventKind::P2pInvitationClaimed
+            | AuditEventKind::P2pAudienceAuthorizationIssued
+            | AuditEventKind::P2pDeviceEnvelopeReleased => has_exact_package,
+            AuditEventKind::P2pDeviceRegistered | AuditEventKind::P2pAudienceAccessDenied => {
+                has_exact_package || has_no_package
+            }
+            _ => false,
+        };
+
+        is_p3_kind
+            && self.ingest_token.is_none()
+            && self.recording_session_id.is_none()
+            && self.platform_ingest_session_id.is_none()
+            && correlation.is_some()
+            && shape_valid
+    }
+
     fn base_event(
         asset_id: Option<AssetId>,
         event_kind: AuditEventKind,
@@ -266,6 +306,23 @@ impl AuditEvent {
     /// Constructor for S-200 auth governance events.
     pub fn new_auth_event(event_kind: AuditEventKind, detail: Option<String>) -> Self {
         Self::base_event(None, event_kind, detail)
+    }
+
+
+    /// Constructor for MVP0-P2P P3 audience/device governance events.
+    pub fn new_p3_event(
+        asset_id: Option<AssetId>,
+        event_kind: AuditEventKind,
+        correlation_id: Uuid,
+        publication_id: Option<Uuid>,
+        lineage_id: Option<Uuid>,
+        detail: Option<String>,
+    ) -> Self {
+        let mut event = Self::base_event(asset_id, event_kind, detail);
+        event.correlation_id = Some(correlation_id);
+        event.publication_id = publication_id;
+        event.lineage_id = lineage_id;
+        event
     }
 
     /// Constructor for MVP0-P2P publication lifecycle audit events.
