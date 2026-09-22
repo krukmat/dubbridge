@@ -7,7 +7,7 @@ slice: MVP0-P2P
 
 # P3 — Invitation, audience authorization, and K1 device envelope
 
-Task ledger: `docs/tasks/mvp0-p2p-p3-invitation-envelope.md`. P2 is PASS and ADR-044 is accepted. P3.T0 PASS. P3.T1 PASS on 2026-09-22. **P3.T2 PASS on 2026-09-22** after local T2c3 certification, 15/15 CI PASS at `56e9412a`, and explicit owner verification. P3.T3 is unblocked but not activated.
+Task ledger: `docs/tasks/mvp0-p2p-p3-invitation-envelope.md`. P2 is PASS and ADR-044 is accepted. P3.T0/T1/T2 PASS. **P3.T3 is active: T3a/T3b integration PASS and T3c secret-boundary PASS on 2026-09-22.** T3c exact head `6c3a565c` completed 15/15 CI with 3/3 integrated T3 cases PASS in test and coverage; T3d remains pending.
 
 ## Objective
 
@@ -38,7 +38,7 @@ Freeze concrete API/schema names, token-expiry policy, O3 authorization lifecycl
 | P3.T0 | Contract and executable-path freeze | planning | M | P2 PASS | **PASS 2026-09-22** |
 | P3.T1 | Invitation persistence, claim, and inbox | development | decomposed | T0 PASS | **PASS 2026-09-22**; owner-verified; 15/15 CI green |
 | P3.T2 | O3 authorization and native K1 envelope delivery | development | decomposed | T1 PASS | **PASS 2026-09-22**; T2c1/T2c2/T2c3 PASS; `56e9412a` 15/15 CI green; owner-verified |
-| P3.T3 | P3 integration certification and closure | development/evidence | M | T2 PASS | **Unblocked; not activated** |
+| P3.T3 | P3 integration certification and closure | development/evidence | decomposed | T2 PASS | **In progress** — T3a/T3b/T3c PASS; T3d pending |
 
 
 The companion ledger defines acceptance, HP/EC, evidence and handoff per task.
@@ -85,3 +85,25 @@ this document does not establish capacity or guarantee the October date.
 The local runner `scripts/p3-t2c3-certify-android.sh` returned `P3_T2C3_RESULT=PASS` against `d14ff8b6646bde4e635d4c2d5bc6e4ff784615e8` on `sdk_gphone64_arm64`, Android API 34, with **2 tests / 0 failures / 0 errors / 0 skipped**. Evidence: [`mvp0-p2p-p3-t2c3-android-certification-2026-09-22.md`](../audit/mvp0-p2p-p3-t2c3-android-certification-2026-09-22.md). The harness matches the existing binding test's full `BeforeUnwrap` name; no crypto implementation or assertion changes were needed.
 
 **T2c1 PASS; T2c2 PASS; T2c3 PASS; P3.T2 PASS.** Final head `56e9412a` completed 15/15 CI checks and the owner explicitly verified the task. P3.T3 is unblocked but not activated. The GitHub-hosted emulator workflow remains hard-disabled and contributed no certification evidence.
+
+
+### 2026-09-22 P3.T3 certification progress
+
+T3a/T3b integrated certification completed at `eb1e8abe` with 15/15 CI.
+The run found and repaired the durable P3 audit-correlation constraint drift via
+migration 0039.
+
+T3c secret-boundary certification completed at `6c3a565c`:
+
+- 15/15 CI PASS;
+- T3a/T3b/T3c integration suite: 3/3 PASS under `test`;
+- same 3/3 PASS under `coverage`;
+- workspace line coverage: 90.43%;
+- static mobile/native/API/audit guard:
+  `P3_T3C_SECRET_BOUNDARY=PASS`;
+- hosted Android HPKE emulator remained hard-disabled.
+
+Evidence:
+`docs/audit/mvp0-p2p-p3-t3c-secret-boundary-evidence-2026-09-22.md`.
+
+**Current P3.T3 status: IN PROGRESS. T3d is the only remaining T3 leaf.**

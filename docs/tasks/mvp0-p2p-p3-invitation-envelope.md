@@ -9,7 +9,7 @@ behavioral_coverage_contract: behavior-v2
 
 # P3 — planning task ledger
 
-**Status:** In progress. P3.T0 PASS. P3.T1 PASS. **P3.T2 PASS 2026-09-22** after T2-A backend closure, T2c1/T2c2 PASS, local Android T2c3 PASS, 15/15 CI PASS on `56e9412a`, and explicit owner verification. Hosted-emulator CI remains hard-disabled. P3.T3 is now unblocked but not activated.
+**Status:** In progress. P3.T0 PASS. P3.T1 PASS. P3.T2 PASS. **P3.T3 is active: T3a/T3b integration PASS and T3c secret-boundary PASS on 2026-09-22; T3d remains pending.** T3c exact head `6c3a565c` completed 15/15 CI with the integrated T3 suite 3/3 PASS in test and coverage. Hosted-emulator CI remains hard-disabled.
 **Phase gate:** P2 PASS; Accepted ADR-044.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
@@ -20,7 +20,7 @@ behavioral_coverage_contract: behavior-v2
 | P3.T0 | Contract and executable-path freeze | planning | M | P2 PASS | **PASS 2026-09-22** — owner-approved; CI 15/15 green |
 | P3.T1 | Invitation persistence, claim, and inbox | development | decomposed | T0 PASS | **PASS 2026-09-22** — owner-verified; `4dede25d` 15/15 CI green |
 | P3.T2 | O3 authorization and native K1 envelope delivery | development | decomposed | T1 PASS | **PASS 2026-09-22** — T2-A Done; T2c1/T2c2/T2c3 PASS; `56e9412a` 15/15 CI green; owner-verified |
-| P3.T3 | P3 integration certification and closure | development/evidence | M | T2 PASS | **Unblocked / not activated** — dependency satisfied by P3.T2 PASS |
+| P3.T3 | P3 integration certification and closure | development/evidence | decomposed | T2 PASS | **In progress** — T3a PASS; T3b PASS; T3c PASS; T3d pending |
 
 
 ## Shared activation and closure contract
@@ -221,7 +221,7 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T2 PASS
 
-**Status:** **Unblocked / not activated.** P3.T2 PASS on 2026-09-22 satisfies the dependency. **Historical verification note (2026-09-18):** no work product
+**Status:** **In progress.** T3a/T3b integrated certification PASS at `eb1e8abe`; **T3c secret-boundary PASS at `6c3a565c` with 15/15 CI, 3/3 integrated cases in test/coverage, static secret-boundary PASS and 90.43% workspace line coverage. T3d remains pending.** **Historical verification note (2026-09-18):** no work product
 exists for this leaf. Full evidence:
 `docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`.
 
@@ -229,6 +229,31 @@ exists for this leaf. Full evidence:
 
 - **HP-P3.T3-1:** Owner create → viewer claim → authorized envelope → native unwrap passes with exact package binding.
 - **EC-P3.T3-1:** Possession of ciphertext or a valid claim without current O3 authorization never permits envelope release.
+
+
+### T3 activation breakdown
+
+| Leaf | Outcome | Status |
+|---|---|---|
+| T3a | Integrated owner → invite → claim → O3 → envelope happy path | **PASS 2026-09-22** |
+| T3b | Integrated fail-closed viewer/O3/device/package matrix | **PASS 2026-09-22** |
+| T3c | API/audit/DB/mobile/native secret-boundary inspection | **PASS 2026-09-22** |
+| T3d | Evidence map, downstream handoff, final closure | **Pending** |
+
+T3a/T3b implementation certification head `eb1e8abe` completed 15/15 CI.
+During that certification, the DB audit CHECK was found to lag the already
+frozen P3 correlation contract; migration 0039 repaired the durable constraint
+without relaxing P2 invariants.
+
+T3c evidence:
+`docs/audit/mvp0-p2p-p3-t3c-secret-boundary-evidence-2026-09-22.md`.
+Exact T3c head `6c3a565c` completed 15/15 CI; the integrated suite executed
+T3a/T3b/T3c 3/3 PASS under both normal tests and coverage, workspace line
+coverage remained 90.43%, and the static guard returned
+`P3_T3C_SECRET_BOUNDARY=PASS`.
+
+T3c closes the frozen secret-deny boundary without re-enabling the hosted
+Android HPKE emulator. **P3.T3 remains IN PROGRESS until T3d closes.**
 
 **Evidence to emit:** task-scoped contract/decision record for planning; actual
 command/test/device/network results as relevant to the acceptance criteria for
