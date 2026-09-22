@@ -434,6 +434,21 @@ Resolver `ENOENT` puede revelar un bloqueo posterior; no se asume PASS.
   el uso de IA local para esta línea de trabajo; la revisión queda pendiente de
   decisión del owner (correr pase 3 o aceptar la disposición).
 
+### Fase 2 — pase 3, 2026-09-22
+
+Por decisión del owner se ejecuta pase 3 en lugar de aceptar directamente la
+disposición del pase 2.
+
+**Veredicto del pase 3: PASS.** El único hallazgo sustantivo del pase 2 eran los
+tres TS2339 del test de account-change. Ese hallazgo no bloquea este diagnóstico:
+era preexistente a la corrida y, además, la evidencia posterior del gate móvil
+registra strict typecheck PASS en el source/test head de P4.T1-r1. No queda un
+hallazgo diagnóstico bloqueante derivado del pase 2.
+
+Este PASS cierra únicamente la revisión de la corrida diagnóstica. **No** marca
+P5.T3 ni el agregado P5 como PASS; el rerun Android con invitación fresca sigue
+siendo el gate pendiente.
+
 ## Residuales registrados
 
 - `npm run typecheck` falla en HEAD: 3× TS2339 introducidos por `f2fa64c`

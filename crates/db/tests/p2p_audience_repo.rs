@@ -2,8 +2,8 @@ use dubbridge_db::{
     create_pool,
     error::DbError,
     p2p_audience_repo::{
-        claim_invitation, create_invitation, get_active_authorization,
-        list_viewer_invitations, register_or_get_active_device,
+        claim_invitation, create_invitation, get_active_authorization, list_viewer_invitations,
+        register_or_get_active_device,
     },
     p2p_envelope_repo::get_envelope_release_context,
 };
@@ -159,15 +159,9 @@ async fn invitation_claim_is_owner_scoped_idempotent_and_exposes_only_active_aut
     ));
 
     let hash = token_hash(Uuid::new_v4());
-    let invitation = create_invitation(
-        &pool,
-        owner,
-        asset_id,
-        &hash,
-        now + Duration::hours(1),
-    )
-    .await
-    .expect("create invitation");
+    let invitation = create_invitation(&pool, owner, asset_id, &hash, now + Duration::hours(1))
+        .await
+        .expect("create invitation");
     assert_eq!(invitation.asset_id(), asset_id);
     assert_eq!(invitation.publication_id().0, publication_id);
     assert_eq!(invitation.lineage_id().0, lineage_id);
@@ -242,15 +236,9 @@ async fn claim_fails_closed_when_ready_publication_drifts_after_invitation_creat
     let now = OffsetDateTime::now_utc();
     let hash = token_hash(Uuid::new_v4());
 
-    create_invitation(
-        &pool,
-        owner,
-        asset_id,
-        &hash,
-        now + Duration::hours(1),
-    )
-    .await
-    .expect("create invitation");
+    create_invitation(&pool, owner, asset_id, &hash, now + Duration::hours(1))
+        .await
+        .expect("create invitation");
     let device = register_or_get_active_device(&pool, viewer, "viewer-key", &[1_u8, 2, 3])
         .await
         .expect("register device");
@@ -276,15 +264,9 @@ async fn envelope_release_requires_live_claim_device_and_ready_publication_evide
     let now = OffsetDateTime::now_utc();
     let hash = token_hash(Uuid::new_v4());
 
-    let invitation = create_invitation(
-        &pool,
-        owner,
-        asset_id,
-        &hash,
-        now + Duration::hours(1),
-    )
-    .await
-    .expect("create invitation");
+    let invitation = create_invitation(&pool, owner, asset_id, &hash, now + Duration::hours(1))
+        .await
+        .expect("create invitation");
     let device = register_or_get_active_device(&pool, viewer, "viewer-key", &[1_u8, 2, 3])
         .await
         .expect("register device");
