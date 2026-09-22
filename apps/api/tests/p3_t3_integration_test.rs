@@ -121,96 +121,19 @@ impl TestContext {
     async fn claimed_fixture(&self) -> ClaimedFixture {
         let (asset_id, publication_id, lineage_id) =
             insert_ready_publication(&self.pool, self.owner, &self.kek).await;
-
-        let device_response = send_json(
-            &self.app,
-            Method::POST,
-            "/p2p/devices",
-            VIEWER_TOKEN,
-            json!({
-                "key_id": DEVICE_KEY_ID,
-                "public_key_spki_base64": DEVICE_SPKI_BASE64,
-            }),
-        )
-        .await;
-        assert_eq!(device_response.status(), StatusCode::OK);
-        let device_body = json_body(device_response).await;
-        let device_id = parse_uuid(&device_body["id"]);
-
-        let invitation_response = send_json(
-            &self.app,
-            Method::POST,
-            &format!("/assets/{asset_id}/p2p/invitations"),
-            OWNER_TOKEN,
-            json!({"ttl_seconds": 3600}),
-        )
-        .await;
-        assert_eq!(invitation_response.status(), StatusCode::CREATED);
-        let invitation_body = json_body(invitation_response).await;
-        let invitation_id = parse_uuid(&invitation_body["invitation"]["id"]);
-        let token = invitation_body["token"]
-            .as_str()
-            .expect("raw invitation token returned once")
-            .to_owned();
-
-        let stored_hash: Vec<u8> =
-            sqlx::query_scalar("SELECT token_hash FROM p2p_invitations WHERE id = $1")
-                .bind(invitation_id)
-                .fetch_one(&self.pool)
-                .await
-                .expect("load persisted token hash");
-        assert_eq!(stored_hash.len(), 32);
-        assert_ne!(stored_hash.as_slice(), token.as_bytes());
-
-        let claim_response = send_json(
-            &self.app,
-            Method::POST,
-            "/p2p/invitations/claim",
-            VIEWER_TOKEN,
-            json!({
-                "token": token,
-                "device_id": device_id,
-            }),
-        )
-        .await;
-        assert_eq!(claim_response.status(), StatusCode::OK);
-        let claim_body = json_body(claim_response).await;
-        let authorization_id = parse_uuid(&claim_body["authorization"]["id"]);
-
-        assert_eq!(parse_uuid(&claim_body["invitation"]["id"]), invitation_id);
-        assert_eq!(
-            parse_uuid(&claim_body["authorization"]["invitation_id"]),
-            invitation_id
-        );
-        assert_eq!(
-            parse_uuid(&claim_body["authorization"]["asset_id"]),
-            asset_id
-        );
-        assert_eq!(
-            parse_uuid(&claim_body["authorization"]["publication_id"]),
-            publication_id
-        );
-        assert_eq!(
-            parse_uuid(&claim_body["authorization"]["lineage_id"]),
-            lineage_id
-        );
-        assert_eq!(
-            parse_uuid(&claim_body["authorization"]["viewer_subject_id"]),
-            self.viewer
-        );
-        assert_eq!(
-            parse_uuid(&claim_body["authorization"]["device_id"]),
-            device_id
-        );
-        assert_eq!(parse_uuid(&claim_body["descriptor"]["asset_id"]), asset_id);
-        assert_eq!(
-            parse_uuid(&claim_body["descriptor"]["publication_id"]),
-            publication_id
-        );
-        assert_eq!(
-            parse_uuid(&claim_body["descriptor"]["lineage_id"]),
-            lineage_id
-        );
+        let device_id = self.register_viewer_device().await;
+        let (invitation_id, token) = self.create_owner_invitation(asset_id).await;
+        self.assert_token_hash_only(invitation_id, &token).await;
+        let authorization_id = self
+            .claim_and_assert_identity(
+                &token,
+                device_id,
+                invitation_id,
+                asset_id,
+                publication_id,
+                lineage_id,
+            )
+            .await;
 
         ClaimedFixture {
             asset_id,
@@ -221,6 +144,121 @@ impl TestContext {
             device_id,
         }
     }
+
+    async fn register_viewer_device(&self) -> Uuid {
+        let response = send_json(
+            &self.app,
+            Method::POST,
+            "/p2p/devices",
+            VIEWER_TOKEN,
+            json!({
+                "key_id": DEVICE_KEY_ID,
+                "public_key_spki_base64": DEVICE_SPKI_BASE64,
+            }),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+        parse_uuid(&json_body(response).await["id"])
+    }
+
+    async fn create_owner_invitation(&self, asset_id: Uuid) -> (Uuid, String) {
+        let response = send_json(
+            &self.app,
+            Method::POST,
+            &format!("/assets/{asset_id}/p2p/invitations"),
+            OWNER_TOKEN,
+            json!({"ttl_seconds": 3600}),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let body = json_body(response).await;
+        let invitation_id = parse_uuid(&body["invitation"]["id"]);
+        let token = body["token"]
+            .as_str()
+            .expect("raw invitation token returned once")
+            .to_owned();
+        (invitation_id, token)
+    }
+
+    async fn assert_token_hash_only(&self, invitation_id: Uuid, token: &str) {
+        let stored_hash: Vec<u8> =
+            sqlx::query_scalar("SELECT token_hash FROM p2p_invitations WHERE id = $1")
+                .bind(invitation_id)
+                .fetch_one(&self.pool)
+                .await
+                .expect("load persisted token hash");
+        assert_eq!(stored_hash.len(), 32);
+        assert_ne!(stored_hash.as_slice(), token.as_bytes());
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn claim_and_assert_identity(
+        &self,
+        token: &str,
+        device_id: Uuid,
+        invitation_id: Uuid,
+        asset_id: Uuid,
+        publication_id: Uuid,
+        lineage_id: Uuid,
+    ) -> Uuid {
+        let response = send_json(
+            &self.app,
+            Method::POST,
+            "/p2p/invitations/claim",
+            VIEWER_TOKEN,
+            json!({
+                "token": token,
+                "device_id": device_id,
+            }),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = json_body(response).await;
+        assert_claim_identity(
+            &body,
+            invitation_id,
+            asset_id,
+            publication_id,
+            lineage_id,
+            self.viewer,
+            device_id,
+        );
+        parse_uuid(&body["authorization"]["id"])
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn assert_claim_identity(
+    body: &Value,
+    invitation_id: Uuid,
+    asset_id: Uuid,
+    publication_id: Uuid,
+    lineage_id: Uuid,
+    viewer_id: Uuid,
+    device_id: Uuid,
+) {
+    assert_eq!(parse_uuid(&body["invitation"]["id"]), invitation_id);
+    assert_eq!(
+        parse_uuid(&body["authorization"]["invitation_id"]),
+        invitation_id
+    );
+    assert_eq!(parse_uuid(&body["authorization"]["asset_id"]), asset_id);
+    assert_eq!(
+        parse_uuid(&body["authorization"]["publication_id"]),
+        publication_id
+    );
+    assert_eq!(parse_uuid(&body["authorization"]["lineage_id"]), lineage_id);
+    assert_eq!(
+        parse_uuid(&body["authorization"]["viewer_subject_id"]),
+        viewer_id
+    );
+    assert_eq!(parse_uuid(&body["authorization"]["device_id"]), device_id);
+    assert_eq!(parse_uuid(&body["descriptor"]["asset_id"]), asset_id);
+    assert_eq!(
+        parse_uuid(&body["descriptor"]["publication_id"]),
+        publication_id
+    );
+    assert_eq!(parse_uuid(&body["descriptor"]["lineage_id"]), lineage_id);
 }
 
 #[tokio::test]
@@ -385,11 +423,7 @@ async fn assert_denied(app: &axum::Router, authorization_id: Uuid, token: &str) 
     assert!(bytes.is_empty(), "denial must not return envelope material");
 }
 
-async fn insert_ready_publication(
-    pool: &PgPool,
-    owner: Uuid,
-    kek: &TestKek,
-) -> (Uuid, Uuid, Uuid) {
+async fn insert_ready_publication(pool: &PgPool, owner: Uuid, kek: &TestKek) -> (Uuid, Uuid, Uuid) {
     let asset_id = Uuid::new_v4();
     let publication_id = Uuid::new_v4();
     let lineage_id = Uuid::new_v4();
