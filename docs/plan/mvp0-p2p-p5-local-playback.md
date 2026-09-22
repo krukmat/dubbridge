@@ -7,7 +7,7 @@ slice: MVP0-P2P
 
 # P5 — Local HLS playback through the existing player
 
-Task ledger: `docs/tasks/mvp0-p2p-p5-local-playback.md`. P5 remains **in progress** because P5.T3/P5-CERT is still open. T0 is Done; **T1/T2 and P5-DEV are closure-ready 2026-09-22**, with owner verification/status sync as the only remaining development-gate closure step. **P4 PASS is satisfied.**
+Task ledger: `docs/tasks/mvp0-p2p-p5-local-playback.md`. P5 remains **in progress** because P5.T3/P5-CERT is still open. **P5-DEV is SATISFIED 2026-09-22:** T0/T1/T2 are formally closed, `e63209f5` completed 15/15 CI, mobile revalidation is 62/62 suites and 446/446 tests, and owner verification is complete. P4 PASS is satisfied.
 
 ## Objective
 
@@ -38,8 +38,8 @@ Freeze loopback-only listener and local session access boundary, HLS path/URI va
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
 | P5.T0 | Gateway/session contract freeze | planning | M | P4 PASS | Done 2026-09-18 |
-| P5.T1 | Loopback ciphertext decryption gateway | development | L | T0 PASS | **Closure-ready; owner verification pending** |
-| P5.T2 | Existing VideoPlayer and deterministic teardown | development | M | T1 PASS | **Closure-ready; owner verification pending** |
+| P5.T1 | Loopback ciphertext decryption gateway | development | L | T0 PASS | **PASS / Done 2026-09-22** |
+| P5.T2 | Existing VideoPlayer and deterministic teardown | development | M | T1 PASS | **PASS / Done 2026-09-22** |
 | P5.T3 | Playback and secret-boundary certification | release-certification evidence | M | T2 PASS | Deferred release obligation; not a P6 activation gate after P5-DEV closes; may close from compatible T7p or P7.T2 evidence |
 
 
@@ -64,9 +64,7 @@ PASS is implied by automated/component evidence alone. The 2026-09-18 T1/T2
 evidence remediation is recorded in
 `docs/audit/mvp0-p2p-p5-t1-t2-evidence-remediation-2026-09-18.md`.
 
-Aggregate P5 remains **IN PROGRESS** until formal T1/T2 closure plus T3 Android
-device evidence. Once T1/T2 formally close, **P5-DEV** is satisfied and P6 may
-activate even while T3 stays pending. P5.T3 is carried to T7p/P7.T2 and remains
+Aggregate P5 remains **IN PROGRESS** until T3 Android device evidence. **P5-DEV is satisfied** because T0-T2 are formally closed, so P6 may activate while T3 stays pending. P5.T3 is carried to T7p/P7.T2 and remains
 a hard prerequisite for a passing P7 verdict and T9g GO.
 
 ## Calendar and estimation limits
