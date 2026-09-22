@@ -9,7 +9,7 @@ behavioral_coverage_contract: behavior-v2
 
 # P3 — planning task ledger
 
-**Status:** In progress. P3.T0 has been reconciled against the current implementation; T0a-T0g are frozen in `docs/audit/mvp0-p2p-p3-t0-contract-freeze-2026-09-22.md`. Final T0 PASS awaits owner verification; no P3 source change is claimed by the freeze.
+**Status:** In progress. P3.T0 PASS on 2026-09-22 after owner approval and 15/15 CI checks green. P3.T1 is the active development block.
 **Phase gate:** P2 PASS; Accepted ADR-044.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
@@ -17,8 +17,8 @@ behavioral_coverage_contract: behavior-v2
 
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
-| P3.T0 | Contract and executable-path freeze | planning | M | P2 PASS | Closure-ready 2026-09-22 — T0a-T0g frozen; owner verification pending |
-| P3.T1 | Invitation persistence, claim, and inbox | development | L | T0 PASS | Blocked on T0 PASS — existing repo tests verified; gaps frozen: concurrent claim race, exact-lineage descriptor handoff, durable P3 audit |
+| P3.T0 | Contract and executable-path freeze | planning | M | P2 PASS | **PASS 2026-09-22** — owner-approved; CI 15/15 green |
+| P3.T1 | Invitation persistence, claim, and inbox | development | decomposed | T0 PASS | **Active 2026-09-22** — T1a/T1b/T1c approved |
 | P3.T2 | O3 authorization and native K1 envelope delivery | development | L | T1 PASS | Blocked on T1 PASS — release-context test exists; remaining predicate/API/native/audit certification frozen in T0 artifact |
 | P3.T3 | P3 integration certification and closure | development/evidence | M | T2 PASS | Blocked — no work product exists, see verification note |
 
@@ -46,7 +46,7 @@ Release artifact/gate changes also synchronize the S-230 plan and ledger.
 
 **Depends on:** P2 PASS
 
-**Status:** Closure-ready 2026-09-22; owner verification pending. The missing
+**Status:** **PASS 2026-09-22.** Owner approved the next block, which serves as explicit T0 owner verification. The freeze commit `ffc7ffa` completed 15/15 CI checks successfully. The missing
 task-scoped contract now exists at
 `docs/audit/mvp0-p2p-p3-t0-contract-freeze-2026-09-22.md`. T0a-T0c reconcile
 the current source and freeze invitation/claim/inbox plus O3/device boundaries;
@@ -68,7 +68,7 @@ and the handoff to T1/T2/T3. This planning closure changes no runtime behavior.
 | T0d | Secret-deny and P3 audit-event contract frozen | Done |
 | T0e | Exact writable-path ownership for T1/T2/T3 frozen | Done |
 | T0f | Test/evidence map and RRI decomposition frozen | Done |
-| T0g | Contract artifact + downstream handoff synchronized | Closure-ready; owner verification pending |
+| T0g | Contract artifact + downstream handoff synchronized | **Done / owner-verified** |
 
 The coherent P3 implementation parent is **RRI 100 / Very high** because it spans
 authorization, persisted state, audit and native cryptographic custody. It must not

@@ -3,7 +3,7 @@ type: Audit
 title: "MVP0-P2P P3.T0 contract and executable-path freeze"
 task: P3.T0
 date: 2026-09-22
-status: closure-ready
+status: pass
 ---
 
 # P3.T0 — contract and executable-path freeze
@@ -11,8 +11,9 @@ status: closure-ready
 ## Disposition
 
 P3.T0a–T0g are complete as a planning freeze. No runtime source is changed by
-this artifact. Final T0 PASS requires owner verification; until then P3.T1
-remains gated.
+this artifact. The owner approved the subsequent P3.T1 block on 2026-09-22,
+providing explicit T0 owner verification. Commit `ffc7ffa` also completed 15/15
+CI checks successfully. P3.T0 is therefore PASS and P3.T1 is activated.
 
 The 2026-09-18 retrospective was directionally correct that P3 lacked its own
 contract artifact, but parts of its test inventory are now stale: current source
@@ -203,7 +204,7 @@ HP-P3.T0-1 is covered by the frozen API/schema/O3/K1/path contract above.
 EC-P3.T0-1 is covered by explicit fail-closed readiness and Keystore STOP rules;
 claim alone never grants envelope release.
 
-P3.T0 is therefore **closure-ready**. Final PASS awaits owner verification.
+P3.T0 is therefore **PASS 2026-09-22** (owner-verified; 15/15 CI green).
 After PASS, execution order is:
 
 ```text
