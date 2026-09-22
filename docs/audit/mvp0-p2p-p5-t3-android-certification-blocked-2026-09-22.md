@@ -442,3 +442,37 @@ Resolver `ENOENT` puede revelar un bloqueo posterior; no se asume PASS.
   implemented", pero `de199ff` lo implementó hoy (revisión pendiente). Estado desactualizado.
 - Camino proof P1 (`transient-drive.ts` `proofStorageUri` → `openStoreAndDrive`)
   tiene el mismo defecto latente; dev-only.
+
+---
+
+# Continuación 2026-09-22 — P4.T1-r1 aplicado; rerun Android pendiente
+
+El defecto P4 confirmado en la corrida instrumentada fue corregido en
+`e44d00f497fe0f7128ce3a31a797b13840dafb2c`.
+
+La frontera del runtime ahora conserva el contrato host→worklet como `file:` URI,
+pero convierte el URI scoped exactamente una vez mediante
+`bare-url.fileURLToPath` inmediatamente antes de construir Corestore. Un error de
+conversión produce `PRODUCT_STORAGE_CONFIG_INVALID` antes de construir
+Corestore/Hyperdrive/Hyperswarm.
+
+Evidencia automatizada:
+- GitHub Actions `35735766081`: mobile **PASS**, 61/61 suites y 441/441 tests.
+- `product-storage-path.test.ts`: PASS con Corestore/Hyperdrive reales para el
+  caso `%20`, aislamiento por cuenta y controles negativos de URI.
+- GitHub Actions `35736737748`: RED contra el source exacto pre-fix
+  `ed55050e6aaba916f3f4ce26d387a0aff74204ae` (6 fallos/7) y GREEN contra el
+  source corregido (7/7 PASS).
+- Worklet comprometido: sha256
+  `2f1f79cdf1d62a2b7cd8fafd3819b4ccb5039b71b519fbf7e954d1654a7bfd1b`.
+- GitHub Actions `35736354778`: `npm run check:bare-worklet` PASS desde
+  checkout limpio.
+
+Evidencia completa:
+`docs/audit/p4-t1-r1-storage-uri-fix-evidence-2026-09-22.md`.
+
+**Estado P5.T3:** ya no está bloqueado por el defecto conocido
+`ENOENT stat "file:"`; queda **pendiente el rerun Android con invitación fresca
+sobre la revisión final del branch**. Ese rerun debe registrar el siguiente estado
+real de SYNC/VERIFY/PLAYBACK. No se infiere PASS de P5.T3 a partir de CI.
+
