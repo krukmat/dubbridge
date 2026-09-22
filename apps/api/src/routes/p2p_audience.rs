@@ -253,11 +253,11 @@ async fn claim(
     .await
     {
         Ok(result) => result,
-        Err(response) => return response,
+        Err(response) => return *response,
     };
     let descriptor = match descriptor_for_claim(&state, &result).await {
         Ok(descriptor) => descriptor,
-        Err(response) => return response,
+        Err(response) => return *response,
     };
     if emit_claim_success_audits(&state, &result).await.is_err() {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
@@ -280,7 +280,7 @@ async fn claim_with_audit(
     device_id: Uuid,
     token_hash: &[u8; 32],
     now: OffsetDateTime,
-) -> Result<P2pClaimResult, Response> {
+) -> Result<P2pClaimResult, Box<Response>> {
     match claim_invitation(&state.pool, token_hash, viewer_subject_id, device_id, now).await {
         Ok(result) => Ok(result),
         Err(error) => {
@@ -302,10 +302,10 @@ async fn claim_with_audit(
                     ),
                 );
                 if emit_p3_audit(state, &denial).await.is_err() {
-                    return Err(StatusCode::INTERNAL_SERVER_ERROR.into_response());
+                    return Err(Box::new(StatusCode::INTERNAL_SERVER_ERROR.into_response()));
                 }
             }
-            Err(db_error_response(error))
+            Err(Box::new(db_error_response(error)))
         }
     }
 }
@@ -313,21 +313,25 @@ async fn claim_with_audit(
 async fn descriptor_for_claim(
     state: &AppState,
     result: &P2pClaimResult,
-) -> Result<P2pReadyDescriptor, Response> {
+) -> Result<P2pReadyDescriptor, Box<Response>> {
     let descriptor = match get_ready_descriptor_by_asset(&state.pool, result.invitation.asset_id())
         .await
     {
         Ok(Some(descriptor)) => descriptor,
         Ok(None) => {
-            return Err(claim_handoff_denial_response(state, result, "descriptor_missing").await);
+            return Err(Box::new(
+                claim_handoff_denial_response(state, result, "descriptor_missing").await,
+            ));
         }
-        Err(error) => return Err(db_error_response(error)),
+        Err(error) => return Err(Box::new(db_error_response(error))),
     };
 
     if descriptor_matches_claim(&descriptor, &result.invitation, &result.authorization) {
         Ok(descriptor)
     } else {
-        Err(claim_handoff_denial_response(state, result, "identity_mismatch").await)
+        Err(Box::new(
+            claim_handoff_denial_response(state, result, "identity_mismatch").await,
+        ))
     }
 }
 
