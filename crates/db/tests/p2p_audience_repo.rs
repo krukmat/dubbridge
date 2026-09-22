@@ -541,29 +541,51 @@ async fn envelope_release_denies_publication_readiness_or_delivery_drift() {
         .expect("mark publication failed");
     assert_release_not_found(&pool, non_ready).await;
 
-    let lineage_drift = setup_release_fixture(&pool).await;
-    sqlx::query("UPDATE p2p_audience_authorizations SET lineage_id = $1 WHERE id = $2")
-        .bind(Uuid::new_v4())
-        .bind(lineage_drift.authorization_id)
-        .execute(&pool)
-        .await
-        .expect("drift authorization lineage");
-    assert_release_not_found(&pool, lineage_drift).await;
+    let lineage_guard = setup_release_fixture(&pool).await;
+    let lineage_drift =
+        sqlx::query("UPDATE p2p_audience_authorizations SET lineage_id = $1 WHERE id = $2")
+            .bind(Uuid::new_v4())
+            .bind(lineage_guard.authorization_id)
+            .execute(&pool)
+            .await;
+    assert!(
+        lineage_drift.is_err(),
+        "publication/lineage FK must reject an impossible authorization lineage"
+    );
 
-    let external_missing = setup_release_fixture(&pool).await;
-    sqlx::query("UPDATE p2p_publications SET external_publication_id = NULL WHERE id = $1")
-        .bind(external_missing.publication_id)
-        .execute(&pool)
-        .await
-        .expect("remove external publication");
-    assert_release_not_found(&pool, external_missing).await;
+    let confirmation_missing = setup_release_fixture(&pool).await;
+    sqlx::query(
+        r#"
+        UPDATE p2p_publications
+           SET state = 'reconciling',
+               external_publication_id = NULL,
+               confirmed_lineage_id = NULL,
+               external_confirmed_at = NULL
+         WHERE id = $1
+        "#,
+    )
+    .bind(confirmation_missing.publication_id)
+    .execute(&pool)
+    .await
+    .expect("remove external confirmation in representable reconciling state");
+    assert_release_not_found(&pool, confirmation_missing).await;
 
     let sealed_missing = setup_release_fixture(&pool).await;
-    sqlx::query("UPDATE p2p_publications SET sealed_kek_id = NULL WHERE id = $1")
-        .bind(sealed_missing.publication_id)
-        .execute(&pool)
-        .await
-        .expect("remove sealed K1 evidence");
+    sqlx::query(
+        r#"
+        UPDATE p2p_publications
+           SET sealed_kek_id = NULL,
+               sealed_kek_version = NULL,
+               sealed_nonce = NULL,
+               sealed_wrapped_ck = NULL,
+               sealed_at = NULL
+         WHERE id = $1
+        "#,
+    )
+    .bind(sealed_missing.publication_id)
+    .execute(&pool)
+    .await
+    .expect("remove sealed K1 evidence atomically");
     assert_release_not_found(&pool, sealed_missing).await;
 
     let undelivered = setup_release_fixture(&pool).await;
