@@ -45,4 +45,12 @@ jobs:
           profile: pixel_6
           disable-animations: true
           working-directory: mobile/android
-          script: ./gradlew connectedDebugAndroidTest --stacktrace
+          script: |
+            MODULE_PATH="$(./gradlew projects --console=plain | sed -n "s/.*Project '\\(:[^']*dubbridge[^']*p2p[^']*\\)'.*/\\1/p" | head -n 1)"
+            if [ -z "$MODULE_PATH" ]; then
+              echo "DubBridge P2P Keystore Gradle subproject not found"
+              ./gradlew projects --console=plain
+              exit 1
+            fi
+            echo "Running instrumentation for $MODULE_PATH"
+            ./gradlew "${MODULE_PATH}:connectedDebugAndroidTest" --stacktrace
