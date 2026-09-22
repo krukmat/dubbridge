@@ -1,4 +1,4 @@
-import { cleanup, render, waitFor } from "@testing-library/react-native";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react-native";
 
 import { createGatewayClient } from "../src/api/client";
 import * as notifications from "../src/api/notifications";
@@ -11,6 +11,7 @@ let mockExtra: {
 } = {};
 
 let mockAuthValue: AuthContextValue;
+let mockClient: { get: jest.Mock; post: jest.Mock; postMultipart: jest.Mock };
 
 (
   globalThis as typeof globalThis & {
@@ -65,7 +66,7 @@ jest.mock("expo-constants", () => ({
 
 describe("RootNavigator", () => {
   beforeEach(() => {
-    const mockClient = { get: jest.fn(), post: jest.fn(), postMultipart: jest.fn() };
+    mockClient = { get: jest.fn(), post: jest.fn(), postMultipart: jest.fn() };
     mockClient.get.mockResolvedValue({ ok: true, value: { data: [], sessionRotation: null } });
     mockCreateGatewayClient.mockReturnValue(mockClient as any);
     mockListNotifications.mockResolvedValue({ ok: true, value: { data: { notifications: [] }, sessionRotation: null } });
@@ -116,6 +117,125 @@ describe("RootNavigator", () => {
     expect(view.getByText("Your workspace")).toBeTruthy();
     // AccountSection renders after dashboard data loads (ready state)
     await waitFor(() => expect(view.getByTestId("home-sign-out")).toBeTruthy());
+  });
+
+  it("P6.T1.F: navigates Home → My Content → Back and remounts without reviving the raw token", async () => {
+    mockExtra = {
+      dubbridgeEnv: "local",
+      gatewayBaseUrl: "http://127.0.0.1:4000",
+    };
+    mockAuthValue = {
+      ...mockAuthValue,
+      sessionRef: "token-abc",
+      status: "authed",
+    };
+    mockClient.get.mockImplementation((path: string) => {
+      if (path === "/api/p2p/content") {
+        return Promise.resolve({
+          ok: true,
+          value: {
+            data: [
+              {
+                asset_id: "asset-ready",
+                title: "Ready package",
+                publication_id: "pub-ready",
+                lineage_id: "lineage-ready",
+                state: "ready",
+                descriptor: {
+                  descriptor_version: "p2p-ready-v1",
+                  asset_id: "asset-ready",
+                  publication_id: "pub-ready",
+                  lineage_id: "lineage-ready",
+                  manifest_version: "p2p-manifest-v1",
+                  manifest_digest_sha256: "a".repeat(64),
+                  external_publication_id: "hyperdrive:ready",
+                  ck_wrap_ref: "k1:ready",
+                  kek_id: "kek-1",
+                  kek_version: 1,
+                  ready_at: "2026-09-22T18:00:00Z",
+                },
+              },
+            ],
+            sessionRotation: null,
+          },
+        });
+      }
+      return Promise.resolve({ ok: true, value: { data: [], sessionRotation: null } });
+    });
+    mockClient.post.mockResolvedValue({
+      ok: true,
+      value: {
+        data: {
+          invitation: {
+            id: "invite-1",
+            asset_id: "asset-ready",
+            publication_id: "pub-ready",
+            lineage_id: "lineage-ready",
+            owner_subject_id: "owner-1",
+            status: "pending",
+            expires_at_unix: 2_000_000_000,
+            claimed_at_unix: null,
+          },
+          token: "navigation-secret",
+        },
+        sessionRotation: null,
+      },
+    });
+
+    const view = await render(<RootNavigator />);
+    await waitFor(() => expect(view.getByTestId("home-open-my-content")).toBeTruthy());
+
+    fireEvent.press(view.getByTestId("home-open-my-content"));
+    await waitFor(() => expect(view.getByTestId("my-content-screen")).toBeTruthy());
+    expect(
+      mockClient.get.mock.calls.filter(([path]) => path === "/api/p2p/content"),
+    ).toHaveLength(1);
+
+    await act(async () => {
+      fireEvent.press(view.getByTestId("my-content-create-invite-asset-ready"));
+    });
+    await waitFor(() => expect(view.getByText("navigation-secret")).toBeTruthy());
+
+    fireEvent.press(view.getByTestId("my-content-back"));
+    await waitFor(() => expect(view.getByTestId("home-screen")).toBeTruthy());
+    expect(view.queryByText("navigation-secret")).toBeNull();
+
+    fireEvent.press(view.getByTestId("home-open-my-content"));
+    await waitFor(() => expect(view.getByTestId("my-content-screen")).toBeTruthy());
+    expect(view.queryByText("navigation-secret")).toBeNull();
+    expect(
+      mockClient.get.mock.calls.filter(([path]) => path === "/api/p2p/content"),
+    ).toHaveLength(2);
+    expect(mockClient.post).toHaveBeenCalledTimes(1);
+  });
+
+  it("P6.T1.F: authenticated route disappears when auth state becomes unauthenticated", async () => {
+    mockExtra = {
+      dubbridgeEnv: "local",
+      gatewayBaseUrl: "http://127.0.0.1:4000",
+    };
+    mockAuthValue = {
+      ...mockAuthValue,
+      sessionRef: "token-abc",
+      status: "authed",
+    };
+
+    const view = await render(<RootNavigator />);
+    await waitFor(() => expect(view.getByTestId("home-open-my-content")).toBeTruthy());
+    fireEvent.press(view.getByTestId("home-open-my-content"));
+    await waitFor(() => expect(view.getByTestId("my-content-screen")).toBeTruthy());
+
+    mockAuthValue = {
+      ...mockAuthValue,
+      sessionRef: null,
+      status: "unauthed",
+    };
+    await act(async () => {
+      view.rerender(<RootNavigator />);
+    });
+
+    await waitFor(() => expect(view.getByTestId("login-screen")).toBeTruthy());
+    expect(view.queryByTestId("my-content-screen")).toBeNull();
   });
 
   it("EC-1: renders a config error when the gateway URL is missing", async () => {

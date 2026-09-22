@@ -14,6 +14,7 @@ import { ComplianceScreen } from "../screens/ComplianceScreen";
 import { ConsentScreen } from "../screens/ConsentScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { LoginScreen } from "../screens/LoginScreen";
+import { MyContentScreen } from "../screens/MyContentScreen";
 import { OrganizationListScreen, type OrganizationSummary } from "../screens/OrganizationListScreen";
 import { OrganizationMembersScreen } from "../screens/OrganizationMembersScreen";
 import { ProjectDetailScreen } from "../screens/ProjectDetailScreen";
@@ -30,6 +31,7 @@ type UnauthedStackParamList = {
 
 type AuthedStackParamList = {
   Home: undefined;
+  MyContent: undefined;
   AssetList: undefined;
   AssetDetail: {
     assetId: string;
@@ -80,6 +82,22 @@ function HomeRoute({
       onOpenUpload={() => navigation.navigate("Upload")}
       onOpenReview={() => navigation.navigate("ReviewInbox")}
       onOpenOrganizations={() => navigation.navigate("OrganizationList")}
+      onOpenMyContent={() => navigation.navigate("MyContent")}
+    />
+  );
+}
+
+function MyContentRoute({
+  navigation,
+  gatewayBaseUrl,
+}: {
+  navigation: NativeStackScreenProps<AuthedStackParamList, "MyContent">["navigation"];
+  gatewayBaseUrl: string;
+}) {
+  return (
+    <MyContentScreen
+      gatewayBaseUrl={gatewayBaseUrl}
+      onBack={() => navigation.goBack()}
     />
   );
 }
@@ -341,6 +359,11 @@ function AuthedNavigator({
     <AuthedStack.Navigator screenOptions={AUTHTED_NAVIGATOR_OPTIONS}>
       <AuthedStack.Screen name="Home">
         {({ navigation }) => <HomeRoute navigation={navigation} gatewayBaseUrl={gatewayBaseUrl} dubbridgeEnv={dubbridgeEnv} />}
+      </AuthedStack.Screen>
+      <AuthedStack.Screen name="MyContent">
+        {({ navigation }) => (
+          <MyContentRoute navigation={navigation} gatewayBaseUrl={gatewayBaseUrl} />
+        )}
       </AuthedStack.Screen>
       <AuthedStack.Screen name="AssetList">
         {({ navigation }) => <AssetListRoute navigation={navigation} gatewayBaseUrl={gatewayBaseUrl} />}

@@ -128,7 +128,13 @@ function ReadyContent({
   );
 }
 
-export function MyContentScreen({ gatewayBaseUrl }: { gatewayBaseUrl: string }) {
+export function MyContentScreen({
+  gatewayBaseUrl,
+  onBack,
+}: {
+  gatewayBaseUrl: string;
+  onBack?: () => void;
+}) {
   const { viewState, retry, refresh } = useMyContentState(gatewayBaseUrl);
   const { inviteState, createInvite, copyInvite, dismissInvite } = useMyContentInvite(
     gatewayBaseUrl,
@@ -183,6 +189,14 @@ export function MyContentScreen({ gatewayBaseUrl }: { gatewayBaseUrl: string }) 
           content={viewState.content}
           onCreateInvite={(content) => void createInvite(content)}
           inviteState={inviteState}
+        />
+      ) : null}
+      {onBack ? (
+        <Button
+          testID="my-content-back"
+          label="Back to home"
+          variant="secondary"
+          onPress={onBack}
         />
       ) : null}
     </Screen>

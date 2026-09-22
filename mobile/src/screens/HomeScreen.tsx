@@ -41,6 +41,14 @@ const NAV_CARDS = [
     tone: "info" as const,
   },
   {
+    testID: "home-open-my-content" as const,
+    title: "My content",
+    subtitle: "Track P2P readiness and create invites",
+    key: "myContent",
+    symbol: "P2",
+    tone: "info" as const,
+  },
+  {
     testID: "home-open-organizations" as const,
     title: "Organizations and projects",
     subtitle: "Manage teams and project workspaces",
@@ -216,17 +224,20 @@ function QuickActionsSection({
   onOpenUpload,
   onOpenReview,
   onOpenOrganizations,
+  onOpenMyContent,
 }: {
   onOpenAssets: () => void;
   onOpenUpload: () => void;
   onOpenReview: () => void;
   onOpenOrganizations: () => void;
+  onOpenMyContent: () => void;
 }) {
   const callbacks: Record<string, () => void> = {
     assets: onOpenAssets,
     upload: onOpenUpload,
     review: onOpenReview,
     organizations: onOpenOrganizations,
+    myContent: onOpenMyContent,
   };
 
   return (
@@ -277,6 +288,7 @@ function DashboardContent({
   onOpenUpload,
   onOpenReview,
   onOpenOrganizations,
+  onOpenMyContent,
   onLogout,
 }: {
   dashState: Extract<HomeDashboardState, { kind: "ready" }>;
@@ -284,6 +296,7 @@ function DashboardContent({
   onOpenUpload: () => void;
   onOpenReview: () => void;
   onOpenOrganizations: () => void;
+  onOpenMyContent: () => void;
   onLogout: () => Promise<void>;
 }) {
   return (
@@ -302,6 +315,7 @@ function DashboardContent({
         onOpenUpload={onOpenUpload}
         onOpenReview={onOpenReview}
         onOpenOrganizations={onOpenOrganizations}
+        onOpenMyContent={onOpenMyContent}
       />
       <AccountSection onLogout={onLogout} />
     </>
@@ -315,6 +329,7 @@ export function HomeScreen({
   onOpenUpload,
   onOpenReview,
   onOpenOrganizations,
+  onOpenMyContent,
 }: {
   dubbridgeEnv: string;
   gatewayBaseUrl: string;
@@ -322,6 +337,7 @@ export function HomeScreen({
   onOpenUpload: () => void;
   onOpenReview: () => void;
   onOpenOrganizations: () => void;
+  onOpenMyContent: () => void;
 }) {
   const auth = useAuth();
   const { dashState, load } = useDashboardState(
@@ -359,6 +375,7 @@ export function HomeScreen({
           onOpenUpload={onOpenUpload}
           onOpenReview={onOpenReview}
           onOpenOrganizations={onOpenOrganizations}
+          onOpenMyContent={onOpenMyContent}
           onLogout={auth.logout}
         />
       ) : null}

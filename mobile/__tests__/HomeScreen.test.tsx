@@ -79,6 +79,7 @@ async function renderHome() {
       onOpenUpload={noop}
       onOpenReview={noop}
       onOpenOrganizations={noop}
+      onOpenMyContent={noop}
     />,
   );
 }
@@ -119,6 +120,7 @@ describe("HomeScreen", () => {
     expect(getByTestId("home-open-upload")).toBeTruthy();
     expect(getByTestId("home-open-review")).toBeTruthy();
     expect(getByTestId("home-open-organizations")).toBeTruthy();
+    expect(getByTestId("home-open-my-content")).toBeTruthy();
     expect(getByTestId("home-account-card")).toBeTruthy();
     expect(getByTestId("home-account-icon")).toBeTruthy();
     expect(getByTestId("home-sign-out")).toBeTruthy();
