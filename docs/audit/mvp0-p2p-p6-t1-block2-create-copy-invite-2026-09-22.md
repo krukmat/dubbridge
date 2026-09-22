@@ -1,9 +1,9 @@
 ---
-type: AuditEvidence
+type: Audit
 title: "P6.T1 Block 2 — Create Invite and one-time Copy"
 status: pass
-slice: MVP0-P2P
-task: P6.T1.D+E
+task: P6.T1
+block: T1.D+E
 date: 2026-09-22
 ---
 
