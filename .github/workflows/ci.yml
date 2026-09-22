@@ -107,7 +107,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       minio:
-        image: quay.io/minio/minio:RELEASE.2025-09-06T17-38-46Z
+        image: minio/minio:RELEASE.2025-04-22T22-12-26Z@sha256:a1ea29fa28355559ef137d71fc570e508a214ec84ff8083e39bc5428980b015e
         env:
           MINIO_ROOT_USER: dubbridge
           MINIO_ROOT_PASSWORD: dubbridge-minio-ci
