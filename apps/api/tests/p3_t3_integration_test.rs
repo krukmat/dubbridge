@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     env,
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
 use axum::{
@@ -21,8 +21,6 @@ use tempfile::TempDir;
 use time::OffsetDateTime;
 use tower::ServiceExt;
 use uuid::Uuid;
-
-static KEK_ENV_LOCK: Mutex<()> = Mutex::new(());
 
 const OWNER_TOKEN: &str = "p3-t3-owner-token";
 const VIEWER_TOKEN: &str = "p3-t3-viewer-token";
@@ -207,7 +205,6 @@ impl TestContext {
 
 #[tokio::test]
 async fn p3_t3a_owner_invite_claim_o3_and_envelope_binding_are_integrated() {
-    let _env_guard = KEK_ENV_LOCK.lock().expect("KEK env lock");
     configure_kek_env();
 
     let Some(ctx) = TestContext::new().await else {
