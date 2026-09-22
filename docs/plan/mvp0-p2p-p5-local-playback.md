@@ -40,7 +40,7 @@ Freeze loopback-only listener and local session access boundary, HLS path/URI va
 | P5.T0 | Gateway/session contract freeze | planning | M | P4 PASS | Done 2026-09-18 |
 | P5.T1 | Loopback ciphertext decryption gateway | development | L | T0 PASS | Automated evidence PASS; formal closure pending |
 | P5.T2 | Existing VideoPlayer and deterministic teardown | development | M | T1 PASS | Automated evidence PASS; formal closure pending |
-| P5.T3 | Playback and secret-boundary certification | development/evidence | M | T2 PASS | **Android rerun pending** (2026-09-22): P4.T1-r1 filesystem fix is implemented + CI verified; exact-head device certification must confirm SYNC/VERIFY/PLAYBACK. |
+| P5.T3 | Playback and secret-boundary certification | release-certification evidence | M | T2 PASS | Deferred release obligation; not a P6 activation gate after P5-DEV closes; may close from compatible T7p or P7.T2 evidence |
 
 
 The companion ledger defines acceptance, HP/EC, evidence and handoff per task.
@@ -52,6 +52,10 @@ integration, authorization or distributed state based on this docs-only edit.
 
 ## Closure and downstream gate
 
+**Replan 2026-09-22:** downstream development consumes **P5-DEV = T0-T2
+formally closed**. P5.T3 remains mandatory for final invited-playback
+certification, but is carried to the release lane instead of blocking P6.
+
 All required parent/leaf HP/EC must map to passing executable evidence at the
 appropriate layer. Apply the current band-routed review (or recorded applicable
 exception), Reflection, behavioral certification and owner-verification gates.
@@ -61,8 +65,9 @@ evidence remediation is recorded in
 `docs/audit/mvp0-p2p-p5-t1-t2-evidence-remediation-2026-09-18.md`.
 
 Aggregate P5 remains **IN PROGRESS** until formal T1/T2 closure plus T3 Android
-device evidence. P6 and roadmap PASS gates therefore remain unchanged. P3-P6
-must all close before S-230 T6p-a can activate.
+device evidence. Once T1/T2 formally close, **P5-DEV** is satisfied and P6 may
+activate even while T3 stays pending. P5.T3 is carried to T7p/P7.T2 and remains
+a hard prerequisite for a passing P7 verdict and T9g GO.
 
 ## Calendar and estimation limits
 

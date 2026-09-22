@@ -20,7 +20,7 @@ behavioral_coverage_contract: behavior-v2
 | P4.T0 | Lifecycle, cache, and RPC freeze | planning | M | P3 PASS | `[x]` Done 2026-09-18 |
 | P4.T1 | Product replication and bounded resume | development | L | T0 PASS | `[x]` Done 2026-09-22 — review PASS |
 | P4.T2 | Manifest verification and lifecycle isolation | development | L | T1 PASS | `[x]` Done 2026-09-18 |
-| P4.T3 | P4 certification and P5 handoff | development/evidence | M | T2 PASS | Closure-ready except exact-head P5.T3 Android rerun |
+| P4.T3 | P4 certification and P5 handoff | development/evidence | M | T2 PASS | Closure-ready; owner verification/status sync pending. P5.T3 no longer gates P4 closure |
 | P4.T1-r1 | Product storage file-URI → path at the Corestore boundary (repair; blocks P5.T3) | development | S | P4.T1 source present | Implemented + CI verified — Android rerun pending |
 
 
@@ -176,15 +176,17 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T2 PASS
 
-**Status:** Closure-ready except exact-head P5.T3 Android rerun. The
+**Status:** Closure-ready; owner verification/status sync pending. The
 2026-09-18 gaps are now addressed: P4.T1 bounded reconnect is Done with review
 PASS, and `p2p.provider-account-change.test.tsx` exercises authenticated
 Account A → B cleanup through `P2PProvider`. The current mobile gate passes
 61/61 suites and 441/441 tests. Certification mapping and the single remaining
 integrated-device blocker are recorded in
 `docs/audit/p4-t3-certification-closure-readiness-2026-09-22.md`.
-Do not mark P4.T3 or aggregate P4 PASS until the repaired product path completes
-the fresh P5.T3 Android `claim -> sync -> verify -> playback` run.
+P5.T3's fresh Android `claim -> sync -> verify -> playback` run is no longer a
+P4 closure prerequisite. P4.T3 closes on its own sync/verification/handoff
+evidence and owner verification; the downstream physical playback proof remains
+open under P5.T3 and the release-certification lane.
 
 **Acceptance criteria:** Certify sync/resume/corruption/account-change HP/EC on the product runtime; record verified package handle and state contract consumed by P5.
 

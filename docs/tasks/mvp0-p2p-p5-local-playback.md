@@ -13,6 +13,14 @@ behavioral_coverage_contract: behavior-v2
 **Phase gate:** P4 PASS remains the formal upstream gate; this evidence remediation does not override it.
 **Effort:** provisional per work package below; no new RRI record is fabricated by the automated-evidence remediation.
 
+**Sequencing amendment — 2026-09-22:** P5 now has two milestones. **P5-DEV**
+means T0-T2 are formally closed and is the handoff consumed by P6 and later
+deployment preparation. **P5-CERT** means P5.T3 has physical Android evidence.
+P5.T3 remains open and aggregate P5 remains IN PROGRESS until that evidence
+exists, but P5.T3 is no longer a downstream development-activation gate. A
+compatible exact-RC T7p run may close it; otherwise P7.T2 is the mandatory
+consolidation point. P7.T3/T9g cannot certify/GO with P5.T3 unresolved or failed.
+
 ## Task map
 
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
@@ -20,7 +28,7 @@ behavioral_coverage_contract: behavior-v2
 | P5.T0 | Gateway/session contract freeze | planning | M | P4 PASS | `[x]` Done 2026-09-18 |
 | P5.T1 | Loopback ciphertext decryption gateway | development | L | T0 PASS | Automated evidence PASS 2026-09-18; formal closure pending owner verification/governance sync |
 | P5.T2 | Existing VideoPlayer and deterministic teardown | development | M | T1 PASS | Automated evidence PASS 2026-09-18; formal closure pending owner verification/governance sync |
-| P5.T3 | Playback and secret-boundary certification | development/evidence | M | T2 PASS | **Android rerun pending** (2026-09-22): P4.T1-r1 filesystem fix is implemented + CI verified; exact-head device certification must now confirm SYNC/VERIFY/PLAYBACK. |
+| P5.T3 | Playback and secret-boundary certification | release-certification evidence | M | T2 PASS | **Deferred release obligation** — remains open; does not block P6 after P5-DEV closes; may be satisfied by compatible T7p evidence or the exact-artifact P7.T2 run |
 
 
 ## Shared activation and closure contract
@@ -171,9 +179,10 @@ exactly once to a filesystem path at the Corestore boundary. CI evidence is gree
 committed Bare worklet drift check PASS). Full implementation evidence:
 `docs/audit/p4-t1-r1-storage-uri-fix-evidence-2026-09-22.md`.
 
-The next required evidence is a fresh-invitation Android certification run on the
-final branch revision. It must record whether the path advances through
-SYNC → VERIFY → PLAYBACK and must not infer PASS from CI alone.
+The required physical evidence remains a fresh-invitation Android run that
+records SYNC → VERIFY → PLAYBACK and the secret/no-fallback boundary. It no
+longer needs to run immediately after T2: compatible exact-RC evidence from T7p
+may close P5.T3, otherwise P7.T2 must produce it. CI alone never satisfies T3.
 
 **Registro histórico (superado) —** BLOCKED at the CLAIM stage of the happy-path attempt. Root
 cause is a local-development-environment gap, not a P3/P4/P5 code defect: the

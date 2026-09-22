@@ -10,14 +10,14 @@ behavioral_coverage_contract: behavior-v2
 # P6 — planning task ledger
 
 **Status:** Planned; no task activated or implemented by this documentation update.
-**Phase gate:** P3-P5 PASS.
+**Phase gate:** P3 PASS; P4 PASS; P5-DEV (P5.T0-T2 formally closed). P5.T3/P5-CERT is not an activation prerequisite.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
 ## Task map
 
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
-| P6.T0 | State/action and navigation contract | planning | M | P3-P5 PASS | Planned; not activated |
+| P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | Planned; not activated |
 | P6.T1 | Owner My Content and invite action | development | M | T0 PASS | Planned; not activated |
 | P6.T2 | Viewer claim, Invites, sync and play actions | development | L | T1 PASS | Planned; not activated |
 | P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | Planned; not activated |
@@ -44,7 +44,7 @@ Release artifact/gate changes also synchronize the S-230 plan and ledger.
 
 **Effort:** M (provisional; re-score/decompose at activation)
 
-**Depends on:** P3-P5 PASS
+**Depends on:** P3 PASS; P4 PASS; P5-DEV. P5.T3 may remain pending.
 
 **Status:** Planned; not activated.
 
@@ -62,7 +62,7 @@ evidence when behavior is delivered. Record failures rather than inferring PASS.
 **Status artifacts affected:** shared status set above; propagate any changed
 downstream input to its consuming phase before claiming closure.
 
-**Agent handoff:** Read this phase plan and governing references. Verify P3-P5 PASS;
+**Agent handoff:** Read this phase plan and governing references. Verify P3 PASS, P4 PASS, and P5-DEV; do not require P5.T3;
 freeze and score exact paths, preserve the accepted boundary, and deliver only
 P6.T0's acceptance criteria through the current workflow. Stop on a
 contract conflict or unmet dependency; do not silently advance the next phase.
