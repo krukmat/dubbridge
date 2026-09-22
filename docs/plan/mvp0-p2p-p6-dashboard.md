@@ -7,7 +7,7 @@ slice: MVP0-P2P
 
 # P6 — Minimal My Content and Invites dashboard
 
-Task ledger: `docs/tasks/mvp0-p2p-p6-dashboard.md`. **Activation gate satisfied 2026-09-22. P6.T0 PASS:** owner verification complete and `c6ce2039` finished 15/15 CI. **P6.T1 T1.A–E PASS**: Block 1 closed on `b52d366c`; Block 2 Create + one-time Copy closed on implementation head `151721a5` with 15/15 CI, mobile 63/63 suites / 456/456 tests and 90.43% workspace line coverage. T1 remains in progress for F-H; T2/T3 remain blocked. P5.T3 is deferred to release certification.
+Task ledger: `docs/tasks/mvp0-p2p-p6-dashboard.md`. **Activation gate satisfied 2026-09-22. P6.T0 PASS:** owner verification complete and `c6ce2039` finished 15/15 CI. **P6.T1 T1.A–G PASS**: Block 1 closed on `b52d366c`; Block 2 Create + one-time Copy on `151721a5`; T1.F navigation on `32ac26c0`; T1.G aggregate gap closure on `47bc3e8b` with 15/15 CI, mobile 63/63 suites / 461/461 tests and 90.43% workspace line coverage. Only T1.H aggregate certification/owner verification remains; T2/T3 remain blocked. P5.T3 is deferred to release certification.
 
 ## Objective
 
@@ -38,7 +38,7 @@ Freeze state projection and action eligibility from canonical backend and runtim
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
 | P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **PASS 2026-09-22** |
-| P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **In progress — A–E PASS; F–H pending; RRI 55 Med-high** |
+| P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **In progress — A–G PASS; H pending; RRI 55 Med-high** |
 | P6.T2 | Viewer claim, Invites, sync and play actions | development | L | T1 PASS | Planned; not activated |
 | P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | Planned; not activated |
 
@@ -97,9 +97,8 @@ the final model/state-hook/view split is green.
 Head `b52d366c`: 15/15 CI PASS; mobile 63/63 suites, 452/452 tests; workspace
 line coverage 90.43%.
 
-P6.T1 is not closed. Block 2 completed T1.D/E; the remaining sequence is T1.F
-navigation, T1.G remaining component/integration evidence, then T1.H aggregate
-certification and owner verification.
+P6.T1 is not closed. Blocks 1–3 now cover T1.A–G; only T1.H aggregate
+certification and owner verification remains before T1 PASS.
 
 
 ### P6.T1 Block 2 result — 2026-09-22
@@ -118,4 +117,22 @@ Done/unmount, and is never added to persistence or logs.
 Implementation head `151721a5`: 15/15 CI PASS; mobile 63/63 suites,
 456/456 tests; workspace line coverage 90.43%.
 
-P6.T1 remains IN PROGRESS. T1.F, T1.G and T1.H are still pending.
+### P6.T1 Block 3 result — 2026-09-22
+
+Evidence: `docs/audit/mvp0-p2p-p6-t1-block3-navigation-evidence-2026-09-22.md`.
+
+T1.F wires the existing authenticated stack as Home → My Content → Back, reuses
+the existing gateway/auth providers, refreshes the owner projection on remount and
+does not revive the one-time raw token after leaving the screen.
+
+T1.G performed the remaining component/integration gap review. The only uncovered
+contract edges were stale Create rejection across the full 403/404/409 set and
+the single-visible-token lock across multiple Ready items. Both are now explicit
+tests; production behavior was unchanged. Existing DB integration evidence also
+proves `/api/p2p/content` is owner-scoped and excludes other-owner assets.
+
+Exact evidence head `47bc3e8b`: 15/15 CI PASS; mobile 63/63 suites,
+461/461 tests; P3 T2c3 certification harness PASS; workspace line coverage 90.43%.
+
+P6.T1 remains IN PROGRESS. T1.A–G are PASS; only T1.H aggregate certification
+and owner verification remains pending.

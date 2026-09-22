@@ -573,7 +573,7 @@
             <div class="sub-row"><span class="sid">P4</span><span class="sdesc"><strong>PASS 2026-09-22</strong> — T0/T1/T2/T3 cerrados; head <code>780519c5</code> 15/15 CI; handoff P4→P5 y owner verification completados.</span></div>
             <div class="sub-row"><span class="sid">P5-DEV</span><span class="sdesc"><strong>SATISFIED 2026-09-22</strong> — T0/T1/T2 formalmente cerrados; owner verification completada; <code>e63209f5</code> 15/15 CI; mobile 62/62 suites y 446/446 tests.</span></div>
             <div class="sub-row"><span class="sid">P5.T3</span><span class="sdesc"><strong>P5-CERT pendiente</strong> — certificación física diferida; no bloquea P6. Se resuelve con T7p compatible o P7.T2.</span></div>
-            <div class="sub-row warn"><span class="sid">P6</span><span class="sdesc"><strong>T0 PASS · T1.A–E PASS</strong> — My Content + exact Ready eligibility + Create Invite real + token one-time/Copy; implementation head <code>151721a5</code> 15/15 CI, mobile 63/63 suites · 456/456 tests, coverage 90.43%. T1.F-H pendientes; T2/T3 bloqueados.</span></div>
+            <div class="sub-row warn"><span class="sid">P6</span><span class="sdesc"><strong>T0 PASS · T1.A–G PASS</strong> — My Content + exact Ready + Create/Copy one-time + navegación Home→My Content + cierre de gaps 403/404/409 y single-token lock. Evidence head <code>47bc3e8b</code>: 15/15 CI, mobile 63/63 suites · 461/461 tests, coverage 90.43%. Solo T1.H pendiente; T2/T3 bloqueados.</span></div>
           </div>
           <div class="lrow next"><span class="id">P7</span><span class="desc">Certificación exact-artifact; P7.T2 absorbe P5.T3 si todavía sigue abierto</span><span class="status">release gate</span></div>
         </div>
@@ -628,7 +628,7 @@
       </div>
       <div class="risk info">
         <span class="tag2">CI — verde</span>
-        <p><strong>P6 implementation head <code>151721a5</code>: 15/15 CI PASS.</strong> Mobile: 63/63 suites, 456/456 tests; coverage 90.43%. P3 y P4 están cerrados; P5-DEV está satisfecho y P6.T1.A–E están verdes. No hay fallo abierto de CI en este bloque de desarrollo.</p>
+        <p><strong>P6 T1.G evidence head <code>47bc3e8b</code>: 15/15 CI PASS.</strong> Mobile: 63/63 suites, 461/461 tests; coverage 90.43%. P3 y P4 están cerrados; P5-DEV está satisfecho y P6.T1.A–G están verdes. Solo falta T1.H para el cierre agregado.</p>
       </div>
       <div class="risk info">
         <span class="tag2">P2P local-dev — infra lista</span>
@@ -659,7 +659,7 @@
     <div class="timeline">
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">6–10 SEP</div><div class="work">T1 done + P2.C0 PASS + T2 completo + T3a/T3b done; nueva T7local</div><div class="outcome">X29 promovido a blocker</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">11–18 SEP</div><div class="work">P2.T3c/T3d/T4 cerrados; ledger de remediación abierto y ejecutado — CONS-T0/T1/T2/T3/T4/T5/T9 <strong>Done</strong> (aggregate P2 PASS); CONS-T6/T7/T8a verificó P3/P4/P5.T0-2 leaf por leaf: P4.T0/P4.T2/P5.T0 Done, resto Blocked por gaps reales; CI sigue roja (RUSTSEC + MinIO + coverage); S-230 T7local sin avance en 12 días</div><div class="outcome">X29 OPEN, plazo venció 18-sep</div></div>
-      <div class="tstep now"><div class="bar"><div class="dot"></div></div><div class="window">19 SEP–2 OCT</div><div class="work"><strong>P3 PASS + P4 PASS</strong>. <strong>P5-DEV SATISFIED</strong>; P6.T0 PASS y P6.T1.A–E PASS. En paralelo sigue T7local→T7c. P5.T3/P5-CERT continúa diferido.</div><div class="outcome">◆ objetivo inmediato: P6.T1.F/G/H (navigation + evidence + cierre) + T7local/T7c<div class="here-flag">estás acá</div></div></div>
+      <div class="tstep now"><div class="bar"><div class="dot"></div></div><div class="window">19 SEP–2 OCT</div><div class="work"><strong>P3 PASS + P4 PASS</strong>. <strong>P5-DEV SATISFIED</strong>; P6.T0 PASS y P6.T1.A–G PASS. En paralelo sigue T7local→T7c. P5.T3/P5-CERT continúa diferido.</div><div class="outcome">◆ objetivo inmediato: P6.T1.H (aggregate certification + owner verification) + T7local/T7c<div class="here-flag">estás acá</div></div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">3–12 OCT</div><div class="work">Activar y cerrar P6 sobre el nuevo gate</div><div class="outcome">DEV-HANDOFF = P3 + P4 + P5-DEV + P6</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">13–21 OCT</div><div class="work">T6p-a → T6p-b → T6p-c → T6p-d; completar T6/T7 si sigue pendiente</div><div class="outcome">backend P2P desplegado</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">22–26 OCT</div><div class="work">T7p: candidato Android físico; reutilizar evidencia para P5.T3 si cubre criterios exactos</div><div class="outcome">RC listo + posible P5-CERT</div></div>
@@ -675,6 +675,7 @@
     <code>docs/audit/mvp0-p2p-p5-dev-closure-readiness-2026-09-22.md</code> (P5.T1/T2 HP/EC, P5-DEV closure readiness, owner verification posterior) ·
     <code>e63209f5</code> (P5-DEV preparation head, 15/15 CI PASS; mobile 62/62 suites, 446/446 tests) ·
     <code>docs/audit/mvp0-p2p-p6-t1-block2-create-copy-invite-2026-09-22.md</code> (P6.T1.D/E, implementation head <code>151721a5</code>, 15/15 CI PASS; mobile 63/63 suites, 456/456 tests; coverage 90.43%) ·
+    <code>docs/audit/mvp0-p2p-p6-t1-block3-navigation-evidence-2026-09-22.md</code> (P6.T1.F/G, evidence head <code>47bc3e8b</code>, 15/15 CI PASS; mobile 63/63 suites, 461/461 tests; coverage 90.43%) ·
     <code>docs/audit/mvp0-p2p-p5-t3-sequencing-replan-2026-09-22.md</code> (P5-DEV/P5-CERT y DEV-HANDOFF) ·
     <code>docs/audit/mvp0-p2p-p3-t0-contract-freeze-2026-09-22.md</code> (P3.T0a–g freeze, gaps y path ownership) ·
     <code>docs/audit/mvp0-p2p-p3-t1-implementation-2026-09-22.md</code> (T1 PASS, head <code>4dede25d</code>) ·
@@ -697,7 +698,7 @@
     <code>docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md</code> (evidencia por leaf) ·
     <code>make qa-docs</code> (pasó limpio tras los cierres).
     <div class="lineage" id="linaje-completo">
-      <strong>Linaje:</strong> 2026-09-22 noche — P6.T1.A–E PASS: My Content, exact Ready eligibility, Create Invite P3 y token one-time/Copy verdes en <code>151721a5</code>; quedan F/G/H ← P3 y P4 cerrados PASS; P5.T1/T2 formalmente cerrados; P5-DEV SATISFIED; P6.T0 PASS ← este documento (2026-09-22 tarde — merge de 14 commits remotos
+      <strong>Linaje:</strong> 2026-09-22 noche — P6.T1.A–G PASS: My Content, exact Ready, Create/Copy, navegación y aggregate gap closure verdes en <code>47bc3e8b</code>; queda solo H ← P3 y P4 cerrados PASS; P5.T1/T2 formalmente cerrados; P5-DEV SATISFIED; P6.T0 PASS ← este documento (2026-09-22 tarde — merge de 14 commits remotos
       (<code>c726e42</code>): P4.T1 pasa de Blocked a <strong>Implemented+verified</strong>
       (reconexión acotada, <code>P2pProductSync.ts</code>, RRI 55, revisión Med-high pendiente);
       P4.T3 suma test de cambio de cuenta (RRI 25 Low); CI cambia de causa — <code>deny</code>/
