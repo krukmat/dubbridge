@@ -73,3 +73,22 @@ handle or network activity exists. An X28 device-runtime failure is classified
 - Official references: [Expo FileSystem](https://docs.expo.dev/versions/latest/sdk/filesystem/),
   [Bare mobile guide](https://github.com/holepunchto/pear-docs/blob/main/guide/making-a-bare-mobile-app.md),
   and [Bare runtime API](https://github.com/holepunchto/bare).
+
+## Amendment 2026-09-22 — URI contract vs Corestore path boundary
+
+The host-to-worklet contract remains a `file:` URI. The earlier wording that
+implied the URI should remain unchanged all the way into Corestore was too broad.
+
+For the **product** runtime, `Bare.argv[0]` and account scoping remain URI-based
+until the Corestore boundary. Immediately before Corestore construction the
+scoped URI is converted exactly once with `bare-url.fileURLToPath`. This matches
+the Bare mobile guidance and preserves percent-decoding semantics without a
+string-prefix replacement.
+
+The correction is recorded as P4.T1-r1. It does not change the host contract,
+RPC surface, account scoping, cache cleanup ownership or crypto behavior.
+
+The development-only P1 transient-drive path still passes its scoped URI directly
+to Corestore and remains a separately named latent residual; this amendment does
+not claim that path is repaired.
+
