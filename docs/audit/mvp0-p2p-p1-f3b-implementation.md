@@ -411,6 +411,224 @@ comes to depend on the harness proof, or if `react-native-bare-kit` still has
 not published a release bundling `bare-module ≥ 6.4.0` by the time P1's
 device-dependent criteria become blocking rather than deferrable.
 
+### 9.4 The `bare-module` upgrade did not fix it — cause re-traced (2026-09-22)
+
+**§ 9.2's conclusion is superseded.** The upstream dependency it named as the
+cause has since been upgraded, the crash reproduces unchanged, and the real
+failing mechanism has now been established on-device. `bare-module@6.3.2`'s
+bundle-evaluation-order bug was *a* real upstream defect, but it was not this
+crash's cause.
+
+`react-native-bare-kit` is now pinned at `^0.15.5` (`mobile/package.json:47`;
+commits `77ee0a3` "upgrade Bare runtime past bundle crash" and `44ec91a` "lock
+react-native-bare-kit 0.15.5"), whose shipped `libbare-kit.so` embeds
+**`bare-module@7.0.3`** — verified live, not from the changelog:
+`strings node_modules/react-native-bare-kit/android/libs/bare-kit/jni/arm64-v8a/libbare-kit.so
+| grep -o 'builtin:bare-module@[0-9.]*'` → `builtin:bare-module@7.0.3`.
+`mobile/scripts/check-bare-runtime.mjs` (which fails closed below
+`react-native-bare-kit` 0.15.5 at `:50` and below embedded `bare-module` 6.4.0
+at `:72`) passes on every run.
+
+#### Reproduction
+
+`npm run android:p2p-dev` against the `fenix_t7` emulator, 2026-09-22. The app
+builds, installs, launches, and the worklet thread starts — then aborts:
+
+```
+E ubbridge.mobile: Uncaught (in promise) SyntaxError: Unexpected token ':'
+E ubbridge.mobile:     at ScriptModule._createFunction (bare:/worklet.bundle/node_modules/bare-module/lib/module.js:209:24)
+E ubbridge.mobile:     at ScriptModule._initialize    (bare:/worklet.bundle/node_modules/bare-module/lib/module/script.js:11:21)
+E ubbridge.mobile:     at ScriptModule._instantiate   (bare:/worklet.bundle/node_modules/bare-module/lib/module.js:151:10)
+E ubbridge.mobile:     at ModuleLoader._instantiate   (bare:/worklet.bundle/node_modules/bare-module/lib/loader.js:642:46)
+E ubbridge.mobile:     at ModuleLoader.linkSync       (bare:/worklet.bundle/node_modules/bare-module/lib/loader.js:240:10)
+E ubbridge.mobile:     at Module.loadSync             (bare:/worklet.bundle/node_modules/bare-module/index.js:44:25)
+E ubbridge.mobile:     at BundleModule.start          (bare:/worklet.bundle/shared/worklet.js:128:17)
+F libc    : Fatal signal 6 (SIGABRT), code -1 (SI_QUEUE) in tid 23652 (bare-worklet), pid 23450 (ubbridge.mobile)
+F DEBUG   : #00 pc …669e4 libc.so (abort+164)
+F DEBUG   : #01 pc …173188 libbare-kit.so
+F DEBUG   : #02 pc …198ce4 libbare-kit.so (js_callback_s::on_call(v8::FunctionCallbackInfo<v8::Value> const&)+104)
+E ReactNativeJS: [P2P development harness] INITIALIZE_FAILED
+W ReactNativeJS: [P2P development harness] shutdown=complete
+```
+
+Full capture: session logcat, `tid 23652`, 09:00:13.371–09:00:17.859.
+
+#### Proven
+
+1. **The SIGABRT is the uncaught `SyntaxError` crossing the native boundary.**
+   `js_callback_s::on_call` aborting is the JS exception terminating the
+   worklet thread, not an independent native fault.
+2. **`shared/worklet.js:128` is bare-kit's own bootstrap**, embedded in
+   `libbare-kit.so` — not `mobile/src/p2p/runtime/worklet.js` (51 lines). This
+   resolves the line-number contradiction that misdirected earlier analysis:
+   the frame never appears among the bundle's keys because it is not in the
+   bundle.
+3. **The runtime is `bare-module@7.0.3`**, confirmed independently of the
+   `strings` probe by exact line-number correspondence against the published
+   source (fetched read-only via `npm pack`, never installed):
+   `lib/module.js:208-209` is `_createFunction`'s `binding.createFunction(…)`;
+   `lib/module/script.js:10-11` is `_initialize`'s `this._fn =
+   this._createFunction(this._text())`. Both match the crash frames exactly.
+4. **The bundle contains zero TypeScript.** 388 keys: 290 `.js`, 97 `.json`,
+   1 `.cjs` (`hyperschema/runtime.cjs`); `main = /src/p2p/runtime/worklet.js`.
+   `build-bare-worklet.mjs` transpiles all 16 own `.ts` files with the real
+   `typescript` package and throws on error diagnostics, so no TS can reach
+   the bundle. The "unstripped TypeScript" theory is dead by ground truth.
+5. **Decisive test — the failing module is a `.json` compiled as a CJS
+   script.** Compiling every one of the 388 packed files with
+   `new Function("require","module","exports","__filename","__dirname", src)`
+   — exactly what `_createFunction` does — yields **97 failures, all of them
+   the `.json` files, all with the identical message `Unexpected token ':'`;
+   291 compile cleanly and zero `.js` files fail.** A JSON object evaluated as
+   a function body parses `{` as a block, `"name"` as a string expression, and
+   then hits `:`. There is no syntax defect in our code or in any JS
+   dependency.
+6. **The runtime's fallback module type is SCRIPT.** `lib/loader.js:448`
+   (`_root()`): `defaultType: this._defaultType || type.SCRIPT`. A `.json`
+   whose type is never determined is therefore handed to `ScriptModule`,
+   which is precisely the observed path.
+7. **Structural anomaly: 372 of 388 bundle keys escape the bundle root**, e.g.
+   `/../node_modules/@hyperswarm/secret-stream/package.json`. Only the 16 own
+   `/src/p2p/runtime/*.js` files are clean. Mechanism confirmed in
+   `mobile/scripts/build-bare-worklet.mjs`: it creates its pack root with
+   `mkdtemp(path.join(mobileRoot, ".bare-pack-"))` (`:72`) and passes it as
+   `--base` (`:86`), while `node_modules` remains one level above it at
+   `mobile/node_modules` — hence every dependency path is emitted as `/../…`.
+   The escaping set includes **every `package.json`**, i.e. exactly the files
+   the runtime's traverse reads to establish package boundaries and module
+   types.
+
+#### Refuted (with sources in hand, not by inference)
+
+- **`bare-module` version skew is not the axis.** 6.3.2 → 7.0.3 landed; crash
+  unchanged. § 9.2's conclusion does not survive.
+- **`bare-bundle` 1.10.0 → 1.11.0 is not the fix.** Neither version serializes
+  a per-file module `type`/`naturalType` at all — diffing the two releases'
+  `this._*` fields shows only `_root` added. The `naturalType` field
+  `bare-module@7.0.3` reads (`lib/source.js:5`: `this.naturalType =
+  dependency.naturalType || 0`) is produced by the runtime's own traverse, not
+  carried in the bundle, so no bundler bump can supply it.
+- **`bare-pack` 2.2.2 is not the fix** (refuted in an earlier session).
+- **An unknown module type would not produce this error.** `lib/loader.js:620`
+  (`const Class = recordClasses[dependency.type]`) would throw
+  `UNKNOWN_MODULE_TYPE`, and `_assertType` (`:646,653,661`) would throw
+  `TYPE_INCOMPATIBLE`. Neither is what we see — consistent with finding 6: the
+  type is not unknown, it is silently defaulted to SCRIPT.
+
+#### Hypothesis raised here — tested the same day and REFUTED
+
+That the `/../` root escape prevented the runtime's traverse from typing the
+`.json` files, producing the SCRIPT fallback of finding 6. It was coherent
+with all seven findings above and was the only structural defect found, but
+**it is wrong**. See § 9.5: correcting `--base` took the escaping-path count
+from 372/388 to 0/388 and the crash was byte-identical. Finding 5 (`.json`
+compiles as a script) is a true statement about the bundle's contents that
+turned out not to be the failure being observed. The real cause is § 9.5.
+
+#### Side finding — environment, not code
+
+`npm run android:p2p-dev` fails before compiling anything when `JAVA_HOME`
+points at OpenJDK 26 (the shell default on this host): AGP's
+`JdkImageTransform` cannot run `jlink` against it —
+`Failed to transform core-for-system-modules.jar … Error while executing
+process …/openjdk/26.0.1/…/bin/jlink`. Overriding `JAVA_HOME` to
+`/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home` for the
+single invocation produces `BUILD SUCCESSFUL`. This was **not** persisted to
+any shell profile or repository file; it is recorded here so the next run does
+not re-diagnose it.
+
+#### Status of § 9.4
+
+Superseded within the same session by § 9.5, which identifies the actual
+cause. The seven findings above stand as evidence; the hypothesis does not.
+
+### 9.5 Actual root cause: the worklet filename's extension (2026-09-22)
+
+**The crash was never upstream. It is a two-line defect in this repository,
+present since the worklet client was written.**
+
+`react-native-bare-kit`'s `Worklet.start(filename, source, args)` derives the
+*module type* of `source` from `filename`'s extension. Its README states the
+constraint outright (`node_modules/react-native-bare-kit/README.md:42`):
+
+```
+// First arg (filename)'s extension *must* be .bundle
+worklet.start('/app.bundle', source)
+```
+
+This repository passed neither:
+
+| File | Constant | Value before fix |
+|---|---|---|
+| `mobile/src/p2p/runtime/BareRuntimeClient.ts:49` | `PRODUCT_WORKLET_FILENAME` | `/dubbridge-p2p-runtime.worklet` |
+| `mobile/src/p2p/proof/ProofRuntimeFactory.ts:8` | `PROOF_WORKLET_FILENAME` | `/dubbridge-p2p-proof.worklet` |
+
+**Mechanism, traced to source.** `bare-module-traverse`'s `moduleType()`
+(`mobile/node_modules/bare-module-traverse/index.js:727-772`) matches the
+pathname against `/\.[a-z]+$/` and switches over the result. The recognized
+set is `.js .ts .cjs .cts .mjs .mts .json .bundle .bare .node .bin .txt`.
+`.worklet` matches the regex but hits no case, so control reaches the final
+`return defaultType` (`:771`) — and `defaultType` is
+`this._defaultType || type.SCRIPT` (`bare-module@7.0.3 lib/loader.js:448`).
+The bundle's bytes are therefore handed to `ScriptModule`, whose
+`_initialize` calls `_createFunction` on them (`lib/module/script.js:10-11`
+→ `lib/module.js:208-209`). A Bare bundle's wire format is
+`<header length><header JSON><files>`, so the first thing the JS parser meets
+is a JSON object — and its first `:` raises **`SyntaxError: Unexpected token
+':'`**, exactly at the frames observed. Uncaught on the worklet thread, it
+aborts the process through `js_callback_s::on_call` → SIGABRT.
+
+**This explains every previously puzzling observation**, including the ones
+that misled §§ 9.2-9.4:
+
+- Content-independence. Every Bare bundle has a JSON header, so *any* bundle
+  crashes identically. § 9.2's "dependency-free bundle crashes too" was read
+  as proof of an upstream bug; it was actually proof the defect is
+  content-independent — which is what a filename-derived type error looks
+  like.
+- Version-independence. `bare-module` 6.3.2 → 7.0.3, `bare-pack` 2.2.2 and
+  `bare-bundle` 1.11.0 could not have helped, because none of them is
+  involved in the decision.
+- The `.json` red herring of § 9.4 finding 5. The 97 packed `.json` files do
+  fail `new Function`, but they were never the file being compiled.
+
+**Verification on device (emulator `fenix_t7`, 2026-09-22):**
+
+1. *Negative control — corrected `--base`, 0/388 escaping paths.* Crash
+   byte-identical (`tid 24034`, same stack, same SIGABRT). Refutes § 9.4's
+   hypothesis.
+2. *Zero-`.json` bundle.* A bundle packed from a staging directory with no
+   `package.json` anywhere, yielding exactly **1 key** (`/worklet.js`) and no
+   `.json` at all: crash **still identical** (`tid 24159`). Refutes the
+   `.json`-as-script reading. Note a bundle packed from `mobile/` always
+   carries `/package.json`, which is why § 9.2's "dependency-free" bundle was
+   not actually `.json`-free and its negative result was misread.
+3. *Positive control for test validity.* Replacing the bundle with
+   `module.exports = "NOT-A-BUNDLE-CONTROL"` produced a **different** error,
+   `ReferenceError: NOT is not defined` — proving Metro served fresh content
+   on each relaunch (so 1 and 2 are valid) and, independently, that the file's
+   contents were being *executed as a script*.
+4. *The fix.* Changing both constants' extension to `.bundle` and relaunching:
+   **zero `SyntaxError`, zero SIGABRT, and
+   `W ReactNativeJS: [P2P development harness] ping=pong`** — the harness
+   completes its round trip for the first time. `npm run typecheck` and
+   `npm run lint` both exit 0.
+
+**Consequences for the record.** § 9.2's conclusion ("confirmed upstream
+`bare-module@6.3.2` bug") is **withdrawn** — it was an inference from a
+control that did not control what it was believed to control. § 9.3's
+self-build evaluation is moot: no upstream artifact ever needed replacing.
+The `react-native-bare-kit` 0.15.5 pin and the `check-bare-runtime.mjs` guard
+are independently fine and are not implicated either way.
+
+**Not yet done.** The two-line change is verified on device but remains
+uncommitted and has had no RRI score, no band-routed phase-1/phase-2 review,
+and no owner verification — it needs its own task card before closure. The
+`--base` correction in `build-bare-worklet.mjs` is a separate, optional
+hygiene change that is **not** part of the fix; it removes the `/../` path
+escape and keeps the bundle deterministic, but it was proven not to affect
+the crash, and whether to keep it is an open decision.
+
 ## 10. `P1.F3b-fix-1` closure (2026-08-28)
 
 Development-task closure for the § 9.1 fix. RRI 17 Low, so no Reflection log
