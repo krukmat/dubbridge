@@ -98,15 +98,15 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-function renderScreen(onCreateInvite = jest.fn()) {
+async function renderScreen(onCreateInvite = jest.fn()) {
   return {
     onCreateInvite,
-    ...render(
+    ...(await render(
       <MyContentScreen
         gatewayBaseUrl="http://localhost:3000"
         onCreateInvite={onCreateInvite}
       />,
-    ),
+    )),
   };
 }
 
@@ -145,7 +145,7 @@ describe("MyContentScreen", () => {
       },
     });
 
-    const { getByText, getByTestId, queryByTestId, onCreateInvite } = renderScreen();
+    const { getByText, getByTestId, queryByTestId, onCreateInvite } = await renderScreen();
 
     await waitFor(() => expect(getByText("Ready package")).toBeTruthy());
 
@@ -186,7 +186,7 @@ describe("MyContentScreen", () => {
       },
     });
 
-    const { getByText, queryByTestId } = renderScreen();
+    const { getByText, queryByTestId } = await renderScreen();
 
     await waitFor(() => expect(getByText("Drifted package")).toBeTruthy());
     expect(queryByTestId("my-content-create-invite-asset-ready")).toBeNull();
@@ -198,7 +198,7 @@ describe("MyContentScreen", () => {
       value: { data: [], sessionRotation: null },
     });
 
-    const { getByTestId } = renderScreen();
+    const { getByTestId } = await renderScreen();
 
     await waitFor(() => expect(getByTestId("my-content-empty")).toBeTruthy());
   });
@@ -226,7 +226,7 @@ describe("MyContentScreen", () => {
         },
       });
 
-    const { getByTestId, getByText } = renderScreen();
+    const { getByTestId, getByText } = await renderScreen();
 
     await waitFor(() => expect(getByTestId("my-content-error")).toBeTruthy());
     await act(async () => {
@@ -242,7 +242,7 @@ describe("MyContentScreen", () => {
       error: { kind: "session_expired" },
     });
 
-    renderScreen();
+    await renderScreen();
     await act(async () => {});
 
     await waitFor(() => expect(mockAuthValue.logout).toHaveBeenCalledTimes(1));
