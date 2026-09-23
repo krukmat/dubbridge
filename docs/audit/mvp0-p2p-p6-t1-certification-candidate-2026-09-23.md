@@ -1,27 +1,23 @@
 ---
 type: Audit
-title: "P6.T1 aggregate certification candidate"
-status: in_progress
+title: "P6.T1 aggregate certification closure"
+status: pass
 task: P6.T1
 block: T1.H
 date: 2026-09-23
 ---
 
-# P6.T1 — aggregate certification candidate
+# P6.T1 — aggregate certification closure
 
 ## Verdict
 
-**TECHNICAL CERTIFICATION READY; T1.H NOT YET PASS.**
+**PASS 2026-09-23.**
 
-T1.A–G are already PASS. This record performs the available aggregate closure
-work for T1.H and deliberately stops before the remaining gate that cannot be
-self-issued:
+T1.A–G are already PASS. T1.H closes the aggregate task under the standing
+MVP0-P2P owner-directed review exception. Owner Matias Kruk explicitly stated on
+2026-09-23 that he reviewed T1 himself and approved closure.
 
-1. independent Med-high code-solution peer review.
-
-Owner final verification was explicitly approved by the owner on 2026-09-23.
-
-P6.T2 remains blocked.
+P6.T2 is now unblocked / not activated.
 
 ## Exact candidate
 
@@ -102,37 +98,22 @@ satisfies the owner slice of that parent case.
 
 Parent viewer-side HP/EC cases remain deliberately uncertified until T2/T3.
 
-## Peer Reviewer evidence
+## Review evidence override
 
-**Status: PENDING — independent execution required.**
+- REVIEW-OVERRIDE: urgency — explicit owner-directed MVP0-P2P exception.
+- Waiver-by: Matias, repository owner
+- Scope-note: skips only phase-1 and phase-2 peer review for P6.T1 under `docs/audit/mvp0-p2p-review-exception.md`; all non-review closure gates remain mandatory.
 
-RRI 55 / Med-high requires the repository's phase-2 independent reviewer.
-The current session cannot access the owner's local Ollama runtime and therefore
-does not manufacture a reviewer verdict.
-
-Exact execution packet and command:
-
-`.agent/p6-t1-certification-closure.md`
-
-Expected artifact:
-
-`.agent/peer-code-review-p6-t1.json`
-
-T1.H cannot PASS until the independent artifact is available and any findings
-have a recorded disposition.
+Matching append-only ledger entry: `docs/audit/gemma-review-overrides.md` → `P6.T1`.
 
 ## Owner final verification
 
-**Status: APPROVED 2026-09-23.**
+**Status: VERIFIED 2026-09-23.**
 
 - Owner: Matias Kruk
 - Date: 2026-09-23
-- Statement: owner approval explicitly provided for P6.T1/T1.H in the project conversation.
-- Commands run by owner: no additional local command was claimed. Approval relied on the exact-head CI evidence already recorded for `b6df0a7f` / run `35825349299`.
-
-This records the owner's approval without inventing an unperformed local command. If the later
-independent peer review requires a code repair, owner verification must be repeated against the
-repaired exact head before T1 can close.
+- Statement: I reviewed P6.T1 myself and approve closure against the recorded behavioral evidence and green CI result.
+- Commands run: manual owner review; no additional CLI command was reported. Automated verification used GitHub Actions run `35825349299` on `b6df0a7f` (15/15 PASS; mobile 63/63 suites, 461/461 tests; coverage 90.43%).
 
 ## Current status
 
@@ -143,6 +124,6 @@ repaired exact head before T1 can close.
 - T1.E — PASS
 - T1.F — PASS
 - T1.G — PASS
-- **T1.H — IN PROGRESS / blocked only on independent peer review**
+- **T1.H — PASS**
 
-**P6.T1 remains IN PROGRESS. P6.T2 remains blocked.**
+**P6.T1 PASS 2026-09-23. P6.T2 is unblocked / not activated.**

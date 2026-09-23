@@ -9,7 +9,7 @@ behavioral_coverage_contract: behavior-v2
 
 # P6 — planning task ledger
 
-**Status:** **In progress. P6.T0 PASS 2026-09-22.** Contract freeze, owner verification and exact-head `c6ce2039` 15/15 CI PASS are complete. **P6.T1 T1.A–G are PASS; T1.H owner verification is APPROVED 2026-09-23 and only the independent RRI-55 peer review remains. T2/T3 remain blocked.**
+**Status:** **In progress. P6.T0 PASS 2026-09-22; P6.T1 PASS 2026-09-23.** T1 closed under the standing MVP0-P2P owner review exception with owner self-review/approval and green exact-head CI evidence. **P6.T2 is now unblocked / not activated; P6.T3 remains blocked on T2 PASS.**
 **Phase gate:** **SATISFIED 2026-09-22 — P3 PASS + P4 PASS + P5-DEV.** P5.T3/P5-CERT is not an activation prerequisite.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
@@ -18,8 +18,8 @@ behavioral_coverage_contract: behavior-v2
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
 | P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **PASS 2026-09-22 — owner-verified; c6ce2039 15/15 CI** |
-| P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **In progress — T1.A–G PASS; T1.H owner-approved, peer review pending** |
-| P6.T2 | Viewer claim, Invites, sync and play actions | development | L | T1 PASS | Planned; not activated |
+| P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **PASS 2026-09-23 — T1.A–H closed; owner-reviewed; REVIEW-OVERRIDE applied** |
+| P6.T2 | Viewer claim, Invites, sync and play actions | development | L | T1 PASS | **Unblocked / not activated** |
 | P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | Planned; not activated |
 
 
@@ -75,7 +75,7 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T0 PASS
 
-**Status:** **In progress — T1.A–G PASS 2026-09-22.** Block 1 closed on `b52d366c`; Block 2 (T1.D+E) on `151721a5`; navigation T1.F closed on `32ac26c0`; aggregate gap tests/evidence T1.G closed on `47bc3e8b` with 15/15 CI, mobile 63/63 suites / 461/461 tests and workspace line coverage 90.43%. Create Invite preserves P3 authority, 403/404/409 stale-state rejection is fail-closed, the raw token remains transient, and Home → My Content navigation clears it on unmount. T1.H aggregate certification is prepared on exact candidate head `d19e51f4`; owner verification is approved 2026-09-23; the required independent Med-high code-solution review remains outstanding. Activation RRI: **55 / Med-high**; no auth decision is delegated to UI.
+**Status:** **PASS 2026-09-23.** Blocks T1.A–G are green; T1.H aggregate certification is closed using the standing MVP0-P2P owner-directed peer-review exception (`docs/audit/mvp0-p2p-review-exception.md`). Owner Matias Kruk explicitly stated that he reviewed T1 himself and approved closure. Functional/evidence head `b6df0a7f` completed 15/15 CI; mobile 63/63 suites / 461/461 tests; workspace line coverage 90.43%. Create Invite preserves P3 authority, 403/404/409 stale-state rejection is fail-closed, the raw token remains transient, and Home → My Content navigation clears it on unmount. Activation RRI: **55 / Med-high**; no auth decision is delegated to UI.
 
 **Acceptance criteria:** Render owned content and correct P2P publication state; create/copy the one-time invite through P3; use existing design primitives.
 
@@ -95,6 +95,35 @@ downstream input to its consuming phase before claiming closure.
 freeze and score exact paths, preserve the accepted boundary, and deliver only
 P6.T1's acceptance criteria through the current workflow. Stop on a
 contract conflict or unmet dependency; do not silently advance the next phase.
+
+
+### Review evidence override
+
+- REVIEW-OVERRIDE: urgency — explicit owner-directed MVP0-P2P exception.
+- Waiver-by: Matias, repository owner
+- Scope-note: skips only phase-1 and phase-2 peer review for P6.T1 under `docs/audit/mvp0-p2p-review-exception.md`; tests, RRI, 3 Reflection passes, behavioral coverage, owner verification, and status synchronization remain mandatory.
+
+### Reflection log
+
+Required passes: 3 (RRI 55 → Med-high).
+
+- **Pass 1 — authority:** PASS. Owner state/Invite eligibility remains backend/P3-authoritative; exact descriptor identity and owner scoping remain enforced.
+- **Pass 2 — secret/session lifecycle:** PASS. Raw invite token remains volatile, Copy/Done/Back/remount/session-expiry behavior is fail-closed, and the single-visible-token lock is covered.
+- **Pass 3 — integrated navigation/evidence:** PASS. Home → My Content re-entry reloads authoritative state; auth loss removes the route; all T1 HP/EC cases map to executable evidence.
+
+### Behavioral coverage certification
+
+| Case ID | Type | Behavior | Layer | Executable evidence | Result |
+|---|---|---|---|---|---|
+| HP-P6.T1-1 | Happy path | Owner sees authoritative state and exact Ready content can create/copy a P3 invite | component + integration | `mobile/__tests__/MyContentScreen.test.tsx`; `mobile/__tests__/RootNavigator.test.tsx` | passed |
+| EC-P6.T1-1 | Edge case | Foreign-owner, non-ready, mismatched or stale content cannot retain Invite authority | integration + component | `crates/db/tests/p2p_dashboard_repo.rs::owner_content_is_scoped_to_owned_assets_and_preserves_publication_state`; `mobile/__tests__/MyContentScreen.test.tsx` | passed |
+
+### Owner final verification
+
+- Owner: Matias Kruk
+- Date: 2026-09-23
+- Statement: I reviewed P6.T1 myself and approve closure against the recorded happy-path/edge-case evidence and green CI result.
+- Commands run: manual owner review; no additional CLI command was reported. Automated verification used GitHub Actions run `35825349299` on `b6df0a7f` (15/15 PASS; mobile 63/63 suites, 461/461 tests; coverage 90.43%).
 
 ## P6.T2 — Viewer claim, Invites, sync and play actions
 
@@ -166,7 +195,7 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 | T1.E | One-time token + Copy Invite | **PASS** |
 | T1.F | Navigation | **PASS** |
 | T1.G | Remaining component/integration tests | **PASS** |
-| T1.H | Aggregate T1 certification/owner verification | **IN PROGRESS — owner-approved; peer review pending** |
+| T1.H | Aggregate T1 certification/owner verification | **PASS — owner-reviewed; REVIEW-OVERRIDE** |
 
 Block 1 evidence:
 `docs/audit/mvp0-p2p-p6-t1-block1-my-content-2026-09-22.md`.
@@ -177,5 +206,5 @@ Block 2 evidence:
 Block 3 evidence (T1.F+G):
 `docs/audit/mvp0-p2p-p6-t1-block3-navigation-evidence-2026-09-22.md`.
 
-T1.H certification candidate:
+T1.H closure evidence:
 `docs/audit/mvp0-p2p-p6-t1-certification-candidate-2026-09-23.md`.

@@ -10,7 +10,7 @@ plan: docs/plan/mvp0-p2p-first.md
 
 > **Plan:** `docs/plan/mvp0-p2p-first.md`.
 > **External taskpack:** `p2p-mvp/taskpacks/P0.zip` through `P7.zip`.
-> **Current task:** P0–P4 are closed and **P5-DEV is SATISFIED 2026-09-22**. P5.T3 remains deferred release certification. **P6.T0 is now unblocked / not activated.** ADR-044 is Accepted. P2.T0
+> **Current task:** P0–P4 are closed and **P5-DEV is SATISFIED 2026-09-22**. P5.T3 remains deferred release certification. **P6.T1 is PASS 2026-09-23; P6.T2 is unblocked / not activated.** ADR-044 is Accepted. P2.T0
 > is PASS and P2.T1a-T1f are Done/owner-approved as the completed P2.T1
 > persistence outcome on 2026-09-06. P2.C0 is PASS; T2 (including T2c-r/T2g)
 > and T4a are Done. T3, T4b-f (retrospective closure, 2026-09-14), T5, T6a-d
@@ -33,7 +33,7 @@ plan: docs/plan/mvp0-p2p-first.md
 | P3 | Invite, claim, and content-key envelope | **PASS 2026-09-22** | P2 PASS; accepted ADR-044 / K1 contract |
 | P4 | Mobile package sync and verification | **PASS 2026-09-22** | P3 PASS |
 | P5 | Local HLS gateway + existing VideoPlayer | **In progress — P5-DEV SATISFIED; P5.T3/P5-CERT deferred** | P4 PASS |
-| P6 | Minimal My Content + Invites dashboard | **Unblocked / not activated** | P3 PASS; P4 PASS; P5-DEV (all satisfied); P5.T3 deferred |
+| P6 | Minimal My Content + Invites dashboard | **In progress — T0/T1 PASS; T2 unblocked / not activated** | P3 PASS; P4 PASS; P5-DEV (all satisfied); P5.T3 deferred |
 | P7 | End-to-end P2P certification | Pending | P2-P4 PASS; P5-DEV; P6 PASS; S-230-T7p PASS; P5.T3 resolved by/within P7.T2 |
 
 > **Review exception:** the repository owner waived phase-1 and phase-2 peer
@@ -373,7 +373,7 @@ and revised approval card: `docs/plan/mvp0-p2p-p1-replication.md`,
 | P3 | `docs/plan/mvp0-p2p-p3-invitation-envelope.md` | `docs/tasks/mvp0-p2p-p3-invitation-envelope.md` | Planned; activation gate remains P2 PASS; Accepted ADR-044 |
 | P4 | `docs/plan/mvp0-p2p-p4-mobile-sync.md` | `docs/tasks/mvp0-p2p-p4-mobile-sync.md` | Planned; activation gate remains P3 PASS |
 | P5 | `docs/plan/mvp0-p2p-p5-local-playback.md` | `docs/tasks/mvp0-p2p-p5-local-playback.md` | Planned; activation gate remains P4 PASS |
-| P6 | `docs/plan/mvp0-p2p-p6-dashboard.md` | `docs/tasks/mvp0-p2p-p6-dashboard.md` | Planned; gate is P3 PASS + P4 PASS + P5-DEV; P5.T3 deferred |
+| P6 | `docs/plan/mvp0-p2p-p6-dashboard.md` | `docs/tasks/mvp0-p2p-p6-dashboard.md` | **T0/T1 PASS; T2 unblocked / not activated; P5.T3 deferred** |
 | P7 | `docs/plan/mvp0-p2p-p7-certification.md` | `docs/tasks/mvp0-p2p-p7-certification.md` | Planned; gate is P2-P4 PASS + P5-DEV + P6 PASS + S-230-T7p; P7.T2 resolves deferred P5.T3 |
 
 Detailed phase plans and work-package ledgers now exist. Exact-path executable
