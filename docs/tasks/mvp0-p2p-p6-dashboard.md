@@ -9,7 +9,7 @@ behavioral_coverage_contract: behavior-v2
 
 # P6 — planning task ledger
 
-**Status:** **In progress. P6.T0 PASS 2026-09-22; P6.T1 PASS 2026-09-23.** T1 closed under the standing MVP0-P2P owner review exception with owner self-review/approval and green exact-head CI evidence. **P6.T2 is now unblocked / not activated; P6.T3 remains blocked on T2 PASS.**
+**Status:** **In progress. P6.T0 PASS 2026-09-22; P6.T1 PASS 2026-09-23.** T1 closed under the standing MVP0-P2P owner review exception with owner self-review/approval and green exact-head CI evidence. **P6.T2 is ACTIVATED 2026-09-23: T2.A PASS; decomposed implementation blocks T2.B–H are frozen but not started. P6.T3 remains blocked on T2 PASS.**
 **Phase gate:** **SATISFIED 2026-09-22 — P3 PASS + P4 PASS + P5-DEV.** P5.T3/P5-CERT is not an activation prerequisite.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
@@ -19,7 +19,7 @@ behavioral_coverage_contract: behavior-v2
 |---|---|---|---|---|---|
 | P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **PASS 2026-09-22 — owner-verified; c6ce2039 15/15 CI** |
 | P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **PASS 2026-09-23 — T1.A–H closed; owner-reviewed; REVIEW-OVERRIDE applied** |
-| P6.T2 | Viewer claim, Invites, sync and play actions | development | L | T1 PASS | **Unblocked / not activated** |
+| P6.T2 | Viewer claim, Invites, sync and play actions | development | XL parent / decomposed leaves | T1 PASS | **IN PROGRESS — T2.A PASS; T2.B–H pending** |
 | P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | Planned; not activated |
 
 
@@ -129,11 +129,11 @@ Required passes: 3 (RRI 55 → Med-high).
 
 **Type:** development
 
-**Effort:** L (provisional; re-score/decompose at activation)
+**Effort:** XL parent; executable leaves S/L after decomposition
 
 **Depends on:** T1 PASS
 
-**Status:** Planned; not activated.
+**Status:** **IN PROGRESS — T2.A activation PASS 2026-09-23; T2.B–H pending.** Parent RRI **100 / Very high**; source implementation is prohibited at parent scope and must execute only through the frozen decomposed leaves below.
 
 **Acceptance criteria:** Connect claim/inbox, verified sync and existing playback through the frozen state model; handle expiry, loading/retry and account changes.
 
@@ -149,10 +149,53 @@ evidence when behavior is delivered. Record failures rather than inferring PASS.
 **Status artifacts affected:** shared status set above; propagate any changed
 downstream input to its consuming phase before claiming closure.
 
-**Agent handoff:** Read this phase plan and governing references. Verify T1 PASS;
-freeze and score exact paths, preserve the accepted boundary, and deliver only
-P6.T2's acceptance criteria through the current workflow. Stop on a
-contract conflict or unmet dependency; do not silently advance the next phase.
+**Agent handoff:** T1 PASS is verified and T2.A activation is complete. Execute only one frozen leaf at a time, preserving the P3/P4/P5 capability boundaries below. Do not implement the RRI-100 parent as one patch. Stop on a contract conflict or unmet dependency; do not silently advance T3.
+
+### P6.T2 execution breakdown — activated 2026-09-23
+
+| Block | Scope | RRI | Status |
+|---|---|---:|---|
+| T2.A | Activation, exact scope, parent/leaf RRI, dependency freeze | docs-only activation | **PASS** |
+| T2.B | Authoritative viewer inbox + product-state projection | 55 / Med-high | Pending |
+| T2.C | Manual Claim via existing P3 audience capability | 55 / Med-high | Pending |
+| T2.D | Sync / Retry Sync via existing P4 controller | 55 / Med-high | Pending |
+| T2.E | Available + Play via verified P4 handle and existing P5 controller/view | 55 / Med-high | Pending |
+| T2.F | Fail-closed expiry/session/account lifecycle | 55 / Med-high | Pending |
+| T2.G | Home → Invites navigation + remount behavior | 55 / Med-high | Pending |
+| T2.H | Aggregate component/integration evidence + closure | 25 / Low | Pending |
+
+Activation evidence:
+`docs/audit/mvp0-p2p-p6-t2-activation-2026-09-23.md`.
+
+### T2 frozen source ownership
+
+Writable T2 source/test envelope:
+
+- `mobile/src/screens/InvitesScreen.tsx` — new product surface;
+- `mobile/src/p2p/dashboard/InvitesModel.ts` — pure viewer-state/action projection only;
+- `mobile/src/p2p/dashboard/useInvitesState.ts` — inbox + P4 local-state read orchestration;
+- `mobile/src/p2p/dashboard/useInvitesActions.ts` — Claim/Sync/Play orchestration only;
+- `mobile/__tests__/InvitesScreen.test.tsx` — new component/integration evidence;
+- `mobile/src/navigation/RootNavigator.tsx`;
+- `mobile/src/screens/HomeScreen.tsx`;
+- `mobile/__tests__/RootNavigator.test.tsx`;
+- `mobile/__tests__/HomeScreen.test.tsx`.
+
+The three dashboard helper files are a bounded maintainability expansion of T0's expected T2 scope, learned from T1's max-lines refactor. They may project/orchestrate existing capabilities but may not duplicate P3/P4/P5 authorization, sync verification, key handling, or playback invariants.
+
+Read-only dependencies unless a separately proven contract defect is found:
+
+- `P2PDashboardService.listInbox()`;
+- `P2PAudienceService.claimInvitation()`;
+- `P2PSyncController.startSync/getSyncState/getVerifiedPackageHandle()`;
+- `P2PPlaybackController.start/stop()`;
+- `P2PPlaybackSessionView`;
+- `P2PProvider/useP2PService/useP2PSyncController`;
+- AuthProvider `sessionRef` + `userId`.
+
+Frozen account binding: **`accountScope = auth.userId`**. This matches P4 cache isolation and P5's authorization assertion `viewerSubjectId === handle.accountScope`.
+
+HPKE emulator remains disabled and outside P6.T2.
 
 ## P6.T3 — Dashboard flow and visual certification
 
