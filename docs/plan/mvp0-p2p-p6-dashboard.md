@@ -7,7 +7,7 @@ slice: MVP0-P2P
 
 # P6 — Minimal My Content and Invites dashboard
 
-Task ledger: `docs/tasks/mvp0-p2p-p6-dashboard.md`. **Activation gate satisfied 2026-09-22. P6.T0 PASS:** owner verification complete and `c6ce2039` finished 15/15 CI. **P6.T1 T1.A–G PASS**: Block 1 closed on `b52d366c`; Block 2 Create + one-time Copy on `151721a5`; T1.F navigation on `32ac26c0`; T1.G aggregate gap closure on `47bc3e8b` with 15/15 CI, mobile 63/63 suites / 461/461 tests and 90.43% workspace line coverage. T1.H aggregate certification is now prepared on `d19e51f4`; the required independent Med-high code-solution review and owner verification remain before PASS. T2/T3 remain blocked. P5.T3 is deferred to release certification.
+Task ledger: `docs/tasks/mvp0-p2p-p6-dashboard.md`. **Activation gate satisfied 2026-09-22. P6.T0 PASS:** owner verification complete and `c6ce2039` finished 15/15 CI. **P6.T1 T1.A–G PASS**: Block 1 closed on `b52d366c`; Block 2 Create + one-time Copy on `151721a5`; T1.F navigation on `32ac26c0`; T1.G aggregate gap closure on `47bc3e8b` with 15/15 CI, mobile 63/63 suites / 461/461 tests and 90.43% workspace line coverage. T1.H aggregate certification is now prepared on `d19e51f4`; owner verification is approved 2026-09-23; the independent Med-high code-solution review remains before PASS. T2/T3 remain blocked. P5.T3 is deferred to release certification.
 
 ## Objective
 
@@ -38,7 +38,7 @@ Freeze state projection and action eligibility from canonical backend and runtim
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
 | P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **PASS 2026-09-22** |
-| P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **In progress — A–G PASS; H awaiting peer review + owner verification; RRI 55 Med-high** |
+| P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **In progress — A–G PASS; H owner-approved, peer review pending; RRI 55 Med-high** |
 | P6.T2 | Viewer claim, Invites, sync and play actions | development | L | T1 PASS | Planned; not activated |
 | P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | Planned; not activated |
 
@@ -148,6 +148,6 @@ the behavior-v2 mapping is complete, and exact candidate head `d19e51f4`
 already completed 15/15 CI with mobile 63/63 suites / 461/461 tests and 90.43%
 workspace line coverage.
 
-T1.H is **not PASS yet**. Repository policy still requires the independent
-RRI-55 code-solution reviewer and explicit owner final verification. T2 remains
-blocked until both are recorded.
+T1.H is **not PASS yet**. Owner final verification was explicitly approved on
+2026-09-23. Repository policy still requires the independent RRI-55 code-solution
+reviewer. T2 remains blocked until that reviewer evidence is recorded.

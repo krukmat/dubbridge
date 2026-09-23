@@ -14,11 +14,12 @@ date: 2026-09-23
 **TECHNICAL CERTIFICATION READY; T1.H NOT YET PASS.**
 
 T1.A–G are already PASS. This record performs the available aggregate closure
-work for T1.H and deliberately stops before the two gates that cannot be
+work for T1.H and deliberately stops before the remaining gate that cannot be
 self-issued:
 
-1. independent Med-high code-solution peer review;
-2. explicit owner final verification.
+1. independent Med-high code-solution peer review.
+
+Owner final verification was explicitly approved by the owner on 2026-09-23.
 
 P6.T2 remains blocked.
 
@@ -122,11 +123,16 @@ have a recorded disposition.
 
 ## Owner final verification
 
-**Status: PENDING — owner-only checkpoint.**
+**Status: APPROVED 2026-09-23.**
 
-The owner verification statement is intentionally not pre-filled or attributed.
-After peer review PASS and any required repair/CI rerun, the owner must explicitly
-verify the behavior/evidence mapping and provide the commands used.
+- Owner: Matias Kruk
+- Date: 2026-09-23
+- Statement: owner approval explicitly provided for P6.T1/T1.H in the project conversation.
+- Commands run by owner: no additional local command was claimed. Approval relied on the exact-head CI evidence already recorded for `b6df0a7f` / run `35825349299`.
+
+This records the owner's approval without inventing an unperformed local command. If the later
+independent peer review requires a code repair, owner verification must be repeated against the
+repaired exact head before T1 can close.
 
 ## Current status
 
@@ -137,6 +143,6 @@ verify the behavior/evidence mapping and provide the commands used.
 - T1.E — PASS
 - T1.F — PASS
 - T1.G — PASS
-- **T1.H — IN PROGRESS / blocked only on independent peer review + owner verification**
+- **T1.H — IN PROGRESS / blocked only on independent peer review**
 
 **P6.T1 remains IN PROGRESS. P6.T2 remains blocked.**
