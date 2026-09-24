@@ -292,7 +292,7 @@ HPKE emulator remains disabled and outside P6.T2.
 
 **Depends on:** T2 PASS
 
-**Status:** **IN PROGRESS 2026-09-24.** T3.A + T3.B PASS on `3474b8b` / Actions `36041983233` (15/15); T3.C is active. Final Android visual certification remains pending.
+**Status:** **IN PROGRESS 2026-09-24.** T3.A+B PASS on `3474b8b` / Actions `36041983233`; T3.C PASS on `0527ec3` / Actions `36046501652`; T3.D1–D3 preparation is active. Local Android execution remains T3.D4.
 
 **Acceptance criteria:** Certify all P6 parent HP/EC with component/integration and Android flow evidence; inspect loading/empty/error/expired states against DESIGN.md and shipped tokens.
 
@@ -365,3 +365,19 @@ T3.C therefore stays presentation-only:
 
 Bounded T3.C RRI: **25 / Low** (UI layout + tests only; no security/domain
 invariant change). HPKE emulator remains disabled.
+
+
+### T3.D execution breakdown — Android visual certification
+
+| Block | Scope | Status |
+|---|---|---|
+| T3.D1 | Freeze local Android visual-certification scope and fixture contract | **PASS** |
+| T3.D2 | Add deterministic P2P gateway fixtures + dev-only local P4 snapshot seeding | **IN PROGRESS** |
+| T3.D3 | Add P2P Maestro flows + local runner integration | Pending |
+| T3.D4 | Execute Maestro locally on Android and capture evidence | Pending — owner/local execution |
+| T3.D5 | Inspect screenshots against DESIGN.md / shipped tokens | Pending |
+| T3.D6 | Record exact-SHA/device verdict and close T3.D | Pending |
+
+T3.D is visual certification only. It does not replace P7Local's complete
+owner→viewer→claim→sync→verify→Available→local-play E2E. HPKE emulator remains
+disabled.

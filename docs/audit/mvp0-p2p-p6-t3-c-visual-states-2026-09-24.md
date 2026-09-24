@@ -1,7 +1,7 @@
 ---
 type: Audit
 title: "P6.T3.C — loading, empty and error visual pass"
-status: in_progress
+status: pass
 task: P6.T3
 block: T3.C
 date: 2026-09-24
@@ -48,3 +48,16 @@ is below that anchor.
 - new layout assertions remain green.
 
 Final Android device screenshots belong to T3.D, not this block.
+
+
+## Closure evidence
+
+Exact implementation head:
+`0527ec32023968e629b33848d3370c3e497a2989`.
+
+GitHub Actions run `36046501652`: **15/15 PASS**. Mobile completed
+**65/65 suites and 517/517 tests**. The change remains layout-only:
+My Content and Invites use the shared scroll/grow contract; backend authority,
+P3/P4/P5 ownership and action eligibility are unchanged.
+
+**T3.C PASS 2026-09-24.**
