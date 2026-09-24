@@ -292,7 +292,7 @@ HPKE emulator remains disabled and outside P6.T2.
 
 **Depends on:** T2 PASS
 
-**Status:** Planned; not activated.
+**Status:** **IN PROGRESS 2026-09-24.** First block T3.A + T3.B activated; final Android visual certification remains pending.
 
 **Acceptance criteria:** Certify all P6 parent HP/EC with component/integration and Android flow evidence; inspect loading/empty/error/expired states against DESIGN.md and shipped tokens.
 
