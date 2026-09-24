@@ -12,21 +12,10 @@ import { useInvitesState } from "../p2p/dashboard/useInvitesState";
 import { P2PPlaybackSessionView } from "../p2p/playback/P2PPlaybackSessionView";
 
 function InvitationRow({
-  projection,
-  syncing,
-  syncError,
-  onSync,
-  playing,
-  playError,
-  onPlay,
+  projection, syncing, syncError, onSync, playing, playError, onPlay,
 }: {
-  projection: ViewerInboxProjection;
-  syncing: boolean;
-  syncError: string | null;
-  onSync: () => void;
-  playing: boolean;
-  playError: string | null;
-  onPlay: () => void;
+  projection: ViewerInboxProjection; syncing: boolean; syncError: string | null;
+  onSync: () => void; playing: boolean; playError: string | null; onPlay: () => void;
 }) {
   const { invitation, authorization } = projection.item;
   return (
@@ -160,20 +149,14 @@ export function InvitesScreen({ gatewayBaseUrl }: { gatewayBaseUrl: string }) {
   return (
     <Screen testID="invites-screen">
       <ScreenHeader
-        kicker="P2P"
-        title="Invites"
+        kicker="P2P" title="Invites"
         copy="Your claimed invitations and local availability."
       />
-
       <ClaimInvitationForm
-        token={claim.claimToken}
-        error={claim.claimError}
-        isClaiming={claim.isClaiming}
-        canClaim={claim.canClaim}
-        onChangeToken={claim.updateClaimToken}
-        onClaim={() => void claim.claim()}
+        token={claim.claimToken} error={claim.claimError}
+        isClaiming={claim.isClaiming} canClaim={claim.canClaim}
+        onChangeToken={claim.updateClaimToken} onClaim={() => void claim.claim()}
       />
-
       {viewState.kind === "loading" ? (
         <StateView
           testID="invites-loading"
