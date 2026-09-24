@@ -10,7 +10,17 @@ import {
 import { useInvitesActions } from "../p2p/dashboard/useInvitesActions";
 import { useInvitesState } from "../p2p/dashboard/useInvitesState";
 
-function InvitationRow({ projection }: { projection: ViewerInboxProjection }) {
+function InvitationRow({
+  projection,
+  syncing,
+  syncError,
+  onSync,
+}: {
+  projection: ViewerInboxProjection;
+  syncing: boolean;
+  syncError: string | null;
+  onSync: () => void;
+}) {
   const { invitation, authorization } = projection.item;
   return (
     <Card testID={`invite-row-${invitation.id}`}>
@@ -26,6 +36,22 @@ function InvitationRow({ projection }: { projection: ViewerInboxProjection }) {
           tone={VIEWER_STATE_TONES[projection.state]}
         />
       </View>
+      {projection.action === "sync" || projection.action === "retry_sync" ? (
+        <Button
+          testID={`invite-sync-${invitation.id}`}
+          label={projection.action === "retry_sync" ? "Retry Sync" : "Sync"}
+          onPress={onSync}
+          loading={syncing}
+          disabled={syncing}
+          variant="secondary"
+          size="sm"
+        />
+      ) : null}
+      {syncError ? (
+        <Text testID={`invite-sync-error-${invitation.id}`} style={styles.error}>
+          {syncError}
+        </Text>
+      ) : null}
     </Card>
   );
 }
@@ -72,8 +98,14 @@ function ClaimInvitationForm({
 
 function ReadyInvitations({
   invitations,
+  busyInvites,
+  syncErrors,
+  onSync,
 }: {
   invitations: ViewerInboxProjection[];
+  busyInvites: ReadonlySet<string>;
+  syncErrors: Readonly<Record<string, string>>;
+  onSync: (projection: ViewerInboxProjection) => void;
 }) {
   return (
     <View style={styles.list}>
@@ -81,6 +113,9 @@ function ReadyInvitations({
         <InvitationRow
           key={projection.item.invitation.id}
           projection={projection}
+          syncing={busyInvites.has(projection.item.invitation.id)}
+          syncError={syncErrors[projection.item.invitation.id] ?? null}
+          onSync={() => onSync(projection)}
         />
       ))}
     </View>
@@ -133,7 +168,12 @@ export function InvitesScreen({ gatewayBaseUrl }: { gatewayBaseUrl: string }) {
         />
       ) : null}
       {viewState.kind === "ready" ? (
-        <ReadyInvitations invitations={viewState.invitations} />
+        <ReadyInvitations
+          invitations={viewState.invitations}
+          busyInvites={claim.busyInvites}
+          syncErrors={claim.syncErrors}
+          onSync={(projection) => void claim.syncInvitation(projection)}
+        />
       ) : null}
     </Screen>
   );

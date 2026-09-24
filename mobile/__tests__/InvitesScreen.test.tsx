@@ -40,7 +40,7 @@ const mockCreateGatewayClient = createGatewayClient as jest.MockedFunction<typeo
 
 let mockAuthValue: AuthContextValue;
 let mockClient: { get: jest.Mock; post: jest.Mock; postMultipart: jest.Mock };
-let mockSyncController: { getSyncState: jest.Mock };
+let mockSyncController: { getSyncState: jest.Mock; startSync: jest.Mock };
 
 const DESCRIPTOR = {
   descriptorVersion: "p2p-ready-descriptor-v1",
@@ -163,6 +163,7 @@ beforeEach(() => {
   };
   mockSyncController = {
     getSyncState: jest.fn(),
+    startSync: jest.fn(),
   };
   mockCreateGatewayClient.mockReturnValue(mockClient as never);
   mockClaimInvitation.mockReset();
@@ -506,5 +507,129 @@ describe("InvitesScreen T2.C manual Claim", () => {
     await waitFor(() => expect(second.getByTestId("invites-empty")).toBeTruthy());
     expect(second.getByTestId("invites-claim-token").props.value).toBe("");
     expect(mockClaimInvitation).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("InvitesScreen T2.D Sync / Retry Sync", () => {
+  it("delegates Pending Sync to P4 and refreshes into Syncing", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: { data: [rawInboxItem()], sessionRotation: null },
+    });
+    mockSyncController.getSyncState
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(snapshot("DOWNLOADING"));
+    mockSyncController.startSync.mockResolvedValue(snapshot("DOWNLOADING"));
+
+    const view = await renderInvitesScreen();
+    await waitFor(() => expect(view.getByTestId("invite-sync-invite-1")).toBeTruthy());
+
+    fireEvent.press(view.getByTestId("invite-sync-invite-1"));
+
+    await waitFor(() => expect(mockSyncController.startSync).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(view.getByText("Syncing")).toBeTruthy());
+    expect(mockSyncController.startSync).toHaveBeenCalledWith(DESCRIPTOR, "viewer-1");
+  });
+
+  it("delegates FAILED Retry Sync to the same P4 startSync capability", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: { data: [rawInboxItem()], sessionRotation: null },
+    });
+    mockSyncController.getSyncState
+      .mockResolvedValueOnce(snapshot("FAILED"))
+      .mockResolvedValueOnce(snapshot("RETRYING"));
+    mockSyncController.startSync.mockResolvedValue(snapshot("RETRYING"));
+
+    const view = await renderInvitesScreen();
+    await waitFor(() => expect(view.getByText("Retry Sync")).toBeTruthy());
+
+    fireEvent.press(view.getByTestId("invite-sync-invite-1"));
+
+    await waitFor(() => expect(mockSyncController.startSync).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(view.getByText("Syncing")).toBeTruthy());
+  });
+
+  it("does not expose Sync for inactive authorization even with an exact descriptor", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: { data: [rawInboxItem({ authorizationActive: false })], sessionRotation: null },
+    });
+
+    const view = await renderInvitesScreen();
+    await waitFor(() => expect(view.getByText("Expired")).toBeTruthy());
+
+    expect(view.queryByTestId("invite-sync-invite-1")).toBeNull();
+    expect(mockSyncController.startSync).not.toHaveBeenCalled();
+  });
+
+  it("does not expose Sync for a mismatched descriptor", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: {
+        data: [rawInboxItem({ descriptor: { ...DESCRIPTOR, lineageId: "other-lineage" } })],
+        sessionRotation: null,
+      },
+    });
+
+    const view = await renderInvitesScreen();
+    await waitFor(() => expect(view.getByText("Pending")).toBeTruthy());
+
+    expect(view.queryByTestId("invite-sync-invite-1")).toBeNull();
+    expect(mockSyncController.startSync).not.toHaveBeenCalled();
+  });
+
+  it("locks duplicate Sync starts for the same descriptor while P4 is in flight", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: { data: [rawInboxItem()], sessionRotation: null },
+    });
+    mockSyncController.getSyncState
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(snapshot("DOWNLOADING"));
+    let resolveSync: ((value: P2pSyncSnapshot) => void) | undefined;
+    mockSyncController.startSync.mockImplementation(
+      () => new Promise<P2pSyncSnapshot>((resolve) => {
+        resolveSync = resolve;
+      }),
+    );
+
+    const view = await renderInvitesScreen();
+    await waitFor(() => expect(view.getByTestId("invite-sync-invite-1")).toBeTruthy());
+
+    fireEvent.press(view.getByTestId("invite-sync-invite-1"));
+    await waitFor(() =>
+      expect(view.getByTestId("invite-sync-invite-1").props.accessibilityState.disabled).toBe(true),
+    );
+    fireEvent.press(view.getByTestId("invite-sync-invite-1"));
+    expect(mockSyncController.startSync).toHaveBeenCalledTimes(1);
+
+    resolveSync?.(snapshot("DOWNLOADING"));
+    await waitFor(() => expect(view.getByText("Syncing")).toBeTruthy());
+  });
+
+  it("keeps a startSync failure fail-closed and exposes the retryable row error", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: { data: [rawInboxItem()], sessionRotation: null },
+    });
+    mockSyncController.getSyncState
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(snapshot("FAILED"));
+    mockSyncController.startSync.mockRejectedValue(new Error("runtime unavailable"));
+
+    const view = await renderInvitesScreen();
+    await waitFor(() => expect(view.getByText("Sync")).toBeTruthy());
+
+    fireEvent.press(view.getByTestId("invite-sync-invite-1"));
+
+    await waitFor(() =>
+      expect(view.getByTestId("invite-sync-error-invite-1")).toBeTruthy(),
+    );
+    expect(view.getByText("Could not sync this invitation.")).toBeTruthy();
+    expect(view.getByText("Sync error")).toBeTruthy();
+    expect(view.queryByText("Available")).toBeNull();
+    expect(view.queryByText("Play")).toBeNull();
   });
 });
