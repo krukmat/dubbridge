@@ -36,6 +36,17 @@ jest.mock("../src/push/registerPush", () => ({
   registerPush: jest.fn().mockResolvedValue(undefined),
 }));
 
+const mockP2PSyncController = {
+  getSyncState: jest.fn(),
+  startSync: jest.fn(),
+  getVerifiedPackageHandle: jest.fn(),
+};
+const mockP2PService = {};
+jest.mock("../src/p2p/P2PProvider", () => ({
+  useP2PSyncController: () => mockP2PSyncController,
+  useP2PService: () => mockP2PService,
+}));
+
 const mockCreateGatewayClient = createGatewayClient as jest.MockedFunction<typeof createGatewayClient>;
 const mockListNotifications = notifications.listNotifications as jest.MockedFunction<typeof notifications.listNotifications>;
 
@@ -73,6 +84,7 @@ describe("RootNavigator", () => {
 
     mockAuthValue = {
       sessionRef: null,
+      userId: null,
       status: "unauthed",
       loginError: null,
       login: jest.fn().mockResolvedValue(undefined),
@@ -236,6 +248,73 @@ describe("RootNavigator", () => {
 
     await waitFor(() => expect(view.getByTestId("login-screen")).toBeTruthy());
     expect(view.queryByTestId("my-content-screen")).toBeNull();
+  });
+
+
+  it("P6.T2.G: navigates Home → Invites → Back and re-entry refetches the authoritative inbox", async () => {
+    mockExtra = {
+      dubbridgeEnv: "local",
+      gatewayBaseUrl: "http://127.0.0.1:4000",
+    };
+    mockAuthValue = {
+      ...mockAuthValue,
+      sessionRef: "token-abc",
+      userId: "viewer-1",
+      status: "authed",
+    };
+    mockClient.get.mockImplementation((path: string) => Promise.resolve({
+      ok: true,
+      value: { data: [], sessionRotation: null },
+    }));
+
+    const view = await render(<RootNavigator />);
+    await waitFor(() => expect(view.getByTestId("home-open-invites")).toBeTruthy());
+
+    fireEvent.press(view.getByTestId("home-open-invites"));
+    await waitFor(() => expect(view.getByTestId("invites-screen")).toBeTruthy());
+    expect(
+      mockClient.get.mock.calls.filter(([path]) => path === "/api/p2p/inbox"),
+    ).toHaveLength(1);
+
+    fireEvent.press(view.getByTestId("invites-back"));
+    await waitFor(() => expect(view.getByTestId("home-screen")).toBeTruthy());
+
+    fireEvent.press(view.getByTestId("home-open-invites"));
+    await waitFor(() => expect(view.getByTestId("invites-screen")).toBeTruthy());
+    expect(
+      mockClient.get.mock.calls.filter(([path]) => path === "/api/p2p/inbox"),
+    ).toHaveLength(2);
+  });
+
+  it("P6.T2.G: Invites route disappears when auth becomes unauthenticated", async () => {
+    mockExtra = {
+      dubbridgeEnv: "local",
+      gatewayBaseUrl: "http://127.0.0.1:4000",
+    };
+    mockAuthValue = {
+      ...mockAuthValue,
+      sessionRef: "token-abc",
+      userId: "viewer-1",
+      status: "authed",
+    };
+
+    const view = await render(<RootNavigator />);
+    await waitFor(() => expect(view.getByTestId("home-open-invites")).toBeTruthy());
+    fireEvent.press(view.getByTestId("home-open-invites"));
+    await waitFor(() => expect(view.getByTestId("invites-screen")).toBeTruthy());
+
+    mockAuthValue = {
+      ...mockAuthValue,
+      sessionRef: null,
+      userId: null,
+      status: "unauthed",
+    };
+    await act(async () => {
+      view.rerender(<RootNavigator />);
+    });
+
+    await waitFor(() => expect(view.getByTestId("login-screen")).toBeTruthy());
+    expect(view.queryByTestId("invites-screen")).toBeNull();
   });
 
   it("EC-1: renders a config error when the gateway URL is missing", async () => {

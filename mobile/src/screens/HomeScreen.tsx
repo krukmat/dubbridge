@@ -49,6 +49,14 @@ const NAV_CARDS = [
     tone: "info" as const,
   },
   {
+    testID: "home-open-invites" as const,
+    title: "Invites",
+    subtitle: "Claim, sync and play shared P2P packages",
+    key: "invites",
+    symbol: "IN",
+    tone: "info" as const,
+  },
+  {
     testID: "home-open-organizations" as const,
     title: "Organizations and projects",
     subtitle: "Manage teams and project workspaces",
@@ -225,12 +233,14 @@ function QuickActionsSection({
   onOpenReview,
   onOpenOrganizations,
   onOpenMyContent,
+  onOpenInvites,
 }: {
   onOpenAssets: () => void;
   onOpenUpload: () => void;
   onOpenReview: () => void;
   onOpenOrganizations: () => void;
   onOpenMyContent: () => void;
+  onOpenInvites: () => void;
 }) {
   const callbacks: Record<string, () => void> = {
     assets: onOpenAssets,
@@ -238,6 +248,7 @@ function QuickActionsSection({
     review: onOpenReview,
     organizations: onOpenOrganizations,
     myContent: onOpenMyContent,
+    invites: onOpenInvites,
   };
 
   return (
@@ -316,6 +327,7 @@ function DashboardContent({
         onOpenReview={onOpenReview}
         onOpenOrganizations={onOpenOrganizations}
         onOpenMyContent={onOpenMyContent}
+        onOpenInvites={onOpenInvites}
       />
       <AccountSection onLogout={onLogout} />
     </>
@@ -330,6 +342,7 @@ export function HomeScreen({
   onOpenReview,
   onOpenOrganizations,
   onOpenMyContent,
+  onOpenInvites,
 }: {
   dubbridgeEnv: string;
   gatewayBaseUrl: string;
@@ -338,6 +351,7 @@ export function HomeScreen({
   onOpenReview: () => void;
   onOpenOrganizations: () => void;
   onOpenMyContent: () => void;
+  onOpenInvites: () => void;
 }) {
   const auth = useAuth();
   const { dashState, load } = useDashboardState(

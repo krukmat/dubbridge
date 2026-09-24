@@ -142,7 +142,13 @@ function ReadyInvitations({
   );
 }
 
-export function InvitesScreen({ gatewayBaseUrl }: { gatewayBaseUrl: string }) {
+export function InvitesScreen({
+  gatewayBaseUrl,
+  onBack,
+}: {
+  gatewayBaseUrl: string;
+  onBack?: () => void;
+}) {
   const { viewState, retry, refresh } = useInvitesState(gatewayBaseUrl);
   const claim = useInvitesActions(gatewayBaseUrl, refresh);
 
@@ -152,6 +158,15 @@ export function InvitesScreen({ gatewayBaseUrl }: { gatewayBaseUrl: string }) {
         kicker="P2P" title="Invites"
         copy="Your claimed invitations and local availability."
       />
+      {onBack ? (
+        <Button
+          testID="invites-back"
+          label="Back to home"
+          variant="secondary"
+          size="sm"
+          onPress={onBack}
+        />
+      ) : null}
       <ClaimInvitationForm
         token={claim.claimToken} error={claim.claimError}
         isClaiming={claim.isClaiming} canClaim={claim.canClaim}

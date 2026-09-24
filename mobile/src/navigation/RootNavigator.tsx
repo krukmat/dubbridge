@@ -13,6 +13,7 @@ import { ConfigErrorScreen } from "../screens/ConfigErrorScreen";
 import { ComplianceScreen } from "../screens/ComplianceScreen";
 import { ConsentScreen } from "../screens/ConsentScreen";
 import { HomeScreen } from "../screens/HomeScreen";
+import { InvitesScreen } from "../screens/InvitesScreen";
 import { LoginScreen } from "../screens/LoginScreen";
 import { MyContentScreen } from "../screens/MyContentScreen";
 import { OrganizationListScreen, type OrganizationSummary } from "../screens/OrganizationListScreen";
@@ -32,6 +33,7 @@ type UnauthedStackParamList = {
 type AuthedStackParamList = {
   Home: undefined;
   MyContent: undefined;
+  Invites: undefined;
   AssetList: undefined;
   AssetDetail: {
     assetId: string;
@@ -83,6 +85,7 @@ function HomeRoute({
       onOpenReview={() => navigation.navigate("ReviewInbox")}
       onOpenOrganizations={() => navigation.navigate("OrganizationList")}
       onOpenMyContent={() => navigation.navigate("MyContent")}
+      onOpenInvites={() => navigation.navigate("Invites")}
     />
   );
 }
@@ -100,6 +103,16 @@ function MyContentRoute({
       onBack={() => navigation.goBack()}
     />
   );
+}
+
+function InvitesRoute({
+  navigation,
+  gatewayBaseUrl,
+}: {
+  navigation: NativeStackScreenProps<AuthedStackParamList, "Invites">["navigation"];
+  gatewayBaseUrl: string;
+}) {
+  return <InvitesScreen gatewayBaseUrl={gatewayBaseUrl} onBack={() => navigation.goBack()} />;
 }
 
 function AssetListRoute({
@@ -361,6 +374,7 @@ function AuthedNavigator({
         {({ navigation }) => <HomeRoute navigation={navigation} gatewayBaseUrl={gatewayBaseUrl} dubbridgeEnv={dubbridgeEnv} />}
       </AuthedStack.Screen>
       <AuthedStack.Screen name="MyContent">{({ navigation }) => <MyContentRoute navigation={navigation} gatewayBaseUrl={gatewayBaseUrl} />}</AuthedStack.Screen>
+      <AuthedStack.Screen name="Invites">{({ navigation }) => <InvitesRoute navigation={navigation} gatewayBaseUrl={gatewayBaseUrl} />}</AuthedStack.Screen>
       <AuthedStack.Screen name="AssetList">
         {({ navigation }) => <AssetListRoute navigation={navigation} gatewayBaseUrl={gatewayBaseUrl} />}
       </AuthedStack.Screen>
