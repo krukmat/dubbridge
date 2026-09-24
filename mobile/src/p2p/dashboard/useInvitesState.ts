@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { createGatewayClient } from "../../api/client";
 import type { P2pInboxItem } from "../../api/p2pDashboard";
@@ -21,34 +21,43 @@ export function useInvitesState(gatewayBaseUrl: string) {
     [gatewayBaseUrl],
   );
   const [viewState, setViewState] = useState<InvitesViewState>({ kind: "loading" });
+  const identity = `${auth.userId ?? ""}:${auth.sessionRef ?? ""}`;
+  const identityRef = useRef(identity);
+  identityRef.current = identity;
 
   const load = useCallback(async () => {
+    const requestIdentity = `${auth.userId ?? ""}:${auth.sessionRef ?? ""}`;
+    const isCurrent = () => identityRef.current === requestIdentity;
     if (!auth.sessionRef || !auth.userId) {
-      setViewState({ kind: "error", message: "Session unavailable." });
+      if (isCurrent()) setViewState({ kind: "error", message: "Session unavailable." });
       return;
     }
 
     const result = await dashboard.listInbox(auth.sessionRef);
     if (!result.ok) {
       if (result.error.kind === "session_expired") {
-        await auth.logout();
+        if (isCurrent()) await auth.logout();
         return;
       }
-      setViewState({ kind: "error", message: invitesErrorMessage(result.error) });
+      if (isCurrent()) setViewState({ kind: "error", message: invitesErrorMessage(result.error) });
       return;
     }
 
+    if (!isCurrent()) return;
     await auth.onSessionRotation(result.value.sessionRotation);
+    if (!isCurrent()) return;
     try {
       const joined = await Promise.all(
         result.value.data.map((item) => readLocalSnapshot(item, auth.userId!, syncController)),
       );
-      setViewState(toInvitesViewState(joined, auth.userId));
+      if (isCurrent()) setViewState(toInvitesViewState(joined, auth.userId));
     } catch {
-      setViewState({
-        kind: "error",
-        message: "Could not read local P2P availability.",
-      });
+      if (isCurrent()) {
+        setViewState({
+          kind: "error",
+          message: "Could not read local P2P availability.",
+        });
+      }
     }
   }, [
     auth.logout,
@@ -60,8 +69,9 @@ export function useInvitesState(gatewayBaseUrl: string) {
   ]);
 
   useEffect(() => {
+    setViewState({ kind: "loading" });
     void load();
-  }, [load]);
+  }, [identity, load]);
 
   const retry = useCallback(() => {
     setViewState({ kind: "loading" });
