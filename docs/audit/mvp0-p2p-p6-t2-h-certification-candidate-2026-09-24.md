@@ -1,24 +1,24 @@
 ---
 type: Audit
-title: "P6.T2.H — aggregate certification candidate"
-status: ready-for-owner-verification
+title: "P6.T2.H — aggregate certification closure"
+status: pass
 task: P6.T2
 block: T2.H
 date: 2026-09-24
 ---
 
-# P6.T2.H — aggregate certification candidate
+# P6.T2.H — aggregate certification closure
 
 ## Status
 
-**READY FOR OWNER VERIFICATION — not PASS yet.**
+**PASS 2026-09-24 — owner final verification complete.**
 
 All executable implementation leaves T2.A–G are PASS. This artifact consolidates
 their behavioral evidence. The remaining mandatory gate is explicit owner final
 verification.
 
 The user's direction to continue through the remaining leaves authorized execution.
-It is **not** treated as owner final verification of the completed parent.
+The explicit owner directive `cierra P6.T2` on 2026-09-24 is the final owner verification of the completed parent.
 
 ## Aggregate implementation chain
 
@@ -27,7 +27,7 @@ manual Claim
    ↓ P3
 authoritative /api/p2p/inbox
    ↓
-Pending
+PASS — explicit owner directive `cierra P6.T2` (2026-09-24)
    ↓ Sync / Retry
 P4 verified sync
    ↓
@@ -115,26 +115,16 @@ session changes. Navigation re-entry performs a fresh authoritative inbox read.
   `docs/audit/mvp0-p2p-review-exception.md`; tests, RRI, Reflection, behavioral
   coverage, owner verification and status synchronization remain mandatory.
 
-The override row should be appended to `docs/audit/gemma-review-overrides.md`
-only when owner final verification closes T2.
+The matching override row is appended to `docs/audit/gemma-review-overrides.md` as part of this closure.
 
-## Remaining gate — owner final verification
+## Owner final verification
 
-Not yet satisfied.
+**Satisfied 2026-09-24.**
 
-Required owner decision:
-
-```text
-P6.T2 owner verification
-├─ review aggregate HP/EC evidence
-├─ confirm viewer flow acceptable
-└─ approve T2 closure
-```
-
-Until that explicit verification is given:
-
-- **P6.T2 remains IN PROGRESS**;
-- **T2.H remains READY FOR OWNER VERIFICATION**;
-- **P6.T3 remains blocked on T2 PASS**.
+- Owner: Matias Kruk
+- Explicit directive: `cierra P6.T2`
+- Context at decision: T2.A–G PASS; aggregate HP/EC certification candidate present on branch; candidate head `085148dc` completed GitHub Actions run `36034227119` with **15/15 PASS**.
+- Result: **T2.H PASS and P6.T2 PASS**.
+- Downstream: **P6.T3 is unblocked / not activated**.
 
 HPKE emulator remains disabled.

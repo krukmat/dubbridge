@@ -9,7 +9,7 @@ behavioral_coverage_contract: behavior-v2
 
 # P6 — planning task ledger
 
-**Status:** **In progress. P6.T0 PASS 2026-09-22; P6.T1 PASS 2026-09-23.** T1 closed under the standing MVP0-P2P owner review exception with owner self-review/approval and green exact-head CI evidence. **P6.T2 is IN PROGRESS: T2.A–G PASS; T2.H aggregate certification is READY FOR OWNER VERIFICATION. P6.T3 remains blocked until owner verification closes T2.**
+**Status:** **In progress. P6.T0 PASS 2026-09-22; P6.T1 PASS 2026-09-23.** T1 closed under the standing MVP0-P2P owner review exception with owner self-review/approval and green exact-head CI evidence. **P6.T2 PASS 2026-09-24: T2.A–H closed with aggregate HP/EC evidence, three Reflection passes, owner final verification, REVIEW-OVERRIDE and exact-head CI. P6.T3 is unblocked / not activated.**
 **Phase gate:** **SATISFIED 2026-09-22 — P3 PASS + P4 PASS + P5-DEV.** P5.T3/P5-CERT is not an activation prerequisite.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
@@ -19,8 +19,8 @@ behavioral_coverage_contract: behavior-v2
 |---|---|---|---|---|---|
 | P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **PASS 2026-09-22 — owner-verified; c6ce2039 15/15 CI** |
 | P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **PASS 2026-09-23 — T1.A–H closed; owner-reviewed; REVIEW-OVERRIDE applied** |
-| P6.T2 | Viewer claim, Invites, sync and play actions | development | XL parent / decomposed leaves | T1 PASS | **IN PROGRESS — A–G PASS; H READY FOR OWNER VERIFICATION** |
-| P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | Planned; not activated |
+| P6.T2 | Viewer claim, Invites, sync and play actions | development | XL parent / decomposed leaves | T1 PASS | **PASS 2026-09-24 — A–H closed; owner-verified** |
+| P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | **Unblocked / not activated** |
 
 
 ## Shared activation and closure contract
@@ -133,7 +133,7 @@ Required passes: 3 (RRI 55 → Med-high).
 
 **Depends on:** T1 PASS
 
-**Status:** **IN PROGRESS — T2.A–G PASS; T2.H READY FOR OWNER VERIFICATION.** Parent RRI **100 / Very high**; aggregate evidence, Reflection and behavioral coverage are assembled. Parent PASS still requires explicit owner final verification.
+**Status:** **PASS 2026-09-24 — T2.A–H closed.** Parent RRI **100 / Very high** was executed only through the frozen bounded leaves. Aggregate HP/EC evidence, three Reflection passes, REVIEW-OVERRIDE, owner final verification and exact-head CI are complete.
 
 **Acceptance criteria:** Connect claim/inbox, verified sync and existing playback through the frozen state model; handle expiry, loading/retry and account changes.
 
@@ -162,7 +162,7 @@ downstream input to its consuming phase before claiming closure.
 | T2.E | Available + Play via verified P4 handle and existing P5 controller/view | 55 / Med-high | **PASS 2026-09-24 — `8fa7411d`, 15/15 CI** |
 | T2.F | Fail-closed expiry/session/account lifecycle | 55 / Med-high | **PASS 2026-09-24 — `9c4b41e4`, 15/15 CI** |
 | T2.G | Home → Invites navigation + remount behavior | 55 / Med-high | **PASS 2026-09-24 — `6f4a89e1`, 15/15 CI** |
-| T2.H | Aggregate component/integration evidence + closure | 25 / Low | **READY FOR OWNER VERIFICATION — certification candidate assembled 2026-09-24** |
+| T2.H | Aggregate component/integration evidence + closure | 25 / Low | **PASS 2026-09-24 — owner-verified** |
 
 Activation evidence:
 `docs/audit/mvp0-p2p-p6-t2-activation-2026-09-23.md`.
@@ -240,8 +240,19 @@ Evidence: `docs/audit/mvp0-p2p-p6-t2-h-certification-candidate-2026-09-24.md`.
 - Navigation evidence proves Home → Invites → Back, re-entry/refetch and auth-tree removal.
 - Aggregate Reflection: authority, secret/lifecycle, and failure/concurrency passes are all PASS.
 - REVIEW-OVERRIDE applies under the standing MVP0-P2P exception and waives only phase-1/phase-2 peer review.
-- **Owner final verification is intentionally NOT recorded yet.** The user's directive to continue authorized execution, not final parent certification.
-- P6.T2 therefore remains IN PROGRESS and P6.T3 remains blocked.
+- **Owner final verification:** explicit owner directive `cierra P6.T2` on 2026-09-24, after the aggregate candidate and A–G PASS evidence were present on the branch.
+- **P6.T2 PASS 2026-09-24.** P6.T3 is unblocked / not activated.
+
+### T2.H owner final verification
+
+- Owner: Matias Kruk
+- Date: 2026-09-24
+- Explicit directive: `cierra P6.T2`
+- Interpretation: approval to close the already assembled T2.H aggregate certification after T2.A–G PASS and exact-head candidate CI.
+- Automated candidate verification: GitHub Actions run `36034227119` on `085148dc` — **15/15 PASS**.
+- REVIEW-OVERRIDE: urgency — explicit owner-directed MVP0-P2P exception.
+- Waiver-by: Matias, repository owner
+- Scope-note: skips only phase-1 and phase-2 peer review for P6.T2; RRI, tests, three aggregate Reflection passes, behavioral coverage, owner verification and status synchronization remain satisfied/mandatory.
 
 ### T2 frozen source ownership
 
