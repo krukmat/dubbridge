@@ -32,6 +32,9 @@ METRO_TIMEOUT=60    # seconds to wait for Metro to be ready
 START_MOCK_SERVERS="${START_MOCK_SERVERS:-0}"
 # Set SKIP_METRO=1 when the APK has an embedded bundle and doesn't need Metro
 SKIP_METRO="${SKIP_METRO:-0}"
+# Set P2P_ONLY=1 to run only the P6.T3.D visual-certification phases.
+P2P_ONLY="${P2P_ONLY:-0}"
+SCREENSHOTS_DIR="$REPO_ROOT/mobile/artifacts/screenshots"
 
 # PIDs of processes started by this script — killed in cleanup
 _STARTED_PIDS=()
@@ -157,6 +160,7 @@ info "Exporting fresh Hermes bundle via expo export..."
   DUBBRIDGE_ENV=local \
   EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL=http://localhost:8081 \
   EXPO_PUBLIC_E2E_ENABLED=true \
+  EXPO_PUBLIC_P2P_VISUAL_FIXTURES=true \
   npx expo export --platform android --output-dir /tmp/dubbridge-expo-export 2>&1 \
   | grep -E '(Bundled|hbc|error|Error)' || true)
 
@@ -220,7 +224,7 @@ else
   info "Starting Metro on :$METRO_PORT..."
   (
     cd "$REPO_ROOT/mobile"
-    EXPO_PUBLIC_E2E_ENABLED=true npx expo start --port "$METRO_PORT" --clear > /tmp/dubbridge-metro.log 2>&1
+    EXPO_PUBLIC_E2E_ENABLED=true EXPO_PUBLIC_P2P_VISUAL_FIXTURES=true npx expo start --port "$METRO_PORT" --clear > /tmp/dubbridge-metro.log 2>&1
   ) &
   _STARTED_PIDS+=($!)
   wait_for_metro
@@ -258,6 +262,63 @@ curl -sf --max-time 10 \
   || die "Mock gateway /auth/login smoke check failed. Is mock-gateway running with S-200 support?"
 
 info "Bearer auth smoke check passed."
+
+# ---------------------------------------------------------------------------
+# P6.T3.D — P2P visual-certification phases
+# ---------------------------------------------------------------------------
+
+run_p2p_visual_suite() {
+  local out_states="/tmp/dubbridge-maestro-p2p-states-$"
+  local out_empty="/tmp/dubbridge-maestro-p2p-empty-$"
+  local out_error="/tmp/dubbridge-maestro-p2p-error-$"
+  local out_loading="/tmp/dubbridge-maestro-p2p-loading-$"
+  mkdir -p "$out_states" "$out_empty" "$out_error" "$out_loading"
+
+  info "P2P visual — canonical product states..."
+  curl -sf --max-time 10 -X POST "$GATEWAY_URL/e2e/seed?p2p_seed=states" > /dev/null \
+    || die "P2P state fixture seed failed."
+  maestro test --test-output-dir "$out_states" \
+    "$REPO_ROOT/mobile/maestro/p2p-states.yaml" \
+    || die "P2P states flow failed. Check $out_states."
+
+  info "P2P visual — empty states..."
+  curl -sf --max-time 10 -X POST "$GATEWAY_URL/e2e/seed?p2p_seed=empty" > /dev/null \
+    || die "P2P empty fixture seed failed."
+  maestro test --test-output-dir "$out_empty" \
+    "$REPO_ROOT/mobile/maestro/p2p-empty.yaml" \
+    || die "P2P empty flow failed. Check $out_empty."
+
+  info "P2P visual — error/retry states..."
+  curl -sf --max-time 10 -X POST "$GATEWAY_URL/e2e/seed?p2p_seed=error" > /dev/null \
+    || die "P2P error fixture seed failed."
+  maestro test --test-output-dir "$out_error" \
+    "$REPO_ROOT/mobile/maestro/p2p-error.yaml" \
+    || die "P2P error flow failed. Check $out_error."
+
+  info "P2P visual — loading states..."
+  curl -sf --max-time 10 -X POST "$GATEWAY_URL/e2e/seed?p2p_seed=loading" > /dev/null \
+    || die "P2P loading fixture seed failed."
+  maestro test --test-output-dir "$out_loading" \
+    "$REPO_ROOT/mobile/maestro/p2p-loading.yaml" \
+    || die "P2P loading flow failed. Check $out_loading."
+
+  mkdir -p "$SCREENSHOTS_DIR"
+  find "$out_states" "$out_empty" "$out_error" "$out_loading" -name "*.png" | while IFS= read -r png; do
+    cp "$png" "$SCREENSHOTS_DIR/"
+    info "  Copied P2P: $(basename "$png")"
+  done
+
+  info "P2P visual-certification flows completed."
+}
+
+if [[ "$P2P_ONLY" == "1" ]]; then
+  run_p2p_visual_suite
+  PNG_COUNT=$(find "$SCREENSHOTS_DIR" -name "*.png" | wc -l | tr -d ' ')
+  info ""
+  info "P2P visual suite complete — screenshots: $SCREENSHOTS_DIR"
+  info "Next: inspect the generated PNGs and record the exact SHA/emulator profile for T3.D5/D6."
+  exit 0
+fi
 
 # ---------------------------------------------------------------------------
 # Full Maestro suite (S-055 phases 1–2 + S-060 phases 3–5)
@@ -408,11 +469,13 @@ maestro test \
 
 info "Phase 8b passed."
 
+# --- P6.T3.D: deterministic P2P dashboard visual surfaces ---
+run_p2p_visual_suite
+
 # ---------------------------------------------------------------------------
 # Copy screenshots
 # ---------------------------------------------------------------------------
 
-SCREENSHOTS_DIR="$REPO_ROOT/mobile/artifacts/screenshots"
 mkdir -p "$SCREENSHOTS_DIR"
 
 info "Copying screenshots to $SCREENSHOTS_DIR ..."

@@ -372,8 +372,8 @@ invariant change). HPKE emulator remains disabled.
 | Block | Scope | Status |
 |---|---|---|
 | T3.D1 | Freeze local Android visual-certification scope and fixture contract | **PASS** |
-| T3.D2 | Add deterministic P2P gateway fixtures + dev-only local P4 snapshot seeding | **IN PROGRESS** |
-| T3.D3 | Add P2P Maestro flows + local runner integration | Pending |
+| T3.D2 | Add deterministic P2P gateway fixtures + dev-only local P4 snapshot seeding | **IMPLEMENTED — exact-head CI pending** |
+| T3.D3 | Add P2P Maestro flows + local runner integration | **IMPLEMENTED — exact-head CI pending** |
 | T3.D4 | Execute Maestro locally on Android and capture evidence | Pending — owner/local execution |
 | T3.D5 | Inspect screenshots against DESIGN.md / shipped tokens | Pending |
 | T3.D6 | Record exact-SHA/device verdict and close T3.D | Pending |

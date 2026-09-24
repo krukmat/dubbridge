@@ -19,7 +19,8 @@
     "test": "npm run check:bare-runtime && npm run build:bare-worklet && jest --runInBand",
     "typecheck": "tsc --noEmit",
     "lint": "eslint --max-warnings 0 src App.tsx index.ts",
-    "screenshots": "bash maestro/seed-and-run.sh"
+    "screenshots": "bash maestro/seed-and-run.sh",
+    "screenshots:p2p": "P2P_ONLY=1 bash maestro/seed-and-run.sh"
   },
   "dependencies": {
     "@react-navigation/native": "^7.2.5",

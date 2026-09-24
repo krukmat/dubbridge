@@ -1,0 +1,41 @@
+appId: com.dubbridge.mobile
+name: P2P dashboard loading states
+tags:
+  - android
+  - p6-t3d
+  - p2p
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: login-screen
+    timeout: 20000
+- runFlow: e2e-login.yaml
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 20000
+
+- tapOn:
+    id: home-open-my-content
+- extendedWaitUntil:
+    visible:
+      id: my-content-loading
+    timeout: 5000
+- takeScreenshot: 29_p2p_my_content_loading
+- scrollUntilVisible:
+    element:
+      id: my-content-back
+    direction: DOWN
+    timeout: 5000
+- tapOn:
+    id: my-content-back
+
+- tapOn:
+    id: home-open-invites
+- extendedWaitUntil:
+    visible:
+      id: invites-loading
+    timeout: 5000
+- takeScreenshot: 30_p2p_invites_loading

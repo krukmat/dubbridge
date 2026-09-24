@@ -95,3 +95,31 @@ logic:
 remain untouched. The visual harness does not create manifests, ciphertext,
 keys or playback material; Available is therefore a visual projection only and
 D4 must not use its Play button as E2E playback evidence.
+
+
+## D3 implementation
+
+D3 adds four focused Maestro flows and a P2P-only local command:
+
+`START_MOCK_SERVERS=1 npm run screenshots:p2p`
+
+The existing screenshot runner remains the single Android orchestration path.
+The P2P-only mode still performs dependency checks, APK bundle refresh/signing,
+install, health checks and adb reverse; it skips unrelated legacy visual phases.
+
+Expected visual artifacts:
+
+- `20_p2p_home.png`
+- `21_p2p_my_content_states_top.png`
+- `22_p2p_my_content_states_bottom.png`
+- `23_p2p_invites_states_top.png`
+- `24_p2p_invites_states_bottom.png`
+- `25_p2p_my_content_empty.png`
+- `26_p2p_invites_empty.png`
+- `27_p2p_my_content_error.png`
+- `28_p2p_invites_error.png`
+- `29_p2p_my_content_loading.png`
+- `30_p2p_invites_loading.png`
+
+Repository CI can validate code/config/tests, but these PNGs are not claimed
+until D4 is run on the owner's local Android emulator.

@@ -271,3 +271,47 @@ Three independent root causes resolved by 2026-06-11:
 3. **Stale Hermes bundle (post-S-200).** `gradle clean assembleDebug` broke CMake native
    artifacts; stale bundle from pre-S-200 caused AppRegistry crash. Fix: `expo export`
    bundle patch flow described above.
+
+
+## P6.T3.D — P2P dashboard visual certification
+
+The P2P dashboard uses the same Android/Maestro infrastructure, with deterministic
+fixtures that are enabled only for the screenshot bundle.
+
+Run only the P2P certification phases:
+
+```sh
+cd mobile
+START_MOCK_SERVERS=1 npm run screenshots:p2p
+```
+
+The command builds a fresh embedded JS bundle with
+`EXPO_PUBLIC_P2P_VISUAL_FIXTURES=true`, installs it on the running Android
+emulator, seeds the mock gateway, then runs:
+
+| Flow | Surfaces |
+|---|---|
+| `p2p-states.yaml` | Home P2P section; Processing/Ready/Failed; Pending/Syncing/Sync error/Available/Expired |
+| `p2p-empty.yaml` | My Content and Invites empty states |
+| `p2p-error.yaml` | retryable My Content and Invites errors |
+| `p2p-loading.yaml` | My Content and Invites loading states |
+
+Screenshots are copied into `mobile/artifacts/screenshots/` using the
+`20_p2p_...` through `30_p2p_...` names.
+
+The P2P visual harness seeds **non-secret P4 lifecycle metadata only**. The
+Available fixture is for visual/action-presence certification; it is not valid
+playback evidence because no manifest, ciphertext or key material is seeded.
+Use P7Local for the complete owner→viewer→sync→verify→local-play E2E.
+
+If the normal complete screenshot suite is run with `npm run screenshots`,
+the P2P visual phases are appended after the existing playback phase.
+
+### Expected local prerequisites
+
+- Android emulator already booted and unlocked;
+- debug APK at `mobile/android/app/build/outputs/apk/debug/app-debug.apk`;
+- `adb`, `maestro`, `node`, `curl` available;
+- use `START_MOCK_SERVERS=1` unless the mock gateway is already running.
+
+HPKE emulator remains disabled; these flows do not require it.

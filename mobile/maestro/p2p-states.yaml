@@ -1,0 +1,111 @@
+appId: com.dubbridge.mobile
+name: P2P dashboard canonical states
+tags:
+  - android
+  - p6-t3d
+  - p2p
+---
+- launchApp:
+    clearState: true
+
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: ".*isn't responding.*"
+          commands:
+            - tapOn: Wait
+
+- extendedWaitUntil:
+    visible:
+      id: login-screen
+    timeout: 20000
+
+- runFlow: e2e-login.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 20000
+
+- assertVisible:
+    id: home-p2p-section
+- takeScreenshot: 20_p2p_home
+
+- tapOn:
+    id: home-open-my-content
+
+- extendedWaitUntil:
+    visible:
+      id: my-content-screen
+    timeout: 20000
+
+- assertVisible:
+    id: my-content-state-asset-p2p-processing
+- assertVisible:
+    id: my-content-state-asset-p2p-ready
+- takeScreenshot: 21_p2p_my_content_states_top
+
+- scrollUntilVisible:
+    element:
+      id: my-content-state-asset-p2p-failed
+    direction: DOWN
+    timeout: 5000
+- assertVisible:
+    id: my-content-create-invite-asset-p2p-ready
+- takeScreenshot: 22_p2p_my_content_states_bottom
+
+- scrollUntilVisible:
+    element:
+      id: my-content-back
+    direction: DOWN
+    timeout: 5000
+- tapOn:
+    id: my-content-back
+
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 10000
+
+- tapOn:
+    id: home-open-invites
+
+- extendedWaitUntil:
+    visible:
+      id: invites-screen
+    timeout: 20000
+
+- scrollUntilVisible:
+    element:
+      id: invite-state-invite-p2p-syncing
+    direction: DOWN
+    timeout: 5000
+- assertVisible:
+    id: invite-state-invite-p2p-pending
+- assertVisible:
+    id: invite-state-invite-p2p-syncing
+- takeScreenshot: 23_p2p_invites_states_top
+
+- scrollUntilVisible:
+    element:
+      id: invite-state-invite-p2p-available
+    direction: DOWN
+    timeout: 5000
+- assertVisible:
+    id: invite-state-invite-p2p-sync-error
+- assertVisible:
+    id: invite-state-invite-p2p-available
+- assertVisible:
+    id: invite-play-invite-p2p-available
+
+- scrollUntilVisible:
+    element:
+      id: invite-state-invite-p2p-expired
+    direction: DOWN
+    timeout: 5000
+- assertVisible:
+    id: invite-state-invite-p2p-expired
+- takeScreenshot: 24_p2p_invites_states_bottom
