@@ -126,17 +126,13 @@ function useSyncAction(refreshInbox: () => Promise<void>) {
   return { syncInvitation, busyInvites, syncErrors };
 }
 
-function usePlaybackAction(
-  gatewayBaseUrl: string,
-  refreshInbox: () => Promise<void>,
-) {
+function usePlaybackAction(gatewayBaseUrl: string, refreshInbox: () => Promise<void>) {
   const auth = useAuth();
   const service = useP2PService();
   const syncController = useP2PSyncController();
   const controller = useMemo(
     () => new P2PPlaybackController(
-      new P2PAudienceService(createGatewayClient({ gatewayBaseUrl })),
-      service,
+      new P2PAudienceService(createGatewayClient({ gatewayBaseUrl })), service,
     ),
     [gatewayBaseUrl, service],
   );
