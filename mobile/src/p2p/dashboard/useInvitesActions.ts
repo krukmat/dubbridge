@@ -175,6 +175,7 @@ function usePlaybackAction(gatewayBaseUrl: string, refreshInbox: () => Promise<v
   const identity = `${auth.userId ?? ""}:${auth.sessionRef ?? ""}`;
   const identityRef = useRef(identity);
   identityRef.current = identity;
+
   useEffect(() => {
     inFlight.current.clear();
     setBusyPlayInvites(new Set());
@@ -183,55 +184,116 @@ function usePlaybackAction(gatewayBaseUrl: string, refreshInbox: () => Promise<v
   }, [identity]);
 
   const playInvitation = useCallback(async (projection: ViewerInboxProjection) => {
-    const descriptor = projection.item.descriptor;
-    const accessToken = auth.sessionRef;
-    const requestIdentity = identity;
-    const accountScope = auth.userId ?? null;
-    if (!descriptor || !accessToken || !accountScope) return;
-    if (!canStartViewerPlayback(projection, accountScope)) return;
-    const key = `${descriptor.publicationId}/${descriptor.lineageId}`;
-    if (inFlight.current.has(key)) return;
-
-    inFlight.current.add(key);
-    updateBusy(setBusyPlayInvites, projection.item.invitation.id, true);
-    setPlayErrors({});
-    try {
-      const handle = await syncController.getVerifiedPackageHandle(descriptor, accountScope);
-      if (identityRef.current !== requestIdentity) return;
-      const result = await controller.start(accessToken, projection.item.authorization.id, handle);
-      if (identityRef.current !== requestIdentity) return;
-      if (!result.ok) {
-        if (result.error.kind === "session_expired") {
-          await auth.logout();
-          return;
-        }
-        setPlayErrors((current) => ({
-          ...current,
-          [projection.item.invitation.id]: "Playback authorization is no longer available.",
-        }));
-        await refreshInbox();
-        return;
-      }
-      await auth.onSessionRotation(result.value.sessionRotation);
-      if (identityRef.current !== requestIdentity) return;
-      setPlaybackSession({ invitationId: projection.item.invitation.id, session: result.value.data });
-    } catch {
-      if (identityRef.current === requestIdentity) {
-        setPlayErrors((current) => ({
-          ...current,
-          [projection.item.invitation.id]: "Could not start verified playback.",
-        }));
-        await refreshInbox();
-      }
-    } finally {
-      if (identityRef.current === requestIdentity) {
-        inFlight.current.delete(key);
-        updateBusy(setBusyPlayInvites, projection.item.invitation.id, false);
-      }
-    }
+    await runPlayback({
+      projection, auth, controller, syncController, refreshInbox,
+      identity, identityRef, inFlight, setBusyPlayInvites, setPlayErrors, setPlaybackSession,
+    });
   }, [auth, controller, identity, refreshInbox, syncController]);
 
   return { playInvitation, busyPlayInvites, playErrors, playbackSession, playbackController: controller };
+}
+
+async function runPlayback({
+  projection, auth, controller, syncController, refreshInbox, identity, identityRef,
+  inFlight, setBusyPlayInvites, setPlayErrors, setPlaybackSession,
+}: {
+  projection: ViewerInboxProjection;
+  auth: ReturnType<typeof useAuth>;
+  controller: P2PPlaybackController;
+  syncController: ReturnType<typeof useP2PSyncController>;
+  refreshInbox: () => Promise<void>;
+  identity: string;
+  identityRef: React.MutableRefObject<string>;
+  inFlight: React.MutableRefObject<Set<string>>;
+  setBusyPlayInvites: React.Dispatch<React.SetStateAction<ReadonlySet<string>>>;
+  setPlayErrors: React.Dispatch<React.SetStateAction<Readonly<Record<string, string>>>>;
+  setPlaybackSession: React.Dispatch<React.SetStateAction<
+    Readonly<{ invitationId: string; session: P2PPlaybackSession }> | null
+  >>;
+}) {
+  const descriptor = projection.item.descriptor;
+  const accessToken = auth.sessionRef;
+  const accountScope = auth.userId ?? null;
+  if (!descriptor || !accessToken || !accountScope) return;
+  if (!canStartViewerPlayback(projection, accountScope)) return;
+  const key = `${descriptor.publicationId}/${descriptor.lineageId}`;
+  if (inFlight.current.has(key)) return;
+
+  inFlight.current.add(key);
+  updateBusy(setBusyPlayInvites, projection.item.invitation.id, true);
+  setPlayErrors({});
+  try {
+    await startCurrentPlayback({
+      projection, descriptor, accessToken, accountScope, auth, controller, syncController,
+      refreshInbox, identity, identityRef, setPlayErrors, setPlaybackSession,
+    });
+  } finally {
+    if (identityRef.current === identity) {
+      inFlight.current.delete(key);
+      updateBusy(setBusyPlayInvites, projection.item.invitation.id, false);
+    }
+  }
+}
+
+async function startCurrentPlayback({
+  projection, descriptor, accessToken, accountScope, auth, controller, syncController,
+  refreshInbox, identity, identityRef, setPlayErrors, setPlaybackSession,
+}: {
+  projection: ViewerInboxProjection;
+  descriptor: NonNullable<ViewerInboxProjection["item"]["descriptor"]>;
+  accessToken: string;
+  accountScope: string;
+  auth: ReturnType<typeof useAuth>;
+  controller: P2PPlaybackController;
+  syncController: ReturnType<typeof useP2PSyncController>;
+  refreshInbox: () => Promise<void>;
+  identity: string;
+  identityRef: React.MutableRefObject<string>;
+  setPlayErrors: React.Dispatch<React.SetStateAction<Readonly<Record<string, string>>>>;
+  setPlaybackSession: React.Dispatch<React.SetStateAction<
+    Readonly<{ invitationId: string; session: P2PPlaybackSession }> | null
+  >>;
+}) {
+  const current = () => identityRef.current === identity;
+  try {
+    const handle = await syncController.getVerifiedPackageHandle(descriptor, accountScope);
+    if (!current()) return;
+    const result = await controller.start(accessToken, projection.item.authorization.id, handle);
+    if (!current()) return;
+    if (!result.ok) {
+      await handlePlaybackFailure(result.error.kind, projection, auth, refreshInbox, setPlayErrors);
+      return;
+    }
+    await auth.onSessionRotation(result.value.sessionRotation);
+    if (current()) {
+      setPlaybackSession({ invitationId: projection.item.invitation.id, session: result.value.data });
+    }
+  } catch {
+    if (!current()) return;
+    setPlayErrors((value) => ({
+      ...value,
+      [projection.item.invitation.id]: "Could not start verified playback.",
+    }));
+    await refreshInbox();
+  }
+}
+
+async function handlePlaybackFailure(
+  kind: string,
+  projection: ViewerInboxProjection,
+  auth: ReturnType<typeof useAuth>,
+  refreshInbox: () => Promise<void>,
+  setPlayErrors: React.Dispatch<React.SetStateAction<Readonly<Record<string, string>>>>,
+) {
+  if (kind === "session_expired") {
+    await auth.logout();
+    return;
+  }
+  setPlayErrors((value) => ({
+    ...value,
+    [projection.item.invitation.id]: "Playback authorization is no longer available.",
+  }));
+  await refreshInbox();
 }
 
 function updateBusy(
