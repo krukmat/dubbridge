@@ -23,6 +23,38 @@ behavior. It certifies only the base S-230 flow.
 - JDK 17 / Android SDK environment is already working.
 - Use the normal mobile app, not `android:p2p-dev` or `android:p2p-cert`.
 
+## Execution blocks
+
+Execute and report T7local using this hierarchy:
+
+```text
+T7local
+├─ A Runtime readiness
+│  ├─ A1 Compose + gateway
+│  ├─ A2 gateway live/ready
+│  └─ A3 mobile gateway configuration
+├─ B Mobile build readiness
+│  ├─ B1 mobile QA
+│  ├─ B2 build/install/launch
+│  └─ B3 login/session smoke
+├─ C Base E2E flow
+│  ├─ C1 upload + rights + finalize
+│  ├─ C2 preparation + artifacts
+│  ├─ C3 review + decision
+│  └─ C4 publish + normal HLS playback
+├─ D Negative controls
+│  ├─ D1 invalid gateway configuration
+│  └─ D2 expired/rejected auth
+└─ E Certification
+   ├─ E1 downstream evidence
+   ├─ E2 audit artifact + exact HEAD
+   ├─ E3 PASS/BLOCKED
+   └─ E4 freshness baseline
+```
+
+Order: **A → B → C → D → E**. Do not advance a block while one of its
+children is unresolved.
+
 ## Environment
 
 1. Record:
@@ -129,18 +161,23 @@ Do not provision or deploy Digital Ocean.
 ```
 S-230-T7local: PASS | BLOCKED
 HEAD:
+A1 Compose+gateway:
+A2 gateway live/ready:
+A3 mobile config:
+B1 mobile QA:
+B2 build/install/launch:
+B3 login/session:
+C1 upload/rights/finalize:
+C2 preparation/artifacts:
+C3 review/decision:
+C4 publish/HLS playback:
+D1 invalid config:
+D2 auth expiry/rejection:
+E1 downstream evidence:
+E2 audit artifact:
+E3 disposition:
+E4 freshness baseline HEAD:
 device:
-gateway:
-login:
-upload/rights/finalize:
-preparation:
-review:
-publish:
-playback:
-negative config:
-negative auth-expiry:
-qa-mobile:
 code changed: YES/NO
-audit artifact:
 next gate: T7c | BLOCKED
 ```

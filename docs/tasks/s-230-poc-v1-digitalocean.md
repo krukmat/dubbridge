@@ -5049,6 +5049,44 @@ code to make the smoke pass — a failure is a finding, not a patch target.
 **Depends on:** S-230-T5d
 **Status:** [ ] Planned — **runnable now in parallel with MVP0-P2P P6**.
 
+### Execution decomposition
+
+T7local executes in five ordered blocks. The second level is the executable
+unit used for progress/evidence reporting; a block is not PASS until all of its
+children are complete.
+
+| Block | Purpose | Children |
+|---|---|---|
+| **T7local.A** | Local runtime readiness | A1 Compose + gateway; A2 gateway live/ready; A3 mobile target/config |
+| **T7local.B** | Mobile build readiness | B1 mobile QA; B2 normal Android build/install; B3 login/session smoke |
+| **T7local.C** | Base E2E product flow | C1 upload/rights/finalize; C2 preparation/artifacts; C3 review/decision; C4 publish/HLS playback |
+| **T7local.D** | Negative controls | D1 invalid gateway config; D2 expired/rejected auth |
+| **T7local.E** | Certification | E1 downstream evidence; E2 audit artifact + exact HEAD; E3 PASS/BLOCKED disposition; E4 freshness baseline |
+
+Detailed leaves:
+
+- **T7local.A1** — start the required local Compose services with the gateway.
+- **T7local.A2** — prove gateway `:8082/health/live` and `:8082/health/ready`.
+- **T7local.A3** — prove the mobile target uses the gateway
+  (`10.0.2.2:8082` on emulator), never API `:8080`.
+- **T7local.B1** — `typecheck` + `lint` + mobile tests / `qa-mobile`.
+- **T7local.B2** — build, install and launch the normal Android application.
+- **T7local.B3** — establish a real authenticated local session.
+- **T7local.C1** — upload, rights confirmation and finalize.
+- **T7local.C2** — preparation reaches authoritative expected state and artifacts.
+- **T7local.C3** — review task appears and accepted decision persists.
+- **T7local.C4** — publication persists and normal HLS playback renders.
+- **T7local.D1** — missing/malformed gateway config reaches `ConfigErrorScreen`.
+- **T7local.D2** — expired/rejected auth follows the existing fail-closed/logout path.
+- **T7local.E1** — consolidate per-stage downstream-state evidence.
+- **T7local.E2** — write the task-scoped audit artifact with exact HEAD/device/config.
+- **T7local.E3** — record aggregate `T7local PASS | BLOCKED`.
+- **T7local.E4** — record the T7local HEAD as the baseline consumed later by the
+  DEV-HANDOFF freshness check before `T6p-a`.
+
+Execution order is **A → B → C → D → E**. P2P Invite/Claim/Sync/Verify,
+loopback playback, HPKE and P5.T3 stay outside every child above.
+
 > **Consolidation update 2026-09-24:** T7local is the S-230 **base-product**
 > mobile smoke, not a P2P product certification. The normal app may contain
 > P6/P2P code because both lanes share the same mobile binary, but this task
