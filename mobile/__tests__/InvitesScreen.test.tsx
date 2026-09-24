@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react-native";
 
 import { createGatewayClient } from "../src/api/client";
+import type { P2pReadyDescriptor } from "../src/api/p2p";
 import type { P2pInboxItem } from "../src/api/p2pDashboard";
 import type { AuthContextValue } from "../src/auth/AuthProvider";
 import {
@@ -42,7 +43,7 @@ let mockAuthValue: AuthContextValue;
 let mockClient: { get: jest.Mock; post: jest.Mock; postMultipart: jest.Mock };
 let mockSyncController: { getSyncState: jest.Mock; startSync: jest.Mock };
 
-const DESCRIPTOR = {
+const DESCRIPTOR: P2pReadyDescriptor = {
   descriptorVersion: "p2p-ready-descriptor-v1",
   assetId: "asset-1",
   publicationId: "pub-1",
@@ -54,7 +55,7 @@ const DESCRIPTOR = {
   kekId: "kek-1",
   kekVersion: 1,
   readyAt: "2026-09-23T00:00:00Z",
-} as const;
+};
 
 function inboxItem(overrides: Partial<P2pInboxItem> = {}): P2pInboxItem {
   return {
@@ -113,7 +114,7 @@ function rawInboxItem({
 }: {
   viewerSubjectId?: string;
   authorizationActive?: boolean;
-  descriptor?: typeof DESCRIPTOR | null;
+  descriptor?: P2pReadyDescriptor | null;
 } = {}) {
   return {
     invitation: {
