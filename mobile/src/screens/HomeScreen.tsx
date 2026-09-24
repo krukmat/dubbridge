@@ -337,14 +337,8 @@ function DashboardContent({
 }
 
 export function HomeScreen({
-  dubbridgeEnv: _dubbridgeEnv,
-  gatewayBaseUrl,
-  onOpenAssets,
-  onOpenUpload,
-  onOpenReview,
-  onOpenOrganizations,
-  onOpenMyContent,
-  onOpenInvites,
+  dubbridgeEnv: _dubbridgeEnv, gatewayBaseUrl, onOpenAssets, onOpenUpload,
+  onOpenReview, onOpenOrganizations, onOpenMyContent, onOpenInvites,
 }: {
   dubbridgeEnv: string;
   gatewayBaseUrl: string;

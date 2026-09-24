@@ -142,6 +142,43 @@ function ReadyInvitations({
   );
 }
 
+function InvitesBody({
+  viewState,
+  retry,
+  claim,
+}: {
+  viewState: ReturnType<typeof useInvitesState>["viewState"];
+  retry: () => void;
+  claim: ReturnType<typeof useInvitesActions>;
+}) {
+  if (viewState.kind === "loading") {
+    return <StateView testID="invites-loading" kind="loading" title="Loading invitations…" />;
+  }
+  if (viewState.kind === "error") {
+    return (
+      <StateView testID="invites-error" kind="error" title="Could not load invitations"
+        message={viewState.message} onRetry={retry} />
+    );
+  }
+  if (viewState.kind === "empty") {
+    return (
+      <StateView testID="invites-empty" kind="empty" title="No P2P invitations"
+        message="Claimed invitations will appear here." />
+    );
+  }
+  return (
+    <ReadyInvitations
+      invitations={viewState.invitations}
+      busyInvites={claim.busyInvites}
+      syncErrors={claim.syncErrors}
+      onSync={(projection) => void claim.syncInvitation(projection)}
+      busyPlayInvites={claim.busyPlayInvites}
+      playErrors={claim.playErrors}
+      onPlay={(projection) => void claim.playInvitation(projection)}
+    />
+  );
+}
+
 export function InvitesScreen({
   gatewayBaseUrl,
   onBack,
@@ -172,41 +209,7 @@ export function InvitesScreen({
         isClaiming={claim.isClaiming} canClaim={claim.canClaim}
         onChangeToken={claim.updateClaimToken} onClaim={() => void claim.claim()}
       />
-      {viewState.kind === "loading" ? (
-        <StateView
-          testID="invites-loading"
-          kind="loading"
-          title="Loading invitations…"
-        />
-      ) : null}
-      {viewState.kind === "error" ? (
-        <StateView
-          testID="invites-error"
-          kind="error"
-          title="Could not load invitations"
-          message={viewState.message}
-          onRetry={retry}
-        />
-      ) : null}
-      {viewState.kind === "empty" ? (
-        <StateView
-          testID="invites-empty"
-          kind="empty"
-          title="No P2P invitations"
-          message="Claimed invitations will appear here."
-        />
-      ) : null}
-      {viewState.kind === "ready" ? (
-        <ReadyInvitations
-          invitations={viewState.invitations}
-          busyInvites={claim.busyInvites}
-          syncErrors={claim.syncErrors}
-          onSync={(projection) => void claim.syncInvitation(projection)}
-          busyPlayInvites={claim.busyPlayInvites}
-          playErrors={claim.playErrors}
-          onPlay={(projection) => void claim.playInvitation(projection)}
-        />
-      ) : null}
+      <InvitesBody viewState={viewState} retry={retry} claim={claim} />
       {claim.playbackSession ? (
         <P2PPlaybackSessionView
           testID="p2p-player"

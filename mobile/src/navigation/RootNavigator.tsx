@@ -361,12 +361,8 @@ function resolvePendingDeepLink(
   }
 }
 
-function AuthedNavigator({
-  gatewayBaseUrl,
-  dubbridgeEnv,
-}: {
-  gatewayBaseUrl: string;
-  dubbridgeEnv: string;
+function AuthedNavigator({ gatewayBaseUrl, dubbridgeEnv }: {
+  gatewayBaseUrl: string; dubbridgeEnv: string;
 }) {
   return (
     <AuthedStack.Navigator screenOptions={AUTHTED_NAVIGATOR_OPTIONS}>
