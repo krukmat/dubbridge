@@ -9,17 +9,24 @@ import {
 } from "../p2p/dashboard/InvitesModel";
 import { useInvitesActions } from "../p2p/dashboard/useInvitesActions";
 import { useInvitesState } from "../p2p/dashboard/useInvitesState";
+import { P2PPlaybackSessionView } from "../p2p/playback/P2PPlaybackSessionView";
 
 function InvitationRow({
   projection,
   syncing,
   syncError,
   onSync,
+  playing,
+  playError,
+  onPlay,
 }: {
   projection: ViewerInboxProjection;
   syncing: boolean;
   syncError: string | null;
   onSync: () => void;
+  playing: boolean;
+  playError: string | null;
+  onPlay: () => void;
 }) {
   const { invitation, authorization } = projection.item;
   return (
@@ -50,6 +57,21 @@ function InvitationRow({
       {syncError ? (
         <Text testID={`invite-sync-error-${invitation.id}`} style={styles.error}>
           {syncError}
+        </Text>
+      ) : null}
+      {projection.action === "play" ? (
+        <Button
+          testID={`invite-play-${invitation.id}`}
+          label="Play"
+          onPress={onPlay}
+          loading={playing}
+          disabled={playing}
+          size="sm"
+        />
+      ) : null}
+      {playError ? (
+        <Text testID={`invite-play-error-${invitation.id}`} style={styles.error}>
+          {playError}
         </Text>
       ) : null}
     </Card>
@@ -101,11 +123,17 @@ function ReadyInvitations({
   busyInvites,
   syncErrors,
   onSync,
+  busyPlayInvites,
+  playErrors,
+  onPlay,
 }: {
   invitations: ViewerInboxProjection[];
   busyInvites: ReadonlySet<string>;
   syncErrors: Readonly<Record<string, string>>;
   onSync: (projection: ViewerInboxProjection) => void;
+  busyPlayInvites: ReadonlySet<string>;
+  playErrors: Readonly<Record<string, string>>;
+  onPlay: (projection: ViewerInboxProjection) => void;
 }) {
   return (
     <View style={styles.list}>
@@ -116,6 +144,9 @@ function ReadyInvitations({
           syncing={busyInvites.has(projection.item.invitation.id)}
           syncError={syncErrors[projection.item.invitation.id] ?? null}
           onSync={() => onSync(projection)}
+          playing={busyPlayInvites.has(projection.item.invitation.id)}
+          playError={playErrors[projection.item.invitation.id] ?? null}
+          onPlay={() => onPlay(projection)}
         />
       ))}
     </View>
@@ -173,6 +204,16 @@ export function InvitesScreen({ gatewayBaseUrl }: { gatewayBaseUrl: string }) {
           busyInvites={claim.busyInvites}
           syncErrors={claim.syncErrors}
           onSync={(projection) => void claim.syncInvitation(projection)}
+          busyPlayInvites={claim.busyPlayInvites}
+          playErrors={claim.playErrors}
+          onPlay={(projection) => void claim.playInvitation(projection)}
+        />
+      ) : null}
+      {claim.playbackSession ? (
+        <P2PPlaybackSessionView
+          testID="p2p-player"
+          session={claim.playbackSession.session}
+          controller={claim.playbackController}
         />
       ) : null}
     </Screen>

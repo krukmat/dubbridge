@@ -28,6 +28,7 @@ jest.mock("../src/api/client", () => ({
 
 jest.mock("../src/p2p/P2PProvider", () => ({
   useP2PSyncController: () => mockSyncController,
+  useP2PService: () => mockP2PService,
 }));
 
 jest.mock("../src/p2p/P2PAudienceService", () => ({
@@ -36,12 +37,36 @@ jest.mock("../src/p2p/P2PAudienceService", () => ({
   })),
 }));
 
+jest.mock("../src/p2p/playback/P2PPlaybackController", () => ({
+  P2PPlaybackController: jest.fn().mockImplementation(() => ({
+    start: (...args: unknown[]) => mockStartPlayback(...args),
+    stop: (...args: unknown[]) => mockStopPlayback(...args),
+  })),
+}));
+
+jest.mock("../src/p2p/playback/P2PPlaybackSessionView", () => ({
+  P2PPlaybackSessionView: (props: Record<string, unknown>) => {
+    mockPlaybackView(props);
+    return require("react").createElement(require("react-native").View, {
+      testID: props.testID,
+    });
+  },
+}));
+
 const mockClaimInvitation = jest.fn();
+const mockStartPlayback = jest.fn();
+const mockStopPlayback = jest.fn();
+const mockPlaybackView = jest.fn();
+const mockP2PService = {};
 const mockCreateGatewayClient = createGatewayClient as jest.MockedFunction<typeof createGatewayClient>;
 
 let mockAuthValue: AuthContextValue;
 let mockClient: { get: jest.Mock; post: jest.Mock; postMultipart: jest.Mock };
-let mockSyncController: { getSyncState: jest.Mock; startSync: jest.Mock };
+let mockSyncController: {
+  getSyncState: jest.Mock;
+  startSync: jest.Mock;
+  getVerifiedPackageHandle: jest.Mock;
+};
 
 const DESCRIPTOR: P2pReadyDescriptor = {
   descriptorVersion: "p2p-ready-descriptor-v1",
@@ -165,9 +190,13 @@ beforeEach(() => {
   mockSyncController = {
     getSyncState: jest.fn(),
     startSync: jest.fn(),
+    getVerifiedPackageHandle: jest.fn(),
   };
   mockCreateGatewayClient.mockReturnValue(mockClient as never);
   mockClaimInvitation.mockReset();
+  mockStartPlayback.mockReset();
+  mockStopPlayback.mockReset();
+  mockPlaybackView.mockReset();
   mockAuthValue = {
     sessionRef: "session-p6",
     userId: "viewer-1",
@@ -632,5 +661,161 @@ describe("InvitesScreen T2.D Sync / Retry Sync", () => {
     expect(view.getByText("Sync error")).toBeTruthy();
     expect(view.queryByText("Available")).toBeNull();
     expect(view.queryByText("Play")).toBeNull();
+  });
+});
+
+
+describe("InvitesScreen T2.E Available + Play", () => {
+  const verifiedHandle = {
+    accountScope: "viewer-1",
+    assetId: "asset-1",
+    publicationId: "pub-1",
+    lineageId: "lineage-1",
+    manifestDigestSha256: DESCRIPTOR.manifestDigestSha256,
+    externalPublicationId: DESCRIPTOR.externalPublicationId,
+  };
+  const playbackSession = {
+    playbackUrl: `http://127.0.0.1:43210/${"c".repeat(32)}/index.m3u8`,
+    accountScope: "viewer-1",
+    publicationId: "pub-1",
+    lineageId: "lineage-1",
+  };
+
+  it("obtains the verified P4 handle before delegating Play to P5", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: { data: [rawInboxItem()], sessionRotation: null },
+    });
+    mockSyncController.getSyncState.mockResolvedValue(snapshot("READY", true));
+    mockSyncController.getVerifiedPackageHandle.mockResolvedValue(verifiedHandle);
+    mockStartPlayback.mockResolvedValue({
+      ok: true,
+      value: { data: playbackSession, sessionRotation: "play-rotation" },
+    });
+
+    const view = await renderInvitesScreen();
+    await waitFor(() => expect(view.getByText("Available")).toBeTruthy());
+
+    fireEvent.press(view.getByTestId("invite-play-invite-1"));
+
+    await waitFor(() => expect(mockStartPlayback).toHaveBeenCalledTimes(1));
+    expect(mockSyncController.getVerifiedPackageHandle).toHaveBeenCalledWith(
+      DESCRIPTOR,
+      "viewer-1",
+    );
+    expect(mockStartPlayback).toHaveBeenCalledWith("session-p6", "auth-1", verifiedHandle);
+    expect(mockAuthValue.onSessionRotation).toHaveBeenCalledWith("play-rotation");
+    await waitFor(() => expect(view.getByTestId("p2p-player")).toBeTruthy());
+    expect(mockPlaybackView).toHaveBeenCalledWith(
+      expect.objectContaining({ session: playbackSession }),
+    );
+  });
+
+  it("does not expose Play for unverified READY", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: { data: [rawInboxItem()], sessionRotation: null },
+    });
+    mockSyncController.getSyncState.mockResolvedValue(snapshot("READY"));
+
+    const view = await renderInvitesScreen();
+    await waitFor(() => expect(view.getByText("Syncing")).toBeTruthy());
+
+    expect(view.queryByTestId("invite-play-invite-1")).toBeNull();
+    expect(mockSyncController.getVerifiedPackageHandle).not.toHaveBeenCalled();
+    expect(mockStartPlayback).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when the verified P4 handle cannot be produced", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: { data: [rawInboxItem()], sessionRotation: null },
+    });
+    mockSyncController.getSyncState.mockResolvedValue(snapshot("READY", true));
+    mockSyncController.getVerifiedPackageHandle.mockRejectedValue(
+      new Error("package no longer verified"),
+    );
+
+    const view = await renderInvitesScreen();
+    await waitFor(() => expect(view.getByText("Available")).toBeTruthy());
+    fireEvent.press(view.getByTestId("invite-play-invite-1"));
+
+    await waitFor(() => expect(view.getByTestId("invite-play-error-invite-1")).toBeTruthy());
+    expect(mockStartPlayback).not.toHaveBeenCalled();
+    expect(view.queryByTestId("p2p-player")).toBeNull();
+  });
+
+  it("fails closed when P5 rejects current authorization and refreshes authority", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: { data: [rawInboxItem()], sessionRotation: null },
+    });
+    mockSyncController.getSyncState.mockResolvedValue(snapshot("READY", true));
+    mockSyncController.getVerifiedPackageHandle.mockResolvedValue(verifiedHandle);
+    mockStartPlayback.mockResolvedValue({
+      ok: false,
+      error: { kind: "forbidden" },
+    });
+
+    const view = await renderInvitesScreen();
+    await waitFor(() => expect(view.getByText("Available")).toBeTruthy());
+    fireEvent.press(view.getByTestId("invite-play-invite-1"));
+
+    await waitFor(() => expect(view.getByTestId("invite-play-error-invite-1")).toBeTruthy());
+    expect(view.getByText("Playback authorization is no longer available.")).toBeTruthy();
+    expect(view.queryByTestId("p2p-player")).toBeNull();
+    expect(mockClient.get.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("logs out and creates no player when P5 reports session expiry", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: { data: [rawInboxItem()], sessionRotation: null },
+    });
+    mockSyncController.getSyncState.mockResolvedValue(snapshot("READY", true));
+    mockSyncController.getVerifiedPackageHandle.mockResolvedValue(verifiedHandle);
+    mockStartPlayback.mockResolvedValue({
+      ok: false,
+      error: { kind: "session_expired" },
+    });
+
+    const view = await renderInvitesScreen();
+    await waitFor(() => expect(view.getByText("Available")).toBeTruthy());
+    fireEvent.press(view.getByTestId("invite-play-invite-1"));
+
+    await waitFor(() => expect(mockAuthValue.logout).toHaveBeenCalledTimes(1));
+    expect(view.queryByTestId("p2p-player")).toBeNull();
+  });
+
+  it("locks duplicate Play starts while P4/P5 startup is in flight", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: { data: [rawInboxItem()], sessionRotation: null },
+    });
+    mockSyncController.getSyncState.mockResolvedValue(snapshot("READY", true));
+    let resolveHandle: ((value: typeof verifiedHandle) => void) | undefined;
+    mockSyncController.getVerifiedPackageHandle.mockImplementation(
+      () => new Promise((resolve) => {
+        resolveHandle = resolve;
+      }),
+    );
+    mockStartPlayback.mockResolvedValue({
+      ok: true,
+      value: { data: playbackSession, sessionRotation: null },
+    });
+
+    const view = await renderInvitesScreen();
+    await waitFor(() => expect(view.getByTestId("invite-play-invite-1")).toBeTruthy());
+
+    fireEvent.press(view.getByTestId("invite-play-invite-1"));
+    await waitFor(() =>
+      expect(view.getByTestId("invite-play-invite-1").props.accessibilityState.disabled).toBe(true),
+    );
+    fireEvent.press(view.getByTestId("invite-play-invite-1"));
+    expect(mockSyncController.getVerifiedPackageHandle).toHaveBeenCalledTimes(1);
+
+    resolveHandle?.(verifiedHandle);
+    await waitFor(() => expect(view.getByTestId("p2p-player")).toBeTruthy());
+    expect(mockStartPlayback).toHaveBeenCalledTimes(1);
   });
 });

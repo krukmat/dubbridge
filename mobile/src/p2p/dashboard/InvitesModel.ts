@@ -147,6 +147,19 @@ export function invitesErrorMessage(error: {
     : "Could not load P2P invitations.";
 }
 
+export function canStartViewerPlayback(
+  projection: ViewerInboxProjection,
+  accountScope: string | null,
+): boolean {
+  return (
+    accountScope !== null &&
+    projection.action === "play" &&
+    projection.item.authorization.viewerSubjectId === accountScope &&
+    projection.item.authorizationActive &&
+    hasExactViewerDescriptor(projection.item)
+  );
+}
+
 export function canStartViewerSync(
   projection: ViewerInboxProjection,
   accountScope: string | null,
