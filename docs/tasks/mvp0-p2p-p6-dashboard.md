@@ -173,7 +173,7 @@ Evidence: `docs/audit/mvp0-p2p-p6-t2-bc-inbox-claim-2026-09-24.md`.
 
 - **T2.B PASS:** authoritative `/api/p2p/inbox` projection joined with P4 local sync facts, including Pending / Syncing / Sync error / Available / Expired precedence, loading/empty/error/retry states and other-viewer fail-closed filtering. Exact implementation head `19a5bca9`, Actions run `36019060607`: **15/15 PASS**; mobile **64/64 suites, 481/481 tests**.
 - **T2.C PASS:** manual raw-token Claim delegates only to `P2PAudienceService.claimInvitation()`; blank/double submit is blocked, success rotates session + clears the token + refreshes the authoritative inbox, claim errors remain fail-closed, session expiry logs out, and remount cannot recover the raw token. Exact implementation head `c104d40a`, Actions run `36022359070`: **15/15 PASS**; mobile **64/64 suites, 489/489 tests**.
-- Owner approved execution of P6.T2.C before implementation. Aggregate T2 owner verification remains a T2.H closure obligation.
+- Owner approved execution of P6.T2.C before implementation. The aggregate owner-verification obligation was retained through T2.H and is now satisfied.
 - Claim success does **not** directly produce Available or Play; T2.D/E retain the P4/P5 gates.
 - HPKE emulator remains disabled.
 
@@ -186,7 +186,7 @@ Evidence: `docs/audit/mvp0-p2p-p6-t2-d-sync-retry-2026-09-24.md`.
 - A per-descriptor in-flight lock prevents duplicate P4 jobs; failures remain fail-closed and never synthesize Available/Play.
 - After start/retry completion or error, the screen refreshes authoritative inbox + P4 snapshot and T2.B re-projects the resulting state.
 - Exact implementation head `a99a712c`, Actions run `36025590927`: **15/15 PASS**; mobile **64/64 suites, 495/495 tests**.
-- Owner approved execution of P6.T2.D before implementation. Aggregate T2 owner verification remains a T2.H closure obligation.
+- Owner approved execution of P6.T2.D before implementation. The aggregate owner-verification obligation was retained through T2.H and is now satisfied.
 - T2.E remains the only leaf allowed to wire verified Available to Play. HPKE emulator remains disabled.
 
 ### T2.E implementation evidence
@@ -200,7 +200,7 @@ Evidence: `docs/audit/mvp0-p2p-p6-t2-e-available-play-2026-09-24.md`.
 - P5 authorization/session failures create no player; denied authorization triggers authoritative inbox refresh; session expiry delegates to logout.
 - A per-descriptor in-flight lock prevents duplicate P4-handle/P5-start requests.
 - Exact implementation head `8fa7411d`, Actions run `36029185810`: **15/15 PASS**; mobile **64/64 suites, 501/501 tests**.
-- The owner directed continuation into T2.E after T2.D closure; aggregate T2 owner verification remains a T2.H obligation.
+- The owner directed continuation into T2.E after T2.D closure; aggregate owner verification was retained through T2.H and is now satisfied.
 - HPKE emulator remains disabled.
 
 ### T2.F implementation evidence
@@ -214,7 +214,7 @@ Evidence: `docs/audit/mvp0-p2p-p6-t2-f-lifecycle-2026-09-24.md`.
 - Claim token/busy/error state and Sync/Play busy/error state are cleared on identity change.
 - Expired/revoked invitations override cached P4 READY and expose no Play.
 - Exact implementation head `9c4b41e4`, Actions run `36031993001`: **15/15 PASS**; mobile **64/64 suites, 507/507 tests**.
-- Owner directed continuation after T2.D/T2.E; aggregate T2 owner verification remains a T2.H closure obligation.
+- Owner directed continuation after T2.D/T2.E; aggregate owner verification was retained through T2.H and is now satisfied.
 - HPKE emulator remains disabled.
 
 ### T2.G implementation evidence
@@ -227,10 +227,10 @@ Evidence: `docs/audit/mvp0-p2p-p6-t2-g-navigation-2026-09-24.md`.
 - When auth becomes unauthenticated, the authenticated stack is removed and the Invites route disappears.
 - Existing T2.F identity invalidation remains active inside the real route.
 - Exact implementation head `6f4a89e1`, Actions run `36033387423`: **15/15 PASS**; mobile **64/64 suites, 509/509 tests**.
-- T2.H remains the aggregate evidence/closure leaf and still requires owner final verification before parent T2 PASS.
+- T2.H aggregate evidence/closure is complete and owner final verification has closed parent T2 PASS.
 - HPKE emulator remains disabled.
 
-### T2.H aggregate certification candidate
+### T2.H aggregate certification closure
 
 Evidence: `docs/audit/mvp0-p2p-p6-t2-h-certification-candidate-2026-09-24.md`.
 
