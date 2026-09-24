@@ -343,10 +343,10 @@
       agregado de P5: es <code>P3 PASS → P4 PASS → P5-DEV → P6 PASS</code>.
       <code>P5.T3</code> queda como rama de certificación tardía y se reincorpora antes del
       veredicto P7/T9g. <code>S-230-T7local</code>, en el riel S-230, corre en paralelo con P6 y sigue siendo
-      un camino paralelo que prueba el build móvil contra el stack Docker local.
+      el smoke del <strong>base-flow S-230</strong> contra el gateway Docker local; no es certificación P2P.
     </p>
     <div class="diagram-frame scrollx">
-      <svg viewBox="0 0 1080 460" role="img" aria-label="Mapa de go-live replanificado. Infraestructura S-230 avanza por T7local y T7c. Producto MVP0-P2P requiere P3 PASS, P4 PASS, P5-DEV y P6 PASS para formar DEV-HANDOFF. P5.T3 queda fuera del critical path de desarrollo y se conserva como certificación física tardía, resoluble con evidencia compatible de T7p o obligatoriamente en P7.T2. DEV-HANDOFF y la pista local habilitan T6p-a a T6p-d, luego T7p y P7; P7/T9g no pueden pasar con P5.T3 pendiente o fallido.">
+      <svg viewBox="0 0 1080 460" role="img" aria-label="Mapa de go-live consolidado. S-230 ejecuta T7local base-flow por gateway local y T7c en paralelo con MVP0-P2P P6. P3 PASS, P4 PASS, P5-DEV y P6 PASS forman DEV-HANDOFF. T7local PASS, T7c PASS y DEV-HANDOFF convergen en un freshness check contra el head exacto antes de T6p-a. P5.T3 queda fuera del critical path de desarrollo y vuelve como certificación física antes de P7/T9g.">
         <defs>
           <marker id="arr-i" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" style="fill:var(--infra)"></polygon></marker>
           <marker id="arr-p" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" style="fill:var(--p2p)"></polygon></marker>
@@ -406,20 +406,21 @@
 
         <line x1="483" y1="350" x2="483" y2="365" style="stroke:var(--ink-dim);stroke-width:1.4;stroke-dasharray:3 3"></line>
         <line x1="483" y1="365" x2="608" y2="365" style="stroke:var(--p2p);stroke-width:1.4;stroke-dasharray:3 3" marker-end="url(#arr-p)"></line>
-        <rect x="518" y="349" width="180" height="34" rx="7" style="fill:var(--gate-soft);stroke:var(--gate);stroke-width:1.6;stroke-dasharray:3 2"></rect>
-        <text x="608" y="366" text-anchor="middle" style="fill:var(--gate);font-size:9.6px;font-weight:700">P3 PASS → P4 PASS → P5-DEV</text>
-        <text x="608" y="378" text-anchor="middle" style="fill:var(--gate);font-size:7.3px">P5.T3 queda fuera del critical path</text>
+        <rect x="508" y="347" width="200" height="38" rx="7" style="fill:var(--gate-soft);stroke:var(--gate);stroke-width:1.6;stroke-dasharray:3 2"></rect>
+        <text x="608" y="363" text-anchor="middle" style="fill:var(--gate);font-size:9.6px;font-weight:700">DEV-HANDOFF</text>
+        <text x="608" y="376" text-anchor="middle" style="fill:var(--gate);font-size:7.5px">P3 + P4 + P5-DEV + P6 PASS</text>
 
         <text x="8" y="336" style="fill:var(--gate);font-size:11px;font-weight:700;font-family:'IBM Plex Mono',monospace;letter-spacing:.04em">CADENA DE DESPLIEGUE P2P</text>
-        <rect x="700" y="60" width="88" height="34" rx="7" style="fill:var(--gate-soft);stroke:var(--gate);stroke-width:1.6;stroke-dasharray:3 2"></rect>
-        <text x="744" y="82" text-anchor="middle" style="fill:var(--gate);font-size:10.3px;font-weight:700">T6p-a</text>
+        <rect x="680" y="56" width="128" height="42" rx="7" style="fill:var(--gate-soft);stroke:var(--gate);stroke-width:1.6;stroke-dasharray:3 2"></rect>
+        <text x="744" y="74" text-anchor="middle" style="fill:var(--gate);font-size:9.4px;font-weight:700">freshness check</text>
+        <text x="744" y="88" text-anchor="middle" style="fill:var(--gate);font-size:10px;font-weight:700">→ T6p-a</text>
 
-        <path d="M 253 94 C 400 40, 600 40, 700 72" style="fill:none;stroke:var(--gate);stroke-width:1.4;stroke-dasharray:3 3" marker-end="url(#arr-g)"></path>
-        <path d="M 393 94 C 500 50, 620 55, 700 80" style="fill:none;stroke:var(--gate);stroke-width:1.4;stroke-dasharray:3 3" marker-end="url(#arr-g)"></path>
-        <path d="M 483 346 C 620 300, 660 150, 700 90" style="fill:none;stroke:var(--p2p);stroke-width:1.4;stroke-dasharray:3 3" marker-end="url(#arr-g)"></path>
-        <path d="M 608 349 C 660 220, 680 130, 700 84" style="fill:none;stroke:var(--p2p);stroke-width:1.4;stroke-dasharray:3 3" marker-end="url(#arr-g)"></path>
+        <path d="M 253 94 C 400 40, 600 40, 680 72" style="fill:none;stroke:var(--gate);stroke-width:1.4;stroke-dasharray:3 3" marker-end="url(#arr-g)"></path>
+        <path d="M 393 94 C 500 50, 620 55, 680 80" style="fill:none;stroke:var(--gate);stroke-width:1.4;stroke-dasharray:3 3" marker-end="url(#arr-g)"></path>
+        <path d="M 483 346 C 620 300, 660 150, 680 90" style="fill:none;stroke:var(--p2p);stroke-width:1.4;stroke-dasharray:3 3" marker-end="url(#arr-g)"></path>
+        <path d="M 608 349 C 660 220, 680 130, 680 84" style="fill:none;stroke:var(--p2p);stroke-width:1.4;stroke-dasharray:3 3" marker-end="url(#arr-g)"></path>
 
-        <line x1="744" y1="94" x2="744" y2="332" style="stroke:var(--gate);stroke-width:1.6" marker-end="url(#arr-g)"></line>
+        <line x1="744" y1="98" x2="744" y2="332" style="stroke:var(--gate);stroke-width:1.6" marker-end="url(#arr-g)"></line>
         <rect x="700" y="336" width="164" height="34" rx="7" style="fill:var(--surface-2);stroke:var(--border);stroke-width:1.4"></rect>
         <text x="782" y="358" text-anchor="middle" style="fill:var(--ink-dim);font-size:10.3px">T6p-b → T6p-c → T6p-d</text>
 

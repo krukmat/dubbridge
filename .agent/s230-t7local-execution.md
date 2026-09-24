@@ -14,9 +14,11 @@ behavior. It certifies only the base S-230 flow.
 ## Preconditions
 
 - Branch: `feature/p2p-mvp-core`.
-- Run only after the current P5.T3 Android run has finished so Metro/ADB/app
-  installation are not competing.
-- Preserve the P5 evidence SHA; do not reinterpret T7local as P5 evidence.
+- P5.T3/P5-CERT is **not a prerequisite**. Do not overlap T7local with an
+  actively running device-certification session only when both would contend
+  for the same Metro/ADB/emulator resources.
+- Preserve any existing P5 evidence SHA; do not reinterpret T7local as P5
+  evidence.
 - Local Docker stack is available.
 - JDK 17 / Android SDK environment is already working.
 - Use the normal mobile app, not `android:p2p-dev` or `android:p2p-cert`.

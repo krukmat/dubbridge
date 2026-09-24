@@ -5042,7 +5042,7 @@ code to make the smoke pass — a failure is a finding, not a patch target.
 
 ---
 
-## S-230-T7local: Mobile POC build against the local Docker Compose stack
+## S-230-T7local: Base mobile POC smoke against the local Docker Compose gateway
 
 **Type:** development/operational
 **Effort:** M
@@ -5127,8 +5127,9 @@ no per-stage downstream-state walkthrough evidence exists, and no
   `T7b`/`T7c`/`T8`/`T8b` can each use this same local target without
   rebuilding the setup.
 
-**Files expected to change:** mobile environment/build configuration only.
-Product screens are expected to need no change; if any does, record why.
+**Files expected to change:** no product-source change is expected. Environment/
+build documentation may change. If the smoke reveals a product defect, stop and
+record it as a separate scoped repair rather than silently expanding T7local.
 
 **Evidence to emit:** local-stack build transcript, `make qa-mobile` output,
 on-device or simulator walkthrough evidence with per-stage downstream-state
