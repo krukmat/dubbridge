@@ -13,11 +13,6 @@ import {
   type InvitesViewState,
 } from "./InvitesModel";
 
-type InboxWithSnapshot = Readonly<{
-  item: P2pInboxItem;
-  snapshot: P2pSyncSnapshot | null;
-}>;
-
 export function useInvitesState(gatewayBaseUrl: string) {
   const auth = useAuth();
   const syncController = useP2PSyncController();
@@ -80,7 +75,7 @@ async function readLocalSnapshot(
   item: P2pInboxItem,
   accountScope: string,
   syncController: ReturnType<typeof useP2PSyncController>,
-): Promise<InboxWithSnapshot> {
+): Promise<Readonly<{ item: P2pInboxItem; snapshot: P2pSyncSnapshot | null }>> {
   if (!shouldReadViewerSyncState(item, accountScope) || item.descriptor === null) {
     return { item, snapshot: null };
   }
