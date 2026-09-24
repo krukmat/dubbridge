@@ -1,12 +1,13 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 
-import { Badge, Card, Screen, ScreenHeader, StateView } from "../components";
-import { space, type, color } from "../theme";
+import { Badge, Button, Card, Screen, ScreenHeader, StateView } from "../components";
+import { color, fieldStyle, space, type } from "../theme";
 import {
   VIEWER_STATE_LABELS,
   VIEWER_STATE_TONES,
   type ViewerInboxProjection,
 } from "../p2p/dashboard/InvitesModel";
+import { useInvitesActions } from "../p2p/dashboard/useInvitesActions";
 import { useInvitesState } from "../p2p/dashboard/useInvitesState";
 
 function InvitationRow({ projection }: { projection: ViewerInboxProjection }) {
@@ -29,6 +30,46 @@ function InvitationRow({ projection }: { projection: ViewerInboxProjection }) {
   );
 }
 
+function ClaimInvitationForm({
+  token,
+  error,
+  isClaiming,
+  canClaim,
+  onChangeToken,
+  onClaim,
+}: {
+  token: string;
+  error: string | null;
+  isClaiming: boolean;
+  canClaim: boolean;
+  onChangeToken: (value: string) => void;
+  onClaim: () => void;
+}) {
+  return (
+    <Card testID="invites-claim-card">
+      <Text style={styles.title}>Claim invitation</Text>
+      <TextInput
+        testID="invites-claim-token"
+        style={fieldStyle}
+        value={token}
+        onChangeText={onChangeToken}
+        autoCapitalize="none"
+        autoCorrect={false}
+        placeholder="Paste invitation token"
+        placeholderTextColor={color.ink400}
+      />
+      {error ? <Text testID="invites-claim-error" style={styles.error}>{error}</Text> : null}
+      <Button
+        testID="invites-claim-submit"
+        label="Claim"
+        onPress={onClaim}
+        loading={isClaiming}
+        disabled={!canClaim}
+      />
+    </Card>
+  );
+}
+
 function ReadyInvitations({
   invitations,
 }: {
@@ -47,7 +88,8 @@ function ReadyInvitations({
 }
 
 export function InvitesScreen({ gatewayBaseUrl }: { gatewayBaseUrl: string }) {
-  const { viewState, retry } = useInvitesState(gatewayBaseUrl);
+  const { viewState, retry, refresh } = useInvitesState(gatewayBaseUrl);
+  const claim = useInvitesActions(gatewayBaseUrl, refresh);
 
   return (
     <Screen testID="invites-screen">
@@ -55,6 +97,15 @@ export function InvitesScreen({ gatewayBaseUrl }: { gatewayBaseUrl: string }) {
         kicker="P2P"
         title="Invites"
         copy="Your claimed invitations and local availability."
+      />
+
+      <ClaimInvitationForm
+        token={claim.claimToken}
+        error={claim.claimError}
+        isClaiming={claim.isClaiming}
+        canClaim={claim.canClaim}
+        onChangeToken={claim.updateClaimToken}
+        onClaim={() => void claim.claim()}
       />
 
       {viewState.kind === "loading" ? (
@@ -98,4 +149,5 @@ const styles = StyleSheet.create({
   text: { flex: 1, gap: space.xs },
   title: { ...type.heading, color: color.ink900 },
   meta: { ...type.meta, color: color.ink500 },
+  error: { ...type.meta, color: color.danger },
 });

@@ -147,6 +147,31 @@ export function invitesErrorMessage(error: {
     : "Could not load P2P invitations.";
 }
 
+export function claimInvitationErrorMessage(error: {
+  kind: string;
+  message?: string;
+  status?: number;
+}): string {
+  if (error.kind === "network") {
+    return "Network request failed. Try claiming the invitation again.";
+  }
+  if (error.kind === "forbidden") {
+    return "This invitation cannot be claimed by this account.";
+  }
+  if (error.kind === "http" && error.status === 404) {
+    return "Invitation token is invalid or no longer available.";
+  }
+  if (error.kind === "http" && error.status === 409) {
+    return "Invitation has already been claimed.";
+  }
+  if (error.kind === "http" && error.status === 410) {
+    return "Invitation has expired.";
+  }
+  return error.status
+    ? `Invitation claim failed with status ${error.status}.`
+    : "Could not claim the invitation.";
+}
+
 function isProgressComplete(snapshot: P2pSyncSnapshot): boolean {
   const progress = snapshot.progress;
   return (

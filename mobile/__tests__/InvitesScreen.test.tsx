@@ -29,6 +29,13 @@ jest.mock("../src/p2p/P2PProvider", () => ({
   useP2PSyncController: () => mockSyncController,
 }));
 
+jest.mock("../src/p2p/P2PAudienceService", () => ({
+  P2PAudienceService: jest.fn().mockImplementation(() => ({
+    claimInvitation: (...args: unknown[]) => mockClaimInvitation(...args),
+  })),
+}));
+
+const mockClaimInvitation = jest.fn();
 const mockCreateGatewayClient = createGatewayClient as jest.MockedFunction<typeof createGatewayClient>;
 
 let mockAuthValue: AuthContextValue;
@@ -158,6 +165,7 @@ beforeEach(() => {
     getSyncState: jest.fn(),
   };
   mockCreateGatewayClient.mockReturnValue(mockClient as never);
+  mockClaimInvitation.mockReset();
   mockAuthValue = {
     sessionRef: "session-p6",
     userId: "viewer-1",
@@ -330,5 +338,177 @@ describe("InvitesScreen T2.B", () => {
 
     await waitFor(() => expect(getByTestId("invites-error")).toBeTruthy());
     expect(getByText("Could not read local P2P availability.")).toBeTruthy();
+  });
+});
+
+
+describe("InvitesScreen T2.C manual Claim", () => {
+  it("delegates a trimmed token to P3, rotates session, clears the token and refreshes inbox", async () => {
+    mockClient.get
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { data: [], sessionRotation: null },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { data: [rawInboxItem()], sessionRotation: null },
+      });
+    mockSyncController.getSyncState.mockResolvedValue(null);
+    mockClaimInvitation.mockResolvedValue({
+      ok: true,
+      value: {
+        data: {
+          invitation: inboxItem().invitation,
+          authorization: inboxItem().authorization,
+          descriptor: DESCRIPTOR,
+        },
+        sessionRotation: "claim-rotation",
+      },
+    });
+
+    const { getByTestId, getByText, queryByText } = await render(
+      <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
+    );
+    await waitFor(() => expect(getByTestId("invites-empty")).toBeTruthy());
+
+    fireEvent.changeText(getByTestId("invites-claim-token"), "  raw-claim-token  ");
+    await act(async () => {
+      fireEvent.press(getByTestId("invites-claim-submit"));
+    });
+
+    await waitFor(() => expect(getByText("Pending")).toBeTruthy());
+    expect(mockClaimInvitation).toHaveBeenCalledWith("session-p6", "raw-claim-token");
+    expect(mockAuthValue.onSessionRotation).toHaveBeenCalledWith("claim-rotation");
+    expect(mockClient.get).toHaveBeenCalledTimes(2);
+    expect(getByTestId("invites-claim-token").props.value).toBe("");
+    expect(queryByText("Play")).toBeNull();
+  });
+
+  it("keeps Claim disabled for blank input and never delegates to P3", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: { data: [], sessionRotation: null },
+    });
+
+    const { getByTestId } = await render(
+      <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
+    );
+    await waitFor(() => expect(getByTestId("invites-empty")).toBeTruthy());
+
+    const submit = getByTestId("invites-claim-submit");
+    expect(submit.props.accessibilityState.disabled).toBe(true);
+    fireEvent.press(submit);
+    expect(mockClaimInvitation).not.toHaveBeenCalled();
+  });
+
+  it("locks duplicate submits while a claim is in flight", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: { data: [], sessionRotation: null },
+    });
+    let resolveClaim: ((value: unknown) => void) | undefined;
+    mockClaimInvitation.mockImplementation(
+      () => new Promise((resolve) => {
+        resolveClaim = resolve;
+      }),
+    );
+
+    const { getByTestId } = await render(
+      <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
+    );
+    await waitFor(() => expect(getByTestId("invites-empty")).toBeTruthy());
+    fireEvent.changeText(getByTestId("invites-claim-token"), "one-token");
+
+    fireEvent.press(getByTestId("invites-claim-submit"));
+    await waitFor(() =>
+      expect(getByTestId("invites-claim-submit").props.accessibilityState.disabled).toBe(true),
+    );
+    fireEvent.press(getByTestId("invites-claim-submit"));
+    expect(mockClaimInvitation).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveClaim?.({
+        ok: false,
+        error: { kind: "network", message: "offline" },
+      });
+    });
+  });
+
+  it.each([
+    [404, "Invitation token is invalid or no longer available."],
+    [409, "Invitation has already been claimed."],
+    [410, "Invitation has expired."],
+  ])("fails closed for claim HTTP %s without fabricating an inbox item", async (status, message) => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: { data: [], sessionRotation: null },
+    });
+    mockClaimInvitation.mockResolvedValue({
+      ok: false,
+      error: { kind: "http", status },
+    });
+
+    const { getByTestId, getByText } = await render(
+      <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
+    );
+    await waitFor(() => expect(getByTestId("invites-empty")).toBeTruthy());
+    fireEvent.changeText(getByTestId("invites-claim-token"), "bad-token");
+
+    await act(async () => {
+      fireEvent.press(getByTestId("invites-claim-submit"));
+    });
+
+    await waitFor(() => expect(getByText(message)).toBeTruthy());
+    expect(getByTestId("invites-empty")).toBeTruthy();
+    expect(mockClient.get).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs out and clears the raw token when P3 reports session expiry", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: { data: [], sessionRotation: null },
+    });
+    mockClaimInvitation.mockResolvedValue({
+      ok: false,
+      error: { kind: "session_expired" },
+    });
+
+    const { getByTestId } = await render(
+      <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
+    );
+    await waitFor(() => expect(getByTestId("invites-empty")).toBeTruthy());
+    fireEvent.changeText(getByTestId("invites-claim-token"), "secret-token");
+
+    await act(async () => {
+      fireEvent.press(getByTestId("invites-claim-submit"));
+    });
+
+    await waitFor(() => expect(mockAuthValue.logout).toHaveBeenCalledTimes(1));
+    expect(getByTestId("invites-claim-token").props.value).toBe("");
+    expect(mockClient.get).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not recover the raw claim token after unmount/remount", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: { data: [], sessionRotation: null },
+    });
+
+    const first = await render(
+      <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
+    );
+    await waitFor(() => expect(first.getByTestId("invites-empty")).toBeTruthy());
+    fireEvent.changeText(first.getByTestId("invites-claim-token"), "transient-token");
+    expect(first.getByTestId("invites-claim-token").props.value).toBe("transient-token");
+    await act(async () => {
+      await first.unmount();
+    });
+
+    const second = await render(
+      <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
+    );
+    await waitFor(() => expect(second.getByTestId("invites-empty")).toBeTruthy());
+    expect(second.getByTestId("invites-claim-token").props.value).toBe("");
+    expect(mockClaimInvitation).not.toHaveBeenCalled();
   });
 });
