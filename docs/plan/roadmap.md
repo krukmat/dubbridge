@@ -153,14 +153,21 @@ as dry-run evidence in place of a literal production-environment local
 boot, which is architecturally precluded by ADR-026's own localhost/
 local-fs rejection; full image-boot readiness remains T6's scope against
 real DO infrastructure. **T5 (parent) is now closed** — all four children
-(T5a–T5d) done. **`T7local` (mobile POC build against the local Docker
-Compose stack, added 2026-09-06) is the next unstarted task, not `T6`.** The
-owner directed that `T6` and everything Digital-Ocean-related wait until
-local development closes; `T7local` breaks the circular dependency this
-created (`T6p-a` had gated on `T7`, which gated on `T6`) by proving the same
-mobile flow against `infra/local/docker-compose.yml` instead. `T6` (first
-deploy) remains planned and independently runnable any time after `T5`, but
-is no longer the next task on the critical path. Deployment-enablement
+(T5a–T5d) done. **`T7local` (base mobile POC smoke against the local Docker
+Compose gateway, added 2026-09-06) is runnable now in parallel with MVP0-P2P
+P6, not gated by DEV-HANDOFF.** The owner directed that `T6` and everything
+Digital-Ocean-related wait until local development closes; `T7local` breaks
+the circular dependency this created (`T6p-a` had gated on `T7`, which
+gated on `T6`). Consolidation 2026-09-24: T7local certifies only the base
+S-230 path via the Compose gateway on host port 8082 — login, upload, rights,
+preparation, review, publish and normal HLS playback. It does not certify P2P
+Invite/Claim/Sync/Verify/loopback/HPKE/P5.T3. `T6p-a` is the convergence
+point and requires T7local PASS + T7c PASS + DEV-HANDOFF plus an evidence
+freshness disposition against the exact DEV-HANDOFF head; relevant intervening
+base-flow/mobile/gateway/local-compose changes trigger a bounded T7local
+regression, not a full P2P rerun. `T6` (first deploy) remains planned and
+independently runnable any time after `T5`, but is no longer the next task on
+the critical path. Deployment-enablement
 slice: makes the already-closed pipeline publicly runnable on a Digital
 Ocean droplet; adds no new technology beyond Redis (already in use). Full
 history incl. gap findings G10–G13: `docs/audit/roadmap-history.md` § S-230.
@@ -279,9 +286,13 @@ work remains per § Known planning gaps below. `T6p-d` specifically proves backe
 ciphertext publication plus durable `P2P_READY`, which are exactly what
 `P2.T3` and `P2.T5` implement — so `T6p-a` cannot start until its full gates pass, and the integrated P2
 publication flow required by `T6p-d` is not yet implemented/certified. The
-base S-230 deployment remains a separate deliverable. **P3 PASS and P4 PASS 2026-09-22.** P5-P7 remain incomplete. T6p-a is deferred until S-230 T7local, T7c, and MVP0-P2P
-P2-P6 are PASS —
-T7local validates the mobile flow against the local Docker Compose stack, so
+base S-230 deployment remains a separate deliverable. **P3 PASS + P4 PASS;
+P5-DEV SATISFIED 2026-09-22; P6 is in progress.** Aggregate P5 remains open
+only because P5.T3/P5-CERT is deferred to the release lane. T6p-a is deferred
+until S-230 T7local PASS, T7c PASS, MVP0-P2P **DEV-HANDOFF** (P3 PASS + P4 PASS
++ P5-DEV + P6 PASS), and the T7local freshness disposition are satisfied.
+T7local validates the base mobile flow against the local Docker Compose gateway,
+so
 this gate no longer requires the S-230 T6 Digital Ocean deploy to have
 happened first (added 2026-09-06, replacing an earlier T7-gated version of
 this row that was circular with T6). **Scope clarification (2026-09-18,
@@ -307,9 +318,12 @@ outside any waiver's reach (device, product decision, net-new UI). | `docs/plan/
 > P2.T0 is PASS, P2.T1a-T1f are Done/owner-approved as P2.T1, and P2.C0 is
 > PASS. C0 froze the manifest/AAD/K1, Availability Node publication, P2 audit,
 > and P3 ready-descriptor contracts. C0 remains input to, but no longer
-> activates, the deployment lane. S-230 `T7local` (mobile vs. local Docker
-> Compose, added 2026-09-06) and MVP0-P2P `P2 -> P6` development now converge
-> on `T6p-a -> T6p-b -> T6p-c -> T6p-d -> T7p -> P7 -> T9g`. The independent
+> activates, the deployment lane. S-230 `T7local` (base mobile flow via the
+> local Compose gateway on host :8082, added 2026-09-06) and MVP0-P2P
+> development through P6 advance in parallel. They converge only at `T6p-a`,
+> after T7local PASS + T7c PASS + DEV-HANDOFF and the exact-head T7local
+> freshness check, then continue through `T6p-b -> T6p-c -> T6p-d -> T7p ->
+> P7 -> T9g`. The independent
 > S-230 `T6 -> T7` Digital Ocean deploy may run any time after `T5` but is no
 > longer a precondition for this gate — it was re-sequenced off the critical
 > path because it previously created a cycle with `T6p-a`. `T6p-d` proves
@@ -428,7 +442,11 @@ captured above under Governing principles and ADR-025/ADR-026.
   ADR materially changes; do not introduce new active `P*` or bare `S0`–`S9` phase IDs.
 - `S-070` (JWKS / production identity hardening) and `S-170`/`S-180` (human review
   and publication runtime) still need plan/task ledgers before execution.
-- **MVP0-P2P P3-P7:** phase plans and planning work-package ledgers exist. **P3 PASS 2026-09-22. P4 is in progress with T0/T1/T2 Done and T3 closure-ready.** P5-P7 remain incomplete. Each
+- **MVP0-P2P P3-P7:** phase plans and planning work-package ledgers exist.
+  **P3 PASS and P4 PASS 2026-09-22; P5-DEV SATISFIED; P6 in progress
+  (T0/T1 PASS, T2 active).** Aggregate P5 remains IN PROGRESS only because
+  deferred P5.T3/P5-CERT is a release obligation; it is not a DEV-HANDOFF
+  component. P7 remains incomplete. Each
   phase still needs exact-path executable decomposition, parent/leaf RRI,
   band-required review/approval, ownership and elapsed-time estimates at
   activation. Existing HP/EC and accepted ADR-043/044 remain binding.
@@ -454,7 +472,11 @@ captured above under Governing principles and ADR-025/ADR-026.
   used the canonical helper), failing 4/86 Availability Node tests. Fixed
   2026-09-18 (RRI 25 Low, `docs/tasks/mvp0-p2p-s230-consistency-remediation.md`
   § CONS-T1 closure record); 86/86 Availability Node tests now pass.
-  T6p-a requires MVP0-P2P DEV-HANDOFF plus T7local/T7c PASS; deferred P5.T3 is not part of that development gate. October capacity is
+  T6p-a requires MVP0-P2P DEV-HANDOFF plus T7local/T7c PASS **and the
+  T7local exact-head freshness disposition**; deferred P5.T3 is not part of
+  that development gate. T7local can run before P6 closes, but relevant
+  base-flow/mobile/gateway/local-compose changes between its PASS head and
+  DEV-HANDOFF require a bounded regression before T6p-a. October capacity is
   not validated by the existence of these plans. X29 is required for the
   release, X28/CI for T9g; optional queue acceleration and S-230
   T7b/T8/T8b are outside the mandatory path.

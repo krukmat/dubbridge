@@ -32,16 +32,19 @@ package, and plays it through the loopback gateway. Legacy HTTP/S3 audience
 media delivery is disabled during certification. This is not GA.
 
 The base path remains `T6 -> T7`, and a parallel `T7local -> T7c/T7b/T8/T8b`
-development path validates the same mobile behaviors against
-`infra/local/docker-compose.yml` without waiting on a Digital Ocean deploy
+development path validates the **base S-230 mobile behavior** against the
+gateway exposed by `infra/local/docker-compose.yml` without waiting on a
+Digital Ocean deploy. T7local is not the MVP0-P2P Invite/Claim/Sync/loopback
+certification lane; those behaviors remain owned by P6/T7p/P7
 (added 2026-09-06, breaking a circular dependency: `T6p-a` cannot gate on
 `T7`, which itself gated on `T6`, once the owner required "T6 and everything
 Digital-Ocean-related" to wait for local development to close). The P2P
 release path adds:
 
-- `T6p-a`: after `T7local PASS`, `T7c PASS`, and MVP0-P2P `DEV-HANDOFF`, freeze
-  only deployment-specific ownership and configuration against the
-  implemented surfaces: Availability Node placement, mTLS identities,
+- `T6p-a`: after `T7local PASS`, `T7c PASS`, MVP0-P2P `DEV-HANDOFF`,
+  **and a freshness disposition comparing T7local's exact evidence HEAD with
+  the exact DEV-HANDOFF head**, freeze only deployment-specific ownership and
+  configuration against the implemented surfaces: Availability Node placement, mTLS identities,
   versioned KEK, persistent ciphertext volume, health, ports, resources, and
   secret paths. It consumes the already-frozen C0 contracts/fixtures; it does
   not redefine them;
@@ -61,9 +64,12 @@ that requires P3-P6, `T7p`, P7, and `T9g`. `T7b`, `T8`, and `T8b` remain
 optional. X29 is now a release blocker for `T7p`/`T9g`, even though it remains
 accepted residual evidence for P1.
 
-Target gates: X29 resolved while S-230 `T7local -> T7c/T7b/T8/T8b` (local
-stack) and MVP0-P2P `P2 -> P6` development advance; both development gates
-PASS by October 15; T6p-a through T6p-d close by October 21 (including the
+Target gates: X29 is resolved. S-230 `T7local -> T7c/T7b/T8/T8b` (local
+stack) and MVP0-P2P through P6 advance in parallel. T7local may close before
+P6; this does not stale its own PASS, but T6p-a requires the freshness
+disposition (and bounded base-flow regression when relevant paths changed)
+against the exact DEV-HANDOFF head. Both development lanes target readiness
+by October 15; T6p-a through T6p-d close by October 21 (including the
 independent `T6`/`T7` Digital Ocean deploy, which may run any time after `T5`
 but is not a T6p-a gate; T7 PASS is required before T7p); the Android RC closes by October 26; and P7/T9g
 close by October 30. If either the Android gate or the development/deployment
@@ -683,7 +689,7 @@ flowchart LR
     T4P --> T4Q["T4q parent closeout ✓"]
     T4Q --> T5["T5 DO descriptor + secrets<br/>T5a ✓ done 2026-08-26, hostname frozen<br/>(poc.iotforce.es); T5b/T5c/T5d ✓ done 2026-08-27 — T5 closed"]
     T5 --> T5D["T5d ✓ local descriptor evidence"]
-    T5D --> T7LOCAL["T7local mobile build<br/>vs local Docker Compose"]
+    T5D --> T7LOCAL["T7local base mobile smoke<br/>via local gateway :8082"]
     T5 --> T6["T6 deploy + E2E smoke<br/>(independent of T6p-a)"]
     T6 --> T7["T7 mobile build vs DO<br/>(post-deploy confirmation only)"]
     T7LOCAL --> T7
@@ -703,9 +709,13 @@ flowchart LR
     T8 --> T8b
     T8b --> T9
     T3b -.folds into demo if done in time.-> T9
-    C0["P2.C0 PASS"] --> P2DEV["MVP0-P2P DEV-HANDOFF"]
-    P2DEV --> T6PA["T6p-a deployment ownership/config freeze"]
-    T7LOCAL --> T6PA
+    P3P4["P3 PASS + P4 PASS"] --> P2DEV["DEV-HANDOFF<br/>+ P5-DEV + P6 PASS"]
+    P5DEV["P5-DEV satisfied"] --> P2DEV
+    P6["P6 PASS"] --> P2DEV
+    T7LOCAL --> FRESH["T7local freshness<br/>vs exact DEV-HANDOFF head"]
+    P2DEV --> FRESH
+    T7c --> FRESH
+    FRESH --> T6PA["T6p-a deployment ownership/config freeze"]
     T6PA --> T6PB["T6p-b P2P descriptor"]
     T6PB --> T6PC["T6p-c local evidence"]
     T6PC --> T6PD["T6p-d DO ciphertext + durable P2P_READY"]

@@ -2,12 +2,14 @@
 
 ## Purpose
 
-Execute the existing non-P2P mobile product flow against
+Execute the base S-230 mobile product flow against the **gateway** exposed by
 `infra/local/docker-compose.yml` and emit the evidence required by
 `docs/tasks/s-230-poc-v1-digitalocean.md § S-230-T7local`.
 
-This is deliberately independent of MVP0-P2P P5. Do not touch
-`mobile/src/p2p/**`.
+This lane is deliberately independent of MVP0-P2P P6/P5 certification so it can
+run in parallel. The normal binary may contain P6/P2P product code, but this task
+must neither modify nor exercise Invite/Claim/P2P Sync/Verify/loopback/HPKE
+behavior. It certifies only the base S-230 flow.
 
 ## Preconditions
 
@@ -25,14 +27,20 @@ This is deliberately independent of MVP0-P2P P5. Do not touch
    - `git rev-parse HEAD`
    - emulator/device name, Android API and ABI
    - Docker Compose service status
-2. Run the local P2P preflight only as an infrastructure sanity check when the
-   full local profile is already up:
+2. Start the Compose app profile with the **gateway service included**. Run the
+   local P2P preflight only as an infrastructure sanity check:
    `bash infra/local/p2p/preflight.sh --with-runtime`
-   T7local itself remains a non-P2P product-flow certification.
+   Then explicitly record the gateway checks until the shared preflight owns
+   them:
+   - `curl -fsS http://localhost:8082/health/live`
+   - `curl -fsS http://localhost:8082/health/ready`
+   T7local itself remains a base/non-P2P product-flow certification.
 3. Select the gateway address reachable from the target:
-   - Android emulator: normally `http://10.0.2.2:8080`
-   - physical Android: use the host LAN address
-   - never use device-local `127.0.0.1:8080` for the host Compose gateway
+   - Android emulator: `http://10.0.2.2:8082`
+   - physical Android: `http://<host-LAN-IP>:8082`
+   - host `8080` is the API port; using it bypasses the gateway and invalidates
+     T7local
+   - never use device-local `127.0.0.1` for the host Compose gateway
 4. Set `EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL` explicitly and record the redacted
    configuration.
 
@@ -41,7 +49,10 @@ This is deliberately independent of MVP0-P2P P5. Do not touch
 Build/install/launch the normal app against the local Compose gateway, then
 exercise one fresh short video through:
 
-`login -> upload -> rights -> finalize -> preparation -> review -> publish -> in-app playback`
+`login -> upload -> rights -> finalize -> preparation -> review -> publish -> normal HLS playback`
+
+Do not open or execute My Content/Invites/P2P Claim/Sync/Verify/loopback actions
+as part of T7local evidence. Those belong to the MVP0-P2P lane.
 
 Do not accept HTTP 2xx alone. For every stage, capture downstream evidence using
 existing API/read-model/DB/audit/artifact surfaces as appropriate:
@@ -90,14 +101,21 @@ Write a new audit artifact under `docs/audit/` containing:
 - mobile QA results
 - screenshots/logs only as supporting evidence
 
-No P2P invitation, P2P sync, P2P loopback playback or P5 claim belongs in this
-artifact.
+No P2P invitation, P2P claim, P2P sync/verification, P2P loopback playback,
+HPKE or P5.T3 evidence belongs in this artifact.
+
+Record the exact T7local HEAD. T7local may legitimately PASS while P6 is still
+moving. Before T6p-a, compare that HEAD with the exact DEV-HANDOFF head. If
+relevant base-flow/mobile/gateway/local-compose paths changed, run the bounded
+regression defined in the S-230 ledger and attach a supplemental freshness
+artifact; do not rerun P2P certification.
 
 ## Stop conditions
 
 Stop and report rather than patching if:
 
-- the normal product flow requires `mobile/src/p2p/**`
+- the base product flow unexpectedly requires invoking P2P Invite/Claim/Sync/
+  Verify/loopback behavior
 - any stage returns 2xx but downstream state does not advance
 - local Compose ownership/provenance is ambiguous
 - a defect would require changing product behavior

@@ -342,7 +342,7 @@
       mobile de cara al usuario. El gate que importa para seguir desarrollando ya no es el PASS
       agregado de P5: es <code>P3 PASS → P4 PASS → P5-DEV → P6 PASS</code>.
       <code>P5.T3</code> queda como rama de certificación tardía y se reincorpora antes del
-      veredicto P7/T9g. <code>S-230-T7local</code>, en el riel de infraestructura, sigue siendo
+      veredicto P7/T9g. <code>S-230-T7local</code>, en el riel S-230, corre en paralelo con P6 y sigue siendo
       un camino paralelo que prueba el build móvil contra el stack Docker local.
     </p>
     <div class="diagram-frame scrollx">
@@ -445,7 +445,10 @@
     </div>
     <p class="caption">
       <code>T6p-a</code> depende de <code>T7local PASS</code> + <code>T7c PASS</code> +
-      <code>DEV-HANDOFF</code>. El nuevo <code>DEV-HANDOFF</code> es exactamente
+      <code>DEV-HANDOFF</code> + un <strong>freshness check</strong> de la evidencia
+      T7local contra el head exacto de DEV-HANDOFF. Si cambiaron superficies
+      relevantes del base flow, se corre una regresión acotada antes de T6p-a.
+      El <code>DEV-HANDOFF</code> es exactamente
       <code>P3 PASS + P4 PASS + P5-DEV + P6 PASS</code>. <code>P5-DEV</code> significa
       P5.T0–T2 formalmente cerrados; <strong>no incluye P5.T3</strong>. P5.T3 conserva toda su
       fuerza como certificación física de release, pero ya no bloquea dashboard ni preparación de
@@ -545,10 +548,10 @@
         <p class="track-sub">Slice de habilitación de despliegue</p>
         <div class="ladder">
           <div class="lrow done"><span class="id">T0–T5</span><span class="desc">Foundation, imágenes de producción, traducción S-150 reabierta, descriptor de producción</span><span class="status">✓ done</span></div>
-          <div class="lrow now"><span class="id">T7local</span><span class="desc">Build móvil <strong>existente sin P2P</strong> contra <code>infra/local/docker-compose.yml</code> en vez del backend real de DO. No toca <code>mobile/src/p2p</code>. Sin avance reportado en 72h — sigue siendo el cuello de botella real del riel de infraestructura.</span><span class="status">→ siguiente</span></div>
+          <div class="lrow now"><span class="id">T7local</span><span class="desc"><strong>Base mobile smoke</strong> contra el gateway de <code>infra/local/docker-compose.yml</code> (<code>host :8082</code>). Corre en paralelo con P6 y certifica login→upload→rights→preparation→review→publish→HLS playback; no certifica Invite/Claim/P2P Sync/Verify/loopback/HPKE.</span><span class="status">→ runnable now</span></div>
           <div class="lrow next"><span class="id">T7c</span><span class="desc">Expiración de sesión — depende de T7local</span><span class="status">planned</span></div>
           <div class="lrow next"><span class="id">T6 / T7</span><span class="desc">Deploy real en DO — rama independiente, no bloquea T6p-a</span><span class="status">planned</span></div>
-          <div class="lrow next"><span class="id">T6p-a…d</span><span class="desc">Ownership/config P2P + publicación en DO — deferred hasta T7local + T7c + <strong>DEV-HANDOFF</strong></span><span class="status">deferred</span></div>
+          <div class="lrow next"><span class="id">T6p-a…d</span><span class="desc">Convergencia P2P/deploy — deferred hasta T7local PASS + T7c PASS + <strong>DEV-HANDOFF</strong> + freshness check de T7local contra el head exacto; luego ownership/config y publicación en DO.</span><span class="status">deferred</span></div>
           <div class="lrow next"><span class="id">T9 / T9g</span><span class="desc">Cierre + GO/NO-GO de octubre</span><span class="status">planned</span></div>
         </div>
       </div>
@@ -632,7 +635,7 @@
       </div>
       <div class="risk info">
         <span class="tag2">P2P local-dev — infra lista</span>
-        <p>Los 4 bloqueadores de local-dev-readiness (entrypoint, certs mTLS, servicio compose, env vars) están resueltos, mergeados y ya en el checkout local (verificado 19-sep: <code>HEAD == origin/feature/p2p-mvp-core</code>). Pendiente real: correr el smoke test end-to-end del build móvil contra el stack local — <code>S-230-T7local</code> sigue <code>[ ] Planned</code>.</p>
+        <p>Los bloqueadores de local-dev-readiness están resueltos. Pendiente real de S-230: ejecutar <code>T7local</code> contra el <strong>gateway local :8082</strong> y registrar evidencia downstream del base flow. Este smoke puede correr mientras P6 continúa; no es P2P certification y no sustituye P6.T3/T7p/P7.</p>
       </div>
       <div class="risk info">
         <span class="tag2">CONS-T4/T5 — cerrado</span>
@@ -644,7 +647,7 @@
       </div>
       <div class="risk med">
         <span class="tag2">T7local — infra lista, smoke test pendiente</span>
-        <p><code>S-230-T7local</code> sigue <code>[ ] Planned</code> desde 2026-09-06 (13 días). Sus prerequisitos de infra (entrypoint, certs mTLS, servicio compose, env vars) ya están mergeados y en el checkout local, verificado 19-sep. Con P2.T3c y P2.T4 cerrados, el smoke test real de build móvil es ahora el único paso restante y sigue siendo el cuello de botella real del riel de infraestructura hacia <code>T6p-a</code>.</p>
+        <p><code>S-230-T7local</code> sigue <code>[ ] Planned</code> y ya está ejecutable en paralelo con P6. Sus prerequisitos de infra están disponibles. El target móvil correcto es el <strong>gateway</strong> de Compose en host <code>:8082</code> (emulador: <code>10.0.2.2:8082</code>), no el API <code>:8080</code>. T7local certifica solo el base-flow S-230. Si P6 u otro trabajo modifica después superficies relevantes del base flow, <code>T6p-a</code> exige una revalidación acotada sobre el head exacto de DEV-HANDOFF antes de consumir ese PASS.</p>
       </div>
       <div class="risk info">
         <span class="tag2">T4e-cov residual</span>
@@ -655,12 +658,12 @@
 
   <section>
     <div class="section-head"><h2>Calendario</h2></div>
-    <p class="section-note">Hoy, <strong>2026-09-22</strong> — X29 cerrado; cierre de la ventana 19 SEP–2 OCT en curso.</p>
+    <p class="section-note">Hoy, <strong>2026-09-24</strong> — P3/P4 PASS, P5-DEV satisfecho; P6 y T7local avanzan en paralelo dentro de la ventana 19 SEP–2 OCT.</p>
     <div class="timeline">
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">6–10 SEP</div><div class="work">T1 done + P2.C0 PASS + T2 completo + T3a/T3b done; nueva T7local</div><div class="outcome">X29 promovido a blocker</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">11–18 SEP</div><div class="work">P2.T3c/T3d/T4 cerrados; ledger de remediación abierto y ejecutado — CONS-T0/T1/T2/T3/T4/T5/T9 <strong>Done</strong> (aggregate P2 PASS); CONS-T6/T7/T8a verificó P3/P4/P5.T0-2 leaf por leaf: P4.T0/P4.T2/P5.T0 Done, resto Blocked por gaps reales; CI sigue roja (RUSTSEC + MinIO + coverage); S-230 T7local sin avance en 12 días</div><div class="outcome">X29 OPEN, plazo venció 18-sep</div></div>
-      <div class="tstep now"><div class="bar"><div class="dot"></div></div><div class="window">19 SEP–2 OCT</div><div class="work"><strong>P3 PASS + P4 PASS</strong>. <strong>P5-DEV SATISFIED</strong>; P6.T0/T1 PASS. P6.T2 ACTIVATED; T2.A PASS y B–H listos para ejecución secuencial. En paralelo sigue T7local→T7c. P5.T3/P5-CERT continúa diferido.</div><div class="outcome">◆ objetivo inmediato: P6.T2.B + T7local/T7c<div class="here-flag">estás acá</div></div></div>
-      <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">3–12 OCT</div><div class="work">Activar y cerrar P6 sobre el nuevo gate</div><div class="outcome">DEV-HANDOFF = P3 + P4 + P5-DEV + P6</div></div>
+      <div class="tstep now"><div class="bar"><div class="dot"></div></div><div class="window">19 SEP–2 OCT</div><div class="work"><strong>P3 PASS + P4 PASS + P5-DEV SATISFIED</strong>. P6 continúa hacia PASS mientras, en paralelo, S-230 ejecuta T7local base-flow vía gateway local :8082 → T7c. La convergencia ocurre recién en T6p-a con DEV-HANDOFF + T7local/T7c + freshness check. P5.T3/P5-CERT sigue diferido.</div><div class="outcome">◆ objetivo inmediato: cerrar P6 + T7local/T7c<div class="here-flag">estás acá</div></div></div>
+      <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">3–12 OCT</div><div class="work">Cerrar cualquier residual de P6/T7local/T7c y emitir freshness disposition del smoke local contra el head exacto de DEV-HANDOFF</div><div class="outcome">DEV-HANDOFF + local lane listos para T6p-a</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">13–21 OCT</div><div class="work">T6p-a → T6p-b → T6p-c → T6p-d; completar T6/T7 si sigue pendiente</div><div class="outcome">backend P2P desplegado</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">22–26 OCT</div><div class="work">T7p: candidato Android físico; reutilizar evidencia para P5.T3 si cubre criterios exactos</div><div class="outcome">RC listo + posible P5-CERT</div></div>
       <div class="tstep milestone"><div class="bar"><div class="dot"></div></div><div class="window">27–30 OCT</div><div class="work">P7 exact-artifact; P7.T2 cierra P5.T3 si aún sigue abierto; soak y rollback</div><div class="outcome">◆ T9g — GO/NO-GO</div></div>
@@ -668,7 +671,7 @@
   </section>
 
   <footer>
-    Fuentes verificadas para este documento (sync 2026-09-22):
+    Fuentes verificadas para este documento (sync 2026-09-24):
     <code>docs/audit/mvp0-p2p-p1-f3b-implementation.md</code> §§ 11-12 (RRI, revisión, coverage,
     owner verification; ambos criterios de dispositivo ejecutados) ·
     <code>docs/tasks/mvp0-p2p-p1-replication.md</code> § P1.F3b-fix-2 ·
@@ -677,6 +680,7 @@
     <code>docs/audit/mvp0-p2p-p6-t1-block2-create-copy-invite-2026-09-22.md</code> (P6.T1.D/E, implementation head <code>151721a5</code>, 15/15 CI PASS; mobile 63/63 suites, 456/456 tests; coverage 90.43%) ·
     <code>docs/audit/mvp0-p2p-p6-t1-block3-navigation-evidence-2026-09-22.md</code> (P6.T1.F/G, evidence head <code>47bc3e8b</code>, 15/15 CI PASS; mobile 63/63 suites, 461/461 tests; coverage 90.43%) ·
     <code>docs/audit/mvp0-p2p-p5-t3-sequencing-replan-2026-09-22.md</code> (P5-DEV/P5-CERT y DEV-HANDOFF) ·
+    <code>docs/audit/go-live-october-t7local-dev-handoff-consolidation-2026-09-24.md</code> (T7local base-flow, gateway :8082, paralelo P6 y freshness gate de T6p-a) ·
     <code>docs/audit/mvp0-p2p-p3-t0-contract-freeze-2026-09-22.md</code> (P3.T0a–g freeze, gaps y path ownership) ·
     <code>docs/audit/mvp0-p2p-p3-t1-implementation-2026-09-22.md</code> (T1 PASS, head <code>4dede25d</code>) ·
     <code>docs/audit/mvp0-p2p-p3-t2a-backend-evidence-2026-09-22.md</code> (T2a/T2b/T2d, head <code>a228ddad</code>, 15/15 CI PASS) ·

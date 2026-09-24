@@ -49,9 +49,20 @@ ledger.
 
 ## Task index
 
-> **MVP0-P2P DEV-HANDOFF — amended 2026-09-22:** P3 PASS + P4 PASS + P5-DEV
-> (P5.T0-T2 formally closed) + P6 PASS. P5.T3 is excluded from this development
-> gate and carried to the release-certification lane; P7/T9g still require it.
+> **MVP0-P2P DEV-HANDOFF — amended 2026-09-22, consolidated 2026-09-24:**
+> P3 PASS + P4 PASS + P5-DEV (P5.T0-T2 formally closed) + P6 PASS. P5.T3 is
+> excluded from this development gate and carried to the release-certification
+> lane; P7/T9g still require it.
+>
+> `T7local` remains an independent S-230 lane and may run in parallel with P6. It
+> certifies only the base S-230 mobile flow against the local Compose **gateway**
+> on host port 8082; it does not execute or certify invitation/claim/P2P sync,
+> ciphertext verification, loopback P2P playback, HPKE, or P5.T3. `T6p-a`
+> is the convergence point and requires T7local PASS + T7c PASS + DEV-HANDOFF
+> **plus a T7local evidence-freshness check against the exact DEV-HANDOFF head**.
+> If relevant base-flow/mobile/gateway/local-compose paths changed after the
+> recorded T7local head, run a bounded base-flow regression and attach
+> supplemental evidence before T6p-a can activate.
 
 | ID | Title | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
@@ -85,11 +96,11 @@ ledger.
 | T5c | Production Compose and TLS reverse proxy | config-only | M (RRI 26 Moderate, recomputed 2026-08-27) | T5b | [x] Done 2026-08-27 — Claude Sonnet 5 direct (owner override); Gemma Reviewer PASS 0 findings both phases; owner-verified |
 | T5d | Local descriptor evidence and aggregate status sync | operational/docs | S (RRI 22 Low, recomputed 2026-08-27) | T5c | [x] Done 2026-08-27 — structural render + fail-closed guard evidence; owner-verified |
 | T6 | First deploy and end-to-end smoke on Digital Ocean | operational | L | T5 | [ ] Planned |
-| T6p-a | Freeze deployment-specific P2P ownership and configuration | planning/config | RUN BEFORE ACTIVATION | T7local PASS; T7c PASS; MVP0-P2P DEV-HANDOFF | [ ] Deferred until development gates pass |
+| T6p-a | Freeze deployment-specific P2P ownership and configuration | planning/config | RUN BEFORE ACTIVATION | T7local PASS; T7c PASS; MVP0-P2P DEV-HANDOFF; T7local evidence freshness against exact DEV-HANDOFF head | [ ] Deferred until convergence gates pass |
 | T6p-b | P2P Compose/config/secrets/private-network wiring | config/ops | TBD exact-path | T6p-a PASS | [ ] Planned |
 | T6p-c | Local P2P deployment-contract evidence | operational/evidence | TBD exact-path | T6p-b PASS | [ ] Planned |
 | T6p-d | Deploy backend ciphertext publication + durable P2P_READY smoke on DO | operational | TBD exact-path | T6p-c PASS | [ ] Planned |
-| T7local | Mobile POC build against the local Docker Compose stack | development/ops | M | T5d | [ ] Planned |
+| T7local | Base mobile POC smoke against the local Docker Compose gateway | development/ops | M | T5d | [ ] Planned — runnable now in parallel with P6 |
 | T7 | Mobile POC build against the deployed backend | development/ops | M | T6; T7local PASS | [ ] Planned |
 | T7p | Physical Android P2P release candidate | development/ops | TBD exact-path | T7; T7c; T6p-d; MVP0-P2P DEV-HANDOFF; X29 resolved | [ ] Planned |
 | T7b | Mobile registration screen | development | M | T7local | [ ] Planned — droppable (first) |
@@ -5036,8 +5047,18 @@ code to make the smoke pass — a failure is a finding, not a patch target.
 **Type:** development/operational
 **Effort:** M
 **Depends on:** S-230-T5d
-**Status:** [ ] Planned
+**Status:** [ ] Planned — **runnable now in parallel with MVP0-P2P P6**.
 
+> **Consolidation update 2026-09-24:** T7local is the S-230 **base-product**
+> mobile smoke, not a P2P product certification. The normal app may contain
+> P6/P2P code because both lanes share the same mobile binary, but this task
+> exercises only login → upload → rights → finalize/preparation → review →
+> publish → normal HLS playback. Invitation/claim, P2P sync/verify, loopback
+> P2P playback, HPKE and P5.T3 remain outside T7local and belong to the
+> MVP0-P2P/P7 release lane. T7local stays independent of P6 so both lanes can
+> progress in parallel. T6p-a later converges them using DEV-HANDOFF plus the
+> freshness rule below.
+>
 > Added 2026-09-06 at owner request, re-sequencing the base `T6 -> T7` path so
 > that P2P deployment-input freeze (`T6p-a`) no longer requires a completed
 > Digital Ocean deploy. The owner's stated intent: "T6 y todo lo relacionado
@@ -5069,11 +5090,14 @@ no per-stage downstream-state walkthrough evidence exists, and no
 
 **Happy paths considered:**
 
-- **HP-1:** A build configured with `EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL`
-  pointed at the gateway exposed by `infra/local/docker-compose.yml`
-  completes login, upload, rights confirmation, finalize, review, publish,
-  and in-app playback against the local stack — the same behavioral
-  surface `T7` exercises against the deployed backend, minus DNS/TLS.
+- **HP-1:** A normal build configured with `EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL`
+  pointed at the gateway exposed by `infra/local/docker-compose.yml` completes
+  login, upload, rights confirmation, finalize/preparation, review, publish,
+  and normal in-app HLS playback against the local stack — the same **base
+  S-230** behavioral surface `T7` later confirms against the deployed backend,
+  minus DNS/TLS. On the Android emulator the canonical host gateway URL is
+  `http://10.0.2.2:8082`; port 8080 is the host API port and must not be used
+  as the mobile gateway target.
 
 **Edge cases considered:**
 
@@ -5084,30 +5108,57 @@ no per-stage downstream-state walkthrough evidence exists, and no
 
 **Acceptance criteria:**
 
-- The build targets the local Compose stack's gateway (HTTP, no TLS
-  required at this stage) with an explicit, recorded environment
-  configuration.
-- Every stage is asserted on observed downstream state (audit rows,
-  artifact records, review-task creation), not on a 2xx response alone —
-  same standard `S-230-T6`'s acceptance criteria hold the DO smoke to.
+- The build targets the local Compose stack's **gateway**, not the API directly:
+  host `8082 -> gateway:8081`. Android emulator uses
+  `http://10.0.2.2:8082`; physical Android uses `http://<host-LAN-IP>:8082`.
+  The environment configuration is explicit and recorded.
+- The runtime preflight proves both gateway liveness and readiness through
+  `http://localhost:8082/health/live` and `/health/ready`; gateway readiness
+  must transitively see the API ready. Until the shared preflight script owns
+  those checks, the T7local transcript records them explicitly.
+- Every base-flow stage is asserted on observed downstream state (audit rows,
+  artifact records, review-task creation), not on a 2xx response alone — same
+  standard `S-230-T6`'s acceptance criteria hold the DO smoke to.
+- T7local does **not** execute or claim evidence for P2P Invite/Claim, P4 sync,
+  ciphertext verification, P5 loopback playback, HPKE, P5.T3 or P7.
 - `npm run typecheck && npm run lint && npm test` stay green.
 - Install and run instructions (including bringing up
-  `infra/local/docker-compose.yml`) are recorded so `T7b`/`T7c`/`T8`/`T8b`
-  can each be developed and verified against this same local target without
-  redoing this setup.
+  `infra/local/docker-compose.yml` with the gateway service) are recorded so
+  `T7b`/`T7c`/`T8`/`T8b` can each use this same local target without
+  rebuilding the setup.
 
 **Files expected to change:** mobile environment/build configuration only.
 Product screens are expected to need no change; if any does, record why.
 
 **Evidence to emit:** local-stack build transcript, `make qa-mobile` output,
 on-device or simulator walkthrough evidence with per-stage downstream-state
-proof, environment-configuration record.
+proof, environment-configuration record, exact T7local HEAD, and gateway
+live/ready evidence on host port 8082.
 
-**Status artifacts affected:** this ledger; README mobile section.
+### DEV-HANDOFF freshness handoff
 
-**Handoff prompt:** Produce a mobile build pointed at the gateway exposed by
-`infra/local/docker-compose.yml` and verify the full flow (login through
-playback) with per-stage evidence, not just 2xx responses.
+T7local may PASS before P6 because parallel execution is intentional. That PASS
+remains valid for T7local itself. Before **T6p-a activation**, compare the exact
+recorded T7local HEAD with the exact DEV-HANDOFF head. Inspect changes affecting
+the base mobile flow or its local entry path, including mobile configuration,
+auth, shared navigation/API client/base screens, gateway, relevant base API
+routes, and `infra/local/docker-compose.yml`.
+
+- If no relevant path changed, record `T7LOCAL_FRESHNESS=PASS_NO_RERUN`.
+- If relevant paths changed, run a bounded base-flow regression on the
+  DEV-HANDOFF head (gateway live/ready, login, representative upload/finalize,
+  review/publish, normal HLS playback, and mobile QA) and attach supplemental
+  evidence. Do **not** rerun P2P certification here.
+- Any regression failure blocks T6p-a and is reported as a finding; it is not
+  silently patched inside T6p-a.
+
+**Status artifacts affected:** this ledger; README mobile section; on T7local
+PASS or freshness disposition, synchronize the October go-live map.
+
+**Handoff prompt:** Produce the normal mobile build pointed at the Compose
+gateway on host port 8082 and verify the base S-230 flow (login through normal
+HLS playback) with per-stage evidence, not just 2xx responses. Keep P2P
+Invite/Claim/Sync/loopback certification out of this task.
 
 **Stop condition:** Stop after the local walkthrough. Do not provision or
 deploy anything on Digital Ocean.
@@ -5171,8 +5222,9 @@ Digital Ocean backend and verify the full flow on a device.
 `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`, and
 `docs/audit/mvp0-p2p-p2-c0-contract-freeze.md`.
 
-- **T6p-a — input freeze (after `T7local PASS`, `T7c PASS`, and MVP0-P2P
-  `DEV-HANDOFF`):** freeze only deployment-specific Availability Node
+- **T6p-a — input freeze (after `T7local PASS`, `T7c PASS`, MVP0-P2P
+  `DEV-HANDOFF`, and the T7local evidence-freshness check against the exact
+  DEV-HANDOFF head):** freeze only deployment-specific Availability Node
   placement, image version, mTLS identity/rotation, versioned KEK
   injection/rotation, persistent ciphertext storage, ports, resources,
   health, secrets, and ownership against implemented surfaces. Consume the
@@ -5203,9 +5255,13 @@ workflow gate before execution.
 **Type:** planning/config
 
 **Depends on:** `S-230-T7local PASS`; `S-230-T7c PASS`; MVP0-P2P
-`DEV-HANDOFF`. `P2.C0 PASS` is a satisfied contractual input, not the
-activation gate. Note this depends on `T7local` (local-stack validation),
-not `T7` (post-deploy validation) — see `S-230-T7local`.
+`DEV-HANDOFF`; and a recorded **T7local evidence-freshness disposition**
+against the exact DEV-HANDOFF head. `P2.C0 PASS` is a satisfied contractual
+input, not the activation gate. Note this depends on `T7local` (local-stack
+base-flow validation), not `T7` (post-deploy validation). If relevant
+base-flow/mobile/gateway/local-compose paths changed after T7local's recorded
+HEAD, the bounded regression defined by T7local must PASS before T6p-a may
+activate.
 
 **Status:** [ ] Deferred — do not present or execute until both development
 gates pass.
