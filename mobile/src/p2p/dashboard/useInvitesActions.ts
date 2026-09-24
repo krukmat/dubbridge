@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { createGatewayClient } from "../../api/client";
 import { useAuth } from "../../auth/AuthProvider";
@@ -32,6 +32,15 @@ function useClaimAction(gatewayBaseUrl: string, refreshInbox: () => Promise<void
   const [claimToken, setClaimToken] = useState("");
   const [claimError, setClaimError] = useState<string | null>(null);
   const [isClaiming, setIsClaiming] = useState(false);
+  const identity = `${auth.userId ?? ""}:${auth.sessionRef ?? ""}`;
+  const identityRef = useRef(identity);
+  identityRef.current = identity;
+  useEffect(() => {
+    submitting.current = false;
+    setClaimToken("");
+    setClaimError(null);
+    setIsClaiming(false);
+  }, [identity]);
 
   const updateClaimToken = useCallback((value: string) => {
     setClaimToken(value);
@@ -41,17 +50,21 @@ function useClaimAction(gatewayBaseUrl: string, refreshInbox: () => Promise<void
   const claim = useCallback(async () => {
     const token = claimToken.trim();
     const accessToken = auth.sessionRef;
+    const requestIdentity = identity;
     if (!accessToken || token.length === 0 || submitting.current) return;
     submitting.current = true;
     setIsClaiming(true);
     setClaimError(null);
     try {
-      await runClaim(audience, accessToken, token, auth, refreshInbox, setClaimToken, setClaimError);
+      await runClaim(
+        audience, accessToken, token, auth, refreshInbox, setClaimToken, setClaimError,
+        () => identityRef.current === requestIdentity,
+      );
     } finally {
       submitting.current = false;
       setIsClaiming(false);
     }
-  }, [audience, auth, claimToken, refreshInbox]);
+  }, [audience, auth, claimToken, identity, refreshInbox]);
 
   return {
     claimToken, updateClaimToken, claim, claimError, isClaiming,
@@ -67,9 +80,11 @@ async function runClaim(
   refreshInbox: () => Promise<void>,
   setClaimToken: (value: string) => void,
   setClaimError: (value: string | null) => void,
+  isCurrent: () => boolean,
 ) {
   try {
     const result = await audience.claimInvitation(accessToken, token);
+    if (!isCurrent()) return;
     if (!result.ok) {
       if (result.error.kind === "session_expired") {
         setClaimToken("");
@@ -80,10 +95,11 @@ async function runClaim(
       return;
     }
     await auth.onSessionRotation(result.value.sessionRotation);
+    if (!isCurrent()) return;
     setClaimToken("");
     await refreshInbox();
   } catch {
-    setClaimError("Could not claim the invitation.");
+    if (isCurrent()) setClaimError("Could not claim the invitation.");
   }
 }
 
@@ -93,9 +109,18 @@ function useSyncAction(refreshInbox: () => Promise<void>) {
   const inFlight = useRef(new Set<string>());
   const [busyInvites, setBusyInvites] = useState<ReadonlySet<string>>(new Set());
   const [syncErrors, setSyncErrors] = useState<Readonly<Record<string, string>>>({});
+  const identity = `${auth.userId ?? ""}:${auth.sessionRef ?? ""}`;
+  const identityRef = useRef(identity);
+  identityRef.current = identity;
+  useEffect(() => {
+    inFlight.current.clear();
+    setBusyInvites(new Set());
+    setSyncErrors({});
+  }, [identity]);
 
   const syncInvitation = useCallback(async (projection: ViewerInboxProjection) => {
     const descriptor = projection.item.descriptor;
+    const requestIdentity = identity;
     const accountScope = auth.userId ?? null;
     if (!descriptor || !accountScope || !canStartViewerSync(projection, accountScope)) return;
     const key = `${descriptor.publicationId}/${descriptor.lineageId}`;
@@ -112,16 +137,19 @@ function useSyncAction(refreshInbox: () => Promise<void>) {
     try {
       await syncController.startSync(descriptor, accountScope);
     } catch {
+      if (identityRef.current !== requestIdentity) return;
       setSyncErrors((current) => ({
         ...current,
         [projection.item.invitation.id]: "Could not sync this invitation.",
       }));
     } finally {
-      await refreshInbox();
-      inFlight.current.delete(key);
-      updateBusy(setBusyInvites, projection.item.invitation.id, false);
+      if (identityRef.current === requestIdentity) {
+        await refreshInbox();
+        inFlight.current.delete(key);
+        updateBusy(setBusyInvites, projection.item.invitation.id, false);
+      }
     }
-  }, [auth.userId, refreshInbox, syncController]);
+  }, [auth.userId, identity, refreshInbox, syncController]);
 
   return { syncInvitation, busyInvites, syncErrors };
 }
@@ -142,10 +170,20 @@ function usePlaybackAction(gatewayBaseUrl: string, refreshInbox: () => Promise<v
   const [playbackSession, setPlaybackSession] = useState<
     Readonly<{ invitationId: string; session: P2PPlaybackSession }> | null
   >(null);
+  const identity = `${auth.userId ?? ""}:${auth.sessionRef ?? ""}`;
+  const identityRef = useRef(identity);
+  identityRef.current = identity;
+  useEffect(() => {
+    inFlight.current.clear();
+    setBusyPlayInvites(new Set());
+    setPlayErrors({});
+    setPlaybackSession(null);
+  }, [identity]);
 
   const playInvitation = useCallback(async (projection: ViewerInboxProjection) => {
     const descriptor = projection.item.descriptor;
     const accessToken = auth.sessionRef;
+    const requestIdentity = identity;
     const accountScope = auth.userId ?? null;
     if (!descriptor || !accessToken || !accountScope) return;
     if (!canStartViewerPlayback(projection, accountScope)) return;
@@ -157,7 +195,9 @@ function usePlaybackAction(gatewayBaseUrl: string, refreshInbox: () => Promise<v
     setPlayErrors({});
     try {
       const handle = await syncController.getVerifiedPackageHandle(descriptor, accountScope);
+      if (identityRef.current !== requestIdentity) return;
       const result = await controller.start(accessToken, projection.item.authorization.id, handle);
+      if (identityRef.current !== requestIdentity) return;
       if (!result.ok) {
         if (result.error.kind === "session_expired") {
           await auth.logout();
@@ -171,18 +211,23 @@ function usePlaybackAction(gatewayBaseUrl: string, refreshInbox: () => Promise<v
         return;
       }
       await auth.onSessionRotation(result.value.sessionRotation);
+      if (identityRef.current !== requestIdentity) return;
       setPlaybackSession({ invitationId: projection.item.invitation.id, session: result.value.data });
     } catch {
-      setPlayErrors((current) => ({
-        ...current,
-        [projection.item.invitation.id]: "Could not start verified playback.",
-      }));
-      await refreshInbox();
+      if (identityRef.current === requestIdentity) {
+        setPlayErrors((current) => ({
+          ...current,
+          [projection.item.invitation.id]: "Could not start verified playback.",
+        }));
+        await refreshInbox();
+      }
     } finally {
-      inFlight.current.delete(key);
-      updateBusy(setBusyPlayInvites, projection.item.invitation.id, false);
+      if (identityRef.current === requestIdentity) {
+        inFlight.current.delete(key);
+        updateBusy(setBusyPlayInvites, projection.item.invitation.id, false);
+      }
     }
-  }, [auth, controller, refreshInbox, syncController]);
+  }, [auth, controller, identity, refreshInbox, syncController]);
 
   return { playInvitation, busyPlayInvites, playErrors, playbackSession, playbackController: controller };
 }
