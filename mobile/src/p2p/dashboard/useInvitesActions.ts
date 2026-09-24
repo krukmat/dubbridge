@@ -61,8 +61,10 @@ function useClaimAction(gatewayBaseUrl: string, refreshInbox: () => Promise<void
         () => identityRef.current === requestIdentity,
       );
     } finally {
-      submitting.current = false;
-      setIsClaiming(false);
+      if (identityRef.current === requestIdentity) {
+        submitting.current = false;
+        setIsClaiming(false);
+      }
     }
   }, [audience, auth, claimToken, identity, refreshInbox]);
 
