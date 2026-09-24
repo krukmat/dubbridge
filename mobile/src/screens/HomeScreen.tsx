@@ -41,22 +41,6 @@ const NAV_CARDS = [
     tone: "info" as const,
   },
   {
-    testID: "home-open-my-content" as const,
-    title: "My content",
-    subtitle: "Track P2P readiness and create invites",
-    key: "myContent",
-    symbol: "P2",
-    tone: "info" as const,
-  },
-  {
-    testID: "home-open-invites" as const,
-    title: "Invites",
-    subtitle: "Claim, sync and play shared P2P packages",
-    key: "invites",
-    symbol: "IN",
-    tone: "info" as const,
-  },
-  {
     testID: "home-open-organizations" as const,
     title: "Organizations and projects",
     subtitle: "Manage teams and project workspaces",
@@ -227,28 +211,56 @@ function RecentAssetsSection({
   );
 }
 
+function P2pSharingSection({
+  onOpenMyContent,
+  onOpenInvites,
+}: {
+  onOpenMyContent: () => void;
+  onOpenInvites: () => void;
+}) {
+  return (
+    <View style={styles.section} testID="home-p2p-section">
+      <Text style={styles.sectionTitle}>P2P sharing</Text>
+      <View style={styles.navCards}>
+        <Card
+          testID="home-open-my-content"
+          title="My content"
+          subtitle="Track readiness and create invites"
+          leadingAdornment={<IconBadge symbol="P2" tone="info" />}
+          trailing="chevron"
+          onPress={onOpenMyContent}
+          accessibilityLabel="My content"
+        />
+        <Card
+          testID="home-open-invites"
+          title="Invites"
+          subtitle="Claim, sync and play shared packages"
+          leadingAdornment={<IconBadge symbol="IN" tone="info" />}
+          trailing="chevron"
+          onPress={onOpenInvites}
+          accessibilityLabel="Invites"
+        />
+      </View>
+    </View>
+  );
+}
+
 function QuickActionsSection({
   onOpenAssets,
   onOpenUpload,
   onOpenReview,
   onOpenOrganizations,
-  onOpenMyContent,
-  onOpenInvites,
 }: {
   onOpenAssets: () => void;
   onOpenUpload: () => void;
   onOpenReview: () => void;
   onOpenOrganizations: () => void;
-  onOpenMyContent: () => void;
-  onOpenInvites: () => void;
 }) {
   const callbacks: Record<string, () => void> = {
     assets: onOpenAssets,
     upload: onOpenUpload,
     review: onOpenReview,
     organizations: onOpenOrganizations,
-    myContent: onOpenMyContent,
-    invites: onOpenInvites,
   };
 
   return (
@@ -323,13 +335,15 @@ function DashboardContent({
         onOpenAssets={onOpenAssets}
       />
       <CommunityModuleSlot />
+      <P2pSharingSection
+        onOpenMyContent={onOpenMyContent}
+        onOpenInvites={onOpenInvites}
+      />
       <QuickActionsSection
         onOpenAssets={onOpenAssets}
         onOpenUpload={onOpenUpload}
         onOpenReview={onOpenReview}
         onOpenOrganizations={onOpenOrganizations}
-        onOpenMyContent={onOpenMyContent}
-        onOpenInvites={onOpenInvites}
       />
       <AccountSection onLogout={onLogout} />
     </>
