@@ -80,37 +80,46 @@ export function projectViewerInboxItem(
   accountScope: string,
 ): ViewerInboxProjection | null {
   if (item.authorization.viewerSubjectId !== accountScope) return null;
-
-  if (
-    !item.authorizationActive ||
-    item.invitation.status === "expired" ||
-    item.invitation.status === "revoked"
-  ) {
+  if (isAccessInactive(item)) {
     return { item, state: "expired", action: "none", snapshot };
   }
-
   if (!hasExactViewerDescriptor(item)) {
     return { item, state: "pending", action: "refresh", snapshot: null };
   }
+  return projectLocalSnapshot(item, snapshot);
+}
 
+function isAccessInactive(item: P2pInboxItem): boolean {
+  return (
+    !item.authorizationActive ||
+    item.invitation.status === "expired" ||
+    item.invitation.status === "revoked"
+  );
+}
+
+function projectLocalSnapshot(
+  item: P2pInboxItem,
+  snapshot: P2pSyncSnapshot | null,
+): ViewerInboxProjection {
   if (snapshot === null || snapshot.phase === "IDLE" || snapshot.phase === "CANCELLED") {
     return { item, state: "pending", action: "sync", snapshot };
   }
-
   if (snapshot.phase === "FAILED") {
     return { item, state: "sync_error", action: "retry_sync", snapshot };
   }
+  if (isVerifiedReady(snapshot)) {
+    return { item, state: "available", action: "play", snapshot };
+  }
+  return { item, state: "syncing", action: "none", snapshot };
+}
 
-  if (
+function isVerifiedReady(snapshot: P2pSyncSnapshot): boolean {
+  return (
     snapshot.phase === "READY" &&
     snapshot.manifestVerified &&
     snapshot.packageVerified &&
     isProgressComplete(snapshot)
-  ) {
-    return { item, state: "available", action: "play", snapshot };
-  }
-
-  return { item, state: "syncing", action: "none", snapshot };
+  );
 }
 
 export function toInvitesViewState(
