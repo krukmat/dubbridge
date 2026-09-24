@@ -9,7 +9,7 @@ behavioral_coverage_contract: behavior-v2
 
 # P6 — planning task ledger
 
-**Status:** **In progress. P6.T0 PASS 2026-09-22; P6.T1 PASS 2026-09-23.** T1 closed under the standing MVP0-P2P owner review exception with owner self-review/approval and green exact-head CI evidence. **P6.T2 is IN PROGRESS: T2.A/B/C/D PASS; T2.E–H remain pending. P6.T3 remains blocked on T2 PASS.**
+**Status:** **In progress. P6.T0 PASS 2026-09-22; P6.T1 PASS 2026-09-23.** T1 closed under the standing MVP0-P2P owner review exception with owner self-review/approval and green exact-head CI evidence. **P6.T2 is IN PROGRESS: T2.A/B/C/D/E PASS; T2.F–H remain pending. P6.T3 remains blocked on T2 PASS.**
 **Phase gate:** **SATISFIED 2026-09-22 — P3 PASS + P4 PASS + P5-DEV.** P5.T3/P5-CERT is not an activation prerequisite.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
@@ -19,7 +19,7 @@ behavioral_coverage_contract: behavior-v2
 |---|---|---|---|---|---|
 | P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **PASS 2026-09-22 — owner-verified; c6ce2039 15/15 CI** |
 | P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **PASS 2026-09-23 — T1.A–H closed; owner-reviewed; REVIEW-OVERRIDE applied** |
-| P6.T2 | Viewer claim, Invites, sync and play actions | development | XL parent / decomposed leaves | T1 PASS | **IN PROGRESS — T2.A/B/C/D PASS; T2.E–H pending** |
+| P6.T2 | Viewer claim, Invites, sync and play actions | development | XL parent / decomposed leaves | T1 PASS | **IN PROGRESS — T2.A/B/C/D/E PASS; T2.F–H pending** |
 | P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | Planned; not activated |
 
 
@@ -133,7 +133,7 @@ Required passes: 3 (RRI 55 → Med-high).
 
 **Depends on:** T1 PASS
 
-**Status:** **IN PROGRESS — T2.A/B/C/D PASS; T2.E–H pending.** Parent RRI **100 / Very high**; source implementation remains prohibited at parent scope and continues only through the frozen leaves below.
+**Status:** **IN PROGRESS — T2.A/B/C/D/E PASS; T2.F–H pending.** Parent RRI **100 / Very high**; source implementation remains prohibited at parent scope and continues only through the frozen leaves below.
 
 **Acceptance criteria:** Connect claim/inbox, verified sync and existing playback through the frozen state model; handle expiry, loading/retry and account changes.
 
@@ -159,7 +159,7 @@ downstream input to its consuming phase before claiming closure.
 | T2.B | Authoritative viewer inbox + product-state projection | 55 / Med-high | **PASS 2026-09-24 — `19a5bca9`, 15/15 CI** |
 | T2.C | Manual Claim via existing P3 audience capability | 55 / Med-high | **PASS 2026-09-24 — `c104d40a`, 15/15 CI** |
 | T2.D | Sync / Retry Sync via existing P4 controller | 55 / Med-high | **PASS 2026-09-24 — `a99a712c`, 15/15 CI** |
-| T2.E | Available + Play via verified P4 handle and existing P5 controller/view | 55 / Med-high | Pending |
+| T2.E | Available + Play via verified P4 handle and existing P5 controller/view | 55 / Med-high | **PASS 2026-09-24 — `8fa7411d`, 15/15 CI** |
 | T2.F | Fail-closed expiry/session/account lifecycle | 55 / Med-high | Pending |
 | T2.G | Home → Invites navigation + remount behavior | 55 / Med-high | Pending |
 | T2.H | Aggregate component/integration evidence + closure | 25 / Low | Pending |
@@ -188,6 +188,20 @@ Evidence: `docs/audit/mvp0-p2p-p6-t2-d-sync-retry-2026-09-24.md`.
 - Exact implementation head `a99a712c`, Actions run `36025590927`: **15/15 PASS**; mobile **64/64 suites, 495/495 tests**.
 - Owner approved execution of P6.T2.D before implementation. Aggregate T2 owner verification remains a T2.H closure obligation.
 - T2.E remains the only leaf allowed to wire verified Available to Play. HPKE emulator remains disabled.
+
+### T2.E implementation evidence
+
+Evidence: `docs/audit/mvp0-p2p-p6-t2-e-available-play-2026-09-24.md`.
+
+- **T2.E PASS:** Play is exposed only from T2.B's `Available` projection; unverified READY never exposes Play.
+- Before P5 startup, T2.E requires `P2PSyncController.getVerifiedPackageHandle(descriptor, accountScope)`; a missing/stale verified handle fails closed.
+- Playback delegates to existing `P2PPlaybackController.start(accessToken, authorizationId, handle)`, which re-reads current O3 authorization and owns transient K1/startup.
+- Only the P5 loopback `P2PPlaybackSession` is rendered through existing `P2PPlaybackSessionView`; no remote audience-media fallback was added.
+- P5 authorization/session failures create no player; denied authorization triggers authoritative inbox refresh; session expiry delegates to logout.
+- A per-descriptor in-flight lock prevents duplicate P4-handle/P5-start requests.
+- Exact implementation head `8fa7411d`, Actions run `36029185810`: **15/15 PASS**; mobile **64/64 suites, 501/501 tests**.
+- The owner directed continuation into T2.E after T2.D closure; aggregate T2 owner verification remains a T2.H obligation.
+- HPKE emulator remains disabled.
 
 ### T2 frozen source ownership
 

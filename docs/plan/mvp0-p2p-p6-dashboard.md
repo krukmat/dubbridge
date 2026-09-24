@@ -7,7 +7,7 @@ slice: MVP0-P2P
 
 # P6 — Minimal My Content and Invites dashboard
 
-Task ledger: `docs/tasks/mvp0-p2p-p6-dashboard.md`. **Activation gate satisfied 2026-09-22. P6.T0 PASS. P6.T1 PASS 2026-09-23:** T1.A–H are closed; the standing MVP0-P2P owner-directed review exception replaces phase-1/phase-2 peer review, and owner Matias Kruk explicitly reviewed and approved T1. Functional/evidence head `b6df0a7f` completed 15/15 CI, mobile 63/63 suites / 461/461 tests and 90.43% workspace line coverage. **P6.T2 is IN PROGRESS with T2.A/B/C/D PASS; T2.E–H remain pending. P6.T3 remains blocked.** P5.T3 is deferred to release certification.
+Task ledger: `docs/tasks/mvp0-p2p-p6-dashboard.md`. **Activation gate satisfied 2026-09-22. P6.T0 PASS. P6.T1 PASS 2026-09-23:** T1.A–H are closed; the standing MVP0-P2P owner-directed review exception replaces phase-1/phase-2 peer review, and owner Matias Kruk explicitly reviewed and approved T1. Functional/evidence head `b6df0a7f` completed 15/15 CI, mobile 63/63 suites / 461/461 tests and 90.43% workspace line coverage. **P6.T2 is IN PROGRESS with T2.A/B/C/D/E PASS; T2.F–H remain pending. P6.T3 remains blocked.** P5.T3 is deferred to release certification.
 
 ## Objective
 
@@ -39,7 +39,7 @@ Freeze state projection and action eligibility from canonical backend and runtim
 |---|---|---|---|---|---|
 | P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **PASS 2026-09-22** |
 | P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **PASS 2026-09-23 — A–H closed; RRI 55 Med-high; owner-reviewed + REVIEW-OVERRIDE** |
-| P6.T2 | Viewer claim, Invites, sync and play actions | development | XL parent / decomposed | T1 PASS | **IN PROGRESS — T2.A/B/C/D PASS; E–H pending** |
+| P6.T2 | Viewer claim, Invites, sync and play actions | development | XL parent / decomposed | T1 PASS | **IN PROGRESS — T2.A/B/C/D/E PASS; F–H pending** |
 | P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | Planned; not activated |
 
 
@@ -176,4 +176,4 @@ T2.B is PASS on `19a5bca9` / run `36019060607` (15/15 CI; mobile 64/64 suites, 4
 
 T2.C is PASS on `c104d40a` / run `36022359070` (15/15 CI; mobile 64/64 suites, 489/489 tests). Manual Claim keeps the raw token in volatile React state, delegates to existing P3 audience capability, refreshes the authoritative inbox after success, and does not infer Available/Play.
 
-P6.T2 remains IN PROGRESS. **T2.D PASS** on `a99a712c` / run `36025590927` (15/15 CI; mobile 64/64 suites, 495/495 tests). Sync/Retry delegates to P4, uses account-scoped exact descriptors, locks duplicate in-flight starts, and refreshes the existing T2.B projection after completion/error. **T2.E — Available + Play** is now the next frozen leaf; T2.F–H remain pending. HPKE emulator remains disabled.
+P6.T2 remains IN PROGRESS. **T2.D PASS** on `a99a712c` / run `36025590927` (15/15 CI; mobile 64/64 suites, 495/495 tests). **T2.E PASS** on `8fa7411d` / run `36029185810` (15/15 CI; mobile 64/64 suites, 501/501 tests): Available alone exposes Play, P4 must first produce a verified package handle, and P5 revalidates authorization before returning the loopback playback session consumed by the existing player view. **T2.F — fail-closed expiry/session/account lifecycle** is now the next frozen leaf; T2.G–H remain pending. HPKE emulator remains disabled.
