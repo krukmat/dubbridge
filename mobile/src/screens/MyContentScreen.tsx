@@ -1,12 +1,9 @@
 import { StyleSheet, Text, View } from "react-native";
 
 import type { P2pOwnerContent } from "../api/p2pDashboard";
-import { Badge, Button, Card, Screen, ScreenHeader, StateView } from "../components";
-import {
-  canCreateP2pInvite,
-  MY_CONTENT_STATE_LABELS,
-  MY_CONTENT_STATE_TONES,
-} from "../p2p/dashboard/MyContentModel";
+import { Button, Card, Screen, ScreenHeader, StateView } from "../components";
+import { canCreateP2pInvite } from "../p2p/dashboard/MyContentModel";
+import { P2pStatusBadge } from "../p2p/dashboard/P2pStatusBadge";
 import {
   type MyContentInviteState,
   useMyContentInvite,
@@ -39,10 +36,10 @@ function MyContentCard({
             {content.publicationId}
           </Text>
         </View>
-        <Badge
+        <P2pStatusBadge
+          surface="owner"
+          state={content.state}
           testID={`my-content-state-${content.assetId}`}
-          label={MY_CONTENT_STATE_LABELS[content.state]}
-          tone={MY_CONTENT_STATE_TONES[content.state]}
         />
       </View>
       {inviteEligible ? (
