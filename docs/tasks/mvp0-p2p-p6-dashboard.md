@@ -9,7 +9,7 @@ behavioral_coverage_contract: behavior-v2
 
 # P6 — planning task ledger
 
-**Status:** **In progress. P6.T0 PASS 2026-09-22; P6.T1 PASS 2026-09-23.** T1 closed under the standing MVP0-P2P owner review exception with owner self-review/approval and green exact-head CI evidence. **P6.T2 is IN PROGRESS: T2.A/B/C/D/E/F PASS; T2.G–H remain pending. P6.T3 remains blocked on T2 PASS.**
+**Status:** **In progress. P6.T0 PASS 2026-09-22; P6.T1 PASS 2026-09-23.** T1 closed under the standing MVP0-P2P owner review exception with owner self-review/approval and green exact-head CI evidence. **P6.T2 is IN PROGRESS: T2.A/B/C/D/E/F/G PASS; T2.H is the only pending closure leaf. P6.T3 remains blocked on T2 PASS.**
 **Phase gate:** **SATISFIED 2026-09-22 — P3 PASS + P4 PASS + P5-DEV.** P5.T3/P5-CERT is not an activation prerequisite.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
@@ -19,7 +19,7 @@ behavioral_coverage_contract: behavior-v2
 |---|---|---|---|---|---|
 | P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **PASS 2026-09-22 — owner-verified; c6ce2039 15/15 CI** |
 | P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **PASS 2026-09-23 — T1.A–H closed; owner-reviewed; REVIEW-OVERRIDE applied** |
-| P6.T2 | Viewer claim, Invites, sync and play actions | development | XL parent / decomposed leaves | T1 PASS | **IN PROGRESS — T2.A/B/C/D/E/F PASS; T2.G–H pending** |
+| P6.T2 | Viewer claim, Invites, sync and play actions | development | XL parent / decomposed leaves | T1 PASS | **IN PROGRESS — T2.A/B/C/D/E/F/G PASS; T2.H pending** |
 | P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | Planned; not activated |
 
 
@@ -133,7 +133,7 @@ Required passes: 3 (RRI 55 → Med-high).
 
 **Depends on:** T1 PASS
 
-**Status:** **IN PROGRESS — T2.A/B/C/D/E/F PASS; T2.G–H pending.** Parent RRI **100 / Very high**; source implementation remains prohibited at parent scope and continues only through the frozen leaves below.
+**Status:** **IN PROGRESS — T2.A/B/C/D/E/F/G PASS; T2.H pending.** Parent RRI **100 / Very high**; implementation leaves are complete and only aggregate closure remains.
 
 **Acceptance criteria:** Connect claim/inbox, verified sync and existing playback through the frozen state model; handle expiry, loading/retry and account changes.
 
@@ -161,7 +161,7 @@ downstream input to its consuming phase before claiming closure.
 | T2.D | Sync / Retry Sync via existing P4 controller | 55 / Med-high | **PASS 2026-09-24 — `a99a712c`, 15/15 CI** |
 | T2.E | Available + Play via verified P4 handle and existing P5 controller/view | 55 / Med-high | **PASS 2026-09-24 — `8fa7411d`, 15/15 CI** |
 | T2.F | Fail-closed expiry/session/account lifecycle | 55 / Med-high | **PASS 2026-09-24 — `9c4b41e4`, 15/15 CI** |
-| T2.G | Home → Invites navigation + remount behavior | 55 / Med-high | Pending |
+| T2.G | Home → Invites navigation + remount behavior | 55 / Med-high | **PASS 2026-09-24 — `6f4a89e1`, 15/15 CI** |
 | T2.H | Aggregate component/integration evidence + closure | 25 / Low | Pending |
 
 Activation evidence:
@@ -215,6 +215,19 @@ Evidence: `docs/audit/mvp0-p2p-p6-t2-f-lifecycle-2026-09-24.md`.
 - Expired/revoked invitations override cached P4 READY and expose no Play.
 - Exact implementation head `9c4b41e4`, Actions run `36031993001`: **15/15 PASS**; mobile **64/64 suites, 507/507 tests**.
 - Owner directed continuation after T2.D/T2.E; aggregate T2 owner verification remains a T2.H closure obligation.
+- HPKE emulator remains disabled.
+
+### T2.G implementation evidence
+
+Evidence: `docs/audit/mvp0-p2p-p6-t2-g-navigation-2026-09-24.md`.
+
+- **T2.G PASS:** Home exposes the Invites entry using the existing authenticated stack.
+- `Home → Invites → Back` uses normal stack navigation; no parallel navigation state was introduced.
+- Back unmounts Invites. Re-entry remounts the real screen and performs a fresh authoritative `GET /api/p2p/inbox`.
+- When auth becomes unauthenticated, the authenticated stack is removed and the Invites route disappears.
+- Existing T2.F identity invalidation remains active inside the real route.
+- Exact implementation head `6f4a89e1`, Actions run `36033387423`: **15/15 PASS**; mobile **64/64 suites, 509/509 tests**.
+- T2.H remains the aggregate evidence/closure leaf and still requires owner final verification before parent T2 PASS.
 - HPKE emulator remains disabled.
 
 ### T2 frozen source ownership
