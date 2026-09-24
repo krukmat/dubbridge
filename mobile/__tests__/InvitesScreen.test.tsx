@@ -256,6 +256,19 @@ describe("InvitesModel", () => {
     });
     expect(projectViewerInboxItem(item, snapshot("READY", true), "viewer-1")).toBeNull();
   });
+
+  it.each(["expired", "revoked"] as const)(
+    "%s invitation overrides cached READY",
+    (status) => {
+      const item = inboxItem({
+        invitation: { ...inboxItem().invitation, status },
+      });
+      expect(projectViewerInboxItem(item, snapshot("READY", true), "viewer-1")).toMatchObject({
+        state: "expired",
+        action: "none",
+      });
+    },
+  );
 });
 
 describe("InvitesScreen T2.B", () => {
@@ -817,5 +830,174 @@ describe("InvitesScreen T2.E Available + Play", () => {
     resolveHandle?.(verifiedHandle);
     await waitFor(() => expect(view.getByTestId("p2p-player")).toBeTruthy());
     expect(mockStartPlayback).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe("InvitesScreen T2.F fail-closed lifecycle", () => {
+  function switchAccount(userId: string, sessionRef: string) {
+    mockAuthValue = {
+      ...mockAuthValue,
+      userId,
+      sessionRef,
+      status: "authed",
+      logout: jest.fn(),
+      onSessionRotation: jest.fn().mockResolvedValue(undefined),
+    };
+  }
+
+  it("invalidates a visible Available item and playback session immediately on account change", async () => {
+    mockClient.get
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { data: [rawInboxItem()], sessionRotation: null },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { data: [], sessionRotation: null },
+      });
+    mockSyncController.getSyncState.mockResolvedValue(snapshot("READY", true));
+    mockSyncController.getVerifiedPackageHandle.mockResolvedValue({
+      accountScope: "viewer-1",
+      assetId: "asset-1",
+      publicationId: "pub-1",
+      lineageId: "lineage-1",
+      manifestDigestSha256: DESCRIPTOR.manifestDigestSha256,
+      externalPublicationId: DESCRIPTOR.externalPublicationId,
+    });
+    mockStartPlayback.mockResolvedValue({
+      ok: true,
+      value: {
+        data: {
+          playbackUrl: `http://127.0.0.1:43210/${"d".repeat(32)}/index.m3u8`,
+          accountScope: "viewer-1",
+          publicationId: "pub-1",
+          lineageId: "lineage-1",
+        },
+        sessionRotation: null,
+      },
+    });
+
+    const view = await renderInvitesScreen();
+    await waitFor(() => expect(view.getByText("Available")).toBeTruthy());
+    fireEvent.press(view.getByTestId("invite-play-invite-1"));
+    await waitFor(() => expect(view.getByTestId("p2p-player")).toBeTruthy());
+
+    switchAccount("viewer-2", "session-p6-2");
+    await act(async () => {
+      await view.rerender(<InvitesScreen gatewayBaseUrl="http://localhost:3000" />);
+    });
+
+    await waitFor(() => expect(view.getByTestId("invites-empty")).toBeTruthy());
+    expect(view.queryByTestId("invite-row-invite-1")).toBeNull();
+    expect(view.queryByTestId("p2p-player")).toBeNull();
+  });
+
+  it("discards a late inbox response from the previous account", async () => {
+    let resolveOldInbox: ((value: unknown) => void) | undefined;
+    mockClient.get
+      .mockImplementationOnce(
+        () => new Promise((resolve) => {
+          resolveOldInbox = resolve;
+        }),
+      )
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { data: [], sessionRotation: null },
+      });
+
+    const view = await renderInvitesScreen();
+    await waitFor(() => expect(mockClient.get).toHaveBeenCalledTimes(1));
+
+    switchAccount("viewer-2", "session-p6-2");
+    await act(async () => {
+      await view.rerender(<InvitesScreen gatewayBaseUrl="http://localhost:3000" />);
+    });
+    await waitFor(() => expect(view.getByTestId("invites-empty")).toBeTruthy());
+
+    resolveOldInbox?.({
+      ok: true,
+      value: { data: [rawInboxItem()], sessionRotation: null },
+    });
+    await act(async () => Promise.resolve());
+
+    expect(view.queryByTestId("invite-row-invite-1")).toBeNull();
+    expect(view.getByTestId("invites-empty")).toBeTruthy();
+  });
+
+  it("discards a verified-handle completion from the previous account before P5 startup", async () => {
+    mockClient.get
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { data: [rawInboxItem()], sessionRotation: null },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { data: [], sessionRotation: null },
+      });
+    mockSyncController.getSyncState.mockResolvedValue(snapshot("READY", true));
+    let resolveHandle: ((value: unknown) => void) | undefined;
+    mockSyncController.getVerifiedPackageHandle.mockImplementation(
+      () => new Promise((resolve) => {
+        resolveHandle = resolve;
+      }),
+    );
+
+    const view = await renderInvitesScreen();
+    await waitFor(() => expect(view.getByTestId("invite-play-invite-1")).toBeTruthy());
+    fireEvent.press(view.getByTestId("invite-play-invite-1"));
+    await waitFor(() =>
+      expect(mockSyncController.getVerifiedPackageHandle).toHaveBeenCalledTimes(1),
+    );
+
+    switchAccount("viewer-2", "session-p6-2");
+    await act(async () => {
+      await view.rerender(<InvitesScreen gatewayBaseUrl="http://localhost:3000" />);
+    });
+    await waitFor(() => expect(view.getByTestId("invites-empty")).toBeTruthy());
+
+    resolveHandle?.({
+      accountScope: "viewer-1",
+      assetId: "asset-1",
+      publicationId: "pub-1",
+      lineageId: "lineage-1",
+      manifestDigestSha256: DESCRIPTOR.manifestDigestSha256,
+      externalPublicationId: DESCRIPTOR.externalPublicationId,
+    });
+    await act(async () => Promise.resolve());
+
+    expect(mockStartPlayback).not.toHaveBeenCalled();
+    expect(view.queryByTestId("p2p-player")).toBeNull();
+  });
+
+  it("clears a raw Claim token when the authenticated account changes", async () => {
+    mockClient.get
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { data: [], sessionRotation: null },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { data: [], sessionRotation: null },
+      });
+
+    const view = await renderInvitesScreen();
+    await waitFor(() => expect(view.getByTestId("invites-empty")).toBeTruthy());
+    await act(async () => {
+      fireEvent.changeText(view.getByTestId("invites-claim-token"), "account-one-secret");
+    });
+    await waitFor(() =>
+      expect(view.getByTestId("invites-claim-token").props.value).toBe("account-one-secret"),
+    );
+
+    switchAccount("viewer-2", "session-p6-2");
+    await act(async () => {
+      await view.rerender(<InvitesScreen gatewayBaseUrl="http://localhost:3000" />);
+    });
+
+    await waitFor(() =>
+      expect(view.getByTestId("invites-claim-token").props.value).toBe(""),
+    );
+    expect(mockClaimInvitation).not.toHaveBeenCalled();
   });
 });
