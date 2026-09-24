@@ -116,13 +116,16 @@ describe("HomeScreen", () => {
     // 1 unread review_task notification
     expect(getByText("1 pending")).toBeTruthy();
     expect(getByTestId("home-pending-review-summary")).toBeTruthy();
-    // Quick-action testIDs intact
+    // P2P owner/viewer flow is grouped without changing route entry testIDs.
+    expect(getByTestId("home-p2p-section")).toBeTruthy();
+    expect(getByText("P2P sharing")).toBeTruthy();
+    expect(getByTestId("home-open-my-content")).toBeTruthy();
+    expect(getByTestId("home-open-invites")).toBeTruthy();
+    // General quick actions remain available.
     expect(getByTestId("home-open-assets")).toBeTruthy();
     expect(getByTestId("home-open-upload")).toBeTruthy();
     expect(getByTestId("home-open-review")).toBeTruthy();
     expect(getByTestId("home-open-organizations")).toBeTruthy();
-    expect(getByTestId("home-open-my-content")).toBeTruthy();
-    expect(getByTestId("home-open-invites")).toBeTruthy();
     expect(getByTestId("home-account-card")).toBeTruthy();
     expect(getByTestId("home-account-icon")).toBeTruthy();
     expect(getByTestId("home-sign-out")).toBeTruthy();
