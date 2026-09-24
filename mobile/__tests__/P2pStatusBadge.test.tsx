@@ -11,9 +11,9 @@ describe("P2pStatusBadge", () => {
     ["processing", "Processing", "info"],
     ["ready", "Ready", "success"],
     ["failed", "Failed", "danger"],
-  ] as const)("certifies owner %s presentation", (state, label, tone) => {
+  ] as const)("certifies owner %s presentation", async (state, label, tone) => {
     expect(p2pOwnerStatusPresentation(state)).toEqual({ label, tone });
-    const view = render(
+    const view = await render(
       <P2pStatusBadge surface="owner" state={state} testID="owner-status" />,
     );
     expect(view.getByTestId("owner-status")).toBeTruthy();
@@ -26,9 +26,9 @@ describe("P2pStatusBadge", () => {
     ["sync_error", "Sync error", "danger"],
     ["available", "Available", "success"],
     ["expired", "Expired", "warning"],
-  ] as const)("certifies viewer %s presentation", (state, label, tone) => {
+  ] as const)("certifies viewer %s presentation", async (state, label, tone) => {
     expect(p2pViewerStatusPresentation(state)).toEqual({ label, tone });
-    const view = render(
+    const view = await render(
       <P2pStatusBadge surface="viewer" state={state} testID="viewer-status" />,
     );
     expect(view.getByTestId("viewer-status")).toBeTruthy();
