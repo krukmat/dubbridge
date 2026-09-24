@@ -16,18 +16,18 @@ import {
 } from "./InvitesModel";
 
 export function useInvitesActions(gatewayBaseUrl: string, refreshInbox: () => Promise<void>) {
-  const audience = useMemo(
-    () => new P2PAudienceService(createGatewayClient({ gatewayBaseUrl })), [gatewayBaseUrl],
-  );
   return {
-    ...useClaimAction(audience, refreshInbox),
+    ...useClaimAction(gatewayBaseUrl, refreshInbox),
     ...useSyncAction(refreshInbox),
-    ...usePlaybackAction(audience, refreshInbox),
+    ...usePlaybackAction(gatewayBaseUrl, refreshInbox),
   };
 }
 
-function useClaimAction(audience: P2PAudienceService, refreshInbox: () => Promise<void>) {
+function useClaimAction(gatewayBaseUrl: string, refreshInbox: () => Promise<void>) {
   const auth = useAuth();
+  const audience = useMemo(
+    () => new P2PAudienceService(createGatewayClient({ gatewayBaseUrl })), [gatewayBaseUrl],
+  );
   const submitting = useRef(false);
   const [claimToken, setClaimToken] = useState("");
   const [claimError, setClaimError] = useState<string | null>(null);
@@ -103,7 +103,12 @@ function useSyncAction(refreshInbox: () => Promise<void>) {
 
     inFlight.current.add(key);
     updateBusy(setBusyInvites, projection.item.invitation.id, true);
-    setSyncErrors((current) => withoutKey(current, projection.item.invitation.id));
+    setSyncErrors((current) => {
+      if (!(projection.item.invitation.id in current)) return current;
+      const next = { ...current };
+      delete next[projection.item.invitation.id];
+      return next;
+    });
     try {
       await syncController.startSync(descriptor, accountScope);
     } catch {
@@ -122,13 +127,19 @@ function useSyncAction(refreshInbox: () => Promise<void>) {
 }
 
 function usePlaybackAction(
-  audience: P2PAudienceService,
+  gatewayBaseUrl: string,
   refreshInbox: () => Promise<void>,
 ) {
   const auth = useAuth();
   const service = useP2PService();
   const syncController = useP2PSyncController();
-  const controller = useMemo(() => new P2PPlaybackController(audience, service), [audience, service]);
+  const controller = useMemo(
+    () => new P2PPlaybackController(
+      new P2PAudienceService(createGatewayClient({ gatewayBaseUrl })),
+      service,
+    ),
+    [gatewayBaseUrl, service],
+  );
   const inFlight = useRef(new Set<string>());
   const [busyPlayInvites, setBusyPlayInvites] = useState<ReadonlySet<string>>(new Set());
   const [playErrors, setPlayErrors] = useState<Readonly<Record<string, string>>>({});
@@ -147,7 +158,7 @@ function usePlaybackAction(
 
     inFlight.current.add(key);
     updateBusy(setBusyPlayInvites, projection.item.invitation.id, true);
-    setPlayErrors((current) => withoutKey(current, projection.item.invitation.id));
+    setPlayErrors({});
     try {
       const handle = await syncController.getVerifiedPackageHandle(descriptor, accountScope);
       const result = await controller.start(accessToken, projection.item.authorization.id, handle);
@@ -191,14 +202,4 @@ function updateBusy(
     else next.delete(invitationId);
     return next;
   });
-}
-
-function withoutKey(
-  current: Readonly<Record<string, string>>,
-  key: string,
-): Readonly<Record<string, string>> {
-  if (!(key in current)) return current;
-  const next = { ...current };
-  delete next[key];
-  return next;
 }
