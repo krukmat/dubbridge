@@ -11,8 +11,7 @@ export function useInvitesActions(
 ) {
   const auth = useAuth();
   const audience = useMemo(
-    () => new P2PAudienceService(createGatewayClient({ gatewayBaseUrl })),
-    [gatewayBaseUrl],
+    () => new P2PAudienceService(createGatewayClient({ gatewayBaseUrl })), [gatewayBaseUrl],
   );
   const submitting = useRef(false);
   const [claimToken, setClaimToken] = useState("");
@@ -53,14 +52,7 @@ export function useInvitesActions(
       submitting.current = false;
       setIsClaiming(false);
     }
-  }, [
-    audience,
-    auth.logout,
-    auth.onSessionRotation,
-    auth.sessionRef,
-    claimToken,
-    refreshInbox,
-  ]);
+  }, [audience, auth.logout, auth.onSessionRotation, auth.sessionRef, claimToken, refreshInbox]);
 
   return {
     claimToken,
