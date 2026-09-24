@@ -1,12 +1,9 @@
 import { StyleSheet, Text, TextInput, View } from "react-native";
 
-import { Badge, Button, Card, Screen, ScreenHeader, StateView } from "../components";
+import { Button, Card, Screen, ScreenHeader, StateView } from "../components";
 import { color, fieldStyle, space, type } from "../theme";
-import {
-  VIEWER_STATE_LABELS,
-  VIEWER_STATE_TONES,
-  type ViewerInboxProjection,
-} from "../p2p/dashboard/InvitesModel";
+import { type ViewerInboxProjection } from "../p2p/dashboard/InvitesModel";
+import { P2pStatusBadge } from "../p2p/dashboard/P2pStatusBadge";
 import { useInvitesActions } from "../p2p/dashboard/useInvitesActions";
 import { useInvitesState } from "../p2p/dashboard/useInvitesState";
 import { P2PPlaybackSessionView } from "../p2p/playback/P2PPlaybackSessionView";
@@ -26,10 +23,10 @@ function InvitationRow({
           <Text style={styles.meta}>Asset {invitation.assetId}</Text>
           <Text style={styles.meta}>Publication {authorization.publicationId}</Text>
         </View>
-        <Badge
+        <P2pStatusBadge
+          surface="viewer"
+          state={projection.state}
           testID={`invite-state-${invitation.id}`}
-          label={VIEWER_STATE_LABELS[projection.state]}
-          tone={VIEWER_STATE_TONES[projection.state]}
         />
       </View>
       {projection.action === "sync" || projection.action === "retry_sync" ? (
