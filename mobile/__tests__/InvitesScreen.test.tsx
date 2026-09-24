@@ -361,7 +361,12 @@ describe("InvitesScreen T2.C manual Claim", () => {
     const { getByTestId, getByText, queryByText } = await renderInvitesScreen();
     await waitFor(() => expect(getByTestId("invites-empty")).toBeTruthy());
 
-    fireEvent.changeText(getByTestId("invites-claim-token"), "  raw-claim-token  ");
+    await act(async () => {
+      fireEvent.changeText(getByTestId("invites-claim-token"), "  raw-claim-token  ");
+    });
+    await waitFor(() =>
+      expect(getByTestId("invites-claim-token").props.value).toBe("  raw-claim-token  "),
+    );
     fireEvent.press(getByTestId("invites-claim-submit"));
 
     await waitFor(() => expect(mockClaimInvitation).toHaveBeenCalledTimes(1));
@@ -402,7 +407,12 @@ describe("InvitesScreen T2.C manual Claim", () => {
 
     const { getByTestId } = await renderInvitesScreen();
     await waitFor(() => expect(getByTestId("invites-empty")).toBeTruthy());
-    fireEvent.changeText(getByTestId("invites-claim-token"), "one-token");
+    await act(async () => {
+      fireEvent.changeText(getByTestId("invites-claim-token"), "one-token");
+    });
+    await waitFor(() =>
+      expect(getByTestId("invites-claim-token").props.value).toBe("one-token"),
+    );
 
     fireEvent.press(getByTestId("invites-claim-submit"));
     await waitFor(() =>
@@ -436,7 +446,12 @@ describe("InvitesScreen T2.C manual Claim", () => {
 
     const { getByTestId, getByText } = await renderInvitesScreen();
     await waitFor(() => expect(getByTestId("invites-empty")).toBeTruthy());
-    fireEvent.changeText(getByTestId("invites-claim-token"), "bad-token");
+    await act(async () => {
+      fireEvent.changeText(getByTestId("invites-claim-token"), "bad-token");
+    });
+    await waitFor(() =>
+      expect(getByTestId("invites-claim-token").props.value).toBe("bad-token"),
+    );
 
     fireEvent.press(getByTestId("invites-claim-submit"));
 
@@ -457,7 +472,12 @@ describe("InvitesScreen T2.C manual Claim", () => {
 
     const { getByTestId } = await renderInvitesScreen();
     await waitFor(() => expect(getByTestId("invites-empty")).toBeTruthy());
-    fireEvent.changeText(getByTestId("invites-claim-token"), "secret-token");
+    await act(async () => {
+      fireEvent.changeText(getByTestId("invites-claim-token"), "secret-token");
+    });
+    await waitFor(() =>
+      expect(getByTestId("invites-claim-token").props.value).toBe("secret-token"),
+    );
 
     fireEvent.press(getByTestId("invites-claim-submit"));
 
@@ -474,8 +494,12 @@ describe("InvitesScreen T2.C manual Claim", () => {
 
     const first = await renderInvitesScreen();
     await waitFor(() => expect(first.getByTestId("invites-empty")).toBeTruthy());
-    fireEvent.changeText(first.getByTestId("invites-claim-token"), "transient-token");
-    expect(first.getByTestId("invites-claim-token").props.value).toBe("transient-token");
+    await act(async () => {
+      fireEvent.changeText(first.getByTestId("invites-claim-token"), "transient-token");
+    });
+    await waitFor(() =>
+      expect(first.getByTestId("invites-claim-token").props.value).toBe("transient-token"),
+    );
     await first.unmount();
 
     const second = await renderInvitesScreen();
