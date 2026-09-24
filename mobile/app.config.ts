@@ -32,6 +32,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "http://10.0.2.2:8082",
     e2eEnabled: process.env.EXPO_PUBLIC_E2E_ENABLED === "true",
     p2pDevelopmentHarness: process.env.EXPO_PUBLIC_P2P_DEV_HARNESS === "true",
+    p2pVisualFixtures: process.env.EXPO_PUBLIC_P2P_VISUAL_FIXTURES === "true",
     p5DeviceCertificationHarness:
       process.env.EXPO_PUBLIC_P5_DEVICE_CERT_HARNESS === "true",
   },

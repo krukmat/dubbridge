@@ -85,6 +85,91 @@ export const E2E_EMAIL = "e2e@dubbridge.dev";
 export const E2E_PASSWORD = "e2etestpass123";
 export const E2E_BEARER_TOKEN = "e2e-bearer-token";
 
+export const P2P_VISUAL_USER_ID = "00000000-0000-0000-0000-000000000001";
+
+function p2pVisualDescriptor(key) {
+  return {
+    descriptor_version: "1",
+    asset_id: `asset-p2p-${key}`,
+    publication_id: `pub-p2p-${key}`,
+    lineage_id: `line-p2p-${key}`,
+    manifest_version: "1",
+    manifest_digest_sha256: "a".repeat(64),
+    external_publication_id: `external-p2p-${key}`,
+    ck_wrap_ref: `e2e-wrap-${key}`,
+    kek_id: "e2e-kek",
+    kek_version: 1,
+    ready_at: "2026-09-24T12:00:00Z",
+  };
+}
+
+export const P2P_OWNER_VISUAL_FIXTURES = [
+  {
+    asset_id: "asset-p2p-processing",
+    title: "P2P Processing",
+    publication_id: "pub-p2p-processing",
+    lineage_id: "line-p2p-processing",
+    state: "processing",
+    descriptor: null,
+  },
+  {
+    asset_id: "asset-p2p-ready",
+    title: "P2P Ready",
+    publication_id: "pub-p2p-ready",
+    lineage_id: "line-p2p-ready",
+    state: "ready",
+    descriptor: p2pVisualDescriptor("ready"),
+  },
+  {
+    asset_id: "asset-p2p-failed",
+    title: "P2P Failed",
+    publication_id: "pub-p2p-failed",
+    lineage_id: "line-p2p-failed",
+    state: "failed",
+    descriptor: null,
+  },
+];
+
+function p2pVisualInboxItem(key, {
+  status = "claimed",
+  authorizationActive = true,
+  descriptor = p2pVisualDescriptor(key),
+} = {}) {
+  return {
+    invitation: {
+      id: `invite-p2p-${key}`,
+      asset_id: `asset-p2p-${key}`,
+      publication_id: `pub-p2p-${key}`,
+      lineage_id: `line-p2p-${key}`,
+      owner_subject_id: "e2e-owner",
+      status,
+      expires_at_unix: status === "expired" ? 1704067200 : 1893456000,
+      claimed_at_unix: 1770000000,
+    },
+    authorization: {
+      id: `auth-p2p-${key}`,
+      invitation_id: `invite-p2p-${key}`,
+      asset_id: `asset-p2p-${key}`,
+      publication_id: `pub-p2p-${key}`,
+      lineage_id: `line-p2p-${key}`,
+      viewer_subject_id: P2P_VISUAL_USER_ID,
+      device_id: "device-p2p-visual",
+      expires_at_unix: status === "expired" ? 1704067200 : 1893456000,
+    },
+    authorization_active: authorizationActive,
+    descriptor,
+  };
+}
+
+export const P2P_INBOX_VISUAL_FIXTURES = [
+  p2pVisualInboxItem("pending"),
+  p2pVisualInboxItem("syncing"),
+  p2pVisualInboxItem("sync-error"),
+  p2pVisualInboxItem("available"),
+  p2pVisualInboxItem("expired", { status: "expired", authorizationActive: false }),
+];
+
+
 // Session used for the non-member EC-2 / SC-MEMBER-2 fixture.
 export const NON_MEMBER_SESSION = "e2e-non-member-session";
 export const NON_MEMBER_BEARER = "e2e-non-member-bearer";
@@ -162,6 +247,20 @@ function getAssetSeedMode(req, tokenModes) {
   return tokenModes.get(token)?.assetSeed ?? "default";
 }
 
+function getP2pSeedMode(req, tokenModes) {
+  const token = extractBearer(req);
+  if (!token) return "off";
+  return tokenModes.get(token)?.p2pSeed ?? "off";
+}
+
+function isP2pSeedMode(value) {
+  return ["states", "empty", "error", "loading"].includes(value);
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export function createMockGatewayServer({
   host = DEFAULT_HOST,
   port = DEFAULT_PORT,
@@ -204,7 +303,7 @@ export function createMockGatewayServer({
       // the Maestro phase seeds the mode BEFORE launching the app, and the app
       // logs in on launch. Overwriting here would wipe the seeded mode.
       if (!tokenModes.has(E2E_BEARER_TOKEN)) {
-        tokenModes.set(E2E_BEARER_TOKEN, { assetSeed: "default" });
+        tokenModes.set(E2E_BEARER_TOKEN, { assetSeed: "default", p2pSeed: "off" });
       }
       logger.log?.(`[mock-gateway] login ok -> token=${E2E_BEARER_TOKEN}`);
       return sendJson(res, 200, {
@@ -238,13 +337,39 @@ export function createMockGatewayServer({
     if (req.method === "POST" && url.pathname === "/e2e/seed") {
       const assetSeed = url.searchParams.get("asset_seed") === "empty" ? "empty" : "default";
       const ingestSeed = url.searchParams.get("ingest_seed") === "no_rights" ? "no_rights" : undefined;
-      tokenModes.set(E2E_BEARER_TOKEN, { assetSeed, ingestSeed });
-      logger.log?.(`[mock-gateway] e2e/seed asset_seed=${assetSeed} ingest_seed=${ingestSeed}`);
-      return sendJson(res, 200, { ok: true, asset_seed: assetSeed });
+      const requestedP2pSeed = url.searchParams.get("p2p_seed");
+      const p2pSeed = isP2pSeedMode(requestedP2pSeed) ? requestedP2pSeed : "off";
+      tokenModes.set(E2E_BEARER_TOKEN, { assetSeed, ingestSeed, p2pSeed });
+      logger.log?.(
+        `[mock-gateway] e2e/seed asset_seed=${assetSeed} ingest_seed=${ingestSeed} p2p_seed=${p2pSeed}`,
+      );
+      return sendJson(res, 200, { ok: true, asset_seed: assetSeed, p2p_seed: p2pSeed });
     }
 
     if (url.pathname.startsWith("/api/") && !hasAuth(req)) {
       return sendJson(res, 401, { error: "missing_auth" });
+    }
+
+
+    if (
+      req.method === "GET" &&
+      (url.pathname === "/api/p2p/content" || url.pathname === "/api/p2p/inbox")
+    ) {
+      const p2pSeed = getP2pSeedMode(req, tokenModes);
+      if (p2pSeed === "loading") await delay(15000);
+      if (p2pSeed === "error") {
+        return sendJson(res, 503, { error: "p2p_visual_fixture_error" });
+      }
+      if (p2pSeed === "empty" || p2pSeed === "loading" || p2pSeed === "off") {
+        return sendJson(res, 200, []);
+      }
+      return sendJson(
+        res,
+        200,
+        url.pathname === "/api/p2p/content"
+          ? P2P_OWNER_VISUAL_FIXTURES
+          : P2P_INBOX_VISUAL_FIXTURES,
+      );
     }
 
     if (req.method === "GET" && url.pathname === "/api/assets") {

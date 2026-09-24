@@ -11,6 +11,8 @@ import {
   SEED_AUDIT_EVENTS,
   SEED_RIGHTS_RECORDS,
   SEED_REVIEW_TASK,
+  P2P_OWNER_VISUAL_FIXTURES,
+  P2P_INBOX_VISUAL_FIXTURES,
   createMockGatewayServer,
 } from "./mock-gateway-server.mjs";
 
@@ -538,5 +540,60 @@ test("mock gateway rejects push-token with missing or invalid platform", async (
       body: JSON.stringify({ token: "   ", platform: "android" }),
     });
     assert.equal(emptyToken.status, 422);
+  });
+});
+
+
+test("mock gateway serves deterministic P2P visual state fixtures through bearer auth", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const seedResponse = await fetch(`${baseUrl}/e2e/seed?p2p_seed=states`, {
+      method: "POST",
+    });
+    assert.equal(seedResponse.status, 200);
+    assert.equal((await seedResponse.json()).p2p_seed, "states");
+
+    const loginResponse = await fetch(`${baseUrl}/auth/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "e2e@dubbridge.dev", password: "e2etestpass123" }),
+    });
+    const { token } = await loginResponse.json();
+    const headers = { authorization: `Bearer ${token}` };
+
+    const contentResponse = await fetch(`${baseUrl}/api/p2p/content`, { headers });
+    const inboxResponse = await fetch(`${baseUrl}/api/p2p/inbox`, { headers });
+
+    assert.equal(contentResponse.status, 200);
+    assert.deepEqual(await contentResponse.json(), P2P_OWNER_VISUAL_FIXTURES);
+    assert.equal(inboxResponse.status, 200);
+    assert.deepEqual(await inboxResponse.json(), P2P_INBOX_VISUAL_FIXTURES);
+  });
+});
+
+test("mock gateway P2P visual fixture mode can return empty and error surfaces", async () => {
+  await withServer(async ({ baseUrl }) => {
+    const login = async () => {
+      const response = await fetch(`${baseUrl}/auth/login`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "e2e@dubbridge.dev", password: "e2etestpass123" }),
+      });
+      return (await response.json()).token;
+    };
+
+    await fetch(`${baseUrl}/e2e/seed?p2p_seed=empty`, { method: "POST" });
+    let token = await login();
+    let response = await fetch(`${baseUrl}/api/p2p/content`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), []);
+
+    await fetch(`${baseUrl}/e2e/seed?p2p_seed=error`, { method: "POST" });
+    token = await login();
+    response = await fetch(`${baseUrl}/api/p2p/inbox`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(response.status, 503);
   });
 });

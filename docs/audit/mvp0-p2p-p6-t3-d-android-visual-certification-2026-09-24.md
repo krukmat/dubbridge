@@ -77,3 +77,21 @@ executed only through bounded leaves:
 
 Owner authorization for this envelope is the explicit 2026-09-24 directive
 `sigue con tu plan`.
+
+
+## D2 implementation
+
+D2 adds two deterministic fixture inputs without changing product projection
+logic:
+
+- mock gateway `p2p_seed=states|empty|error|loading` modes for the real
+  `/api/p2p/content` and `/api/p2p/inbox` clients;
+- `P2PVisualFixtureHarness`, enabled only by
+  `EXPO_PUBLIC_P2P_VISUAL_FIXTURES=true`, which writes fixed non-secret
+  DOWNLOADING / FAILED / verified READY snapshots through
+  `ExpoP2pSyncCache`.
+
+`InvitesModel`, authorization, P4 verified-handle creation and P5 playback
+remain untouched. The visual harness does not create manifests, ciphertext,
+keys or playback material; Available is therefore a visual projection only and
+D4 must not use its Play button as E2E playback evidence.
