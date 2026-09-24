@@ -10,16 +10,14 @@ import {
   type ViewerInboxProjection,
 } from "./InvitesModel";
 
-type RefreshInbox = () => Promise<void>;
-
-export function useInvitesActions(gatewayBaseUrl: string, refreshInbox: RefreshInbox) {
+export function useInvitesActions(gatewayBaseUrl: string, refreshInbox: () => Promise<void>) {
   return {
     ...useClaimAction(gatewayBaseUrl, refreshInbox),
     ...useSyncAction(refreshInbox),
   };
 }
 
-function useClaimAction(gatewayBaseUrl: string, refreshInbox: RefreshInbox) {
+function useClaimAction(gatewayBaseUrl: string, refreshInbox: () => Promise<void>) {
   const auth = useAuth();
   const audience = useMemo(
     () => new P2PAudienceService(createGatewayClient({ gatewayBaseUrl })), [gatewayBaseUrl],
@@ -60,7 +58,7 @@ async function runClaim(
   accessToken: string,
   token: string,
   auth: ReturnType<typeof useAuth>,
-  refreshInbox: RefreshInbox,
+  refreshInbox: () => Promise<void>,
   setClaimToken: (value: string) => void,
   setClaimError: (value: string | null) => void,
 ) {
@@ -83,7 +81,7 @@ async function runClaim(
   }
 }
 
-function useSyncAction(refreshInbox: RefreshInbox) {
+function useSyncAction(refreshInbox: () => Promise<void>) {
   const auth = useAuth();
   const syncController = useP2PSyncController();
   const inFlight = useRef(new Set<string>());
@@ -99,7 +97,12 @@ function useSyncAction(refreshInbox: RefreshInbox) {
 
     inFlight.current.add(key);
     updateBusy(setBusyInvites, projection.item.invitation.id, true);
-    clearSyncError(setSyncErrors, projection.item.invitation.id);
+    setSyncErrors((current) => {
+      if (!(projection.item.invitation.id in current)) return current;
+      const next = { ...current };
+      delete next[projection.item.invitation.id];
+      return next;
+    });
     try {
       await syncController.startSync(descriptor, accountScope!);
     } catch {
@@ -126,18 +129,6 @@ function updateBusy(
     const next = new Set(current);
     if (busy) next.add(invitationId);
     else next.delete(invitationId);
-    return next;
-  });
-}
-
-function clearSyncError(
-  setter: React.Dispatch<React.SetStateAction<Readonly<Record<string, string>>>>,
-  invitationId: string,
-) {
-  setter((current) => {
-    if (!(invitationId in current)) return current;
-    const next = { ...current };
-    delete next[invitationId];
     return next;
   });
 }
