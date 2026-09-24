@@ -9,7 +9,7 @@ behavioral_coverage_contract: behavior-v2
 
 # P6 — planning task ledger
 
-**Status:** **In progress. P6.T0 PASS 2026-09-22; P6.T1 PASS 2026-09-23.** T1 closed under the standing MVP0-P2P owner review exception with owner self-review/approval and green exact-head CI evidence. **P6.T2 is ACTIVATED 2026-09-23: T2.A PASS; decomposed implementation blocks T2.B–H are frozen but not started. P6.T3 remains blocked on T2 PASS.**
+**Status:** **In progress. P6.T0 PASS 2026-09-22; P6.T1 PASS 2026-09-23.** T1 closed under the standing MVP0-P2P owner review exception with owner self-review/approval and green exact-head CI evidence. **P6.T2 is IN PROGRESS: T2.A/B/C PASS; T2.D–H remain pending. P6.T3 remains blocked on T2 PASS.**
 **Phase gate:** **SATISFIED 2026-09-22 — P3 PASS + P4 PASS + P5-DEV.** P5.T3/P5-CERT is not an activation prerequisite.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
@@ -19,7 +19,7 @@ behavioral_coverage_contract: behavior-v2
 |---|---|---|---|---|---|
 | P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **PASS 2026-09-22 — owner-verified; c6ce2039 15/15 CI** |
 | P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **PASS 2026-09-23 — T1.A–H closed; owner-reviewed; REVIEW-OVERRIDE applied** |
-| P6.T2 | Viewer claim, Invites, sync and play actions | development | XL parent / decomposed leaves | T1 PASS | **IN PROGRESS — T2.A PASS; T2.B–H pending** |
+| P6.T2 | Viewer claim, Invites, sync and play actions | development | XL parent / decomposed leaves | T1 PASS | **IN PROGRESS — T2.A/B/C PASS; T2.D–H pending** |
 | P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | Planned; not activated |
 
 
@@ -133,7 +133,7 @@ Required passes: 3 (RRI 55 → Med-high).
 
 **Depends on:** T1 PASS
 
-**Status:** **IN PROGRESS — T2.A activation PASS 2026-09-23; T2.B–H pending.** Parent RRI **100 / Very high**; source implementation is prohibited at parent scope and must execute only through the frozen decomposed leaves below.
+**Status:** **IN PROGRESS — T2.A/B/C PASS; T2.D–H pending.** Parent RRI **100 / Very high**; source implementation remains prohibited at parent scope and continues only through the frozen leaves below.
 
 **Acceptance criteria:** Connect claim/inbox, verified sync and existing playback through the frozen state model; handle expiry, loading/retry and account changes.
 
@@ -156,8 +156,8 @@ downstream input to its consuming phase before claiming closure.
 | Block | Scope | RRI | Status |
 |---|---|---:|---|
 | T2.A | Activation, exact scope, parent/leaf RRI, dependency freeze | docs-only activation | **PASS** |
-| T2.B | Authoritative viewer inbox + product-state projection | 55 / Med-high | Pending |
-| T2.C | Manual Claim via existing P3 audience capability | 55 / Med-high | Pending |
+| T2.B | Authoritative viewer inbox + product-state projection | 55 / Med-high | **PASS 2026-09-24 — `19a5bca9`, 15/15 CI** |
+| T2.C | Manual Claim via existing P3 audience capability | 55 / Med-high | **PASS 2026-09-24 — `c104d40a`, 15/15 CI** |
 | T2.D | Sync / Retry Sync via existing P4 controller | 55 / Med-high | Pending |
 | T2.E | Available + Play via verified P4 handle and existing P5 controller/view | 55 / Med-high | Pending |
 | T2.F | Fail-closed expiry/session/account lifecycle | 55 / Med-high | Pending |
@@ -166,6 +166,16 @@ downstream input to its consuming phase before claiming closure.
 
 Activation evidence:
 `docs/audit/mvp0-p2p-p6-t2-activation-2026-09-23.md`.
+
+### T2.B/C implementation evidence
+
+Evidence: `docs/audit/mvp0-p2p-p6-t2-bc-inbox-claim-2026-09-24.md`.
+
+- **T2.B PASS:** authoritative `/api/p2p/inbox` projection joined with P4 local sync facts, including Pending / Syncing / Sync error / Available / Expired precedence, loading/empty/error/retry states and other-viewer fail-closed filtering. Exact implementation head `19a5bca9`, Actions run `36019060607`: **15/15 PASS**; mobile **64/64 suites, 481/481 tests**.
+- **T2.C PASS:** manual raw-token Claim delegates only to `P2PAudienceService.claimInvitation()`; blank/double submit is blocked, success rotates session + clears the token + refreshes the authoritative inbox, claim errors remain fail-closed, session expiry logs out, and remount cannot recover the raw token. Exact implementation head `c104d40a`, Actions run `36022359070`: **15/15 PASS**; mobile **64/64 suites, 489/489 tests**.
+- Owner approved execution of P6.T2.C before implementation. Aggregate T2 owner verification remains a T2.H closure obligation.
+- Claim success does **not** directly produce Available or Play; T2.D/E retain the P4/P5 gates.
+- HPKE emulator remains disabled.
 
 ### T2 frozen source ownership
 

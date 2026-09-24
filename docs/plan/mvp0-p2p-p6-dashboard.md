@@ -7,7 +7,7 @@ slice: MVP0-P2P
 
 # P6 — Minimal My Content and Invites dashboard
 
-Task ledger: `docs/tasks/mvp0-p2p-p6-dashboard.md`. **Activation gate satisfied 2026-09-22. P6.T0 PASS. P6.T1 PASS 2026-09-23:** T1.A–H are closed; the standing MVP0-P2P owner-directed review exception replaces phase-1/phase-2 peer review, and owner Matias Kruk explicitly reviewed and approved T1. Functional/evidence head `b6df0a7f` completed 15/15 CI, mobile 63/63 suites / 461/461 tests and 90.43% workspace line coverage. **P6.T2 is ACTIVATED 2026-09-23 with T2.A PASS; decomposed leaves T2.B–H are frozen/pending. P6.T3 remains blocked.** P5.T3 is deferred to release certification.
+Task ledger: `docs/tasks/mvp0-p2p-p6-dashboard.md`. **Activation gate satisfied 2026-09-22. P6.T0 PASS. P6.T1 PASS 2026-09-23:** T1.A–H are closed; the standing MVP0-P2P owner-directed review exception replaces phase-1/phase-2 peer review, and owner Matias Kruk explicitly reviewed and approved T1. Functional/evidence head `b6df0a7f` completed 15/15 CI, mobile 63/63 suites / 461/461 tests and 90.43% workspace line coverage. **P6.T2 is IN PROGRESS with T2.A/B/C PASS; T2.D–H remain pending. P6.T3 remains blocked.** P5.T3 is deferred to release certification.
 
 ## Objective
 
@@ -39,7 +39,7 @@ Freeze state projection and action eligibility from canonical backend and runtim
 |---|---|---|---|---|---|
 | P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **PASS 2026-09-22** |
 | P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **PASS 2026-09-23 — A–H closed; RRI 55 Med-high; owner-reviewed + REVIEW-OVERRIDE** |
-| P6.T2 | Viewer claim, Invites, sync and play actions | development | XL parent / decomposed | T1 PASS | **IN PROGRESS — T2.A PASS; B–H pending** |
+| P6.T2 | Viewer claim, Invites, sync and play actions | development | XL parent / decomposed | T1 PASS | **IN PROGRESS — T2.A/B/C PASS; D–H pending** |
 | P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | Planned; not activated |
 
 
@@ -166,3 +166,14 @@ T2.A verified T1 PASS and the existing P3/P4/P5 seams before source work:
 The coherent parent scores **RRI 100 / Very high**, driven by combining authorization precedence, async P4 sync state, P5 playback and account/session lifecycle. It must not execute as one patch. The decomposition is frozen as T2.B–T2.H; B–G each score 55 / Med-high because each is limited to UI-level projection/orchestration over an existing capability, while T2.H is 25 / Low evidence/closure work.
 
 No P3/P4/P5 capability implementation is reopened. HPKE emulator remains disabled.
+
+
+### P6.T2 B/C result — 2026-09-24
+
+Evidence: `docs/audit/mvp0-p2p-p6-t2-bc-inbox-claim-2026-09-24.md`.
+
+T2.B is PASS on `19a5bca9` / run `36019060607` (15/15 CI; mobile 64/64 suites, 481/481 tests). It adds the authoritative viewer inbox projection over existing P3/P4 facts without reopening those capability owners.
+
+T2.C is PASS on `c104d40a` / run `36022359070` (15/15 CI; mobile 64/64 suites, 489/489 tests). Manual Claim keeps the raw token in volatile React state, delegates to existing P3 audience capability, refreshes the authoritative inbox after success, and does not infer Available/Play.
+
+P6.T2 remains IN PROGRESS. **T2.D — Sync / Retry Sync** is the next frozen leaf; T2.E–H remain pending. HPKE emulator remains disabled.
