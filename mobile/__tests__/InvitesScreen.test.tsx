@@ -223,7 +223,7 @@ describe("InvitesScreen T2.B", () => {
     });
     mockSyncController.getSyncState.mockResolvedValue(snapshot("READY", true));
 
-    const { getByText, getByTestId } = render(
+    const { getByText, getByTestId } = await render(
       <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
     );
 
@@ -244,7 +244,7 @@ describe("InvitesScreen T2.B", () => {
       value: { data: [rawInboxItem({ descriptor: null })], sessionRotation: null },
     });
 
-    const { getByText } = render(
+    const { getByText } = await render(
       <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
     );
 
@@ -261,7 +261,7 @@ describe("InvitesScreen T2.B", () => {
       },
     });
 
-    const { getByTestId, queryByTestId } = render(
+    const { getByTestId, queryByTestId } = await render(
       <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
     );
 
@@ -276,7 +276,7 @@ describe("InvitesScreen T2.B", () => {
       value: { data: [], sessionRotation: null },
     });
 
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
     );
 
@@ -294,7 +294,7 @@ describe("InvitesScreen T2.B", () => {
         value: { data: [rawInboxItem({ descriptor: null })], sessionRotation: null },
       });
 
-    const { getByTestId, getByText } = render(
+    const { getByTestId, getByText } = await render(
       <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
     );
 
@@ -312,7 +312,7 @@ describe("InvitesScreen T2.B", () => {
       error: { kind: "session_expired" },
     });
 
-    render(<InvitesScreen gatewayBaseUrl="http://localhost:3000" />);
+    await render(<InvitesScreen gatewayBaseUrl="http://localhost:3000" />);
 
     await waitFor(() => expect(mockAuthValue.logout).toHaveBeenCalledTimes(1));
   });
@@ -324,7 +324,7 @@ describe("InvitesScreen T2.B", () => {
     });
     mockSyncController.getSyncState.mockRejectedValue(new Error("cache unavailable"));
 
-    const { getByTestId, getByText } = render(
+    const { getByTestId, getByText } = await render(
       <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
     );
 
