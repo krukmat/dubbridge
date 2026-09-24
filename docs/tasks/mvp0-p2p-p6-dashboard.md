@@ -292,7 +292,7 @@ HPKE emulator remains disabled and outside P6.T2.
 
 **Depends on:** T2 PASS
 
-**Status:** **IN PROGRESS 2026-09-24.** First block T3.A + T3.B activated; final Android visual certification remains pending.
+**Status:** **IN PROGRESS 2026-09-24.** T3.A + T3.B PASS on `3474b8b` / Actions `36041983233` (15/15); T3.C is active. Final Android visual certification remains pending.
 
 **Acceptance criteria:** Certify all P6 parent HP/EC with component/integration and Android flow evidence; inspect loading/empty/error/expired states against DESIGN.md and shipped tokens.
 
@@ -338,3 +338,30 @@ Block 3 evidence (T1.F+G):
 
 T1.H closure evidence:
 `docs/audit/mvp0-p2p-p6-t1-certification-candidate-2026-09-23.md`.
+
+
+### T3.A+B closure evidence
+
+- Exact head: `3474b8b2a09f287076aa8dd3ed27c1b2e1f528a1`.
+- GitHub Actions run `36041983233`: **15/15 PASS**.
+- Home groups the two existing P2P routes under one `P2P sharing` section without changing route ownership or testIDs.
+- `P2pStatusBadge` is the single presentation path for owner Processing/Ready/Failed and viewer Pending/Syncing/Sync error/Available/Expired.
+- No P3/P4/P5 authority, API, storage, sync verification or playback invariant changed.
+
+### T3.C activation — loading / empty / error visual pass
+
+A concrete DESIGN.md drift was found: `StateView` documents that scroll
+containers need `flexGrow: 1` for centered operational states. My Content was
+scrollable without that growth contract, while Invites was non-scrollable and
+could overflow when claim/list/playback content grows.
+
+T3.C therefore stays presentation-only:
+
+- My Content: retain scrolling and add a growing content container.
+- Invites: use the same scroll/grow screen contract.
+- Preserve the existing `StateView` loading/empty/error/retry behavior.
+- Add component assertions for the grow contract; do not change authority,
+  action eligibility, API behavior or P3/P4/P5 ownership.
+
+Bounded T3.C RRI: **25 / Low** (UI layout + tests only; no security/domain
+invariant change). HPKE emulator remains disabled.

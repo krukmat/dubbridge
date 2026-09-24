@@ -187,7 +187,7 @@ export function InvitesScreen({
   const claim = useInvitesActions(gatewayBaseUrl, refresh);
 
   return (
-    <Screen testID="invites-screen">
+    <Screen testID="invites-screen" scroll contentContainerStyle={styles.screenContent}>
       <ScreenHeader
         kicker="P2P" title="Invites"
         copy="Your claimed invitations and local availability."
@@ -219,6 +219,7 @@ export function InvitesScreen({
 }
 
 const styles = StyleSheet.create({
+  screenContent: { flexGrow: 1 },
   list: { gap: space.md, paddingBottom: space.xl },
   header: {
     flexDirection: "row",

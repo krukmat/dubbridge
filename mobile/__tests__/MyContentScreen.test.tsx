@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 import * as Clipboard from "expo-clipboard";
 
 import { createGatewayClient } from "../src/api/client";
@@ -382,6 +383,9 @@ describe("MyContentScreen", () => {
     const { getByTestId } = await renderScreen();
 
     await waitFor(() => expect(getByTestId("my-content-empty")).toBeTruthy());
+    expect(
+      StyleSheet.flatten(getByTestId("my-content-screen").props.contentContainerStyle).flexGrow,
+    ).toBe(1);
   });
 
   it("shows a retryable error and reloads owner content", async () => {

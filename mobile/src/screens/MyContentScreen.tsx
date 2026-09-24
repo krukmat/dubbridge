@@ -144,7 +144,7 @@ export function MyContentScreen({ gatewayBaseUrl, onBack }: MyContentScreenProps
     useMyContentInvite(gatewayBaseUrl, refresh);
 
   return (
-    <Screen testID="my-content-screen" scroll>
+    <Screen testID="my-content-screen" scroll contentContainerStyle={styles.screenContent}>
       <ScreenHeader
         kicker="P2P"
         title="My content"
@@ -199,6 +199,7 @@ export function MyContentScreen({ gatewayBaseUrl, onBack }: MyContentScreenProps
 }
 
 const styles = StyleSheet.create({
+  screenContent: { flexGrow: 1 },
   list: { gap: space.md, paddingBottom: space.xl },
   cardHeader: {
     flexDirection: "row",

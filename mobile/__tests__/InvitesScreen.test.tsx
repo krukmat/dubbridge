@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 
 import { createGatewayClient } from "../src/api/client";
 import type { P2pReadyDescriptor } from "../src/api/p2p";
@@ -336,6 +337,9 @@ describe("InvitesScreen T2.B", () => {
     const { getByTestId } = await renderInvitesScreen();
 
     await waitFor(() => expect(getByTestId("invites-empty")).toBeTruthy());
+    expect(
+      StyleSheet.flatten(getByTestId("invites-screen").props.contentContainerStyle).flexGrow,
+    ).toBe(1);
   });
 
   it("shows a retryable API error and reloads the authoritative inbox", async () => {

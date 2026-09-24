@@ -89,3 +89,15 @@ The owner directive to work this first block also authorizes the implementation.
 - backend/API/schema changes;
 - changes to P3/P4/P5 authority;
 - HPKE emulator enablement.
+
+
+## Closure evidence
+
+T3.A+B closed PASS on exact head
+`3474b8b2a09f287076aa8dd3ed27c1b2e1f528a1`.
+
+GitHub Actions run `36041983233`: **15/15 PASS**, including mobile,
+maintainability, fmt, clippy, test, coverage, roadmap-drift and QA-docs.
+
+The canonical status layer remains presentation-only and Home retains the
+existing authenticated navigation contract.
