@@ -179,6 +179,10 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
+function renderInvitesScreen() {
+  return render(<InvitesScreen gatewayBaseUrl="http://localhost:3000" />);
+}
+
 describe("InvitesModel", () => {
   it.each([
     ["inactive authorization wins over local READY", inboxItem({ authorizationActive: false }), snapshot("READY", true), "expired", "none"],
@@ -231,9 +235,7 @@ describe("InvitesScreen T2.B", () => {
     });
     mockSyncController.getSyncState.mockResolvedValue(snapshot("READY", true));
 
-    const { getByText, getByTestId } = await render(
-      <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
-    );
+    const { getByText, getByTestId } = await renderInvitesScreen();
 
     await waitFor(() => expect(getByText("Available")).toBeTruthy());
     expect(getByTestId("invite-row-invite-1")).toBeTruthy();
@@ -252,9 +254,7 @@ describe("InvitesScreen T2.B", () => {
       value: { data: [rawInboxItem({ descriptor: null })], sessionRotation: null },
     });
 
-    const { getByText } = await render(
-      <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
-    );
+    const { getByText } = await renderInvitesScreen();
 
     await waitFor(() => expect(getByText("Pending")).toBeTruthy());
     expect(mockSyncController.getSyncState).not.toHaveBeenCalled();
@@ -269,9 +269,7 @@ describe("InvitesScreen T2.B", () => {
       },
     });
 
-    const { getByTestId, queryByTestId } = await render(
-      <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
-    );
+    const { getByTestId, queryByTestId } = await renderInvitesScreen();
 
     await waitFor(() => expect(getByTestId("invites-empty")).toBeTruthy());
     expect(queryByTestId("invite-row-invite-1")).toBeNull();
@@ -284,9 +282,7 @@ describe("InvitesScreen T2.B", () => {
       value: { data: [], sessionRotation: null },
     });
 
-    const { getByTestId } = await render(
-      <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
-    );
+    const { getByTestId } = await renderInvitesScreen();
 
     await waitFor(() => expect(getByTestId("invites-empty")).toBeTruthy());
   });
@@ -302,9 +298,7 @@ describe("InvitesScreen T2.B", () => {
         value: { data: [rawInboxItem({ descriptor: null })], sessionRotation: null },
       });
 
-    const { getByTestId, getByText } = await render(
-      <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
-    );
+    const { getByTestId, getByText } = await renderInvitesScreen();
 
     await waitFor(() => expect(getByTestId("invites-error")).toBeTruthy());
     await act(async () => {
@@ -320,7 +314,7 @@ describe("InvitesScreen T2.B", () => {
       error: { kind: "session_expired" },
     });
 
-    await render(<InvitesScreen gatewayBaseUrl="http://localhost:3000" />);
+    await renderInvitesScreen();
 
     await waitFor(() => expect(mockAuthValue.logout).toHaveBeenCalledTimes(1));
   });
@@ -332,9 +326,7 @@ describe("InvitesScreen T2.B", () => {
     });
     mockSyncController.getSyncState.mockRejectedValue(new Error("cache unavailable"));
 
-    const { getByTestId, getByText } = await render(
-      <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
-    );
+    const { getByTestId, getByText } = await renderInvitesScreen();
 
     await waitFor(() => expect(getByTestId("invites-error")).toBeTruthy());
     expect(getByText("Could not read local P2P availability.")).toBeTruthy();
@@ -366,9 +358,7 @@ describe("InvitesScreen T2.C manual Claim", () => {
       },
     });
 
-    const { getByTestId, getByText, queryByText } = await render(
-      <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
-    );
+    const { getByTestId, getByText, queryByText } = await renderInvitesScreen();
     await waitFor(() => expect(getByTestId("invites-empty")).toBeTruthy());
 
     fireEvent.changeText(getByTestId("invites-claim-token"), "  raw-claim-token  ");
@@ -390,9 +380,7 @@ describe("InvitesScreen T2.C manual Claim", () => {
       value: { data: [], sessionRotation: null },
     });
 
-    const { getByTestId } = await render(
-      <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
-    );
+    const { getByTestId } = await renderInvitesScreen();
     await waitFor(() => expect(getByTestId("invites-empty")).toBeTruthy());
 
     const submit = getByTestId("invites-claim-submit");
@@ -413,9 +401,7 @@ describe("InvitesScreen T2.C manual Claim", () => {
       }),
     );
 
-    const { getByTestId } = await render(
-      <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
-    );
+    const { getByTestId } = await renderInvitesScreen();
     await waitFor(() => expect(getByTestId("invites-empty")).toBeTruthy());
     fireEvent.changeText(getByTestId("invites-claim-token"), "one-token");
 
@@ -448,9 +434,7 @@ describe("InvitesScreen T2.C manual Claim", () => {
       error: { kind: "http", status },
     });
 
-    const { getByTestId, getByText } = await render(
-      <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
-    );
+    const { getByTestId, getByText } = await renderInvitesScreen();
     await waitFor(() => expect(getByTestId("invites-empty")).toBeTruthy());
     fireEvent.changeText(getByTestId("invites-claim-token"), "bad-token");
 
@@ -473,9 +457,7 @@ describe("InvitesScreen T2.C manual Claim", () => {
       error: { kind: "session_expired" },
     });
 
-    const { getByTestId } = await render(
-      <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
-    );
+    const { getByTestId } = await renderInvitesScreen();
     await waitFor(() => expect(getByTestId("invites-empty")).toBeTruthy());
     fireEvent.changeText(getByTestId("invites-claim-token"), "secret-token");
 
@@ -494,9 +476,7 @@ describe("InvitesScreen T2.C manual Claim", () => {
       value: { data: [], sessionRotation: null },
     });
 
-    const first = await render(
-      <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
-    );
+    const first = await renderInvitesScreen();
     await waitFor(() => expect(first.getByTestId("invites-empty")).toBeTruthy());
     fireEvent.changeText(first.getByTestId("invites-claim-token"), "transient-token");
     expect(first.getByTestId("invites-claim-token").props.value).toBe("transient-token");
@@ -504,9 +484,7 @@ describe("InvitesScreen T2.C manual Claim", () => {
       await first.unmount();
     });
 
-    const second = await render(
-      <InvitesScreen gatewayBaseUrl="http://localhost:3000" />,
-    );
+    const second = await renderInvitesScreen();
     await waitFor(() => expect(second.getByTestId("invites-empty")).toBeTruthy());
     expect(second.getByTestId("invites-claim-token").props.value).toBe("");
     expect(mockClaimInvitation).not.toHaveBeenCalled();
