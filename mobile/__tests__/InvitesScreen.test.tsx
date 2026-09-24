@@ -362,10 +362,9 @@ describe("InvitesScreen T2.C manual Claim", () => {
     await waitFor(() => expect(getByTestId("invites-empty")).toBeTruthy());
 
     fireEvent.changeText(getByTestId("invites-claim-token"), "  raw-claim-token  ");
-    await act(async () => {
-      fireEvent.press(getByTestId("invites-claim-submit"));
-    });
+    fireEvent.press(getByTestId("invites-claim-submit"));
 
+    await waitFor(() => expect(mockClaimInvitation).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(getByText("Pending")).toBeTruthy());
     expect(mockClaimInvitation).toHaveBeenCalledWith("session-p6", "raw-claim-token");
     expect(mockAuthValue.onSessionRotation).toHaveBeenCalledWith("claim-rotation");
@@ -412,12 +411,13 @@ describe("InvitesScreen T2.C manual Claim", () => {
     fireEvent.press(getByTestId("invites-claim-submit"));
     expect(mockClaimInvitation).toHaveBeenCalledTimes(1);
 
-    await act(async () => {
-      resolveClaim?.({
-        ok: false,
-        error: { kind: "network", message: "offline" },
-      });
+    resolveClaim?.({
+      ok: false,
+      error: { kind: "network", message: "offline" },
     });
+    await waitFor(() =>
+      expect(getByTestId("invites-claim-error")).toBeTruthy(),
+    );
   });
 
   it.each([
@@ -438,9 +438,7 @@ describe("InvitesScreen T2.C manual Claim", () => {
     await waitFor(() => expect(getByTestId("invites-empty")).toBeTruthy());
     fireEvent.changeText(getByTestId("invites-claim-token"), "bad-token");
 
-    await act(async () => {
-      fireEvent.press(getByTestId("invites-claim-submit"));
-    });
+    fireEvent.press(getByTestId("invites-claim-submit"));
 
     await waitFor(() => expect(getByText(message)).toBeTruthy());
     expect(getByTestId("invites-empty")).toBeTruthy();
@@ -461,9 +459,7 @@ describe("InvitesScreen T2.C manual Claim", () => {
     await waitFor(() => expect(getByTestId("invites-empty")).toBeTruthy());
     fireEvent.changeText(getByTestId("invites-claim-token"), "secret-token");
 
-    await act(async () => {
-      fireEvent.press(getByTestId("invites-claim-submit"));
-    });
+    fireEvent.press(getByTestId("invites-claim-submit"));
 
     await waitFor(() => expect(mockAuthValue.logout).toHaveBeenCalledTimes(1));
     expect(getByTestId("invites-claim-token").props.value).toBe("");
@@ -480,9 +476,7 @@ describe("InvitesScreen T2.C manual Claim", () => {
     await waitFor(() => expect(first.getByTestId("invites-empty")).toBeTruthy());
     fireEvent.changeText(first.getByTestId("invites-claim-token"), "transient-token");
     expect(first.getByTestId("invites-claim-token").props.value).toBe("transient-token");
-    await act(async () => {
-      await first.unmount();
-    });
+    await first.unmount();
 
     const second = await renderInvitesScreen();
     await waitFor(() => expect(second.getByTestId("invites-empty")).toBeTruthy());
