@@ -300,6 +300,7 @@ function DashboardContent({
   onOpenReview,
   onOpenOrganizations,
   onOpenMyContent,
+  onOpenInvites,
   onLogout,
 }: {
   dashState: Extract<HomeDashboardState, { kind: "ready" }>;
@@ -308,6 +309,7 @@ function DashboardContent({
   onOpenReview: () => void;
   onOpenOrganizations: () => void;
   onOpenMyContent: () => void;
+  onOpenInvites: () => void;
   onLogout: () => Promise<void>;
 }) {
   return (
