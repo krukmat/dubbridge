@@ -90,8 +90,8 @@ function useSyncAction(refreshInbox: () => Promise<void>) {
 
   const syncInvitation = useCallback(async (projection: ViewerInboxProjection) => {
     const descriptor = projection.item.descriptor;
-    const accountScope = auth.userId;
-    if (!descriptor || !canStartViewerSync(projection, accountScope)) return;
+    const accountScope = auth.userId ?? null;
+    if (!descriptor || !accountScope || !canStartViewerSync(projection, accountScope)) return;
     const key = `${descriptor.publicationId}/${descriptor.lineageId}`;
     if (inFlight.current.has(key)) return;
 
@@ -104,7 +104,7 @@ function useSyncAction(refreshInbox: () => Promise<void>) {
       return next;
     });
     try {
-      await syncController.startSync(descriptor, accountScope!);
+      await syncController.startSync(descriptor, accountScope);
     } catch {
       setSyncErrors((current) => ({
         ...current,
