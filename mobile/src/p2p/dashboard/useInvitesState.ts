@@ -21,52 +21,17 @@ export function useInvitesState(gatewayBaseUrl: string) {
     [gatewayBaseUrl],
   );
   const [viewState, setViewState] = useState<InvitesViewState>({ kind: "loading" });
-  const identity = `${auth.userId ?? ""}:${auth.sessionRef ?? ""}`;
+  const identity = authIdentity(auth.userId, auth.sessionRef);
   const identityRef = useRef(identity);
   identityRef.current = identity;
 
   const load = useCallback(async () => {
-    const requestIdentity = `${auth.userId ?? ""}:${auth.sessionRef ?? ""}`;
+    const requestIdentity = authIdentity(auth.userId, auth.sessionRef);
     const isCurrent = () => identityRef.current === requestIdentity;
-    if (!auth.sessionRef || !auth.userId) {
-      if (isCurrent()) setViewState({ kind: "error", message: "Session unavailable." });
-      return;
-    }
-
-    const result = await dashboard.listInbox(auth.sessionRef);
-    if (!result.ok) {
-      if (result.error.kind === "session_expired") {
-        if (isCurrent()) await auth.logout();
-        return;
-      }
-      if (isCurrent()) setViewState({ kind: "error", message: invitesErrorMessage(result.error) });
-      return;
-    }
-
-    if (!isCurrent()) return;
-    await auth.onSessionRotation(result.value.sessionRotation);
-    if (!isCurrent()) return;
-    try {
-      const joined = await Promise.all(
-        result.value.data.map((item) => readLocalSnapshot(item, auth.userId!, syncController)),
-      );
-      if (isCurrent()) setViewState(toInvitesViewState(joined, auth.userId));
-    } catch {
-      if (isCurrent()) {
-        setViewState({
-          kind: "error",
-          message: "Could not read local P2P availability.",
-        });
-      }
-    }
-  }, [
-    auth.logout,
-    auth.onSessionRotation,
-    auth.sessionRef,
-    auth.userId,
-    dashboard,
-    syncController,
-  ]);
+    await loadInvites({
+      auth, dashboard, syncController, isCurrent, setViewState,
+    });
+  }, [auth, dashboard, syncController]);
 
   useEffect(() => {
     setViewState({ kind: "loading" });
@@ -81,6 +46,80 @@ export function useInvitesState(gatewayBaseUrl: string) {
   return { viewState, retry, refresh: load };
 }
 
+async function loadInvites({
+  auth,
+  dashboard,
+  syncController,
+  isCurrent,
+  setViewState,
+}: {
+  auth: ReturnType<typeof useAuth>;
+  dashboard: P2PDashboardService;
+  syncController: ReturnType<typeof useP2PSyncController>;
+  isCurrent: () => boolean;
+  setViewState: React.Dispatch<React.SetStateAction<InvitesViewState>>;
+}) {
+  if (!auth.sessionRef || !auth.userId) {
+    commitState(isCurrent, setViewState, { kind: "error", message: "Session unavailable." });
+    return;
+  }
+  const result = await dashboard.listInbox(auth.sessionRef);
+  if (!result.ok) {
+    await handleInboxFailure(result.error, auth, isCurrent, setViewState);
+    return;
+  }
+  if (!isCurrent()) return;
+  await auth.onSessionRotation(result.value.sessionRotation);
+  if (!isCurrent()) return;
+  await projectInbox(result.value.data, auth.userId, syncController, isCurrent, setViewState);
+}
+
+async function handleInboxFailure(
+  error: { kind: string; message?: string; status?: number },
+  auth: ReturnType<typeof useAuth>,
+  isCurrent: () => boolean,
+  setViewState: React.Dispatch<React.SetStateAction<InvitesViewState>>,
+) {
+  if (!isCurrent()) return;
+  if (error.kind === "session_expired") {
+    await auth.logout();
+    return;
+  }
+  setViewState({ kind: "error", message: invitesErrorMessage(error) });
+}
+
+async function projectInbox(
+  items: P2pInboxItem[],
+  accountScope: string,
+  syncController: ReturnType<typeof useP2PSyncController>,
+  isCurrent: () => boolean,
+  setViewState: React.Dispatch<React.SetStateAction<InvitesViewState>>,
+) {
+  try {
+    const joined = await Promise.all(
+      items.map((item) => readLocalSnapshot(item, accountScope, syncController)),
+    );
+    commitState(isCurrent, setViewState, toInvitesViewState(joined, accountScope));
+  } catch {
+    commitState(isCurrent, setViewState, {
+      kind: "error",
+      message: "Could not read local P2P availability.",
+    });
+  }
+}
+
+function commitState(
+  isCurrent: () => boolean,
+  setViewState: React.Dispatch<React.SetStateAction<InvitesViewState>>,
+  state: InvitesViewState,
+) {
+  if (isCurrent()) setViewState(state);
+}
+
+function authIdentity(userId: string | null | undefined, sessionRef: string | null) {
+  return `${userId ?? ""}:${sessionRef ?? ""}`;
+}
+
 async function readLocalSnapshot(
   item: P2pInboxItem,
   accountScope: string,
@@ -89,7 +128,6 @@ async function readLocalSnapshot(
   if (!shouldReadViewerSyncState(item, accountScope) || item.descriptor === null) {
     return { item, snapshot: null };
   }
-
   const snapshot = await syncController.getSyncState({
     accountScope,
     publicationId: item.descriptor.publicationId,
