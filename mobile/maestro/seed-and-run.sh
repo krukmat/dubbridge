@@ -268,10 +268,10 @@ info "Bearer auth smoke check passed."
 # ---------------------------------------------------------------------------
 
 run_p2p_visual_suite() {
-  local out_states="/tmp/dubbridge-maestro-p2p-states-$"
-  local out_empty="/tmp/dubbridge-maestro-p2p-empty-$"
-  local out_error="/tmp/dubbridge-maestro-p2p-error-$"
-  local out_loading="/tmp/dubbridge-maestro-p2p-loading-$"
+  local out_states="/tmp/dubbridge-maestro-p2p-states-$$"
+  local out_empty="/tmp/dubbridge-maestro-p2p-empty-$$"
+  local out_error="/tmp/dubbridge-maestro-p2p-error-$$"
+  local out_loading="/tmp/dubbridge-maestro-p2p-loading-$$"
   mkdir -p "$out_states" "$out_empty" "$out_error" "$out_loading"
 
   info "P2P visual — canonical product states..."
