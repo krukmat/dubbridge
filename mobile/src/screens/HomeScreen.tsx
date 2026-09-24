@@ -392,6 +392,7 @@ export function HomeScreen({
           onOpenReview={onOpenReview}
           onOpenOrganizations={onOpenOrganizations}
           onOpenMyContent={onOpenMyContent}
+          onOpenInvites={onOpenInvites}
           onLogout={auth.logout}
         />
       ) : null}
