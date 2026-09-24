@@ -214,6 +214,13 @@ function renderInvitesScreen() {
   return render(<InvitesScreen gatewayBaseUrl="http://localhost:3000" />);
 }
 
+function mockInboxOnce(data: unknown[]) {
+  mockClient.get.mockResolvedValueOnce({
+    ok: true,
+    value: { data, sessionRotation: null },
+  });
+}
+
 describe("InvitesModel", () => {
   it.each([
     ["inactive authorization wins over local READY", inboxItem({ authorizationActive: false }), snapshot("READY", true), "expired", "none"],
@@ -847,15 +854,8 @@ describe("InvitesScreen T2.F fail-closed lifecycle", () => {
   }
 
   it("invalidates a visible Available item and playback session immediately on account change", async () => {
-    mockClient.get
-      .mockResolvedValueOnce({
-        ok: true,
-        value: { data: [rawInboxItem()], sessionRotation: null },
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        value: { data: [], sessionRotation: null },
-      });
+    mockInboxOnce([rawInboxItem()]);
+    mockInboxOnce([]);
     mockSyncController.getSyncState.mockResolvedValue(snapshot("READY", true));
     mockSyncController.getVerifiedPackageHandle.mockResolvedValue({
       accountScope: "viewer-1",
@@ -895,16 +895,12 @@ describe("InvitesScreen T2.F fail-closed lifecycle", () => {
 
   it("discards a late inbox response from the previous account", async () => {
     let resolveOldInbox: ((value: unknown) => void) | undefined;
-    mockClient.get
-      .mockImplementationOnce(
-        () => new Promise((resolve) => {
-          resolveOldInbox = resolve;
-        }),
-      )
-      .mockResolvedValueOnce({
-        ok: true,
-        value: { data: [], sessionRotation: null },
-      });
+    mockClient.get.mockImplementationOnce(
+      () => new Promise((resolve) => {
+        resolveOldInbox = resolve;
+      }),
+    );
+    mockInboxOnce([]);
 
     const view = await renderInvitesScreen();
     await waitFor(() => expect(mockClient.get).toHaveBeenCalledTimes(1));
@@ -926,15 +922,8 @@ describe("InvitesScreen T2.F fail-closed lifecycle", () => {
   });
 
   it("discards a verified-handle completion from the previous account before P5 startup", async () => {
-    mockClient.get
-      .mockResolvedValueOnce({
-        ok: true,
-        value: { data: [rawInboxItem()], sessionRotation: null },
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        value: { data: [], sessionRotation: null },
-      });
+    mockInboxOnce([rawInboxItem()]);
+    mockInboxOnce([]);
     mockSyncController.getSyncState.mockResolvedValue(snapshot("READY", true));
     let resolveHandle: ((value: unknown) => void) | undefined;
     mockSyncController.getVerifiedPackageHandle.mockImplementation(
@@ -971,15 +960,8 @@ describe("InvitesScreen T2.F fail-closed lifecycle", () => {
   });
 
   it("clears a raw Claim token when the authenticated account changes", async () => {
-    mockClient.get
-      .mockResolvedValueOnce({
-        ok: true,
-        value: { data: [], sessionRotation: null },
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        value: { data: [], sessionRotation: null },
-      });
+    mockInboxOnce([]);
+    mockInboxOnce([]);
 
     const view = await renderInvitesScreen();
     await waitFor(() => expect(view.getByTestId("invites-empty")).toBeTruthy());
