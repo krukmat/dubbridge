@@ -55,8 +55,14 @@ tags:
 - assertNotVisible:
     id: publish-action
 
-- tapOn:
+- assertVisible:
     id: review-approve
+
+# Tap the rendered button label rather than the RN testID wrapper. On Android,
+# Maestro can resolve a Pressable testID to an accessibility node whose bounds
+# do not match the actual tappable text surface.
+- tapOn:
+    text: "Approve"
 
 # The fixed Publish action is the functional postcondition of an approved
 # review. Do not depend on the summary badge text being inside the viewport.
