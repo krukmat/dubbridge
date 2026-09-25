@@ -1,4 +1,4 @@
-.PHONY: qa-fmt qa-lint qa-test qa-test-redis qa-test-s3 qa-check qa-local qa-p2p-preflight qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-python-complexity qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-docs-review qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review qa-golden-set show-codex-session-model install-hooks
+.PHONY: qa-fmt qa-lint qa-test qa-test-redis qa-test-s3 qa-check qa-local qa-p2p-preflight qa-t7local-maestro qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-python-complexity qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-docs-review qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review qa-golden-set show-codex-session-model install-hooks
 
 COVERAGE_MIN ?= 90
 PEER_REVIEW_RRI      ?= 22
@@ -92,9 +92,12 @@ qa-review-budget:
 # Mobile production-readiness + correctness: strict types, AST lint (no any /
 # console / debugger / ts-suppression), and the Jest suite. Replaces the former
 # regex production-readiness scan for the mobile surface.
-qa-mobile:
+qa-mobile: qa-t7local-maestro
 	cd mobile && npm run typecheck && npm run lint && npm test
 	python3 scripts/check-primary-label-usage.py
+
+qa-t7local-maestro:
+	bash mobile/maestro/t7local/check-harness.sh
 
 # DESIGN.md stays on an explicit opt-in gate for now because the Google CLI and
 # spec are still alpha and should not widen the main CI surface by default.

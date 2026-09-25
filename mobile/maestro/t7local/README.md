@@ -55,3 +55,29 @@ The real flows receive values at runtime through Maestro `-e` arguments:
   `T7LOCAL_REVIEW_TASK_ID`.
 
 Credentials must never be written to audit artifacts.
+
+## One-command B3 -> C4 execution
+
+Prerequisites: the normal Android development build is already installed with
+`EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL=http://10.0.2.2:8082`, Compose is healthy,
+and the preflight is PASS.
+
+From repo root:
+
+```bash
+bash mobile/maestro/t7local/run-real.sh
+```
+
+By default the runner creates a disposable real account through
+`POST /auth/register`. To reuse an existing real local account, provide both
+`T7LOCAL_EMAIL` and `T7LOCAL_PASSWORD`.
+
+Before ingestion, the runner creates a real organization/project and target
+language through supported API routes. After finalization it links the newly
+created asset to that project. This is setup through the product API, not DB
+seeding. The runner then fails closed unless the normal backend pipeline creates
+a real review task for that asset.
+
+The runner writes only non-secret identifiers to
+`/tmp/dubbridge-t7local-<run-id>/summary.env`. That summary is an input to the
+final A->E audit; it is not itself the certification artifact.

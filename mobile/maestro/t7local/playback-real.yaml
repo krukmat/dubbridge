@@ -1,0 +1,54 @@
+appId: com.dubbridge.mobile
+name: T7local real HLS playback
+tags:
+  - android
+  - s-230
+  - t7local
+---
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: login-screen
+    timeout: 20000
+
+- runFlow: login-real.yaml
+
+- assertVisible:
+    id: home-screen
+
+- tapOn:
+    id: home-open-assets
+
+- extendedWaitUntil:
+    visible:
+      id: asset-list-screen
+    timeout: 20000
+
+- extendedWaitUntil:
+    visible:
+      id: "asset-card-${T7LOCAL_ASSET_ID}"
+    timeout: 30000
+
+- tapOn:
+    id: "asset-card-${T7LOCAL_ASSET_ID}"
+
+- extendedWaitUntil:
+    visible:
+      id: asset-detail-screen
+    timeout: 20000
+
+- assertVisible:
+    id: asset-play-button
+
+- tapOn:
+    id: asset-play-button
+
+- extendedWaitUntil:
+    visible:
+      id: asset-inline-player
+    timeout: 30000
+
+- assertVisible:
+    id: asset-inline-player

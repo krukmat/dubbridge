@@ -1,0 +1,74 @@
+appId: com.dubbridge.mobile
+name: T7local real review and publication
+tags:
+  - android
+  - s-230
+  - t7local
+---
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: login-screen
+    timeout: 20000
+
+- runFlow: login-real.yaml
+
+- assertVisible:
+    id: home-screen
+
+- tapOn:
+    id: home-open-review
+
+- extendedWaitUntil:
+    visible:
+      id: review-inbox-screen
+    timeout: 30000
+
+- extendedWaitUntil:
+    visible:
+      id: "review-task-card-${T7LOCAL_REVIEW_TASK_ID}"
+    timeout: 30000
+
+- tapOn:
+    id: "review-task-card-${T7LOCAL_REVIEW_TASK_ID}"
+
+- extendedWaitUntil:
+    visible:
+      id: review-detail-screen
+    timeout: 20000
+
+- assertVisible:
+    id: review-player
+
+- assertNotVisible:
+    id: publish-action
+
+- tapOn:
+    id: review-approve
+
+- extendedWaitUntil:
+    visible:
+      text: "Approved"
+    timeout: 20000
+
+- assertVisible:
+    id: publish-action
+
+- tapOn:
+    id: publish-action
+
+- extendedWaitUntil:
+    notVisible:
+      id: publish-action
+    timeout: 20000
+
+- scrollUntilVisible:
+    element:
+      text: "Published.*"
+    direction: DOWN
+    timeout: 8000
+
+- assertVisible:
+    text: "Published.*"
