@@ -49,10 +49,10 @@ ledger.
 
 ## Task index
 
-> **MVP0-P2P DEV-HANDOFF — amended 2026-09-22, consolidated 2026-09-24:**
-> P3 PASS + P4 PASS + P5-DEV (P5.T0-T2 formally closed) + P6 PASS. P5.T3 is
-> excluded from this development gate and carried to the release-certification
-> lane; P7/T9g still require it.
+> **MVP0-P2P DEV-HANDOFF — SATISFIED 2026-09-25:**
+> P3 PASS + P4 PASS + P5-DEV (P5.T0-T2 formally closed) + P6 PASS are all
+> satisfied. P5.T3 is excluded from this development gate and carried to the
+> release-certification lane; P7/T9g still require it.
 >
 > `T7local` remains an independent S-230 lane and may run in parallel with P6. It
 > certifies only the base S-230 mobile flow against the local Compose **gateway**
@@ -100,7 +100,7 @@ ledger.
 | T6p-b | P2P Compose/config/secrets/private-network wiring | config/ops | TBD exact-path | T6p-a PASS | [ ] Planned |
 | T6p-c | Local P2P deployment-contract evidence | operational/evidence | TBD exact-path | T6p-b PASS | [ ] Planned |
 | T6p-d | Deploy backend ciphertext publication + durable P2P_READY smoke on DO | operational | TBD exact-path | T6p-c PASS | [ ] Planned |
-| T7local | Base mobile POC smoke against the local Docker Compose gateway | development/ops | M | T5d | [ ] Planned — runnable now in parallel with P6 |
+| T7local | Base mobile POC smoke against the local Docker Compose gateway | development/ops | M | T5d | [ ] Planned — runnable now; P6/DEV-HANDOFF already PASS |
 | T7 | Mobile POC build against the deployed backend | development/ops | M | T6; T7local PASS | [ ] Planned |
 | T7p | Physical Android P2P release candidate | development/ops | TBD exact-path | T7; T7c; T6p-d; MVP0-P2P DEV-HANDOFF; X29 resolved | [ ] Planned |
 | T7b | Mobile registration screen | development | M | T7local | [ ] Planned — droppable (first) |
