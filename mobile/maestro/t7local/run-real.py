@@ -221,15 +221,93 @@ def create_review_scope(token: str) -> tuple[str, str]:
     return org_id, project_id
 
 
+def maestro_env(serial: str) -> dict[str, str]:
+    env = os.environ.copy()
+    env["ANDROID_SERIAL"] = serial
+    env["MAESTRO_CLI_NO_ANALYTICS"] = "1"
+
+    java17 = Path(
+        env.get(
+            "T7LOCAL_JAVA_HOME",
+            "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home",
+        )
+    )
+    if java17.exists():
+        env["JAVA_HOME"] = str(java17)
+        env["PATH"] = f"{java17 / 'bin'}:{env.get('PATH', '')}"
+    return env
+
+
+def reset_maestro_android_transport(serial: str) -> None:
+    subprocess.run(
+        ["adb", "-s", serial, "forward", "--remove-all"],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    subprocess.run(
+        ["adb", "reconnect"],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    command(["adb", "-s", serial, "wait-for-device"], capture=True)
+
+
 def maestro(flow: str, values: dict[str, str], serial: str) -> None:
     args = ["maestro", "test"]
     for key, value in values.items():
         args.extend(["-e", f"{key}={value}"])
     args.append(str(T7_DIR / flow))
-    env = os.environ.copy()
-    env["ANDROID_SERIAL"] = serial
-    env["MAESTRO_CLI_NO_ANALYTICS"] = "1"
-    command(args, env=env)
+    env = maestro_env(serial)
+
+    first = subprocess.run(
+        args,
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if first.returncode == 0:
+        if first.stdout:
+            print(first.stdout, end="")
+        return
+
+    combined = f"{first.stdout}\n{first.stderr}"
+    transport_failure = (
+        "StatusRuntimeException: UNAVAILABLE" in combined
+        or "Command failed (tcp:" in combined
+    )
+    if not transport_failure:
+        if first.stdout:
+            print(first.stdout, end="", file=sys.stderr)
+        if first.stderr:
+            print(first.stderr, end="", file=sys.stderr)
+        blocked(f"Maestro flow failed: {flow}")
+
+    print(
+        f"T7LOCAL_MAESTRO_TRANSPORT_RETRY flow={flow}",
+        file=sys.stderr,
+    )
+    reset_maestro_android_transport(serial)
+
+    second = subprocess.run(
+        args,
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if second.stdout:
+        print(second.stdout, end="")
+    if second.returncode != 0:
+        if second.stderr:
+            print(second.stderr, end="", file=sys.stderr)
+        blocked(f"Maestro transport retry failed: {flow}")
 
 
 def db_probe(action: str, value: str) -> list[str]:
