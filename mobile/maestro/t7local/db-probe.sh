@@ -13,6 +13,7 @@ Usage:
   db-probe.sh wait-c1 <proof_reference>
   db-probe.sh wait-c2 <asset_id>
   db-probe.sh wait-review-task <asset_id>
+  db-probe.sh review-context <review_task_id>
   db-probe.sh verify-c3 <review_task_id>
   db-probe.sh verify-c4 <review_task_id>
 EOF
@@ -155,6 +156,35 @@ wait_review_task() {
   return 1
 }
 
+review_context() {
+  local task_id="$1"
+  require_uuid "$task_id"
+  local row org_name run_id asset_id
+  row="$(psql_query "
+    SELECT o.name || '|' || rt.asset_id::text
+    FROM review_tasks rt
+    JOIN organizations o ON o.id = rt.org_id
+    WHERE rt.id = '$task_id'::uuid
+    LIMIT 1;
+  ")"
+  if [[ -z "$row" ]]; then
+    echo "REVIEW_CONTEXT=BLOCKED review_task_id=$task_id missing" >&2
+    return 1
+  fi
+  IFS='|' read -r org_name asset_id <<<"$row"
+  if [[ "$org_name" != T7local-* ]]; then
+    echo "REVIEW_CONTEXT=BLOCKED review_task_id=$task_id unexpected_org_name=$org_name" >&2
+    return 1
+  fi
+  run_id="${org_name#T7local-}"
+  if [[ -z "$run_id" ]]; then
+    echo "REVIEW_CONTEXT=BLOCKED review_task_id=$task_id missing_run_id" >&2
+    return 1
+  fi
+  echo "REVIEW_CONTEXT=PASS review_task_id=$task_id run_id=$run_id asset_id=$asset_id"
+  echo "$run_id|$asset_id"
+}
+
 verify_c3() {
   local task_id="$1"
   require_uuid "$task_id"
@@ -200,6 +230,7 @@ case "$command" in
   wait-c1) wait_c1 "$value" ;;
   wait-c2) wait_c2 "$value" ;;
   wait-review-task) wait_review_task "$value" ;;
+  review-context) review_context "$value" ;;
   verify-c3) verify_c3 "$value" ;;
   verify-c4) verify_c4 "$value" ;;
   *) usage >&2; exit 2 ;;

@@ -204,6 +204,28 @@ def resolve_account() -> tuple[str, str, str]:
     return email, password, token
 
 
+def resolve_existing_run_account(run_id: str) -> tuple[str, str]:
+    email = os.environ.get("T7LOCAL_EMAIL", "")
+    password = os.environ.get("T7LOCAL_PASSWORD", "")
+    if bool(email) != bool(password):
+        blocked("provide both T7LOCAL_EMAIL and T7LOCAL_PASSWORD, or neither")
+
+    if not email:
+        email = f"t7local-{run_id}@dubbridge.dev"
+        ui_safe_run_id = "".join(char for char in run_id if char.isalnum()) or "run"
+        password = f"T7local{ui_safe_run_id}A9zQ7"
+
+    require_object(
+        http_json(
+            "POST",
+            "/auth/login",
+            payload={"email": email, "password": password},
+        ),
+        "POST /auth/login",
+    )
+    return email, password
+
+
 def create_review_scope(token: str) -> tuple[str, str]:
     org = require_object(
         http_json(
@@ -480,6 +502,48 @@ def db_probe(action: str, value: str) -> list[str]:
     return lines
 
 
+def review_only(review_task_id: str) -> None:
+    serial = check_environment()
+    context = db_probe("review-context", review_task_id)
+    print(context[0])
+    try:
+        run_id, asset_id = context[-1].split("|", 1)
+    except ValueError:
+        blocked("review-context returned malformed evidence")
+
+    email, password = resolve_existing_run_account(run_id)
+
+    maestro(
+        "review-publish-real.yaml",
+        {
+            "T7LOCAL_EMAIL": email,
+            "T7LOCAL_PASSWORD": password,
+            "T7LOCAL_REVIEW_TASK_ID": review_task_id,
+        },
+        serial,
+    )
+
+    print(db_probe("verify-c3", review_task_id)[0])
+    print(db_probe("verify-c4", review_task_id)[0])
+
+    maestro(
+        "playback-real.yaml",
+        {
+            "T7LOCAL_EMAIL": email,
+            "T7LOCAL_PASSWORD": password,
+            "T7LOCAL_ASSET_ID": asset_id,
+        },
+        serial,
+    )
+
+    head_sha = command(["git", "rev-parse", "HEAD"], capture=True).stdout.strip()
+    print("T7LOCAL_REVIEW_ONLY=PASS")
+    print(f"HEAD={head_sha}")
+    print(f"RUN_ID={run_id}")
+    print(f"ASSET_ID={asset_id}")
+    print(f"REVIEW_TASK_ID={review_task_id}")
+
+
 def main() -> None:
     serial = check_environment()
     email, password, token = resolve_account()
@@ -581,4 +645,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) == 3 and sys.argv[1] == "--review-only":
+        review_only(sys.argv[2])
+    elif len(sys.argv) == 1:
+        main()
+    else:
+        blocked("usage: run-real.py [--review-only <review_task_id>]")
