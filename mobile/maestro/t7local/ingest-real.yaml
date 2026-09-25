@@ -46,10 +46,9 @@ tags:
     id: upload-field-proof-reference
 - inputText: ${T7LOCAL_PROOF_REFERENCE}
 
-- hideKeyboard
-
-- tapOn:
-    id: upload-submit-rights
+# Submit the completed rights form through the proof-reference IME action.
+# This avoids the Android first post-keyboard tap being consumed.
+- pressKey: Enter
 
 - extendedWaitUntil:
     visible:
