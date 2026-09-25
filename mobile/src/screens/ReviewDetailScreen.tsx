@@ -56,19 +56,60 @@ function ReviewScopePanel({ task }: { task: ReviewTaskSummary }) {
 type ActionBarsProps = { taskState: TaskState; publishedAt: string | null; isSubmitting: boolean; decide: (v: "approved" | "rejected") => Promise<void>; publish: () => Promise<void> };
 
 function ReviewActionBars({ taskState, publishedAt, isSubmitting, decide, publish }: ActionBarsProps) {
+  const [lastInvoked, setLastInvoked] = useState<"approve" | "reject" | "publish" | null>(null);
+
   if (taskState === "pending") {
     return (
-      <ActionBar>
-        <Button testID="review-approve" label="Approve" onPress={() => void decide("approved")} loading={isSubmitting} disabled={isSubmitting} fullWidth style={styles.actionButton} />
-        <Button testID="review-reject" label="Reject" variant="danger" onPress={() => void decide("rejected")} loading={isSubmitting} disabled={isSubmitting} fullWidth style={styles.actionButton} />
-      </ActionBar>
+      <>
+        {lastInvoked ? <Text testID={`review-action-invoked-${lastInvoked}`} style={styles.actionProbe}>Action invoked: {lastInvoked}</Text> : null}
+        <ActionBar>
+          <Button
+            testID="review-approve"
+            label="Approve"
+            onPress={() => {
+              setLastInvoked("approve");
+              void decide("approved");
+            }}
+            loading={isSubmitting}
+            disabled={isSubmitting}
+            fullWidth
+            style={styles.actionButton}
+          />
+          <Button
+            testID="review-reject"
+            label="Reject"
+            variant="danger"
+            onPress={() => {
+              setLastInvoked("reject");
+              void decide("rejected");
+            }}
+            loading={isSubmitting}
+            disabled={isSubmitting}
+            fullWidth
+            style={styles.actionButton}
+          />
+        </ActionBar>
+      </>
     );
   }
   if (taskState === "approved" && !publishedAt) {
     return (
-      <ActionBar>
-        <Button testID="publish-action" label="Publish" onPress={() => void publish()} loading={isSubmitting} disabled={isSubmitting} fullWidth />
-      </ActionBar>
+      <>
+        {lastInvoked ? <Text testID={`review-action-invoked-${lastInvoked}`} style={styles.actionProbe}>Action invoked: {lastInvoked}</Text> : null}
+        <ActionBar>
+          <Button
+            testID="publish-action"
+            label="Publish"
+            onPress={() => {
+              setLastInvoked("publish");
+              void publish();
+            }}
+            loading={isSubmitting}
+            disabled={isSubmitting}
+            fullWidth
+          />
+        </ActionBar>
+      </>
     );
   }
   return null;
@@ -177,5 +218,6 @@ const styles = StyleSheet.create({
   body: { ...type.body, color: color.ink500 },
   commentInput: { minHeight: space.xxxl * 2, textAlignVertical: "top" },
   actionButton: { flex: 1 },
+  actionProbe: { ...type.meta, color: color.ink400, paddingHorizontal: space.xxl, paddingVertical: space.xs },
   errorText: { ...type.meta, color: color.danger },
 });

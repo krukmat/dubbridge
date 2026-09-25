@@ -64,6 +64,14 @@ tags:
 - tapOn:
     text: "Approve"
 
+# This probe is set synchronously at the start of the RN onPress handler,
+# before any network request. If it never appears, the gesture did not reach
+# the button callback.
+- extendedWaitUntil:
+    visible:
+      id: review-action-invoked-approve
+    timeout: 5000
+
 # The fixed Publish action is the functional postcondition of an approved
 # review. Do not depend on the summary badge text being inside the viewport.
 - extendedWaitUntil:
