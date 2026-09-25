@@ -54,7 +54,7 @@ ledger.
 > satisfied. P5.T3 is excluded from this development gate and carried to the
 > release-certification lane; P7/T9g still require it.
 >
-> `T7local` remains an independent S-230 lane and may run in parallel with P6. It
+> `T7local` remains an independent S-230 lane. P6/DEV-HANDOFF are already PASS; it
 > certifies only the base S-230 mobile flow against the local Compose **gateway**
 > on host port 8082; it does not execute or certify invitation/claim/P2P sync,
 > ciphertext verification, loopback P2P playback, HPKE, or P5.T3. `T6p-a`
