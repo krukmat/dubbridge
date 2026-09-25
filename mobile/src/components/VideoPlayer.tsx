@@ -122,6 +122,7 @@ export function VideoPlayer({
         style={styles.video}
         nativeControls
         contentFit={contentFit}
+        surfaceType="textureView"
         fullscreenOptions={{ enable: true }}
       />
 
