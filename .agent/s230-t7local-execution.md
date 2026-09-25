@@ -133,6 +133,42 @@ C4** is:
 bash mobile/maestro/t7local/run-real.sh
 ```
 
+**Bootstrap prerequisite (verified 2026-09-25, HEAD `13c353b`):** keep Metro
+running in a separate terminal throughout Maestro. If the build terminal has
+exited, restart it from `mobile/`:
+
+```bash
+DUBBRIDGE_ENV=local \
+EXPO_PUBLIC_E2E_ENABLED=false \
+EXPO_PUBLIC_P2P_DEV_HARNESS=false \
+EXPO_PUBLIC_P2P_VISUAL_FIXTURES=false \
+EXPO_PUBLIC_P5_DEVICE_CERT_HARNESS=false \
+EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL=http://10.0.2.2:8082 \
+npx expo start --lan --port 8081
+```
+
+Before launching Maestro, `curl -fsS http://127.0.0.1:8081/status` must return
+`packager-status:running`; confirm the server belongs to this `mobile/` project.
+The installed debug APK at this head does **not** include `expo-dev-client` or
+`expo-dev-launcher`. Its normal `.MainActivity` launch loads Metro from the
+Android emulator default `10.0.2.2:8081`, including after `clearState: true`.
+An `expo-development-client` deep link reaching `.MainActivity` does not prove
+that its nested URL was interpreted or that a bundle loaded. Do not install a
+new native dependency just to work around a missing Metro process.
+
+`adb reverse tcp:8081 tcp:8081` provides Android loopback transport, but does not
+change this APK's Metro host selection. `--localhost` bound only to host `::1`
+in the observed environment; the `--lan` start above restored emulator access.
+Keep the gateway on `8082`. Verify the bundle load and `login-screen`, rather
+than treating an `openLink` success as bootstrap evidence.
+
+**Current stop point:** bootstrap passes; B3 Maestro submit remains blocked.
+The 2026-09-25 diagnostic reached `home-screen` through real authentication
+after a normal ADB UI tap, but Maestro's submit tap left `Login phase: idle`;
+`retryTapIfNoChange` also failed. Until B3 passes automatically, run only the
+bootstrap/login prefix, not the full B3–C4 driver above. See
+`docs/audit/s-230-t7local-2026-09-25.md` for exact evidence and limitations.
+
 The runner uses the real gateway, a real account, supported workspace/project
 APIs, a fresh local MP4, the normal mobile UI, and read-only PostgreSQL probes.
 It must not use the mock gateway, `/e2e/seed`, seeded IDs, or the E2E upload

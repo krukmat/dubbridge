@@ -5058,7 +5058,13 @@ negative is repaired and independently verified: regression PASS, runtime
 preflight PASS and gateway live/ready PASS. The normal Android build/install/
 launch also passed after pinning the local toolchain to JDK 17. A real-stack
 Maestro harness now drives B3→C4 without mocks, seeded IDs or DB writes; the
-full A→E certification rerun is still pending. Historical blocker evidence:
+full A→E certification rerun is still pending. Bootstrap diagnostic on
+`13c353b` (2026-09-25): Metro was unavailable on `8081`; the installed debug
+APK has no Expo Dev Launcher. Starting Metro with `--lan --port 8081` restored
+clean-state bundle loading and `login-screen`. A real login reached home after
+an ADB UI tap, but Maestro's submit still left `Login phase: idle`; automated
+B3 remains **BLOCKED** and C1–C4 were not executed. No auth/product changes.
+Operational instructions: `.agent/s230-t7local-execution.md`. Current and historical evidence:
 `docs/audit/s-230-t7local-2026-09-25.md`.
 
 ### Executor contract
