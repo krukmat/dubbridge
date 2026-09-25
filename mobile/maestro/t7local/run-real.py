@@ -286,6 +286,10 @@ def diagnose_maestro_ui(serial: str, env: dict[str, str], flow: str) -> None:
             "This app is missing its gateway configuration.",
             "LOGIN_CONFIG missing runtime gateway configuration",
         ),
+        (
+            "We could not securely store your session. Try again.",
+            "SESSION_STORAGE secure session persistence failed",
+        ),
     )
     for needle, diagnosis in known:
         if needle in ui:

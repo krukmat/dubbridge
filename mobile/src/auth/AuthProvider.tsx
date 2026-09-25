@@ -111,6 +111,15 @@ function resetAuthState(controls: AuthStateControls) {
   controls.setLoginError(null);
 }
 
+async function clearPersistedSession(): Promise<boolean> {
+  try {
+    await clearAuthSession();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function acceptStoredSession(
   storedSession: AuthSession | null,
   controls: AuthStateControls,
@@ -134,9 +143,10 @@ async function hydrateStoredSession(
     if (!isMounted()) return;
     acceptStoredSession(storedSession, controls);
   } catch {
-    await clearAuthSession();
+    await clearPersistedSession();
     if (!isMounted()) return;
     resetAuthState(controls);
+    controls.setLoginError("session_storage_error");
   }
 }
 
@@ -174,14 +184,27 @@ async function submitLogin(
   });
 
   if (!loginResult.ok || !isAuthSuccessPayload(loginResult.value.data)) {
-    await clearAuthSession();
+    const storageCleared = await clearPersistedSession();
     resetAuthState(controls);
-    controls.setLoginError(loginResult.ok ? "login_failed" : loginErrorKind(loginResult.error.kind));
+    controls.setLoginError(
+      storageCleared
+        ? loginResult.ok
+          ? "login_failed"
+          : loginErrorKind(loginResult.error.kind)
+        : "session_storage_error",
+    );
     return;
   }
 
   const nextSession = toAuthSession(loginResult.value.data);
-  await saveAuthSession(nextSession);
+  try {
+    await saveAuthSession(nextSession);
+  } catch {
+    resetAuthState(controls);
+    controls.setLoginError("session_storage_error");
+    return;
+  }
+
   controls.setSession(nextSession);
   controls.setStatus("authed");
   controls.setLoginError(null);
@@ -202,7 +225,9 @@ export function AuthProvider({
 
   async function logout(): Promise<void> {
     resetAuthState(controls);
-    await clearAuthSession();
+    if (!(await clearPersistedSession())) {
+      controls.setLoginError("session_storage_error");
+    }
   }
 
   async function login(email: string, password: string): Promise<void> {

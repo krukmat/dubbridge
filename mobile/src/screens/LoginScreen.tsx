@@ -20,6 +20,8 @@ function getLoginErrorCopy(error: string | null): string | null {
       return "We could not reach DubBridge. Try again.";
     case "login_failed":
       return "Invalid email or password.";
+    case "session_storage_error":
+      return "We could not securely store your session. Try again.";
     default:
       return null;
   }

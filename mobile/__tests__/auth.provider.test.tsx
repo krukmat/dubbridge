@@ -204,6 +204,30 @@ describe("AuthProvider", () => {
     expect(mockClearAuthSession).toHaveBeenCalledTimes(1);
     expect(view.getByText("sessionRef:null")).toBeTruthy();
     expect(view.getByText("userId:null")).toBeTruthy();
+    expect(view.getByText("loginError:session_storage_error")).toBeTruthy();
+  });
+
+  it("EC-2b: secure-store write failure stays unauthenticated and is observable", async () => {
+    mockSaveAuthSession.mockRejectedValueOnce(new Error("secure-store write failure"));
+
+    const view = await render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(view.getByText("status:unauthed")).toBeTruthy();
+    });
+
+    await act(async () => {
+      await latestAuthValue?.login("user@example.com", "password-123456");
+    });
+
+    expect(mockSaveAuthSession).toHaveBeenCalledWith(LOGIN_PAYLOAD);
+    expect(view.getByText("status:unauthed")).toBeTruthy();
+    expect(view.getByText("sessionRef:null")).toBeTruthy();
+    expect(view.getByText("loginError:session_storage_error")).toBeTruthy();
   });
 
   it("EC-3: logout clears local bearer state fail-closed", async () => {
