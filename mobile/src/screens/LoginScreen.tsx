@@ -89,6 +89,10 @@ function LoginForm({
   );
 }
 
+function canSubmitLogin(email: string, password: string, isSubmitting: boolean) {
+  return email.trim().length > 0 && password.length > 0 && !isSubmitting;
+}
+
 function LoginPhaseDiagnostic({ phase }: { phase: string }) {
   if (!__DEV__) return null;
 
@@ -105,10 +109,7 @@ export function LoginScreen() {
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const canSubmit =
-    email.trim().length > 0 &&
-    password.length > 0 &&
-    !isSubmitting;
+  const canSubmit = canSubmitLogin(email, password, isSubmitting);
 
   async function handleSubmit(): Promise<void> {
     if (!canSubmit) {
