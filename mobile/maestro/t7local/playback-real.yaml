@@ -9,8 +9,9 @@ tags:
     clearState: true
 
 # Clearing app state also clears the Expo development client's remembered
-# Metro URL. Re-open the dev client explicitly against the host Metro server.
-- openLink: "dubbridge://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8081"
+# Metro URL. T7local creates an adb reverse for tcp:8081, so device localhost
+# reaches the host Metro server without depending on Wi-Fi or emulator routing.
+- openLink: "dubbridge://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081"
 
 - extendedWaitUntil:
     visible:

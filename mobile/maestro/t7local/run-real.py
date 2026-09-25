@@ -21,6 +21,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 T7_DIR = REPO_ROOT / "mobile" / "maestro" / "t7local"
 GATEWAY = os.environ.get("T7LOCAL_HOST_GATEWAY_URL", "http://localhost:8082").rstrip("/")
+METRO_HOST_URL = os.environ.get("T7LOCAL_HOST_METRO_URL", "http://127.0.0.1:8081").rstrip("/")
 RUN_ID = os.environ.get(
     "T7LOCAL_RUN_ID",
     datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"),
@@ -107,6 +108,21 @@ def require_string(value: object, field: str) -> str:
     return value
 
 
+def configure_metro_transport(serial: str) -> None:
+    try:
+        with urllib.request.urlopen(f"{METRO_HOST_URL}/status", timeout=5) as response:
+            metro_status = response.read().decode("utf-8", errors="replace")
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as exc:
+        blocked(f"Metro not reachable at {METRO_HOST_URL}: {exc}")
+    if "packager-status:running" not in metro_status:
+        blocked(f"Metro did not report running at {METRO_HOST_URL}/status")
+
+    command(
+        ["adb", "-s", serial, "reverse", "tcp:8081", "tcp:8081"],
+        capture=True,
+    )
+
+
 def check_environment() -> str:
     for name in ("python3", "adb", "maestro", "docker-compose"):
         if shutil.which(name) is None:
@@ -151,6 +167,8 @@ def check_environment() -> str:
     ).stdout.strip()
     if not package:
         blocked("com.dubbridge.mobile is not installed")
+
+    configure_metro_transport(serial)
     return serial
 
 
@@ -254,6 +272,7 @@ def reset_maestro_android_transport(serial: str) -> None:
         check=False,
     )
     command(["adb", "-s", serial, "wait-for-device"], capture=True)
+    configure_metro_transport(serial)
 
 
 def diagnose_maestro_ui(serial: str, env: dict[str, str], flow: str) -> None:
@@ -322,8 +341,32 @@ def diagnose_maestro_ui(serial: str, env: dict[str, str], flow: str) -> None:
             file=sys.stderr,
         )
     else:
+        activity = subprocess.run(
+            [
+                "adb",
+                "-s",
+                serial,
+                "shell",
+                "dumpsys",
+                "activity",
+                "activities",
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        resumed = next(
+            (
+                line.strip()
+                for line in activity.stdout.splitlines()
+                if "mResumedActivity" in line or "topResumedActivity" in line
+            ),
+            "unavailable",
+        )
         print(
-            f"T7LOCAL_UI_DIAGNOSTIC=UNKNOWN flow={flow}",
+            f"T7LOCAL_UI_DIAGNOSTIC=UNKNOWN activity={resumed} flow={flow}",
             file=sys.stderr,
         )
 
