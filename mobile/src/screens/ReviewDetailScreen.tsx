@@ -63,18 +63,23 @@ function ReviewActionBars({ taskState, publishedAt, isSubmitting, decide, publis
       <>
         {lastInvoked ? <Text testID={`review-action-invoked-${lastInvoked}`} style={styles.actionProbe}>Action invoked: {lastInvoked}</Text> : null}
         <ActionBar>
-          <Button
+          <Pressable
             testID="review-approve"
-            label="Approve"
+            accessibilityRole="button"
+            accessibilityLabel="Approve"
+            disabled={isSubmitting}
             onPress={() => {
               setLastInvoked("approve");
               void decide("approved");
             }}
-            loading={isSubmitting}
-            disabled={isSubmitting}
-            fullWidth
-            style={styles.actionButton}
-          />
+            style={({ pressed }) => [
+              styles.nativeActionButton,
+              pressed ? styles.nativeActionButtonPressed : null,
+              isSubmitting ? styles.nativeActionButtonDisabled : null,
+            ]}
+          >
+            <Text style={styles.nativeActionButtonLabel}>Approve</Text>
+          </Pressable>
           <Button
             testID="review-reject"
             label="Reject"
@@ -218,6 +223,17 @@ const styles = StyleSheet.create({
   body: { ...type.body, color: color.ink500 },
   commentInput: { minHeight: space.xxxl * 2, textAlignVertical: "top" },
   actionButton: { flex: 1 },
+  nativeActionButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: color.primary,
+  },
+  nativeActionButtonPressed: { backgroundColor: color.primaryPressed },
+  nativeActionButtonDisabled: { opacity: 0.5 },
+  nativeActionButtonLabel: { ...type.button, color: color.onPrimary },
   actionProbe: { ...type.meta, color: color.ink400, paddingHorizontal: space.xxl, paddingVertical: space.xs },
   errorText: { ...type.meta, color: color.danger },
 });

@@ -58,11 +58,10 @@ tags:
 - assertVisible:
     id: review-approve
 
-# Tap the rendered button label rather than the RN testID wrapper. On Android,
-# Maestro can resolve a Pressable testID to an accessibility node whose bounds
-# do not match the actual tappable text surface.
+# Tap the minimal native Pressable directly. This isolates the review action
+# from the shared Button primitive while preserving the same handler.
 - tapOn:
-    text: "Approve"
+    id: review-approve
 
 # This probe is set synchronously at the start of the RN onPress handler,
 # before any network request. If it never appears, the gesture did not reach
