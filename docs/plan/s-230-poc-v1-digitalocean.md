@@ -65,9 +65,9 @@ that requires P3-P6, `T7p`, P7, and `T9g`. `T7b`, `T8`, and `T8b` remain
 optional. X29 is now a release blocker for `T7p`/`T9g`, even though it remains
 accepted residual evidence for P1.
 
-Target gates: X29 is resolved. S-230 `T7local -> T7c/T7b/T8/T8b` (local
-stack) and MVP0-P2P through P6 advance in parallel. T7local may close before
-P6; this does not stale its own PASS, but T6p-a requires the freshness
+Target gates: X29 is resolved and MVP0-P2P through P6 is PASS. S-230
+`T7local -> T7c/T7b/T8/T8b` remains the active local-stack lane. T7local may
+close independently; T6p-a still requires the freshness
 disposition (and bounded base-flow regression when relevant paths changed)
 against the exact DEV-HANDOFF head. Both development lanes target readiness
 by October 15; T6p-a through T6p-d close by October 21 (including the
