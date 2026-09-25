@@ -154,8 +154,8 @@ boot, which is architecturally precluded by ADR-026's own localhost/
 local-fs rejection; full image-boot readiness remains T6's scope against
 real DO infrastructure. **T5 (parent) is now closed** — all four children
 (T5a–T5d) done. **`T7local` (base mobile POC smoke against the local Docker
-Compose gateway, added 2026-09-06) is runnable now in parallel with MVP0-P2P
-P6, not gated by DEV-HANDOFF.** The owner directed that `T6` and everything
+Compose gateway, added 2026-09-06) is runnable now. P6/DEV-HANDOFF are already
+PASS, and T7local remains independently gated only by its own prerequisites.** The owner directed that `T6` and everything
 Digital-Ocean-related wait until local development closes; `T7local` breaks
 the circular dependency this created (`T6p-a` had gated on `T7`, which
 gated on `T6`). Consolidation 2026-09-24: T7local certifies only the base
