@@ -70,7 +70,7 @@ def http_json(
     *,
     payload: dict[str, object] | None = None,
     token: str | None = None,
-) -> dict[str, object]:
+) -> object:
     data = None if payload is None else json.dumps(payload).encode("utf-8")
     headers = {"content-type": "application/json"}
     if token:
@@ -92,8 +92,12 @@ def http_json(
         value = json.loads(raw)
     except json.JSONDecodeError:
         blocked(f"{method} {path} returned invalid JSON")
+    return value
+
+
+def require_object(value: object, context: str) -> dict[str, object]:
     if not isinstance(value, dict):
-        blocked(f"{method} {path} returned non-object JSON")
+        blocked(f"{context} returned non-object JSON")
     return value
 
 
@@ -169,29 +173,38 @@ def resolve_account() -> tuple[str, str, str]:
             },
         )
 
-    login = http_json(
-        "POST",
-        "/auth/login",
-        payload={"email": email, "password": password},
+    login = require_object(
+        http_json(
+            "POST",
+            "/auth/login",
+            payload={"email": email, "password": password},
+        ),
+        "POST /auth/login",
     )
     token = require_string(login.get("token"), "token")
     return email, password, token
 
 
 def create_review_scope(token: str) -> tuple[str, str]:
-    org = http_json(
-        "POST",
-        "/api/orgs",
-        token=token,
-        payload={"name": f"T7local-{RUN_ID}"},
+    org = require_object(
+        http_json(
+            "POST",
+            "/api/orgs",
+            token=token,
+            payload={"name": f"T7local-{RUN_ID}"},
+        ),
+        "POST /api/orgs",
     )
     org_id = require_string(org.get("id"), "organization id")
 
-    project = http_json(
-        "POST",
-        f"/api/orgs/{org_id}/projects",
-        token=token,
-        payload={"name": f"T7local-{RUN_ID}", "asset_ids": []},
+    project = require_object(
+        http_json(
+            "POST",
+            f"/api/orgs/{org_id}/projects",
+            token=token,
+            payload={"name": f"T7local-{RUN_ID}", "asset_ids": []},
+        ),
+        "POST project",
     )
     project_id = require_string(project.get("id"), "project id")
 
