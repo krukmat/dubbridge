@@ -334,7 +334,7 @@ describe("RootNavigator", () => {
     ).toBeTruthy();
   });
 
-  it("EC-2: loading auth still stays on the unauthenticated navigator", async () => {
+  it("EC-2: loading auth renders no authenticated or login surface", async () => {
     mockExtra = {
       dubbridgeEnv: "local",
       gatewayBaseUrl: "http://127.0.0.1:4000",
@@ -346,7 +346,7 @@ describe("RootNavigator", () => {
 
     const view = await render(<RootNavigator />);
 
-    expect(view.getByTestId("login-screen")).toBeTruthy();
+    expect(view.queryByTestId("login-screen")).toBeNull();
     expect(view.queryByTestId("home-screen")).toBeNull();
   });
 

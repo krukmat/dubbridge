@@ -755,8 +755,8 @@ describe("asset screens", () => {
 
   async function fillRightsForm(view: Awaited<ReturnType<typeof render>>) {
     await fireEvent.changeText(view.getByTestId("upload-field-owner"), "DubBridge Studios");
-    await fireEvent.press(view.getByTestId("upload-field-license-type-option-exclusive"));
-    await fireEvent.press(view.getByTestId("upload-field-source-type-option-original"));
+    await fireEvent.press(view.getByTestId("upload-field-license-type-option-all_rights_reserved"));
+    await fireEvent.press(view.getByTestId("upload-field-source-type-option-direct_upload"));
     await fireEvent.changeText(view.getByTestId("upload-field-proof-reference"), "contract-123");
   }
 
