@@ -98,6 +98,12 @@ tags:
     id: invite-state-invite-p2p-sync-error
 - assertVisible:
     id: invite-state-invite-p2p-available
+
+- scrollUntilVisible:
+    element:
+      id: invite-play-invite-p2p-available
+    direction: DOWN
+    timeout: 5000
 - assertVisible:
     id: invite-play-invite-p2p-available
 

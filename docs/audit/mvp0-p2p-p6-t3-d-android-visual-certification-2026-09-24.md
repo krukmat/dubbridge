@@ -123,3 +123,27 @@ Expected visual artifacts:
 
 Repository CI can validate code/config/tests, but these PNGs are not claimed
 until D4 is run on the owner's local Android emulator.
+
+
+## D4 local execution observation
+
+The first local Android attempt was operationally valid but did not complete the
+full four-flow certification. Environment-only corrections were required:
+OpenJDK 17 for the Android build, `npm ci` to restore declared dependencies,
+an APK rebuild carrying the E2E configuration, and stopping the unrelated
+`local-gateway-1` container that occupied port 8082. These actions did not
+change product behavior or P3/P4/P5/P7Local semantics.
+
+The remaining D4 blocker was isolated to `p2p-states.yaml`: scrolling the
+Available status into view did not guarantee that the separate Play button was
+also inside the viewport. The bounded repair adds an explicit
+`scrollUntilVisible` for `invite-play-invite-p2p-available` before asserting
+that control.
+
+D4 remains **BLOCKED pending local rerun**. `local-gateway-1` was left in
+Exited state and is not restarted by this task; restoring it is a separate
+owner-authorized environment action.
+
+Broader harness hardening (port preflight, reproducible APK build automation,
+partial screenshot promotion, and path normalization) remains outside this
+bounded D4 repair.
