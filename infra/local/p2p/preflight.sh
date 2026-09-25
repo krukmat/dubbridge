@@ -108,14 +108,14 @@ if [[ "${runtime_checks}" == "--with-runtime" ]]; then
   strip_ansi() { sed -E $'s/\033\\[[0-9;]*m//g'; }
 
   echo "== worker P2P publication flag =="
-  if compose logs --tail=500 worker-runner 2>&1 | strip_ansi | grep -q "p2p_publication_enabled=true"; then
+  if compose logs --tail=500 worker-runner 2>&1 | strip_ansi | grep -F "p2p_publication_enabled=true" >/dev/null; then
     say_ok "recent worker-runner logs show p2p_publication_enabled=true"
   else
     say_fail "recent worker-runner logs do not show p2p_publication_enabled=true"
   fi
 
   echo "== availability node listening =="
-  if compose logs --tail=500 availability-node 2>&1 | strip_ansi | grep -q "Availability Node listening"; then
+  if compose logs --tail=500 availability-node 2>&1 | strip_ansi | grep -F "Availability Node listening" >/dev/null; then
     say_ok "recent availability-node logs show 'Availability Node listening'"
   else
     say_fail "recent availability-node logs do not show 'Availability Node listening'"

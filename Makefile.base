@@ -1,4 +1,4 @@
-.PHONY: qa-fmt qa-lint qa-test qa-test-redis qa-test-s3 qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-python-complexity qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-docs-review qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review qa-golden-set show-codex-session-model install-hooks
+.PHONY: qa-fmt qa-lint qa-test qa-test-redis qa-test-s3 qa-check qa-local qa-p2p-preflight qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-python-complexity qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-docs-review qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review qa-golden-set show-codex-session-model install-hooks
 
 COVERAGE_MIN ?= 90
 PEER_REVIEW_RRI      ?= 22
@@ -49,7 +49,10 @@ qa-test-s3:
 qa-check:
 	$(CARGO) check --workspace --all-targets --all-features
 
-qa-local: qa-fmt qa-lint qa-test qa-check
+qa-local: qa-fmt qa-lint qa-test qa-check qa-p2p-preflight
+
+qa-p2p-preflight:
+	bash infra/local/p2p/preflight-pipeline-test.sh
 
 qa-deny:
 	$(CARGO) deny check
