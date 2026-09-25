@@ -256,6 +256,62 @@ def reset_maestro_android_transport(serial: str) -> None:
     command(["adb", "-s", serial, "wait-for-device"], capture=True)
 
 
+def diagnose_maestro_ui(serial: str, env: dict[str, str], flow: str) -> None:
+    hierarchy = subprocess.run(
+        ["maestro", "--device", serial, "hierarchy"],
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if hierarchy.returncode != 0:
+        print(
+            f"T7LOCAL_UI_DIAGNOSTIC=UNAVAILABLE flow={flow}",
+            file=sys.stderr,
+        )
+        return
+
+    ui = hierarchy.stdout
+    known = (
+        (
+            "Invalid email or password.",
+            "LOGIN_REJECTED credentials rejected by mobile login request",
+        ),
+        (
+            "We could not reach DubBridge. Try again.",
+            "LOGIN_NETWORK Android app could not reach configured gateway",
+        ),
+        (
+            "This app is missing its gateway configuration.",
+            "LOGIN_CONFIG missing runtime gateway configuration",
+        ),
+    )
+    for needle, diagnosis in known:
+        if needle in ui:
+            print(
+                f"T7LOCAL_UI_DIAGNOSTIC={diagnosis}",
+                file=sys.stderr,
+            )
+            return
+
+    if "home-screen" in ui:
+        print(
+            f"T7LOCAL_UI_DIAGNOSTIC=HOME_VISIBLE selector timing mismatch flow={flow}",
+            file=sys.stderr,
+        )
+    elif "login-screen" in ui:
+        print(
+            f"T7LOCAL_UI_DIAGNOSTIC=LOGIN_STILL_VISIBLE no known error copy flow={flow}",
+            file=sys.stderr,
+        )
+    else:
+        print(
+            f"T7LOCAL_UI_DIAGNOSTIC=UNKNOWN flow={flow}",
+            file=sys.stderr,
+        )
+
+
 def maestro(flow: str, values: dict[str, str], serial: str) -> None:
     args = ["maestro", "test"]
     for key, value in values.items():
@@ -286,6 +342,7 @@ def maestro(flow: str, values: dict[str, str], serial: str) -> None:
             print(first.stdout, end="", file=sys.stderr)
         if first.stderr:
             print(first.stderr, end="", file=sys.stderr)
+        diagnose_maestro_ui(serial, env, flow)
         blocked(f"Maestro flow failed: {flow}")
 
     print(
@@ -307,6 +364,12 @@ def maestro(flow: str, values: dict[str, str], serial: str) -> None:
     if second.returncode != 0:
         if second.stderr:
             print(second.stderr, end="", file=sys.stderr)
+        second_combined = f"{second.stdout}\n{second.stderr}"
+        if not (
+            "StatusRuntimeException: UNAVAILABLE" in second_combined
+            or "Command failed (tcp:" in second_combined
+        ):
+            diagnose_maestro_ui(serial, env, flow)
         blocked(f"Maestro transport retry failed: {flow}")
 
 
