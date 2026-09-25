@@ -209,4 +209,6 @@ permits only an explicitly labeled base POC/backend preview, not an invited-play
 > artifacts at `5fc8725` and D5 visual review PASS. MVP0-P2P
 > **DEV-HANDOFF = P3 PASS + P4 PASS + P5-DEV + P6 PASS is SATISFIED.**
 > P5.T3 remains deferred to release certification; P7 and S-230 convergence
-> gates remain unchanged.
+> gates remain unchanged. **Exact DEV-HANDOFF head:** `84ea5edc` (15/15 CI),
+> code-equivalent to the last P6 code commit `2cc8a6b` (15/15 CI); it is the
+> reference for S-230's T7local freshness check before T6p-a.

@@ -63,6 +63,12 @@ ledger.
 > If relevant base-flow/mobile/gateway/local-compose paths changed after the
 > recorded T7local head, run a bounded base-flow regression and attach
 > supplemental evidence before T6p-a can activate.
+>
+> **Exact DEV-HANDOFF head (pinned 2026-09-25):** `84ea5edc`
+> (`docs(p2p): satisfy dev handoff`, 15/15 CI). It is code-equivalent to
+> `2cc8a6b` (last P6 code commit, 15/15 CI): `git diff 2cc8a6b 84ea5edc`
+> touches only `docs/` and `mobile/artifacts/screenshots/`. The T6p-a
+> freshness check compares the recorded T7local head against this commit.
 
 | ID | Title | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
@@ -5178,7 +5184,8 @@ live/ready evidence on host port 8082.
 
 T7local may PASS before P6 because parallel execution is intentional. That PASS
 remains valid for T7local itself. Before **T6p-a activation**, compare the exact
-recorded T7local HEAD with the exact DEV-HANDOFF head. Inspect changes affecting
+recorded T7local HEAD with the exact DEV-HANDOFF head (`84ea5edc`, pinned
+2026-09-25; code-equivalent to `2cc8a6b`). Inspect changes affecting
 the base mobile flow or its local entry path, including mobile configuration,
 auth, shared navigation/API client/base screens, gateway, relevant base API
 routes, and `infra/local/docker-compose.yml`.

@@ -263,71 +263,10 @@
     <span class="pill pass"><span class="dot"></span>P4 — <strong>PASS 2026-09-22</strong>; T0/T1/T2/T3 cerrados</span>
     <span class="pill pass"><span class="dot"></span>P5-DEV — <strong>SATISFIED 2026-09-22</strong>; T0/T1/T2 formalmente cerrados</span>
     <span class="pill watch"><span class="dot"></span><strong>P5.T3 / P5-CERT diferido</strong>: fuera del critical path de desarrollo; vuelve como gate de release en T7p/P7.T2</span>
-    <span class="pill pass"><span class="dot"></span>Head <code>e63209f5</code> — <strong>15/15 CI PASS</strong>; mobile 62/62 suites · 446/446 tests</span>
+    <span class="pill pass"><span class="dot"></span>P6 — <strong>PASS 2026-09-25</strong>; T0–T3 cerrados</span>
+    <span class="pill pass"><span class="dot"></span>DEV-HANDOFF — <strong>SATISFIED 2026-09-25</strong>; head <code>84ea5edc</code> 15/15 CI</span>
     <span class="pill pass"><span class="dot"></span>X29 — <strong>CLOSED 2026-09-22</strong></span>
     <span class="pill neutral"><span class="dot"></span>Objetivo: 2026-10-30, no GA</span>
-  </div>
-
-  <div class="consolidation">
-    <p class="ctitle">Actualización 2026-09-22</p>
-    <p>
-      <strong>P3 PASS.</strong> T0/T1/T2 y T3a/T3b/T3c/T3d están cerrados. La certificación integrada
-      cubrió <code>owner → invitation → device → claim → O3 → device envelope</code>, fail-closed,
-      secret-boundary y handoff P3→P4/P5. Durante T3 se corrigió el CHECK durable P3 mediante
-      <code>0039_extend_audit_events_p3_correlation.sql</code> sin relajar P2. Head T3c
-      <code>6c3a565c</code>: 15/15 CI, T3 suite 3/3 PASS en test/coverage, 90.43% line coverage;
-      T3d cerró evidence map + handoff con owner verification.
-    </p>
-    <p>
-      <strong>P4 PASS + P5-DEV SATISFIED.</strong> P4.T0/T1/T2/T3 están cerrados;
-      <code>780519c5</code> completó 15/15 CI y el owner verificó P4.T3. Para P5, T0 ya estaba Done,
-      T1/T2 tienen HP/EC y evidencia ejecutable, el owner verificó explícitamente T1/T2/P5-DEV y
-      el head de preparación <code>e63209f5</code> terminó <strong>15/15 CI PASS</strong>. El job
-      mobile revalidó <strong>62/62 suites y 446/446 tests</strong>. Los status artifacts ya reflejan el cierre formal: <code>P5-DEV</code> está <strong>SATISFIED</strong>
-      y <code>P6.T0</code> queda <strong>unblocked / not activated</strong>. Aggregate P5 sigue IN PROGRESS porque P5.T3/P5-CERT continúa abierto.
-    </p>
-    <p>
-      <strong>Replan de P5.T3.</strong> P5 se divide en dos hitos: <code>P5-DEV</code>
-      (T0–T2 formalmente cerrados) y <code>P5-CERT</code> (T3 con evidencia física).
-      <code>P5.T3</code> deja de bloquear P6 y la preparación de despliegue. El gate de
-      desarrollo pasa a ser <code>P3 PASS + P4 PASS + P5-DEV + P6 PASS</code>
-      (<code>DEV-HANDOFF</code>). La prueba física no se elimina: puede cerrarse en
-      <code>T7p</code> si la evidencia del RC exacto cubre los criterios, o como máximo en
-      <code>P7.T2</code>. Un P5.T3 fallido o pendiente impide <code>P7 PASS</code> y
-      <code>T9g GO</code>.
-    </p>
-    <p>
-      <strong>X29 cerrado.</strong> El "bug upstream confirmado de <code>bare-module@6.3.2</code>"
-      de la entrada 2026-08-28 era un diagnóstico incorrecto — un re-trace del 2026-09-22 encontró
-      la causa real: <code>Worklet.start(filename, source)</code> deriva el tipo de módulo del
-      bundle a partir de la extensión de <code>filename</code>; el repo pasaba
-      <code>.worklet</code> (no reconocido por <code>bare-module-traverse</code>, cae a tipo
-      <code>SCRIPT</code>), lo que hacía compilar el header JSON binario del bundle como código
-      fuente y producía <code>SyntaxError: Unexpected token ':'</code> + SIGABRT — no un defecto de
-      <code>bare-module</code>. Fix de dos líneas en
-      <code>mobile/src/p2p/runtime/BareRuntimeClient.ts</code> y
-      <code>mobile/src/p2p/proof/ProofRuntimeFactory.ts</code> (<code>.worklet</code> →
-      <code>.bundle</code>, commit <code>75eeb3b</code>). El re-scoring honesto de RRI encontró
-      además 2 tests Jest obsoletos que seguían asertando el literal <code>.worklet</code> pre-fix
-      (<code>p2p-service.test.ts</code>, <code>transient-drive.test.ts</code>) — corregidos en
-      <code>c16c3ff</code>, 167/167 tests pasando. RRI final 25 Low, revisión
-      <code>gpt-oss:20b</code> PASS 3/3 0 hallazgos
-      (<code>docs/audit/gemma-evidence/x29-worklet-extension-fix.json</code>). Los dos criterios de
-      X29 que seguían pendientes de dispositivo real se ejecutaron hoy en el emulador
-      <code>fenix_t7</code>: (a) <code>npm run android:p2p-dev</code> completó build+install+launch
-      limpio de punta a punta; (b) el A/B ejecutado de <code>useLegacyPackaging</code> (true/false/
-      true) no mostró fallas de link nativo en ningún estado — resultado negativo documentado sin
-      sobre-reclamar que la bandera sea provadamente innecesaria, ya que no revierte la decisión
-      original de F3b de mantenerla por análisis estático. Detalle completo:
-      <code>docs/audit/mvp0-p2p-p1-f3b-implementation.md</code> §§ 11-12,
-      <code>docs/tasks/mvp0-p2p-p1-replication.md</code> § P1.F3b-fix-2.
-    </p>
-    <p>
-      Backlog de actualizaciones anteriores (2026-09-19, 2026-09-18 y previas) recortado de este
-      bloque para mantener solo el último día trabajado — el detalle completo sigue disponible en
-      el <a href="#linaje-completo">linaje del footer</a> y en la
-      <a href="https://claude.ai/code/artifact/42e0005d-4866-4a2c-95f7-0e7b92ea05bb" target="_blank" rel="noopener">bitácora histórica</a>.
-    </p>
   </div>
 
   <section>
@@ -350,7 +289,7 @@
         <defs>
           <marker id="arr-i" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" style="fill:var(--infra)"></polygon></marker>
           <marker id="arr-p" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" style="fill:var(--p2p)"></polygon></marker>
-          <marker id="arr-g" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" style="fill:var(--gate)"></polygon></marker>
+          <marker id="arr-g" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" style="fill:var(--gate)"></polygon></marker><marker id="arr-ok" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" style="fill:var(--green)"></polygon></marker>
           <marker id="arr-slate" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" style="fill:var(--ink-dim)"></polygon></marker>
         </defs>
 
@@ -404,11 +343,11 @@
         <text x="483" y="337" text-anchor="middle" style="fill:var(--green);font-size:7.3px">✓ Done 18-sep — aggregate</text>
         <text x="483" y="347" text-anchor="middle" style="fill:var(--green);font-size:7.3px">MVP0-P2P P2 es PASS</text>
 
-        <line x1="483" y1="350" x2="483" y2="365" style="stroke:var(--ink-dim);stroke-width:1.4;stroke-dasharray:3 3"></line>
-        <line x1="483" y1="365" x2="608" y2="365" style="stroke:var(--p2p);stroke-width:1.4;stroke-dasharray:3 3" marker-end="url(#arr-p)"></line>
-        <rect x="508" y="347" width="200" height="38" rx="7" style="fill:var(--gate-soft);stroke:var(--gate);stroke-width:1.6;stroke-dasharray:3 2"></rect>
-        <text x="608" y="363" text-anchor="middle" style="fill:var(--gate);font-size:9.6px;font-weight:700">DEV-HANDOFF</text>
-        <text x="608" y="376" text-anchor="middle" style="fill:var(--gate);font-size:7.5px">P3 + P4 + P5-DEV + P6 PASS</text>
+        <line x1="483" y1="350" x2="483" y2="365" style="stroke:var(--green);stroke-width:1.6"></line>
+        <line x1="483" y1="365" x2="508" y2="365" style="stroke:var(--green);stroke-width:1.6" marker-end="url(#arr-p)"></line>
+        <rect x="508" y="347" width="200" height="38" rx="7" style="fill:var(--green-soft);stroke:var(--green);stroke-width:1.8"></rect>
+        <text x="608" y="363" text-anchor="middle" style="fill:var(--green);font-size:9.6px;font-weight:700">DEV-HANDOFF — ✓ 25-sep</text>
+        <text x="608" y="376" text-anchor="middle" style="fill:var(--green);font-size:7.5px">P3 + P4 + P5-DEV + P6 PASS · 84ea5edc</text>
 
         <text x="8" y="336" style="fill:var(--gate);font-size:11px;font-weight:700;font-family:'IBM Plex Mono',monospace;letter-spacing:.04em">CADENA DE DESPLIEGUE P2P</text>
         <rect x="680" y="56" width="128" height="42" rx="7" style="fill:var(--gate-soft);stroke:var(--gate);stroke-width:1.6;stroke-dasharray:3 2"></rect>
@@ -417,7 +356,7 @@
 
         <path d="M 253 94 C 400 40, 600 40, 680 72" style="fill:none;stroke:var(--gate);stroke-width:1.4;stroke-dasharray:3 3" marker-end="url(#arr-g)"></path>
         <path d="M 393 94 C 500 50, 620 55, 680 80" style="fill:none;stroke:var(--gate);stroke-width:1.4;stroke-dasharray:3 3" marker-end="url(#arr-g)"></path>
-        <path d="M 608 349 C 660 220, 680 130, 680 84" style="fill:none;stroke:var(--p2p);stroke-width:1.4;stroke-dasharray:3 3" marker-end="url(#arr-g)"></path>
+        <path d="M 608 349 C 660 220, 680 130, 680 84" style="fill:none;stroke:var(--green);stroke-width:1.6" marker-end="url(#arr-ok)"></path>
 
         <line x1="744" y1="98" x2="744" y2="332" style="stroke:var(--gate);stroke-width:1.6" marker-end="url(#arr-g)"></line>
         <rect x="700" y="336" width="164" height="34" rx="7" style="fill:var(--surface-2);stroke:var(--border);stroke-width:1.4"></rect>
@@ -446,7 +385,7 @@
     <p class="caption">
       <code>T6p-a</code> depende de <code>T7local PASS</code> + <code>T7c PASS</code> +
       <code>DEV-HANDOFF</code> + un <strong>freshness check</strong> de la evidencia
-      T7local contra el head exacto de DEV-HANDOFF. Si cambiaron superficies
+      T7local contra el head exacto de DEV-HANDOFF (<code>84ea5edc</code>, fijado 2026-09-25). Si cambiaron superficies
       relevantes del base flow, se corre una regresión acotada antes de T6p-a.
       El <code>DEV-HANDOFF</code> es exactamente
       <code>P3 PASS + P4 PASS + P5-DEV + P6 PASS</code>. <code>P5-DEV</code> significa
@@ -458,41 +397,6 @@
     </p>
   </section>
 
-  <section>
-    <div class="section-head"><h2>Ráfaga de 72h: P3–P6 aterrizan código real sin activación formal</h2></div>
-    <p class="section-note">
-      Hallazgo principal de esta sync. No es un problema de que falte trabajo — es lo opuesto: se
-      construyó una cantidad grande de funcionalidad de producto real en tres días, pero por fuera
-      del proceso de aprobación/RRI/revisión que este mismo repositorio exige para RRI 26+, y el
-      dashboard (P6) arrancó sin que su propio gate de activación estuviera satisfecho.
-    </p>
-    <div class="risks">
-      <div class="risk high">
-        <span class="tag2">P6 vs. su gate</span>
-        <p><code>docs/audit/mvp0-p2p-p6-t0-preflight-2026-09-17.md</code> (commit <code>8d85a79</code>, 13:28) declara: <em>"P6.T0 remains blocked until P3-P5 are PASS"</em> y define dos gaps de contrato obligatorios antes de activar (GAP-1: falta un read model de publicación P2P para el dueño; GAP-2: una invitación reclamada no sobrevive un restart sin un contrato de recuperación). Los commits de implementación de dashboard (read models, repo, rutas, servicio mobile) empiezan a las 13:44 — 16 minutos después — sin PASS de P3-P5 registrado en ningún lado.</p>
-      </div>
-      <div class="risk high">
-        <span class="tag2">Sin gobernanza</span>
-        <p>149 de 151 commits en 72h son autoría directa del owner; ninguno de los cuatro tramos (P3/P4/P5/P6) tiene approval card, RRI, review de fase 1/2, Reflection log ni verificación del owner en <code>docs/audit/</code>. Los task ledgers de las cuatro fases siguen textualmente <code>Planned; not activated</code> desde el 2026-09-08.</p>
-      </div>
-      <div class="risk med">
-        <span class="tag2">Lo construido — P3</span>
-        <p>Cifrado de sobre K1 por dispositivo vía HPKE RFC9180, módulo nativo Android Keystore (unwrap opaco P256), schema + repositorio + rutas API de invitación/claim/autorización de audiencia, cliente API mobile.</p>
-      </div>
-      <div class="risk med">
-        <span class="tag2">Lo construido — P4</span>
-        <p>Orquestador de sync producto-a-producto con máquina de estados resumible tras restart, protocolo RPC del worklet Bare extendido (paquetes + hashing), aislamiento y limpieza de caché por cuenta en sign-out, handoff P4→P5 verificado.</p>
-      </div>
-      <div class="risk med">
-        <span class="tag2">Lo construido — P5</span>
-        <p>Runtime de descifrado y reproducción local, lifecycle de sesión de playback con teardown determinista, harness de certificación Android (estilo P5.T3).</p>
-      </div>
-      <div class="risk info">
-        <span class="tag2">CI roja</span>
-        <p>Los últimos 5 runs de <code>ci</code> en <code>feature/p2p-mvp-core</code> fallan: <code>qa-deny</code> por <code>RUSTSEC-2026-0285</code> (rustls, probablemente vía el backend <code>aws-lc</code> nuevo de K1) y el job <code>s3-integration</code> por <code>docker pull</code> denegado de <code>minio/minio:edge-cicd</code>. Ninguna es una regresión de lógica de negocio, pero la rama no puede fusionarse así.</p>
-      </div>
-    </div>
-  </section>
 
   <section>
     <div class="section-head"><h2>P2P local-dev-readiness (hallazgo 14-sep) — mergeado en local, verificado por código; smoke test real aún pendiente</h2></div>
@@ -551,7 +455,7 @@
           <div class="lrow now"><span class="id">T7local</span><span class="desc"><strong>Base mobile smoke</strong> contra el gateway de <code>infra/local/docker-compose.yml</code> (<code>host :8082</code>). Corre como lane independiente y certifica login→upload→rights→preparation→review→publish→HLS playback; no certifica Invite/Claim/P2P Sync/Verify/loopback/HPKE.</span><span class="status">→ runnable now</span></div>
           <div class="lrow next"><span class="id">T7c</span><span class="desc">Expiración de sesión — depende de T7local</span><span class="status">planned</span></div>
           <div class="lrow next"><span class="id">T6 / T7</span><span class="desc">Deploy real en DO — rama independiente, no bloquea T6p-a</span><span class="status">planned</span></div>
-          <div class="lrow next"><span class="id">T6p-a…d</span><span class="desc">Convergencia P2P/deploy — deferred hasta T7local PASS + T7c PASS + <strong>DEV-HANDOFF</strong> + freshness check de T7local contra el head exacto; luego ownership/config y publicación en DO.</span><span class="status">deferred</span></div>
+          <div class="lrow next"><span class="id">T6p-a…d</span><span class="desc">Convergencia P2P/deploy — deferred hasta T7local PASS + T7c PASS + <strong>DEV-HANDOFF</strong> + freshness check de T7local contra el head exacto <code>84ea5edc</code>; luego ownership/config y publicación en DO.</span><span class="status">deferred</span></div>
           <div class="lrow next"><span class="id">T9 / T9g</span><span class="desc">Cierre + GO/NO-GO de octubre</span><span class="status">planned</span></div>
         </div>
       </div>
@@ -569,14 +473,14 @@
           <div class="lrow done" style="border-left:3px solid var(--green)"><span class="id">P2.T4 (a–f)</span><span class="desc">Kernel de recuperación + claim/lease + cliente mTLS + dispatcher + ventanas de crash + reconciler — <strong>Done</strong></span><span class="status">✓ Done 14-sep</span></div>
           <div class="lrow done" style="border-left:3px solid var(--green)"><span class="id">P2.T5/T6</span><span class="desc">Integración S-120 + auditoría/cierre de P2 — retro-certificado (CONS-T4/T5) con RRI/Reflection/coverage/owner-verification propios</span><span class="status">✓ Done 18-sep</span></div>
           <div class="lrow done" style="border-left:3px solid var(--green)"><span class="id">P2 (agregado)</span><span class="desc">P2.T0–T6 completos</span><span class="status">✓ PASS</span></div>
-          <div class="lrow now"><span class="id">local-dev</span><span class="desc">Entrypoint + servicio compose + certs mTLS + env vars — mergeado y ya en el checkout local (HEAD == origin, verificado 19-sep); falta correr el smoke test móvil real</span><span class="status">infra lista</span></div>
-          <div class="lrow done"><span class="id">DEV-HANDOFF</span><span class="desc">Camino de desarrollo: P3 PASS + P4 PASS + P5-DEV + P6 PASS. P5.T3 queda explícitamente fuera de este gate.</span><span class="status">✓ SATISFIED 2026-09-25</span></div>
+          <div class="lrow done"><span class="id">local-dev</span><span class="desc">Entrypoint + servicio compose + certs mTLS + env vars — mergeado; el smoke móvil base se ejecuta en S-230 <code>T7local</code></span><span class="status">✓ infra lista</span></div>
+          <div class="lrow done"><span class="id">DEV-HANDOFF</span><span class="desc">Camino de desarrollo: P3 PASS + P4 PASS + P5-DEV + P6 PASS. P5.T3 queda explícitamente fuera de este gate. Head <code>84ea5edc</code> (15/15 CI).</span><span class="status">✓ SATISFIED 2026-09-25</span></div>
           <div class="sub-ladder">
             <div class="sub-row"><span class="sid">P3</span><span class="sdesc"><strong>PASS 2026-09-22</strong> — T0/T1/T2/T3a-d cerrados; integración, secret-boundary y handoff certificados.</span></div>
             <div class="sub-row"><span class="sid">P4</span><span class="sdesc"><strong>PASS 2026-09-22</strong> — T0/T1/T2/T3 cerrados; head <code>780519c5</code> 15/15 CI; handoff P4→P5 y owner verification completados.</span></div>
             <div class="sub-row"><span class="sid">P5-DEV</span><span class="sdesc"><strong>SATISFIED 2026-09-22</strong> — T0/T1/T2 formalmente cerrados; owner verification completada; <code>e63209f5</code> 15/15 CI; mobile 62/62 suites y 446/446 tests.</span></div>
             <div class="sub-row"><span class="sid">P5.T3</span><span class="sdesc"><strong>P5-CERT pendiente</strong> — certificación física diferida; no bloquea P6. Se resuelve con T7p compatible o P7.T2.</span></div>
-            <div class="sub-row warn"><span class="sid">P6</span><span class="sdesc"><strong>P6 PASS 2026-09-25</strong> — T0–T3 cerrados. T1/T2 mantienen su evidencia y owner verification; T3 cerró la certificación visual Android con 11/11 screenshots, D5 PASS y D6 en <code>fenix_t7</code> / <code>emulator-5554</code>, Android 14, Maestro 2.6.1. DEV-HANDOFF queda satisfecho.</span></div>
+            <div class="sub-row"><span class="sid">P6</span><span class="sdesc"><strong>P6 PASS 2026-09-25</strong> — T0–T3 cerrados. T1/T2 mantienen su evidencia y owner verification; T3 cerró la certificación visual Android con 11/11 screenshots, D5 PASS y D6 en <code>fenix_t7</code> / <code>emulator-5554</code>, Android 14, Maestro 2.6.1. DEV-HANDOFF queda satisfecho.</span></div>
           </div>
           <div class="lrow next"><span class="id">P7</span><span class="desc">Certificación exact-artifact; P7.T2 absorbe P5.T3 si todavía sigue abierto</span><span class="status">release gate</span></div>
         </div>
@@ -621,9 +525,9 @@
         <span class="tag2">X29 — cerrado</span>
         <p><strong>CLOSED 2026-09-22.</strong> El diagnóstico previo ("bug upstream confirmado de <code>bare-module@6.3.2</code>") era incorrecto — la causa real era un defecto propio de 2 líneas: <code>Worklet.start()</code> deriva el tipo de módulo del bundle por extensión de archivo, y el repo pasaba <code>.worklet</code> (no reconocido, cae a tipo <code>SCRIPT</code>) en vez de <code>.bundle</code>. Fix + 2 tests obsoletos corregidos, RRI 25 Low, revisión <code>gpt-oss:20b</code> PASS 0 hallazgos, owner-verified. Ambos criterios de dispositivo (build/install/launch completo, A/B de <code>useLegacyPackaging</code>) ejecutados hoy en <code>fenix_t7</code>. Ya no es blocker de <code>T7p</code>/<code>T9g</code>.</p>
       </div>
-      <div class="risk med">
-        <span class="tag2">DEV-HANDOFF — SATISFIED 2026-09-25</span>
-        <p><strong>P3 PASS + P4 PASS + P5-DEV + P6 PASS</strong> están satisfechos. P6 cerró tras T3.D6 con evidencia Android en <code>fenix_t7</code> / <code>emulator-5554</code>, Android 14, Maestro 2.6.1 y 11/11 screenshots. P5.T3 permanece fuera de este gate y vuelve en release certification. T6p-a sigue esperando T7local PASS + T7c PASS + freshness contra el head exacto de DEV-HANDOFF.</p>
+      <div class="risk info">
+        <span class="tag2">DEV-HANDOFF — cerrado 2026-09-25</span>
+        <p><strong>P3 PASS + P4 PASS + P5-DEV + P6 PASS</strong> están satisfechos. P6 cerró tras T3.D6 con evidencia Android en <code>fenix_t7</code> / <code>emulator-5554</code>, Android 14, Maestro 2.6.1 y 11/11 screenshots. P5.T3 permanece fuera de este gate y vuelve en release certification. Head exacto fijado: <code>84ea5edc</code> (15/15 CI), equivalente en código a <code>2cc8a6b</code> (último commit de código P6, 15/15 CI). T6p-a sigue esperando T7local PASS + T7c PASS + freshness contra <code>84ea5edc</code>.</p>
       </div>
       <div class="risk med">
         <span class="tag2">P5.T3 — diferido, no eliminado</span>
@@ -631,7 +535,7 @@
       </div>
       <div class="risk info">
         <span class="tag2">CI — verde</span>
-        <p><strong>P6.T1 PASS 2026-09-23.</strong> T1.A–H cerrados; owner Matias revisó y aprobó el bloque. El peer review de fase 2 queda cubierto por la excepción owner-directed vigente para MVP0-P2P P0–P7. Functional/evidence head <code>b6df0a7f</code>: 15/15 CI PASS; mobile 63/63 suites, 461/461 tests; coverage 90.43%. P6.T2 PASS 2026-09-24: T2.A–H cerrados; owner final verification registrada por la directiva `cierra P6.T2`; REVIEW-OVERRIDE vigente. P6.T3 PASS 2026-09-25; P6 PASS y DEV-HANDOFF satisfecho. B: inbox+P4 projection `19a5bca9` 15/15 CI, 64/64 suites · 481/481 tests. C: manual Claim vía P3 `c104d40a` 15/15 CI, 64/64 suites · 489/489 tests. D: Sync/Retry vía P4 `a99a712c` 15/15 CI, 64/64 suites · 495/495 tests. E: verified Available→Play vía P4/P5 `8fa7411d` 15/15 CI, 64/64 suites · 501/501 tests. F: lifecycle fail-closed por account/session `9c4b41e4` 15/15 CI, 64/64 suites · 507/507 tests. G: Home→Invites→Back + re-entry/refetch `6f4a89e1` 15/15 CI, 64/64 suites · 509/509 tests.</p>
+        <p><strong>Verde en el head de DEV-HANDOFF.</strong> <code>84ea5edc</code> y <code>2cc8a6b</code> 15/15 CI; <code>git diff 2cc8a6b 84ea5edc</code> solo toca <code>docs/</code> y screenshots. Evidencia por bloque de P6.T1–T3 en <code>docs/tasks/mvp0-p2p-p6-dashboard.md</code>.</p>
       </div>
       <div class="risk info">
         <span class="tag2">P2P local-dev — infra lista</span>
@@ -647,7 +551,7 @@
       </div>
       <div class="risk med">
         <span class="tag2">T7local — infra lista, smoke test pendiente</span>
-        <p><code>S-230-T7local</code> sigue <code>[ ] Planned</code> y ya está ejecutable con P6/DEV-HANDOFF ya PASS. Sus prerequisitos de infra están disponibles. El target móvil correcto es el <strong>gateway</strong> de Compose en host <code>:8082</code> (emulador: <code>10.0.2.2:8082</code>), no el API <code>:8080</code>. T7local certifica solo el base-flow S-230. Si P6 u otro trabajo modifica después superficies relevantes del base flow, <code>T6p-a</code> exige una revalidación acotada sobre el head exacto de DEV-HANDOFF antes de consumir ese PASS.</p>
+        <p><code>S-230-T7local</code> sigue <code>[ ] Planned</code> y ya está ejecutable con P6/DEV-HANDOFF ya PASS. Sus prerequisitos de infra están disponibles. El target móvil correcto es el <strong>gateway</strong> de Compose en host <code>:8082</code> (emulador: <code>10.0.2.2:8082</code>), no el API <code>:8080</code>. T7local certifica solo el base-flow S-230. Si su PASS queda en un head distinto de <code>84ea5edc</code> y cambiaron superficies relevantes del base flow, <code>T6p-a</code> exige una revalidación acotada antes de consumir ese PASS.</p>
       </div>
       <div class="risk info">
         <span class="tag2">T4e-cov residual</span>
@@ -662,8 +566,8 @@
     <div class="timeline">
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">6–10 SEP</div><div class="work">T1 done + P2.C0 PASS + T2 completo + T3a/T3b done; nueva T7local</div><div class="outcome">X29 promovido a blocker</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">11–18 SEP</div><div class="work">P2.T3c/T3d/T4 cerrados; ledger de remediación abierto y ejecutado — CONS-T0/T1/T2/T3/T4/T5/T9 <strong>Done</strong> (aggregate P2 PASS); CONS-T6/T7/T8a verificó P3/P4/P5.T0-2 leaf por leaf: P4.T0/P4.T2/P5.T0 Done, resto Blocked por gaps reales; CI sigue roja (RUSTSEC + MinIO + coverage); S-230 T7local sin avance en 12 días</div><div class="outcome">X29 OPEN, plazo venció 18-sep</div></div>
-      <div class="tstep now"><div class="bar"><div class="dot"></div></div><div class="window">19 SEP–2 OCT</div><div class="work"><strong>P3 PASS + P4 PASS + P5-DEV SATISFIED</strong>. P6 ya está PASS y DEV-HANDOFF satisfecho; S-230 debe completar T7local base-flow vía gateway local :8082 → T7c. La convergencia ocurre recién en T6p-a con DEV-HANDOFF + T7local/T7c + freshness check. P5.T3/P5-CERT sigue diferido.</div><div class="outcome">◆ objetivo inmediato: cerrar T7local/T7c + freshness<div class="here-flag">estás acá</div></div></div>
-      <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">3–12 OCT</div><div class="work">Cerrar cualquier residual de T7local/T7c y emitir freshness disposition del smoke local contra el head exacto de DEV-HANDOFF</div><div class="outcome">DEV-HANDOFF + local lane listos para T6p-a</div></div>
+      <div class="tstep now"><div class="bar"><div class="dot"></div></div><div class="window">19 SEP–2 OCT</div><div class="work"><strong>P3 PASS + P4 PASS + P5-DEV SATISFIED</strong>. P6 PASS y DEV-HANDOFF satisfecho (head <code>84ea5edc</code>); S-230 debe completar T7local base-flow vía gateway local :8082 → T7c. La convergencia ocurre recién en T6p-a con DEV-HANDOFF + T7local/T7c + freshness check. P5.T3/P5-CERT sigue diferido.</div><div class="outcome">◆ objetivo inmediato: cerrar T7local/T7c + freshness<div class="here-flag">estás acá</div></div></div>
+      <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">3–12 OCT</div><div class="work">Cerrar cualquier residual de T7local/T7c y emitir freshness disposition del smoke local contra <code>84ea5edc</code></div><div class="outcome">DEV-HANDOFF + local lane listos para T6p-a</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">13–21 OCT</div><div class="work">T6p-a → T6p-b → T6p-c → T6p-d; completar T6/T7 si sigue pendiente</div><div class="outcome">backend P2P desplegado</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">22–26 OCT</div><div class="work">T7p: candidato Android físico; reutilizar evidencia para P5.T3 si cubre criterios exactos</div><div class="outcome">RC listo + posible P5-CERT</div></div>
       <div class="tstep milestone"><div class="bar"><div class="dot"></div></div><div class="window">27–30 OCT</div><div class="work">P7 exact-artifact; P7.T2 cierra P5.T3 si aún sigue abierto; soak y rollback</div><div class="outcome">◆ T9g — GO/NO-GO</div></div>
@@ -671,7 +575,7 @@
   </section>
 
   <footer>
-    Fuentes verificadas para este documento (sync 2026-09-24):
+    Fuentes verificadas para este documento (sync 2026-09-25):
     <code>docs/audit/mvp0-p2p-p1-f3b-implementation.md</code> §§ 11-12 (RRI, revisión, coverage,
     owner verification; ambos criterios de dispositivo ejecutados) ·
     <code>docs/tasks/mvp0-p2p-p1-replication.md</code> § P1.F3b-fix-2 ·
@@ -702,7 +606,7 @@
     <code>docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md</code> (evidencia por leaf) ·
     <code>make qa-docs</code> (pasó limpio tras los cierres).
     <div class="lineage" id="linaje-completo">
-      <strong>Linaje:</strong> 2026-09-24 — P6.T2 PASS: A–H cerrados; owner final verification + REVIEW-OVERRIDE; P6.T3 desbloqueado ← 2026-09-24 — P6.T2.G PASS: Home→Invites→Back + re-entry verde en <code>6f4a89e1</code> ← 2026-09-24 — P6.T2.F PASS: lifecycle fail-closed account/session verde en <code>9c4b41e4</code> ← 2026-09-24 — P6.T2.E PASS: Available→Play vía verified P4 handle + P5 verde en <code>8fa7411d</code> ← 2026-09-24 — P6.T2.D PASS: Sync/Retry vía P4 verde en <code>a99a712c</code> ← 2026-09-24 — P6.T2.B/C PASS: inbox+state projection y manual Claim verdes ← 2026-09-23 — P6.T1 PASS: T1.A–H cerrados con owner self-review + REVIEW-OVERRIDE vigente; P6.T2 desbloqueado ← 2026-09-22 noche — P6.T1.A–G PASS: My Content, exact Ready, Create/Copy, navegación y aggregate gap closure verdes en <code>47bc3e8b</code> ← P3 y P4 cerrados PASS; P5.T1/T2 formalmente cerrados; P5-DEV SATISFIED; P6.T0 PASS ← este documento (2026-09-22 tarde — merge de 14 commits remotos
+      <strong>Linaje:</strong> 2026-09-25 — P6 PASS + DEV-HANDOFF SATISFIED (head <code>84ea5edc</code>); sección “Ráfaga de 72h” retirada por obsoleta ← 2026-09-24 — P6.T2 PASS: A–H cerrados; owner final verification + REVIEW-OVERRIDE; P6.T3 desbloqueado ← 2026-09-24 — P6.T2.G PASS: Home→Invites→Back + re-entry verde en <code>6f4a89e1</code> ← 2026-09-24 — P6.T2.F PASS: lifecycle fail-closed account/session verde en <code>9c4b41e4</code> ← 2026-09-24 — P6.T2.E PASS: Available→Play vía verified P4 handle + P5 verde en <code>8fa7411d</code> ← 2026-09-24 — P6.T2.D PASS: Sync/Retry vía P4 verde en <code>a99a712c</code> ← 2026-09-24 — P6.T2.B/C PASS: inbox+state projection y manual Claim verdes ← 2026-09-23 — P6.T1 PASS: T1.A–H cerrados con owner self-review + REVIEW-OVERRIDE vigente; P6.T2 desbloqueado ← 2026-09-22 noche — P6.T1.A–G PASS: My Content, exact Ready, Create/Copy, navegación y aggregate gap closure verdes en <code>47bc3e8b</code> ← P3 y P4 cerrados PASS; P5.T1/T2 formalmente cerrados; P5-DEV SATISFIED; P6.T0 PASS ← este documento (2026-09-22 tarde — merge de 14 commits remotos
       (<code>c726e42</code>): P4.T1 pasa de Blocked a <strong>Implemented+verified</strong>
       (reconexión acotada, <code>P2pProductSync.ts</code>, RRI 55, revisión Med-high pendiente);
       P4.T3 suma test de cambio de cuenta (RRI 25 Low); CI cambia de causa — <code>deny</code>/

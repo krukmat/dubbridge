@@ -308,7 +308,7 @@ controlled Android P2P beta/POC by 2026-10-30 through S-230 T6p-a..d, T7p,
 P7, and T9g. X29 is a release blocker for that target. iOS remains deferred. **Bounded exception (2026-09-06, deactivated 2026-09-07 by owner instruction — owner back online):** while active, every code-touching task in S-230 or MVP0-P2P defaulted to cloud implementation instead of local-first, per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Bounded cloud-implementation priority`. Deactivated 2026-09-07; code-touching tasks in these slices now resume the normal RRI-band local-first default. Local phase-1/phase-2 review was and remains unaffected. **2026-09-18: `CONS-T5` closed `P2.T6e` — aggregate `MVP0-P2P P2` is PASS**
 (`docs/audit/mvp0-p2p-p2-t6-closure.md`). `CONS-T6/T7/T8a` then verified P3/
 P4/P5.T0-2 per-leaf against real acceptance criteria (not authorization
-alone): **P4.T0, P4.T2, P5.T0 are Done, owner-verified**; **P3 PASS; P4 PASS (2026-09-22); P5.T1/P5.T2 retain formal-closure work toward P5-DEV** on genuine gaps, mostly
+alone): **P4.T0, P4.T2, P5.T0 are Done, owner-verified**; **P3 PASS; P4 PASS (2026-09-22); P5.T1/P5.T2 formally closed 2026-09-22 (P5-DEV SATISFIED)** after closing genuine gaps, mostly
 untested fail-closed logic — see
 `docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`
 and the P3/P4/P5 task ledgers. `CONS-T8b`/`CONS-T10a`/`CONS-T10c` stay
@@ -474,9 +474,9 @@ captured above under Governing principles and ADR-025/ADR-026.
   § CONS-T1 closure record); 86/86 Availability Node tests now pass.
   T6p-a requires MVP0-P2P DEV-HANDOFF plus T7local/T7c PASS **and the
   T7local exact-head freshness disposition**; deferred P5.T3 is not part of
-  that development gate. T7local can run before P6 closes, but relevant
-  base-flow/mobile/gateway/local-compose changes between its PASS head and
-  DEV-HANDOFF require a bounded regression before T6p-a. October capacity is
+  that development gate. The exact DEV-HANDOFF head is pinned at `84ea5edc`;
+  relevant base-flow/mobile/gateway/local-compose changes between T7local's
+  PASS head and that commit require a bounded regression before T6p-a. October capacity is
   not validated by the existence of these plans. X29 is required for the
   release, X28/CI for T9g; optional queue acceleration and S-230
   T7b/T8/T8b are outside the mandatory path.
@@ -532,11 +532,7 @@ captured above under Governing principles and ADR-025/ADR-026.
 > **P4 PASS — 2026-09-22:** P4.T0/T1/T2/T3 are closed. P4.T3 HP/EC mapping and verified-handle handoff to P5 are recorded in `docs/audit/p4-t3-certification-and-p5-handoff-2026-09-22.md`; certification head `780519c5` completed 15/15 CI and owner verification is complete. The physical Android proof remains mandatory under deferred P5.T3/P5-CERT but does not reopen P4.
 
 
-> **P5-DEV closure-readiness — 2026-09-22:** P3 PASS + P4 PASS are satisfied.
-> P5.T0 is Done; P5.T1/T2 are closure-ready with current mobile evidence
-> 62/62 suites and 446/446 tests PASS. Owner verification is the final step to
-> establish P5-DEV and unlock P6.T0. P5.T3 remains a deferred physical
-> release-certification obligation and aggregate P5 remains IN PROGRESS.
+> **P5-DEV SATISFIED — 2026-09-22:** P5.T0/T1/T2 are formally closed. Preparation head `e63209f5` completed 15/15 CI; mobile revalidation is 62/62 suites and 446/446 tests; owner verification is complete. P5.T3/P5-CERT remains open in the release lane and aggregate P5 remains IN PROGRESS.
 
 
-> **P5-DEV SATISFIED — 2026-09-22:** P5.T0/T1/T2 are formally closed. Preparation head `e63209f5` completed 15/15 CI; mobile revalidation is 62/62 suites and 446/446 tests; owner verification is complete. P5.T3/P5-CERT remains open in the release lane and aggregate P5 remains IN PROGRESS. **P6.T0 is now unblocked / not activated.**
+> **DEV-HANDOFF SATISFIED — 2026-09-25:** P3 PASS + P4 PASS + P5-DEV + P6 PASS (`docs/tasks/mvp0-p2p-p6-dashboard.md` § T3.D6). Exact DEV-HANDOFF head: `84ea5edc` (15/15 CI), code-equivalent to the last P6 code commit `2cc8a6b` (15/15 CI). This is the reference for S-230's T7local freshness check before T6p-a. P5.T3/P5-CERT remains a release-lane obligation for T7p/P7.T2.
