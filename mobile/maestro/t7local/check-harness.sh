@@ -28,8 +28,9 @@ for banned in   "/e2e/seed"   "e2e@dubbridge.dev"   "review-task-seed-"   "asset
   fi
 done
 
-grep -F 'inputText: ${T7LOCAL_EMAIL}' "$dir/login-real.yaml" >/dev/null
-grep -F 'inputText: ${T7LOCAL_PASSWORD}' "$dir/login-real.yaml" >/dev/null
+grep -F 'setClipboard: ${T7LOCAL_EMAIL}' "$dir/login-real.yaml" >/dev/null
+grep -F 'setClipboard: ${T7LOCAL_PASSWORD}' "$dir/login-real.yaml" >/dev/null
+grep -F 'enabled: true' "$dir/login-real.yaml" >/dev/null
 grep -F 'upload-field-proof-reference' "$dir/ingest-real.yaml" >/dev/null
 grep -F 'review-task-card-${T7LOCAL_REVIEW_TASK_ID}' "$dir/review-publish-real.yaml" >/dev/null
 grep -F 'asset-card-${T7LOCAL_ASSET_ID}' "$dir/playback-real.yaml" >/dev/null

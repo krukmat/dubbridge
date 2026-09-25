@@ -7,16 +7,23 @@ tags:
 ---
 - tapOn:
     id: login-email-input
-- inputText: ${T7LOCAL_EMAIL}
+- setClipboard: ${T7LOCAL_EMAIL}
+- pasteText
 
 - tapOn:
     id: login-password-input
-- inputText: ${T7LOCAL_PASSWORD}
+- setClipboard: ${T7LOCAL_PASSWORD}
+- pasteText
 
 - hideKeyboard
 
+- assertVisible:
+    id: login-submit-button
+    enabled: true
+
 - tapOn:
     id: login-submit-button
+    enabled: true
 
 - extendedWaitUntil:
     visible:
