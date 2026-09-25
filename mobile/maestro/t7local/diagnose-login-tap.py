@@ -282,6 +282,50 @@ def run_maestro_probe(
     return state
 
 
+def run_delayed_maestro_probe(
+    serial: str,
+    env: dict[str, str],
+    label: str,
+    delay_ms: int,
+) -> str:
+    clear_logcat(serial)
+    flow = write_probe_flow(
+        label,
+        f"- waitForAnimationToEnd:\n"
+        f"    timeout: {max(delay_ms, 100)}\n"
+        f"- tapOn:\n"
+        f"    id: login-submit-button\n"
+        f"    enabled: true",
+    )
+    if delay_ms > 0:
+        time.sleep(delay_ms / 1000.0)
+    result = maestro_test(flow, env)
+    write_text(f"{label}-tap-stdout.txt", result.stdout)
+    write_text(f"{label}-tap-stderr.txt", result.stderr)
+    state = wait_for_probe_state(serial, env, label)
+    save_logcat(serial, label)
+    return state
+
+
+def run_delayed_adb_probe(
+    serial: str,
+    env: dict[str, str],
+    label: str,
+    x: int,
+    y: int,
+    delay_ms: int,
+) -> str:
+    clear_logcat(serial)
+    if delay_ms > 0:
+        time.sleep(delay_ms / 1000.0)
+    tap = run(["adb", "-s", serial, "shell", "input", "tap", str(x), str(y)])
+    write_text(f"{label}-tap-stdout.txt", tap.stdout)
+    write_text(f"{label}-tap-stderr.txt", tap.stderr)
+    state = wait_for_probe_state(serial, env, label)
+    save_logcat(serial, label)
+    return state
+
+
 def run_adb_probe(
     serial: str,
     env: dict[str, str],
@@ -517,7 +561,54 @@ def main() -> None:
         '    enabled: true',
     )
 
-    if (
+    # Separate "first tap primes the UI" from "tap happens too soon after the
+    # keyboard is hidden". Each delayed probe starts from a fresh login state
+    # and performs exactly one submit tap.
+    for delay_ms in (500, 1000, 2000, 4000, 6000):
+        label = f"adb_delay_{delay_ms}ms"
+        center = prepare(serial, env, email, password, label)
+        results[label] = run_delayed_adb_probe(
+            serial,
+            env,
+            label,
+            center[0],
+            center[1],
+            delay_ms,
+        )
+
+    for delay_ms in (1000, 2000, 4000, 6000):
+        label = f"maestro_delay_{delay_ms}ms"
+        prepare(serial, env, email, password, label)
+        results[label] = run_delayed_maestro_probe(
+            serial,
+            env,
+            label,
+            delay_ms,
+        )
+
+    delayed_adb_home = [
+        delay_ms
+        for delay_ms in (500, 1000, 2000, 4000, 6000)
+        if results[f"adb_delay_{delay_ms}ms"] == "home"
+    ]
+    delayed_maestro_home = [
+        delay_ms
+        for delay_ms in (1000, 2000, 4000, 6000)
+        if results[f"maestro_delay_{delay_ms}ms"] == "home"
+    ]
+
+    if delayed_adb_home and delayed_maestro_home:
+        diagnosis = (
+            "POST_IME_SETTLE_DELAY "
+            f"adb_min={min(delayed_adb_home)}ms "
+            f"maestro_min={min(delayed_maestro_home)}ms"
+        )
+    elif delayed_adb_home:
+        diagnosis = (
+            "POST_IME_SETTLE_PLUS_MAESTRO_PATH "
+            f"adb_min={min(delayed_adb_home)}ms"
+        )
+    elif (
         results["maestro_then_adb_maestro"] == "phase:idle"
         and results["maestro_then_adb_adb"] == "home"
     ):
