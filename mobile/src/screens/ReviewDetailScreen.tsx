@@ -58,7 +58,6 @@ type ReviewActionsProps = {
   isSubmitting: boolean;
   decide: (v: "approved" | "rejected") => Promise<void>;
   publish: () => Promise<void>;
-  onInvoked: (action: "approve" | "reject" | "publish") => void;
 };
 
 function ReviewActions({
@@ -67,7 +66,6 @@ function ReviewActions({
   isSubmitting,
   decide,
   publish,
-  onInvoked,
 }: ReviewActionsProps) {
   if (taskState === "pending") {
     return (
@@ -75,10 +73,7 @@ function ReviewActions({
         <Button
           testID="review-approve"
           label="Approve"
-          onPress={() => {
-            onInvoked("approve");
-            void decide("approved");
-          }}
+          onPress={() => void decide("approved")}
           loading={isSubmitting}
           disabled={isSubmitting}
           fullWidth
@@ -88,10 +83,7 @@ function ReviewActions({
           testID="review-reject"
           label="Reject"
           variant="danger"
-          onPress={() => {
-            onInvoked("reject");
-            void decide("rejected");
-          }}
+          onPress={() => void decide("rejected")}
           loading={isSubmitting}
           disabled={isSubmitting}
           fullWidth
@@ -106,10 +98,7 @@ function ReviewActions({
       <Button
         testID="publish-action"
         label="Publish"
-        onPress={() => {
-          onInvoked("publish");
-          void publish();
-        }}
+        onPress={() => void publish()}
         loading={isSubmitting}
         disabled={isSubmitting}
         fullWidth
@@ -159,7 +148,6 @@ export function ReviewDetailScreen({ task, gatewayBaseUrl, onBack }: ReviewDetai
   const { taskState, comment, setComment, publishedAt, mutation, decide, publish } =
     useReviewDetailMutations(task, gatewayBaseUrl);
   const [playbackAttempt, setPlaybackAttempt] = useState(0);
-  const [lastInvoked, setLastInvoked] = useState<"approve" | "reject" | "publish" | null>(null);
   const playbackState = usePlaybackLoader({ assetId: task.asset_id, gatewayBaseUrl, attempt: playbackAttempt });
   const isSubmitting = mutation.kind === "submitting";
   const readiness = readinessLabel(taskState, publishedAt);
@@ -193,7 +181,6 @@ export function ReviewDetailScreen({ task, gatewayBaseUrl, onBack }: ReviewDetai
         <Panel>
           <Text style={styles.sectionTitle}>Decision</Text>
           <TextInput testID="review-comment-input" accessibilityLabel="Comment" value={comment} onChangeText={setComment} placeholder="Add a comment…" multiline numberOfLines={3} style={[fieldStyle, styles.commentInput]} />
-          {lastInvoked ? <Text testID={`review-action-invoked-${lastInvoked}`} style={styles.actionProbe}>Action invoked: {lastInvoked}</Text> : null}
           {mutation.kind === "error" ? <Text testID="review-mutation-error" style={styles.errorText} accessibilityRole="alert" accessibilityLiveRegion="assertive">{mutation.message}</Text> : null}
           <ReviewActions
             taskState={taskState}
@@ -201,7 +188,6 @@ export function ReviewDetailScreen({ task, gatewayBaseUrl, onBack }: ReviewDetai
             isSubmitting={isSubmitting}
             decide={decide}
             publish={publish}
-            onInvoked={setLastInvoked}
           />
         </Panel>
         <ReviewPublicationSection taskState={taskState} publishedAt={publishedAt} />
@@ -233,6 +219,5 @@ const styles = StyleSheet.create({
   commentInput: { minHeight: space.xxxl * 2, textAlignVertical: "top" },
   inlineActions: { flexDirection: "row", gap: space.sm },
   actionButton: { flex: 1 },
-  actionProbe: { ...type.meta, color: color.ink400 },
   errorText: { ...type.meta, color: color.danger },
 });

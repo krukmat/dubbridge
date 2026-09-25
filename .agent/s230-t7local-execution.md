@@ -162,12 +162,14 @@ in the observed environment; the `--lan` start above restored emulator access.
 Keep the gateway on `8082`. Verify the bundle load and `login-screen`, rather
 than treating an `openLink` success as bootstrap evidence.
 
-**Current stop point:** bootstrap passes; B3 Maestro submit remains blocked.
-The 2026-09-25 diagnostic reached `home-screen` through real authentication
-after a normal ADB UI tap, but Maestro's submit tap left `Login phase: idle`;
-`retryTapIfNoChange` also failed. Until B3 passes automatically, run only the
-bootstrap/login prefix, not the full B3–C4 driver above. See
-`docs/audit/s-230-t7local-2026-09-25.md` for exact evidence and limitations.
+**Final local disposition (2026-09-26):** B3, C1 and C2 are proven on the
+real local stack. Review Inbox, target task navigation, Review Detail and the
+normal review playback surface are also proven. C3 (Approve decision) and C4
+(Publish) are deliberately deferred after repeated Android/Maestro taps failed
+to enter the React Native Approve `onPress`; a DB probe confirmed no decision
+was persisted. Do not rerun the full ingestion pipeline for this residual.
+Reopen C3/C4 only if a later release gate requires device-level proof. See
+`docs/audit/s-230-t7local-2026-09-25.md` for the exact evidence and scope cut.
 
 The runner uses the real gateway, a real account, supported workspace/project
 APIs, a fresh local MP4, the normal mobile UI, and read-only PostgreSQL probes.

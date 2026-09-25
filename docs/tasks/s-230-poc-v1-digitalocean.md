@@ -106,7 +106,7 @@ ledger.
 | T6p-b | P2P Compose/config/secrets/private-network wiring | config/ops | TBD exact-path | T6p-a PASS | [ ] Planned |
 | T6p-c | Local P2P deployment-contract evidence | operational/evidence | TBD exact-path | T6p-b PASS | [ ] Planned |
 | T6p-d | Deploy backend ciphertext publication + durable P2P_READY smoke on DO | operational | TBD exact-path | T6p-c PASS | [ ] Planned |
-| T7local | Base mobile POC smoke against the local Docker Compose gateway | development/ops | M | T5d | [ ] Planned — runnable now; P6/DEV-HANDOFF already PASS |
+| T7local | Base mobile POC smoke against the local Docker Compose gateway | development/ops | M | T5d | [~] Closed partial 2026-09-26 — B3/C1/C2 + review navigation/detail/playback proven; C3/C4 residual deferred |
 | T7 | Mobile POC build against the deployed backend | development/ops | M | T6; T7local PASS | [ ] Planned |
 | T7p | Physical Android P2P release candidate | development/ops | TBD exact-path | T7; T7c; T6p-d; MVP0-P2P DEV-HANDOFF; X29 resolved | [ ] Planned |
 | T7b | Mobile registration screen | development | M | T7local | [ ] Planned — droppable (first) |
@@ -5053,18 +5053,15 @@ code to make the smoke pass — a failure is a finding, not a patch target.
 **Type:** development/operational
 **Effort:** M
 **Depends on:** S-230-T5d
-**Status:** [~] IN PROGRESS 2026-09-25 — the original A1 preflight false
-negative is repaired and independently verified: regression PASS, runtime
-preflight PASS and gateway live/ready PASS. The normal Android build/install/
-launch also passed after pinning the local toolchain to JDK 17. A real-stack
-Maestro harness now drives B3→C4 without mocks, seeded IDs or DB writes; the
-full A→E certification rerun is still pending. Bootstrap diagnostic on
-`13c353b` (2026-09-25): Metro was unavailable on `8081`; the installed debug
-APK has no Expo Dev Launcher. Starting Metro with `--lan --port 8081` restored
-clean-state bundle loading and `login-screen`. A real login reached home after
-an ADB UI tap, but Maestro's submit still left `Login phase: idle`; automated
-B3 remains **BLOCKED** and C1–C4 were not executed. No auth/product changes.
-Operational instructions: `.agent/s230-t7local-execution.md`. Current and historical evidence:
+**Status:** [~] CLOSED PARTIAL 2026-09-26 — real-stack B3, C1 and C2 are
+proven; review task creation, Home → Review Inbox → target task → Review Detail,
+and the normal review playback surface are also proven. C3 (Approve decision)
+and C4 (Publish) are **deferred residuals** after repeated Android/Maestro taps
+failed to enter the React Native Approve `onPress`; a direct PostgreSQL probe
+confirmed no decision was persisted for the sampled failing run. No further
+full local reruns are required. This is intentionally **not T7local PASS** and
+does not waive any later exact-artifact/device proof required by P7. Operational
+instructions: `.agent/s230-t7local-execution.md`. Evidence:
 `docs/audit/s-230-t7local-2026-09-25.md`.
 
 ### Executor contract
