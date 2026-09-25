@@ -1,7 +1,7 @@
 ---
 type: TaskList
 title: "Tasks: P6 Minimal My Content and Invites dashboard"
-status: in_progress
+status: pass
 slice: MVP0-P2P
 plan: docs/plan/mvp0-p2p-p6-dashboard.md
 behavioral_coverage_contract: behavior-v2
@@ -9,7 +9,7 @@ behavioral_coverage_contract: behavior-v2
 
 # P6 — planning task ledger
 
-**Status:** **In progress. P6.T0 PASS 2026-09-22; P6.T1 PASS 2026-09-23; P6.T2 PASS 2026-09-24. P6.T3 is IN PROGRESS: T3.A–D4 PASS; T3.D5 visual inspection is next.**
+**Status:** **PASS 2026-09-25.** P6.T0–T3 are closed. T3.D6 recorded the exact Android execution identity supplied by the owner: AVD `fenix_t7`, serial `emulator-5554`, model/product `sdk_gphone64_arm64`, Android 14, Maestro 2.6.1. DEV-HANDOFF is satisfied.
 **Phase gate:** **SATISFIED 2026-09-22 — P3 PASS + P4 PASS + P5-DEV.** P5.T3/P5-CERT is not an activation prerequisite.
 **Effort:** provisional per work package below; executable RRI/effort pending activation.
 
@@ -20,7 +20,7 @@ behavioral_coverage_contract: behavior-v2
 | P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **PASS 2026-09-22 — owner-verified; c6ce2039 15/15 CI** |
 | P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **PASS 2026-09-23 — T1.A–H closed; owner-reviewed; REVIEW-OVERRIDE applied** |
 | P6.T2 | Viewer claim, Invites, sync and play actions | development | XL parent / decomposed leaves | T1 PASS | **PASS 2026-09-24 — A–H closed; owner-verified** |
-| P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | **IN PROGRESS — T3.A–D4 PASS; T3.D5 active** |
+| P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | **PASS 2026-09-25 — T3.A–D6 closed** |
 
 
 ## Shared activation and closure contract
@@ -292,7 +292,7 @@ HPKE emulator remains disabled and outside P6.T2.
 
 **Depends on:** T2 PASS
 
-**Status:** **IN PROGRESS 2026-09-25.** T3.A+B PASS on `3474b8b` / Actions `36041983233`; T3.C PASS on `0527ec3` / Actions `36046501652`; T3.D1–D3 PASS on exact-head CI `581c696` / Actions `36051247079`; T3.D4 PASS with local Android evidence committed at `5fc8725`. T3.D5 visual inspection PASS; T3.D6 awaits exact emulator identification.
+**Status:** **PASS 2026-09-25.** T3.A+B PASS on `3474b8b` / Actions `36041983233`; T3.C PASS on `0527ec3` / Actions `36046501652`; T3.D1–D3 PASS on exact-head CI `581c696` / Actions `36051247079`; T3.D4 PASS with 11/11 local Android screenshots committed at `5fc8725`; T3.D5 visual inspection PASS; T3.D6 PASS with owner-supplied device/toolchain identity (`fenix_t7`, `emulator-5554`, `sdk_gphone64_arm64`, Android 14, Maestro 2.6.1).
 
 **Acceptance criteria:** Certify all P6 parent HP/EC with component/integration and Android flow evidence; inspect loading/empty/error/expired states against DESIGN.md and shipped tokens.
 
@@ -376,8 +376,26 @@ invariant change). HPKE emulator remains disabled.
 | T3.D3 | Add P2P Maestro flows + local runner integration | **PASS — exact-head CI `581c696` / `36051247079`** |
 | T3.D4 | Execute Maestro locally on Android and capture evidence | **PASS — rerun after `2cc8a6b`; 11/11 PNG committed at `5fc8725`** |
 | T3.D5 | Inspect screenshots against DESIGN.md / shipped tokens | **PASS — 11/11 screenshots reviewed; no P6-scoped visual blocker** |
-| T3.D6 | Record exact-SHA/device verdict and close T3.D | **BLOCKED — exact emulator profile/serial was not preserved** |
+| T3.D6 | Record exact-SHA/device verdict and close T3.D | **PASS — `2cc8a6b` execution lineage; `5fc8725` evidence; `fenix_t7` / `emulator-5554` / Android 14 / Maestro 2.6.1** |
 
 T3.D is visual certification only. It does not replace P7Local's complete
 owner→viewer→claim→sync→verify→Available→local-play E2E. HPKE emulator remains
 disabled.
+
+
+### T3.D6 / P6 aggregate closure — 2026-09-25
+
+- Executed harness lineage: `2cc8a6b14cad5cdf278c8cbf27bef39da7a3de84`.
+- Screenshot evidence commit: `5fc87253fbf5f0cc049ea3cdd7997a4564f3aefb` — 11/11 expected PNGs.
+- D5 visual review: PASS; no P6-scoped visual blocker.
+- Android AVD: `fenix_t7`.
+- adb serial: `emulator-5554`.
+- adb product/model: `sdk_gphone64_arm64`; device: `emu64a`.
+- Android release: `14`.
+- Maestro: `2.6.1`.
+- The Maestro JVM warnings about reflective final-field mutation/native access are tool-runtime warnings and did not represent a flow failure.
+- Owner verification: repository owner Matias Kruk supplied the exact local device/toolchain transcript at the D6 checkpoint on 2026-09-25.
+- HPKE emulator remained disabled; P7Local was not started or claimed by P6.
+- `local-gateway-1` remains outside P6 restoration scope as previously recorded.
+
+**T3.D PASS. P6.T3 PASS. P6 PASS 2026-09-25.**
