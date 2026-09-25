@@ -48,5 +48,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.xxl,
     gap: space.sm,
     flexDirection: "row",
+    // Keep the absolute action surface above scrollable siblings on Android.
+    // Without an explicit stacking order the ScrollView can win hit-testing
+    // even while the bar remains visually rendered.
+    zIndex: 10,
+    elevation: 8,
   },
 });
