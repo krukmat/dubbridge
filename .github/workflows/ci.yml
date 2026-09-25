@@ -91,6 +91,8 @@ jobs:
         run: cargo fetch --locked
       - name: Run workspace tests
         run: make qa-test
+      - name: Run P2P preflight pipeline regression
+        run: make qa-p2p-preflight
       - name: Probe Redis test service
         run: |
           python3 - <<'PY'
