@@ -4,7 +4,6 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { formatId, formatRelative, formatStatusLabel, formatTimestamp } from "../format";
 
 import { type ReviewTaskSummary } from "../api/review";
-import { ActionBar } from "../components/ActionBar";
 import { Badge, statusTone } from "../components/Badge";
 import { Button } from "../components/Button";
 import { Panel } from "../components/Panel";
@@ -53,70 +52,71 @@ function ReviewScopePanel({ task }: { task: ReviewTaskSummary }) {
   );
 }
 
-type ActionBarsProps = { taskState: TaskState; publishedAt: string | null; isSubmitting: boolean; decide: (v: "approved" | "rejected") => Promise<void>; publish: () => Promise<void> };
+type ReviewActionsProps = {
+  taskState: TaskState;
+  publishedAt: string | null;
+  isSubmitting: boolean;
+  decide: (v: "approved" | "rejected") => Promise<void>;
+  publish: () => Promise<void>;
+  onInvoked: (action: "approve" | "reject" | "publish") => void;
+};
 
-function ReviewActionBars({ taskState, publishedAt, isSubmitting, decide, publish }: ActionBarsProps) {
-  const [lastInvoked, setLastInvoked] = useState<"approve" | "reject" | "publish" | null>(null);
-
+function ReviewActions({
+  taskState,
+  publishedAt,
+  isSubmitting,
+  decide,
+  publish,
+  onInvoked,
+}: ReviewActionsProps) {
   if (taskState === "pending") {
     return (
-      <>
-        {lastInvoked ? <Text testID={`review-action-invoked-${lastInvoked}`} style={styles.actionProbe}>Action invoked: {lastInvoked}</Text> : null}
-        <ActionBar>
-          <Pressable
-            testID="review-approve"
-            accessibilityRole="button"
-            accessibilityLabel="Approve"
-            disabled={isSubmitting}
-            onPress={() => {
-              setLastInvoked("approve");
-              void decide("approved");
-            }}
-            style={({ pressed }) => [
-              styles.nativeActionButton,
-              pressed ? styles.nativeActionButtonPressed : null,
-              isSubmitting ? styles.nativeActionButtonDisabled : null,
-            ]}
-          >
-            <Text style={styles.nativeActionButtonLabel}>Approve</Text>
-          </Pressable>
-          <Button
-            testID="review-reject"
-            label="Reject"
-            variant="danger"
-            onPress={() => {
-              setLastInvoked("reject");
-              void decide("rejected");
-            }}
-            loading={isSubmitting}
-            disabled={isSubmitting}
-            fullWidth
-            style={styles.actionButton}
-          />
-        </ActionBar>
-      </>
+      <View style={styles.inlineActions}>
+        <Button
+          testID="review-approve"
+          label="Approve"
+          onPress={() => {
+            onInvoked("approve");
+            void decide("approved");
+          }}
+          loading={isSubmitting}
+          disabled={isSubmitting}
+          fullWidth
+          style={styles.actionButton}
+        />
+        <Button
+          testID="review-reject"
+          label="Reject"
+          variant="danger"
+          onPress={() => {
+            onInvoked("reject");
+            void decide("rejected");
+          }}
+          loading={isSubmitting}
+          disabled={isSubmitting}
+          fullWidth
+          style={styles.actionButton}
+        />
+      </View>
     );
   }
+
   if (taskState === "approved" && !publishedAt) {
     return (
-      <>
-        {lastInvoked ? <Text testID={`review-action-invoked-${lastInvoked}`} style={styles.actionProbe}>Action invoked: {lastInvoked}</Text> : null}
-        <ActionBar>
-          <Button
-            testID="publish-action"
-            label="Publish"
-            onPress={() => {
-              setLastInvoked("publish");
-              void publish();
-            }}
-            loading={isSubmitting}
-            disabled={isSubmitting}
-            fullWidth
-          />
-        </ActionBar>
-      </>
+      <Button
+        testID="publish-action"
+        label="Publish"
+        onPress={() => {
+          onInvoked("publish");
+          void publish();
+        }}
+        loading={isSubmitting}
+        disabled={isSubmitting}
+        fullWidth
+      />
     );
   }
+
   return null;
 }
 
@@ -159,6 +159,7 @@ export function ReviewDetailScreen({ task, gatewayBaseUrl, onBack }: ReviewDetai
   const { taskState, comment, setComment, publishedAt, mutation, decide, publish } =
     useReviewDetailMutations(task, gatewayBaseUrl);
   const [playbackAttempt, setPlaybackAttempt] = useState(0);
+  const [lastInvoked, setLastInvoked] = useState<"approve" | "reject" | "publish" | null>(null);
   const playbackState = usePlaybackLoader({ assetId: task.asset_id, gatewayBaseUrl, attempt: playbackAttempt });
   const isSubmitting = mutation.kind === "submitting";
   const readiness = readinessLabel(taskState, publishedAt);
@@ -192,12 +193,20 @@ export function ReviewDetailScreen({ task, gatewayBaseUrl, onBack }: ReviewDetai
         <Panel>
           <Text style={styles.sectionTitle}>Decision</Text>
           <TextInput testID="review-comment-input" accessibilityLabel="Comment" value={comment} onChangeText={setComment} placeholder="Add a comment…" multiline numberOfLines={3} style={[fieldStyle, styles.commentInput]} />
+          {lastInvoked ? <Text testID={`review-action-invoked-${lastInvoked}`} style={styles.actionProbe}>Action invoked: {lastInvoked}</Text> : null}
           {mutation.kind === "error" ? <Text testID="review-mutation-error" style={styles.errorText} accessibilityRole="alert" accessibilityLiveRegion="assertive">{mutation.message}</Text> : null}
+          <ReviewActions
+            taskState={taskState}
+            publishedAt={publishedAt}
+            isSubmitting={isSubmitting}
+            decide={decide}
+            publish={publish}
+            onInvoked={setLastInvoked}
+          />
         </Panel>
         <ReviewPublicationSection taskState={taskState} publishedAt={publishedAt} />
         <Button label="Back to inbox" variant="secondary" onPress={onBack} />
       </Screen>
-      <ReviewActionBars taskState={taskState} publishedAt={publishedAt} isSubmitting={isSubmitting} decide={decide} publish={publish} />
     </View>
   );
 }
@@ -222,18 +231,8 @@ const styles = StyleSheet.create({
   metaVal: { ...type.meta, color: color.ink700 },
   body: { ...type.body, color: color.ink500 },
   commentInput: { minHeight: space.xxxl * 2, textAlignVertical: "top" },
+  inlineActions: { flexDirection: "row", gap: space.sm },
   actionButton: { flex: 1 },
-  nativeActionButton: {
-    flex: 1,
-    minHeight: 48,
-    borderRadius: radius.md,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: color.primary,
-  },
-  nativeActionButtonPressed: { backgroundColor: color.primaryPressed },
-  nativeActionButtonDisabled: { opacity: 0.5 },
-  nativeActionButtonLabel: { ...type.button, color: color.onPrimary },
-  actionProbe: { ...type.meta, color: color.ink400, paddingHorizontal: space.xxl, paddingVertical: space.xs },
+  actionProbe: { ...type.meta, color: color.ink400 },
   errorText: { ...type.meta, color: color.danger },
 });

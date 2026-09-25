@@ -55,11 +55,15 @@ tags:
 - assertNotVisible:
     id: publish-action
 
+- scrollUntilVisible:
+    element:
+      id: review-approve
+    direction: DOWN
+    timeout: 8000
+
 - assertVisible:
     id: review-approve
 
-# Tap the minimal native Pressable directly. This isolates the review action
-# from the shared Button primitive while preserving the same handler.
 - tapOn:
     id: review-approve
 
@@ -80,6 +84,12 @@ tags:
 
 - assertNotVisible:
     id: review-mutation-error
+
+- scrollUntilVisible:
+    element:
+      id: publish-action
+    direction: DOWN
+    timeout: 8000
 
 - tapOn:
     id: publish-action
