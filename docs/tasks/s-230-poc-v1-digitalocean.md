@@ -5055,6 +5055,13 @@ code to make the smoke pass — a failure is a finding, not a patch target.
 **Depends on:** S-230-T5d
 **Status:** [ ] Planned — **runnable now; P6 PASS and DEV-HANDOFF are already satisfied**.
 
+### Executor contract
+
+The canonical low-context execution instructions are
+`.agent/s230-t7local-execution.md`. An advanced executor should start from that
+packet and must not read this full ledger/plan/history unless a concrete blocker
+requires additional context.
+
 ### Execution decomposition
 
 T7local executes in five ordered blocks. The second level is the executable
@@ -5082,8 +5089,12 @@ Detailed leaves:
 - **T7local.C2** — preparation reaches authoritative expected state and artifacts.
 - **T7local.C3** — review task appears and accepted decision persists.
 - **T7local.C4** — publication persists and normal HLS playback renders.
-- **T7local.D1** — missing/malformed gateway config reaches `ConfigErrorScreen`.
-- **T7local.D2** — expired/rejected auth follows the existing fail-closed/logout path.
+- **T7local.D1** — missing gateway config reaches `ConfigErrorScreen`; canonical
+  RootNavigator coverage from `make qa-mobile` is sufficient unless it fails.
+- **T7local.D2** — rejected credentials remain unauthenticated and render the
+  generic login error; canonical RootNavigator coverage from `make qa-mobile`
+  is sufficient. Session-expiry/logout semantics belong to `S-230-T7c`, not
+  T7local.
 - **T7local.E1** — consolidate per-stage downstream-state evidence.
 - **T7local.E2** — write the task-scoped audit artifact with exact HEAD/device/config.
 - **T7local.E3** — record aggregate `T7local PASS | BLOCKED`.
@@ -5148,10 +5159,11 @@ no per-stage downstream-state walkthrough evidence exists, and no
 
 **Edge cases considered:**
 
-- **EC-1:** A missing or malformed gateway URL surfaces the existing
-  `ConfigErrorScreen` rather than failing opaquely at first request.
-- **EC-2:** An expired or rejected token drives the existing logout path, not a
-  silent stall.
+- **EC-1:** Missing gateway runtime configuration renders the existing
+  `ConfigErrorScreen`. The normal local build has a valid :8082 fallback, so
+  the canonical RootNavigator test is the efficient reproducible evidence.
+- **EC-2:** Rejected credentials stay unauthenticated and render the generic
+  login error. Session expiry is deliberately deferred to `S-230-T7c`.
 
 **Acceptance criteria:**
 
@@ -5168,7 +5180,8 @@ no per-stage downstream-state walkthrough evidence exists, and no
   standard `S-230-T6`'s acceptance criteria hold the DO smoke to.
 - T7local does **not** execute or claim evidence for P2P Invite/Claim, P4 sync,
   ciphertext verification, P5 loopback playback, HPKE, P5.T3 or P7.
-- `npm run typecheck && npm run lint && npm test` stay green.
+- Canonical aggregate `make qa-mobile` stays green; do not duplicate it with
+  separate typecheck/lint/Jest runs.
 - Install and run instructions (including bringing up
   `infra/local/docker-compose.yml` with the gateway service) are recorded so
   `T7b`/`T7c`/`T8`/`T8b` can each use this same local target without
@@ -5211,9 +5224,9 @@ relevant base API routes, and `infra/local/docker-compose.yml`.
 **Status artifacts affected:** this ledger; README mobile section; on T7local
 PASS or freshness disposition, synchronize the October go-live map.
 
-**Handoff prompt:** Produce the normal mobile build pointed at the Compose
-gateway on host port 8082 and verify the base S-230 flow (login through normal
-HLS playback) with per-stage evidence, not just 2xx responses. Keep P2P
+**Handoff prompt:** Use `.agent/s230-t7local-execution.md` as the sole initial
+execution context. Execute A→E end to end, stop rather than patch on product
+defects, emit the task audit artifact, synchronize status, and keep P2P
 Invite/Claim/Sync/loopback certification out of this task.
 
 **Stop condition:** Stop after the local walkthrough. Do not provision or

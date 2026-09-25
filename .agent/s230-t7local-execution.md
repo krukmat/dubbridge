@@ -1,187 +1,258 @@
-# S-230-T7local execution packet
+# S-230-T7local — compact execution packet
 
-## Purpose
+## Goal
 
-Execute the base S-230 mobile product flow against the **gateway** exposed by
-`infra/local/docker-compose.yml` and emit the evidence required by
-`docs/tasks/s-230-poc-v1-digitalocean.md § S-230-T7local`.
+Certify the **base S-230 mobile flow** against the local Docker Compose
+**gateway** and emit durable evidence.
 
-P6 is already PASS and DEV-HANDOFF is pinned at `84ea5edc`. T7local now
-certifies the base S-230 flow on top of that closed product-development
-baseline. The normal binary contains P6/P2P product code, but this task must
-neither modify nor exercise Invite/Claim/P2P Sync/Verify/loopback/HPKE behavior.
-
-## Preconditions
-
-- Branch: `feature/p2p-mvp-core`.
-- Pinned DEV-HANDOFF reference: `84ea5edc` (P6 PASS; 15/15 CI). At task start,
-  compare the actual checkout HEAD against this reference and retain the changed
-  path list for E4.
-- P5.T3/P5-CERT is **not a prerequisite**. Do not overlap T7local with an
-  actively running device-certification session only when both would contend
-  for the same Metro/ADB/emulator resources.
-- Preserve any existing P5 evidence SHA; do not reinterpret T7local as P5
-  evidence.
-- Local Docker stack is available.
-- JDK 17 / Android SDK environment is already working.
-- Use the normal mobile app, not `android:p2p-dev` or `android:p2p-cert`.
-
-## Execution blocks
-
-Execute and report T7local using this hierarchy:
+Scope:
 
 ```text
-T7local
-├─ A Runtime readiness
-│  ├─ A1 Compose + gateway
-│  ├─ A2 gateway live/ready
-│  └─ A3 mobile gateway configuration
-├─ B Mobile build readiness
-│  ├─ B1 mobile QA
-│  ├─ B2 build/install/launch
-│  └─ B3 login/session smoke
-├─ C Base E2E flow
-│  ├─ C1 upload + rights + finalize
-│  ├─ C2 preparation + artifacts
-│  ├─ C3 review + decision
-│  └─ C4 publish + normal HLS playback
-├─ D Negative controls
-│  ├─ D1 invalid gateway configuration
-│  └─ D2 expired/rejected auth
-└─ E Certification
-   ├─ E1 downstream evidence
-   ├─ E2 audit artifact + exact HEAD
-   ├─ E3 PASS/BLOCKED
-   └─ E4 DEV-HANDOFF freshness disposition
+login
+→ upload
+→ rights
+→ finalize
+→ preparation
+→ review
+→ publish
+→ normal HLS playback
 ```
 
-Order: **A → B → C → D → E**. Do not advance a block while one of its
-children is unresolved.
+Out of scope: My Content/Invite/Claim, P2P Sync/Verify, loopback P2P playback,
+HPKE/Keystore certification and P5.T3.
 
-## Environment
+Pinned DEV-HANDOFF: `84ea5edc` (P6 PASS, 15/15 CI).
 
-1. Record:
-   - `git rev-parse HEAD`
-   - emulator/device name, Android API and ABI
-   - Docker Compose service status
-2. Start the Compose app profile with the **gateway service included**. Run the
-   local P2P preflight only as an infrastructure sanity check:
-   `bash infra/local/p2p/preflight.sh --with-runtime`
-   Then explicitly record the gateway checks until the shared preflight owns
-   them:
-   - `curl -fsS http://localhost:8082/health/live`
-   - `curl -fsS http://localhost:8082/health/ready`
-   T7local itself remains a base/non-P2P product-flow certification.
-3. Select the gateway address reachable from the target:
-   - Android emulator: `http://10.0.2.2:8082`
-   - physical Android: `http://<host-LAN-IP>:8082`
-   - host `8080` is the API port; using it bypasses the gateway and invalidates
-     T7local
-   - never use device-local `127.0.0.1` for the host Compose gateway
-4. Set `EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL` explicitly and record the redacted
-   configuration.
+## Minimal-context contract
 
-## Required run
+For normal execution, read **this file only** before starting.
 
-Build/install/launch the normal app against the local Compose gateway, then
-exercise one fresh short video through:
+Do not read the full S-230 plan, roadmap, historical P6 evidence, ADRs, or old
+audit artifacts unless a concrete failure requires them. Do not browse the web.
 
-`login -> upload -> rights -> finalize -> preparation -> review -> publish -> normal HLS playback`
+Only inspect source when a command or runtime behavior contradicts this packet:
 
-Do not open or execute My Content/Invites/P2P Claim/Sync/Verify/loopback actions
-as part of T7local evidence. Those belong to the MVP0-P2P lane.
+- `infra/local/docker-compose.yml` — Compose/runtime mismatch;
+- `infra/local/p2p/preflight.sh` — preflight mismatch;
+- `mobile/app.config.ts` / `mobile/src/config/env.ts` — config mismatch;
+- `Makefile.base` — QA target mismatch.
 
-Do not accept HTTP 2xx alone. For every stage, capture downstream evidence using
-existing API/read-model/DB/audit/artifact surfaces as appropriate:
+`DESIGN.md` is required only if a separately approved repair changes product
+UI/source. T7local itself should not modify product source.
 
-- login: authenticated session established
-- upload/finalize: asset id and finalized ingest
-- preparation: authoritative preparation state + expected HLS artifacts
-- review: review task is created and visible
-- review decision: accepted decision persisted
-- publish: publication state persisted
-- playback: existing non-P2P player renders the published media
+If a product defect is found, record **BLOCKED** and stop. Do not repair it
+inside T7local.
 
-Use only normal product behavior. Do not seed state manually.
+## Execution map
 
-## Negative controls
+```text
+A Runtime
+├─ A1 Compose + gateway
+├─ A2 gateway live/ready
+└─ A3 mobile gateway config
 
-- malformed/missing gateway URL -> existing `ConfigErrorScreen`
-- expired/rejected token -> existing logout/auth-expiry path, not a silent stall
+B Mobile
+├─ B1 make qa-mobile
+├─ B2 normal Android build/install/launch
+└─ B3 real login/session
 
-Do not mutate product code to force either result.
+C Base E2E
+├─ C1 upload + rights + finalize
+├─ C2 preparation + artifacts
+├─ C3 review + approved decision
+└─ C4 publish + normal HLS playback
 
-## Verification
+D Negative controls
+├─ D1 missing gateway config → ConfigErrorScreen
+└─ D2 rejected credentials → generic login error / remains unauthenticated
 
-Run:
+E Certification
+├─ E1 downstream-state evidence
+├─ E2 audit artifact + exact HEAD
+├─ E3 PASS/BLOCKED
+└─ E4 freshness vs 84ea5edc
+```
+
+Order: **A → B → C → D → E**.
+
+Session-expiry behavior is intentionally **not D2**; it belongs to
+`S-230-T7c`.
+
+## Fast path
+
+Run from repo root.
+
+### A — runtime
+
+```bash
+git rev-parse HEAD
+git diff --name-only 84ea5edc...HEAD
+
+bash infra/local/p2p/generate-mtls.sh
+mkdir -p tmp/p2p-ciphertext tmp/p2p-availability-drive tmp/p2p-availability-index
+
+docker-compose -f infra/local/docker-compose.yml --profile app up -d
+docker-compose -f infra/local/docker-compose.yml --profile app ps
+
+bash infra/local/p2p/preflight.sh --with-runtime
+curl -fsS http://localhost:8082/health/live
+curl -fsS http://localhost:8082/health/ready
+```
+
+A3 contract:
+
+```text
+Android emulator → http://10.0.2.2:8082
+physical Android → http://<host-LAN-IP>:8082
+host :8080       → API only; never use as the mobile gateway
+```
+
+### B — mobile
+
+Run the aggregate QA **once**; do not separately repeat typecheck/lint/Jest:
+
+```bash
+make qa-mobile
+```
+
+Build the normal app, not a P2P harness:
 
 ```bash
 cd mobile
-npm run typecheck
-npm run lint
-npm test
+DUBBRIDGE_ENV=local \
+EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL=http://10.0.2.2:8082 \
+npm run android
 ```
 
-If the repository's `make qa-mobile` target is available from the repo root,
-run it as the canonical aggregate mobile gate.
+If no reusable local account exists, create one through the supported gateway
+endpoint `POST /auth/register` on `localhost:8082`, then log in through the
+mobile UI. This is normal product behavior, not DB seeding. Never write the
+password or returned bearer token into evidence.
 
-## Evidence artifact
+### C — one fresh asset
 
-Write a new audit artifact under `docs/audit/` containing:
+Use one short local MP4. Do not download media from the internet. If no suitable
+fixture exists, generate a tiny synthetic clip locally and push it to the
+emulator/device.
 
-- exact HEAD
-- gateway profile (no credentials)
-- device/emulator
-- asset id
-- per-stage observed downstream evidence
-- negative controls actually executed
-- mobile QA results
-- screenshots/logs only as supporting evidence
+Drive the normal UI through C1–C4. Capture the `asset_id` once and reuse it.
 
-No P2P invitation, P2P claim, P2P sync/verification, P2P loopback playback,
-HPKE or P5.T3 evidence belongs in this artifact.
+Do not accept HTTP 2xx as evidence. Verify downstream state directly. The
+relevant PostgreSQL tables are:
 
-Record the exact T7local HEAD. In E4, compare it with pinned DEV-HANDOFF
-`84ea5edc`. The pre-execution comparison through `1067d2b2` is docs-only,
-but recompute at execution time. If relevant runtime paths differ, map them to
-the A–D smoke evidence already executed on the T7local head; run only any
-remaining bounded regression required by the S-230 ledger. Do not rerun P2P
+```text
+assets
+rights_records
+artifact_records
+asset_preparation_status
+review_tasks
+review_decisions
+publications
+audit_events
+```
+
+Use:
+
+```bash
+docker-compose -f infra/local/docker-compose.yml exec -T postgres \
+  psql -U dubbridge -d dubbridge
+```
+
+Query only the rows for the current `asset_id` / review task. Do not dump whole
+tables.
+
+Minimum evidence:
+
+- C1: asset finalized + rights row + source artifact;
+- C2: preparation authoritative state + expected derived/HLS artifacts;
+- C3: review task exists + latest decision is `approved`;
+- C4: publication row is `published` + normal mobile HLS playback renders.
+
+### D — negative controls
+
+Do not rebuild twice just to prove negatives if canonical tests already prove
+them.
+
+`make qa-mobile` must include and pass the existing RootNavigator coverage for:
+
+- missing gateway configuration → `config-error-screen`;
+- login failure → generic `Invalid email or password.` while unauthenticated.
+
+Record those test results as D1/D2 evidence. Only execute an extra device
+negative if the canonical tests are missing or fail.
+
+### E — certification
+
+Create one task-scoped artifact:
+
+```text
+docs/audit/s-230-t7local-<YYYY-MM-DD>.md
+```
+
+It must contain only:
+
+- exact HEAD;
+- device/emulator;
+- gateway target;
+- A1–D2 PASS/BLOCKED results;
+- asset/review/publication identifiers needed for traceability;
+- concise downstream-state evidence;
+- `make qa-mobile` result;
+- no credentials, bearer tokens, raw secrets, CK/KEK material.
+
+Then compute E4:
+
+```bash
+git diff --name-only 84ea5edc...HEAD
+```
+
+If there is no relevant runtime/config change, record:
+
+```text
+T7LOCAL_FRESHNESS=PASS_NO_RERUN
+```
+
+If relevant paths changed, first map them to the A–D evidence already executed
+on this HEAD. Run only uncovered bounded regression; do not rerun P2P
 certification.
 
-## Stop conditions
+Finally synchronize:
 
-Stop and report rather than patching if:
+- `docs/tasks/s-230-poc-v1-digitalocean.md` T7local status;
+- `docs/audit/go-live-octubre-2026-mirror.html`;
+- roadmap only if the roadmap state actually changes.
 
-- the base product flow unexpectedly requires invoking P2P Invite/Claim/Sync/
-  Verify/loopback behavior
-- any stage returns 2xx but downstream state does not advance
-- local Compose ownership/provenance is ambiguous
-- a defect would require changing product behavior
+Commit the evidence/status documentation once at the end. Do not create
+intermediate docs-only commits unless execution is BLOCKED and the finding must
+be preserved.
 
-Do not provision or deploy Digital Ocean.
+## PASS / BLOCKED rule
 
-## Final output
+**PASS** only when A1–E4 are satisfied.
 
-```
-S-230-T7local: PASS | BLOCKED
+**BLOCKED** immediately when:
+
+- gateway/Compose provenance is ambiguous;
+- a base-flow stage returns success but downstream state does not advance;
+- normal base flow requires a P2P-only action;
+- product behavior needs a source-code repair;
+- required device/runtime access is unavailable.
+
+A blocker is evidence, not permission to expand scope.
+
+## Final response
+
+Keep the chat response compact:
+
+```text
+T7local: PASS | BLOCKED
 HEAD:
-A1 Compose+gateway:
-A2 gateway live/ready:
-A3 mobile config:
-B1 mobile QA:
-B2 build/install/launch:
-B3 login/session:
-C1 upload/rights/finalize:
-C2 preparation/artifacts:
-C3 review/decision:
-C4 publish/HLS playback:
-D1 invalid config:
-D2 auth expiry/rejection:
-E1 downstream evidence:
-E2 audit artifact:
-E3 disposition:
-E4 freshness vs 84ea5edc:
-device:
-code changed: YES/NO
-next gate: T7c | BLOCKED
+A:
+B:
+C:
+D:
+E4:
+artifact:
+commit:
+next: T7c | blocker
 ```
