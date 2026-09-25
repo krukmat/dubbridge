@@ -62,6 +62,7 @@ beforeEach(() => {
     sessionRef: "tok-abc",
     status: "authed",
     loginError: null,
+    loginPhase: "idle",
     login: jest.fn(),
     logout: jest.fn(),
     onSessionRotation: jest.fn().mockResolvedValue(undefined),
@@ -144,7 +145,7 @@ describe("HomeScreen", () => {
     });
 
     const onOpenReview = jest.fn();
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <HomeScreen
         dubbridgeEnv="local"
         gatewayBaseUrl="http://localhost:3000"

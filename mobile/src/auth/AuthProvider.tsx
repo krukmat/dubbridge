@@ -76,6 +76,11 @@ type AuthStateControls = {
   setLoginPhase: (phase: LoginPhase) => void;
 };
 
+type AuthSessionStateControls = Pick<
+  AuthStateControls,
+  "setSession" | "setStatus" | "setLoginError"
+>;
+
 function getGatewayClient(): GatewayClientBundle | null {
   const runtimeConfig = readRuntimeConfig();
 
@@ -115,7 +120,7 @@ function toAuthSession(payload: AuthSuccessPayload): AuthSession {
   };
 }
 
-function resetAuthState(controls: AuthStateControls) {
+function resetAuthState(controls: AuthSessionStateControls) {
   controls.setSession(null);
   controls.setStatus("unauthed");
   controls.setLoginError(null);
@@ -132,7 +137,7 @@ async function clearPersistedSession(): Promise<boolean> {
 
 function acceptStoredSession(
   storedSession: AuthSession | null,
-  controls: AuthStateControls,
+  controls: AuthSessionStateControls,
 ) {
   if (storedSession === null) {
     resetAuthState(controls);
@@ -145,7 +150,7 @@ function acceptStoredSession(
 }
 
 async function hydrateStoredSession(
-  controls: AuthStateControls,
+  controls: AuthSessionStateControls,
   isMounted: () => boolean,
 ) {
   try {

@@ -1,7 +1,7 @@
 import { act, cleanup, render } from "@testing-library/react-native";
 
 const mockPlayerListeners: Record<string, ((payload?: any) => void) | undefined> = {};
-const mockVideoView = jest.fn(() => null);
+const mockVideoView = jest.fn((_props: Record<string, unknown>) => null);
 
 jest.mock("expo", () => {
   const actual = jest.requireActual("expo");
@@ -37,8 +37,9 @@ describe("VideoPlayer lifecycle seam", () => {
       />,
     );
 
-    expect(mockVideoView).toHaveBeenCalled();
-    expect(mockVideoView.mock.calls[0][0].surfaceType).toBe("textureView");
+    expect(mockVideoView).toHaveBeenCalledWith(
+      expect.objectContaining({ surfaceType: "textureView" }),
+    );
   });
 
   it("forwards native playback errors without changing legacy rendering behavior", async () => {

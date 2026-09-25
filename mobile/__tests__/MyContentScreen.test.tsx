@@ -151,6 +151,7 @@ beforeEach(() => {
     userId: "owner-1",
     status: "authed",
     loginError: null,
+    loginPhase: "idle",
     login: jest.fn(),
     logout: jest.fn(),
     onSessionRotation: jest.fn().mockResolvedValue(undefined),
