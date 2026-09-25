@@ -156,6 +156,9 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-dubbridge123}
       AWS_REGION: ${AWS_REGION:-us-east-1}
       DUBBRIDGE_CONFIG_DIR: /workspace/config
+      DUBBRIDGE_ASR_WORKER_PYTHON: /usr/local/bin/python3
+      ASR_MODEL_SIZE: ${ASR_MODEL_SIZE:-tiny}
+      HF_HOME: /var/cache/dubbridge/huggingface
       DUBBRIDGE_P2P_AVAILABILITY_URL: https://availability-node:8443
       DUBBRIDGE_P2P_AVAILABILITY_CA_PEM: /run/dubbridge/p2p-mtls/ca.pem
       DUBBRIDGE_P2P_AVAILABILITY_IDENTITY_PEM: /run/dubbridge/p2p-mtls/client-identity.pem
@@ -168,6 +171,7 @@ services:
     volumes:
       - ../..:/workspace
       - local-app-storage:/tmp/dubbridge-storage
+      - asr-model-cache:/var/cache/dubbridge/huggingface
       - ../../tmp/p2p-ciphertext:/var/lib/dubbridge/p2p-ciphertext
       - ../../tmp/p2p-mtls/ca.pem:/run/dubbridge/p2p-mtls/ca.pem:ro
       - ../../tmp/p2p-mtls/client-identity.pem:/run/dubbridge/p2p-mtls/client-identity.pem:ro
@@ -200,4 +204,5 @@ volumes:
   postgres-data:
   minio-data:
   availability-node-modules:
+  asr-model-cache:
   local-app-storage:
