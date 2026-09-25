@@ -398,50 +398,6 @@
   </section>
 
 
-  <section>
-    <div class="section-head"><h2>P2P local-dev-readiness (hallazgo 14-sep) — mergeado en local, verificado por código; smoke test real aún pendiente</h2></div>
-    <p class="section-note">
-      Los cuatro bloqueadores reportados el 14-sep están resueltos en el código y, a partir de la
-      verificación del 19-sep, ya están en el checkout de trabajo. <code>git rev-parse HEAD</code>
-      del working tree (<code>feature/p2p-mvp-core</code>) es idéntico a
-      <code>origin/feature/p2p-mvp-core</code> (<code>4df3334</code>) y <code>git status</code>
-      está limpio — no queda nada por traer. Los 6 commits relevantes (<code>d121394</code>,
-      <code>4d08a47</code>, <code>1d7bf59</code>, <code>15d958b</code>, <code>b85c0cc</code>,
-      <code>51e88a2</code>) se re-verificaron contra el árbol local, no solo contra
-      <code>origin</code>. Lo que sigue sin ocurrir es el smoke test end-to-end real: ningún
-      build móvil corrió todavía contra <code>infra/local/docker-compose.yml</code>, y
-      <code>docs/tasks/s-230-poc-v1-digitalocean.md</code> § S-230-T7local sigue
-      <code>[ ] Planned</code> — el ledger fue actualizado el 19-sep con una nota de progreso
-      fechada que registra exactamente esta distinción.
-    </p>
-    <div class="risks">
-      <div class="risk info">
-        <span class="tag2">Bloqueador A — OK</span>
-        <p><strong>Entrypoint real agregado y verificado.</strong> <code>apps/availability-node/src/main.ts</code> (nuevo, 44 líneas) + <code>bootstrap.ts</code> (nuevo, 175 líneas) + test de bootstrap config. Se confirmó por código: <code>main()</code> llama <code>createPrivatePublicationServer(...).listen(...)</code> y loguea <code>"Availability Node listening on https://…"</code>. El binario ahora tiene punto de arranque real.</p>
-      </div>
-      <div class="risk info">
-        <span class="tag2">Bloqueador B — OK</span>
-        <p><code>infra/local/p2p/generate-mtls.sh</code> (nuevo, 78 líneas) genera certificados mTLS de dev, con un fix de seguimiento ("emit PKCS8 local mTLS private keys") para el formato de clave que <code>from_mtls_pem</code> espera.</p>
-      </div>
-      <div class="risk info">
-        <span class="tag2">Bloqueador C — OK</span>
-        <p><code>infra/local/docker-compose.yml</code> (+43 líneas) ahora define el servicio <code>availability-node</code>, verificado por código: puerto 8443, working dir, volumen de node_modules propio, y <code>DUBBRIDGE_P2P_AVAILABILITY_URL: https://availability-node:8443</code> cableado hacia el resto del stack.</p>
-      </div>
-      <div class="risk info">
-        <span class="tag2">Bloqueador D — OK</span>
-        <p>Las variables <code>DUBBRIDGE_P2P_*</code> quedaron documentadas en <code>.env.example</code> (+26 líneas), <code>config/README.md</code> (+37 líneas) y un nuevo runbook <code>infra/local/p2p/README.md</code> (169 líneas) con el flujo local P2 a P5.</p>
-      </div>
-      <div class="risk med">
-        <span class="tag2">Pendiente real</span>
-        <p>Estos commits son autoría directa del owner sin traza de sesión gobernada. El ledger
-        de gobernanza ya fue sincronizado el 19-sep (nota de progreso en
-        <code>S-230-T7local</code>), pero eso documenta el estado — no cierra la tarea. Lo único
-        que falta ahora es (1) correr el smoke test end-to-end real de build móvil contra el
-        stack local, con evidencia por etapa (no solo respuestas 2xx), y (2) registrar esa
-        evidencia como <code>[x] Done</code> con el checklist de cierre correspondiente.</p>
-      </div>
-    </div>
-  </section>
 
   <section>
     <div class="section-head"><h2>Estado por riel</h2></div>
@@ -538,10 +494,6 @@
         <p><strong>Verde en el head de DEV-HANDOFF.</strong> <code>84ea5edc</code> y <code>2cc8a6b</code> 15/15 CI; <code>git diff 2cc8a6b 84ea5edc</code> solo toca <code>docs/</code> y screenshots. Evidencia por bloque de P6.T1–T3 en <code>docs/tasks/mvp0-p2p-p6-dashboard.md</code>.</p>
       </div>
       <div class="risk info">
-        <span class="tag2">P2P local-dev — infra lista</span>
-        <p>Los bloqueadores de local-dev-readiness están resueltos. Pendiente real de S-230: ejecutar <code>T7local</code> contra el <strong>gateway local :8082</strong> y registrar evidencia downstream del base flow. Este smoke continúa como lane independiente con P6 ya PASS; no es P2P certification y no sustituye P6.T3/T7p/P7.</p>
-      </div>
-      <div class="risk info">
         <span class="tag2">CONS-T4/T5 — cerrado</span>
         <p><code>CONS-T4</code> retro-certificó T5a-d + T6a-d (RRI/Reflection/coverage/owner-verification propios); <code>CONS-T5</code> cerró T6e. <strong>Aggregate MVP0-P2P P2 es PASS</strong> — deja de ser un riesgo abierto.</p>
       </div>
@@ -606,7 +558,7 @@
     <code>docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md</code> (evidencia por leaf) ·
     <code>make qa-docs</code> (pasó limpio tras los cierres).
     <div class="lineage" id="linaje-completo">
-      <strong>Linaje:</strong> 2026-09-25 — P6 PASS + DEV-HANDOFF SATISFIED (head <code>84ea5edc</code>); sección “Ráfaga de 72h” retirada por obsoleta ← 2026-09-24 — P6.T2 PASS: A–H cerrados; owner final verification + REVIEW-OVERRIDE; P6.T3 desbloqueado ← 2026-09-24 — P6.T2.G PASS: Home→Invites→Back + re-entry verde en <code>6f4a89e1</code> ← 2026-09-24 — P6.T2.F PASS: lifecycle fail-closed account/session verde en <code>9c4b41e4</code> ← 2026-09-24 — P6.T2.E PASS: Available→Play vía verified P4 handle + P5 verde en <code>8fa7411d</code> ← 2026-09-24 — P6.T2.D PASS: Sync/Retry vía P4 verde en <code>a99a712c</code> ← 2026-09-24 — P6.T2.B/C PASS: inbox+state projection y manual Claim verdes ← 2026-09-23 — P6.T1 PASS: T1.A–H cerrados con owner self-review + REVIEW-OVERRIDE vigente; P6.T2 desbloqueado ← 2026-09-22 noche — P6.T1.A–G PASS: My Content, exact Ready, Create/Copy, navegación y aggregate gap closure verdes en <code>47bc3e8b</code> ← P3 y P4 cerrados PASS; P5.T1/T2 formalmente cerrados; P5-DEV SATISFIED; P6.T0 PASS ← este documento (2026-09-22 tarde — merge de 14 commits remotos
+      <strong>Linaje:</strong> 2026-09-25 — P6 PASS + DEV-HANDOFF SATISFIED (head <code>84ea5edc</code>); sección “Ráfaga de 72h” retirada por obsoleta; sección “P2P local-dev-readiness (hallazgo 14-sep)” y riesgo duplicado retirados (cubiertos por T7local) ← 2026-09-24 — P6.T2 PASS: A–H cerrados; owner final verification + REVIEW-OVERRIDE; P6.T3 desbloqueado ← 2026-09-24 — P6.T2.G PASS: Home→Invites→Back + re-entry verde en <code>6f4a89e1</code> ← 2026-09-24 — P6.T2.F PASS: lifecycle fail-closed account/session verde en <code>9c4b41e4</code> ← 2026-09-24 — P6.T2.E PASS: Available→Play vía verified P4 handle + P5 verde en <code>8fa7411d</code> ← 2026-09-24 — P6.T2.D PASS: Sync/Retry vía P4 verde en <code>a99a712c</code> ← 2026-09-24 — P6.T2.B/C PASS: inbox+state projection y manual Claim verdes ← 2026-09-23 — P6.T1 PASS: T1.A–H cerrados con owner self-review + REVIEW-OVERRIDE vigente; P6.T2 desbloqueado ← 2026-09-22 noche — P6.T1.A–G PASS: My Content, exact Ready, Create/Copy, navegación y aggregate gap closure verdes en <code>47bc3e8b</code> ← P3 y P4 cerrados PASS; P5.T1/T2 formalmente cerrados; P5-DEV SATISFIED; P6.T0 PASS ← este documento (2026-09-22 tarde — merge de 14 commits remotos
       (<code>c726e42</code>): P4.T1 pasa de Blocked a <strong>Implemented+verified</strong>
       (reconexión acotada, <code>P2pProductSync.ts</code>, RRI 55, revisión Med-high pendiente);
       P4.T3 suma test de cambio de cuenta (RRI 25 Low); CI cambia de causa — <code>deny</code>/
