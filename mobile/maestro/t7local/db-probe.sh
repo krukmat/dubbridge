@@ -129,7 +129,29 @@ wait_review_task() {
     fi
     sleep "$poll_seconds"
   done
-  echo "REVIEW_TASK=BLOCKED asset_id=$asset_id timeout=${timeout_seconds}s" >&2
+  local transcription subtitle translation
+  transcription="$(psql_query "
+    SELECT status || ':' || COALESCE(error_detail, '')
+    FROM asset_transcription_status
+    WHERE asset_id = '$asset_id'::uuid;
+  ")"
+  subtitle="$(psql_query "
+    SELECT status || ':' || COALESCE(error_detail, '')
+    FROM asset_subtitle_status
+    WHERE asset_id = '$asset_id'::uuid;
+  ")"
+  translation="$(psql_query "
+    SELECT COALESCE(
+      string_agg(
+        target_language_id::text || ':' || status || ':' || COALESCE(error_detail, ''),
+        ';' ORDER BY target_language_id::text
+      ),
+      ''
+    )
+    FROM asset_translation_status
+    WHERE asset_id = '$asset_id'::uuid;
+  ")"
+  echo "REVIEW_TASK=BLOCKED asset_id=$asset_id timeout=${timeout_seconds}s transcription=${transcription:-missing} subtitle=${subtitle:-missing} translation=${translation:-missing}" >&2
   return 1
 }
 
