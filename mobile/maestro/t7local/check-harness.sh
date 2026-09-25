@@ -8,6 +8,7 @@ dir="$repo_root/mobile/maestro/t7local"
 for script in "$dir/prepare-media.sh" "$dir/db-probe.sh" "$dir/run-real.sh"; do
   bash -n "$script"
 done
+python3 -m py_compile "$dir/run-real.py"
 
 scan_files=(
   "$dir/login-real.yaml"
@@ -17,6 +18,7 @@ scan_files=(
   "$dir/prepare-media.sh"
   "$dir/db-probe.sh"
   "$dir/run-real.sh"
+  "$dir/run-real.py"
 )
 
 for banned in   "/e2e/seed"   "e2e@dubbridge.dev"   "review-task-seed-"   "asset-seed-"   "localhost:8081"   "EXPO_PUBLIC_E2E_ENABLED=true"; do
@@ -31,7 +33,8 @@ grep -F 'inputText: ${T7LOCAL_PASSWORD}' "$dir/login-real.yaml" >/dev/null
 grep -F 'upload-field-proof-reference' "$dir/ingest-real.yaml" >/dev/null
 grep -F 'review-task-card-${T7LOCAL_REVIEW_TASK_ID}' "$dir/review-publish-real.yaml" >/dev/null
 grep -F 'asset-card-${T7LOCAL_ASSET_ID}' "$dir/playback-real.yaml" >/dev/null
-grep -F 'wait-c2' "$dir/run-real.sh" >/dev/null
-grep -F 'verify-c4' "$dir/run-real.sh" >/dev/null
+grep -F '"wait-c2"' "$dir/run-real.py" >/dev/null
+grep -F '"verify-c4"' "$dir/run-real.py" >/dev/null
+grep -F 'http://localhost:8082' "$dir/run-real.py" >/dev/null
 
 echo "T7LOCAL MAESTRO HARNESS CHECK: PASS"
