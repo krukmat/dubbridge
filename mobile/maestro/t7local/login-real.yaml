@@ -1,0 +1,24 @@
+appId: com.dubbridge.mobile
+name: T7local real login
+tags:
+  - android
+  - s-230
+  - t7local
+---
+- tapOn:
+    id: login-email-input
+- inputText: ${T7LOCAL_EMAIL}
+
+- tapOn:
+    id: login-password-input
+- inputText: ${T7LOCAL_PASSWORD}
+
+- hideKeyboard
+
+- tapOn:
+    id: login-submit-button
+
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 20000

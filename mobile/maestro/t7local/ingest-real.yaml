@@ -1,0 +1,83 @@
+appId: com.dubbridge.mobile
+name: T7local real ingestion
+tags:
+  - android
+  - s-230
+  - t7local
+---
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: login-screen
+    timeout: 20000
+
+- runFlow: login-real.yaml
+
+- assertVisible:
+    id: home-screen
+
+- tapOn:
+    id: home-open-upload
+
+- extendedWaitUntil:
+    visible:
+      id: upload-screen
+    timeout: 20000
+
+# Real rights form. Do not enable EXPO_PUBLIC_E2E_ENABLED for this build.
+- tapOn:
+    id: upload-field-owner
+- inputText: ${T7LOCAL_OWNER}
+
+- tapOn:
+    id: upload-field-license-type-option-exclusive
+
+- tapOn:
+    id: upload-field-source-type-option-original
+
+- tapOn:
+    id: upload-field-proof-reference
+- inputText: ${T7LOCAL_PROOF_REFERENCE}
+
+- hideKeyboard
+
+- tapOn:
+    id: upload-submit-rights
+
+- extendedWaitUntil:
+    visible:
+      id: upload-pick-file
+    timeout: 10000
+
+- tapOn:
+    id: upload-pick-file
+
+# The freshly adb-pushed file is expected in Android's Recent/Downloads view.
+- extendedWaitUntil:
+    visible:
+      text: ${T7LOCAL_FILENAME}
+    timeout: 15000
+
+- tapOn:
+    text: ${T7LOCAL_FILENAME}
+
+- extendedWaitUntil:
+    visible:
+      text: ${T7LOCAL_FILENAME}
+    timeout: 10000
+
+- assertVisible:
+    id: upload-finalize
+
+- tapOn:
+    id: upload-finalize
+
+- extendedWaitUntil:
+    visible:
+      id: asset-list-screen
+    timeout: 45000
+
+- assertVisible:
+    id: asset-list-screen
