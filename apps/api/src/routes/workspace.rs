@@ -13,10 +13,12 @@ use dubbridge_auth::{
     require_scope,
 };
 use dubbridge_domain::{
+    artifact::PreparationStatus,
     asset::AssetId,
     audit::{AuditEvent, AuditEventKind},
     workspace::{OrgId, OrgMember, OrgRole, Organization, Project, ProjectId},
 };
+use dubbridge_jobs::TranscriptionJob;
 use serde::Deserialize;
 use serde_json::json;
 use sqlx::PgPool;
@@ -321,6 +323,8 @@ async fn link_project_asset(
         .map_err(ApiError::from_workspace_service)
         .map_err(map_project_asset_error)?;
 
+    reconcile_transcription_for_asset(state.as_ref(), AssetId(request.asset_id)).await;
+
     Ok(Json(
         build_project_detail_response(state.as_ref(), project_id, member.org_id).await?,
     ))
@@ -346,6 +350,21 @@ async fn set_target_languages(
         .replace_target_languages(project_id, source_lang, target_languages)
         .await
         .map_err(ApiError::from_workspace_service)?;
+
+    match state.workspace_service.list_assets_for_project(project_id).await {
+        Ok(assets) => {
+            for asset in assets {
+                reconcile_transcription_for_asset(state.as_ref(), asset.id).await;
+            }
+        }
+        Err(error) => {
+            tracing::warn!(
+                project_id = %project_id.0,
+                error = %error,
+                "failed to list project assets for transcription reconciliation"
+            );
+        }
+    }
 
     Ok(Json(
         stored
@@ -378,6 +397,106 @@ async fn get_target_languages(
             .map(TargetLanguageResponse::from)
             .collect(),
     ))
+}
+
+async fn reconcile_transcription_for_asset(state: &AppState, asset_id: AssetId) {
+    let preparation = match dubbridge_db::preparation_repo::get_preparation_status(
+        &state.pool,
+        asset_id,
+    )
+    .await
+    {
+        Ok(Some(status)) if status.status == PreparationStatus::Ready => status,
+        Ok(_) => return,
+        Err(error) => {
+            tracing::warn!(
+                asset_id = %asset_id.0,
+                error = %error,
+                "failed to load preparation status for transcription reconciliation"
+            );
+            return;
+        }
+    };
+
+    let source = match dubbridge_db::preparation_repo::find_source_artifact(&state.pool, asset_id)
+        .await
+    {
+        Ok(Some(source)) => source,
+        Ok(None) => {
+            tracing::warn!(
+                asset_id = %asset_id.0,
+                preparation_updated_at = %preparation.updated_at,
+                "prepared asset has no source artifact during transcription reconciliation"
+            );
+            return;
+        }
+        Err(error) => {
+            tracing::warn!(
+                asset_id = %asset_id.0,
+                error = %error,
+                "failed to load source artifact for transcription reconciliation"
+            );
+            return;
+        }
+    };
+
+    let source_language =
+        match dubbridge_db::target_language_repo::get_source_language_for_asset(
+            &state.pool,
+            asset_id,
+        )
+        .await
+        {
+            Ok(Some(language)) => language,
+            Ok(None) => return,
+            Err(error) => {
+                tracing::warn!(
+                    asset_id = %asset_id.0,
+                    error = %error,
+                    "failed to resolve source language for transcription reconciliation"
+                );
+                return;
+            }
+        };
+
+    let claimed =
+        match dubbridge_db::transcription_repo::try_claim_transcription_pending(
+            &state.pool,
+            asset_id,
+        )
+        .await
+        {
+            Ok(claimed) => claimed,
+            Err(error) => {
+                tracing::warn!(
+                    asset_id = %asset_id.0,
+                    error = %error,
+                    "failed to claim transcription during workspace reconciliation"
+                );
+                return;
+            }
+        };
+
+    if !claimed {
+        return;
+    }
+
+    let job = TranscriptionJob::new(asset_id.0, source.id, source_language);
+    if let Err(error) = state.transcription_queue.enqueue(job).await {
+        let detail = format!("workspace transcription reconciliation enqueue failed: {error}");
+        let _ = dubbridge_db::transcription_repo::upsert_transcription_status(
+            &state.pool,
+            asset_id,
+            dubbridge_domain::artifact::TranscriptionStatus::Failed,
+            Some(&detail),
+        )
+        .await;
+        tracing::warn!(
+            asset_id = %asset_id.0,
+            error = %error,
+            "failed to enqueue transcription during workspace reconciliation"
+        );
+    }
 }
 
 async fn build_project_detail_response(

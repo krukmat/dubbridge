@@ -31,13 +31,19 @@ async fn main() -> anyhow::Result<()> {
             .await
             .context("failed to connect preparation Redis queue")?,
     );
-    let app_state = Arc::new(AppState::with_auth_service_and_preparation_queue(
+    let transcription_queue = Arc::new(
+        dubbridge_jobs::RedisTranscriptionJobQueue::connect(&config.redis_url)
+            .await
+            .context("failed to connect transcription Redis queue")?,
+    );
+    let app_state = Arc::new(AppState::with_auth_service_and_queues(
         pool,
         storage,
         verifier.clone(),
         config.clone(),
         auth_service,
         preparation_queue,
+        transcription_queue,
     ));
     let api_port = app_state.config.api_port;
     let resolved_env = app_state.config.env.clone();
