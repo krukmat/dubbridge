@@ -58,13 +58,15 @@ tags:
 - tapOn:
     id: review-approve
 
+# The fixed Publish action is the functional postcondition of an approved
+# review. Do not depend on the summary badge text being inside the viewport.
 - extendedWaitUntil:
     visible:
-      text: "Approved"
+      id: publish-action
     timeout: 20000
 
-- assertVisible:
-    id: publish-action
+- assertNotVisible:
+    id: review-mutation-error
 
 - tapOn:
     id: publish-action

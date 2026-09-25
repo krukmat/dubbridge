@@ -147,7 +147,7 @@ export function ReviewDetailScreen({ task, gatewayBaseUrl, onBack }: ReviewDetai
         <Panel>
           <Text style={styles.sectionTitle}>Decision</Text>
           <TextInput testID="review-comment-input" accessibilityLabel="Comment" value={comment} onChangeText={setComment} placeholder="Add a comment…" multiline numberOfLines={3} style={[fieldStyle, styles.commentInput]} />
-          {mutation.kind === "error" ? <Text style={styles.errorText} accessibilityRole="alert" accessibilityLiveRegion="assertive">{mutation.message}</Text> : null}
+          {mutation.kind === "error" ? <Text testID="review-mutation-error" style={styles.errorText} accessibilityRole="alert" accessibilityLiveRegion="assertive">{mutation.message}</Text> : null}
         </Panel>
         <ReviewPublicationSection taskState={taskState} publishedAt={publishedAt} />
         <Button label="Back to inbox" variant="secondary" onPress={onBack} />

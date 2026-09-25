@@ -349,6 +349,10 @@ def diagnose_maestro_ui(serial: str, env: dict[str, str], flow: str) -> None:
             "Finalize failed:",
             "UPLOAD_FINALIZE_FAILED /api/ingest/{token}/finalize failed",
         ),
+        (
+            "review-mutation-error",
+            "REVIEW_MUTATION_FAILED review decision or publication request failed",
+        ),
     )
     for needle, diagnosis in known:
         if needle in ui:
