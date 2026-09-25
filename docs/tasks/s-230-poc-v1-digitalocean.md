@@ -5053,7 +5053,7 @@ code to make the smoke pass — a failure is a finding, not a patch target.
 **Type:** development/operational
 **Effort:** M
 **Depends on:** S-230-T5d
-**Status:** [ ] Planned — **runnable now in parallel with MVP0-P2P P6**.
+**Status:** [ ] Planned — **runnable now; P6 PASS and DEV-HANDOFF are already satisfied**.
 
 ### Execution decomposition
 
@@ -5067,7 +5067,7 @@ children are complete.
 | **T7local.B** | Mobile build readiness | B1 mobile QA; B2 normal Android build/install; B3 login/session smoke |
 | **T7local.C** | Base E2E product flow | C1 upload/rights/finalize; C2 preparation/artifacts; C3 review/decision; C4 publish/HLS playback |
 | **T7local.D** | Negative controls | D1 invalid gateway config; D2 expired/rejected auth |
-| **T7local.E** | Certification | E1 downstream evidence; E2 audit artifact + exact HEAD; E3 PASS/BLOCKED disposition; E4 freshness baseline |
+| **T7local.E** | Certification | E1 downstream evidence; E2 audit artifact + exact HEAD; E3 PASS/BLOCKED disposition; E4 DEV-HANDOFF freshness disposition |
 
 Detailed leaves:
 
@@ -5087,21 +5087,24 @@ Detailed leaves:
 - **T7local.E1** — consolidate per-stage downstream-state evidence.
 - **T7local.E2** — write the task-scoped audit artifact with exact HEAD/device/config.
 - **T7local.E3** — record aggregate `T7local PASS | BLOCKED`.
-- **T7local.E4** — record the T7local HEAD as the baseline consumed later by the
-  DEV-HANDOFF freshness check before `T6p-a`.
+- **T7local.E4** — compare the exact T7local evidence HEAD against pinned
+  DEV-HANDOFF `84ea5edc` and record the freshness disposition required before
+  `T6p-a`. If no relevant runtime path changed, record
+  `T7LOCAL_FRESHNESS=PASS_NO_RERUN`; otherwise map the changed behavior to
+  the executed A–D evidence and run only any uncovered bounded regression.
 
 Execution order is **A → B → C → D → E**. P2P Invite/Claim/Sync/Verify,
 loopback playback, HPKE and P5.T3 stay outside every child above.
 
-> **Consolidation update 2026-09-24:** T7local is the S-230 **base-product**
-> mobile smoke, not a P2P product certification. The normal app may contain
-> P6/P2P code because both lanes share the same mobile binary, but this task
-> exercises only login → upload → rights → finalize/preparation → review →
-> publish → normal HLS playback. Invitation/claim, P2P sync/verify, loopback
-> P2P playback, HPKE and P5.T3 remain outside T7local and belong to the
-> MVP0-P2P/P7 release lane. T7local stays independent of P6 so both lanes can
-> progress in parallel. T6p-a later converges them using DEV-HANDOFF plus the
-> freshness rule below.
+> **Consolidation update 2026-09-25:** T7local is the S-230 **base-product**
+> mobile smoke, not a P2P product certification. P6 is now PASS and
+> DEV-HANDOFF is pinned at `84ea5edc`; T7local therefore executes against a
+> closed product-development baseline rather than racing P6. The normal app
+> contains the completed P6/P2P surfaces, but this task exercises only
+> login → upload → rights → finalize/preparation → review → publish → normal
+> HLS playback. Invitation/claim, P2P sync/verify, loopback P2P playback, HPKE
+> and P5.T3 remain outside T7local and belong to the MVP0-P2P/P7 release lane.
+> T6p-a consumes T7local PASS + T7c PASS + the E4 freshness disposition.
 >
 > Added 2026-09-06 at owner request, re-sequencing the base `T6 -> T7` path so
 > that P2P deployment-input freeze (`T6p-a`) no longer requires a completed
@@ -5182,19 +5185,26 @@ live/ready evidence on host port 8082.
 
 ### DEV-HANDOFF freshness handoff
 
-T7local may PASS before P6 because parallel execution is intentional. That PASS
-remains valid for T7local itself. Before **T6p-a activation**, compare the exact
-recorded T7local HEAD with the exact DEV-HANDOFF head (`84ea5edc`, pinned
-2026-09-25; code-equivalent to `2cc8a6b`). Inspect changes affecting
-the base mobile flow or its local entry path, including mobile configuration,
-auth, shared navigation/API client/base screens, gateway, relevant base API
-routes, and `infra/local/docker-compose.yml`.
+DEV-HANDOFF is already satisfied and pinned at `84ea5edc`. T7local performs
+the freshness check as part of **T7local.E4**, after the smoke evidence HEAD is
+known.
+
+Current pre-execution verification (2026-09-25): `84ea5edc..1067d2b2`
+contains only documentation changes; there are no code/config/runtime path
+changes. This is informative only — E4 must recompute against the actual
+T7local evidence HEAD.
+
+Inspect changes affecting the base mobile flow or local entry path, including
+mobile configuration, auth, shared navigation/API client/base screens, gateway,
+relevant base API routes, and `infra/local/docker-compose.yml`.
 
 - If no relevant path changed, record `T7LOCAL_FRESHNESS=PASS_NO_RERUN`.
-- If relevant paths changed, run a bounded base-flow regression on the
-  DEV-HANDOFF head (gateway live/ready, login, representative upload/finalize,
-  review/publish, normal HLS playback, and mobile QA) and attach supplemental
-  evidence. Do **not** rerun P2P certification here.
+- If relevant paths changed after `84ea5edc`, map them to the T7local A–D
+  evidence executed on the newer head. Only behavior not already covered by
+  that run requires an additional bounded regression.
+- Any required regression covers gateway live/ready, login, representative
+  upload/finalize/preparation, review/publish, normal HLS playback, and mobile
+  QA. Do **not** rerun P2P certification here.
 - Any regression failure blocks T6p-a and is reported as a finding; it is not
   silently patched inside T6p-a.
 

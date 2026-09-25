@@ -11,23 +11,26 @@ related: MVP0-P2P
 
 ## Decision
 
-The October plan keeps two development lanes intentionally parallel:
+The 2026-09-24 model intentionally allowed two lanes to advance in parallel.
+That sequencing worked: MVP0-P2P has now reached **P6 PASS** and
+**DEV-HANDOFF SATISFIED**. The current execution shape is:
 
 ```text
-S-230:     T5d PASS -> T7local -> T7c ------------------+
-                                                         |
-MVP0-P2P:  P3 PASS + P4 PASS + P5-DEV -> P6 -> P6 PASS |
-                                      \                  |
-                                       +--> DEV-HANDOFF --+
-                                                         |
-                                                         v
-                                T7local freshness vs exact DEV-HANDOFF head
-                                                         |
-                                                         v
-                                                       T6p-a
+P3 PASS + P4 PASS + P5-DEV + P6 PASS
+                  |
+                  v
+        DEV-HANDOFF @ 84ea5edc
+                  |
+T5d PASS -> T7local -> T7c
+              |
+              +-> E4 freshness vs 84ea5edc
+                        |
+                        v
+                      T6p-a
 ```
 
-`DEV-HANDOFF = P3 PASS + P4 PASS + P5-DEV + P6 PASS`.
+`DEV-HANDOFF = P3 PASS + P4 PASS + P5-DEV + P6 PASS`, pinned at
+`84ea5edc` on 2026-09-25.
 
 P5.T3/P5-CERT remains outside DEV-HANDOFF and returns in the release
 certification lane (compatible T7p evidence or mandatory P7.T2 resolution).
@@ -89,14 +92,15 @@ GET http://localhost:8082/health/ready
 
 until the shared preflight script owns those checks directly.
 
-## Why T7local does not wait for P6
+## Sequencing result
 
-Making T7local depend on P6 would remove useful parallelism and recreate the
-schedule pressure the 2026-09-06 re-sequencing was designed to avoid. T7local
-can therefore PASS on an earlier head while P6 continues.
+T7local was deliberately kept independent of P6 so the roadmap did not recreate
+the original deployment cycle. P6 happened to close first. This does not change
+T7local scope; it only simplifies freshness handling.
 
-That earlier PASS remains valid for **T7local itself**. It is not automatically
-treated as fresh enough for T6p-a.
+The exact DEV-HANDOFF reference is now known: `84ea5edc`. T7local runs on the
+current integrated branch and records its own exact evidence HEAD. E4 compares
+those two heads before T6p-a.
 
 ## T6p-a freshness gate
 
@@ -135,18 +139,22 @@ branch and must not be revived for this work.
 ## Canonical sequence
 
 ```text
-NOW
-├─ MVP0-P2P: P6 -> P6 PASS -> DEV-HANDOFF
-└─ S-230:    T7local -> T7c
-                     \       /
-                      freshness
-                         |
-                         v
-                       T6p-a
-                         |
-                 T6p-b -> T6p-c -> T6p-d
-                         |
-                   T7 + T7p / P7
-                         |
-                        T9g
+DEV-HANDOFF @ 84ea5edc  [SATISFIED]
+          |
+T7local -> T7c
+    |
+    +-> E4 freshness vs 84ea5edc
+             |
+             v
+           T6p-a
+             |
+     T6p-b -> T6p-c -> T6p-d
+             |
+       T7 + T7p / P7
+             |
+            T9g
 ```
+
+Pre-execution check on 2026-09-25: `84ea5edc..1067d2b2` is documentation-only,
+so no additional runtime regression is currently implied. Recompute this against
+the actual T7local evidence HEAD.

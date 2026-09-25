@@ -6,14 +6,17 @@ Execute the base S-230 mobile product flow against the **gateway** exposed by
 `infra/local/docker-compose.yml` and emit the evidence required by
 `docs/tasks/s-230-poc-v1-digitalocean.md § S-230-T7local`.
 
-This lane is deliberately independent of MVP0-P2P P6/P5 certification so it can
-run in parallel. The normal binary may contain P6/P2P product code, but this task
-must neither modify nor exercise Invite/Claim/P2P Sync/Verify/loopback/HPKE
-behavior. It certifies only the base S-230 flow.
+P6 is already PASS and DEV-HANDOFF is pinned at `84ea5edc`. T7local now
+certifies the base S-230 flow on top of that closed product-development
+baseline. The normal binary contains P6/P2P product code, but this task must
+neither modify nor exercise Invite/Claim/P2P Sync/Verify/loopback/HPKE behavior.
 
 ## Preconditions
 
 - Branch: `feature/p2p-mvp-core`.
+- Pinned DEV-HANDOFF reference: `84ea5edc` (P6 PASS; 15/15 CI). At task start,
+  compare the actual checkout HEAD against this reference and retain the changed
+  path list for E4.
 - P5.T3/P5-CERT is **not a prerequisite**. Do not overlap T7local with an
   actively running device-certification session only when both would contend
   for the same Metro/ADB/emulator resources.
@@ -49,7 +52,7 @@ T7local
    ├─ E1 downstream evidence
    ├─ E2 audit artifact + exact HEAD
    ├─ E3 PASS/BLOCKED
-   └─ E4 freshness baseline
+   └─ E4 DEV-HANDOFF freshness disposition
 ```
 
 Order: **A → B → C → D → E**. Do not advance a block while one of its
@@ -138,11 +141,12 @@ Write a new audit artifact under `docs/audit/` containing:
 No P2P invitation, P2P claim, P2P sync/verification, P2P loopback playback,
 HPKE or P5.T3 evidence belongs in this artifact.
 
-Record the exact T7local HEAD. T7local may legitimately PASS while P6 is still
-moving. Before T6p-a, compare that HEAD with the exact DEV-HANDOFF head. If
-relevant base-flow/mobile/gateway/local-compose paths changed, run the bounded
-regression defined in the S-230 ledger and attach a supplemental freshness
-artifact; do not rerun P2P certification.
+Record the exact T7local HEAD. In E4, compare it with pinned DEV-HANDOFF
+`84ea5edc`. The pre-execution comparison through `1067d2b2` is docs-only,
+but recompute at execution time. If relevant runtime paths differ, map them to
+the A–D smoke evidence already executed on the T7local head; run only any
+remaining bounded regression required by the S-230 ledger. Do not rerun P2P
+certification.
 
 ## Stop conditions
 
@@ -176,7 +180,7 @@ D2 auth expiry/rejection:
 E1 downstream evidence:
 E2 audit artifact:
 E3 disposition:
-E4 freshness baseline HEAD:
+E4 freshness vs 84ea5edc:
 device:
 code changed: YES/NO
 next gate: T7c | BLOCKED
