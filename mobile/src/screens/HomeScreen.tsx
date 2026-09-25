@@ -372,7 +372,7 @@ export function HomeScreen({
   );
 
   return (
-    <Screen testID="home-screen">
+    <Screen scroll testID="home-screen">
       <ScreenHeader
         kicker="DubBridge"
         title="Your workspace"
