@@ -5071,9 +5071,9 @@ children are complete.
 | Block | Purpose | Children |
 |---|---|---|
 | **T7local.A** | Local runtime readiness | A1 Compose + gateway; A2 gateway live/ready; A3 mobile target/config |
-| **T7local.B** | Mobile build readiness | B1 mobile QA; B2 normal Android build/install; B3 login/session smoke |
+| **T7local.B** | Mobile build readiness | B1 canonical qa-mobile; B2 normal Android build/install; B3 login/session smoke |
 | **T7local.C** | Base E2E product flow | C1 upload/rights/finalize; C2 preparation/artifacts; C3 review/decision; C4 publish/HLS playback |
-| **T7local.D** | Negative controls | D1 invalid gateway config; D2 expired/rejected auth |
+| **T7local.D** | Negative controls | D1 missing gateway config; D2 rejected credentials |
 | **T7local.E** | Certification | E1 downstream evidence; E2 audit artifact + exact HEAD; E3 PASS/BLOCKED disposition; E4 DEV-HANDOFF freshness disposition |
 
 Detailed leaves:
@@ -5082,7 +5082,8 @@ Detailed leaves:
 - **T7local.A2** — prove gateway `:8082/health/live` and `:8082/health/ready`.
 - **T7local.A3** — prove the mobile target uses the gateway
   (`10.0.2.2:8082` on emulator), never API `:8080`.
-- **T7local.B1** — `typecheck` + `lint` + mobile tests / `qa-mobile`.
+- **T7local.B1** — run canonical `make qa-mobile` once; do not duplicate its
+  typecheck/lint/Jest work.
 - **T7local.B2** — build, install and launch the normal Android application.
 - **T7local.B3** — establish a real authenticated local session.
 - **T7local.C1** — upload, rights confirmation and finalize.
