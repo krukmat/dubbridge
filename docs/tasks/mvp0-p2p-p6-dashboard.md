@@ -292,7 +292,7 @@ HPKE emulator remains disabled and outside P6.T2.
 
 **Depends on:** T2 PASS
 
-**Status:** **IN PROGRESS 2026-09-25.** T3.A+B PASS on `3474b8b` / Actions `36041983233`; T3.C PASS on `0527ec3` / Actions `36046501652`; T3.D1–D3 PASS on exact-head CI `581c696` / Actions `36051247079`; T3.D4 PASS with local Android evidence committed at `5fc8725`. T3.D5 visual inspection is active.
+**Status:** **IN PROGRESS 2026-09-25.** T3.A+B PASS on `3474b8b` / Actions `36041983233`; T3.C PASS on `0527ec3` / Actions `36046501652`; T3.D1–D3 PASS on exact-head CI `581c696` / Actions `36051247079`; T3.D4 PASS with local Android evidence committed at `5fc8725`. T3.D5 visual inspection PASS; T3.D6 awaits exact emulator identification.
 
 **Acceptance criteria:** Certify all P6 parent HP/EC with component/integration and Android flow evidence; inspect loading/empty/error/expired states against DESIGN.md and shipped tokens.
 
@@ -375,8 +375,8 @@ invariant change). HPKE emulator remains disabled.
 | T3.D2 | Add deterministic P2P gateway fixtures + dev-only local P4 snapshot seeding | **PASS — exact-head CI `581c696` / `36051247079`** |
 | T3.D3 | Add P2P Maestro flows + local runner integration | **PASS — exact-head CI `581c696` / `36051247079`** |
 | T3.D4 | Execute Maestro locally on Android and capture evidence | **PASS — rerun after `2cc8a6b`; 11/11 PNG committed at `5fc8725`** |
-| T3.D5 | Inspect screenshots against DESIGN.md / shipped tokens | **IN PROGRESS — visual review pending** |
-| T3.D6 | Record exact-SHA/device verdict and close T3.D | Pending |
+| T3.D5 | Inspect screenshots against DESIGN.md / shipped tokens | **PASS — 11/11 screenshots reviewed; no P6-scoped visual blocker** |
+| T3.D6 | Record exact-SHA/device verdict and close T3.D | **BLOCKED — exact emulator profile/serial was not preserved** |
 
 T3.D is visual certification only. It does not replace P7Local's complete
 owner→viewer→claim→sync→verify→Available→local-play E2E. HPKE emulator remains

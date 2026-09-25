@@ -7,7 +7,7 @@ slice: MVP0-P2P
 
 # P6 — Minimal My Content and Invites dashboard
 
-Task ledger: `docs/tasks/mvp0-p2p-p6-dashboard.md`. **Activation gate satisfied 2026-09-22. P6.T0 PASS. P6.T1 PASS 2026-09-23:** T1.A–H are closed; the standing MVP0-P2P owner-directed review exception replaces phase-1/phase-2 peer review, and owner Matias Kruk explicitly reviewed and approved T1. Functional/evidence head `b6df0a7f` completed 15/15 CI, mobile 63/63 suites / 461/461 tests and 90.43% workspace line coverage. **P6.T2 PASS 2026-09-24:** T2.A–H are closed with owner final verification and the standing MVP0-P2P REVIEW-OVERRIDE. **P6.T3 is IN PROGRESS. T3.A+B PASS on `3474b8b` / Actions `36041983233`; T3.C PASS on `0527ec3` / Actions `36046501652`; T3.D1–D4 PASS. D2/D3 exact-head CI: `581c696` / Actions `36051247079` (15/15). D4 local evidence: 11/11 P2P screenshots committed at `5fc8725`. T3.D5 visual inspection is active.** P5.T3 is deferred to release certification.
+Task ledger: `docs/tasks/mvp0-p2p-p6-dashboard.md`. **Activation gate satisfied 2026-09-22. P6.T0 PASS. P6.T1 PASS 2026-09-23:** T1.A–H are closed; the standing MVP0-P2P owner-directed review exception replaces phase-1/phase-2 peer review, and owner Matias Kruk explicitly reviewed and approved T1. Functional/evidence head `b6df0a7f` completed 15/15 CI, mobile 63/63 suites / 461/461 tests and 90.43% workspace line coverage. **P6.T2 PASS 2026-09-24:** T2.A–H are closed with owner final verification and the standing MVP0-P2P REVIEW-OVERRIDE. **P6.T3 is IN PROGRESS. T3.A+B PASS on `3474b8b` / Actions `36041983233`; T3.C PASS on `0527ec3` / Actions `36046501652`; T3.D1–D5 PASS. D2/D3 exact-head CI: `581c696` / Actions `36051247079` (15/15). D4 local evidence: 11/11 P2P screenshots committed at `5fc8725`. T3.D5 visual inspection found no P6-scoped blocker. T3.D6 awaits the exact Android emulator profile/serial before aggregate closure.** P5.T3 is deferred to release certification.
 
 ## Objective
 
@@ -40,7 +40,7 @@ Freeze state projection and action eligibility from canonical backend and runtim
 | P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **PASS 2026-09-22** |
 | P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **PASS 2026-09-23 — A–H closed; RRI 55 Med-high; owner-reviewed + REVIEW-OVERRIDE** |
 | P6.T2 | Viewer claim, Invites, sync and play actions | development | XL parent / decomposed | T1 PASS | **PASS 2026-09-24 — A–H closed; owner-verified** |
-| P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | **IN PROGRESS — T3.A–D4 PASS; T3.D5 active** |
+| P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | **IN PROGRESS — T3.A–D5 PASS; T3.D6 blocked on device ID** |
 
 
 The companion ledger defines acceptance, HP/EC, evidence and handoff per task.

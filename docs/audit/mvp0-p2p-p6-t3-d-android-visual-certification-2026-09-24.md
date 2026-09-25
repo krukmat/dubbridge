@@ -172,3 +172,57 @@ bounded D4 repair.
 
 D4 certifies execution/evidence capture only. It does not certify visual
 quality. D5 must inspect the committed images before D6 can close T3.D.
+
+
+## D5 visual inspection
+
+Visual evidence reviewed from the 11 PNGs produced by D4 and committed at
+`5fc87253fbf5f0cc049ea3cdd7997a4564f3aefb`. Review baseline:
+`DESIGN.md`, shipped `mobile/src/theme/tokens.ts`, and the
+`StateView` centering contract.
+
+Verdict: **T3.D5 PASS 2026-09-25 — no P6-scoped visual blocker.**
+
+Findings:
+
+- Home: the P2P sharing section is clearly grouped and both My content and
+  Invites entries are fully visible and consistent with the existing card
+  vocabulary.
+- My Content: Processing, Ready and Failed are visible with semantic badges;
+  Create invite is fully visible on Ready; no P2P action or status badge is
+  clipped.
+- `21_p2p_my_content_states_top.png` and
+  `22_p2p_my_content_states_bottom.png` are byte-identical because all three
+  owner states already fit in the viewport. This is redundant evidence only,
+  not a UI defect.
+- Invites: Pending, Syncing, Sync error, Available and Expired are all
+  represented. Sync, Retry Sync and Play are visible; the Play action is fully
+  inside the viewport after the bounded D4 harness repair.
+- The long Invites surface demonstrates working vertical scroll without
+  clipping the required P2P status/action targets.
+- Empty, error/retry and loading states for both My Content and Invites are
+  centered cleanly within the available content area, consistent with
+  `StateView` and the T3.C `flexGrow: 1` contract.
+- Palette, typography, panels, rounded shapes and semantic status colors are
+  consistent with the shipped dark-canvas token system. Primary Play remains
+  visually dominant while secondary actions remain quieter.
+
+Non-blocking inherited observation:
+
+- Android system status-bar glyphs/time render dark against the dark canvas.
+  `mobile/App.tsx` currently uses `<StatusBar style="dark" />`.
+- The same condition is visible in pre-P6 screenshot evidence (for example
+  `02_home.png`), so it is not introduced by P6/T3 and is not treated as a
+  T3.D blocker. It should be tracked as separate global mobile-theme debt.
+
+## D6 remaining gate
+
+D6 requires the exact-SHA/device verdict. The executable/evidence SHA chain is
+known (`2cc8a6b` repair → `5fc8725` screenshot evidence), but the exact
+Android emulator profile/serial and Maestro version were not preserved in the
+available execution record. Screenshot dimensions are 1080x2400, which is not
+sufficient to infer an exact emulator model.
+
+Therefore **T3.D6 remains BLOCKED only on exact local device identification**.
+No additional P2P code, harness change or screenshot rerun is required unless
+the owner cannot recover that device identity.
