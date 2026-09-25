@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { formatId, formatRelative, formatStatusLabel, formatTimestamp } from "../format";
 
 import { type ReviewTaskSummary } from "../api/review";
-import { ActionBar, ACTION_BAR_CONTENT_HEIGHT } from "../components/ActionBar";
+import { ActionBar } from "../components/ActionBar";
 import { Badge, statusTone } from "../components/Badge";
 import { Button } from "../components/Button";
 import { Panel } from "../components/Panel";
@@ -115,12 +115,11 @@ export function ReviewDetailScreen({ task, gatewayBaseUrl, onBack }: ReviewDetai
   const [playbackAttempt, setPlaybackAttempt] = useState(0);
   const playbackState = usePlaybackLoader({ assetId: task.asset_id, gatewayBaseUrl, attempt: playbackAttempt });
   const isSubmitting = mutation.kind === "submitting";
-  const actionBarHeight = ACTION_BAR_CONTENT_HEIGHT + space.md * 2;
   const readiness = readinessLabel(taskState, publishedAt);
 
   return (
     <View style={styles.container}>
-      <Screen testID="review-detail-screen" scroll extraBottomPadding={actionBarHeight}>
+      <Screen testID="review-detail-screen" scroll>
         <ScreenHeader kicker="Review" title="Review task" />
         <Panel testID="review-editorial-summary">
           <View style={styles.row}>

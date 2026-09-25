@@ -25,7 +25,7 @@ describe("ActionBar", () => {
     expect(view.getByText("Approve")).toBeTruthy();
   });
 
-  it("HP-Android: stays above scrollable siblings for hit testing", async () => {
+  it("HP-Android: participates in normal layout instead of overlaying scroll content", async () => {
     const view = await render(
       <ActionBar testID="action-bar">
         <Text>Approve</Text>
@@ -33,8 +33,8 @@ describe("ActionBar", () => {
     );
 
     const style = StyleSheet.flatten(view.getByTestId("action-bar").props.style);
-    expect(style.zIndex).toBeGreaterThan(0);
-    expect(style.elevation).toBeGreaterThan(0);
+    expect(style.position).not.toBe("absolute");
+    expect(style.flexShrink).toBe(0);
   });
 
   it("HP-2: renders multiple children", async () => {
