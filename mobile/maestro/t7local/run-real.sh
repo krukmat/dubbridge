@@ -110,8 +110,378 @@ maestro test   -e T7LOCAL_EMAIL="$email"   -e T7LOCAL_PASSWORD="$password"   -e 
   die "B3/C1 Maestro ingestion flow failed"
 
 c1_output="$("$t7_dir/db-probe.sh" wait-c1 "$proof")" || die "C1 durable evidence failed"
-printf '%s\n' "$c1_output" | head -n 1
-asset_id="$(printf '%s\n' "$c1_output" | tail -n 1)"
+c1_status="${c1_output%%
+
+api_json POST "/api/orgs/$org_id/projects/$project_id/assets"   "{"asset_id":"$asset_id"}" >/dev/null ||
+  die "linking real asset to project failed"
+
+"$t7_dir/db-probe.sh" wait-c2 "$asset_id" || die "C2 preparation evidence failed"
+
+review_output="$("$t7_dir/db-probe.sh" wait-review-task "$asset_id")" ||
+  die "no real review task appeared for the current asset"
+review_status="${review_output%%
+
+maestro test   -e T7LOCAL_EMAIL="$email"   -e T7LOCAL_PASSWORD="$password"   -e T7LOCAL_REVIEW_TASK_ID="$review_task_id"   "$t7_dir/review-publish-real.yaml" ||
+  die "C3/C4 review-publication Maestro flow failed"
+
+"$t7_dir/db-probe.sh" verify-c3 "$review_task_id" || die "C3 durable decision evidence failed"
+"$t7_dir/db-probe.sh" verify-c4 "$review_task_id" || die "C4 durable publication evidence failed"
+
+maestro test   -e T7LOCAL_EMAIL="$email"   -e T7LOCAL_PASSWORD="$password"   -e T7LOCAL_ASSET_ID="$asset_id"   "$t7_dir/playback-real.yaml" ||
+  die "C4 normal HLS playback flow failed"
+
+mkdir -p "$summary_dir"
+chmod 700 "$summary_dir"
+head_sha="$(git -C "$repo_root" rev-parse HEAD)"
+cat >"$summary_dir/summary.env" <<EOF
+T7LOCAL_RUN_ID=$run_id
+T7LOCAL_HEAD=$head_sha
+T7LOCAL_EMULATOR_SERIAL=$serial
+T7LOCAL_GATEWAY=$gateway
+T7LOCAL_PROOF_REFERENCE=$proof
+T7LOCAL_FILENAME=$filename
+T7LOCAL_ORG_ID=$org_id
+T7LOCAL_PROJECT_ID=$project_id
+T7LOCAL_ASSET_ID=$asset_id
+T7LOCAL_REVIEW_TASK_ID=$review_task_id
+B3=PASS
+C1=PASS
+C2=PASS
+C3=PASS
+C4=PASS
+EOF
+
+echo "T7LOCAL_MAESTRO=PASS"
+echo "HEAD=$head_sha"
+echo "RUN_ID=$run_id"
+echo "ASSET_ID=$asset_id"
+echo "REVIEW_TASK_ID=$review_task_id"
+echo "SUMMARY=$summary_dir/summary.env"
+\n'*}"
+asset_id="${c1_output##*
+
+api_json POST "/api/orgs/$org_id/projects/$project_id/assets"   "{"asset_id":"$asset_id"}" >/dev/null ||
+  die "linking real asset to project failed"
+
+"$t7_dir/db-probe.sh" wait-c2 "$asset_id" || die "C2 preparation evidence failed"
+
+review_output="$("$t7_dir/db-probe.sh" wait-review-task "$asset_id")" ||
+  die "no real review task appeared for the current asset"
+printf '%s\n' "$review_output" | head -n 1
+review_task_id="$(printf '%s\n' "$review_output" | tail -n 1)"
+
+maestro test   -e T7LOCAL_EMAIL="$email"   -e T7LOCAL_PASSWORD="$password"   -e T7LOCAL_REVIEW_TASK_ID="$review_task_id"   "$t7_dir/review-publish-real.yaml" ||
+  die "C3/C4 review-publication Maestro flow failed"
+
+"$t7_dir/db-probe.sh" verify-c3 "$review_task_id" || die "C3 durable decision evidence failed"
+"$t7_dir/db-probe.sh" verify-c4 "$review_task_id" || die "C4 durable publication evidence failed"
+
+maestro test   -e T7LOCAL_EMAIL="$email"   -e T7LOCAL_PASSWORD="$password"   -e T7LOCAL_ASSET_ID="$asset_id"   "$t7_dir/playback-real.yaml" ||
+  die "C4 normal HLS playback flow failed"
+
+mkdir -p "$summary_dir"
+chmod 700 "$summary_dir"
+head_sha="$(git -C "$repo_root" rev-parse HEAD)"
+cat >"$summary_dir/summary.env" <<EOF
+T7LOCAL_RUN_ID=$run_id
+T7LOCAL_HEAD=$head_sha
+T7LOCAL_EMULATOR_SERIAL=$serial
+T7LOCAL_GATEWAY=$gateway
+T7LOCAL_PROOF_REFERENCE=$proof
+T7LOCAL_FILENAME=$filename
+T7LOCAL_ORG_ID=$org_id
+T7LOCAL_PROJECT_ID=$project_id
+T7LOCAL_ASSET_ID=$asset_id
+T7LOCAL_REVIEW_TASK_ID=$review_task_id
+B3=PASS
+C1=PASS
+C2=PASS
+C3=PASS
+C4=PASS
+EOF
+
+echo "T7LOCAL_MAESTRO=PASS"
+echo "HEAD=$head_sha"
+echo "RUN_ID=$run_id"
+echo "ASSET_ID=$asset_id"
+echo "REVIEW_TASK_ID=$review_task_id"
+echo "SUMMARY=$summary_dir/summary.env"
+\n'}"
+printf '%s\n' "$c1_status"
+
+api_json POST "/api/orgs/$org_id/projects/$project_id/assets"   "{"asset_id":"$asset_id"}" >/dev/null ||
+  die "linking real asset to project failed"
+
+"$t7_dir/db-probe.sh" wait-c2 "$asset_id" || die "C2 preparation evidence failed"
+
+review_output="$("$t7_dir/db-probe.sh" wait-review-task "$asset_id")" ||
+  die "no real review task appeared for the current asset"
+printf '%s\n' "$review_output" | head -n 1
+review_task_id="$(printf '%s\n' "$review_output" | tail -n 1)"
+
+maestro test   -e T7LOCAL_EMAIL="$email"   -e T7LOCAL_PASSWORD="$password"   -e T7LOCAL_REVIEW_TASK_ID="$review_task_id"   "$t7_dir/review-publish-real.yaml" ||
+  die "C3/C4 review-publication Maestro flow failed"
+
+"$t7_dir/db-probe.sh" verify-c3 "$review_task_id" || die "C3 durable decision evidence failed"
+"$t7_dir/db-probe.sh" verify-c4 "$review_task_id" || die "C4 durable publication evidence failed"
+
+maestro test   -e T7LOCAL_EMAIL="$email"   -e T7LOCAL_PASSWORD="$password"   -e T7LOCAL_ASSET_ID="$asset_id"   "$t7_dir/playback-real.yaml" ||
+  die "C4 normal HLS playback flow failed"
+
+mkdir -p "$summary_dir"
+chmod 700 "$summary_dir"
+head_sha="$(git -C "$repo_root" rev-parse HEAD)"
+cat >"$summary_dir/summary.env" <<EOF
+T7LOCAL_RUN_ID=$run_id
+T7LOCAL_HEAD=$head_sha
+T7LOCAL_EMULATOR_SERIAL=$serial
+T7LOCAL_GATEWAY=$gateway
+T7LOCAL_PROOF_REFERENCE=$proof
+T7LOCAL_FILENAME=$filename
+T7LOCAL_ORG_ID=$org_id
+T7LOCAL_PROJECT_ID=$project_id
+T7LOCAL_ASSET_ID=$asset_id
+T7LOCAL_REVIEW_TASK_ID=$review_task_id
+B3=PASS
+C1=PASS
+C2=PASS
+C3=PASS
+C4=PASS
+EOF
+
+echo "T7LOCAL_MAESTRO=PASS"
+echo "HEAD=$head_sha"
+echo "RUN_ID=$run_id"
+echo "ASSET_ID=$asset_id"
+echo "REVIEW_TASK_ID=$review_task_id"
+echo "SUMMARY=$summary_dir/summary.env"
+\n'*}"
+review_task_id="${review_output##*
+
+maestro test   -e T7LOCAL_EMAIL="$email"   -e T7LOCAL_PASSWORD="$password"   -e T7LOCAL_REVIEW_TASK_ID="$review_task_id"   "$t7_dir/review-publish-real.yaml" ||
+  die "C3/C4 review-publication Maestro flow failed"
+
+"$t7_dir/db-probe.sh" verify-c3 "$review_task_id" || die "C3 durable decision evidence failed"
+"$t7_dir/db-probe.sh" verify-c4 "$review_task_id" || die "C4 durable publication evidence failed"
+
+maestro test   -e T7LOCAL_EMAIL="$email"   -e T7LOCAL_PASSWORD="$password"   -e T7LOCAL_ASSET_ID="$asset_id"   "$t7_dir/playback-real.yaml" ||
+  die "C4 normal HLS playback flow failed"
+
+mkdir -p "$summary_dir"
+chmod 700 "$summary_dir"
+head_sha="$(git -C "$repo_root" rev-parse HEAD)"
+cat >"$summary_dir/summary.env" <<EOF
+T7LOCAL_RUN_ID=$run_id
+T7LOCAL_HEAD=$head_sha
+T7LOCAL_EMULATOR_SERIAL=$serial
+T7LOCAL_GATEWAY=$gateway
+T7LOCAL_PROOF_REFERENCE=$proof
+T7LOCAL_FILENAME=$filename
+T7LOCAL_ORG_ID=$org_id
+T7LOCAL_PROJECT_ID=$project_id
+T7LOCAL_ASSET_ID=$asset_id
+T7LOCAL_REVIEW_TASK_ID=$review_task_id
+B3=PASS
+C1=PASS
+C2=PASS
+C3=PASS
+C4=PASS
+EOF
+
+echo "T7LOCAL_MAESTRO=PASS"
+echo "HEAD=$head_sha"
+echo "RUN_ID=$run_id"
+echo "ASSET_ID=$asset_id"
+echo "REVIEW_TASK_ID=$review_task_id"
+echo "SUMMARY=$summary_dir/summary.env"
+\n'*}"
+asset_id="${c1_output##*
+
+api_json POST "/api/orgs/$org_id/projects/$project_id/assets"   "{"asset_id":"$asset_id"}" >/dev/null ||
+  die "linking real asset to project failed"
+
+"$t7_dir/db-probe.sh" wait-c2 "$asset_id" || die "C2 preparation evidence failed"
+
+review_output="$("$t7_dir/db-probe.sh" wait-review-task "$asset_id")" ||
+  die "no real review task appeared for the current asset"
+printf '%s\n' "$review_output" | head -n 1
+review_task_id="$(printf '%s\n' "$review_output" | tail -n 1)"
+
+maestro test   -e T7LOCAL_EMAIL="$email"   -e T7LOCAL_PASSWORD="$password"   -e T7LOCAL_REVIEW_TASK_ID="$review_task_id"   "$t7_dir/review-publish-real.yaml" ||
+  die "C3/C4 review-publication Maestro flow failed"
+
+"$t7_dir/db-probe.sh" verify-c3 "$review_task_id" || die "C3 durable decision evidence failed"
+"$t7_dir/db-probe.sh" verify-c4 "$review_task_id" || die "C4 durable publication evidence failed"
+
+maestro test   -e T7LOCAL_EMAIL="$email"   -e T7LOCAL_PASSWORD="$password"   -e T7LOCAL_ASSET_ID="$asset_id"   "$t7_dir/playback-real.yaml" ||
+  die "C4 normal HLS playback flow failed"
+
+mkdir -p "$summary_dir"
+chmod 700 "$summary_dir"
+head_sha="$(git -C "$repo_root" rev-parse HEAD)"
+cat >"$summary_dir/summary.env" <<EOF
+T7LOCAL_RUN_ID=$run_id
+T7LOCAL_HEAD=$head_sha
+T7LOCAL_EMULATOR_SERIAL=$serial
+T7LOCAL_GATEWAY=$gateway
+T7LOCAL_PROOF_REFERENCE=$proof
+T7LOCAL_FILENAME=$filename
+T7LOCAL_ORG_ID=$org_id
+T7LOCAL_PROJECT_ID=$project_id
+T7LOCAL_ASSET_ID=$asset_id
+T7LOCAL_REVIEW_TASK_ID=$review_task_id
+B3=PASS
+C1=PASS
+C2=PASS
+C3=PASS
+C4=PASS
+EOF
+
+echo "T7LOCAL_MAESTRO=PASS"
+echo "HEAD=$head_sha"
+echo "RUN_ID=$run_id"
+echo "ASSET_ID=$asset_id"
+echo "REVIEW_TASK_ID=$review_task_id"
+echo "SUMMARY=$summary_dir/summary.env"
+\n'}"
+printf '%s\n' "$c1_status"
+
+api_json POST "/api/orgs/$org_id/projects/$project_id/assets"   "{"asset_id":"$asset_id"}" >/dev/null ||
+  die "linking real asset to project failed"
+
+"$t7_dir/db-probe.sh" wait-c2 "$asset_id" || die "C2 preparation evidence failed"
+
+review_output="$("$t7_dir/db-probe.sh" wait-review-task "$asset_id")" ||
+  die "no real review task appeared for the current asset"
+printf '%s\n' "$review_output" | head -n 1
+review_task_id="$(printf '%s\n' "$review_output" | tail -n 1)"
+
+maestro test   -e T7LOCAL_EMAIL="$email"   -e T7LOCAL_PASSWORD="$password"   -e T7LOCAL_REVIEW_TASK_ID="$review_task_id"   "$t7_dir/review-publish-real.yaml" ||
+  die "C3/C4 review-publication Maestro flow failed"
+
+"$t7_dir/db-probe.sh" verify-c3 "$review_task_id" || die "C3 durable decision evidence failed"
+"$t7_dir/db-probe.sh" verify-c4 "$review_task_id" || die "C4 durable publication evidence failed"
+
+maestro test   -e T7LOCAL_EMAIL="$email"   -e T7LOCAL_PASSWORD="$password"   -e T7LOCAL_ASSET_ID="$asset_id"   "$t7_dir/playback-real.yaml" ||
+  die "C4 normal HLS playback flow failed"
+
+mkdir -p "$summary_dir"
+chmod 700 "$summary_dir"
+head_sha="$(git -C "$repo_root" rev-parse HEAD)"
+cat >"$summary_dir/summary.env" <<EOF
+T7LOCAL_RUN_ID=$run_id
+T7LOCAL_HEAD=$head_sha
+T7LOCAL_EMULATOR_SERIAL=$serial
+T7LOCAL_GATEWAY=$gateway
+T7LOCAL_PROOF_REFERENCE=$proof
+T7LOCAL_FILENAME=$filename
+T7LOCAL_ORG_ID=$org_id
+T7LOCAL_PROJECT_ID=$project_id
+T7LOCAL_ASSET_ID=$asset_id
+T7LOCAL_REVIEW_TASK_ID=$review_task_id
+B3=PASS
+C1=PASS
+C2=PASS
+C3=PASS
+C4=PASS
+EOF
+
+echo "T7LOCAL_MAESTRO=PASS"
+echo "HEAD=$head_sha"
+echo "RUN_ID=$run_id"
+echo "ASSET_ID=$asset_id"
+echo "REVIEW_TASK_ID=$review_task_id"
+echo "SUMMARY=$summary_dir/summary.env"
+\n'}"
+printf '%s\n' "$review_status"
+
+maestro test   -e T7LOCAL_EMAIL="$email"   -e T7LOCAL_PASSWORD="$password"   -e T7LOCAL_REVIEW_TASK_ID="$review_task_id"   "$t7_dir/review-publish-real.yaml" ||
+  die "C3/C4 review-publication Maestro flow failed"
+
+"$t7_dir/db-probe.sh" verify-c3 "$review_task_id" || die "C3 durable decision evidence failed"
+"$t7_dir/db-probe.sh" verify-c4 "$review_task_id" || die "C4 durable publication evidence failed"
+
+maestro test   -e T7LOCAL_EMAIL="$email"   -e T7LOCAL_PASSWORD="$password"   -e T7LOCAL_ASSET_ID="$asset_id"   "$t7_dir/playback-real.yaml" ||
+  die "C4 normal HLS playback flow failed"
+
+mkdir -p "$summary_dir"
+chmod 700 "$summary_dir"
+head_sha="$(git -C "$repo_root" rev-parse HEAD)"
+cat >"$summary_dir/summary.env" <<EOF
+T7LOCAL_RUN_ID=$run_id
+T7LOCAL_HEAD=$head_sha
+T7LOCAL_EMULATOR_SERIAL=$serial
+T7LOCAL_GATEWAY=$gateway
+T7LOCAL_PROOF_REFERENCE=$proof
+T7LOCAL_FILENAME=$filename
+T7LOCAL_ORG_ID=$org_id
+T7LOCAL_PROJECT_ID=$project_id
+T7LOCAL_ASSET_ID=$asset_id
+T7LOCAL_REVIEW_TASK_ID=$review_task_id
+B3=PASS
+C1=PASS
+C2=PASS
+C3=PASS
+C4=PASS
+EOF
+
+echo "T7LOCAL_MAESTRO=PASS"
+echo "HEAD=$head_sha"
+echo "RUN_ID=$run_id"
+echo "ASSET_ID=$asset_id"
+echo "REVIEW_TASK_ID=$review_task_id"
+echo "SUMMARY=$summary_dir/summary.env"
+\n'*}"
+asset_id="${c1_output##*
+
+api_json POST "/api/orgs/$org_id/projects/$project_id/assets"   "{"asset_id":"$asset_id"}" >/dev/null ||
+  die "linking real asset to project failed"
+
+"$t7_dir/db-probe.sh" wait-c2 "$asset_id" || die "C2 preparation evidence failed"
+
+review_output="$("$t7_dir/db-probe.sh" wait-review-task "$asset_id")" ||
+  die "no real review task appeared for the current asset"
+printf '%s\n' "$review_output" | head -n 1
+review_task_id="$(printf '%s\n' "$review_output" | tail -n 1)"
+
+maestro test   -e T7LOCAL_EMAIL="$email"   -e T7LOCAL_PASSWORD="$password"   -e T7LOCAL_REVIEW_TASK_ID="$review_task_id"   "$t7_dir/review-publish-real.yaml" ||
+  die "C3/C4 review-publication Maestro flow failed"
+
+"$t7_dir/db-probe.sh" verify-c3 "$review_task_id" || die "C3 durable decision evidence failed"
+"$t7_dir/db-probe.sh" verify-c4 "$review_task_id" || die "C4 durable publication evidence failed"
+
+maestro test   -e T7LOCAL_EMAIL="$email"   -e T7LOCAL_PASSWORD="$password"   -e T7LOCAL_ASSET_ID="$asset_id"   "$t7_dir/playback-real.yaml" ||
+  die "C4 normal HLS playback flow failed"
+
+mkdir -p "$summary_dir"
+chmod 700 "$summary_dir"
+head_sha="$(git -C "$repo_root" rev-parse HEAD)"
+cat >"$summary_dir/summary.env" <<EOF
+T7LOCAL_RUN_ID=$run_id
+T7LOCAL_HEAD=$head_sha
+T7LOCAL_EMULATOR_SERIAL=$serial
+T7LOCAL_GATEWAY=$gateway
+T7LOCAL_PROOF_REFERENCE=$proof
+T7LOCAL_FILENAME=$filename
+T7LOCAL_ORG_ID=$org_id
+T7LOCAL_PROJECT_ID=$project_id
+T7LOCAL_ASSET_ID=$asset_id
+T7LOCAL_REVIEW_TASK_ID=$review_task_id
+B3=PASS
+C1=PASS
+C2=PASS
+C3=PASS
+C4=PASS
+EOF
+
+echo "T7LOCAL_MAESTRO=PASS"
+echo "HEAD=$head_sha"
+echo "RUN_ID=$run_id"
+echo "ASSET_ID=$asset_id"
+echo "REVIEW_TASK_ID=$review_task_id"
+echo "SUMMARY=$summary_dir/summary.env"
+\n'}"
+printf '%s\n' "$c1_status"
 
 api_json POST "/api/orgs/$org_id/projects/$project_id/assets"   "{"asset_id":"$asset_id"}" >/dev/null ||
   die "linking real asset to project failed"

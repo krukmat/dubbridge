@@ -144,7 +144,7 @@ verify_c3() {
     ORDER BY happened_at DESC, id DESC
     LIMIT 1;
   ")"
-  if [[ "$row" == approved|* ]]; then
+  if [[ "${row%%|*}" == "approved" ]]; then
     echo "C3=PASS review_task_id=$task_id decision=$row"
     return 0
   fi
@@ -162,7 +162,7 @@ verify_c4() {
     WHERE review_task_id = '$task_id'::uuid
     LIMIT 1;
   ")"
-  if [[ "$row" == published|* ]]; then
+  if [[ "${row%%|*}" == "published" ]]; then
     echo "C4_DB=PASS review_task_id=$task_id publication=$row"
     return 0
   fi
