@@ -15,9 +15,13 @@ tags:
 - setClipboard: ${T7LOCAL_PASSWORD}
 - pasteText
 
-- assertVisible:
-    id: login-submit-button
-    enabled: true
+# Clipboard paste updates React state asynchronously. Wait until the rendered
+# submit control reflects the completed password value before sending IME Done.
+- extendedWaitUntil:
+    visible:
+      id: login-submit-button
+      enabled: true
+    timeout: 5000
 
 # Submit through the password field's native IME action instead of depending on
 # a first post-keyboard tap, which Android consumes in this emulator path.
