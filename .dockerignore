@@ -6,6 +6,8 @@
 target
 mobile
 node_modules
+**/node_modules
+apps/availability-node/node_modules
 .git
 logs
 .next
