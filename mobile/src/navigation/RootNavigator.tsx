@@ -437,6 +437,13 @@ function RootNavigatorContent() {
     return <ConfigErrorScreen message={runtimeConfig.message} />;
   }
 
+  // Do not expose an interactive unauthenticated surface until persisted auth
+  // hydration has finished. Otherwise a fast login can race the pending
+  // loadAuthSession() result and be overwritten back to unauthenticated state.
+  if (auth.status === "loading") {
+    return null;
+  }
+
   return (
     <NavigationContainer ref={navRef} onReady={onNavReady}>
       {auth.status === "authed" ? (

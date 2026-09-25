@@ -143,6 +143,34 @@ describe("mobile auth flow integration", () => {
     );
   });
 
+  it("SC-AUTH-3: does not expose login while stored-session hydration is pending", async () => {
+    let resolveStoredSession: ((session: AuthSession | null) => void) | undefined;
+    mockLoadAuthSession.mockImplementationOnce(
+      () =>
+        new Promise<AuthSession | null>((resolve) => {
+          resolveStoredSession = resolve;
+        }),
+    );
+
+    const view = await render(
+      <AuthProvider>
+        <P2PProvider>
+          <RootNavigator />
+        </P2PProvider>
+      </AuthProvider>,
+    );
+
+    expect(view.queryByTestId("login-screen")).toBeNull();
+
+    await act(async () => {
+      resolveStoredSession?.(null);
+    });
+
+    await waitFor(() => {
+      expect(view.getByTestId("login-screen")).toBeTruthy();
+    });
+  });
+
   it("HP-1 + HP-2 + EC-1: bearer login reaches home and asset detail without any browser handoff", async () => {
     const view = await render(
       <AuthProvider>
