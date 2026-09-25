@@ -37,9 +37,22 @@ tags:
 - setClipboard: ${T7LOCAL_OWNER}
 - pasteText
 
+# The next controls are Pressables inside horizontal ScrollViews. Close the
+# owner TextInput first, then make each enum selection idempotent against the
+# Android first-post-keyboard-tap consumption reproduced in B1.
+- hideKeyboard
+
+- tapOn:
+    id: upload-field-license-type-option-exclusive
+- waitForAnimationToEnd:
+    timeout: 1000
 - tapOn:
     id: upload-field-license-type-option-exclusive
 
+- tapOn:
+    id: upload-field-source-type-option-original
+- waitForAnimationToEnd:
+    timeout: 1000
 - tapOn:
     id: upload-field-source-type-option-original
 
