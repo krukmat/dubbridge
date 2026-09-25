@@ -23,37 +23,13 @@ tags:
 - assertVisible:
     id: home-screen
 
-# The review quick-action card sits below the initial Home viewport. Maestro can
-# resolve an off-screen testID but a direct tap may not dispatch to the Pressable,
-# so make the card physically visible before tapping it.
-- scrollUntilVisible:
-    element:
-      id: home-open-review
-    direction: DOWN
-    timeout: 8000
-
+# Use the always-visible primary review entry. This avoids coupling T7local
+# certification to the lower quick-actions section or ScrollView gesture state.
 - assertVisible:
-    id: home-open-review
-
-# scrollUntilVisible can return while the native ScrollView is still
-# decelerating. A tap during deceleration is consumed as a stop-scroll gesture
-# and never reaches the Pressable, even though Maestro reports it completed.
-- waitForAnimationToEnd:
-    timeout: 3000
+    id: home-open-review-primary
 
 - tapOn:
-    id: home-open-review
-
-# Retry once only if navigation did not leave Home.
-- runFlow:
-    when:
-      visible:
-        id: home-screen
-    commands:
-      - waitForAnimationToEnd:
-          timeout: 3000
-      - tapOn:
-          id: home-open-review
+    id: home-open-review-primary
 
 - extendedWaitUntil:
     visible:

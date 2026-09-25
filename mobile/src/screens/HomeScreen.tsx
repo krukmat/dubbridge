@@ -379,6 +379,13 @@ export function HomeScreen({
         copy="Pick up where you left off."
       />
 
+      <Button
+        testID="home-open-review-primary"
+        label="Open review inbox"
+        variant="secondary"
+        onPress={onOpenReview}
+      />
+
       {dashState.kind === "loading" ? (
         <StateView kind="loading" title="Loading dashboard…" />
       ) : null}
