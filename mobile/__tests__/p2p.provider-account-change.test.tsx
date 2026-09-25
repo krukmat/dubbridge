@@ -29,6 +29,7 @@ function authValue(userId: string | null): AuthContextValue {
     userId,
     status: userId === null ? "unauthed" : "authed",
     loginError: null,
+    loginPhase: "idle",
     login: jest.fn(async () => undefined),
     logout: jest.fn(async () => undefined),
     onSessionRotation: jest.fn(async () => undefined),

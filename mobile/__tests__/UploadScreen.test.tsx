@@ -28,6 +28,7 @@ beforeEach(() => {
     sessionRef: "session-abc",
     status: "authed",
     loginError: null,
+    loginPhase: "idle",
     login: jest.fn().mockResolvedValue(undefined),
     logout: jest.fn().mockResolvedValue(undefined),
     onSessionRotation: jest.fn().mockResolvedValue(undefined),

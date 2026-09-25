@@ -87,6 +87,7 @@ describe("RootNavigator", () => {
       userId: null,
       status: "unauthed",
       loginError: null,
+      loginPhase: "idle",
       login: jest.fn().mockResolvedValue(undefined),
       logout: jest.fn().mockResolvedValue(undefined),
       onSessionRotation: jest.fn().mockResolvedValue(undefined),

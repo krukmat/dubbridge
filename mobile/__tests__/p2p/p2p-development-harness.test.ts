@@ -35,6 +35,7 @@ function testAuth(): AuthContextValue {
     userId: null,
     status: "unauthed",
     loginError: null,
+    loginPhase: "idle",
     login: jest.fn(async () => undefined),
     logout: jest.fn(async () => undefined),
     onSessionRotation: jest.fn(async () => undefined),

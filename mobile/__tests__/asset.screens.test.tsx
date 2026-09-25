@@ -74,6 +74,7 @@ describe("asset screens", () => {
       sessionRef: "opaque-session-abc123",
       status: "authed",
       loginError: null,
+      loginPhase: "idle",
       login: jest.fn().mockResolvedValue(undefined),
       logout: jest.fn().mockResolvedValue(undefined),
       onSessionRotation: jest.fn().mockResolvedValue(undefined),
