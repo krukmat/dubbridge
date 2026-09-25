@@ -34,7 +34,8 @@ tags:
 # Real rights form. Do not enable EXPO_PUBLIC_E2E_ENABLED for this build.
 - tapOn:
     id: upload-field-owner
-- inputText: ${T7LOCAL_OWNER}
+- setClipboard: ${T7LOCAL_OWNER}
+- pasteText
 
 - tapOn:
     id: upload-field-license-type-option-exclusive
@@ -44,7 +45,15 @@ tags:
 
 - tapOn:
     id: upload-field-proof-reference
-- inputText: ${T7LOCAL_PROOF_REFERENCE}
+- setClipboard: ${T7LOCAL_PROOF_REFERENCE}
+- pasteText
+
+# Do not submit until the native hierarchy reflects the pasted proof value.
+# This prevents submitEditing from validating against the previous React state.
+- extendedWaitUntil:
+    visible:
+      text: ${T7LOCAL_PROOF_REFERENCE}
+    timeout: 5000
 
 # Submit the completed rights form through the proof-reference IME action.
 # This avoids the Android first post-keyboard tap being consumed.

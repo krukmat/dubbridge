@@ -321,6 +321,22 @@ def diagnose_maestro_ui(serial: str, env: dict[str, str], flow: str) -> None:
             "An unexpected sign-in error occurred. Try again.",
             "LOGIN_UNEXPECTED unexpected exception escaped the normal login result path",
         ),
+        (
+            "Owner is required",
+            "UPLOAD_RIGHTS_OWNER_REQUIRED rights form owner value was not committed",
+        ),
+        (
+            "Select a license type",
+            "UPLOAD_RIGHTS_LICENSE_REQUIRED rights form license selection was not committed",
+        ),
+        (
+            "Select a source type",
+            "UPLOAD_RIGHTS_SOURCE_REQUIRED rights form source selection was not committed",
+        ),
+        (
+            "Proof reference is required",
+            "UPLOAD_RIGHTS_PROOF_REQUIRED rights form proof reference was not committed",
+        ),
     )
     for needle, diagnosis in known:
         if needle in ui:
@@ -338,6 +354,11 @@ def diagnose_maestro_ui(serial: str, env: dict[str, str], flow: str) -> None:
     elif "login-screen" in ui:
         print(
             f"T7LOCAL_UI_DIAGNOSTIC=LOGIN_STILL_VISIBLE no known error copy flow={flow}",
+            file=sys.stderr,
+        )
+    elif "upload-screen" in ui:
+        print(
+            f"T7LOCAL_UI_DIAGNOSTIC=UPLOAD_RIGHTS_STILL_VISIBLE no known validation error flow={flow}",
             file=sys.stderr,
         )
     else:
