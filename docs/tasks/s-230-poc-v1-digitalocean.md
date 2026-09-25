@@ -5053,7 +5053,12 @@ code to make the smoke pass — a failure is a finding, not a patch target.
 **Type:** development/operational
 **Effort:** M
 **Depends on:** S-230-T5d
-**Status:** [ ] Planned — **runnable now; P6 PASS and DEV-HANDOFF are already satisfied**.
+**Status:** [!] BLOCKED 2026-09-25 — the mandatory local-runtime preflight
+reproduces exit 1 although the fresh worker banner reports
+`p2p_publication_enabled=true`; its `pipefail` pipeline exits 141 on SIGPIPE
+from `docker-compose logs | sed | grep -q`. Execution stopped in A before
+mobile QA/build, with no product-source change. Evidence:
+`docs/audit/s-230-t7local-2026-09-25.md`.
 
 ### Executor contract
 

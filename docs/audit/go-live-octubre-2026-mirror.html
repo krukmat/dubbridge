@@ -408,7 +408,7 @@
         <p class="track-sub">Slice de habilitación de despliegue</p>
         <div class="ladder">
           <div class="lrow done"><span class="id">T0–T5</span><span class="desc">Foundation, imágenes de producción, traducción S-150 reabierta, descriptor de producción</span><span class="status">✓ done</span></div>
-          <div class="lrow now"><span class="id">T7local</span><span class="desc"><strong>Base mobile smoke</strong> contra el gateway de <code>infra/local/docker-compose.yml</code> (<code>host :8082</code>). Corre como lane independiente y certifica login→upload→rights→preparation→review→publish→HLS playback; no certifica Invite/Claim/P2P Sync/Verify/loopback/HPKE.</span><span class="status">→ runnable now</span></div>
+          <div class="lrow now"><span class="id">T7local</span><span class="desc"><strong>BLOCKED 2026-09-25 en A1.</strong> El gateway está live/ready en <code>host :8082</code> y el worker reporta <code>p2p_publication_enabled=true</code>, pero el preflight obligatorio devuelve 1 por SIGPIPE en su pipeline con <code>pipefail</code>. Se detuvo antes de QA/build móvil y sin cambios de product source. Evidencia: <code>docs/audit/s-230-t7local-2026-09-25.md</code>.</span><span class="status">! blocked</span></div>
           <div class="lrow next"><span class="id">T7c</span><span class="desc">Expiración de sesión — depende de T7local</span><span class="status">planned</span></div>
           <div class="lrow next"><span class="id">T6 / T7</span><span class="desc">Deploy real en DO — rama independiente, no bloquea T6p-a</span><span class="status">planned</span></div>
           <div class="lrow next"><span class="id">T6p-a…d</span><span class="desc">Convergencia P2P/deploy — deferred hasta T7local PASS + T7c PASS + <strong>DEV-HANDOFF</strong> + freshness check de T7local contra el head exacto <code>84ea5edc</code>; luego ownership/config y publicación en DO.</span><span class="status">deferred</span></div>
@@ -502,8 +502,8 @@
         <p><code>CONS-T2</code> encontró un gap genuino en la tabla de rúbrica RRI (<code>crates/db/tests/*</code> heredaba el piso D/P/K=3 de <code>crates/db/src/*</code>, inflando un fix trivial de 2 líneas a RRI 70 Complex) y una race condition real entre tests concurrentes sobre <code>p2p_publication_outbox</code>. Ambos diagnosticados por reproducción, corregidos a RRI 25 Low cada uno, con revisión <code>gpt-oss:20b</code> PASS 0 hallazgos — evidencia de que el proceso de gates se autocorrige en vez de solo bloquear.</p>
       </div>
       <div class="risk med">
-        <span class="tag2">T7local — infra lista, smoke test pendiente</span>
-        <p><code>S-230-T7local</code> sigue <code>[ ] Planned</code> y ya está ejecutable con P6/DEV-HANDOFF ya PASS. Sus prerequisitos de infra están disponibles. El target móvil correcto es el <strong>gateway</strong> de Compose en host <code>:8082</code> (emulador: <code>10.0.2.2:8082</code>), no el API <code>:8080</code>. T7local certifica solo el base-flow S-230. Si su PASS queda en un head distinto de <code>84ea5edc</code> y cambiaron superficies relevantes del base flow, <code>T6p-a</code> exige una revalidación acotada antes de consumir ese PASS.</p>
+        <span class="tag2">T7local — BLOCKED en preflight local</span>
+        <p><code>S-230-T7local</code> quedó <strong>BLOCKED 2026-09-25</strong> en A1. Gateway live/ready y worker configurado correctamente, pero <code>infra/local/p2p/preflight.sh --with-runtime</code> devuelve 1 porque <code>pipefail</code> propaga SIGPIPE desde <code>docker-compose logs | sed | grep -q</code> (<code>PIPESTATUS=141 141 0</code>). No se ejecutaron B–D ni se cambió product source. Artifact: <code>docs/audit/s-230-t7local-2026-09-25.md</code>. T6p-a sigue bloqueado hasta T7local PASS, T7c PASS y freshness PASS.</p>
       </div>
       <div class="risk info">
         <span class="tag2">T4e-cov residual</span>
