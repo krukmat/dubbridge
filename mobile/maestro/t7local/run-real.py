@@ -337,6 +337,18 @@ def diagnose_maestro_ui(serial: str, env: dict[str, str], flow: str) -> None:
             "Proof reference is required",
             "UPLOAD_RIGHTS_PROOF_REQUIRED rights form proof reference was not committed",
         ),
+        (
+            "Ingest upload failed:",
+            "UPLOAD_INGEST_FAILED multipart /api/ingest failed",
+        ),
+        (
+            "Rights submission failed:",
+            "UPLOAD_RIGHTS_API_FAILED /api/ingest/{token}/rights failed",
+        ),
+        (
+            "Finalize failed:",
+            "UPLOAD_FINALIZE_FAILED /api/ingest/{token}/finalize failed",
+        ),
     )
     for needle, diagnosis in known:
         if needle in ui:

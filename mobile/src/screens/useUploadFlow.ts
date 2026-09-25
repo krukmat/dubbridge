@@ -70,7 +70,7 @@ async function runIngest(client: GatewayClient, auth: Auth, file: FileAsset, rig
   const result = await client.postMultipart<IngestCreateResponse>('/api/ingest', auth.sessionRef, upload);
   if (!result.ok) {
     if (result.error.kind === 'session_expired') { await auth.logout(); return { logout: true }; }
-    return { error: httpErrorMessage(result.error), recovery: { kind: 'ready', rights, file } };
+    return { error: `Ingest upload failed: ${httpErrorMessage(result.error)}`, recovery: { kind: 'ready', rights, file } };
   }
   await auth.onSessionRotation(result.value.sessionRotation);
   return { token: result.value.data.ingest_token };
@@ -81,7 +81,7 @@ async function runRights(client: GatewayClient, auth: Auth, token: string, right
   if (!result.ok) {
     if (result.error.kind === 'session_expired') { await auth.logout(); return { logout: true }; }
     const expired = result.error.kind === 'http' && result.error.status === 410;
-    return { error: expired ? 'Ingest session expired. Please start over.' : httpErrorMessage(result.error), recovery: expired ? { kind: 'rights_form', fields: EMPTY_RIGHTS } : { kind: 'ready', rights, file } };
+    return { error: expired ? 'Rights submission failed: ingest session expired. Please start over.' : `Rights submission failed: ${httpErrorMessage(result.error)}`, recovery: expired ? { kind: 'rights_form', fields: EMPTY_RIGHTS } : { kind: 'ready', rights, file } };
   }
   await auth.onSessionRotation(result.value.sessionRotation);
   return { ok: true };
@@ -93,7 +93,11 @@ async function runFinalize(client: GatewayClient, auth: Auth, token: string, rig
     if (result.error.kind === 'session_expired') { await auth.logout(); return { logout: true }; }
     const expired = result.error.kind === 'http' && result.error.status === 410;
     const blocked = result.error.kind === 'http' && result.error.status === 422;
-    const msg = expired ? 'Ingest session expired. Please start over.' : blocked ? 'Rights are required before finalizing. Please re-enter rights details.' : httpErrorMessage(result.error);
+    const msg = expired
+      ? 'Finalize failed: ingest session expired. Please start over.'
+      : blocked
+        ? 'Finalize failed: rights are required before finalizing. Please re-enter rights details.'
+        : `Finalize failed: ${httpErrorMessage(result.error)}`;
     return { error: msg, recovery: expired || blocked ? { kind: 'rights_form', fields: EMPTY_RIGHTS } : { kind: 'ready', rights, file } };
   }
   await auth.onSessionRotation(result.value.sessionRotation);

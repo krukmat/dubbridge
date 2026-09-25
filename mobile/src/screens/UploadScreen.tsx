@@ -100,7 +100,7 @@ function UploadBody({ viewState, validationErrors, onFieldChange, onPickFile, on
   if (viewState.kind === 'file_pending') return <Panel><Button testID="upload-pick-file" label="Pick file" variant="secondary" onPress={() => void onPickFile(viewState.rights)} /></Panel>;
   if (viewState.kind === 'ready') return <Panel><Text style={styles.fileName} numberOfLines={1}>{viewState.file.name}</Text></Panel>;
   if (viewState.kind === 'processing') return <StateView kind="loading" title="Uploading…" />;
-  return <Panel><Text style={styles.errorText}>{viewState.message}</Text><Button label="Try again" variant="secondary" onPress={() => onSetViewState(viewState.recovery)} /></Panel>;
+  return <Panel><Text testID="upload-error-message" style={styles.errorText}>{viewState.message}</Text><Button label="Try again" variant="secondary" onPress={() => onSetViewState(viewState.recovery)} /></Panel>;
 }
 
 export function UploadScreen({ gatewayBaseUrl, onSuccess }: { gatewayBaseUrl: string; onSuccess: () => void }) {
