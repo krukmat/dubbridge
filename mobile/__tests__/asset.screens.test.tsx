@@ -823,7 +823,7 @@ describe("asset screens", () => {
       expect(mockClient.post).toHaveBeenCalledWith(
         "/api/ingest/tok-abc/rights",
         "opaque-session-abc123",
-        expect.objectContaining({ owner: "DubBridge Studios", license_type: "exclusive" }),
+        expect.objectContaining({ owner: "DubBridge Studios", license_type: "all_rights_reserved" }),
       );
       expect(mockClient.post).toHaveBeenCalledWith(
         "/api/ingest/tok-abc/finalize",
@@ -958,8 +958,8 @@ describe("asset screens", () => {
 
       // Fill only 3 of 4 fields
       await fireEvent.changeText(view.getByTestId("upload-field-owner"), "DubBridge Studios");
-      await fireEvent.press(view.getByTestId("upload-field-license-type-option-exclusive"));
-      await fireEvent.press(view.getByTestId("upload-field-source-type-option-original"));
+      await fireEvent.press(view.getByTestId("upload-field-license-type-option-all_rights_reserved"));
+      await fireEvent.press(view.getByTestId("upload-field-source-type-option-direct_upload"));
       // upload-field-proof-reference left empty
 
       await fireEvent.press(view.getByTestId("upload-submit-rights"));
