@@ -1,13 +1,13 @@
 ---
 type: Plan
 title: "P6: Minimal My Content and Invites dashboard"
-status: in_progress
+status: pass
 slice: MVP0-P2P
 ---
 
 # P6 — Minimal My Content and Invites dashboard
 
-Task ledger: `docs/tasks/mvp0-p2p-p6-dashboard.md`. **Activation gate satisfied 2026-09-22. P6.T0 PASS. P6.T1 PASS 2026-09-23:** T1.A–H are closed; the standing MVP0-P2P owner-directed review exception replaces phase-1/phase-2 peer review, and owner Matias Kruk explicitly reviewed and approved T1. Functional/evidence head `b6df0a7f` completed 15/15 CI, mobile 63/63 suites / 461/461 tests and 90.43% workspace line coverage. **P6.T2 PASS 2026-09-24:** T2.A–H are closed with owner final verification and the standing MVP0-P2P REVIEW-OVERRIDE. **P6.T3 is IN PROGRESS. T3.A+B PASS on `3474b8b` / Actions `36041983233`; T3.C PASS on `0527ec3` / Actions `36046501652`; T3.D1–D5 PASS. D2/D3 exact-head CI: `581c696` / Actions `36051247079` (15/15). D4 local evidence: 11/11 P2P screenshots committed at `5fc8725`. T3.D5 visual inspection found no P6-scoped blocker. T3.D6 awaits the exact Android emulator profile/serial before aggregate closure.** P5.T3 is deferred to release certification.
+Task ledger: `docs/tasks/mvp0-p2p-p6-dashboard.md`. **Activation gate satisfied 2026-09-22. P6.T0 PASS. P6.T1 PASS 2026-09-23:** T1.A–H are closed; the standing MVP0-P2P owner-directed review exception replaces phase-1/phase-2 peer review, and owner Matias Kruk explicitly reviewed and approved T1. Functional/evidence head `b6df0a7f` completed 15/15 CI, mobile 63/63 suites / 461/461 tests and 90.43% workspace line coverage. **P6.T2 PASS 2026-09-24:** T2.A–H are closed with owner final verification and the standing MVP0-P2P REVIEW-OVERRIDE. **P6.T3 PASS 2026-09-25.** T3.A–D6 are closed. D2/D3 exact-head CI: `581c696` / Actions `36051247079` (15/15); D4 evidence: 11/11 screenshots at `5fc8725`; D5 visual review PASS; D6 exact device/toolchain: `fenix_t7`, `emulator-5554`, `sdk_gphone64_arm64`, Android 14, Maestro 2.6.1. **P6 PASS 2026-09-25; DEV-HANDOFF is satisfied.** P5.T3 remains deferred to release certification.
 
 ## Objective
 
@@ -40,7 +40,7 @@ Freeze state projection and action eligibility from canonical backend and runtim
 | P6.T0 | State/action and navigation contract | planning | M | P3 PASS; P4 PASS; P5-DEV | **PASS 2026-09-22** |
 | P6.T1 | Owner My Content and invite action | development | M | T0 PASS | **PASS 2026-09-23 — A–H closed; RRI 55 Med-high; owner-reviewed + REVIEW-OVERRIDE** |
 | P6.T2 | Viewer claim, Invites, sync and play actions | development | XL parent / decomposed | T1 PASS | **PASS 2026-09-24 — A–H closed; owner-verified** |
-| P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | **IN PROGRESS — T3.A–D5 PASS; T3.D6 blocked on device ID** |
+| P6.T3 | Dashboard flow and visual certification | development/evidence | M | T2 PASS | **PASS 2026-09-25 — T3.A–D6 closed** |
 
 
 The companion ledger defines acceptance, HP/EC, evidence and handoff per task.
@@ -58,9 +58,11 @@ exception), Reflection, behavioral certification and owner-verification gates.
 Synchronize this plan, its ledger, the parent plan/ledger and roadmap. No phase
 PASS is implied by plan availability or provisional effort.
 
-P3 and P4 must be PASS, P5-DEV must be closed, and P6 must close before S-230
-T6p-a can activate. P5.T3 is intentionally carried to the release-certification
-lane and is not part of this development gate.
+P3 PASS, P4 PASS, P5-DEV and P6 PASS are now satisfied, so MVP0-P2P
+`DEV-HANDOFF` is satisfied as of 2026-09-25. S-230 T6p-a still cannot activate
+until its independent `T7local PASS`, `T7c PASS`, and exact-head T7local
+freshness disposition are also satisfied. P5.T3 remains intentionally carried
+to the release-certification lane and is not part of this development gate.
 
 ## Calendar and estimation limits
 
