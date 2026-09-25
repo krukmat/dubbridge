@@ -9,6 +9,7 @@ import {
 } from "../src/auth/AuthProvider";
 import {
   clearAuthSession,
+  isStoredAuthSessionValid,
   loadAuthSession,
   saveAuthSession,
   type AuthSession,
@@ -25,6 +26,7 @@ jest.mock("../src/auth/session", () => ({
   loadAuthSession: jest.fn(),
   saveAuthSession: jest.fn(),
   clearAuthSession: jest.fn(),
+  isStoredAuthSessionValid: jest.fn(),
 }));
 
 jest.mock("../src/config/env", () => ({
@@ -49,6 +51,8 @@ const LOGIN_PAYLOAD = {
 
 const mockLoadAuthSession =
   loadAuthSession as jest.MockedFunction<typeof loadAuthSession>;
+const mockIsStoredAuthSessionValid =
+  isStoredAuthSessionValid as jest.MockedFunction<typeof isStoredAuthSessionValid>;
 const mockSaveAuthSession =
   saveAuthSession as jest.MockedFunction<typeof saveAuthSession>;
 const mockClearAuthSession =
@@ -85,6 +89,7 @@ describe("AuthProvider", () => {
     jest.clearAllMocks();
 
     mockLoadAuthSession.mockResolvedValue(null);
+    mockIsStoredAuthSessionValid.mockReturnValue(true);
     mockSaveAuthSession.mockResolvedValue(undefined);
     mockClearAuthSession.mockResolvedValue(undefined);
     mockReadRuntimeConfig.mockReturnValue({
@@ -129,6 +134,27 @@ describe("AuthProvider", () => {
 
     expect(view.getByText(`sessionRef:${STORED_SESSION.token}`)).toBeTruthy();
     expect(view.getByText(`userId:${STORED_SESSION.userId}`)).toBeTruthy();
+  });
+
+  it("EC-Hydration: expired stored session is cleared before auth state is accepted", async () => {
+    mockLoadAuthSession.mockResolvedValueOnce(STORED_SESSION);
+    mockIsStoredAuthSessionValid.mockReturnValueOnce(false);
+
+    const view = await render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(view.getByText("status:unauthed")).toBeTruthy();
+    });
+
+    expect(mockIsStoredAuthSessionValid).toHaveBeenCalledWith(STORED_SESSION);
+    expect(mockClearAuthSession).toHaveBeenCalledTimes(1);
+    expect(view.getByText("sessionRef:null")).toBeTruthy();
+    expect(view.getByText("userId:null")).toBeTruthy();
+    expect(view.getByText("loginError:null")).toBeTruthy();
   });
 
   it("HP-2: login persists the bearer session and authenticates", async () => {

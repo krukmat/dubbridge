@@ -9,6 +9,7 @@ import {
 import { createGatewayClient } from "../api/client";
 import {
   clearAuthSession,
+  isStoredAuthSessionValid,
   loadAuthSession,
   saveAuthSession,
   type AuthSession,
@@ -150,6 +151,17 @@ async function hydrateStoredSession(
   try {
     const storedSession = await loadAuthSession();
     if (!isMounted()) return;
+
+    if (storedSession !== null && !isStoredAuthSessionValid(storedSession)) {
+      const storageCleared = await clearPersistedSession();
+      if (!isMounted()) return;
+      resetAuthState(controls);
+      if (!storageCleared) {
+        controls.setLoginError("session_storage_error");
+      }
+      return;
+    }
+
     acceptStoredSession(storedSession, controls);
   } catch {
     await clearPersistedSession();
