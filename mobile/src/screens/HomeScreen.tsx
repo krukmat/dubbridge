@@ -284,6 +284,17 @@ function QuickActionsSection({
   );
 }
 
+function PrimaryReviewEntry({ onOpenReview }: { onOpenReview: () => void }) {
+  return (
+    <Button
+      testID="home-open-review-primary"
+      label="Open review inbox"
+      variant="secondary"
+      onPress={onOpenReview}
+    />
+  );
+}
+
 function AccountSection({ onLogout }: { onLogout: () => Promise<void> }) {
   return (
     <View style={styles.section}>
@@ -379,12 +390,7 @@ export function HomeScreen({
         copy="Pick up where you left off."
       />
 
-      <Button
-        testID="home-open-review-primary"
-        label="Open review inbox"
-        variant="secondary"
-        onPress={onOpenReview}
-      />
+      <PrimaryReviewEntry onOpenReview={onOpenReview} />
 
       {dashState.kind === "loading" ? (
         <StateView kind="loading" title="Loading dashboard…" />

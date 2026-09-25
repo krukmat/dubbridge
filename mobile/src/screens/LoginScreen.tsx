@@ -89,6 +89,16 @@ function LoginForm({
   );
 }
 
+function LoginPhaseDiagnostic({ phase }: { phase: string }) {
+  if (!__DEV__) return null;
+
+  return (
+    <Text testID="login-phase-text" style={styles.phase}>
+      Login phase: {phase}
+    </Text>
+  );
+}
+
 export function LoginScreen() {
   const auth = useAuth();
   const [email, setEmail] = useState("");
@@ -137,11 +147,7 @@ export function LoginScreen() {
           onSubmit={() => void handleSubmit()}
         />
 
-        {__DEV__ ? (
-          <Text testID="login-phase-text" style={styles.phase}>
-            Login phase: {auth.loginPhase}
-          </Text>
-        ) : null}
+        <LoginPhaseDiagnostic phase={auth.loginPhase} />
       </View>
 
       <Button

@@ -14,34 +14,38 @@ type Base64Globals = typeof globalThis & {
   atob?: (encoded: string) => string;
 };
 
-function readJwtExpirySeconds(token: string): number | null {
-  const parts = token.split(".");
-  if (parts.length !== 3 || parts[1].length === 0) {
-    return null;
-  }
-
-  const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+function decodeBase64UrlJson(value: string): unknown | null {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
   const remainder = base64.length % 4;
   const padded = remainder === 0 ? base64 : base64 + "=".repeat(4 - remainder);
   const decode = (globalThis as Base64Globals).atob;
 
-  if (typeof decode !== "function") {
-    return null;
-  }
+  if (typeof decode !== "function") return null;
 
   try {
-    const parsed = JSON.parse(decode(padded)) as unknown;
-    if (typeof parsed !== "object" || parsed === null) {
-      return null;
-    }
-
-    const exp = (parsed as Record<string, unknown>).exp;
-    return typeof exp === "number" && Number.isSafeInteger(exp) && exp > 0
-      ? exp
-      : null;
+    return JSON.parse(decode(padded)) as unknown;
   } catch {
     return null;
   }
+}
+
+function readPositiveIntegerClaim(
+  payload: unknown,
+  claim: string,
+): number | null {
+  if (typeof payload !== "object" || payload === null) return null;
+
+  const value = (payload as Record<string, unknown>)[claim];
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0
+    ? value
+    : null;
+}
+
+function readJwtExpirySeconds(token: string): number | null {
+  const parts = token.split(".");
+  if (parts.length !== 3 || parts[1].length === 0) return null;
+
+  return readPositiveIntegerClaim(decodeBase64UrlJson(parts[1]), "exp");
 }
 
 export function isStoredAuthSessionValid(
