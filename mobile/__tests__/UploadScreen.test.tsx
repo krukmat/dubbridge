@@ -123,28 +123,6 @@ describe("SC-FORM-2: step-progress indicator", () => {
     expect(view.getByText("Finalize")).toBeTruthy();
   });
 
-  it("HP-3: proof-reference IME submit advances the completed rights form to File", async () => {
-    const view = await render(
-      <UploadScreen gatewayBaseUrl="http://127.0.0.1:4000" onSuccess={jest.fn()} />,
-    );
-
-    await waitFor(() => {
-      expect(view.getByTestId("upload-field-owner")).toBeTruthy();
-    });
-
-    fireEvent.changeText(view.getByTestId("upload-field-owner"), "DubBridge Studios");
-    fireEvent.press(view.getByTestId("upload-field-license-type-option-exclusive"));
-    fireEvent.press(view.getByTestId("upload-field-source-type-option-original"));
-    fireEvent.changeText(view.getByTestId("upload-field-proof-reference"), "contract-456");
-
-    fireEvent(view.getByTestId("upload-field-proof-reference"), "submitEditing");
-
-    await waitFor(() => {
-      expect(view.getByTestId("upload-pick-file")).toBeTruthy();
-      expect(view.getByTestId("upload-step-progress")).toBeTruthy();
-    });
-  });
-
   it("HP-2: completing the rights step advances the progress indicator to File", async () => {
     const view = await render(
       <UploadScreen gatewayBaseUrl="http://127.0.0.1:4000" onSuccess={jest.fn()} />,

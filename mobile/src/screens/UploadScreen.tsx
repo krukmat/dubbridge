@@ -71,12 +71,10 @@ function RightsFormBody({
   fields,
   errors,
   onFieldChange,
-  onSubmit,
 }: {
   fields: RightsFormData;
   errors: ValidationErrors;
   onFieldChange: (field: keyof RightsFormData, value: string) => void;
-  onSubmit: () => void;
 }) {
   return (
     <View style={styles.form}>
@@ -91,15 +89,14 @@ function RightsFormBody({
         value={fields.proof_reference}
         onChangeText={(v) => onFieldChange('proof_reference', v)}
         returnKeyType="done"
-        onSubmitEditing={onSubmit}
       />
       {errors.proof_reference ? <Text testID="upload-error-proof-reference" style={styles.errorText}>{errors.proof_reference}</Text> : null}
     </View>
   );
 }
 
-function UploadBody({ viewState, validationErrors, onFieldChange, onSubmitRights, onPickFile, onSetViewState }: { viewState: UploadViewState; validationErrors: ValidationErrors; onFieldChange: (f: keyof RightsFormData, v: string) => void; onSubmitRights: () => void; onPickFile: (rights: RightsFormData) => Promise<void>; onSetViewState: (s: UploadViewState) => void }) {
-  if (viewState.kind === 'rights_form') return <RightsFormBody fields={viewState.fields} errors={validationErrors} onFieldChange={onFieldChange} onSubmit={onSubmitRights} />;
+function UploadBody({ viewState, validationErrors, onFieldChange, onPickFile, onSetViewState }: { viewState: UploadViewState; validationErrors: ValidationErrors; onFieldChange: (f: keyof RightsFormData, v: string) => void; onPickFile: (rights: RightsFormData) => Promise<void>; onSetViewState: (s: UploadViewState) => void }) {
+  if (viewState.kind === 'rights_form') return <RightsFormBody fields={viewState.fields} errors={validationErrors} onFieldChange={onFieldChange} />;
   if (viewState.kind === 'file_pending') return <Panel><Button testID="upload-pick-file" label="Pick file" variant="secondary" onPress={() => void onPickFile(viewState.rights)} /></Panel>;
   if (viewState.kind === 'ready') return <Panel><Text style={styles.fileName} numberOfLines={1}>{viewState.file.name}</Text></Panel>;
   if (viewState.kind === 'processing') return <StateView kind="loading" title="Uploading…" />;
@@ -117,7 +114,7 @@ export function UploadScreen({ gatewayBaseUrl, onSuccess }: { gatewayBaseUrl: st
       <Screen testID="upload-screen" extraBottomPadding={actionBarHeight}>
         <ScreenHeader kicker="Upload" title="New asset" />
         {showProgress ? <StepProgress steps={STEP_LABELS} currentIndex={stepIndex} testID="upload-step-progress" /> : null}
-        <UploadBody viewState={viewState} validationErrors={validationErrors} onFieldChange={handleFieldChange} onSubmitRights={handleRightsSubmit} onPickFile={handlePickFile} onSetViewState={setViewState} />
+        <UploadBody viewState={viewState} validationErrors={validationErrors} onFieldChange={handleFieldChange} onPickFile={handlePickFile} onSetViewState={setViewState} />
       </Screen>
       {viewState.kind === 'rights_form' ? <ActionBar><Button testID="upload-submit-rights" label="Continue" onPress={handleRightsSubmit} fullWidth /></ActionBar> : null}
       {viewState.kind === 'ready' ? <ActionBar><Button testID="upload-finalize" label="Upload & finalize" onPress={() => void handleFinalize(viewState.rights, viewState.file)} fullWidth /></ActionBar> : null}
