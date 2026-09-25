@@ -31,11 +31,26 @@ tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/dubbridge-t7local-media.XXXXXX")"
 trap 'rm -rf "$tmp_dir"' EXIT
 
 container_path="/tmp/$filename"
+speech_path="/tmp/t7local-speech.wav"
 host_path="$tmp_dir/$filename"
+
+# T7local exercises the real ASR -> subtitle -> translation path, so the
+# fixture must contain intelligible speech rather than a synthetic tone.
+# espeak-ng provides deterministic local speech without an external service.
+docker-compose -f "$compose_file" exec -T worker-runner \
+  espeak-ng -v en-us -s 135 -w "$speech_path" \
+  "DubBridge local transcription test. This media contains real spoken words."
 
 # H.264/AAC is representative of the normal preparation pipeline. The local
 # worker image is the canonical ffmpeg-bearing runtime for this task.
-docker-compose -f "$compose_file" exec -T worker-runner   ffmpeg -hide_banner -loglevel error -y     -f lavfi -i "testsrc=size=320x180:rate=12"     -f lavfi -i "sine=frequency=880:sample_rate=44100"     -t 2 -c:v libx264 -pix_fmt yuv420p -c:a aac -movflags +faststart     "$container_path"
+docker-compose -f "$compose_file" exec -T worker-runner \
+  ffmpeg -hide_banner -loglevel error -y \
+    -f lavfi -i "testsrc=size=320x180:rate=12" \
+    -i "$speech_path" \
+    -shortest -c:v libx264 -pix_fmt yuv420p -c:a aac -movflags +faststart \
+    "$container_path"
+
+docker-compose -f "$compose_file" exec -T worker-runner rm -f "$speech_path"
 
 docker cp "$container_id:$container_path" "$host_path" >/dev/null
 adb -s "$serial" push "$host_path" "/sdcard/Download/$filename" >/dev/null
