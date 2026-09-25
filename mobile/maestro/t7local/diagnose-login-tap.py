@@ -298,6 +298,80 @@ def run_adb_probe(
     return state
 
 
+def adb_tap(serial: str, x: int, y: int) -> None:
+    run(["adb", "-s", serial, "shell", "input", "tap", str(x), str(y)])
+
+
+def run_maestro_then_adb_probe(
+    serial: str,
+    env: dict[str, str],
+    label: str,
+    x: int,
+    y: int,
+) -> tuple[str, str]:
+    clear_logcat(serial)
+    flow = write_probe_flow(
+        label,
+        "- tapOn:\n"
+        "    id: login-submit-button\n"
+        "    enabled: true",
+    )
+    first = maestro_test(flow, env)
+    write_text(f"{label}-maestro-stdout.txt", first.stdout)
+    write_text(f"{label}-maestro-stderr.txt", first.stderr)
+    maestro_state = wait_for_probe_state(serial, env, f"{label}-after-maestro")
+
+    if maestro_state == "home":
+        save_logcat(serial, label)
+        return maestro_state, "not-run"
+
+    adb_tap(serial, x, y)
+    adb_state = wait_for_probe_state(serial, env, f"{label}-after-adb")
+    save_logcat(serial, label)
+    return maestro_state, adb_state
+
+
+def run_adb_double_probe(
+    serial: str,
+    env: dict[str, str],
+    label: str,
+    x: int,
+    y: int,
+) -> tuple[str, str]:
+    clear_logcat(serial)
+    adb_tap(serial, x, y)
+    first_state = wait_for_probe_state(serial, env, f"{label}-first")
+    if first_state == "home":
+        save_logcat(serial, label)
+        return first_state, "not-run"
+
+    adb_tap(serial, x, y)
+    second_state = wait_for_probe_state(serial, env, f"{label}-second")
+    save_logcat(serial, label)
+    return first_state, second_state
+
+
+def device_metrics(serial: str) -> str:
+    size = run(["adb", "-s", serial, "shell", "wm", "size"]).stdout.strip()
+    density = run(["adb", "-s", serial, "shell", "wm", "density"]).stdout.strip()
+    rotation = run(
+        [
+            "adb",
+            "-s",
+            serial,
+            "shell",
+            "dumpsys",
+            "input",
+        ]
+    ).stdout
+    rotation_lines = [
+        line.strip()
+        for line in rotation.splitlines()
+        if "SurfaceOrientation" in line or "orientation" in line.lower()
+    ][:10]
+    return "\n".join([size, density, *rotation_lines]) + "\n"
+
+
 def classify(results: dict[str, str]) -> str:
     maestro = {
         name: state
@@ -334,6 +408,9 @@ def main() -> None:
     serial = runner.check_environment()
     email, password, _token = runner.resolve_account()
     env = runner.maestro_env(serial)
+
+    metrics = device_metrics(serial)
+    write_text("device-metrics.txt", metrics)
 
     probes: list[tuple[str, str | None]] = [
         (
@@ -386,10 +463,81 @@ def main() -> None:
             raise RuntimeError(f"missing Maestro command for {label}")
         results[label] = run_maestro_probe(serial, env, label, command)
 
-    diagnosis = classify(results)
+    # Reproduce Astra's positive-control sequence exactly: Maestro first, then
+    # ADB on the same prepared screen without resetting state or credentials.
+    center = prepare(serial, env, email, password, "maestro_then_adb")
+    maestro_state, adb_after_maestro_state = run_maestro_then_adb_probe(
+        serial,
+        env,
+        "maestro_then_adb",
+        center[0],
+        center[1],
+    )
+    results["maestro_then_adb_maestro"] = maestro_state
+    results["maestro_then_adb_adb"] = adb_after_maestro_state
+
+    # Check whether the first Android tap is simply being consumed/used to
+    # dismiss lingering TextInput/IME focus.
+    center = prepare(serial, env, email, password, "adb_double")
+    adb_first_state, adb_second_state = run_adb_double_probe(
+        serial,
+        env,
+        "adb_double",
+        center[0],
+        center[1],
+    )
+    results["adb_double_first"] = adb_first_state
+    results["adb_double_second"] = adb_second_state
+
+    # Maestro supports repeat/delay explicitly; this checks the same consumed
+    # first-tap hypothesis using Maestro alone.
+    center = prepare(serial, env, email, password, "maestro_repeat2")
+    results["maestro_repeat2"] = run_maestro_probe(
+        serial,
+        env,
+        "maestro_repeat2",
+        "- tapOn:\n"
+        "    id: login-submit-button\n"
+        "    enabled: true\n"
+        "    repeat: 2\n"
+        "    delay: 250",
+    )
+
+    # A non-interactive header tap is Maestro's documented keyboard-dismissal
+    # fallback. Run it on a fresh form before the submit.
+    center = prepare(serial, env, email, password, "header_then_submit")
+    results["header_then_submit"] = run_maestro_probe(
+        serial,
+        env,
+        "header_then_submit",
+        '- tapOn:\n'
+        '    text: "DubBridge"\n'
+        '- tapOn:\n'
+        '    id: login-submit-button\n'
+        '    enabled: true',
+    )
+
+    if (
+        results["maestro_then_adb_maestro"] == "phase:idle"
+        and results["maestro_then_adb_adb"] == "home"
+    ):
+        diagnosis = "FIRST_TAP_OR_MAESTRO_PRIMING_EFFECT"
+    elif (
+        results["adb_double_first"] == "phase:idle"
+        and results["adb_double_second"] == "home"
+    ):
+        diagnosis = "FIRST_TAP_CONSUMED"
+    elif results["maestro_repeat2"] == "home":
+        diagnosis = "FIRST_MAESTRO_TAP_CONSUMED"
+    elif results["header_then_submit"] == "home":
+        diagnosis = "TEXTINPUT_IME_FOCUS_INTERFERENCE"
+    else:
+        diagnosis = classify(results)
+
     summary_lines = [
         f"B1_RUN_ID={RUN_ID}",
         f"B1_EMULATOR_SERIAL={serial}",
+        "B1_DEVICE_METRICS=" + metrics.replace("\n", " | ").strip(),
         f"B1_REFERENCE_CENTER={reference_center[0]},{reference_center[1]}"
         if reference_center
         else "B1_REFERENCE_CENTER=unavailable",
