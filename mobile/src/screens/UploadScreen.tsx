@@ -11,16 +11,17 @@ import { color, fieldStyle, space, type } from '../theme';
 import { type RightsFormData, type ValidationErrors, type UploadViewState, useUploadFlow } from './useUploadFlow';
 
 const LICENSE_TYPE_OPTIONS = [
-  { label: 'Exclusive', value: 'exclusive' },
-  { label: 'Non-exclusive', value: 'non_exclusive' },
+  { label: 'Exclusive', value: 'all_rights_reserved' },
+  { label: 'Non-exclusive', value: 'licensed_distribution' },
   { label: 'Creative Commons', value: 'creative_commons' },
 ];
 
 const SOURCE_TYPE_OPTIONS = [
-  { label: 'Original', value: 'original' },
-  { label: 'Licensed', value: 'licensed' },
-  { label: 'Public domain', value: 'public_domain' },
   { label: 'Direct upload', value: 'direct_upload' },
+  { label: 'Authorized S3', value: 'authorized_s3' },
+  { label: 'Internal feed', value: 'internal_feed' },
+  { label: 'Licensed', value: 'licensed_source' },
+  { label: 'Public domain', value: 'public_domain_with_proof' },
 ];
 
 const STEP_LABELS = ['Rights', 'File', 'Finalize'] as const;

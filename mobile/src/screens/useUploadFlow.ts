@@ -31,7 +31,7 @@ type IngestCreateResponse = { ingest_token: string };
 
 export const EMPTY_RIGHTS: RightsFormData = { owner: '', license_type: '', source_type: '', proof_reference: '' };
 
-const E2E_RIGHTS: RightsFormData = { owner: 'DubBridge Studios', license_type: 'exclusive', source_type: 'original', proof_reference: 'contract-123' };
+const E2E_RIGHTS: RightsFormData = { owner: 'DubBridge Studios', license_type: 'all_rights_reserved', source_type: 'direct_upload', proof_reference: 'contract-123' };
 
 export function isE2EEnabled(): boolean {
   if (process.env.EXPO_PUBLIC_E2E_ENABLED === 'true') return true;

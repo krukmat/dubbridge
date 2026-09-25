@@ -43,18 +43,18 @@ tags:
 - hideKeyboard
 
 - tapOn:
-    id: upload-field-license-type-option-exclusive
+    id: upload-field-license-type-option-all_rights_reserved
 - waitForAnimationToEnd:
     timeout: 1000
 - tapOn:
-    id: upload-field-license-type-option-exclusive
+    id: upload-field-license-type-option-all_rights_reserved
 
 - tapOn:
-    id: upload-field-source-type-option-original
+    id: upload-field-source-type-option-direct_upload
 - waitForAnimationToEnd:
     timeout: 1000
 - tapOn:
-    id: upload-field-source-type-option-original
+    id: upload-field-source-type-option-direct_upload
 
 - tapOn:
     id: upload-field-proof-reference
