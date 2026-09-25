@@ -140,10 +140,35 @@ also inside the viewport. The bounded repair adds an explicit
 `scrollUntilVisible` for `invite-play-invite-p2p-available` before asserting
 that control.
 
-D4 remains **BLOCKED pending local rerun**. `local-gateway-1` was left in
-Exited state and is not restarted by this task; restoring it is a separate
-owner-authorized environment action.
+The bounded Play-scroll repair landed at `2cc8a6b14cad5cdf278c8cbf27bef39da7a3de84` and completed GitHub Actions run `36109900533` with **15/15 PASS**. The subsequent local rerun completed and produced the full expected P2P screenshot inventory. Evidence was committed as `5fc87253fbf5f0cc049ea3cdd7997a4564f3aefb`, a direct child of `2cc8a6b`, containing **11/11 expected PNGs** under `mobile/artifacts/screenshots/` and no source/configuration changes.
+
+**T3.D4 PASS 2026-09-25.** `local-gateway-1` remains in Exited state and is not restarted by this task; restoring it is a separate owner-authorized environment action.
 
 Broader harness hardening (port preflight, reproducible APK build automation,
 partial screenshot promotion, and path normalization) remains outside this
 bounded D4 repair.
+
+
+## D4 closure evidence
+
+- Harness repair head: `2cc8a6b14cad5cdf278c8cbf27bef39da7a3de84`.
+- Exact-head GitHub Actions: `36109900533` — **15/15 PASS**.
+- Local evidence commit: `5fc87253fbf5f0cc049ea3cdd7997a4564f3aefb`.
+- Evidence commit parent: `2cc8a6b14cad5cdf278c8cbf27bef39da7a3de84`.
+- Evidence commit scope: **11 PNG files only**, no product/source/config changes.
+- Expected/produced screenshots: **11/11**.
+- Evidence path: `mobile/artifacts/screenshots/`.
+- The runner copies P2P screenshots to the final evidence directory only after
+  all four P2P Maestro flows complete; the full final inventory is therefore
+  consistent with a completed states → empty → error → loading rerun.
+- `21_p2p_my_content_states_top.png` and
+  `22_p2p_my_content_states_bottom.png` share the same Git blob SHA. This is
+  recorded as redundant visual evidence, not a D4 execution failure; D5 owns
+  the visual interpretation.
+- Environment used during the successful D4 sequence required OpenJDK 17,
+  `npm ci`, an E2E-configured Android APK rebuild, and freeing port 8082.
+- `local-gateway-1` remains stopped/Exited by design; no P7Local startup was
+  performed.
+
+D4 certifies execution/evidence capture only. It does not certify visual
+quality. D5 must inspect the committed images before D6 can close T3.D.
