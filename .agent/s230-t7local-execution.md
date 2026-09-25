@@ -35,7 +35,8 @@ Only inspect source when a command or runtime behavior contradicts this packet:
 - `infra/local/docker-compose.yml` — Compose/runtime mismatch;
 - `infra/local/p2p/preflight.sh` — preflight mismatch;
 - `mobile/app.config.ts` / `mobile/src/config/env.ts` — config mismatch;
-- `Makefile.base` — QA target mismatch.
+- `Makefile.base` — QA target mismatch;
+- `mobile/maestro/t7local/` — real-stack certification harness mismatch.
 
 `DESIGN.md` is required only if a separately approved repair changes product
 UI/source. T7local itself should not modify product source.
@@ -115,7 +116,8 @@ Run the aggregate QA **once**; do not separately repeat typecheck/lint/Jest:
 make qa-mobile
 ```
 
-Build the normal app, not a P2P harness:
+Build the normal app, not a P2P harness. The Android build must run on JDK 17;
+verify the Gradle launcher/daemon JVM before debugging native build failures.
 
 ```bash
 cd mobile
@@ -124,10 +126,24 @@ EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL=http://10.0.2.2:8082 \
 npm run android
 ```
 
-If no reusable local account exists, create one through the supported gateway
-endpoint `POST /auth/register` on `localhost:8082`, then log in through the
-mobile UI. This is normal product behavior, not DB seeding. Never write the
-password or returned bearer token into evidence.
+After B2, return to repo root. The canonical low-touch driver for **B3 through
+C4** is:
+
+```bash
+bash mobile/maestro/t7local/run-real.sh
+```
+
+The runner uses the real gateway, a real account, supported workspace/project
+APIs, a fresh local MP4, the normal mobile UI, and read-only PostgreSQL probes.
+It must not use the mock gateway, `/e2e/seed`, seeded IDs, or the E2E upload
+fast-path. It fails closed if the normal backend does not produce the expected
+durable state, including a real review task. Its `/tmp` summary is evidence
+input only; it does not certify T7local or edit status documents.
+
+If running B3-C4 manually instead, a missing local account may be created
+through the supported gateway endpoint `POST /auth/register` on
+`localhost:8082`. Never write a password or returned bearer token into
+evidence.
 
 ### C — one fresh asset
 

@@ -5053,11 +5053,12 @@ code to make the smoke pass — a failure is a finding, not a patch target.
 **Type:** development/operational
 **Effort:** M
 **Depends on:** S-230-T5d
-**Status:** [!] BLOCKED 2026-09-25 — the mandatory local-runtime preflight
-reproduces exit 1 although the fresh worker banner reports
-`p2p_publication_enabled=true`; its `pipefail` pipeline exits 141 on SIGPIPE
-from `docker-compose logs | sed | grep -q`. Execution stopped in A before
-mobile QA/build, with no product-source change. Evidence:
+**Status:** [~] IN PROGRESS 2026-09-25 — the original A1 preflight false
+negative is repaired and independently verified: regression PASS, runtime
+preflight PASS and gateway live/ready PASS. The normal Android build/install/
+launch also passed after pinning the local toolchain to JDK 17. A real-stack
+Maestro harness now drives B3→C4 without mocks, seeded IDs or DB writes; the
+full A→E certification rerun is still pending. Historical blocker evidence:
 `docs/audit/s-230-t7local-2026-09-25.md`.
 
 ### Executor contract
@@ -5112,6 +5113,25 @@ Detailed leaves:
 
 Execution order is **A → B → C → D → E**. P2P Invite/Claim/Sync/Verify,
 loopback playback, HPKE and P5.T3 stay outside every child above.
+
+### T7local-M — real-stack Maestro harness
+
+This is a certification-support sub-block, not product scope. It is implemented
+under `mobile/maestro/t7local/` and is consumed only after B2.
+
+| Unit | Purpose | Depends on |
+|---|---|---|
+| **M0** | real-stack contract / no-mock boundary | preflight repair |
+| **M1** | real credential login | M0 |
+| **M2** | fresh MP4 + real rights/file picker | M0 |
+| **M3** | UI ingestion/finalize | M1 + M2 |
+| **M4** | read-only DB correlation + C1/C2/review-task probes | M3 |
+| **M5** | dynamic real review/publish/playback | M4 |
+| **M6** | one-command B3→C4 orchestration, fail closed | M1–M5 |
+
+Canonical command: `bash mobile/maestro/t7local/run-real.sh`. Existing
+screenshot/mock Maestro flows remain unchanged. M6 never marks T7local PASS:
+the final disposition still comes from the complete A→E packet.
 
 > **Consolidation update 2026-09-25:** T7local is the S-230 **base-product**
 > mobile smoke, not a P2P product certification. P6 is now PASS and
