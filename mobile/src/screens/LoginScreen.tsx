@@ -35,12 +35,14 @@ function LoginForm({
   errorCopy,
   onChangeEmail,
   onChangePassword,
+  onSubmit,
 }: {
   email: string;
   password: string;
   errorCopy: string | null;
   onChangeEmail: (value: string) => void;
   onChangePassword: (value: string) => void;
+  onSubmit: () => void;
 }) {
   return (
     <View style={styles.form}>
@@ -71,6 +73,8 @@ function LoginForm({
           autoCorrect={false}
           secureTextEntry
           textContentType="password"
+          returnKeyType="done"
+          onSubmitEditing={() => onSubmit()}
           placeholder="Enter your password"
           placeholderTextColor={color.ink400}
         />
@@ -130,6 +134,7 @@ export function LoginScreen() {
           errorCopy={errorCopy}
           onChangeEmail={setEmail}
           onChangePassword={setPassword}
+          onSubmit={() => void handleSubmit()}
         />
 
         {__DEV__ ? (

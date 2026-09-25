@@ -171,6 +171,51 @@ describe("mobile auth flow integration", () => {
     });
   });
 
+  it("HP-1b: password IME submit uses the real login path and reaches home", async () => {
+    const view = await render(
+      <AuthProvider>
+        <P2PProvider>
+          <RootNavigator />
+        </P2PProvider>
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(view.getByTestId("login-email-input")).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.changeText(view.getByTestId("login-email-input"), "user@example.com");
+      fireEvent.changeText(view.getByTestId("login-password-input"), "password-123456");
+    });
+
+    await waitFor(() => {
+      expect(view.getByTestId("login-submit-button").props.accessibilityState.disabled).toBe(false);
+    });
+
+    await act(async () => {
+      fireEvent(view.getByTestId("login-password-input"), "submitEditing");
+    });
+
+    await waitFor(() => {
+      expect(view.getByTestId("home-screen")).toBeTruthy();
+    });
+
+    expect(mockSaveAuthSession).toHaveBeenCalledWith(LOGIN_SESSION);
+
+    const mockClient = mockCreateGatewayClient.mock.results[0]?.value as {
+      post: jest.Mock;
+    };
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/auth/login",
+      null,
+      {
+        email: "user@example.com",
+        password: "password-123456",
+      },
+    );
+  });
+
   it("HP-1 + HP-2 + EC-1: bearer login reaches home and asset detail without any browser handoff", async () => {
     const view = await render(
       <AuthProvider>

@@ -15,15 +15,13 @@ tags:
 - setClipboard: ${T7LOCAL_PASSWORD}
 - pasteText
 
-- hideKeyboard
-
 - assertVisible:
     id: login-submit-button
     enabled: true
 
-- tapOn:
-    id: login-submit-button
-    enabled: true
+# Submit through the password field's native IME action instead of depending on
+# a first post-keyboard tap, which Android consumes in this emulator path.
+- pressKey: Enter
 
 - extendedWaitUntil:
     visible:
