@@ -273,6 +273,14 @@ def diagnose_maestro_ui(serial: str, env: dict[str, str], flow: str) -> None:
         return
 
     ui = hierarchy.stdout
+    for phase in ("authenticated", "persisting", "response_received", "requesting", "error", "idle"):
+        if f"Login phase: {phase}" in ui:
+            print(
+                f"T7LOCAL_LOGIN_PHASE={phase} flow={flow}",
+                file=sys.stderr,
+            )
+            break
+
     known = (
         (
             "Invalid email or password.",
@@ -289,6 +297,10 @@ def diagnose_maestro_ui(serial: str, env: dict[str, str], flow: str) -> None:
         (
             "We could not securely store your session. Try again.",
             "SESSION_STORAGE secure session persistence failed",
+        ),
+        (
+            "An unexpected sign-in error occurred. Try again.",
+            "LOGIN_UNEXPECTED unexpected exception escaped the normal login result path",
         ),
     )
     for needle, diagnosis in known:

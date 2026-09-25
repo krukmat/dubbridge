@@ -22,6 +22,8 @@ function getLoginErrorCopy(error: string | null): string | null {
       return "Invalid email or password.";
     case "session_storage_error":
       return "We could not securely store your session. Try again.";
+    case "unexpected_login_error":
+      return "An unexpected sign-in error occurred. Try again.";
     default:
       return null;
   }
@@ -129,6 +131,12 @@ export function LoginScreen() {
           onChangeEmail={setEmail}
           onChangePassword={setPassword}
         />
+
+        {__DEV__ ? (
+          <Text testID="login-phase-text" style={styles.phase}>
+            Login phase: {auth.loginPhase}
+          </Text>
+        ) : null}
       </View>
 
       <Button
@@ -160,5 +168,9 @@ const styles = StyleSheet.create({
   error: {
     ...type.meta,
     color: color.danger,
+  },
+  phase: {
+    ...type.meta,
+    color: color.ink400,
   },
 });
