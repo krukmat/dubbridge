@@ -1,7 +1,7 @@
 ---
 type: Audit
 title: "P6.T3.D — Android visual certification preparation"
-status: in_progress
+status: pass
 task: P6.T3
 block: T3.D
 date: 2026-09-24
@@ -226,3 +226,31 @@ sufficient to infer an exact emulator model.
 Therefore **T3.D6 remains BLOCKED only on exact local device identification**.
 No additional P2P code, harness change or screenshot rerun is required unless
 the owner cannot recover that device identity.
+
+
+## D6 exact device verdict and aggregate closure
+
+Owner-provided local transcript on 2026-09-25:
+
+- `adb devices -l`: `emulator-5554 device product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a`.
+- AVD name: `fenix_t7`.
+- Android product model: `sdk_gphone64_arm64`.
+- Android release: `14`.
+- Maestro version: `2.6.1`.
+
+The Maestro CLI emitted Java runtime deprecation/access warnings, but returned
+its version successfully; these warnings are not a P2P flow failure and do not
+invalidate the already captured D4 evidence.
+
+Exact evidence chain:
+
+`2cc8a6b` bounded Play-scroll repair
+→ local four-flow Maestro rerun
+→ `5fc8725` 11/11 screenshot evidence
+→ D5 visual PASS
+→ owner-supplied exact device/toolchain identity.
+
+**T3.D6 PASS. T3.D PASS. P6.T3 PASS. P6 PASS 2026-09-25.**
+
+P6 closure does not claim P7Local or P7 certification. HPKE emulator remains
+disabled. Deferred P5.T3/P5-CERT remains a release-lane obligation.
