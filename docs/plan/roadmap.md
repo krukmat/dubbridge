@@ -286,8 +286,8 @@ work remains per § Known planning gaps below. `T6p-d` specifically proves backe
 ciphertext publication plus durable `P2P_READY`, which are exactly what
 `P2.T3` and `P2.T5` implement — so `T6p-a` cannot start until its full gates pass, and the integrated P2
 publication flow required by `T6p-d` is not yet implemented/certified. The
-base S-230 deployment remains a separate deliverable. **P3 PASS + P4 PASS;
-P5-DEV SATISFIED 2026-09-22; P6 is in progress.** Aggregate P5 remains open
+base S-230 deployment remains a separate deliverable. **P3 PASS + P4 PASS; P5-DEV SATISFIED 2026-09-22; P6 PASS 2026-09-25;
+DEV-HANDOFF SATISFIED.** Aggregate P5 remains open
 only because P5.T3/P5-CERT is deferred to the release lane. T6p-a is deferred
 until S-230 T7local PASS, T7c PASS, MVP0-P2P **DEV-HANDOFF** (P3 PASS + P4 PASS
 + P5-DEV + P6 PASS), and the T7local freshness disposition are satisfied.
@@ -443,8 +443,8 @@ captured above under Governing principles and ADR-025/ADR-026.
 - `S-070` (JWKS / production identity hardening) and `S-170`/`S-180` (human review
   and publication runtime) still need plan/task ledgers before execution.
 - **MVP0-P2P P3-P7:** phase plans and planning work-package ledgers exist.
-  **P3 PASS and P4 PASS 2026-09-22; P5-DEV SATISFIED; P6 in progress
-  (T0/T1 PASS, T2 active).** Aggregate P5 remains IN PROGRESS only because
+  **P3 PASS and P4 PASS 2026-09-22; P5-DEV SATISFIED; P6 PASS 2026-09-25;
+  DEV-HANDOFF SATISFIED.** Aggregate P5 remains IN PROGRESS only because
   deferred P5.T3/P5-CERT is a release obligation; it is not a DEV-HANDOFF
   component. P7 remains incomplete. Each
   phase still needs exact-path executable decomposition, parent/leaf RRI,
