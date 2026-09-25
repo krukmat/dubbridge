@@ -162,7 +162,8 @@ def resolve_account() -> tuple[str, str, str]:
 
     if not email:
         email = f"t7local-{RUN_ID}@dubbridge.dev"
-        password = f"T7local-{RUN_ID}-A9zQ!"
+        ui_safe_run_id = "".join(char for char in RUN_ID if char.isalnum()) or "run"
+        password = f"T7local{ui_safe_run_id}A9zQ7"
         http_json(
             "POST",
             "/auth/register",
