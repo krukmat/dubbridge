@@ -32,6 +32,18 @@ tags:
 - assertVisible:
     id: home-screen
 
+# The review quick-action card sits below the initial Home viewport. Maestro can
+# resolve an off-screen testID but a direct tap may not dispatch to the Pressable,
+# so make the card physically visible before tapping it.
+- scrollUntilVisible:
+    element:
+      id: home-open-review
+    direction: DOWN
+    timeout: 8000
+
+- assertVisible:
+    id: home-open-review
+
 # SC-REVIEW-1: Reviewer opens the review inbox
 - tapOn:
     id: home-open-review
