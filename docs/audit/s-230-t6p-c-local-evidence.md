@@ -138,7 +138,7 @@ entrypoint. The T6p-c runtime harness records:
 - `T6PC_IMAGE_ID=sha256:...`.
 
 This local OCI image ID is the content-addressed image evidence consumed by the
-T6p-d deployment preparation; T6p-d must additionally record the deployed
+T7a backend deployment preparation; T7a must additionally record the deployed
 registry/runtime digest if its transport changes the identity surface.
 
 ## Runtime attempt 2 — local Mac
@@ -368,7 +368,7 @@ T6PC_NEGATIVE_MISSING_SERVER_KEY=PASS
 T6PC=PASS
 ```
 
-The exact tested HEAD and image ID are captured above. All required runtime/network/mTLS/persistence/negative markers and final `T6PC=PASS` were observed; T6p-d is READY.
+The exact tested HEAD and image ID are captured above. All required runtime/network/mTLS/persistence/negative markers and final `T6PC=PASS` were observed; T7a is READY.
 
 ## CI context
 
@@ -399,4 +399,4 @@ pinned to `c4b8da98...` and image `sha256:9bc98e5590aa...`.
 
 ## Status
 
-`T6p-a PASS -> T6p-b PASS (amendment recertified) -> T6p-c PASS -> T6p-d READY`.
+`T6p-a PASS -> T6p-b PASS (amendment recertified) -> T6p-c PASS`; the local T6p lane is complete and deployed execution continues at `T7a READY`.
