@@ -1,4 +1,4 @@
-.PHONY: qa-fmt qa-lint qa-test qa-test-redis qa-test-s3 qa-check qa-local qa-p2p-preflight qa-t7local-maestro qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-python-complexity qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-docs-review qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review qa-golden-set show-codex-session-model install-hooks
+.PHONY: qa-fmt qa-lint qa-test qa-test-redis qa-test-s3 qa-check qa-local qa-p2p-preflight qa-t7local-maestro qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-python-complexity qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-docs-review qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review qa-golden-set show-codex-session-model install-hooks do-plan do-inventory
 
 COVERAGE_MIN ?= 90
 PEER_REVIEW_RRI      ?= 22
@@ -254,3 +254,11 @@ install-hooks:
 	git config core.hooksPath .githooks
 	chmod +x .githooks/pre-push
 	@echo "Git hooks installed (core.hooksPath=.githooks)."
+
+
+# S-230-T6 stable DigitalOcean operator interface.
+do-inventory:
+	bash scripts/do-readonly-inventory.sh
+
+do-plan:
+	bash scripts/do-plan.sh

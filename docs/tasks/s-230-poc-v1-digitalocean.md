@@ -114,7 +114,7 @@ ledger.
 | T5d | Local descriptor evidence and aggregate status sync | operational/docs | S (RRI 22 Low, recomputed 2026-08-27) | T5c | [x] Done 2026-08-27 — structural render + fail-closed guard evidence; owner-verified |
 | T6 | First deploy and end-to-end smoke on Digital Ocean | non-executable parent | L | T5 | [ ] IN PROGRESS — T6a PASS; T6b next |
 | T6a | Freeze DO deployment contract + low-context agent interface | planning/docs | S | T5 PASS | [x] PASS 2026-09-26 — adopt/import-first topology, boundaries, immutable-release identity, six-command agent/evidence contract frozen; cloud mutation NONE |
-| T6b | OpenTofu infrastructure descriptor + inventory/import plan | config/ops | TBD | T6a PASS | [ ] Planned — next executable child; NO APPLY |
+| T6b | OpenTofu infrastructure descriptor + inventory/import plan | config/ops | TBD | T6a PASS | [ ] IN PROGRESS — descriptor/guards committed; live inventory + lock/validate pending; NO APPLY |
 | T6c | Immutable production release packaging | build/ops | TBD | T6b PASS | [ ] Planned |
 | T6d | Provision/import/apply base Digital Ocean platform | operational | TBD | T6b PASS; T6c PASS | [ ] Planned — first allowed cloud mutation |
 | T6e | Deploy + migrate + runtime/network readiness | operational | TBD | T6d PASS | [ ] Planned |
@@ -5019,8 +5019,8 @@ itself did not move: this task only ran validation.
 **Effort:** L — mandatory decomposition; each child receives its own
 presentation-time RRI  
 **Depends on:** S-230-T5 PASS  
-**Status:** [ ] IN PROGRESS — T6a PASS 2026-09-26; T6b is the next executable
-child. T7a remains blocked until aggregate T6 PASS.
+**Status:** [ ] IN PROGRESS — T6a PASS 2026-09-26; T6b implementation is now
+committed and awaits read-only live inventory/provider-lock validation. T7a remains blocked until aggregate T6 PASS.
 
 T6 is no longer executed as one monolithic operational task. It is the parent
 for seven ordered children. The base deployment stays HTTP/HLS scope; deployed
@@ -5031,7 +5031,7 @@ P2P publication semantics remain T7a.
 | Child | Purpose | Depends on | Status |
 |---|---|---|---|
 | **T6a** | Freeze deployment identity, topology, network/persistence/secret ownership, immutable-release policy, agent command/evidence contract | T5 PASS | **PASS 2026-09-26** |
-| **T6b** | Author OpenTofu descriptor; inventory existing DO resources; produce import/adoption plan; validate/plan only | T6a PASS | **NEXT — Planned** |
+| **T6b** | Author OpenTofu descriptor; inventory existing DO resources; produce import/adoption plan; validate/plan only | T6a PASS | **IN PROGRESS — implementation complete; local inventory/lock/validate pending** |
 | **T6c** | Build/test/push immutable production release; record exact OCI digests + release manifest | T6b PASS | Planned |
 | **T6d** | Execute controlled import/provision/apply; prove expected resources and second-plan no drift | T6b PASS; T6c PASS | Planned |
 | **T6e** | Materialize runtime secrets, deploy by digest, migrate, prove TLS/readiness/private boundaries | T6d PASS | Planned |

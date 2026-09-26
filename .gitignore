@@ -38,3 +38,8 @@ p2p-mvp/*
 pending/*
 mobile/modules/dubbridge-p2p-keystore/*
 .githooks/pre-push
+infra/digitalocean/backend.hcl
+infra/digitalocean/terraform.tfvars
+infra/digitalocean/.terraform/
+infra/digitalocean/.t6-plan.bin
+infra/digitalocean/.t6-plan.json

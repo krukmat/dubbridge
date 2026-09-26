@@ -242,7 +242,7 @@
     <span class="pill pass"><span class="dot"></span>DEV-HANDOFF — <strong>25-sep</strong> · <code>84ea5edc</code></span>
     <span class="pill pass"><span class="dot"></span>T7local · T7c — <strong>verde</strong></span>
     <span class="pill pass"><span class="dot"></span>T6p-a…c (lane local) — <strong>cerrado</strong></span>
-    <span class="pill watch"><span class="dot"></span>T6a <strong>PASS</strong> — próximo <strong>T6b</strong> IaC/import plan; T7a sigue bloqueado hasta T6 PASS</span>
+    <span class="pill watch"><span class="dot"></span>T6a <strong>PASS</strong> — <strong>T6b IN PROGRESS</strong>: IaC/guards listos; inventory + lock/validate pendientes; T7a sigue bloqueado hasta T6 PASS</span>
     <span class="pill pass"><span class="dot"></span>P5.T3 — <strong>cerrado</strong>; checklist en P7.T2</span>
     <span class="pill neutral"><span class="dot"></span>Objetivo 2026-10-30, no GA</span>
   </div>
@@ -283,7 +283,7 @@
 
         <line x1="253" y1="94" x2="253" y2="118" style="stroke:var(--ink-dim);stroke-width:1.4;stroke-dasharray:3 3" marker-end="url(#arr-slate)"></line>
         <rect x="180" y="122" width="106" height="30" rx="7" style="fill:var(--surface);stroke:var(--ink-dim);stroke-width:1.2;stroke-dasharray:3 2"></rect>
-        <text x="233" y="141" text-anchor="middle" style="fill:var(--ink-dim);font-size:9.6px">T6a ✓ · T6b next</text>
+        <text x="233" y="141" text-anchor="middle" style="fill:var(--ink-dim);font-size:9.6px">T6a ✓ · T6b active</text>
         <line x1="286" y1="137" x2="318" y2="137" style="stroke:var(--ink-dim);stroke-width:1.4" marker-end="url(#arr-slate)"></line>
         <rect x="322" y="122" width="106" height="30" rx="7" style="fill:var(--surface);stroke:var(--ink-dim);stroke-width:1.2;stroke-dasharray:3 2"></rect>
         <text x="375" y="141" text-anchor="middle" style="fill:var(--ink-dim);font-size:9.6px">T7 (convergencia DO)</text>
@@ -375,7 +375,7 @@
           <div class="lrow done"><span class="id">T7local</span><span class="desc"><strong>Verde 26-sep.</strong> B3/C1/C2/C3 probados en stack local; C4 aceptado. Sin más reruns.</span><span class="status">✓ verde</span></div>
           <div class="lrow done"><span class="id">T7c</span><span class="desc"><strong>PASS 26-sep.</strong> JWT 8h, leeway 30s, hydration rechaza sesión expirada/malformada.</span><span class="status">✓ PASS</span></div>
           <div class="lrow done"><span class="id">T6p-a…c</span><span class="desc">Lane P2P local: freeze de ownership/config, wiring Compose/secrets y certificación local (imagen ARM64 en <code>c4b8da98</code>).</span><span class="status">✓ cerrado</span></div>
-          <div class="lrow next"><span class="id">T6</span><span class="desc"><strong>T6a PASS 26-sep.</strong> Freeze adopt/import-first sin mutación cloud; próximo T6b OpenTofu + inventory/import plan. T6d será la primera mutación DO.</span><span class="status">T6b next</span></div>
+          <div class="lrow next"><span class="id">T6</span><span class="desc"><strong>T6a PASS 26-sep.</strong> Freeze adopt/import-first sin mutación cloud; T6b activo: OpenTofu + guards implementados; inventory/lock/validate pendientes. T6d.0 será la primera mutación DO.</span><span class="status">T6b active</span></div>
           <div class="lrow next"><span class="id">T7a</span><span class="desc">Backend P2P en DO: publicación de ciphertext + <code>P2P_READY</code> durable. Depende de <strong>T6 PASS</strong> + T6p-c PASS.</span><span class="status">blocked on T6</span></div>
           <div class="lrow next"><span class="id">T7p</span><span class="desc">RC Android físico contra el backend de T7a. T7 cierra cuando T7a y T7p pasan.</span><span class="status">planned</span></div>
           <div class="lrow next"><span class="id">T9 / T9g</span><span class="desc">Cierre + GO/NO-GO de octubre</span><span class="status">planned</span></div>
@@ -453,10 +453,10 @@
 
   <section>
     <div class="section-head"><h2>Calendario</h2></div>
-    <p class="section-note">Hoy, <strong>2026-09-26</strong> — T7local verde, lane local <strong>T6p-a…c cerrado</strong> y <strong>T6a PASS</strong> sin mutación cloud; próximo bloque ejecutable: <strong>T6b</strong>. T7a queda bloqueado hasta T6 PASS.</p>
+    <p class="section-note">Hoy, <strong>2026-09-26</strong> — T7local verde, lane local <strong>T6p-a…c cerrado</strong> y <strong>T6a PASS</strong> sin mutación cloud; bloque activo: <strong>T6b</strong>. T7a queda bloqueado hasta T6 PASS.</p>
     <div class="timeline">
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">6–18 SEP</div><div class="work">P2.C0, T2, T3, T4 cerrados; remediación CONS-T0…T5</div><div class="outcome">P2 PASS</div></div>
-      <div class="tstep now"><div class="bar"><div class="dot"></div></div><div class="window">19–26 SEP</div><div class="work">P3–P6 PASS, DEV-HANDOFF, T7local verde, T7c PASS, lane local T6p-a…c cerrado, T6a freeze PASS</div><div class="outcome">◆ próximo: T6b IaC/import plan<div class="here-flag">estás acá</div></div></div>
+      <div class="tstep now"><div class="bar"><div class="dot"></div></div><div class="window">19–26 SEP</div><div class="work">P3–P6 PASS, DEV-HANDOFF, T7local verde, T7c PASS, lane local T6p-a…c cerrado, T6a freeze PASS</div><div class="outcome">◆ T6b activo · inventory/validate<div class="here-flag">estás acá</div></div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">27 SEP–21 OCT</div><div class="work">T6b–g: IaC/import, release, deploy base y E2E; después T7a backend P2P</div><div class="outcome">T6 PASS → desbloquea T7a</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">22–26 OCT</div><div class="work">T7p: RC Android físico contra T7a; evidencia reutilizable por P7.T2 con identidad exacta</div><div class="outcome">RC listo</div></div>
       <div class="tstep milestone"><div class="bar"><div class="dot"></div></div><div class="window">27–30 OCT</div><div class="work">P7 exact-artifact; P7.T2 completa checklist físico, soak y rollback</div><div class="outcome">◆ T9g — GO/NO-GO</div></div>
