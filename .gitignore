@@ -43,3 +43,5 @@ infra/digitalocean/terraform.tfvars
 infra/digitalocean/.terraform/
 infra/digitalocean/.t6-plan.bin
 infra/digitalocean/.t6-plan.json
+artifacts/releases/*
+!artifacts/releases/*/release.json
