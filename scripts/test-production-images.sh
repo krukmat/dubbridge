@@ -3,7 +3,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # Case registry - bash 3.2 compatible (no associative arrays)
-CASE_LIST="self-check api gateway migration worker asr translation full-pipeline"
+CASE_LIST="self-check api gateway migration worker asr translation availability full-pipeline"
 
 # Cleanup machinery
 TEMP_DIR=""
@@ -626,6 +626,228 @@ run_translation() {
 
     echo "Run check passed for translation"
     return 0
+}
+
+
+contract_availability() {
+    echo "Contract check for availability case"
+    local dockerfile="apps/availability-node/Dockerfile"
+    if [ ! -f "$dockerfile" ]; then
+        echo "ERROR: $dockerfile not found" >&2
+        return 1
+    fi
+    if ! grep -q '^FROM node:22\.23\.0-bookworm-slim AS build
+
+# Main execution
+main() {
+    # Validation 1: Exactly 2 positional arguments
+    if [[ $# -ne 2 ]]; then
+        usage
+    fi
+
+    local mode="$1"
+    local case_name="$2"
+
+    # Validation 2: Mode must be contract or run
+    if [[ "$mode" != "contract" && "$mode" != "run" ]]; then
+        usage
+    fi
+
+    # Validation 3: Case must exist in registry
+    if ! case_exists "$case_name"; then
+        usage
+    fi
+
+    # Dispatch to function
+    local func_name="${mode}_${case_name}"
+    if ! declare -F "$func_name" >/dev/null 2>&1; then
+        echo "ERROR: Function $func_name not found" >&2
+        exit 1
+    fi
+
+    "$func_name"
+}
+
+main "$@"
+ "$dockerfile"; then
+        echo "ERROR: Availability Node build stage is not pinned to node:22.23.0-bookworm-slim" >&2
+        return 1
+    fi
+    if ! grep -q '^FROM node:22\.23\.0-bookworm-slim
+
+# Main execution
+main() {
+    # Validation 1: Exactly 2 positional arguments
+    if [[ $# -ne 2 ]]; then
+        usage
+    fi
+
+    local mode="$1"
+    local case_name="$2"
+
+    # Validation 2: Mode must be contract or run
+    if [[ "$mode" != "contract" && "$mode" != "run" ]]; then
+        usage
+    fi
+
+    # Validation 3: Case must exist in registry
+    if ! case_exists "$case_name"; then
+        usage
+    fi
+
+    # Dispatch to function
+    local func_name="${mode}_${case_name}"
+    if ! declare -F "$func_name" >/dev/null 2>&1; then
+        echo "ERROR: Function $func_name not found" >&2
+        exit 1
+    fi
+
+    "$func_name"
+}
+
+main "$@"
+ "$dockerfile"; then
+        echo "ERROR: Availability Node runtime stage is not pinned to node:22.23.0-bookworm-slim" >&2
+        return 1
+    fi
+    if ! grep -q '^RUN npm ci
+
+# Main execution
+main() {
+    # Validation 1: Exactly 2 positional arguments
+    if [[ $# -ne 2 ]]; then
+        usage
+    fi
+
+    local mode="$1"
+    local case_name="$2"
+
+    # Validation 2: Mode must be contract or run
+    if [[ "$mode" != "contract" && "$mode" != "run" ]]; then
+        usage
+    fi
+
+    # Validation 3: Case must exist in registry
+    if ! case_exists "$case_name"; then
+        usage
+    fi
+
+    # Dispatch to function
+    local func_name="${mode}_${case_name}"
+    if ! declare -F "$func_name" >/dev/null 2>&1; then
+        echo "ERROR: Function $func_name not found" >&2
+        exit 1
+    fi
+
+    "$func_name"
+}
+
+main "$@"
+ "$dockerfile"; then
+        echo "ERROR: Availability Node Dockerfile does not use npm ci" >&2
+        return 1
+    fi
+    if ! grep -q '^RUN npm run build && npm prune --omit=dev
+
+# Main execution
+main() {
+    # Validation 1: Exactly 2 positional arguments
+    if [[ $# -ne 2 ]]; then
+        usage
+    fi
+
+    local mode="$1"
+    local case_name="$2"
+
+    # Validation 2: Mode must be contract or run
+    if [[ "$mode" != "contract" && "$mode" != "run" ]]; then
+        usage
+    fi
+
+    # Validation 3: Case must exist in registry
+    if ! case_exists "$case_name"; then
+        usage
+    fi
+
+    # Dispatch to function
+    local func_name="${mode}_${case_name}"
+    if ! declare -F "$func_name" >/dev/null 2>&1; then
+        echo "ERROR: Function $func_name not found" >&2
+        exit 1
+    fi
+
+    "$func_name"
+}
+
+main "$@"
+ "$dockerfile"; then
+        echo "ERROR: Availability Node build/prune contract not found" >&2
+        return 1
+    fi
+    if ! grep -q '^EXPOSE 8443
+
+# Main execution
+main() {
+    # Validation 1: Exactly 2 positional arguments
+    if [[ $# -ne 2 ]]; then
+        usage
+    fi
+
+    local mode="$1"
+    local case_name="$2"
+
+    # Validation 2: Mode must be contract or run
+    if [[ "$mode" != "contract" && "$mode" != "run" ]]; then
+        usage
+    fi
+
+    # Validation 3: Case must exist in registry
+    if ! case_exists "$case_name"; then
+        usage
+    fi
+
+    # Dispatch to function
+    local func_name="${mode}_${case_name}"
+    if ! declare -F "$func_name" >/dev/null 2>&1; then
+        echo "ERROR: Function $func_name not found" >&2
+        exit 1
+    fi
+
+    "$func_name"
+}
+
+main "$@"
+ "$dockerfile"; then
+        echo "ERROR: Availability Node EXPOSE 8443 contract not found" >&2
+        return 1
+    fi
+    if ! grep -q 'ENTRYPOINT \["node", "dist/main.js"\]' "$dockerfile"; then
+        echo "ERROR: Availability Node ENTRYPOINT contract not found" >&2
+        return 1
+    fi
+    echo "Contract check passed for availability"
+}
+
+run_availability() {
+    echo "Run check for availability case"
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "ERROR: docker not found on PATH" >&2
+        return 1
+    fi
+    local image="${DUBBRIDGE_AVAILABILITY_IMAGE_TAG:-dubbridge-availability-node:test}"
+    local node_version
+    node_version=$(docker run --rm --entrypoint node "$image" --version)
+    if [[ "$node_version" != "v22.23.0" ]]; then
+        echo "ERROR: expected Node v22.23.0, got $node_version" >&2
+        return 1
+    fi
+    local entrypoint
+    entrypoint=$(docker image inspect --format '{{json .Config.Entrypoint}}' "$image")
+    if [[ "$entrypoint" != '["node","dist/main.js"]' ]]; then
+        echo "ERROR: unexpected Availability Node entrypoint: $entrypoint" >&2
+        return 1
+    fi
+    echo "Run check passed for availability"
 }
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/full-pipeline.sh"
