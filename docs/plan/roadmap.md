@@ -172,7 +172,8 @@ and a regression guard, and the corrected image was subsequently certified.
 render, scoped secrets, health, private network, corrected mTLS probes,
 persistence, and fail-closed checks all passed with final `T6PC=PASS`.
 **The T6p local lane is CLOSED at T6p-c PASS. T7a is BLOCKED on T6 PASS** as the backend deployment branch; T7p remains the mobile branch and starts only after T7a PASS. T7local does not certify P2P
-Invite/Claim/Sync/Verify/loopback/HPKE/P5.T3. `T6` (first deploy) remains
+Invite/Claim/Sync/Verify/loopback/HPKE and the P7.T2-owned transferred
+physical checklist. `T6` (first deploy) remains
 planned and may proceed under its own dependencies, but it does not satisfy or
 bypass the T7local gate. Deployment-enablement
 slice: makes the already-closed pipeline publicly runnable on a Digital
@@ -294,8 +295,8 @@ which are exactly what `P2.T3` and `P2.T5` implement. The implementation
 already exists; the remaining lane is deployed wiring/certification. The
 local T6p family is complete through `T6p-c PASS`. The
 base S-230 deployment remains a separate deliverable. **P3 PASS + P4 PASS; P5-DEV SATISFIED 2026-09-22; P6 PASS 2026-09-25;
-DEV-HANDOFF SATISFIED.** Aggregate P5 remains open
-only because P5.T3/P5-CERT is deferred to the release lane. **T6p-a is PASS as of 2026-09-26.** The owner explicitly amended
+DEV-HANDOFF SATISFIED.** P5 is closed; P7.T2 owns the former P5.T3 release
+checklist. **T6p-a is PASS as of 2026-09-26.** The owner explicitly amended
 the convergence contract so the final S-230 `T7local CLOSED — OWNER ACCEPTED`
 disposition (B3/C1/C2/C3 runtime-proven, C4 owner-accepted, E4 freshness
 owner-waived) satisfies the former technical `T7local PASS + freshness`
@@ -442,7 +443,7 @@ captured above under Governing principles and ADR-025/ADR-026.
 
 ## Known planning gaps
 
-> **MVP0-P2P sequencing amendment — 2026-09-22:** P5.T3 is now a deferred
+> **MVP0-P2P sequencing amendment — 2026-09-22 (superseded 2026-09-26):** P5.T3 is now a deferred
 > release-certification obligation, not a downstream development gate. P6
 > activates on P3 PASS + P4 PASS + **P5-DEV** (P5.T0-T2 formally closed).
 > S-230 T6p/T7p preparation uses **DEV-HANDOFF** = P3 PASS + P4 PASS + P5-DEV
@@ -458,16 +459,19 @@ captured above under Governing principles and ADR-025/ADR-026.
 > audience-media HTTP/S3 fallback, and a failed control there blocks a passing
 > P7 verdict and T9g GO. Decision:
 > `docs/audit/mvp0-p2p-p5-t3-sequencing-replan-2026-09-22.md` § Amendment 2026-09-26.
+>
+> **Closure 2026-09-26:** P5.T3 is closed as a standalone task. P7.T2 owns
+> the complete physical checklist. This changes documentation ownership only:
+> no physical playback PASS is implied, and P7.T3/T9g remain blocked without it.
 
 - `S-xxx` numbering is canonical. Update this map whenever a phase, dependency, or
   ADR materially changes; do not introduce new active `P*` or bare `S0`–`S9` phase IDs.
 - `S-070` (JWKS / production identity hardening) and `S-170`/`S-180` (human review
   and publication runtime) still need plan/task ledgers before execution.
 - **MVP0-P2P P3-P7:** phase plans and planning work-package ledgers exist.
-  **P3 PASS and P4 PASS 2026-09-22; P5-DEV SATISFIED; P6 PASS 2026-09-25;
-  DEV-HANDOFF SATISFIED.** Aggregate P5 remains IN PROGRESS only because
-  deferred P5.T3/P5-CERT is a release obligation; it is not a DEV-HANDOFF
-  component. P7 remains incomplete. Each
+  **P3 PASS and P4 PASS 2026-09-22; P5 closed 2026-09-26; P6 PASS 2026-09-25;
+  DEV-HANDOFF SATISFIED.** P7.T2 owns the transferred physical release
+  checklist. P7 remains incomplete. Each
   phase still needs exact-path executable decomposition, parent/leaf RRI,
   band-required review/approval, ownership and elapsed-time estimates at
   activation. Existing HP/EC and accepted ADR-043/044 remain binding.
@@ -498,7 +502,8 @@ captured above under Governing principles and ADR-025/ADR-026.
   Final `T7local CLOSED — OWNER ACCEPTED` + T7c PASS + DEV-HANDOFF activated
   the freeze, and T6p-a is now PASS. The exact DEV-HANDOFF head remains pinned
   at `84ea5edc` as historical lineage evidence; no additional T7local rerun is
-  required for T6p-a. Deferred P5.T3 remains outside this development gate.
+  required for T6p-a. The P7.T2-owned physical checklist remains outside this
+  development gate.
   October capacity is
   not validated by the existence of these plans. X29 is required for the
   release, X28/CI for T9g; optional queue acceleration and S-230
@@ -552,10 +557,10 @@ captured above under Governing principles and ADR-025/ADR-026.
   rationale, and detailed per-slice status narrative trimmed from this file
 
 
-> **P4 PASS — 2026-09-22:** P4.T0/T1/T2/T3 are closed. P4.T3 HP/EC mapping and verified-handle handoff to P5 are recorded in `docs/audit/p4-t3-certification-and-p5-handoff-2026-09-22.md`; certification head `780519c5` completed 15/15 CI and owner verification is complete. The physical Android proof remains mandatory under deferred P5.T3/P5-CERT but does not reopen P4.
+> **P4 PASS — 2026-09-22:** P4.T0/T1/T2/T3 are closed. P4.T3 HP/EC mapping and verified-handle handoff to P5 are recorded in `docs/audit/p4-t3-certification-and-p5-handoff-2026-09-22.md`; certification head `780519c5` completed 15/15 CI and owner verification is complete. The physical Android proof is now a P7.T2 control and does not reopen P4.
 
 
-> **P5-DEV SATISFIED — 2026-09-22:** P5.T0/T1/T2 are formally closed. Preparation head `e63209f5` completed 15/15 CI; mobile revalidation is 62/62 suites and 446/446 tests; owner verification is complete. P5.T3/P5-CERT remains open in the release lane and aggregate P5 remains IN PROGRESS.
+> **P5 closure — 2026-09-26:** P5.T0/T1/T2 are formally closed. Preparation head `e63209f5` completed 15/15 CI; mobile revalidation is 62/62 suites and 446/446 tests; owner verification is complete. P5.T3 is closed as a standalone record and P7.T2 owns the physical release checklist.
 
 
-> **DEV-HANDOFF SATISFIED — 2026-09-25:** P3 PASS + P4 PASS + P5-DEV + P6 PASS (`docs/tasks/mvp0-p2p-p6-dashboard.md` § T3.D6). Exact DEV-HANDOFF head: `84ea5edc` (15/15 CI), code-equivalent to the last P6 code commit `2cc8a6b` (15/15 CI). It remains the historical convergence reference; the 2026-09-26 owner amendment closed the separate T7local freshness requirement and T6p-a is now PASS. P5.T3/P5-CERT remains a release-lane obligation for T7p/P7.T2.
+> **DEV-HANDOFF SATISFIED — 2026-09-25:** P3 PASS + P4 PASS + P5-DEV + P6 PASS (`docs/tasks/mvp0-p2p-p6-dashboard.md` § T3.D6). Exact DEV-HANDOFF head: `84ea5edc` (15/15 CI), code-equivalent to the last P6 code commit `2cc8a6b` (15/15 CI). It remains the historical convergence reference; the 2026-09-26 owner amendment closed the separate T7local freshness requirement and T6p-a is now PASS. P7.T2 owns the physical release checklist.

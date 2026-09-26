@@ -1,13 +1,15 @@
 ---
 type: Audit
 title: "P5.T3 post-fix Android diagnostic — device identity conflict"
-status: active
+status: closed
 ---
 
 # P5.T3 post-fix Android diagnostic — 2026-09-26
 
-**Result:** `CLAIM_FAILED` before the invitation claim. P5.T3 remains open; no
-SYNC, VERIFY, playback, secret-boundary, or no-fallback evidence was produced.
+**Result:** `CLAIM_FAILED` before the invitation claim. This is a closed
+historical diagnostic: it produced no SYNC, VERIFY, playback, secret-boundary,
+or no-fallback evidence. The checklist ownership was transferred to T7p/P7.T2
+by the 2026-09-26 closure amendment.
 
 ## Scope and environment
 
@@ -110,8 +112,11 @@ Between the two runs a client repair (`P5.T3-r1`, committed afterwards as `3f3ff
 `swarm.flush()` + wait-for-first-update on an empty drive, with
 `mobile/__tests__/p2p/product-package-discovery.test.ts`) was applied. It is
 consistent with the installed Hyperswarm/Hyperdrive APIs and passes the full
-mobile Jest suite, typecheck, lint and worklet drift check, but it has no
-recorded RRI/review/RED evidence and is **not validated on device** (the
+mobile Jest suite, typecheck, lint and worklet drift check. A later evidence
+reconciliation recovered the session's RRI 70 artifact and reproduced the RED
+failure against `3f3ffbd^`, followed by 34/34 focused tests and a worklet drift
+PASS; see `docs/audit/p5-t3-r1-discovery-repair-evidence-2026-09-26.md`.
+The standing MVP0-P2P review exception applies; it is **not validated on device** (the
 second run failed identically; that run is not proven to have loaded the
 regenerated worklet).
 

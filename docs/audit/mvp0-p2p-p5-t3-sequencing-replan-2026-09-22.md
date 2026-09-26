@@ -84,3 +84,11 @@ P7.T2 when T7p does not cover it.
   local Colima topology does not allow from the host/emulator; the client
   cold-drive discovery repair `P5.T3-r1` (commit `3f3ffbd`) is not
   device-validated, and the physical run is its first Android validation.
+
+## Amendment 2026-09-26 — standalone P5.T3 record closed
+
+**Decision (owner, 2026-09-26):** close P5.T3 as a standalone documentation
+task. This is a transfer of evidence ownership, not a certification PASS or a
+waiver. T7p owns the checklist when its exact-RC run covers it; otherwise
+P7.T2 is the sole mandatory producer. P7.T3/T9g remain blocked from PASS/GO
+until that physical evidence passes. No local-development follow-up is active.

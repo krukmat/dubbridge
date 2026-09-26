@@ -23,9 +23,9 @@ MVP0-P2P P7 certification.
 
 **Sequencing amendment 2026-09-22:** the deployment-development gate is now
 `MVP0-P2P DEV-HANDOFF` = P3 PASS + P4 PASS + P5-DEV + P6 PASS. **DEV-HANDOFF
-is SATISFIED 2026-09-25 after P6 PASS.** P5.T3 is not part of this gate; its
-physical evidence is carried to the release lane and must be resolved before a
-passing P7 verdict/T9g GO.
+is SATISFIED 2026-09-25 after P6 PASS.** P5.T3 is closed as a standalone
+record; its physical checklist is owned by P7.T2 and must pass before a P7
+verdict/T9g GO.
 
 The release target is a controlled Android beta/POC: one owner uploads a short
 video, one invited viewer claims it, fully syncs and verifies the encrypted

@@ -1,7 +1,7 @@
 ---
 type: TaskList
 title: "Tasks: P5 Local HLS playback through the existing player"
-status: in_progress
+status: complete
 slice: MVP0-P2P
 plan: docs/plan/mvp0-p2p-p5-local-playback.md
 behavioral_coverage_contract: behavior-v2
@@ -9,24 +9,25 @@ behavioral_coverage_contract: behavior-v2
 
 # P5 — planning task ledger
 
-**Status:** **In progress / P5-DEV SATISFIED 2026-09-22.** T0/T1/T2 are formally closed; preparation head `e63209f5` completed 15/15 CI, mobile revalidation is 62/62 suites and 446/446 tests, and owner verification is complete. P5.T3/P5-CERT remains an independent deferred release obligation, so aggregate P5 is not PASS.
+**Status:** **Closed 2026-09-26 — release evidence transferred.** T0/T1/T2
+are formally closed; preparation head `e63209f5` completed 15/15 CI, mobile
+revalidation is 62/62 suites and 446/446 tests, and owner verification is
+complete. P5.T3 no longer remains an independent open task: P7.T2 owns the
+physical checklist and P7/T9g retain the certification gate.
 **Phase gate:** **P4 PASS — satisfied 2026-09-22.**
 **Effort:** provisional per work package below; no new RRI record is fabricated by the automated-evidence remediation.
 
-**Sequencing amendment — 2026-09-22:** P5 now has two milestones. **P5-DEV**
-means T0-T2 are formally closed and is the handoff consumed by P6 and later
-deployment preparation. **P5-CERT** means P5.T3 has physical Android evidence.
-P5.T3 remains open and aggregate P5 remains IN PROGRESS until that evidence
-exists, but P5.T3 is no longer a downstream development-activation gate. A
-compatible exact-RC T7p run may close it; otherwise P7.T2 is the mandatory
-consolidation point. P7.T3/T9g cannot certify/GO with P5.T3 unresolved or failed.
+**Closure amendment — 2026-09-26:** P5-DEV (T0-T2) is complete and P5.T3 is
+closed as a standalone record. Its physical controls are now P7.T2 acceptance
+criteria, satisfied by compatible exact-RC T7p evidence only when P7.T2
+verifies artifact identity. P7.T3/T9g cannot certify/GO without passing those
+controls.
 
 **Re-scope 2026-09-26:** P5.T3 is relativized to a **general test** — the
 checklist in `docs/playbooks/P5_T3_ANDROID_CERTIFICATION.md` — executed inside
 the physical tests (S-230-T7p on the exact RC, else P7.T2). It has no dedicated
-device run, emulator loop or local-topology work of its own, and its importance
-is that of a release control, not a milestone. Aggregate P5 stays IN PROGRESS
-until that evidence exists; no PASS is inferred. Decision:
+device run, emulator loop or local-topology work of its own. P5 is closed; no
+certification PASS is inferred. Decision:
 `docs/audit/mvp0-p2p-p5-t3-sequencing-replan-2026-09-22.md` § Amendment 2026-09-26.
 
 ## Task map
@@ -36,7 +37,7 @@ until that evidence exists; no PASS is inferred. Decision:
 | P5.T0 | Gateway/session contract freeze | planning | M | P4 PASS | `[x]` Done 2026-09-18 |
 | P5.T1 | Loopback ciphertext decryption gateway | development | L | T0 PASS | **PASS / Done 2026-09-22** — HP/EC evidence PASS; 15/15 CI; owner-verified |
 | P5.T2 | Existing VideoPlayer and deterministic teardown | development | M | T1 PASS | **PASS / Done 2026-09-22** — HP/EC evidence PASS; 15/15 CI; owner-verified |
-| P5.T3 | Playback and secret-boundary certification | general test (evidence checklist carried by the physical tests) | M | T2 PASS | **Re-scoped 2026-09-26** — no dedicated run; recorded by the T7p exact-RC run or, at latest, P7.T2; does not block P6 or DEV-HANDOFF |
+| P5.T3 | Playback and secret-boundary certification | transferred release checklist | M | T2 PASS | **Closed 2026-09-26** — exact-RC evidence is owned by T7p/P7.T2; no P5-CERT PASS claimed |
 
 
 ## Shared activation and closure contract
@@ -178,17 +179,23 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T2 PASS
 
-**Status:** **Re-scoped 2026-09-26 as a general test carried by the physical
-tests** (S-230-T7p exact-RC run, else P7.T2); no dedicated Android run, emulator
-loop or local-topology work is scheduled for this task. The 2026-09-26 emulator
-attempts produced no SYNC/VERIFY/PLAYBACK evidence and do not count toward the
-checklist: the first stopped in CLAIM on a Keystore/device-key conflict; with a
-fresh viewer, CLAIM passed twice and SYNC failed because the Colima-hosted
-Availability Node is not Hyperswarm-reachable from the host/emulator. Probes and
-operational lessons: `docs/audit/mvp0-p2p-p5-t3-postfix-diagnostic-2026-09-26.md`.
+**Status:** **Closed 2026-09-26 — transferred to T7p/P7.T2.** P5.T3 is no
+longer an independently executable or tracked certification task. Its complete
+checklist is owned by the exact-RC physical run in T7p or, if not fully covered
+there, P7.T2. The 2026-09-26 emulator attempts produced no
+SYNC/VERIFY/PLAYBACK evidence and do not count toward the checklist. They are
+historical observations only: `docs/audit/mvp0-p2p-p5-t3-postfix-diagnostic-2026-09-26.md`.
 The client discovery repair `P5.T3-r1` is committed (`3f3ffbd`) but is not
-device-validated and has no RRI/review evidence; the physical run is its first
-Android validation.
+device-validated; the physical run is its first proven Android validation.
+Its recovered RRI 70 record, reproduced RED and focused 34/34 GREEN evidence
+are in `docs/audit/p5-t3-r1-discovery-repair-evidence-2026-09-26.md`.
+The standing MVP0-P2P owner review exception applies to this repair; the
+evidence record is closed without claiming Android behavioral certification.
+
+**Owner confirmation 2026-09-26:** local-development diagnosis is discarded.
+Do not schedule emulator retries, Colima networking repairs or a host-side
+seeder. Retain existing diagnostic evidence; certification belongs solely to
+the physical T7p/P7.T2 release run.
 
 The previously confirmed P4
 filesystem defect is now repaired by P4.T1-r1: the scoped `file:` URI is converted
@@ -233,12 +240,12 @@ evidence when behavior is delivered. Record failures rather than inferring PASS.
 **Status artifacts affected:** shared status set above; propagate any changed
 downstream input to its consuming phase before claiming closure.
 
-**Agent handoff:** Read this phase plan and governing references. Verify T2 PASS;
-freeze and score exact paths, preserve the accepted boundary, and deliver only
-P5.T3's acceptance criteria through the current workflow. Stop on a
-contract conflict or unmet dependency; do not silently advance the next phase.
+**Handoff:** P7.T2 is the sole evidence producer. It must use the exact RC and
+complete the existing certification checklist. A missing or failed control is a
+P7 `NOT_CERTIFIED` result, not a reopened P5.T3 task.
 
 
 ## P5-DEV milestone closure — 2026-09-22
 
-**P5-DEV = SATISFIED.** T0-T2 are formally closed for downstream development. P5.T3/P5-CERT remains open and aggregate P5 remains IN PROGRESS.
+**P5 closed 2026-09-26.** T0-T2 are formally closed and P5.T3 is transferred
+to T7p/P7.T2. P7/T9g retain the open release-certification decision.

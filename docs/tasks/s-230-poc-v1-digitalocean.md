@@ -51,8 +51,8 @@ ledger.
 
 > **MVP0-P2P DEV-HANDOFF — SATISFIED 2026-09-25:**
 > P3 PASS + P4 PASS + P5-DEV (P5.T0-T2 formally closed) + P6 PASS are all
-> satisfied. P5.T3 is excluded from this development gate and carried to the
-> release-certification lane; P7/T9g still require it.
+> satisfied. P5.T3 is closed as a standalone record; P7.T2 owns its physical
+> checklist, which P7/T9g still require.
 >
 > **Local-lane disposition 2026-09-26:** `T7c PASS` is satisfied and
 > `T7local` is **CLOSED — OWNER ACCEPTED**. Runtime-proven evidence covers

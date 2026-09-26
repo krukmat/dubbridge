@@ -8,7 +8,9 @@ slice: MVP0-P2P
 # P7 — Exact-artifact end-to-end P2P certification
 
 Task ledger: `docs/tasks/mvp0-p2p-p7-certification.md`. Documentation prepared 2026-09-08;
-implementation remains blocked on **P2-P4 PASS + P5-DEV + P6 PASS + S-230-T7p PASS** and the per-task workflow gate. P5.T3 may remain pending until P7.T2.
+implementation remains blocked on **P2-P5 closed + P6 PASS + S-230-T7p PASS**
+and the per-task workflow gate. P5.T3 is closed as a standalone record; P7.T2
+owns its former physical checklist.
 
 ## Objective
 
@@ -38,10 +40,10 @@ Freeze the certification profile and evidence capture method: disable remote aud
 
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
-| P7.T0 | Certification profile and artifact manifest | planning/config | M | P2-P4 PASS; P5-DEV; P6 PASS; S-230-T7p PASS | Planned; not activated |
+| P7.T0 | Certification profile and artifact manifest | planning/config | M | P2-P5 closed; P6 PASS; S-230-T7p PASS | Planned; not activated |
 | P7.T1 | No-fallback controls and control-plane checks | operational/evidence | M | T0 PASS | Planned; not activated |
 | P7.T2 | Physical owner-to-viewer end-to-end proof | operational/evidence | M | T1 PASS | Planned; not activated |
-| P7.T3 | Certification verdict and T9g handoff | operational/evidence | S | T2 evidence complete + P5.T3 disposition recorded | Planned; not activated |
+| P7.T3 | Certification verdict and T9g handoff | operational/evidence | S | T2 evidence complete | Planned; not activated |
 
 
 The companion ledger defines acceptance, HP/EC, evidence and handoff per task.
