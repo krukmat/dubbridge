@@ -11,7 +11,7 @@ date: 2026-09-26
 
 ## Current disposition
 
-**IN PROGRESS — deterministic harness implemented; Docker runtime evidence pending.**
+**IN PROGRESS — T6p-b runtime-image defect fixed; clean Docker recertification pending.**
 
 T6p-c must not be recorded as PASS until the runtime harness emits
 `T6PC=PASS` on a clean checkout. The execution environment used to author
@@ -112,7 +112,7 @@ No real secret is used by the harness.
 
 ## T6p-c.4 — Availability Node image
 
-**PASS — owner-local Docker evidence captured 2026-09-26.**
+**PRIOR IMAGE EVIDENCE INVALIDATED — recertification required after T6p-b amendment.**
 
 Observed:
 - exact HEAD: `369792d6e7ed241e1162f67f7de4dd62bf09c076`;
@@ -181,9 +181,28 @@ fails immediately on Docker's terminal `unhealthy`, `exited`, or `dead`
 states. This remains classified inside T6p-c unless the next run shows an
 actual Availability Node startup/healthcheck defect.
 
+## Runtime attempt 4 — real image defect found
+
+The owner-local runtime produced a terminal `unhealthy` state. The Availability
+Node repeatedly exited with code 1 because `rocksdb-native` attempted to load
+its Linux ARM64 native addon and the runtime image lacked `libatomic.so.1`.
+
+This is a real T6p-b image-descriptor defect, not a healthcheck/harness defect.
+T6p-b was therefore reopened as required by the frozen ownership rule.
+
+T6p-b fix implemented:
+
+- runtime stage installs Debian `libatomic1`;
+- Availability Node image contract now requires that dependency;
+- runtime image check now proves `libatomic.so.1` is resolvable.
+
+The previously recorded image ID
+`sha256:6c23231778a85fae15ed5e7182a0eb711d64ca33a3af8af1cfe7fb8264a54146`
+is obsolete for closure. T6p-c must rebuild and certify the amended exact HEAD.
+
 ## T6p-c.5 — runtime/network/mTLS proof
 
-**IN PROGRESS — container started; health/network/mTLS assertions not yet observed.**
+**IN PROGRESS — awaiting clean rerun against amended T6p-b image.**
 
 Owner-local run reached:
 - Availability Node container recreate;
