@@ -11,3 +11,9 @@ qa-behavioral-coverage:
 qa-bdd-map:
 	python3 scripts/check_bdd_map_test.py
 	python3 scripts/check-bdd-map.py
+
+
+.PHONY: do-state-bootstrap
+
+do-state-bootstrap:
+	bash scripts/do-bootstrap-state.sh
