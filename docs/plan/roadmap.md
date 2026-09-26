@@ -161,9 +161,10 @@ on evidence head `582be62c`. C4 is owner-accepted PASS. E4 freshness is
 owner-waived because relevant gateway changes landed after the evidence head;
 no technical freshness PASS is asserted and no full local rerun is required.
 The owner-directed sequencing still keeps the Digital Ocean base deploy
-(`T6 -> T7`) independent from the P2P convergence gate. **T6p-a is now
-READY / UNBLOCKED** by the 2026-09-26 owner gate amendment: T7local final
-owner-accepted closure + T7c PASS + DEV-HANDOFF satisfy convergence. T7local does not certify P2P
+(`T6 -> T7`) independent from the P2P convergence gate. **T6p-a is PASS 2026-09-26**: the owner gate amendment satisfied activation,
+and the approved a.1–a.8 execution froze deployment ownership/configuration at
+RRI 70 Complex. **T6p-b is now READY as the next executable P2P deployment
+child.** T7local does not certify P2P
 Invite/Claim/Sync/Verify/loopback/HPKE/P5.T3. `T6` (first deploy) remains
 planned and may proceed under its own dependencies, but it does not satisfy or
 bypass the T7local gate. Deployment-enablement
@@ -281,20 +282,24 @@ retrospective integrated closure record". **`P2.T6e` (final P2 evidence/
 status closeout, CONS-T5) closed `[x] Done`, owner-verified, 2026-09-18 —
 aggregate `MVP0-P2P P2` is now PASS**
 (`docs/audit/mvp0-p2p-p2-t6-closure.md`) — plus `P3`–`P6` themselves, whose phase plans and planning ledgers now exist; executable activation
-work remains per § Known planning gaps below. `T6p-d` specifically proves backend
+deployment work remains per § Known planning gaps below. `T6p-d` specifically proves backend
 ciphertext publication plus durable `P2P_READY`, which are exactly what
-`P2.T3` and `P2.T5` implement — so `T6p-a` cannot start until its full gates pass, and the integrated P2
-publication flow required by `T6p-d` is not yet implemented/certified. The
+`P2.T3` and `P2.T5` implement. The implementation already exists; the remaining
+lane is deployment wiring/certification. `T6p-a` closed PASS on 2026-09-26 and
+`T6p-b` is the next executable child. The
 base S-230 deployment remains a separate deliverable. **P3 PASS + P4 PASS; P5-DEV SATISFIED 2026-09-22; P6 PASS 2026-09-25;
 DEV-HANDOFF SATISFIED.** Aggregate P5 remains open
-only because P5.T3/P5-CERT is deferred to the release lane. **T6p-a is READY / UNBLOCKED as of 2026-09-26.** The owner explicitly amended
+only because P5.T3/P5-CERT is deferred to the release lane. **T6p-a is PASS as of 2026-09-26.** The owner explicitly amended
 the convergence contract so the final S-230 `T7local CLOSED — OWNER ACCEPTED`
 disposition (B3/C1/C2/C3 runtime-proven, C4 owner-accepted, E4 freshness
 owner-waived) satisfies the former technical `T7local PASS + freshness`
 clauses. `T7c PASS` and MVP0-P2P **DEV-HANDOFF** (P3 PASS + P4 PASS +
 P5-DEV + P6 PASS) are also satisfied. This gate amendment does not relabel the
-waived evidence as technical PASS; it authorizes T6p-a to proceed under its
-normal RRI/workflow gate. T7local
+waived evidence as technical PASS. T6p-a then executed under its normal
+RRI/workflow gate (RRI 70 Complex, approved a.1–a.8 decomposition) and froze
+placement, image, mTLS/KEK, volumes, network/health/resources, secret ownership,
+and exact T6p-b/c/d paths; see
+`docs/audit/s-230-t6p-a-input-freeze-2026-09-26.md`. T7local
 validates the base mobile flow against the local Docker Compose gateway, so
 this gate still does not require the S-230 T6 Digital Ocean deploy to have
 happened first (added 2026-09-06, replacing an earlier T7-gated version of
@@ -323,9 +328,11 @@ outside any waiver's reach (device, product decision, net-new UI). | `docs/plan/
 > and P3 ready-descriptor contracts. C0 remains input to, but no longer
 > activates, the deployment lane. S-230 `T7local` (base mobile flow via the
 > local Compose gateway on host :8082, added 2026-09-06) and MVP0-P2P
-> development through P6 advance in parallel. They converge only at `T6p-a`,
-> after T7local PASS + T7c PASS + DEV-HANDOFF and the exact-head T7local
-> freshness check, then continue through `T6p-b -> T6p-c -> T6p-d -> T7p ->
+> development through P6 advanced in parallel and converged at `T6p-a`.
+> The 2026-09-26 owner amendment accepted final `T7local CLOSED — OWNER ACCEPTED`
+> + T7c PASS + DEV-HANDOFF in place of the former technical PASS/freshness
+> clauses. `T6p-a` is now PASS and the lane continues through
+> `T6p-b -> T6p-c -> T6p-d -> T7p ->
 > P7 -> T9g`. The independent
 > S-230 `T6 -> T7` Digital Ocean deploy may run any time after `T5` but is no
 > longer a precondition for this gate — it was re-sequenced off the critical
@@ -483,11 +490,13 @@ captured above under Governing principles and ADR-025/ADR-026.
   used the canonical helper), failing 4/86 Availability Node tests. Fixed
   2026-09-18 (RRI 25 Low, `docs/tasks/mvp0-p2p-s230-consistency-remediation.md`
   § CONS-T1 closure record); 86/86 Availability Node tests now pass.
-  T6p-a requires MVP0-P2P DEV-HANDOFF plus T7local/T7c PASS **and the
-  T7local exact-head freshness disposition**; deferred P5.T3 is not part of
-  that development gate. The exact DEV-HANDOFF head is pinned at `84ea5edc`;
-  relevant base-flow/mobile/gateway/local-compose changes between T7local's
-  PASS head and that commit require a bounded regression before T6p-a. October capacity is
+  T6p-a's former technical T7local PASS + exact-head freshness activation
+  requirement was superseded by the explicit 2026-09-26 owner amendment.
+  Final `T7local CLOSED — OWNER ACCEPTED` + T7c PASS + DEV-HANDOFF activated
+  the freeze, and T6p-a is now PASS. The exact DEV-HANDOFF head remains pinned
+  at `84ea5edc` as historical lineage evidence; no additional T7local rerun is
+  required for T6p-a. Deferred P5.T3 remains outside this development gate.
+  October capacity is
   not validated by the existence of these plans. X29 is required for the
   release, X28/CI for T9g; optional queue acceleration and S-230
   T7b/T8/T8b are outside the mandatory path.
@@ -546,4 +555,4 @@ captured above under Governing principles and ADR-025/ADR-026.
 > **P5-DEV SATISFIED — 2026-09-22:** P5.T0/T1/T2 are formally closed. Preparation head `e63209f5` completed 15/15 CI; mobile revalidation is 62/62 suites and 446/446 tests; owner verification is complete. P5.T3/P5-CERT remains open in the release lane and aggregate P5 remains IN PROGRESS.
 
 
-> **DEV-HANDOFF SATISFIED — 2026-09-25:** P3 PASS + P4 PASS + P5-DEV + P6 PASS (`docs/tasks/mvp0-p2p-p6-dashboard.md` § T3.D6). Exact DEV-HANDOFF head: `84ea5edc` (15/15 CI), code-equivalent to the last P6 code commit `2cc8a6b` (15/15 CI). This is the reference for S-230's T7local freshness check before T6p-a. P5.T3/P5-CERT remains a release-lane obligation for T7p/P7.T2.
+> **DEV-HANDOFF SATISFIED — 2026-09-25:** P3 PASS + P4 PASS + P5-DEV + P6 PASS (`docs/tasks/mvp0-p2p-p6-dashboard.md` § T3.D6). Exact DEV-HANDOFF head: `84ea5edc` (15/15 CI), code-equivalent to the last P6 code commit `2cc8a6b` (15/15 CI). It remains the historical convergence reference; the 2026-09-26 owner amendment closed the separate T7local freshness requirement and T6p-a is now PASS. P5.T3/P5-CERT remains a release-lane obligation for T7p/P7.T2.
