@@ -57,7 +57,7 @@ release path adds:
   leaf rotation, single-active-KEK POC policy, persistent ciphertext/drive/index
   volumes, private network/port ownership, non-semantic health, a 1 CPU /
   1 GiB Availability Node ceiling, service-specific secret exposure, and exact
-  writable paths for T6p-b/c/d. It consumes the already-frozen C0
+  writable paths for T6p-b/c. It consumes the already-frozen C0
   contracts/fixtures and does not redefine them. Evidence:
   `docs/audit/s-230-t6p-a-input-freeze-2026-09-26.md`;
 - `T6p-b`: **PASS 2026-09-26 — amendment recertified.** T6p-c runtime on
@@ -80,7 +80,7 @@ release path adds:
   only when both deployed children are complete;
 - `T7a`: **READY** — backend branch; deploy the P2 publication plane and prove
   ciphertext publication plus durable `P2P_READY` on Digital Ocean. This is the
-  former T7a scope, moved here so deployment work stays under T7;
+  former T6p-d scope, moved here so deployment work stays under T7;
 - `T7p`: mobile branch; build and verify the physical Android
   owner-to-invited-viewer P2P RC against the backend certified by T7a;
 - `T9g`: issue GO/NO-GO only after MVP0-P2P P7 certifies the exact deployed
@@ -97,10 +97,10 @@ Target gates: X29 is resolved, MVP0-P2P through P6 is PASS, DEV-HANDOFF is
 pinned at `84ea5edc`, T7c is PASS, and T7local is `CLOSED — OWNER ACCEPTED`.
 By explicit owner amendment on 2026-09-26, that final T7local disposition
 satisfies the former T7local PASS + freshness activation clauses for T6p-a.
-Therefore **T6p-a is PASS (2026-09-26)**. Its deployment freeze is complete
-and **T6p-b is now the next executable P2P deployment block**. Optional
-T7b/T8/T8b do not gate it. The independent `T6`/`T7` Digital Ocean
-base-deploy lane remains separate. The Android RC target remains October 26 and
+Therefore **T6p-a is PASS (2026-09-26)** and the local P2P lane is now fully
+closed through **T6p-c PASS**. The next deployment work belongs to `T7a`, which
+consumes the base `T6` Digital Ocean deployment plus the certified local P2P
+contract. Optional T7b/T8/T8b do not gate it. The Android RC target remains October 26 and
 P7/T9g remain targeted for October 30; no invited-P2P claim is permitted until
 the remaining deployment/release gates are actually satisfied.
 
