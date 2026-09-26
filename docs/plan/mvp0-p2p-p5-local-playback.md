@@ -9,6 +9,15 @@ slice: MVP0-P2P
 
 Task ledger: `docs/tasks/mvp0-p2p-p5-local-playback.md`. P5 remains **in progress** because P5.T3/P5-CERT is still open. **P5-DEV is SATISFIED 2026-09-22:** T0/T1/T2 are formally closed, `e63209f5` completed 15/15 CI, mobile revalidation is 62/62 suites and 446/446 tests, and owner verification is complete. P4 PASS is satisfied.
 
+**P5.T3 re-scope 2026-09-26:** P5.T3 is a **general test** carried by the
+physical tests (S-230-T7p exact-RC run, else P7.T2), not a task with its own
+Android run. The 2026-09-26 emulator attempts (Keystore/device-key conflict at
+CLAIM; then SYNC blocked because the Colima-hosted Availability Node is not
+Hyperswarm-reachable from the host/emulator) gave no playback evidence and
+schedule no follow-up work. Evidence and lessons:
+`docs/audit/mvp0-p2p-p5-t3-postfix-diagnostic-2026-09-26.md`; decision:
+`docs/audit/mvp0-p2p-p5-t3-sequencing-replan-2026-09-22.md` § Amendment 2026-09-26.
+
 ## Objective
 
 Deliver G5 and the playback half of CU-04 from verified local ciphertext through a loopback HLS gateway and existing VideoPlayer.
@@ -40,7 +49,7 @@ Freeze loopback-only listener and local session access boundary, HLS path/URI va
 | P5.T0 | Gateway/session contract freeze | planning | M | P4 PASS | Done 2026-09-18 |
 | P5.T1 | Loopback ciphertext decryption gateway | development | L | T0 PASS | **PASS / Done 2026-09-22** |
 | P5.T2 | Existing VideoPlayer and deterministic teardown | development | M | T1 PASS | **PASS / Done 2026-09-22** |
-| P5.T3 | Playback and secret-boundary certification | release-certification evidence | M | T2 PASS | Deferred release obligation; not a P6 activation gate after P5-DEV closes; may close from compatible T7p or P7.T2 evidence |
+| P5.T3 | Playback and secret-boundary certification | general test (evidence checklist carried by the physical tests) | M | T2 PASS | Re-scoped 2026-09-26: no dedicated run; recorded by the T7p exact-RC run or, at latest, P7.T2; not a P6 or DEV-HANDOFF gate |
 
 
 The companion ledger defines acceptance, HP/EC, evidence and handoff per task.
@@ -64,8 +73,8 @@ PASS is implied by automated/component evidence alone. The 2026-09-18 T1/T2
 evidence remediation is recorded in
 `docs/audit/mvp0-p2p-p5-t1-t2-evidence-remediation-2026-09-18.md`.
 
-Aggregate P5 remains **IN PROGRESS** until T3 Android device evidence. **P5-DEV is satisfied** because T0-T2 are formally closed, so P6 may activate while T3 stays pending. P5.T3 is carried to T7p/P7.T2 and remains
-a hard prerequisite for a passing P7 verdict and T9g GO.
+Aggregate P5 remains **IN PROGRESS** until T3 Android device evidence. **P5-DEV is satisfied** because T0-T2 are formally closed, so P6 may activate while T3 stays pending. P5.T3 is carried as a general test to T7p/P7.T2; a failed control there
+still forces a P7 NOT_CERTIFIED verdict and blocks T9g GO.
 
 ## Calendar and estimation limits
 

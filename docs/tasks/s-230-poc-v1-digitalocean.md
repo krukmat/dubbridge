@@ -5391,6 +5391,12 @@ playback path. No legacy HTTP/S3 audience-media fallback may be compiled or
 observed in the certification profile. Emit the exact commit, build artifact,
 device/runtime evidence, and installation instructions consumed by P7.
 
+**General test (P5.T3, re-scoped 2026-09-26):** the same physical run also
+records the P5.T3 checklist controls (`docs/playbooks/P5_T3_ANDROID_CERTIFICATION.md`
+§ Required evidence: playback, remote-media-unavailable, teardown, key/gateway
+failure, tamper, review-path non-regression). P7.T2 reuses that evidence after
+artifact-identity verification, or executes it when absent.
+
 ---
 
 ## S-230-T7b: Mobile registration screen

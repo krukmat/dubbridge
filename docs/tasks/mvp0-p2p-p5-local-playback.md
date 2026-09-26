@@ -21,6 +21,14 @@ exists, but P5.T3 is no longer a downstream development-activation gate. A
 compatible exact-RC T7p run may close it; otherwise P7.T2 is the mandatory
 consolidation point. P7.T3/T9g cannot certify/GO with P5.T3 unresolved or failed.
 
+**Re-scope 2026-09-26:** P5.T3 is relativized to a **general test** — the
+checklist in `docs/playbooks/P5_T3_ANDROID_CERTIFICATION.md` — executed inside
+the physical tests (S-230-T7p on the exact RC, else P7.T2). It has no dedicated
+device run, emulator loop or local-topology work of its own, and its importance
+is that of a release control, not a milestone. Aggregate P5 stays IN PROGRESS
+until that evidence exists; no PASS is inferred. Decision:
+`docs/audit/mvp0-p2p-p5-t3-sequencing-replan-2026-09-22.md` § Amendment 2026-09-26.
+
 ## Task map
 
 | Task | Outcome | Type | Provisional effort | Depends on | Status |
@@ -28,7 +36,7 @@ consolidation point. P7.T3/T9g cannot certify/GO with P5.T3 unresolved or failed
 | P5.T0 | Gateway/session contract freeze | planning | M | P4 PASS | `[x]` Done 2026-09-18 |
 | P5.T1 | Loopback ciphertext decryption gateway | development | L | T0 PASS | **PASS / Done 2026-09-22** — HP/EC evidence PASS; 15/15 CI; owner-verified |
 | P5.T2 | Existing VideoPlayer and deterministic teardown | development | M | T1 PASS | **PASS / Done 2026-09-22** — HP/EC evidence PASS; 15/15 CI; owner-verified |
-| P5.T3 | Playback and secret-boundary certification | release-certification evidence | M | T2 PASS | **Deferred release obligation** — remains open; does not block P6 after P5-DEV closes; may be satisfied by compatible T7p evidence or the exact-artifact P7.T2 run |
+| P5.T3 | Playback and secret-boundary certification | general test (evidence checklist carried by the physical tests) | M | T2 PASS | **Re-scoped 2026-09-26** — no dedicated run; recorded by the T7p exact-RC run or, at latest, P7.T2; does not block P6 or DEV-HANDOFF |
 
 
 ## Shared activation and closure contract
@@ -170,17 +178,30 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 **Depends on:** T2 PASS
 
-**Status:** Android rerun pending 2026-09-22. The previously confirmed P4
+**Status:** **Re-scoped 2026-09-26 as a general test carried by the physical
+tests** (S-230-T7p exact-RC run, else P7.T2); no dedicated Android run, emulator
+loop or local-topology work is scheduled for this task. The 2026-09-26 emulator
+attempts produced no SYNC/VERIFY/PLAYBACK evidence and do not count toward the
+checklist: the first stopped in CLAIM on a Keystore/device-key conflict; with a
+fresh viewer, CLAIM passed twice and SYNC failed because the Colima-hosted
+Availability Node is not Hyperswarm-reachable from the host/emulator. Probes and
+operational lessons: `docs/audit/mvp0-p2p-p5-t3-postfix-diagnostic-2026-09-26.md`.
+The client discovery repair `P5.T3-r1` is committed (`3f3ffbd`) but is not
+device-validated and has no RRI/review evidence; the physical run is its first
+Android validation.
+
+The previously confirmed P4
 filesystem defect is now repaired by P4.T1-r1: the scoped `file:` URI is converted
 exactly once to a filesystem path at the Corestore boundary. CI evidence is green
 (61/61 mobile suites, 441/441 tests; focused RED→GREEN 7/7 current-source PASS;
 committed Bare worklet drift check PASS). Full implementation evidence:
 `docs/audit/p4-t1-r1-storage-uri-fix-evidence-2026-09-22.md`.
 
-The required physical evidence remains a fresh-invitation Android run that
-records SYNC → VERIFY → PLAYBACK and the secret/no-fallback boundary. It no
-longer needs to run immediately after T2: compatible exact-RC evidence from T7p
-may close P5.T3, otherwise P7.T2 must produce it. CI alone never satisfies T3.
+The required physical evidence is the checklist in
+`docs/playbooks/P5_T3_ANDROID_CERTIFICATION.md` § Required evidence (SYNC →
+VERIFY → PLAYBACK plus the secret/no-fallback, teardown, tamper and review-path
+controls), recorded on a physical Android device by the T7p/P7.T2 run against the
+exact RC. CI alone never satisfies it, and an emulator run never does.
 
 **Registro histórico (superado) —** BLOCKED at the CLAIM stage of the happy-path attempt. Root
 cause is a local-development-environment gap, not a P3/P4/P5 code defect: the

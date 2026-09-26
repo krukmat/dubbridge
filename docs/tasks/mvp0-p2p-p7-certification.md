@@ -98,8 +98,10 @@ contract conflict or unmet dependency; do not silently advance the next phase.
 
 ## P7.T2 — Physical owner-to-viewer end-to-end proof
 
-**P5.T3 consolidation rule (2026-09-22):** this exact-artifact physical run is
-the mandatory fallback evidence producer for deferred P5.T3. If a prior T7p
+**P5.T3 consolidation rule (2026-09-22, re-scoped 2026-09-26):** P5.T3 is a
+general test (checklist in `docs/playbooks/P5_T3_ANDROID_CERTIFICATION.md`)
+carried by the physical tests. This exact-artifact physical run is the mandatory
+fallback evidence producer for it. If a prior T7p
 run already satisfies the same criteria against the exact RC, P7.T2 may reuse
 that evidence after artifact-identity verification. Otherwise P7.T2 must execute
 the playback/no-fallback proof. A failed P5.T3 criterion forces NOT_CERTIFIED.

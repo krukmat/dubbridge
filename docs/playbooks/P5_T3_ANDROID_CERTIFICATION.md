@@ -6,7 +6,13 @@ status: active
 
 # P5.T3 Android device certification
 
-Purpose: execute the remaining P5 device evidence without waiting for P6 product screens. This playbook uses the development-only P5 certification harness and the production P3/P4/P5 seams. It does not create a mock content key, alternate decrypt path or remote media fallback.
+Purpose: checklist for the P5 **general test**. Since 2026-09-26 (`docs/audit/mvp0-p2p-p5-t3-sequencing-replan-2026-09-22.md` § Amendment) P5.T3 has no dedicated device run: these controls are executed and recorded inside the physical tests (S-230-T7p on the exact RC, else P7.T2). It uses the development-only P5 certification harness and the production P3/P4/P5 seams. It does not create a mock content key, alternate decrypt path or remote media fallback.
+
+Scope notes for the physical run:
+
+- Evidence must come from a physical Android device; an emulator run is de-risking only and never counts.
+- Provision a fresh viewer and do not clear app state afterwards: clearing regenerates the Keystore key under alias `dubbridge-p2p-k1-v1` while the server still holds the previous active device, and CLAIM fails before the invitation is reached.
+- The Preconditions below describe the local Compose topology. The local Colima-hosted Availability Node is not Hyperswarm-reachable from the host/emulator; the physical run targets the deployed backend and Availability Node instead.
 
 ## Preconditions
 

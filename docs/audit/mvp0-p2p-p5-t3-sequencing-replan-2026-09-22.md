@@ -55,3 +55,32 @@ The previous sequence made one environment-sensitive Android run block dashboard
 and deployment work even though the release lane already contains an
 exact-artifact physical owner-to-viewer proof. Consolidating those proofs removes
 duplicate device pressure without weakening the final go-live claim.
+
+## Amendment 2026-09-26 — P5.T3 becomes a general test inside the physical tests
+
+**Decision (owner, 2026-09-26):** P5.T3 is relativized. It is no longer a task
+with its own Android run, harness loop or environment work. It remains as a
+**general test**: the control checklist in
+`docs/playbooks/P5_T3_ANDROID_CERTIFICATION.md` § Required evidence, executed
+and recorded as part of the physical tests — S-230-T7p on the exact RC, or
+P7.T2 when T7p does not cover it.
+
+- **Not scheduled:** a dedicated P5.T3 device session, emulator diagnostic
+  loops, or local-topology work (routable Colima VM, host-side seeder). Emulator
+  runs are de-risking only and never count as P5-CERT evidence, which requires
+  physical Android.
+- **P5-CERT** is satisfied when the physical-test evidence covers every
+  checklist control. It is no longer a separate milestone with its own owner
+  action.
+- **Invariants unchanged:** no PASS inferred from CI; no HTTP/S3 audience-media
+  fallback; a failed checklist control in the physical tests forces P7
+  NOT_CERTIFIED and blocks T9g GO; JWT, CK, envelopes and invitation tokens stay
+  redacted.
+- **Inputs for the physical run**, from the 2026-09-26 emulator attempts
+  (`docs/audit/mvp0-p2p-p5-t3-postfix-diagnostic-2026-09-26.md`): provision a
+  fresh viewer and do not clear app state afterwards (the Keystore key under
+  alias `dubbridge-p2p-k1-v1` regenerates and conflicts with the active server
+  device); the phone must reach the Availability Node over Hyperswarm, which the
+  local Colima topology does not allow from the host/emulator; the client
+  cold-drive discovery repair `P5.T3-r1` (commit `3f3ffbd`) is not
+  device-validated, and the physical run is its first Android validation.

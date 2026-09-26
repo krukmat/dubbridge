@@ -434,6 +434,14 @@ captured above under Governing principles and ADR-025/ADR-026.
 > T7p evidence or, at latest, P7.T2. P7.T3/T9g cannot PASS/GO without it.
 > This supersedes older roadmap sentences that require aggregate P5/P2-P6 PASS
 > for those development activations.
+>
+> **Re-scope 2026-09-26:** P5.T3 is relativized to a **general test** (checklist
+> in `docs/playbooks/P5_T3_ANDROID_CERTIFICATION.md`) recorded inside the
+> physical tests — S-230 T7p on the exact RC, else P7.T2 — with no dedicated
+> device run or emulator work. Invariants unchanged: no PASS from CI, no
+> audience-media HTTP/S3 fallback, and a failed control there blocks a passing
+> P7 verdict and T9g GO. Decision:
+> `docs/audit/mvp0-p2p-p5-t3-sequencing-replan-2026-09-22.md` § Amendment 2026-09-26.
 
 - `S-xxx` numbering is canonical. Update this map whenever a phase, dependency, or
   ADR materially changes; do not introduce new active `P*` or bare `S0`–`S9` phase IDs.
