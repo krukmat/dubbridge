@@ -1,7 +1,7 @@
 ---
 type: Audit
 title: "S-230 T6p-b production descriptor implementation"
-status: in_progress
+status: complete
 slice: S-230
 task: S-230-T6p-b
 date: 2026-09-26
@@ -91,14 +91,8 @@ Fix commits:
 - `ac76856f860234e3c61f67a4430149f10c13daec` — runtime dependency;
 - `a68aa37a29e17a964d9d5f0edf983e2763545b80` — image-contract regression guard.
 
-**T6p-b disposition after amendment: FIX IMPLEMENTED / READY FOR T6p-c
-RECERTIFICATION.** The previous runtime evidence for image
-`sha256:6c232317...` is obsolete and must not be reused because the image
-content changes.
+**T6p-b disposition after amendment: PASS — RECERTIFIED 2026-09-26.** T6p-c completed the full local Docker preflight on exact tested HEAD `c4b8da98c93e80b88ed06a466226fe00273514d2`; the amended image reached healthy, passed the corrected mTLS matrix, persistence, and negative startup checks, and emitted final `T6PC=PASS`. The certified image ID is `sha256:9bc98e5590aa3a5fba1478adc99cc64a6185fde9320f0c5323cd8ad134de7d68`. The older `sha256:6c232317...` image remains obsolete.
 
 ## Next gate
 
-**S-230-T6p-c is READY FOR RECERTIFICATION.** It must render and exercise this amended descriptor,
-build the exact Availability Node image, verify secret/network isolation and
-volume persistence, and record the image digest. Any defect requiring
-descriptor/source changes reopens T6p-b.
+**S-230-T6p-c is PASS. T6p-d is READY.** The local certification exercised the amended descriptor and recorded the exact tested revision and image ID. Any later descriptor/source change requires a new certification cycle.
