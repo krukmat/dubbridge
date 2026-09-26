@@ -163,6 +163,24 @@ T6p-b production-descriptor defect. The harness was corrected in
 on every health polling iteration and to emit Compose status/log diagnostics
 if the service exits or cannot be observed.
 
+## Runtime attempt 3 — local Mac
+
+Observed by the owner on 2026-09-26:
+
+- Availability Node container remained observable;
+- the harness still ended with
+  `ERROR: Availability Node did not become healthy`;
+- Docker diagnostic output was emitted before the final error.
+
+Inspection of the production health policy found a harness timing defect:
+the Compose healthcheck allows a startup window materially longer than the
+harness's previous 30-second polling limit
+(`start_period: 5s`, `interval: 10s`, `timeout: 2s`, `retries: 6`).
+The harness now waits up to 90 seconds, reports health-state transitions, and
+fails immediately on Docker's terminal `unhealthy`, `exited`, or `dead`
+states. This remains classified inside T6p-c unless the next run shows an
+actual Availability Node startup/healthcheck defect.
+
 ## T6p-c.5 — runtime/network/mTLS proof
 
 **IN PROGRESS — container started; health/network/mTLS assertions not yet observed.**
