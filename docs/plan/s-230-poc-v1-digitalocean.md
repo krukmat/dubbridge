@@ -60,16 +60,17 @@ release path adds:
   writable paths for T6p-b/c/d. It consumes the already-frozen C0
   contracts/fixtures and does not redefine them. Evidence:
   `docs/audit/s-230-t6p-a-input-freeze-2026-09-26.md`;
-- `T6p-b`: **PASS 2026-09-26** — production Availability Node image and
-  Compose descriptor now implement the T6p-a freeze: private `:8443`, no Caddy
-  route/host port, persistent ciphertext/drive/index volumes, `p2p-control`,
-  mTLS mounts, immutable revision tag, 1 CPU / 1 GiB ceiling, and explicit
-  service-scoped secret injection. Evidence:
+- `T6p-b`: **REOPENED/FIX IMPLEMENTED 2026-09-26** — T6p-c runtime on
+  Linux ARM64 exposed a real image defect: `rocksdb-native` could not load
+  because `libatomic.so.1` was absent from the slim Node runtime. The runtime
+  stage now installs `libatomic1`, and the Availability Node image contract
+  proves the shared library is resolvable. The rest of the frozen descriptor
+  remains unchanged. Evidence:
   `docs/audit/s-230-t6p-b-production-descriptor-2026-09-26.md`;
-- `T6p-c`: **IN PROGRESS 2026-09-26** — deterministic preflight harness and
-  Availability Node image-contract case are implemented. Repository-level
-  structural checks pass; Docker render/build/mTLS/network/persistence evidence
-  is still required because the authoring environment has no Docker. Evidence:
+- `T6p-c`: **IN PROGRESS 2026-09-26** — deterministic preflight harness is
+  implemented. Earlier image evidence is invalidated by the T6p-b amendment;
+  the amended exact HEAD must be rebuilt and rerun through
+  render/build/mTLS/network/persistence/fail-closed checks. Evidence:
   `docs/audit/s-230-t6p-c-local-evidence.md`;
 - `T6p-d`: **BLOCKED on T6p-c runtime PASS**; after that, deploy the P2
   publication plane and prove only backend ciphertext publication plus durable
