@@ -173,9 +173,15 @@ render, scoped secrets, health, private network, corrected mTLS probes,
 persistence, and fail-closed checks all passed with final `T6PC=PASS`.
 **The T6p local lane is CLOSED at T6p-c PASS. T7a is BLOCKED on T6 PASS** as the backend deployment branch; T7p remains the mobile branch and starts only after T7a PASS. T7local does not certify P2P
 Invite/Claim/Sync/Verify/loopback/HPKE and the P7.T2-owned transferred
-physical checklist. `T6` (first deploy) remains
-planned and may proceed under its own dependencies, but it does not satisfy or
-bypass the T7local gate. Deployment-enablement
+physical checklist. **T6a is PASS 2026-09-26** with no cloud mutation: it
+froze the adopt/import-first Digital Ocean topology, network/persistence/secret
+ownership, immutable-release identity, dedicated remote-state boundary and
+six-command low-context agent interface. Evidence:
+`docs/audit/s-230-t6a-do-deployment-contract-2026-09-26.md`; executor packet:
+`.agent/s230-t6-execution.md`. T6 is now the non-executable parent
+`T6a -> T6b -> T6c -> T6d -> T6e -> T6f -> T6g`; **T6b is next** and is
+plan/validate-only, while T6d is the first child allowed to mutate Digital
+Ocean. Deployment-enablement
 slice: makes the already-closed pipeline publicly runnable on a Digital
 Ocean droplet; adds no new technology beyond Redis (already in use). Full
 history incl. gap findings G10–G13: `docs/audit/roadmap-history.md` § S-230.
