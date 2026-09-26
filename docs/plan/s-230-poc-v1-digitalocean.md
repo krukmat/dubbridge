@@ -732,7 +732,8 @@ flowchart LR
     T4Q --> T5["T5 DO descriptor + secrets<br/>T5a ✓ done 2026-08-26, hostname frozen<br/>(poc.iotforce.es); T5b/T5c/T5d ✓ done 2026-08-27 — T5 closed"]
     T5 --> T5D["T5d ✓ local descriptor evidence"]
     T5D --> T7LOCAL["T7local base mobile smoke<br/>via local gateway :8082"]
-    T5 --> T6A["T6a contract freeze<br/>PASS · no cloud mutation"]\n    T6A --> T6["T6b–g deploy + E2E smoke<br/>(T6b next)"]
+    T5 --> T6A["T6a contract freeze<br/>PASS · no cloud mutation"]
+    T6A --> T6["T6b–g deploy + E2E smoke<br/>(T6b next)"]
     T6 --> T7["T7 mobile build vs DO<br/>(post-deploy confirmation only)"]
     T7LOCAL --> T7
     T7LOCAL --> T8["T8 subtitle visible in review (optional)"]
