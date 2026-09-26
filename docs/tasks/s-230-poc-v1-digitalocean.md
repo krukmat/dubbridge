@@ -114,8 +114,8 @@ ledger.
 | T5d | Local descriptor evidence and aggregate status sync | operational/docs | S (RRI 22 Low, recomputed 2026-08-27) | T5c | [x] Done 2026-08-27 — structural render + fail-closed guard evidence; owner-verified |
 | T6 | First deploy and end-to-end smoke on Digital Ocean | operational | L | T5 | [ ] Planned |
 | T6p-a | Freeze deployment-specific P2P ownership and configuration | planning/config | docs/audit + S-230/P2 status docs only | T7local CLOSED — OWNER ACCEPTED; T7c PASS; MVP0-P2P DEV-HANDOFF | [x] PASS 2026-09-26 — RRI 70 Complex; deployment ownership/config and T6p-b/c/d paths frozen |
-| T6p-b | P2P Compose/config/secrets/private-network wiring | config/ops | `apps/availability-node/Dockerfile`; `infra/production/docker-compose.yml`; `.env.example`; `config/README.md`; `scripts/test-production-images.sh` | T6p-a PASS | [>] READY — next executable child |
-| T6p-c | Local P2P deployment-contract evidence | operational/evidence | TBD exact-path | T6p-b PASS | [ ] Planned |
+| T6p-b | P2P Compose/config/secrets/private-network wiring | config/ops | `apps/availability-node/Dockerfile`; `infra/production/docker-compose.yml`; `.env.example`; `config/README.md` (`scripts/test-production-images.sh` reserved but unchanged) | T6p-a PASS | [x] PASS 2026-09-26 — RRI 70 Complex; private AN/image/network/volumes/mTLS + scoped secret injection wired |
+| T6p-c | Local P2P deployment-contract evidence | operational/evidence | `infra/production/p2p/preflight.sh`; evidence/status docs; `scripts/test-production-images.sh` only if evidence correction is required | T6p-b PASS | [>] READY — next executable child |
 | T6p-d | Deploy backend ciphertext publication + durable P2P_READY smoke on DO | operational | TBD exact-path | T6p-c PASS | [ ] Planned |
 | T7local | Base mobile POC smoke against the local Docker Compose gateway | development/ops | M | T5d | [x] CLOSED 2026-09-26 — OWNER ACCEPTED; B3/C1/C2/C3 runtime-proven, C4 owner-accepted, E4 freshness owner-waived |
 | T7 | Mobile POC build against the deployed backend | development/ops | M | T6; T7local CLOSED — OWNER ACCEPTED | [ ] Planned |
