@@ -94,12 +94,29 @@ requires `T7p`, P7, and `T9g`. `T7b`, `T8`, and `T8b` remain
 optional. X29 is now a release blocker for `T7p`/`T9g`, even though it remains
 accepted residual evidence for P1.
 
+**T6 decomposition update (2026-09-26):** T6 is now a non-executable parent,
+executed as `T6a -> T6b -> T6c -> T6d -> T6e -> T6f -> T6g`. **T6a is PASS**:
+the Digital Ocean deployment contract is frozen with no cloud mutation. It
+preserves the T5a values (`ams3`, `poc.iotforce.es`,
+`dubbridge-poc-v1`, Caddy, 100 MiB, JWT 8h) and adds an
+**adopt/import-first** rule because T5a records an already-provisioned Droplet
+at `46.101.217.151`. Existing compatible DO resources are inventoried/imported
+rather than recreated. OpenTofu is the IaC source of truth, remote state uses a
+dedicated Spaces bucket with locking, releases run by immutable OCI digest, and
+normal agent operation is constrained to `do-plan / do-provision / do-deploy /
+do-smoke / do-status / do-rollback` through stable Make targets. Evidence:
+`docs/audit/s-230-t6a-do-deployment-contract-2026-09-26.md`; low-context
+executor packet: `.agent/s230-t6-execution.md`. **T6b is next** and may author,
+validate and plan IaC/imports but must not apply. T6d is the first child allowed
+to mutate Digital Ocean.
+
 Target gates: X29 is resolved, MVP0-P2P through P6 is PASS, DEV-HANDOFF is
 pinned at `84ea5edc`, T7c is PASS, and T7local is `CLOSED — OWNER ACCEPTED`.
 By explicit owner amendment on 2026-09-26, that final T7local disposition
 satisfies the former T7local PASS + freshness activation clauses for T6p-a.
 Therefore **T6p-a is PASS (2026-09-26)** and the local P2P lane is now fully
-closed through **T6p-c PASS**. The next deployment work belongs to `T7a`, which
+closed through **T6p-c PASS**. The next executable deployment work is **T6b**
+(after T6a PASS); aggregate T6 must close before `T7a` can start. T7a then
 consumes the base `T6` Digital Ocean deployment plus the certified local P2P
 contract. Optional T7b/T8/T8b do not gate it. The Android RC target remains October 26 and
 P7/T9g remain targeted for October 30; no invited-P2P claim is permitted until
@@ -715,7 +732,7 @@ flowchart LR
     T4Q --> T5["T5 DO descriptor + secrets<br/>T5a ✓ done 2026-08-26, hostname frozen<br/>(poc.iotforce.es); T5b/T5c/T5d ✓ done 2026-08-27 — T5 closed"]
     T5 --> T5D["T5d ✓ local descriptor evidence"]
     T5D --> T7LOCAL["T7local base mobile smoke<br/>via local gateway :8082"]
-    T5 --> T6["T6 deploy + E2E smoke<br/>(independent of T6p-a)"]
+    T5 --> T6A["T6a contract freeze<br/>PASS · no cloud mutation"]\n    T6A --> T6["T6b–g deploy + E2E smoke<br/>(T6b next)"]
     T6 --> T7["T7 mobile build vs DO<br/>(post-deploy confirmation only)"]
     T7LOCAL --> T7
     T7LOCAL --> T8["T8 subtitle visible in review (optional)"]
