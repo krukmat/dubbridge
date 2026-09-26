@@ -8,7 +8,11 @@ use std::time::Duration;
 use axum::{Json, Router, extract::State, http::StatusCode, routing::get};
 use serde::Serialize;
 
-use crate::{auth::auth_router, proxy::proxy_router, state::GatewayState};
+use crate::{
+    auth::auth_router,
+    proxy::{proxy_router, public_proxy_handler},
+    state::GatewayState,
+};
 
 #[derive(Serialize)]
 struct HealthResponse {
@@ -24,6 +28,17 @@ pub fn build_app(state: Arc<GatewayState>) -> Router {
         .route("/health/ready", get(ready))
         // P1-T4: mount auth routes under /auth (state propagated from parent)
         .nest("/auth", auth_router())
+        // The API emits root-relative HLS playback references (/assets/*).
+        // Expose those grant-scoped paths at the gateway root so native players
+        // can resolve manifest segment URLs without a Bearer header.
+        .route(
+            "/assets/{id}/playback/{grant_id}/manifest",
+            get(public_proxy_handler),
+        )
+        .route(
+            "/assets/{id}/playback/segments/{filename}",
+            get(public_proxy_handler),
+        )
         // P1-T5.3: authenticated API proxy under /api
         .nest("/api", proxy_router())
         .with_state(state)
