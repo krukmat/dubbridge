@@ -165,7 +165,9 @@ The owner-directed sequencing still keeps the Digital Ocean base deploy
 and the approved a.1–a.8 execution froze deployment ownership/configuration at
 RRI 70 Complex. **T6p-b is PASS 2026-09-26** with the private Availability
 Node image/Compose/mTLS/storage/network/secret boundary wired; **T6p-c is now
-READY as the next executable P2P deployment child.** T7local does not certify P2P
+IN PROGRESS** with the local preflight harness committed. Structural checks are
+ready, while Docker render/build/mTLS/persistence evidence remains pending;
+**T6p-d stays blocked until T6p-c emits runtime PASS.** T7local does not certify P2P
 Invite/Claim/Sync/Verify/loopback/HPKE/P5.T3. `T6` (first deploy) remains
 planned and may proceed under its own dependencies, but it does not satisfy or
 bypass the T7local gate. Deployment-enablement
