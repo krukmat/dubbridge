@@ -112,7 +112,14 @@ ledger.
 | T5b | Production profile and environment/secret template | config-only | M (RRI 27 Moderate, corrected 2026-08-27) | T5a | [x] Done 2026-08-27 — Claude Sonnet 5 direct; Gemma Reviewer PASS 0 findings; owner-verified |
 | T5c | Production Compose and TLS reverse proxy | config-only | M (RRI 26 Moderate, recomputed 2026-08-27) | T5b | [x] Done 2026-08-27 — Claude Sonnet 5 direct (owner override); Gemma Reviewer PASS 0 findings both phases; owner-verified |
 | T5d | Local descriptor evidence and aggregate status sync | operational/docs | S (RRI 22 Low, recomputed 2026-08-27) | T5c | [x] Done 2026-08-27 — structural render + fail-closed guard evidence; owner-verified |
-| T6 | First deploy and end-to-end smoke on Digital Ocean | operational | L | T5 | [ ] Planned |
+| T6 | First deploy and end-to-end smoke on Digital Ocean | non-executable parent | L | T5 | [ ] IN PROGRESS — T6a PASS; T6b next |
+| T6a | Freeze DO deployment contract + low-context agent interface | planning/docs | S | T5 PASS | [x] PASS 2026-09-26 — adopt/import-first topology, boundaries, immutable-release identity, six-command agent/evidence contract frozen; cloud mutation NONE |
+| T6b | OpenTofu infrastructure descriptor + inventory/import plan | config/ops | TBD | T6a PASS | [ ] Planned — next executable child; NO APPLY |
+| T6c | Immutable production release packaging | build/ops | TBD | T6b PASS | [ ] Planned |
+| T6d | Provision/import/apply base Digital Ocean platform | operational | TBD | T6b PASS; T6c PASS | [ ] Planned — first allowed cloud mutation |
+| T6e | Deploy + migrate + runtime/network readiness | operational | TBD | T6d PASS | [ ] Planned |
+| T6f | Real-video base E2E downstream-state smoke | operational/evidence | TBD | T6e PASS | [ ] Planned |
+| T6g | Operational closeout: restart/rollback/logs/runbook/cost | operational/evidence | TBD | T6f PASS | [ ] Planned |
 | T6p-a | Freeze local P2P deployment ownership and configuration | planning/config | docs/audit + S-230/P2 status docs only | T7local CLOSED — OWNER ACCEPTED; T7c PASS; MVP0-P2P DEV-HANDOFF | [x] PASS 2026-09-26 — RRI 70 Complex; local deployment ownership/config and T6p-b/c paths frozen |
 | T6p-b | Local P2P Compose/config/secrets/private-network wiring | config/ops | `apps/availability-node/Dockerfile`; `infra/production/docker-compose.yml`; `.env.example`; `config/README.md`; image-contract regression guard | T6p-a PASS | [x] PASS 2026-09-26 — ARM64 `libatomic1` amendment recertified by final T6p-c runtime PASS |
 | T6p-c | Local P2P deployment-contract evidence | operational/evidence | `infra/production/p2p/preflight.sh`; `scripts/test-production-images.sh` availability case; evidence/status docs | T6p-b PASS | [x] PASS 2026-09-26 — exact tested HEAD `c4b8da98`; image `sha256:9bc98e...`; render/secret/image/health/network/mTLS/persistence/negative checks all PASS; final `T6PC=PASS` |
@@ -5008,54 +5015,158 @@ itself did not move: this task only ran validation.
 
 ## S-230-T6: First deploy and end-to-end smoke on Digital Ocean
 
-**Type:** operational
-**Effort:** L (operational; RRI expected well below the effort impression)
-**Depends on:** S-230-T5
-**Status:** [ ] Planned — base platform smoke; not the P2P go-live
+**Type:** non-executable parent  
+**Effort:** L — mandatory decomposition; each child receives its own
+presentation-time RRI  
+**Depends on:** S-230-T5 PASS  
+**Status:** [ ] IN PROGRESS — T6a PASS 2026-09-26; T6b is the next executable
+child. T7a remains blocked until aggregate T6 PASS.
 
-**Acceptance criteria:**
+T6 is no longer executed as one monolithic operational task. It is the parent
+for seven ordered children. The base deployment stays HTTP/HLS scope; deployed
+P2P publication semantics remain T7a.
 
-- Droplet, managed PostgreSQL, Spaces bucket, DNS, and TLS are provisioned and
-  recorded.
-- Migrations applied via the T2 runner; api, gateway, and worker report ready via
-  the T3 probes.
-- The first account is created against `POST /auth/register` directly — at T6
-  time the mobile app still has no registration screen — and the runbook records
-  the exact call. This step stays in the runbook even if `S-230-T7b` later adds
-  the screen: it is the operator's recovery path when no UI is reachable.
-- A real video completes the full path: login, upload, rights confirmation,
-  finalize, HLS preparation, ASR, subtitle generation, review-task creation,
-  approval, publication, and in-app playback — with evidence for each stage
-  (audit rows, artifact records, storage keys, manifest fetch).
-- **Every stage is asserted on observed downstream state, never on a 2xx alone.**
-  A successful finalize response is not evidence that preparation ran; the
-  corresponding artifact rows, preparation status transitions and the review task
-  appearing in the inbox are. This is the direct lesson of plan G10, where a green
-  API and a silently inert pipeline coexisted.
-- Managed-PostgreSQL TLS behavior through `create_pool` is confirmed rather than
-  assumed.
-- A runbook records provisioning, deploy, migrate, rollback, log access, and
-  observed timings for preparation and ASR.
-- **Conditional on `S-230-T3b`/`T4`:** if the deployed worker-runner image
-  bundles the translation worker (see `S-230-T4`'s conditional bullet), the
-  smoke run additionally asserts a translated-subtitle artifact on observed
-  downstream state for at least one target language, held to the same "never
-  a 2xx alone" standard as every other stage above. If the image does not yet
-  bundle it, this task proceeds exactly as originally scoped and the gap is
-  recorded at T9, not silently passed over.
+### Execution decomposition
 
-**Evidence to emit:** provisioning record, deploy transcript, per-stage E2E
-evidence, runbook, cost summary.
+| Child | Purpose | Depends on | Status |
+|---|---|---|---|
+| **T6a** | Freeze deployment identity, topology, network/persistence/secret ownership, immutable-release policy, agent command/evidence contract | T5 PASS | **PASS 2026-09-26** |
+| **T6b** | Author OpenTofu descriptor; inventory existing DO resources; produce import/adoption plan; validate/plan only | T6a PASS | **NEXT — Planned** |
+| **T6c** | Build/test/push immutable production release; record exact OCI digests + release manifest | T6b PASS | Planned |
+| **T6d** | Execute controlled import/provision/apply; prove expected resources and second-plan no drift | T6b PASS; T6c PASS | Planned |
+| **T6e** | Materialize runtime secrets, deploy by digest, migrate, prove TLS/readiness/private boundaries | T6d PASS | Planned |
+| **T6f** | Drive one real video through the base product path and prove every stage by downstream state | T6e PASS | Planned |
+| **T6g** | Restart/recovery, rollback/log-access drill, runbook, cost/evidence consolidation, aggregate T6 closure | T6f PASS | Planned |
 
-**Status artifacts affected:** this ledger; `docs/plan/roadmap.md`; README status
-table.
+Execution order is **T6a → T6b → T6c → T6d → T6e → T6f → T6g**. T6 PASS
+requires all seven children PASS.
 
-**Handoff prompt:** Provision, deploy, migrate, and drive one real video through
-the entire pipeline on Digital Ocean; record evidence per stage and write the
-runbook.
+### S-230-T6a: Freeze DO deployment contract + low-context agent interface
 
-**Stop condition:** Stop after the smoke run and runbook. Do not change product
-code to make the smoke pass — a failure is a finding, not a patch target.
+**Type:** planning/docs  
+**Effort:** S / Low-band docs-planning work; no runtime/config/cloud mutation  
+**Depends on:** S-230-T5 PASS  
+**Status:** [x] PASS 2026-09-26  
+**Evidence:** `docs/audit/s-230-t6a-do-deployment-contract-2026-09-26.md`  
+**Executor packet:** `.agent/s230-t6-execution.md`
+
+T6a consumed the already-frozen T5a production inputs rather than redefining
+them: `ams3`, `poc.iotforce.es`, media Space `dubbridge-poc-v1`, Caddy,
+100 MiB, JWT 8h, Managed PostgreSQL, Compose Redis, and the production
+ADR-026 secret/config boundary. T5a also records that an owner-provisioned
+Droplet already existed at `46.101.217.151`; therefore T6a freezes
+**adopt/import-first** semantics. T6b must inventory/import compatible existing
+resources instead of blindly recreating them, and must stop on any unexpected
+destroy/replace plan.
+
+Frozen contract:
+
+- OpenTofu is the IaC source of truth; the Digital Ocean provider is
+  version-constrained and its dependency lock is committed. `doctl` remains
+  auxiliary inspection/bootstrap/registry tooling.
+- IaC state uses a **dedicated** Spaces bucket, never the media bucket, with
+  credentials supplied by environment and lockfile-based state locking proved
+  in T6b before apply.
+- only Caddy exposes application ports 80/443. API 8080, gateway 8081, Redis,
+  and Availability Node 8443 receive no public host exposure; SSH is a
+  separately restricted operator surface.
+- production is pull-and-run. Exact OCI digests, Git SHA, Compose/config hash,
+  IaC revision and release ID together identify a release. The Droplet does not
+  normally `git pull`, build images, install application dependencies, or
+  compile source.
+- cloud-init is bootstrap-only for a newly created/replacement host; the
+  existing Droplet is not replaced merely to gain cloud-init.
+- deploy/restart/rollback never delete PostgreSQL, media objects, Redis/P2P
+  persistent volumes, Hyperdrive/index state, or IaC state.
+- no real secret may enter Git, committed tfvars, release manifests, normal
+  logs, or audit evidence. T6p-b/c service-specific P2P secret ownership remains
+  authoritative.
+- normal agent operation is reduced to six stable commands:
+  `make do-plan`, `make do-provision`, `make do-deploy REV=<sha>`,
+  `make do-smoke`, `make do-status`, and
+  `make do-rollback RELEASE=<id>`. Later children implement them; T6a freezes
+  their semantics.
+- successful commands emit compact stable markers; verbose output goes to
+  bounded evidence files and is surfaced only for diagnosis.
+- missing inputs, adoption ambiguity, unexpected destructive plans, secret
+  validation failures, migration/health failures, downstream-state mismatches,
+  and ambiguous rollback targets fail closed.
+- T6a performed **no Digital Ocean mutation**.
+
+Closure markers:
+
+```text
+T6A_CONTRACT=PASS
+T6A_TOPOLOGY_FREEZE=PASS
+T6A_ADOPT_IMPORT_FIRST=PASS
+T6A_NETWORK_FREEZE=PASS
+T6A_PERSISTENCE_FREEZE=PASS
+T6A_SECRET_OWNERSHIP=PASS
+T6A_RELEASE_CONTRACT=PASS
+T6A_AGENT_INTERFACE=PASS
+T6A_EVIDENCE_CONTRACT=PASS
+T6A_CLOUD_MUTATION=NONE
+T6A=PASS
+```
+
+**Stop condition met:** contract/audit/executor packet are frozen and status is
+synchronized. No resource was created/imported/changed. Proceed to T6b.
+
+### T6b–T6e implementation boundary
+
+T6b authors and validates the IaC and existing-resource adoption/import plan
+without apply. T6c packages the immutable release. T6d is the **first child
+allowed to mutate Digital Ocean**. T6e deploys that release, applies migrations,
+and proves public TLS plus runtime/private-network readiness.
+
+Each child must stop and record a finding rather than patch product behavior
+inside the deployment task.
+
+### S-230-T6f: Base E2E smoke acceptance
+
+The original T6 product-smoke acceptance is preserved here:
+
+- Droplet/adopted compute, managed PostgreSQL, Spaces, DNS, TLS, registry and
+  required network controls are provisioned/imported and recorded.
+- Migrations applied via the T2 runner; api, gateway, worker and required
+  runtime services report ready via the canonical probes.
+- The first account is created against `POST /auth/register` directly — at
+  T6 time the mobile app still has no registration screen — and the runbook
+  records the exact call. This remains the operator recovery path even if a
+  later UI adds registration.
+- A real video completes login, upload, rights confirmation, finalize, HLS
+  preparation, ASR, subtitle generation, review-task creation, approval,
+  publication and normal playback, with evidence for each stage.
+- **Every stage is asserted on observed downstream state, never on a 2xx
+  alone.** Artifact rows, state transitions, review-task persistence, storage
+  keys and manifest/playback evidence are the oracle.
+- Managed-PostgreSQL TLS behavior through `create_pool` is confirmed rather
+  than assumed.
+- Conditional on the deployed worker-runner actually bundling the translation
+  worker, the smoke additionally proves a translated-subtitle artifact for at
+  least one target language by downstream state. Otherwise the gap is recorded
+  for T9 rather than silently passed.
+
+### S-230-T6g: Operational closeout acceptance
+
+T6g records:
+
+- exact deployed Git SHA, OCI digests, Compose/config hash and IaC revision;
+- restart/recreate recovery without persistent-data loss;
+- rollback to a known release without rebuilding on the Droplet;
+- bounded log-access procedure;
+- provisioning/deploy/migrate/rollback runbook;
+- observed preparation/ASR timings and cost summary;
+- final aggregate `T6=PASS | BLOCKED` disposition and synchronized status
+  artifacts.
+
+**Aggregate evidence to emit:** T6a freeze audit, T6b plan/import evidence,
+T6c release manifest, T6d provisioning/no-drift record, T6e deploy/readiness
+record, T6f per-stage E2E evidence, T6g runbook/recovery/rollback/cost record.
+
+**Aggregate stop condition:** stop at T6 PASS. Do not claim deployed P2P
+publication readiness here. T7a consumes T6 PASS + T6p-c PASS and owns
+ciphertext publication plus durable `P2P_READY`.
 
 ---
 
