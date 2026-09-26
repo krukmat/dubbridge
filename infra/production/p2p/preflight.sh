@@ -342,7 +342,7 @@ node_probe() {
     local cert="$1"
     local key="$2"
     local expected_code="$3"
-    docker run --rm \
+    docker run --rm -i \
         --network "$AN_NETWORK" \
         -v "$MTLS_DIR:/certs:ro" \
         node:22.23.0-bookworm-slim \
@@ -382,7 +382,7 @@ NODE
 }
 
 no_client_cert_probe() {
-    if docker run --rm \
+    if docker run --rm -i \
         --network "$AN_NETWORK" \
         -v "$MTLS_DIR:/certs:ro" \
         node:22.23.0-bookworm-slim \
