@@ -289,11 +289,10 @@ retrospective integrated closure record". **`P2.T6e` (final P2 evidence/
 status closeout, CONS-T5) closed `[x] Done`, owner-verified, 2026-09-18 —
 aggregate `MVP0-P2P P2` is now PASS**
 (`docs/audit/mvp0-p2p-p2-t6-closure.md`) — plus `P3`–`P6` themselves, whose phase plans and planning ledgers now exist; executable activation
-deployment work remains per § Known planning gaps below. `T6p-d` specifically proves backend
-ciphertext publication plus durable `P2P_READY`, which are exactly what
-`P2.T3` and `P2.T5` implement. The implementation already exists; the remaining
-lane is deployment wiring/certification. `T6p-a` closed PASS on 2026-09-26 and
-`T6p-b` is the next executable child. The
+deployment work remains per § Known planning gaps below. `T7a` now proves backend ciphertext publication plus durable `P2P_READY`,
+which are exactly what `P2.T3` and `P2.T5` implement. The implementation
+already exists; the remaining lane is deployed wiring/certification. The
+local T6p family is complete through `T6p-c PASS`. The
 base S-230 deployment remains a separate deliverable. **P3 PASS + P4 PASS; P5-DEV SATISFIED 2026-09-22; P6 PASS 2026-09-25;
 DEV-HANDOFF SATISFIED.** Aggregate P5 remains open
 only because P5.T3/P5-CERT is deferred to the release lane. **T6p-a is PASS as of 2026-09-26.** The owner explicitly amended
