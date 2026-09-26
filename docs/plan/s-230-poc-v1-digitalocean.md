@@ -66,8 +66,12 @@ release path adds:
   mTLS mounts, immutable revision tag, 1 CPU / 1 GiB ceiling, and explicit
   service-scoped secret injection. Evidence:
   `docs/audit/s-230-t6p-b-production-descriptor-2026-09-26.md`;
-- `T6p-c`: **READY** — certify the exact local deployment contract after `T6p-b`;
-- `T6p-d`: after `T6p-c PASS`, deploy the P2
+- `T6p-c`: **IN PROGRESS 2026-09-26** — deterministic preflight harness and
+  Availability Node image-contract case are implemented. Repository-level
+  structural checks pass; Docker render/build/mTLS/network/persistence evidence
+  is still required because the authoring environment has no Docker. Evidence:
+  `docs/audit/s-230-t6p-c-local-evidence.md`;
+- `T6p-d`: **BLOCKED on T6p-c runtime PASS**; after that, deploy the P2
   publication plane and prove only backend ciphertext publication plus durable
   `P2P_READY` on Digital Ocean;
 - `T7p`: build and verify the physical Android owner-to-invited-viewer P2P RC;
