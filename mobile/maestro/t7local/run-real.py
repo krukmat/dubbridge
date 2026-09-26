@@ -96,6 +96,26 @@ def http_json(
     return value
 
 
+def http_bytes(
+    path: str,
+    *,
+    token: str | None = None,
+) -> tuple[bytes, str]:
+    headers: dict[str, str] = {}
+    if token:
+        headers["authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(
+        f"{GATEWAY}{path}",
+        headers=headers,
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            return response.read(), response.headers.get("content-type", "")
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as exc:
+        blocked(f"GET {path} failed: {exc}")
+
+
 def require_object(value: object, context: str) -> dict[str, object]:
     if not isinstance(value, dict):
         blocked(f"{context} returned non-object JSON")
@@ -577,7 +597,7 @@ def certify_c3(review_task_id: str) -> None:
 
 
 def certify_c4(review_task_id: str) -> None:
-    serial = check_environment()
+    check_c3_environment()
     context = db_probe("review-context", review_task_id)
     print(context[0])
     try:
@@ -585,13 +605,13 @@ def certify_c4(review_task_id: str) -> None:
     except ValueError:
         blocked("review-context returned malformed evidence")
 
-    email, password, token = resolve_existing_run_account(run_id)
+    _email, _password, token = resolve_existing_run_account(run_id)
 
     # C4 is only valid after a persisted approval.
     print(db_probe("verify-c3", review_task_id)[0])
 
     # Keep this command rerunnable. If publication already persisted during a
-    # previous attempt, skip the mutating POST and continue with DB/playback proof.
+    # previous attempt, skip the mutating POST and continue with HLS proof.
     existing = subprocess.run(
         [str(T7_DIR / "db-probe.sh"), "verify-c4", review_task_id],
         cwd=REPO_ROOT,
@@ -631,24 +651,54 @@ def certify_c4(review_task_id: str) -> None:
         )
         print(db_probe("verify-c4", review_task_id)[0])
 
-    maestro(
-        "playback-real.yaml",
-        {
-            "T7LOCAL_EMAIL": email,
-            "T7LOCAL_PASSWORD": password,
-            "T7LOCAL_ASSET_ID": asset_id,
-        },
-        serial,
+    grant = require_object(
+        http_json(
+            "POST",
+            f"/api/assets/{asset_id}/playback-grants",
+            token=token,
+            payload={},
+        ),
+        "POST playback grant",
+    )
+    grant_id = require_string(grant.get("grant_id"), "grant_id")
+
+    manifest_path = f"/api/assets/{asset_id}/playback/{grant_id}/manifest"
+    manifest_bytes, manifest_content_type = http_bytes(manifest_path)
+    try:
+        manifest = manifest_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        blocked("playback manifest was not valid UTF-8")
+    if "#EXTM3U" not in manifest:
+        blocked("playback manifest missing #EXTM3U")
+
+    segment_refs = [
+        line.strip()
+        for line in manifest.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    if not segment_refs:
+        blocked("playback manifest contained no media segment references")
+
+    segment_ref = segment_refs[0]
+    if not segment_ref.startswith("/"):
+        blocked(f"unexpected non-root playback segment reference: {segment_ref}")
+    segment_bytes, segment_content_type = http_bytes(segment_ref)
+    if not segment_bytes:
+        blocked("playback segment returned zero bytes")
+
+    print(
+        "C4_PLAYBACK=PASS "
+        f"grant_id={grant_id} manifest_content_type={manifest_content_type or 'unknown'} "
+        f"segment_content_type={segment_content_type or 'unknown'} "
+        f"segment_bytes={len(segment_bytes)}"
     )
 
     head_sha = command(["git", "rev-parse", "HEAD"], capture=True).stdout.strip()
-    print("C4_PLAYBACK=PASS")
     print("T7LOCAL_C4=PASS")
     print(f"HEAD={head_sha}")
     print(f"RUN_ID={run_id}")
     print(f"ASSET_ID={asset_id}")
     print(f"REVIEW_TASK_ID={review_task_id}")
-
 
 def review_only(review_task_id: str) -> None:
     serial = check_environment()
