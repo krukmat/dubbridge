@@ -63,3 +63,24 @@ RELEASE_VERIFY=PASS
 
 T6c remains IN PROGRESS until the pushed release manifest is produced and
 verified.
+
+
+## Local execution finding
+
+Owner execution reached Docker packaging but failed before any image push:
+
+```text
+unknown flag: --platform
+Usage: docker [OPTIONS] COMMAND [ARG...]
+make: *** [do-release] Error 125
+```
+
+Diagnosis: the local Docker CLI does not currently expose the Buildx plugin,
+so `docker buildx build --platform linux/amd64` cannot run. The release script
+now checks `docker buildx version` explicitly and fails closed with:
+
+```text
+DO_RELEASE=BLOCKED reason=missing-docker-buildx
+```
+
+No release image was certified from this failed attempt.
