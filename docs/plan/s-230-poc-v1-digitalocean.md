@@ -32,14 +32,15 @@ video, one invited viewer claims it, fully syncs and verifies the encrypted
 package, and plays it through the loopback gateway. Legacy HTTP/S3 audience
 media delivery is disabled during certification. This is not GA.
 
-The base path remains `T6 -> T7`. The independent local lane
-`T7local -> T7c/T7b/T8/T8b` validates the **base S-230 mobile behavior**
-against the gateway exposed by `infra/local/docker-compose.yml` without
-waiting on a Digital Ocean deploy. The original sequencing allowed this lane
-to run in parallel with P6; **P6 and DEV-HANDOFF are now already PASS**, so
-T7local executes against pinned DEV-HANDOFF `84ea5edc`. T7local is not the
-MVP0-P2P Invite/Claim/Sync/loopback certification lane; those behaviors remain
-owned by T7p/P7
+The base path remains `T6 -> T7`. The independent local lane validates the
+**base S-230 mobile behavior** against the gateway exposed by
+`infra/local/docker-compose.yml` without waiting on a Digital Ocean deploy.
+As of 2026-09-26, **T7c is PASS** and **T7local is CLOSED PARTIAL**: B3/C1/C2
+plus review navigation/detail/playback are proven on the real local stack,
+while C3/C4 are deferred after the Android/Maestro interaction blocker. No
+further full T7local reruns are required by the current disposition. T7local is
+not the MVP0-P2P Invite/Claim/Sync/loopback certification lane; those behaviors
+remain owned by T7p/P7
 (added 2026-09-06, breaking a circular dependency: `T6p-a` cannot gate on
 `T7`, which itself gated on `T6`, once the owner required "T6 and everything
 Digital-Ocean-related" to wait for local development to close). The P2P
@@ -68,17 +69,17 @@ that requires P3-P6, `T7p`, P7, and `T9g`. `T7b`, `T8`, and `T8b` remain
 optional. X29 is now a release blocker for `T7p`/`T9g`, even though it remains
 accepted residual evidence for P1.
 
-Target gates: X29 is resolved, MVP0-P2P through P6 is PASS, and DEV-HANDOFF
-is pinned at `84ea5edc`. S-230 `T7local -> T7c/T7b/T8/T8b` is now the
-remaining local-stack lane. T7local.E4 records freshness against that exact
-head; a bounded regression is needed only for relevant behavior not already
-covered by the T7local run on its actual evidence head. The local lane targets
-readiness by October 15; T6p-a through T6p-d close by October 21 (including the
-independent `T6`/`T7` Digital Ocean deploy, which may run any time after `T5`
-but is not a T6p-a gate; T7 PASS is required before T7p); the Android RC closes by October 26; and P7/T9g
-close by October 30. If either the Android gate or the development/deployment
-dates are missed, October may expose the base S-230 POC and a labeled backend
-preview, but must not claim invited P2P playback.
+Target gates: X29 is resolved, MVP0-P2P through P6 is PASS, DEV-HANDOFF is
+pinned at `84ea5edc`, and T7c is PASS. The remaining convergence issue is the
+standing `T6p-a` requirement for **T7local PASS**: T7local is currently
+CLOSED PARTIAL, not PASS, so T6p-a remains deferred. Optional T7b/T8/T8b do not
+change that gate. The independent `T6`/`T7` Digital Ocean base-deploy lane
+may still proceed under its own dependencies, but it does not satisfy or bypass
+the T7local requirement. If the October release path later requires C3/C4
+device proof, reopen only that residual rather than repeating the full local
+ingestion pipeline. The Android RC target remains October 26 and P7/T9g remain
+targeted for October 30; no invited-P2P claim is permitted until the standing
+release gates are actually satisfied.
 
 ## Scope decision (owner, 2026-08-16)
 

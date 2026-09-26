@@ -54,15 +54,17 @@ ledger.
 > satisfied. P5.T3 is excluded from this development gate and carried to the
 > release-certification lane; P7/T9g still require it.
 >
-> `T7local` remains an independent S-230 lane. P6/DEV-HANDOFF are already PASS; it
-> certifies only the base S-230 mobile flow against the local Compose **gateway**
-> on host port 8082; it does not execute or certify invitation/claim/P2P sync,
-> ciphertext verification, loopback P2P playback, HPKE, or P5.T3. `T6p-a`
-> is the convergence point and requires T7local PASS + T7c PASS + DEV-HANDOFF
-> **plus a T7local evidence-freshness check against the exact DEV-HANDOFF head**.
-> If relevant base-flow/mobile/gateway/local-compose paths changed after the
-> recorded T7local head, run a bounded base-flow regression and attach
-> supplemental evidence before T6p-a can activate.
+> **Local-lane disposition 2026-09-26:** `T7c PASS` is satisfied. `T7local`
+> is **CLOSED PARTIAL**, with real-stack B3/C1/C2 plus review
+> navigation/detail/playback proven and C3/C4 explicitly deferred after the
+> Android/Maestro interaction blocker. No further full T7local reruns are
+> required by the current task disposition.
+>
+> `T6p-a` remains **DEFERRED/BLOCKED** because its standing contract still
+> requires **T7local PASS + T7c PASS + DEV-HANDOFF + T7local freshness**.
+> T7c PASS does not convert the partial T7local result into PASS. The C3/C4
+> residual is reopened only if a later release gate explicitly requires that
+> device-level evidence, or if the T6p-a gate contract is deliberately amended.
 >
 > **Exact DEV-HANDOFF head (pinned 2026-09-25):** `84ea5edc`
 > (`docs(p2p): satisfy dev handoff`, 15/15 CI). It is code-equivalent to

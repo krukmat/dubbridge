@@ -503,8 +503,8 @@
         <p><code>CONS-T2</code> encontró un gap genuino en la tabla de rúbrica RRI (<code>crates/db/tests/*</code> heredaba el piso D/P/K=3 de <code>crates/db/src/*</code>, inflando un fix trivial de 2 líneas a RRI 70 Complex) y una race condition real entre tests concurrentes sobre <code>p2p_publication_outbox</code>. Ambos diagnosticados por reproducción, corregidos a RRI 25 Low cada uno, con revisión <code>gpt-oss:20b</code> PASS 0 hallazgos — evidencia de que el proceso de gates se autocorrige en vez de solo bloquear.</p>
       </div>
       <div class="risk med">
-        <span class="tag2">T7local — rerun real en progreso</span>
-        <p>El blocker histórico de A1 quedó resuelto: regresión de <code>pipefail</code>, preflight runtime y gateway están PASS. El build Android normal también pasó con JDK 17. Se añadió un harness Maestro específico que usa el gateway real <code>:8082</code>, cuenta/API reales, MP4 fresco y probes PostgreSQL read-only; no reutiliza mock gateway, <code>/e2e/seed</code> ni IDs seed. La certificación sigue abierta hasta ejecutar B3→C4 y cerrar A→E/E4. El artifact BLOCKED del primer intento se conserva como evidencia histórica.</p>
+        <span class="tag2">T7local — CLOSED PARTIAL</span>
+        <p>B3/C1/C2 y la navegación Review Inbox → Detail + playback quedaron probados sobre el stack local real. C3/C4 se difieren tras el blocker Android/Maestro sobre Approve; no se requieren más reruns completos. <code>T7c</code> está PASS, pero <code>T6p-a</code> continúa bloqueado porque su contrato vigente exige <code>T7local PASS</code>, no partial.</p>
       </div>
       <div class="risk info">
         <span class="tag2">T4e-cov residual</span>
@@ -515,12 +515,12 @@
 
   <section>
     <div class="section-head"><h2>Calendario</h2></div>
-    <p class="section-note">Hoy, <strong>2026-09-25</strong> — P3/P4 PASS, P5-DEV satisfecho y P6 PASS: DEV-HANDOFF está satisfecho. T7c está PASS; T7local permanece cerrado parcial con C3/C4 diferidos, por lo que la convergencia en T6p-a sigue bloqueada por su requisito de T7local PASS.</p>
+    <p class="section-note">Hoy, <strong>2026-09-26</strong> — P3/P4 PASS, P5-DEV satisfecho y P6 PASS: DEV-HANDOFF está satisfecho. T7c está PASS; T7local permanece cerrado parcial con C3/C4 diferidos, por lo que la convergencia en T6p-a sigue bloqueada por su requisito de T7local PASS.</p>
     <div class="timeline">
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">6–10 SEP</div><div class="work">T1 done + P2.C0 PASS + T2 completo + T3a/T3b done; nueva T7local</div><div class="outcome">X29 promovido a blocker</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">11–18 SEP</div><div class="work">P2.T3c/T3d/T4 cerrados; ledger de remediación abierto y ejecutado — CONS-T0/T1/T2/T3/T4/T5/T9 <strong>Done</strong> (aggregate P2 PASS); CONS-T6/T7/T8a verificó P3/P4/P5.T0-2 leaf por leaf: P4.T0/P4.T2/P5.T0 Done, resto Blocked por gaps reales; CI sigue roja (RUSTSEC + MinIO + coverage); S-230 T7local sin avance en 12 días</div><div class="outcome">X29 OPEN, plazo venció 18-sep</div></div>
-      <div class="tstep now"><div class="bar"><div class="dot"></div></div><div class="window">19 SEP–2 OCT</div><div class="work"><strong>P3 PASS + P4 PASS + P5-DEV SATISFIED</strong>. P6 PASS y DEV-HANDOFF satisfecho (head <code>84ea5edc</code>); S-230 cerró T7local en alcance parcial: B3/C1/C2 y review navigation/detail/playback están probados; C3/C4 quedan como residual diferido de interacción Android/Maestro. <strong>T7c PASS</strong>: expiry 8h, leeway 30s y hydration fail-closed para sesiones expiradas/malformadas. T6p-a sigue bloqueado porque su contrato aún exige T7local PASS. P5.T3/P5-CERT sigue diferido.</div><div class="outcome">◆ objetivo inmediato: T7c + freshness; C3/C4 residual diferido<div class="here-flag">estás acá</div></div></div>
-      <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">3–12 OCT</div><div class="work">Cerrar T7c y emitir freshness disposition; mantener C3/C4 de T7local como residual diferido salvo que un gate de release exija reabrirlo</div><div class="outcome">DEV-HANDOFF + local lane listos para T6p-a</div></div>
+      <div class="tstep now"><div class="bar"><div class="dot"></div></div><div class="window">19 SEP–2 OCT</div><div class="work"><strong>P3 PASS + P4 PASS + P5-DEV SATISFIED</strong>. P6 PASS y DEV-HANDOFF satisfecho (head <code>84ea5edc</code>); S-230 cerró T7local en alcance parcial: B3/C1/C2 y review navigation/detail/playback están probados; C3/C4 quedan como residual diferido de interacción Android/Maestro. <strong>T7c PASS</strong>: expiry 8h, leeway 30s y hydration fail-closed para sesiones expiradas/malformadas. T6p-a sigue bloqueado porque su contrato aún exige T7local PASS. P5.T3/P5-CERT sigue diferido.</div><div class="outcome">◆ objetivo inmediato: trabajo no bloqueado; T6p-a sigue deferred por T7local PASS<div class="here-flag">estás acá</div></div></div>
+      <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">3–12 OCT</div><div class="work">T7c ya está PASS. Mantener C3/C4 de T7local como residual diferido; avanzar T6/T7 u otro trabajo independiente y no activar T6p-a mientras siga vigente el requisito de T7local PASS.</div><div class="outcome">T6p-a permanece deferred; sin rerun local completo</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">13–21 OCT</div><div class="work">T6p-a → T6p-b → T6p-c → T6p-d; completar T6/T7 si sigue pendiente</div><div class="outcome">backend P2P desplegado</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">22–26 OCT</div><div class="work">T7p: candidato Android físico; reutilizar evidencia para P5.T3 si cubre criterios exactos</div><div class="outcome">RC listo + posible P5-CERT</div></div>
       <div class="tstep milestone"><div class="bar"><div class="dot"></div></div><div class="window">27–30 OCT</div><div class="work">P7 exact-artifact; P7.T2 cierra P5.T3 si aún sigue abierto; soak y rollback</div><div class="outcome">◆ T9g — GO/NO-GO</div></div>
@@ -528,7 +528,12 @@
   </section>
 
   <footer>
-    Fuentes verificadas para este documento (sync 2026-09-25):
+    Fuentes verificadas para este documento (sync 2026-09-26):
+    <code>docs/audit/s-230-t7c-2026-09-26.md</code> (T7c PASS; mobile 66/66 suites, 529/529 tests) ·
+    <code>docs/audit/s-230-t7local-2026-09-25.md</code> § Final local disposition (T7local CLOSED PARTIAL; C3/C4 deferred) ·
+    <code>docs/tasks/s-230-poc-v1-digitalocean.md</code> (status vigente T7local/T7c/T6p-a) ·
+    <code>docs/plan/s-230-poc-v1-digitalocean.md</code> § October 2026 P2P go-live amendment ·
+    <code>docs/plan/roadmap.md</code> § S-230/MVP0-P2P ·
     <code>docs/audit/mvp0-p2p-p1-f3b-implementation.md</code> §§ 11-12 (RRI, revisión, coverage,
     owner verification; ambos criterios de dispositivo ejecutados) ·
     <code>docs/tasks/mvp0-p2p-p1-replication.md</code> § P1.F3b-fix-2 ·
@@ -545,9 +550,9 @@
     <code>docs/audit/gemma-evidence/x29-worklet-extension-fix.json</code> (commit
     <code>c16c3ff</code>, reviewer <code>gpt-oss:20b</code>, verdict <code>PASS</code>) ·
     commits <code>75eeb3b</code> (fix), <code>c16c3ff</code> (tests obsoletos corregidos).
-    <br>Fuentes de la sync 2026-09-19, aún vigentes:
-    <code>docs/tasks/s-230-poc-v1-digitalocean.md</code> § S-230-T7local (líneas 88, 5030-5107;
-    status <code>[ ] Planned</code>, nota de progreso agregada 19-sep) ·
+    <br>Fuentes históricas de la sync 2026-09-19, superseded para el estado de T7local:
+    <code>docs/tasks/s-230-poc-v1-digitalocean.md</code> § S-230-T7local (entonces
+    status <code>[ ] Planned</code>; el estado vigente 2026-09-26 es <code>CLOSED PARTIAL</code>) ·
     <code>git rev-parse HEAD</code> / <code>git rev-parse origin/feature/p2p-mvp-core</code>
     (idénticos, <code>4df3334</code>) · <code>git status</code> (limpio) ·
     <code>git log --all --oneline</code> (commits <code>d121394</code>, <code>4d08a47</code>,
@@ -559,7 +564,7 @@
     <code>docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md</code> (evidencia por leaf) ·
     <code>make qa-docs</code> (pasó limpio tras los cierres).
     <div class="lineage" id="linaje-completo">
-      <strong>Linaje:</strong> 2026-09-25 — P6 PASS + DEV-HANDOFF SATISFIED (head <code>84ea5edc</code>); sección “Ráfaga de 72h” retirada por obsoleta; sección “P2P local-dev-readiness (hallazgo 14-sep)” y riesgo duplicado retirados (cubiertos por T7local) ← 2026-09-24 — P6.T2 PASS: A–H cerrados; owner final verification + REVIEW-OVERRIDE; P6.T3 desbloqueado ← 2026-09-24 — P6.T2.G PASS: Home→Invites→Back + re-entry verde en <code>6f4a89e1</code> ← 2026-09-24 — P6.T2.F PASS: lifecycle fail-closed account/session verde en <code>9c4b41e4</code> ← 2026-09-24 — P6.T2.E PASS: Available→Play vía verified P4 handle + P5 verde en <code>8fa7411d</code> ← 2026-09-24 — P6.T2.D PASS: Sync/Retry vía P4 verde en <code>a99a712c</code> ← 2026-09-24 — P6.T2.B/C PASS: inbox+state projection y manual Claim verdes ← 2026-09-23 — P6.T1 PASS: T1.A–H cerrados con owner self-review + REVIEW-OVERRIDE vigente; P6.T2 desbloqueado ← 2026-09-22 noche — P6.T1.A–G PASS: My Content, exact Ready, Create/Copy, navegación y aggregate gap closure verdes en <code>47bc3e8b</code> ← P3 y P4 cerrados PASS; P5.T1/T2 formalmente cerrados; P5-DEV SATISFIED; P6.T0 PASS ← este documento (2026-09-22 tarde — merge de 14 commits remotos
+      <strong>Linaje:</strong> 2026-09-26 — T7c PASS (JWT 8h, leeway 30s, hydration fail-closed) + T7local CLOSED PARTIAL (B3/C1/C2 + review navigation/detail/playback PASS; C3/C4 deferred; sin más reruns completos) + T6p-a aún DEFERRED por requisito T7local PASS ← 2026-09-25 — P6 PASS + DEV-HANDOFF SATISFIED (head <code>84ea5edc</code>); sección “Ráfaga de 72h” retirada por obsoleta; sección “P2P local-dev-readiness (hallazgo 14-sep)” y riesgo duplicado retirados (cubiertos por T7local) ← 2026-09-24 — P6.T2 PASS: A–H cerrados; owner final verification + REVIEW-OVERRIDE; P6.T3 desbloqueado ← 2026-09-24 — P6.T2.G PASS: Home→Invites→Back + re-entry verde en <code>6f4a89e1</code> ← 2026-09-24 — P6.T2.F PASS: lifecycle fail-closed account/session verde en <code>9c4b41e4</code> ← 2026-09-24 — P6.T2.E PASS: Available→Play vía verified P4 handle + P5 verde en <code>8fa7411d</code> ← 2026-09-24 — P6.T2.D PASS: Sync/Retry vía P4 verde en <code>a99a712c</code> ← 2026-09-24 — P6.T2.B/C PASS: inbox+state projection y manual Claim verdes ← 2026-09-23 — P6.T1 PASS: T1.A–H cerrados con owner self-review + REVIEW-OVERRIDE vigente; P6.T2 desbloqueado ← 2026-09-22 noche — P6.T1.A–G PASS: My Content, exact Ready, Create/Copy, navegación y aggregate gap closure verdes en <code>47bc3e8b</code> ← P3 y P4 cerrados PASS; P5.T1/T2 formalmente cerrados; P5-DEV SATISFIED; P6.T0 PASS ← este documento (2026-09-22 tarde — merge de 14 commits remotos
       (<code>c726e42</code>): P4.T1 pasa de Blocked a <strong>Implemented+verified</strong>
       (reconexión acotada, <code>P2pProductSync.ts</code>, RRI 55, revisión Med-high pendiente);
       P4.T3 suma test de cambio de cuenta (RRI 25 Low); CI cambia de causa — <code>deny</code>/

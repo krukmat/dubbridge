@@ -153,21 +153,17 @@ as dry-run evidence in place of a literal production-environment local
 boot, which is architecturally precluded by ADR-026's own localhost/
 local-fs rejection; full image-boot readiness remains T6's scope against
 real DO infrastructure. **T5 (parent) is now closed** — all four children
-(T5a–T5d) done. **`T7local` (base mobile POC smoke against the local Docker
-Compose gateway, added 2026-09-06) is runnable now. P6/DEV-HANDOFF are already
-PASS, and T7local remains independently gated only by its own prerequisites.** The owner directed that `T6` and everything
-Digital-Ocean-related wait until local development closes; `T7local` breaks
-the circular dependency this created (`T6p-a` had gated on `T7`, which
-gated on `T6`). Consolidation 2026-09-24: T7local certifies only the base
-S-230 path via the Compose gateway on host port 8082 — login, upload, rights,
-preparation, review, publish and normal HLS playback. It does not certify P2P
-Invite/Claim/Sync/Verify/loopback/HPKE/P5.T3. `T6p-a` is the convergence
-point and requires T7local PASS + T7c PASS + DEV-HANDOFF plus an evidence
-freshness disposition against the exact DEV-HANDOFF head; relevant intervening
-base-flow/mobile/gateway/local-compose changes trigger a bounded T7local
-regression, not a full P2P rerun. `T6` (first deploy) remains planned and
-independently runnable any time after `T5`, but is no longer the next task on
-the critical path. Deployment-enablement
+(T5a–T5d) done. **Local-lane update 2026-09-26:** `T7c PASS` is satisfied and
+`T7local` is **CLOSED PARTIAL**, with B3/C1/C2 plus review
+navigation/detail/playback proven on the real local stack; C3/C4 are deferred
+after the Android/Maestro interaction blocker and no further full local reruns
+are required. The owner-directed sequencing still keeps the Digital Ocean base
+deploy (`T6 -> T7`) independent from the P2P convergence gate. `T6p-a`
+continues to require T7local PASS + T7c PASS + DEV-HANDOFF + freshness, so it
+remains deferred because T7local is not PASS. T7local does not certify P2P
+Invite/Claim/Sync/Verify/loopback/HPKE/P5.T3. `T6` (first deploy) remains
+planned and may proceed under its own dependencies, but it does not satisfy or
+bypass the T7local gate. Deployment-enablement
 slice: makes the already-closed pipeline publicly runnable on a Digital
 Ocean droplet; adds no new technology beyond Redis (already in use). Full
 history incl. gap findings G10–G13: `docs/audit/roadmap-history.md` § S-230.
@@ -291,9 +287,10 @@ DEV-HANDOFF SATISFIED.** Aggregate P5 remains open
 only because P5.T3/P5-CERT is deferred to the release lane. T6p-a is deferred
 until S-230 T7local PASS, T7c PASS, MVP0-P2P **DEV-HANDOFF** (P3 PASS + P4 PASS
 + P5-DEV + P6 PASS), and the T7local freshness disposition are satisfied.
-T7local validates the base mobile flow against the local Docker Compose gateway,
-so
-this gate no longer requires the S-230 T6 Digital Ocean deploy to have
+**Current 2026-09-26 disposition:** T7c PASS and DEV-HANDOFF are satisfied;
+T7local is CLOSED PARTIAL, therefore this gate remains blocked. T7local
+validates the base mobile flow against the local Docker Compose gateway, so
+this gate still does not require the S-230 T6 Digital Ocean deploy to have
 happened first (added 2026-09-06, replacing an earlier T7-gated version of
 this row that was circular with T6). **Scope clarification (2026-09-18,
 owner decision D0-d,
