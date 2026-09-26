@@ -242,7 +242,7 @@
     <span class="pill pass"><span class="dot"></span>DEV-HANDOFF — <strong>25-sep</strong> · <code>84ea5edc</code></span>
     <span class="pill pass"><span class="dot"></span>T7local · T7c — <strong>verde</strong></span>
     <span class="pill pass"><span class="dot"></span>T6p-a…c (lane local) — <strong>cerrado</strong></span>
-    <span class="pill watch"><span class="dot"></span>Próximo — <strong>T7a</strong> backend en DO</span>
+    <span class="pill watch"><span class="dot"></span>Próximo — <strong>T6</strong> deploy base; T7a queda bloqueado hasta T6 PASS</span>
     <span class="pill watch"><span class="dot"></span>P5.T3 — <strong>diferido</strong> a T7p / P7.T2</span>
     <span class="pill neutral"><span class="dot"></span>Objetivo 2026-10-30, no GA</span>
   </div>
@@ -258,7 +258,7 @@
       <strong>cerrado por aceptación del owner</strong> y no certifica P2P.
     </p>
     <div class="diagram-frame scrollx">
-      <svg viewBox="0 0 1080 460" role="img" aria-label="Mapa de go-live: T7local cerrado, T7c PASS, DEV-HANDOFF satisfecho, lane local T6p-a…c cerrado; próximo T7a (backend DO) y luego T7p (mobile); P5.T3 diferido a certificación física antes de P7/T9g.">
+      <svg viewBox="0 0 1080 460" role="img" aria-label="Mapa de go-live: T7local cerrado, T7c PASS, DEV-HANDOFF satisfecho, lane local T6p-a…c cerrado; próximo T6 base, luego T7a (backend DO) y T7p (mobile); P5.T3 diferido a certificación física antes de P7/T9g.">
         <defs>
           <marker id="arr-i" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" style="fill:var(--infra)"></polygon></marker>
           <marker id="arr-p" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" style="fill:var(--p2p)"></polygon></marker>
@@ -358,7 +358,7 @@
     </div>
     <p class="caption">
       <strong>26-sep:</strong> el lane local <code>T6p-a…c</code> está cerrado. El despliegue P2P pasó a <code>T7</code>:
-      <code>T7a</code> (backend en DO, absorbe el ex-T6p-d; consume <code>T6</code> + <code>T6p-c</code>) y luego
+      <code>T7a</code> (backend en DO; bloqueado hasta <code>T6 PASS</code>, consume además <code>T6p-c PASS</code>) y luego
       <code>T7p</code> (RC Android físico contra ese backend). <code>P5.T3</code> no bloquea desarrollo,
       pero <code>P7.T3</code> y <code>T9g</code> no pueden dar PASS/GO si queda pendiente o falla.
     </p>
@@ -376,7 +376,7 @@
           <div class="lrow done"><span class="id">T7c</span><span class="desc"><strong>PASS 26-sep.</strong> JWT 8h, leeway 30s, hydration rechaza sesión expirada/malformada.</span><span class="status">✓ PASS</span></div>
           <div class="lrow done"><span class="id">T6p-a…c</span><span class="desc">Lane P2P local: freeze de ownership/config, wiring Compose/secrets y certificación local (imagen ARM64 en <code>c4b8da98</code>).</span><span class="status">✓ cerrado</span></div>
           <div class="lrow next"><span class="id">T6</span><span class="desc">Deploy base + smoke end-to-end en DO — insumo de T7a</span><span class="status">planned</span></div>
-          <div class="lrow now"><span class="id">T7a</span><span class="desc">Backend P2P en DO: publicación de ciphertext + <code>P2P_READY</code> durable (ex-T6p-d). Consume T6 + T6p-c.</span><span class="status">ready</span></div>
+          <div class="lrow next"><span class="id">T7a</span><span class="desc">Backend P2P en DO: publicación de ciphertext + <code>P2P_READY</code> durable. Depende de <strong>T6 PASS</strong> + T6p-c PASS.</span><span class="status">blocked on T6</span></div>
           <div class="lrow next"><span class="id">T7p</span><span class="desc">RC Android físico contra el backend de T7a. T7 cierra cuando T7a y T7p pasan.</span><span class="status">planned</span></div>
           <div class="lrow next"><span class="id">T9 / T9g</span><span class="desc">Cierre + GO/NO-GO de octubre</span><span class="status">planned</span></div>
         </div>
@@ -449,11 +449,11 @@
 
   <section>
     <div class="section-head"><h2>Calendario</h2></div>
-    <p class="section-note">Hoy, <strong>2026-09-26</strong> — T7local verde y lane local <strong>T6p-a…c cerrado</strong>; próximo T7a.</p>
+    <p class="section-note">Hoy, <strong>2026-09-26</strong> — T7local verde y lane local <strong>T6p-a…c cerrado</strong>; próximo bloque ejecutable: <strong>T6</strong>. T7a queda bloqueado hasta T6 PASS.</p>
     <div class="timeline">
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">6–18 SEP</div><div class="work">P2.C0, T2, T3, T4 cerrados; remediación CONS-T0…T5</div><div class="outcome">P2 PASS</div></div>
-      <div class="tstep now"><div class="bar"><div class="dot"></div></div><div class="window">19–26 SEP</div><div class="work">P3–P6 PASS, DEV-HANDOFF, T7local verde, T7c PASS, lane local T6p-a…c cerrado</div><div class="outcome">◆ próximo: T7a<div class="here-flag">estás acá</div></div></div>
-      <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">27 SEP–21 OCT</div><div class="work">T6 deploy base + T7a backend P2P en DO</div><div class="outcome">backend P2P desplegado</div></div>
+      <div class="tstep now"><div class="bar"><div class="dot"></div></div><div class="window">19–26 SEP</div><div class="work">P3–P6 PASS, DEV-HANDOFF, T7local verde, T7c PASS, lane local T6p-a…c cerrado</div><div class="outcome">◆ próximo: T6 base deploy<div class="here-flag">estás acá</div></div></div>
+      <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">27 SEP–21 OCT</div><div class="work">T6 deploy base en DO; después T7a backend P2P</div><div class="outcome">T6 PASS → desbloquea T7a</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">22–26 OCT</div><div class="work">T7p: RC Android físico contra T7a; reutilizar evidencia para P5.T3 si cubre criterios exactos</div><div class="outcome">RC listo + posible P5-CERT</div></div>
       <div class="tstep milestone"><div class="bar"><div class="dot"></div></div><div class="window">27–30 OCT</div><div class="work">P7 exact-artifact; P7.T2 cierra P5.T3 si sigue abierto; soak y rollback</div><div class="outcome">◆ T9g — GO/NO-GO</div></div>
     </div>
