@@ -635,188 +635,23 @@ contract_availability() {
         echo "ERROR: $dockerfile not found" >&2
         return 1
     fi
-    if ! grep -q '^FROM node:22\\.23\\.0-bookworm-slim AS build
-
-# Main execution
-main() {
-    # Validation 1: Exactly 2 positional arguments
-    if [[ $# -ne 2 ]]; then
-        usage
-    fi
-
-    local mode="$1"
-    local case_name="$2"
-
-    # Validation 2: Mode must be contract or run
-    if [[ "$mode" != "contract" && "$mode" != "run" ]]; then
-        usage
-    fi
-
-    # Validation 3: Case must exist in registry
-    if ! case_exists "$case_name"; then
-        usage
-    fi
-
-    # Dispatch to function
-    local func_name="${mode}_${case_name}"
-    if ! declare -F "$func_name" >/dev/null 2>&1; then
-        echo "ERROR: Function $func_name not found" >&2
-        exit 1
-    fi
-
-    "$func_name"
-}
-
-main "$@"
- "$dockerfile"; then
+    if ! grep -q '^FROM node:22\\.23\\.0-bookworm-slim AS build$' "$dockerfile"; then
         echo "ERROR: Availability Node build stage is not pinned to node:22.23.0-bookworm-slim" >&2
         return 1
     fi
-    if ! grep -q '^FROM node:22\\.23\\.0-bookworm-slim
-
-# Main execution
-main() {
-    # Validation 1: Exactly 2 positional arguments
-    if [[ $# -ne 2 ]]; then
-        usage
-    fi
-
-    local mode="$1"
-    local case_name="$2"
-
-    # Validation 2: Mode must be contract or run
-    if [[ "$mode" != "contract" && "$mode" != "run" ]]; then
-        usage
-    fi
-
-    # Validation 3: Case must exist in registry
-    if ! case_exists "$case_name"; then
-        usage
-    fi
-
-    # Dispatch to function
-    local func_name="${mode}_${case_name}"
-    if ! declare -F "$func_name" >/dev/null 2>&1; then
-        echo "ERROR: Function $func_name not found" >&2
-        exit 1
-    fi
-
-    "$func_name"
-}
-
-main "$@"
- "$dockerfile"; then
+    if ! grep -q '^FROM node:22\\.23\\.0-bookworm-slim$' "$dockerfile"; then
         echo "ERROR: Availability Node runtime stage is not pinned to node:22.23.0-bookworm-slim" >&2
         return 1
     fi
-    if ! grep -q '^RUN npm ci
-
-# Main execution
-main() {
-    # Validation 1: Exactly 2 positional arguments
-    if [[ $# -ne 2 ]]; then
-        usage
-    fi
-
-    local mode="$1"
-    local case_name="$2"
-
-    # Validation 2: Mode must be contract or run
-    if [[ "$mode" != "contract" && "$mode" != "run" ]]; then
-        usage
-    fi
-
-    # Validation 3: Case must exist in registry
-    if ! case_exists "$case_name"; then
-        usage
-    fi
-
-    # Dispatch to function
-    local func_name="${mode}_${case_name}"
-    if ! declare -F "$func_name" >/dev/null 2>&1; then
-        echo "ERROR: Function $func_name not found" >&2
-        exit 1
-    fi
-
-    "$func_name"
-}
-
-main "$@"
- "$dockerfile"; then
+    if ! grep -q '^RUN npm ci$' "$dockerfile"; then
         echo "ERROR: Availability Node Dockerfile does not use npm ci" >&2
         return 1
     fi
-    if ! grep -q '^RUN npm run build && npm prune --omit=dev
-
-# Main execution
-main() {
-    # Validation 1: Exactly 2 positional arguments
-    if [[ $# -ne 2 ]]; then
-        usage
-    fi
-
-    local mode="$1"
-    local case_name="$2"
-
-    # Validation 2: Mode must be contract or run
-    if [[ "$mode" != "contract" && "$mode" != "run" ]]; then
-        usage
-    fi
-
-    # Validation 3: Case must exist in registry
-    if ! case_exists "$case_name"; then
-        usage
-    fi
-
-    # Dispatch to function
-    local func_name="${mode}_${case_name}"
-    if ! declare -F "$func_name" >/dev/null 2>&1; then
-        echo "ERROR: Function $func_name not found" >&2
-        exit 1
-    fi
-
-    "$func_name"
-}
-
-main "$@"
- "$dockerfile"; then
+    if ! grep -q '^RUN npm run build && npm prune --omit=dev$' "$dockerfile"; then
         echo "ERROR: Availability Node build/prune contract not found" >&2
         return 1
     fi
-    if ! grep -q '^EXPOSE 8443
-
-# Main execution
-main() {
-    # Validation 1: Exactly 2 positional arguments
-    if [[ $# -ne 2 ]]; then
-        usage
-    fi
-
-    local mode="$1"
-    local case_name="$2"
-
-    # Validation 2: Mode must be contract or run
-    if [[ "$mode" != "contract" && "$mode" != "run" ]]; then
-        usage
-    fi
-
-    # Validation 3: Case must exist in registry
-    if ! case_exists "$case_name"; then
-        usage
-    fi
-
-    # Dispatch to function
-    local func_name="${mode}_${case_name}"
-    if ! declare -F "$func_name" >/dev/null 2>&1; then
-        echo "ERROR: Function $func_name not found" >&2
-        exit 1
-    fi
-
-    "$func_name"
-}
-
-main "$@"
- "$dockerfile"; then
+    if ! grep -q '^EXPOSE 8443$' "$dockerfile"; then
         echo "ERROR: Availability Node EXPOSE 8443 contract not found" >&2
         return 1
     fi
