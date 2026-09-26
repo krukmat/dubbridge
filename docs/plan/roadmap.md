@@ -161,9 +161,9 @@ on evidence head `582be62c`. C4 is owner-accepted PASS. E4 freshness is
 owner-waived because relevant gateway changes landed after the evidence head;
 no technical freshness PASS is asserted and no full local rerun is required.
 The owner-directed sequencing still keeps the Digital Ocean base deploy
-(`T6 -> T7`) independent from the P2P convergence gate. `T6p-a` continues
-to require technical T7local PASS + T7c PASS + DEV-HANDOFF + freshness, so it
-remains deferred under the unchanged gate. T7local does not certify P2P
+(`T6 -> T7`) independent from the P2P convergence gate. **T6p-a is now
+READY / UNBLOCKED** by the 2026-09-26 owner gate amendment: T7local final
+owner-accepted closure + T7c PASS + DEV-HANDOFF satisfy convergence. T7local does not certify P2P
 Invite/Claim/Sync/Verify/loopback/HPKE/P5.T3. `T6` (first deploy) remains
 planned and may proceed under its own dependencies, but it does not satisfy or
 bypass the T7local gate. Deployment-enablement
@@ -287,12 +287,14 @@ ciphertext publication plus durable `P2P_READY`, which are exactly what
 publication flow required by `T6p-d` is not yet implemented/certified. The
 base S-230 deployment remains a separate deliverable. **P3 PASS + P4 PASS; P5-DEV SATISFIED 2026-09-22; P6 PASS 2026-09-25;
 DEV-HANDOFF SATISFIED.** Aggregate P5 remains open
-only because P5.T3/P5-CERT is deferred to the release lane. T6p-a is deferred
-until S-230 T7local PASS, T7c PASS, MVP0-P2P **DEV-HANDOFF** (P3 PASS + P4 PASS
-+ P5-DEV + P6 PASS), and the T7local freshness disposition are satisfied.
-**Current 2026-09-26 disposition:** T7c PASS and DEV-HANDOFF are satisfied;
-T7local has C1–C4 closed, but E4 freshness is still open, therefore this gate
-remains blocked until that disposition is recorded. T7local
+only because P5.T3/P5-CERT is deferred to the release lane. **T6p-a is READY / UNBLOCKED as of 2026-09-26.** The owner explicitly amended
+the convergence contract so the final S-230 `T7local CLOSED — OWNER ACCEPTED`
+disposition (B3/C1/C2/C3 runtime-proven, C4 owner-accepted, E4 freshness
+owner-waived) satisfies the former technical `T7local PASS + freshness`
+clauses. `T7c PASS` and MVP0-P2P **DEV-HANDOFF** (P3 PASS + P4 PASS +
+P5-DEV + P6 PASS) are also satisfied. This gate amendment does not relabel the
+waived evidence as technical PASS; it authorizes T6p-a to proceed under its
+normal RRI/workflow gate. T7local
 validates the base mobile flow against the local Docker Compose gateway, so
 this gate still does not require the S-230 T6 Digital Ocean deploy to have
 happened first (added 2026-09-06, replacing an earlier T7-gated version of

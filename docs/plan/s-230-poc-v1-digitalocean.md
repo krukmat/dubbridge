@@ -49,9 +49,13 @@ remain owned by T7p/P7
 Digital-Ocean-related" to wait for local development to close). The P2P
 release path adds:
 
-- `T6p-a`: after `T7local PASS`, `T7c PASS`, MVP0-P2P `DEV-HANDOFF`,
-  **and a freshness disposition comparing T7local's exact evidence HEAD with
-  the exact DEV-HANDOFF head**, freeze only deployment-specific ownership and
+- `T6p-a`: **READY as of 2026-09-26** after the owner explicitly amended the
+  convergence contract to accept the final `T7local CLOSED — OWNER ACCEPTED`
+  disposition (including C4 owner acceptance and E4 freshness waiver), together
+  with `T7c PASS` and MVP0-P2P `DEV-HANDOFF`. This owner disposition
+  substitutes for the former separate `T7local PASS + freshness` activation
+  clauses without fabricating either runtime C4 evidence or a technical
+  freshness PASS. T6p-a freezes only deployment-specific ownership and
   configuration against the implemented surfaces: Availability Node placement, mTLS identities,
   versioned KEK, persistent ciphertext volume, health, ports, resources, and
   secret paths. It consumes the already-frozen C0 contracts/fixtures; it does
@@ -73,16 +77,15 @@ optional. X29 is now a release blocker for `T7p`/`T9g`, even though it remains
 accepted residual evidence for P1.
 
 Target gates: X29 is resolved, MVP0-P2P through P6 is PASS, DEV-HANDOFF is
-pinned at `84ea5edc`, T7c is PASS, and T7local is owner-closed. The remaining
-convergence issue is the standing `T6p-a` requirement for **T7local PASS +
-freshness**: the owner closure/waiver does not silently satisfy or amend that
-technical gate, so T6p-a remains deferred. Optional T7b/T8/T8b do not
-change that gate. The independent `T6`/`T7` Digital Ocean base-deploy lane
-may still proceed under its own dependencies, but it does not satisfy or bypass
-the T7local requirement. If the October release path requires the remaining publication proof, reopen
-only C4 rather than repeating the full local ingestion pipeline. The Android RC target remains October 26 and P7/T9g remain
-targeted for October 30; no invited-P2P claim is permitted until the standing
-release gates are actually satisfied.
+pinned at `84ea5edc`, T7c is PASS, and T7local is `CLOSED — OWNER ACCEPTED`.
+By explicit owner amendment on 2026-09-26, that final T7local disposition
+satisfies the former T7local PASS + freshness activation clauses for T6p-a.
+Therefore **T6p-a is READY / UNBLOCKED** and becomes the next P2P deployment
+freeze block to present under its normal RRI/workflow process. Optional
+T7b/T8/T8b do not gate it. The independent `T6`/`T7` Digital Ocean
+base-deploy lane remains separate. The Android RC target remains October 26 and
+P7/T9g remain targeted for October 30; no invited-P2P claim is permitted until
+the remaining deployment/release gates are actually satisfied.
 
 ## Scope decision (owner, 2026-08-16)
 

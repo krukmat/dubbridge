@@ -67,9 +67,13 @@ ledger.
 > technical `PASS_NO_RERUN`. The waiver closes T7local without manufacturing
 > a freshness transcript.
 >
-> `T6p-a` remains **DEFERRED/BLOCKED** because its standing contract still
-> requires **T7local PASS + T7c PASS + DEV-HANDOFF + T7local freshness**.
-> Owner-closing T7local does not silently amend that downstream gate.
+> **T6p-a gate amendment — owner direction 2026-09-26:** the final
+> `T7local CLOSED — OWNER ACCEPTED` disposition is now an accepted activation
+> input for T6p-a. Its C4 acceptance and E4 freshness waiver are part of that
+> explicit owner disposition and are not represented as fabricated runtime
+> evidence. Together with `T7c PASS` and `DEV-HANDOFF SATISFIED`, the
+> convergence gate is now **SATISFIED**. T6p-a may be presented/executed under
+> its normal RRI/workflow gates.
 >
 > **Exact DEV-HANDOFF head (pinned 2026-09-25):** `84ea5edc`
 > (`docs(p2p): satisfy dev handoff`, 15/15 CI). It is code-equivalent to
@@ -109,12 +113,12 @@ ledger.
 | T5c | Production Compose and TLS reverse proxy | config-only | M (RRI 26 Moderate, recomputed 2026-08-27) | T5b | [x] Done 2026-08-27 — Claude Sonnet 5 direct (owner override); Gemma Reviewer PASS 0 findings both phases; owner-verified |
 | T5d | Local descriptor evidence and aggregate status sync | operational/docs | S (RRI 22 Low, recomputed 2026-08-27) | T5c | [x] Done 2026-08-27 — structural render + fail-closed guard evidence; owner-verified |
 | T6 | First deploy and end-to-end smoke on Digital Ocean | operational | L | T5 | [ ] Planned |
-| T6p-a | Freeze deployment-specific P2P ownership and configuration | planning/config | RUN BEFORE ACTIVATION | T7local PASS; T7c PASS; MVP0-P2P DEV-HANDOFF; T7local evidence freshness against exact DEV-HANDOFF head | [ ] Deferred until convergence gates pass |
+| T6p-a | Freeze deployment-specific P2P ownership and configuration | planning/config | RUN BEFORE ACTIVATION | T7local CLOSED — OWNER ACCEPTED; T7c PASS; MVP0-P2P DEV-HANDOFF | [>] READY 2026-09-26 — convergence gate satisfied; present/recompute RRI before execution |
 | T6p-b | P2P Compose/config/secrets/private-network wiring | config/ops | TBD exact-path | T6p-a PASS | [ ] Planned |
 | T6p-c | Local P2P deployment-contract evidence | operational/evidence | TBD exact-path | T6p-b PASS | [ ] Planned |
 | T6p-d | Deploy backend ciphertext publication + durable P2P_READY smoke on DO | operational | TBD exact-path | T6p-c PASS | [ ] Planned |
 | T7local | Base mobile POC smoke against the local Docker Compose gateway | development/ops | M | T5d | [x] CLOSED 2026-09-26 — OWNER ACCEPTED; B3/C1/C2/C3 runtime-proven, C4 owner-accepted, E4 freshness owner-waived |
-| T7 | Mobile POC build against the deployed backend | development/ops | M | T6; T7local PASS | [ ] Planned |
+| T7 | Mobile POC build against the deployed backend | development/ops | M | T6; T7local CLOSED — OWNER ACCEPTED | [ ] Planned |
 | T7p | Physical Android P2P release candidate | development/ops | TBD exact-path | T7; T7c; T6p-d; MVP0-P2P DEV-HANDOFF; X29 resolved | [ ] Planned |
 | T7b | Mobile registration screen | development | M | T7local | [ ] Planned — droppable (first) |
 | T7c | Session lifetime and expiry behavior | development/config | S | T7local | [x] Done 2026-09-26 — stored-session expiry guard + explicit 8h POC lifetime; mobile QA 66/66 suites, 529/529 tests |
@@ -5358,26 +5362,33 @@ playback requires T7p, P7, and T9g against the exact deployed artifact.
 Each executable child requires exact paths, `scripts/rri.py`, and its normal
 workflow gate before execution.
 
-### S-230-T6p-a: Freeze deployment-specific P2P ownership and configuration (deferred)
+### S-230-T6p-a: Freeze deployment-specific P2P ownership and configuration
 
 **Type:** planning/config
 
-**Depends on:** `S-230-T7local PASS`; `S-230-T7c PASS`; MVP0-P2P
-`DEV-HANDOFF`; and a recorded **T7local evidence-freshness disposition**
-against the exact DEV-HANDOFF head. `P2.C0 PASS` is a satisfied contractual
-input, not the activation gate. Note this depends on `T7local` (local-stack
-base-flow validation), not `T7` (post-deploy validation). If relevant
-base-flow/mobile/gateway/local-compose paths changed after T7local's recorded
-HEAD, the bounded regression defined by T7local must PASS before T6p-a may
-activate.
+**Gate amendment (owner direction, 2026-09-26):** the original activation
+contract required a technical `T7local PASS` plus a separate exact-head
+freshness disposition. The owner subsequently closed T7local explicitly as
+`CLOSED — OWNER ACCEPTED`: B3/C1/C2/C3 are runtime-proven, C4 is
+owner-accepted, and E4 freshness is owner-waived. This explicit final
+disposition now substitutes for the two former T7local gate clauses for T6p-a.
+It does not rewrite the underlying evidence or claim a technical freshness PASS.
 
-**Status:** [ ] Deferred — do not present or execute until both development
-gates pass.
+**Depends on:**
+- `S-230-T7local CLOSED — OWNER ACCEPTED` — satisfied 2026-09-26;
+- `S-230-T7c PASS` — satisfied 2026-09-26;
+- MVP0-P2P `DEV-HANDOFF` — satisfied 2026-09-25;
+- `P2.C0 PASS` remains a satisfied contractual input, not an activation gate.
 
-At activation, inspect the implemented runtime/configuration surfaces, assign
-exact writable paths for T6p-a through T6p-d, rerun `scripts/rri.py`, and
-present the resulting task under the then-current workflow. The freeze remains
-deployment-specific and must consume C0 without redefining it.
+**Status:** [>] READY / UNBLOCKED 2026-09-26 — convergence prerequisites are
+satisfied. The task itself is not PASS yet; before implementation, inspect the
+current runtime/configuration surfaces, assign exact writable paths for
+T6p-a through T6p-d, recompute `scripts/rri.py`, and present the executable
+block under the current workflow.
+
+The freeze remains deployment-specific and must consume C0 without redefining
+it. `T7` stays the post-deploy base-flow confirmation and is not restored as a
+T6p-a prerequisite.
 
 ---
 
