@@ -16,6 +16,11 @@ fail() {
 command -v docker >/dev/null 2>&1 || fail "missing-docker"
 command -v jq >/dev/null 2>&1 || fail "missing-jq"
 docker buildx version >/dev/null 2>&1 || fail "missing-docker-buildx"
+
+host_arch="$(uname -m)"
+if [[ "${host_arch}" != "x86_64" && "${DUBBRIDGE_ALLOW_QEMU:-0}" != "1" ]]; then
+  fail "native-amd64-required-use-ci"
+fi
 git -C "${ROOT}" cat-file -e "${REV}^{commit}" 2>/dev/null || fail "unknown-revision"
 
 CURRENT="$(git -C "${ROOT}" rev-parse HEAD)"
