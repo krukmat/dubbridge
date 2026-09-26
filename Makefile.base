@@ -1,4 +1,4 @@
-.PHONY: qa-fmt qa-lint qa-test qa-test-redis qa-test-s3 qa-check qa-local qa-p2p-preflight qa-t7local-maestro qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-python-complexity qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-docs-review qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review qa-golden-set show-codex-session-model install-hooks do-plan do-inventory
+.PHONY: qa-fmt qa-lint qa-test qa-test-redis qa-test-s3 qa-check qa-local qa-p2p-preflight qa-t7local-maestro qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-python-complexity qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-docs-review qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review qa-golden-set show-codex-session-model install-hooks do-plan do-inventory do-release
 
 COVERAGE_MIN ?= 90
 PEER_REVIEW_RRI      ?= 22
@@ -262,3 +262,10 @@ do-inventory:
 
 do-plan:
 	bash scripts/do-plan.sh
+
+
+# S-230-T6c immutable production release packaging.
+do-release:
+	@test -n "$(REV)" || (echo "DO_RELEASE=BLOCKED reason=missing-REV" >&2; exit 2)
+	@test -n "$(REGISTRY)" || (echo "DO_RELEASE=BLOCKED reason=missing-REGISTRY" >&2; exit 2)
+	bash scripts/do-release.sh "$(REV)" "$(REGISTRY)"

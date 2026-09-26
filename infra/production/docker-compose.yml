@@ -29,9 +29,7 @@ services:
       retries: 5
 
   migration:
-    build:
-      context: ../..
-      dockerfile: apps/cli/Dockerfile
+    image: "${DUBBRIDGE_MIGRATION_IMAGE:?set immutable migration image ref with @sha256 digest}"
     environment:
       DUBBRIDGE_ENV: production
       DUBBRIDGE_DATABASE_URL: "${DUBBRIDGE_DATABASE_URL:?set DUBBRIDGE_DATABASE_URL}"
@@ -42,9 +40,7 @@ services:
       DUBBRIDGE_GATEWAY__OAUTH__CLIENT_SECRET: config-validation-unused
 
   api:
-    build:
-      context: ../..
-      dockerfile: apps/api/Dockerfile
+    image: "${DUBBRIDGE_API_IMAGE:?set immutable API image ref with @sha256 digest}"
     restart: unless-stopped
     environment:
       DUBBRIDGE_ENV: production
@@ -64,9 +60,7 @@ services:
         condition: service_healthy
 
   gateway:
-    build:
-      context: ../..
-      dockerfile: apps/gateway/Dockerfile
+    image: "${DUBBRIDGE_GATEWAY_IMAGE:?set immutable gateway image ref with @sha256 digest}"
     restart: unless-stopped
     environment:
       DUBBRIDGE_ENV: production
@@ -83,10 +77,7 @@ services:
         condition: service_started
 
   availability-node:
-    image: "dubbridge-availability-node:${DUBBRIDGE_IMAGE_REVISION:?set DUBBRIDGE_IMAGE_REVISION to the exact Git SHA}"
-    build:
-      context: ../..
-      dockerfile: apps/availability-node/Dockerfile
+    image: "${DUBBRIDGE_AVAILABILITY_IMAGE:?set immutable availability image ref with @sha256 digest}"
     restart: unless-stopped
     cpus: "1.0"
     mem_limit: 1g
@@ -119,9 +110,7 @@ services:
       - p2p-control
 
   worker-runner:
-    build:
-      context: ../..
-      dockerfile: apps/worker-runner/Dockerfile
+    image: "${DUBBRIDGE_WORKER_IMAGE:?set immutable worker image ref with @sha256 digest}"
     restart: unless-stopped
     environment:
       DUBBRIDGE_ENV: production
