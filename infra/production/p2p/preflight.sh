@@ -14,15 +14,41 @@ MTLS_DIR=""
 PROJECT=""
 HEAD_SHA=""
 AN_CONTAINER=""
+COMPOSE_BACKEND=""
 
 log() { printf '%s\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 need_cmd() { command -v "$1" >/dev/null 2>&1 || die "$1 not found on PATH"; }
 
+detect_compose() {
+    if docker compose version >/dev/null 2>&1; then
+        COMPOSE_BACKEND="plugin"
+        return 0
+    fi
+    if command -v docker-compose >/dev/null 2>&1 && docker-compose version >/dev/null 2>&1; then
+        COMPOSE_BACKEND="standalone"
+        return 0
+    fi
+    die "Docker Compose unavailable: install Compose v2 (docker compose) or docker-compose"
+}
+
+compose_with_env_file() {
+    local env_file="$1"
+    shift
+    if [[ "$COMPOSE_BACKEND" == "plugin" ]]; then
+        docker compose --project-name "$PROJECT" --env-file "$env_file" \
+            -f "$COMPOSE_FILE" "$@"
+    elif [[ "$COMPOSE_BACKEND" == "standalone" ]]; then
+        docker-compose --project-name "$PROJECT" --env-file "$env_file" \
+            -f "$COMPOSE_FILE" "$@"
+    else
+        die "Docker Compose backend was not initialized"
+    fi
+}
+
 cleanup() {
-    if [[ -n "$PROJECT" ]] && command -v docker >/dev/null 2>&1 && [[ -n "$ENV_FILE" ]]; then
-        docker compose --project-name "$PROJECT" --env-file "$ENV_FILE" \
-            -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true
+    if [[ -n "$PROJECT" ]] && [[ -n "$COMPOSE_BACKEND" ]] && command -v docker >/dev/null 2>&1 && [[ -n "$ENV_FILE" ]]; then
+        compose_with_env_file "$ENV_FILE" down --remove-orphans >/dev/null 2>&1 || true
         docker volume ls -q --filter "label=com.docker.compose.project=$PROJECT" \
             | while IFS= read -r volume; do
                 [[ -n "$volume" ]] && docker volume rm "$volume" >/dev/null 2>&1 || true
@@ -180,16 +206,14 @@ EOF
 }
 
 compose() {
-    docker compose --project-name "$PROJECT" --env-file "$ENV_FILE" \
-        -f "$COMPOSE_FILE" "$@"
+    compose_with_env_file "$ENV_FILE" "$@"
 }
 
 expect_config_failure_without() {
     local var="$1"
     local stripped="$TEMP_DIR/no-${var}.env"
     grep -v "^${var}=" "$ENV_FILE" >"$stripped"
-    if docker compose --project-name "$PROJECT" --env-file "$stripped" \
-        -f "$COMPOSE_FILE" config >/dev/null 2>&1; then
+    if compose_with_env_file "$stripped" config >/dev/null 2>&1; then
         die "Compose rendered without required $var"
     fi
     log "T6PC_FAIL_CLOSED_${var}=PASS"
@@ -351,7 +375,8 @@ runtime_checks() {
     need_cmd jq
     need_cmd openssl
     need_cmd git
-    docker compose version >/dev/null 2>&1 || die "docker compose plugin unavailable"
+    detect_compose
+    log "T6PC_COMPOSE_BACKEND=$COMPOSE_BACKEND"
 
     cd "$ROOT_DIR"
     HEAD_SHA="$(git rev-parse HEAD)"
