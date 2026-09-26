@@ -113,18 +113,18 @@ ledger.
 | T5c | Production Compose and TLS reverse proxy | config-only | M (RRI 26 Moderate, recomputed 2026-08-27) | T5b | [x] Done 2026-08-27 — Claude Sonnet 5 direct (owner override); Gemma Reviewer PASS 0 findings both phases; owner-verified |
 | T5d | Local descriptor evidence and aggregate status sync | operational/docs | S (RRI 22 Low, recomputed 2026-08-27) | T5c | [x] Done 2026-08-27 — structural render + fail-closed guard evidence; owner-verified |
 | T6 | First deploy and end-to-end smoke on Digital Ocean | operational | L | T5 | [ ] Planned |
-| T6p-a | Freeze deployment-specific P2P ownership and configuration | planning/config | docs/audit + S-230/P2 status docs only | T7local CLOSED — OWNER ACCEPTED; T7c PASS; MVP0-P2P DEV-HANDOFF | [x] PASS 2026-09-26 — RRI 70 Complex; deployment ownership/config and T6p-b/c/d paths frozen |
-| T6p-b | P2P Compose/config/secrets/private-network wiring | config/ops | `apps/availability-node/Dockerfile`; `infra/production/docker-compose.yml`; `.env.example`; `config/README.md`; image-contract regression guard | T6p-a PASS | [x] PASS 2026-09-26 — ARM64 `libatomic1` amendment recertified by final T6p-c runtime PASS |
+| T6p-a | Freeze local P2P deployment ownership and configuration | planning/config | docs/audit + S-230/P2 status docs only | T7local CLOSED — OWNER ACCEPTED; T7c PASS; MVP0-P2P DEV-HANDOFF | [x] PASS 2026-09-26 — RRI 70 Complex; local deployment ownership/config and T6p-b/c paths frozen |
+| T6p-b | Local P2P Compose/config/secrets/private-network wiring | config/ops | `apps/availability-node/Dockerfile`; `infra/production/docker-compose.yml`; `.env.example`; `config/README.md`; image-contract regression guard | T6p-a PASS | [x] PASS 2026-09-26 — ARM64 `libatomic1` amendment recertified by final T6p-c runtime PASS |
 | T6p-c | Local P2P deployment-contract evidence | operational/evidence | `infra/production/p2p/preflight.sh`; `scripts/test-production-images.sh` availability case; evidence/status docs | T6p-b PASS | [x] PASS 2026-09-26 — exact tested HEAD `c4b8da98`; image `sha256:9bc98e...`; render/secret/image/health/network/mTLS/persistence/negative checks all PASS; final `T6PC=PASS` |
-| T6p-d | Deploy backend ciphertext publication + durable P2P_READY smoke on DO | operational | TBD exact-path | T6p-c PASS | [ ] READY — T6p-c runtime PASS satisfied |
 | T7local | Base mobile POC smoke against the local Docker Compose gateway | development/ops | M | T5d | [x] CLOSED 2026-09-26 — OWNER ACCEPTED; B3/C1/C2/C3 runtime-proven, C4 owner-accepted, E4 freshness owner-waived |
-| T7 | Mobile POC build against the deployed backend | development/ops | M | T6; T7local CLOSED — OWNER ACCEPTED | [ ] Planned |
-| T7p | Physical Android P2P release candidate | development/ops | TBD exact-path | T7; T7c; T6p-d; MVP0-P2P DEV-HANDOFF; X29 resolved | [ ] Planned |
+| T7 | Deployed P2P convergence on Digital Ocean — backend + mobile | non-executable parent | L | T6; T6p-c; T7local CLOSED — OWNER ACCEPTED | [ ] Planned — closes only when T7a backend and T7p mobile are both complete |
+| T7a | Backend P2P deploy + ciphertext publication + durable P2P_READY smoke | operational | TBD exact-path | T6; T6p-c PASS; MVP0-P2P DEV-HANDOFF | [ ] READY — absorbs former T6p-d scope |
+| T7p | Physical Android P2P release candidate against deployed backend | development/ops | TBD exact-path | T7a PASS; T7c PASS; MVP0-P2P DEV-HANDOFF; X29 resolved | [ ] Planned |
 | T7b | Mobile registration screen | development | M | T7local | [ ] Planned — droppable (first) |
 | T7c | Session lifetime and expiry behavior | development/config | S | T7local | [x] Done 2026-09-26 — stored-session expiry guard + explicit 8h POC lifetime; mobile QA 66/66 suites, 529/529 tests |
 | T8 | Subtitle visible in the review surface (optional) | development | M | T7local | [ ] Planned — droppable (second) |
 | T8b | Translated subtitle visible in the review surface | development | M | T3b, T8 | [ ] Planned — double-conditional |
-| T9g | October P2P GO/NO-GO | operational/decision | S | T6p-d; T7p; P7 PASS; X28 closed; release CI green | [ ] Planned |
+| T9g | October P2P GO/NO-GO | operational/decision | S | T7a PASS; T7p PASS; P7 PASS; X28 closed; release CI green | [ ] Planned |
 | T9 | Status, README, and debt-register closeout | docs-only | S | T9g GO, plus each optional task executed | [ ] Planned |
 
 ---
