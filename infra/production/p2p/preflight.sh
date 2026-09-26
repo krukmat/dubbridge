@@ -279,23 +279,37 @@ render_checks() {
     log "T6PC_SECRET_BOUNDARY=PASS"
 }
 
-wait_for_health() {
-    local container="$1"
+wait_for_service_health() {
+    local service="$1"
     local attempt=0
+    local container=""
+    local status=""
+
     while [[ "$attempt" -lt 30 ]]; do
-        local status
-        status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container" 2>/dev/null || true)"
-        if [[ "$status" == "healthy" ]]; then
-            return 0
-        fi
-        if [[ "$status" == "exited" || "$status" == "dead" ]]; then
-            docker logs "$container" >&2 || true
-            return 1
+        container="$(compose ps -a -q "$service" 2>/dev/null | tail -n 1 || true)"
+        if [[ -n "$container" ]] && docker inspect "$container" >/dev/null 2>&1; then
+            AN_CONTAINER="$container"
+            status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container" 2>/dev/null || true)"
+            if [[ "$status" == "healthy" ]]; then
+                return 0
+            fi
+            if [[ "$status" == "exited" || "$status" == "dead" ]]; then
+                compose logs --no-color "$service" >&2 || true
+                docker inspect "$container" >&2 || true
+                return 1
+            fi
         fi
         attempt=$((attempt + 1))
         sleep 1
     done
-    docker inspect "$container" >&2 || true
+
+    printf 'ERROR: %s did not become healthy; last container=%s status=%s\n' \
+        "$service" "${container:-none}" "${status:-unknown}" >&2
+    compose ps -a >&2 || true
+    compose logs --no-color "$service" >&2 || true
+    if [[ -n "$container" ]]; then
+        docker inspect "$container" >&2 || true
+    fi
     return 1
 }
 
@@ -402,9 +416,8 @@ runtime_checks() {
     log "T6PC_IMAGE_CONTRACT=PASS"
 
     compose up -d --no-deps availability-node
-    AN_CONTAINER="$(compose ps -q availability-node)"
-    [[ -n "$AN_CONTAINER" ]] || die "Availability Node container id not found"
-    wait_for_health "$AN_CONTAINER" || die "Availability Node did not become healthy"
+    wait_for_service_health availability-node || die "Availability Node did not become healthy"
+    [[ -n "$AN_CONTAINER" ]] || die "Availability Node container id not found after health check"
 
     local running_image
     running_image="$(docker inspect --format '{{.Image}}' "$AN_CONTAINER")"
@@ -471,9 +484,10 @@ runtime_checks() {
     compose exec -T availability-node sh -c \
         'printf "%s\n" t6pc-index > /var/lib/dubbridge/p2p-index/t6pc-index-marker'
 
+    AN_CONTAINER=""
     compose up -d --no-deps --force-recreate availability-node
-    AN_CONTAINER="$(compose ps -q availability-node)"
-    wait_for_health "$AN_CONTAINER" || die "Availability Node did not recover after recreate"
+    wait_for_service_health availability-node || die "Availability Node did not recover after recreate"
+    [[ -n "$AN_CONTAINER" ]] || die "Availability Node container id not found after recreate"
 
     compose exec -T availability-node sh -c \
         'test "$(cat /var/lib/dubbridge/p2p-ciphertext/t6pc-ciphertext-marker)" = "t6pc-ciphertext"'
