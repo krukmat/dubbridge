@@ -45,3 +45,4 @@ infra/digitalocean/.t6-plan.bin
 infra/digitalocean/.t6-plan.json
 artifacts/releases/*
 !artifacts/releases/*/release.json
+artifacts/releases/*/*.ref
