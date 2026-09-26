@@ -635,27 +635,27 @@ contract_availability() {
         echo "ERROR: $dockerfile not found" >&2
         return 1
     fi
-    if ! grep -q '^FROM node:22\\.23\\.0-bookworm-slim AS build$' "$dockerfile"; then
+    if ! grep -Fxq 'FROM node:22.23.0-bookworm-slim AS build' "$dockerfile"; then
         echo "ERROR: Availability Node build stage is not pinned to node:22.23.0-bookworm-slim" >&2
         return 1
     fi
-    if ! grep -q '^FROM node:22\\.23\\.0-bookworm-slim$' "$dockerfile"; then
+    if ! grep -Fxq 'FROM node:22.23.0-bookworm-slim' "$dockerfile"; then
         echo "ERROR: Availability Node runtime stage is not pinned to node:22.23.0-bookworm-slim" >&2
         return 1
     fi
-    if ! grep -q '^RUN npm ci$' "$dockerfile"; then
+    if ! grep -Fxq 'RUN npm ci' "$dockerfile"; then
         echo "ERROR: Availability Node Dockerfile does not use npm ci" >&2
         return 1
     fi
-    if ! grep -q '^RUN npm run build && npm prune --omit=dev$' "$dockerfile"; then
+    if ! grep -Fxq 'RUN npm run build && npm prune --omit=dev' "$dockerfile"; then
         echo "ERROR: Availability Node build/prune contract not found" >&2
         return 1
     fi
-    if ! grep -q '^EXPOSE 8443$' "$dockerfile"; then
+    if ! grep -Fxq 'EXPOSE 8443' "$dockerfile"; then
         echo "ERROR: Availability Node EXPOSE 8443 contract not found" >&2
         return 1
     fi
-    if ! grep -q 'ENTRYPOINT \\["node", "dist/main.js"\\]' "$dockerfile"; then
+    if ! grep -Fxq 'ENTRYPOINT ["node", "dist/main.js"]' "$dockerfile"; then
         echo "ERROR: Availability Node ENTRYPOINT contract not found" >&2
         return 1
     fi
