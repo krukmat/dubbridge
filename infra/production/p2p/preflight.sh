@@ -282,18 +282,24 @@ render_checks() {
 wait_for_service_health() {
     local service="$1"
     local attempt=0
+    local max_attempts=90
     local container=""
     local status=""
+    local previous_status=""
 
-    while [[ "$attempt" -lt 30 ]]; do
+    while [[ "$attempt" -lt "$max_attempts" ]]; do
         container="$(compose ps -a -q "$service" 2>/dev/null | tail -n 1 || true)"
         if [[ -n "$container" ]] && docker inspect "$container" >/dev/null 2>&1; then
             AN_CONTAINER="$container"
             status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container" 2>/dev/null || true)"
+            if [[ "$status" != "$previous_status" ]]; then
+                log "T6PC_HEALTH_STATUS=$status"
+                previous_status="$status"
+            fi
             if [[ "$status" == "healthy" ]]; then
                 return 0
             fi
-            if [[ "$status" == "exited" || "$status" == "dead" ]]; then
+            if [[ "$status" == "unhealthy" || "$status" == "exited" || "$status" == "dead" ]]; then
                 compose logs --no-color "$service" >&2 || true
                 docker inspect "$container" >&2 || true
                 return 1
@@ -303,8 +309,8 @@ wait_for_service_health() {
         sleep 1
     done
 
-    printf 'ERROR: %s did not become healthy; last container=%s status=%s\n' \
-        "$service" "${container:-none}" "${status:-unknown}" >&2
+    printf 'ERROR: %s health state did not settle within %ss; last container=%s status=%s\n' \
+        "$service" "$max_attempts" "${container:-none}" "${status:-unknown}" >&2
     compose ps -a >&2 || true
     compose logs --no-color "$service" >&2 || true
     if [[ -n "$container" ]]; then
