@@ -171,7 +171,7 @@ and a regression guard, and the corrected image was subsequently certified.
 `sha256:9bc98e5590aa3a5fba1478adc99cc64a6185fde9320f0c5323cd8ad134de7d68`;
 render, scoped secrets, health, private network, corrected mTLS probes,
 persistence, and fail-closed checks all passed with final `T6PC=PASS`.
-**The T6p local lane is CLOSED at T6p-c PASS. T7a is READY** as the backend deployment branch; T7p remains the mobile branch. T7local does not certify P2P
+**The T6p local lane is CLOSED at T6p-c PASS. T7a is BLOCKED on T6 PASS** as the backend deployment branch; T7p remains the mobile branch and starts only after T7a PASS. T7local does not certify P2P
 Invite/Claim/Sync/Verify/loopback/HPKE/P5.T3. `T6` (first deploy) remains
 planned and may proceed under its own dependencies, but it does not satisfy or
 bypass the T7local gate. Deployment-enablement
