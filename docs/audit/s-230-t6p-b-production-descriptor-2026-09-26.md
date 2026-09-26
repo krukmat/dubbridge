@@ -67,9 +67,38 @@ decomposed T6p-b execution. The implemented surface is config/ops only;
 phase-1 and phase-2 reviewer steps are n/a under the config-only exemption.
 No product-source behavior was modified.
 
+## Runtime defect amendment — 2026-09-26
+
+T6p-c runtime evidence on Apple Silicon / Linux ARM64 exposed a production-image
+defect: `rocksdb-native` could not load because the slim Node runtime image did
+not contain `libatomic.so.1`. Docker therefore restarted the Availability Node
+with exit code 1 before the listener healthcheck could succeed.
+
+Per the frozen T6p-b/T6p-c ownership rule, this finding **reopened T6p-b** rather
+than being patched silently inside T6p-c.
+
+The descriptor fix is intentionally narrow:
+
+- install Debian package `libatomic1` in the Availability Node runtime stage;
+- remove apt metadata after installation;
+- extend the Availability Node image contract to require the package-install
+  declaration;
+- extend the runtime image check to prove `libatomic.so.1` is resolvable before
+  T6p-c starts the service.
+
+Fix commits:
+
+- `ac76856f860234e3c61f67a4430149f10c13daec` — runtime dependency;
+- `a68aa37a29e17a964d9d5f0edf983e2763545b80` — image-contract regression guard.
+
+**T6p-b disposition after amendment: FIX IMPLEMENTED / READY FOR T6p-c
+RECERTIFICATION.** The previous runtime evidence for image
+`sha256:6c232317...` is obsolete and must not be reused because the image
+content changes.
+
 ## Next gate
 
-**S-230-T6p-c is READY.** It must render and exercise this exact descriptor,
+**S-230-T6p-c is READY FOR RECERTIFICATION.** It must render and exercise this amended descriptor,
 build the exact Availability Node image, verify secret/network isolation and
 volume persistence, and record the image digest. Any defect requiring
 descriptor/source changes reopens T6p-b.
